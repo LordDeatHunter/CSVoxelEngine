@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.Juice;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Juice;
 
 /// <summary>
 /// The placement pop's curve (<see cref="PlacePop"/>): the block starts a little too big, settles

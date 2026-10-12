@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Effects.Sky;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 /// <summary>
 /// One falling leaf: a small billboard that flutters down off a canopy with a sinusoidal

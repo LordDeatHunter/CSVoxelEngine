@@ -1,7 +1,9 @@
 using System;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// Hot springs and sea stacks: a spring's site holds one flat level below its centre's land

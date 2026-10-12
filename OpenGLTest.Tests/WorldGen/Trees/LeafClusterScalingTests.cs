@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Trees;
 
 /// <summary>
 /// Rule tests only for the crown-scaling half of <see cref="LeafCluster"/>: the cluster radius

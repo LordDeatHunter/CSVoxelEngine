@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Data;
+using VoxelEngine.Lod;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// The fluid simulation: a fixed tick (<see cref="WorldGenerationConfig.FluidTickSeconds"/>)

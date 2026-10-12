@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Data;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// The tree-wood connection rule (<see cref="TreeWoodShape.Connects"/>) and the shape built on

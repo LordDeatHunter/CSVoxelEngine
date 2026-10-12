@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Lod;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// Covers the cold-weather features: the temperature/humidity biomes (taiga and barren frozen),

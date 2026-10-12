@@ -1,8 +1,11 @@
 using System;
 using System.IO;
 using System.Numerics;
+using VoxelEngine.Items;
+using VoxelEngine.Player;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.ItemDebugger;
 
 /// <summary>
 /// Editable copy of the selected item's <c>display</c> block plus the debugger-only renderer

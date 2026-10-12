@@ -1,7 +1,8 @@
 using System.Numerics;
+using VoxelEngine.Content.Shapes;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 public sealed class BreakOverlayUvTests
 {

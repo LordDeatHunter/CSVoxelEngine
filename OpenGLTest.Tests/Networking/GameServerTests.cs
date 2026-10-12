@@ -5,10 +5,19 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.Entities;
+using VoxelEngine.Interaction;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.Saves;
+using VoxelEngine.Server;
+using VoxelEngine.Simulation;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// A real <see cref="GameServer"/> over loopback: a malformed frame drops only its sender, chunks
@@ -172,7 +181,7 @@ public sealed class GameServerTests : IDisposable
         public Inventory Mirror()
         {
             Assert.NotNull(Inventory);
-            var mirror = silkgltriangle.Inventory.Empty();
+            var mirror = VoxelEngine.UI.InventoryPanel.Inventory.Empty();
             mirror.Import(Inventory!);
             return mirror;
         }

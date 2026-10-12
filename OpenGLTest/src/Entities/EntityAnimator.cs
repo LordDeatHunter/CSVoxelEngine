@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// Plays an entity's Blockbench keyframe clips (<see cref="AnimationClip"/>) on its rig, one

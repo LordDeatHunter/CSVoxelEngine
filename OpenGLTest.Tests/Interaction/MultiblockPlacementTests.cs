@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Interaction;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// Which 2x2x2 volume a right-click means: the clicked cell is a corner, the volume extends into

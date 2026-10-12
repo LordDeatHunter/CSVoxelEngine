@@ -1,6 +1,6 @@
 ﻿using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Data;
 
 public struct Plane
 {

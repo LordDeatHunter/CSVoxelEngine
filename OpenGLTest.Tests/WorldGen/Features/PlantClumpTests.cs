@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// The clumped-plant rule (<see cref="PlantClumps"/> over a <see cref="PlantClumpSpec"/>), tested

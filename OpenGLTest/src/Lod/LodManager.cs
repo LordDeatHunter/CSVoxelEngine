@@ -3,8 +3,11 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Chunks;
+using VoxelEngine.Player;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Lod;
 
 /// <summary>
 /// Manages far-terrain LOD regions across all LOD levels: a pool of

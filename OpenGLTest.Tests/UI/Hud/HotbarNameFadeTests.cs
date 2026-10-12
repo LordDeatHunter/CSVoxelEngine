@@ -1,7 +1,9 @@
 using System.Linq;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Hud;
 
 /// <summary>
 /// The selected item's name over the hotbar: a switch of slot or of the item in the selected slot

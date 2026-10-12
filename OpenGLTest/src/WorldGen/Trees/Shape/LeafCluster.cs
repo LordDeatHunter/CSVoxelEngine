@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Shape;
 
 /// <summary>
 /// The leaf rule, a pure function of a grown <see cref="TreeGraph"/> plus the obstacles of an

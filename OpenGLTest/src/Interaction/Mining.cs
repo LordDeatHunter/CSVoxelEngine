@@ -1,6 +1,9 @@
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Items;
+using VoxelEngine.WorldGen.Trees;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// GL-free mining rules shared by the break loop and the tests. A block's <c>tools</c> dict

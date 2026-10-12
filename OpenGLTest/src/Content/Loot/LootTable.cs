@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.WorldGen.Features;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Loot;
 
 /// <summary>
 /// A compiled loot table: pools of weighted entries whose item names are already resolved to

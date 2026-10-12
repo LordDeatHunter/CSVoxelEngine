@@ -1,8 +1,9 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.ItemDebugger;
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.ItemDebugger;
 
 /// <summary>
 /// The item debugger's slider state: RESET PREVIEW puts every slider back (the display ones to what the item loaded

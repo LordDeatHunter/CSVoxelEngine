@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using Silk.NET.Input;
 
-namespace silkgltriangle;
+namespace VoxelEngine.VisualTest;
 
 /// <summary>
 /// An <see cref="IKeyboard"/> whose pressed keys are set by code instead of the OS, so visual

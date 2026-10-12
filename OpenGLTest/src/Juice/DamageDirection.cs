@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Player;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free state of the damage direction arc: where the last billed blow came from, kept as a

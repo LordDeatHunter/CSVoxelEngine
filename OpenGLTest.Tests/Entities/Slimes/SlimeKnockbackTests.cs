@@ -1,9 +1,9 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities.Slimes;
 
 /// <summary>
 /// Size-scaled knockback (<see cref="SlimeSize.ShoveSpeed"/>): the same shove pushes a larger slime

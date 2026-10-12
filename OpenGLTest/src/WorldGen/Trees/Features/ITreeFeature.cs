@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Features;
 
 /// <summary>
 /// A post-growth stage a tree species' <c>features[]</c> names (roots, buttress), run by

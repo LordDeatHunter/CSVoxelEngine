@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Content.Shapes;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// GL-free placement rules shared by the block-editing paths and the tests: which cell a

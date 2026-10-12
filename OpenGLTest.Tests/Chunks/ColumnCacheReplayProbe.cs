@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Tests.Lod;
+using VoxelEngine.WorldGen;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// A MEASUREMENT HARNESS for item D2, in the explicit style of <see cref="LodBuildCostProbe"/>: it

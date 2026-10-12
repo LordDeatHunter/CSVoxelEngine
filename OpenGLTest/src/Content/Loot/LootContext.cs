@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Loot;
 
 /// <summary>
 /// Where a loot roll happens, in world block coordinates. Count providers that depend on the

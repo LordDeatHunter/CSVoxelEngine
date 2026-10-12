@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Logics;
+using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Trees;
 
 /// <summary>
 /// Shape rules of the umbrella (stone pine), baobab and cactus growth logics, plus the wide-trunk

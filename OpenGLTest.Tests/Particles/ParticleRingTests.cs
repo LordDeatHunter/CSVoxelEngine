@@ -2,9 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Particles;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 /// <summary>
 /// Pins <see cref="ParticleRing{T}"/>, the order-preserving circular buffer the four particle

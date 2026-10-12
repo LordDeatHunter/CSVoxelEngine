@@ -1,6 +1,9 @@
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.Interaction;
+using VoxelEngine.UI.Hud;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// The chat command table (<see cref="ChatCommands"/>): plain lines are not commands, the words

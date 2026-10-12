@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// The async mesh path end to end: until now only the synchronous ImmediateRemesh path had

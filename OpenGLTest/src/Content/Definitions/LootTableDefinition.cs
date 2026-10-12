@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Text.Json;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Loot;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Definitions;
 
 /// <summary>
 /// JSON shape of <c>assets/data/loot/&lt;name&gt;.json</c>: a simplified Minecraft loot table.

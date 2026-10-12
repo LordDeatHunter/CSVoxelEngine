@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>What a <see cref="TreeSupport.Search"/> found: the start cell reaches an anchor, it
 /// provably cannot (its whole component is then in <see cref="TreeSupport.Component"/>), or the

@@ -1,7 +1,8 @@
 using System;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// The desert well: a rare hand-stamped ruin — a sandstone wall ringing a sunken pool — out in the

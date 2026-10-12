@@ -1,7 +1,8 @@
 using System.Numerics;
+using VoxelEngine.Networking;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The server's client-input sanity rules: a plausible move is accepted verbatim, a teleport-scale

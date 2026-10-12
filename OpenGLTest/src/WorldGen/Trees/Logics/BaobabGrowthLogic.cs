@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Logics;
 
 /// <summary>
 /// Baobab growth: a short, massive trunk that forks eagerly (<see cref="ForkBoost"/>) from the

@@ -1,4 +1,8 @@
-namespace silkgltriangle;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.Simulation;
+
+namespace VoxelEngine.Content.Blocks;
 
 /// <summary>
 /// What right-clicking while holding a pure item does, from the <c>use.action</c> field of

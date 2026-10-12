@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Logics;
 
 /// <summary>
 /// Conifer growth: a straight leader with short whorled side branches. The trunk may only fork

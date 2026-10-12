@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.UI;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Stations;
 
 /// <summary>
 /// Authoring contract of how an extruded item sprite is posed when it lies on a surface.

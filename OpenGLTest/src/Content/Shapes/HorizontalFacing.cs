@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Models;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Shapes;
 
 /// <summary>
 /// Quarter turns about the vertical axis through the middle of a <c>size</c>-wide footprint,

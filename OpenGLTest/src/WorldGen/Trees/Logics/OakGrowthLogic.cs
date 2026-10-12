@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Logics;
 
 /// <summary>
 /// Broadleaf crown growth. The trunk keeps the grower's base weights (it forks only above the

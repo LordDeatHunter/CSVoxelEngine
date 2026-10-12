@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Core;
 
 /// <summary>
 /// Async console sink: every diagnostic line is enqueued and written by one background thread

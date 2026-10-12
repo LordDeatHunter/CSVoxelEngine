@@ -1,8 +1,9 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// Geodes and meteor craters: a geode carves a crystal shell around an air heart deep in stone,

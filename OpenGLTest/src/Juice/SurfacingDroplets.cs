@@ -1,6 +1,8 @@
 using System;
+using VoxelEngine.Player;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free timing of the surfacing droplets: when the eye comes up out of water, droplets streak

@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>What one <see cref="TreeGrowthWriter.Grow"/> call did.</summary>
 public enum TreeGrowthStatus

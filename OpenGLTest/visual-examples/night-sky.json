@@ -2,7 +2,7 @@
 // sky-fragment.glsl. Run from OpenGLTest/ once per time of day, copying visual/night-sky/ aside
 // between runs since each run overwrites it:
 //   $env:VOXEL_SCRIPT='visual-examples/night-sky.json'; $env:VOXEL_TIME='<t>'
-//   bin/Release/net9.0/silkgltriangle.exe
+//   bin/Release/net9.0/VoxelEngine.exe
 // Times (DayLengthSeconds 1200, RenderManager.SetLighting: the sun at normalize(cos a, sin a, 0.35) with
 // a = t / 1200 * tau + 0.8): 700 night (full stars), 450 dusk (the run moves the sun ~0.3 degrees
 // a second, so the dome shots ~15 s in catch it ~6 degrees down with the stars a third faded in),

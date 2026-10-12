@@ -2,10 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Interaction;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// Rules of <see cref="LeafDecayManager"/>: a scheduled leaf re-derives its hydration from the

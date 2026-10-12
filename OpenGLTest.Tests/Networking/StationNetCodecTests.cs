@@ -2,10 +2,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Items;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The stations a server runs reach its clients whole: a snapshot read back into fresh managers

@@ -1,6 +1,10 @@
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Interaction;
+using VoxelEngine.Networking;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>
 /// Who an interaction runs for: the eye it is aimed from, the direction it is aimed along, the

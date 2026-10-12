@@ -5,10 +5,23 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using static silkgltriangle.ChunkLighting;
-using static silkgltriangle.ColumnCache;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Interaction;
+using VoxelEngine.Rendering;
+using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
+using static VoxelEngine.Chunks.ChunkLighting;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// Represents a 16x16x16 chunk of blocks in the world.

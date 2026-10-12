@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Clumped plant placement, the shared rule behind any plant that grows in clusters rather than

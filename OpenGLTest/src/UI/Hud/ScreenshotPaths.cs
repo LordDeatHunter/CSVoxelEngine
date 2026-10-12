@@ -1,7 +1,8 @@
 using System;
 using System.IO;
+using VoxelEngine.Saves;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// Where F2's screenshots land, GL-free so the naming is testable: a PNG named for the moment it

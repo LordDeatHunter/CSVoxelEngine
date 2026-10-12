@@ -5,8 +5,16 @@ using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Threading;
 using Silk.NET.OpenGL;
+using VoxelEngine.Data;
+using VoxelEngine.Lod;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.Rendering;
+using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// Manages chunk loading, unloading, and mesh generation.

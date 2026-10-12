@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// One player a drop may fly to on a multiplayer server: where their eye is and what their own

@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.Networking;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Block-entity registry for querns: one crushable unit per cell plus a one-rotation spin

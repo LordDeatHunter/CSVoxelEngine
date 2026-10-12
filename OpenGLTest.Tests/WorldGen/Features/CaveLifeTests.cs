@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// The cave life: a glow mushroom stands on a dry carved cave floor well under the surface, and a

@@ -1,6 +1,8 @@
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.UI.Hud;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Hud;
 
 /// <summary>
 /// The HUD toast and its dawn watch: a line holds opaque then fades out, a new line restarts the

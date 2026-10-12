@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Entities;
+using VoxelEngine.Items;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities.Goblins;
 
 /// <summary>
 /// The goblin's shipped content: it satisfies <see cref="Goblin.ValidateContent"/> (parts, clips

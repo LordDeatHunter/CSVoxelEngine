@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Sky;
 
 /// <summary>
 /// GL-free twin of the sun's lens glare: a soft, wide glow around the sun added by the sky dome

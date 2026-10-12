@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Data;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Support;
 
 /// <summary>
 /// Builds the smallest world a chunk can be meshed in: the centre chunk plus its six face

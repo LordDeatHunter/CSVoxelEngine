@@ -1,10 +1,11 @@
 using System;
 using System.IO;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Interaction;
+using VoxelEngine.Networking;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The GL-free rules a server judges a client's world intents by: the wire form round-trips and

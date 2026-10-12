@@ -1,6 +1,7 @@
+using VoxelEngine.Juice;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Juice;
 
 public sealed class SurfacingDropletsTests
 {

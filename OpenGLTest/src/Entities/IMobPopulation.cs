@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// One mob kind's live population as the global caps see it (<see cref="MobCaps"/>): every mob

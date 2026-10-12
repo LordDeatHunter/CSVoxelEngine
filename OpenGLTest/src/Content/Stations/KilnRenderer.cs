@@ -1,7 +1,10 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Entities;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Stations;
 
 /// <summary>
 /// Authoring contract of the mud brick kiln's model: where its opening is and where the things

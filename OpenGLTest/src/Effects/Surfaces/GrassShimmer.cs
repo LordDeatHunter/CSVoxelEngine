@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Sky;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Surfaces;
 
 /// <summary>
 /// GL-free twin of the grass wind shimmer in test-fragment.glsl: soft bright bands that lie across

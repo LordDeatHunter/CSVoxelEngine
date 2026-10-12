@@ -1,6 +1,8 @@
 using System.Numerics;
+using VoxelEngine.Interaction;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// Turns a hand-built 2x2x2 cube of <see cref="Item.UseBlockId"/> into the multiblock anchor

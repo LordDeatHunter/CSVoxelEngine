@@ -1,6 +1,7 @@
+using VoxelEngine.UI.Menus;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Menus;
 
 public sealed class TextFieldStateTests
 {

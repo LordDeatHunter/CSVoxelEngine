@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Definitions;
 
 /// <summary>
 /// JSON shape of <c>assets/data/tags/&lt;name&gt;.json</c>: a named set of blocks and/or items

@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// GL-free geometry of the block-selection outline: the twelve edges of a box, each drawn as a

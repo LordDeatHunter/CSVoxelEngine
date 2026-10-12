@@ -2,8 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// Drives a multiplayer client's chunk loading from the server instead of worldgen: each update it

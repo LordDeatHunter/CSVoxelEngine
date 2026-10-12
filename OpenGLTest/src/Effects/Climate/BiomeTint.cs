@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Climate;
 
 /// <summary>
 /// GL-free biome tint: the grass and foliage color as a pure function of world (x, z). The

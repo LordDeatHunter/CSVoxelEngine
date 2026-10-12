@@ -2,7 +2,7 @@ using System.Linq;
 using System.Numerics;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// Pins <see cref="ChunkMap"/>'s contract - the wrapper that keeps <c>Vector3</c> as the outward

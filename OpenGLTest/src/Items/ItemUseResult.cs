@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Items;
 
 /// <summary>Outcome of <see cref="Item.OnUse"/>: did the use take effect, what the tool morphs
 /// into, and whether the player punches. The caller applies the morph; durability, cooldown

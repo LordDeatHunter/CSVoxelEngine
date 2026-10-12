@@ -1,6 +1,10 @@
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// The oasis: its site marks a disc with a smaller pond, its palm is an oasis-only species with a

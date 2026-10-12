@@ -1,8 +1,12 @@
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// The construction pieces (slabs and the other partial building blocks) asserted through the

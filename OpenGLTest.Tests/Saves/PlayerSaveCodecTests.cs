@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using VoxelEngine.Saves;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Saves;
 
 /// <summary>
 /// <see cref="PlayerSaveCodec"/>: every field of <see cref="PlayerSaveData"/> survives a write

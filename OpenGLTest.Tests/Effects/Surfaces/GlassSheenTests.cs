@@ -1,7 +1,8 @@
 using System.Numerics;
+using VoxelEngine.Effects.Surfaces;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Surfaces;
 
 /// <summary>
 /// The glass sheen (<see cref="GlassSheen"/>, the twin of the glass tile term in test-fragment.glsl):

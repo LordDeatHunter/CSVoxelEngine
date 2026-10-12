@@ -2,8 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Particles;
+using VoxelEngine.UI;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Graphics;
 
 /// <summary>
 /// Lazily built cube meshes, one per block type. Item drops, held items and inventory

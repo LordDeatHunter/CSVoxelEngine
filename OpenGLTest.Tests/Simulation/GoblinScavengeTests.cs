@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// Goblins scavenging flint (<see cref="GoblinManager.AppendCollectors"/>): a live goblin with

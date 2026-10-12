@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Content.Models;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// One entity kind loaded from <c>assets/data/entities/&lt;name&gt;.json</c>: its display name,

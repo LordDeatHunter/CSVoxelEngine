@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Recipes;
 
 /// <summary>One compiled campfire recipe: raw input, cooked result and seconds on the fire.</summary>
 public sealed class CookRecipe

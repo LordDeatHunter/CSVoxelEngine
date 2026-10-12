@@ -2,8 +2,10 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
+using VoxelEngine.Chunks;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// The on-disk format of one imported chunk column's <see cref="ColumnData"/>

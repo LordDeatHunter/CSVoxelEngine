@@ -1,8 +1,8 @@
 using System.Collections.Generic;
-using silkgltriangle.Content;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 public sealed class MalachiteTests
 {

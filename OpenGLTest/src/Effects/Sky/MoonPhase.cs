@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Sky;
 
 /// <summary>
 /// GL-free moon: which phase it shows on a given lighting time, and how that phase lights its disc.

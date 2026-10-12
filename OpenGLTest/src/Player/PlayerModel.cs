@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using static silkgltriangle.PlayerRig;
+using static VoxelEngine.Player.PlayerRig;
 using Silk.NET.OpenGL;
+using VoxelEngine.Juice;
+using VoxelEngine.Particles;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>
 /// Blocky Minecraft-like player model with two-segment limbs: upper arm + forearm and

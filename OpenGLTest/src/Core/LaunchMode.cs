@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Core;
 
 /// <summary>
 /// Decides whether a launch goes to the main menu or straight into a storeless world.

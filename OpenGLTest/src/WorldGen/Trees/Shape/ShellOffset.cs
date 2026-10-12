@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Shape;
 
 /// <summary>
 /// One shell cell of a wide trunk, relative to its core (same Y), plus its parent direction in

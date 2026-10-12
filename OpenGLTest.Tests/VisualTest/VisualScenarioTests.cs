@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using Silk.NET.Input;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.VisualTest;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.VisualTest;
 
 public sealed class VisualScenarioTests
 {

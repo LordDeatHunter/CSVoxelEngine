@@ -5,9 +5,13 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using VoxelEngine.Data;
+using VoxelEngine.Lod;
+using VoxelEngine.Player;
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>
 /// The stress half of item C5's test pairing: <see cref="StressWorkers"/> real builder threads
@@ -354,6 +358,9 @@ public sealed class LodBuildPoolTests
     [Fact]
     public void TheInFlightCapHoldsUnderThreeProducers()
     {
+        // Warm the process (JIT, worldgen caches) exactly as ThreeWorkersBetweenThemClaimEveryRegionExactlyOnce did when
+        // xUnit happened to run it first; the order follows a hash of the namespace-qualified name, so it is not stable.
+        RunStress(targetBuilds: 60, drainSleepMs: 0, deadlineMs: 30_000);
         var bound = WorldGenerationConfig.MaxLodBuildsInFlight + StressWorkers;
         var result = RunStress(targetBuilds: 60, drainSleepMs: 20, deadlineMs: 30_000);
 

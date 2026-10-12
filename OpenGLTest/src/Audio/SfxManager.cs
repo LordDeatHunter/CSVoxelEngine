@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using NAudio.Wave;
+using VoxelEngine.UI;
 
 // One-shot playback opens a WinMM device, so the constructor refuses non-Windows up front and
 // catches every remaining failure; Linux and headless runs stay silent like the ambience does.
 #pragma warning disable CA1416
 
-namespace silkgltriangle;
+namespace VoxelEngine.Audio;
 
 /// <summary>
 /// One-shot sound effects built on the same NAudio stack as <see cref="AmbienceManager"/>:

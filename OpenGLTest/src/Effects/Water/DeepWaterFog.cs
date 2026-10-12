@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Water;
 
 /// <summary>
 /// How much the underwater fog darkens with the eye's depth below the water surface: the deeper the

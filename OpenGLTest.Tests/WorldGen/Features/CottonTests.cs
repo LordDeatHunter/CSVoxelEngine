@@ -1,9 +1,12 @@
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// Wild cotton: the plant breaks into cotton, the generator places it only on dry grass inside its

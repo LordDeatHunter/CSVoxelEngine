@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Content.Models;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// One keyframe animation authored in Blockbench (a clip in the project's <c>animations</c>

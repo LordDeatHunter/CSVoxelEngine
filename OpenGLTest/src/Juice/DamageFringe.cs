@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free twin of the damage chromatic fringe: on a hit the screen edges split red and blue for a

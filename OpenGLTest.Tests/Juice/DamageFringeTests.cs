@@ -1,7 +1,9 @@
 using System;
+using VoxelEngine.Juice;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Juice;
 
 /// <summary>
 /// The damage chromatic fringe (<see cref="DamageFringe"/>, the twin of post-fragment.glsl's): driven

@@ -1,9 +1,10 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Particles;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 /// <summary>
 /// Steam off hardening lava: <see cref="FluidManager.HardenedCells"/> reports both hardening paths

@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Networking;
+
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// One saved multiplayer server as <see cref="ServerStore"/> lists it: the display name the player

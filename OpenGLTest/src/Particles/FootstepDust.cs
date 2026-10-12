@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 /// <summary>
 /// The sprint footstep dust rule, GL-free: when a footfall happens (the gait clock crossing a foot

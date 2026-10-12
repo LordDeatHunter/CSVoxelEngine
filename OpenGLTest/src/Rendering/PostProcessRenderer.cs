@@ -1,8 +1,9 @@
 using System;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using VoxelEngine.Effects.Post;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// The frame's final full-screen pass: one oversized triangle (the shape <see cref="SkyRenderer"/>

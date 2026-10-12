@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Climate;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Sky;
 
 /// <summary>
 /// GL-free twin of the aurora's fade: slow green and violet curtains in the night dome

@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Effects.Sky;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 /// <summary>
 /// Owns the live falling leaves: ambient fall sampled off canopy around the camera plus

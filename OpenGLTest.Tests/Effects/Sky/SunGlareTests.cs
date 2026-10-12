@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.Effects.Sky;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Sky;
 
 /// <summary>
 /// The sun's lens glare (<see cref="SunGlare"/>, the twin of the glare term in sky-fragment.glsl):

@@ -1,6 +1,8 @@
 using System;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// Pure clock math behind the HUD's held-clock readout (see <see cref="UIRenderer.DrawClock"/>):

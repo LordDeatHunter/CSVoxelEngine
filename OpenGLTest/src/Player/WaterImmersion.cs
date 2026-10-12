@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>
 /// GL-free rule of how deep the player's body stands in a fluid: the share of its height

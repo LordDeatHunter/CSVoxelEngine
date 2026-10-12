@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 /// <summary>
 /// One body's memory for its water splashes, GL-free: whether it was in water last frame and how fast

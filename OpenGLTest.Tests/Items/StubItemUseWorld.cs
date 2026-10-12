@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Items;
+using VoxelEngine.Player;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Items;
 
 /// <summary>
 /// Headless <see cref="IItemUseWorld"/> for item <c>OnUse</c> tests: queries answer from plain

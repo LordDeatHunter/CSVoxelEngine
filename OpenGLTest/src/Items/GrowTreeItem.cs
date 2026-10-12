@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// Grows the tree the targeted cell belongs to by a few pulses (ash on a trunk or a canopy),

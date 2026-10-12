@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Core;
 
 /// <summary>
 /// Exact sRGB transfer functions. CPU colors (sun, ambient, sky palette, fog, tints) are

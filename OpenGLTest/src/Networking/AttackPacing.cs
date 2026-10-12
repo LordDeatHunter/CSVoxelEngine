@@ -1,4 +1,8 @@
-namespace silkgltriangle;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.Player;
+
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// How often a player may land a left-click attack, the server-side twin of the client's own

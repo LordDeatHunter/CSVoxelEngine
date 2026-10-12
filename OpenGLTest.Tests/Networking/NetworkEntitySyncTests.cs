@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Entities;
+using VoxelEngine.Networking;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The client's entity reconcile: a server snapshot spawns, updates by network id, removes and

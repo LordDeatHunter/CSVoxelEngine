@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Player;
+
+namespace VoxelEngine.Interaction;
 
 /// <summary>What claimed a right-click (<see cref="World.TryUseSelected(float, PlayerContext, out RightClickOutcome, bool)"/>).</summary>
 public enum RightClickOutcome

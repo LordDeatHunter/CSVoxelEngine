@@ -1,8 +1,8 @@
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Graphics;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// The metalworks content pipeline: molten materials, the melt recipes that fill a crucible and

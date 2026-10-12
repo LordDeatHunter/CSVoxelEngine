@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Chunks;
+
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// Packs a block cell into one <see cref="long"/> for the growth engine's membership sets.

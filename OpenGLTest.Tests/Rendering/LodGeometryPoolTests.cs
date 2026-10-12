@@ -1,6 +1,8 @@
+using VoxelEngine.Lod;
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// The GL-free arithmetic behind the LOD geometry pool: how a mesh's vertex and index counts turn

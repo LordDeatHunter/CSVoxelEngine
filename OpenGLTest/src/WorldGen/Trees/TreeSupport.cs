@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// The one rule that decides which tree wood stands: <b>cells that lose every path to an anchor

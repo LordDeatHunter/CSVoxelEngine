@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// The mobs' lava rule, GL-free: the body box touches a burning fluid (a fluid with a light

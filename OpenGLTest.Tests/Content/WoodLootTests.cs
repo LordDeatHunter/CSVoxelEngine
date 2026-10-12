@@ -1,8 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// Tree wood drops by thickness: <see cref="DropManager.RollLoot"/> reads the cell's

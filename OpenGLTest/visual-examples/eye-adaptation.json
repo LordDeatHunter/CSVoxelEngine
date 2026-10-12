@@ -2,7 +2,7 @@
 // dark cave (slowly) and back down outside (quickly), and never changes under open sky. Run from
 // OpenGLTest/:
 //   $env:VOXEL_SCRIPT='visual-examples/eye-adaptation.json'; $env:VOXEL_TIME='147'
-//   bin/Release/net9.0/silkgltriangle.exe
+//   bin/Release/net9.0/VoxelEngine.exe
 // The cave is an unlit tunnel ~25 blocks under the forest north-east of the origin (a headless probe on
 // WorldSeed.Default: air along x 53..57, z -53..-77 at y -12, no fluid within a chunk). Flying, so the pose holds.
 {

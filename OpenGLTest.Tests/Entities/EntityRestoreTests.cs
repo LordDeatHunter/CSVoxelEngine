@@ -1,8 +1,9 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities;
 
 /// <summary>
 /// The entity save-restore seams: <see cref="Mob.RestoreState"/> puts a mob's health, facing and

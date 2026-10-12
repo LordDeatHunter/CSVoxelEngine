@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Core;
 
 public sealed class LogTests
 {

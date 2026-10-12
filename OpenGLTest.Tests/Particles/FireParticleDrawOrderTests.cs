@@ -1,8 +1,9 @@
 using System;
 using System.Linq;
+using VoxelEngine.Particles;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 /// <summary>
 /// The fire-particle batch is drawn as an additive ember run followed by an alpha-blended

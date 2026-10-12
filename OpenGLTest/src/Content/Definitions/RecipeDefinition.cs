@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Definitions;
 
 /// <summary>JSON shape of <c>assets/data/recipes/&lt;name&gt;.json</c>.</summary>
 public sealed class RecipeDefinition

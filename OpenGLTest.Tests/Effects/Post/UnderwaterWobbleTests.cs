@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Post;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Post;
 
 /// <summary>
 /// The underwater screen wobble (<see cref="UnderwaterWobble"/>, the twin of post-fragment.glsl's):

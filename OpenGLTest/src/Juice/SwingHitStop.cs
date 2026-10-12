@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free hit-stop of one swing clock (<see cref="PlayerModel"/>'s punch or slice). Once a swing

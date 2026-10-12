@@ -2,8 +2,10 @@ using System;
 using System.Numerics;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using VoxelEngine.Effects.Post;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Godrays: light shafts through trees, clouds and gaps in dry air when the sun is in view. Two

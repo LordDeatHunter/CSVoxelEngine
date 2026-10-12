@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Menus;
 
 /// <summary>What a click on the settings page landed on; Row indexes <see cref="SettingsRows.All"/>,
 /// except for Tab where it indexes <see cref="SettingsRows.Tabs"/>.</summary>

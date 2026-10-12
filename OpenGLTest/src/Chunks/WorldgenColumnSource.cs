@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// The singleplayer and server <see cref="IColumnSource"/>: every column straight from the

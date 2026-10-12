@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.ItemDebugger;
 
 /// <summary>
 /// GL-free state behind the item debugger's player animations (the ITEMS tab): which animation the

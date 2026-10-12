@@ -4,8 +4,16 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Rendering;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Lod;
 
 /// <summary>
 /// Parameters for one far-terrain LOD ring. RegionBlocks and RegionRadius must keep

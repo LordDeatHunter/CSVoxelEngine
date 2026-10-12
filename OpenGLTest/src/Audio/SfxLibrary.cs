@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Audio;
 
 /// <summary>
 /// Maps the loose <c>.wav</c> files under a folder onto sound groups. A group is the file name

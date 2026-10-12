@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using Silk.NET.OpenGL;
 using System.IO;
 using StbImageSharp;
+using VoxelEngine.Data;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Graphics;
 
 /// <summary>
 /// Uploads textures for the shared <see cref="Vertex"/> layout. Every one of them is a

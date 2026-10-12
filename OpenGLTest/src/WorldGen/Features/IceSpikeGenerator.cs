@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Chunks;
+
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Occasional ice spikes standing on the barren frozen plains: a single narrow column of ice

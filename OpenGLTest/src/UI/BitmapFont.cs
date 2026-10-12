@@ -3,8 +3,11 @@ using System.IO;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using StbTrueTypeSharp;
+using VoxelEngine.Data;
+using VoxelEngine.Graphics;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI;
 
 /// <summary>
 /// One screen-space draw of a single glyph: its atlas UV rect and where to place it. Produced by

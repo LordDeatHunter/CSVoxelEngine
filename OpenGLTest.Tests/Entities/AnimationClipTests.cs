@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Entities;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities;
 
 public sealed class AnimationClipTests
 {

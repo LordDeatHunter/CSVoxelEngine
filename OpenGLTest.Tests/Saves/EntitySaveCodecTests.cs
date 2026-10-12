@@ -1,8 +1,9 @@
 using System.Linq;
 using System.Text;
+using VoxelEngine.Saves;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Saves;
 
 /// <summary>
 /// <see cref="EntitySaveCodec"/>: mobs and drops survive a write and a read, a missing list

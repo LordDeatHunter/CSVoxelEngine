@@ -1,4 +1,7 @@
-namespace silkgltriangle;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Lighting;
+
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// Sun and block light (each 0..1) one entity draw is lit with, plus the

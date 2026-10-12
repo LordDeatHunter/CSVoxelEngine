@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// Strikes a spark at the aimed block: a dry TNT block primes, a fully built firepit lights.

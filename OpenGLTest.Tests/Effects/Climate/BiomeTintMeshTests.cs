@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Climate;
 
 /// <summary>
 /// The chunk mesher's biome tint: a <c>biomeTint</c> block's tinted quads carry shade * the

@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.WorldGen;
+
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// Where a world's terrain comes from: the <see cref="ColumnData"/> of every chunk column and the

@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Player;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// THE CROSS-TREE OUTPUT-PRESERVATION GATE for item D1, which repacks the chunk-side dictionaries

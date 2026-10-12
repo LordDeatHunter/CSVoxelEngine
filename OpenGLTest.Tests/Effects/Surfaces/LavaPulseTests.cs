@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Surfaces;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Surfaces;
 
 /// <summary>
 /// The lava glow pulse (<see cref="LavaPulse"/>, the twin of the term in test-fragment.glsl): a

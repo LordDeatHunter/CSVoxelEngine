@@ -3,10 +3,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Numerics;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.Saves;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// A server-mode <see cref="World"/> runs headlessly over real terrain: no geometry pools, no LOD

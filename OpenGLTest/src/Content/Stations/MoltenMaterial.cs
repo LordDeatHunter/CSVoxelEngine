@@ -1,6 +1,7 @@
-using silkgltriangle.Content;
+using VoxelEngine.Data;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Stations;
 
 /// <summary>
 /// One molten metal a crucible can hold. Molten material is content rather than a

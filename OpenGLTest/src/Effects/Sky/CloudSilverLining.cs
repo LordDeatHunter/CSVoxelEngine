@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Sky;
 
 /// <summary>
 /// GL-free twin of the cloud layer's silver lining (cloud-fragment.glsl): the thin edges of a cloud

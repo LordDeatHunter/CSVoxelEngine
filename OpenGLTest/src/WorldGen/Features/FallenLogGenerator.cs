@@ -1,7 +1,9 @@
 using System;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.WorldGen.Trees;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Fallen logs: a rare detached oak log lying along X or Z on the forest floor, decided per

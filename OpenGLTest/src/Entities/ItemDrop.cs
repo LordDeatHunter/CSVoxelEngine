@@ -1,7 +1,11 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Items;
+using VoxelEngine.Juice;
+using VoxelEngine.Particles;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
     /// A collectable left behind by mining: usually a block, sometimes a pure item (see

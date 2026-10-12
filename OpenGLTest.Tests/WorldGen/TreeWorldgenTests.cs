@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen;
 
 /// <summary>
 /// Rules of the worldgen tree front-end (<see cref="TreeGenerator"/>): placement honors each

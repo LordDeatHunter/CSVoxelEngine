@@ -2,7 +2,7 @@
 // sun light up, the heart of a thick cloud and clouds away from the sun do not. Run from
 // OpenGLTest/, once per time, copying visual/cloud-silver-lining/ aside between runs:
 //   $env:VOXEL_SCRIPT='visual-examples/cloud-silver-lining.json'; $env:VOXEL_TIME='<t>'
-//   bin/Release/net9.0/silkgltriangle.exe
+//   bin/Release/net9.0/VoxelEngine.exe
 // Times: 343 afternoon (the shots land ~8 s in, with the sun at yaw ~159, pitch ~25), 400 low sun
 // (pitch ~13, the same yaw), 147 noon (the sun overhead: the up shot looks at it), 700 night (no
 // lining at all, the sun is down).

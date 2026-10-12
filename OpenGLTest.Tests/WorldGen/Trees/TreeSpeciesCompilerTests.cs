@@ -1,9 +1,13 @@
 using System;
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Logics;
+using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Trees;
 
 /// <summary>
 /// Rules of <see cref="TreeSpeciesCompiler.Compile"/>: what a species definition must say, what

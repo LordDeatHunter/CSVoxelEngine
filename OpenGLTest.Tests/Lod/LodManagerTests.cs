@@ -4,9 +4,12 @@ using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Data;
+using VoxelEngine.Lod;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>Covers the item-19 slicing of the buried-flag pass: new regions evaluate the
 /// same pass they are added in, still-buried regions re-evaluate every pass (a stale

@@ -2,8 +2,9 @@ using System;
 using System.Numerics;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using VoxelEngine.Juice;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Full-screen damage vignette: one oversized triangle with a radial fragment gradient,

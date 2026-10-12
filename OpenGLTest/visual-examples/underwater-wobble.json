@@ -2,7 +2,7 @@
 // water the image sways gently, FXAA reading around the swayed point; above water nothing moves.
 // Run from OpenGLTest/:
 //   $env:VOXEL_SCRIPT='visual-examples/underwater-wobble.json'; $env:VOXEL_TIME='147'
-//   bin/Release/net9.0/silkgltriangle.exe
+//   bin/Release/net9.0/VoxelEngine.exe
 // Flying, so the pose holds and only the clock moves between the paired shots: the two underwater
 // shots differ by the sway (edges shifted a few pixels, bent by the waves), the two dry ones do not.
 // The open-sea column is sky.json's (floor -8, sea level 0).

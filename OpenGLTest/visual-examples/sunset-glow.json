@@ -2,7 +2,7 @@
 // shows while the sun crosses the horizon. Run from OpenGLTest/, once per time, copying
 // visual/sunset-glow/ aside between runs since each run overwrites it:
 //   $env:VOXEL_SCRIPT='visual-examples/sunset-glow.json'; $env:VOXEL_TIME='<t>'
-//   bin/Release/net9.0/silkgltriangle.exe
+//   bin/Release/net9.0/VoxelEngine.exe
 // Times: 430 sunset (the shots land ~15 s in, with the sun on the horizon at yaw ~160: the glow
 // at its peak), 147 noon (no glow: toward and away from the sun look the same), 1030 sunrise
 // (the same band low toward the rising sun at yaw ~20).

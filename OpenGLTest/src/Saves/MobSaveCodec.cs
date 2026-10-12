@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Entities;
+
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// Serialises a live <see cref="Mob"/> into its <see cref="EntitySaveData"/> form. Extracted

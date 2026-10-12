@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Entities;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 /// <summary>
 /// The landing-dust rule, GL-free: how many chips a landing kicks up and how fast they fly, as a

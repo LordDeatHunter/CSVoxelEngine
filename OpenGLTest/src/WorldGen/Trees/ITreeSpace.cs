@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.WorldGen.Trees.Shape;
+
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// The obstacle view a tree grows against: whether a tree may write wood or leaves into a cell.

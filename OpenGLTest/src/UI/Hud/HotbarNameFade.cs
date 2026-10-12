@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// The selected item's name shown above the hotbar for a moment after a switch, then faded out.

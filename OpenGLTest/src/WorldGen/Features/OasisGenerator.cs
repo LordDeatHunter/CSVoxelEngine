@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Oases: a rare green pocket deep in the desert — a pond ringed by grass, its own palm and denser

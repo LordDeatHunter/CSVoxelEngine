@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI;
 
 /// <summary>Width in canvas units of a run of text at some fixed draw scale. Injected so the wrap is
 /// GL-free: UIRenderer binds it to BitmapFont.MeasureSize(text, scale).X, tests to a synthetic width.</summary>

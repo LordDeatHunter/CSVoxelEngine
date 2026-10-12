@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 /// <summary>
 /// One exhaled bubble: a small billboard that rises off the player's mouth while the eye

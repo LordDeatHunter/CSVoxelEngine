@@ -1,9 +1,10 @@
 using System;
 using System.Diagnostics;
+using VoxelEngine.Lod;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>
 /// A MEASUREMENT HARNESS for item C5, not a regression guard. It exists to answer one

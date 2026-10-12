@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Shapes;
 
 /// <summary>
 /// The dimensions of one <see cref="BlockRenderer.Pane"/> block, read from its <c>pane</c> JSON:

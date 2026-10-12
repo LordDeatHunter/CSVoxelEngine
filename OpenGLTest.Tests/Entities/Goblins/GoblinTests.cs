@@ -1,9 +1,10 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities.Goblins;
 
 /// <summary>
 /// The goblin's own AI and physics, driven headless: it closes to the throw band, throws only

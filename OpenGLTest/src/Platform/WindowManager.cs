@@ -1,8 +1,9 @@
 ﻿using System;
 using Silk.NET.Windowing;
 using Silk.NET.Maths;
+using VoxelEngine.UI;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Platform;
 
 public class WindowManager : IDisposable
 {

@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// The climate of a world column, a pure function of (x, z) (<see cref="TerrainGenerator"/>).

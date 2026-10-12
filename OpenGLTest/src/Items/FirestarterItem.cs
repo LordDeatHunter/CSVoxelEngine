@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// The firestarter's own code class: the worked example of a per-item override. Behavior is

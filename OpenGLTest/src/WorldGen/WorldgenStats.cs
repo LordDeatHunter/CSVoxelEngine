@@ -1,6 +1,7 @@
 using System.Threading;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// Lock-free worldgen timing, fed from the chunk generation workers and the LOD builder thread

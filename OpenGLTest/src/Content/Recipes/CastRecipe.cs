@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Content.Stations;
+
+namespace VoxelEngine.Content.Recipes;
 
 /// <summary>
 /// One compiled metalworks recipe: pouring <see cref="AmountMl"/> of <see cref="MaterialId"/>

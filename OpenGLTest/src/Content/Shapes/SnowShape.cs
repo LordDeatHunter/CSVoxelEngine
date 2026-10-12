@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.WorldGen.Features;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Shapes;
 
 /// <summary>
 /// Shape and stack rules for a layered snow cell. The chunk state byte holds 1..<c>StackMax</c>

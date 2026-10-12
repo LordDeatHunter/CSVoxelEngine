@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.WorldGen.Trees;
+
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// Every tree of one 64x64 XZ cell (<see cref="WorldGenerationConfig.TreeCellBlocks"/>), grown

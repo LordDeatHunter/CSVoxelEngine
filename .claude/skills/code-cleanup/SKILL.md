@@ -51,10 +51,21 @@ Prefer `rg`/Grep over guesswork. Useful recon commands (PowerShell):
 
 ## Namespace scheme
 
-Root `VoxelEngine`; one namespace per folder, mirroring the tree (`VoxelEngine.Systems.Chunks`).
-Each project has a `GlobalUsings.cs` listing its own sub-namespaces; keep that list short and
-only grow it when a namespace is genuinely used across most of its project. The test project's
-namespace is `VoxelEngine.Tests` (assembly name follows the csproj).
+Root `VoxelEngine`; one namespace per folder below `OpenGLTest/src`, mirroring the tree
+(`src/Chunks/` -> `VoxelEngine.Chunks`, `src/WorldGen/Trees/` -> `VoxelEngine.WorldGen.Trees`);
+only the six files directly in `src/` are in `VoxelEngine` itself. The tests mirror their own
+tree: `OpenGLTest.Tests/Chunks/` -> `VoxelEngine.Tests.Chunks`, the shared fixtures in
+`Support/` -> `VoxelEngine.Tests.Support` (nothing sits at the test project root). The server
+and the item debugger are flat (`VoxelEngine.Server`, `VoxelEngine.ItemDebugger`; assembly names
+follow the csproj). Moving a file means changing its namespace line and letting the compiler
+name the usings to add; a using that only a `cref` needs stays (a doc build counts it as used).
+Each project keeps a `GlobalUsings.cs` at its root beside the csproj listing only the namespaces
+most of its files need (`VoxelEngine.Core` everywhere; the tests add `VoxelEngine.Chunks`,
+`VoxelEngine.Content` and `VoxelEngine.Tests.Support`; the game and the item debugger add
+`global using Shader = VoxelEngine.Graphics.Shader;` because Silk.NET.OpenGL has a `Shader`
+struct); keep that list short and only grow it when a namespace is genuinely used across most
+of its project. A new folder is a new namespace; never add a type to a namespace its folder
+does not map to.
 
 ## Splitting a god class - recipe
 

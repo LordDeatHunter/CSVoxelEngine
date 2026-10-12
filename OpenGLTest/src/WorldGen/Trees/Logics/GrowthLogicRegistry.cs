@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Logics;
 
 /// <summary>
 /// Name -> <see cref="IGrowthLogic"/> table a species' <c>growth.logic</c> is resolved through.

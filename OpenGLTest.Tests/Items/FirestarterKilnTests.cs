@@ -1,8 +1,9 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Items;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Items;
 
 /// <summary>
 /// The firestarter's kiln branch: a fuelled kiln is a target like a firepit pile, an unfuelled one

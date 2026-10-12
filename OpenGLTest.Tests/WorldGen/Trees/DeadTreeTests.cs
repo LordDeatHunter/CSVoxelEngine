@@ -1,7 +1,8 @@
-using silkgltriangle.Content;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Trees;
 
 /// <summary>
 /// The dead tree species: leafless, sharing the oak wood, and planted only in the desert and the

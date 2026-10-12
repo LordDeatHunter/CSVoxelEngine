@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// The state byte of an openable block (a trapdoor, a door half; <see cref="BlockType.Openable"/>):

@@ -1,6 +1,7 @@
 using System.Threading;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// A test hook counting the engine's entries into worldgen, so a test can prove a path (a

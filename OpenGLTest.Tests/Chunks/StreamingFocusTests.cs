@@ -1,7 +1,7 @@
 using System.Numerics;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// <see cref="StreamingFocus"/> republishes its foci only when a focus changes chunk or the set

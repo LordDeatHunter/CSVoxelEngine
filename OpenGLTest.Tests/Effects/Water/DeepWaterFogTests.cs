@@ -1,7 +1,8 @@
 using System.Numerics;
+using VoxelEngine.Effects.Water;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Water;
 
 /// <summary>
 /// The deep-water darkness curve (<see cref="DeepWaterFog"/>, uploaded as test-fragment.glsl's

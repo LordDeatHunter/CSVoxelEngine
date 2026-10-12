@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Graphics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Models;
 
 /// <summary>
 /// Turns a flattened <see cref="BlockModel"/> into a <see cref="BakedModel"/>: model-space

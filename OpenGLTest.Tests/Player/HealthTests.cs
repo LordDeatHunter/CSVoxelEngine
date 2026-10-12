@@ -1,8 +1,10 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Player;
+using VoxelEngine.UI;
+using VoxelEngine.VisualTest;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 /// <summary>First-cut survival: fall damage curve, lava burns, pool/flash behavior.</summary>
 public sealed class HealthTests

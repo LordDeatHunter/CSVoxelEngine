@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// Classic worm-carved tunnels: a random walk drags a sphere brush through the rock, leaving

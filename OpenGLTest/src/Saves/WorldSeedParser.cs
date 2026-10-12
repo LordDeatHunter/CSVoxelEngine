@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// GL-free rule turning the create-world seed field into a world seed. Empty or whitespace text

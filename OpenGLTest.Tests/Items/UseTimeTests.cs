@@ -1,9 +1,9 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Items;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Items;
 
 /// <summary>
 /// The timed use (use.seconds): holding the button charges a use pose and the use runs only when

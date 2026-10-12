@@ -1,10 +1,13 @@
 using System;
 using System.IO;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Data;
+using VoxelEngine.Player;
+using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Saves;
 
 /// <summary>
 /// <see cref="ChunkManager"/> with a <see cref="ChunkSaveStore"/> attached: an edited chunk that

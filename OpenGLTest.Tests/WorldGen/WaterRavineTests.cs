@@ -1,9 +1,10 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen;
 
 public sealed class WaterRavineTests
 {

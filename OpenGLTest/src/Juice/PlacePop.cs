@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free twin of the placement pop: the growth a freshly placed block's pop box is drawn with

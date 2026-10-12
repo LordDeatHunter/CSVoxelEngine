@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// Smooth per-corner voxel light: each vertex of a full face averages the front cell with the

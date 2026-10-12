@@ -1,8 +1,10 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Juice;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Juice;
 
 public sealed class SprintFovTests
 {

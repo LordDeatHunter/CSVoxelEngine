@@ -1,8 +1,12 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Lod;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 [Collection("LOD column caps")]
 public sealed class FallingBlockTests

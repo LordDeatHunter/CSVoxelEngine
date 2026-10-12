@@ -3,7 +3,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// One entry of a <c>glMultiDrawElementsIndirect</c> command buffer, laid out exactly as the GL

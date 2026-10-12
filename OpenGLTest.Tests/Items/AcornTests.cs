@@ -1,8 +1,10 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Items;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Items;
 
 /// <summary>
 /// The acorn (<see cref="ItemUseAction.PlantTree"/> / <see cref="PlantTreeItem"/>): using one on

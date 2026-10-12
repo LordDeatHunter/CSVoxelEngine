@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using VoxelEngine.Data;
+using VoxelEngine.Items;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.ItemDebugger;
 
 public enum DebugButton
 {

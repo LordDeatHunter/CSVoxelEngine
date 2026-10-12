@@ -1,9 +1,9 @@
 using System;
 using System.IO;
-using silkgltriangle;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Graphics;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Support;
 
 /// <summary>
 /// One-time headless content load shared by every test that names a block or item.

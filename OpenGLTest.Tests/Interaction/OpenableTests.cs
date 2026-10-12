@@ -1,10 +1,12 @@
 using System;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Interaction;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// Openable blocks (the trapdoor): the open bit sits beside the facing in the state byte

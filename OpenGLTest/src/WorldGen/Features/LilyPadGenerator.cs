@@ -1,7 +1,8 @@
 using System;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Lily pads: a flat pad stamped on the cell above a still lake's top water cell. A lake is a

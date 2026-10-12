@@ -4,8 +4,9 @@ using System.IO;
 using System.Numerics;
 using System.Text.Json;
 using Silk.NET.Input;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.VisualTest;
 
 /// <summary>
 /// One parsed visual-scenario step. Parsing and validation are GL-free so the xUnit suite

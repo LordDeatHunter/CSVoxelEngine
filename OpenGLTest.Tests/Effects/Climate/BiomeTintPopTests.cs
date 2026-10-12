@@ -2,10 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Graphics;
+using VoxelEngine.Particles;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Climate;
 
 /// <summary>
 /// The mining pop and the break debris of a biome-tinted block: they wear its world tiles

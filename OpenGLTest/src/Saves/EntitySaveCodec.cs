@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// Reads and writes a world's <see cref="FileName"/> (<see cref="EntitySaveData"/> as indented

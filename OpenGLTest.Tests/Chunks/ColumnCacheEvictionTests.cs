@@ -5,10 +5,12 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using VoxelEngine.Lod;
+using VoxelEngine.WorldGen;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// Item D2's output-preservation fact, and the cross-tree hash that is its authority.

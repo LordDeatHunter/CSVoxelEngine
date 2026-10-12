@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>
 /// Reads the state of a player's body from the live chunk map alone, with no simulation state:

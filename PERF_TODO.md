@@ -2991,7 +2991,7 @@ this file's own instruments — see the carried-debt bullet below.
   Build: `~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release` (Release only — it is the sole
   configuration measured or shipped here). Tests:
   `DOTNET_ROLL_FORWARD=LatestMajor ~/.dotnet/dotnet.exe test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`.
-  All code lives in the `VoxelEngine` root namespace even though the solution is `VoxelEngine.sln`.
+  All code lives under the `VoxelEngine` root namespace, one sub-namespace per folder (AGENTS.md, "Code organization").
 - **The suite baseline, and how the series moved it.** **790 total / 786 passed / 4 failed** at
   9b7a244, rising to **797 / 793 / 4** by the D5 round's HEAD (8b743c7) — which is exactly what this
   round re-measured before touching anything. R6's three `GpuTimingGateTests` facts take it to

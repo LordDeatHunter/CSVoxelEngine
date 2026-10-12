@@ -2,10 +2,13 @@ using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Data;
+using VoxelEngine.Networking;
+using VoxelEngine.Saves;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// A multiplayer client never meshes a chunk before the server's terrain for the nine chunk

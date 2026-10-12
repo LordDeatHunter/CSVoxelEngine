@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using Silk.NET.OpenGL;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// One directional shadow cascade: an orthographic box of half-extent <see cref="RadiusBlocks"/>

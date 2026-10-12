@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>One player position from a server <c>PlayerList</c> broadcast, with the cosmetic state
 /// that poses their model: the movement <paramref name="Flags"/> and the last swing

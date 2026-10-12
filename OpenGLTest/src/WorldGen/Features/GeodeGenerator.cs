@@ -1,7 +1,8 @@
 using System;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Geodes: a rare hollow sphere deep in solid rock, its shell lined with crystal and its heart

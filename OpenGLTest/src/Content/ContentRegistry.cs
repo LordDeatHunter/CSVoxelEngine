@@ -4,8 +4,29 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json;
+using VoxelEngine.Audio;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Entities;
+using VoxelEngine.Graphics;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.Player;
+using VoxelEngine.Saves;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace silkgltriangle.Content;
+namespace VoxelEngine.Content;
 
 /// <summary>
 /// Loads every block, item, loot table, tag and model from <c>assets/data</c> and

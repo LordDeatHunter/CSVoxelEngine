@@ -2,8 +2,9 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Lod;
 
 /// <summary>
 /// Per-column surface overrides that keep the far LOD in step with player edits: the actual top

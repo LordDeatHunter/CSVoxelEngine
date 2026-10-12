@@ -1,9 +1,12 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
+using VoxelEngine.VisualTest;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities.Slimes;
 
 public sealed class SlimeTests
 {

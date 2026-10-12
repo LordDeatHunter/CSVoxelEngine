@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// The wire form of a <see cref="WorldIntent"/>: the sequence id, the kind, the eye and the aim,

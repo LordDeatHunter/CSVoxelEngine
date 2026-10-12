@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen;
 
 /// <summary>
 /// Rules of <see cref="TreeGenerator.PoisonCanopy"/>'s radius: a single edit disturbs a smaller

@@ -2,10 +2,12 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Saves;
 
 /// <summary>
 /// The chunk save format (<see cref="ChunkSaveCodec"/>) and the chunk seams it feeds: an encoded

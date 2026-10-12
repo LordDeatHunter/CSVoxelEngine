@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Server;
 
 /// <summary>
 /// Locates the game's <c>assets/</c> directory from the server's working directory. The server is

@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Data;
+using VoxelEngine.Graphics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 /// <summary>
 /// Draws every live <see cref="LeafParticle"/> as a camera-facing billboard in a single

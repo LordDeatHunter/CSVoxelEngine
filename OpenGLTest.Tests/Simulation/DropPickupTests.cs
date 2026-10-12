@@ -1,9 +1,9 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// The multiplayer server's drop pickup (<see cref="DropManager.Update(float, System.Collections.Generic.IReadOnlyList{DropCollector}, ChunkManager)"/>):

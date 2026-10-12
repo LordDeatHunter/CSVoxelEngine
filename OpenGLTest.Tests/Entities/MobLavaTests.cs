@@ -1,8 +1,9 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities;
 
 /// <summary>
 /// Mobs burn in lava (<see cref="MobLava"/>, <see cref="Mob.UpdateHazards"/>): a body in lava loses

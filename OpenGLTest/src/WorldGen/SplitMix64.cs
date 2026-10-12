@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// Small deterministic PRNG (SplitMix64) for world generation. Unlike System.Random its

@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Features;
 
 /// <summary>
 /// Grows the base cell's root straight down through free cells, up to the feature depth, the

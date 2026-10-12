@@ -1,7 +1,9 @@
 using System.Linq;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Hud;
 
 /// <summary>
 /// The hotbar's pickup pop reads each slot's (item, count): only a rise of the same item pops,

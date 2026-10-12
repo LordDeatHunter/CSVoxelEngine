@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Data;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Graphics;
 
 /// <summary>
 /// How reflective one atlas tile's surface is, from the owning block's <c>material</c> JSON.

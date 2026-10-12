@@ -1,8 +1,10 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 public sealed class RemotePlayerAnimationTests
 {

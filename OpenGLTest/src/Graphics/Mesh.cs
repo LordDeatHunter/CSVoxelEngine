@@ -1,7 +1,9 @@
 using Silk.NET.OpenGL;
 using System;
+using VoxelEngine.Data;
+using VoxelEngine.UI;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Graphics;
 
 /// <summary>
 /// An indexed triangle mesh in the shared <see cref="Vertex"/> layout. See

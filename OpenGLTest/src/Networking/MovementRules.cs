@@ -1,6 +1,8 @@
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// The server's movement rubberband: judges the position one <see cref="NetMessage.PlayerState"/>

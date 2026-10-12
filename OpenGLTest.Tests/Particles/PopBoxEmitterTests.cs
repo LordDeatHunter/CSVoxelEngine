@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Data;
+using VoxelEngine.Particles;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 public sealed class PopBoxEmitterTests
 {

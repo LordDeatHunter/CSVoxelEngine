@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// The day watch behind the "Day 4" toast, GL-free: it reports the day number once each time the

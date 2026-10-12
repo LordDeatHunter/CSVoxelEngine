@@ -1,8 +1,10 @@
 using System;
 using System.IO;
 using System.Numerics;
+using VoxelEngine.Networking;
+using VoxelEngine.Saves;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Menus;
 
 /// <summary>
 /// Every rule of the main menu in one GL-free place: page transitions, the four non-character

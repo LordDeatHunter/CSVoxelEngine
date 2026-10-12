@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Runtime.InteropServices;
+using VoxelEngine.Data;
+using VoxelEngine.Lod;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// Wire form of one far-LOD region's mesh (<see cref="LodMeshData"/>): the level and region

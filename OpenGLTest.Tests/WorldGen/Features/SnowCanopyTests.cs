@@ -1,9 +1,10 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// Snow on canopies: a cold column's highest leaf with air over it wears a snow cell, while the

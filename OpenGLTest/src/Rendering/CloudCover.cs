@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Whether the cloud layer, as <see cref="CloudRenderer"/> draws it, stands between an eye and the

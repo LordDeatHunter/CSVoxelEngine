@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using VoxelEngine.Content.Definitions;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Models;
 
 /// <summary>
 /// A model with its parent chain already flattened: every texture variable merged

@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Interaction;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// What an <see cref="Item"/> override may query and change during <see cref="Item.OnUse"/>.

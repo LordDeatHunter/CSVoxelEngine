@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Networking;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// The block-contact damage rule (a cactus), GL-free: a body whose box touches a cell whose block

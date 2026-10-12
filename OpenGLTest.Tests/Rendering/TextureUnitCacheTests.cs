@@ -1,6 +1,7 @@
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// <c>TextureUnitCache</c> is the GL-free bookkeeping behind the render-state rebind cache

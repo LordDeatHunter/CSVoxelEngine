@@ -1,7 +1,9 @@
 using System;
+using VoxelEngine.ItemDebugger;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.ItemDebugger;
 
 /// <summary>
 /// The item debugger's player animation modes: every mode exists, drives the real <see cref="PlayerModel"/>,

@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// What the HUD's look-at label draws with this frame, GL-free: the rule's text and flags

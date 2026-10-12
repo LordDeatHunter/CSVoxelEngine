@@ -1,10 +1,12 @@
 using System;
 using System.Numerics;
 using Silk.NET.Input;
-using silkgltriangle.Content;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
+using VoxelEngine.VisualTest;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 /// <summary>
 /// The water depth states' movement (<see cref="PlayerPhysics"/> over <see cref="WaterImmersion"/>):

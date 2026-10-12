@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.UI.InventoryPanel;
+
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// The block half of the unification: every placeable block is also an <see cref="Item"/> so the

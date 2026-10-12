@@ -2,8 +2,12 @@ using System;
 using System.Globalization;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Data;
+using VoxelEngine.Entities;
+using VoxelEngine.Graphics;
+using VoxelEngine.UI;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Draws the floating damage numbers (<see cref="DamageNumberPool"/>) as world-space text that

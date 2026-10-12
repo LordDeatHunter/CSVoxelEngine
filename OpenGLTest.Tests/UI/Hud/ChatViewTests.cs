@@ -1,6 +1,7 @@
+using VoxelEngine.UI.Hud;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Hud;
 
 public sealed class ChatViewTests
 {

@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Player;
+
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free rule of the throw charge zoom: the view narrows a few degrees as a throw winds up and

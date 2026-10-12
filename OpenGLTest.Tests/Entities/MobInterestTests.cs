@@ -1,9 +1,11 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities;
 
 /// <summary>
 /// Losing interest (<see cref="MobInterest"/>, <see cref="Mob.PickTarget"/>): a mob gives up a target it

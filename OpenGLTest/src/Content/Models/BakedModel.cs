@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Models;
 
 /// <summary>
 /// A model turned into chunk-ready geometry: atlas slices resolved, UVs tile-local, element rotations applied and

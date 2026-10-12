@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Sky;
 
 /// <summary>
 /// GL-free twin of the night sky's star field, drawn by <c>Stars</c> in sky-fragment.glsl; keep

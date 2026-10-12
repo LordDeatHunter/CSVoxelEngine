@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// A multiplayer client's bookkeeping of what it predicted and the server has not answered yet, so

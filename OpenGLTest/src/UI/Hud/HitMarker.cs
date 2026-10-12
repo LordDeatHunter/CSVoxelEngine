@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// The crosshair's hit marker, GL-free: an X flashes when a hit lands and fades out over

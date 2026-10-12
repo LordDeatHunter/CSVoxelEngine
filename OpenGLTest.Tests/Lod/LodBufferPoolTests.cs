@@ -1,7 +1,9 @@
 using System.Linq;
+using VoxelEngine.Lod;
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>
 /// Covers item C8: a region build's four output lists are rented from a LOD-sized

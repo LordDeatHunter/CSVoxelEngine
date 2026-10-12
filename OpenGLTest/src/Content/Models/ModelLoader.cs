@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Definitions;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Models;
 
 /// <summary>
 /// Reads Minecraft-format model files under <c>assets/models/</c> and flattens their parent

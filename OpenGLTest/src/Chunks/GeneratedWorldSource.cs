@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.WorldGen;
+
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// The default <see cref="IWorldSource"/>: worldgen, exactly as before world sources existed.

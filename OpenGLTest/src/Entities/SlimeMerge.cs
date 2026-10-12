@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// The slime merge, GL-free: the inverse of the split (<see cref="SlimeSize.SplitsOnHit"/>). Two

@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Entities;
+using VoxelEngine.Lod;
+using VoxelEngine.Particles;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Owns gravity-affected blocks: topples a <c>falls</c> block into a <see cref="FallingBlock"/>

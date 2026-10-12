@@ -1,9 +1,12 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities.Slimes;
 
 /// <summary>
 /// Slime sizes (<see cref="SlimeSize"/>): every scaled stat grows with the size, the smallest size

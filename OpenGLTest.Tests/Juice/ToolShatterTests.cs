@@ -1,8 +1,8 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Juice;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Juice;
 
 /// <summary>
 /// The tool break shatter's color rule (<see cref="ToolShatter"/>): the chips wear the mean color

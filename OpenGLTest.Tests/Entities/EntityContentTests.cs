@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Entities;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities;
 
 public sealed class EntityContentTests
 {

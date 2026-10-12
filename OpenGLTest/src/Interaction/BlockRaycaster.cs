@@ -1,7 +1,11 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// GL-free, main-thread voxel raycasting: the DDA walk the camera aims with and the

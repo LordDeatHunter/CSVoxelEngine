@@ -1,7 +1,8 @@
 using System;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Items;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// Namespaced content names for save files. Byte ids are handed out at startup in file-name

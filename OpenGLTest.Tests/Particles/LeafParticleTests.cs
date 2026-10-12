@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.Particles;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 public sealed class LeafParticleTests
 {

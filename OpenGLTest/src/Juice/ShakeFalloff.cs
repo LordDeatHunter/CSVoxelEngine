@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// How hard a world event (a TNT blast, a felled tree hitting the ground) shakes a camera standing

@@ -1,10 +1,12 @@
 using System;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Lod;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>
 /// The edit paths outside World that move a column's far-LOD surface — a falling block landing,

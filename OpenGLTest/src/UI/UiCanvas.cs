@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI;
 
 /// <summary>
 /// The UI's virtual canvas, modelled on Godot's "canvas_items / keep aspect / expand" stretch mode:

@@ -1,7 +1,10 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.WorldGen.Trees;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Shapes;
 
 /// <summary>
 /// The one shape rule of a <see cref="BlockRenderer.Pane"/> block (the glass pane, the fence, the

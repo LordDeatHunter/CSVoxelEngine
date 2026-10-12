@@ -2,8 +2,10 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Numerics;
 using StbImageSharp;
+using VoxelEngine.Items;
+using VoxelEngine.Particles;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free rules of a tool that ran out of durability: its shatter chips wear the mean color of

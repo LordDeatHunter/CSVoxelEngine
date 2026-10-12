@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using VoxelEngine.Lod;
+using VoxelEngine.Rendering;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Core;
 
 /// <summary>
 /// The part of a frame a timing sample belongs to. The order here is the order the rows

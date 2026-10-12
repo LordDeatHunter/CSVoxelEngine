@@ -1,7 +1,11 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Data;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 /// <summary>
 /// The mining pop's geometry: each hitbox drawn as a box sampling its crop of the block's

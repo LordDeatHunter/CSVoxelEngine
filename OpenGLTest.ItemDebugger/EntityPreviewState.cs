@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Entities;
 
-namespace silkgltriangle;
+namespace VoxelEngine.ItemDebugger;
 
 /// <summary>
 /// GL-free state behind the item debugger's ENTITIES tab: which entity is previewed and which

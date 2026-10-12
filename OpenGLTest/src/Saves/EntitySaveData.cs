@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using VoxelEngine.Entities;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// The JSON shape of a world's <c>entities.json</c> (<see cref="EntitySaveCodec"/>): the live

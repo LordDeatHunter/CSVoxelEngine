@@ -1,9 +1,10 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Particles;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 /// <summary>
 /// The water splash: the droplet rule (<see cref="WaterSplash.Count"/>), the per-body crossing

@@ -1,7 +1,8 @@
 using System;
 using Silk.NET.OpenGL;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// The cloud-shadow coverage map: one R8 <c>GL_TEXTURE_2D</c> of <see cref="CloudField.Cells"/>

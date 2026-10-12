@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Effects.Climate;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 /// <summary>
 /// Owns the live mining debris: small textured cubes chipped off on every mining hit plus

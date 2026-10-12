@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Sky;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 public enum FireParticleKind : byte
 {

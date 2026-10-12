@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Player;
+
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// The blade's two-phase slice combo, GL-free so the punch loop and the tests share it. A press

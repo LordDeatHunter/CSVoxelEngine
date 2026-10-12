@@ -1,7 +1,9 @@
 using System;
 using Silk.NET.OpenGL;
+using VoxelEngine.Data;
+using VoxelEngine.Graphics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// A range handed out by a <see cref="ChunkGeometryPool"/>: a run of units that covers both the

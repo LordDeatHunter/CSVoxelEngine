@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// An immutable copy of one chunk's saveable data: the block ids, the per-block state byte and

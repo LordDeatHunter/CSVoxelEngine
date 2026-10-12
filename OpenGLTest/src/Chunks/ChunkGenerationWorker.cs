@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Lod;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// Handles continuous chunk generation in background threads, around every focus of a

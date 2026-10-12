@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Rendering;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.UI.Menus;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>Who a chat line came from: a player (shown "Name: text") or the game itself.</summary>
 public enum ChatKind

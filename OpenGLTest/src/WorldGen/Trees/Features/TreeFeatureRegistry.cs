@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Features;
 
 /// <summary>
 /// Name -> <see cref="ITreeFeature"/> table a species' feature <c>type</c> is resolved through.

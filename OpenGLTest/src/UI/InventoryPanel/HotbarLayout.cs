@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>
 /// GL-free geometry of the hotbar strip centred along the bottom edge, in canvas units (see

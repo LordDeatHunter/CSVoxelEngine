@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// Reads and writes a world's <see cref="FileName"/> (<see cref="PlayerSaveData"/> as indented

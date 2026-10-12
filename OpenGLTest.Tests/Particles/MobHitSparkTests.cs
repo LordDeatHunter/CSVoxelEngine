@@ -1,8 +1,12 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Entities;
+using VoxelEngine.Networking;
+using VoxelEngine.Particles;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 /// <summary>
 /// The hit sparks: a punch, slice or thrown hit that connects throws pale chips off the mob, and a

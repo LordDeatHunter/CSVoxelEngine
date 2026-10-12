@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Lod;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Shape;
 
 /// <summary>
 /// The far-LOD crown silhouette of a species' <c>lod</c> block: the cheap stand-in the rings

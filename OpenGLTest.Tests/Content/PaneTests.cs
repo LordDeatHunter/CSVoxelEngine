@@ -2,10 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Data;
+using VoxelEngine.Interaction;
+using VoxelEngine.Player;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// A glass pane is a thin translucent block on glass's path: it never hides a neighbor's face,

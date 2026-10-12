@@ -1,7 +1,8 @@
 using System;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Boulders: a rare blob of stone or cobblestone cells sitting on the forest or taiga floor,

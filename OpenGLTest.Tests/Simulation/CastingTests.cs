@@ -2,10 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.Items;
+using VoxelEngine.Simulation;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// Casting: pouring a crucible of molten metal into a fired mold, letting it set and taking the

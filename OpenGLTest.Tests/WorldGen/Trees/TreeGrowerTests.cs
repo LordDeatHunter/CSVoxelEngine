@@ -1,10 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Features;
+using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Trees;
 
 /// <summary>
 /// Rules of <see cref="TreeGrower"/>: determinism from position and seed, the parent chain, the

@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.Effects.Post;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Post;
 
 /// <summary>
 /// The godrays' strength (<see cref="Godrays"/>, the twin of the strength and phase the godrays pass

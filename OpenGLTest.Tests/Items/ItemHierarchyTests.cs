@@ -1,7 +1,8 @@
-using silkgltriangle.Content;
+using VoxelEngine.Items;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Items;
 
 public sealed class ItemHierarchyTests
 {

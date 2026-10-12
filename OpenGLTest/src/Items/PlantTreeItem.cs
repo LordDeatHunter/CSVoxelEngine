@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Simulation;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// Plants a sapling of the item's <see cref="Item.UseTreeName"/> species on the aimed ground (an

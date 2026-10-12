@@ -1,8 +1,11 @@
 using System;
 using System.IO;
+using VoxelEngine.Networking;
+using VoxelEngine.Saves;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The chunk/column wire codec the multiplayer client restores streamed chunks from: blocks and

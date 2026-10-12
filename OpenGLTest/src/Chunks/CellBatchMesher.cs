@@ -1,7 +1,11 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// Meshes an arbitrary set of cells (a grown tree, its ground) with the real chunk mesher, so

@@ -2,9 +2,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Threading;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen;
 
 /// <summary>
 /// Pins <see cref="GenerationalCache{TKey,TValue}"/>, the eviction policy that replaced the

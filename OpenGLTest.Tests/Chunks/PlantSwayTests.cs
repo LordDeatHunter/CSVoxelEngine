@@ -1,9 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Data;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// Rooted plants keep their roots: a swaying block whose model is not a full cube (tall grass,

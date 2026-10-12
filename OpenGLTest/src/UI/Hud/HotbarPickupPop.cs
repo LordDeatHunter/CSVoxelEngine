@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// The hotbar's pickup pop: a slot whose count rises bumps its icon up and springs it back.

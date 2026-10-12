@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Player;
+
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free rule of the strafe camera tilt: the view rolls a little toward the side the player

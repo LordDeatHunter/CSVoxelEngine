@@ -1,8 +1,12 @@
 using System;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.UI;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Draws the cloud layer: one static mesh built once from <see cref="CloudField"/>, a 2D grid of

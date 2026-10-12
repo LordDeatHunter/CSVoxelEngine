@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Core;
 
 /// <summary>
 /// Shared scalar math: interpolation and easing curves for animations (mining pop, fades)

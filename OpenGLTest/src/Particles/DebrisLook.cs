@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Graphics;
+
+namespace VoxelEngine.Particles;
 
 /// <summary>What a <see cref="BlockDebris"/> chip looks like, i.e. which cached cube
 /// <see cref="BlockCubeCache"/> draws it with.</summary>

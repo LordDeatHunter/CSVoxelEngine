@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// GL-free ballistic aim for a goblin's thrown stone: the launch velocity of fixed speed that

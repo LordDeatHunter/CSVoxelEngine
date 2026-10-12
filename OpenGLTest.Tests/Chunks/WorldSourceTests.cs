@@ -4,10 +4,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Numerics;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Lod;
+using VoxelEngine.Player;
+using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// The <see cref="IWorldSource"/> seam behind <see cref="ChunkManager.CreateChunk"/>: the default

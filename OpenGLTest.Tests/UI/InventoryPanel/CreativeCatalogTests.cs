@@ -1,9 +1,10 @@
 using System;
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Items;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.InventoryPanel;
 
 public sealed class CreativeCatalogTests
 {

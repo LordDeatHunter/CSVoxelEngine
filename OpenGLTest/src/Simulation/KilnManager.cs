@@ -1,9 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.Lod;
+using VoxelEngine.Networking;
+using VoxelEngine.Particles;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Block-entity registry for mud brick kilns, keyed by the structure's anchor cell (the volume's

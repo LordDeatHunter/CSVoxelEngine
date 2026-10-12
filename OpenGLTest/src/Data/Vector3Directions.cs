@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Data;
 
 public static class Vector3Directions
 {

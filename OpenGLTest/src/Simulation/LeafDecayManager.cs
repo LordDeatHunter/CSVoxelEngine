@@ -2,8 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Interaction;
+using VoxelEngine.Lod;
+using VoxelEngine.Particles;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Leaf decay and orphaned-wood crumbling: a fixed tick

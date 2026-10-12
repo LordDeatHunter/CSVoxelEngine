@@ -1,6 +1,9 @@
 using System;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// The look-at label's rule, GL-free: what the label under the crosshair reads and how it draws.

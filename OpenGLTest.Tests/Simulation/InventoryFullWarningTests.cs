@@ -1,8 +1,8 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// The "Inventory full" warning's rule (<see cref="DropManager.BlockedCollectors"/>): a drop within

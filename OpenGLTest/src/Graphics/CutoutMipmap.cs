@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Graphics;
 
 /// <summary>
 /// Builds the mip chain of an alpha-tested (cutout) tile so its coverage survives minification.

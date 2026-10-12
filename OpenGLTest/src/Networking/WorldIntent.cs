@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>What a <see cref="WorldIntent"/> asks the server to do.</summary>
 public enum NetIntentKind : byte

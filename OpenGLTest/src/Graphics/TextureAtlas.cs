@@ -5,7 +5,7 @@ using System.Linq;
 using Silk.NET.OpenGL;
 using StbImageSharp;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Graphics;
 
 /// <summary>
 /// Loads the individual block textures in <c>assets/textures/blocks/*.png</c> into one

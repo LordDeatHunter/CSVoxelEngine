@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
+using VoxelEngine.Saves;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Saves;
 
 /// <summary>
 /// The imported-map column format (<see cref="ColumnFileCodec"/>): a column decodes to exactly the

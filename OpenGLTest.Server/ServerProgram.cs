@@ -5,9 +5,13 @@ using System.IO;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Graphics;
+using VoxelEngine.Networking;
+using VoxelEngine.Saves;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Server;
 
 /// <summary>
 /// The dedicated server's entry point: loads content headlessly, asks which saved world to host (or

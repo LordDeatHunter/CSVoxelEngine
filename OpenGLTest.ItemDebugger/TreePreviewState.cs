@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace silkgltriangle;
+namespace VoxelEngine.ItemDebugger;
 
 /// <summary>
 /// GL-free state behind the item debugger's TREES tab: which <see cref="TreeSpecies"/> is

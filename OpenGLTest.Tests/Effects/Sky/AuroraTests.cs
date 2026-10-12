@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Sky;
 
 /// <summary>
 /// The aurora's fade and drift (<see cref="Aurora"/>, the twin of sky-fragment.glsl's), and the eye

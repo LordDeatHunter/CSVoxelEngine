@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// A worm-carved tunnel: its node spheres plus the bounding box enclosing all of them, so a

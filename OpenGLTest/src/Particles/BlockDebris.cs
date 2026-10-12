@@ -1,7 +1,10 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Graphics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Particles;
 
 /// <summary>
 /// One chunk of mining debris: a small cube textured as the block it broke off from.

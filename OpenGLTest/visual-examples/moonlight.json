@@ -3,7 +3,7 @@
 // both dark, so the light never pops. Run from OpenGLTest/, once per time, copying
 // visual/moonlight/ aside between runs:
 //   $env:VOXEL_SCRIPT='visual-examples/moonlight.json'; $env:VOXEL_TIME='<t>'
-//   bin/Release/net9.0/silkgltriangle.exe
+//   bin/Release/net9.0/VoxelEngine.exe
 // Times: 455 (the handover: the shots step through it ~3 s apart at the same pose, the sun
 // reaching the switch elevation at t ~467), 950 (a low moon: long shadows), 700 (the moon high),
 // 5450 (the same hour on day 4, a new moon: the dimmest moonlight).

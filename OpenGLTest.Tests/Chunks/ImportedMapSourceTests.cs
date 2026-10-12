@@ -2,10 +2,11 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Saves;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// The imported map (<see cref="ImportedMapSource"/>, written by <see cref="ImportedMapWriter"/>): a

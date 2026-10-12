@@ -5,8 +5,16 @@ using System.Numerics;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.Windowing;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Data;
+using VoxelEngine.Entities;
+using VoxelEngine.Interaction;
+using VoxelEngine.Juice;
+using VoxelEngine.Simulation;
+using VoxelEngine.UI;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>F5 camera modes, cycled FirstPerson -> Shoulder -> Orbit -> FirstPerson.</summary>
 public enum CameraMode

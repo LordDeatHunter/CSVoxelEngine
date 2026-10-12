@@ -1,8 +1,11 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Data;
+using VoxelEngine.Lod;
+using VoxelEngine.Networking;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The far-LOD wire codec: a server-built region mesh must survive the round trip exactly, since a

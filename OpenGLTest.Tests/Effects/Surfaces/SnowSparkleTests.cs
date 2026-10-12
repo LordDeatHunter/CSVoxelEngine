@@ -1,9 +1,10 @@
 using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
+using VoxelEngine.Graphics;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Surfaces;
 
 /// <summary>
 /// The snow glints in test-fragment.glsl light whole texels: each sits on a world-space grid of

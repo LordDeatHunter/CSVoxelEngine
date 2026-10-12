@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Data;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// <c>ChunkKey</c> is the pure, GL-free arithmetic the chunk dictionaries are rekeyed on, so

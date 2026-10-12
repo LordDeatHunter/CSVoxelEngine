@@ -1,7 +1,9 @@
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Items;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Items;
 
 /// <summary>
 /// The bandage's heal (<see cref="ItemUseAction.Heal"/> / <see cref="HealItem"/>): a hurt player

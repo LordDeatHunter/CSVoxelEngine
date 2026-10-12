@@ -1,9 +1,12 @@
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Lod;
+using VoxelEngine.Particles;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 /// <summary>
 /// A settling sand cube's dust: the rule sizing it by the fall (<see cref="LandingDust.FallingBlockCount"/>),

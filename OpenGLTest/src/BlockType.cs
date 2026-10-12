@@ -1,9 +1,24 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using silkgltriangle.Content;
+using VoxelEngine.Audio;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Entities;
+using VoxelEngine.Graphics;
+using VoxelEngine.Interaction;
+using VoxelEngine.Particles;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
 
-namespace silkgltriangle;
+namespace VoxelEngine;
 
 /// <summary>
 /// Everything the engine knows about one block, loaded from
@@ -439,7 +454,7 @@ public sealed record BlockType
     public bool CollidesByHitbox { get; init; }
 
     /// <summary>Loot rolled on break. Null means "drop yourself";
-    /// <see cref="silkgltriangle.LootTable.None"/> means "drop nothing".</summary>
+    /// <see cref="VoxelEngine.Content.Loot.LootTable.None"/> means "drop nothing".</summary>
     public LootTable? LootTable { get; init; }
 
     /// <summary>The block's model, baked to atlas-ready quads at startup.</summary>

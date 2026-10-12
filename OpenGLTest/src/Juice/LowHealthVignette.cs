@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Rendering;
+
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// The low-health warning: how strongly the screen edge pulses red, as a pure function of the

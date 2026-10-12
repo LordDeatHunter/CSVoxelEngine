@@ -1,8 +1,8 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Lighting;
 
 /// <summary>
 /// The small palette of block-light colors (SH-26). A block's JSON may declare

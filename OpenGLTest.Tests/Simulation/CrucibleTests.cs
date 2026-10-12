@@ -2,10 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.Simulation;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// The crucible: a vessel whose molten contents ride on its own item instance, the kiln slot it

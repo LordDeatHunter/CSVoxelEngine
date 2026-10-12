@@ -2,9 +2,10 @@ using System;
 using System.IO;
 using System.Numerics;
 using System.Text.Json;
+using VoxelEngine.ItemDebugger;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.ItemDebugger;
 
 public sealed class ItemJsonDisplayWriterTests : IDisposable
 {

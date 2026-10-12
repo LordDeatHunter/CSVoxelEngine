@@ -1,9 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Entities;
+using VoxelEngine.Particles;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Owns the live goblins and the stones they throw: ticks their AI and physics, spawns a stone

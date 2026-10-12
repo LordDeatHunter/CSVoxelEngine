@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.Juice;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Juice;
 
 /// <summary>
 /// The low-health edge pulse: nothing at or above the threshold, nothing while dead or in

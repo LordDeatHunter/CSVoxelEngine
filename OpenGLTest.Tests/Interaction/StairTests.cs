@@ -1,10 +1,11 @@
 using System;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.Interaction;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// Stairs take their facing from the placing player's look (<c>facingFromLook</c>): the four look

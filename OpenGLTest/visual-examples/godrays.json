@@ -2,7 +2,7 @@
 // clouds and gaps when the sun is in view. Run from OpenGLTest/, once per time, copying
 // visual/godrays/ aside between runs:
 //   $env:VOXEL_SCRIPT='visual-examples/godrays.json'; $env:VOXEL_TIME='<t>'
-//   bin/Release/net9.0/silkgltriangle.exe
+//   bin/Release/net9.0/VoxelEngine.exe
 // Times: 395 (the shots land ~15-25 s in, a low sun near the shafts' peak at yaw ~160, pitch ~11:
 // the meadow and over-canopy shots show beams fanning from the sun through the cloud gaps and over
 // the tree line), 425 (the sun reaches the horizon behind the trees during the run: the shafts

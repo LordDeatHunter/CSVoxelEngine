@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// A player a hostile mob can chase and hurt: the local <see cref="Camera"/> in singleplayer, or a

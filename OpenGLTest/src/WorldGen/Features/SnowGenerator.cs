@@ -1,6 +1,8 @@
 using System;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Shapes;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Cold weather: freezes a cold column's surface water into a walkable ice sheet and lays layered

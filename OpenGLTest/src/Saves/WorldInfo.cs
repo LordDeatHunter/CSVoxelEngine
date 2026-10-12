@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Chunks;
+
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// One saved world as <see cref="WorldStore"/> lists it: the metadata in its <c>world.json</c>

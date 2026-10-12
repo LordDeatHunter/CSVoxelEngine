@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Post;
 
 /// <summary>
 /// GL-free twin of the underwater screen wobble (post-fragment.glsl's <c>uUnderwater</c>): while the

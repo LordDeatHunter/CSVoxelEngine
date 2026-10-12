@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Linq;
+using VoxelEngine.Saves;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Saves;
 
 /// <summary>
 /// The dedicated server's choice of world source (<see cref="WorldSources.Create"/>): no name or

@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// The GL-free decision behind the per-pass GPU timer queries: given whether the <c>X</c> profiler

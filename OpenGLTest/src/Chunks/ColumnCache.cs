@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
-using static silkgltriangle.Chunk;
+using VoxelEngine.WorldGen;
+using static VoxelEngine.Chunks.Chunk;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// The process-global, seed-dependent column-data cache and the accessors over it, extracted

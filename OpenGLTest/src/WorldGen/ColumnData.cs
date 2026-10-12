@@ -1,4 +1,7 @@
-namespace silkgltriangle;
+using VoxelEngine.Chunks;
+using VoxelEngine.WorldGen.Features;
+
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// The 2D world generation inputs for one chunk column, every array indexed by

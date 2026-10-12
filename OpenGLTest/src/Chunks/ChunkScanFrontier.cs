@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using System.Threading;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// The shared resume point for the chunk-generation workers' closest-first offset scan

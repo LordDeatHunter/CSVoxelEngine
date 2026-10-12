@@ -1,7 +1,9 @@
 using System;
+using VoxelEngine.ItemDebugger;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 public sealed class PlayerModelJuiceTests
 {

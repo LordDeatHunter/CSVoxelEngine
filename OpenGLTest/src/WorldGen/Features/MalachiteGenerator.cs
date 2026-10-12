@@ -1,6 +1,7 @@
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Malachite ore veins: sparse large blobs where a low-frequency 3D OpenSimplex2 field

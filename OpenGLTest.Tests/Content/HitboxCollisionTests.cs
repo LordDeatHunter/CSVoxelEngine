@@ -2,10 +2,15 @@ using System;
 using System.Linq;
 using System.Numerics;
 using Silk.NET.Input;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Player;
+using VoxelEngine.VisualTest;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// The <c>collidesByHitbox</c> flag: a flagged block collides with its declared hitbox boxes

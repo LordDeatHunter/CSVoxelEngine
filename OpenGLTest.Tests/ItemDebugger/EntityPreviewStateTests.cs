@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Entities;
+using VoxelEngine.ItemDebugger;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.ItemDebugger;
 
 /// <summary>
 /// The item debugger's ENTITIES tab state: data-driven modes (one per authored clip plus HURT),
@@ -109,7 +111,7 @@ public sealed class EntityPreviewStateTests
         var walk = state.Animator.Find(EntityAnimator.WalkClip);
         Assert.NotNull(walk);
         var bones = new List<string>();
-        foreach (var bone in global::silkgltriangle.Goblin.RequiredParts)
+        foreach (var bone in global::VoxelEngine.Entities.Goblin.RequiredParts)
             if (walk!.Keys(bone)) bones.Add(bone);
         Assert.NotEmpty(bones);
 
@@ -134,7 +136,7 @@ public sealed class EntityPreviewStateTests
         var reference = new EntityAnimator(clips, WorldGenerationConfig.GoblinWalkSpeed);
         for (var i = 0; i < walkFrames + idleFrames; i++) reference.Update(Dt, 0f);
 
-        foreach (var bone in global::silkgltriangle.Goblin.RequiredParts)
+        foreach (var bone in global::VoxelEngine.Entities.Goblin.RequiredParts)
         {
             var d = Distance(state.Animator.LocalTransform(bone), reference.LocalTransform(bone));
             Assert.True(d < 1e-2f, $"Bone '{bone}' is {d} away from the idle pose after the walk faded.");

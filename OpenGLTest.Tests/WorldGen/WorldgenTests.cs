@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Lod;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen;
 
 // Shares a collection with TreeWorldgenTests so its shape-cache reset never lands between
 // TrunkShapeIsCachedAcrossChunks' two adjacent ShapeOf calls - that assertion compares the shapes

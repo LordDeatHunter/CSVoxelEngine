@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Menus;
 
 /// <summary>
 /// Pure screen layout of the main menu in canvas units (see <see cref="UiCanvas"/>; origin

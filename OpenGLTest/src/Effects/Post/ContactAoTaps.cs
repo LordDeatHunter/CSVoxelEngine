@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Post;
 
 /// <summary>The nine raw window depths the contact AO pass reads around one pixel
 /// (<see cref="ContactAo.Occlusion"/>): the centre, its four taps a tap radius away and its four

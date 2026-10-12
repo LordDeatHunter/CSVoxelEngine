@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// The loaded-chunk table, keyed internally on a packed <see cref="ChunkKey"/> <c>long</c> so a

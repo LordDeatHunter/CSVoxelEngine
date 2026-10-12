@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Shape;
 
 /// <summary>
 /// Turns a grown <see cref="TreeGraph"/> into the cells it writes: wood with its

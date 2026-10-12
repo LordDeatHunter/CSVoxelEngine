@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.ItemDebugger;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.ItemDebugger;
 
 /// <summary>
 /// The item debugger's timeline: speed x0..x4 in tenths, fixed-step stepping, loop on/off, and scrubbing that lands on

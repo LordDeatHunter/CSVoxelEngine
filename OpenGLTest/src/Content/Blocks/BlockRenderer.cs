@@ -1,4 +1,8 @@
-namespace silkgltriangle;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.WorldGen.Trees;
+
+namespace VoxelEngine.Content.Blocks;
 
 /// <summary>
 /// How a block turns into chunk geometry. <see cref="Model"/> emits the baked quads of its

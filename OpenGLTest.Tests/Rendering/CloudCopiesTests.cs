@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Data;
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// <c>CloudCopies</c> is the GL-free arithmetic behind the cloud layer's 3x3 sweep: the per-copy

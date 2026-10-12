@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// What the crosshair draws with this frame, GL-free: a throw's charge (the arms spread), a mined

@@ -1,8 +1,7 @@
 using System.Numerics;
-using silkgltriangle.Content;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The server's network capture must not clear a chunk's save-dirty flag (unlike the save

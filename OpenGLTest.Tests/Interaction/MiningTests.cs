@@ -1,8 +1,10 @@
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 public sealed class MiningTests
 {

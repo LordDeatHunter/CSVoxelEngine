@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// Static registry of every <see cref="TreeSpecies"/>, published once by

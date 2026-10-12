@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Sky;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Sky;
 
 /// <summary>SH-27: the shared wind is a unit heading that turns slowly, and its travelled offset is its integral.</summary>
 public sealed class WindTests

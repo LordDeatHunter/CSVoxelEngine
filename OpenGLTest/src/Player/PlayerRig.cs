@@ -3,8 +3,13 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Data;
+using VoxelEngine.Entities;
+using VoxelEngine.Graphics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>
 /// The shape being posed: one skin texture plus a pivot and pivot-relative cuboids per part,

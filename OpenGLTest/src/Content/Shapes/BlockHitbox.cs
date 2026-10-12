@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Shapes;
 
 /// <summary>
 /// One axis-aligned selection box in cell-local 0..1 space. A block lists one or more of

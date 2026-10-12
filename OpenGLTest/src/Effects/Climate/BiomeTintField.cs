@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Climate;
 
 /// <summary>
 /// One palette's vertex tint over a 16-block square: the tints at its four corners, interpolated

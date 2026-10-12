@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>
 /// The player's survival pool, 0-100 HP drawn as 10 hearts (1 heart = 10 HP).

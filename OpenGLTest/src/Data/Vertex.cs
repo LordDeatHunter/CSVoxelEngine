@@ -1,8 +1,11 @@
 using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using VoxelEngine.Chunks;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Data;
 
 /// <summary>
 /// The one vertex layout every textured mesh shares (chunks, LOD, drops, icons, UI, sun).
@@ -44,7 +47,7 @@ public struct Vertex
     public byte Normal;
 
     /// <summary>High byte of the attribute-5 ushort: bits 2-9 of the 10-bit block-light tint code
-    /// (<see cref="BlockTint"/>, <see cref="silkgltriangle.LightTint"/> layout: slot A, slot B and
+    /// (<see cref="BlockTint"/>, <see cref="VoxelEngine.Effects.Lighting.LightTint"/> layout: slot A, slot B and
     /// B's weight), which the world vertex shader decodes against the light palette.</summary>
     public byte LightTint;
 
@@ -211,7 +214,7 @@ public struct Vertex
         return a >= 253 ? (byte)255 : (byte)a;
     }
 
-    /// <summary>The 10-bit block-light tint code (<see cref="silkgltriangle.LightTint"/>), split
+    /// <summary>The 10-bit block-light tint code (<see cref="VoxelEngine.Effects.Lighting.LightTint"/>), split
     /// across <see cref="Normal"/> bits 6-7 and <see cref="LightTint"/>.</summary>
     public readonly int BlockTint => (Normal >> 6) | (LightTint << 2);
 

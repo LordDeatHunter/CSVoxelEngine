@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Logics;
 
 /// <summary>
 /// Cactus growth: a saguaro "pitchfork". A straight stem throws arms that leave it horizontally,

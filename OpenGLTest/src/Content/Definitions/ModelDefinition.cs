@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Definitions;
 
 /// <summary>
 /// JSON shape of a Minecraft Java block model — what BlockBench exports. Only the fields the

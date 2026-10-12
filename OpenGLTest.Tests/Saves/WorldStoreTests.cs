@@ -2,9 +2,10 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using VoxelEngine.Saves;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Saves;
 
 public sealed class WorldStoreTests : IDisposable
 {

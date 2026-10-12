@@ -5,7 +5,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>Where a connection attempt currently is.</summary>
 public enum NetworkStatus

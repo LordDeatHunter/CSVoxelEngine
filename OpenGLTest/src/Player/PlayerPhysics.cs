@@ -1,8 +1,10 @@
 using System;
 using System.Numerics;
 using Silk.NET.Input;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Shapes;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>
 /// The player's movement simulation, extracted from <see cref="Camera"/>: walk/fly/swim input

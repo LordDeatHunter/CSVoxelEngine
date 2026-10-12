@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Shape;
 
 /// <summary>Cross-section of a species' wood: the pixel footprint a thickness is rasterised to.</summary>
 public enum TrunkShape : byte

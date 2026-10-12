@@ -1,7 +1,8 @@
-using silkgltriangle.Content;
+using VoxelEngine.Networking;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The inventory wire codec: the mirror a client imports must match the server's inventory, since

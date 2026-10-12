@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.WorldGen.Trees.Logics;
+
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// One step of a growth pulse as an <see cref="IGrowthLogic"/> sees it: the node the signal

@@ -4,9 +4,13 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Data;
+using VoxelEngine.Networking;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// A multiplayer client meshes a streamed chunk exactly as the server's own worldgen-backed build

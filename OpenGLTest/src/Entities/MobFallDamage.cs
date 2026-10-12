@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// The mobs' fall-damage rule, GL-free: the mob counterpart of <see cref="PlayerHealth.FallDamage"/>,

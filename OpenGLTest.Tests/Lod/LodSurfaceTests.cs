@@ -1,10 +1,11 @@
 using System;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Lod;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>
 /// The LOD reflects the current terrain: <see cref="LodSurface"/> overrides record an edited

@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// The pond plants' placement rules over hand-built columns: a reed stands in the shallowest

@@ -1,4 +1,7 @@
-namespace silkgltriangle;
+using VoxelEngine.Player;
+using VoxelEngine.UI.InventoryPanel;
+
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// Restores health (a bandage): heals the player the use runs for by

@@ -1,10 +1,14 @@
 using System;
 using System.IO;
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Features;
+using VoxelEngine.WorldGen.Trees.Logics;
+using VoxelEngine.WorldGen.Trees.Shape;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Trees;
 
 /// <summary>
 /// The shipped tree species under <c>assets/data/trees</c>: they load at all, every reference

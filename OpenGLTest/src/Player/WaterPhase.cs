@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>
 /// How deep the player's body stands in a fluid, by the share of its height under the surface

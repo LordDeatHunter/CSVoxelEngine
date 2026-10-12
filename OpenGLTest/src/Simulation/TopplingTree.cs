@@ -3,8 +3,15 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Graphics;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// A felled tree: the wood a mined tree-wood cell held up (see <see cref="Collect"/>) and the

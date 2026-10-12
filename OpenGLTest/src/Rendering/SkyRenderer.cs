@@ -1,8 +1,11 @@
 using System;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.UI;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// The sky dome: one oversized full-screen triangle (the same shape

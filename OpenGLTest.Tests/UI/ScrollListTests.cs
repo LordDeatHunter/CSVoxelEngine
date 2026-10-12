@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.UI;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI;
 
 public sealed class ScrollListTests
 {

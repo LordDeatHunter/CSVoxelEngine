@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Graphics;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Graphics;
 
 /// <summary>
 /// <c>CutoutMipmap</c> is the GL-free half of the atlas's cutout mips: the level dimensions,

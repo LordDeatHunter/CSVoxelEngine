@@ -1,9 +1,9 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Interaction;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 public sealed class CombatTests
 {

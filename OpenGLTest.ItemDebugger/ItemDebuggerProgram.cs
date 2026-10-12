@@ -6,8 +6,12 @@ using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
+using VoxelEngine.Items;
+using VoxelEngine.Platform;
+using VoxelEngine.Player;
+using VoxelEngine.VisualTest;
 
-namespace silkgltriangle;
+namespace VoxelEngine.ItemDebugger;
 
 /// <summary>
 /// Standalone item-debugger entrypoint: a window showing the player model in its carrying pose

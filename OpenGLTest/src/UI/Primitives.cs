@@ -2,8 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.Data;
+using VoxelEngine.Graphics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI;
 
 /// <summary>
 /// Mesh factories for simple shapes, built in the same <see cref="Vertex"/> layout the world

@@ -4,9 +4,12 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Lod;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// One world's far-LOD edit state: the removal caps (<see cref="LodRegion.LowerColumnBelow"/>),

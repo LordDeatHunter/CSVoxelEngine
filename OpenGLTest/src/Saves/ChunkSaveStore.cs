@@ -4,9 +4,10 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// One world's chunk files (<c>&lt;world&gt;/chunks/&lt;cx&gt;_&lt;cy&gt;_&lt;cz&gt;.bin</c>, see

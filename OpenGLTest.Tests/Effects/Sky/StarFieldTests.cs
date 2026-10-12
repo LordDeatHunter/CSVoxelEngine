@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Sky;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Sky;
 
 /// <summary>
 /// The GL-free twin of the night sky's star field (<see cref="StarField"/>, the <c>Stars</c> term in

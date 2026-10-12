@@ -1,6 +1,8 @@
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.UI.Hud;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Hud;
 
 /// <summary>
 /// The held clock's rules (<see cref="Clock"/>): the day rolls over at midnight, the readout runs

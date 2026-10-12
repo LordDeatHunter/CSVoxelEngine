@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Definitions;
 
 /// <summary>JSON shape of <c>assets/data/recipes/cast/&lt;result&gt;.json</c>.</summary>
 public sealed class CastRecipeDefinition

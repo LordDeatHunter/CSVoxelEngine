@@ -1,8 +1,10 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// The cloud cover along a ray (<see cref="CloudCover"/>, the twin of <c>CloudCoverAlongRay</c> in

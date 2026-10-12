@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Data;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Lod;
 
 /// <summary>
 /// Coarse per-vertex sky exposure for the far LOD shells, baked into <see cref="Vertex.Sun"/>

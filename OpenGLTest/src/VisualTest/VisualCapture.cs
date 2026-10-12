@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Silk.NET.OpenGL;
 
-namespace silkgltriangle;
+namespace VoxelEngine.VisualTest;
 
 /// <summary>
 /// Reads the finished frame back from the GPU and writes it as a PNG. Called at the end of

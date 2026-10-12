@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// GL-free rules the mob managers share for choosing and touching their <see cref="IMobTarget"/>s:

@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// GL-free rules of a block two cells tall (a door, <c>upperHalf</c> in its JSON): a lower half,

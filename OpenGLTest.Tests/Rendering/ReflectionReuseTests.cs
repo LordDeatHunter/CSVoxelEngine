@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// <c>ReflectionReuse</c> is the GL-free gate in front of the planar water mirror: it decides

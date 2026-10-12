@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>What <see cref="MovementRules.Judge"/> made of one player state's position.</summary>
 public enum MoveVerdict

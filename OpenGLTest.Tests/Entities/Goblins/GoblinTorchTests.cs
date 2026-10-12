@@ -1,8 +1,10 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities.Goblins;
 
 /// <summary>
 /// The goblin torch rule (<see cref="GoblinTorches"/>): the carry chance is higher at night and

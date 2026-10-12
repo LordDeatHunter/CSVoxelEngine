@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// The two shadow cascades together: each steps its own centre on its own texel lattice, and the

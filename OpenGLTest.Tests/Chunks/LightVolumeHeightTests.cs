@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// ComputeLight is private and has no direct coverage: the mesh-level sun bytes asserted by

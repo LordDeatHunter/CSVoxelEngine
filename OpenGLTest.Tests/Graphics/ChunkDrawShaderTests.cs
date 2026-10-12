@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Graphics;
 
 /// <summary>
 /// The world and shadow vertex shaders each displace swaying vertices (canopy leaves, rooted

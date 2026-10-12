@@ -1,9 +1,11 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Entities;
+using VoxelEngine.Items;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities;
 
 public sealed class ThrownProjectileTests
 {

@@ -1,6 +1,6 @@
-using silkgltriangle.Content;
+using VoxelEngine.Content.Stations;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Recipes;
 
 /// <summary>
 /// One compiled melt recipe: what a crucible turns one unit of an input into. There is at most

@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
+using VoxelEngine.VisualTest;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The server's movement rubberband (<see cref="MovementRules"/>): everything the client's own

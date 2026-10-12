@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Rendering;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// <c>UITextCache</c> is the GL-free half of the HUD's per-frame text (PERF_TODO R8): the four

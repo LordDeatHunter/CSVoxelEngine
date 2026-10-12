@@ -4,10 +4,13 @@ using System.Linq;
 using System.Numerics;
 using System.Reflection;
 using Silk.NET.Input;
-using silkgltriangle.Content;
+using VoxelEngine.Data;
+using VoxelEngine.Player;
+using VoxelEngine.UI;
+using VoxelEngine.VisualTest;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 /// <summary>
 /// <see cref="Camera.GetViewProjection"/> is cached per distinct camera pose (PERF_TODO R7).
@@ -35,7 +38,7 @@ namespace silkgltriangle.Tests;
 /// <see cref="Camera.GetViewFrustum"/> (PERF_TODO R11) rides the same key and is refreshed in the
 /// same miss branch, replacing three independent <c>new Frustum(camera.GetViewProjection())</c>
 /// builds a frame in RenderWorld, CullWater and RenderLod. <see cref="Frustum"/> is a readonly
-/// struct of private <see cref="Plane"/> fields with no equality of its own, so the frustum facts
+/// struct of private <see cref="VoxelEngine.Data.Plane"/> fields with no equality of its own, so the frustum facts
 /// compare BEHAVIOUR: <c>IntersectsAABB</c> over a grid of boxes around the camera, against a
 /// frustum freshly built from the oracle matrix, requiring both an accepted and a rejected box so
 /// the comparison cannot pass vacuously.

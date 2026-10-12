@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// The live-world tree space: whether reactive growth may write into a cell of the loaded world,

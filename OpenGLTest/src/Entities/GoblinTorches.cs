@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Effects.Sky;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// The goblin torch rule, GL-free: how many torches a spawn carries (0, 1 or 2) from one uniform

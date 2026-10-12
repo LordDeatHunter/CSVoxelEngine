@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// <c>GeometryAllocator</c> is the first-fit free list behind the shared chunk geometry buffers.

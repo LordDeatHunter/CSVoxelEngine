@@ -1,6 +1,7 @@
+using VoxelEngine.Graphics;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Graphics;
 
 /// <summary>
 /// <c>Shader.InjectDefines</c> lets one GLSL file be compiled as two program variants (the plain

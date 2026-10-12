@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Chunks;
+using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// A tree space with no block storage behind it: the terrain is a height delegate (every cell at

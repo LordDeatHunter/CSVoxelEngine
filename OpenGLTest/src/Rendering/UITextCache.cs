@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// The per-frame HUD string formatting, memoised (PERF_TODO R8). The FPS line, the compass

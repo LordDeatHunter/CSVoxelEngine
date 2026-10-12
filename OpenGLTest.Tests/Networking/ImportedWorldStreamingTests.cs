@@ -4,10 +4,17 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Data;
+using VoxelEngine.Lod;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.Saves;
+using VoxelEngine.Server;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// An imported world end to end over the real server path: a server-mode <see cref="World"/> built

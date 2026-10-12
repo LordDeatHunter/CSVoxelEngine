@@ -1,8 +1,12 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Entities;
+using VoxelEngine.Particles;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 /// <summary>
 /// The mob death poof (<see cref="GroundDust.DeathPoof"/>): a mob whose death animation ends bursts

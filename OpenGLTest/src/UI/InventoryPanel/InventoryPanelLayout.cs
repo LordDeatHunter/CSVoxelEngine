@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
+using VoxelEngine.UI.Menus;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>What part of the inventory list's scrollbar a point lands on.</summary>
 public enum ScrollbarHit

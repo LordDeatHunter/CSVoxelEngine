@@ -1,8 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Data;
+using VoxelEngine.Lod;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>
 /// <see cref="LodSkyExposure"/> is the coarse skylight the far LOD shells bake into

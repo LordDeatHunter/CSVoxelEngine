@@ -1,7 +1,9 @@
 using System.Linq;
+using VoxelEngine.Lod;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>
 /// Covers item C9: LOD column height caps are bucketed by chunk column and resolved once per

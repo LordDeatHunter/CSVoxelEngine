@@ -1,9 +1,13 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Entities;
+using VoxelEngine.Graphics;
+using VoxelEngine.Particles;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 /// <summary>
 /// The landing dust: the rule that sizes a puff from the fall (<see cref="LandingDust"/>), the

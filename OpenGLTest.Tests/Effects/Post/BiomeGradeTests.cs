@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Post;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Post;
 
 /// <summary>
 /// The biome color grade (<see cref="BiomeGrade"/>): neutral in the temperate lands, warm only where

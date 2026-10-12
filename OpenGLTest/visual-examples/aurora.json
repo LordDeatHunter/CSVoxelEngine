@@ -2,7 +2,7 @@
 // night dome, seen only from cold lands. Run from OpenGLTest/ at night, copying visual/aurora/ aside
 // between runs:
 //   $env:VOXEL_SCRIPT='visual-examples/aurora.json'; $env:VOXEL_TIME='700'
-//   bin/Release/net9.0/silkgltriangle.exe
+//   bin/Release/net9.0/VoxelEngine.exe
 // Times: 700 night (the curtains), 147 noon (none, whatever the climate).
 // The cold spot is snow-sparkle.json's barren frozen plain (-1112, 584), ground 18 (WorldSeed.Default).
 // The coldness at the eye is eased, so each arrival waits for it to settle; the last shot flies back

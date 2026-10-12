@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// One HUD toast line (a day change, a first pickup, a full inventory): a text with a hold-then-fade

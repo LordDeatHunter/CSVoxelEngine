@@ -1,8 +1,10 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities.Goblins;
 
 /// <summary>
 /// Goblin stones hitting mobs: a stone in flight strikes a goblin or a slime in its way (never its

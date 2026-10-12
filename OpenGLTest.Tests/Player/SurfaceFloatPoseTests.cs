@@ -1,8 +1,10 @@
 using System;
 using System.Numerics;
+using VoxelEngine.ItemDebugger;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 /// <summary>
 /// The player's surface-float pose (<see cref="PlayerModel"/> with <c>floating</c>): upright and straight

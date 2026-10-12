@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// <see cref="ShadowCascade.StepCentre"/> carries the shadow box's centre forward frame to

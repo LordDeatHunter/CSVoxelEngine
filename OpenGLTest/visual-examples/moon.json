@@ -2,7 +2,7 @@
 // the day's phase shaded over it, the stars hidden behind it, and the moon in the water mirror and
 // in the Snell window. Run from OpenGLTest/, once per time, copying visual/moon/ aside between runs:
 //   $env:VOXEL_SCRIPT='visual-examples/moon.json'; $env:VOXEL_TIME='<t>'
-//   bin/Release/net9.0/silkgltriangle.exe
+//   bin/Release/net9.0/VoxelEngine.exe
 // Times: 700 (night of day 0: full), 1900 (day 1: waning gibbous), 3100 (day 2: last quarter, the
 // left half lit), 4300 (day 3: waning crescent), 5500 (day 4: new, only the earthshine), 7900
 // (day 6: first quarter, the right half lit). Each is the same hour, so the moon stands in the same

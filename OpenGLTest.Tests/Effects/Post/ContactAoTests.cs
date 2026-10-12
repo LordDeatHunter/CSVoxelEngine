@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Effects.Post;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Post;
 
 /// <summary>
 /// <see cref="ContactAo"/> mirrors contact-ao-fragment.glsl. Scenes are analytic surfaces seen

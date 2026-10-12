@@ -1,6 +1,7 @@
+using VoxelEngine.UI.Hud;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Hud;
 
 /// <summary>
 /// The crosshair's hit marker (<see cref="HitMarker"/>): a hit flashes it full, it fades out over

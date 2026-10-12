@@ -1,7 +1,13 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Entities;
+using VoxelEngine.Items;
+using VoxelEngine.Player;
+using VoxelEngine.Saves;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// One connected player as the server tracks it: its own <see cref="Inventory"/> (never shared with

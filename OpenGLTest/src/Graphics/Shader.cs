@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Graphics;
 
 public class Shader : IDisposable
 {

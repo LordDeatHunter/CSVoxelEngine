@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// GL-free support rule of the <see cref="BlockType.NeedsSupport"/> blocks, shared by placement,

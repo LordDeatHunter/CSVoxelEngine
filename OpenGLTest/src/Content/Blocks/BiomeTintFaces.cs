@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.Effects.Climate;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Blocks;
 
 /// <summary>
 /// A biome-tinted block's resolved faces (<see cref="BlockType.BiomeTint"/>): per face, the

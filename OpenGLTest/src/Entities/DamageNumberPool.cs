@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// The floating damage numbers over struck mobs, in one fixed array: a hit claims a free slot, or

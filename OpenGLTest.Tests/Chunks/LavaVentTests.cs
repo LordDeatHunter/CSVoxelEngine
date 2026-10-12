@@ -1,9 +1,9 @@
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// Hot-fluid vents are the ember/smoke spawn points over exposed lava: a glowing fluid cell

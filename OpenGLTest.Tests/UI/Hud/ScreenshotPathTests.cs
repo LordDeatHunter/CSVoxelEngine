@@ -1,8 +1,10 @@
 using System;
 using System.IO;
+using VoxelEngine.Saves;
+using VoxelEngine.UI.Hud;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Hud;
 
 /// <summary>
 /// F2's screenshot naming (<see cref="ScreenshotPaths"/>): a timestamped PNG in a folder beside the

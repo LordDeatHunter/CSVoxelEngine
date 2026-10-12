@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Climate;
 
 /// <summary>
 /// One mesh build's tint fields, both palettes, which come out of one climate evaluation per

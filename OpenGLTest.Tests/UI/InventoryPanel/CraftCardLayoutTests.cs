@@ -1,9 +1,12 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.UI;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.InventoryPanel;
 
 public sealed class CraftCardLayoutTests
 {

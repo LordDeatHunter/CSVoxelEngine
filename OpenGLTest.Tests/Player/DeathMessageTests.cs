@@ -1,6 +1,7 @@
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 /// <summary>
 /// The death message (<see cref="DeathMessages"/>): the line names the killer for a mob, and the

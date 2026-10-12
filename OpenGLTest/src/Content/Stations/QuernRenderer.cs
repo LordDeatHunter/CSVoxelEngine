@@ -1,4 +1,7 @@
-namespace silkgltriangle;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Simulation;
+
+namespace VoxelEngine.Content.Stations;
 
 /// <summary>
 /// Split convention for the quern block: its model leaves an air gap between the static

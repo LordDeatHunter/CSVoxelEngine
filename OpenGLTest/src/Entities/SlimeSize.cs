@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Effects.Sky;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// GL-free per-size slime rules. A slime's size is an integer from <see cref="Min"/> to

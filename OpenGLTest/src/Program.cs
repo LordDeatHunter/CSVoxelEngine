@@ -9,9 +9,21 @@ using System.Runtime;
 using System.Threading;
 using Silk.NET.Input;
 using Silk.NET.Maths;
-using silkgltriangle.Content;
+using VoxelEngine.Audio;
+using VoxelEngine.Content;
+using VoxelEngine.Interaction;
+using VoxelEngine.Networking;
+using VoxelEngine.Platform;
+using VoxelEngine.Player;
+using VoxelEngine.Rendering;
+using VoxelEngine.Saves;
+using VoxelEngine.UI;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.UI.Menus;
+using VoxelEngine.VisualTest;
 
-namespace silkgltriangle;
+namespace VoxelEngine;
 
 /// <summary>
 /// Entry point and window wiring. The game boots to the main menu (<see cref="MainMenuController"/>)

@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Trees;
 
 public sealed class LeafStateTests
 {

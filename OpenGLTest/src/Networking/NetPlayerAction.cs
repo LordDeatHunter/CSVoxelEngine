@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// The swing a player just made, as the server rebroadcasts it in each player list entry

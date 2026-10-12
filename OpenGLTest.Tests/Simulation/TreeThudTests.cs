@@ -1,10 +1,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Particles;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// A felled tree's thud: <see cref="TopplingTree"/> reports the moment it swings flat exactly once

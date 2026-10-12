@@ -2,10 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Graphics;
+using VoxelEngine.Items;
+using VoxelEngine.Simulation;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// The cast-mold pipeline end to end, asserted through the baked tables rather than the JSON:

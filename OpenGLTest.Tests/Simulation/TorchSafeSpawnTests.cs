@@ -1,8 +1,8 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// Torch-safe ground (<see cref="MobSpawner.IsLitByBlocks"/>): a ring spawn never lands where block

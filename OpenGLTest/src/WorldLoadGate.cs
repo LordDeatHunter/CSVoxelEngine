@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine;
 
 /// <summary>
 /// Decides when a loading world may start playing: every chunk inside a sphere of

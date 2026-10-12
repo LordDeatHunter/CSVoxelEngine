@@ -2,9 +2,13 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Networking;
+using VoxelEngine.Saves;
+using VoxelEngine.UI;
+using VoxelEngine.UI.Menus;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Menus;
 
 public sealed class MainMenuControllerTests : IDisposable
 {

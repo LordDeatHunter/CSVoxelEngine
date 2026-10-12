@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Data;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// <c>Chunk.WorldMin</c> / <c>Chunk.WorldMax</c> are the world-space corners of a chunk's cell,

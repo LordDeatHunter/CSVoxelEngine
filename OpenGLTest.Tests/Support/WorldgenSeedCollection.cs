@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Support;
 
 /// <summary>
 /// Tests that swap the process-global world seed (<see cref="WorldSeed.Apply"/>). The seed and

@@ -1,9 +1,9 @@
 using System.IO;
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Graphics;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Graphics;
 
 /// <summary>
 /// The reflective-ore material path. These cover the data half end to end — the block JSON

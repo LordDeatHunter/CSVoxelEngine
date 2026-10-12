@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Surfaces;
 
 /// <summary>
 /// GL-free twin of the lava glow pulse in test-fragment.glsl: the lava surface breathes in

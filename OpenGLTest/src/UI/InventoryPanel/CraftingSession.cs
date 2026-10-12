@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Content.Recipes;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>
 /// The crafting tab's working state: which recipe is open, how many copies are wanted, and

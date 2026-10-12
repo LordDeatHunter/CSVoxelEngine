@@ -3,7 +3,7 @@ using System.Linq;
 using Silk.NET.Input;
 using Silk.NET.Windowing;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Platform;
 
 public class InputManager : IDisposable
 {

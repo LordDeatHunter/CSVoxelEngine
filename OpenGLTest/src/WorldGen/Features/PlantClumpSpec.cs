@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// The shape of one clumped plant scatter for <see cref="PlantClumps"/>: at most one clump per

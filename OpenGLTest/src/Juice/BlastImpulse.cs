@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// The shove a TNT blast gives a loose thing in range, GL-free: a velocity change in blocks per

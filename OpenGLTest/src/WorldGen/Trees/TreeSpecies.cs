@@ -1,6 +1,9 @@
 using System.Collections.Generic;
+using VoxelEngine.WorldGen.Trees.Features;
+using VoxelEngine.WorldGen.Trees.Logics;
+using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// One compiled, immutable tree species (<c>assets/data/trees/&lt;name&gt;.json</c> through

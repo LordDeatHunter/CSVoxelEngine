@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Post;
 
 /// <summary>
 /// The C# twin of <c>post-fragment.glsl</c>'s tonemap, used only by tests: exposure, then a

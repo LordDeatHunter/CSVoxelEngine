@@ -1,8 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Entities;
+using VoxelEngine.Interaction;
+using VoxelEngine.Juice;
+using VoxelEngine.Lod;
+using VoxelEngine.Particles;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Owns the live primed TNT: spawns cubes where firestarter strikes and blasts light TNT,

@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// A token bucket: <see cref="TryTake"/> succeeds while tokens are left, and the bucket refills at a

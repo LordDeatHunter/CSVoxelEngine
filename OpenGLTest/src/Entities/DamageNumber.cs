@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// One floating damage number in a <see cref="DamageNumberPool"/>: where it started, the damage it

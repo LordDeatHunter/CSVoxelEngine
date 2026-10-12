@@ -1,9 +1,10 @@
 using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using static silkgltriangle.Chunk;
+using VoxelEngine.Effects.Lighting;
+using static VoxelEngine.Chunks.Chunk;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// GL-free voxel lighting: the wide light-volume BFS flood (sun + coloured lamp light) and the

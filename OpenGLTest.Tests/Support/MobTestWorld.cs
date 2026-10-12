@@ -1,7 +1,6 @@
 using System.Numerics;
-using silkgltriangle.Content;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Support;
 
 /// <summary>Small headless worlds the mob tests (slimes, goblins) stand their bodies in.</summary>
 internal static class MobTestWorld

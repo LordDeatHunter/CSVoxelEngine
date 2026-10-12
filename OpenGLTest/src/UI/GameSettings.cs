@@ -1,8 +1,9 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using VoxelEngine.UI.Menus;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI;
 
 /// <summary>
 /// Mutable player-facing settings with JSON persistence, shadowing the

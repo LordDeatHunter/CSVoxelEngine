@@ -1,6 +1,7 @@
+using VoxelEngine.Effects.Water;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Water;
 
 /// <summary>
 /// The sun glitter on water (<see cref="WaterGlitter"/>, the twin of the term in test-fragment.glsl):

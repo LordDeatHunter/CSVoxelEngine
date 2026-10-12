@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// The shared eviction policy behind the deterministic worldgen caches (PERF_TODO D2). Replaces the

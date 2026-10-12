@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Water;
 
 /// <summary>
 /// GL-free twin of the sun glitter on water in test-fragment.glsl: the water plane is cut into

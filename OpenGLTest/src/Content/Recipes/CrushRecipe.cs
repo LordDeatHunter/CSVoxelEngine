@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Recipes;
 
 /// <summary>One compiled quern recipe: crushable input and the crushed result.</summary>
 public sealed class CrushRecipe

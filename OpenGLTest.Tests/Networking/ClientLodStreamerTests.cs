@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Lod;
+using VoxelEngine.Networking;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The client's far-LOD request pacing: never more than the in-flight cap outstanding, no region

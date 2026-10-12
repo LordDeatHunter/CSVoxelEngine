@@ -1,6 +1,7 @@
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 /// <summary>
 /// The sprint latch (<see cref="SprintToggle"/>): off, it follows the key; on, each fresh press

@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// One inventory intent a client sends (<see cref="NetMessage.InventoryRequest"/>): what the player

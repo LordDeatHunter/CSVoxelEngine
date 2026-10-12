@@ -2,7 +2,7 @@
 // desert, a cool one over the snow and nothing in the temperate lands, eased across a border. Run
 // from OpenGLTest/ at noon:
 //   $env:VOXEL_SCRIPT='visual-examples/biome-grade.json'; $env:VOXEL_TIME='147'
-//   bin/Release/net9.0/silkgltriangle.exe
+//   bin/Release/net9.0/VoxelEngine.exe
 // The grade is a few percent, so compare the plain sky in the top of each shot (the dome is the same
 // color everywhere at noon): warmer over the dunes, bluer over the snow than at the origin.
 // Spots (WorldGenerationConfig.Seed default): a deep desert at (256, 0), ground 9 (a headless probe: warmth 1, wetness 0), the

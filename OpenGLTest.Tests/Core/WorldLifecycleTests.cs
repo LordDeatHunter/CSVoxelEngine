@@ -5,9 +5,14 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
+using VoxelEngine.Saves;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Core;
 
 /// <summary>
 /// The World lifecycle on the headless path: a storeless world plays at once, a store-backed one

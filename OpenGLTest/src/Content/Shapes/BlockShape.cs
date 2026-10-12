@@ -1,4 +1,8 @@
-namespace silkgltriangle;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Interaction;
+
+namespace VoxelEngine.Content.Shapes;
 
 /// <summary>
 /// The one resolver of a cell's boxes from the live world, shared by the raycast, the hover

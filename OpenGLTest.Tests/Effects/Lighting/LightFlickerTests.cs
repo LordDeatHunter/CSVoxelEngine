@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Effects.Lighting;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Lighting;
 
 /// <summary>The per-cell campfire flicker phase and curve (<c>LightFlicker</c>).</summary>
 public sealed class LightFlickerTests

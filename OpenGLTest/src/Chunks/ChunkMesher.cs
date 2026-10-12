@@ -2,10 +2,19 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Numerics;
-using static silkgltriangle.Chunk;
-using static silkgltriangle.ChunkLighting;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
+using static VoxelEngine.Chunks.Chunk;
+using static VoxelEngine.Chunks.ChunkLighting;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// GL-free chunk mesh emission extracted from <see cref="Chunk"/>: the binary greedy pass

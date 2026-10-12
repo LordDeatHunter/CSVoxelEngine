@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Networking;
+
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// Where a hosted world keeps each multiplayer player: one <see cref="PlayerSaveCodec"/>-shaped

@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Concurrent;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Interaction;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// A goblin: a short forest raider that lobs the flint it carries at the player from a

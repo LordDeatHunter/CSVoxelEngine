@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Saves;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// An <see cref="IWorldSource"/> that reads a pre-built map instead of generating it: a folder

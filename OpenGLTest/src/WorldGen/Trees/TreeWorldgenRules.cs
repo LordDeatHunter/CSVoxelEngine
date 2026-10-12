@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// Where worldgen plants a <see cref="TreeSpecies"/>: the biomes it grows in and the per-column

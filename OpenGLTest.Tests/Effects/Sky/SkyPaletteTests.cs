@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Sky;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Sky;
 
 /// <summary>
 /// The sky palette and its C# reference sampler (the GLSL SkySample twins transcribe it):

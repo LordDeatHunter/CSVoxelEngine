@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.WorldGen.Trees;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// The saplings planted in the world (an acorn, or any <see cref="ItemUseAction.PlantTree"/> use),

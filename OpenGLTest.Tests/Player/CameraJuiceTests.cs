@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 public sealed class CameraJuiceTests
 {

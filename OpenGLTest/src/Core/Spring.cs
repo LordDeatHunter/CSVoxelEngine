@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Core;
 
 /// <summary>
 /// A damped spring that carries its own velocity, for jiggle and overshoot (slime squash, hit

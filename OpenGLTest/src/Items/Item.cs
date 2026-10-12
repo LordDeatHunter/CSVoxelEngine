@@ -1,8 +1,13 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Interaction;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Items;
 
 /// <summary>How a spritesheet item picks its frame each draw.</summary>
 public enum ItemAnimationMode

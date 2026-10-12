@@ -1,6 +1,7 @@
 using System.Linq;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// Puts a crucible into an <see cref="Inventory"/> <em>with its contents</em>. Taking a vessel

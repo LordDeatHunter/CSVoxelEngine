@@ -1,6 +1,8 @@
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// Ledge caution, GL-free (main thread: it reads the live chunk map): how far the ground lies under a

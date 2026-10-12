@@ -1,8 +1,12 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Entities;
+using VoxelEngine.Juice;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Juice;
 
 /// <summary>
 /// The hit-stop on a landed punch or slice: a swing that connected holds at its impact pose for a

@@ -1,8 +1,8 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Interaction;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// The sight-only ray walk (<see cref="BlockType.BlocksSightAt"/>): a punch, a slice or a goblin's

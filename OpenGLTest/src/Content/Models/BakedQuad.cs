@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Models;
 
 /// <summary>
 /// One textured quad of a baked model, in cell-local space (0..1 across the block).

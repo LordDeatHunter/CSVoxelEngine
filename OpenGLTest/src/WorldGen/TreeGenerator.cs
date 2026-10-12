@@ -3,8 +3,13 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using VoxelEngine.Chunks;
+using VoxelEngine.Lod;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// The worldgen front-end over the tree growth engine (<see cref="TreeGrower"/>): decides which

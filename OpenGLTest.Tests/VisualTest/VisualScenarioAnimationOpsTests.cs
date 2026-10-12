@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.VisualTest;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.VisualTest;
 
 public sealed class VisualScenarioAnimationOpsTests
 {

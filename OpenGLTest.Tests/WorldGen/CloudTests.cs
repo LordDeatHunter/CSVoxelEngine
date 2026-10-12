@@ -2,10 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using VoxelEngine.WorldGen;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen;
 
 public sealed class CloudTests(ITestOutputHelper output)
 {

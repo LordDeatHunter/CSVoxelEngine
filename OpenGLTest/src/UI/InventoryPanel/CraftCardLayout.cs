@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Content.Recipes;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>What part of the crafting detail card a click landed on.</summary>
 public enum CraftHitKind

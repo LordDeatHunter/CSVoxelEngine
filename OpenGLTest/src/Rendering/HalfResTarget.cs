@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// The GL-free sizing arithmetic behind the half-resolution underwater-rays render target: given a

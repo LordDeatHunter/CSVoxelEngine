@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Trees;
 
 /// <summary>
 /// Freeness rules of <see cref="WorldTreeSpace"/>: growth may write only into air or the species'

@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>
 /// Memoises the crafting card's <see cref="CraftCardLayout"/>, so the word wrap and every text

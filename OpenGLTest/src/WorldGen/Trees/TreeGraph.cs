@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// The virtual node graph one tree grows in before it is rasterised: one node per wood cell,

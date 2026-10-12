@@ -1,11 +1,10 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
-using silkgltriangle.Content;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// A MEASUREMENT HARNESS for the chunk mesh build, not a regression guard. It prints the mean

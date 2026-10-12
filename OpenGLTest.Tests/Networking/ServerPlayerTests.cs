@@ -1,10 +1,12 @@
 using System;
 using System.IO;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.Saves;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// A hosted world keeps each multiplayer player in its own file: a player saved and loaded again

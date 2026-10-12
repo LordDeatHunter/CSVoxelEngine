@@ -1,6 +1,8 @@
 using System;
+using VoxelEngine.Chunks;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Climate;
 
 /// <summary>
 /// GL-free climate at an arbitrary world column, read from an <see cref="IColumnSource"/>'s stored

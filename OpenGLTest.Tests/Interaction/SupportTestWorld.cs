@@ -2,10 +2,13 @@ using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Data;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// A headless server-mode <see cref="World"/> over a flat stone plateau, for edit tests that need

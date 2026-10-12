@@ -1,9 +1,10 @@
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities.Slimes;
 
 /// <summary>
 /// The slime merge (<see cref="SlimeMerge"/>): two touching slimes of one size become one of the next

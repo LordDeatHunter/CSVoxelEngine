@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using StbImageSharp;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Graphics;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Climate;
 
 /// <summary>
 /// The textureless tiles a biome tint draws: every tinted tile is pure grey at the one grey

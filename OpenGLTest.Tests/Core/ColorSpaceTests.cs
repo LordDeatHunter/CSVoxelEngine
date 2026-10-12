@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Post;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Core;
 
 /// <summary>
 /// <see cref="ColorSpace"/> is the exact sRGB transfer pair the linear pipeline decodes CPU

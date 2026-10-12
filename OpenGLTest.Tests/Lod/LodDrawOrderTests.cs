@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Lod;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>
 /// Since R10 the LOD passes submit through <c>ChunkDrawBatch</c>, and

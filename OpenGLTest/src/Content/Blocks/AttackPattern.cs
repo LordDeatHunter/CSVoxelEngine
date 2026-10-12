@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Interaction;
+
+namespace VoxelEngine.Content.Blocks;
 
 /// <summary>
 /// How a left-click attack behaves, from the optional <c>attack</c> field of

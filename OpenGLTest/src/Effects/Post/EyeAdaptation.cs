@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Post;
 
 /// <summary>
 /// GL-free eye adaptation: the tonemap exposure eases up in a dark cave and back down outside. The

@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Entities;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities;
 
 /// <summary>
 /// Floating damage numbers: the fixed pool (one number per hit, never more than its capacity, the

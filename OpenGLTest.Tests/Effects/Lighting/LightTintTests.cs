@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Lighting;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Lighting;
 
 /// <summary>
 /// The per-corner block-light tint code: how four (level, slot) light samples, or a per-slot

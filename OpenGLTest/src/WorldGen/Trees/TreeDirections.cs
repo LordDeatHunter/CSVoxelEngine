@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// The six face directions a tree grows along, in <c>Chunk.CubeFaces</c> order (0 -Z, 1 +Z,

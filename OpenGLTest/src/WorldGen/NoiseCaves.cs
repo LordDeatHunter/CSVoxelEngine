@@ -1,8 +1,9 @@
 using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// 3D-noise caves: "cheese" rooms where a low-frequency field is high, "spaghetti" tunnels along

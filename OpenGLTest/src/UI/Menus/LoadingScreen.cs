@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Menus;
 
 /// <summary>What the full-screen loading overlay is announcing.</summary>
 public enum LoadingScreenKind

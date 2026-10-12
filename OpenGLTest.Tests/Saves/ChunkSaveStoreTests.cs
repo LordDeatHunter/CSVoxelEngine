@@ -1,10 +1,10 @@
 using System;
 using System.IO;
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Saves;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Saves;
 
 /// <summary>
 /// <see cref="ChunkSaveStore"/>: an enqueued chunk is readable at once from memory and after the

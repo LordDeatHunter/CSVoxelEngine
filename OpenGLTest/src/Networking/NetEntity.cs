@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Entities;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>What a <see cref="NetEntity"/> entry is.</summary>
 public enum NetEntityKind : byte

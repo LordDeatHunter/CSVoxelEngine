@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.UI.Menus;
+
+namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>
 /// GL-free contents and cursor of one dropdown search field: the typed query, the highlighted

@@ -1,7 +1,6 @@
 using System;
-using silkgltriangle.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Recipes;
 
 /// <summary>One compiled crafting recipe: what it makes and what one craft consumes.</summary>
 public sealed class CraftingRecipe

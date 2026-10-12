@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Items;
+using VoxelEngine.Saves;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.InventoryPanel;
 
 /// <summary>
 /// The inventory's save seam: <see cref="Inventory.Export"/> and <see cref="Inventory.Import"/>

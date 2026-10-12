@@ -1,6 +1,9 @@
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Interaction;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Shapes;
 
 /// <summary>
 /// The geometry of a multiblock's 2x2x2 volume: how a point, a direction or a whole baked model

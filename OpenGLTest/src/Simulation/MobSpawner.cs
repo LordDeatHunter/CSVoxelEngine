@@ -1,7 +1,11 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// The surface spawn search shared by every mob manager: samples a ring around the player and

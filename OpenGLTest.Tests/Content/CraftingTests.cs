@@ -1,7 +1,8 @@
-using silkgltriangle.Content;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 public sealed class CraftingTests
 {

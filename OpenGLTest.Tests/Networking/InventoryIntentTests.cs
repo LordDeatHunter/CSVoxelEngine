@@ -1,9 +1,12 @@
 using System;
 using System.IO;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.Networking;
+using VoxelEngine.Saves;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The inventory intents a client sends the server: every action reads back exactly what was

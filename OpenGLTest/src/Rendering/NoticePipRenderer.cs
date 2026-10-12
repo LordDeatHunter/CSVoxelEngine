@@ -2,8 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Data;
+using VoxelEngine.Entities;
+using VoxelEngine.Graphics;
+using VoxelEngine.UI;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Draws the "!" a goblin pops over its head the moment it first notices a player, through the

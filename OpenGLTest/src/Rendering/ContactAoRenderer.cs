@@ -2,8 +2,9 @@ using System;
 using System.Numerics;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using VoxelEngine.Effects.Post;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// The screen-space contact AO pass (SH-28, contact-ao-fragment.glsl, twin <see cref="ContactAo"/>):

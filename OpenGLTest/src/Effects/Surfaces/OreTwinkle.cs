@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Surfaces;
 
 /// <summary>
 /// GL-free twin of the ore twinkle in test-fragment.glsl: on the reflective tiles (a non-zero

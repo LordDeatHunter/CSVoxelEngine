@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Shape;
 
 /// <summary>The volume a species' leaf cluster fills around a branch tip.</summary>
 public enum LeafClusterShape : byte

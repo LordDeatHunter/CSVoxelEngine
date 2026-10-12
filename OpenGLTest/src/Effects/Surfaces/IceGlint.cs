@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Effects.Water;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Surfaces;
 
 /// <summary>
 /// GL-free twin of the ice term in test-fragment.glsl, a separate tile term on the ice block's

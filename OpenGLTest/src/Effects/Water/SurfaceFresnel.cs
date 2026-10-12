@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Water;
 
 /// <summary>
 /// GL-free twin of the surface fresnel terms in test-fragment.glsl: the shared <c>Schlick</c>

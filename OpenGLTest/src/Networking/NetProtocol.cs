@@ -4,7 +4,7 @@ using System.IO;
 using System.Numerics;
 using System.Text;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>The message id on the wire (the first byte of every framed payload).</summary>
 public enum NetMessage : byte
@@ -58,7 +58,7 @@ public enum NetMessage : byte
     InventoryState = 70,
     /// <summary>Client to server: a sequence id and an <see cref="InventoryIntent"/>.</summary>
     InventoryRequest = 71,
-    /// <summary>Client to server: a <see cref="silkgltriangle.WorldIntent"/> (break, place, use,
+    /// <summary>Client to server: a <see cref="VoxelEngine.Networking.WorldIntent"/> (break, place, use,
     /// throw, attack) with its sequence id (<see cref="WorldIntentCodec"/>).</summary>
     WorldIntent = 80,
     /// <summary>Server to one client: the sequence id of an intent and whether it was accepted.
@@ -100,7 +100,7 @@ public static class NetFraming
     /// <see cref="NetMessage.PlayerCorrection"/> that every following
     /// <see cref="NetMessage.PlayerState"/> acks; and a respawn is a
     /// <see cref="NetIntentKind.Respawn"/> world intent. 5: a column answer is the whole
-    /// <see cref="silkgltriangle.ColumnTerrain"/> (heights, water levels, corner climate), so a
+    /// <see cref="VoxelEngine.Chunks.ColumnTerrain"/> (heights, water levels, corner climate), so a
     /// client derives nothing from worldgen. 6: <see cref="NetMessage.EntityList"/> also carries
     /// primed TNT and falling blocks (<see cref="NetEntityKind.PrimedTnt"/>,
     /// <see cref="NetEntityKind.FallingBlock"/>), which a client draws as display-only mirrors.

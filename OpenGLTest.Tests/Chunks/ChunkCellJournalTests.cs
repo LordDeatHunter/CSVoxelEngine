@@ -1,9 +1,8 @@
 using System.Collections.Concurrent;
 using System.Numerics;
-using silkgltriangle.Content;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// The raw-write journal a server hooks to broadcast every cell change, including simulation steps

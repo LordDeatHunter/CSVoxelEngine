@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Core;
 
 /// <summary>
 /// Pins <see cref="WorldLoadGate"/>: a loading world starts playing only once every chunk of the

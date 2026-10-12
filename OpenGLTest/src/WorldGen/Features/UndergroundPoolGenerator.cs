@@ -1,6 +1,7 @@
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Underground pools: cave floors between the lava band and the sea pond over with water sources

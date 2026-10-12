@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// The flags byte of a <see cref="NetMessage.PlayerState"/> (and of each player list entry): the

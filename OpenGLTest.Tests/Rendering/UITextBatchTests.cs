@@ -1,8 +1,11 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Data;
+using VoxelEngine.Rendering;
+using VoxelEngine.UI;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// The headless slice of the batched text path: <see cref="UIRenderer.WriteGlyphQuad"/> and

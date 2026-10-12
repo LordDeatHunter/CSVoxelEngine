@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Support;
 
 /// <summary>
 /// Serialises the tests that depend on <c>TreeGenerator.ShapeCache</c> instance identity or reset

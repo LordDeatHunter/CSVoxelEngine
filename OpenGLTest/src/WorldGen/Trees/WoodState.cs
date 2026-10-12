@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// Encoding of the per-block state byte (see <c>Chunk._state</c>) for wood cells of the

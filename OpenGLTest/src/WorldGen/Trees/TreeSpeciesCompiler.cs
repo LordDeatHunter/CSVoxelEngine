@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.WorldGen.Trees.Features;
+using VoxelEngine.WorldGen.Trees.Logics;
+using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// Turns a parsed <see cref="TreeSpeciesDefinition"/> into an immutable <see cref="TreeSpecies"/>,

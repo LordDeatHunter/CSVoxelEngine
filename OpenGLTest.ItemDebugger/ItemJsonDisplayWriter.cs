@@ -5,7 +5,7 @@ using System.Numerics;
 using System.Text;
 using System.Text.Json;
 
-namespace silkgltriangle;
+namespace VoxelEngine.ItemDebugger;
 
 /// <summary>
 /// Writes an item's <c>display</c> block back into its JSON file. Only the display value's

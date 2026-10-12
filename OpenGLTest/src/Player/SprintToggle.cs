@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>
 /// The sprint latch, GL-free: with the sprint-toggle setting on, the sprint key flips the latch on

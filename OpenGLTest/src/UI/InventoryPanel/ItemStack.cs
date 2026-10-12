@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Items;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>Durability component: uses left out of the item's maximum.</summary>
 public record struct DurabilityComponent(int UsesLeft, int MaxUses)

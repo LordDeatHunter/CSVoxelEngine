@@ -4,9 +4,13 @@ using System.Diagnostics;
 using System.IO;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.Server;
+using VoxelEngine.UI.Hud;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 public sealed class NetFramingTests
 {

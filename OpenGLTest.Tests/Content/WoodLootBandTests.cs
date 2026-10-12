@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// <see cref="WoodLootBand.Select"/> is the thickness-to-loot rule of tree wood: the band with

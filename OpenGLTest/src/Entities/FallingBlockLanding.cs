@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// A falling cube that just settled back into the world as a block (<see cref="FallingBlockManager.Landings"/>):

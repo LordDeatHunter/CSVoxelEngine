@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
 /// A world cell read: the block id and state byte at (x, y, z), false when the cell's chunk is

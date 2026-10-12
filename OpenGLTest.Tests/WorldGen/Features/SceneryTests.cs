@@ -1,8 +1,11 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// The floor scenery: a fallen log stamps a whole 3-5 cell detached oak log at one height on the

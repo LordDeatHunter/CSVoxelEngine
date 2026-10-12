@@ -1,8 +1,10 @@
 using System;
 using System.IO;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Player;
+using VoxelEngine.WorldGen.Trees;
 
-namespace silkgltriangle;
+namespace VoxelEngine.VisualTest;
 
 /// <summary>
 /// Runs a <see cref="VisualScenario"/> inside the live game: each frame advances one step by

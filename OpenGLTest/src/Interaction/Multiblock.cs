@@ -1,7 +1,10 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Shapes;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// GL-free structure rules for a multiblock: how its 2x2x2 volume is written into the chunks,

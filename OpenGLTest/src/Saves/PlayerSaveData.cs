@@ -1,6 +1,7 @@
 using System.Collections.Generic;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// The JSON shape of a world's <c>player.json</c>: where the player stands and looks, which

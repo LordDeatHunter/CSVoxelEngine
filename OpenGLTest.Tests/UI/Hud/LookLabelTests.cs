@@ -1,7 +1,8 @@
-using silkgltriangle.Content;
+using VoxelEngine.Rendering;
+using VoxelEngine.UI.Hud;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Hud;
 
 /// <summary>
 /// The look-at label's rules (<see cref="LookLabel"/>): a block reads as "Unknown" until its item

@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Content.Blocks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Loot;
 
 /// <summary>
 /// One thickness band of a <see cref="BlockRenderer.TreeWood"/> block's loot: wood whose

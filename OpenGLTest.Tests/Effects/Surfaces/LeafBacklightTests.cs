@@ -1,6 +1,7 @@
+using VoxelEngine.Effects.Surfaces;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Surfaces;
 
 /// <summary>
 /// The leaf backlight (<see cref="LeafBacklight"/>, the twin of the term in test-fragment.glsl):

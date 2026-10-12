@@ -1,10 +1,14 @@
 using System;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Graphics;
+using VoxelEngine.Particles;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// Torch flames: the <c>flame</c> block field (parsed by <see cref="ContentRegistry.ParseFlame"/>,

@@ -1,8 +1,10 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// The GL-free half of the cloud shadow: the coverage bake that turns the mesh's level grid into the

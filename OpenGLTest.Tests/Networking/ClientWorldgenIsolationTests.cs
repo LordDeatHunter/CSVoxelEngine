@@ -1,10 +1,13 @@
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Lod;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.WorldGen;
 using Xunit;
-using Target = silkgltriangle.Tests.StreamedTerrainMeshTests.Target;
+using Target = VoxelEngine.Tests.Networking.StreamedTerrainMeshTests.Target;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// A multiplayer client derives nothing from worldgen: a client-mode <see cref="World"/> whose

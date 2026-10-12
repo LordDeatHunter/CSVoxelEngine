@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI;
 
 /// <summary>
 /// GL-free math for a vertically scrolled list of equal-height rows shown through a viewport

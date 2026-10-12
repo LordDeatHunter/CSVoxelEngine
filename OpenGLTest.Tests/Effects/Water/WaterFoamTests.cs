@@ -1,6 +1,7 @@
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Water;
 
 /// <summary>
 /// The shore foam in test-fragment.glsl rises as the water the eye looks through (the

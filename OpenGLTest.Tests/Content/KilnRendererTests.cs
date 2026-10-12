@@ -1,9 +1,12 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.Entities;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// The placement and animation contracts the kiln and casting render passes read: where the

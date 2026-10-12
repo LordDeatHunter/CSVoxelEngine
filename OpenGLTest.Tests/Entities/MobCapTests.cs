@@ -1,7 +1,10 @@
 using System.Numerics;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities;
 
 /// <summary>
 /// The two global mob caps (<see cref="MobCaps"/>): the ring spawners of every kind stop at the

@@ -6,8 +6,11 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using StbImageSharp;
+using VoxelEngine.Chunks;
+using VoxelEngine.Data;
+using VoxelEngine.Entities;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Models;
 
 /// <summary>
 /// Parsed Blockbench project: one skin texture plus named rigid parts

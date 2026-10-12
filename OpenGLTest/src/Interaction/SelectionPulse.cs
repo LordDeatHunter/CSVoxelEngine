@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// GL-free twin of the selection outline's breathing in selection-fragment.glsl: the outline's

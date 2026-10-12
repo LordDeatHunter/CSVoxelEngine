@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Shape;
 
 /// <summary>The silhouette the far LOD draws a species' crown as.</summary>
 public enum LodCrownProfile : byte

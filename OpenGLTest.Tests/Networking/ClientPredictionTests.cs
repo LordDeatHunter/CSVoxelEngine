@@ -1,7 +1,8 @@
 using System.Collections.Generic;
+using VoxelEngine.Networking;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// A client's predictions against the server's answers, which arrive in order but late: a stale

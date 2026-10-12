@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Menus;
 
 /// <summary>Which pause-menu page is showing. Closed means the game runs normally.</summary>
 public enum PauseMenuPage

@@ -1,6 +1,9 @@
 using System.Collections.Generic;
+using VoxelEngine.Networking;
+using VoxelEngine.Rendering;
+using VoxelEngine.Saves;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Menus;
 
 /// <summary>Which main-menu page is showing (the menu the game boots to, with no world loaded).</summary>
 public enum MainMenuPage

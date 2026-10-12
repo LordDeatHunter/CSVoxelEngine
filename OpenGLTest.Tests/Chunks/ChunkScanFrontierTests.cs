@@ -6,7 +6,7 @@ using System.Numerics;
 using System.Threading;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// Pins <see cref="ChunkScanFrontier"/>, the shared resume point the four chunk-generation workers

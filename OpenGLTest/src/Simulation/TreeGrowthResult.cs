@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.WorldGen.Trees;
+
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// The outcome of one tree growth call: its status, the root cell it grew from (the target

@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Lod;
+using VoxelEngine.Rendering;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// THE CROSS-TREE OUTPUT-PRESERVATION GATE for item D5, which prices the geometry free list's

@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.Effects.Surfaces;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Surfaces;
 
 /// <summary>
 /// The ore twinkle (<see cref="OreTwinkle"/>, the twin of the term in test-fragment.glsl): an

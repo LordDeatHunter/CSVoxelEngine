@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.UI.InventoryPanel;
+
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// A vessel for molten metal. Unlike every other item family here the crucible carries per-vessel

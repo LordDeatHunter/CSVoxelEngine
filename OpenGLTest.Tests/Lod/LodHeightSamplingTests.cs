@@ -1,7 +1,8 @@
 using System.Linq;
+using VoxelEngine.Lod;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>
 /// Covers items C1 and C9. <see cref="LodRegion.BuildMeshData"/> now takes each LOD cell's

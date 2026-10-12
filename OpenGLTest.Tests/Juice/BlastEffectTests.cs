@@ -1,8 +1,10 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Juice;
+using VoxelEngine.Lod;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Juice;
 
 /// <summary>
 /// The rules behind a TNT blast's side effects: the camera shake falls off with distance

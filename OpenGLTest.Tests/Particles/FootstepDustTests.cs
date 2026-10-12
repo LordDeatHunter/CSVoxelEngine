@@ -1,9 +1,11 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Particles;
+using VoxelEngine.Player;
+using VoxelEngine.VisualTest;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 /// <summary>
 /// The sprint footstep dust: when a footfall happens (<see cref="FootstepDust.FootfallsBetween"/>),

@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Core;
 
 public sealed class MathUtilsExtensionsTests
 {

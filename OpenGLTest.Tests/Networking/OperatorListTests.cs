@@ -1,9 +1,11 @@
 using System;
 using System.IO;
 using System.Text;
+using VoxelEngine.Networking;
+using VoxelEngine.Saves;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The dedicated server's operator list: a name is an operator exactly when it shares the save slug

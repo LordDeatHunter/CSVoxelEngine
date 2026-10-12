@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Items;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>
 /// GL-free browsable catalog behind creative mode: every item that exists, grouped into the

@@ -1,6 +1,7 @@
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Lava pockets deep underground: cave floors at or below <see cref="WorldGenerationConfig.LavaMaxY"/>

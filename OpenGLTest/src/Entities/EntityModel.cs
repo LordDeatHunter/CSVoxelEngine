@@ -3,8 +3,12 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Data;
+using VoxelEngine.Graphics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// A runtime entity model: the cubes parsed from a Blockbench project, baked into one

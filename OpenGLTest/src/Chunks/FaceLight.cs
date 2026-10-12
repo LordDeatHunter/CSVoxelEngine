@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Lighting;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// The smooth corner light of one full cell face (see <see cref="Chunk.SmoothCornerLight"/>),

@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Shape;
 
 /// <summary>How a trunk wider than one block meets the cell grid at its rim.</summary>
 public enum TrunkRim : byte

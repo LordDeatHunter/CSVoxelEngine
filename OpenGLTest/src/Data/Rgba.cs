@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Data;
 
 /// <summary>
 /// Straight (non-premultiplied) 8-bit RGBA color, matching the packing <see cref="Vertex"/>

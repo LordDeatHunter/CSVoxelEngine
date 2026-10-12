@@ -1,6 +1,7 @@
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Coal ore veins: the same threshold-on-3D-noise deposits as <see cref="MalachiteGenerator"/>,

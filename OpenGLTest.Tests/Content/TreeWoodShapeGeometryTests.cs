@@ -1,8 +1,10 @@
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 /// <summary>
 /// The content-free geometry of <see cref="TreeWoodShape"/>: node width by thickness, the tube

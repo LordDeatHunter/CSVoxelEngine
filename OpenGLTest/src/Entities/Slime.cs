@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// A slime: a gel cube that hops toward the player and only hurts on contact while it is off the

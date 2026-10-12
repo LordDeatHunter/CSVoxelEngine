@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.IO;
 using Silk.NET.OpenGL;
 using StbImageSharp;
+using VoxelEngine.Items;
+using VoxelEngine.UI;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Graphics;
 
 /// <summary>
 /// Lazily built extruded-sprite meshes plus their GL textures, one per <see cref="Item"/>.

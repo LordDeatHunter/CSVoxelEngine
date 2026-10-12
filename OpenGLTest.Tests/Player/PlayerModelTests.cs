@@ -1,9 +1,11 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.ItemDebugger;
+using VoxelEngine.Items;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 public sealed class PlayerModelTests
 {

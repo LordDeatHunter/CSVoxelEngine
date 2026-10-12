@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// First-fit free-block allocator over an integer "unit" space <c>[0, Capacity)</c>, backing the

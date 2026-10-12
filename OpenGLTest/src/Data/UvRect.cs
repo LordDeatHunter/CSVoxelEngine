@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Data;
 
 /// <summary>
 /// An axis-aligned region of one slice of an array texture, in 0..1 UV space. <see cref="Min"/>

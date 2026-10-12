@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Post;
 
 /// <summary>
 /// GL-free biome color grade: a faint warm tint over the desert and a cool one over the snow,

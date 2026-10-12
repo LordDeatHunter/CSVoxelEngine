@@ -1,6 +1,8 @@
+using VoxelEngine.Tests.Lod;
+using VoxelEngine.Tests.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Support;
 
 /// <summary>
 /// Serialises the tests that compare LOD region builds near the origin

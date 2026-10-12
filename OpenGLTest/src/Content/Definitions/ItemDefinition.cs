@@ -1,4 +1,8 @@
-namespace silkgltriangle;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Items;
+using VoxelEngine.UI.InventoryPanel;
+
+namespace VoxelEngine.Content.Definitions;
 
 /// <summary>JSON shape of <c>assets/data/items/&lt;name&gt;.json</c>.</summary>
 public sealed class ItemDefinition

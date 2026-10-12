@@ -1,9 +1,11 @@
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities.Slimes;
 
 /// <summary>
 /// Slime splitting: a slime larger than the smallest size splits into children of the next smaller

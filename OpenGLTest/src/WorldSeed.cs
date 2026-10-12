@@ -1,7 +1,11 @@
 using System;
 using System.Threading;
+using VoxelEngine.Chunks;
+using VoxelEngine.Lod;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 
-namespace silkgltriangle;
+namespace VoxelEngine;
 
 /// <summary>
 /// The world seed as runtime state. Every worldgen noise channel and hash derives from

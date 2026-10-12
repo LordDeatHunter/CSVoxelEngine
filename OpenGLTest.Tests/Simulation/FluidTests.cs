@@ -1,10 +1,12 @@
 using System;
 using System.IO;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 public sealed class FluidTests
 {

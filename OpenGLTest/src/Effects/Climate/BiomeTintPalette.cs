@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.WorldGen;
+
+namespace VoxelEngine.Effects.Climate;
 
 /// <summary>
 /// Which climate palette a biome-tinted block wears (<see cref="BiomeTint"/>). Both palettes are

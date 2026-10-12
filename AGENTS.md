@@ -842,6 +842,7 @@ its weight decode (both read `vColor.a` at location 1).
 ```
 OpenGLTest/
   VoxelEngine.csproj           # the game (net9.0); <None Update> rules copy assets/ to the output directory
+  GlobalUsings.cs              # project-wide usings: VoxelEngine.Core and the Shader alias (see "Code organization")
   src/                         # the app entry and the core types only (Program, World and its phase/seed/load gate, BlockType)
     Program.cs                 # entry point, wires window callbacks, input polling; the AppScreen
                                #   flow (Menu/Loading/Playing/Saving) and the deferred open/save
@@ -1523,6 +1524,7 @@ OpenGLTest/
   visual-examples/                    # the VOXEL_SCRIPT scenario JSONs (see `VOXEL_SCRIPT`)
 OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS, ENTITIES and TREES tabs)
   VoxelEngine.ItemDebugger.csproj     # the project file (references the game project)
+  GlobalUsings.cs                     # VoxelEngine.Core and the Shader alias
   AnimationClock.cs                   # the playback controls of the item debugger's timeline
   AssetRoot.cs                        # points the process at the engine's assets directory before any content loads
   DebuggerTab.cs                      # which grid the item debugger's left panel shows, and
@@ -1538,13 +1540,16 @@ OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS
                                       #   snapshots, ground plane and framing bounds
 OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple players and chat")
   VoxelEngine.Server.csproj           # the project file (references the game project)
+  GlobalUsings.cs                     # VoxelEngine.Core
   AssetRoot.cs                        # locate assets/ walking up from the server's working directory
   GameServer.cs                       # TCP listener, per-connection reader threads, main-thread Pump
   ServerProgram.cs                    # content load, world/port prompts, headless World + tick loop
 OpenGLTest.Tests/                     # xUnit tests, headless (no window); a test sits beside the area
                                       #   of the code it tests (by the type under test), a probe beside
-                                      #   the area it probes, a helper of several areas in Support/
+                                      #   the area it probes, a helper of several areas in Support/;
+                                      #   namespaces mirror the test folders (VoxelEngine.Tests.<folder>)
   VoxelEngine.Tests.csproj            # the test project (references the game, the server and the item debugger)
+  GlobalUsings.cs                     # VoxelEngine.Core, VoxelEngine.Chunks, VoxelEngine.Content and VoxelEngine.Tests.Support
   Support/                     # cross-area fixtures: TestContent (the headless content load),
                                #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
                                #   WideTreeSpecies, TreeWorldgenFixture and the three [CollectionDefinition]s
@@ -3737,10 +3742,28 @@ touch a file that violates one of them, fixing it is in scope.
   root holds the app entry and core types only; a new file goes into the folder of its area
   (a new feature area gets a new folder), never into a catch-all.
 - **Namespaces mirror the folder tree.** Root namespace is `VoxelEngine`; a file in
-  `WorldGen/Trees/` declares `namespace VoxelEngine.WorldGen.Trees;`. Never park a new file in
-  the root namespace out of convenience; never add an unrelated type to whichever namespace a
-  file happened to have. Each project keeps a short, deliberate `GlobalUsings.cs` for its own
-  sub-namespaces, so cross-area references stay one blank line, not a using wall.
+  `OpenGLTest/src/WorldGen/Trees/` declares `namespace VoxelEngine.WorldGen.Trees;`, and only
+  the six files directly in `src/` (Program, World, WorldPhase, WorldLoadGate, WorldSeed,
+  BlockType) are in `VoxelEngine` itself. The tests mirror their own tree the same way:
+  `OpenGLTest.Tests/Chunks/` is `VoxelEngine.Tests.Chunks` and the shared fixtures in
+  `Support/` are `VoxelEngine.Tests.Support` (no test sits at the project root); the server and
+  the item debugger are flat (`VoxelEngine.Server`, `VoxelEngine.ItemDebugger`). Moving a file
+  means changing its namespace line and letting the compiler name the usings to add. Never
+  park a new file in the root namespace out of convenience; never add an unrelated type to
+  whichever namespace a file happened to have. Each project keeps a short, deliberate
+  `GlobalUsings.cs` at its root beside the csproj (`OpenGLTest/GlobalUsings.cs`,
+  `OpenGLTest.Tests/GlobalUsings.cs`, `OpenGLTest.Server/GlobalUsings.cs`,
+  `OpenGLTest.ItemDebugger/GlobalUsings.cs`) listing only the namespaces most of that
+  project's files need: `VoxelEngine.Core` everywhere (the `Vector2Utils`/`Vector3Utils`
+  extension methods, `MathUtils`, `WorldGenerationConfig`, `Log`), plus `VoxelEngine.Chunks`,
+  `VoxelEngine.Content` and `VoxelEngine.Tests.Support` in the test project. Everything else is
+  an explicit `using` in the files that use it, including a using that only an XML `cref`
+  needs (a doc build, `-p:GenerateDocumentationFile=true`, counts it as used; the plain build
+  checks neither crefs nor unused usings). The game and the item debugger also carry
+  `global using Shader = VoxelEngine.Graphics.Shader;`, because `Silk.NET.OpenGL` has a
+  `Shader` struct too; `Plane` likewise clashes with `System.Numerics.Plane`, so a cref to the
+  engine's is written `VoxelEngine.Data.Plane`. The vendored `Core/FastNoiseLite.cs` carries
+  `namespace VoxelEngine.Core;` as its only local edit.
 - **American English** in identifiers, comments and docs — `color` (not colour), `behavior`,
   `initializer`, `center`, `gray`, `normalize`, `canceled`, `traveled`, `catalog`, `license`,
   `meter`. Applies to renames of existing symbols too.
@@ -3758,7 +3781,7 @@ touch a file that violates one of them, fixing it is in scope.
 
 ## Conventions
 
-- C# with file-scoped namespaces, one type per file, `_camelCase` private fields, PascalCase public members. Primary constructors are used where natural (`ChunkManager(GL gl)`).
+- C# with file-scoped namespaces (one per folder, see "Code organization"), one type per file, `_camelCase` private fields, PascalCase public members. Primary constructors are used where natural (`ChunkManager(GL gl)`).
 - XML doc comments (`/// <summary>`) on classes and non-obvious public methods; brief `//` comments explaining *why* for tricky logic. Match the existing density — the code is moderately commented.
 - **New blocks go in JSON, not C#.** When a block has to behave differently, prefer a new data flag on `BlockDefinition`/`BlockType` that every call site reads over another per-id branch in gameplay code — the point of the content registry is that `World`, `TntManager` and the mesher ask "what does this block do?" instead of "which block is this?".
 - `FastNoiseLite.cs` is vendored third-party code — do not reformat or refactor it.

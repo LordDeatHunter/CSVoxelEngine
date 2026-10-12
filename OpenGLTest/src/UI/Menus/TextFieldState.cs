@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Menus;
 
 /// <summary>
 /// GL-free contents of one single-line text field on the main menu (a world name, a seed).

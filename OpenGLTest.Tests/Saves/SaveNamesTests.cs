@@ -1,8 +1,9 @@
 using System.Collections.Generic;
-using silkgltriangle.Content;
+using VoxelEngine.Items;
+using VoxelEngine.Saves;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Saves;
 
 /// <summary>
 /// The name mapping save files reference content through: every named id must come back as

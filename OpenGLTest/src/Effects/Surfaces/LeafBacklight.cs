@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Surfaces;
 
 /// <summary>
 /// GL-free twin of the leaf backlight in test-fragment.glsl: a leaf-sway face (canopy leaves and

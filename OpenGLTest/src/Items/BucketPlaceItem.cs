@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.UI.InventoryPanel;
+
+namespace VoxelEngine.Items;
 
 /// <summary>Pours a fluid source into the targeted cell (full bucket), becoming the empty item
 /// again. A fragile block in the way pops exactly as a flow washing over it would.</summary>

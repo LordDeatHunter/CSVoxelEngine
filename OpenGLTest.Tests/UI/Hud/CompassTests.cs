@@ -1,7 +1,9 @@
-using silkgltriangle.Content;
+using VoxelEngine.Items;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI.Hud;
 
 public sealed class CompassTests
 {

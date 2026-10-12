@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.Interaction;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// The selection outline's breathing (<see cref="SelectionPulse"/>, the twin of

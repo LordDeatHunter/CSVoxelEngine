@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Encoding of the per-block state byte (see <c>Chunk._state</c>) for fluid cells, mirroring

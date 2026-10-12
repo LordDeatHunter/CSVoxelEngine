@@ -4,9 +4,21 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Entities;
+using VoxelEngine.Graphics;
+using VoxelEngine.Items;
+using VoxelEngine.Player;
+using VoxelEngine.Rendering;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace silkgltriangle;
+namespace VoxelEngine.ItemDebugger;
 
 /// <summary>
 /// A minimal standalone renderer for the item debugger: content registry, block atlas, the

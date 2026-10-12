@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// Where a chunk column's <see cref="ColumnTerrain"/> comes from: worldgen for singleplayer and

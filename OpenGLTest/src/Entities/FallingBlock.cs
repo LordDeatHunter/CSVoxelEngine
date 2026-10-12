@@ -1,7 +1,11 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Juice;
+using VoxelEngine.Particles;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// A gravity-affected block (sand, gravel) in flight: a full-size cube that falls under

@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.Effects.Post;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Post;
 
 /// <summary>
 /// The eye adaptation (<see cref="EyeAdaptation"/>): the exposure rises only in the dark, never under

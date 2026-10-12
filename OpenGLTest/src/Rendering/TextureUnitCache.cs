@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// The GL-free bookkeeping behind the render-state rebind cache (PERF_TODO R5): which texture unit

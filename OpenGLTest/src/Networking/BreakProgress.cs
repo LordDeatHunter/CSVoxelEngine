@@ -1,6 +1,8 @@
 using System;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>What the server made of a <see cref="NetIntentKind.BreakComplete"/>.</summary>
 public enum BreakVerdict

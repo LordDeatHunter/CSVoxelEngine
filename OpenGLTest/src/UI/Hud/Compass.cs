@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// Pure heading math behind the HUD compass (see <see cref="UIRenderer.DrawCompass"/>):

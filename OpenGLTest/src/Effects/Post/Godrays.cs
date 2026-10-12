@@ -1,6 +1,8 @@
 using System;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Post;
 
 /// <summary>
 /// GL-free twin of the godrays' strength: visible light shafts through trees, clouds and gaps when the

@@ -1,6 +1,9 @@
 using System.Collections.Generic;
+using VoxelEngine.Entities;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// The live entities <see cref="RenderManager.RenderReflection"/> may draw into the water mirror,

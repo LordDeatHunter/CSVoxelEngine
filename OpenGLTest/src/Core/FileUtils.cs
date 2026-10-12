@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Core;
 
 public static class FileUtils
 {

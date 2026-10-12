@@ -1,7 +1,8 @@
 using System;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 /// <summary>
 /// The fall-damage rule (<see cref="FallTracker"/>), driven by explicit feet sequences: a

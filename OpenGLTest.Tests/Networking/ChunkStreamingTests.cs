@@ -2,9 +2,13 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using VoxelEngine.Lod;
+using VoxelEngine.Networking;
+using VoxelEngine.Saves;
+using VoxelEngine.Server;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// End-to-end chunk streaming over a real loopback connection: a server-mode world serves a loaded

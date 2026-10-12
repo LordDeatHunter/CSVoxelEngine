@@ -1,6 +1,7 @@
+using VoxelEngine.Effects.Surfaces;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Effects.Surfaces;
 
 /// <summary>
 /// The ice glint (<see cref="IceGlint"/>, the twin of the ice tile term in test-fragment.glsl): a sky

@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Support;
 
 /// <summary>
 /// Shared helpers of the worldgen tree facts: finding a wooded forest chunk column, generating

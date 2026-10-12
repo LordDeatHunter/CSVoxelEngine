@@ -1,7 +1,9 @@
 using System.Numerics;
+using VoxelEngine.Player;
+using VoxelEngine.UI;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Player;
 
 /// <summary>
 /// The player's save-restore seams: <see cref="Camera.RestoreState"/> sets pose and modes with

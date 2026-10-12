@@ -1,10 +1,10 @@
 using System;
 using System.IO;
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Audio;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Audio;
 
 public sealed class SfxTests
 {

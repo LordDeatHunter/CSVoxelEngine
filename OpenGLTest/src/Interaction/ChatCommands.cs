@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.UI.Hud;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// The chat commands, GL-free: a line starting with <c>/</c> is parsed here and never echoed as

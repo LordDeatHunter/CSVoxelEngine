@@ -1,7 +1,9 @@
 using System;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// What a server accepts of a client's <see cref="InventoryIntent"/>, replayed against that

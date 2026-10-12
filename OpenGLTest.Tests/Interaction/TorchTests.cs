@@ -2,10 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Interaction;
+using VoxelEngine.Lod;
+using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// The torch is a placeable light source that needs the block it stands on: its light spreads

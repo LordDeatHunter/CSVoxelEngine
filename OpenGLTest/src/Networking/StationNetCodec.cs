@@ -1,6 +1,7 @@
 using System.IO;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// The wire form of a <see cref="NetMessage.StationState"/>: every campfire, quern, kiln and cast

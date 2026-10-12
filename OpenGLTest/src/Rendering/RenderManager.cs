@@ -5,9 +5,34 @@ using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using System.Numerics;
 using Silk.NET.Maths;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Climate;
+using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Effects.Post;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.Effects.Water;
+using VoxelEngine.Entities;
+using VoxelEngine.Graphics;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.Juice;
+using VoxelEngine.Lod;
+using VoxelEngine.Networking;
+using VoxelEngine.Particles;
+using VoxelEngine.Player;
+using VoxelEngine.Simulation;
+using VoxelEngine.UI;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.UI.Menus;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 public class RenderManager : IDisposable
 {

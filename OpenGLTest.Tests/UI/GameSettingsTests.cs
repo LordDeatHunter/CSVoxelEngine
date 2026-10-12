@@ -1,7 +1,9 @@
 using System.IO;
+using VoxelEngine.UI;
+using VoxelEngine.UI.Menus;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.UI;
 
 public sealed class GameSettingsTests
 {

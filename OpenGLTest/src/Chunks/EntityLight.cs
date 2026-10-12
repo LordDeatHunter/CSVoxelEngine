@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Data;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// GL-free world light query for entity draws (drops, pops, debris, the player, ...), read

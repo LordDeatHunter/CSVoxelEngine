@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Definitions;
 
 /// <summary>JSON shape of <c>assets/data/entities/&lt;name&gt;.json</c>.</summary>
 public sealed class EntityDefinition

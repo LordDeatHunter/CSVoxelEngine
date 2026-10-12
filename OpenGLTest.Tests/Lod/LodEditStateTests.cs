@@ -1,9 +1,12 @@
 using System;
 using System.IO;
 using System.Linq;
+using VoxelEngine.Lod;
+using VoxelEngine.Saves;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Lod;
 
 /// <summary>
 /// <see cref="LodEditState"/> carries one world's far-LOD edits (removal caps, surface overrides,

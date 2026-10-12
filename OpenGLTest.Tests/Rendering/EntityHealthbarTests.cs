@@ -1,7 +1,9 @@
 using System;
+using VoxelEngine.Entities;
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 public sealed class EntityHealthbarTests
 {

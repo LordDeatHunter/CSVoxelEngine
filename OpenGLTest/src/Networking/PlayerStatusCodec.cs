@@ -1,8 +1,9 @@
 using System;
 using System.IO;
 using System.Numerics;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// One <see cref="NetMessage.PlayerStatus"/>: the creative and flight modes the server granted, the

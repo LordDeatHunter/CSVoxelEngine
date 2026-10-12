@@ -1,7 +1,8 @@
 using System.Numerics;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// Climate-scaled grass and flower meadows: the tuft density runs from the dry end of the climate

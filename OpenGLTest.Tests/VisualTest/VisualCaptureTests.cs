@@ -1,9 +1,10 @@
 using System;
 using System.IO;
 using StbImageSharp;
+using VoxelEngine.VisualTest;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.VisualTest;
 
 /// <summary>Encode path is GL-free, so the flip + PNG round-trip and the worker drain
 /// are covered headless; only the readback needs a context.</summary>

@@ -1,4 +1,10 @@
-namespace silkgltriangle;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
+using VoxelEngine.WorldGen.Trees.Features;
+using VoxelEngine.WorldGen.Trees.Logics;
+using VoxelEngine.WorldGen.Trees.Shape;
+
+namespace VoxelEngine.Content.Definitions;
 
 /// <summary>
 /// JSON shape of <c>assets/data/trees/&lt;species&gt;.json</c>: one tree species, the wood and
@@ -71,7 +77,7 @@ public sealed class TreeSpeciesDefinition
         /// </summary>
         public float[][]? GirthProfile { get; set; }
 
-        /// <summary><c>circle</c> (default) or <c>square</c>; see <see cref="silkgltriangle.TrunkShape"/>.</summary>
+        /// <summary><c>circle</c> (default) or <c>square</c>; see <see cref="VoxelEngine.WorldGen.Trees.Shape.TrunkShape"/>.</summary>
         public string? TrunkShape { get; set; }
 
         /// <summary><c>block</c> (default) or <c>pixel</c>; see <see cref="TrunkRim"/>.</summary>

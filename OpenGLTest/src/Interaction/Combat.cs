@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Items;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// GL-free player-combat rules shared by the punch loop and the tests: the reach and spread of

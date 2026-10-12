@@ -1,6 +1,7 @@
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// <c>HalfResTarget</c> is the GL-free arithmetic behind the half-resolution underwater-rays render

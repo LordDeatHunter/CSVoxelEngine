@@ -1,6 +1,9 @@
 using System.Collections.Generic;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.UI.InventoryPanel;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.Hud;
 
 /// <summary>
 /// The hover tooltip's lines, GL-free: the display name, what the thing is (a block, a tool, a

@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.WorldGen.Trees.Shape;
+
+namespace VoxelEngine.WorldGen.Trees.Features;
 
 /// <summary>
 /// Grows a wide trunk's buttress fins: straight runs of full-cube wood along the ground at the

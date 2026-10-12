@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine;
 
 /// <summary>Where a <see cref="World"/> is in its lifecycle.</summary>
 public enum WorldPhase

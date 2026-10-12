@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using static silkgltriangle.Chunk;
-using static silkgltriangle.ChunkLighting;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Data;
+using static VoxelEngine.Chunks.Chunk;
+using static VoxelEngine.Chunks.ChunkLighting;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// Emits a <see cref="BlockRenderer.Pane"/> cell from the padded snapshot: the centre post plus an

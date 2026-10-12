@@ -2,8 +2,9 @@ using System;
 using System.Numerics;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Underwater sun shafts, drawn after everything else while the eye is submerged. Two draws,

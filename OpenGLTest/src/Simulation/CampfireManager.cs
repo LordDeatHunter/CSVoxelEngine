@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Networking;
+using VoxelEngine.WorldGen.Features;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Block-entity registry for campfires: lit branch piles with a per-branch burn timer.

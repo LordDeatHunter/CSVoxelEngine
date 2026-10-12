@@ -3,6 +3,7 @@ using System.IO;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
 using NLayer.NAudioSupport;
+using VoxelEngine.UI;
 
 // WinMM playback is Windows-only by design; the constructor refuses non-Windows up front
 // and catches every remaining failure, so Linux and headless runs stay silent. MP3s decode
@@ -10,7 +11,7 @@ using NLayer.NAudioSupport;
 // when the app itself targets a -windows TFM.
 #pragma warning disable CA1416
 
-namespace silkgltriangle;
+namespace VoxelEngine.Audio;
 
 /// <summary>
 /// Looping day/night ambience with a slow crossfade. Volumes track the lighting pass's

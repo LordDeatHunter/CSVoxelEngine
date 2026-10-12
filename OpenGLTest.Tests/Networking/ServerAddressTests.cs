@@ -1,6 +1,7 @@
+using VoxelEngine.Networking;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 public sealed class ServerAddressTests
 {

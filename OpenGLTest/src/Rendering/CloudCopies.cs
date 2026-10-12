@@ -1,7 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Data;
+using VoxelEngine.Effects.Sky;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// The GL-free arithmetic behind the cloud layer's 3x3 sweep: where each copy of the field sits this

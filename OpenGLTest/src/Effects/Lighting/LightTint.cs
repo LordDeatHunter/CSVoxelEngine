@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Lighting;
 
 /// <summary>
 /// The 10-bit block-light tint code a vertex corner carries (SH-26), and its C# decode, the

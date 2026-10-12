@@ -2,8 +2,10 @@ using System;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+using VoxelEngine.Chunks;
+using VoxelEngine.Saves;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// Compact wire form of one chunk's block data: the <see cref="Chunk.BlockCount"/> block ids and,

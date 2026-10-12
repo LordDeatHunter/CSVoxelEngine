@@ -5,9 +5,11 @@ using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Text.Json.Nodes;
+using VoxelEngine.Content.Models;
+using VoxelEngine.Entities;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Content;
 
 public sealed class BbmodelLoaderTests
 {

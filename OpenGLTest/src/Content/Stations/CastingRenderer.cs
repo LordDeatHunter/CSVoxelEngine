@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Stations;
 
 /// <summary>
 /// Authoring contract of a cast mold's pocket: where the molten metal sits inside the slab and

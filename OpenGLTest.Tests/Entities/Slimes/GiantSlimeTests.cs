@@ -1,6 +1,7 @@
+using VoxelEngine.Entities;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities.Slimes;
 
 /// <summary>
 /// The giant slime (<see cref="SlimeSize.Max"/>): a ring spawn rolls it less often than the size below

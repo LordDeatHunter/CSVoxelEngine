@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Rendering;
+
+namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>Which inventory text field has keyboard focus, if any.</summary>
 public enum InventoryFocus

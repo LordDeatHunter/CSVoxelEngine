@@ -1,10 +1,16 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Stations;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.Particles;
+using VoxelEngine.Rendering;
+using VoxelEngine.Simulation;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// The kiln's block-entity rules: what it accepts as fuel, how a strike burns through it, where

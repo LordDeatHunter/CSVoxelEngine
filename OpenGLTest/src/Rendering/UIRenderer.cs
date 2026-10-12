@@ -4,9 +4,20 @@ using System.IO;
 using System.Numerics;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
-using silkgltriangle.Content;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.Data;
+using VoxelEngine.Graphics;
+using VoxelEngine.Items;
+using VoxelEngine.Player;
+using VoxelEngine.Saves;
+using VoxelEngine.UI;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.UI.Menus;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Draws screen-space UI through an orthographic projection measured in canvas units, with the

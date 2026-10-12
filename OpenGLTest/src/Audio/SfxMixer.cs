@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using NAudio.Wave;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Audio;
 
 /// <summary>
 /// Mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline. All

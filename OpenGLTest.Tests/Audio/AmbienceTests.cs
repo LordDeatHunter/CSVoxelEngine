@@ -1,8 +1,10 @@
 using System;
 using System.IO;
+using VoxelEngine.Audio;
+using VoxelEngine.UI;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Audio;
 
 public sealed class AmbienceTests
 {

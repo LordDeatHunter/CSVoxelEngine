@@ -1,4 +1,8 @@
-namespace silkgltriangle;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Features;
+
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// Builds up a multi-state block (flint or obsidian on a pebble pile): augments the targeted

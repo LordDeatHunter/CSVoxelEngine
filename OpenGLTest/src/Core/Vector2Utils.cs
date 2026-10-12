@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Core;
 
 /// <summary>
 /// Extension operations on <see cref="Vector2"/> mirroring <see cref="Vector3Utils"/>.

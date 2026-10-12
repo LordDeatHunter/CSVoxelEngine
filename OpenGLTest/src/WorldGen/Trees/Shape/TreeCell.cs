@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Shape;
 
 /// <summary>
 /// One cell a rasterised tree writes: the world cell, the block id and the per-block state byte

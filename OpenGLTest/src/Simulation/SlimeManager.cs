@@ -1,8 +1,14 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.Entities;
+using VoxelEngine.Particles;
+using VoxelEngine.Player;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Owns the live slimes: ticks their hop AI and physics, shoves the ones a player walks into,

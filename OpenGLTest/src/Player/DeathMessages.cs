@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Player;
 
 /// <summary>What dealt the last blow to a player's pool, for the death message.</summary>
 public enum DamageSource : byte

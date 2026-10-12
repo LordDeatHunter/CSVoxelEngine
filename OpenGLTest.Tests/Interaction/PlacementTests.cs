@@ -1,8 +1,8 @@
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Interaction;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// Which cell a right-click fills and what it may write over. A stack that opts in

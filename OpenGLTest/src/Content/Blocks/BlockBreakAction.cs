@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Entities;
+
+namespace VoxelEngine.Content.Blocks;
 
 /// <summary>What happens when a block is destroyed: roll its loot table like normal.
 /// <see cref="PrimeTnt"/> additionally marks the block as primable: a firestarter strike or

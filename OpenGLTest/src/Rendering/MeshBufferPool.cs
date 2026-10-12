@@ -1,6 +1,9 @@
 using System.Collections.Generic;
+using VoxelEngine.Chunks;
+using VoxelEngine.Data;
+using VoxelEngine.Lod;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Recycles the vertex and index lists a mesh build fills. Each build otherwise

@@ -1,6 +1,7 @@
 using System.Numerics;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Core;
 
 /// <summary>
 /// Configuration for world generation and chunk management. Distances and frequencies are in

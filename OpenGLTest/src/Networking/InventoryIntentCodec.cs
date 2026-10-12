@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// The wire form of an <see cref="InventoryIntent"/>: the <see cref="NetInventoryAction"/> byte,

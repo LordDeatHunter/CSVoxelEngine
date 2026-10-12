@@ -1,9 +1,9 @@
 using System;
 using System.Numerics;
-using silkgltriangle.Content;
+using VoxelEngine.Particles;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Particles;
 
 public sealed class BlockDebrisTests
 {

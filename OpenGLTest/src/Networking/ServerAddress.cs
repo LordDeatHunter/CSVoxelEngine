@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// GL-free, content-free rules for a server address: <c>host</c> or <c>host:port</c>, the format

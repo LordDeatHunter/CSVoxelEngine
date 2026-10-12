@@ -1,6 +1,7 @@
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// Ruined pillars and desert wells: the pillar's stack honors its height and gap bits with the

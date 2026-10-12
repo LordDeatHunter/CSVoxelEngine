@@ -1,7 +1,12 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.Juice;
+using VoxelEngine.Networking;
+using VoxelEngine.Particles;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// A primed TNT block: a full-size cube that falls under gravity and collides with blocks axis

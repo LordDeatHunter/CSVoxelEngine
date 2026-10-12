@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Content.Shapes;
 
 /// <summary>
 /// Cell-space crop of the block-breaking crack sprite for one hitbox face. The overlay draws

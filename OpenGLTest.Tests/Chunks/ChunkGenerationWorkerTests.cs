@@ -5,7 +5,7 @@ using System.Numerics;
 using System.Threading;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Chunks;
 
 /// <summary>
 /// End-to-end cover for the chunk-generation scan after PERF_TODO C3 replaced its per-call full

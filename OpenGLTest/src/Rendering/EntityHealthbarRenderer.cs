@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Data;
+using VoxelEngine.Entities;
+using VoxelEngine.Graphics;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Five hearts floating above every live mob, always facing the camera. Uses the same

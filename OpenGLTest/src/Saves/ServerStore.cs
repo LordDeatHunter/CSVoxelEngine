@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using VoxelEngine.Networking;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// The player's saved multiplayer servers, in one JSON file. Mirrors <see cref="WorldStore"/>'s

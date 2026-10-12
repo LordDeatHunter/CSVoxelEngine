@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen;
 
 /// <summary>Position + flat face normal; the cloud shader needs nothing else.</summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1)]

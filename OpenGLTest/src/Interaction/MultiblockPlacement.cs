@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Content.Shapes;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// GL-free search for the 2x2x2 volume a right-click meant, shared by the converter item's world

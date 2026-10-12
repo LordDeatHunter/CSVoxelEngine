@@ -2,8 +2,10 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.Numerics;
+using VoxelEngine.Chunks;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Saves;
 
 /// <summary>
 /// Writes the folder an <see cref="ImportedMapSource"/> reads: <c>columns/&lt;cx&gt;_&lt;cz&gt;.col</c>

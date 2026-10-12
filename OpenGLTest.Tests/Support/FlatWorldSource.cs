@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using VoxelEngine.Saves;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Support;
 
 /// <summary>
 /// A test <see cref="IWorldSource"/> that supplies a rectangle of chunk columns itself and defers

@@ -1,8 +1,9 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Data;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Core;
 
 public sealed class VectorUtilsTests
 {

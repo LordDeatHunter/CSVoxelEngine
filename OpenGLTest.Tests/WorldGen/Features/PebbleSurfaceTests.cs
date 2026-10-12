@@ -1,7 +1,8 @@
-using silkgltriangle.Content;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// Rock piles are surface-gated: an exposed block's <c>pebbleWeight</c> scales the scatter, so

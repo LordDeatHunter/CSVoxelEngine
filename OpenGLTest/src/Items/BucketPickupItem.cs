@@ -1,4 +1,8 @@
-namespace silkgltriangle;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Simulation;
+using VoxelEngine.UI.InventoryPanel;
+
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// Scoops a targeted fluid source into the item (empty bucket). An empty bucket scoops whatever

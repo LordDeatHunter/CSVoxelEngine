@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Sky;
 
 /// <summary>
 /// GL-free day/night clock: where the sun is at a given lighting time (<see cref="World.LightingTime"/>)

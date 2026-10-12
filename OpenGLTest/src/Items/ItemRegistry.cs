@@ -1,8 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Items;
 
 /// <summary>
 /// Static singletons for every item: pure items from <c>assets/data/items/</c> plus one

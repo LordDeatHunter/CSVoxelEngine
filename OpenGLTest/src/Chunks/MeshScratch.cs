@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// Per-thread scratch buffers for the binary greedy pass of <c>Chunk.GenerateMeshData</c>

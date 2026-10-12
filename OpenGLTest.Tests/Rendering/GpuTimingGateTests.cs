@@ -1,6 +1,7 @@
+using VoxelEngine.Rendering;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
 /// <c>GpuTimingGate</c> is the GL-free gate in front of the per-pass <c>TIME_ELAPSED</c> queries:

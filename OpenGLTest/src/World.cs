@@ -5,9 +5,31 @@ using System.Numerics;
 using Silk.NET.OpenGL;
 using Silk.NET.Input;
 using Silk.NET.Windowing;
-using silkgltriangle.Content;
+using VoxelEngine.Audio;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Effects.Sky;
+using VoxelEngine.Entities;
+using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.Juice;
+using VoxelEngine.Lod;
+using VoxelEngine.Networking;
+using VoxelEngine.Particles;
+using VoxelEngine.Player;
+using VoxelEngine.Rendering;
+using VoxelEngine.Saves;
+using VoxelEngine.Simulation;
+using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.UI.Menus;
+using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
 
-namespace silkgltriangle;
+namespace VoxelEngine;
 
 /// <summary>
 /// Main world class that manages the camera, chunks, and world generation. Implements
@@ -1151,7 +1173,7 @@ public class World : IItemUseWorld
             if (_netTnt.TryGetValue(netEntity.Id, out var existing))
                 existing.MirrorSetState(netEntity.Position, remaining);
             else
-                _netTnt[netEntity.Id] = silkgltriangle.PrimedTnt.Mirror(netEntity.Position, netEntity.ItemId, duration, remaining);
+                _netTnt[netEntity.Id] = VoxelEngine.Entities.PrimedTnt.Mirror(netEntity.Position, netEntity.ItemId, duration, remaining);
         }
 
         _netTntRemovals.Clear();
@@ -1524,7 +1546,7 @@ public class World : IItemUseWorld
 
         var primed = _tntManager.Primed;
         foreach (var primedTnt in primed)
-            WaterSplash.Track(primedTnt.Splash, primedTnt.Position - new Vector3(0f, silkgltriangle.PrimedTnt.HalfExtent, 0f),
+            WaterSplash.Track(primedTnt.Splash, primedTnt.Position - new Vector3(0f, VoxelEngine.Entities.PrimedTnt.HalfExtent, 0f),
                 deltaTime, WorldGenerationConfig.WaterSplashCubeScale, _chunkManager, _debris);
     }
 

@@ -1,6 +1,7 @@
 using System;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// One chunk column's terrain beyond its blocks: everything a mesh build, the fluid-surface

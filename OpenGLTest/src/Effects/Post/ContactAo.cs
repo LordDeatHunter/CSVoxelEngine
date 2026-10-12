@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Rendering;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Post;
 
 /// <summary>The contact AO pass's tuning, uploaded as uniforms by <see cref="ContactAoRenderer"/>.
 /// Distances are in blocks except <see cref="MaxPx"/> and the two reach bounds, which are in tap

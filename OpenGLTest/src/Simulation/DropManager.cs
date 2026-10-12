@@ -2,8 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Loot;
+using VoxelEngine.Entities;
+using VoxelEngine.Items;
+using VoxelEngine.Juice;
+using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Owns the live item drops: spawns them where blocks break, pulls nearby ones towards the

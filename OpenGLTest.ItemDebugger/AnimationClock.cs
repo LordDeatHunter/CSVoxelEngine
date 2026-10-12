@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.ItemDebugger;
 
 /// <summary>
 /// What an <see cref="AnimationClock"/> drives: a preview that can be restarted from a known state and

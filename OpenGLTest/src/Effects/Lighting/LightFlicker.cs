@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.WorldGen;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Lighting;
 
 /// <summary>
 /// GL-free flicker curves for the warm fire lights. Every campfire used to share one global

@@ -1,6 +1,7 @@
 using System.Text.Json;
+using VoxelEngine.Saves;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// The inventory's wire form: the same JSON shape <see cref="PlayerSaveData.InventoryData"/> uses in

@@ -1,6 +1,6 @@
 using System;
 
-namespace silkgltriangle;
+namespace VoxelEngine.WorldGen.Trees.Logics;
 
 /// <summary>
 /// The direction chooser a tree species' <c>growth.logic</c> names (oak, conifer, cactus, ...).

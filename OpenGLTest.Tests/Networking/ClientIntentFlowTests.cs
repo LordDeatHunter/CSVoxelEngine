@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
-using silkgltriangle.Content;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
+using VoxelEngine.Server;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// A real client-mode <see cref="World"/> against a real <see cref="GameServer"/> over loopback,

@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Effects.Water;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Effects.Surfaces;
 
 /// <summary>
 /// GL-free twin of the glass sheen in test-fragment.glsl: glass blocks and panes (which share the

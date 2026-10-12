@@ -1,7 +1,10 @@
 using System.Numerics;
+using VoxelEngine.Entities;
+using VoxelEngine.Networking;
+using VoxelEngine.Player;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Entities;
 
 /// <summary>
 /// The notice range (<see cref="MobTargets.NoticeRadius"/>): a mob only chases a target it can notice,

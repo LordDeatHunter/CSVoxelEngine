@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
-using silkgltriangle.Content;
+using VoxelEngine.Content;
+using VoxelEngine.Content.Recipes;
+using VoxelEngine.Items;
 
-namespace silkgltriangle;
+namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>What one search hit refers to: an item the player owns, or a crafting recipe.</summary>
 public enum SearchHitKind

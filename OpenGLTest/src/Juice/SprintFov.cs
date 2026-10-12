@@ -1,4 +1,6 @@
-namespace silkgltriangle;
+using VoxelEngine.Player;
+
+namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free rule of the sprint FOV widening: how many degrees the view eases out by while the

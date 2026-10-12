@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using VoxelEngine.Lod;
+using VoxelEngine.WorldGen;
 using Xunit;
 
-namespace silkgltriangle.Tests;
+namespace VoxelEngine.Tests.Core;
 
 /// <summary>
 /// The re-seedable worldgen: <see cref="WorldSeed.Apply"/> rebuilds every static noise from the new

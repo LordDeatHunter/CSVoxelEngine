@@ -1,4 +1,4 @@
-namespace silkgltriangle;
+namespace VoxelEngine.Networking;
 
 /// <summary>
 /// What <see cref="MovementRules"/> remembers about one connected player between its states (held

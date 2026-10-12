@@ -1,7 +1,8 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Simulation;
 
-namespace silkgltriangle;
+namespace VoxelEngine.Entities;
 
 /// <summary>
 /// The loot toss, GL-free: the launch a killed mob's every dropped item gets on top of a drop's own
