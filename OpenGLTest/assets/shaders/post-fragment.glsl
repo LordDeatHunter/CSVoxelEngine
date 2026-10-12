@@ -68,7 +68,7 @@ vec3 DisplayAt(ivec2 p)
     return ToDisplay(texelFetch(uScene, clamp(p, ivec2(0), ivec2(uResolution) - 1), 0).rgb);
 }
 
-// Manual bilinear filter at pixelPos (pixel units, texel centres at .5). Each of the four texels
+// Manual bilinear filter at pixelPos (pixel units, texel centers at .5). Each of the four texels
 // is converted to display space before they are mixed, so a filtered tap is an average of
 // tonemapped, encoded values. A hardware bilinear sample of the HDR buffer would instead average
 // a highlight far above 1 with its dark neighbors before the tonemap, and the clamp would
@@ -92,11 +92,11 @@ float Luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
 // contrast early-out: the four half-pixel
 // corner taps are 2x2 averages that find the local edge direction, then the pixel is blended
 // along it from two (rgbA) or four (rgbB) filtered taps, falling back to the narrower blend
-// when the wider one overshoots the neighbourhood's luma range (it crossed another edge).
+// when the wider one overshoots the neighborhood's luma range (it crossed another edge).
 vec3 Fxaa(vec2 pos)
 {
-    // The four corner taps DisplayBilinear(pos +- 0.5) land exactly between texel centres, so
-    // each is the plain mean of a 2x2 block, and together they cover just the 3x3 neighbourhood:
+    // The four corner taps DisplayBilinear(pos +- 0.5) land exactly between texel centers, so
+    // each is the plain mean of a 2x2 block, and together they cover just the 3x3 neighborhood:
     // fetch those nine once instead of sixteen times (same result, fewer ToDisplay calls).
     ivec2 c = ivec2(pos);
     vec3 t00 = DisplayAt(c + ivec2(-1, -1)), t10 = DisplayAt(c + ivec2(0, -1)), t20 = DisplayAt(c + ivec2(1, -1));
@@ -115,12 +115,12 @@ vec3 Fxaa(vec2 pos)
     float lumaMin = min(lumaM, min(min(lumaNW, lumaNE), min(lumaSW, lumaSE)));
     float lumaMax = max(lumaM, max(max(lumaNW, lumaNE), max(lumaSW, lumaSE)));
 
-    // FXAA 3.11's local-contrast early-out: a neighbourhood whose luma range is below the
+    // FXAA 3.11's local-contrast early-out: a neighborhood whose luma range is below the
     // threshold holds no edge worth smoothing, so it keeps its own pixel and skips the sixteen
     // direction-tap fetches. Most of a frame (sky, flat faces, fog) takes this branch, which is
     // what keeps the pass near a millisecond at 1080p; it also stops low-contrast texture
     // detail from being blurred along a false edge.
-    // A swayed point (the underwater wobble) sits between texel centres, so it keeps its exact
+    // A swayed point (the underwater wobble) sits between texel centers, so it keeps its exact
     // filtered color instead of the nearest texel's, or the sway would step a whole pixel at a time
     if (lumaMax - lumaMin < max(uFxaaEdgeThresholdMin, lumaMax * uFxaaEdgeThreshold))
         return uUnderwater > 0.0 ? DisplayBilinear(pos) : rgbM;
@@ -155,11 +155,11 @@ void main()
     }
     vec3 c = Fxaa(pos);
     // The damage fringe: red and blue read from either side of the pixel along the line from the
-    // screen centre, nothing in the middle and the most at the corners (DamageFringe.EdgeWeight)
+    // screen center, nothing in the middle and the most at the corners (DamageFringe.EdgeWeight)
     if (uDamageFringe > 0.0) {
-        vec2 fromCentre = gl_FragCoord.xy / uResolution - 0.5;
-        float d = length(fromCentre);
-        vec2 shift = fromCentre / max(d, 1e-4)
+        vec2 fromCenter = gl_FragCoord.xy / uResolution - 0.5;
+        float d = length(fromCenter);
+        vec2 shift = fromCenter / max(d, 1e-4)
                    * (uDamageFringe * smoothstep(0.2, 0.7, d) * uFringeShare * uResolution.y);
         c.r = DisplayBilinear(pos + shift).r;
         c.b = DisplayBilinear(pos - shift).b;

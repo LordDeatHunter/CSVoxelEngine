@@ -32,7 +32,7 @@ public static class LeafCluster
     public static int Distance(int dx, int dy, int dz) => Math.Abs(dx) + Math.Abs(dy) + Math.Abs(dz);
 
     /// <summary>
-    /// The tree's support in pixels: the root node's diameter quantised exactly as
+    /// The tree's support in pixels: the root node's diameter quantized exactly as
     /// <see cref="TreeRasterizer"/> writes it, so it equals the <see cref="WoodState.DiameterPx"/>
     /// stored in the root cell (capped at one block, the most a wood state byte holds). That is
     /// what lets the world side re-derive the same number from the root cell alone.
@@ -144,7 +144,7 @@ public static class LeafCluster
     /// <see cref="HydrationAt"/> by construction. Tips are visited in index order and offsets in
     /// a fixed x, y, z order, and cells are emitted in first-visit order through a list, so the
     /// output depends only on the graph and never on dictionary order. A leafless species adds nothing.
-    /// Cells in <paramref name="exclude"/> (the rasteriser's shells, packed by
+    /// Cells in <paramref name="exclude"/> (the rasterizer's shells, packed by
     /// <see cref="TreeCellKey.Pack"/>) are skipped like the graph's own cells.
     /// </summary>
     public static void Collect(TreeGraph graph, TreeSpecies species, ITreeSpace space, List<TreeCell> output,

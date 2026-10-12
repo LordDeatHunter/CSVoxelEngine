@@ -88,7 +88,7 @@ public sealed class TreePreviewState
     /// renderer rebuilds its meshes when it differs from the one it built.</summary>
     public int Version { get; private set; }
 
-    /// <summary>The rasterised tree at <see cref="Step"/>: wood first, then leaves.</summary>
+    /// <summary>The rasterized tree at <see cref="Step"/>: wood first, then leaves.</summary>
     public IReadOnlyList<TreeCell> Cells => Current.Cells;
 
     /// <summary>How many of <see cref="Cells"/> are wood (where the leaves begin).</summary>
@@ -109,8 +109,8 @@ public sealed class TreePreviewState
         }
     }
 
-    /// <summary>The centre of <see cref="FramingBounds"/>.</summary>
-    public Vector3 FramingCentre
+    /// <summary>The center of <see cref="FramingBounds"/>.</summary>
+    public Vector3 FramingCenter
     {
         get
         {
@@ -240,7 +240,7 @@ public sealed class TreePreviewState
         var species = Selected;
         if (species == null) return new Snapshot(new List<TreeCell>(), 0, rootMin, rootMin + Vector3.One);
 
-        // A fresh space per snapshot: the rasteriser and the grower must never see another step's cells
+        // A fresh space per snapshot: the rasterizer and the grower must never see another step's cells
         var space = new VirtualTreeSpace(static (_, _) => GroundY);
         var graph = TreeGrower.GrowSteps(species, RootX, GroundY + 1, RootZ, space, Seed, step,
             applyFeatures: step >= _maturitySteps);

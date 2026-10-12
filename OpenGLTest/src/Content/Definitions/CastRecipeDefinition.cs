@@ -9,7 +9,7 @@ public sealed class CastRecipeDefinition
     /// <summary>Molten material poured in, by file name, e.g. <c>copper</c>.</summary>
     public string? Fluid { get; set; }
 
-    /// <summary>Millilitres the mold takes before it is full.</summary>
+    /// <summary>Milliliters the mold takes before it is full.</summary>
     public int? AmountMl { get; set; }
 
     /// <summary>Seconds a full mold takes to cool into its result.</summary>

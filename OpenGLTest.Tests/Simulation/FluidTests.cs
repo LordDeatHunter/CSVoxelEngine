@@ -141,7 +141,7 @@ public sealed class FluidTests
     }
 
     [Fact]
-    public void WakeLoadedChunksHonoursThePerFrameCap()
+    public void WakeLoadedChunksHonorsThePerFrameCap()
     {
         var manager = new ChunkManager(null!);
         const int extra = 3;
@@ -248,7 +248,7 @@ public sealed class FluidTests
         AssertFlowingWater(PouredWaterAcrossBorder(restoredFirst: true, wakeAfterEachLoad: false));
 
     [Fact]
-    public void RestoredPouredWaterWakesWhenTheGeneratedNeighbourLoadsLater()
+    public void RestoredPouredWaterWakesWhenTheGeneratedNeighborLoadsLater()
     {
         // The restored chunk streams in last: its own border scan finds the loaded neighbor
         AssertFlowingWater(PouredWaterAcrossBorder(restoredFirst: false, wakeAfterEachLoad: true));

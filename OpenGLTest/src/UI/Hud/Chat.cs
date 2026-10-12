@@ -167,7 +167,7 @@ public sealed class ChatView
 
 /// <summary>
 /// Pure screen layout of the chat HUD in canvas units (see <see cref="UiCanvas"/>), shared by the
-/// draw and any hit-testing so they cannot drift. Sits bottom-left, clear of the centred hotbar.
+/// draw and any hit-testing so they cannot drift. Sits bottom-left, clear of the centered hotbar.
 /// </summary>
 public static class ChatLayout
 {
@@ -180,11 +180,11 @@ public static class ChatLayout
 
     /// <summary>Baseline the newest log line sits on, just above the hotbar (or the input when open).</summary>
     public static float LogBottom(Vector2 screen, bool inputOpen) =>
-        inputOpen ? InputCentreY(screen) - InputHeight * 0.5f - 8f : HotbarLayout.Top(screen) - 10f;
+        inputOpen ? InputCenterY(screen) - InputHeight * 0.5f - 8f : HotbarLayout.Top(screen) - 10f;
 
-    public static float InputCentreY(Vector2 screen) => HotbarLayout.Top(screen) - InputHeight * 0.5f - 8f;
+    public static float InputCenterY(Vector2 screen) => HotbarLayout.Top(screen) - InputHeight * 0.5f - 8f;
 
-    public static Vector2 InputCentre(Vector2 screen) => new(Left + InputWidth * 0.5f, InputCentreY(screen));
+    public static Vector2 InputCenter(Vector2 screen) => new(Left + InputWidth * 0.5f, InputCenterY(screen));
 
     public static Vector2 InputSize => new(InputWidth, InputHeight);
 

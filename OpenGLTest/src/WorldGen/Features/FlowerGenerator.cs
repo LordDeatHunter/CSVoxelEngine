@@ -6,7 +6,7 @@ namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Meadow flowers in clumps: one X-shaped cross block sitting on the surface, placed through
-/// <see cref="PlantClumps"/> over <see cref="Clumps"/> and gated at the clump's centre by
+/// <see cref="PlantClumps"/> over <see cref="Clumps"/> and gated at the clump's center by
 /// <see cref="IsOpenMeadow"/> (open forest), so a meadow grows whole or not at all. A pure
 /// function of (x, z) and the seed, so chunks agree without shared state. Only dry grass columns
 /// qualify (no beaches, no sea floors), and the cell above the ground must be air over grass.
@@ -40,7 +40,7 @@ public static class FlowerGenerator
     }
 
     /// <summary>
-    /// Whether a clump centred at (x, z) may grow: forest open enough
+    /// Whether a clump centered at (x, z) may grow: forest open enough
     /// (<see cref="TerrainGenerator.ForestOpenness"/> at least
     /// <see cref="WorldGenerationConfig.MeadowMinOpenness"/>), so meadows fill the open stretches
     /// between the woodland instead of the woods themselves.

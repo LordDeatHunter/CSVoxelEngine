@@ -65,11 +65,11 @@ public sealed class EntityHealthbarTests
     }
 
     [Fact]
-    public void BarCentreFloatsAboveTheHead()
+    public void BarCenterFloatsAboveTheHead()
     {
         Assert.Equal(
             10f + Slime.HalfExtent + WorldGenerationConfig.EntityHealthbarLiftBlocks,
-            EntityHealthbarRenderer.BarCentreY(10f, Slime.HalfExtent),
+            EntityHealthbarRenderer.BarCenterY(10f, Slime.HalfExtent),
             precision: 5);
     }
 }

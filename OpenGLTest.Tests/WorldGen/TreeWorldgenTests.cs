@@ -129,7 +129,7 @@ public sealed class TreeWorldgenTests
     }
 
     [Fact]
-    public void TryGetTreeHonoursItsSpeciesRules()
+    public void TryGetTreeHonorsItsSpeciesRules()
     {
         // The origin square (spawn clearing included) plus a desert and a taiga square, so every
         // shipped biome with trees is sampled

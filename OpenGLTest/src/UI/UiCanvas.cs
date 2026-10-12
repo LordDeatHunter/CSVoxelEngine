@@ -5,7 +5,7 @@ using System.Numerics;
 namespace VoxelEngine.UI;
 
 /// <summary>
-/// The UI's virtual canvas, modelled on Godot's "canvas_items / keep aspect / expand" stretch mode:
+/// The UI's virtual canvas, modeled on Godot's "canvas_items / keep aspect / expand" stretch mode:
 /// the UI is laid out against <see cref="ReferenceSize"/> and scaled uniformly to the window.
 /// <b>Canvas space</b> is what every <c>UIRenderer</c> draw call and layout constant is measured in;
 /// window pixels only appear at the edges (mouse input in, the scissor rectangle out).
@@ -69,7 +69,7 @@ public static class UiCanvas
 
     /// <summary>
     /// The GUI Scale policy. <paramref name="requestedScale"/> null (or non-positive) is Auto: the fit
-    /// scale, scaling both up and down. A fixed multiplier of the reference layout is honoured exactly
+    /// scale, scaling both up and down. A fixed multiplier of the reference layout is honored exactly
     /// while it fits and capped at the fit scale otherwise, like Minecraft refusing a GUI scale that
     /// does not fit, so the UI can never leave the window.
     /// </summary>

@@ -7,7 +7,7 @@ namespace VoxelEngine.WorldGen.Features;
 /// <summary>
 /// Ruined pillars: a broken stone-brick column of 2-4 cells, some bricks missing, scattered over
 /// the dry land as ruins. Decided per 2^<see cref="WorldGenerationConfig.PillarCellShift"/>-block
-/// cell from a pure hash of (cell, seed); the centre column's ground comes from
+/// cell from a pure hash of (cell, seed); the center column's ground comes from
 /// <see cref="ColumnCache"/> like the pebble scatter's, so a pillar near a chunk border is whole.
 /// The far LOD shows none.
 /// </summary>
@@ -42,7 +42,7 @@ public static class RuinedPillarGenerator
     }
 
     /// <summary>
-    /// Stamps every pillar that reaches this chunk: its cells at the centre column's ground plus
+    /// Stamps every pillar that reaches this chunk: its cells at the center column's ground plus
     /// one, into air only, a level skipped where the gap bit is set, clipped at the chunk's border.
     /// Runs on a generation worker thread after the trees.
     /// </summary>

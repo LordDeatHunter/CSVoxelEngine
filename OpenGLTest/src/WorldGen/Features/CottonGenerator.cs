@@ -7,8 +7,8 @@ namespace VoxelEngine.WorldGen.Features;
 /// <summary>
 /// Wild cotton: clumps of the <c>cotton_plant</c> cross block on the warm, dry forest fringe
 /// before the desert line. Placement is <see cref="PlantClumps"/> over <see cref="Clumps"/> (one
-/// candidate clump per coarse cell, a disc of plants thinning outward from its centre), gated at
-/// the clump's centre by <see cref="IsCottonClimate"/> so a clump grows whole or not at all. A pure
+/// candidate clump per coarse cell, a disc of plants thinning outward from its center), gated at
+/// the clump's center by <see cref="IsCottonClimate"/> so a clump grows whole or not at all. A pure
 /// function of (x, z) and the seed with no noise of its own, so it needs no reseed and chunks agree
 /// without shared state. Only a dry grass column with air above takes a plant.
 /// </summary>
@@ -41,7 +41,7 @@ public static class CottonGenerator
     }
 
     /// <summary>
-    /// Whether a clump centred at (x, z) may grow: forest whose desert weight
+    /// Whether a clump centered at (x, z) may grow: forest whose desert weight
     /// (<see cref="TerrainGenerator.BiomeWeights"/>, exactly 0.5 on the desert line) reaches
     /// <see cref="WorldGenerationConfig.CottonMinDesertWeight"/>, i.e. both warm and dry enough to
     /// be the forest's edge toward the dunes, but stays under

@@ -78,7 +78,7 @@ public static class TextureLoader
     /// <summary>
     /// Uploads one array texture with a slice per entry of <paramref name="layers"/> (each a
     /// top-first RGBA buffer of <paramref name="width"/> × <paramref name="height"/>), slice
-    /// <c>i</c> being <c>layers[i]</c>. Mipmaps are generated per slice, so neighbouring tiles
+    /// <c>i</c> being <c>layers[i]</c>. Mipmaps are generated per slice, so neighboring tiles
     /// never bleed into each other at any level.
     ///
     /// With <paramref name="sampleMips"/> false (every sprite, the font, the UI) minification

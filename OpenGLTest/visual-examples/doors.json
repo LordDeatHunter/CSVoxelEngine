@@ -4,7 +4,7 @@
   //
   // The flat desert patch of torches.json: the player hovers at (253, -5) (sand at y 9, feet at
   // 10, eye (253.5, 11.62, -4.5)) and every placement aims at an exact cell, written relative to
-  // the player's cell as (dx, y, dz): a ground cell centre (dx, 9, dz) is yaw atan2(dz, dx),
+  // the player's cell as (dx, y, dz): a ground cell center (dx, 9, dz) is yaw atan2(dz, dx),
   // pitch -atan(1.62 / |(dx, dz)|). The place op is the right-click: aimed at an openable block
   // it opens or closes it instead of placing anything.
   //   Two oak trapdoors on the ground, both placed looking (mostly) north: (-1, 10, -3) and

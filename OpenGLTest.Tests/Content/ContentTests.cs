@@ -38,14 +38,14 @@ public sealed class ContentTests
         // renderer's forced flags must reach them, not just the BlockType record
         foreach (var (id, type) in BlockType.Types)
         {
-            Assert.Equal(type.OccludesNeighbours, BlockType.OccludesById[id]);
+            Assert.Equal(type.OccludesNeighbors, BlockType.OccludesById[id]);
             Assert.Equal(type.CastsAmbientOcclusion, BlockType.CastsAoById[id]);
             Assert.Equal(type.PassesLight, BlockType.PassesLightById[id]);
             Assert.Equal(type.Renderer == BlockRenderer.TreeWood, BlockType.IsTreeWood(id));
             if (type.Renderer != BlockRenderer.TreeWood) continue;
 
             // Tree wood is drawn down to a 1 px twig, which the per-id flags cannot see
-            Assert.False(type.OccludesNeighbours);
+            Assert.False(type.OccludesNeighbors);
             Assert.False(type.CastsAmbientOcclusion);
             Assert.True(type.PassesLight);
             Assert.False(BlockType.IsGreedy(id));
@@ -53,7 +53,7 @@ public sealed class ContentTests
     }
 
     [Fact]
-    public void WaterIsForcedToFluidBehaviour()
+    public void WaterIsForcedToFluidBehavior()
     {
         var water = ContentRegistry.RequireBlock("water");
         Assert.False(water.Solid);
@@ -67,7 +67,7 @@ public sealed class ContentTests
     [Fact]
     public void FullCubeOccludesAfterBake()
     {
-        Assert.True(ContentRegistry.RequireBlock("grass").OccludesNeighbours);
+        Assert.True(ContentRegistry.RequireBlock("grass").OccludesNeighbors);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public sealed class ContentTests
     [Fact]
     public void BiomeTintLeavesTheModelTilesAlone()
     {
-        // The tinted tiles live beside the model's: the default coloured tiles stay the block's
+        // The tinted tiles live beside the model's: the default colored tiles stay the block's
         // icon, drop and held look, and the block still takes the greedy cube-face path.
         var grass = ContentRegistry.RequireBlock("grass");
         Assert.NotNull(grass.BiomeTint);
@@ -193,7 +193,7 @@ public sealed class ContentTests
         var glass = ContentRegistry.RequireBlock("glass");
         Assert.True(glass.Translucent);
         Assert.True(glass.CullSelf);
-        Assert.False(glass.OccludesNeighbours);
+        Assert.False(glass.OccludesNeighbors);
         Assert.True(glass.PassesLight);
         Assert.False(glass.CastsAmbientOcclusion);
         Assert.False(BlockType.Occludes(glass.Id));
@@ -321,7 +321,7 @@ public sealed class ContentTests
         ContentRegistry.DeclaredLightColor(id) is { } c ? new Vector3(c[0], c[1], c[2]) / 255f : null;
 
     [Fact]
-    public void EmittersDeclaringNoColourTakeTheDefaultSlot()
+    public void EmittersDeclaringNoColorTakeTheDefaultSlot()
     {
         var emitters = BlockType.Types.Keys.Where(id => BlockType.Emission[id] > 0 && DeclaredSrgb(id) == null).ToArray();
         Assert.NotEmpty(emitters);
@@ -329,7 +329,7 @@ public sealed class ContentTests
     }
 
     [Fact]
-    public void DistinctDeclaredLightColoursGetDistinctSlots()
+    public void DistinctDeclaredLightColorsGetDistinctSlots()
     {
         var declared = BlockType.Types.Keys.Where(id => DeclaredSrgb(id) != null).ToArray();
         Assert.NotEmpty(declared);
@@ -343,7 +343,7 @@ public sealed class ContentTests
     }
 
     [Fact]
-    public void ANonDefaultDeclaredColourLightsWithItsOwnPaletteColour()
+    public void ANonDefaultDeclaredColorLightsWithItsOwnPaletteColor()
     {
         var nonDefault = BlockType.Types.Keys
             .Where(id => DeclaredSrgb(id) is { } c && Vector3.Distance(c, BlockLightPalette.DefaultSrgb) > 1f / 255f)

@@ -15,7 +15,7 @@ namespace VoxelEngine.Chunks;
 /// item-debugger tree spanning several chunks does not. Here every chunk the cells touch is a
 /// scratch chunk at its <b>real</b> chunk position, inside a throwaway manager whose whole 3D box
 /// is padded by a one-chunk ring of empty, ready chunks (edge and corner diagonals included, since
-/// the bevelled-shell cull reads edge neighbors). Chunks therefore see each other across every
+/// the beveled-shell cull reads edge neighbors). Chunks therefore see each other across every
 /// border, nothing past the set is anything but air, and each chunk's own
 /// <see cref="BiomeTint.FieldsFor"/> is the true tint field at those cells.
 /// No GL; single-threaded (the mesher's scratch is thread-static).

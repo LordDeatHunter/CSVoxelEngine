@@ -14,7 +14,7 @@ namespace VoxelEngine.WorldGen.Trees;
 /// re-attach a cut branch. An unloaded cell is never free, and a cell beside one is refused too,
 /// since the orphan rule cannot be checked there.</para>
 /// <para>A wide trunk's shells (<see cref="WoodState.IsShell"/>) are the tree's own wood: never
-/// free, so growth never grows into one, and never obstacles to their own re-rasterisation
+/// free, so growth never grows into one, and never obstacles to their own re-rasterization
 /// (<see cref="AcceptsShell"/>).</para>
 /// <para>A space lives for one main-thread growth call, during which no chunk unloads, so it
 /// caches the last chunk it read through. It is not thread-safe.</para>
@@ -25,7 +25,7 @@ public sealed class WorldTreeSpace : ITreeSpace
     private readonly TreeSpecies _species;
     private readonly Func<int, int, int, bool>? _reserved;
 
-    // Single-slot chunk cache: neighbouring probes almost always share a chunk.
+    // Single-slot chunk cache: neighboring probes almost always share a chunk.
     private Chunk? _cached;
     private int _cachedCx, _cachedCy, _cachedCz;
 
@@ -45,7 +45,7 @@ public sealed class WorldTreeSpace : ITreeSpace
 
     /// <summary>
     /// The shell placement test: everything <see cref="IsFree"/> accepts, plus a loaded cell that
-    /// already holds an attached shell of this species' wood. Re-rasterising a wide trunk lays its
+    /// already holds an attached shell of this species' wood. Re-rasterizing a wide trunk lays its
     /// shells back onto the shells it already has, so the tree's own shells are never obstacles to
     /// it, while <see cref="IsFree"/> still refuses them and growth never grows a node into one.
     /// </summary>

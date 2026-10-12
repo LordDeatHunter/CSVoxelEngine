@@ -9,7 +9,7 @@ namespace VoxelEngine.Tests.Networking;
 
 /// <summary>
 /// The dedicated server's operator list: a name is an operator exactly when it shares the save slug
-/// of a listed one (the same normalisation that keys the player's save file), a broken or missing
+/// of a listed one (the same normalization that keys the player's save file), a broken or missing
 /// <see cref="OperatorList.FileName"/> lists nobody, and the command line's <c>--op</c> names and
 /// the world folder's file merge into one list.
 /// </summary>

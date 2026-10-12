@@ -28,7 +28,7 @@ public static class WorldNames
     private const string DefaultSlug = "world";
 
     /// <summary>Trims the request, substitutes the default for an empty one and caps its length.</summary>
-    public static string Normalise(string? requested)
+    public static string Normalize(string? requested)
     {
         var name = requested?.Trim();
         if (string.IsNullOrEmpty(name))
@@ -39,13 +39,13 @@ public static class WorldNames
     }
 
     /// <summary>
-    /// The normalised request when no existing name matches it case-insensitively, otherwise
+    /// The normalized request when no existing name matches it case-insensitively, otherwise
     /// "<c>name n</c>" for the smallest n &gt;= 2 that is free. The numbered form may exceed
     /// <see cref="MaxNameLength"/>.
     /// </summary>
     public static string Unique(string? requested, IEnumerable<string> existing)
     {
-        var name = Normalise(requested);
+        var name = Normalize(requested);
         var taken = new HashSet<string>(existing, StringComparer.OrdinalIgnoreCase);
         if (!taken.Contains(name))
             return name;

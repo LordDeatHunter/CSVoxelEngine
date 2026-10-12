@@ -51,7 +51,7 @@ public sealed class KilnManager
     /// crucible's pending charge. Declared here as the single source of that pace.</summary>
     public const float MeltSeconds = 2f;
 
-    /// <summary>Millilitres that turn molten per <see cref="MeltSeconds"/> while the kiln
+    /// <summary>Milliliters that turn molten per <see cref="MeltSeconds"/> while the kiln
     /// burns.</summary>
     public const int MeltChunkMl = 100;
 
@@ -175,7 +175,7 @@ public sealed class KilnManager
             : 0f;
 
     /// <summary>
-    /// Millilitres of molten metal the render pass should draw: the settled pool plus the
+    /// Milliliters of molten metal the render pass should draw: the settled pool plus the
     /// fraction of the chunk currently melting. Continuous across a melt tick (the 100 ml the
     /// bookkeeping moves is exactly the fraction this was already showing) and across burn-out.
     /// </summary>
@@ -184,7 +184,7 @@ public sealed class KilnManager
         + MeltProgress01(state) * Math.Min(MeltChunkMl, state.Contents.PendingMl);
 
     /// <summary>
-    /// Millilitres of solid charge the render pass should still show waiting over the pool: the
+    /// Milliliters of solid charge the render pass should still show waiting over the pool: the
     /// exact complement of <see cref="DisplayMoltenMl"/>, so drawn pending plus drawn molten
     /// always equals <see cref="CrucibleComponent.TotalMl"/> and the lump shrinks by precisely
     /// what the pool gains.
@@ -194,7 +194,7 @@ public sealed class KilnManager
         - MeltProgress01(state) * Math.Min(MeltChunkMl, state.Contents.PendingMl);
 
     /// <summary>
-    /// Millilitres one unit of the last charged input is worth — the size at which the drawn lump
+    /// Milliliters one unit of the last charged input is worth — the size at which the drawn lump
     /// reads as one whole piece. Falls back to a single melt chunk when no input was recorded, so
     /// the lump's scale stays finite whatever the vessel remembers.
     /// </summary>

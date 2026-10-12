@@ -53,10 +53,10 @@ internal sealed class SupportTestWorld : IDisposable
     /// <summary>Streams in the chunk holding the cell and its six face neighbors.</summary>
     public void Load(int x, int y, int z)
     {
-        var centre = VoxelCoords.ChunkPosOf(x, y, z);
-        Manager.QueueChunk(centre);
+        var center = VoxelCoords.ChunkPosOf(x, y, z);
+        Manager.QueueChunk(center);
         foreach (var offset in Vector3Directions.CardinalDirections)
-            Manager.QueueChunk(centre + offset);
+            Manager.QueueChunk(center + offset);
 
         // A generation worker may already be building one of them, which QueueChunk then skips
         var sw = Stopwatch.StartNew();
@@ -69,7 +69,7 @@ internal sealed class SupportTestWorld : IDisposable
             if (Manager.ChunkAt(x, y, z) == null) return false;
             foreach (var offset in Vector3Directions.CardinalDirections)
             {
-                var p = (centre + offset) * Chunk.Size;
+                var p = (center + offset) * Chunk.Size;
                 if (Manager.ChunkAt((int)p.X, (int)p.Y, (int)p.Z) == null) return false;
             }
             return true;

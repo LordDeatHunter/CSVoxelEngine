@@ -54,7 +54,7 @@ public static class SettingsRows
     /// through <see cref="UiCanvas.FormatScale"/>, so the length is always 1 + GuiScales.Length.</summary>
     public static readonly string[] GuiScaleOptions = ["Auto", .. GameSettings.GuiScales.Select(UiCanvas.FormatScale)];
 
-    /// <summary>A single static instance: the settings page recognises it by reference to show the
+    /// <summary>A single static instance: the settings page recognizes it by reference to show the
     /// effective scale while the pick is capped.</summary>
     public static readonly OptionsRow GuiScaleRow = new("Display", "GUI Scale", GuiScaleOptions,
         () => GameSettings.GuiScaleIndex, v => GameSettings.GuiScaleIndex = v);
@@ -166,19 +166,19 @@ public static class SettingsLayout
     public static float ListBottom(Vector2 screenSize) =>
         screenSize.Y - PanelBottomMargin - BackGap - BackHeight;
 
-    public static Vector2 BackCentre(Vector2 screenSize) =>
+    public static Vector2 BackCenter(Vector2 screenSize) =>
         new(screenSize.X * 0.5f, ListBottom(screenSize) + BackGap + BackHeight * 0.5f);
 
     public static float TabWidth() => PanelWidth / SettingsRows.Tabs.Length;
 
-    public static Vector2 TabCentre(int tab, Vector2 screenSize) =>
+    public static Vector2 TabCenter(int tab, Vector2 screenSize) =>
         new(PanelLeft(screenSize) + TabWidth() * (tab + 0.5f),
             PanelTop + TitleHeight + TabHeight * 0.5f);
 
     public static float RowTop(int tabRow, Vector2 screenSize) =>
         ListTop(screenSize) + tabRow * RowHeight;
 
-    public static Vector2 RowCentre(int tabRow, Vector2 screenSize) =>
+    public static Vector2 RowCenter(int tabRow, Vector2 screenSize) =>
         new(screenSize.X * 0.5f, RowTop(tabRow, screenSize) + RowHeight * 0.5f);
 
     /// <summary>Tab-relative position of an absolute row on its tab (-1 when off-tab).</summary>
@@ -192,11 +192,11 @@ public static class SettingsLayout
     }
 
     /// <summary>Slider track rectangle: between the label column and the value slot.</summary>
-    public static (Vector2 Centre, Vector2 Size) TrackRect(int tabRow, Vector2 screenSize)
+    public static (Vector2 Center, Vector2 Size) TrackRect(int tabRow, Vector2 screenSize)
     {
         var left = PanelLeft(screenSize) + LabelWidth;
         var right = PanelLeft(screenSize) + PanelWidth - ValueWidth;
-        var y = RowCentre(tabRow, screenSize).Y;
+        var y = RowCenter(tabRow, screenSize).Y;
         return (new Vector2((left + right) * 0.5f, y), new Vector2(right - left, TrackHeight));
     }
 
@@ -204,13 +204,13 @@ public static class SettingsLayout
     public static float ValueRight(Vector2 screenSize) =>
         PanelLeft(screenSize) + PanelWidth - 8f;
 
-    public static Vector2 ToggleCentre(int tabRow, Vector2 screenSize) =>
-        TrackRect(tabRow, screenSize).Centre;
+    public static Vector2 ToggleCenter(int tabRow, Vector2 screenSize) =>
+        TrackRect(tabRow, screenSize).Center;
 
     public static SettingsHit HitAt(Vector2 point, string tab, Vector2 screenSize)
     {
         if (Math.Abs(point.X - screenSize.X * 0.5f) <= PauseMenuLayout.ButtonWidth * 0.5f
-            && Math.Abs(point.Y - BackCentre(screenSize).Y) <= BackHeight * 0.5f)
+            && Math.Abs(point.Y - BackCenter(screenSize).Y) <= BackHeight * 0.5f)
             return new SettingsHit(SettingsHitKind.Back);
 
         var tabTop = PanelTop + TitleHeight;
@@ -245,8 +245,8 @@ public static class SettingsLayout
 
     public static float SliderFraction(float x, int tabRow, Vector2 screenSize)
     {
-        var (centre, size) = TrackRect(tabRow, screenSize);
-        return MathUtils.Clamp01((x - (centre.X - size.X * 0.5f)) / size.X);
+        var (center, size) = TrackRect(tabRow, screenSize);
+        return MathUtils.Clamp01((x - (center.X - size.X * 0.5f)) / size.X);
     }
 
     public static float SliderValue(SliderRow row, float fraction) =>

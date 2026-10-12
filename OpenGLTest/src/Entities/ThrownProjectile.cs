@@ -25,7 +25,7 @@ public sealed class ThrownProjectile
     private Vector3 _velocity;
     private float _age;
 
-    /// <summary>The projectile's water-splash memory, stepped by the world from its centre each frame
+    /// <summary>The projectile's water-splash memory, stepped by the world from its center each frame
     /// (<see cref="WaterSplash.Track"/>).</summary>
     internal WaterSplashTracker Splash { get; } = new();
 
@@ -76,7 +76,7 @@ public sealed class ThrownProjectile
         if (mobs != null)
         {
             // Box overlap against the mob's own body, so a tall mob is hittable through its
-            // head and shins rather than only near its centre.
+            // head and shins rather than only near its center.
             for (var i = 0; i < mobs.Count; i++)
             {
                 var mob = mobs[i];

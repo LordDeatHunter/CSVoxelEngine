@@ -5,7 +5,7 @@ uniform float uOpacity;
 
 // Face highlight only (uDisplayMix 1): uColor is sRGB and the mix happens in display space, the
 // way it looked before the scene went linear. Blending it into the linear HDR target instead
-// lifts a dark face far more (15% of a pale grey over coal read as a flat grey slab). uScene is
+// lifts a dark face far more (15% of a pale gray over coal read as a flat gray slab). uScene is
 // the HDR target this pass is drawing into, read texel-for-texel after a glTextureBarrier, so
 // blending is off for this draw. The outline (uDisplayMix 0) stays an ordinary linear blend.
 uniform int uDisplayMix;

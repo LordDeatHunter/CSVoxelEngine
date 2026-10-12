@@ -13,7 +13,7 @@ their faces out of exactly that stick:
 so moving the stick here means moving those uvs too.
 
 A second tile, torch_top.png (32x32, fully opaque), is the burnt end of the stick seen straight
-down: char with a faint ember still glowing at the centre. The models' `up` faces sample it with
+down: char with a faint ember still glowing at the center. The models' `up` faces sample it with
 [0, 0, 16, 16] (the whole tile), so the top never shows the side crop's char band and wood rows.
 
 The output is a pure function of the constants below (no noise, no randomness), so re-running
@@ -33,7 +33,7 @@ FLAME_ROWS = range(12, 16)
 CHAR_ROWS = range(16, 18)
 WOOD_ROWS = range(18, 32)
 
-# Flame, hottest at the top centre: one row per entry, (centre two columns, outer two columns)
+# Flame, hottest at the top center: one row per entry, (center two columns, outer two columns)
 FLAME = [
     ((255, 251, 222), (255, 230, 132)),
     ((255, 238, 156), (255, 204, 84)),
@@ -43,7 +43,7 @@ FLAME = [
 
 CHAR = [(96, 61, 38), (82, 52, 32), (72, 45, 28), (60, 38, 24)]
 
-# The top tile: char, with a faint ember still glowing at the centre (radius in texels)
+# The top tile: char, with a faint ember still glowing at the center (radius in texels)
 TOP_CHAR = (58, 37, 23)
 TOP_EMBER = (208, 104, 40)
 TOP_EMBER_RADIUS = 11
@@ -61,9 +61,9 @@ def main():
     pixels = image.load()
 
     for row_index, row in enumerate(FLAME_ROWS):
-        centre, outer = FLAME[row_index]
+        center, outer = FLAME[row_index]
         for column in STICK_COLUMNS:
-            rgb = centre if column in (15, 16) else outer
+            rgb = center if column in (15, 16) else outer
             pixels[column, row] = rgb + (255,)
 
     for row_index, row in enumerate(CHAR_ROWS):

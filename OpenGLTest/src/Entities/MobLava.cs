@@ -15,14 +15,14 @@ namespace VoxelEngine.Entities;
 public static class MobLava
 {
     /// <summary>
-    /// Whether any cell of the body box centred at <paramref name="centre"/> (horizontal half extent
+    /// Whether any cell of the body box centered at <paramref name="center"/> (horizontal half extent
     /// <paramref name="halfExtent"/>, vertical <paramref name="halfHeight"/>) holds a burning fluid.
     /// An unloaded cell is not lava.
     /// </summary>
-    public static bool BodyInLava(Vector3 centre, float halfExtent, float halfHeight, ChunkManager chunks)
+    public static bool BodyInLava(Vector3 center, float halfExtent, float halfHeight, ChunkManager chunks)
     {
         var half = new Vector3(halfExtent, halfHeight, halfExtent);
-        VoxelCoords.CellRange(centre - half, centre + half,
+        VoxelCoords.CellRange(center - half, center + half,
             out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
         for (var x = minX; x <= maxX; x++)
         for (var y = minY; y <= maxY; y++)

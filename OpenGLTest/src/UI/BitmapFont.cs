@@ -15,7 +15,7 @@ namespace VoxelEngine.UI;
 /// vertex buffer and draws it through the UI shader in a single call (see
 /// <see cref="UIRenderer.DrawText"/>).
 /// </summary>
-public readonly record struct GlyphInstance(Vector2 Centre, Vector2 Size, UvRect Uv);
+public readonly record struct GlyphInstance(Vector2 Center, Vector2 Size, UvRect Uv);
 
 /// <summary>
 /// A TrueType font baked once into a GL atlas, for crisp screen-space text. The ASCII
@@ -106,10 +106,10 @@ public sealed class BitmapFont : IDisposable
         for (var i = 0; i < count; i++)
         {
             var q = quads[i];
-            var centre = new Vector2(
+            var center = new Vector2(
                 topLeft.X + (q.X0 + q.X1) * 0.5f,
                 topLeft.Y + (q.Y0 + q.Y1) * 0.5f - minY);
-            outInstances[i] = new GlyphInstance(centre, new Vector2(q.X1 - q.X0, q.Y1 - q.Y0), _glyphUv[q.Index]!.Value);
+            outInstances[i] = new GlyphInstance(center, new Vector2(q.X1 - q.X0, q.Y1 - q.Y0), _glyphUv[q.Index]!.Value);
         }
 
         return count;

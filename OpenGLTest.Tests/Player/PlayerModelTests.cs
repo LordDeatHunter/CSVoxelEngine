@@ -351,7 +351,7 @@ public sealed class PlayerModelTests
         player.Update(PlayerModel.SliceDuration * 0.51f, 0f);  // settled back to the idle pose
         var settled = HandX();
 
-        // Right-to-left, against the body centre: wound up to the player's right, struck to the left.
+        // Right-to-left, against the body center: wound up to the player's right, struck to the left.
         Assert.True(windup > eye.X);
         Assert.True(followThrough < eye.X);
         Assert.True(windup > followThrough);

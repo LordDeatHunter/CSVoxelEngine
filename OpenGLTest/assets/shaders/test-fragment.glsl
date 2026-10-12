@@ -82,7 +82,7 @@ uniform float uIceSheen;
 // ItemDebugger's, switches it off.
 uniform float uGlassLayer;
 uniform float uGlassSheen;
-// The leaf sway's wind (test-vertex.glsl): downwind direction * WindLean and the gusts' travelled
+// The leaf sway's wind (test-vertex.glsl): downwind direction * WindLean and the gusts' traveled
 // offset; the grass shimmer rolls its bands along it.
 uniform vec2 uWind;
 uniform vec2 uWindOffset;
@@ -387,7 +387,7 @@ vec2 LavaWaveSlope(vec2 p, float t) {
     return g;
 }
 
-// The slope scaled up into a normal: the geometry moves a few centimetres but the shading wants
+// The slope scaled up into a normal: the geometry moves a few centimeters but the shading wants
 // a visibly rippled surface.
 vec3 WaveNormal(vec2 p, float t, float k) {
     vec2 g = WaveSlope(p, t);
@@ -397,7 +397,7 @@ vec3 WaveNormal(vec2 p, float t, float k) {
 // WaveNormal carried along a flow: a two-phase flow map. Each phase samples the wave slope at an
 // offset that slides downstream over one period and snaps back; the two phases sit half a period
 // apart with triangle weights that sum to 1, so each snap lands while its phase weighs 0. The
-// offsets are bounded by span (never an unbounded world or time phase), so neighbouring cells
+// offsets are bounded by span (never an unbounded world or time phase), so neighboring cells
 // with different flows meet without a seam, and still water (flow 0) is exactly WaveNormal.
 // Damping the along-flow slope stretches the crests along the flow without shifting their phase.
 vec3 FlowWaveNormal(vec2 p, float t, float k, vec2 flow) {
@@ -460,7 +460,7 @@ float FlowFoam(vec2 p, float t, vec2 flow) {
          + FoamField(p - span * ph1, t) * (1.0 - abs(2.0 * ph1 - 1.0));
 }
 
-// Block-light flicker, desynchronised by position. Each corner of a coarse xz lattice
+// Block-light flicker, desynchronized by position. Each corner of a coarse xz lattice
 // (FlickerCell blocks apart) flickers on its own hashed phase and the four corner VALUES are
 // blended bilinearly. Blending the phase instead would turn the flicker into a wave sweeping
 // across a wall (the phase gradient reads as motion) and would wrap around at 2*pi midway
@@ -494,7 +494,7 @@ vec2 FadeTapOffset(vec2 base, vec2 off) {
     return off * smoothstep(0.0, max(length(off), 1e-4) * 1.5, e);
 }
 
-// Distance from the second-nearest to the nearest animated Voronoi centre: small along the
+// Distance from the second-nearest to the nearest animated Voronoi center: small along the
 // cell borders, which is where refracted sunlight piles up into the bright caustic net.
 float VoronoiEdge(vec2 p, float t) {
     vec2 n = floor(p), f = fract(p);
@@ -522,7 +522,7 @@ float Caustics(vec2 p, float t) {
 }
 
 // pcg3d (Jarzynski & Olano 2020): three well-mixed 32-bit hashes of an integer cell. Integer
-// maths, so a texel far from the origin hashes as well as one beside it.
+// math, so a texel far from the origin hashes as well as one beside it.
 uvec3 Pcg3d(uvec3 v) {
     v = v * 1664525u + 1013904223u;
     v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
@@ -634,8 +634,8 @@ void main() {
     // Far LOD crowns are opaque instead: holes fall back to the average leaf color so no
     // sky shows through the magnified texels.
     if (lodLeaves) {
-        // A biome-tinted canopy falls back to its textureless tile's grey (sRGB 98/255,
-        // WorldGenerationConfig.BiomeTintTextureGrey, decoded) so the tint still applies in the holes.
+        // A biome-tinted canopy falls back to its textureless tile's gray (sRGB 98/255,
+        // WorldGenerationConfig.BiomeTintTextureGray, decoded) so the tint still applies in the holes.
         vec3 leafRgb = texColor.a < 0.5 ? (fTintGain > 1.0 ? vec3(0.1221) : uLodLeafColor) : texColor.rgb;
         texColor = vec4(leafRgb, 1.0);
     } else if (texColor.a < uAlphaCutoff) discard;
@@ -750,7 +750,7 @@ void main() {
 
             // Metal is a dark body with a bright specular: the body pays for the highlight, so
             // the diffuse darkens by the same 0.6 it did before linear lighting. Easing that off
-            // let the lifted body and the broad lobe below smear coal's specks into a grey wash.
+            // let the lifted body and the broad lobe below smear coal's specks into a gray wash.
             col *= 1.0 - metallic * 0.6 * nearFade;
             // The sky is mixed in, not added. A reflection replaces what the surface would
             // otherwise show, and adding it instead piled a whole extra sky on top of the albedo
@@ -813,7 +813,7 @@ void main() {
     // Grass wind shimmer, on biome-tinted up faces only (the grass tops: bit 4, face 4; never the
     // swaying canopy nor the far crowns): soft bright bands lie across the wind and roll downwind
     // with the leaf sway's gusts. The pattern is read at the position carried back by the gusts'
-    // travelled offset (uWindOffset), exactly as the sway samples its gust wave, and weighted by
+    // traveled offset (uWindOffset), exactly as the sway samples its gust wave, and weighted by
     // that same gust, so the bands travel and swell with the canopy. It brightens the lit grass by
     // a share of its own light, so it darkens with shade and night, and fades out with distance
     // before a band turns into shimmering pixels. GL-free twin: GrassShimmer.
@@ -833,7 +833,7 @@ void main() {
 
     // Ice glint, on the ice tile only (a separate tile term like the snow sparkle, not the ore
     // material path): a Schlick-weighted mirror of the sky in the reflected direction, mixed in like
-    // the ore's sky so a grazing face turns sky-coloured rather than piling a sky on top, and a Blinn
+    // the ore's sky so a grazing face turns sky-colored rather than piling a sky on top, and a Blinn
     // sun highlight added in linear light. The sky is dimmed by skylight (nothing to mirror
     // underground) and the highlight is gated by the direct sun the face really gets: skylight, the
     // shadow and cloud shadow, the sun on the face's own side. GL-free twin: IceGlint.
@@ -932,7 +932,7 @@ void main() {
         col += spec * uLavaCatchLight * (1.0 - 0.6 * molten);
     } else if (isWater) {
         // Far water skips the wave/reflection/refraction model below: past the full-detail
-        // ring each pixel covers metres of surface, so a geometric-normal fresnel between
+        // ring each pixel covers meters of surface, so a geometric-normal fresnel between
         // saturated scatter and the sky mirror reads the same for no texture fetches. The
         // Near->Far band blends the two so the switch never pops; lava keeps its glow path
         // above regardless of distance.

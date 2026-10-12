@@ -26,12 +26,12 @@ public sealed class MainMenuLayoutTests
     public void MainPageButtonsHitInOrderAndGapsMiss()
     {
         var view = new MainMenuView();
-        Assert.Equal(MainMenuHitKind.Start, KindAt(MainMenuLayout.MainButtonCentre(Screen, 0), view));
-        Assert.Equal(MainMenuHitKind.Multiplayer, KindAt(MainMenuLayout.MainButtonCentre(Screen, 1), view));
-        Assert.Equal(MainMenuHitKind.Settings, KindAt(MainMenuLayout.MainButtonCentre(Screen, 2), view));
-        Assert.Equal(MainMenuHitKind.Exit, KindAt(MainMenuLayout.MainButtonCentre(Screen, 3), view));
+        Assert.Equal(MainMenuHitKind.Start, KindAt(MainMenuLayout.MainButtonCenter(Screen, 0), view));
+        Assert.Equal(MainMenuHitKind.Multiplayer, KindAt(MainMenuLayout.MainButtonCenter(Screen, 1), view));
+        Assert.Equal(MainMenuHitKind.Settings, KindAt(MainMenuLayout.MainButtonCenter(Screen, 2), view));
+        Assert.Equal(MainMenuHitKind.Exit, KindAt(MainMenuLayout.MainButtonCenter(Screen, 3), view));
 
-        var gap = (MainMenuLayout.MainButtonCentre(Screen, 0) + MainMenuLayout.MainButtonCentre(Screen, 1)) * 0.5f;
+        var gap = (MainMenuLayout.MainButtonCenter(Screen, 0) + MainMenuLayout.MainButtonCenter(Screen, 1)) * 0.5f;
         Assert.Equal(MainMenuHitKind.None, KindAt(gap, view));
     }
 
@@ -43,17 +43,17 @@ public sealed class MainMenuLayoutTests
         {
             for (var which = 0; which < 3; which++)
             {
-                var hit = MainMenuLayout.HitAt(MainMenuLayout.RowButtonCentre(Screen, row, 0f, which), Screen, view);
+                var hit = MainMenuLayout.HitAt(MainMenuLayout.RowButtonCenter(Screen, row, 0f, which), Screen, view);
                 Assert.Equal((MainMenuHitKind)((int)MainMenuHitKind.Play + which), hit.Kind);
                 Assert.Equal(row, hit.Row);
             }
 
-            var rowCentreY = MainMenuLayout.RowTop(row, 0f, Screen) + MainMenuLayout.RowHeight * 0.5f;
-            var onName = new Vector2(MainMenuLayout.NameLeft(Screen) + 10f, rowCentreY);
+            var rowCenterY = MainMenuLayout.RowTop(row, 0f, Screen) + MainMenuLayout.RowHeight * 0.5f;
+            var onName = new Vector2(MainMenuLayout.NameLeft(Screen) + 10f, rowCenterY);
             Assert.Equal(MainMenuHitKind.None, KindAt(onName, view));
         }
 
-        Assert.Equal(MainMenuHitKind.None, KindAt(MainMenuLayout.RowButtonCentre(Screen, 5, 0f, 0), view));
+        Assert.Equal(MainMenuHitKind.None, KindAt(MainMenuLayout.RowButtonCenter(Screen, 5, 0f, 0), view));
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class MainMenuLayoutTests
     {
         var rows = (int)MathF.Ceiling(MainMenuLayout.ListHeight(Screen) / MainMenuLayout.RowHeight) + 3;
         var view = WorldsView(rows);
-        var point = MainMenuLayout.RowButtonCentre(Screen, 0, 0f, 0);
+        var point = MainMenuLayout.RowButtonCenter(Screen, 0, 0f, 0);
         Assert.Equal(new MainMenuHit(MainMenuHitKind.Play, 0), MainMenuLayout.HitAt(point, Screen, view));
 
         view.ScrollOffset = MainMenuLayout.RowHeight * 2f;
@@ -78,43 +78,43 @@ public sealed class MainMenuLayoutTests
     public void ConfirmPopupSwallowsClicksBeneathIt()
     {
         var view = WorldsView(3, MainMenuPage.ConfirmDelete);
-        Assert.Equal(MainMenuHitKind.None, KindAt(MainMenuLayout.RowButtonCentre(Screen, 0, 0f, 2), view));
-        Assert.Equal(MainMenuHitKind.None, KindAt(MainMenuLayout.BottomButtonCentre(Screen, 0), view));
+        Assert.Equal(MainMenuHitKind.None, KindAt(MainMenuLayout.RowButtonCenter(Screen, 0, 0f, 2), view));
+        Assert.Equal(MainMenuHitKind.None, KindAt(MainMenuLayout.BottomButtonCenter(Screen, 0), view));
 
-        var box = MainMenuLayout.ConfirmBoxCentre(Screen);
+        var box = MainMenuLayout.ConfirmBoxCenter(Screen);
         var outside = box + new Vector2(MainMenuLayout.ConfirmBoxSize.X, 0f);
         Assert.Equal(MainMenuHitKind.None, KindAt(outside, view));
 
-        Assert.Equal(MainMenuHitKind.ConfirmDelete, KindAt(MainMenuLayout.ConfirmYesCentre(Screen), view));
-        Assert.Equal(MainMenuHitKind.CancelDelete, KindAt(MainMenuLayout.ConfirmNoCentre(Screen), view));
+        Assert.Equal(MainMenuHitKind.ConfirmDelete, KindAt(MainMenuLayout.ConfirmYesCenter(Screen), view));
+        Assert.Equal(MainMenuHitKind.CancelDelete, KindAt(MainMenuLayout.ConfirmNoCenter(Screen), view));
     }
 
     [Fact]
     public void CreateAndEditPagesExposeTheirFields()
     {
         var create = new MainMenuView { Page = MainMenuPage.Create };
-        Assert.Equal(MainMenuHitKind.NameField, KindAt(MainMenuLayout.NameFieldCentre(Screen), create));
-        Assert.Equal(MainMenuHitKind.SeedField, KindAt(MainMenuLayout.SeedFieldCentre(Screen), create));
-        Assert.Equal(MainMenuHitKind.Confirm, KindAt(MainMenuLayout.BottomButtonCentre(Screen, 0), create));
-        Assert.Equal(MainMenuHitKind.Back, KindAt(MainMenuLayout.BottomButtonCentre(Screen, 1), create));
+        Assert.Equal(MainMenuHitKind.NameField, KindAt(MainMenuLayout.NameFieldCenter(Screen), create));
+        Assert.Equal(MainMenuHitKind.SeedField, KindAt(MainMenuLayout.SeedFieldCenter(Screen), create));
+        Assert.Equal(MainMenuHitKind.Confirm, KindAt(MainMenuLayout.BottomButtonCenter(Screen, 0), create));
+        Assert.Equal(MainMenuHitKind.Back, KindAt(MainMenuLayout.BottomButtonCenter(Screen, 1), create));
 
         var edit = new MainMenuView { Page = MainMenuPage.Edit };
-        Assert.Equal(MainMenuHitKind.NameField, KindAt(MainMenuLayout.NameFieldCentre(Screen), edit));
-        Assert.Equal(MainMenuHitKind.None, KindAt(MainMenuLayout.SeedFieldCentre(Screen), edit));
-        Assert.Equal(MainMenuHitKind.Confirm, KindAt(MainMenuLayout.BottomButtonCentre(Screen, 0), edit));
-        Assert.Equal(MainMenuHitKind.Back, KindAt(MainMenuLayout.BottomButtonCentre(Screen, 1), edit));
+        Assert.Equal(MainMenuHitKind.NameField, KindAt(MainMenuLayout.NameFieldCenter(Screen), edit));
+        Assert.Equal(MainMenuHitKind.None, KindAt(MainMenuLayout.SeedFieldCenter(Screen), edit));
+        Assert.Equal(MainMenuHitKind.Confirm, KindAt(MainMenuLayout.BottomButtonCenter(Screen, 0), edit));
+        Assert.Equal(MainMenuHitKind.Back, KindAt(MainMenuLayout.BottomButtonCenter(Screen, 1), edit));
     }
 
     [Fact]
     public void EmptyWorldsPageHasNoRowHitsButKeepsCreateAndBack()
     {
         var view = WorldsView(0);
-        Assert.Equal(MainMenuHitKind.None, KindAt(MainMenuLayout.RowButtonCentre(Screen, 0, 0f, 0), view));
-        Assert.Equal(MainMenuHitKind.Create, KindAt(MainMenuLayout.BottomButtonCentre(Screen, 0), view));
-        Assert.Equal(MainMenuHitKind.Back, KindAt(MainMenuLayout.BottomButtonCentre(Screen, 1), view));
+        Assert.Equal(MainMenuHitKind.None, KindAt(MainMenuLayout.RowButtonCenter(Screen, 0, 0f, 0), view));
+        Assert.Equal(MainMenuHitKind.Create, KindAt(MainMenuLayout.BottomButtonCenter(Screen, 0), view));
+        Assert.Equal(MainMenuHitKind.Back, KindAt(MainMenuLayout.BottomButtonCenter(Screen, 1), view));
 
         Assert.True(MainMenuLayout.NameMaxWidth(Screen) > 0f);
-        var playLeft = MainMenuLayout.RowButtonCentre(Screen, 0, 0f, 0).X - MainMenuLayout.RowButtonSize.X * 0.5f;
+        var playLeft = MainMenuLayout.RowButtonCenter(Screen, 0, 0f, 0).X - MainMenuLayout.RowButtonSize.X * 0.5f;
         Assert.True(playLeft >= MainMenuLayout.NameLeft(Screen) + MainMenuLayout.NameMaxWidth(Screen));
     }
 

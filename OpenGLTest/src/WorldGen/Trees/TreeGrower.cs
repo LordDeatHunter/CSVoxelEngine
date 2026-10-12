@@ -95,7 +95,7 @@ public static class TreeGrower
 
     /// <summary>
     /// The base weights before the logic: sides 1, up <see cref="TreeSpecies.UpProbability"/>,
-    /// down 0, the travel direction reinforced, existing children favoured by their pipe
+    /// down 0, the travel direction reinforced, existing children favored by their pipe
     /// diameter (Dynamic Trees' probabilityForBlock), and no forks off the trunk below
     /// <see cref="TreeSpecies.LowestBranchHeight"/>.
     /// </summary>

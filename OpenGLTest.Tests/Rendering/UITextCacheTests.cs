@@ -22,7 +22,7 @@ namespace VoxelEngine.Tests.Rendering;
 /// it here, these facts are the thing that has to be consciously updated.</para>
 ///
 /// <para>What is NOT covered, and is only visible by running the game: the <c>DrawText</c> /
-/// <c>DrawTextCentred</c> calls themselves. A cache hit is supposed to skip the formatting and
+/// <c>DrawTextCentered</c> calls themselves. A cache hit is supposed to skip the formatting and
 /// nothing else — every caller still draws every frame — but nothing here can observe a draw, and
 /// nothing here can observe the <em>absence</em> of an allocation either. These facts pin the
 /// strings; the screenshot gate and an eyeball read of the HUD pin the pixels.</para>

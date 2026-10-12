@@ -5,16 +5,16 @@ namespace VoxelEngine.WorldGen.Features;
 /// <summary>
 /// Hot springs: a small pond in a cold biome whose water never freezes, steaming where it meets
 /// the cold air. Decided per 2^<see cref="WorldGenerationConfig.SpringCellShift"/>-block cell from
-/// a pure hash of (cell, seed) and <see cref="TerrainGenerator.ColdWeight"/> at the site's centre,
+/// a pure hash of (cell, seed) and <see cref="TerrainGenerator.ColdWeight"/> at the site's center,
 /// so the carve, the freeze exemption, the far LOD's water and the steam vents all read the same
-/// site. The pond's surface comes from the centre's <see cref="TerrainGenerator.LandHeight"/>, so
+/// site. The pond's surface comes from the center's <see cref="TerrainGenerator.LandHeight"/>, so
 /// it is one flat level across the disc instead of following the ground.
 /// </summary>
 public static class HotSpringGenerator
 {
     /// <summary>
     /// Whether the column (x, z) is inside a spring's disc, and the spring's own water level: the
-    /// centre column's land height less one. A pure function of (x, z) and the seed.
+    /// center column's land height less one. A pure function of (x, z) and the seed.
     /// </summary>
     public static bool TryGetSite(int x, int z, out int level)
     {
@@ -28,11 +28,11 @@ public static class HotSpringGenerator
         for (var cellX = minCellX; cellX <= maxCellX; cellX++)
         for (var cellZ = minCellZ; cellZ <= maxCellZ; cellZ++)
         {
-            if (!TryGetCentre(cellX, cellZ, out var centreX, out var centreZ)) continue;
-            var dx = x - centreX;
-            var dz = z - centreZ;
+            if (!TryGetCenter(cellX, cellZ, out var centerX, out var centerZ)) continue;
+            var dx = x - centerX;
+            var dz = z - centerZ;
             if (dx * dx + dz * dz > radius * radius) continue;
-            level = (int)TerrainGenerator.LandHeight(centreX, centreZ, out _, out _, out _, out _) - 1;
+            level = (int)TerrainGenerator.LandHeight(centerX, centerZ, out _, out _, out _, out _) - 1;
             return true;
         }
         return false;
@@ -42,10 +42,10 @@ public static class HotSpringGenerator
     public static bool IsSite(int x, int z) => TryGetSite(x, z, out _);
 
     /// <summary>
-    /// The spring a cell holds: its centre column (jittered inside the cell), gated on the centre's
+    /// The spring a cell holds: its center column (jittered inside the cell), gated on the center's
     /// climate being cold enough (<see cref="WorldGenerationConfig.SpringMinCold"/>), or false.
     /// </summary>
-    private static bool TryGetCentre(int cellX, int cellZ, out int x, out int z)
+    private static bool TryGetCenter(int cellX, int cellZ, out int x, out int z)
     {
         x = 0;
         z = 0;

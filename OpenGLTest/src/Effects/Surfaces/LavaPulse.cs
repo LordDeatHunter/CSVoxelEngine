@@ -7,7 +7,7 @@ namespace VoxelEngine.Effects.Surfaces;
 /// GL-free twin of the lava glow pulse in test-fragment.glsl: the lava surface breathes in
 /// brightness on a slow noise field. <see cref="Field"/> is the shader's <c>LavaPulseField</c> (two
 /// octaves of the shader's <c>ValueNoise</c> drifting slowly against each other) and
-/// <see cref="Brightness"/> the factor the shader multiplies the lava's glow by. Float maths, so it
+/// <see cref="Brightness"/> the factor the shader multiplies the lava's glow by. Float math, so it
 /// follows the shader closely but not to the last bit.
 /// </summary>
 public static class LavaPulse

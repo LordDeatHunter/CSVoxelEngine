@@ -14,7 +14,7 @@ public static class SeaStackGenerator
 {
     /// <summary>
     /// The stack top for column (x, z) whose land height is <paramref name="height"/> in
-    /// <paramref name="biome"/>: the highest site disc reaching it, tapered down from the centre,
+    /// <paramref name="biome"/>: the highest site disc reaching it, tapered down from the center,
     /// or <paramref name="height"/> itself when no shallow-ocean site does. A pure function.
     /// </summary>
     public static int TopAt(int x, int z, int height, Biome biome)
@@ -34,9 +34,9 @@ public static class SeaStackGenerator
         for (var cellX = minCellX; cellX <= maxCellX; cellX++)
         for (var cellZ = minCellZ; cellZ <= maxCellZ; cellZ++)
         {
-            if (!TryGetStack(cellX, cellZ, out var centreX, out var centreZ, out var top)) continue;
-            var dx = x - centreX;
-            var dz = z - centreZ;
+            if (!TryGetStack(cellX, cellZ, out var centerX, out var centerZ, out var top)) continue;
+            var dx = x - centerX;
+            var dz = z - centerZ;
             var distanceSquared = dx * dx + dz * dz;
             if (distanceSquared > radius * radius) continue;
             var tapered = top - (int)MathF.Sqrt(distanceSquared);
@@ -46,7 +46,7 @@ public static class SeaStackGenerator
     }
 
     /// <summary>
-    /// The stack a cell holds: its centre column (jittered inside the cell) and its top height
+    /// The stack a cell holds: its center column (jittered inside the cell) and its top height
     /// (above the waterline), or false for the many cells without one.
     /// </summary>
     public static bool TryGetStack(int cellX, int cellZ, out int x, out int z, out int top)

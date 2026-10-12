@@ -39,7 +39,7 @@ namespace VoxelEngine.Tests.Player;
 /// same miss branch, replacing three independent <c>new Frustum(camera.GetViewProjection())</c>
 /// builds a frame in RenderWorld, CullWater and RenderLod. <see cref="Frustum"/> is a readonly
 /// struct of private <see cref="VoxelEngine.Data.Plane"/> fields with no equality of its own, so the frustum facts
-/// compare BEHAVIOUR: <c>IntersectsAABB</c> over a grid of boxes around the camera, against a
+/// compare BEHAVIOR: <c>IntersectsAABB</c> over a grid of boxes around the camera, against a
 /// frustum freshly built from the oracle matrix, requiring both an accepted and a rejected box so
 /// the comparison cannot pass vacuously.
 /// </summary>
@@ -48,7 +48,7 @@ public sealed class CameraViewProjectionCacheTests
     public CameraViewProjectionCacheTests()
     {
         TestContent.EnsureLoaded();
-        // GameSettings.FieldOfView is 0 until the game (or a settings test) initialises it, and
+        // GameSettings.FieldOfView is 0 until the game (or a settings test) initializes it, and
         // Matrix4x4.CreatePerspectiveFieldOfView rejects a zero FOV. Camera reads it through
         // DefaultFov both at construction and every Update, so these facts must not depend on
         // some other test class having loaded settings first.
@@ -333,7 +333,7 @@ public sealed class CameraViewProjectionCacheTests
     {
         // Guards against the two caches drifting apart if EnsureViewCache is ever split: one
         // mutation must move both the matrix and the frustum, and the frustum must still match a
-        // fresh build from the moved matrix. The lattice is pinned to the ORIGINAL centre here, so
+        // fresh build from the moved matrix. The lattice is pinned to the ORIGINAL center here, so
         // a half-turn of the yaw has to flip which boxes are accepted.
         var cam = Settled();
         var center = cam.Position;

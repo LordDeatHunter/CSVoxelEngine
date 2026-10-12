@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATH = os.path.join(ROOT, "OpenGLTest", "assets", "textures", "blocks", "glow_mushroom.png")
 
 SIZE = 32
-CENTRE = 15.5
+CENTER = 15.5
 CAP_TOP = 12.0
 CAP_RADIUS = 8.5
 STEM_HALF = 2.0
@@ -32,7 +32,7 @@ GLOW = (0xB6, 0xF2, 0xFF)
 
 def texel(x, y):
     # The cap: a dome over the stem
-    dx = x - CENTRE
+    dx = x - CENTER
     dy = y - CAP_TOP
     if dy <= 0.0 and math.hypot(dx, dy) <= CAP_RADIUS:
         if dx * dx + dy * dy >= (CAP_RADIUS - 2.0) ** 2:
@@ -70,8 +70,8 @@ def main():
     for y in range(SIZE):
         row = bytearray()
         for x in range(SIZE):
-            colour = texel(x, y)
-            row += bytes(colour if colour else (0, 0, 0)) + (b"\xff" if colour else b"\x00")
+            color = texel(x, y)
+            row += bytes(color if color else (0, 0, 0)) + (b"\xff" if color else b"\x00")
         rows.append(bytes(row))
     write_png(PATH, rows)
     print("wrote", os.path.relpath(PATH, ROOT))

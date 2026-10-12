@@ -10,7 +10,7 @@ namespace VoxelEngine.Content.Shapes;
 /// turns from the authored orientation (the structure's front on north, -Z) to any of the four
 /// horizontal facings.
 ///
-/// The rotation is a quarter turn about the vertical axis through the centre of the volume's
+/// The rotation is a quarter turn about the vertical axis through the center of the volume's
 /// footprint, <c>(1, y, 1)</c>, which maps the volume onto itself — so a rotated anchor model
 /// still sits inside the same eight cells and no cell bookkeeping depends on the facing.
 /// GL-free and pure, so the mesher, the content bake and the tests all share it.

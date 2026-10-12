@@ -84,9 +84,9 @@
 //   - Reading the bursts: the raw frame-to-frame delta of shaft_still_* is NOT a build property.
 //     The gap between two screenshots is wall-clock and varies per run, and the sun dims through
 //     it, which shows up as a signed mean tracking mean|delta| at a fixed ratio (~3.0 in both
-//     builds). Normalise before comparing: divide by that drift, or high-pass the difference
+//     builds). Normalize before comparing: divide by that drift, or high-pass the difference
 //     field (the dimming is spatially smooth, flicker is not). Raw, the half-res tree looked
-//     2.3x worse; normalised it is 0.579 vs 0.846, i.e. slightly BETTER. Do not skip that step.
+//     2.3x worse; normalized it is 0.579 vs 0.846, i.e. slightly BETTER. Do not skip that step.
 {
   "steps": [
     { "op": "teleport", "pos": [243.5, -2.5, -143.5], "yaw": 20, "pitch": 5 },

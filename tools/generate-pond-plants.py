@@ -93,8 +93,8 @@ def build(texel):
     for y in range(SIZE):
         row = bytearray()
         for x in range(SIZE):
-            colour = texel(x, y)
-            row += bytes(colour if colour else (0, 0, 0)) + (b"\xff" if colour else b"\x00")
+            color = texel(x, y)
+            row += bytes(color if color else (0, 0, 0)) + (b"\xff" if color else b"\x00")
         rows.append(bytes(row))
     return rows
 

@@ -20,7 +20,7 @@ public enum FireParticleKind : byte
 
 /// <summary>
 /// One campfire particle: an ember (small, orange, fast rise, short life), a smoke puff
-/// (larger, grey, slow rise, grows as it climbs) or a steam puff (pale, quick, brief). Pure CPU
+/// (larger, gray, slow rise, grows as it climbs) or a steam puff (pale, quick, brief). Pure CPU
 /// state; drawn batched by <see cref="FireParticleRenderer"/>, which blends everything but an
 /// ember like smoke. Main thread only.
 /// </summary>

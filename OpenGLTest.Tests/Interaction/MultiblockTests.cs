@@ -158,7 +158,7 @@ public sealed class MultiblockTests
     [Fact]
     public void IsIntactReportsUnloadedInsteadOfBroken()
     {
-        // The volume straddles the centre chunk's +X border
+        // The volume straddles the center chunk's +X border
         var anchor = new Vector3(15, 3, 3);
         var (manager, _) = ConvertedKiln(anchor, 0);
         Assert.True(Multiblock.IsIntact(manager, anchor, 0, Kiln, out _));

@@ -1,5 +1,5 @@
 {
-  // Biome tint check (grass and leaves coloured by climate): run from OpenGLTest/ with
+  // Biome tint check (grass and leaves colored by climate): run from OpenGLTest/ with
   //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/grass-tint.json
   // Shots land in visual/grass-tint/. VOXEL_TIME=147 is noon, so the tint is read under a high,
   // neutral sun rather than the warm low light of a morning or a dusk.
@@ -30,7 +30,7 @@
   //     columns before it, so the camera stands at x -100.5 facing +X.
   //   forest trunks around the forest ground spot (x, baseY, z): (-79, 14, -2), (-70, 13, -6),
   //     (-66, 13, -12); the (-79, -2) crown tops out at y 24 over ground 13.
-  //   the nearest taiga columns with a spruce canopy within 4 blocks of a chunk centre:
+  //   the nearest taiga columns with a spruce canopy within 4 blocks of a chunk center:
   //     (-172, -124) canopy top 19 over ground 13, with ground 13 again 14 blocks south of it,
   //     and further ones at (-172, -132) and (-172, -108).
   //   forest_mountain_ground stands at (113.5, -194.5) on ground 27 (eye cell 29), re-probed after

@@ -19,7 +19,7 @@ public class ChunkGenerationWorker(ChunkManager chunkManager, StreamingFocus foc
     // One frontier per focus index, shared by all MaxConcurrentBlockDataGenerations threads this
     // instance starts; see ChunkScanFrontier for the invariant the threads share (PERF_TODO C3).
     // Grown on demand (FrontiersFor) to the focus count and never shrunk: a slot whose focus moved
-    // or now belongs to another player simply resets by centre mismatch. Replaced, never mutated,
+    // or now belongs to another player simply resets by center mismatch. Replaced, never mutated,
     // so a thread that read the array can index it without a lock.
     private ChunkScanFrontier[] _frontiers = [];
 

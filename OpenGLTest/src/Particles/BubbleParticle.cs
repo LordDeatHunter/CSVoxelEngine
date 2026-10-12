@@ -57,7 +57,7 @@ public sealed class BubbleParticle
 
     /// <summary>
     /// Advances the bubble. Returns false once it should be removed: on timeout, or the
-    /// moment its centre reaches the fluid surface above it (popping out of the water).
+    /// moment its center reaches the fluid surface above it (popping out of the water).
     /// A bubble found in a cell with no fluid has already left the water, so it pops too.
     /// </summary>
     public bool Update(float deltaTime, ChunkManager chunks)

@@ -16,7 +16,7 @@ namespace VoxelEngine.Tests.Simulation;
 /// result out. Every number here comes out of the recipe, out of
 /// <see cref="CastingManager.PourMlPerSecond"/> or out of the baked models — the rules under test
 /// are relations (mass is conserved, the pour only pauses and never loses what it poured, the
-/// cooling curve is monotone and the dissolve is complementary), never the particular millilitres
+/// cooling curve is monotone and the dissolve is complementary), never the particular milliliters
 /// or seconds the JSON happens to ship.
 /// </summary>
 public sealed class CastingTests

@@ -25,7 +25,7 @@ public sealed class LodEditHookTests
     public LodEditHookTests() => TestContent.EnsureLoaded();
 
     private const int ChunksPerLevel1Region = 8;   // 128 / 16
-    private const int CentreChunk = 4;
+    private const int CenterChunk = 4;
 
     private static int LocalIndex(int x, int z) =>
         ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
@@ -68,7 +68,7 @@ public sealed class LodEditHookTests
         var sand = TerrainGenerator.SandBlock;
 
         // A 3x3 stone slab one above the surface, so the landing sand has solid ground all round
-        // its support and never slides off, and a clear shaft above its centre.
+        // its support and never slides off, and a clear shaft above its center.
         for (var dx = -1; dx <= 1; dx++)
         for (var dz = -1; dz <= 1; dz++)
         {
@@ -130,12 +130,12 @@ public sealed class LodEditHookTests
         var bx = x + 2 * Chunk.Size;
         var bh = HeightAt(bx, z);
         QueueStack(chunks, bx >> Chunk.SizeShift, cz, bh - 24, bh + 8);
-        var centreY = bh - 12;
-        // A cell well inside the blast sphere, directly under its centre
-        var dugY = centreY - 3;
+        var centerY = bh - 12;
+        // A cell well inside the blast sphere, directly under its center
+        var dugY = centerY - 3;
         var dugBefore = BlockAt(chunks, bx, dugY, z);
         Assert.True(dugBefore != 0 && !BlockType.IsFluid(dugBefore), "nothing for the buried blast to clear");
-        tnt.Spawn(new Vector3(bx, centreY, z), tntBlock, 0f);
+        tnt.Spawn(new Vector3(bx, centerY, z), tntBlock, 0f);
         tnt.Update(1e-4f, chunks, lod, drops, fluids, falling);
 
         Assert.Equal(BlockType.Air, BlockAt(chunks, bx, dugY, z));
@@ -147,8 +147,8 @@ public sealed class LodEditHookTests
     [Fact]
     public void HardenedLavaAboveTheSurfaceRaisesTheLod()
     {
-        var cx = 777 * ChunksPerLevel1Region + CentreChunk;
-        var cz = 791 * ChunksPerLevel1Region + CentreChunk;
+        var cx = 777 * ChunksPerLevel1Region + CenterChunk;
+        var cz = 791 * ChunksPerLevel1Region + CenterChunk;
 
         // With the LOD attached, the crust is recorded as the column's new surface.
         var (x, y, z, cobble, withLod) = HardenLavaAbove(cx, cz, attachLod: true);
@@ -167,13 +167,13 @@ public sealed class LodEditHookTests
     public void BlockWritesUnderTheGeneratedWaterLevelLeaveTheLodAlone()
     {
         const int Rz = 792;
-        var cz = Rz * ChunksPerLevel1Region + CentreChunk;
+        var cz = Rz * ChunksPerLevel1Region + CenterChunk;
         var cx = 0;
         var waterLevel = 0;
         var found = false;
         for (var rx = 777; rx < 777 + 400 && !found; rx++)
         {
-            cx = rx * ChunksPerLevel1Region + CentreChunk;
+            cx = rx * ChunksPerLevel1Region + CenterChunk;
             var column = ColumnCache.Get(cx, cz);
             waterLevel = column.WaterLevel[LocalIndex(8, 8)];
             // Any generated water will do (sea level is 0, so the chunk under it may sit at
@@ -182,7 +182,7 @@ public sealed class LodEditHookTests
             found = waterLevel != TerrainGenerator.NoWater
                     && (((waterLevel >> Chunk.SizeShift) - 1) << Chunk.SizeShift) + 1 > column.Heights[LocalIndex(8, 8)];
         }
-        Assert.True(found, $"no chunk column in row {Rz} whose centre column stands under generated water");
+        Assert.True(found, $"no chunk column in row {Rz} whose center column stands under generated water");
 
         // (A) The whole chunk sits at or below the generated level: the lava still hardens, but
         // the crust is on the bed, so the far LOD keeps its generated depth band.
@@ -255,16 +255,16 @@ public sealed class LodEditHookTests
     }
 
     /// <summary>
-    /// A column near the centre of a level-1 region in row <paramref name="rz"/> (walking east
-    /// from 777) whose whole blast neighbourhood is dry land, so no fluid is left standing in
+    /// A column near the center of a level-1 region in row <paramref name="rz"/> (walking east
+    /// from 777) whose whole blast neighborhood is dry land, so no fluid is left standing in
     /// the crater, and whose neighbor two chunks east is dry too, for the buried blast.
     /// </summary>
     private static (int X, int Z, int Height) FindDryColumn(int rz)
     {
         for (var rx = 777; rx < 777 + 400; rx++)
         {
-            var cx = rx * ChunksPerLevel1Region + CentreChunk;
-            var cz = rz * ChunksPerLevel1Region + CentreChunk;
+            var cx = rx * ChunksPerLevel1Region + CenterChunk;
+            var cz = rz * ChunksPerLevel1Region + CenterChunk;
             if (!IsDryChunkColumn(cx, cz) || !IsDryChunkColumn(cx + 2, cz)) continue;
             var x = (cx << Chunk.SizeShift) + 8;
             var z = (cz << Chunk.SizeShift) + 8;

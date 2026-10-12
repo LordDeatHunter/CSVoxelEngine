@@ -133,7 +133,7 @@ public sealed class DamageNumberRenderer : IDisposable
         _gl.DepthMask(true);
     }
 
-    // Lays one number out centred on its current position: its shadow quads, then its face quads.
+    // Lays one number out centered on its current position: its shadow quads, then its face quads.
     // Returns how many quads it wrote at firstQuad.
     private int WriteNumber(in DamageNumber number, Vector3 right, Vector3 up, int firstQuad)
     {
@@ -157,24 +157,24 @@ public sealed class DamageNumberRenderer : IDisposable
         return n * 2;
     }
 
-    // One glyph quad: the layout's pixel space (Y down from the run's top-left) centred on the anchor
+    // One glyph quad: the layout's pixel space (Y down from the run's top-left) centered on the anchor
     // and mapped onto the camera-facing right/up basis, corners in the shared bottom-left, top-left,
     // top-right, bottom-right winding.
     private void WriteGlyph(int quad, GlyphInstance glyph, Vector2 runSize, Vector3 anchor, Vector3 right,
         Vector3 up, float k, Rgba color)
     {
-        var centre = anchor
-                     + right * ((glyph.Centre.X - runSize.X * 0.5f) * k)
-                     - up * ((glyph.Centre.Y - runSize.Y * 0.5f) * k);
+        var center = anchor
+                     + right * ((glyph.Center.X - runSize.X * 0.5f) * k)
+                     - up * ((glyph.Center.Y - runSize.Y * 0.5f) * k);
         var halfRight = right * (glyph.Size.X * 0.5f * k);
         var halfUp = up * (glyph.Size.Y * 0.5f * k);
         Span<Vector2> uv = stackalloc Vector2[4];
         glyph.Uv.CornersTo(uv);
         var v = quad * 4;
-        _verts[v + 0] = new Vertex(centre - halfRight - halfUp, color, uv[0], 1f, 0f, Vector3.UnitY);
-        _verts[v + 1] = new Vertex(centre - halfRight + halfUp, color, uv[1], 1f, 0f, Vector3.UnitY);
-        _verts[v + 2] = new Vertex(centre + halfRight + halfUp, color, uv[2], 1f, 0f, Vector3.UnitY);
-        _verts[v + 3] = new Vertex(centre + halfRight - halfUp, color, uv[3], 1f, 0f, Vector3.UnitY);
+        _verts[v + 0] = new Vertex(center - halfRight - halfUp, color, uv[0], 1f, 0f, Vector3.UnitY);
+        _verts[v + 1] = new Vertex(center - halfRight + halfUp, color, uv[1], 1f, 0f, Vector3.UnitY);
+        _verts[v + 2] = new Vertex(center + halfRight + halfUp, color, uv[2], 1f, 0f, Vector3.UnitY);
+        _verts[v + 3] = new Vertex(center + halfRight - halfUp, color, uv[3], 1f, 0f, Vector3.UnitY);
     }
 
     private string TextFor(int amount)

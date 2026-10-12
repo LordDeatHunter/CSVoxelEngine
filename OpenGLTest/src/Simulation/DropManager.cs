@@ -14,12 +14,12 @@ using VoxelEngine.WorldGen.Trees;
 namespace VoxelEngine.Simulation;
 
 /// <summary>
-/// Owns the live item drops: spawns them where blocks break, pulls nearby ones towards the
+/// Owns the live item drops: spawns them where blocks break, pulls nearby ones toward the
 /// player, and reports what was collected each tick for the caller to credit to an inventory.
 /// </summary>
 public class DropManager
 {
-    /// <summary>How close the player must get before a drop starts flying towards them (3 blocks).</summary>
+    /// <summary>How close the player must get before a drop starts flying toward them (3 blocks).</summary>
     public const float PickupRange = 3f;
 
     // Drops aim below the eye so they fly to the player's chest rather than into the camera
@@ -38,13 +38,13 @@ public class DropManager
     public void Clear() => _drops.Clear();
 
     /// <summary>
-    /// A TNT blast of <paramref name="radius"/> at <paramref name="centre"/> shoves every idle drop in
+    /// A TNT blast of <paramref name="radius"/> at <paramref name="center"/> shoves every idle drop in
     /// range away from it (<see cref="BlastImpulse"/>), so loot flies out of a crater.
     /// </summary>
-    public void ApplyBlastImpulse(Vector3 centre, float radius)
+    public void ApplyBlastImpulse(Vector3 center, float radius)
     {
         for (var i = 0; i < _drops.Count; i++)
-            _drops[i].Push(BlastImpulse.At(centre, _drops[i].Position, radius));
+            _drops[i].Push(BlastImpulse.At(center, _drops[i].Position, radius));
     }
 
     /// <summary>
@@ -60,7 +60,7 @@ public class DropManager
     public ReadOnlySpan<int> CollectedBy => CollectionsMarshal.AsSpan(_collectedBy);
 
     /// <summary>
-    /// Drops a block or item at the centre of the cell it occupied. Air and unknown ids drop
+    /// Drops a block or item at the center of the cell it occupied. Air and unknown ids drop
     /// nothing.
     /// </summary>
     public void Spawn(byte blockId, Vector3 blockPosition)
@@ -71,7 +71,7 @@ public class DropManager
     }
 
     /// <summary>
-    /// Drops a block or item at an exact world position (no cell-centre snap), for throws.
+    /// Drops a block or item at an exact world position (no cell-center snap), for throws.
     /// Air and unknown ids drop nothing.
     /// </summary>
     public void SpawnAt(byte blockId, Vector3 position, Vector3? toss = null)
@@ -124,7 +124,7 @@ public class DropManager
     }
 
     /// <summary>
-    /// Rolls a destroyed block's loot and drops every rolled id at the centre of the cell the
+    /// Rolls a destroyed block's loot and drops every rolled id at the center of the cell the
     /// block occupied. The cell doubles as the loot context, so position-dependent rolls (the
     /// pebble's yield) see where the block stood. <paramref name="count"/> carries an
     /// explicit pile size for a player-built stack (see <see cref="PileCount"/>); 0 derives it.

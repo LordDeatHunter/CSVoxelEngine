@@ -78,7 +78,7 @@ public sealed class ItemDefinition
     /// <summary>The <c>crucible</c> object: how much molten metal one vessel holds.</summary>
     public sealed class CrucibleDefinition
     {
-        /// <summary>Millilitres the vessel holds, melted and pending together; 100..10000.</summary>
+        /// <summary>Milliliters the vessel holds, melted and pending together; 100..10000.</summary>
         public int? CapacityMl { get; set; }
     }
 

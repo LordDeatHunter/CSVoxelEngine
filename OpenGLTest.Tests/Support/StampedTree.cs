@@ -10,7 +10,7 @@ namespace VoxelEngine.Tests.Support;
 
 /// <summary>
 /// A grown species stamped into a headless <see cref="ChunkManager"/>, shared by the felling and
-/// leaf-decay rules: the species is grown on a flat <see cref="VirtualTreeSpace"/>, rasterised and
+/// leaf-decay rules: the species is grown on a flat <see cref="VirtualTreeSpace"/>, rasterized and
 /// written wood first (nodes and any shells), then leaves into air only, exactly like worldgen, so
 /// the facts read the same wood and leaf state bytes worldgen writes.
 /// </summary>

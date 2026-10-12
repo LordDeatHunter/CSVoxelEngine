@@ -27,7 +27,7 @@ public sealed class LodEditStateTests
     private const int BucketSize = Chunk.Size * Chunk.Size;
     private const int Level1RegionBlocks = 128;
     private const int ChunksPerLevel1Region = 8;
-    private const int CentreChunk = 4;
+    private const int CenterChunk = 4;
 
     private static int HeightAt(int x, int z) =>
         ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
@@ -248,8 +248,8 @@ public sealed class LodEditStateTests
     {
         const int Rz = 787;
         var rx = LodSurfaceTests.FindQuietFrozenRx(Rz);
-        var cx = rx * ChunksPerLevel1Region + CentreChunk;
-        var cz = Rz * ChunksPerLevel1Region + CentreChunk;
+        var cx = rx * ChunksPerLevel1Region + CenterChunk;
+        var cz = Rz * ChunksPerLevel1Region + CenterChunk;
         var y = ColumnCache.GetHeights(cx, cz).Max() + 8;
 
         var before = LodRegion.BuildMeshData(1, rx, Rz);
@@ -268,6 +268,6 @@ public sealed class LodEditStateTests
         var a = LodSurfaceTests.TopFaceYAt(after, px, pz);
         Assert.True(a > b, $"the imported plateau left the level-1 surface at {b}");
         Assert.True(a <= y + 1, $"level 1 at {a} stands above the plateau top {y + 1}");
-        Assert.True(after.ColumnCyMax[CentreChunk * ChunksPerLevel1Region + CentreChunk] >= y >> Chunk.SizeShift);
+        Assert.True(after.ColumnCyMax[CenterChunk * ChunksPerLevel1Region + CenterChunk] >= y >> Chunk.SizeShift);
     }
 }

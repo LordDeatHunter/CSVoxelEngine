@@ -7,9 +7,9 @@ namespace VoxelEngine.Content.Shapes;
 
 /// <summary>
 /// The dimensions of one <see cref="BlockRenderer.Pane"/> block, read from its <c>pane</c> JSON:
-/// how wide its full-height centre post is, how wide its arms are, and the height bands
+/// how wide its full-height center post is, how wide its arms are, and the height bands
 /// (<see cref="Rails"/>) each arm fills - one full-height band for a glass pane or a wall, two
-/// rails for a fence. Everything is cell-local (0..1), centred on the cell; an arm is never wider
+/// rails for a fence. Everything is cell-local (0..1), centered on the cell; an arm is never wider
 /// than the post. Immutable and interned by <see cref="Create"/>, so two blocks with the same
 /// dimensions share one instance, which is what <see cref="PaneShape.ConnectsTo(PaneProfile, byte, byte)"/>
 /// compares: panes of one shape join each other, a fence never reaches into a glass pane. The
@@ -124,7 +124,7 @@ public sealed class PaneProfile
         return true;
     }
 
-    /// <summary>The full-height centre post, cell-local.</summary>
+    /// <summary>The full-height center post, cell-local.</summary>
     public void PostBox(out Vector3 min, out Vector3 max)
     {
         min = new Vector3(PostNear, 0f, PostNear);

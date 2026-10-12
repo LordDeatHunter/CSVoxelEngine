@@ -60,7 +60,7 @@ public sealed class KilnRendererTests
         Assert.True(KilnRenderer.FireLocal.Z >= KilnRenderer.CrucibleLocal.Z + KilnRenderer.CrucibleOuterHalf);
         Assert.True(KilnRenderer.FuelLocal.Z > KilnRenderer.FireLocal.Z);
 
-        // The whole drawn fuel row - every unit's full width, not just the row's centre - has to
+        // The whole drawn fuel row - every unit's full width, not just the row's center - has to
         // fit between the piers and clear the hearth's back wall, and no two units may share a
         // plane
         Assert.True(KilnRenderer.FuelSpacing >= KilnRenderer.FuelSize);
@@ -184,7 +184,7 @@ public sealed class KilnRendererTests
         Assert.True(CastingRenderer.ResultSize < CastingRenderer.PocketWidth);
         Assert.True(CastingRenderer.ResultSize > ItemDrop.Size * 1.5f);
 
-        // Centred in the cell, its edges stand exactly the clearance inside each pocket wall
+        // Centered in the cell, its edges stand exactly the clearance inside each pocket wall
         Assert.Equal(CastingRenderer.ResultClearance,
             0.5f - CastingRenderer.ResultSize / 2f - CastingRenderer.PocketInset, precision: 4);
         Assert.Equal(CastingRenderer.ResultClearance,

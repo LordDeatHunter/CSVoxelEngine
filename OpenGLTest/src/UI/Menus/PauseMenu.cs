@@ -46,16 +46,16 @@ public static class PauseMenuLayout
 
     public static Vector2 ButtonSize => new(ButtonWidth, ButtonHeight);
 
-    /// <summary>Centre of the Resume/Settings/Exit button on the main page.</summary>
-    public static Vector2 MainButtonCentre(Vector2 screenSize, int index)
+    /// <summary>Center of the Resume/Settings/Exit button on the main page.</summary>
+    public static Vector2 MainButtonCenter(Vector2 screenSize, int index)
     {
         var totalHeight = 3 * ButtonHeight + 2 * ButtonGap;
         var top = screenSize.Y * 0.5f - totalHeight * 0.5f + ButtonHeight * 0.5f;
         return new Vector2(screenSize.X * 0.5f, top + index * (ButtonHeight + ButtonGap));
     }
 
-    /// <summary>Centre of the Back button on the settings page.</summary>
-    public static Vector2 BackButtonCentre(Vector2 screenSize) =>
+    /// <summary>Center of the Back button on the settings page.</summary>
+    public static Vector2 BackButtonCenter(Vector2 screenSize) =>
         new(screenSize.X * 0.5f, screenSize.Y * 0.5f + 80f);
 
     /// <summary>Top edge (Y) of the page title text.</summary>
@@ -70,19 +70,19 @@ public static class PauseMenuLayout
         {
             for (var i = 0; i < 3; i++)
             {
-                if (InBox(point, MainButtonCentre(screenSize, i), ButtonSize))
+                if (InBox(point, MainButtonCenter(screenSize, i), ButtonSize))
                     return (PauseMenuHit)((int)PauseMenuHit.Resume + i);
             }
             return PauseMenuHit.None;
         }
 
-        if (page == PauseMenuPage.Settings && InBox(point, BackButtonCentre(screenSize), ButtonSize))
+        if (page == PauseMenuPage.Settings && InBox(point, BackButtonCenter(screenSize), ButtonSize))
             return PauseMenuHit.Back;
 
         return PauseMenuHit.None;
     }
 
-    private static bool InBox(Vector2 point, Vector2 centre, Vector2 size) =>
-        float.Abs(point.X - centre.X) <= size.X * 0.5f
-        && float.Abs(point.Y - centre.Y) <= size.Y * 0.5f;
+    private static bool InBox(Vector2 point, Vector2 center, Vector2 size) =>
+        float.Abs(point.X - center.X) <= size.X * 0.5f
+        && float.Abs(point.Y - center.Y) <= size.Y * 0.5f;
 }

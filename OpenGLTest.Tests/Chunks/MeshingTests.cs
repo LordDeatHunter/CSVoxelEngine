@@ -51,7 +51,7 @@ public sealed class MeshingTests
     }
 
     [Fact]
-    public void MissingFaceNeighbourAbandonsTheBuild()
+    public void MissingFaceNeighborAbandonsTheBuild()
     {
         var (manager, center) = MeshTestWorld.WalledArea();
         manager.Chunks.TryRemove(Vector3.UnitX, out _);
@@ -140,7 +140,7 @@ public sealed class MeshingTests
         Assert.Empty(mesh.TranslucentVertices);
     }
 
-    // One air cell in the neighbor plane that touches the centre exposes exactly one face,
+    // One air cell in the neighbor plane that touches the center exposes exactly one face,
     // which also pins the orientation of each boundary plane the fast path inspects.
     [Theory]
     [InlineData(1, 0, 0, 0, 8, 8)]
@@ -149,7 +149,7 @@ public sealed class MeshingTests
     [InlineData(0, -1, 0, 8, 15, 8)]
     [InlineData(0, 0, 1, 8, 8, 0)]
     [InlineData(0, 0, -1, 8, 8, 15)]
-    public void HoleInNeighbourPlaneEmitsOneFace(int ox, int oy, int oz, int hx, int hy, int hz)
+    public void HoleInNeighborPlaneEmitsOneFace(int ox, int oy, int oz, int hx, int hy, int hz)
     {
         var (manager, center) = MeshTestWorld.WalledArea();
         MeshTestWorld.FillWalledArea(manager, ContentRegistry.RequireBlock("stone").Id);
@@ -291,7 +291,7 @@ public sealed class MeshingTests
             Assert.True(t.IsSwaying);
         }
 
-        // The baked water surface survives its quarter-block quantisation
+        // The baked water surface survives its quarter-block quantization
         foreach (var y in new[] { -44f, -0.25f, 0f, 8f / 9f, 12.75f, 200.5f })
         {
             var encoded = Vertex.EncodeWaterSurface(y);
@@ -588,7 +588,7 @@ public sealed class MeshingTests
     }
 
     [Fact]
-    public void ThinWoodAndLeavesDoNotDarkenNeighbourTopFace()
+    public void ThinWoodAndLeavesDoNotDarkenNeighborTopFace()
     {
         // High above the terrain so sunlight is uniform: only AO can vary the shade.
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
@@ -598,7 +598,7 @@ public sealed class MeshingTests
         var branchState = WoodState.Encode(0, WoodState.ParentDetached, false);
         center.SetBlockRaw(8, 8, 8, stone, 0);
 
-        // Ring the top-face AO neighbourhood with canopy and thin wood: every side/corner
+        // Ring the top-face AO neighborhood with canopy and thin wood: every side/corner
         // sample around the +Y face sits on leaves or a branch. A full-cube neighbor here
         // would drag corners to AO 0 (black); these must leave it at full brightness.
         var ring = new (int x, int z, byte id)[]
@@ -628,7 +628,7 @@ public sealed class MeshingTests
     }
 
     [Fact]
-    public void ClearingBorderCellExposesNeighbourFace()
+    public void ClearingBorderCellExposesNeighborFace()
     {
         // High above the terrain so sunlight is uniform: only culling decides the face count.
         var h = MeshTestWorld.HighAbove;
@@ -662,7 +662,7 @@ public sealed class MeshingTests
     }
 
     /// <summary>
-    /// Item C12(b): GenerateBlockData's final recount is vectorised
+    /// Item C12(b): GenerateBlockData's final recount is vectorized
     /// (BlockCount - _blocks.AsSpan().Count(BlockType.Air)) rather than a scalar foreach over
     /// all 4096 cells. Pins the new form against an independent scalar oracle walking the public
     /// GetLocalBlock, which is the shape of the loop that was deleted -- the fast path that

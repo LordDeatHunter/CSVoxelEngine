@@ -9,7 +9,7 @@ namespace VoxelEngine.Particles;
 
 /// <summary>
 /// Draws every live <see cref="FireParticle"/> as a camera-facing billboard: plain
-/// vertex-coloured quads (embers glow orange, smoke drifts grey), fogged like the world.
+/// vertex-colored quads (embers glow orange, smoke drifts gray), fogged like the world.
 /// One buffer upload feeds two draws. Embers go first and <b>additively</b>, so a cluster of
 /// them builds up light instead of stacking into an opaque orange blot, and additive light
 /// needs no sort. Smoke follows <b>alpha-blended</b> and back-to-front, drawn over the embers

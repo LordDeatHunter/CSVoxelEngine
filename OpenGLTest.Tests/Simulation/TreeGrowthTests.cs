@@ -593,7 +593,7 @@ public sealed class TreeGrowthTests
         return (id, state);
     }
 
-    // A root state for a lone wood cell, as the rasteriser writes it
+    // A root state for a lone wood cell, as the rasterizer writes it
     private static byte LoneRootState(TreeSpecies species)
     {
         var lone = new TreeGraph(0, 0, 0, species.TipPx);

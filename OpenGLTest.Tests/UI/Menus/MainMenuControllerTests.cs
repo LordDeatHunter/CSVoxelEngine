@@ -88,7 +88,7 @@ public sealed class MainMenuControllerTests : IDisposable
         var request = controller.TakePlayRequest();
         Assert.NotNull(request);
         Assert.True(controller.PlayRequestIsNew);
-        Assert.Equal(WorldNames.Normalise(""), request!.Name);
+        Assert.Equal(WorldNames.Normalize(""), request!.Name);
         Assert.Equal(4242, request.Seed);
         Assert.Contains(_store.List(), w => w.Slug == request.Slug);
 

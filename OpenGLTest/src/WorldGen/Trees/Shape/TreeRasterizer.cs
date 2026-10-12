@@ -24,12 +24,12 @@ namespace VoxelEngine.WorldGen.Trees.Shape;
 /// <b>Output order</b> (load-bearing): <c>cells[0..graph.Count)</c> are the graph nodes in index
 /// order (growth nodes, then feature nodes such as roots), then the shells, which end the wood at
 /// <c>woodCount</c>, then the leaves. A species that never grows past 16 px emits no shell and
-/// rasterises exactly as before shells existed.
+/// rasterizes exactly as before shells existed.
 /// </para>
 /// </summary>
 public static class TreeRasterizer
 {
-    // Initialisation order matters: MaxShellRadius is computed from the unclamped helper before
+    // Initialization order matters: MaxShellRadius is computed from the unclamped helper before
     // the offset tables (built in the static ctor) read it.
 
     /// <summary>The largest shell radius any species can reach: <see cref="BlockRadius"/> of the compiler's trunk cap.</summary>
@@ -152,12 +152,12 @@ public static class TreeRasterizer
             dst.Add(node);
     }
 
-    /// <summary>Rasterises the tree; see <see cref="Rasterize(TreeGraph, TreeSpecies, ITreeSpace, out int)"/>.</summary>
+    /// <summary>Rasterizes the tree; see <see cref="Rasterize(TreeGraph, TreeSpecies, ITreeSpace, out int)"/>.</summary>
     public static List<TreeCell> Rasterize(TreeGraph graph, TreeSpecies species, ITreeSpace space)
         => Rasterize(graph, species, space, out _);
 
     /// <summary>
-    /// Rasterises the tree in a fixed order: every node in index order as wood (growth nodes
+    /// Rasterizes the tree in a fixed order: every node in index order as wood (growth nodes
     /// first, then feature nodes such as roots, since features append after growth), then the
     /// shells of the wide trunk-chain nodes, then the leaves. <paramref name="woodCount"/> is the
     /// number of wood cells (nodes plus shells), where the leaves begin.
@@ -230,7 +230,7 @@ public static class TreeRasterizer
     }
 
     /// <summary>
-    /// The box every rasterised cell of the species stays inside, relative to the root:
+    /// The box every rasterized cell of the species stays inside, relative to the root:
     /// horizontally the signal energy (no growth node is further than that from the root) plus
     /// the larger of the leaf radius and the trunk's <see cref="BlockRadius"/> (shells stand
     /// around the trunk chain only, which never leaves the root column); upward the signal

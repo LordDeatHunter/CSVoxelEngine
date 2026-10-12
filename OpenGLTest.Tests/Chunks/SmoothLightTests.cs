@@ -29,13 +29,13 @@ public sealed class SmoothLightTests
         }
     }
 
-    /// <summary>The per-quad top (+Y) face of the given cell, found by its centre.</summary>
+    /// <summary>The per-quad top (+Y) face of the given cell, found by its center.</summary>
     private static Vertex[] TopFace(ChunkMeshData mesh, int x, int y, int z)
     {
-        var centre = new Vector3(x + 0.5f, y + 1f, z + 0.5f);
+        var center = new Vector3(x + 0.5f, y + 1f, z + 0.5f);
         return Quads(mesh.Vertices, mesh.Indices).Single(q =>
             (q[0].Normal & 7) == 4 &&
-            Vector3.DistanceSquared(q.Aggregate(Vector3.Zero, (s, v) => s + v.Position) / 4f, centre) < 1e-6f);
+            Vector3.DistanceSquared(q.Aggregate(Vector3.Zero, (s, v) => s + v.Position) / 4f, center) < 1e-6f);
     }
 
     private static (ChunkManager Manager, Chunk Center) FloorWorld()
@@ -56,7 +56,7 @@ public sealed class SmoothLightTests
     }
 
     [Fact]
-    public void OccludersDoNotDarkenTheLightOfANeighbouringFace()
+    public void OccludersDoNotDarkenTheLightOfANeighboringFace()
     {
         var (manager, center) = FloorWorld();
         center.SetBlockRaw(8, 1, 8, Block("stone"), 0);
@@ -139,7 +139,7 @@ public sealed class SmoothLightTests
         Assert.Equal(2, far.Count);
         Assert.All(near, n => Assert.All(far, f => Assert.True(n.Block > f.Block, $"{n.Block} <= {f.Block}")));
 
-        // The neighbouring pool cell computes the same light at the corners the two share
+        // The neighboring pool cell computes the same light at the corners the two share
         var next = TopOver(mesh.TranslucentVertices, mesh.TranslucentIndices, 8, 8, 1f, 2f);
         foreach (var v in far)
         {
@@ -176,13 +176,13 @@ public sealed class SmoothLightTests
         Assert.All(nearer, n => Assert.All(shared, s => Assert.NotEqual(s.Block, n.Block)));
     }
 
-    // ---------------------------------------------------------------- coloured lamp light
+    // ---------------------------------------------------------------- colored lamp light
 
     private static Vector3 Decode(Vertex v) => LightTint.Decode(v.BlockTint, BlockLightPalette.Linear);
 
     private static Vector3 Color(byte id) => BlockLightPalette.Linear[BlockType.LightSlot[id]];
 
-    /// <summary>The coloured proof lamp, with the preconditions the tests below lean on.</summary>
+    /// <summary>The colored proof lamp, with the preconditions the tests below lean on.</summary>
     private static (byte Lamp, byte Blue) Lamps()
     {
         var lamp = Block("lamp");
@@ -203,7 +203,7 @@ public sealed class SmoothLightTests
             .ToLookup(v => v.Position.X);
 
     [Fact]
-    public void AColouredLampLightsExactlyAsBrightlyAsTheDefaultLamp()
+    public void AColoredLampLightsExactlyAsBrightlyAsTheDefaultLamp()
     {
         var (lamp, blue) = Lamps();
         var (manager, center) = FloorWorld();
@@ -242,7 +242,7 @@ public sealed class SmoothLightTests
     }
 
     [Fact]
-    public void TintShiftsTowardTheNearerLampColour()
+    public void TintShiftsTowardTheNearerLampColor()
     {
         var (lamp, blue) = Lamps();
         var (manager, center) = FloorWorld();
@@ -258,7 +258,7 @@ public sealed class SmoothLightTests
             var here = row[x].ToList();
             Assert.NotEmpty(here);
             Assert.All(here, v => Assert.True(Distance(v) <= previous + 1e-5f,
-                $"x {x}: tint {Decode(v)} moved away from the coloured lamp ({Distance(v)} > {previous})"));
+                $"x {x}: tint {Decode(v)} moved away from the colored lamp ({Distance(v)} > {previous})"));
             previous = here.Max(Distance);
         }
 
@@ -267,12 +267,12 @@ public sealed class SmoothLightTests
     }
 
     [Fact]
-    public void ColourTiesDoNotDependOnPlacementOrder()
+    public void ColorTiesDoNotDependOnPlacementOrder()
     {
         var (lamp, blue) = Lamps();
         var lower = Math.Min(BlockType.LightSlot[lamp], BlockType.LightSlot[blue]);
 
-        // A default and a coloured lamp equidistant from column x = 8, then the same with the two
+        // A default and a colored lamp equidistant from column x = 8, then the same with the two
         // swapped: world B is world A mirrored about that column, but the scan that seeds the
         // flood meets the two lamps in the opposite order
         ChunkMeshData Build(byte left, byte right)
@@ -312,7 +312,7 @@ public sealed class SmoothLightTests
     }
 
     [Fact]
-    public void EmittersNearAColouredLampTakeItsTint()
+    public void EmittersNearAColoredLampTakeItsTint()
     {
         var (lamp, blue) = Lamps();
         var water = Block("water");

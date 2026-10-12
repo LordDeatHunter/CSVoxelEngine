@@ -3,7 +3,7 @@
   // Shots land in visual/fences/.
   //
   // The flat desert patch of torches.json: the player hovers at (253, -5) (sand at y 9, feet at
-  // 10, eye (253.5, 11.62, -4.5)) and every placement aims at an exact ground cell centre
+  // 10, eye (253.5, 11.62, -4.5)) and every placement aims at an exact ground cell center
   // (dx, 9, dz) relative to the player's cell: yaw atan2(dz, dx), pitch -atan(1.62 / |(dx, dz)|),
   // farthest first so none blocks a later ray.
   //   Cobblestone walls at (-1..1, 10, -5), one stacked on the middle at (0, 11, -5) and one at

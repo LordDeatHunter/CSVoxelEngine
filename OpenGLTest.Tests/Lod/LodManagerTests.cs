@@ -201,13 +201,13 @@ public sealed class LodManagerTests
     /// linear <c>List.Remove</c>, and the buried-flag pass resets every index as it drains the list.
     ///
     /// Two halves, because the two ways the bookkeeping can be wrong show up differently. The
-    /// FIRST half is behavioural: no chunk is meshed anywhere, so every region the pass evaluates
+    /// FIRST half is behavioral: no chunk is meshed anywhere, so every region the pass evaluates
     /// comes back unburied, and a region still reading the <c>true</c> sentinel afterwards is one
     /// the pass never looked at. An unloaded region is gone from RegionList, so <c>_pendingCover</c>
     /// is the only route by which the pass could still reach it — if the swap-remove dropped the
     /// wrong entry, the unloaded region would be evaluated and one survivor would not be.
     ///
-    /// The SECOND half pins the reset at the Clear, which has no behavioural tell here (the pass's
+    /// The SECOND half pins the reset at the Clear, which has no behavioral tell here (the pass's
     /// later loops re-reach any region still in RegionList whichever list it is on) and is asserted
     /// on the indices directly. Without the reset a region added before one pass and unloaded after
     /// a later one would swap-remove against a stale index and evict whichever region has since
@@ -273,7 +273,7 @@ public sealed class LodManagerTests
     }
 
     /// <summary>Covers item C11: TakeDirtyRegion now walks the dirty dictionary itself instead of
-    /// materialising <c>.Keys</c>. The fact pins the drain's BEHAVIOUR — every pending region is
+    /// materializing <c>.Keys</c>. The fact pins the drain's BEHAVIOR — every pending region is
     /// handed out exactly once and the set then reports empty — not the enumeration mechanism: a
     /// test cannot observe the absence of the Keys snapshot's locks or its copy, only that the
     /// claim semantics are unchanged. The dirty regions are produced through the real path
@@ -389,11 +389,11 @@ public sealed class LodManagerTests
         return lods;
     }
 
-    /// <summary>The block column at the centre of a region, which is the only column guaranteed to
+    /// <summary>The block column at the center of a region, which is the only column guaranteed to
     /// mark that region and nothing beside it: MarkEditedColumn widens the edit by
-    /// SampleMargin + CellSize (3 blocks at level 0) and a column at the centre of a 64-block
+    /// SampleMargin + CellSize (3 blocks at level 0) and a column at the center of a 64-block
     /// region is far inside that margin.</summary>
-    private static (int X, int Z) CentreColumnOf((int Level, int X, int Z) key)
+    private static (int X, int Z) CenterColumnOf((int Level, int X, int Z) key)
     {
         var blocks = LodRegion.Levels[key.Level].RegionBlocks;
         return (key.X * blocks + blocks / 2, key.Z * blocks + blocks / 2);
@@ -428,7 +428,7 @@ public sealed class LodManagerTests
         var k = claimed!.Value;
         Assert.Equal(1, lods.BuildingClaimCount);
 
-        var (cx, cz) = CentreColumnOf(k);
+        var (cx, cz) = CenterColumnOf(k);
         lods.MarkEditedColumn(cx, cz);
 
         // Repeatedly, because the refusal must hold for every spin of every worker, not just the
@@ -471,7 +471,7 @@ public sealed class LodManagerTests
         Assert.NotNull(claimed);
         var k = claimed!.Value;
 
-        var (cx, cz) = CentreColumnOf(k);
+        var (cx, cz) = CenterColumnOf(k);
         lods.MarkEditedColumn(cx, cz);
 
         // Drain to exhaustion while the claim is held. Nothing comes out — but the mark must
@@ -508,7 +508,7 @@ public sealed class LodManagerTests
         Assert.NotNull(claimed);
         var k = claimed!.Value;
         lods.ReleaseRegion(k);
-        var (cx, cz) = CentreColumnOf(k);
+        var (cx, cz) = CenterColumnOf(k);
         lods.MarkEditedColumn(cx, cz);
 
         for (var i = 0; i < WorldGenerationConfig.MaxLodBuildsInFlight; i++)
@@ -571,7 +571,7 @@ public sealed class LodManagerTests
 
         // Claimable again through the dirty path, which is the one the release actually reopens:
         // the needed-scan would skip K anyway, since _queued still holds it.
-        var (cx, cz) = CentreColumnOf(k);
+        var (cx, cz) = CenterColumnOf(k);
         lods.MarkEditedColumn(cx, cz);
         var reclaimed = lods.ClaimNextRegion();
         Assert.NotNull(reclaimed);

@@ -27,7 +27,7 @@ public sealed class MobDeathPoofTests
     }
 
     [Fact]
-    public void AKilledMobsFinishedDeathBurstsSkinColouredChips()
+    public void AKilledMobsFinishedDeathBurstsSkinColoredChips()
     {
         var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
         var camera = MakeCamera();
@@ -51,7 +51,7 @@ public sealed class MobDeathPoofTests
             Assert.Equal(DebrisLook.Color, chip.Look);
 
         // The chips wear the goblin's own mean skin color, not the fallback
-        var skin = LandingDust.SkinColour(EntityRegistry.Require("goblin").Model, Vector3.Zero);
+        var skin = LandingDust.SkinColor(EntityRegistry.Require("goblin").Model, Vector3.Zero);
         Assert.True(skin != Vector3.Zero, "the goblin model has no skin to read");
         Assert.Equal(BiomeTint.VertexTint(skin), debris.Debris[0].Tint);
     }

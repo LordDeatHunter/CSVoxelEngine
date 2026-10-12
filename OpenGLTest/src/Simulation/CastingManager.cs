@@ -22,7 +22,7 @@ namespace VoxelEngine.Simulation;
 /// </summary>
 public sealed class CastingManager
 {
-    /// <summary>How fast a crucible pours into a mold, in millilitres per second.</summary>
+    /// <summary>How fast a crucible pours into a mold, in milliliters per second.</summary>
     public const float PourMlPerSecond = 100f;
 
     /// <summary>Live state of one mold cell: how full it is, who is pouring and how far it cooled.</summary>
@@ -36,10 +36,10 @@ public sealed class CastingManager
         /// <summary>The metalworks recipe this cell is casting; fixed for the cell's lifetime.</summary>
         public CastRecipe Recipe { get; }
 
-        /// <summary>Millilitres poured in so far, up to the recipe's amount.</summary>
+        /// <summary>Milliliters poured in so far, up to the recipe's amount.</summary>
         public int FilledMl;
 
-        /// <summary>Sub-millilitre remainder of the pour, so a fractional frame is never lost.</summary>
+        /// <summary>Sub-milliliter remainder of the pour, so a fractional frame is never lost.</summary>
         public float PourCarry;
 
         /// <summary>Tool instance currently pouring, or 0 while the pour is paused.</summary>
@@ -187,10 +187,10 @@ public sealed class CastingManager
     {
         var stack = inventory.GetToolStack(state.PourInstance);
         var contents = stack?.Get<CrucibleComponent>() ?? default;
-        var centre = new Vector3(key.X + 0.5f, key.Y + 0.5f, key.Z + 0.5f);
+        var center = new Vector3(key.X + 0.5f, key.Y + 0.5f, key.Z + 0.5f);
         if (stack == null
             || state.PourInstance != selectedInstance
-            || Vector3.Distance(playerPos, centre) > reach
+            || Vector3.Distance(playerPos, center) > reach
             || contents.MaterialId != state.Recipe.MaterialId
             || contents.MoltenMl <= 0)
         {

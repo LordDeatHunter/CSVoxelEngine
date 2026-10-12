@@ -186,7 +186,7 @@ public sealed class GreedyMeshingTests
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
             center.SetBlockRaw(x, 0, z, stone, 0);
-        // Hung above the floor's AO neighbourhood (the y = 1 row), so only light varies
+        // Hung above the floor's AO neighborhood (the y = 1 row), so only light varies
         center.SetBlockRaw(8, 3, 8, Block("lamp"), 0);
 
         AssertGreedyMatchesPerQuad(manager, center);
@@ -289,7 +289,7 @@ public sealed class GreedyMeshingTests
     /// boxes, sloped fluid tops) is kept verbatim in <paramref name="raw"/>: the two paths emit
     /// those with the same code, so they must match byte for byte.
     /// </summary>
-    private static void Rasterise(List<Vertex> vertices, List<ushort> indices, int list,
+    private static void Rasterize(List<Vertex> vertices, List<ushort> indices, int list,
         Dictionary<(int X, int Y, int Z, int Face, int Layer), CellFace> cells, List<string> raw)
     {
         Assert.Equal(0, indices.Count % 6);
@@ -304,7 +304,7 @@ public sealed class GreedyMeshingTests
             foreach (var v in quad)
             {
                 // Bits 0-5 (face, submerged, biome tint, sway) are per quad; the tint code above them is
-                // per corner and is compared through the rasterised corners instead
+                // per corner and is compared through the rasterized corners instead
                 Assert.Equal(v0.Normal & 0x3F, v.Normal & 0x3F);
                 Assert.Equal(v0.Layer, v.Layer);
                 Assert.Equal(v0.IsSwaying, v.IsSwaying);
@@ -401,12 +401,12 @@ public sealed class GreedyMeshingTests
         }
     }
 
-    private static (Dictionary<(int, int, int, int, int), CellFace> Cells, List<string> Raw) Rasterise(ChunkMeshData mesh)
+    private static (Dictionary<(int, int, int, int, int), CellFace> Cells, List<string> Raw) Rasterize(ChunkMeshData mesh)
     {
         var cells = new Dictionary<(int, int, int, int, int), CellFace>();
         var raw = new List<string>();
-        Rasterise(mesh.Vertices, mesh.Indices, 0, cells, raw);
-        Rasterise(mesh.TranslucentVertices, mesh.TranslucentIndices, 1, cells, raw);
+        Rasterize(mesh.Vertices, mesh.Indices, 0, cells, raw);
+        Rasterize(mesh.TranslucentVertices, mesh.TranslucentIndices, 1, cells, raw);
         raw.Sort(StringComparer.Ordinal);
         return (cells, raw);
     }
@@ -434,10 +434,10 @@ public sealed class GreedyMeshingTests
     [InlineData(4, 8)]
     public void GreedyMeshDrawsExactlyWhatThePerQuadPathDraws(int seed, int chunkY)
     {
-        // Random soup of every kind of block, in the centre and in the six neighbors (so halo
+        // Random soup of every kind of block, in the center and in the six neighbors (so halo
         // culling and cross-border AO are exercised), at chunk heights where sunlight varies
-        var centre = new Vector3(0, chunkY, 0);
-        var (manager, center) = MeshTestWorld.WalledArea(centre);
+        var centerPosition = new Vector3(0, chunkY, 0);
+        var (manager, center) = MeshTestWorld.WalledArea(centerPosition);
         var water = Block("water");
         byte[] palette =
         [
@@ -467,8 +467,8 @@ public sealed class GreedyMeshingTests
         Assert.True(scalar.TranslucentVertices.Count < 60000, $"{scalar.TranslucentVertices.Count} translucent vertices");
         Assert.Equal(scalar.HasWater, greedy.HasWater);
 
-        var (gCells, gRaw) = Rasterise(greedy);
-        var (sCells, sRaw) = Rasterise(scalar);
+        var (gCells, gRaw) = Rasterize(greedy);
+        var (sCells, sRaw) = Rasterize(scalar);
 
         Assert.Equal(sRaw, gRaw);
         Assert.Equal(sCells.Count, gCells.Count);
@@ -515,9 +515,9 @@ public sealed class GreedyMeshingTests
     }
 
     [Fact]
-    public void TwoLampColoursMeshTheSameBothWays()
+    public void TwoLampColorsMeshTheSameBothWays()
     {
-        // A walled stone floor lit by a default lamp and a coloured one six cells apart, hung two
+        // A walled stone floor lit by a default lamp and a colored one six cells apart, hung two
         // cells above it, so the floor between them blends two palette slots
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         var stone = Block("stone");

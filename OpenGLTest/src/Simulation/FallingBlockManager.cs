@@ -37,7 +37,7 @@ public class FallingBlockManager
     }
 
     /// <summary>
-    /// Starts a cube at the centre of the cell the block occupied. The cube carries
+    /// Starts a cube at the center of the cell the block occupied. The cube carries
     /// <paramref name="blockId"/> so it renders as the block that toppled. Returns the cube
     /// so <see cref="TryTopple"/> can flag chain collapses.
     /// </summary>
@@ -49,16 +49,16 @@ public class FallingBlockManager
     }
 
     /// <summary>
-    /// A multiplayer client replaces its cubes with the server's, each at the exact centre the
+    /// A multiplayer client replaces its cubes with the server's, each at the exact center the
     /// server reported. Only a client calls this, and it never calls <see cref="Update"/>, so a
     /// mirror never moves or lands here; it is drawn, and it still blocks a placement into its cell
     /// (<see cref="OverlapsAny"/>).
     /// </summary>
-    internal void ReplaceMirrors(IReadOnlyList<(Vector3 Centre, byte BlockId)> cubes)
+    internal void ReplaceMirrors(IReadOnlyList<(Vector3 Center, byte BlockId)> cubes)
     {
         _falling.Clear();
         for (var i = 0; i < cubes.Count; i++)
-            _falling.Add(new FallingBlock(cubes[i].Centre, cubes[i].BlockId));
+            _falling.Add(new FallingBlock(cubes[i].Center, cubes[i].BlockId));
     }
 
     /// <summary>

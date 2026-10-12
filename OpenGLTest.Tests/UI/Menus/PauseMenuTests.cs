@@ -30,11 +30,11 @@ public sealed class PauseMenuTests
     public void MainButtonsHitInOrder()
     {
         Assert.Equal(PauseMenuHit.Resume,
-            PauseMenuLayout.HitAt(PauseMenuLayout.MainButtonCentre(Screen, 0), Screen, PauseMenuPage.Main));
+            PauseMenuLayout.HitAt(PauseMenuLayout.MainButtonCenter(Screen, 0), Screen, PauseMenuPage.Main));
         Assert.Equal(PauseMenuHit.Settings,
-            PauseMenuLayout.HitAt(PauseMenuLayout.MainButtonCentre(Screen, 1), Screen, PauseMenuPage.Main));
+            PauseMenuLayout.HitAt(PauseMenuLayout.MainButtonCenter(Screen, 1), Screen, PauseMenuPage.Main));
         Assert.Equal(PauseMenuHit.Exit,
-            PauseMenuLayout.HitAt(PauseMenuLayout.MainButtonCentre(Screen, 2), Screen, PauseMenuPage.Main));
+            PauseMenuLayout.HitAt(PauseMenuLayout.MainButtonCenter(Screen, 2), Screen, PauseMenuPage.Main));
     }
 
     [Fact]
@@ -52,8 +52,8 @@ public sealed class PauseMenuTests
     public void SettingsPageHitsBackOnly()
     {
         Assert.Equal(PauseMenuHit.Back,
-            PauseMenuLayout.HitAt(PauseMenuLayout.BackButtonCentre(Screen), Screen, PauseMenuPage.Settings));
+            PauseMenuLayout.HitAt(PauseMenuLayout.BackButtonCenter(Screen), Screen, PauseMenuPage.Settings));
         Assert.Equal(PauseMenuHit.None,
-            PauseMenuLayout.HitAt(PauseMenuLayout.MainButtonCentre(Screen, 0), Screen, PauseMenuPage.Settings));
+            PauseMenuLayout.HitAt(PauseMenuLayout.MainButtonCenter(Screen, 0), Screen, PauseMenuPage.Settings));
     }
 }

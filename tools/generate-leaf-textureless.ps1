@@ -1,24 +1,24 @@
-# Generates the grey ("textureless") leaf tiles the biome tint draws in place of the coloured
+# Generates the gray ("textureless") leaf tiles the biome tint draws in place of the colored
 # leaf art: assets/textures/blocks/<name>_textureless.png beside each <name>.png in -Sources
 # (default: every leaf tile; tools/generate-tree-textures.ps1 passes only the leaves it made, so
 # a run from there never rewrites the oak and spruce tiles).
 #
 # The world shader draws a biome-tinted face as texel * vertexRgb * BiomeTint.Gain, and the one
-# Gain (4) is sized against tiles whose opaque texels average the same sRGB grey the two supplied
+# Gain (4) is sized against tiles whose opaque texels average the same sRGB gray the two supplied
 # grass tiles (grass_top_textureless, grass_side_textureless) measure - about 98. So each leaf
 # tile is desaturated to its Rec. 601 luminance (as tools/generate-ore-materials.ps1 reads it) and
-# then scaled uniformly until the mean grey of its opaque texels lands on that same value. Alpha
+# then scaled uniformly until the mean gray of its opaque texels lands on that same value. Alpha
 # is copied unchanged, so the canopy keeps exactly the holes of the source art.
 #
 # Conventions that must not drift:
-#   * $TargetGrey must equal WorldGenerationConfig.BiomeTintTextureGrey * 255, and the LOD canopy
-#     hole fallback in test-fragment.glsl is that grey decoded to linear.
+#   * $TargetGray must equal WorldGenerationConfig.BiomeTintTextureGray * 255, and the LOD canopy
+#     hole fallback in test-fragment.glsl is that gray decoded to linear.
 #   * $OpaqueAlpha is the first alpha byte at or above WorldGenerationConfig.AlphaCutoff (0.5) * 255,
 #     i.e. the texels the alpha test keeps; only those count toward the mean.
 #   * Every texel is written, transparent ones too, so the output never depends on what the
 #     encoder would make of skipped pixels.
 #
-# BiomeTintTextureTests checks the result (grey on every texel, the opaque mean at the target,
+# BiomeTintTextureTests checks the result (gray on every texel, the opaque mean at the target,
 # alpha equal to the source texel for texel).
 #
 # The output is a pure function of the input pixels - no noise, no randomness - so re-running
@@ -29,7 +29,7 @@ param([string[]]$Sources = @('oak_leaves', 'spruce_leaves', 'baobab_leaves', 'st
 
 Add-Type -AssemblyName System.Drawing
 
-$TargetGrey  = 98
+$TargetGray  = 98
 $OpaqueAlpha = 128
 
 $root     = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -67,7 +67,7 @@ foreach ($name in $Sources) {
     }
     if ($count -eq 0) { throw "Leaf tile '$src' has no opaque texel." }
     $mean = $sum / $count
-    $scale = $TargetGrey / $mean
+    $scale = $TargetGray / $mean
 
     $out = New-Object System.Drawing.Bitmap $w, $h
     for ($y = 0; $y -lt $h; $y++) {

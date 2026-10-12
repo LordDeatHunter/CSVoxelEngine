@@ -1,6 +1,6 @@
 # Generates the placeholder tiles of the tree species that have no art of their own yet (baobab,
 # stone pine): assets/textures/blocks/<species>_log_side.png, <species>_log_top.png and
-# <species>_leaves.png, each tinted from the matching oak tile, then their grey
+# <species>_leaves.png, each tinted from the matching oak tile, then their gray
 # <species>_leaves_textureless.png through tools/generate-leaf-textureless.ps1.
 #
 # Every output texel is the oak texel's RGB multiplied channel by channel by the species' fixed
@@ -24,7 +24,7 @@ Add-Type -AssemblyName System.Drawing
 
 # RGB multipliers per species and tile kind.
 $Tints = @{
-    'baobab_bark'       = @(1.30, 1.22, 1.12)   # pale grey-tan
+    'baobab_bark'       = @(1.30, 1.22, 1.12)   # pale gray-tan
     'baobab_leaves'     = @(1.15, 1.08, 0.55)   # olive / yellow-green
     'stone_pine_bark'   = @(1.18, 0.82, 0.70)   # warm red-brown
     'stone_pine_leaves' = @(0.62, 0.82, 0.92)   # dark blue-green
@@ -48,7 +48,7 @@ function Clamp255([double]$v) {
     if ($i -lt 0) { return 0 } elseif ($i -gt 255) { return 255 } else { return $i }
 }
 
-# The pure per-texel function: tint the colour, keep the alpha.
+# The pure per-texel function: tint the color, keep the alpha.
 function Tint-Texel([System.Drawing.Color]$c, [double[]]$tint) {
     return [System.Drawing.Color]::FromArgb(
         $c.A,

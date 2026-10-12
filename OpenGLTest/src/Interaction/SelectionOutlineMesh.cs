@@ -62,7 +62,7 @@ public static class SelectionOutlineMesh
     /// <summary>
     /// Writes the <see cref="VertexCount"/> world-space corners of the twelve edge beams of the
     /// box <paramref name="min"/>..<paramref name="max"/>, each beam
-    /// <paramref name="thickness"/> across and centred on its edge.
+    /// <paramref name="thickness"/> across and centered on its edge.
     /// </summary>
     public static void BuildVertices(Vector3 min, Vector3 max, float thickness, Span<Vector3> vertices)
     {

@@ -139,7 +139,7 @@ public sealed class CloudCopiesTests
         Assert.Equal(Field, CloudCopies.Snap(Field, Field));
         Assert.Equal(2f * Field, CloudCopies.Snap(2f * Field + 7f, Field));
 
-        // The negative half is where floor and truncation disagree: truncating -1 / Field towards
+        // The negative half is where floor and truncation disagree: truncating -1 / Field toward
         // zero would snap the grid to 0 and slide every copy a whole field off the camera.
         Assert.Equal(-Field, CloudCopies.Snap(-1f, Field));
         Assert.Equal(-Field, CloudCopies.Snap(-Field, Field));

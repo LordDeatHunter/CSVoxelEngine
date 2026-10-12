@@ -8,7 +8,7 @@
     "lowestBranchHeight": 5,
     "maturitySteps": [90, 130]
   },
-  // A wide, pixel-bevelled trunk: the strong base girth swells the trunk chain past 48 px, where
+  // A wide, pixel-beveled trunk: the strong base girth swells the trunk chain past 48 px, where
   // it becomes a core plus a ring of shells (TreeRasterizer), and the rim rounds the ring off.
   // The profile drops steeply above the trunk so the crown's limbs stay near 16 px.
   // Tuned against 8 flat-ground seeds: root 79-80 px (block radius 2 on 7 of 8, 1 otherwise),

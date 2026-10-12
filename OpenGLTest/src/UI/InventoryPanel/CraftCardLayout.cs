@@ -120,7 +120,7 @@ public sealed class CraftCardLayout
     public float TitleY { get; }
     public float MakesY { get; }
     public float BatchTextY { get; }
-    public float BatchCentreY { get; }
+    public float BatchCenterY { get; }
     public float HeaderHeight { get; }
     public IngredientLayout[] Ingredients { get; }
     public float StatusY { get; }
@@ -153,7 +153,7 @@ public sealed class CraftCardLayout
         TitleY = y + HeaderTextTop;
         MakesY = TitleY + Math.Max(1, titleLines.Length) * TitleLineH;
         BatchTextY = MakesY + Math.Max(1, makesLines.Length) * BodyLineH + 4f;
-        BatchCentreY = BatchTextY + 8f;
+        BatchCenterY = BatchTextY + 8f;
         HeaderHeight = BatchTextY + BatchRowH - y;
         y += HeaderHeight + HeaderGap;
 
@@ -224,41 +224,41 @@ public sealed class CraftCardLayout
     /// <summary>Canvas Y of content-relative <paramref name="y"/> with the card scrolled by <paramref name="scroll"/>.</summary>
     public float ContentY(float y, float scroll) => Top + y - scroll;
 
-    public Vector2 CardCentre => new(Left + Width * 0.5f, Top + ViewHeight * 0.5f);
+    public Vector2 CardCenter => new(Left + Width * 0.5f, Top + ViewHeight * 0.5f);
     public Vector2 CardSize => new(Width, ViewHeight);
     /// <summary>Left edge of the header text, right of the icon column.</summary>
     public float TextX => Left + Pad + IconColumn;
 
-    public Vector2 IconCentre(float scroll) => new(Left + Pad + 32f, ContentY(Pad, scroll) + 38f);
+    public Vector2 IconCenter(float scroll) => new(Left + Pad + 32f, ContentY(Pad, scroll) + 38f);
 
-    public Vector2 BatchMinusCentre(float scroll) =>
-        new(TextX + BatchLabelWidth + BatchGap + StepBox * 0.5f, ContentY(BatchCentreY, scroll));
+    public Vector2 BatchMinusCenter(float scroll) =>
+        new(TextX + BatchLabelWidth + BatchGap + StepBox * 0.5f, ContentY(BatchCenterY, scroll));
 
-    public Vector2 BatchCountCentre(float scroll)
+    public Vector2 BatchCountCenter(float scroll)
     {
-        var minus = BatchMinusCentre(scroll);
+        var minus = BatchMinusCenter(scroll);
         return new Vector2(minus.X + StepBox * 0.5f + BatchGap + BatchCountW * 0.5f, minus.Y);
     }
 
-    public Vector2 BatchPlusCentre(float scroll)
+    public Vector2 BatchPlusCenter(float scroll)
     {
-        var count = BatchCountCentre(scroll);
+        var count = BatchCountCenter(scroll);
         return new Vector2(count.X + BatchCountW * 0.5f + BatchGap + StepBox * 0.5f, count.Y);
     }
 
     /// <summary>Left edge of the "max N" label, right of the batch + box.</summary>
-    public float BatchMaxX(float scroll) => BatchPlusCentre(scroll).X + StepBox * 0.5f + BatchGap;
+    public float BatchMaxX(float scroll) => BatchPlusCenter(scroll).X + StepBox * 0.5f + BatchGap;
 
-    public Vector2 IngPlusCentre(int i, float scroll) =>
+    public Vector2 IngPlusCenter(int i, float scroll) =>
         new(Left + Width - Pad - IngPad - IngStepBox * 0.5f, ContentY(Ingredients[i].FedY, scroll) + IngFedH * 0.5f);
 
-    public Vector2 IngMinusCentre(int i, float scroll)
+    public Vector2 IngMinusCenter(int i, float scroll)
     {
-        var plus = IngPlusCentre(i, scroll);
+        var plus = IngPlusCenter(i, scroll);
         return new Vector2(plus.X - IngStepBox - 8f, plus.Y);
     }
 
-    public Vector2 ChipCentre(int i, int pos, float scroll)
+    public Vector2 ChipCenter(int i, int pos, float scroll)
     {
         var col = pos % ChipsPerRow;
         var row = pos / ChipsPerRow;
@@ -267,17 +267,17 @@ public sealed class CraftCardLayout
             ContentY(Ingredients[i].ChipsY, scroll) + ChipSize * 0.5f + row * (ChipSize + ChipGap));
     }
 
-    public Vector2 ButtonCentre(float scroll) => new(Left + Width * 0.5f, ContentY(ButtonY, scroll) + ButtonH * 0.5f);
+    public Vector2 ButtonCenter(float scroll) => new(Left + Width * 0.5f, ContentY(ButtonY, scroll) + ButtonH * 0.5f);
     public Vector2 ButtonSize => new(InnerWidth, ButtonH);
 
     /// <summary>The scrollbar track down the card's right padding, inset by <see cref="Pad"/> top and bottom.</summary>
-    public (Vector2 Centre, Vector2 Size) TrackRect()
+    public (Vector2 Center, Vector2 Size) TrackRect()
     {
         var length = TrackLength;
         return (new Vector2(TrackX, Top + Pad + length * 0.5f), new Vector2(ScrollbarWidth, length));
     }
 
-    public (Vector2 Centre, Vector2 Size) ThumbRect(float scroll)
+    public (Vector2 Center, Vector2 Size) ThumbRect(float scroll)
     {
         var (start, length) = ScrollList.Thumb(TrackLength, ContentHeight, ViewHeight, scroll, ThumbMinLength);
         return (new Vector2(TrackX, Top + Pad + start + length * 0.5f), new Vector2(ScrollbarWidth, length));
@@ -297,27 +297,27 @@ public sealed class CraftCardLayout
     public CraftHit HitAt(Vector2 point, float scroll)
     {
         if (!Contains(point)) return new CraftHit(CraftHitKind.None);
-        if (InBox(point, ButtonCentre(scroll), ButtonSize))
+        if (InBox(point, ButtonCenter(scroll), ButtonSize))
             return new CraftHit(CraftHitKind.CraftButton);
-        if (InBox(point, BatchMinusCentre(scroll), new Vector2(StepBox)))
+        if (InBox(point, BatchMinusCenter(scroll), new Vector2(StepBox)))
             return new CraftHit(CraftHitKind.BatchMinus);
-        if (InBox(point, BatchPlusCentre(scroll), new Vector2(StepBox)))
+        if (InBox(point, BatchPlusCenter(scroll), new Vector2(StepBox)))
             return new CraftHit(CraftHitKind.BatchPlus);
 
         for (var i = 0; i < Ingredients.Length; i++)
         {
-            if (InBox(point, IngMinusCentre(i, scroll), new Vector2(IngStepBox)))
+            if (InBox(point, IngMinusCenter(i, scroll), new Vector2(IngStepBox)))
                 return new CraftHit(CraftHitKind.IngMinus, i);
-            if (InBox(point, IngPlusCentre(i, scroll), new Vector2(IngStepBox)))
+            if (InBox(point, IngPlusCenter(i, scroll), new Vector2(IngStepBox)))
                 return new CraftHit(CraftHitKind.IngPlus, i);
             for (var c = 0; c < Ingredients[i].MemberCount; c++)
-                if (InBox(point, ChipCentre(i, c, scroll), new Vector2(ChipSize)))
+                if (InBox(point, ChipCenter(i, c, scroll), new Vector2(ChipSize)))
                     return new CraftHit(CraftHitKind.MemberChip, i, Recipe.Ingredients[i].AcceptedIds[c]);
         }
         return new CraftHit(CraftHitKind.None);
     }
 
-    internal static bool InBox(Vector2 point, Vector2 centre, Vector2 size) =>
-        MathF.Abs(point.X - centre.X) <= size.X * 0.5f
-        && MathF.Abs(point.Y - centre.Y) <= size.Y * 0.5f;
+    internal static bool InBox(Vector2 point, Vector2 center, Vector2 size) =>
+        MathF.Abs(point.X - center.X) <= size.X * 0.5f
+        && MathF.Abs(point.Y - center.Y) <= size.Y * 0.5f;
 }

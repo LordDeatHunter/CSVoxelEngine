@@ -336,7 +336,7 @@ public sealed class ChunkRekeyReplayProbe
 
         // PHASE 4 - a real synchronous mesh build on the test thread, the pattern MeshingTests uses.
         // This is what exercises Chunk.TryResolveNeighbors' 26 chunk probes deterministically: the
-        // centre chunk has all six face neighbors registered and must build, while (17,0,0) is
+        // center chunk has all six face neighbors registered and must build, while (17,0,0) is
         // missing its (18,0,0) neighbor and must abandon the build and return null.
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var meshedChunk = manager.Chunks[Vector3.Zero];

@@ -35,7 +35,7 @@ public sealed class GoblinStoneTests
         var slime = slimes.Spawn(new Vector3(4.5f, 1f + Slime.HalfExtentFor(1), 8.5f))!;
         var before = slime.Health;
 
-        // A stone from the thrower straight down +X into the slime's body, level with its centre
+        // A stone from the thrower straight down +X into the slime's body, level with its center
         goblins.TestThrowStone(thrower, new Vector3(3.5f, 1.25f, 8.5f), new Vector3(14f, 0f, 0f));
         for (var i = 0; i < 120 && slimes.Slimes.Count > 0 && slime.Health == before; i++)
             goblins.Update(Dt, chunks, new DropManager(), camera, slimes: slimes.Slimes);

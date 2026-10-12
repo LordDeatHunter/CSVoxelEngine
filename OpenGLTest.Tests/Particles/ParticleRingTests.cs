@@ -22,7 +22,7 @@ namespace VoxelEngine.Tests.Particles;
 ///
 /// <para>The oracle is <see cref="List{T}"/> itself: the type being replaced, driven through the
 /// identical operation script, with Count, every index and the full enumeration compared after EVERY
-/// operation rather than at the end. A differential fact of that shape localises a divergence to the
+/// operation rather than at the end. A differential fact of that shape localizes a divergence to the
 /// operation that caused it, and it cannot be satisfied by a container that merely ends up holding
 /// the right set.</para>
 ///
@@ -34,7 +34,7 @@ namespace VoxelEngine.Tests.Particles;
 public sealed class ParticleRingTests
 {
     /// <summary>
-    /// The centrepiece: a seeded script of several thousand mixed operations driven against both a
+    /// The centerpiece: a seeded script of several thousand mixed operations driven against both a
     /// <see cref="ParticleRing{T}"/> and a <see cref="List{T}"/>, asserting they agree on Count,
     /// every index and the whole enumeration after every single operation.
     ///

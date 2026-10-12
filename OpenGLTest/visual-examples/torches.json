@@ -4,7 +4,7 @@
   //
   // Stands on a flat, bare patch of desert at (253, -5) (sand at y 9, so the feet are at 10; the
   // desert spawns no mobs, so nothing shoves the player off its marks) and aims every placement
-  // at an exact cell: from the eye (253.5, 11.62, -4.5) a cell centre (dx, 0, dz) away on the
+  // at an exact cell: from the eye (253.5, 11.62, -4.5) a cell center (dx, 0, dz) away on the
   // ground top is yaw atan2(dz, dx), pitch -atan(1.62 / |(dx, dz)|). The first-person ray walks
   // at most ten cells, so every target stays within that many DDA steps of the eye.
   //   floor-close  three floor torches two cells ahead: thin posts with bright tops, warm pools

@@ -14,7 +14,7 @@ namespace VoxelEngine.Tests.Effects.Climate;
 /// <summary>
 /// The far LOD's biome tint: tinted LOD vertices wear only tinted tiles, the LOD samples the very
 /// tint lattice the chunk mesher does (from the region's own chunk columns, not the prefetch
-/// origin one chunk before it), and untinted blocks stay grey.
+/// origin one chunk before it), and untinted blocks stay gray.
 /// </summary>
 public sealed class BiomeTintLodTests
 {
@@ -49,7 +49,7 @@ public sealed class BiomeTintLodTests
     }
 
     /// <summary>
-    /// Level-0 regions whose first chunk-centre probe is <paramref name="biome"/> on a non-beach
+    /// Level-0 regions whose first chunk-center probe is <paramref name="biome"/> on a non-beach
     /// column, nearest the origin first, each region once.
     /// </summary>
     private static IEnumerable<(int Rx, int Rz)> RegionsOver(Biome biome)
@@ -146,7 +146,7 @@ public sealed class BiomeTintLodTests
     }
 
     [Fact]
-    public void UntintedLodBlocksStayGrey()
+    public void UntintedLodBlocksStayGray()
     {
         var sand = ContentRegistry.RequireBlock("sand");
         Assert.Null(sand.BiomeTint);
@@ -160,7 +160,7 @@ public sealed class BiomeTintLodTests
         {
             if (v.IsBiomeTinted) continue;
             var (r, g, b) = Rgb(v);
-            Assert.True(r == g && g == b, $"untinted LOD vertex on tile {v.Layer} is coloured {Rgb(v)}");
+            Assert.True(r == g && g == b, $"untinted LOD vertex on tile {v.Layer} is colored {Rgb(v)}");
         }
 
         Assert.DoesNotContain(mesh.Vertices, v => v.IsBiomeTinted && sandTiles.Contains(v.Layer));

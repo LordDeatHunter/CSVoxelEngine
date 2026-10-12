@@ -6,7 +6,7 @@ using VoxelEngine.Rendering;
 namespace VoxelEngine.UI.InventoryPanel;
 
 /// <summary>
-/// Memoises the crafting card's <see cref="CraftCardLayout"/>, so the word wrap and every text
+/// Memoizes the crafting card's <see cref="CraftCardLayout"/>, so the word wrap and every text
 /// measurement behind it run only when something on the card actually changed: the canvas size,
 /// the open recipe or the status line. The previous layout is also what
 /// <see cref="UIRenderer.CraftHitAt"/> hit-tests (<see cref="Current"/>), so a click always reads

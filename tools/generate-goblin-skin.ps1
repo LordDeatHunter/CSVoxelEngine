@@ -28,7 +28,7 @@ function In-Rect([int]$x, [int]$y, [int]$x1, [int]$y1, [int]$x2, [int]$y2) {
 }
 
 # Mottled goblin green: a fine per-texel speckle plus a coarser blotch so the skin never reads
-# as one flat colour.
+# as one flat color.
 function Skin([int]$x, [int]$y, [int]$lift) {
     $fine = (Get-Noise $x $y 7) * 16 - 8
     $blotch = if ((Get-Noise ([int][Math]::Floor($x / 2)) ([int][Math]::Floor($y / 2)) 13) -gt 0.7) { -14 } else { 0 }

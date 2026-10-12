@@ -12,7 +12,7 @@ public sealed class PillarWellTests
     public PillarWellTests() => TestContent.EnsureLoaded();
 
     [Fact]
-    public void APillarsStackHonoursItsHeightAndGaps()
+    public void APillarsStackHonorsItsHeightAndGaps()
     {
         var brick = RuinedPillarGenerator.BrickBlock;
         var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];

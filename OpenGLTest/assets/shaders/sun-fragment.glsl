@@ -1,6 +1,6 @@
 #version 460 core
 // Drawn with additive blending (One, One): black contributes nothing, so the quad's corners
-// disappear and the glow brightens the sky instead of greying it. Never write anything but
+// disappear and the glow brightens the sky instead of graying it. Never write anything but
 // light here - there is no alpha to hide behind.
 in vec2 fTexCoord;
 flat in uint fLayer;
@@ -17,7 +17,7 @@ out vec4 FragColor;
 void main()
 {
     vec2 c = fTexCoord - 0.5;
-    float r = length(c) * 2.0;                       // 0 at centre, 1 at the quad's inscribed circle
+    float r = length(c) * 2.0;                       // 0 at center, 1 at the quad's inscribed circle
 
     vec3 disc = vec3(0.0);
     if (r < uDiscFraction) {                          // never sample outside 0..1: the texture wraps

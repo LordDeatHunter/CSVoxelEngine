@@ -116,7 +116,7 @@ public sealed class CraftCardLayoutTests
         Assert.Equal(delta, many.StatusY - one.StatusY, 3);
         Assert.Equal(delta, many.ButtonY - one.ButtonY, 3);
         Assert.Equal(delta, many.ContentHeight - one.ContentHeight, 3);
-        Assert.Equal(delta, many.BatchMinusCentre(0f).Y - one.BatchMinusCentre(0f).Y, 3);
+        Assert.Equal(delta, many.BatchMinusCenter(0f).Y - one.BatchMinusCenter(0f).Y, 3);
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public sealed class CraftCardLayoutTests
     }
 
     [Fact]
-    public void ControlCentresHitTheirControls()
+    public void ControlCentersHitTheirControls()
     {
         foreach (var screen in Screens)
         {
@@ -161,11 +161,11 @@ public sealed class CraftCardLayoutTests
             AssertEveryControlHits(layout, 0f, _ => true);
 
             // The chip that wrapped onto the second row sits below the +/- boxes.
-            var second = layout.ChipCentre(1, layout.ChipsPerRow, 0f);
+            var second = layout.ChipCenter(1, layout.ChipsPerRow, 0f);
             Assert.True(second.Y - CraftCardLayout.ChipSize / 2f
-                        >= layout.IngPlusCentre(1, 0f).Y + CraftCardLayout.IngStepBox / 2f);
+                        >= layout.IngPlusCenter(1, 0f).Y + CraftCardLayout.IngStepBox / 2f);
 
-            var mid = layout.CardCentre;
+            var mid = layout.CardCenter;
             Assert.Equal(CraftHitKind.None, layout.HitAt(new Vector2(layout.Left - 1f, mid.Y), 0f).Kind);
             Assert.Equal(CraftHitKind.None, layout.HitAt(new Vector2(mid.X, CraftCardLayout.Top - 1f), 0f).Kind);
             Assert.Equal(CraftHitKind.None,
@@ -188,29 +188,29 @@ public sealed class CraftCardLayoutTests
         bool Visible(Vector2 c) => c.Y >= CraftCardLayout.Top && c.Y <= CraftCardLayout.Top + layout.ViewHeight;
         AssertEveryControlHits(layout, scroll, Visible);
 
-        var batch = layout.BatchMinusCentre(scroll);
+        var batch = layout.BatchMinusCenter(scroll);
         Assert.True(batch.Y < CraftCardLayout.Top);
         Assert.Equal(CraftHitKind.None, layout.HitAt(batch, scroll).Kind);
     }
 
-    /// <summary>Every control whose centre passes <paramref name="visible"/> is hit there as itself.</summary>
+    /// <summary>Every control whose center passes <paramref name="visible"/> is hit there as itself.</summary>
     private static void AssertEveryControlHits(CraftCardLayout layout, float scroll, Func<Vector2, bool> visible)
     {
-        void Expect(Vector2 centre, CraftHit expected)
+        void Expect(Vector2 center, CraftHit expected)
         {
-            if (visible(centre)) Assert.Equal(expected, layout.HitAt(centre, scroll));
+            if (visible(center)) Assert.Equal(expected, layout.HitAt(center, scroll));
         }
 
-        Expect(layout.ButtonCentre(scroll), new CraftHit(CraftHitKind.CraftButton));
-        Expect(layout.BatchMinusCentre(scroll), new CraftHit(CraftHitKind.BatchMinus));
-        Expect(layout.BatchPlusCentre(scroll), new CraftHit(CraftHitKind.BatchPlus));
+        Expect(layout.ButtonCenter(scroll), new CraftHit(CraftHitKind.CraftButton));
+        Expect(layout.BatchMinusCenter(scroll), new CraftHit(CraftHitKind.BatchMinus));
+        Expect(layout.BatchPlusCenter(scroll), new CraftHit(CraftHitKind.BatchPlus));
         for (var i = 0; i < layout.Ingredients.Length; i++)
         {
-            Expect(layout.IngMinusCentre(i, scroll), new CraftHit(CraftHitKind.IngMinus, i));
-            Expect(layout.IngPlusCentre(i, scroll), new CraftHit(CraftHitKind.IngPlus, i));
+            Expect(layout.IngMinusCenter(i, scroll), new CraftHit(CraftHitKind.IngMinus, i));
+            Expect(layout.IngPlusCenter(i, scroll), new CraftHit(CraftHitKind.IngPlus, i));
             var members = layout.Recipe.Ingredients[i].AcceptedIds;
             for (var c = 0; c < members.Length; c++)
-                Expect(layout.ChipCentre(i, c, scroll), new CraftHit(CraftHitKind.MemberChip, i, members[c]));
+                Expect(layout.ChipCenter(i, c, scroll), new CraftHit(CraftHitKind.MemberChip, i, members[c]));
         }
     }
 }

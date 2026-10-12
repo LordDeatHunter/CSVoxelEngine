@@ -17,8 +17,8 @@ public readonly record struct Rgba(byte R, byte G, byte B, byte A = 255)
     public static Rgba FromFloat(float r, float g, float b, float a = 1f) =>
         new(ToByte(r), ToByte(g), ToByte(b), ToByte(a));
 
-    /// <summary>Uniform grey, handy for UI panels and borders.</summary>
-    public static Rgba Grey(float level, float alpha = 1f)
+    /// <summary>Uniform gray, handy for UI panels and borders.</summary>
+    public static Rgba Gray(float level, float alpha = 1f)
     {
         var v = ToByte(level);
         return new Rgba(v, v, v, ToByte(alpha));

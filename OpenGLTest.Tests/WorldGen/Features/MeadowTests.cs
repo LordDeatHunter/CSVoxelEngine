@@ -6,7 +6,7 @@ namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// Climate-scaled grass and flower meadows: the tuft density runs from the dry end of the climate
-/// to the wet end, and every flower stands in a clump whose centre is open forest.
+/// to the wet end, and every flower stands in a clump whose center is open forest.
 /// </summary>
 public sealed class MeadowTests
 {
@@ -42,7 +42,7 @@ public sealed class MeadowTests
                     if (chunk.GetLocalBlock(x, y, z) != flower) continue;
                     var worldX = (cx << Chunk.SizeShift) + x;
                     var worldZ = (cz << Chunk.SizeShift) + z;
-                    // The clump reaching this column is one whose centre is open forest
+                    // The clump reaching this column is one whose center is open forest
                     Assert.True(FlowerGenerator.TryGetFlower(worldX, worldZ),
                         $"a flower at ({worldX}, {worldZ}) is not in an open meadow clump");
                     found++;

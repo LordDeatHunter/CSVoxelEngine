@@ -105,7 +105,7 @@ public sealed class GroundDust
                 // A bigger slime splats bigger by its body scale. Splat widens the spread by that
                 // scale itself, so it gets the size-1 width rather than the already scaled body.
                 var scale = SlimeSize.Scale(slime.Size);
-                Splat(feet, impactSpeed, SplatColourOf(mob.Type), mob.BodyHalfExtent / scale, debris, scale, random);
+                Splat(feet, impactSpeed, SplatColorOf(mob.Type), mob.BodyHalfExtent / scale, debris, scale, random);
             }
             else
                 Land(feet, fallBlocks, mob.BodyHalfExtent, chunks, debris, random);
@@ -113,14 +113,14 @@ public sealed class GroundDust
     }
 
     // Each splatting kind's skin color, read once from its model
-    private readonly Dictionary<EntityType, Vector3> _splatColours = new();
+    private readonly Dictionary<EntityType, Vector3> _splatColors = new();
 
-    private Vector3 SplatColourOf(EntityType type)
+    private Vector3 SplatColorOf(EntityType type)
     {
-        if (!_splatColours.TryGetValue(type, out var color))
+        if (!_splatColors.TryGetValue(type, out var color))
         {
-            color = LandingDust.SkinColour(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor);
-            _splatColours[type] = color;
+            color = LandingDust.SkinColor(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor);
+            _splatColors[type] = color;
         }
         return color;
     }
@@ -128,29 +128,29 @@ public sealed class GroundDust
     /// <summary>
     /// A slime whose feet are at <paramref name="feet"/> landed at <paramref name="impactSpeed"/>
     /// blocks per second: throws the goo <see cref="LandingDust.SplatCount"/> sizes, in
-    /// <paramref name="colourSrgb"/>, from under a body <paramref name="halfWidth"/> across.
+    /// <paramref name="colorSrgb"/>, from under a body <paramref name="halfWidth"/> across.
     /// <paramref name="scale"/> is the slime's body scale (<see cref="SlimeSize.Scale"/>), growing the
     /// count, the fling, the spread and the chips. Returns how many chips it spawned.
     /// </summary>
-    public static int Splat(Vector3 feet, float impactSpeed, Vector3 colourSrgb, float halfWidth,
+    public static int Splat(Vector3 feet, float impactSpeed, Vector3 colorSrgb, float halfWidth,
         BlockDebrisSystem debris, float scale = 1f, Random? random = null)
     {
         var count = LandingDust.SplatCount(impactSpeed, scale);
         if (count <= 0) return 0;
         var size = WorldGenerationConfig.SlimeSplatSize * scale;
-        debris.Splat(feet + new Vector3(0f, size, 0f), colourSrgb, halfWidth * scale, count,
+        debris.Splat(feet + new Vector3(0f, size, 0f), colorSrgb, halfWidth * scale, count,
             LandingDust.SplatSpeed(impactSpeed, scale), size, random);
         return count;
     }
 
     /// <summary>
     /// A mob whose death animation just ended bursts into chips of its own skin color
-    /// (<see cref="LandingDust.SkinColour"/> of its model: a goblin's mean skin color, a slime's
+    /// (<see cref="LandingDust.SkinColor"/> of its model: a goblin's mean skin color, a slime's
     /// green), spread by its body width. Returns how many chips it spawned.
     /// </summary>
     public static int DeathPoof(Mob mob, BlockDebrisSystem debris, Random? random = null)
     {
-        var color = LandingDust.SkinColour(mob.Type.Model, WorldGenerationConfig.MobDeathPoofFallbackColor);
+        var color = LandingDust.SkinColor(mob.Type.Model, WorldGenerationConfig.MobDeathPoofFallbackColor);
         var count = WorldGenerationConfig.MobDeathPoofCount;
         debris.Splat(mob.Position, color, mob.BodyHalfExtent, count,
             WorldGenerationConfig.MobDeathPoofSpeed, WorldGenerationConfig.MobDeathPoofSize, random);
@@ -218,8 +218,8 @@ public sealed class GroundDust
 
     /// <summary>
     /// The block a body standing with its feet at <paramref name="feet"/> stands on, and its cell:
-    /// the feet's own cell under their centre first (a cover the feet sink into, such as a layered
-    /// snow drift, or a slab the body stands on), then the cell below, under the centre and then under
+    /// the feet's own cell under their center first (a cover the feet sink into, such as a layered
+    /// snow drift, or a slab the body stands on), then the cell below, under the center and then under
     /// the four corners of a body <paramref name="halfWidth"/> across, so a body on a ledge's edge
     /// still finds the ledge. Only a solid block or a stack block (snow, pebbles) counts; a plant or
     /// a fluid is looked through. False when nothing is underfoot.

@@ -267,7 +267,7 @@ public sealed class ServerWorldTests : IDisposable
             Thread.Sleep(1);
         }
 
-        // A player standing centred on its column's generated ground: the heightmap is pure
+        // A player standing centered on its column's generated ground: the heightmap is pure
         // worldgen, so the far column needs no loaded chunk to be found
         ServerPlayer OnGround(int id, string name, int x, int z)
         {
@@ -315,7 +315,7 @@ public sealed class ServerWorldTests : IDisposable
         Assert.True(Loaded(near), "the near player's terrain never loaded around the spawn");
         var nearChunk = ChunkUnder(near);
 
-        // Both players online: each one's neighbourhood streams in, and the near one's is never
+        // Both players online: each one's neighborhood streams in, and the near one's is never
         // dropped meanwhile (a chunk unloads only outside every player's radius)
         world.ServerPlayers = [near, far];
         wait.Restart();

@@ -34,7 +34,7 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 - A non-full-cube model needs `light.passes: true` (default) or its cell and interior quads render black.
 - A `cutout` block must not occlude. `translucent` forces occludes off.
 - Partial-block textures are cropped, never stretched (`FaceTiles` crops); a new partial block needs no mining-pop work if its `FaceTiles` are sensible.
-- `biomeTint` only on blocks that bake to a plain full cube, not translucent; overlay not on cutout. Textureless tint tiles must be grey (see the biome tint section; generator scripts in `tools/`).
+- `biomeTint` only on blocks that bake to a plain full cube, not translucent; overlay not on cutout. Textureless tint tiles must be gray (see the biome tint section; generator scripts in `tools/`).
 - `multiblock` anchors/parts: `hasItem: false`, model authored in 0..32 units, no `cullface`, opening on north.
 - Two blocks sharing a texture share its material (warned at startup).
 - Fluids force `solid/castsAO/hasItem/needsSupport` off; `hardensTo` pairs live under `flow`.

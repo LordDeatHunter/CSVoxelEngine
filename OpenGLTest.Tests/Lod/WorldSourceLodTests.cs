@@ -139,9 +139,9 @@ public sealed class WorldSourceLodTests : IDisposable
         for (var rz = -ring; rz <= ring; rz++)
         {
             if (Math.Max(Math.Abs(rx), Math.Abs(rz)) != ring) continue;
-            var centreX = rx * Spec.RegionBlocks + Chunk.Size;
-            var centreZ = rz * Spec.RegionBlocks + Chunk.Size;
-            if (TerrainGenerator.BiomeAt(centreX, centreZ) is not (Biome.Forest or Biome.Taiga)) continue;
+            var centerX = rx * Spec.RegionBlocks + Chunk.Size;
+            var centerZ = rz * Spec.RegionBlocks + Chunk.Size;
+            if (TerrainGenerator.BiomeAt(centerX, centerZ) is not (Biome.Forest or Biome.Taiga)) continue;
 
             var mesh = LodRegion.BuildMeshData(Level, rx, rz);
             if (mesh.Vertices.Any(v => InInterior(v) && IsCanopy(v)))

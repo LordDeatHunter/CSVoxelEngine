@@ -25,7 +25,7 @@ public sealed class EntitySaveData
         /// <summary><see cref="EntityType.Name"/>, e.g. the entity JSON's file name.</summary>
         public string? Type { get; set; }
 
-        /// <summary>The body centre (<see cref="Mob.Position"/>), not the feet.</summary>
+        /// <summary>The body center (<see cref="Mob.Position"/>), not the feet.</summary>
         public float[]? Position { get; set; }
 
         public int? Health { get; set; }

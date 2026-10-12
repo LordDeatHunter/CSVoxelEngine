@@ -6,7 +6,7 @@ using Xunit;
 namespace VoxelEngine.Tests.Items;
 
 /// <summary>
-/// The firestarter's kiln branch: a fuelled kiln is a target like a firepit pile, an unfuelled one
+/// The firestarter's kiln branch: a fueled kiln is a target like a firepit pile, an unfueled one
 /// is not a target at all, so striking it spends neither durability nor the use delay.
 /// </summary>
 public sealed class FirestarterKilnTests

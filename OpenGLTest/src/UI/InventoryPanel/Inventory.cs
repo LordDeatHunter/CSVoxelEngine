@@ -645,7 +645,7 @@ public class Inventory
 
     /// <summary>
     /// Replaces everything this inventory holds — the constructor's spawn stock included —
-    /// with a saved one (main thread). Pool caps are honoured, tool instance ids are kept (a
+    /// with a saved one (main thread). Pool caps are honored, tool instance ids are kept (a
     /// repeated id is restored once) and later pickups get ids above every restored one; a
     /// durability or crucible value is clamped to this run's maximum. Names this run does not
     /// know, or that belong to the wrong pool, are dropped with one warning, and a hotbar slot

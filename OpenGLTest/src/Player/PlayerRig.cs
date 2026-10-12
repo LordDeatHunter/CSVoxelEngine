@@ -149,7 +149,7 @@ public sealed class PlayerRig
 
     /// <summary>
     /// The 4x2 solid-color palette texture (top-first RGBA): skin, shirt, pants, hair,
-    /// shoe, then white spares. Every cuboid face UVs to one swatch centre, so the model
+    /// shoe, then white spares. Every cuboid face UVs to one swatch center, so the model
     /// is UV-mapped Blockbench-style with zero image assets to author.
     /// </summary>
     public static byte[] PalettePixels()
@@ -177,7 +177,7 @@ public sealed class PlayerRig
         return pixels;
     }
 
-    /// <summary>UV centre of a palette swatch (v = 0 is the top row, like TextureLoader).</summary>
+    /// <summary>UV center of a palette swatch (v = 0 is the top row, like TextureLoader).</summary>
     public static Vector2 SwatchUv(int swatch) =>
         new(((swatch % PaletteCols) + 0.5f) / PaletteCols, ((swatch / PaletteCols) + 0.5f) / PaletteRows);
 

@@ -8,7 +8,7 @@ namespace VoxelEngine.WorldGen.Features;
 /// Geodes: a rare hollow sphere deep in solid rock, its shell lined with crystal and its heart
 /// open air — break into one and the cave opens up. Decided per
 /// 2^<see cref="WorldGenerationConfig.GeodeCellShift"/>-block cell from a pure hash of (cell, seed)
-/// (the centre column, a depth in the band and a radius 2..3), so every chunk the sphere crosses
+/// (the center column, a depth in the band and a radius 2..3), so every chunk the sphere crosses
 /// stamps the same cells; only stone is carved or lined, so a geode never eats soil or a cave. The
 /// far LOD shows none.
 /// </summary>
@@ -26,7 +26,7 @@ public static class GeodeGenerator
     }
 
     /// <summary>
-    /// The geode a cell holds: its centre (jittered inside the cell, its y in the deep band) and
+    /// The geode a cell holds: its center (jittered inside the cell, its y in the deep band) and
     /// radius, or false for the many cells without one. A pure function of the cell and the seed.
     /// </summary>
     public static bool TryGetGeode(int cellX, int cellZ, out int x, out int y, out int z, out int radius)

@@ -123,12 +123,12 @@ public sealed class EntityHealthbarRenderer : IDisposable
     }
 
     /// <summary>
-    /// World Y of the hearts row's centre for a body centred at
-    /// <paramref name="bodyCentreY"/> whose head sits <paramref name="headAboveCentre"/>
-    /// above it (already scaled — pass <see cref="Mob.HeadAboveCentre"/>).
+    /// World Y of the hearts row's center for a body centered at
+    /// <paramref name="bodyCenterY"/> whose head sits <paramref name="headAboveCenter"/>
+    /// above it (already scaled — pass <see cref="Mob.HeadAboveCenter"/>).
     /// </summary>
-    public static float BarCentreY(float bodyCentreY, float headAboveCentre) =>
-        bodyCentreY + headAboveCentre + WorldGenerationConfig.EntityHealthbarLiftBlocks;
+    public static float BarCenterY(float bodyCenterY, float headAboveCenter) =>
+        bodyCenterY + headAboveCenter + WorldGenerationConfig.EntityHealthbarLiftBlocks;
 
     /// <summary>
     /// Draws one five-heart row above each mob as two blended, depth-tested batches with
@@ -169,13 +169,13 @@ public sealed class EntityHealthbarRenderer : IDisposable
         for (var slot = 0; slot < count; slot++)
         {
             var mob = mobs[_order[count - 1 - slot]];
-            var centre = new Vector3(mob.Position.X,
-                BarCentreY(mob.Position.Y, mob.HeadAboveCentre),
+            var center = new Vector3(mob.Position.X,
+                BarCenterY(mob.Position.Y, mob.HeadAboveCenter),
                 mob.Position.Z);
             for (var h = 0; h < HeartCount; h++)
             {
-                var heartCentre = centre + right * ((h - (HeartCount - 1) * 0.5f) * size);
-                WriteQuad(quads * 4, heartCentre, size, right, up, HeartUMin, HeartUMax);
+                var heartCenter = center + right * ((h - (HeartCount - 1) * 0.5f) * size);
+                WriteQuad(quads * 4, heartCenter, size, right, up, HeartUMin, HeartUMax);
                 quads++;
             }
         }
@@ -188,17 +188,17 @@ public sealed class EntityHealthbarRenderer : IDisposable
         {
             var mob = mobs[_order[count - 1 - slot]];
             HeartFills(mob.Health, mob.MaxHealth, _fills);
-            var centre = new Vector3(mob.Position.X,
-                BarCentreY(mob.Position.Y, mob.HeadAboveCentre),
+            var center = new Vector3(mob.Position.X,
+                BarCenterY(mob.Position.Y, mob.HeadAboveCenter),
                 mob.Position.Z);
             for (var h = 0; h < HeartCount; h++)
             {
                 var fill = _fills[h];
                 if (fill <= 0f) continue;
-                var heartCentre = centre + right * ((h - (HeartCount - 1) * 0.5f) * size);
+                var heartCenter = center + right * ((h - (HeartCount - 1) * 0.5f) * size);
                 var width = size * fill;
-                var fillCentre = heartCentre + right * ((width - size) * 0.5f);
-                WriteQuad(quads * 4, fillCentre, width, right, up,
+                var fillCenter = heartCenter + right * ((width - size) * 0.5f);
+                WriteQuad(quads * 4, fillCenter, width, right, up,
                     HeartUMin, HeartUMin + (HeartUMax - HeartUMin) * fill);
                 quads++;
             }
@@ -209,7 +209,7 @@ public sealed class EntityHealthbarRenderer : IDisposable
         _gl.DepthMask(true);
     }
 
-    private void WriteQuad(int baseVert, Vector3 centre, float width, Vector3 right, Vector3 up,
+    private void WriteQuad(int baseVert, Vector3 center, float width, Vector3 right, Vector3 up,
         float uMin, float uMax)
     {
         var size = WorldGenerationConfig.EntityHeartSizeBlocks;
@@ -226,7 +226,7 @@ public sealed class EntityHealthbarRenderer : IDisposable
         {
             var (sx, sy) = CornerSigns[c];
             _verts[baseVert + c] = new Vertex(
-                centre + right * (sx * halfW) + up * (sy * halfH),
+                center + right * (sx * halfW) + up * (sy * halfH),
                 255, 255, 255, 255, uvs[c], 1f, 0f, Vector3.UnitY);
         }
     }

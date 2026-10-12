@@ -11,7 +11,7 @@ namespace VoxelEngine.Entities;
     /// A collectable left behind by mining: usually a block, sometimes a pure item (see
     /// <see cref="Item"/>). A drop pops out where the block was, falls under
 /// gravity and rests on the terrain, spinning and breathing in scale, until the player comes
-/// close enough — then it accelerates towards them and is collected on contact. Once latched
+/// close enough — then it accelerates toward them and is collected on contact. Once latched
 /// onto the player it flies straight and ignores terrain.
 /// </summary>
 public class ItemDrop
@@ -22,7 +22,7 @@ public class ItemDrop
     /// <summary>Item sprites render larger than block cubes so they read at a distance.</summary>
     private const float ItemSizeMultiplier = 1.5f;
 
-    /// <summary>Half the edge length; the drop collides as a cube this far from its centre.</summary>
+    /// <summary>Half the edge length; the drop collides as a cube this far from its center.</summary>
     private const float HalfExtent = Size * 0.5f;
 
     private const float SpinRadiansPerSecond = 1.5f;

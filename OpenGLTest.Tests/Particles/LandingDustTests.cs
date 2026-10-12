@@ -175,7 +175,7 @@ public sealed class LandingDustTests
         var chunk = chunks.Chunks[Vector3.Zero];
         chunk.SetBlockRaw(8, 0, 8, BlockType.Air, 0);
 
-        // The centre hangs over the hole, a corner of the body is still over the floor
+        // The center hangs over the hole, a corner of the body is still over the floor
         Assert.True(GroundDust.TryFindSurface(chunks, new Vector3(8.15f, 1f, 8.5f), 0.3f, out var cell, out _));
         Assert.Equal(7f, cell.X);
 
@@ -232,7 +232,7 @@ public sealed class LandingDustTests
         // An ordinary hop is far under the ground dust's minimum fall, yet it splats
         Assert.True(hopped);
         Assert.NotEmpty(debris.Debris);
-        var expected = BiomeTint.VertexTint(LandingDust.SkinColour(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor));
+        var expected = BiomeTint.VertexTint(LandingDust.SkinColor(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor));
         Assert.All(debris.Debris, chip =>
         {
             Assert.Equal(DebrisLook.Color, chip.Look);
@@ -324,10 +324,10 @@ public sealed class LandingDustTests
     }
 
     [Fact]
-    public void TheSplatColourIsTheMeanOfTheOpaqueSkin()
+    public void TheSplatColorIsTheMeanOfTheOpaqueSkin()
     {
         var fallback = new Vector3(0.1f, 0.2f, 0.3f);
-        Assert.Equal(fallback, LandingDust.SkinColour(new BbmodelData(), fallback));
+        Assert.Equal(fallback, LandingDust.SkinColor(new BbmodelData(), fallback));
 
         // Two opaque greens average; a transparent red texel never counts
         var model = new BbmodelData
@@ -336,20 +336,20 @@ public sealed class LandingDustTests
             TextureWidth = 3,
             TextureHeight = 1,
         };
-        var color = LandingDust.SkinColour(model, fallback);
+        var color = LandingDust.SkinColor(model, fallback);
         Assert.Equal(0f, color.X, 4);
         Assert.Equal(150f / 255f, color.Y, 4);
         Assert.Equal(25f / 255f, color.Z, 4);
 
         var clear = new BbmodelData { TexturePixels = [255, 0, 0, 0], TextureWidth = 1, TextureHeight = 1 };
-        Assert.Equal(fallback, LandingDust.SkinColour(clear, fallback));
+        Assert.Equal(fallback, LandingDust.SkinColor(clear, fallback));
     }
 
     [Fact]
-    public void AColourChipIsOneTintedTileOnEveryFace()
+    public void AColorChipIsOneTintedTileOnEveryFace()
     {
         const ushort tile = 3;
-        var (verts, _) = BlockCubeCache.BuildColourChip(tile);
+        var (verts, _) = BlockCubeCache.BuildColorChip(tile);
         Assert.All(verts, v => Assert.True(v.IsBiomeTinted));
         Assert.All(verts, v => Assert.Equal(tile, v.Layer));
         for (var face = 0; face < 6; face++)

@@ -9,7 +9,7 @@ namespace VoxelEngine.Tests.Support;
 
 /// <summary>
 /// Shared helpers of the worldgen tree facts: finding a wooded forest chunk column, generating
-/// its 3x3 neighbourhood and the wood/leaf id sets.
+/// its 3x3 neighborhood and the wood/leaf id sets.
 /// </summary>
 internal static class TreeWorldgenFixture
 {
@@ -18,7 +18,7 @@ internal static class TreeWorldgenFixture
             [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
 
     /// <summary>
-    /// A chunk column whose 3x3 neighbourhood is forest and whose centre roots a tree, searched in
+    /// A chunk column whose 3x3 neighborhood is forest and whose center roots a tree, searched in
     /// rings outward from <paramref name="origin"/> (chunk coordinates) up to <paramref name="maxRadius"/>.
     /// </summary>
     public static (int Cx, int Cz) FindForestTreeColumn((int OriginCx, int OriginCz) origin = default, int maxRadius = 48)

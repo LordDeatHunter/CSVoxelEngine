@@ -315,7 +315,7 @@ public sealed class GameServerTests : IDisposable
     /// </summary>
     private sealed record Arena(Vector3 Eye, int X, int Y, int Z)
     {
-        /// <summary>The cell at eye height two blocks along +X, and the aim at its centre.</summary>
+        /// <summary>The cell at eye height two blocks along +X, and the aim at its center.</summary>
         public Vector3 Front => new(X + 2, Y + 1, Z);
         public Vector3 AimAtFront => Vector3.Normalize(Front + new Vector3(0.5f) - Eye);
 

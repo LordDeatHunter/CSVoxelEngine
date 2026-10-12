@@ -4,15 +4,15 @@ Writes 32x32 opaque RGBA tiles (the size of every block tile) into OpenGLTest/as
   oak_trapdoor.png     a square hatch: a dark frame around four vertical boards, a cross brace
                        and two dark slits, in the plank palette
   oak_door_bottom.png  the door's lower half: the frame down both sides and along the bottom,
-                       two recessed panels and an iron ring pull centred near its top
+                       two recessed panels and an iron ring pull centered near its top
   oak_door_top.png     the door's upper half: the frame down both sides and along the top, four
                        dark window panes over a recessed panel
 The trapdoor models (assets/models/block/trapdoor_*.json) and door models (door_*.json) crop
 their faces out of these with default (position-derived) uvs, so the whole tile shows on the
 broad faces and its edge rows and columns on the thin sides; every texel is opaque, so the blocks
 are drawn without cutout. The two door tiles meet without a frame row where the halves touch.
-The pull sits on the door's centre line because the model baker mirrors a face's uv
-(ModelBaker.FlipU), so an off-centre handle would land on the hinge edge seen from one side.
+The pull sits on the door's center line because the model baker mirrors a face's uv
+(ModelBaker.FlipU), so an off-center handle would land on the hinge edge seen from one side.
 
 No randomness and no image library: the PNG is encoded here with zlib at a fixed level and filter
 0, so re-running reproduces every file byte for byte. Run from anywhere:
@@ -105,7 +105,7 @@ def door_bottom(x, y):
     frame = door_frame(x, y, top=False)
     if frame is not None:
         return frame
-    # An iron ring pull on the centre line near the top: a ring around a dark middle
+    # An iron ring pull on the center line near the top: a ring around a dark middle
     if 13 <= x <= 18 and 2 <= y <= 7:
         if 15 <= x <= 16 and 4 <= y <= 5:
             return SLIT

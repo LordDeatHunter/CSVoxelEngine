@@ -11,19 +11,19 @@ namespace VoxelEngine.Effects.Sky;
 /// square is cut into <see cref="WorldGenerationConfig.StarCellsPerFace"/>² cells. A cell holds at
 /// most one star, kept <see cref="CellMargin"/> clear of its edges so the shader, which only looks
 /// at the one cell a pixel falls in, never clips a star's soft point at a cell border. The warp
-/// leaves a cell at a face edge a little smaller in solid angle than one at the face centre, so
+/// leaves a cell at a face edge a little smaller in solid angle than one at the face center, so
 /// <see cref="Probability"/> scales each cell's chance by its relative solid angle and the field
 /// is equally dense in every direction (no cube-shaped clumping at the face corners). The stars
 /// stay put in the sky; only <see cref="Visibility"/> moves.
 /// </summary>
 public static class StarField
 {
-    /// <summary>A quarter turn, the angle each half of a cube face spans from its centre.</summary>
+    /// <summary>A quarter turn, the angle each half of a cube face spans from its center.</summary>
     private const float QuarterPi = MathF.PI / 4f;
 
     /// <summary>
     /// How far a star stays from its cell's edges, as a fraction of the cell, so its soft point
-    /// (a few pixels wide) never reaches into a neighbouring cell the shader would not evaluate.
+    /// (a few pixels wide) never reaches into a neighboring cell the shader would not evaluate.
     /// </summary>
     public const float CellMargin = 0.25f;
 
@@ -51,7 +51,7 @@ public static class StarField
         return (d.Z > 0f ? 4 : 5, new Vector2(d.X, d.Y) / az);
     }
 
-    /// <summary>The (unnormalised) direction through face coordinates <paramref name="uv"/> of face <paramref name="face"/>; the inverse of <see cref="FaceOf"/>.</summary>
+    /// <summary>The (unnormalized) direction through face coordinates <paramref name="uv"/> of face <paramref name="face"/>; the inverse of <see cref="FaceOf"/>.</summary>
     public static Vector3 FaceDirection(int face, Vector2 uv) => face switch
     {
         0 => new Vector3(1f, uv.Y, uv.X),
@@ -86,7 +86,7 @@ public static class StarField
 
     /// <summary>
     /// The solid angle of a small patch of warped square at face coordinates <paramref name="uv"/>,
-    /// relative to the same patch at the face centre: the cube's own (1 + u² + v²)^-3/2 density
+    /// relative to the same patch at the face center: the cube's own (1 + u² + v²)^-3/2 density
     /// times the warp's stretch (1 + u²)(1 + v²). Between about 0.7 and 1.
     /// </summary>
     public static float RelativeSolidAngle(Vector2 uv)
@@ -98,7 +98,7 @@ public static class StarField
 
     /// <summary>
     /// The chance cell (<paramref name="face"/>, <paramref name="x"/>, <paramref name="y"/>) holds
-    /// a star: <paramref name="density"/> scaled by the cell's relative solid angle at its centre.
+    /// a star: <paramref name="density"/> scaled by the cell's relative solid angle at its center.
     /// </summary>
     public static float Probability(int x, int y, int cellsPerFace, float density) =>
         density * RelativeSolidAngle(CellPointUv(x + 0.5f, y + 0.5f, cellsPerFace));

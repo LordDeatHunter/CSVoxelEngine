@@ -245,14 +245,14 @@ public sealed class DebugSceneRenderer : IDisposable
             Log.Warn($"Tree preview: {translucent} translucent vertices are not drawn.");
     }
 
-    // The chunk mesher bakes a biome tint as a *linear* multiplier against the decoded grey of the
+    // The chunk mesher bakes a biome tint as a *linear* multiplier against the decoded gray of the
     // textureless tiles (BiomeTint.VertexTint). The debugger samples its atlas undecoded and never
     // encodes, so that multiplier would lift a tinted face about three times too bright here. Rebake
-    // it so the grey texel times Gain lands on the color the game displays: encode(greyLin * v * Gain).
+    // it so the gray texel times Gain lands on the color the game displays: encode(grayLin * v * Gain).
     private static void ToDisplaySpaceTint(List<Vertex> vertices)
     {
-        var greyLinear = ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGrey) * BiomeTint.Gain;
-        var greyDisplay = WorldGenerationConfig.BiomeTintTextureGrey * BiomeTint.Gain;
+        var grayLinear = ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGray) * BiomeTint.Gain;
+        var grayDisplay = WorldGenerationConfig.BiomeTintTextureGray * BiomeTint.Gain;
         var span = CollectionsMarshal.AsSpan(vertices);
         for (var i = 0; i < span.Length; i++)
         {
@@ -267,7 +267,7 @@ public sealed class DebugSceneRenderer : IDisposable
 
         uint Rebake(uint channel)
         {
-            var display = ColorSpace.LinearToSrgb(channel / 255f * greyLinear) / greyDisplay;
+            var display = ColorSpace.LinearToSrgb(channel / 255f * grayLinear) / grayDisplay;
             return (uint)Math.Clamp(MathF.Round(display * 255f), 0f, 255f);
         }
     }

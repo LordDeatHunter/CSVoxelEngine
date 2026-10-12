@@ -74,7 +74,7 @@ public class Chunk : IDisposable
 
     /// <summary>
     /// Test seam: the non-air cell count <see cref="GenerateBlockData"/> reports. It exists so
-    /// the vectorised recount there can be pinned against an independent scalar oracle walking
+    /// the vectorized recount there can be pinned against an independent scalar oracle walking
     /// <see cref="GetLocalBlock"/>; nothing in the engine reads it.
     /// </summary>
     internal int SolidCount => _solidCount;
@@ -358,7 +358,7 @@ public class Chunk : IDisposable
         }
 
         // All-default light keeps the plain pass: the values (slot bits all 0) and the cost are
-        // exactly what they were before coloured light existed
+        // exactly what they were before colored light existed
         if (anyTinted)
             SpreadBlockLight(light, block, queue, ref head, ref tail);
         else
@@ -420,7 +420,7 @@ public class Chunk : IDisposable
         // Entirely above the terrain: nothing to fill, nothing to carve, nothing to stamp.
         // With trees enabled the band above the surface still needs generation (a tree reaches
         // TreeGenerator.ReachUp above its base), and overhanging limbs near cliffs can cross
-        // from higher neighbouring columns, so the test uses the tallest column in reach.
+        // from higher neighboring columns, so the test uses the tallest column in reach.
         var maxHeight = column.MaxHeight;
         if (WorldGenerationConfig.TreesEnabled)
         {
@@ -430,8 +430,8 @@ public class Chunk : IDisposable
             for (var dx = -reach; dx <= reach; dx++)
             for (var dz = -reach; dz <= reach; dz++)
             {
-                var neighbourMax = ColumnCache.Get(cx + dx, cz + dz).MaxHeight;
-                if (neighbourMax > maxHeight) maxHeight = neighbourMax;
+                var neighborMax = ColumnCache.Get(cx + dx, cz + dz).MaxHeight;
+                if (neighborMax > maxHeight) maxHeight = neighborMax;
             }
             maxHeight += TreeGenerator.ReachUp + 1;
         }
@@ -590,7 +590,7 @@ public class Chunk : IDisposable
 
         // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping.
         // Counting AIR and subtracting beats counting non-air: BlockType.Air is
-        // `public const byte Air = 0`, so this binds to the vectorised
+        // `public const byte Air = 0`, so this binds to the vectorized
         // MemoryExtensions.Count<byte> with no cast, where a "!= Air" predicate would
         // have to run one comparison per cell.
         _solidCount = BlockCount - _blocks.AsSpan().Count(BlockType.Air);
@@ -1120,7 +1120,7 @@ public class Chunk : IDisposable
     /// Builds this chunk's mesh, or returns null when a face neighbor, or one of the nine chunk
     /// columns' terrain (<see cref="ChunkManager.ColumnSource"/>, a streamed column that has not
     /// arrived), is missing.
-    /// The whole 3x3x3 neighbourhood is resolved once, up front: the caller checked for face
+    /// The whole 3x3x3 neighborhood is resolved once, up front: the caller checked for face
     /// neighbors before scheduling, but this runs on a pool thread behind a semaphore and can
     /// start seconds later, by which time an unload may have taken one away. Meshing against
     /// that hole reads solid ground as air and bakes bogus side faces, sunk fluid corners and
@@ -1136,13 +1136,13 @@ public class Chunk : IDisposable
     /// <paramref name="tintFields"/> overrides the biome tint field: a build whose chunk is not
     /// where its blocks really stand (TopplingTree.BuildMeshData's scratch chunk at (256, 0, 256))
     /// passes the field of the real footprint; null means the chunk's own fields, from the stored
-    /// corner climate of its lattice columns (<see cref="BiomeTint.FieldsFromNeighbourhood"/>).
+    /// corner climate of its lattice columns (<see cref="BiomeTint.FieldsFromNeighborhood"/>).
     /// </summary>
     internal ChunkMeshData? GenerateMeshData(ChunkManager chunkManager, bool greedy,
         BiomeTintFields? tintFields = null)
     {
         // Resolve before renting or touching anything: an abandoned build should cost nothing.
-        // The neighbourhood lives in the thread's mesh scratch, not in two fresh arrays.
+        // The neighborhood lives in the thread's mesh scratch, not in two fresh arrays.
         var scratch = MeshScratch.Current;
         var neighbors = scratch.Neighbors;
         var neighborStates = scratch.NeighborStates;
@@ -1188,7 +1188,7 @@ public class Chunk : IDisposable
             var anyTinted = ComputeLight(lightBlocks, sunLight, blockLight, queue);
             // Keep the chunk's own cells of the flood for entity lighting: a fresh array owned
             // by this build alone, published by UpdateMesh with the mesh it belongs to. A chunk
-            // lit by coloured light appends a second half holding each cell's color slot.
+            // lit by colored light appends a second half holding each cell's color slot.
             var packed = new byte[anyTinted ? BlockCount * 2 : BlockCount];
             for (var x = 0; x < Size; x++)
             for (var y = 0; y < Size; y++)
@@ -1215,13 +1215,13 @@ public class Chunk : IDisposable
         }
     }
 
-    // Slots of the six face-adjacent chunks in the 3x3x3 (cx*3+cy)*3+cz neighbourhood
+    // Slots of the six face-adjacent chunks in the 3x3x3 (cx*3+cy)*3+cz neighborhood
     // (slot 13 is this chunk itself). Meshing cannot proceed without these; the twenty
     // edge and corner slots only feed light and fluid corner heights, so they may be null.
     private static readonly int[] FaceNeighborSlots = [4, 10, 12, 14, 16, 22];
 
     /// <summary>
-    /// Resolves the 3x3x3 chunk neighbourhood once per mesh build, so both snapshot fills work
+    /// Resolves the 3x3x3 chunk neighborhood once per mesh build, so both snapshot fills work
     /// from the same picture of the world instead of each racing the loader on its own. A
     /// neighbor that exists but has no block data yet counts as absent, exactly like one that
     /// was never loaded. Returns false when any of the six FACE neighbors is missing, which
@@ -1341,7 +1341,7 @@ public class Chunk : IDisposable
     /// <summary>
     /// Turns the padded block snapshot into vertices. Plain full cubes (<see cref="BlockType.IsGreedy"/>)
     /// go through the binary greedy pass first (<see cref="EmitGreedyFaces"/>), which merges
-    /// identical neighbouring faces into one quad. The per-voxel loop then handles the rest: each
+    /// identical neighboring faces into one quad. The per-voxel loop then handles the rest: each
     /// block picks an emitter from its <see cref="BlockType.Renderer"/> — the procedural ones
     /// (tree wood, pebbles, branch piles) build their geometry from tiles, everything else
     /// replays its baked model's quads.
@@ -1382,7 +1382,7 @@ public class Chunk : IDisposable
         // Biome tint of grass and leaves, both palettes from the stored corner climate of the
         // four lattice columns (no noise evaluation). A scratch build away from its blocks' real
         // position (a felled tree) passes the field of the real footprint instead.
-        var fields = tintFields ?? BiomeTint.FieldsFromNeighbourhood(columns);
+        var fields = tintFields ?? BiomeTint.FieldsFromNeighborhood(columns);
         // Corner scratch of a biome-tinted face in the per-voxel loop below
         Span<byte> tShade = stackalloc byte[4];
         Span<float> tSun = stackalloc float[4];
@@ -1422,7 +1422,7 @@ public class Chunk : IDisposable
                     continue;
                 }
 
-                // A pixel-rim trunk shell with an exposed corner is bevelled from its four edge
+                // A pixel-rim trunk shell with an exposed corner is beveled from its four edge
                 // neighbors (TreeWoodShape.RimCornerMask; the diagonals never change it, since a
                 // cell only carves its own material); see EmitRimWood. Mask 0 is a plain cube.
                 if (BlockType.HasPixelRim(blockId))
@@ -1482,7 +1482,7 @@ public class Chunk : IDisposable
                 continue;
             }
 
-            // A pane is a post plus an arm toward each neighbouring pane or solid full cube, read
+            // A pane is a post plus an arm toward each neighboring pane or solid full cube, read
             // from the snapshot (see PaneEmitter); a glass pane draws blended like glass
             if (type.Renderer == BlockRenderer.Pane)
             {
@@ -1551,7 +1551,7 @@ public class Chunk : IDisposable
                     // face against the same block, the way glass panes fuse.
                     if (BlockType.Occludes(neighbor) || (type.CullSelf && neighbor == blockId)) continue;
                     // Stacked full-thickness tree wood hides its shared faces itself - unless the
-                    // neighbor is a bevelled pixel-rim shell whose face toward this cell is
+                    // neighbor is a beveled pixel-rim shell whose face toward this cell is
                     // carved, which would open a hole (a core, a detached log or a mask-0 shell
                     // beside a rounded corner keeps its face). Non-rim species never read a mask.
                     if (cullSameFullWood && neighbor == blockId
@@ -1577,7 +1577,7 @@ public class Chunk : IDisposable
                 {
                     // An interior quad of a sub-cell model has no neighbor to read: light it
                     // from its own cell, which passes light precisely because the model is not
-                    // a full cube (the generalised form of the pebble trick).
+                    // a full cube (the generalized form of the pebble trick).
                     lightCell = lightBase;
                 }
 

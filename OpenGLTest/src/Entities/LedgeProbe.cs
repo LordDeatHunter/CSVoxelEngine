@@ -45,17 +45,17 @@ public static class LedgeProbe
         targetBelow || drop <= WorldGenerationConfig.MobLedgeMaxDropBlocks;
 
     /// <summary>
-    /// Whether moving a body (centre <paramref name="centre"/>, feet <paramref name="feetY"/>) along the
-    /// horizontal <paramref name="direction"/> to <paramref name="distance"/> blocks from its centre would
+    /// Whether moving a body (center <paramref name="center"/>, feet <paramref name="feetY"/>) along the
+    /// horizontal <paramref name="direction"/> to <paramref name="distance"/> blocks from its center would
     /// step off a ledge it should not: the drop there is not safe and the target (its eye
     /// <paramref name="targetEye"/>, or none) is not below.
     /// </summary>
-    public static bool IsLedgeAhead(ChunkManager chunks, Vector3 centre, float feetY, Vector3 direction, float distance,
+    public static bool IsLedgeAhead(ChunkManager chunks, Vector3 center, float feetY, Vector3 direction, float distance,
         Vector3? targetEye)
     {
         direction.Y = 0f;
         if (direction.LengthSquared() < 1e-8f) return false;
-        var probe = centre + Vector3.Normalize(direction) * distance;
+        var probe = center + Vector3.Normalize(direction) * distance;
         var maxScan = (int)WorldGenerationConfig.MobLedgeMaxDropBlocks + 1;
         var drop = DropBelow(chunks, probe.X, feetY, probe.Z, maxScan);
         var below = targetEye is { } eye && TargetBelow(feetY, eye.Y - Camera.EyeHeight);

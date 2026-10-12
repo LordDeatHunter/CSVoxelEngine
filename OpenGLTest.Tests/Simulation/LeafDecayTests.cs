@@ -386,7 +386,7 @@ public sealed class LeafDecayTests
     }
 
     [Fact]
-    public void AnUnloadedNeighbourFreezesTheCell()
+    public void AnUnloadedNeighborFreezesTheCell()
     {
         var cell = (X: BaseX, Y: 8, Z: BaseZ);
         var cx = cell.X >> Chunk.SizeShift;
@@ -411,7 +411,7 @@ public sealed class LeafDecayTests
             manager.ScheduleAround(cell.X, cell.Y, cell.Z);
             RunTicks(manager, chunks, drops, Bound(1));
 
-            Assert.True(IsAir(chunks, cell), $"{what} still stands once its neighbourhood loaded");
+            Assert.True(IsAir(chunks, cell), $"{what} still stands once its neighborhood loaded");
         }
 
         foreach (var species in LeafySpecies)

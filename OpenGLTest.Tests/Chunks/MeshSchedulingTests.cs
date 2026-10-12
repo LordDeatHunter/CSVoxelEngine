@@ -135,7 +135,7 @@ public sealed class MeshSchedulingTests
 
         // Task.Run(async closure) cost ~400 B per chunk on the scheduling thread (display class +
         // delegate + Task + unwrap promise). The work-item dispatcher leaves only the unchanged
-        // _generatingMeshes node plus an amortised queue slot, ~80 B. If this is close to the
+        // _generatingMeshes node plus an amortized queue slot, ~80 B. If this is close to the
         // budget, print it and find out why rather than raising the budget.
         Assert.True(perChunk < 256, $"scheduling allocated {perChunk:F0} B per chunk");
 
@@ -151,7 +151,7 @@ public sealed class MeshSchedulingTests
     /// <see cref="ChunkManager.DrainMeshWork"/> returns only once the build queue is empty and
     /// every pool runner has exited, so a world-seed swap after it cannot race a mesh build, and
     /// the finished result is still there for the next Update to apply. The whole walled area
-    /// is stone, so the centre is a real 4096-cell build (not the empty-chunk fast path) whose
+    /// is stone, so the center is a real 4096-cell build (not the empty-chunk fast path) whose
     /// faces are all culled: its mesh is empty and applies headlessly.
     /// </summary>
     [Fact]

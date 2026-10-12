@@ -591,7 +591,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             if (!HasAllNeighbors(pos))
                 continue;
 
-            if (!HasColumnNeighbourhood(chunk, cx, cz))
+            if (!HasColumnNeighborhood(chunk, cx, cz))
                 continue;
 
             _dirtyCandidates.Add((key, pos, chunk, distSq));
@@ -1083,7 +1083,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         // A streamed column is missing: mesh once it arrives instead of baking dark light and
         // no water now. The entry is re-added once per edit, never per frame, and the next
         // ProcessDirtyChunks drops it until ApplyColumn wakes it, so nothing spins.
-        if (!HasColumnNeighbourhood(chunk, (int)pos.X, (int)pos.Z))
+        if (!HasColumnNeighborhood(chunk, (int)pos.X, (int)pos.Z))
         {
             _dirtyChunks.TryAdd(key, 0);
             return;
@@ -1279,12 +1279,12 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// <summary>
     /// Unit-length horizontal direction the fluid in the cell (x, y, z) flows, or
     /// <see cref="Vector3.Zero"/> when the cell holds no fluid or the fluid is still: the
-    /// normalised <see cref="FluidFlow.Raw"/> (Minecraft's <c>FlowingFluid.getFlow</c>).
+    /// normalized <see cref="FluidFlow.Raw"/> (Minecraft's <c>FlowingFluid.getFlow</c>).
     /// </summary>
     public Vector3 GetFluidFlowGlobal(int x, int y, int z) =>
         FluidFlow.Raw(new LiveCells(this), x, y, z).NormalizeSafe();
 
-    /// <summary>The un-normalised <see cref="FluidFlow.Raw"/> flow at (x, y, z).</summary>
+    /// <summary>The un-normalized <see cref="FluidFlow.Raw"/> flow at (x, y, z).</summary>
     internal Vector3 GetFluidFlowRawGlobal(int x, int y, int z) =>
         FluidFlow.Raw(new LiveCells(this), x, y, z);
 
@@ -1328,7 +1328,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// neighbors and so waits for its columns too, which only delays <see cref="Chunk.IsMeshed"/>
     /// for <c>LodManager.IsCoveredByChunks</c> at a client's load-sphere rim.
     /// </summary>
-    private bool HasColumnNeighbourhood(Chunk chunk, int cx, int cz)
+    private bool HasColumnNeighborhood(Chunk chunk, int cx, int cz)
     {
         if (chunk.SolidCount == 0)
             return true;

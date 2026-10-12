@@ -45,7 +45,7 @@ public sealed class DamageFringeTests
     }
 
     [Fact]
-    public void TheFringeLeavesTheCentreAloneAndIsStrongestAtTheCorners()
+    public void TheFringeLeavesTheCenterAloneAndIsStrongestAtTheCorners()
     {
         Assert.Equal(0f, DamageFringe.EdgeWeight(0f));
         Assert.Equal(1f, DamageFringe.EdgeWeight(MathF.Sqrt(0.5f)), 5);

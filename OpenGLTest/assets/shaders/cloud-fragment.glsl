@@ -1,6 +1,6 @@
 #version 460 core
 // Near-flat cartoon shading: uniform skydome light plus a small sun term for form, then a
-// normal band that keeps tops white, sides bright and bottoms cool grey. The faces are flat
+// normal band that keeps tops white, sides bright and bottoms cool gray. The faces are flat
 // and axis-aligned, so the band reduces to three tones and the silhouette stays hard-edged.
 // Alpha fades with fog on top of the color blend, so distant clouds thin into the sky
 // instead of ending in a visible band at the far plane.

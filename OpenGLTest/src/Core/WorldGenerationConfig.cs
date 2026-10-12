@@ -64,7 +64,7 @@ public static class WorldGenerationConfig
     // longer a wholesale Clear(). ColumnCache runs on GenerationalCache, so a level-2 ring sweep
     // (roughly 51k distinct columns) can only age out the OLDEST generation at a time instead of
     // dropping chunk generation's hot working set along with its own one-shot columns (that set is
-    // a radius-16 disc: ~800 columns, 933 once each build's 3x3 heightmap neighbourhood is counted).
+    // a radius-16 disc: ~800 columns, 933 once each build's 3x3 heightmap neighborhood is counted).
     // Measured on the replayed key sequences: chunk-gen's own misses during the mixed burst fell
     // 1219 -> 733. See PERF_TODO's "Measurement: D2".
     //
@@ -214,7 +214,7 @@ public const float DayLengthSeconds = 1200f;
     public const float FxaaReduceMin = 1f / 128f;
 
     /// <summary>FXAA's luma-proportional direction reduction (uFxaaReduceMul): brighter
-    /// neighbourhoods shorten the search span a little, which keeps high-contrast texture detail
+    /// neighborhoods shorten the search span a little, which keeps high-contrast texture detail
     /// (ore specks, leaf cutouts) from being blurred along a false edge.</summary>
     public const float FxaaReduceMul = 1f / 8f;
 
@@ -229,7 +229,7 @@ public const float DayLengthSeconds = 1200f;
     public const float FxaaEdgeThreshold = 0.125f;
 
     /// <summary>FXAA's absolute contrast floor (uFxaaEdgeThresholdMin, FXAA 3.11's default):
-    /// dark neighbourhoods need at least this luma range before they are smoothed, so noise in
+    /// dark neighborhoods need at least this luma range before they are smoothed, so noise in
     /// caves and at night is not smeared.</summary>
     public const float FxaaEdgeThresholdMin = 0.0312f;
 
@@ -383,7 +383,7 @@ public const float DayLengthSeconds = 1200f;
 
     /// <summary>
     /// How much brighter the haze band makes the horizon right at elevation 0 (0.2 = 20 %).
-    /// 0 while the palette is the flat 28198cc sky color: the haze multiplies the (linearised)
+    /// 0 while the palette is the flat 28198cc sky color: the haze multiplies the (linearized)
     /// horizon, which would push the low sky and every fogged fragment away from that color.
     /// </summary>
     public const float SkyHazeStrength = 0f;
@@ -414,7 +414,7 @@ public const float DayLengthSeconds = 1200f;
     public const int StarCellsPerFace = 72;
 
     /// <summary>
-    /// Chance a cell at a cube face's centre holds a star (StarField.Probability scales it per cell
+    /// Chance a cell at a cube face's center holds a star (StarField.Probability scales it per cell
     /// by solid angle), so about this share of 6 * StarCellsPerFace^2 stars cover the whole sphere.
     /// </summary>
     public const float StarDensity = 0.16f;
@@ -434,7 +434,7 @@ public const float DayLengthSeconds = 1200f;
 
     /// <summary>
     /// Gaussian radius of a faint star in screen pixels (pixel-relative, so stars stay pin-sharp
-    /// at any resolution and FOV and never vanish between pixel centres while the view turns).
+    /// at any resolution and FOV and never vanish between pixel centers while the view turns).
     /// </summary>
     public const float StarRadiusPixels = 0.85f;
 
@@ -891,7 +891,7 @@ public const float DayLengthSeconds = 1200f;
     /// Scale on the ore sun highlight (uOreSpecScale). The highlight is added in linear light,
     /// where the sRGB encode lifts a small add on the near-black ore body far more than the same
     /// add did in display space before linear lighting; at full strength the broad lobe washed
-    /// coal's specks into grey. 0.1 matches the pre-linear look side by side.
+    /// coal's specks into gray. 0.1 matches the pre-linear look side by side.
     /// </summary>
     public const float OreSpecLinearScale = 0.1f;
 
@@ -918,7 +918,7 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>
     /// Brightness of a snow glint (uSnowSparkle), as a multiple of the direct sun: the sun
     /// mirrored by one ice-crystal facet, added in linear light. A glint is a single texel, so
-    /// unlike the ore highlight's broad lobe it cannot wash a face grey, and it is meant to reach
+    /// unlike the ore highlight's broad lobe it cannot wash a face gray, and it is meant to reach
     /// white. Sunlit snow already sits past the tonemap clip for most of the day (the sun's linear
     /// gain is ~2.7 at noon), so the glints read only where it does not: a low sun, whose n.l on
     /// the flat tops is small. 0 switches the term off.
@@ -1104,7 +1104,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
 
     // Ocean depth ramp: the shelf sits just over the waterline and the basin falls to the floor.
     public const float OceanShoreHeight = 3f;       // blocks, the shallowest shelf
-    public const float OceanFloorHeight = -44f;     // blocks, the deepest basin centre
+    public const float OceanFloorHeight = -44f;     // blocks, the deepest basin center
     public const float OceanDepthExponent = 1.35f;  // >1 keeps a wide shelf and a steep drop
 
     // Ocean floor materials by depth below sea level: sand near the beach, gravel down the
@@ -1167,7 +1167,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // taiga, WarmDry = desert, WarmWet = warm forest); the temperate band is the midpoint of the
     // two rows, and at full wetness the grass midpoint (70, 132, 77) lands near grass_top's
     // measured mean, so near-spawn grass matches the inventory icon. Every channel must stay
-    // under the ceiling BiomeTint.Gain reaches against the grey tiles (about sRGB 183), which
+    // under the ceiling BiomeTint.Gain reaches against the gray tiles (about sRGB 183), which
     // BiomeTintTests enforces.
     public static readonly Vector3 GrassColorColdDry = new Vector3(112f, 138f, 104f) / 255f;
     public static readonly Vector3 GrassColorColdWet = new Vector3(74f, 124f, 88f) / 255f;
@@ -1178,16 +1178,16 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public static readonly Vector3 FoliageColorColdWet = new Vector3(58f, 106f, 70f) / 255f;
     public static readonly Vector3 FoliageColorWarmDry = new Vector3(120f, 126f, 58f) / 255f;
     public static readonly Vector3 FoliageColorWarmWet = new Vector3(52f, 120f, 52f) / 255f;
-    // The sRGB grey every textureless tile averages to (the two supplied grass tiles measure 98.4
-    // and 97.4, and tools/generate-leaf-textureless.ps1 normalises the leaf tiles to it), so the
+    // The sRGB gray every textureless tile averages to (the two supplied grass tiles measure 98.4
+    // and 97.4, and tools/generate-leaf-textureless.ps1 normalizes the leaf tiles to it), so the
     // one BiomeTint.Gain fits them all.
-    public const float BiomeTintTextureGrey = 98f / 255f;
+    public const float BiomeTintTextureGray = 98f / 255f;
 
     // --- Mud ---
     // Dirt with water directly above it and at least this many water cells in its
-    // 26-neighbourhood (faces, edges and corners alike) rots to mud the moment a
-    // neighbouring fluid ticks and notices it.
-    public const int MudWaterNeighbours = 2;
+    // 26-neighborhood (faces, edges and corners alike) rots to mud the moment a
+    // neighboring fluid ticks and notices it.
+    public const int MudWaterNeighbors = 2;
 
     // Blocks the far LOD water sheet sits below the chunk water surface, so the two never
     // z-fight where they meet at the full-detail ring. Depth resolution there is ~0.02 blocks;
@@ -1425,7 +1425,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // TreeGenerator.ShapeCache and TreeGenerator.CanopyCache, both on the same GenerationalCache as
     // the column and worm-path caches above (item D6).
     //
-    // The SHAPE cache holds one grown, rasterised tree per accepted trunk column, keyed by (x, z):
+    // The SHAPE cache holds one grown, rasterized tree per accepted trunk column, keyed by (x, z):
     // one entry is a whole tree of roughly a thousand TreeCells, so its capacity is far below the
     // old 16384 small-shape entries. It is genuinely shared: TreeGenerator.Stamp asks it on the
     // four generation workers, and BuildCanopyTops asks it for every leafy trunk in a
@@ -1495,7 +1495,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float LeafParticleSize = 0.2f;
     // Seconds a landed leaf takes to fade out before it is removed
     public const float LeafParticleFadeSeconds = 1.2f;
-    // Texels of the centred square cropped out of the leaves tile for the sprite
+    // Texels of the centered square cropped out of the leaves tile for the sprite
     public const int LeafParticleCropPixels = 6;
     public const int LeafParticleBurstMined = 6;
     public const int LeafParticleBurstFell = 24;
@@ -1553,17 +1553,17 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public static readonly Vector3 HitSparkColor = new(1f, 0.96f, 0.8f);
 
     // --- Mob death poof (GroundDust.DeathPoof): a mob whose death animation just ended bursts
-    // into chips of its own skin color (LandingDust.SkinColour of its model), so a goblin throws
-    // goblin-coloured chips and a slime its green. Cosmetic: singleplayer and a client, never a server. ---
+    // into chips of its own skin color (LandingDust.SkinColor of its model), so a goblin throws
+    // goblin-colored chips and a slime its green. Cosmetic: singleplayer and a client, never a server. ---
     public const int MobDeathPoofCount = 12;
     // Blocks per second the chips fly out at, between a landing splat and a mining burst
     public const float MobDeathPoofSpeed = 2.4f;
     public const float MobDeathPoofSize = 0.1f;
     // sRGB color of the chips when the mob's model has no skin to read one from
     public static readonly Vector3 MobDeathPoofFallbackColor = new(0.62f, 0.5f, 0.42f);
-    // A grey textureless block tile (its mean grey is BiomeTintTextureGrey) that a plain-color chip
+    // A gray textureless block tile (its mean gray is BiomeTintTextureGray) that a plain-color chip
     // wears on every face, so BiomeTint.VertexTint lands the chip on its target color
-    public const string ColourChipTile = "grass_top_textureless";
+    public const string ColorChipTile = "grass_top_textureless";
 
     // --- Sprint footstep dust (FootstepDust rules, GroundDust): while sprinting on foot over loose
     // ground (a block with "footstepDust"), every footfall of the gait kicks up a tiny puff ---
@@ -1588,7 +1588,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float BlastMirrorFuseSlackSeconds = 0.5f;
 
     // --- TNT blast push (BlastImpulse): a blast shoves every loose thing within TntManager.BlastRadius
-    // away from its centre, this many blocks per second at the centre, falling linearly to nothing at
+    // away from its center, this many blocks per second at the center, falling linearly to nothing at
     // the radius. The direction is tipped up by the bias so things are tossed, not skated. Gameplay:
     // singleplayer and the server (a player's share goes through its queued knockback). ---
     public const float BlastPushMaxSpeed = 14f;
@@ -1736,7 +1736,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Seconds a bubble takes to fade in at spawn and out at the end of its life
     public const float BubbleFadeSeconds = 0.4f;
     // Each swim stroke with the eye underwater lets out one burst of this many bubbles
-    // (BubbleParticleSystem.TrackSwimStrokes), centred this far in front of the head and scattered
+    // (BubbleParticleSystem.TrackSwimStrokes), centered this far in front of the head and scattered
     // up to this far around that point.
     public const int SwimStrokeBubbleCount = 4;
     public const float SwimStrokeBubbleForward = 0.4f;
@@ -1763,7 +1763,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int MeadowMinMembers = 4;
     public const float MeadowClumpChance = 0.45f;
     public const float MeadowEdgeDensity = 0.25f;
-    // ForestOpenness a clump's centre needs: the open stretches between the woodland
+    // ForestOpenness a clump's center needs: the open stretches between the woodland
     public const float MeadowMinOpenness = 0.55f;
 
     // --- Foliage (FoliageGenerator) ---
@@ -1782,12 +1782,12 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // --- Cotton (CottonGenerator over PlantClumps) ---
     // Clumped, not scattered: at most one clump per 2^CottonCellShift-block cell, accepted with
     // CottonClumpChance and only on the warm, dry forest fringe before the desert line: a forest
-    // centre whose desert weight (0.5 on the desert line itself) lies in
+    // center whose desert weight (0.5 on the desert line itself) lies in
     // [CottonMinDesertWeight, CottonMaxDesertWeight), the top end being where the grass/sand border
-    // dither starts, so a clump never lands on dithered sand. The centre sits up to CottonJitter
-    // blocks off the cell's middle, so centres are at least 2^shift - 2 * jitter apart, and the clump
-    // fills a CottonRadius disc: the CottonMinMembers cells nearest the centre always, the rest with
-    // a density falling from 1 at the centre to CottonEdgeDensity at the rim. Clumps never overlap
+    // dither starts, so a clump never lands on dithered sand. The center sits up to CottonJitter
+    // blocks off the cell's middle, so centers are at least 2^shift - 2 * jitter apart, and the clump
+    // fills a CottonRadius disc: the CottonMinMembers cells nearest the center always, the rest with
+    // a density falling from 1 at the center to CottonEdgeDensity at the rim. Clumps never overlap
     // while that spacing exceeds 2 * radius.
     public const bool CottonEnabled = true;
     public const int CottonCellShift = 6;
@@ -2034,7 +2034,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int EntityHealthbarHearts = 5;
     // Width (and height) of one heart in blocks; neighbors sit edge to edge like the HUD row.
     public const float EntityHeartSizeBlocks = 0.2f;
-    // How far above the mob's head (Position + Mob.HeadAboveCentre) the row's centre floats.
+    // How far above the mob's head (Position + Mob.HeadAboveCenter) the row's center floats.
     public const float EntityHealthbarLiftBlocks = 0.22f;
 
     // --- Floating damage numbers (DamageNumberPool, DamageNumberRenderer) ---
@@ -2049,7 +2049,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float DamageNumberDriftBlocks = 0.25f;
     public const float DamageNumberPopSeconds = 0.18f;
     public const float DamageNumberPopScale = 1.5f;
-    // Start height above the healthbar row's centre, and the digit cap height, in blocks.
+    // Start height above the healthbar row's center, and the digit cap height, in blocks.
     public const float DamageNumberLiftBlocks = 0.18f;
     public const float DamageNumberCapHeightBlocks = 0.2f;
     // A client sees a killing blow only as the mob leaving the server's snapshot. Within this range
@@ -2219,7 +2219,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const bool GeodesEnabled = true;
     public const int GeodeCellShift = 7;
     public const float GeodeChance = 0.25f;
-    // The depth band the centres sit in, and the radius range
+    // The depth band the centers sit in, and the radius range
     public const int GeodeMinY = -48;
     public const int GeodeMaxY = -16;
     public const int GeodeMinRadius = 2;
@@ -2231,7 +2231,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float MeteorChance = 0.06f;
     public const int MeteorMinRadius = 4;
     public const int MeteorMaxRadius = 7;
-    // Bowl depth per block inside the rim: the centre is radius * this deep
+    // Bowl depth per block inside the rim: the center is radius * this deep
     public const float MeteorBowlSlope = 0.6f;
 
     // --- Hot springs (HotSpringGenerator): a small pond in cold biomes that never freezes ---
@@ -2346,7 +2346,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // the speed clamp and the collision test: the rise and hover rules need a short, honest gap.
     public const double NetMaxJudgedStateGapSeconds = 0.5;
     // How far from the player's eye a client may edit a block: the client's own raycast reach,
-    // one block of cell-centre slack, and one state interval of movement, since the eye the server
+    // one block of cell-center slack, and one state interval of movement, since the eye the server
     // judges from can lag the eye that aimed the edit by up to one PlayerState.
     public const float NetMaxEditReachBlocks =
         World.InteractionReach + 1f + (float)(NetMaxMoveBlocksPerSecond * NetPlayerStateSeconds);

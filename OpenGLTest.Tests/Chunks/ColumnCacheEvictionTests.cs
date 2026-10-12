@@ -241,8 +241,8 @@ public sealed class ColumnCacheEvictionTests
     /// Generates <see cref="SweepColumns"/> distinct chunk columns on <see cref="SweepThreads"/>
     /// dedicated threads and returns the wall clock it took. Conventions from
     /// <c>LodBuildPoolTests</c>: a fixed <see cref="Thread"/> array rather than the ThreadPool
-    /// (which would silently serialise the stripes or inject threads of its own), background and
-    /// named, disjoint contiguous stripes, failures funnelled into a <see cref="ConcurrentBag{T}"/>
+    /// (which would silently serialize the stripes or inject threads of its own), background and
+    /// named, disjoint contiguous stripes, failures funneled into a <see cref="ConcurrentBag{T}"/>
     /// because an xUnit assertion thrown on a worker thread is swallowed and would let this fact
     /// pass silently, and <c>Join()</c> on every thread before anything is asserted.
     /// </summary>

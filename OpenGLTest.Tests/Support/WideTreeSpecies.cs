@@ -10,7 +10,7 @@ namespace VoxelEngine.Tests.Support;
 /// <summary>
 /// Synthetic wide-trunk species for the core/shell rules: a registered species copied property
 /// for property with a larger <see cref="TreeSpecies.MaxPx"/>, its own girth profile, trunk shape
-/// and rim, so its trunk chain grows past 16 px and rasterises shells. The species is never
+/// and rim, so its trunk chain grows past 16 px and rasterizes shells. The species is never
 /// registered; its block ids are the base species' own. Tests assert relations only, never the
 /// numbers chosen here.
 /// </summary>

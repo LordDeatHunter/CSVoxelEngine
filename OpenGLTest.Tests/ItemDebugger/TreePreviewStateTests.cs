@@ -226,11 +226,11 @@ public sealed class TreePreviewStateTests
         {
             state.Select(i);
             var (min, max) = state.FramingBounds;
-            var centre = state.FramingCentre;
+            var center = state.FramingCenter;
             var distance = TreePreviewState.FitDistance(state.FramingRadius, FovY, Aspect);
             foreach (var dir in directions)
             {
-                var view = Matrix4x4.CreateLookAt(centre + dir * distance, centre, Vector3.UnitY);
+                var view = Matrix4x4.CreateLookAt(center + dir * distance, center, Vector3.UnitY);
                 var viewProj = view * projection;
                 for (var corner = 0; corner < 8; corner++)
                 {

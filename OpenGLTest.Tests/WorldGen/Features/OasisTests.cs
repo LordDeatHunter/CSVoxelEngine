@@ -20,29 +20,29 @@ public sealed class OasisTests
         // A real deep-desert site from the pure hash (the gate makes them sparse, so the scan
         // walks whole cells)
         var found = false;
-        var centreX = 0;
-        var centreZ = 0;
+        var centerX = 0;
+        var centerZ = 0;
         var surface = 0;
         for (var cellX = -80; cellX <= 80 && !found; cellX++)
         for (var cellZ = -80; cellZ <= 80 && !found; cellZ++)
         {
-            if (!OasisGenerator.TryGetCentre(cellX, cellZ, out var x, out var z, out var level)) continue;
-            centreX = x;
-            centreZ = z;
+            if (!OasisGenerator.TryGetCenter(cellX, cellZ, out var x, out var z, out var level)) continue;
+            centerX = x;
+            centerZ = z;
             surface = level;
             found = true;
         }
         Assert.True(found, "no oasis site found in the scanned cells");
 
-        Assert.True(OasisGenerator.IsDisc(centreX, centreZ));
-        Assert.True(OasisGenerator.IsDisc(centreX + WorldGenerationConfig.OasisRadius - 1, centreZ));
-        Assert.False(OasisGenerator.IsDisc(centreX + WorldGenerationConfig.OasisRadius + 1, centreZ));
+        Assert.True(OasisGenerator.IsDisc(centerX, centerZ));
+        Assert.True(OasisGenerator.IsDisc(centerX + WorldGenerationConfig.OasisRadius - 1, centerZ));
+        Assert.False(OasisGenerator.IsDisc(centerX + WorldGenerationConfig.OasisRadius + 1, centerZ));
 
-        // The pond is the inner disc, and the surface is one under the centre's land height, so
+        // The pond is the inner disc, and the surface is one under the center's land height, so
         // the pond digs in rather than floods
-        Assert.True(OasisGenerator.IsPond(centreX, centreZ));
-        Assert.False(OasisGenerator.IsPond(centreX + WorldGenerationConfig.OasisPondRadius + 1, centreZ));
-        Assert.True(surface < (int)TerrainGenerator.LandHeight(centreX, centreZ, out _, out _, out _, out _));
+        Assert.True(OasisGenerator.IsPond(centerX, centerZ));
+        Assert.False(OasisGenerator.IsPond(centerX + WorldGenerationConfig.OasisPondRadius + 1, centerZ));
+        Assert.True(surface < (int)TerrainGenerator.LandHeight(centerX, centerZ, out _, out _, out _, out _));
     }
 
     [Fact]

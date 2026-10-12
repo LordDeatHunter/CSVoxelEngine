@@ -17,7 +17,7 @@ namespace VoxelEngine.Tests.Simulation;
 /// stands in and the melting that slot drives. Every number here comes out of the content or out
 /// of <see cref="KilnManager"/>'s own constants — the rules under test are relations (mass is
 /// conserved, the pool only ever rises, a charge is refused when it would not fit), never the
-/// particular millilitres the JSON happens to ship.
+/// particular milliliters the JSON happens to ship.
 /// </summary>
 public sealed class CrucibleTests
 {
@@ -72,7 +72,7 @@ public sealed class CrucibleTests
             Assert.InRange(p.Z, 0f, 1f);
         });
 
-        // The rim is the top of the bowl, and the footprint is centred and OuterHalf wide
+        // The rim is the top of the bowl, and the footprint is centered and OuterHalf wide
         Assert.Equal(KilnRenderer.CrucibleTopY, positions.Max(p => p.Y), precision: 4);
         Assert.Equal(0.5f - KilnRenderer.CrucibleOuterHalf, positions.Min(p => p.X), precision: 4);
         Assert.Equal(0.5f - KilnRenderer.CrucibleOuterHalf, positions.Min(p => p.Z), precision: 4);
@@ -146,7 +146,7 @@ public sealed class CrucibleTests
         // No crucible, nothing to charge
         Assert.False(kilns.TryInsertMelt(anchor, ingot.InputId));
 
-        // One millilitre short of room for another ingot
+        // One milliliter short of room for another ingot
         var start = new CrucibleComponent(Copper, capacity - ingot.AmountMl + 1, 0);
         Assert.True(kilns.TryPlaceCrucible(anchor, Crucible.Id, start));
         Assert.False(kilns.TryPlaceCrucible(anchor, Crucible.Id, default));
@@ -275,7 +275,7 @@ public sealed class CrucibleTests
     /// The vessel remembers what was last charged into it, because the render pass has to draw
     /// <em>something</em> for the solid charge and the aggregate (material, molten, pending) does
     /// not say which item it came from. The rule is that the hint rides inside the component, so
-    /// it survives a take and a place into another kiln exactly like the millilitres do — and
+    /// it survives a take and a place into another kiln exactly like the milliliters do — and
     /// that a component written without it is still the component it always was.
     /// </summary>
     [Fact]
@@ -332,7 +332,7 @@ public sealed class CrucibleTests
         Assert.Equal(ore.AmountMl, KilnManager.PendingUnitMl(state));
 
         Assert.True(kilns.TryAddFuel(anchor, Coal));
-        // Cold: every millilitre charged is still solid
+        // Cold: every milliliter charged is still solid
         Assert.Equal((float)state.Contents.PendingMl, KilnManager.DisplayPendingMl(state));
 
         Assert.True(kilns.Ignite(anchor));

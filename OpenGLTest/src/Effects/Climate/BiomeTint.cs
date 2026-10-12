@@ -8,15 +8,15 @@ namespace VoxelEngine.Effects.Climate;
 /// <summary>
 /// GL-free biome tint: the grass and foliage color as a pure function of world (x, z). The
 /// climate (<see cref="TerrainGenerator.Climate"/>) picks an sRGB color from a four-corner
-/// palette, which is turned into the linear multiplier a vertex carries against the grey
+/// palette, which is turned into the linear multiplier a vertex carries against the gray
 /// textureless tiles. Meshes sample it on the 16-block lattice of chunk-column corners and
-/// interpolate bilinearly, so neighbouring chunks agree bit for bit at their shared borders and
+/// interpolate bilinearly, so neighboring chunks agree bit for bit at their shared borders and
 /// the tint depends on vertex position only, never on the cell.
 /// <para>
 /// The lattice climate is evaluated once per chunk column into <see cref="ColumnData"/>
 /// (<see cref="ColumnData.CornerWarmth"/>/<see cref="ColumnData.CornerWetness"/>) and reaches the
 /// chunk mesher, the mining pop and the debris through an <see cref="IColumnSource"/>
-/// (<see cref="FieldsFromNeighbourhood"/>, <see cref="TryFieldsFor"/>,
+/// (<see cref="FieldsFromNeighborhood"/>, <see cref="TryFieldsFor"/>,
 /// <see cref="TryCellTint"/>), worldgen or streamed from a server. The far LOD and the felled
 /// tree's arbitrary origin still evaluate <see cref="TerrainGenerator.Climate"/> directly
 /// (<see cref="TintsAt"/>, <see cref="LatticeTints"/>, <see cref="FieldsAt"/>); the stored value
@@ -30,7 +30,7 @@ public static class BiomeTint
     /// Fragment-side multiplier of a biome-tinted face, mirrored by the literal 4.0 in
     /// <c>assets/shaders/test-vertex.glsl</c> (<c>fTintGain</c>). A tinted face's albedo is
     /// texel * vertexRgb * Gain, so a byte rgb can carry a linear multiplier up to 4 against the
-    /// grey tiles.
+    /// gray tiles.
     /// </summary>
     public const float Gain = 4f;
 
@@ -48,12 +48,12 @@ public static class BiomeTint
                 WorldGenerationConfig.GrassColorColdWet, WorldGenerationConfig.GrassColorWarmWet,
                 warmth01, wetness01);
 
-    /// <summary>The 0..1 vertex multiplier that, times <see cref="Gain"/> against the grey
+    /// <summary>The 0..1 vertex multiplier that, times <see cref="Gain"/> against the gray
     /// textureless tile, lands a flat fully lit face on <paramref name="targetSrgb"/>.</summary>
     public static Vector3 VertexTint(Vector3 targetSrgb) =>
         Vector3.Clamp(
             ColorSpace.SrgbToLinear(targetSrgb)
-            / (ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGrey) * Gain),
+            / (ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGray) * Gain),
             Vector3.Zero, Vector3.One);
 
     /// <summary>
@@ -104,13 +104,13 @@ public static class BiomeTint
     }
 
     /// <summary>
-    /// A chunk column's fields from a mesh build's resolved 3x3 column neighbourhood:
+    /// A chunk column's fields from a mesh build's resolved 3x3 column neighborhood:
     /// <paramref name="columns"/> holds chunk column (cx - 1 + dx, cz - 1 + dz) at index
-    /// dx * 3 + dz, so the four lattice corners of the centre column are [4] (cx, cz),
+    /// dx * 3 + dz, so the four lattice corners of the center column are [4] (cx, cz),
     /// [7] (cx + 1, cz), [5] (cx, cz + 1) and [8] (cx + 1, cz + 1). Reads the stored corner
     /// climate, never noise.
     /// </summary>
-    public static BiomeTintFields FieldsFromNeighbourhood(ColumnTerrain[] columns) =>
+    public static BiomeTintFields FieldsFromNeighborhood(ColumnTerrain[] columns) =>
         FieldsFromCorners(columns[4], columns[7], columns[5], columns[8]);
 
     /// <summary>
@@ -134,7 +134,7 @@ public static class BiomeTint
     }
 
     /// <summary>
-    /// The tint at the centre of world cell (worldX, worldZ), from its owning chunk's field over
+    /// The tint at the center of world cell (worldX, worldZ), from its owning chunk's field over
     /// <paramref name="source"/>: what a standalone copy of a block (the mining pop, debris)
     /// wears. False when a corner column is not available.
     /// </summary>
@@ -166,7 +166,7 @@ public static class BiomeTint
     public static BiomeTintField FieldFor(BiomeTintPalette palette, int chunkX, int chunkZ) =>
         FieldsFor(chunkX, chunkZ).Field(palette);
 
-    /// <summary>The tint at the centre of world cell (worldX, worldZ) from worldgen; see
+    /// <summary>The tint at the center of world cell (worldX, worldZ) from worldgen; see
     /// <see cref="TryCellTint"/>.</summary>
     public static Vector3 CellTint(BiomeTintPalette palette, int worldX, int worldZ) =>
         TryCellTint(WorldgenColumnSource.Instance, palette, worldX, worldZ, out var tint)

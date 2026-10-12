@@ -47,7 +47,7 @@ public sealed class WaterGlitterTests
         for (var d = 0f; d <= 1f; d += 0.01f)
         {
             var s = WaterGlitter.Spot(d);
-            Assert.True(s <= previous, $"spot rose from {previous} to {s} away from its centre ({d})");
+            Assert.True(s <= previous, $"spot rose from {previous} to {s} away from its center ({d})");
             previous = s;
         }
 

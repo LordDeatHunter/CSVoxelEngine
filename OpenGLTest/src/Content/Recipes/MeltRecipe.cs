@@ -26,6 +26,6 @@ public sealed class MeltRecipe
     /// <summary>Molten material it melts into (<see cref="MoltenMaterial.Id"/>).</summary>
     public byte MaterialId { get; }
 
-    /// <summary>Millilitres one unit yields.</summary>
+    /// <summary>Milliliters one unit yields.</summary>
     public int AmountMl { get; }
 }

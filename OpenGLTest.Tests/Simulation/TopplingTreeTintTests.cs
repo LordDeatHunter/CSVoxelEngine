@@ -13,7 +13,7 @@ namespace VoxelEngine.Tests.Simulation;
 /// <summary>
 /// A felled tree is meshed by the real chunk mesher inside a scratch chunk that stands far from
 /// the tree, so its biome tint must come from the tree's own footprint
-/// (<see cref="BiomeTint.FieldsAt"/> at the scratch origin centred on the pivot,
+/// (<see cref="BiomeTint.FieldsAt"/> at the scratch origin centered on the pivot,
 /// <see cref="TopplingTree.ScratchOrigin"/>), never from the scratch chunk's position, and its
 /// wood stays untinted.
 /// </summary>
@@ -56,7 +56,7 @@ public sealed class TopplingTreeTintTests
 
     /// <summary>
     /// A pivot cell (off the 16-block lattice, a few blocks past a lattice line so the tree's
-    /// minimum corner lies in the lattice cell before it) whose centred scratch origin's foliage
+    /// minimum corner lies in the lattice cell before it) whose centered scratch origin's foliage
     /// field differs clearly from the scratch chunk's own.
     /// </summary>
     private static bool TryFindDiscriminatingPivot(out Vector3 pivotCell)
@@ -90,7 +90,7 @@ public sealed class TopplingTreeTintTests
         var leaves = Leaves;
         var bt = leaves.BiomeTint ?? throw new InvalidOperationException("leaves declare no biomeTint");
         // The minimum corner sits across a lattice line from the pivot column, so the footprint
-        // the field is read over is the one centred on the pivot, not the one from the corner
+        // the field is read over is the one centered on the pivot, not the one from the corner
         var corner = pivotCell - new Vector3(CornerOffset, 0, CornerOffset);
         List<TopplingTree.FellBlock> blocks =
         [
@@ -104,7 +104,7 @@ public sealed class TopplingTreeTintTests
         var mesh = TopplingTree.BuildMeshData(blocks, pivot);
 
         // A vertex position is pivot-relative; its offset into the footprint the field is
-        // sampled over is measured from the centred origin
+        // sampled over is measured from the centered origin
         var origin = TopplingTree.ScratchOrigin(pivot, pivotCell.Y);
         var toLocal = pivot - origin;
         var footprint = BiomeTint.FieldsAt((int)origin.X, (int)origin.Z).Foliage;
@@ -169,7 +169,7 @@ public sealed class TopplingTreeTintTests
         {
             Assert.False(v.IsBiomeTinted, $"felled wood vertex at {v.Position} carries the biome-tint flag");
             var (r, g, b) = Rgb(v);
-            Assert.True(r == g && g == b, $"felled wood vertex at {v.Position} is not grey: {(r, g, b)}");
+            Assert.True(r == g && g == b, $"felled wood vertex at {v.Position} is not gray: {(r, g, b)}");
         }
     }
 }

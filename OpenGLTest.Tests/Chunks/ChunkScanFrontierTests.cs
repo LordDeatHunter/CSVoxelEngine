@@ -28,7 +28,7 @@ namespace VoxelEngine.Tests.Chunks;
 /// them.</para>
 ///
 /// <para><b>Two threads returning the same position is expected and benign</b>, so no fact asserts
-/// that returns are distinct. The frontier is an optimisation over a scan, not a work queue;
+/// that returns are distinct. The frontier is an optimization over a scan, not a work queue;
 /// duplicate hand-outs are deduped downstream by <c>QueueChunk</c>'s
 /// <c>_queuedChunkPositions.TryAdd</c> (ChunkManager.cs:574), exactly as they were before this
 /// change, when four threads independently scanning the same list routinely picked the same chunk.
@@ -42,7 +42,7 @@ public sealed class ChunkScanFrontierTests
     private static ChunkScanFrontier NewFrontier() => new(Offsets);
 
     /// <summary>
-    /// The pre-C3 scan, verbatim: walk the closest-first offsets from the centre and return the
+    /// The pre-C3 scan, verbatim: walk the closest-first offsets from the center and return the
     /// first needed position. This is the behavior the frontier must reproduce.
     /// </summary>
     private static Vector3? Reference(Vector3 center, Func<Vector3, bool> isNeeded)
@@ -59,7 +59,7 @@ public sealed class ChunkScanFrontierTests
 
     /// <summary>
     /// The equivalence fact: over a long single-threaded run that fills a world, moves the camera
-    /// centre and frees already-claimed positions (bumping the removal version as
+    /// center and frees already-claimed positions (bumping the removal version as
     /// UnloadDistantChunks does), the frontier's answer equals the full scan's answer on every
     /// single call. Phase A fills from an empty world; phase B settles the world completely and then
     /// frees one position at a random index at a time, which is what produces the null answers the
@@ -73,10 +73,10 @@ public sealed class ChunkScanFrontierTests
         var frontier = NewFrontier();
         var rng = new Random(20260912);
 
-        // Far enough apart that the three centres' offset spheres cannot overlap.
-        var centres = new[] { Vector3.Zero, new Vector3(1000f, 0f, 0f), new Vector3(2000f, 0f, 0f) };
-        var centreIndex = 0;
-        var center = centres[0];
+        // Far enough apart that the three centers' offset spheres cannot overlap.
+        var centers = new[] { Vector3.Zero, new Vector3(1000f, 0f, 0f), new Vector3(2000f, 0f, 0f) };
+        var centerIndex = 0;
+        var center = centers[0];
         var version = 0;
         var claimedOrder = new List<Vector3>();
         var sawHit = false;
@@ -106,8 +106,8 @@ public sealed class ChunkScanFrontierTests
 
             if ((round + 1) % 150 == 0)
             {
-                centreIndex = (centreIndex + 1) % centres.Length;
-                center = centres[centreIndex];
+                centerIndex = (centerIndex + 1) % centers.Length;
+                center = centers[centerIndex];
             }
 
             if ((round + 1) % 300 == 0 && claimedOrder.Count > 0)
@@ -122,7 +122,7 @@ public sealed class ChunkScanFrontierTests
             }
         }
 
-        // Phase B: settle the world around the current centre, then free one position at a time.
+        // Phase B: settle the world around the current center, then free one position at a time.
         foreach (var offset in Offsets)
             claimed.TryAdd(center + offset, 0);
 
@@ -177,15 +177,15 @@ public sealed class ChunkScanFrontierTests
     }
 
     /// <summary>
-    /// A centre that does not match the published node resets the scan to the closest offset. The
-    /// second centre has its nearest 40 offsets pre-claimed so a non-zero index is genuinely reached
+    /// A center that does not match the published node resets the scan to the closest offset. The
+    /// second center has its nearest 40 offsets pre-claimed so a non-zero index is genuinely reached
     /// and published; the first is checked only against the oracle, because a hit at index 0
     /// publishes nothing by design (Publish early-returns when index &lt;= start), which is also why
     /// this fact keys on <see cref="ChunkScanFrontier.PublishedCenter"/> rather than on
     /// <see cref="ChunkScanFrontier.PublishedIndex"/>.
     /// </summary>
     [Fact]
-    public void AMovedCentreIsScannedFromTheClosestOffset()
+    public void AMovedCenterIsScannedFromTheClosestOffset()
     {
         var claimed = new ConcurrentDictionary<Vector3, byte>();
         Func<Vector3, bool> needs = p => !claimed.ContainsKey(p);
@@ -370,7 +370,7 @@ public sealed class ChunkScanFrontierTests
     /// call, which over a full fill is four orders of magnitude above this bound.
     /// </summary>
     [Fact]
-    public void TheScanCostIsAmortisedNotPerCall()
+    public void TheScanCostIsAmortizedNotPerCall()
     {
         var claimed = new ConcurrentDictionary<Vector3, byte>();
         var probes = 0;

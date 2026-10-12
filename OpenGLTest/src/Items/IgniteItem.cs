@@ -22,7 +22,7 @@ public class IgniteItem : Item
     /// <summary>Whether this item may light firepit piles.</summary>
     protected virtual bool CanLightPile => true;
 
-    /// <summary>Whether this item may light a fuelled kiln.</summary>
+    /// <summary>Whether this item may light a fueled kiln.</summary>
     protected virtual bool CanLightKiln => true;
 
     public override ItemUseResult OnUse(ItemUseContext ctx, ItemStack? stack)
@@ -62,7 +62,7 @@ public class IgniteItem : Item
             return new ItemUseResult(primed, null, primed);
         }
 
-        // A fuelled kiln lights from any of its cells; an unfuelled one is not a target at all,
+        // A fueled kiln lights from any of its cells; an unfueled one is not a target at all,
         // so a strike against it spends neither durability nor the use delay
         if (CanLightKiln && world.CanIgniteKiln(hx, hy, hz))
         {

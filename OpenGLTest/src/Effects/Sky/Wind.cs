@@ -28,7 +28,7 @@ public static class Wind
     }
 
     /// <summary>
-    /// How far something carried at <paramref name="speed"/> blocks per second has travelled
+    /// How far something carried at <paramref name="speed"/> blocks per second has traveled
     /// between time 0 and <paramref name="t"/>, as (x, z): the closed-form integral of
     /// <c>speed * Direction</c>. While the wind turns it traces a circle, so it stays bounded
     /// however long the clock runs.

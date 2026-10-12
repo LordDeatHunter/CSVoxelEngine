@@ -7,7 +7,7 @@ namespace VoxelEngine.WorldGen.Features;
 /// one stem every so many blocks (<see cref="CottonGenerator"/> is the first user). A pure
 /// function of (x, z), the seed and a <see cref="PlantClumpSpec"/>, the way the tree cells are
 /// (<see cref="TreeGenerator"/>), so every chunk agrees without shared state: each cell hashes
-/// whether it holds a clump and where its jittered centre sits, and a column asks every cell whose
+/// whether it holds a clump and where its jittered center sits, and a column asks every cell whose
 /// clump could reach it, so a clump near a cell border is never cut in half.
 /// </summary>
 public static class PlantClumps
@@ -22,46 +22,46 @@ public static class PlantClumps
 
     /// <summary>
     /// Whether cell (<paramref name="cellX"/>, <paramref name="cellZ"/>) holds a clump, and the
-    /// clump's centre. The centre always lies inside the cell (the spec caps the jitter), so
-    /// centres of distinct clumps sit in distinct cells, at least
-    /// <see cref="PlantClumpSpec.MinCentreSpacing"/> apart.
+    /// clump's center. The center always lies inside the cell (the spec caps the jitter), so
+    /// centers of distinct clumps sit in distinct cells, at least
+    /// <see cref="PlantClumpSpec.MinCenterSpacing"/> apart.
     /// </summary>
     public static bool TryGetClump(PlantClumpSpec spec, int seed, int cellX, int cellZ,
-        out int centreX, out int centreZ)
+        out int centerX, out int centerZ)
     {
         var h = SplitMix64.Hash(cellX, cellZ, seed ^ spec.Salt);
         if (Unit(SplitMix64.Mix(h + AcceptStream)) >= spec.Chance)
         {
-            centreX = 0;
-            centreZ = 0;
+            centerX = 0;
+            centerZ = 0;
             return false;
         }
 
         var span = (ulong)(2 * spec.Jitter + 1);
         var half = spec.CellSize >> 1;
-        centreX = (cellX << spec.CellShift) + half + (int)(SplitMix64.Mix(h + JitterXStream) % span) - spec.Jitter;
-        centreZ = (cellZ << spec.CellShift) + half + (int)(SplitMix64.Mix(h + JitterZStream) % span) - spec.Jitter;
+        centerX = (cellX << spec.CellShift) + half + (int)(SplitMix64.Mix(h + JitterXStream) % span) - spec.Jitter;
+        centerZ = (cellZ << spec.CellShift) + half + (int)(SplitMix64.Mix(h + JitterZStream) % span) - spec.Jitter;
         return true;
     }
 
     /// <summary>
-    /// Whether column (<paramref name="x"/>, <paramref name="z"/>) belongs to the clump centred at
-    /// (<paramref name="centreX"/>, <paramref name="centreZ"/>): inside the radius, and either in the
+    /// Whether column (<paramref name="x"/>, <paramref name="z"/>) belongs to the clump centered at
+    /// (<paramref name="centerX"/>, <paramref name="centerZ"/>): inside the radius, and either in the
     /// guaranteed core or through the falloff roll (a hash of the column itself, so the answer
     /// never depends on who asks).
     /// </summary>
-    public static bool IsMember(PlantClumpSpec spec, int seed, int centreX, int centreZ, int x, int z)
+    public static bool IsMember(PlantClumpSpec spec, int seed, int centerX, int centerZ, int x, int z)
     {
-        var dx = x - centreX;
-        var dz = z - centreZ;
+        var dx = x - centerX;
+        var dz = z - centerZ;
         // Box test first: it keeps the squares below from overflowing for far columns
         if (Math.Abs(dx) > spec.Radius || Math.Abs(dz) > spec.Radius) return false;
         var d2 = dx * dx + dz * dz;
         if (d2 > spec.Radius * spec.Radius) return false;
         if (d2 <= spec.CoreRadiusSquared) return true;
 
-        // Dense at the centre, thinning toward the rim. Radius > 0 here: a zero radius puts the
-        // only cell (the centre) in the core.
+        // Dense at the center, thinning toward the rim. Radius > 0 here: a zero radius puts the
+        // only cell (the center) in the core.
         var density = MathUtils.Lerp(1f, spec.EdgeDensity, MathF.Sqrt(d2) / spec.Radius);
         var h = SplitMix64.Hash(x, z, seed ^ spec.Salt);
         return Unit(SplitMix64.Mix(h + MemberStream)) < density;
@@ -69,8 +69,8 @@ public static class PlantClumps
 
     /// <summary>
     /// The inclusive range of cells along one axis whose clumps can reach coordinate
-    /// <paramref name="coord"/>: a centre sits within <see cref="PlantClumpSpec.Jitter"/> of its
-    /// cell's middle and a member within <see cref="PlantClumpSpec.Radius"/> of its centre. Empty
+    /// <paramref name="coord"/>: a center sits within <see cref="PlantClumpSpec.Jitter"/> of its
+    /// cell's middle and a member within <see cref="PlantClumpSpec.Radius"/> of its center. Empty
     /// (<paramref name="cellMin"/> &gt; <paramref name="cellMax"/>) where no clump can ever reach.
     /// </summary>
     public static void ReachingCells(PlantClumpSpec spec, int coord, out int cellMin, out int cellMax)
@@ -85,27 +85,27 @@ public static class PlantClumps
 
     /// <summary>
     /// Whether column (<paramref name="x"/>, <paramref name="z"/>) is a member of any clump whose
-    /// centre passes <paramref name="centreGate"/> (a biome test, say; null admits every centre),
-    /// and that clump's centre. Every cell that could reach the column is asked, in a fixed order,
+    /// center passes <paramref name="centerGate"/> (a biome test, say; null admits every center),
+    /// and that clump's center. Every cell that could reach the column is asked, in a fixed order,
     /// so a clump straddling a cell border has the same members from both sides; where two clumps
     /// of a loose spec overlap, the first in that order is reported. The gate runs only for a
     /// clump the column is already a member of, so a costly test stays rare.
     /// </summary>
     public static bool TryGetMember(PlantClumpSpec spec, int seed, int x, int z,
-        Func<int, int, bool>? centreGate, out int centreX, out int centreZ)
+        Func<int, int, bool>? centerGate, out int centerX, out int centerZ)
     {
         ReachingCells(spec, x, out var cx0, out var cx1);
         ReachingCells(spec, z, out var cz0, out var cz1);        for (var cellX = cx0; cellX <= cx1; cellX++)
         for (var cellZ = cz0; cellZ <= cz1; cellZ++)
         {
-            if (!TryGetClump(spec, seed, cellX, cellZ, out centreX, out centreZ)) continue;
-            if (!IsMember(spec, seed, centreX, centreZ, x, z)) continue;
-            if (centreGate != null && !centreGate(centreX, centreZ)) continue;
+            if (!TryGetClump(spec, seed, cellX, cellZ, out centerX, out centerZ)) continue;
+            if (!IsMember(spec, seed, centerX, centerZ, x, z)) continue;
+            if (centerGate != null && !centerGate(centerX, centerZ)) continue;
             return true;
         }
 
-        centreX = 0;
-        centreZ = 0;
+        centerX = 0;
+        centerZ = 0;
         return false;
     }
 

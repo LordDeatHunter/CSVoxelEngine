@@ -165,8 +165,8 @@ public class World : IItemUseWorld
     private readonly Dictionary<int, PrimedTnt> _netTnt = [];
     private readonly HashSet<int> _netTntSeen = [];
     private readonly List<int> _netTntRemovals = [];
-    private readonly List<(Vector3 Centre, byte BlockId)> _netFalling = [];
-    private readonly List<(Vector3 Centre, byte BlockId)> _netFallingPrevious = [];
+    private readonly List<(Vector3 Center, byte BlockId)> _netFalling = [];
+    private readonly List<(Vector3 Center, byte BlockId)> _netFallingPrevious = [];
 
     // Null on the headless path (tests), where Now runs off the summed Update deltas instead
     private readonly IWindow? _window;
@@ -479,7 +479,7 @@ public class World : IItemUseWorld
     /// <para>
     /// The constructor registers the world as live (<see cref="WorldSeed.BeginWorld"/>), so
     /// <see cref="WorldSeed.Apply"/> refuses to run from here on: its worker threads read the
-    /// worldgen statics unsynchronised. <see cref="SaveAndDispose"/> is the teardown; it stops the
+    /// worldgen statics unsynchronized. <see cref="SaveAndDispose"/> is the teardown; it stops the
     /// workers and calls <see cref="WorldSeed.EndWorld"/> last. A constructor that throws stops what
     /// it started and ends the world itself.
     /// </para>
@@ -695,8 +695,8 @@ public class World : IItemUseWorld
     {
         if (string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
         {
-            var centre = feet + new Vector3(0f, Slime.HalfExtentFor(size), 0f);
-            if (_slimes?.Spawn(centre, size) == null) return false;
+            var center = feet + new Vector3(0f, Slime.HalfExtentFor(size), 0f);
+            if (_slimes?.Spawn(center, size) == null) return false;
             RefreshMobs();
             return true;
         }
@@ -727,7 +727,7 @@ public class World : IItemUseWorld
     /// <paramref name="z"/>) by up to <paramref name="steps"/> growth pulses, or plants a sapling
     /// on the column's ground when it has no such tree (<see cref="TreeGrowthWriter"/>). Main
     /// thread only; this is the scripted visual tests' <c>grow</c> op's entry point.
-    /// <paramref name="yHint"/> centres the column scan (the generated ground + 1). Refused with
+    /// <paramref name="yHint"/> centers the column scan (the generated ground + 1). Refused with
     /// <see cref="TreeGrowthStatus.NotGrowable"/> while the world is still loading or for an
     /// unknown species.
     /// </summary>
@@ -1150,7 +1150,7 @@ public class World : IItemUseWorld
     private void ApplyNetworkMirrors(IReadOnlyList<NetEntity> entities)
     {
         _netTntSeen.Clear();
-        // The last snapshot's cubes stay known for one more, so a cube's cell write is recognised
+        // The last snapshot's cubes stay known for one more, so a cube's cell write is recognized
         // whichever of its EntityList and BlockChanges arrives first
         _netFallingPrevious.Clear();
         _netFallingPrevious.AddRange(_netFalling);
@@ -1218,44 +1218,44 @@ public class World : IItemUseWorld
     /// itself back there.</summary>
     private bool NearMirroredFallingCube(int x, int y, int z, byte blockId)
     {
-        var centre = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
+        var center = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
         const float reach = 1.5f * 1.5f;
         return
-            _netFalling.Any(c => c.BlockId == blockId && Vector3.DistanceSquared(c.Centre, centre) <= reach)
-            || _netFallingPrevious.Any(c => c.BlockId == blockId && Vector3.DistanceSquared(c.Centre, centre) <= reach);
+            _netFalling.Any(c => c.BlockId == blockId && Vector3.DistanceSquared(c.Center, center) <= reach)
+            || _netFallingPrevious.Any(c => c.BlockId == blockId && Vector3.DistanceSquared(c.Center, center) <= reach);
     }
 
-    /// <summary>Shakes the local camera for a TNT blast at <paramref name="centre"/>, by its distance
+    /// <summary>Shakes the local camera for a TNT blast at <paramref name="center"/>, by its distance
     /// (<see cref="ShakeFalloff"/>). Cosmetic: singleplayer and a client.</summary>
-    private void ShakeForBlast(Vector3 centre) =>
+    private void ShakeForBlast(Vector3 center) =>
         Camera.AddShake(ShakeFalloff.Trauma(WorldGenerationConfig.BlastShakeStrength, TntManager.BlastRadius,
-            WorldGenerationConfig.BlastShakeRangeBlocks, Vector3.Distance(Camera.Position, centre)));
+            WorldGenerationConfig.BlastShakeRangeBlocks, Vector3.Distance(Camera.Position, center)));
 
     /// <summary>
-    /// A TNT blast at <paramref name="centre"/> shoves the players and the living mobs in range away
+    /// A TNT blast at <paramref name="center"/> shoves the players and the living mobs in range away
     /// from it (<see cref="BlastImpulse"/>): the local camera in singleplayer, every connected player
     /// on a server (through <see cref="IMobTarget.TakeHit"/>, which queues the knockback the player's
     /// status carries to its client), a creative, flying or dead player being immune; a mob is shoved
     /// sideways (<see cref="Mob.Shove"/>). The drops, falling cubes and other TNT the blast reached
     /// were already flung by <see cref="TntManager"/>. Gameplay: singleplayer and the server.
     /// </summary>
-    private void PushFromBlast(Vector3 centre)
+    private void PushFromBlast(Vector3 center)
     {
         if (_serverMode)
         {
             var players = ServerPlayers;
             for (var i = 0; i < players.Count; i++)
-                PushTargetFromBlast(players[i], centre);
+                PushTargetFromBlast(players[i], center);
         }
         else
         {
-            PushTargetFromBlast(Camera, centre);
+            PushTargetFromBlast(Camera, center);
         }
 
         foreach (var mob in _mobs)
         {
             if (mob.IsDying) continue;
-            var impulse = BlastImpulse.At(centre, mob.Position, TntManager.BlastRadius);
+            var impulse = BlastImpulse.At(center, mob.Position, TntManager.BlastRadius);
             var sideways = impulse with { Y = 0f };
             if (sideways.LengthSquared() > 1e-6f)
                 mob.Shove(sideways, sideways.Length());
@@ -1263,11 +1263,11 @@ public class World : IItemUseWorld
     }
 
     // One player's share of a blast, aimed at its body's middle rather than its eye
-    private static void PushTargetFromBlast(IMobTarget target, Vector3 centre)
+    private static void PushTargetFromBlast(IMobTarget target, Vector3 center)
     {
         if (target.IsImmune) return;
         var body = target.Eye - new Vector3(0f, Camera.EyeHeight * 0.5f, 0f);
-        var impulse = BlastImpulse.At(centre, body, TntManager.BlastRadius);
+        var impulse = BlastImpulse.At(center, body, TntManager.BlastRadius);
         if (impulse == Vector3.Zero) return;
         var sideways = impulse with { Y = 0f };
         target.TakeHit(0, sideways, sideways.Length(), MathF.Max(0f, impulse.Y));
@@ -2069,8 +2069,8 @@ public class World : IItemUseWorld
                 continue;
             }
 
-            var centre = new Vector3(p[0], p[1], p[2]);
-            if (!IsCellLoaded(centre))
+            var center = new Vector3(p[0], p[1], p[2]);
+            if (!IsCellLoaded(center))
                 continue;
 
             // A forced spawn, bounded by the hard cap rather than the natural one: a save only holds
@@ -2082,8 +2082,8 @@ public class World : IItemUseWorld
             var isSlime = string.Equals(type!.Name, "slime", StringComparison.OrdinalIgnoreCase);
             // A file saved before slimes had sizes carries none: those were all the smallest size
             Mob? spawned = isSlime
-                ? _slimes!.Spawn(centre, mob.Size ?? SlimeSize.Min)
-                : _goblins!.Spawn(centre, mob.Ammo ?? 0, mob.Torches ?? 0);
+                ? _slimes!.Spawn(center, mob.Size ?? SlimeSize.Min)
+                : _goblins!.Spawn(center, mob.Ammo ?? 0, mob.Torches ?? 0);
             if (spawned == null)
                 continue;
 
@@ -3245,7 +3245,7 @@ public class World : IItemUseWorld
     }
 
     private void ShowDamageNumber(Mob mob, int amount) =>
-        DamageNumbers.Spawn(mob.Position with { Y = EntityHealthbarRenderer.BarCentreY(mob.Position.Y, mob.HeadAboveCentre)
+        DamageNumbers.Spawn(mob.Position with { Y = EntityHealthbarRenderer.BarCenterY(mob.Position.Y, mob.HeadAboveCenter)
                                                     + WorldGenerationConfig.DamageNumberLiftBlocks }, amount);
 
     /// <summary>
@@ -3382,7 +3382,7 @@ public class World : IItemUseWorld
     /// Breaks every support-fragile block the emptied cell <paramref name="holder"/> was holding
     /// up (see <see cref="BlockSupport"/>): the pebble or floor torch right above it and a wall
     /// torch on any side, never a wall torch that merely stood over it. Each goes through
-    /// <see cref="RemoveBlock"/>, so it rolls its loot and its own dependants are checked in turn.
+    /// <see cref="RemoveBlock"/>, so it rolls its loot and its own dependents are checked in turn.
     /// Nothing pops while the cell still holds something solid.
     /// </summary>
     private void PopUnsupportedAround(Vector3 holder, PlayerContext player)
@@ -3668,7 +3668,7 @@ public class World : IItemUseWorld
         _thudLeaves.Clear();
         _thudWood.Clear();
         tree.GatherLanded(_thudLanded);
-        var centre = Vector3.Zero;
+        var center = Vector3.Zero;
         foreach (var block in _thudLanded)
         {
             if (TreeGenerator.IsLeaf(block.Id))
@@ -3677,17 +3677,17 @@ public class World : IItemUseWorld
                 continue;
             }
             _thudWood.Add(block.Cell);
-            centre += block.Cell;
+            center += block.Cell;
         }
 
         _leaves.BurstCells(_thudLeaves, WorldGenerationConfig.LeafParticleBurstThud);
         GroundDust.TreeThud(_thudWood, _chunkManager, _debris);
         if (_thudWood.Count == 0) return;
-        centre = centre / _thudWood.Count + new Vector3(0.5f);
+        center = center / _thudWood.Count + new Vector3(0.5f);
         var strength = WorldGenerationConfig.TreeThudShakeStrength
                        * MathUtils.Clamp01(_thudWood.Count / (float)WorldGenerationConfig.TreeThudFullWoodCells);
         Camera.AddShake(ShakeFalloff.Trauma(strength, WorldGenerationConfig.TreeThudShakeNearBlocks,
-            WorldGenerationConfig.TreeThudShakeRangeBlocks, Vector3.Distance(Camera.Position, centre)));
+            WorldGenerationConfig.TreeThudShakeRangeBlocks, Vector3.Distance(Camera.Position, center)));
     }
 
     private void UpdateToppling(float deltaTime)
@@ -4278,7 +4278,7 @@ public class World : IItemUseWorld
         if (itemId == 0 || ItemRegistry.TryGet(itemId) is not { } item) return;
         var hand = Player.GetHandAnchorMatrix(Camera.Position, Camera.PlayerYaw,
             PlayerModel.FirstPersonBodyBack * (1f - Camera.ShoulderBlend), Camera.Pitch).Translation;
-        _debris.Spark(hand, ToolShatter.ColourOf(item, WorldGenerationConfig.ToolShatterFallbackColor),
+        _debris.Spark(hand, ToolShatter.ColorOf(item, WorldGenerationConfig.ToolShatterFallbackColor),
             0.12f, WorldGenerationConfig.ToolShatterCount, WorldGenerationConfig.ToolShatterSpeed,
             WorldGenerationConfig.ToolShatterSize);
     }

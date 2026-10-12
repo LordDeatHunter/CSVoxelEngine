@@ -94,7 +94,7 @@ public sealed class StairTests : IDisposable
     }
 
     [Fact]
-    public void TheRegistryRefusesALookFacingItCannotHonour()
+    public void TheRegistryRefusesALookFacingItCannotHonor()
     {
         const string path = "data/blocks/x.json";
         var look = new BlockDefinition { FacingFromLook = true };

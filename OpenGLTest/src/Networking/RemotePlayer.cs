@@ -13,7 +13,7 @@ public readonly record struct RemotePlayerSnapshot(int Id, string Name, Vector3 
 /// <summary>
 /// A player connected to the same server, as the client sees them: a target pose from the last
 /// broadcast (smoothed toward between broadcasts) and a <see cref="PlayerModel"/> posed from what
-/// the broadcast says they are doing: the walk cycle runs off the distance actually travelled, and
+/// the broadcast says they are doing: the walk cycle runs off the distance actually traveled, and
 /// the sprint, jump, crouch and swim poses and their swings (punch, slice, throw) come from the
 /// flags and the action counter. GL-free.
 /// </summary>

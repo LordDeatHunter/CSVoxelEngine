@@ -14,7 +14,7 @@ namespace VoxelEngine.WorldGen;
 /// <summary>
 /// The worldgen front-end over the tree growth engine (<see cref="TreeGrower"/>): decides which
 /// columns root a tree and of which <see cref="TreeSpecies"/> (each species' <c>worldgen</c>
-/// rules), grows every tree to maturity over the terrain heightmap and stamps the rasterised
+/// rules), grows every tree to maturity over the terrain heightmap and stamps the rasterized
 /// cells into chunks. The trees of one 64x64 XZ cell grow together (<see cref="TreeBatch"/>),
 /// each avoiding the cells of the batch's earlier trees and the SOLO shapes (one tree grown
 /// alone, cached per trunk) of the neighbor cells' trees. Like <see cref="WormCarver"/>'s
@@ -127,7 +127,7 @@ public static class TreeGenerator
     }
 
     /// <summary>
-    /// One grown, rasterised tree: its species, base cell and every cell it writes in rasterizer
+    /// One grown, rasterized tree: its species, base cell and every cell it writes in rasterizer
     /// order (wood first: the first <see cref="WoodCount"/> cells, nodes then shells, then the leaves), plus the
     /// vertical span of those cells. Immutable after build and shared across threads.
     /// </summary>
@@ -143,7 +143,7 @@ public static class TreeGenerator
         public required int MaxY { get; init; }
 
         /// <summary>
-        /// Wraps a grown tree's rasterised cells, computing the vertical span (seeded with the
+        /// Wraps a grown tree's rasterized cells, computing the vertical span (seeded with the
         /// base cell, so an empty raster still spans its base).
         /// </summary>
         internal static TreeShape Build(TreeSpecies species, int x, int baseY, int z, TreeCell[] cells, int woodCount)

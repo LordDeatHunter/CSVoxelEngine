@@ -30,10 +30,10 @@ public sealed class MultiblockShapeTests
         var point = new Vector3(0.5f, 1.25f, 0.75f);
         Assert.Equal(point, MultiblockShape.RotatePoint(point, 0));
 
-        // A half turn about the footprint's centre is the identity, and a quarter turn takes
+        // A half turn about the footprint's center is the identity, and a quarter turn takes
         // the volume's -X/-Z corner to its +X/+Z one: the volume maps onto itself either way.
         AssertClose(new Vector3(1f, 1f, 1f), MultiblockShape.RotatePoint(MultiblockShape.RotatePoint(
-            new Vector3(1f, 1f, 1f), 1), 1), "centre survives a half turn");
+            new Vector3(1f, 1f, 1f), 1), 1), "center survives a half turn");
         AssertClose(point, MultiblockShape.RotatePoint(MultiblockShape.RotatePoint(point, 1), 1),
             "half turn is the identity");
         AssertClose(new Vector3(2f, 0f, 2f), MultiblockShape.RotatePoint(Vector3.Zero, 1), "min corner");

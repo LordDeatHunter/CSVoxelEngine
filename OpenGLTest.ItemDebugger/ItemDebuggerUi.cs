@@ -29,7 +29,7 @@ public enum DebugButton
     Loop,
 }
 
-/// <summary>One editable number: a labelled track the debugger draws and hit-tests.</summary>
+/// <summary>One editable number: a labeled track the debugger draws and hit-tests.</summary>
 public sealed class DebugSlider
 {
     public DebugSlider(string label, float min, float max, int decimals, Func<float> get, Action<float> set)
@@ -49,7 +49,7 @@ public sealed class DebugSlider
     public Func<float> Get { get; }
     public Action<float> Set { get; }
 
-    public Vector2 TrackCentre { get; set; }
+    public Vector2 TrackCenter { get; set; }
     public Vector2 TrackSize { get; set; }
     public float Value => Get();
     public string Formatted => Value.ToString("F" + Decimals, CultureInfo.InvariantCulture);
@@ -94,15 +94,15 @@ public sealed class ItemDebuggerUi
     private const int ModesPerRow = 3;
     private const int PlayerModesPerRow = 4;
 
-    private static readonly Rgba Panel = Rgba.Grey(0.03f, 0.74f);
-    private static readonly Rgba PanelLine = Rgba.Grey(0.45f, 0.6f);
-    private static readonly Rgba TextDim = Rgba.Grey(0.62f);
-    private static readonly Rgba SlotBg = Rgba.Grey(0.09f, 0.72f);
+    private static readonly Rgba Panel = Rgba.Gray(0.03f, 0.74f);
+    private static readonly Rgba PanelLine = Rgba.Gray(0.45f, 0.6f);
+    private static readonly Rgba TextDim = Rgba.Gray(0.62f);
+    private static readonly Rgba SlotBg = Rgba.Gray(0.09f, 0.72f);
     private static readonly Rgba Accent = new(232, 184, 72);
-    private static readonly Rgba Track = Rgba.Grey(0.2f, 0.9f);
+    private static readonly Rgba Track = Rgba.Gray(0.2f, 0.9f);
     private static readonly Rgba Knob = Rgba.White;
-    private static readonly Rgba ButtonBg = Rgba.Grey(0.18f, 0.92f);
-    private static readonly Rgba ButtonOff = Rgba.Grey(0.1f, 0.92f);
+    private static readonly Rgba ButtonBg = Rgba.Gray(0.18f, 0.92f);
+    private static readonly Rgba ButtonOff = Rgba.Gray(0.1f, 0.92f);
 
     public IReadOnlyList<GridEntry> Entries { get; }
 
@@ -113,9 +113,9 @@ public sealed class ItemDebuggerUi
     private DebuggerTab _tab;
     private int _gridCount;
 
-    private readonly List<(Vector2 Centre, Vector2 Size, int Entry)> _slots = new();
+    private readonly List<(Vector2 Center, Vector2 Size, int Entry)> _slots = new();
     private readonly List<DebugSlider> _sliders = new();
-    private readonly List<(Vector2 Centre, Vector2 Size, DebugButton Button, int Arg, string Label, bool Enabled, bool Active)> _buttons = new();
+    private readonly List<(Vector2 Center, Vector2 Size, DebugButton Button, int Arg, string Label, bool Enabled, bool Active)> _buttons = new();
 
     public ItemDebuggerUi()
     {
@@ -141,10 +141,10 @@ public sealed class ItemDebuggerUi
 
     public int? SlotAt(Vector2 point)
     {
-        foreach (var (centre, size, entry) in _slots)
+        foreach (var (center, size, entry) in _slots)
         {
-            if (MathF.Abs(point.X - centre.X) <= size.X * 0.5f
-                && MathF.Abs(point.Y - centre.Y) <= size.Y * 0.5f)
+            if (MathF.Abs(point.X - center.X) <= size.X * 0.5f
+                && MathF.Abs(point.Y - center.Y) <= size.Y * 0.5f)
                 return entry;
         }
         return null;
@@ -155,8 +155,8 @@ public sealed class ItemDebuggerUi
         foreach (var slider in _sliders)
         {
             var halfW = slider.TrackSize.X * 0.5f;
-            if (MathF.Abs(point.X - slider.TrackCentre.X) <= halfW
-                && MathF.Abs(point.Y - slider.TrackCentre.Y) <= SliderRowH * 0.5f)
+            if (MathF.Abs(point.X - slider.TrackCenter.X) <= halfW
+                && MathF.Abs(point.Y - slider.TrackCenter.Y) <= SliderRowH * 0.5f)
                 return slider;
         }
         return null;
@@ -177,18 +177,18 @@ public sealed class ItemDebuggerUi
     /// <see cref="Draw"/> built can be hit.</summary>
     public (DebugButton Button, int Arg)? ButtonAt(Vector2 point)
     {
-        foreach (var (centre, size, button, arg, _, enabled, _) in _buttons)
+        foreach (var (center, size, button, arg, _, enabled, _) in _buttons)
         {
             if (!enabled) continue;
-            if (MathF.Abs(point.X - centre.X) <= size.X * 0.5f
-                && MathF.Abs(point.Y - centre.Y) <= size.Y * 0.5f)
+            if (MathF.Abs(point.X - center.X) <= size.X * 0.5f
+                && MathF.Abs(point.Y - center.Y) <= size.Y * 0.5f)
                 return (button, arg);
         }
         return null;
     }
 
     public static float Fraction(DebugSlider slider, float x) => Math.Clamp(
-        (x - (slider.TrackCentre.X - slider.TrackSize.X * 0.5f)) / slider.TrackSize.X, 0f, 1f);
+        (x - (slider.TrackCenter.X - slider.TrackSize.X * 0.5f)) / slider.TrackSize.X, 0f, 1f);
 
     public static float ValueAt(DebugSlider slider, float x) =>
         slider.Min + Fraction(slider, x) * (slider.Max - slider.Min);
@@ -231,7 +231,7 @@ public sealed class ItemDebuggerUi
         DrawPanel(ui, new Vector2(screen.X - Pad - PanelWidth * 0.5f, screen.Y * 0.5f),
             new Vector2(PanelWidth, screen.Y - Pad * 2f));
         if (_timelineBar is { } bar)
-            DrawPanel(ui, bar.Centre, bar.Size);
+            DrawPanel(ui, bar.Center, bar.Size);
 
         switch (tab)
         {
@@ -294,10 +294,10 @@ public sealed class ItemDebuggerUi
                 var index = (scroll + row) * _columns + col;
                 if (index >= count) return;
 
-                var centre = new Vector2(
+                var center = new Vector2(
                     gridLeft + slotSize.X * 0.5f + col * strideX,
                     gridTop + slotSize.Y * 0.5f + row * strideY);
-                _slots.Add((centre, slotSize, index));
+                _slots.Add((center, slotSize, index));
             }
         }
     }
@@ -355,7 +355,7 @@ public sealed class ItemDebuggerUi
         AddSlider(TreeStepSlider, 0f, Math.Max(1, trees.MaxStep), 0, () => trees.Step,
             v => trees.SetStep((int)MathF.Round(v)));
         var slider = _sliders[^1];
-        slider.TrackCentre = new Vector2((left + right) * 0.5f, y + 22f);
+        slider.TrackCenter = new Vector2((left + right) * 0.5f, y + 22f);
         slider.TrackSize = new Vector2(width, TrackH);
     }
 
@@ -395,7 +395,7 @@ public sealed class ItemDebuggerUi
         {
             var slider = _sliders[i];
             var rowTop = y + i * SliderRowH;
-            slider.TrackCentre = new Vector2((left + right) * 0.5f, rowTop + 22f);
+            slider.TrackCenter = new Vector2((left + right) * 0.5f, rowTop + 22f);
             slider.TrackSize = new Vector2(right - left, TrackH);
         }
 
@@ -454,7 +454,7 @@ public sealed class ItemDebuggerUi
         _sliders.Add(new DebugSlider(label, min, max, decimals, get, set));
 
     // Where the timeline strip sits this frame (null when the tab has none).
-    private (Vector2 Centre, Vector2 Size)? _timelineBar;
+    private (Vector2 Center, Vector2 Size)? _timelineBar;
 
     // The animation's progress and speed sliders and the loop toggle, in one row along the bottom of the viewport.
     // The sliders are positioned here rather than in the right panel's column, and their labels follow their own
@@ -475,40 +475,40 @@ public sealed class ItemDebuggerUi
             new Vector2(width + 16f, 68f));
 
         AddSlider(ProgressSlider, 0f, clock.Duration, 2, () => clock.Time, v => clock.Seek(v));
-        _sliders[^1].TrackCentre = new Vector2(left + progressWidth * 0.5f, trackY);
+        _sliders[^1].TrackCenter = new Vector2(left + progressWidth * 0.5f, trackY);
         _sliders[^1].TrackSize = new Vector2(progressWidth, TrackH);
 
         AddSlider(SpeedSlider, 0f, AnimationClock.MaxSpeed, 1, () => clock.Speed, v => clock.Speed = v);
-        _sliders[^1].TrackCentre = new Vector2(left + progressWidth + gap + speedWidth * 0.5f, trackY);
+        _sliders[^1].TrackCenter = new Vector2(left + progressWidth + gap + speedWidth * 0.5f, trackY);
         _sliders[^1].TrackSize = new Vector2(speedWidth, TrackH);
 
         AddButton(new Vector2(right - loopWidth * 0.5f, trackY), new Vector2(loopWidth, ButtonH),
             DebugButton.Loop, clock.Loop ? "LOOP: ON" : "LOOP: OFF", true, clock.Loop);
     }
 
-    private void AddButton(Vector2 centre, Vector2 size, DebugButton button, string label, bool enabled, bool active,
+    private void AddButton(Vector2 center, Vector2 size, DebugButton button, string label, bool enabled, bool active,
         int arg = 0) =>
-        _buttons.Add((centre, size, button, arg, label, enabled, active));
+        _buttons.Add((center, size, button, arg, label, enabled, active));
 
     private int TotalRows() => (_gridCount + _columns - 1) / _columns;
 
-    private static void DrawPanel(UIRenderer ui, Vector2 centre, Vector2 size) =>
-        ui.DrawRect(centre, size, Panel);
+    private static void DrawPanel(UIRenderer ui, Vector2 center, Vector2 size) =>
+        ui.DrawRect(center, size, Panel);
 
     private void DrawGrid(UIRenderer ui, ItemDisplayEditor editor)
     {
         DrawGridHeader(ui, $"ITEMS  ({Entries.Count})");
 
         // Flat sprites for items, cubes for blocks: the same mix the inventory rows show.
-        foreach (var (centre, size, index) in _slots)
+        foreach (var (center, size, index) in _slots)
         {
             var entry = Entries[index];
-            DrawSlot(ui, centre, size, entry.Id == editor.SelectedId);
+            DrawSlot(ui, center, size, entry.Id == editor.SelectedId);
 
             if (entry.IsBlock)
-                ui.DrawBlockIcon(centre, SlotSize * 0.74f, entry.Id);
+                ui.DrawBlockIcon(center, SlotSize * 0.74f, entry.Id);
             else
-                ui.DrawItemSprite(centre, SlotSize * 0.72f, entry.Id, 0f, 0f);
+                ui.DrawItemSprite(center, SlotSize * 0.72f, entry.Id, 0f, 0f);
         }
     }
 
@@ -518,12 +518,12 @@ public sealed class ItemDebuggerUi
 
         // No icon renderer exists for entities, so a slot is its display name.
         var scale = ui.CapHeightScale(TextCap);
-        foreach (var (centre, size, index) in _slots)
+        foreach (var (center, size, index) in _slots)
         {
-            DrawSlot(ui, centre, size, index == entities.SelectedIndex);
+            DrawSlot(ui, center, size, index == entities.SelectedIndex);
             var name = entities.Entries[index].DisplayName;
             var width = ui.MeasureTextWidth(name, scale);
-            ui.DrawText(name, new Vector2(centre.X - width * 0.5f, centre.Y - TextCap * 0.5f), scale, Rgba.White);
+            ui.DrawText(name, new Vector2(center.X - width * 0.5f, center.Y - TextCap * 0.5f), scale, Rgba.White);
         }
     }
 
@@ -531,13 +531,13 @@ public sealed class ItemDebuggerUi
     {
         DrawGridHeader(ui, $"TREES  ({trees.Entries.Count})");
 
-        foreach (var (centre, size, index) in _slots)
+        foreach (var (center, size, index) in _slots)
         {
-            DrawSlot(ui, centre, size, index == trees.SelectedIndex);
+            DrawSlot(ui, center, size, index == trees.SelectedIndex);
             var name = TreePreviewState.DisplayNameOf(trees.Entries[index]);
             var (scale, cap) = FitText(ui, name, TextCap, size.X - 8f);
             var width = ui.MeasureTextWidth(name, scale);
-            ui.DrawText(name, new Vector2(centre.X - width * 0.5f, centre.Y - cap * 0.5f), scale, Rgba.White);
+            ui.DrawText(name, new Vector2(center.X - width * 0.5f, center.Y - cap * 0.5f), scale, Rgba.White);
         }
     }
 
@@ -552,13 +552,13 @@ public sealed class ItemDebuggerUi
                 new Vector2(Pad + 8f, top + HeaderH * 0.5f), ui.CapHeightScale(TextCap), TextDim);
     }
 
-    private static void DrawSlot(UIRenderer ui, Vector2 centre, Vector2 size, bool selected)
+    private static void DrawSlot(UIRenderer ui, Vector2 center, Vector2 size, bool selected)
     {
-        ui.DrawRect(centre, size, SlotBg);
+        ui.DrawRect(center, size, SlotBg);
         if (selected)
-            ui.DrawBorder(centre, size, 2f, Accent);
+            ui.DrawBorder(center, size, 2f, Accent);
         else
-            ui.DrawBorder(centre, size, 1f, PanelLine);
+            ui.DrawBorder(center, size, 1f, PanelLine);
     }
 
     private static void DrawTitle(UIRenderer ui, ItemDisplayEditor editor, Vector2 screen, string status)
@@ -600,7 +600,7 @@ public sealed class ItemDebuggerUi
         // Below the step slider: what the shown tree is made of. Flat preview ground carves
         // nothing, so the roots feature never grows here.
         if (Slider(TreeStepSlider) is not { } slider) return;
-        var y = slider.TrackCentre.Y + 22f;
+        var y = slider.TrackCenter.Y + 22f;
         DrawFitted(ui, $"wood {trees.WoodCount}  leaves {trees.Cells.Count - trees.WoodCount}",
             new Vector2(left, y), lineWidth);
         if (!trees.FeaturesApplied)
@@ -634,35 +634,35 @@ public sealed class ItemDebuggerUi
         var left = screen.X - Pad - PanelWidth + Pad;
         var right = screen.X - Pad - Pad;
 
-        foreach (var (centre, size, _, _, label, enabled, active) in _buttons)
+        foreach (var (center, size, _, _, label, enabled, active) in _buttons)
         {
             var background = !enabled ? ButtonOff : active ? Accent : ButtonBg;
-            ui.DrawRect(centre, size, background);
-            ui.DrawBorder(centre, size, 1f, PanelLine);
+            ui.DrawRect(center, size, background);
+            ui.DrawBorder(center, size, 1f, PanelLine);
 
             var (labelScale, cap) = FitText(ui, label, TextCap, size.X - 8f);
             var width = ui.MeasureTextWidth(label, labelScale);
-            ui.DrawText(label, new Vector2(centre.X - width * 0.5f, centre.Y - cap * 0.5f), labelScale,
+            ui.DrawText(label, new Vector2(center.X - width * 0.5f, center.Y - cap * 0.5f), labelScale,
                 enabled ? Rgba.White : TextDim);
         }
 
         foreach (var slider in _sliders)
         {
             // The label and value sit over their own track, so a slider need not be in the right panel's column.
-            var labelY = slider.TrackCentre.Y - 22f;
-            var trackStart = slider.TrackCentre.X - slider.TrackSize.X * 0.5f;
-            var trackEnd = slider.TrackCentre.X + slider.TrackSize.X * 0.5f;
+            var labelY = slider.TrackCenter.Y - 22f;
+            var trackStart = slider.TrackCenter.X - slider.TrackSize.X * 0.5f;
+            var trackEnd = slider.TrackCenter.X + slider.TrackSize.X * 0.5f;
             ui.DrawText(slider.Label, new Vector2(trackStart, labelY), scale, Rgba.White);
             var valueWidth = ui.MeasureTextWidth(slider.Formatted, scale);
             ui.DrawText(slider.Formatted, new Vector2(trackEnd - valueWidth, labelY), scale, TextDim);
 
-            ui.DrawRect(slider.TrackCentre, slider.TrackSize, Track);
+            ui.DrawRect(slider.TrackCenter, slider.TrackSize, Track);
             var fraction = Math.Clamp((slider.Value - slider.Min) / (slider.Max - slider.Min), 0f, 1f);
-            var trackLeft = slider.TrackCentre.X - slider.TrackSize.X * 0.5f;
+            var trackLeft = slider.TrackCenter.X - slider.TrackSize.X * 0.5f;
             if (fraction > 0f)
-                ui.DrawRect(new Vector2(trackLeft + slider.TrackSize.X * fraction * 0.5f, slider.TrackCentre.Y),
+                ui.DrawRect(new Vector2(trackLeft + slider.TrackSize.X * fraction * 0.5f, slider.TrackCenter.Y),
                     new Vector2(slider.TrackSize.X * fraction, TrackH), Accent);
-            ui.DrawRect(new Vector2(trackLeft + slider.TrackSize.X * fraction, slider.TrackCentre.Y),
+            ui.DrawRect(new Vector2(trackLeft + slider.TrackSize.X * fraction, slider.TrackCenter.Y),
                 new Vector2(6f, 20f), Knob);
         }
     }

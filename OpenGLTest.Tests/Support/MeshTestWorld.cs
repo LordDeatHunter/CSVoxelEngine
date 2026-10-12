@@ -4,13 +4,13 @@ using VoxelEngine.Data;
 namespace VoxelEngine.Tests.Support;
 
 /// <summary>
-/// Builds the smallest world a chunk can be meshed in: the centre chunk plus its six face
+/// Builds the smallest world a chunk can be meshed in: the center chunk plus its six face
 /// neighbors, all empty and marked ready. Shared by the meshing test classes.
 /// </summary>
 internal static class MeshTestWorld
 {
     /// <summary>
-    /// Chunk position far above the terrain, where the whole light volume around the centre
+    /// Chunk position far above the terrain, where the whole light volume around the center
     /// chunk reads sunlight 15. Tests that count merged quads sit here: light is part of the
     /// greedy key, and at the origin the sunlight follows the real terrain heights, so two
     /// adjacent cells may differ and stay separate quads for that reason alone.
@@ -19,17 +19,17 @@ internal static class MeshTestWorld
 
     internal static (ChunkManager Manager, Chunk Center) WalledArea() => WalledArea(Vector3.Zero);
 
-    internal static (ChunkManager Manager, Chunk Center) WalledArea(Vector3 centre)
+    internal static (ChunkManager Manager, Chunk Center) WalledArea(Vector3 centerPosition)
     {
         var manager = new ChunkManager(null!);
-        var center = new Chunk(null!, centre, generateBlockData: false);
+        var center = new Chunk(null!, centerPosition, generateBlockData: false);
         center.IsBlockDataReady = true;
-        manager.Chunks[centre] = center;
+        manager.Chunks[centerPosition] = center;
         foreach (var offset in Vector3Directions.CardinalDirections)
         {
-            var neighbor = new Chunk(null!, centre + offset, generateBlockData: false);
+            var neighbor = new Chunk(null!, centerPosition + offset, generateBlockData: false);
             neighbor.IsBlockDataReady = true;
-            manager.Chunks[centre + offset] = neighbor;
+            manager.Chunks[centerPosition + offset] = neighbor;
         }
         return (manager, center);
     }

@@ -16,7 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PATH = os.path.join(ROOT, "OpenGLTest", "assets", "textures", "items", "acorn.png")
 
 SIZE = 32
-CENTRE = (15.5, 18.0)
+CENTER = (15.5, 18.0)
 RADIUS = 9.5
 CAP_TOP = 10.0            # the cap covers everything above this row
 
@@ -30,8 +30,8 @@ OUTLINE = (0x35, 0x22, 0x10)
 
 
 def texel(x, y):
-    dx = x - CENTRE[0]
-    dy = y - CENTRE[1]
+    dx = x - CENTER[0]
+    dy = y - CENTER[1]
     # The nut: a circle, pointed at the bottom by shrinking the radius with dy
     taper = RADIUS - max(0.0, dy) * 0.35
     distance = math.hypot(dx, dy)
@@ -72,15 +72,15 @@ def main():
     for y in range(SIZE):
         row = bytearray()
         for x in range(SIZE):
-            colour = fill[y][x]
-            if colour is None:
+            color = fill[y][x]
+            if color is None:
                 rimmed = any(
                     0 <= x + dx < SIZE and 0 <= y + dy < SIZE and fill[y + dy][x + dx] is not None
                     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
                 )
                 row += bytes(OUTLINE if rimmed else (0, 0, 0)) + (b"\xff" if rimmed else b"\x00")
             else:
-                row += bytes(colour) + b"\xff"
+                row += bytes(color) + b"\xff"
         rows.append(bytes(row))
     write_png(PATH, rows)
     print("wrote", os.path.relpath(PATH, ROOT))

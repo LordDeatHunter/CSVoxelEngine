@@ -72,7 +72,7 @@ flat out float fSwayFlag;
 // face).
 flat out float fWaterSurfaceY;
 // Water flow on fluid quads (Vertex.EncodeWaterFlow): xy = flow direction * strength, z = falling
-// flag. Deliberately NOT flat: the mesher bakes one code per corner and neighbouring cells share
+// flag. Deliberately NOT flat: the mesher bakes one code per corner and neighboring cells share
 // their corner codes (FluidFlow.Corner), so the interpolated flow is continuous across cells.
 out vec3 fWaterFlow;
 
@@ -109,7 +109,7 @@ void main() {
 #endif
     // Canopy wind, shaderpack-style: broad sine waves rolling over world XZ breathe whole
     // crowns at once instead of jittering single blocks (per-block offsets would crack the
-    // voxel seams). Wavelengths span many blocks, so neighbouring verts shear by ~a texel
+    // voxel seams). Wavelengths span many blocks, so neighboring verts shear by ~a texel
     // while the canopy visibly sways; amplitude peaks under a tenth of a block.
     vec3 displaced = vPosition;
     // ponytail: water flag rides in vColor.a (254 = water, 255 = everything else); fColor.a is unused otherwise.
@@ -130,7 +130,7 @@ void main() {
     }
     if (vSway > 0.001 && uSwayStrength > 0.001) {
         vec3 anchor = TO_WORLD(vPosition);
-        // The gust wave is sampled at the anchor carried back by the wind's travelled offset
+        // The gust wave is sampled at the anchor carried back by the wind's traveled offset
         // (Wind.Offset, bounded), so gusts roll downwind while the phase rate stays the same
         // anywhere in the world; Wind.GustPhase is the C# twin.
         vec2 ga = anchor.xz - uWindOffset;
@@ -151,7 +151,7 @@ void main() {
     // The sway weight is spent here: the fragment stage decodes the exact alpha byte as the
     // water / LOD-foliage flag, so a swaying vertex hands it a plain 255.
     fColor = vec4(vColor.rgb, swaying ? 1.0 : vColor.a);
-    // Vertex.Normal bit 4: biome-tinted face. Mirrors BiomeTint.Gain (4): the grey textureless
+    // Vertex.Normal bit 4: biome-tinted face. Mirrors BiomeTint.Gain (4): the gray textureless
     // tiles need a multiplier above 1 to reach grass green, so the vertex rgb carries tint/4 and
     // the fragment scales it back.
     bool biomeTinted = (vNormalBits & 16u) != 0u;

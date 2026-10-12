@@ -7,7 +7,7 @@ namespace VoxelEngine.Content.Stations;
 /// Split convention for the quern block: its model leaves an air gap between the static
 /// base (top at y = 6/16) and the spinning plate plus handle (bottom at y = 7/16), so the
 /// chunk keeps the base quads and a dynamic entity draws the top quads rotating about the
-/// cell centre (see <see cref="QuernManager"/>). A quad never straddles the gap, which is
+/// cell center (see <see cref="QuernManager"/>). A quad never straddles the gap, which is
 /// what makes the partition exact.
 /// </summary>
 public static class QuernRenderer

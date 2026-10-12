@@ -35,7 +35,7 @@ public static class KilnRenderer
     /// structure's front face at z = 0.</summary>
     public const float OpeningDepthZ = 12f / 16f;
 
-    /// <summary>Centre of the bowl a crucible rests on inside the hearth: on the floor and
+    /// <summary>Center of the bowl a crucible rests on inside the hearth: on the floor and
     /// toward the front so it can be reached. The bowl spans z 0.03..0.53 around this, which
     /// leaves <see cref="FireLocal"/>'s flame at 0.55 standing just behind its back wall.</summary>
     public static readonly Vector3 CrucibleLocal = new(1f, OpeningFloorY, 0.28f);
@@ -64,11 +64,11 @@ public static class KilnRenderer
         MathUtils.Lerp(CrucibleFloorY + 0.03f, CrucibleTopY - 0.03f,
             capacityMl > 0 ? MathUtils.Clamp01(ml / capacityMl) : 0f);
 
-    /// <summary>Where the kiln's flame burns: centred between the piers, just above the hearth
+    /// <summary>Where the kiln's flame burns: centered between the piers, just above the hearth
     /// floor and behind the crucible.</summary>
     public static readonly Vector3 FireLocal = new(1f, 0.25f, 0.55f);
 
-    /// <summary>Centre of the fuel row at the back of the hearth: far enough forward that a unit
+    /// <summary>Center of the fuel row at the back of the hearth: far enough forward that a unit
     /// lying flat (<see cref="FuelSize"/> across) stays clear of the back wall at
     /// <see cref="OpeningDepthZ"/>, and still behind the flame. Consumed by the casting run's
     /// render pass.</summary>
@@ -78,7 +78,7 @@ public static class KilnRenderer
     /// item.</summary>
     public const float FuelSize = ItemDrop.Size;
 
-    /// <summary>Centre-to-centre distance between stored units along the opening. Never less
+    /// <summary>Center-to-center distance between stored units along the opening. Never less
     /// than a unit's own width, so two sprites lying flat never overlap coplanarly and
     /// z-fight.</summary>
     public const float FuelSpacing = FuelSize;
@@ -93,8 +93,8 @@ public static class KilnRenderer
     /// bowl itself.</summary>
     public const float PendingSize = 2f * CrucibleOuterHalf * 0.8f;
 
-    /// <summary>Bottom-centre of that lump in the volume's local frame: over the bowl, just above
-    /// its rim. The render pass lifts by half the drawn size to centre the mesh on it.</summary>
+    /// <summary>Bottom-center of that lump in the volume's local frame: over the bowl, just above
+    /// its rim. The render pass lifts by half the drawn size to center the mesh on it.</summary>
     public static readonly Vector3 PendingLocal =
         new(CrucibleLocal.X, OpeningFloorY + CrucibleTopY + PendingGap, CrucibleLocal.Z);
 

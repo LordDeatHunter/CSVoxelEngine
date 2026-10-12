@@ -30,8 +30,11 @@ Prefer `rg`/Grep over guesswork. Useful recon commands (PowerShell):
 - Largest files: `Get-ChildItem OpenGLTest/src -Recurse -Filter *.cs | Sort-Object Length -Descending`
 - Files per folder: group the .cs files by `DirectoryName`, flag anything past ~30.
 - British spellings: grep `colour|behaviour|initialis|centre|fibre|grey|normalis|serialis|
-  catalogu|analys|defence|licence|travell|cancell|favour|honour|neighbour` (word-ish, case
-  insensitive, minus `Color`-legit hits like `oncologist`; check each).
+  catalogu|analys|defence|licence|travell|cancell|favour|honour|neighbour|bevell|spirall|
+  funnell|rasteris|memois|quantis|artefact|millilitre` (word-ish, case insensitive, minus
+  `Color`-legit hits like `oncologist`; check each). The stems are British on purpose: never
+  convert this list. Substring false positives to skip: `TranslucentRenderable`,
+  `ModelLoader`/`BbmodelLoader`, `FuelLocal`, `Silk.NET.Maths`, `optimistic`.
 - Dead code: the compiler only flags unused usings via IDE; grep for private members and
   confirm zero references, and treat `private` fields with no reads as deletions.
 - Duplicates: two near-identical methods are easiest found while editing a file; search the

@@ -21,7 +21,7 @@ namespace VoxelEngine.Content.Blocks;
 /// <see cref="MultiblockShape"/> — turned to the facing in the cell's state byte, while each of
 /// the other seven cells is a part that draws nothing at all and only exists so the volume is
 /// solid, occludes and can be mined.
-/// <see cref="Pane"/> is a glass pane: a thin centre post plus an arm toward every neighbouring
+/// <see cref="Pane"/> is a glass pane: a thin center post plus an arm toward every neighboring
 /// pane or solid full cube, derived from the neighbors at mesh time (see <see cref="PaneShape"/>);
 /// its model only supplies the tiles and the icon.
 /// </summary>

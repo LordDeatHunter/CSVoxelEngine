@@ -10,9 +10,9 @@ using Xunit;
 namespace VoxelEngine.Tests.Effects.Climate;
 
 /// <summary>
-/// The textureless tiles a biome tint draws: every tinted tile is pure grey at the one grey
+/// The textureless tiles a biome tint draws: every tinted tile is pure gray at the one gray
 /// <see cref="BiomeTint.Gain"/> is sized against, a cutout block's tinted tile keeps its source's
-/// holes texel for texel, and the default coloured tiles stay with icons and drops.
+/// holes texel for texel, and the default colored tiles stay with icons and drops.
 /// </summary>
 public sealed class BiomeTintTextureTests
 {
@@ -31,7 +31,7 @@ public sealed class BiomeTintTextureTests
     }
 
     [Fact]
-    public void EveryTintedTileIsGreyAtTheGainsGrey()
+    public void EveryTintedTileIsGrayAtTheGainsGray()
     {
         var tiles = TintedBlocks
             .SelectMany(b => Enumerable.Range(0, 6).Where(b.BiomeTint!.IsTinted).Select(f => b.BiomeTint!.Tinted[f]))
@@ -50,7 +50,7 @@ public sealed class BiomeTintTextureTests
             for (var i = 0; i < data.Length; i += 4)
             {
                 Assert.True(data[i] == data[i + 1] && data[i + 1] == data[i + 2],
-                    $"tinted tile '{name}' texel {i / 4} is coloured ({data[i]}, {data[i + 1]}, {data[i + 2]})");
+                    $"tinted tile '{name}' texel {i / 4} is colored ({data[i]}, {data[i + 1]}, {data[i + 2]})");
                 if (data[i + 3] < opaqueAlpha) continue;
                 sum += data[i];
                 opaque++;
@@ -58,8 +58,8 @@ public sealed class BiomeTintTextureTests
 
             Assert.True(opaque > 0, $"tinted tile '{name}' has no opaque texel");
             var mean = sum / opaque / 255.0;
-            Assert.True(Math.Abs(mean - WorldGenerationConfig.BiomeTintTextureGrey) <= 2.0 / 255.0,
-                $"tinted tile '{name}' averages grey {mean * 255:F1}, not the gain's {WorldGenerationConfig.BiomeTintTextureGrey * 255:F1}");
+            Assert.True(Math.Abs(mean - WorldGenerationConfig.BiomeTintTextureGray) <= 2.0 / 255.0,
+                $"tinted tile '{name}' averages gray {mean * 255:F1}, not the gain's {WorldGenerationConfig.BiomeTintTextureGray * 255:F1}");
         }
     }
 

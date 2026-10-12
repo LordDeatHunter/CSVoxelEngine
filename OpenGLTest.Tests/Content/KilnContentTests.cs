@@ -46,7 +46,7 @@ public sealed class KilnContentTests
             Assert.Null(ItemRegistry.TryGet(cell.Id));
             // The surface really covers its neighbors, but light must still reach the anchor
             // cell, which is where every quad of the model is lit from
-            Assert.True(cell.OccludesNeighbours);
+            Assert.True(cell.OccludesNeighbors);
             Assert.True(cell.PassesLight);
             Assert.True(cell.CastsAmbientOcclusion);
             // Neither renderer is the plain model renderer, so neither joins the greedy pass
@@ -138,7 +138,7 @@ public sealed class KilnContentTests
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
 
         // A part is solid and occludes, but the anchor's model already covers its cell
-        // (state byte: facing 2 at offset dx = 1, the encoding Multiblock formalises)
+        // (state byte: facing 2 at offset dx = 1, the encoding Multiblock formalizes)
         center.SetBlockRaw(8, 8, 8, part.Id, (byte)(2 | (1 << 2)));
         Assert.Empty(center.GenerateMeshData(manager)!.Vertices);
 

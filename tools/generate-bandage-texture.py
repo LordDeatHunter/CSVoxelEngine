@@ -44,7 +44,7 @@ def distance_to_band(x, y):
     return math.hypot(x - px, y - py)
 
 
-def cloth_colour(distance, x, y):
+def cloth_color(distance, x, y):
     # The lit edge is the upper side of the band (smaller y along the perpendicular), and the
     # wrap creases run across the band every four texels of its length
     if distance > HALF - 1.0:
@@ -64,7 +64,7 @@ def texel(x, y):
         return CLOTH_SHADE if (x + y) % 3 else CLOTH
     if in_knot:
         return CLOTH_LIGHT
-    return cloth_colour(distance, x, y)
+    return cloth_color(distance, x, y)
 
 
 def write_png(path, rows):
@@ -84,21 +84,21 @@ def write_png(path, rows):
 
 
 def main():
-    # Fill pass, then an outline pass rims every filled texel with the dark tan on empty neighbours
+    # Fill pass, then an outline pass rims every filled texel with the dark tan on empty neighbors
     fill = [[texel(x, y) for x in range(SIZE)] for y in range(SIZE)]
     rows = []
     for y in range(SIZE):
         row = bytearray()
         for x in range(SIZE):
-            colour = fill[y][x]
-            if colour is None:
+            color = fill[y][x]
+            if color is None:
                 rimmed = any(
                     0 <= x + dx < SIZE and 0 <= y + dy < SIZE and fill[y + dy][x + dx] is not None
                     for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
                 )
                 row += bytes(OUTLINE if rimmed else (0, 0, 0)) + (b"\xff" if rimmed else b"\x00")
             else:
-                row += bytes(colour) + b"\xff"
+                row += bytes(color) + b"\xff"
         rows.append(bytes(row))
     write_png(PATH, rows)
     print("wrote", os.path.relpath(PATH, ROOT))

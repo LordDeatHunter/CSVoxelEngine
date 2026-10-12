@@ -19,7 +19,7 @@ public sealed class GoblinManagerTests
 
     private static ChunkManager StoneFloor() => MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
 
-    // A goblin body centre standing on the stone floor (feet at y = 1).
+    // A goblin body center standing on the stone floor (feet at y = 1).
     private static Vector3 GroundBody(float x, float z) => new(x, 1f + Goblin.Height * 0.5f, z);
 
     // A player standing on the stone floor at (x, z).

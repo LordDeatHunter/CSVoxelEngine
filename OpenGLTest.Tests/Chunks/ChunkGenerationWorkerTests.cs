@@ -72,7 +72,7 @@ public sealed class ChunkGenerationWorkerTests
         for (var round = 0; round < 400; round++)
         {
             // Two moves during the run: the frontier must reset to the closest offset for the new
-            // centre rather than resuming someone else's prefix.
+            // center rather than resuming someone else's prefix.
             if (round == 150) focus.SetEye(poses[1]);
             if (round == 300) focus.SetEye(poses[2]);
 

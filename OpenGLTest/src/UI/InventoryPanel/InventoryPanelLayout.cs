@@ -68,7 +68,7 @@ public static class InventoryPanelLayout
 
     public static float TabWidth(Vector2 screen) => (PanelWidth(screen) - PanelPad * 2f) / Tabs.Length;
 
-    public static Vector2 TabCentre(int t, Vector2 screen) =>
+    public static Vector2 TabCenter(int t, Vector2 screen) =>
         new(PanelLeft + PanelPad + TabWidth(screen) * (t + 0.5f), PanelTop + PanelPad + TabHeight * 0.5f);
 
     /// <summary>
@@ -83,7 +83,7 @@ public static class InventoryPanelLayout
     public static float ClampedOffset(float offset, int rowCount, Vector2 screen) =>
         ScrollList.Clamp(offset, ContentHeight(rowCount), ListHeight(screen));
 
-    public static float RowCentreY(int row, float offset, Vector2 screen) =>
+    public static float RowCenterY(int row, float offset, Vector2 screen) =>
         ListTop + ScrollList.RowTop(row, offset, RowHeight) + RowHeight * 0.5f;
 
     /// <summary>Left edge of the search field box.</summary>
@@ -92,7 +92,7 @@ public static class InventoryPanelLayout
     /// <summary>Width of the search field box: the panel inside its pads.</summary>
     public static float SearchWidth(Vector2 screen) => PanelWidth(screen) - PanelPad * 2f;
 
-    public static (Vector2 Centre, Vector2 Size) SearchBoxRect(Vector2 screen) =>
+    public static (Vector2 Center, Vector2 Size) SearchBoxRect(Vector2 screen) =>
         (new Vector2(SearchLeft + SearchWidth(screen) * 0.5f, SearchTop + SearchHeight * 0.5f),
             new Vector2(SearchWidth(screen), SearchHeight));
 
@@ -121,21 +121,21 @@ public static class InventoryPanelLayout
     public static float CatalogButtonGroupWidth =>
         CatalogButtonCount * CatalogButtonWidth + (CatalogButtonCount - 1) * CatalogButtonGap;
 
-    /// <summary>Centre of a catalog row's button <paramref name="which"/> (0..3), right-aligned.</summary>
-    public static Vector2 CatalogButtonCentre(int row, float offset, Vector2 screen, int rowCount, int which) =>
+    /// <summary>Center of a catalog row's button <paramref name="which"/> (0..3), right-aligned.</summary>
+    public static Vector2 CatalogButtonCenter(int row, float offset, Vector2 screen, int rowCount, int which) =>
         new(RowRight(screen, rowCount) - 6f
             - (CatalogButtonCount - 1 - which) * (CatalogButtonWidth + CatalogButtonGap)
             - CatalogButtonWidth * 0.5f,
-            RowCentreY(row, offset, screen));
+            RowCenterY(row, offset, screen));
 
     /// <summary>The button of the catalog row it names under a canvas point, if any.</summary>
     public static CatalogButton? CatalogButtonAt(Vector2 point, int row, float offset, int rowCount, Vector2 screen)
     {
         for (var which = 0; which < CatalogButtonCount; which++)
         {
-            var centre = CatalogButtonCentre(row, offset, screen, rowCount, which);
-            if (MathF.Abs(point.X - centre.X) <= CatalogButtonWidth * 0.5f
-                && MathF.Abs(point.Y - centre.Y) <= CatalogButtonHeight * 0.5f)
+            var center = CatalogButtonCenter(row, offset, screen, rowCount, which);
+            if (MathF.Abs(point.X - center.X) <= CatalogButtonWidth * 0.5f
+                && MathF.Abs(point.Y - center.Y) <= CatalogButtonHeight * 0.5f)
                 return (CatalogButton)which;
         }
         return null;
@@ -176,22 +176,22 @@ public static class InventoryPanelLayout
         && point.Y >= ListTop && point.Y < ListTop + ListHeight(screen);
 
     /// <summary>The track runs down the middle of the panel's right padding.</summary>
-    public static float TrackCentreX(Vector2 screen) => PanelLeft + PanelWidth(screen) - PanelPad * 0.5f;
+    public static float TrackCenterX(Vector2 screen) => PanelLeft + PanelWidth(screen) - PanelPad * 0.5f;
 
     public static float ScrollbarHitLeft(Vector2 screen) =>
-        TrackCentreX(screen) - ScrollbarWidth * 0.5f - ScrollbarHitPad;
+        TrackCenterX(screen) - ScrollbarWidth * 0.5f - ScrollbarHitPad;
 
-    public static (Vector2 Centre, Vector2 Size) TrackRect(Vector2 screen)
+    public static (Vector2 Center, Vector2 Size) TrackRect(Vector2 screen)
     {
         var height = ListHeight(screen);
-        return (new Vector2(TrackCentreX(screen), ListTop + height * 0.5f), new Vector2(ScrollbarWidth, height));
+        return (new Vector2(TrackCenterX(screen), ListTop + height * 0.5f), new Vector2(ScrollbarWidth, height));
     }
 
-    public static (Vector2 Centre, Vector2 Size) ThumbRect(Vector2 screen, float offset, int rowCount)
+    public static (Vector2 Center, Vector2 Size) ThumbRect(Vector2 screen, float offset, int rowCount)
     {
         var view = ListHeight(screen);
         var (start, length) = ScrollList.Thumb(view, ContentHeight(rowCount), view, offset, ThumbMinLength);
-        return (new Vector2(TrackCentreX(screen), ListTop + start + length * 0.5f),
+        return (new Vector2(TrackCenterX(screen), ListTop + start + length * 0.5f),
             new Vector2(ScrollbarWidth, length));
     }
 
@@ -199,12 +199,12 @@ public static class InventoryPanelLayout
     public static ScrollbarHit ScrollbarHitAt(Vector2 point, Vector2 screen, float offset, int rowCount)
     {
         if (!Overflows(rowCount, screen)) return ScrollbarHit.None;
-        var right = TrackCentreX(screen) + ScrollbarWidth * 0.5f + ScrollbarHitPad;
+        var right = TrackCenterX(screen) + ScrollbarWidth * 0.5f + ScrollbarHitPad;
         if (point.X < ScrollbarHitLeft(screen) || point.X > right) return ScrollbarHit.None;
         if (point.Y < ListTop || point.Y > ListTop + ListHeight(screen)) return ScrollbarHit.None;
 
-        var (centre, size) = ThumbRect(screen, offset, rowCount);
-        var thumbTop = centre.Y - size.Y * 0.5f;
+        var (center, size) = ThumbRect(screen, offset, rowCount);
+        var thumbTop = center.Y - size.Y * 0.5f;
         if (point.Y < thumbTop) return ScrollbarHit.TrackAbove;
         if (point.Y > thumbTop + size.Y) return ScrollbarHit.TrackBelow;
         return ScrollbarHit.Thumb;
@@ -220,7 +220,7 @@ public static class InventoryPanelLayout
     private static bool Overflows(int rowCount, Vector2 screen) =>
         ScrollList.Overflows(ContentHeight(rowCount), ListHeight(screen));
 
-    private static bool InBox(Vector2 point, (Vector2 Centre, Vector2 Size) rect) =>
-        MathF.Abs(point.X - rect.Centre.X) <= rect.Size.X * 0.5f
-        && MathF.Abs(point.Y - rect.Centre.Y) <= rect.Size.Y * 0.5f;
+    private static bool InBox(Vector2 point, (Vector2 Center, Vector2 Size) rect) =>
+        MathF.Abs(point.X - rect.Center.X) <= rect.Size.X * 0.5f
+        && MathF.Abs(point.Y - rect.Center.Y) <= rect.Size.Y * 0.5f;
 }

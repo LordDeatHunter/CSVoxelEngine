@@ -3,13 +3,13 @@
   // Shots land in visual/panes/.
   //
   // The flat desert patch of torches.json: the player stands at (253, -5) (sand at y 9, feet at
-  // 10, eye (253.5, 11.62, -4.5)) and every placement aims at an exact cell centre, cells written
+  // 10, eye (253.5, 11.62, -4.5)) and every placement aims at an exact cell center, cells written
   // relative to the player's cell as (dx, y, dz). A three-wide dirt wall stands four cells ahead
   // with a fourth dirt block on its middle; then panes, farthest first so none blocks a later ray:
   //   (0, 11, -3) against the raised block's near face, (0, 10, -3) and (0, 10, -2) in a line
   //   from the wall toward the camera, (-1, 10, -2) and (-2, 10, -2) branching off to the left,
   //   (1, 10, -2) to the right and (0, 10, -1) toward the camera, and a lone pane at (2, 10, -1).
-  // Each pane reaches an arm toward every neighbouring pane or dirt block (PaneShape), so the
+  // Each pane reaches an arm toward every neighboring pane or dirt block (PaneShape), so the
   // line meets the wall, (0, 10, -2) is a full cross, the upper pane is a post with one arm into
   // the raised block, the row ends stop at their posts and the lone pane is just a post:
   //   panes-front    from where the player stands, with the HUD and the selection outline

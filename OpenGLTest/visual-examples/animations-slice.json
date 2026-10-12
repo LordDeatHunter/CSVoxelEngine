@@ -2,7 +2,7 @@
   // The obsidian blade's slice from the shoulder camera: run with
   // VOXEL_SCRIPT=visual-examples/animations-slice.json VOXEL_TIME=147 from OpenGLTest/.
   // Shots land in visual/animations-slice/. A slice lasts 0.7 s: the wind-up ends at ~0.18 s, the
-  // strike is centred on the impact at ~0.26 s and ends at ~0.34 s, the rest is the recovery. Each
+  // strike is centered on the impact at ~0.26 s and ends at ~0.34 s, the rest is the recovery. Each
   // shot lands a frame or two after its wait, so they are approximate. The second slice is the
   // buffered return swing (right-to-left, then left-to-right).
   "steps": [

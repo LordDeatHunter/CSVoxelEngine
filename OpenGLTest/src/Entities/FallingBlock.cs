@@ -73,14 +73,14 @@ public class FallingBlock
     private Vector3 _lastPosition;
     private float _stillTime;
 
-    // The highest the centre has been, so a settle knows how far the cube fell
+    // The highest the center has been, so a settle knows how far the cube fell
     private float _peakY;
 
     /// <summary>How far the cube has dropped from the highest point it reached, in blocks; what its
     /// settling dust is sized by (<see cref="LandingDust.FallingBlockCount"/>).</summary>
     public float FallBlocks => MathF.Max(0f, _peakY - Position.Y);
 
-    /// <summary>Whether the cube's centre was under a fluid surface on its last physics step.</summary>
+    /// <summary>Whether the cube's center was under a fluid surface on its last physics step.</summary>
     public bool IsSubmerged { get; private set; }
 
     /// <summary>The cube's water-splash memory, stepped by the world from its bottom each frame
@@ -192,7 +192,7 @@ public class FallingBlock
         }
 
         // A sliding cube keeps its shove while crossing the block top; friction would kill a
-        // 2.5 blocks/s nudge within centimetres, so it is skipped until the cube lands again
+        // 2.5 blocks/s nudge within centimeters, so it is skipped until the cube lands again
         if (hitY && _velocity.Y == 0f && !_sliding)
         {
             var damp = MathF.Max(0f, 1f - GroundFriction * deltaTime);
@@ -214,7 +214,7 @@ public class FallingBlock
         // A slide that walks off its pillar drops straight into the cell beside it instead
         // of sailing on: the shove only ever crosses one block top, so anything left in the
         // air past the edge is overshoot, not momentum. hitY only fires on real Y motion, so
-        // a coasting cube tests the support under its centre instead.
+        // a coasting cube tests the support under its center instead.
         if (_sliding && !hitY)
         {
             var (cx, cy, cz) = Position.BlockCell();
@@ -315,7 +315,7 @@ public class FallingBlock
 
     /// <summary>
     /// Whether the cube fits through the side cell at rest level and has room to drop into
-    /// below it. A diagonal also needs its two neighbouring sides and the three cells above
+    /// below it. A diagonal also needs its two neighboring sides and the three cells above
     /// the move clear, so the cube never clips a corner it slides toward.
     /// </summary>
     private static bool IsSlideTarget(int rx, int ry, int rz, (int X, int Z) dir,

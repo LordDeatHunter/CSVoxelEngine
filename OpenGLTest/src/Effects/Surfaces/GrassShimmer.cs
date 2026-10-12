@@ -7,7 +7,7 @@ namespace VoxelEngine.Effects.Surfaces;
 /// <summary>
 /// GL-free twin of the grass wind shimmer in test-fragment.glsl: soft bright bands that lie across
 /// the wind on the grass tops and roll downwind with the leaf sway's gusts. The pattern is read at
-/// the position carried back by the gusts' travelled offset (<see cref="Wind.Offset"/> at
+/// the position carried back by the gusts' traveled offset (<see cref="Wind.Offset"/> at
 /// <see cref="WorldGenerationConfig.WindGustSpeed"/>, the shader's <c>uWindOffset</c>), the way the
 /// sway samples its gust wave, and weighted by that same gust (<see cref="Wind.Gust"/>), so the
 /// bands travel and swell with the canopy. Only biome-tinted up faces shimmer (<see cref="Applies"/>).
@@ -23,7 +23,7 @@ public static class GrassShimmer
 
     /// <summary>
     /// The band strength at <paramref name="worldXZ"/>, 0..1: the crest pattern along the wind
-    /// (<paramref name="windDirection"/>, any length, normalised here as the shader does) at the
+    /// (<paramref name="windDirection"/>, any length, normalized here as the shader does) at the
     /// position less <paramref name="gustOffset"/>, times the gust there at <paramref name="time"/>.
     /// </summary>
     public static float Band(Vector2 worldXZ, Vector2 windDirection, Vector2 gustOffset, double time)

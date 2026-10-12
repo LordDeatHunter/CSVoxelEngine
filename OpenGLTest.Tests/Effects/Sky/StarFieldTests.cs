@@ -146,7 +146,7 @@ public sealed class StarFieldTests
             mean += StarField.Twinkle(10f, rate, phase);
         }
 
-        Assert.True(rates.Count > twinkles.Length / 2, "neighbouring stars share their twinkle rate");
+        Assert.True(rates.Count > twinkles.Length / 2, "neighboring stars share their twinkle rate");
         // At one instant the stars sit all over their swing rather than dimming together
         mean /= twinkles.Length;
         var variance = 0f;
@@ -156,7 +156,7 @@ public sealed class StarFieldTests
         Assert.True(spread > 0.1f * WorldGenerationConfig.StarTwinkleDepth, $"the stars twinkle in step (spread {spread})");
     }
 
-    // The twinkles of a run of neighbouring cells on one face.
+    // The twinkles of a run of neighboring cells on one face.
     private static (float Rate, float Phase)[] SomeTwinkles()
     {
         var twinkles = new (float, float)[64];

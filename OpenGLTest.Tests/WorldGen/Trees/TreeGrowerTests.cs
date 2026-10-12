@@ -32,7 +32,7 @@ public sealed class TreeGrowerTests
     private static TreeGraph Grow(TreeSpecies species, (int X, int Y, int Z) pos, int seed, ITreeSpace? space = null) =>
         TreeGrower.GrowToMaturity(species, pos.X, pos.Y, pos.Z, space ?? Flat(), seed);
 
-    /// <summary>The rasterisation with every cell made relative to the root.</summary>
+    /// <summary>The rasterization with every cell made relative to the root.</summary>
     private static List<TreeCell> RelativeCells(TreeSpecies species, (int X, int Y, int Z) pos, int seed)
     {
         var space = Flat();

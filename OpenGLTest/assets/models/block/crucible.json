@@ -5,7 +5,7 @@
   // multiblock bake rules do not apply - but it carries no "cullface" all the same, because an
   // entity mesh has no cell neighbors to cull against.
   //
-  // Authored in the usual 0..16 model units, centred on x/z 8 and 8 units tall, so the bowl is
+  // Authored in the usual 0..16 model units, centered on x/z 8 and 8 units tall, so the bowl is
   // a 8x8x8 box hugging the middle of its cell. KilnRenderer mirrors those numbers:
   //   CrucibleOuterHalf = 4/16   (half the outer footprint)
   //   CrucibleFloorY    = 2/16   (top of the floor slab, where the liquid starts)

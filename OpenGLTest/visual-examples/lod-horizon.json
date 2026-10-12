@@ -26,7 +26,7 @@
 // player lands, and a blind 90 deg turn from a scored vantage lands on an unscored one (in
 // practice, a tree). Each teleport drops 30 blocks above its stand point; the waits let the
 // player land and settle AND let the LodGen worker build the rings before the shot.
-// Pitch -10 centres the band: from summit A the terrain 256 blocks out sits ~18 deg below the
+// Pitch -10 centers the band: from summit A the terrain 256 blocks out sits ~18 deg below the
 // eye and 2048 blocks out ~2 deg below, so that span brackets the middle of the frame.
 //
 // Timing is part of the framing. RenderManager.cs:639 drives the sun from wall-clock elapsed

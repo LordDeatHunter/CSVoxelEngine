@@ -13,7 +13,7 @@ namespace VoxelEngine.Rendering;
 /// it out here. The GL half (texture allocation, framebuffer completeness) is not covered by tests at
 /// all; it is only reachable by running the game.
 ///
-/// Two properties are worth stating because they are what make the caller's UV maths and its resize
+/// Two properties are worth stating because they are what make the caller's UV math and its resize
 /// handling correct:
 ///
 /// <list type="bullet">

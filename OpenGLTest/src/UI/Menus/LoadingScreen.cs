@@ -105,23 +105,23 @@ public static class LoadingScreenLayout
 
     public static Vector2 BarSize => new(640f, 18f);
 
-    public static Vector2 BarCentre(Vector2 screenSize) =>
+    public static Vector2 BarCenter(Vector2 screenSize) =>
         new(screenSize.X * 0.5f, screenSize.Y * 0.5f + 60f);
 
-    public static Vector2 SpinnerCentre(Vector2 screenSize) =>
+    public static Vector2 SpinnerCenter(Vector2 screenSize) =>
         new(screenSize.X * 0.5f, screenSize.Y * 0.5f - 40f);
 
     /// <summary>Top edge of the world-name title, above the spinner.</summary>
     public static float TitleTop(Vector2 screenSize) =>
-        SpinnerCentre(screenSize).Y - SpinnerRadius - 90f;
+        SpinnerCenter(screenSize).Y - SpinnerRadius - 90f;
 
     /// <summary>Top edge of the caption, between the spinner and the bar.</summary>
     public static float CaptionTop(Vector2 screenSize) =>
-        BarCentre(screenSize).Y - BarSize.Y * 0.5f - 44f;
+        BarCenter(screenSize).Y - BarSize.Y * 0.5f - 44f;
 
     /// <summary>Top edge of the percentage text under the bar.</summary>
     public static float PercentTop(Vector2 screenSize) =>
-        BarCentre(screenSize).Y + BarSize.Y * 0.5f + 14f;
+        BarCenter(screenSize).Y + BarSize.Y * 0.5f + 14f;
 
     /// <summary>
     /// Where the spinner is in its revolution, in [0, 1): the fractional part of
@@ -135,12 +135,12 @@ public static class LoadingScreenLayout
         return phase >= 1f ? 0f : phase;
     }
 
-    /// <summary>Centre of dot <paramref name="dot"/> of <paramref name="dotCount"/> on the spinner ring.</summary>
-    public static Vector2 DotCentre(Vector2 screenSize, int dot, int dotCount)
+    /// <summary>Center of dot <paramref name="dot"/> of <paramref name="dotCount"/> on the spinner ring.</summary>
+    public static Vector2 DotCenter(Vector2 screenSize, int dot, int dotCount)
     {
         var angle = dotCount > 0 ? dot * MathF.Tau / dotCount : 0f;
         // Start at the top and run clockwise (Y is down).
-        return SpinnerCentre(screenSize) + new Vector2(MathF.Sin(angle), -MathF.Cos(angle)) * SpinnerRadius;
+        return SpinnerCenter(screenSize) + new Vector2(MathF.Sin(angle), -MathF.Cos(angle)) * SpinnerRadius;
     }
 
     /// <summary>

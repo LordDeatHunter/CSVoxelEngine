@@ -13,7 +13,7 @@ namespace VoxelEngine;
 /// switches it between worlds and rebuilds everything that was derived from the old one.
 /// </summary>
 /// <remarks>
-/// Worldgen statics are read unsynchronised by the chunk-generation workers, the LOD workers and
+/// Worldgen statics are read unsynchronized by the chunk-generation workers, the LOD workers and
 /// the mesh runners, so a swap is legal only while no <see cref="World"/> exists and all of those
 /// threads have been stopped and joined. The writes are then published to the next world's
 /// workers by <c>Thread.Start</c> (and were fenced from the old ones by <c>Thread.Join</c>), so no
@@ -55,7 +55,7 @@ public static class WorldSeed
             throw new InvalidOperationException(
                 "WorldSeed.Apply is legal only while no World exists: stop and join the chunk-generation " +
                 "and LOD workers and drain the mesh runners first (worldgen statics are read " +
-                "unsynchronised on those threads)");
+                "unsynchronized on those threads)");
 
         _value = seed;
 

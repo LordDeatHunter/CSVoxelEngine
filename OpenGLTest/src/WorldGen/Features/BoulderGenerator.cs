@@ -8,14 +8,14 @@ namespace VoxelEngine.WorldGen.Features;
 /// Boulders: a rare blob of stone or cobblestone cells sitting on the forest or taiga floor,
 /// decided per 2^<see cref="WorldGenerationConfig.BoulderCellShift"/>-block cell from a pure hash
 /// of (cell, seed), so every chunk a boulder reaches stamps the same cells (clipped at its
-/// border). Its cells share one height (the centre column's ground plus one) and go into air only;
+/// border). Its cells share one height (the center column's ground plus one) and go into air only;
 /// the far LOD shows none.
 /// </summary>
 public static class BoulderGenerator
 {
     private const ulong AcceptStream = 0x9E3779B97F4A7C15UL;
-    private const ulong CentreXStream = unchecked(AcceptStream * 2);
-    private const ulong CentreZStream = unchecked(AcceptStream * 3);
+    private const ulong CenterXStream = unchecked(AcceptStream * 2);
+    private const ulong CenterZStream = unchecked(AcceptStream * 3);
     private const ulong CountStream = unchecked(AcceptStream * 4);
     private const ulong ShapeStream = unchecked(AcceptStream * 5);
     private const ulong MaterialStream = unchecked(AcceptStream * 6);
@@ -31,14 +31,14 @@ public static class BoulderGenerator
     }
 
     /// <summary>
-    /// The boulder a cell holds: its centre column (jittered inside the cell), its block count
+    /// The boulder a cell holds: its center column (jittered inside the cell), its block count
     /// (2..4) and its material, or false for the many cells without one. A pure function of the
     /// cell and the seed.
     /// </summary>
-    public static bool TryGetBoulder(int cellX, int cellZ, out int centreX, out int centreZ, out int count,
+    public static bool TryGetBoulder(int cellX, int cellZ, out int centerX, out int centerZ, out int count,
         out byte blockId)
     {
-        centreX = centreZ = 0;
+        centerX = centerZ = 0;
         count = 0;
         blockId = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x80D1);
@@ -46,8 +46,8 @@ public static class BoulderGenerator
 
         var size = 1 << WorldGenerationConfig.BoulderCellShift;
         var span = (ulong)size;
-        centreX = (cellX << WorldGenerationConfig.BoulderCellShift) + (int)(SplitMix64.Mix(h + CentreXStream) % span);
-        centreZ = (cellZ << WorldGenerationConfig.BoulderCellShift) + (int)(SplitMix64.Mix(h + CentreZStream) % span);
+        centerX = (cellX << WorldGenerationConfig.BoulderCellShift) + (int)(SplitMix64.Mix(h + CenterXStream) % span);
+        centerZ = (cellZ << WorldGenerationConfig.BoulderCellShift) + (int)(SplitMix64.Mix(h + CenterZStream) % span);
         var counts = WorldGenerationConfig.BoulderMaxBlocks - WorldGenerationConfig.BoulderMinBlocks + 1;
         count = WorldGenerationConfig.BoulderMinBlocks + (int)(SplitMix64.Mix(h + CountStream) % (ulong)counts);
         blockId = (SplitMix64.Mix(h + MaterialStream) & 1) == 0 ? StoneBlock : CobblestoneBlock;
@@ -55,7 +55,7 @@ public static class BoulderGenerator
     }
 
     /// <summary>
-    /// Stamps every boulder that reaches this chunk: its cells around the centre at the centre
+    /// Stamps every boulder that reaches this chunk: its cells around the center at the center
     /// column's ground plus one, into air only, clipped at the chunk's border. Runs on a generation
     /// worker thread after the trees, so a boulder never displaces one.
     /// </summary>
@@ -71,20 +71,20 @@ public static class BoulderGenerator
         for (var cellX = minCellX; cellX <= maxCellX; cellX++)
         for (var cellZ = minCellZ; cellZ <= maxCellZ; cellZ++)
         {
-            if (!TryGetBoulder(cellX, cellZ, out var centreX, out var centreZ, out var count, out var blockId))
+            if (!TryGetBoulder(cellX, cellZ, out var centerX, out var centerZ, out var count, out var blockId))
                 continue;
-            var biome = TerrainGenerator.BiomeAt(centreX, centreZ);
+            var biome = TerrainGenerator.BiomeAt(centerX, centerZ);
             if (biome != Biome.Forest && biome != Biome.Taiga) continue;
 
-            var heights = ColumnCache.GetHeights(VoxelCoords.WorldToChunk(centreX), VoxelCoords.WorldToChunk(centreZ));
-            var height = heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(centreX),
-                VoxelCoords.WorldToLocal(centreZ))];
-            if (TerrainGenerator.IsWaterColumn(centreX, centreZ, height)) continue;
+            var heights = ColumnCache.GetHeights(VoxelCoords.WorldToChunk(centerX), VoxelCoords.WorldToChunk(centerZ));
+            var height = heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(centerX),
+                VoxelCoords.WorldToLocal(centerZ))];
+            if (TerrainGenerator.IsWaterColumn(centerX, centerZ, height)) continue;
 
             var ly = height + 1 - worldY0;
             if ((uint)ly >= Chunk.Size) continue;
 
-            // The blob's cells: the centre first, then its neighbors in a fixed order, one row of
+            // The blob's cells: the center first, then its neighbors in a fixed order, one row of
             // the shape hash per count so a small boulder is a subset of a larger one's cells
             var shape = SplitMix64.Mix(SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x80D1) + ShapeStream);
             dx[0] = 0;
@@ -106,8 +106,8 @@ public static class BoulderGenerator
                     2 => (-dx[i], -dz[i]),
                     _ => (dz[i], -dx[i]),
                 };
-                var lx = centreX + ox - worldX0;
-                var lz = centreZ + oz - worldZ0;
+                var lx = centerX + ox - worldX0;
+                var lz = centerZ + oz - worldZ0;
                 if ((uint)lx >= Chunk.Size || (uint)lz >= Chunk.Size) continue;
                 var index = Chunk.Idx(lx, ly, lz);
                 if (blocks[index] != BlockType.Air) continue;

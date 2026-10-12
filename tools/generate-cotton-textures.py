@@ -8,8 +8,8 @@ Writes two 32x32 RGBA tiles (the size of every other block tile and item sprite)
       four locks sitting in a brown star-shaped calyx over a stub of green stem.
 
 The palette is taken from the existing art (the flower's greens and teal outline, the snowball's
-whites and grey rim, the mudball's browns), and every shape is drawn in code with an outline pass
-that rims each material in its own dark colour, the way the hand-made sprites are rimmed.
+whites and gray rim, the mudball's browns), and every shape is drawn in code with an outline pass
+that rims each material in its own dark color, the way the hand-made sprites are rimmed.
 
 No randomness and no image library: the PNG is encoded here with zlib at a fixed level and filter
 0, so re-running reproduces both files byte for byte. Run from anywhere:
@@ -26,15 +26,15 @@ ITEM_PATH = os.path.join(ROOT, "OpenGLTest", "assets", "textures", "items", "cot
 
 SIZE = 32
 
-# Materials: each fill colour belongs to one material, and the outline pass rims a material with
-# its own dark colour.
+# Materials: each fill color belongs to one material, and the outline pass rims a material with
+# its own dark color.
 GREEN, FLUFF, CALYX = "green", "fluff", "calyx"
 OUTLINE = {
     GREEN: (0x04, 0x4C, 0x4C),   # the flower's teal rim
-    FLUFF: (0xA4, 0xAD, 0xAF),   # the snowball's grey rim
+    FLUFF: (0xA4, 0xAD, 0xAF),   # the snowball's gray rim
     CALYX: (0x3B, 0x29, 0x21),   # the mudball's darkest brown
 }
-# Outline priority where two materials meet the same empty pixel: the fluff reads best rimmed grey
+# Outline priority where two materials meet the same empty pixel: the fluff reads best rimmed gray
 PRIORITY = (FLUFF, CALYX, GREEN)
 
 LEAF_DARK = (0x1A, 0x75, 0x46)
@@ -67,7 +67,7 @@ class Canvas:
 
     def outline(self):
         """Rims every filled region: each empty pixel 4-adjacent to a fill takes the darkest
-        outline among its neighbours' materials (by PRIORITY)."""
+        outline among its neighbors' materials (by PRIORITY)."""
         rim = []
         for y in range(SIZE):
             for x in range(SIZE):
@@ -134,22 +134,22 @@ def line(c, x0, y0, x1, y1, rgb, material=GREEN):
             y0 += sy
 
 
-def stamp(c, x0, y0, art, colours):
+def stamp(c, x0, y0, art, colors):
     """Stamps an ASCII sprite: each character maps to (rgb, material), '.' is left alone."""
     for dy, row in enumerate(art):
         for dx, ch in enumerate(row):
             if ch != ".":
-                rgb, material = colours[ch]
+                rgb, material = colors[ch]
                 c.set(x0 + dx, y0 + dy, rgb, material)
 
 
-LEAF_COLOURS = {
+LEAF_COLORS = {
     "d": (LEAF_DARK, GREEN),
     "g": (LEAF_MID, GREEN),
     "l": (LEAF_LIGHT, GREEN),
     "h": (LEAF_HIGHLIGHT, GREEN),
 }
-BOLL_COLOURS = {
+BOLL_COLORS = {
     "W": (FLUFF_WHITE, FLUFF),
     "w": (FLUFF_LIGHT, FLUFF),
     "s": (FLUFF_SHADE, FLUFF),
@@ -196,17 +196,17 @@ def cotton_plant():
     line(c, 16, 25, 25, 20, LEAF_MID)
 
     # Leaves along the stems
-    stamp(c, 9, 25, LEAF_LEFT, LEAF_COLOURS)
-    stamp(c, 18, 26, LEAF_RIGHT, LEAF_COLOURS)
-    stamp(c, 10, 16, LEAF_LEFT, LEAF_COLOURS)
-    stamp(c, 18, 14, LEAF_RIGHT, LEAF_COLOURS)
+    stamp(c, 9, 25, LEAF_LEFT, LEAF_COLORS)
+    stamp(c, 18, 26, LEAF_RIGHT, LEAF_COLORS)
+    stamp(c, 10, 16, LEAF_LEFT, LEAF_COLORS)
+    stamp(c, 18, 14, LEAF_RIGHT, LEAF_COLORS)
 
     # Bolls at the branch tips, the top one over the main stem
-    stamp(c, 13, 2, BOLL, BOLL_COLOURS)
-    stamp(c, 5, 8, BOLL, BOLL_COLOURS)
-    stamp(c, 21, 6, BOLL, BOLL_COLOURS)
-    stamp(c, 3, 16, BOLL, BOLL_COLOURS)
-    stamp(c, 23, 14, BOLL, BOLL_COLOURS)
+    stamp(c, 13, 2, BOLL, BOLL_COLORS)
+    stamp(c, 5, 8, BOLL, BOLL_COLORS)
+    stamp(c, 21, 6, BOLL, BOLL_COLORS)
+    stamp(c, 3, 16, BOLL, BOLL_COLORS)
+    stamp(c, 23, 14, BOLL, BOLL_COLORS)
 
     c.outline()
     return c
@@ -256,7 +256,7 @@ def cotton_item():
         (11.5, 11.5, 5.4),   # back left
         (9.5, 18.0, 4.6),    # front left
         (22.0, 17.5, 4.8),   # front right
-        (15.5, 18.5, 5.3),   # front centre
+        (15.5, 18.5, 5.3),   # front center
     )
     light = (-0.6, -0.8)
     for lx, ly, r in locks:

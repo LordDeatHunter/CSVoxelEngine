@@ -235,7 +235,7 @@ public sealed class TreeRasterizerTests
         }
     }
 
-    /// <summary>The wood cells of a rasterisation by cell key.</summary>
+    /// <summary>The wood cells of a rasterization by cell key.</summary>
     private static Dictionary<long, TreeCell> WoodByKey(List<TreeCell> cells, int woodCount)
     {
         var wood = new Dictionary<long, TreeCell>();

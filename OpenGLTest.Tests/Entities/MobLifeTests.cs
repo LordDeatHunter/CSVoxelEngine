@@ -128,7 +128,7 @@ public sealed class MobLifeTests
     }
 
     [Fact]
-    public void AHitFlinchesOverTheRunningActionWithoutCancellingIt()
+    public void AHitFlinchesOverTheRunningActionWithoutCancelingIt()
     {
         var goblin = new Goblin(EntityRegistry.Require("goblin"), new Vector3(2.5f, 1f + Goblin.Height * 0.5f, 2.5f), 3);
         var animator = goblin.Animation;

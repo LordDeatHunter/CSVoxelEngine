@@ -44,9 +44,9 @@ public sealed class TreeBatchTests
         for (var cz = -r; cz <= r; cz++)
         {
             if (Math.Max(Math.Abs(cx), Math.Abs(cz)) != r) continue;
-            var centreX = (cx << WorldGenerationConfig.TreeCellShift) + half;
-            var centreZ = (cz << WorldGenerationConfig.TreeCellShift) + half;
-            if (!TerrainGenerator.IsForest(centreX, centreZ)) continue;
+            var centerX = (cx << WorldGenerationConfig.TreeCellShift) + half;
+            var centerZ = (cz << WorldGenerationConfig.TreeCellShift) + half;
+            if (!TerrainGenerator.IsForest(centerX, centerZ)) continue;
             if (CellTrunks(cx, cz) >= minTrunks)
                 return (cx, cz);
         }
@@ -66,7 +66,7 @@ public sealed class TreeBatchTests
     /// batch's Chebyshev filter drops cannot reach the cell's trees by the reach bound, so
     /// asserting against the whole ring is the stronger rule.
     /// </summary>
-    private static HashSet<long> NeighbourSoloCells(int cellX, int cellZ)
+    private static HashSet<long> NeighborSoloCells(int cellX, int cellZ)
     {
         var size = WorldGenerationConfig.TreeCellBlocks;
         var x0 = cellX << WorldGenerationConfig.TreeCellShift;
@@ -148,12 +148,12 @@ public sealed class TreeBatchTests
     }
 
     [Fact]
-    public void AGrownCellNeverEntersEarlierTreesOrNeighbourSoloCells()
+    public void AGrownCellNeverEntersEarlierTreesOrNeighborSoloCells()
     {
         foreach (var (cx, cz) in SampleCells())
         {
             var batch = TreeGenerator.BatchOf(cx, cz);
-            var occupied = NeighbourSoloCells(cx, cz);
+            var occupied = NeighborSoloCells(cx, cz);
             foreach (var tree in batch.Trees)
             {
                 for (var i = 1; i < tree.Cells.Length; i++)
@@ -228,7 +228,7 @@ public sealed class TreeBatchTests
 
     /// <summary>
     /// A forest trunk within <see cref="TreeGenerator.ReachHorizontal"/> of a cell border whose
-    /// batch shape crosses into a neighbor cell and whose 3x3 chunk-column neighbourhood is forest,
+    /// batch shape crosses into a neighbor cell and whose 3x3 chunk-column neighborhood is forest,
     /// searched in rings of cells outward from the origin, then by column.
     /// </summary>
     private static (int X, int Z) FindForestTrunkNearCellBorder()
@@ -295,7 +295,7 @@ public sealed class TreeBatchTests
     }
 
     /// <summary>
-    /// Wooded forest chunk columns whose 3x3 neighbourhood is forest and whose whole 16x16 lies at
+    /// Wooded forest chunk columns whose 3x3 neighborhood is forest and whose whole 16x16 lies at
     /// least <see cref="TreeGenerator.ReachHorizontal"/> from every cell border, so only their own
     /// cell's trees reach them, searched in rings outward from the origin.
     /// </summary>

@@ -21,7 +21,7 @@ public sealed class SlimeSizeTests
 
     private static EntityType SlimeType => EntityRegistry.Require("slime");
 
-    // A body centre resting on the stone floor (feet at y = 1) for a slime of this size.
+    // A body center resting on the stone floor (feet at y = 1) for a slime of this size.
     private static Vector3 GroundBody(float x, float z, int size) => new(x, 1f + Slime.HalfExtentFor(size), z);
 
     [Fact]
@@ -78,7 +78,7 @@ public sealed class SlimeSizeTests
             if (smaller != null)
             {
                 Assert.True(slime.BodyHalfExtent > smaller.BodyHalfExtent);
-                Assert.True(slime.HeadAboveCentre > smaller.HeadAboveCentre);
+                Assert.True(slime.HeadAboveCenter > smaller.HeadAboveCenter);
                 Assert.True(slime.MaxHealth > smaller.MaxHealth);
             }
             smaller = slime;

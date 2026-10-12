@@ -16,7 +16,7 @@ namespace VoxelEngine.Tests.Content;
 /// <summary>
 /// A glass pane is a thin translucent block on glass's path: it never hides a neighbor's face,
 /// lets light through and is drawn in the blended pass. Its shape follows its neighbors
-/// (<see cref="PaneShape"/>): a post plus an arm toward every neighbouring pane or solid full
+/// (<see cref="PaneShape"/>): a post plus an arm toward every neighboring pane or solid full
 /// cube, drawn with no face between two connected panes, and hit and collided with by exactly
 /// those arms.
 /// </summary>
@@ -61,7 +61,7 @@ public sealed class PaneTests
         (boxes.Select(b => b.Min).Aggregate(Vector3.Min), boxes.Select(b => b.Max).Aggregate(Vector3.Max));
 
     [Fact]
-    public void APaneNeverHidesANeighbourAndIsDrawnInTheBlendedPass()
+    public void APaneNeverHidesANeighborAndIsDrawnInTheBlendedPass()
     {
         foreach (var type in BlockType.Types.Values.Where(t => t.Renderer == BlockRenderer.Pane))
         {
@@ -201,7 +201,7 @@ public sealed class PaneTests
             var boxes = PaneShape.GetBoxesAt(manager, (int)origin.X + 8, (int)origin.Y + y, (int)origin.Z + 8);
             var (boxMin, boxMax) = Union(boxes);
 
-            // Only the middle pane's quads: a neighbouring pane's arm never reaches inside its cell
+            // Only the middle pane's quads: a neighboring pane's arm never reaches inside its cell
             // and carries no cap on the shared edge, so every one of its quads leaves the cell
             var cell = new Vector3(8, y, 8);
             var own = Quads(mesh.TranslucentVertices)

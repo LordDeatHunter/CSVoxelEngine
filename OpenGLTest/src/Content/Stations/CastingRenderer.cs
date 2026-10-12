@@ -36,7 +36,7 @@ public static class CastingRenderer
     /// rather than reading as a ground-drop icon dropped into the slab.</summary>
     public const float ResultSize = PocketWidth - 2f * ResultClearance;
 
-    /// <summary>Height of that sprite's centre: lying face-up on the pocket floor with its back
+    /// <summary>Height of that sprite's center: lying face-up on the pocket floor with its back
     /// face just clear of it (<see cref="SpritePose.RestingLift"/>), under the molten sheet that
     /// dissolves into it.</summary>
     public static readonly float ResultY = PocketFloorY + SpritePose.RestingLift(ResultSize);
@@ -46,7 +46,7 @@ public static class CastingRenderer
     /// since a pocket-wide cube would stand straight through the slab.</summary>
     public const float ResultCubeSize = PocketTopY - PocketFloorY;
 
-    /// <summary>Height of that cube's centre: resting on the pocket floor.</summary>
+    /// <summary>Height of that cube's center: resting on the pocket floor.</summary>
     public const float ResultCubeY = PocketFloorY + ResultCubeSize * 0.5f;
 
     /// <summary>

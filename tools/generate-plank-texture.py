@@ -7,7 +7,7 @@ of planks reads as laid boards rather than stripes. The tile wraps on both axes 
 function of the texel only), so greedy-merged plank walls tile without a visible edge, and the
 slabs, stairs, fence and door crop their faces out of it.
 
-No randomness and no image library: the colours come from a small integer hash of the texel, and
+No randomness and no image library: the colors come from a small integer hash of the texel, and
 the PNG is encoded here with zlib at a fixed level and filter 0, so re-running reproduces the file
 byte for byte. Run from anywhere:
     python -I tools/generate-plank-texture.py
@@ -49,7 +49,7 @@ def texel(x, y):
     if row == 0:
         return EDGE
     # Grain runs along the board: a streak's shade is constant over a few texels of x, so it
-    # reads as long horizontal fibres, and each board starts its streaks somewhere else
+    # reads as long horizontal fibers, and each board starts its streaks somewhere else
     streak = hash2(y, (x + board * 7) // 5) % 9
     if streak < 2:
         return DARK

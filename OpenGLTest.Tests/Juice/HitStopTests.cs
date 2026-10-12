@@ -249,7 +249,7 @@ public sealed class HitStopTests : IDisposable
     public void APunchThatLandsOnAMobFreezesTheSwing()
     {
         var world = NewWorld(out var eye);
-        // A goblin two blocks straight ahead, its body centred on the aim line.
+        // A goblin two blocks straight ahead, its body centered on the aim line.
         Assert.True(world.SpawnEntity("goblin", eye + new Vector3(0f, -Goblin.Height * 0.5f, -2f)));
 
         world.UpdateBlockBreaking(Dt, isHolding: true);

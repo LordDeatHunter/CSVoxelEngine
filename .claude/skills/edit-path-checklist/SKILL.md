@@ -11,7 +11,7 @@ Existing call sites to mirror: `World.RemoveBlock`, `World.FellWood`, `World.Try
 
 ## Always
 - [ ] **Write through the raw writers.** `Chunk.SetBlockRaw` / `RemoveBlockAt` / `ClearBlockAt` set `ModifiedSinceSave`; a path that bypasses them is not saved. Every write that is not an owner of the state byte **zeroes it** (stale level/count/offset/thickness/hydration must never outlive the block). `PlaceBlockAt` with default state 0 also treats a fluid cell as replaceable.
-- [ ] **Remesh the right chunks.** Border edits also dirty the face-adjacent neighbours. Single click edit: `ChunkManager.ImmediateRemesh*`. Batches (fell, blast, multiblock convert/revert): `Chunk.RemeshAfterBatchEdit` / `MarkDirty`, one immediate remesh on the clicked cell at most. Never a loop of immediate remeshes, never `MarkAreaDirty` for a fluid-only change (fluids pass light, cast no AO).
+- [ ] **Remesh the right chunks.** Border edits also dirty the face-adjacent neighbors. Single click edit: `ChunkManager.ImmediateRemesh*`. Batches (fell, blast, multiblock convert/revert): `Chunk.RemeshAfterBatchEdit` / `MarkDirty`, one immediate remesh on the clicked cell at most. Never a loop of immediate remeshes, never `MarkAreaDirty` for a fluid-only change (fluids pass light, cast no AO).
 - [ ] **No GL calls off the main thread.**
 
 ## Side systems

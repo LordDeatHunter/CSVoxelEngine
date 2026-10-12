@@ -72,7 +72,7 @@ public sealed class MoldTests
         var type = ContentRegistry.RequireBlock(name);
 
         Assert.False(type.BakedModel!.IsFullCube);
-        Assert.False(type.OccludesNeighbours);
+        Assert.False(type.OccludesNeighbors);
         Assert.True(type.PassesLight);
         Assert.True(type.Solid);
         Assert.True(type.HasItem);

@@ -218,7 +218,7 @@ public sealed class FallingBlockTests
 
         camera.PushOutOf(cube.Position, FallingBlock.HalfExtent, chunks);
 
-        // Eye tied with the cube centre goes -X by the full expulsion, clearing the body
+        // Eye tied with the cube center goes -X by the full expulsion, clearing the body
         Assert.True(camera.Position.X < 1.5f);
         Assert.True(camera.Position.X + 0.3f <= 1.5f - FallingBlock.HalfExtent + 1e-4f);
         Assert.Equal(new Vector3(1.5f, 0.5f, 1.5f), cube.Position);
@@ -304,9 +304,9 @@ public sealed class FallingBlockTests
     }
 
     [Fact]
-    public void DiagonalNeedsItsNeighbouringSidesClear()
+    public void DiagonalNeedsItsNeighboringSidesClear()
     {
-        // Only the (1,1) corner has an open target, but its neighbouring side is walled and
+        // Only the (1,1) corner has an open target, but its neighboring side is walled and
         // every other side is shut: nothing may move
         var solid = new System.Collections.Generic.HashSet<(int, int, int)>
         {

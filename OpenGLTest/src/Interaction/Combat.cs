@@ -12,7 +12,7 @@ namespace VoxelEngine.Interaction;
 /// </summary>
 public static class Combat
 {
-    /// <summary>How far ahead the punch connects, in blocks (eye to body centre).</summary>
+    /// <summary>How far ahead the punch connects, in blocks (eye to body center).</summary>
     public const float PunchReach = 7f;
 
     /// <summary>Half the punch cone's opening angle, in degrees.</summary>

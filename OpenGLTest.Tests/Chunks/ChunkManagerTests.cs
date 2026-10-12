@@ -39,7 +39,7 @@ public sealed class ChunkManagerTests
     }
 
     [Fact]
-    public void BorderBreakRemeshesNeighbourSynchronously()
+    public void BorderBreakRemeshesNeighborSynchronously()
     {
         var manager = new ChunkManager(null!);
         var h = MeshTestWorld.HighAbove;
@@ -171,8 +171,8 @@ public sealed class ChunkManagerTests
         }
 
         var focus = new StreamingFocus();
-        var centre = new Vector3(Chunk.Size / 2f);
-        focus.SetEyes([first * Chunk.Size + centre, second * Chunk.Size + centre]);
+        var center = new Vector3(Chunk.Size / 2f);
+        focus.SetEyes([first * Chunk.Size + center, second * Chunk.Size + center]);
         var before = manager.ChunkRemovalVersion;
 
         manager.Update(focus.Chunks);
@@ -184,7 +184,7 @@ public sealed class ChunkManagerTests
         Assert.True(manager.NeedsChunk(nearNeither));
 
         // The second player leaves: its chunk is now outside every remaining focus.
-        focus.SetEye(first * Chunk.Size + centre);
+        focus.SetEye(first * Chunk.Size + center);
         manager.Update(focus.Chunks);
 
         Assert.True(manager.Chunks.ContainsKey(first));
@@ -309,13 +309,13 @@ public sealed class ChunkManagerTests
     /// <see cref="ChunkManager.ReleaseAll"/> (world teardown, after the workers joined and the
     /// mesh work drained) leaves no chunk, renderable, dirty entry, pending build, placement or
     /// finished-but-unapplied mesh behind, makes every position needed again, and is idempotent.
-    /// The area is walled solid so the centre's mesh is empty: the only kind a pool-less
+    /// The area is walled solid so the center's mesh is empty: the only kind a pool-less
     /// manager can apply.
     /// </summary>
     [Fact]
     public void ReleaseAllEmptiesEveryTableAndFreesEveryMesh()
     {
-        var (manager, centre) = MeshTestWorld.WalledArea();
+        var (manager, center) = MeshTestWorld.WalledArea();
         MeshTestWorld.FillWalledArea(manager, TerrainGenerator.RockBlock);
         var camera = new Camera(null, null);
         camera.TestTeleport(new Vector3(8f, 8f, 8f), yaw: 0f, pitch: 0f);
@@ -324,20 +324,20 @@ public sealed class ChunkManagerTests
         // as soon as the work is done
         var drain = System.TimeSpan.FromSeconds(30);
 
-        manager.MarkDirty(centre.Position);
+        manager.MarkDirty(center.Position);
         manager.Update(camera); // schedules the build
         Assert.True(manager.DrainMeshWork(drain), "mesh work did not drain");
         manager.Update(camera); // applies it
-        Assert.True(centre.IsMeshed);
+        Assert.True(center.IsMeshed);
 
         // A second build that finishes but is never applied: it sits in the completed queue
-        manager.MarkDirty(centre.Position);
+        manager.MarkDirty(center.Position);
         manager.Update(camera);
         Assert.True(manager.DrainMeshWork(drain), "mesh work did not drain");
 
         // Pending state in the tables the release has to empty
         manager.MarkPlayerPlaced(1, 1, 1);
-        manager.MarkDirty(centre.Position + Vector3.UnitX);
+        manager.MarkDirty(center.Position + Vector3.UnitX);
         Assert.True(manager.PlayerPlacedChunkCount > 0);
         Assert.True(manager.DirtyCount > 0);
 
@@ -360,13 +360,13 @@ public sealed class ChunkManagerTests
             Assert.Null(chunk.TranslucentSlice);
             Assert.Equal(-1, chunk.RenderIndex);
         }
-        Assert.True(manager.NeedsChunk(centre.Position));
+        Assert.True(manager.NeedsChunk(center.Position));
 
         // The unapplied build was drained with the release: a following frame applies nothing
-        var meshedAfterRelease = centre.IsMeshed;
+        var meshedAfterRelease = center.IsMeshed;
         var versionAfterRelease = manager.MeshVersion;
         manager.Update(camera);
-        Assert.Equal(meshedAfterRelease, centre.IsMeshed);
+        Assert.Equal(meshedAfterRelease, center.IsMeshed);
         Assert.Equal(versionAfterRelease, manager.MeshVersion);
         Assert.Equal(0, manager.Chunks.Count);
 

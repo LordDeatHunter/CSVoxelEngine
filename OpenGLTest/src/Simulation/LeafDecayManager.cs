@@ -16,7 +16,7 @@ namespace VoxelEngine.Simulation;
 /// Leaf decay and orphaned-wood crumbling: a fixed tick
 /// (<see cref="WorldGenerationConfig.LeafDecayTickSeconds"/>) over a set of scheduled cells, in
 /// the same shape as <see cref="FluidManager"/>. Only scheduled cells do any work, and only a
-/// crumbled wood cell reschedules its neighbourhood (a decayed leaf feeds nothing), so a settled
+/// crumbled wood cell reschedules its neighborhood (a decayed leaf feeds nothing), so a settled
 /// canopy costs nothing.
 /// Every edit path that can change a leaf's support (mining, felling, placement, a blast, a
 /// bucket) calls <see cref="ScheduleAround(Vector3)"/> or <see cref="ScheduleBox"/>; both grow
@@ -52,7 +52,7 @@ namespace VoxelEngine.Simulation;
 /// plus vertical shell-to-shell adjacency; anchors are roots and shells standing on real ground,
 /// so a wide trunk with one shell of a slice still standing never crumbles). A cell first walks
 /// its own parent chain, which on an intact tree reaches an anchor in about its height; only a
-/// broken chain pays for the full support search. Both answers are memoised for the frame
+/// broken chain pays for the full support search. Both answers are memoized for the frame
 /// (cleared at the top of every <see cref="Update"/>): inside a frame only decay removals edit
 /// the world, and removing a cell of an unsupported component never changes whether another
 /// component is anchored, so later cells of the same trunk stop after a step or two. Crumbling
@@ -490,7 +490,7 @@ public class LeafDecayManager
     /// follows (<see cref="TreeSupport.Links"/>) for at most
     /// <see cref="WorldGenerationConfig.TreeFellWoodCap"/> steps. A chain that stops first (no
     /// parent cell, a broken link, the cap) answers with the last cell it reached, which only an
-    /// orphaned branch does. Memoised for the frame on every walked cell, since they all end at
+    /// orphaned branch does. Memoized for the frame on every walked cell, since they all end at
     /// the same cell. False when a read hit an unloaded chunk, which freezes the leaf.
     /// </summary>
     private bool TryTipSupport(TreeSpecies species, int tx, int ty, int tz, byte tstate, out int supportPx)
@@ -568,7 +568,7 @@ public class LeafDecayManager
     /// <summary>
     /// The fast half of the orphan test: follows the cell's parent chain while every step links
     /// (<see cref="TreeSupport.Links"/>). <see cref="TreeSupportResult.Supported"/> when it reaches
-    /// an anchor or a cell already known anchored this frame (every walked cell is then memoised
+    /// an anchor or a cell already known anchored this frame (every walked cell is then memoized
     /// as anchored, since it reaches the same anchor), <see cref="TreeSupportResult.Unknown"/>
     /// when a read hit an unloaded chunk, and <see cref="TreeSupportResult.Unsupported"/> when the
     /// chain broke or ran past the cap, which only means the full search has to decide.

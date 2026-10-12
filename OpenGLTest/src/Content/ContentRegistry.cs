@@ -196,14 +196,14 @@ public static class ContentRegistry
             // a face culled behind one shows through the texture's holes as an X-ray.
             // A translucent block must never hide a neighbor's face either, or the
             // neighbor shows a hole through the glass.
-            type.OccludesNeighbours = !type.Cutout && !type.Translucent && (definition.Occludes ?? baked.IsFullCube);
+            type.OccludesNeighbors = !type.Cutout && !type.Translucent && (definition.Occludes ?? baked.IsFullCube);
             type.PassesLight = definition.Light?.Passes ?? !baked.IsFullCube;
 
             // A fluid's model is a full cube (it only supplies the tile), but its surface sits
             // below the cell top and it must never hide a neighbor or shade its own cell dark
             if (type.Fluid)
             {
-                type.OccludesNeighbours = false;
+                type.OccludesNeighbors = false;
                 type.PassesLight = true;
             }
 
@@ -219,11 +219,11 @@ public static class ContentRegistry
                 // the per-id mirrors cannot see the state byte: it never hides a neighbor (the mesher
                 // culls same-block full-thickness faces itself) and always lets light through
                 case BlockRenderer.TreeWood:
-                    type.OccludesNeighbours = false;
+                    type.OccludesNeighbors = false;
                     type.PassesLight = true;
                     break;
                 case BlockRenderer.Multiblock or BlockRenderer.MultiblockPart:
-                    type.OccludesNeighbours = !type.Cutout && !type.Translucent && (definition.Occludes ?? true);
+                    type.OccludesNeighbors = !type.Cutout && !type.Translucent && (definition.Occludes ?? true);
                     type.PassesLight = definition.Light?.Passes ?? true;
                     break;
             }
@@ -288,7 +288,7 @@ public static class ContentRegistry
                 }
             }
 
-            BlockType.OccludesById[id] = type.OccludesNeighbours;
+            BlockType.OccludesById[id] = type.OccludesNeighbors;
             BlockType.PassesLightById[id] = type.PassesLight;
             BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && BakesGreedy(baked);
         }
@@ -735,7 +735,7 @@ public static class ContentRegistry
                 crucibleCapacity = crucible.CapacityMl ?? 0;
                 if (crucibleCapacity < 100 || crucibleCapacity > 10000)
                     throw new InvalidOperationException(
-                        $"Item '{path}' has crucible.capacityMl {crucible.CapacityMl}; expected 100..10000 millilitres.");
+                        $"Item '{path}' has crucible.capacityMl {crucible.CapacityMl}; expected 100..10000 milliliters.");
             }
 
             var id = ItemIds[name];

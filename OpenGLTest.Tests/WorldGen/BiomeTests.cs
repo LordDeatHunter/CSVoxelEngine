@@ -311,8 +311,8 @@ public sealed class BiomeTests
         for (var cx = 0; cx <= 64 && (seen.Count < 2 || checkedChunks < 8); cx++)
         for (var cz = -64; cz <= 64 && (seen.Count < 2 || checkedChunks < 8); cz++)
         {
-            var centre = TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8);
-            if (centre is not (Biome.Desert or Biome.Forest)) continue;
+            var center = TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8);
+            if (center is not (Biome.Desert or Biome.Forest)) continue;
             checkedChunks++;
 
             for (var x = 0; x < Chunk.Size; x++)
@@ -446,7 +446,7 @@ public sealed class BiomeTests
     public void BiomeBorderDitherFlipsCoherentPatchesNotSingleColumns()
     {
         var band = 0;
-        var differingNeighbour = 0;
+        var differingNeighbor = 0;
         const int step = 4;
 
         for (var x = -2048; x < 2048; x += step)
@@ -463,13 +463,13 @@ public sealed class BiomeTests
 
             var nx = x + step;
             var neighbor = ColumnCache.Get(nx >> Chunk.SizeShift, z >> Chunk.SizeShift);
-            var neighbourLocal = ((nx & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
-            if (neighbor.Biomes[neighbourLocal] != here) differingNeighbour++;
+            var neighborLocal = ((nx & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+            if (neighbor.Biomes[neighborLocal] != here) differingNeighbor++;
         }
 
         Assert.True(band > 0, "no forest/desert dither band found in the scanned area");
-        Assert.True(differingNeighbour * 3 < band,
-            $"the dither flips single columns: {differingNeighbour} of {band} samples differ from a neighbor");
+        Assert.True(differingNeighbor * 3 < band,
+            $"the dither flips single columns: {differingNeighbor} of {band} samples differ from a neighbor");
     }
 
     [Fact]
@@ -580,7 +580,7 @@ public sealed class BiomeTests
 
         // Multi-source 8-connected BFS from the snow. Ring r is a Chebyshev distance of r * stride,
         // a lower bound on the Euclidean band, so a failure measured on the diagonal is a real
-        // shortfall rather than a test artefact. The rule is "no hot cell closer than bufferBlocks",
+        // shortfall rather than a test artifact. The rule is "no hot cell closer than bufferBlocks",
         // so rings stop before reaching it and a hot cell exactly bufferBlocks away is never visited.
         void Check(int k, int ring)
         {

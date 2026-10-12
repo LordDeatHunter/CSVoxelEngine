@@ -97,7 +97,7 @@ public sealed record BlockType
     // read per cell by the mesher, the raycast and body collision.
     internal static readonly bool[] PixelRimById = new bool[256];
 
-    // Whether the block is a pane (the pane renderer), which reaches arms toward neighbouring
+    // Whether the block is a pane (the pane renderer), which reaches arms toward neighboring
     // panes: read per neighbor by the pane emitter and the pane shape
     internal static readonly bool[] PaneById = new bool[256];
 
@@ -194,23 +194,23 @@ public sealed record BlockType
     /// (a cactus pricks for 1); 0 is harmless. Read through <see cref="ContactDamageAt"/>.</summary>
     public float ContactDamage { get; init; }
 
-    /// <summary>Whether the block hides a neighbouring full cube's face. Defaults to "the baked
+    /// <summary>Whether the block hides a neighboring full cube's face. Defaults to "the baked
     /// model is a full cube and it is not cutout", so it is only known after baking.</summary>
-    public bool OccludesNeighbours { get; internal set; }
+    public bool OccludesNeighbors { get; internal set; }
 
     /// <summary>Whether faces are also culled against a neighbor of the same block (glass).</summary>
     public bool CullSelf { get; init; }
 
-    /// <summary>Whether the block darkens neighbouring faces via ambient occlusion. Defaults to
+    /// <summary>Whether the block darkens neighboring faces via ambient occlusion. Defaults to
     /// <see cref="Solid"/>.</summary>
     public bool CastsAmbientOcclusion { get; internal set; }
 
-    /// <summary>Alpha-tested texture (leaves); forces <see cref="OccludesNeighbours"/> off, or a
+    /// <summary>Alpha-tested texture (leaves); forces <see cref="OccludesNeighbors"/> off, or a
     /// face culled behind it becomes an X-ray window through the texture's holes.</summary>
     public bool Cutout { get; init; }
 
     /// <summary>Drawn blended in the sorted translucent pass together with the fluids;
-    /// forces <see cref="OccludesNeighbours"/> off.</summary>
+    /// forces <see cref="OccludesNeighbors"/> off.</summary>
     public bool Translucent { get; init; }
 
     /// <summary>Whether the vertex shader gives this block the leaf-wind sway.</summary>
@@ -244,7 +244,7 @@ public sealed record BlockType
     /// Which faces wear a climate-tinted tile and from which palette (grass, leaves), or null when
     /// every face is drawn as the model says. Set in <c>ContentRegistry.BakeModels</c>, and only
     /// ever non-null on a block that bakes greedy (<see cref="IsGreedy"/>), so both mesh paths may
-    /// treat its faces as plain cube faces. <see cref="FaceTiles"/> keep the default coloured
+    /// treat its faces as plain cube faces. <see cref="FaceTiles"/> keep the default colored
     /// tiles, which is what icons, drops and the held block wear.
     /// </summary>
     public BiomeTintFaces? BiomeTint { get; internal set; }
@@ -515,7 +515,7 @@ public sealed record BlockType
     public static bool CollidesByHitboxOf(byte blockId) => CollidesByHitboxById[blockId];
 
     /// <summary>
-    /// Whether a cell collides with bodies, honouring a stack block whose partial stacks are
+    /// Whether a cell collides with bodies, honoring a stack block whose partial stacks are
     /// walked through: a layered-snow cell is solid once its state reaches
     /// <see cref="StackSolidStateById"/>, and every other block answers exactly as
     /// <see cref="IsSolid"/>. Callers that only have an id still use <see cref="IsSolid"/>.
@@ -551,18 +551,18 @@ public sealed record BlockType
     /// <summary>Damage a body touching the block takes per contact tick (0 when harmless).</summary>
     public static float ContactDamageAt(byte blockId) => ContactDamageById[blockId];
 
-    /// <summary>Whether a block fully hides a neighbouring full cube's face.</summary>
+    /// <summary>Whether a block fully hides a neighboring full cube's face.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool Occludes(byte blockId) => OccludesById[blockId];
 
-    /// <summary>Whether a block darkens neighbouring faces via ambient occlusion. This is the
+    /// <summary>Whether a block darkens neighboring faces via ambient occlusion. This is the
     /// raw JSON flag (<c>castsAO</c>, defaulting to <see cref="Solid"/>); meshing must read
     /// <see cref="OccludesAO"/> instead, so a thin shape can never darken a face it does not
     /// fully block.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool CastsAO(byte blockId) => CastsAoById[blockId];
 
-    /// <summary>Whether a block actually blocks a neighbouring face's corner/edge for ambient
+    /// <summary>Whether a block actually blocks a neighboring face's corner/edge for ambient
     /// occlusion: only a fully occupying block (see <see cref="Occludes"/>) counts. Leaves pass
     /// light and thin shapes (tree wood, pebbles, flowers) never fill the corner voxel, so
     /// they leave AO at full brightness even when their JSON flag is set.</summary>

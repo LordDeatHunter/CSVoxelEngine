@@ -248,7 +248,7 @@ internal static class ChunkMesher
                     // empty slot is table entry 0, never a key value. The light travels in a
                     // parallel 48-bit key: four 12-bit SmoothCornerLight codes, corner j at 12j,
                     // and the color in a second parallel 40-bit key: the four 10-bit LightTint
-                    // codes, corner j at 10j (all zero wherever the lamp light is default-coloured).
+                    // codes, corner j at 10j (all zero wherever the lamp light is default-colored).
                     var key = id | ao << 8;
                     if (BlockType.IsFluid(neighbor))
                         key |= 1 << 24 | SubmergedSurfaceCode(padded, paddedState, pIdx + faceDelta,
@@ -443,7 +443,7 @@ internal static class ChunkMesher
     /// is shade * the field's tint at each corner and whose packed normal sets bit 4 so the world
     /// fragment shader applies <see cref="BiomeTint.Gain"/>. The base goes first so the overlay,
     /// at identical depth, wins under Lequal. Corner values are in <see cref="CubeFaces"/> order;
-    /// the field is sampled at the chunk-local vertex position, so neighbouring chunks agree.
+    /// the field is sampled at the chunk-local vertex position, so neighboring chunks agree.
     /// </summary>
     internal static void EmitTintedCubeFace(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         int f, Vector3 origin, Vector3 extent, ReadOnlySpan<byte> shade, ReadOnlySpan<float> sun,
@@ -496,7 +496,7 @@ internal static class ChunkMesher
     }
 
     /// <summary>
-    /// Recolours one quad vertex of a <c>modelTint</c> block: its rgb becomes the vertex's shade
+    /// Recolors one quad vertex of a <c>modelTint</c> block: its rgb becomes the vertex's shade
     /// times the palette's field at the vertex, flagged so the world fragment shader applies
     /// <see cref="BiomeTint.Gain"/>. The vertex's rgb standing in for its shade (three equal
     /// channels, 255 on an unshaded quad) is what makes the shade recoverable here.
@@ -705,7 +705,7 @@ internal static class ChunkMesher
 
         // A blocked sample takes the brightest open sample's color too; on a level tie the
         // lowest slot among the open samples at that level, so the fill never depends on which
-        // of the four cells is the own one and neighbouring fluid cells agree at the corner
+        // of the four cells is the own one and neighboring fluid cells agree at the corner
         int sl0 = (r0 >> 4) & 7, sl1 = (r1 >> 4) & 7, sl2 = (r2 >> 4) & 7, sl3 = (r3 >> 4) & 7;
         var slMax = 7;
         if (b0 == bMax) slMax = sl0;
@@ -942,7 +942,7 @@ internal static class ChunkMesher
     }
 
     /// <summary>
-    /// Emits a thin <see cref="BlockRenderer.TreeWood"/> cell: a centred node box sized by its
+    /// Emits a thin <see cref="BlockRenderer.TreeWood"/> cell: a centered node box sized by its
     /// <see cref="WoodState"/> thickness and one square tube toward every neighbor it connects
     /// to (<see cref="TreeWoodShape.Connects"/>), at the thinner of the two widths, plus a
     /// same-width plug toward every solid occluding neighbor (<see cref="TreeWoodShape.PlugMask"/>)
@@ -1003,7 +1003,7 @@ internal static class ChunkMesher
 
     private const int RimPx = WoodState.PixelsPerBlock;
 
-    // Upper bound on the quads one bevelled shell emits: each cap is at most two segments per
+    // Upper bound on the quads one beveled shell emits: each cap is at most two segments per
     // pixel row, each box at most two X walls, and each Z boundary at most four wall segments
     private const int MaxRimQuads = 4 * RimPx + 6 * TreeWoodShape.MaxRimBoxes;
 
@@ -1084,7 +1084,7 @@ internal static class ChunkMesher
     }
 
     /// <summary>
-    /// Emits a bevelled pixel-rim trunk shell (<see cref="TreeWoodShape.CanBevel"/> with a
+    /// Emits a beveled pixel-rim trunk shell (<see cref="TreeWoodShape.CanBevel"/> with a
     /// non-zero corner <paramref name="mask"/>): the full-height <see cref="TreeWoodShape.RimBoxes"/>
     /// stair-stepping each carved corner, which are exactly the cell's hitboxes, so the raycast,
     /// the outline and collision match what is drawn. Faces on the cell boundary cull like a

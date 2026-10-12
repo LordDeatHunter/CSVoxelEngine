@@ -133,7 +133,7 @@ public sealed class WorldgenTests
     [Fact]
     public void LodWearsSandOnBeaches()
     {
-        // A 3x3 all-beach fine neighbourhood, so whichever LOD cell covers its centre reads
+        // A 3x3 all-beach fine neighborhood, so whichever LOD cell covers its center reads
         // beachy from its uneroded max (erosion would drag it below the band)
         var found = false;
         var fx = 0;
@@ -206,7 +206,7 @@ public sealed class WorldgenTests
     [Fact]
     public void LodWearsGravelOnPatchedBeaches()
     {
-        // A level-1 cell (2x2 fine columns) whose footprint is all beach and whose centre
+        // A level-1 cell (2x2 fine columns) whose footprint is all beach and whose center
         // is a gravel patch: the built region must carry the gravel tile. This also proves
         // patches generate at all — a missing patch fails the search, not the assert.
         var found = false;

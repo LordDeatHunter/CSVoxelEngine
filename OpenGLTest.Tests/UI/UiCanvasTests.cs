@@ -60,10 +60,10 @@ public sealed class UiCanvasTests
         Assert.Equal(p.X, back.X, 2);
         Assert.Equal(p.Y, back.Y, 2);
 
-        var centre = UiCanvas.WindowToCanvas(window / 2f, s);
-        var canvasCentre = UiCanvas.CanvasSizeFor(window, s) / 2f;
-        Assert.Equal(canvasCentre.X, centre.X, 2);
-        Assert.Equal(canvasCentre.Y, centre.Y, 2);
+        var center = UiCanvas.WindowToCanvas(window / 2f, s);
+        var canvasCenter = UiCanvas.CanvasSizeFor(window, s) / 2f;
+        Assert.Equal(canvasCenter.X, center.X, 2);
+        Assert.Equal(canvasCenter.Y, center.Y, 2);
     }
 
     [Theory]

@@ -38,7 +38,7 @@ public static class NetValidation
     public static float AllowedDistance(double deltaSeconds, float maxSpeed) =>
         maxSpeed * MathF.Max((float)deltaSeconds, 0.001f) + 2f;
 
-    /// <summary>Whether a block cell's centre is within <paramref name="reach"/> blocks of the eye.</summary>
+    /// <summary>Whether a block cell's center is within <paramref name="reach"/> blocks of the eye.</summary>
     public static bool InEditReach(Vector3 eye, int x, int y, int z, float reach)
     {
         var dx = x + 0.5f - eye.X;
@@ -58,7 +58,7 @@ public static class NetValidation
     /// <summary>
     /// Whether a placement may go against the face of <paramref name="cell"/> whose outward normal
     /// is <paramref name="normal"/>, seen from <paramref name="eye"/>: the normal must be one of the
-    /// six axis directions, and the eye must lie on its outer side of the cell's centre. A client's
+    /// six axis directions, and the eye must lie on its outer side of the cell's center. A client's
     /// third-person aim can report a different face of the hit cell than the server's first-person
     /// ray does, so the face is judged by visibility rather than by equality; a face that points
     /// away from the eye (the far side of a wall) is refused.
@@ -69,7 +69,7 @@ public static class NetValidation
         if (axes != 1f || (normal.X != 0f && MathF.Abs(normal.X) != 1f)
             || (normal.Y != 0f && MathF.Abs(normal.Y) != 1f) || (normal.Z != 0f && MathF.Abs(normal.Z) != 1f))
             return false;
-        var centre = cell + new Vector3(0.5f);
-        return Vector3.Dot(eye - centre, normal) > 0f;
+        var center = cell + new Vector3(0.5f);
+        return Vector3.Dot(eye - center, normal) > 0f;
     }
 }

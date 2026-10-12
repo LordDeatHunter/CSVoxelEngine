@@ -87,7 +87,7 @@ public sealed class LightVolumeHeightTests
 
     /// <summary>
     /// A build's column fill takes every column from its source and nowhere else: a source that
-    /// lacks any of the nine (the centre's neighbors included, the far diagonal too) makes the
+    /// lacks any of the nine (the center's neighbors included, the far diagonal too) makes the
     /// fill fail, so the build is abandoned rather than lit, watered and tinted from a substitute,
     /// and a source that has all nine lands each one in its dx * 3 + dz slot. The source is only
     /// ever asked about the nine columns around the chunk.
@@ -101,11 +101,11 @@ public sealed class LightVolumeHeightTests
         for (var dz = -1; dz <= 1; dz++)
             nine.Add((cx + dx, cz + dz));
 
-        // Only the centre column: the fill fails, and nothing outside the nine was asked for
-        var centreOnly = new FakeColumnSource();
-        centreOnly.Add(cx, cz, Terrain(123));
-        Assert.False(ChunkLighting.FillColumns(centreOnly, cx, cz, new ColumnTerrain[9]));
-        Assert.Subset(nine, centreOnly.Asked);
+        // Only the center column: the fill fails, and nothing outside the nine was asked for
+        var centerOnly = new FakeColumnSource();
+        centerOnly.Add(cx, cz, Terrain(123));
+        Assert.False(ChunkLighting.FillColumns(centerOnly, cx, cz, new ColumnTerrain[9]));
+        Assert.Subset(nine, centerOnly.Asked);
 
         // Eight of the nine, missing a far diagonal: still refused
         var missingDiagonal = new FakeColumnSource();

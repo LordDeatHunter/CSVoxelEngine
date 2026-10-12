@@ -56,7 +56,7 @@ public sealed class CellBatchMesherTests
 
     /// <summary>
     /// Whether some quad draws this cell: an axis-aligned quad on one of its face planes covering
-    /// the face's centre (a greedy merge draws one quad across many cells, so the cells it covers
+    /// the face's center (a greedy merge draws one quad across many cells, so the cells it covers
     /// in the middle hold no vertex of their own), or — for the procedural boxes, tubes and rims —
     /// a vertex landing inside the cell.
     /// </summary>
@@ -69,12 +69,12 @@ public sealed class CellBatchMesherTests
                 return true;
         }
 
-        var centre = new Vector3(cell.X + 0.5f, cell.Y + 0.5f, cell.Z + 0.5f);
+        var center = new Vector3(cell.X + 0.5f, cell.Y + 0.5f, cell.Z + 0.5f);
         foreach (var quad in quads)
         for (var axis = 0; axis < 3; axis++)
         {
             var plane = Axis(quad[0], axis);
-            if (!IsInteger(plane) || MathF.Abs(plane - (Axis(centre, axis) + 0.5f)) > 0.5f + Eps) continue;
+            if (!IsInteger(plane) || MathF.Abs(plane - (Axis(center, axis) + 0.5f)) > 0.5f + Eps) continue;
             var covers = true;
             for (var other = 0; other < 3 && covers; other++)
             {
@@ -85,7 +85,7 @@ public sealed class CellBatchMesherTests
                     lo = MathF.Min(lo, Axis(corner, other));
                     hi = MathF.Max(hi, Axis(corner, other));
                 }
-                covers = Axis(centre, other) >= lo - Eps && Axis(centre, other) <= hi + Eps;
+                covers = Axis(center, other) >= lo - Eps && Axis(center, other) <= hi + Eps;
             }
             if (covers) return true;
         }

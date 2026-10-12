@@ -9,6 +9,6 @@ public sealed class MeltRecipeDefinition
     /// <summary>Molten material one unit of the input yields, by file name, e.g. <c>copper</c>.</summary>
     public string? Fluid { get; set; }
 
-    /// <summary>Millilitres of that material one unit yields.</summary>
+    /// <summary>Milliliters of that material one unit yields.</summary>
     public int? AmountMl { get; set; }
 }

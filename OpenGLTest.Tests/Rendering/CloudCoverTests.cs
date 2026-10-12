@@ -130,7 +130,7 @@ public sealed class CloudCoverTests
         for (var x = 0; x < cells; x++)
         for (var z = 0; z < cells; z++)
         {
-            // straight up through the cell's centre, with no drift, where the field's cell (x, z) lies
+            // straight up through the cell's center, with no drift, where the field's cell (x, z) lies
             var at = new Vector3((x + 0.5f) * cell, Below, (z + 0.5f) * cell);
             var cover = CloudCover.AlongRay(coverage, cells, at, Vector3.UnitY, Vector2.Zero, 1f);
             Assert.Equal(levels[x, z] > 0 ? 1f : 0f, cover);

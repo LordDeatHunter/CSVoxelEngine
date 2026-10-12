@@ -248,7 +248,7 @@ public sealed class CloudTests(ITestOutputHelper output)
     [Fact]
     public void CurvedNormalsAreUnit()
     {
-        // The fillets, octants and tori carry per-vertex normals, so the shader normalises nothing:
+        // The fillets, octants and tori carry per-vertex normals, so the shader normalizes nothing:
         // a normal that drifted off unit length would show up as a bright or dark band.
         var (vertices, _) = CloudField.BuildMesh(CloudField.BuildLevels());
         foreach (var vertex in vertices)
@@ -269,7 +269,7 @@ public sealed class CloudTests(ITestOutputHelper output)
         const float radius = 3f * S + 4f * T;
         const float step = 0.25f;
         const float skin = R + 0.05f;
-        var centre = new Vector3(2.5f * S, Y0 + 1.5f * T, 2.5f * S);
+        var center = new Vector3(2.5f * S, Y0 + 1.5f * T, 2.5f * S);
         var watch = System.Diagnostics.Stopwatch.StartNew();
 
         for (var seed = 0; seed < 30; seed++)
@@ -311,7 +311,7 @@ public sealed class CloudTests(ITestOutputHelper output)
                 var u = (float)(rng.NextDouble() * 2.0 - 1.0);
                 var phi = (float)(rng.NextDouble() * 2.0 * Math.PI);
                 var ring = MathF.Sqrt(MathF.Max(0f, 1f - u * u));
-                var origin = centre + radius * new Vector3(ring * MathF.Cos(phi), u, ring * MathF.Sin(phi));
+                var origin = center + radius * new Vector3(ring * MathF.Cos(phi), u, ring * MathF.Sin(phi));
                 var target = new Vector3(
                     (float)rng.NextDouble() * 5f * S,
                     Y0 + (float)rng.NextDouble() * 3f * T,

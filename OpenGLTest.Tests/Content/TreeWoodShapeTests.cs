@@ -55,7 +55,7 @@ public sealed class TreeWoodShapeTests
         var seed = 12345u;
         for (var trial = 0; trial < 500; trial++)
         {
-            var centre = states[(int)(Next(ref seed) % (uint)states.Length)];
+            var center = states[(int)(Next(ref seed) % (uint)states.Length)];
             for (var dir = 0; dir < 6; dir++)
             {
                 // Mostly oak, sometimes air or spruce, so foreign neighbors are in the sweep too
@@ -64,16 +64,16 @@ public sealed class TreeWoodShapeTests
                 nbStates[dir] = states[(int)(Next(ref seed) % (uint)states.Length)];
             }
 
-            var mask = TreeWoodShape.ConnectionMask(oak, centre, ids, nbStates);
+            var mask = TreeWoodShape.ConnectionMask(oak, center, ids, nbStates);
             for (var dir = 0; dir < 6; dir++)
             {
                 backIds.Clear();
                 backStates.Clear();
                 var back = TreeWoodShape.Opposite(dir);
                 backIds[back] = oak;
-                backStates[back] = centre;
-                var neighbourMask = TreeWoodShape.ConnectionMask(ids[dir], nbStates[dir], backIds, backStates);
-                Assert.Equal((mask >> dir) & 1, (neighbourMask >> back) & 1);
+                backStates[back] = center;
+                var neighborMask = TreeWoodShape.ConnectionMask(ids[dir], nbStates[dir], backIds, backStates);
+                Assert.Equal((mask >> dir) & 1, (neighborMask >> back) & 1);
             }
         }
     }
@@ -154,16 +154,16 @@ public sealed class TreeWoodShapeTests
         for (var dir = 0; dir < 6; dir++)
         {
             var o = Offset(dir);
-            var neighbourThickness = (thickness + 4 + dir * 3) % WoodState.FullCube; // always thin
+            var neighborThickness = (thickness + 4 + dir * 3) % WoodState.FullCube; // always thin
             byte nbState;
             if ((connected >> dir & 1) != 0)
                 nbState = dir == parent
-                    ? WoodState.Encode(neighbourThickness, WoodState.ParentRoot, false)
-                    : WoodState.Encode(neighbourThickness, TreeWoodShape.Opposite(dir), false);
+                    ? WoodState.Encode(neighborThickness, WoodState.ParentRoot, false)
+                    : WoodState.Encode(neighborThickness, TreeWoodShape.Opposite(dir), false);
             else if (!strangerPlaced)
             {
                 strangerPlaced = true;
-                nbState = WoodState.Encode(neighbourThickness, dir, false); // points away from us
+                nbState = WoodState.Encode(neighborThickness, dir, false); // points away from us
             }
             else continue;
 
@@ -293,8 +293,8 @@ public sealed class TreeWoodShapeTests
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var state = WoodState.Encode(5, WoodState.ParentRoot, false);
         var (manager, chunk) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
-        // The wood sits in the centre chunk's bottom row and the ground in the chunk below it, so
-        // the centre chunk's mesh holds only the wood and the check is not confused by the ground.
+        // The wood sits in the center chunk's bottom row and the ground in the chunk below it, so
+        // the center chunk's mesh holds only the wood and the check is not confused by the ground.
         chunk.SetBlockRaw(Cx, 0, Cz, oak, state);
         manager.Chunks[MeshTestWorld.HighAbove + new Vector3(0, -1, 0)]
             .SetBlockRaw(Cx, Chunk.Size - 1, Cz, stone, 0);
@@ -327,7 +327,7 @@ public sealed class TreeWoodShapeTests
 
     private static byte CoreState => WoodState.Encode(WoodState.FullCube, WoodState.ParentRoot, false);
 
-    // The rim configurations, all one wood, inside the centre chunk and away from its borders
+    // The rim configurations, all one wood, inside the center chunk and away from its borders
     private static IEnumerable<(string Name, RimCell[] Cells)> RimConfigurations()
     {
         yield return ("lone shell", [new RimCell(Cx, Cy, Cz, ShellState(1, 0))]);
@@ -339,7 +339,7 @@ public sealed class TreeWoodShapeTests
         yield return ("3x3 slice", slice.ToArray());
 
         // Lone shells over the core and over a corner shell: diagonal to each other, so both
-        // stay fully bevelled, each narrower than the cell below it
+        // stay fully beveled, each narrower than the cell below it
         var stack = new List<RimCell>(slice)
         {
             new(Cx, Cy + 1, Cz, ShellState(1, 0)),
@@ -372,8 +372,8 @@ public sealed class TreeWoodShapeTests
         return TreeWoodShape.GetBoxes(wood, c.State, ids, states);
     }
 
-    // 16x16 pixel-centre coverage of the XZ rectangle [min, max] (cell-local)
-    private static void Rasterise(Vector3 min, Vector3 max, int[,] px)
+    // 16x16 pixel-center coverage of the XZ rectangle [min, max] (cell-local)
+    private static void Rasterize(Vector3 min, Vector3 max, int[,] px)
     {
         for (var i = 0; i < 16; i++)
         for (var k = 0; k < 16; k++)
@@ -387,7 +387,7 @@ public sealed class TreeWoodShapeTests
     private static int[,] Footprint(IEnumerable<BlockHitbox> boxes)
     {
         var px = new int[16, 16];
-        foreach (var b in boxes) Rasterise(b.Min, b.Max, px);
+        foreach (var b in boxes) Rasterize(b.Min, b.Max, px);
         return px;
     }
 
@@ -398,11 +398,11 @@ public sealed class TreeWoodShapeTests
         return true;
     }
 
-    // The cell holding a quad's material: just behind its centre, against its normal
+    // The cell holding a quad's material: just behind its center, against its normal
     private static (int, int, int) OwnerOf(Vertex[] q)
     {
-        var centre = (q[0].Position + q[1].Position + q[2].Position + q[3].Position) / 4f;
-        var p = centre - Chunk.CubeFaces[q[0].Normal & 7].normal * 0.01f;
+        var center = (q[0].Position + q[1].Position + q[2].Position + q[3].Position) / 4f;
+        var p = center - Chunk.CubeFaces[q[0].Normal & 7].normal * 0.01f;
         return ((int)MathF.Floor(p.X), (int)MathF.Floor(p.Y), (int)MathF.Floor(p.Z));
     }
 
@@ -414,7 +414,7 @@ public sealed class TreeWoodShapeTests
     public void RimMeshCoversExactlyTheRimHitboxes()
     {
         var wood = PixelRimWood;
-        var bevelled = 0;
+        var beveled = 0;
         foreach (var (name, cells) in RimConfigurations())
         {
             var (manager, chunk) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
@@ -443,12 +443,12 @@ public sealed class TreeWoodShapeTests
                 var boxes = BoxesOf(wood, byPos, c);
                 var mine = quads.GetValueOrDefault((c.X, c.Y, c.Z)) ?? [];
                 Assert.NotEmpty(mine);
-                if (boxes.Length > 1) bevelled++;
+                if (boxes.Length > 1) beveled++;
                 var self = Footprint(boxes);
 
-                // Top and bottom: a bevelled shell draws its footprint minus what the same-wood
+                // Top and bottom: a beveled shell draws its footprint minus what the same-wood
                 // cell beyond covers; a plain cube draws its whole cap unless the cell beyond
-                // fills it, so a cube under a bevelled shell keeps its full top
+                // fills it, so a cube under a beveled shell keeps its full top
                 foreach (var (face, dy) in new[] { (4, 1), (5, -1) })
                 {
                     var beyond = byPos.TryGetValue((c.X, c.Y + dy, c.Z), out var bs)
@@ -460,7 +460,7 @@ public sealed class TreeWoodShapeTests
                     {
                         Assert.All(q, v => Assert.True(MathF.Abs(v.Position.Y - planeY) <= Eps,
                             $"{name}: cap vertex {v.Position} off the cell's face plane"));
-                        Rasterise(QuadMin(q) - origin, QuadMax(q) - origin, drawn);
+                        Rasterize(QuadMin(q) - origin, QuadMax(q) - origin, drawn);
                     }
 
                     var beyondWhole = IsWhole(beyond);
@@ -505,7 +505,7 @@ public sealed class TreeWoodShapeTests
             }
         }
 
-        Assert.True(bevelled > 0, "no configuration produced a bevelled shell");
+        Assert.True(beveled > 0, "no configuration produced a beveled shell");
     }
 
     private static bool OnSurface(Vector3 p, BlockHitbox b) =>

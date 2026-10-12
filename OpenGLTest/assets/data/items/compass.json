@@ -1,6 +1,6 @@
 { "name": "Compass", "texture": "assets/textures/items/compass.png",
   // 128x128 sheet of 32x32 needles, row-major clockwise: frame 0 faces north.
   "spritesheet": { "cols": 4, "rows": 4, "mode": "heading" },
-  // Held facing up-back toward the holder instead of like a tool: smaller, centred
+  // Held facing up-back toward the holder instead of like a tool: smaller, centered
   // on the palm and lifted clear of it.
   "display": { "rotation": [-60, 0, 0], "translation": [-0.01, 0.06, -0.02], "scale": 0.67 } }

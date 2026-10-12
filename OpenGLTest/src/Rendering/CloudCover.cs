@@ -60,7 +60,7 @@ internal static class CloudCover
 
     /// <summary>
     /// The drawn cloud cover averaged over a disc of angular radius <paramref name="radius"/>
-    /// (radians) around unit direction <paramref name="dir"/>: <see cref="AlongRay"/> at the centre
+    /// (radians) around unit direction <paramref name="dir"/>: <see cref="AlongRay"/> at the center
     /// and on two rings of eight, so the cover of the sun's disc rises in small steps as a cloud
     /// edge drifts across it instead of flipping at once. Allocation-free, for once a frame.
     /// </summary>

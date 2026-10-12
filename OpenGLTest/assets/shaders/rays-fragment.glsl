@@ -3,7 +3,7 @@
 // scene depth says how far the eye can see through the water, and the shader marches that
 // segment in uSteps jittered samples, adding the sunlight that actually reaches each point
 // (the same shadow map the world shader uses) attenuated by how deep it sits and how far it
-// has travelled. The depth term is per channel (uWaterAbsorb, the world shader's own
+// has traveled. The depth term is per channel (uWaterAbsorb, the world shader's own
 // Beer-Lambert coefficient), so a shaft shifts toward teal with depth exactly as the water
 // it passes through does; the distance term stays a scalar haze. The depth is turned back into a world position through uInvViewProj, the
 // inverse of the very matrix that wrote it, so the projection's clip-depth convention cancels

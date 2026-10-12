@@ -9,7 +9,7 @@ namespace VoxelEngine.Particles;
 
 /// <summary>
 /// Draws every live <see cref="LeafParticle"/> as a camera-facing billboard in a single
-/// dynamic draw: one quad per leaf sampling the centred crop of the leaves tile, faded
+/// dynamic draw: one quad per leaf sampling the centered crop of the leaves tile, faded
 /// per vertex through its own shader (the world shader reserves vertex alpha for water).
 /// Back-to-front so the blend reads correctly. Main thread only.
 /// </summary>
@@ -81,9 +81,9 @@ public sealed class LeafParticleRenderer : IDisposable
     }
 
     /// <summary>
-    /// The centred <c>cropPixels × cropPixels</c> square of a <c>tilePixels</c> tile in 0..1
+    /// The centered <c>cropPixels × cropPixels</c> square of a <c>tilePixels</c> tile in 0..1
     /// UV space, on <paramref name="tile"/>. With the atlas on Nearest filtering the crop
-    /// edge lands exactly between texels, so neighbouring tiles never bleed in.
+    /// edge lands exactly between texels, so neighboring tiles never bleed in.
     /// </summary>
     public static UvRect CenterCrop(ushort tile, int tilePixels, int cropPixels)
     {

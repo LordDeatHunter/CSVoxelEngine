@@ -10,7 +10,7 @@ namespace VoxelEngine.Particles;
 /// function of the fall that ended. Nothing below <see cref="WorldGenerationConfig.LandingDustMinFallBlocks"/>,
 /// then both grow with the drop along <see cref="MathUtils.ImpactStrength"/> and stop at their caps
 /// at <see cref="WorldGenerationConfig.LandingDustFullFallBlocks"/>. A slime splats its own goo
-/// instead (<see cref="SplatCount"/>, <see cref="SplatSpeed"/>, <see cref="SkinColour"/>).
+/// instead (<see cref="SplatCount"/>, <see cref="SplatSpeed"/>, <see cref="SkinColor"/>).
 /// <see cref="GroundDust"/> spawns what this decides.
 /// </summary>
 public static class LandingDust
@@ -85,15 +85,15 @@ public static class LandingDust
     /// The sRGB color (0..1) of an entity skin: the mean of its opaque texels, so a slime splats its
     /// own green. <paramref name="fallback"/> when the model has no skin or not one opaque texel.
     /// </summary>
-    public static Vector3 SkinColour(BbmodelData model, Vector3 fallback) =>
-        MeanColour(model.TexturePixels, fallback);
+    public static Vector3 SkinColor(BbmodelData model, Vector3 fallback) =>
+        MeanColor(model.TexturePixels, fallback);
 
     /// <summary>
     /// The mean sRGB color (0..1) of an RGBA pixel array's opaque texels (an entity skin, an item
     /// sprite, so a breaking tool shatters in its own colors). <paramref name="fallback"/> when
     /// there is no array or not one opaque texel.
     /// </summary>
-    public static Vector3 MeanColour(byte[]? pixels, Vector3 fallback)
+    public static Vector3 MeanColor(byte[]? pixels, Vector3 fallback)
     {
         if (pixels == null) return fallback;
         long r = 0, g = 0, b = 0, n = 0;

@@ -24,7 +24,7 @@ public static class DesertWellGenerator
     }
 
     /// <summary>
-    /// The well a cell holds: the centre column of its 5x5 footprint (jittered inside the cell), or
+    /// The well a cell holds: the center column of its 5x5 footprint (jittered inside the cell), or
     /// false for the many cells without one. A pure function of the cell and the seed.
     /// </summary>
     public static bool TryGetWell(int cellX, int cellZ, out int x, out int z)
@@ -66,9 +66,9 @@ public static class DesertWellGenerator
     }
 
     /// <summary>
-    /// Writes one well centred on column (x, z) whose ground is <paramref name="ground"/>: the
+    /// Writes one well centered on column (x, z) whose ground is <paramref name="ground"/>: the
     /// 5x5 wall one cell up, the inner 3x3 ring a sandstone floor at the ground's own level (its
-    /// centre the water source), into air and the surface cell only. The test seam for the shape.
+    /// center the water source), into air and the surface cell only. The test seam for the shape.
     /// </summary>
     internal static void StampWell(byte[] blocks, int worldY0, int x, int z, int ground)
     {
@@ -100,7 +100,7 @@ public static class DesertWellGenerator
         }
     }
 
-    // The footprint must sit level: every column within a cell of the centre's ground, so the
+    // The footprint must sit level: every column within a cell of the center's ground, so the
     // wall never floats over a dune or buries itself in one
     private static bool IsFlatSite(int x, int z, int ground)
     {

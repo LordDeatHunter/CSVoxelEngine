@@ -66,12 +66,12 @@ public struct Vertex
     /// surface meaning only on submerged faces that are not water themselves.</para></summary>
     public ushort WaterSurface;
 
-    /// <summary>Blocks added to a world Y before <see cref="WaterSurface"/> quantises it, so
+    /// <summary>Blocks added to a world Y before <see cref="WaterSurface"/> quantizes it, so
     /// every surface down to -4096 encodes as a positive ushort. The world vertex shader
     /// mirrors this constant.</summary>
     public const int WaterSurfaceOffset = 4096;
 
-    /// <summary>Quantisation steps per block of <see cref="WaterSurface"/> (quarter blocks).
+    /// <summary>Quantization steps per block of <see cref="WaterSurface"/> (quarter blocks).
     /// The world vertex shader mirrors this constant.</summary>
     public const int WaterSurfaceStepsPerBlock = 4;
 
@@ -83,7 +83,7 @@ public struct Vertex
     /// <summary>Inverse of <see cref="EncodeWaterSurface"/>.</summary>
     public static float DecodeWaterSurface(ushort v) => v / (float)WaterSurfaceStepsPerBlock - WaterSurfaceOffset;
 
-    /// <summary>Quantisation steps per unit of each flow component in
+    /// <summary>Quantization steps per unit of each flow component in
     /// <see cref="EncodeWaterFlow"/>. The world vertex shader mirrors this constant.</summary>
     public const int WaterFlowSteps = 63;
 
@@ -105,7 +105,7 @@ public struct Vertex
         var qz = (int)MathF.Round(flow.Y * WaterFlowSteps);
         if (qx == 0 && qz == 0 && length > 0f)
         {
-            // A trickle too weak to quantise still has to read as moving, not still
+            // A trickle too weak to quantize still has to read as moving, not still
             if (MathF.Abs(flow.X) >= MathF.Abs(flow.Y))
                 qx = flow.X >= 0f ? 1 : -1;
             else
@@ -179,7 +179,7 @@ public struct Vertex
     /// multiplies its texel by <see cref="BiomeTint.Gain"/>.</summary>
     public readonly bool IsBiomeTinted => (Normal & BiomeTintBit) != 0;
 
-    /// <summary>This vertex recoloured to <paramref name="r"/>/<paramref name="g"/>/
+    /// <summary>This vertex recolored to <paramref name="r"/>/<paramref name="g"/>/
     /// <paramref name="b"/> with the biome-tint flag set, alpha unchanged: the mesher's
     /// <c>modelTint</c> path turns a sub-cell model quad's shade into shade * the palette field.</summary>
     internal Vertex WithBiomeTint(byte r, byte g, byte b)

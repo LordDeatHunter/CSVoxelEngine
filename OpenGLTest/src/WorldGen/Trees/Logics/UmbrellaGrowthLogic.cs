@@ -17,7 +17,7 @@ namespace VoxelEngine.WorldGen.Trees.Logics;
 /// (<see cref="RiseWeight"/>, never twice in a row), a rising staircase that lifts the pads clear
 /// of the fork, so the only childless nodes, and with them the leaf pads, sit out at the
 /// limb ends and the wood between the trunk and the pads stays bare. Beyond the zone a limb runs
-/// level and outward as before, favouring straight runs and stepping up only now and then
+/// level and outward as before, favoring straight runs and stepping up only now and then
 /// (<see cref="ClimbWeight"/>, never twice in a row), and never turns back into the zone, so the
 /// crown comes out flat and wider than it is tall.
 /// </para>

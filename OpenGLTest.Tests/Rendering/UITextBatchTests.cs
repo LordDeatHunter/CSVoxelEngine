@@ -21,17 +21,17 @@ public sealed class UITextBatchTests
         // draw: the same corner positions RectTransform produced, the same UV winding
         // UvRect.CornersTo hands Primitives.CreateRectangle, and the tint — which used to be
         // the per-draw uColor uniform — now carried per-vertex.
-        var centre = new Vector2(37.5f, 12.25f);
+        var center = new Vector2(37.5f, 12.25f);
         var size = new Vector2(9f, 14f);
         var uv = new UvRect(new Vector2(0.125f, 0.25f), new Vector2(0.1875f, 0.375f));
         var color = new Rgba(17, 200, 3, 180);
 
         Span<Vertex> quad = stackalloc Vertex[4];
-        UIRenderer.WriteGlyphQuad(quad, new GlyphInstance(centre, size, uv), centre, color);
+        UIRenderer.WriteGlyphQuad(quad, new GlyphInstance(center, size, uv), center, color);
 
         // The body of the private UIRenderer.RectTransform, rebuilt independently.
         var model = Matrix4x4.CreateScale(size.X, -size.Y, 1f)
-                    * Matrix4x4.CreateTranslation(centre.X, centre.Y, 0f);
+                    * Matrix4x4.CreateTranslation(center.X, center.Y, 0f);
         // Primitives.CreateRectangle's local corner order for a unit rect.
         Span<Vector3> local =
         [

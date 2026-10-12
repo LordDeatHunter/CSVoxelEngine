@@ -1,6 +1,6 @@
 """Deterministic generator of the stone brick tile (OpenGLTest/assets/textures/blocks/stone_bricks.png).
 
-A 32x32 opaque tile of grey bricks in a running bond: four 8-texel rows, each brick 16 texels wide
+A 32x32 opaque tile of gray bricks in a running bond: four 8-texel rows, each brick 16 texels wide
 and offset by 8 from the row above, with 2-texel mortar lines and a faint per-brick shade from a
 small integer hash. Tileable on both axes (the pattern wraps). No randomness and no image library:
 the PNG is encoded here with zlib at a fixed level and filter 0, so re-running reproduces the file
@@ -18,7 +18,7 @@ ROW = 8                   # texel rows per brick course; SIZE must be a multiple
 BRICK = 16                # brick length in texels
 MORTAR = 2                # mortar thickness
 
-MORTAR_COLOUR = (108, 108, 108)
+MORTAR_COLOR = (108, 108, 108)
 BRICK_SHADES = [(152, 152, 152), (144, 144, 144), (136, 136, 136), (148, 148, 148)]
 
 
@@ -35,7 +35,7 @@ def texel(x, y):
     brick_index = ((x + offset) % SIZE) // BRICK
     in_mortar = row < MORTAR or (x + offset) % BRICK < MORTAR
     if in_mortar:
-        return MORTAR_COLOUR
+        return MORTAR_COLOR
     base = BRICK_SHADES[hash2(brick_index, course) % len(BRICK_SHADES)]
     # A faint speckle so a wall of bricks is not perfectly flat
     speck = -6 if hash2(x, y) % 11 == 0 else 0

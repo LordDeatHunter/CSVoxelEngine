@@ -23,7 +23,7 @@ public static class ContactDamage
     public const float TouchMargin = 0.08f;
 
     /// <summary>
-    /// Whether a body box (<paramref name="radius"/> around its centre, <paramref name="height"/>
+    /// Whether a body box (<paramref name="radius"/> around its center, <paramref name="height"/>
     /// tall) with its feet at <paramref name="feet"/> touches a contact-damage cell it is not
     /// standing on top of, and the most damage one deals. False for an unloaded read (an unknown
     /// cell is air).

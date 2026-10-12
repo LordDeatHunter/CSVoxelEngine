@@ -19,11 +19,11 @@ namespace VoxelEngine.Tests.Networking;
 /// </summary>
 public sealed class ClientMeshGateTests
 {
-    private static readonly Vector3 Centre = Vector3.Zero;
+    private static readonly Vector3 Center = Vector3.Zero;
 
     // The foci array ChunkManager.Update streams around (chunk positions); one reference for the
     // whole test, as a real caller passes while the focus is unchanged.
-    private readonly Vector3[] _foci = [Centre];
+    private readonly Vector3[] _foci = [Center];
 
     private readonly byte _stone;
 
@@ -34,21 +34,21 @@ public sealed class ClientMeshGateTests
     }
 
     /// <summary>
-    /// A headless client manager with its streamer, the centre chunk (one stone block, or all air)
+    /// A headless client manager with its streamer, the center chunk (one stone block, or all air)
     /// and its six empty face neighbors streamed in, and no column yet.
     /// </summary>
-    private (ChunkManager Manager, ClientChunkStreamer Streamer, Chunk Centre) StreamedNeighbourhood(bool centreHasStone)
+    private (ChunkManager Manager, ClientChunkStreamer Streamer, Chunk Center) StreamedNeighborhood(bool centerHasStone)
     {
         var manager = new ChunkManager(null!) { Headless = true };
         var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
 
         var blocks = new byte[Chunk.BlockCount];
-        if (centreHasStone) blocks[Chunk.Idx(8, 8, 8)] = _stone;
-        manager.ApplyStreamedChunk(Centre, new ChunkSnapshot(blocks, null, null));
+        if (centerHasStone) blocks[Chunk.Idx(8, 8, 8)] = _stone;
+        manager.ApplyStreamedChunk(Center, new ChunkSnapshot(blocks, null, null));
         foreach (var offset in Vector3Directions.CardinalDirections)
-            manager.ApplyStreamedChunk(Centre + offset, new ChunkSnapshot(new byte[Chunk.BlockCount], null, null));
+            manager.ApplyStreamedChunk(Center + offset, new ChunkSnapshot(new byte[Chunk.BlockCount], null, null));
 
-        return (manager, streamer, manager.Chunks[Centre]);
+        return (manager, streamer, manager.Chunks[Center]);
     }
 
     // Far below the chunks, so the whole light volume is open sky; no water.
@@ -66,7 +66,7 @@ public sealed class ClientMeshGateTests
         for (var dx = -1; dx <= 1; dx++)
         for (var dz = -1; dz <= 1; dz++)
             if (which(dx, dz))
-                streamer.ApplyColumn((int)Centre.X + dx, (int)Centre.Z + dz, ColumnPayload());
+                streamer.ApplyColumn((int)Center.X + dx, (int)Center.Z + dz, ColumnPayload());
     }
 
     /// <summary>One frame that schedules, then the drain, then the frame that applies the result.</summary>
@@ -94,60 +94,60 @@ public sealed class ClientMeshGateTests
     [Fact]
     public void AChunkIsNotMeshedUntilItsNineColumnsArrived()
     {
-        var (manager, streamer, centre) = StreamedNeighbourhood(centreHasStone: true);
+        var (manager, streamer, center) = StreamedNeighborhood(centerHasStone: true);
 
         Frames(manager);
-        Assert.False(centre.IsMeshed, "meshed before any column arrived");
+        Assert.False(center.IsMeshed, "meshed before any column arrived");
         // Dropped from the dirty set, not retried every frame
         Assert.Equal(0, manager.DirtyCount);
 
         ApplyColumns(streamer, (_, _) => true);
         Frames(manager);
-        Assert.True(centre.IsMeshed, "the column arrivals never woke the chunk");
+        Assert.True(center.IsMeshed, "the column arrivals never woke the chunk");
     }
 
     [Fact]
     public void ADiagonalColumnIsRequiredToo()
     {
-        var (manager, streamer, centre) = StreamedNeighbourhood(centreHasStone: true);
+        var (manager, streamer, center) = StreamedNeighborhood(centerHasStone: true);
 
         // Every column but one corner of the 3x3
         ApplyColumns(streamer, (dx, dz) => !(dx == 1 && dz == 1));
         Frames(manager);
-        Assert.False(centre.IsMeshed, "meshed without the diagonal column");
+        Assert.False(center.IsMeshed, "meshed without the diagonal column");
         Assert.Equal(0, manager.DirtyCount);
 
         ApplyColumns(streamer, (dx, dz) => dx == 1 && dz == 1);
         Frames(manager);
-        Assert.True(centre.IsMeshed, "the last column's arrival never woke the chunk");
+        Assert.True(center.IsMeshed, "the last column's arrival never woke the chunk");
     }
 
     [Fact]
     public void AnAllAirChunkMeshesBeforeItsColumnsArrive()
     {
-        var (manager, _, centre) = StreamedNeighbourhood(centreHasStone: false);
+        var (manager, _, center) = StreamedNeighborhood(centerHasStone: false);
 
         Frames(manager);
-        Assert.True(centre.IsMeshed, "an all-air chunk waited for columns its build never reads");
+        Assert.True(center.IsMeshed, "an all-air chunk waited for columns its build never reads");
     }
 
     [Fact]
     public void AnEditBeforeTheColumnsArriveWaitsForThemInsteadOfMeshing()
     {
-        var (manager, streamer, centre) = StreamedNeighbourhood(centreHasStone: true);
+        var (manager, streamer, center) = StreamedNeighborhood(centerHasStone: true);
         Frames(manager);
 
         // The synchronous edit remesh does not bake the chunk without its columns; it leaves the
         // chunk dirty once, and the next frame drops it rather than spinning on it.
-        manager.ImmediateRemesh(Centre);
-        Assert.False(centre.IsMeshed, "the edit remesh built without the columns");
+        manager.ImmediateRemesh(Center);
+        Assert.False(center.IsMeshed, "the edit remesh built without the columns");
         Assert.Equal(1, manager.DirtyCount);
         Frames(manager);
-        Assert.False(centre.IsMeshed);
+        Assert.False(center.IsMeshed);
         Assert.Equal(0, manager.DirtyCount);
 
         ApplyColumns(streamer, (_, _) => true);
         Frames(manager);
-        Assert.True(centre.IsMeshed, "the column arrivals never woke the edited chunk");
+        Assert.True(center.IsMeshed, "the column arrivals never woke the edited chunk");
     }
 }

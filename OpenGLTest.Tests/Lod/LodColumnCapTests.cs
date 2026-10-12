@@ -20,7 +20,7 @@ public sealed class LodColumnCapTests
     /// The lowest terrain height anywhere the given region can sample — its chunk columns plus the
     /// 1-chunk border BuildMeshData prefetches. Capping a column below this is guaranteed to become
     /// the minimum of every sample window that covers it, so a test never has to guess whether a
-    /// relative cap survives a 22x22 min and the &gt;&gt; cellShift quantisation.
+    /// relative cap survives a 22x22 min and the &gt;&gt; cellShift quantization.
     /// </summary>
     private static int RegionFloor(int level, int rx, int rz)
     {

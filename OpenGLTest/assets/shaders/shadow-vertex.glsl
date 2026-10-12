@@ -37,14 +37,14 @@ void main() {
 #endif
     // Canopy wind, shaderpack-style: broad sine waves rolling over world XZ breathe whole
     // crowns at once instead of jittering single blocks (per-block offsets would crack the
-    // voxel seams). Wavelengths span many blocks, so neighbouring verts shear by ~a texel
+    // voxel seams). Wavelengths span many blocks, so neighboring verts shear by ~a texel
     // while the canopy visibly sways; amplitude peaks under a tenth of a block.
     // Kept byte for byte in step with test-vertex.glsl, or leaf shadows would drift away
     // from the leaves that cast them.
     vec3 displaced = vPosition;
     if (vSway > 0.001 && uSwayStrength > 0.001) {
         vec3 anchor = TO_WORLD(vPosition);
-        // The gust wave is sampled at the anchor carried back by the wind's travelled offset
+        // The gust wave is sampled at the anchor carried back by the wind's traveled offset
         // (Wind.Offset, bounded), so gusts roll downwind while the phase rate stays the same
         // anywhere in the world; Wind.GustPhase is the C# twin.
         vec2 ga = anchor.xz - uWindOffset;

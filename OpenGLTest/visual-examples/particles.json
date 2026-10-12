@@ -35,7 +35,7 @@
 // obviously re-sorted. The headless facts are what pin eviction ORDER exactly —
 // LeafParticleTests / BlockDebrisTests / BubbleParticleTests / FireParticleTests each carry
 // an EvictionDropsTheOldest...AndKeepsTheRestInSpawnOrder fact, and ParticleRingTests'
-// randomised differential fact pins the ring itself against a List<T> oracle.
+// randomized differential fact pins the ring itself against a List<T> oracle.
 //
 // ============================================================================
 // NO FIRE LEG, and the reason is structural rather than a missing pose.

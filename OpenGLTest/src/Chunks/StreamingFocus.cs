@@ -14,7 +14,7 @@ namespace VoxelEngine.Chunks;
 /// published only when the set really changed - a different count, or any focus in another chunk -
 /// so a still camera allocates nothing and keeps the same reference. Both consumers lean on that:
 /// the chunk manager's unload gate compares the reference to skip the scan on frames nothing moved,
-/// and each worker's <see cref="ChunkScanFrontier"/> survives while its centre stays equal. Eyes that
+/// and each worker's <see cref="ChunkScanFrontier"/> survives while its center stays equal. Eyes that
 /// share a chunk are kept once, in first-seen order, so two players standing together cost one
 /// focus.
 /// </para>

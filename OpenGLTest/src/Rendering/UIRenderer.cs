@@ -94,32 +94,32 @@ public class UIRenderer : IDisposable
     private const float PreviewSize = 190f;
     private const float PreviewRight = 300f;
     private const float HeadCapHeight = 22f;
-    private static readonly Rgba PanelBackground = Rgba.Grey(0.03f, 0.72f);
-    private static readonly Rgba RowSelected = Rgba.Grey(0.22f, 0.8f);
+    private static readonly Rgba PanelBackground = Rgba.Gray(0.03f, 0.72f);
+    private static readonly Rgba RowSelected = Rgba.Gray(0.22f, 0.8f);
 
     // Inventory prettify palette: warm gold accents, green ready states, muted dims
     private static readonly Rgba AccentGold = new(232, 184, 72);
     private static readonly Rgba AccentDim = new(150, 120, 60);
     private static readonly Rgba ReadyGreen = new(126, 217, 87);
     private static readonly Rgba DangerRed = new(230, 110, 110);
-    private static readonly Rgba TextDim = Rgba.Grey(0.55f, 1f);
-    private static readonly Rgba CardBackground = Rgba.Grey(0.07f, 0.85f);
-    private static readonly Rgba ChipBackground = Rgba.Grey(0.12f, 0.9f);
+    private static readonly Rgba TextDim = Rgba.Gray(0.55f, 1f);
+    private static readonly Rgba CardBackground = Rgba.Gray(0.07f, 0.85f);
+    private static readonly Rgba ChipBackground = Rgba.Gray(0.12f, 0.9f);
     private static readonly Rgba ButtonReady = new(232, 184, 72);
-    private static readonly Rgba ButtonDisabled = Rgba.Grey(0.12f, 0.9f);
+    private static readonly Rgba ButtonDisabled = Rgba.Gray(0.12f, 0.9f);
     private static readonly Rgba ButtonTextReady = new(30, 26, 20);
-    private static readonly Rgba ButtonTextDisabled = Rgba.Grey(0.45f, 1f);
+    private static readonly Rgba ButtonTextDisabled = Rgba.Gray(0.45f, 1f);
 
     // Durability bar under a tool icon: fraction of the slot width, a few px tall.
     private const float DurabilityHeight = 5f;
     private const float DurabilityFill = 0.8f;
     private const float DurabilityPadBottom = 6f;
-    private static readonly Rgba DurabilityBack = Rgba.Grey(0.05f, 0.9f);
+    private static readonly Rgba DurabilityBack = Rgba.Gray(0.05f, 0.9f);
 
     // Frame-timing overlay (DrawProfiler), in pixels
     private const float ProfilerLeft = 10f;
     private const float ProfilerPadding = 6f;
-    private static readonly Rgba ProfilerBackground = Rgba.Grey(0.04f, 0.6f);
+    private static readonly Rgba ProfilerBackground = Rgba.Gray(0.04f, 0.6f);
 
     // Top-center compass bar (DrawCompass), in pixels: a scrolling 120-degree window
     // of the horizon with cardinals every 45 degrees and minor ticks every 15
@@ -137,9 +137,9 @@ public class UIRenderer : IDisposable
     private const float CompassHideSpawnWithin = 1f;
     private static readonly Rgba CompassNorth = new(255, 92, 92);
     private static readonly Rgba CompassSpawn = new(140, 210, 255);
-    private static readonly Rgba CompassTick = Rgba.Grey(0.75f, 0.9f);
+    private static readonly Rgba CompassTick = Rgba.Gray(0.75f, 0.9f);
 
-    // Three-quarter view: yaw swings a side face towards the viewer, pitch tilts the top down
+    // Three-quarter view: yaw swings a side face toward the viewer, pitch tilts the top down
     private const float IconYaw = 45f * MathF.PI / 180f;
     private const float IconPitch = 30f * MathF.PI / 180f;
 
@@ -150,9 +150,9 @@ public class UIRenderer : IDisposable
     // and divided by this, so retuning the angles above never changes how much room they take.
     private static readonly float IconExtent = UnitCubeExtent(IconRotation);
 
-    private static readonly Rgba SlotBackground = Rgba.Grey(0.08f, 0.55f);
-    private static readonly Rgba SlotBorderColor = Rgba.Grey(0.65f, 0.45f);
-    private static readonly Rgba SelectedBackground = Rgba.Grey(0.18f, 0.65f);
+    private static readonly Rgba SlotBackground = Rgba.Gray(0.08f, 0.55f);
+    private static readonly Rgba SlotBorderColor = Rgba.Gray(0.65f, 0.45f);
+    private static readonly Rgba SelectedBackground = Rgba.Gray(0.18f, 0.65f);
     private static readonly Rgba SelectedBorderColor = Rgba.White;
 
     private readonly GL _gl;
@@ -187,7 +187,7 @@ public class UIRenderer : IDisposable
     private readonly Mesh _heartHalfMesh;
 
     // The crosshair's five cropped pieces (see DrawCrosshair)
-    private readonly Mesh _crosshairCentreMesh;
+    private readonly Mesh _crosshairCenterMesh;
     private readonly Mesh[] _crosshairArmMeshes;
 
     // Count font, baked once from the TTF. Null when the file is missing or broken, in
@@ -251,7 +251,7 @@ public class UIRenderer : IDisposable
     private readonly string?[] _percentTexts = new string?[101];
 
     // The opaque backdrop behind every menu and loading frame: nothing is rendered behind those.
-    private static readonly Rgba MenuBackdrop = Rgba.Grey(0.08f);
+    private static readonly Rgba MenuBackdrop = Rgba.Gray(0.08f);
 
     /// <param name="atlasIsSrgb">Whether <paramref name="atlasTexture"/> was uploaded as
     /// <c>SRGB8_ALPHA8</c>: its icons are then re-encoded in the shader so they write the same
@@ -281,9 +281,9 @@ public class UIRenderer : IDisposable
         _heartFullMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
         _heartHalfMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartHalfUv);
 
-        // The crosshair's five pieces, cropped out of the 16x16 texture: a 4x4 centre dot and four
+        // The crosshair's five pieces, cropped out of the 16x16 texture: a 4x4 center dot and four
         // 5x4 pills with an empty row and column between them (see DrawCrosshair)
-        _crosshairCentreMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(6f, 6f, 10f, 10f));
+        _crosshairCenterMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(6f, 6f, 10f, 10f));
         _crosshairArmMeshes =
         [
             Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(6f, 0f, 10f, 5f)),
@@ -402,7 +402,7 @@ public class UIRenderer : IDisposable
         _gl.Enable(EnableCap.DepthTest);
     }
 
-    public Vector2 ScreenCentre => _screenSize * 0.5f;
+    public Vector2 ScreenCenter => _screenSize * 0.5f;
 
     /// <summary>The canvas size of the current (or last) pass, in canvas units.</summary>
     public Vector2 ScreenSize => _screenSize;
@@ -414,42 +414,42 @@ public class UIRenderer : IDisposable
     /// first <see cref="Begin(Vector2D{int}, Vector2D{int}, float)"/>.</summary>
     public Vector2 ToCanvas(Vector2 windowPoint) => UiCanvas.WindowToCanvas(windowPoint, _scale);
 
-    /// <summary>Solid-color rectangle centred on <paramref name="centre"/>.</summary>
-    public void DrawRect(Vector2 centre, Vector2 size, Rgba color) =>
-        DrawMesh(_unitSquare, RectTransform(centre, size), color);
+    /// <summary>Solid-color rectangle centered on <paramref name="center"/>.</summary>
+    public void DrawRect(Vector2 center, Vector2 size, Rgba color) =>
+        DrawMesh(_unitSquare, RectTransform(center, size), color);
 
-    public void DrawSquare(Vector2 centre, float size, Rgba color) =>
-        DrawRect(centre, new Vector2(size), color);
+    public void DrawSquare(Vector2 center, float size, Rgba color) =>
+        DrawRect(center, new Vector2(size), color);
 
     /// <summary>
     /// Textured rectangle. The whole texture is stretched to fit; for a region of an atlas,
     /// build a square with a <see cref="UvRect"/> via <see cref="Primitives"/> and draw it
     /// through <see cref="DrawMesh"/>.
     /// </summary>
-    public void DrawTexture(Vector2 centre, Vector2 size, uint texture, Rgba? tint = null) =>
-        DrawMesh(_unitSquare, RectTransform(centre, size), tint, texture);
+    public void DrawTexture(Vector2 center, Vector2 size, uint texture, Rgba? tint = null) =>
+        DrawMesh(_unitSquare, RectTransform(center, size), tint, texture);
 
     /// <summary>An outline drawn as four rectangles just inside the given bounds.</summary>
-    public void DrawBorder(Vector2 centre, Vector2 size, float thickness, Rgba color)
+    public void DrawBorder(Vector2 center, Vector2 size, float thickness, Rgba color)
     {
         var half = size * 0.5f;
         var horizontal = new Vector2(size.X, thickness);
         var vertical = new Vector2(thickness, size.Y - thickness * 2f);
         var inset = thickness * 0.5f;
 
-        DrawRect(centre with { Y = centre.Y - half.Y + inset }, horizontal, color);
-        DrawRect(centre with { Y = centre.Y + half.Y - inset }, horizontal, color);
-        DrawRect(centre with { X = centre.X - half.X + inset }, vertical, color);
-        DrawRect(centre with { X = centre.X + half.X + inset }, vertical, color);
+        DrawRect(center with { Y = center.Y - half.Y + inset }, horizontal, color);
+        DrawRect(center with { Y = center.Y + half.Y - inset }, horizontal, color);
+        DrawRect(center with { X = center.X - half.X + inset }, vertical, color);
+        DrawRect(center with { X = center.X + half.X + inset }, vertical, color);
     }
 
-    private void DrawDurabilityBar(Vector2 centre, float width, float fraction)
+    private void DrawDurabilityBar(Vector2 center, float width, float fraction)
     {
         var f = MathUtils.Clamp01(fraction);
-        DrawRect(centre, new Vector2(width, DurabilityHeight), DurabilityBack);
+        DrawRect(center, new Vector2(width, DurabilityHeight), DurabilityBack);
         if (f <= 0f) return;
         var fill = new Rgba((byte)(230 - 104 * f), (byte)(110 + 107 * f), (byte)(110 - 23 * f));
-        DrawRect(new Vector2(centre.X - width * 0.5f + width * f * 0.5f, centre.Y),
+        DrawRect(new Vector2(center.X - width * 0.5f + width * f * 0.5f, center.Y),
             new Vector2(width * f, DurabilityHeight), fill);
     }
 
@@ -472,7 +472,7 @@ public class UIRenderer : IDisposable
     /// Width and height of the box the icon fits in, in pixels — not the cube's edge length,
     /// which is derived from the viewing angle.
     /// </param>
-    public void DrawBlockIcon(Vector2 centre, float size, byte blockId)
+    public void DrawBlockIcon(Vector2 center, float size, byte blockId)
     {
         var mesh = _blockCubes.Get(blockId);
         if (mesh == null) return;
@@ -485,7 +485,7 @@ public class UIRenderer : IDisposable
 
         var model = Matrix4x4.CreateScale(size / IconExtent)
                     * IconRotation
-                    * FlipToScreen(centre);
+                    * FlipToScreen(center);
 
         // Cutout blocks (flower, leaves) carry transparent texels: discard them so they
         // draw neither color nor depth, exactly like the world opaque pass and DrawItemIcon.
@@ -509,7 +509,7 @@ public class UIRenderer : IDisposable
             new Vector2(x1 / CrosshairTextureSize, 1f - y0 / CrosshairTextureSize));
 
     /// <summary>
-    /// The crosshair, cropped out of the 16x16 texture into its five pieces: the centre dot stays
+    /// The crosshair, cropped out of the 16x16 texture into its five pieces: the center dot stays
     /// put while the four arms slide outward with a throw's charge (snapping back on release), a
     /// ring of segments around them fills with <paramref name="breakProgress"/> while a block is
     /// mined (nothing at zero, so creative never shows it) and an X flashes at
@@ -517,13 +517,13 @@ public class UIRenderer : IDisposable
     /// </summary>
     public void DrawCrosshair(float throwCharge = 0f, float breakProgress = 0f, float hitMarker = 0f)
     {
-        var centre = ScreenCentre;
+        var center = ScreenCenter;
         var unit = CrosshairSize / CrosshairTextureSize;
         var spread = MathUtils.SmoothStep(MathUtils.Clamp01(throwCharge)) * CrosshairSpreadPx;
 
         // The pieces' pixel rects in the texture: the dot at the middle, one pill per direction,
         // an empty row and column between each
-        DrawMesh(_crosshairCentreMesh, RectTransform(centre, new Vector2(4f * unit)), Rgba.White, _crosshairTexture);
+        DrawMesh(_crosshairCenterMesh, RectTransform(center, new Vector2(4f * unit)), Rgba.White, _crosshairTexture);
         for (var i = 0; i < _crosshairArmMeshes.Length; i++)
         {
             var (size, offset) = i switch
@@ -533,7 +533,7 @@ public class UIRenderer : IDisposable
                 2 => (new Vector2(5f, 4f), new Vector2(-5.5f, 0f)),
                 _ => (new Vector2(5f, 4f), new Vector2(5.5f, 0f)),
             };
-            var position = centre + new Vector2(offset.X * unit, offset.Y * unit)
+            var position = center + new Vector2(offset.X * unit, offset.Y * unit)
                 + (i switch
                 {
                     0 => new Vector2(0f, -spread),
@@ -553,8 +553,8 @@ public class UIRenderer : IDisposable
             for (var i = 0; i < CrosshairRingSegments; i++)
             {
                 var angle = i / (float)CrosshairRingSegments * MathF.Tau - MathF.PI * 0.5f;
-                var position = centre + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * CrosshairRingRadius;
-                DrawRect(position, new Vector2(CrosshairRingDot), i < lit ? Rgba.White : Rgba.Grey(1f, 0.22f));
+                var position = center + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * CrosshairRingRadius;
+                DrawRect(position, new Vector2(CrosshairRingDot), i < lit ? Rgba.White : Rgba.Gray(1f, 0.22f));
             }
         }
 
@@ -568,7 +568,7 @@ public class UIRenderer : IDisposable
                 var rotation = Matrix4x4.CreateRotationZ((i == 0 ? 1f : -1f) * MathF.PI * 0.25f);
                 var model = Matrix4x4.CreateScale(CrosshairMarkerLength, CrosshairMarkerWidth, 1f)
                             * rotation
-                            * Matrix4x4.CreateTranslation(centre.X, centre.Y, 0f);
+                            * Matrix4x4.CreateTranslation(center.X, center.Y, 0f);
                 DrawMesh(_unitSquare, model, color);
             }
         }
@@ -587,7 +587,7 @@ public class UIRenderer : IDisposable
     private const float CrosshairMarkerWidth = 3f;
 
     /// <summary>
-    /// The survival hearts: 10 in a row centred above the hotbar, 1 heart per 10 HP.
+    /// The survival hearts: 10 in a row centered above the hotbar, 1 heart per 10 HP.
     /// Every heart draws its empty shell first and the red heart over it — full, left
     /// half (5 HP steps), or nothing — so damage reads heart by heart like Minecraft.
     /// </summary>
@@ -597,27 +597,27 @@ public class UIRenderer : IDisposable
         var rowWidth = HeartDrawWidth + (PlayerHealth.HeartCount - 1) * HeartStride;
         var firstX = (_screenSize.X - rowWidth) * 0.5f + HeartDrawWidth * 0.5f;
         var hotbarTop = _screenSize.Y - BottomMargin - SlotSize;
-        var centreY = hotbarTop - HeartGap - HeartDrawHeight * 0.5f;
+        var centerY = hotbarTop - HeartGap - HeartDrawHeight * 0.5f;
         var fullSize = new Vector2(HeartDrawWidth, HeartDrawHeight);
         var halfSize = new Vector2(HeartDrawWidth * 0.5f, HeartDrawHeight);
 
         for (var i = 0; i < PlayerHealth.HeartCount; i++)
         {
-            var centre = new Vector2(firstX + i * HeartStride, centreY);
-            DrawMesh(_heartEmptyMesh, RectTransform(centre, fullSize), Rgba.White, _heartEmptyTexture);
+            var center = new Vector2(firstX + i * HeartStride, centerY);
+            DrawMesh(_heartEmptyMesh, RectTransform(center, fullSize), Rgba.White, _heartEmptyTexture);
 
             var fill = Math.Clamp(hp - i * PlayerHealth.HpPerHeart, 0, PlayerHealth.HpPerHeart);
             if (fill >= PlayerHealth.HpPerHeart)
-                DrawMesh(_heartFullMesh, RectTransform(centre, fullSize), Rgba.White, _heartTexture);
+                DrawMesh(_heartFullMesh, RectTransform(center, fullSize), Rgba.White, _heartTexture);
             else if (fill >= PlayerHealth.HpPerHeart / 2)
                 DrawMesh(_heartHalfMesh,
-                    RectTransform(centre with { X = centre.X - HeartDrawWidth * 0.25f }, halfSize),
+                    RectTransform(center with { X = center.X - HeartDrawWidth * 0.25f }, halfSize),
                     Rgba.White, _heartTexture);
         }
     }
 
     /// <summary>
-    /// The Tab player list: a centred panel with a header and one line per online player (the local
+    /// The Tab player list: a centered panel with a header and one line per online player (the local
     /// one first), drawn over the HUD while Tab is held.
     /// </summary>
     public void DrawPlayerList(IReadOnlyList<string> names)
@@ -629,14 +629,14 @@ public class UIRenderer : IDisposable
         foreach (var name in names)
             width = MathF.Max(width, _font.MeasureSize(name, _countScale).X + 32f);
         var height = lineHeight * (names.Count + 1) + 16f;
-        var centre = new Vector2(_screenSize.X * 0.5f, _screenSize.Y * 0.28f);
-        DrawRect(centre, new Vector2(width, height), PanelBackground);
+        var center = new Vector2(_screenSize.X * 0.5f, _screenSize.Y * 0.28f);
+        DrawRect(center, new Vector2(width, height), PanelBackground);
 
-        var top = centre.Y - height * 0.5f + 8f;
-        DrawTextCentred($"Players ({names.Count})", centre.X, top, _countScale, AccentGold);
+        var top = center.Y - height * 0.5f + 8f;
+        DrawTextCentered($"Players ({names.Count})", center.X, top, _countScale, AccentGold);
         for (var i = 0; i < names.Count; i++)
         {
-            DrawText(names[i], new Vector2(centre.X - width * 0.5f + 16f, top + lineHeight * (i + 1)),
+            DrawText(names[i], new Vector2(center.X - width * 0.5f + 16f, top + lineHeight * (i + 1)),
                 _countScale, Rgba.White);
         }
     }
@@ -653,15 +653,15 @@ public class UIRenderer : IDisposable
     {
         if (_font == null || string.IsNullOrEmpty(label.Text)) return;
 
-        var centre = ScreenCentre;
+        var center = ScreenCenter;
         // Anchored by the spinning cube's largest half-height, so no yaw ever rises above `top`
-        var cubeCentre = new Vector2(centre.X, top + LookLabelCubeHalfHeight);
+        var cubeCenter = new Vector2(center.X, top + LookLabelCubeHalfHeight);
         if (_blockCubes.Get(label.BlockId) is { } cube)
         {
-            // The shape is centred on its own origin, so it spins in place; an unknown block is
+            // The shape is centered on its own origin, so it spins in place; an unknown block is
             // the same mesh with uUseTexture off, a flat dark silhouette. FlipToScreen mirrors
             // the Y-up model into the Y-down canvas with the tilt then tipping its top face
-            // towards the viewer, like the icons; the model's faces overlap on screen, so the
+            // toward the viewer, like the icons; the model's faces overlap on screen, so the
             // draw needs the depth test the flat shapes skip, or its back faces blend over the
             // front ones.
             _gl.Enable(EnableCap.DepthTest);
@@ -670,7 +670,7 @@ public class UIRenderer : IDisposable
             var model = Matrix4x4.CreateScale(LookLabelCubeSize)
                         * Matrix4x4.CreateRotationY(time * 0.6f)
                         * Matrix4x4.CreateRotationX(LookLabelCubeTilt)
-                        * FlipToScreen(cubeCentre);
+                        * FlipToScreen(cubeCenter);
 
             // Same cutout discard as DrawBlockIcon: a leaf's transparent texels would
             // otherwise write depth and swallow the faces behind them.
@@ -689,7 +689,7 @@ public class UIRenderer : IDisposable
         }
 
         var name = FittedText(label.Text, _countScale, LookLabelMaxWidth);
-        DrawTextCentred(name, centre.X, cubeCentre.Y + LookLabelNameGap, _countScale,
+        DrawTextCentered(name, center.X, cubeCenter.Y + LookLabelNameGap, _countScale,
             label.Mineable ? Rgba.White : DangerRed);
         if (!debug) return;
 
@@ -700,14 +700,14 @@ public class UIRenderer : IDisposable
             $"sun {label.Light.Sun:0}   block {label.Light.Block:0}",
             $"chunk {(int)chunkPos.X} {(int)chunkPos.Y} {(int)chunkPos.Z}   cell {(int)label.Cell.X & Chunk.SizeMask} {(int)label.Cell.Y & Chunk.SizeMask} {(int)label.Cell.Z & Chunk.SizeMask}",
         };
-        var linesTop = cubeCentre.Y + LookLabelNameGap + CountCapHeight + 6f;
+        var linesTop = cubeCenter.Y + LookLabelNameGap + CountCapHeight + 6f;
         for (var i = 0; i < lines.Length; i++)
-            DrawTextCentred(lines[i], centre.X, linesTop + i * (CountCapHeight + 4f), _countScale, TextDim);
+            DrawTextCentered(lines[i], center.X, linesTop + i * (CountCapHeight + 4f), _countScale, TextDim);
     }
 
     /// <summary>
     /// The y the look-at label's layout starts at: below the compass or the clock while either
-    /// occupies the top-centre strip, the compass as low as its coordinates line when one is
+    /// occupies the top-center strip, the compass as low as its coordinates line when one is
     /// shown, and the strip's own top margin with neither — so equipping the compass pushes the
     /// label down instead of overlapping it. The compass wins when both are equipped, like the
     /// draw itself, and a clock has no coordinates line.
@@ -746,16 +746,16 @@ public class UIRenderer : IDisposable
         foreach (var line in lines)
             width = MathF.Max(width, _font.MeasureSize(line, _countScale).X + 24f);
         var height = lineHeight * lines.Count + 16f;
-        var centre = anchor + new Vector2(16f + width * 0.5f, 18f + height * 0.5f);
-        centre.X = Math.Clamp(centre.X, width * 0.5f + 4f, _screenSize.X - width * 0.5f - 4f);
-        centre.Y = Math.Clamp(centre.Y, height * 0.5f + 4f, _screenSize.Y - height * 0.5f - 4f);
-        DrawRect(centre, new Vector2(width, height), PanelBackground);
-        DrawBorder(centre, new Vector2(width, height), SlotBorder, SlotBorderColor);
+        var center = anchor + new Vector2(16f + width * 0.5f, 18f + height * 0.5f);
+        center.X = Math.Clamp(center.X, width * 0.5f + 4f, _screenSize.X - width * 0.5f - 4f);
+        center.Y = Math.Clamp(center.Y, height * 0.5f + 4f, _screenSize.Y - height * 0.5f - 4f);
+        DrawRect(center, new Vector2(width, height), PanelBackground);
+        DrawBorder(center, new Vector2(width, height), SlotBorder, SlotBorderColor);
 
-        var top = centre.Y - height * 0.5f + 8f;
+        var top = center.Y - height * 0.5f + 8f;
         for (var i = 0; i < lines.Count; i++)
         {
-            DrawText(lines[i], new Vector2(centre.X - width * 0.5f + 12f, top + lineHeight * i),
+            DrawText(lines[i], new Vector2(center.X - width * 0.5f + 12f, top + lineHeight * i),
                 _countScale, i == 0 ? Rgba.White : TextDim);
         }
     }
@@ -764,8 +764,8 @@ public class UIRenderer : IDisposable
     private const float TooltipWidth = 120f;
 
     /// <summary>
-    /// One toast line (<see cref="HudToast"/>) centred a little above the item-name row, at
-    /// <paramref name="alpha"/>. The chat log sits bottom-left, clear of the centred hotbar.
+    /// One toast line (<see cref="HudToast"/>) centered a little above the item-name row, at
+    /// <paramref name="alpha"/>. The chat log sits bottom-left, clear of the centered hotbar.
     /// </summary>
     public void DrawToast(string text, float alpha)
     {
@@ -781,9 +781,9 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
-    /// The selected item's name centred over the hearts row (see <see cref="HotbarNameFade"/>),
+    /// The selected item's name centered over the hearts row (see <see cref="HotbarNameFade"/>),
     /// at <paramref name="alpha"/>, fitted to the hotbar's width. The chat log sits bottom-left,
-    /// clear of the centred hotbar, so the two never overlap.
+    /// clear of the centered hotbar, so the two never overlap.
     /// </summary>
     public void DrawHotbarName(string name, float alpha)
     {
@@ -795,7 +795,7 @@ public class UIRenderer : IDisposable
         _textFade = a;
         try
         {
-            DrawTextCentredFitted(name, _screenSize.X * 0.5f, top, _countScale, Rgba.White, HotbarLayout.RowWidth());
+            DrawTextCenteredFitted(name, _screenSize.X * 0.5f, top, _countScale, Rgba.White, HotbarLayout.RowWidth());
         }
         finally
         {
@@ -839,7 +839,7 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
-    /// The held clock's readout: the same top-centre panel the compass uses, showing the day
+    /// The held clock's readout: the same top-center panel the compass uses, showing the day
     /// number and the time of day (see <see cref="Clock"/>). Drawn only while the clock is in
     /// the hotbar, like the compass.
     /// </summary>
@@ -848,14 +848,14 @@ public class UIRenderer : IDisposable
         var cx = _screenSize.X * 0.5f;
         DrawRect(new Vector2(cx, CompassTop + CompassHeight * 0.5f),
             new Vector2(CompassWidth, CompassHeight), PanelBackground);
-        DrawTextCentred($"Day {day}   {timeOfDay}", cx, CompassTop + CompassReadoutTop,
+        DrawTextCentered($"Day {day}   {timeOfDay}", cx, CompassTop + CompassReadoutTop,
             _countScale, Rgba.White);
     }
 
     /// <summary>
-    /// RPG-style compass: a translucent bar across the top centre showing a 120-degree
+    /// RPG-style compass: a translucent bar across the top center showing a 120-degree
     /// window of the horizon around the camera heading, with cardinal labels every 45
-    /// degrees (N in red), minor ticks every 15, a centre caret, the numeric heading on
+    /// degrees (N in red), minor ticks every 15, a center caret, the numeric heading on
     /// top and a light-blue dot at the bearing toward the world spawn. The font only
     /// covers printable ASCII, so the readout is "N 005" rather than using a degree sign.
     /// <paramref name="yaw"/> is the camera yaw in degrees (0 looks down +X);
@@ -872,7 +872,7 @@ public class UIRenderer : IDisposable
             new Vector2(CompassWidth, CompassHeight), PanelBackground);
 
         var readout = _textCache.CompassReadout(heading);
-        DrawTextCentred(readout, cx, CompassTop + CompassReadoutTop, _countScale, Rgba.White);
+        DrawTextCentered(readout, cx, CompassTop + CompassReadoutTop, _countScale, Rgba.White);
 
         var tickTop = CompassTop + CompassTickTop;
         var start = MathF.Floor((heading - CompassHalfSpan) / CompassTickStep) * CompassTickStep;
@@ -885,7 +885,7 @@ public class UIRenderer : IDisposable
             if (MathF.Abs(norm % CompassCardinalStep) < 0.01f)
             {
                 var name = Compass.CardinalName(norm);
-                DrawTextCentred(name, x, tickTop, _countScale,
+                DrawTextCentered(name, x, tickTop, _countScale,
                     name == "N" ? CompassNorth : Rgba.White);
             }
             else
@@ -910,7 +910,7 @@ public class UIRenderer : IDisposable
         if (showCoordinates && _font != null)
         {
             var coords = _textCache.Coords(position);
-            DrawTextCentred(coords, cx, CompassTop + CompassHeight + CompassCoordsGap,
+            DrawTextCentered(coords, cx, CompassTop + CompassHeight + CompassCoordsGap,
                 _countScale, Rgba.White);
         }
     }
@@ -941,10 +941,10 @@ public class UIRenderer : IDisposable
         var face = _textFade >= 1f ? color : Faded(color, _textFade);
         for (var i = 0; i < n; i++)
             WriteGlyphQuad(_textVerts.AsSpan(i * 4, 4), instances[i],
-                instances[i].Centre + new Vector2(1f, 1f), shadow);
+                instances[i].Center + new Vector2(1f, 1f), shadow);
         for (var i = 0; i < n; i++)
             WriteGlyphQuad(_textVerts.AsSpan((n + i) * 4, 4), instances[i],
-                instances[i].Centre, face);
+                instances[i].Center, face);
 
         DrawTextBatch(n * 2);
     }
@@ -985,26 +985,26 @@ public class UIRenderer : IDisposable
     /// <summary>
     /// Writes one glyph's 4 vertices into <paramref name="quad"/>, positioned exactly where
     /// <see cref="RectTransform"/> would have placed a unit rect of
-    /// <paramref name="instance"/>.Size at <paramref name="centre"/> — this is that
+    /// <paramref name="instance"/>.Size at <paramref name="center"/> — this is that
     /// transform's closed form, which is why the local bottom corner lands at
-    /// <c>centre.Y + half.Y</c> (the rect transform scales Y negatively).
+    /// <c>center.Y + half.Y</c> (the rect transform scales Y negatively).
     /// <paramref name="color"/> rides per-vertex instead of arriving as a per-draw uniform.
     /// Corner order matches the static text EBO (see <see cref="BuildQuadIndices"/>).
     /// </summary>
-    internal static void WriteGlyphQuad(Span<Vertex> quad, GlyphInstance instance, Vector2 centre,
+    internal static void WriteGlyphQuad(Span<Vertex> quad, GlyphInstance instance, Vector2 center,
         Rgba color)
     {
         Span<Vector2> corners = stackalloc Vector2[4];
         instance.Uv.CornersTo(corners);
         var half = instance.Size * 0.5f;
 
-        quad[0] = new Vertex(new Vector3(centre.X - half.X, centre.Y + half.Y, 0f),
+        quad[0] = new Vertex(new Vector3(center.X - half.X, center.Y + half.Y, 0f),
             color.R, color.G, color.B, color.A, corners[0]);
-        quad[1] = new Vertex(new Vector3(centre.X - half.X, centre.Y - half.Y, 0f),
+        quad[1] = new Vertex(new Vector3(center.X - half.X, center.Y - half.Y, 0f),
             color.R, color.G, color.B, color.A, corners[1]);
-        quad[2] = new Vertex(new Vector3(centre.X + half.X, centre.Y - half.Y, 0f),
+        quad[2] = new Vertex(new Vector3(center.X + half.X, center.Y - half.Y, 0f),
             color.R, color.G, color.B, color.A, corners[2]);
-        quad[3] = new Vertex(new Vector3(centre.X + half.X, centre.Y + half.Y, 0f),
+        quad[3] = new Vertex(new Vector3(center.X + half.X, center.Y + half.Y, 0f),
             color.R, color.G, color.B, color.A, corners[3]);
     }
 
@@ -1045,30 +1045,30 @@ public class UIRenderer : IDisposable
         _gl.BindVertexArray(0);
     }
 
-    /// <summary>Draws the hotbar centred along the bottom edge, highlighting the selected slot.</summary>
+    /// <summary>Draws the hotbar centered along the bottom edge, highlighting the selected slot.</summary>
     /// <param name="headingDegrees">Compass heading (0 = north), picking heading-driven sheet frames.</param>
     /// <param name="timeSeconds">Scene clock, picking loop-driven sheet frames.</param>
     /// <param name="pops">Per-slot pickup pops scaling each icon and its count; null draws every slot at rest.</param>
     public void DrawHotbar(Inventory inventory, float headingDegrees, float timeSeconds, HotbarPickupPop? pops = null)
     {
         var stride = SlotSize + SlotGap;
-        var firstCentreX = HotbarLayout.FirstCentreX(_screenSize);
-        var centreY = HotbarLayout.CentreY(_screenSize);
+        var firstCenterX = HotbarLayout.FirstCenterX(_screenSize);
+        var centerY = HotbarLayout.CenterY(_screenSize);
         var slotSize = new Vector2(SlotSize);
 
         for (var i = 0; i < Inventory.SlotCount; i++)
         {
-            var centre = new Vector2(firstCentreX + i * stride, centreY);
+            var center = new Vector2(firstCenterX + i * stride, centerY);
             var selected = i == inventory.SelectedIndex;
 
-            DrawRect(centre, slotSize, selected ? SelectedBackground : SlotBackground);
-            DrawBorder(centre, slotSize,
+            DrawRect(center, slotSize, selected ? SelectedBackground : SlotBackground);
+            DrawBorder(center, slotSize,
                 selected ? SelectedBorder : SlotBorder,
                 selected ? SelectedBorderColor : SlotBorderColor);
             // A broken tool's slot flashes: a bright panel fading out (HotbarPickupPop.FlashAt)
             var flash = pops?.FlashAt(i) ?? 0f;
             if (flash > 0f)
-                DrawRect(centre, slotSize, new Rgba(255, 255, 255,
+                DrawRect(center, slotSize, new Rgba(255, 255, 255,
                     (byte)Math.Clamp(flash * WorldGenerationConfig.HotbarFlashAlpha * 255f, 0f, 255f)));
         }
 
@@ -1077,14 +1077,14 @@ public class UIRenderer : IDisposable
         {
             var id = inventory.IdAt(i);
             if (id == 0) continue;
-            var centre = new Vector2(firstCentreX + i * stride, centreY);
+            var center = new Vector2(firstCenterX + i * stride, centerY);
             // The pop marks a pickup; IconFill leaves enough margin for it to stay in the slot
             var iconSize = SlotSize * IconFill * (pops?.ScaleAt(i) ?? 1f);
             // Items show their flat sprites here like the list rows; blocks keep 3D cubes
             if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
-                DrawItemSprite(centre, new Vector2(iconSize), id, icon, headingDegrees, timeSeconds);
+                DrawItemSprite(center, new Vector2(iconSize), id, icon, headingDegrees, timeSeconds);
             else
-                DrawBlockIcon(centre, iconSize, id);
+                DrawBlockIcon(center, iconSize, id);
         }
 
         // Durability bars sit along the slot bottom, under the icons so they stay visible.
@@ -1094,9 +1094,9 @@ public class UIRenderer : IDisposable
             if (!slot.IsTool) continue;
             var fraction = inventory.ToolDurabilityFraction(slot.ToolInstance);
             if (fraction == null) continue;
-            var centre = new Vector2(firstCentreX + i * stride,
-                centreY + SlotSize * 0.5f - DurabilityPadBottom - DurabilityHeight * 0.5f);
-            DrawDurabilityBar(centre, SlotSize * DurabilityFill, fraction.Value);
+            var center = new Vector2(firstCenterX + i * stride,
+                centerY + SlotSize * 0.5f - DurabilityPadBottom - DurabilityHeight * 0.5f);
+            DrawDurabilityBar(center, SlotSize * DurabilityFill, fraction.Value);
         }
 
         // Counts overlay the slot's bottom-right corner, after the icons so text is on top.
@@ -1110,8 +1110,8 @@ public class UIRenderer : IDisposable
                 // The count pops with its icon, growing out of the slot's corner
                 var countScale = _countScale * (pops?.ScaleAt(i) ?? 1f);
                 var size = _font.MeasureSize(text.AsSpan(), countScale);
-                var slotRight = firstCentreX + i * stride + SlotSize * 0.5f;
-                var slotBottom = centreY + SlotSize * 0.5f;
+                var slotRight = firstCenterX + i * stride + SlotSize * 0.5f;
+                var slotBottom = centerY + SlotSize * 0.5f;
                 DrawText(text,
                     new Vector2(slotRight - CountPadRight - size.X, slotBottom - CountPadBottom - size.Y),
                     countScale, Rgba.White);
@@ -1136,20 +1136,20 @@ public class UIRenderer : IDisposable
         var tabWidth = InventoryPanelLayout.TabWidth(_screenSize);
         for (var t = 0; t < tabs.Length; t++)
         {
-            var centre = InventoryPanelLayout.TabCentre(t, _screenSize);
+            var center = InventoryPanelLayout.TabCenter(t, _screenSize);
             var active = view.Tab == tabs[t];
-            DrawRect(centre, new Vector2(tabWidth - 4f, TabHeight),
+            DrawRect(center, new Vector2(tabWidth - 4f, TabHeight),
                 active ? SelectedBackground : SlotBackground);
             if (active)
-                DrawBorder(centre, new Vector2(tabWidth - 4f, TabHeight), SlotBorder, SelectedBorderColor);
-            DrawTextCentredFitted(TabTitle(tabs[t]),
-                centre.X, top + PanelPad + 6f, _countScale, Rgba.White, tabWidth - 8f);
-            DrawTextCentredFitted(TabSubtitle(inventory, tabs[t]),
-                centre.X, top + PanelPad + 30f, _countScale, Rgba.White, tabWidth - 8f);
+                DrawBorder(center, new Vector2(tabWidth - 4f, TabHeight), SlotBorder, SelectedBorderColor);
+            DrawTextCenteredFitted(TabTitle(tabs[t]),
+                center.X, top + PanelPad + 6f, _countScale, Rgba.White, tabWidth - 8f);
+            DrawTextCenteredFitted(TabSubtitle(inventory, tabs[t]),
+                center.X, top + PanelPad + 30f, _countScale, Rgba.White, tabWidth - 8f);
         }
 
-        var (searchCentre, searchSize) = InventoryPanelLayout.SearchBoxRect(_screenSize);
-        DrawInputField(searchCentre, searchSize, view.Search.Text,
+        var (searchCenter, searchSize) = InventoryPanelLayout.SearchBoxRect(_screenSize);
+        DrawInputField(searchCenter, searchSize, view.Search.Text,
             view.Focus == InventoryFocus.Search, "Search items and recipes", time);
 
         // A query replaces the tab's list with search results; the list region below doubles as
@@ -1252,9 +1252,9 @@ public class UIRenderer : IDisposable
         if (ScrollList.Overflows(InventoryPanelLayout.ContentHeight(rowCount), listHeight))
         {
             var track = InventoryPanelLayout.TrackRect(_screenSize);
-            DrawRect(track.Centre, track.Size, SlotBackground);
+            DrawRect(track.Center, track.Size, SlotBackground);
             var thumb = InventoryPanelLayout.ThumbRect(_screenSize, offset, rowCount);
-            DrawRect(thumb.Centre, thumb.Size,
+            DrawRect(thumb.Center, thumb.Size,
                 view.ThumbDragGrab.HasValue ? SelectedBorderColor : SlotBorderColor);
         }
 
@@ -1265,7 +1265,7 @@ public class UIRenderer : IDisposable
     /// The ESC pause menu over the still-rendered game: a fullscreen dim standing in for a
     /// blur (this pass has no blur target; the dark translucency keeps the scene visible
     /// but unreadable, like the Godot reference's BlurOverlay in overlay mode), then a
-    /// centred title with RESUME / SETTINGS / SAVE &amp; QUIT buttons, or the settings title with a
+    /// centered title with RESUME / SETTINGS / SAVE &amp; QUIT buttons, or the settings title with a
     /// BACK button. Click targets come from <see cref="PauseMenuLayout"/> so drawing and
     /// hit-testing can never drift apart (the third button is still <see cref="PauseMenuHit.Exit"/>).
     /// </summary>
@@ -1273,16 +1273,16 @@ public class UIRenderer : IDisposable
     {
         if (view.Page == PauseMenuPage.Closed) return;
 
-        DrawRect(_screenSize * 0.5f, _screenSize, Rgba.Grey(0f, 0.62f));
+        DrawRect(_screenSize * 0.5f, _screenSize, Rgba.Gray(0f, 0.62f));
 
         var screen = _screenSize;
         if (view.Page == PauseMenuPage.Main)
         {
-            DrawTextCentred("PAUSED", screen.X * 0.5f,
+            DrawTextCentered("PAUSED", screen.X * 0.5f,
                 PauseMenuLayout.TitleTop(screen, view.Page), _headScale, Rgba.White);
-            DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 0), "RESUME");
-            DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 1), "SETTINGS");
-            DrawMenuButton(PauseMenuLayout.MainButtonCentre(screen, 2), "SAVE & QUIT");
+            DrawMenuButton(PauseMenuLayout.MainButtonCenter(screen, 0), "RESUME");
+            DrawMenuButton(PauseMenuLayout.MainButtonCenter(screen, 1), "SETTINGS");
+            DrawMenuButton(PauseMenuLayout.MainButtonCenter(screen, 2), "SAVE & QUIT");
             return;
         }
 
@@ -1298,50 +1298,50 @@ public class UIRenderer : IDisposable
     {
         var screen = _screenSize;
         var left = SettingsLayout.PanelLeft(screen);
-        DrawTextCentred("SETTINGS", screen.X * 0.5f, SettingsLayout.PanelTop, _headScale, Rgba.White);
+        DrawTextCentered("SETTINGS", screen.X * 0.5f, SettingsLayout.PanelTop, _headScale, Rgba.White);
 
         for (var t = 0; t < SettingsRows.Tabs.Length; t++)
         {
-            var centre = SettingsLayout.TabCentre(t, screen);
+            var center = SettingsLayout.TabCenter(t, screen);
             var size = new Vector2(SettingsLayout.TabWidth() - 4f, SettingsLayout.TabHeight);
             var active = SettingsRows.Tabs[t] == view.Tab;
-            DrawRect(centre, size, active ? SelectedBackground : SlotBackground);
+            DrawRect(center, size, active ? SelectedBackground : SlotBackground);
             if (active)
-                DrawBorder(centre, size, SlotBorder, SelectedBorderColor);
-            DrawTextCentred(SettingsRows.Tabs[t], centre.X, centre.Y - 8f, _countScale, Rgba.White);
+                DrawBorder(center, size, SlotBorder, SelectedBorderColor);
+            DrawTextCentered(SettingsRows.Tabs[t], center.X, center.Y - 8f, _countScale, Rgba.White);
         }
 
         var rows = SettingsRows.RowsInTab(view.Tab);
         for (var r = 0; r < rows.Length; r++)
         {
             var row = SettingsRows.All[rows[r]];
-            var centre = SettingsLayout.RowCentre(r, screen);
+            var center = SettingsLayout.RowCenter(r, screen);
             DrawText(FitText(row.Label, _countScale, SettingsLayout.LabelWidth - 16f),
-                new Vector2(left + 8f, centre.Y - 8f), _countScale, Rgba.White);
+                new Vector2(left + 8f, center.Y - 8f), _countScale, Rgba.White);
 
             switch (row)
             {
                 case ToggleRow t:
-                    DrawToggle(SettingsLayout.ToggleCentre(r, screen), t.Get());
-                    DrawValueRight(centre.Y, SettingsRows.FormatValue(row), screen);
+                    DrawToggle(SettingsLayout.ToggleCenter(r, screen), t.Get());
+                    DrawValueRight(center.Y, SettingsRows.FormatValue(row), screen);
                     break;
                 case SliderRow s:
                     DrawSlider(r, screen, s, view.DragRow == rows[r]);
-                    DrawValueRight(centre.Y, SettingsRows.FormatValue(row), screen);
+                    DrawValueRight(center.Y, SettingsRows.FormatValue(row), screen);
                     break;
                 case OptionsRow:
                     // The GUI Scale row names the effective scale (this frame's Begin scale) while capped.
                     var value = ReferenceEquals(row, SettingsRows.GuiScaleRow)
                         ? UiCanvas.ScaleLabel(GameSettings.RequestedGuiScale, _scale)
                         : SettingsRows.FormatValue(row);
-                    DrawTextCentred($"< {value} >",
-                        SettingsLayout.TrackRect(r, screen).Centre.X,
-                        centre.Y - 8f, _countScale, Rgba.White);
+                    DrawTextCentered($"< {value} >",
+                        SettingsLayout.TrackRect(r, screen).Center.X,
+                        center.Y - 8f, _countScale, Rgba.White);
                     break;
             }
         }
 
-        DrawMenuButton(SettingsLayout.BackCentre(screen), "BACK");
+        DrawMenuButton(SettingsLayout.BackCenter(screen), "BACK");
     }
 
     /// <summary>Settings widget under a window-pixel point (top-left origin), if any.</summary>
@@ -1351,34 +1351,34 @@ public class UIRenderer : IDisposable
         return SettingsLayout.HitAt(point, view.Tab, _screenSize);
     }
 
-    private void DrawValueRight(float centreY, string text, Vector2 screen)
+    private void DrawValueRight(float centerY, string text, Vector2 screen)
     {
         var w = TextWidth(text, _countScale);
-        DrawText(text, new Vector2(SettingsLayout.ValueRight(screen) - w, centreY - 8f),
+        DrawText(text, new Vector2(SettingsLayout.ValueRight(screen) - w, centerY - 8f),
             _countScale, TextDim);
     }
 
-    private void DrawToggle(Vector2 centre, bool on)
+    private void DrawToggle(Vector2 center, bool on)
     {
         var size = new Vector2(SettingsLayout.ToggleSize);
-        DrawRect(centre, size, SlotBackground);
-        DrawBorder(centre, size, SlotBorder, SlotBorderColor);
+        DrawRect(center, size, SlotBackground);
+        DrawBorder(center, size, SlotBorder, SlotBorderColor);
         if (on)
-            DrawSquare(centre, SettingsLayout.ToggleSize - 8f, AccentGold);
+            DrawSquare(center, SettingsLayout.ToggleSize - 8f, AccentGold);
     }
 
     private void DrawSlider(int tabRow, Vector2 screen, SliderRow def, bool active)
     {
-        var (centre, size) = SettingsLayout.TrackRect(tabRow, screen);
+        var (center, size) = SettingsLayout.TrackRect(tabRow, screen);
         var fraction = MathUtils.Clamp01((def.Get() - def.Min) / (def.Max - def.Min));
-        DrawRect(centre, size, SlotBackground);
+        DrawRect(center, size, SlotBackground);
         if (fraction > 0f)
         {
             var fillW = size.X * fraction;
-            DrawRect(new Vector2(centre.X - size.X * 0.5f + fillW * 0.5f, centre.Y),
+            DrawRect(new Vector2(center.X - size.X * 0.5f + fillW * 0.5f, center.Y),
                 new Vector2(fillW, size.Y), active ? Rgba.White : AccentGold);
         }
-        DrawSquare(new Vector2(centre.X - size.X * 0.5f + size.X * fraction, centre.Y),
+        DrawSquare(new Vector2(center.X - size.X * 0.5f + size.X * fraction, center.Y),
             14f, active ? Rgba.White : SelectedBorderColor);
     }
 
@@ -1389,11 +1389,11 @@ public class UIRenderer : IDisposable
         return PauseMenuLayout.HitAt(point, _screenSize, view.Page);
     }
 
-    private void DrawMenuButton(Vector2 centre, string label)
+    private void DrawMenuButton(Vector2 center, string label)
     {
-        DrawRect(centre, PauseMenuLayout.ButtonSize, SlotBackground);
-        DrawBorder(centre, PauseMenuLayout.ButtonSize, SlotBorder, SelectedBorderColor);
-        DrawTextCentred(label, centre.X, centre.Y - 9f, _countScale, Rgba.White);
+        DrawRect(center, PauseMenuLayout.ButtonSize, SlotBackground);
+        DrawBorder(center, PauseMenuLayout.ButtonSize, SlotBorder, SelectedBorderColor);
+        DrawTextCentered(label, center.X, center.Y - 9f, _countScale, Rgba.White);
     }
 
     /// <summary>
@@ -1411,12 +1411,12 @@ public class UIRenderer : IDisposable
         switch (view.Page)
         {
             case MainMenuPage.Main:
-                DrawTextCentred("CSVOXELENGINE", screen.X * 0.5f,
+                DrawTextCentered("CSVOXELENGINE", screen.X * 0.5f,
                     MainMenuLayout.TitleTop(screen, MainMenuPage.Main), _headScale, Rgba.White);
-                DrawMenuButton(MainMenuLayout.MainButtonCentre(screen, 0), "START");
-                DrawMenuButton(MainMenuLayout.MainButtonCentre(screen, 1), "MULTIPLAYER");
-                DrawMenuButton(MainMenuLayout.MainButtonCentre(screen, 2), "SETTINGS");
-                DrawMenuButton(MainMenuLayout.MainButtonCentre(screen, 3), "EXIT");
+                DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 0), "START");
+                DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 1), "MULTIPLAYER");
+                DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 2), "SETTINGS");
+                DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 3), "EXIT");
                 break;
 
             case MainMenuPage.Multiplayer:
@@ -1424,25 +1424,25 @@ public class UIRenderer : IDisposable
                 break;
 
             case MainMenuPage.AddServer:
-                DrawTextCentred("ADD SERVER", screen.X * 0.5f,
+                DrawTextCentered("ADD SERVER", screen.X * 0.5f,
                     MainMenuLayout.TitleTop(screen, MainMenuPage.AddServer), _headScale, Rgba.White);
-                DrawLabelledField(MainMenuLayout.NameFieldCentre(screen), "NAME", view.ServerName,
+                DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "NAME", view.ServerName,
                     view.Focus == MenuField.ServerName, WorldNames.DefaultName, time);
-                DrawLabelledField(MainMenuLayout.SeedFieldCentre(screen), "ADDRESS", view.Address,
+                DrawLabeledField(MainMenuLayout.SeedFieldCenter(screen), "ADDRESS", view.Address,
                     view.Focus == MenuField.Address, "192.168.1.10 or host:25566", time);
                 DrawNotice(view, screen);
-                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 0), "ADD");
-                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
+                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "ADD");
+                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
                 break;
 
             case MainMenuPage.DirectConnect:
-                DrawTextCentred("DIRECT CONNECT", screen.X * 0.5f,
+                DrawTextCentered("DIRECT CONNECT", screen.X * 0.5f,
                     MainMenuLayout.TitleTop(screen, MainMenuPage.DirectConnect), _headScale, Rgba.White);
-                DrawLabelledField(MainMenuLayout.NameFieldCentre(screen), "ADDRESS", view.Address,
+                DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "ADDRESS", view.Address,
                     view.Focus == MenuField.Address, "192.168.1.10 or host:25566", time);
                 DrawNotice(view, screen);
-                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 0), "CONNECT");
-                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
+                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CONNECT");
+                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
                 break;
 
             case MainMenuPage.ConfirmDeleteServer:
@@ -1455,23 +1455,23 @@ public class UIRenderer : IDisposable
                 break;
 
             case MainMenuPage.Create:
-                DrawTextCentred("NEW WORLD", screen.X * 0.5f,
+                DrawTextCentered("NEW WORLD", screen.X * 0.5f,
                     MainMenuLayout.TitleTop(screen, MainMenuPage.Create), _headScale, Rgba.White);
-                DrawLabelledField(MainMenuLayout.NameFieldCentre(screen), "NAME", view.Name,
+                DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "NAME", view.Name,
                     view.Focus == MenuField.Name, WorldNames.DefaultName, time);
-                DrawLabelledField(MainMenuLayout.SeedFieldCentre(screen), "SEED", view.Seed,
+                DrawLabeledField(MainMenuLayout.SeedFieldCenter(screen), "SEED", view.Seed,
                     view.Focus == MenuField.Seed, "random", time);
-                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 0), "CREATE");
-                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
+                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CREATE");
+                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
                 break;
 
             case MainMenuPage.Edit:
-                DrawTextCentred("EDIT WORLD", screen.X * 0.5f,
+                DrawTextCentered("EDIT WORLD", screen.X * 0.5f,
                     MainMenuLayout.TitleTop(screen, MainMenuPage.Edit), _headScale, Rgba.White);
-                DrawLabelledField(MainMenuLayout.NameFieldCentre(screen), "NAME", view.Name,
+                DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "NAME", view.Name,
                     view.Focus == MenuField.Name, WorldNames.DefaultName, time);
-                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 0), "SAVE");
-                DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
+                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "SAVE");
+                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
                 break;
 
             case MainMenuPage.ConfirmDelete:
@@ -1490,21 +1490,21 @@ public class UIRenderer : IDisposable
     // and the CREATE / BACK buttons.
     private void DrawWorldsPage(MainMenuView view, Vector2 screen)
     {
-        DrawTextCentred("WORLDS", screen.X * 0.5f,
+        DrawTextCentered("WORLDS", screen.X * 0.5f,
             MainMenuLayout.TitleTop(screen, MainMenuPage.Worlds), _headScale, Rgba.White);
 
         var left = MainMenuLayout.PanelLeft(screen);
         var top = MainMenuLayout.ListTop(screen);
         var listHeight = MainMenuLayout.ListHeight(screen);
-        var panelCentre = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
+        var panelCenter = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
         var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
-        DrawRect(panelCentre, panelSize, SlotBackground);
-        DrawBorder(panelCentre, panelSize, SlotBorder, SlotBorderColor);
+        DrawRect(panelCenter, panelSize, SlotBackground);
+        DrawBorder(panelCenter, panelSize, SlotBorder, SlotBorderColor);
 
         var count = view.Worlds.Count;
         if (count == 0)
         {
-            DrawTextCentred("No worlds yet - create one", panelCentre.X, panelCentre.Y - 8f,
+            DrawTextCentered("No worlds yet - create one", panelCenter.X, panelCenter.Y - 8f,
                 _countScale, TextDim);
         }
         else
@@ -1528,18 +1528,18 @@ public class UIRenderer : IDisposable
                     var world = view.Worlds[i];
                     var rowTop = MainMenuLayout.RowTop(i, offset, screen);
                     if (i > 0)
-                        DrawRect(new Vector2(panelCentre.X, rowTop),
+                        DrawRect(new Vector2(panelCenter.X, rowTop),
                             new Vector2(MainMenuLayout.PanelWidth - 2f * MainMenuLayout.RowPad, 1.5f),
                             SlotBorderColor);
                     DrawText(FittedText(world.Name, _countScale, nameWidth),
                         new Vector2(nameLeft, rowTop + 8f), _countScale, Rgba.White);
                     DrawText(MainMenuLayout.WorldDetailText(world.Seed, world.LastPlayedUnixMs),
                         new Vector2(nameLeft, rowTop + 36f), _countScale, TextDim);
-                    DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 0),
+                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 0),
                         MainMenuLayout.RowButtonSize, "PLAY");
-                    DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 1),
+                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 1),
                         MainMenuLayout.RowButtonSize, "EDIT");
-                    DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 2),
+                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 2),
                         MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
                 }
             }
@@ -1550,11 +1550,11 @@ public class UIRenderer : IDisposable
         }
 
         if (!string.IsNullOrEmpty(view.Notice))
-            DrawTextCentred(FittedText(view.Notice, _countScale, MainMenuLayout.PanelWidth),
+            DrawTextCentered(FittedText(view.Notice, _countScale, MainMenuLayout.PanelWidth),
                 screen.X * 0.5f, MainMenuLayout.NoticeTop(screen), _countScale, AccentGold);
 
-        DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 0), "CREATE");
-        DrawMenuButton(MainMenuLayout.BottomButtonCentre(screen, 1), "BACK");
+        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CREATE");
+        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
     }
 
     // The multiplayer list, shaped exactly like the worlds list: title, panel, the scissored rows
@@ -1562,21 +1562,21 @@ public class UIRenderer : IDisposable
     // buttons ADD SERVER / DIRECT CONNECT / BACK.
     private void DrawMultiplayerPage(MainMenuView view, Vector2 screen)
     {
-        DrawTextCentred("MULTIPLAYER", screen.X * 0.5f,
+        DrawTextCentered("MULTIPLAYER", screen.X * 0.5f,
             MainMenuLayout.TitleTop(screen, MainMenuPage.Multiplayer), _headScale, Rgba.White);
 
         var left = MainMenuLayout.PanelLeft(screen);
         var top = MainMenuLayout.ListTop(screen);
         var listHeight = MainMenuLayout.ListHeight(screen);
-        var panelCentre = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
+        var panelCenter = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
         var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
-        DrawRect(panelCentre, panelSize, SlotBackground);
-        DrawBorder(panelCentre, panelSize, SlotBorder, SlotBorderColor);
+        DrawRect(panelCenter, panelSize, SlotBackground);
+        DrawBorder(panelCenter, panelSize, SlotBorder, SlotBorderColor);
 
         var count = view.Servers.Count;
         if (count == 0)
         {
-            DrawTextCentred("No servers yet - add one", panelCentre.X, panelCentre.Y - 8f,
+            DrawTextCentered("No servers yet - add one", panelCenter.X, panelCenter.Y - 8f,
                 _countScale, TextDim);
         }
         else
@@ -1597,15 +1597,15 @@ public class UIRenderer : IDisposable
                     var server = view.Servers[i];
                     var rowTop = MainMenuLayout.RowTop(i, offset, screen);
                     if (i > 0)
-                        DrawRect(new Vector2(panelCentre.X, rowTop),
+                        DrawRect(new Vector2(panelCenter.X, rowTop),
                             new Vector2(MainMenuLayout.PanelWidth - 2f * MainMenuLayout.RowPad, 1.5f),
                             SlotBorderColor);
                     DrawText(FittedText(server.Name, _countScale, nameWidth),
                         new Vector2(nameLeft, rowTop + 8f), _countScale, Rgba.White);
                     DrawText(server.Address.ToString(), new Vector2(nameLeft, rowTop + 36f), _countScale, TextDim);
-                    DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 0, 2),
+                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 0, 2),
                         MainMenuLayout.RowButtonSize, "CONNECT");
-                    DrawSmallButton(MainMenuLayout.RowButtonCentre(screen, i, offset, 1, 2),
+                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 1, 2),
                         MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
                 }
             }
@@ -1617,15 +1617,15 @@ public class UIRenderer : IDisposable
 
         DrawNotice(view, screen);
 
-        DrawSmallButton(MainMenuLayout.TripleButtonCentre(screen, 0), MainMenuLayout.TripleButtonSize, "ADD SERVER");
-        DrawSmallButton(MainMenuLayout.TripleButtonCentre(screen, 1), MainMenuLayout.TripleButtonSize, "DIRECT CONNECT");
-        DrawSmallButton(MainMenuLayout.TripleButtonCentre(screen, 2), MainMenuLayout.TripleButtonSize, "BACK");
+        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 0), MainMenuLayout.TripleButtonSize, "ADD SERVER");
+        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 1), MainMenuLayout.TripleButtonSize, "DIRECT CONNECT");
+        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 2), MainMenuLayout.TripleButtonSize, "BACK");
     }
 
     private void DrawNotice(MainMenuView view, Vector2 screen)
     {
         if (!string.IsNullOrEmpty(view.Notice))
-            DrawTextCentred(FittedText(view.Notice, _countScale, MainMenuLayout.PanelWidth),
+            DrawTextCentered(FittedText(view.Notice, _countScale, MainMenuLayout.PanelWidth),
                 screen.X * 0.5f, MainMenuLayout.NoticeTop(screen), _countScale, AccentGold);
     }
 
@@ -1633,62 +1633,62 @@ public class UIRenderer : IDisposable
     // own line, DELETE / CANCEL.
     private void DrawConfirmDeleteServer(MainMenuView view, Vector2 screen)
     {
-        DrawRect(screen * 0.5f, screen, Rgba.Grey(0f, 0.62f));
+        DrawRect(screen * 0.5f, screen, Rgba.Gray(0f, 0.62f));
 
-        var centre = MainMenuLayout.ConfirmBoxCentre(screen);
+        var center = MainMenuLayout.ConfirmBoxCenter(screen);
         var size = MainMenuLayout.ConfirmBoxSize;
-        DrawRect(centre, size, CardBackground);
-        DrawBorder(centre, size, SlotBorder, SelectedBorderColor);
+        DrawRect(center, size, CardBackground);
+        DrawBorder(center, size, SlotBorder, SelectedBorderColor);
 
-        var top = centre.Y - size.Y * 0.5f;
-        DrawTextCentred("Delete this server?", centre.X, top + 32f, _headScale, Rgba.White);
+        var top = center.Y - size.Y * 0.5f;
+        DrawTextCentered("Delete this server?", center.X, top + 32f, _headScale, Rgba.White);
         if (view.SelectedServer is { } server)
-            DrawTextCentred(FittedText(server.Name, _countScale, size.X - 48f),
-                centre.X, top + 84f, _countScale, AccentGold);
+            DrawTextCentered(FittedText(server.Name, _countScale, size.X - 48f),
+                center.X, top + 84f, _countScale, AccentGold);
 
-        DrawSmallButton(MainMenuLayout.ConfirmYesCentre(screen), MainMenuLayout.ConfirmButtonSize,
+        DrawSmallButton(MainMenuLayout.ConfirmYesCenter(screen), MainMenuLayout.ConfirmButtonSize,
             "DELETE", DangerRed);
-        DrawSmallButton(MainMenuLayout.ConfirmNoCentre(screen), MainMenuLayout.ConfirmButtonSize, "CANCEL");
+        DrawSmallButton(MainMenuLayout.ConfirmNoCenter(screen), MainMenuLayout.ConfirmButtonSize, "CANCEL");
     }
 
     // The delete confirmation over the dimmed worlds page: question, the world's name on its own
     // line, DELETE / CANCEL.
     private void DrawConfirmDelete(MainMenuView view, Vector2 screen)
     {
-        DrawRect(screen * 0.5f, screen, Rgba.Grey(0f, 0.62f));
+        DrawRect(screen * 0.5f, screen, Rgba.Gray(0f, 0.62f));
 
-        var centre = MainMenuLayout.ConfirmBoxCentre(screen);
+        var center = MainMenuLayout.ConfirmBoxCenter(screen);
         var size = MainMenuLayout.ConfirmBoxSize;
         // CardBackground rather than the translucent SlotBackground, so the rows under the dim
         // do not show through the box.
-        DrawRect(centre, size, CardBackground);
-        DrawBorder(centre, size, SlotBorder, SelectedBorderColor);
+        DrawRect(center, size, CardBackground);
+        DrawBorder(center, size, SlotBorder, SelectedBorderColor);
 
-        var top = centre.Y - size.Y * 0.5f;
-        DrawTextCentred("Delete this world?", centre.X, top + 32f, _headScale, Rgba.White);
+        var top = center.Y - size.Y * 0.5f;
+        DrawTextCentered("Delete this world?", center.X, top + 32f, _headScale, Rgba.White);
         if (view.SelectedWorld is { } world)
-            DrawTextCentred(FittedText(world.Name, _countScale, size.X - 48f),
-                centre.X, top + 84f, _countScale, AccentGold);
+            DrawTextCentered(FittedText(world.Name, _countScale, size.X - 48f),
+                center.X, top + 84f, _countScale, AccentGold);
 
-        DrawSmallButton(MainMenuLayout.ConfirmYesCentre(screen), MainMenuLayout.ConfirmButtonSize,
+        DrawSmallButton(MainMenuLayout.ConfirmYesCenter(screen), MainMenuLayout.ConfirmButtonSize,
             "DELETE", DangerRed);
-        DrawSmallButton(MainMenuLayout.ConfirmNoCentre(screen), MainMenuLayout.ConfirmButtonSize, "CANCEL");
+        DrawSmallButton(MainMenuLayout.ConfirmNoCenter(screen), MainMenuLayout.ConfirmButtonSize, "CANCEL");
     }
 
-    private void DrawLabelledField(Vector2 centre, string label, TextFieldState field, bool focused,
+    private void DrawLabeledField(Vector2 center, string label, TextFieldState field, bool focused,
         string placeholder, float time)
     {
-        DrawText(label, new Vector2(centre.X - MainMenuLayout.FieldSize.X * 0.5f,
-            MainMenuLayout.FieldLabelTop(centre)), _countScale, TextDim);
-        DrawInputField(centre, MainMenuLayout.FieldSize, field, focused, placeholder, time);
+        DrawText(label, new Vector2(center.X - MainMenuLayout.FieldSize.X * 0.5f,
+            MainMenuLayout.FieldLabelTop(center)), _countScale, TextDim);
+        DrawInputField(center, MainMenuLayout.FieldSize, field, focused, placeholder, time);
     }
 
     /// <summary>A <see cref="DrawMenuButton"/> of any size, with an optional border color.</summary>
-    private void DrawSmallButton(Vector2 centre, Vector2 size, string label, Rgba? border = null)
+    private void DrawSmallButton(Vector2 center, Vector2 size, string label, Rgba? border = null)
     {
-        DrawRect(centre, size, SlotBackground);
-        DrawBorder(centre, size, SlotBorder, border ?? SelectedBorderColor);
-        DrawTextCentred(label, centre.X, centre.Y - 9f, _countScale, Rgba.White);
+        DrawRect(center, size, SlotBackground);
+        DrawBorder(center, size, SlotBorder, border ?? SelectedBorderColor);
+        DrawTextCentered(label, center.X, center.Y - 9f, _countScale, Rgba.White);
     }
 
     /// <summary>
@@ -1697,15 +1697,15 @@ public class UIRenderer : IDisposable
     /// Shared by the main menu and the inventory search field; callers size the text to the
     /// box's length cap.
     /// </summary>
-    public void DrawInputField(Vector2 centre, Vector2 size, TextFieldState field, bool focused,
+    public void DrawInputField(Vector2 center, Vector2 size, TextFieldState field, bool focused,
         string placeholder, float time, bool showTail = false)
     {
         const float pad = 12f;
-        DrawRect(centre, size, SlotBackground);
-        DrawBorder(centre, size, SlotBorder, focused ? SelectedBorderColor : SlotBorderColor);
+        DrawRect(center, size, SlotBackground);
+        DrawBorder(center, size, SlotBorder, focused ? SelectedBorderColor : SlotBorderColor);
 
-        var textLeft = centre.X - size.X * 0.5f + pad;
-        var textTop = centre.Y - 9f;
+        var textLeft = center.X - size.X * 0.5f + pad;
+        var textTop = center.Y - 9f;
         // A field whose cap exceeds what fits (the chat line) shows the tail being typed, so the
         // caret and the newest characters never leave the box; the short fields show it all.
         var shown = showTail ? TailThatFits(field.Text, _countScale, size.X - pad * 2f - 6f) : field.Text;
@@ -1717,7 +1717,7 @@ public class UIRenderer : IDisposable
         if (focused && ((int)(time * 2f)) % 2 == 0)
         {
             var caretX = textLeft + (field.IsEmpty ? 0f : TextWidth(shown, _countScale)) + 3f;
-            DrawRect(new Vector2(caretX, centre.Y), new Vector2(2f, 22f), Rgba.White);
+            DrawRect(new Vector2(caretX, center.Y), new Vector2(2f, 22f), Rgba.White);
         }
     }
 
@@ -1768,10 +1768,10 @@ public class UIRenderer : IDisposable
 
             var visible = _chatLines.Count;
             var bottom = ChatLayout.LogBottom(screen, view.IsOpen);
-            var blockCentre = new Vector2(ChatLayout.Left + ChatLayout.MaxWidth * 0.5f,
+            var blockCenter = new Vector2(ChatLayout.Left + ChatLayout.MaxWidth * 0.5f,
                 bottom - visible * ChatLayout.LineHeight * 0.5f);
-            DrawRect(blockCentre, new Vector2(ChatLayout.MaxWidth + 16f, visible * ChatLayout.LineHeight + 8f),
-                Rgba.Grey(0f, 0.35f));
+            DrawRect(blockCenter, new Vector2(ChatLayout.MaxWidth + 16f, visible * ChatLayout.LineHeight + 8f),
+                Rgba.Gray(0f, 0.35f));
 
             // _chatLines[0] is the newest line and sits at the bottom
             for (var i = 0; i < visible; i++)
@@ -1781,7 +1781,7 @@ public class UIRenderer : IDisposable
         }
 
         if (view.IsOpen)
-            DrawInputField(ChatLayout.InputCentre(screen), ChatLayout.InputSize, view.Input, true,
+            DrawInputField(ChatLayout.InputCenter(screen), ChatLayout.InputSize, view.Input, true,
                 "Say something...", time, showTail: true);
     }
 
@@ -1821,9 +1821,9 @@ public class UIRenderer : IDisposable
         {
             var barSize = LoadingScreenLayout.BarSize;
             if (!string.IsNullOrEmpty(view.WorldName))
-                DrawTextCentred(FittedText(view.WorldName, _headScale, barSize.X), screen.X * 0.5f,
+                DrawTextCentered(FittedText(view.WorldName, _headScale, barSize.X), screen.X * 0.5f,
                     LoadingScreenLayout.TitleTop(screen), _headScale, Rgba.White);
-            DrawTextCentred(view.Caption, screen.X * 0.5f, LoadingScreenLayout.CaptionTop(screen),
+            DrawTextCentered(view.Caption, screen.X * 0.5f, LoadingScreenLayout.CaptionTop(screen),
                 _countScale, TextDim);
 
             const int dots = WorldGenerationConfig.LoadingSpinnerDots;
@@ -1831,23 +1831,23 @@ public class UIRenderer : IDisposable
             for (var d = 0; d < dots; d++)
             {
                 var brightness = LoadingScreenLayout.DotBrightness(d, dots, phase);
-                DrawSquare(LoadingScreenLayout.DotCentre(screen, d, dots), LoadingScreenLayout.DotSize,
+                DrawSquare(LoadingScreenLayout.DotCenter(screen, d, dots), LoadingScreenLayout.DotSize,
                     Faded(AccentGold, brightness * fade));
             }
 
             if (view.Kind == LoadingScreenKind.Loading)
             {
-                var centre = LoadingScreenLayout.BarCentre(screen);
-                DrawRect(centre, barSize, Faded(SlotBackground, fade));
-                DrawBorder(centre, barSize, SlotBorder, Faded(SlotBorderColor, fade));
+                var center = LoadingScreenLayout.BarCenter(screen);
+                DrawRect(center, barSize, Faded(SlotBackground, fade));
+                DrawBorder(center, barSize, SlotBorder, Faded(SlotBorderColor, fade));
                 var progress = MathUtils.Clamp01(view.ShownProgress);
                 if (progress > 0f)
                 {
                     var fillW = barSize.X * progress;
-                    DrawRect(new Vector2(centre.X - barSize.X * 0.5f + fillW * 0.5f, centre.Y),
+                    DrawRect(new Vector2(center.X - barSize.X * 0.5f + fillW * 0.5f, center.Y),
                         new Vector2(fillW, barSize.Y), Faded(AccentGold, fade));
                 }
-                DrawTextCentred(PercentText(progress), screen.X * 0.5f,
+                DrawTextCentered(PercentText(progress), screen.X * 0.5f,
                     LoadingScreenLayout.PercentTop(screen), _countScale, Rgba.White);
             }
         }
@@ -1923,37 +1923,37 @@ public class UIRenderer : IDisposable
         bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null, float? durability = null,
         float countInset = 0f)
     {
-        var centreY = InventoryPanelLayout.RowCentreY(row, offset, _screenSize);
-        var centre = new Vector2(PanelLeft + PanelWidth * 0.5f, centreY);
-        DrawRect(centre, new Vector2(PanelWidth - PanelPad * 2f, RowHeight - 4f),
+        var centerY = InventoryPanelLayout.RowCenterY(row, offset, _screenSize);
+        var center = new Vector2(PanelLeft + PanelWidth * 0.5f, centerY);
+        DrawRect(center, new Vector2(PanelWidth - PanelPad * 2f, RowHeight - 4f),
             selected ? RowSelected : SlotBackground);
 
         var barColor = accent ?? (selected ? SelectedBorderColor : SlotBorderColor);
-        DrawRect(new Vector2(PanelLeft + PanelPad + 2f, centreY),
+        DrawRect(new Vector2(PanelLeft + PanelPad + 2f, centerY),
             new Vector2(4f, RowHeight - 4f), dim ? TextDim : barColor);
 
-        var iconCentre = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 8f, centreY);
+        var iconCenter = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 8f, centerY);
         if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
-            DrawItemSprite(iconCentre, new Vector2(RowIcon), id, icon, headingDegrees, timeSeconds);
+            DrawItemSprite(iconCenter, new Vector2(RowIcon), id, icon, headingDegrees, timeSeconds);
         else
-            DrawBlockIcon(iconCentre, RowIcon, id);
+            DrawBlockIcon(iconCenter, RowIcon, id);
 
-        DrawText(FitText(name, _countScale, RowNameAvail(count, countInset)), new Vector2(iconCentre.X + RowIcon * 0.5f + 8f, centreY - 9f),
+        DrawText(FitText(name, _countScale, RowNameAvail(count, countInset)), new Vector2(iconCenter.X + RowIcon * 0.5f + 8f, centerY - 9f),
             _countScale, dim && !selected ? TextDim : Rgba.White);
 
         if (_font != null)
         {
             var size = _font.MeasureSize(count.AsSpan(), _countScale);
             DrawText(count,
-                new Vector2(PanelLeft + PanelWidth - PanelPad - 8f - countInset - size.X, centreY - 9f),
+                new Vector2(PanelLeft + PanelWidth - PanelPad - 8f - countInset - size.X, centerY - 9f),
                 _countScale, dim && !selected ? TextDim : Rgba.White);
         }
 
         if (durability != null)
         {
-            var barLeft = iconCentre.X + RowIcon * 0.5f + 8f;
+            var barLeft = iconCenter.X + RowIcon * 0.5f + 8f;
             const float barWidth = 140f;
-            DrawDurabilityBar(new Vector2(barLeft + barWidth * 0.5f, centreY + 11f),
+            DrawDurabilityBar(new Vector2(barLeft + barWidth * 0.5f, centerY + 11f),
                 barWidth, durability.Value);
         }
     }
@@ -1975,7 +1975,7 @@ public class UIRenderer : IDisposable
             headingDegrees, timeSeconds, null, null, InventoryPanelLayout.CatalogButtonGroupWidth + 12f);
         for (var which = 0; which < InventoryPanelLayout.CatalogButtonCount; which++)
         {
-            var centre = InventoryPanelLayout.CatalogButtonCentre(row, offset, _screenSize, rowCount, which);
+            var center = InventoryPanelLayout.CatalogButtonCenter(row, offset, _screenSize, rowCount, which);
             var label = (InventoryPanelLayout.CatalogButton)which switch
             {
                 InventoryPanelLayout.CatalogButton.AddOne => "+1",
@@ -1984,19 +1984,19 @@ public class UIRenderer : IDisposable
                 _ => "X",
             };
             var danger = (InventoryPanelLayout.CatalogButton)which == InventoryPanelLayout.CatalogButton.Clear;
-            DrawCatalogButton(centre, label, danger);
+            DrawCatalogButton(center, label, danger);
         }
     }
 
-    private void DrawCatalogButton(Vector2 centre, string label, bool danger)
+    private void DrawCatalogButton(Vector2 center, string label, bool danger)
     {
         var size = new Vector2(InventoryPanelLayout.CatalogButtonWidth, InventoryPanelLayout.CatalogButtonHeight);
-        DrawRect(centre, size, ChipBackground);
-        DrawBorder(centre, size, SlotBorder, danger ? DangerRed : AccentGold);
+        DrawRect(center, size, ChipBackground);
+        DrawBorder(center, size, SlotBorder, danger ? DangerRed : AccentGold);
         if (_font == null) return;
 
         // Cap-sized, then shrunk to fit the button's inner width so "+100" never spills into
-        // its neighbor; the measured ink size centres the label on both axes.
+        // its neighbor; the measured ink size centers the label on both axes.
         var scale = _font.ScaleForCapHeight(CatalogButtonCapHeight);
         var maxWidth = InventoryPanelLayout.CatalogButtonWidth - 8f;
         var width = _font.MeasureSize(label.AsSpan(), scale).X;
@@ -2004,7 +2004,7 @@ public class UIRenderer : IDisposable
             scale *= maxWidth / width;
         var textSize = _font.MeasureSize(label.AsSpan(), scale);
         DrawText(label,
-            new Vector2(centre.X - textSize.X * 0.5f, centre.Y - textSize.Y * 0.5f),
+            new Vector2(center.X - textSize.X * 0.5f, center.Y - textSize.Y * 0.5f),
             scale, danger ? DangerRed : Rgba.White);
     }
 
@@ -2039,24 +2039,24 @@ public class UIRenderer : IDisposable
         }
         if (id == 0) return;
 
-        var centre = new Vector2(_screenSize.X - PreviewRight, _screenSize.Y * 0.38f);
+        var center = new Vector2(_screenSize.X - PreviewRight, _screenSize.Y * 0.38f);
         var cardSize = new Vector2(PreviewSize + 40f, PreviewSize + 96f);
-        DrawRect(centre, cardSize, PanelBackground);
-        DrawBorder(centre, cardSize, SlotBorder, SlotBorderColor);
-        DrawRect(new Vector2(centre.X, centre.Y - cardSize.Y * 0.5f + 3f),
+        DrawRect(center, cardSize, PanelBackground);
+        DrawBorder(center, cardSize, SlotBorder, SlotBorderColor);
+        DrawRect(new Vector2(center.X, center.Y - cardSize.Y * 0.5f + 3f),
             new Vector2(cardSize.X - 4f, 2f), AccentGold);
 
         var spin = time * 0.9f;
         if (ItemRegistry.IsItem(id))
-            DrawItemIcon(centre with { Y = centre.Y - 12f }, PreviewSize * 0.7f, id, spin);
+            DrawItemIcon(center with { Y = center.Y - 12f }, PreviewSize * 0.7f, id, spin);
         else
-            DrawBlockIconSpinning(centre with { Y = centre.Y - 12f }, PreviewSize * 0.7f, id, spin);
+            DrawBlockIconSpinning(center with { Y = center.Y - 12f }, PreviewSize * 0.7f, id, spin);
 
-        DrawTextCentredFitted(name, centre.X, centre.Y + PreviewSize * 0.5f + 12f, _headScale, Rgba.White,
+        DrawTextCenteredFitted(name, center.X, center.Y + PreviewSize * 0.5f + 12f, _headScale, Rgba.White,
             cardSize.X - 16f);
-        DrawTextCentred(stock, centre.X, centre.Y + PreviewSize * 0.5f + 40f, _countScale, TextDim);
-        DrawTextCentred("Click a hotbar slot to equip", centre.X,
-            centre.Y + PreviewSize * 0.5f + 58f, _countScale, TextDim);
+        DrawTextCentered(stock, center.X, center.Y + PreviewSize * 0.5f + 40f, _countScale, TextDim);
+        DrawTextCentered("Click a hotbar slot to equip", center.X,
+            center.Y + PreviewSize * 0.5f + 58f, _countScale, TextDim);
     }
 
     /// <summary>
@@ -2095,19 +2095,19 @@ public class UIRenderer : IDisposable
     /// <summary>Clamps a crafting card scroll offset against the last drawn layout (0 without one).</summary>
     public float ClampCraftScroll(float offset) => _craftLayouts.Current?.ClampScroll(offset) ?? 0f;
 
-    private void DrawBoxButton(Vector2 centre, float size, string label, Rgba bg, Rgba border, Rgba text)
+    private void DrawBoxButton(Vector2 center, float size, string label, Rgba bg, Rgba border, Rgba text)
     {
-        DrawRect(centre, new Vector2(size), bg);
-        DrawBorder(centre, new Vector2(size), 1.5f, border);
-        DrawTextCentred(label, centre.X, centre.Y - 8f, _countScale, text);
+        DrawRect(center, new Vector2(size), bg);
+        DrawBorder(center, new Vector2(size), 1.5f, border);
+        DrawTextCentered(label, center.X, center.Y - 8f, _countScale, text);
     }
 
-    private void DrawIdIcon(Vector2 centre, float size, byte id, float headingDegrees, float timeSeconds)
+    private void DrawIdIcon(Vector2 center, float size, byte id, float headingDegrees, float timeSeconds)
     {
         if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
-            DrawItemSprite(centre, new Vector2(size), id, icon, headingDegrees, timeSeconds);
+            DrawItemSprite(center, new Vector2(size), id, icon, headingDegrees, timeSeconds);
         else
-            DrawBlockIcon(centre, size, id);
+            DrawBlockIcon(center, size, id);
     }
 
     private void DrawCraftDetail(Inventory inventory, InventoryView view, float time, float headingDegrees)
@@ -2117,25 +2117,25 @@ public class UIRenderer : IDisposable
         if (layout == null)
         {
             var width = CraftCardLayout.WidthFor(_screenSize);
-            var centre = new Vector2(CraftCardLayout.LeftFor(_screenSize) + width * 0.5f,
+            var center = new Vector2(CraftCardLayout.LeftFor(_screenSize) + width * 0.5f,
                 top + CraftCardLayout.EmptyHeight * 0.5f);
             var size = new Vector2(width, CraftCardLayout.EmptyHeight);
-            DrawRect(centre, size, PanelBackground);
-            DrawBorder(centre, size, SlotBorder, SlotBorderColor);
-            DrawRect(new Vector2(centre.X, top + 3f), new Vector2(width - 4f, 2f), AccentGold);
+            DrawRect(center, size, PanelBackground);
+            DrawBorder(center, size, SlotBorder, SlotBorderColor);
+            DrawRect(new Vector2(center.X, top + 3f), new Vector2(width - 4f, 2f), AccentGold);
             var avail = CraftCardLayout.InnerWidthFor(_screenSize) - 8f;
-            DrawTextCentredFitted("Crafting", centre.X, top + CraftCardLayout.Pad, _headScale, Rgba.White, avail);
-            DrawTextCentredFitted("Pick a recipe on the left", centre.X,
+            DrawTextCenteredFitted("Crafting", center.X, top + CraftCardLayout.Pad, _headScale, Rgba.White, avail);
+            DrawTextCenteredFitted("Pick a recipe on the left", center.X,
                 top + CraftCardLayout.Pad + 34f, _countScale, TextDim, avail);
-            DrawTextCentredFitted("then feed it items and hit CRAFT", centre.X,
+            DrawTextCenteredFitted("then feed it items and hit CRAFT", center.X,
                 top + CraftCardLayout.Pad + 54f, _countScale, TextDim, avail);
             return;
         }
 
         var scroll = layout.ClampScroll(view.CraftScrollOffset);
-        DrawRect(layout.CardCentre, layout.CardSize, PanelBackground);
-        DrawBorder(layout.CardCentre, layout.CardSize, SlotBorder, SlotBorderColor);
-        DrawRect(new Vector2(layout.CardCentre.X, top + 3f), new Vector2(layout.Width - 4f, 2f), AccentGold);
+        DrawRect(layout.CardCenter, layout.CardSize, PanelBackground);
+        DrawBorder(layout.CardCenter, layout.CardSize, SlotBorder, SlotBorderColor);
+        DrawRect(new Vector2(layout.CardCenter.X, top + 3f), new Vector2(layout.Width - 4f, 2f), AccentGold);
 
         if (layout.Overflows)
         {
@@ -2160,9 +2160,9 @@ public class UIRenderer : IDisposable
         if (layout.Overflows)
         {
             var track = layout.TrackRect();
-            DrawRect(track.Centre, track.Size, SlotBackground);
+            DrawRect(track.Center, track.Size, SlotBackground);
             var thumb = layout.ThumbRect(scroll);
-            DrawRect(thumb.Centre, thumb.Size, SlotBorderColor);
+            DrawRect(thumb.Center, thumb.Size, SlotBorderColor);
         }
     }
 
@@ -2175,15 +2175,15 @@ public class UIRenderer : IDisposable
         var session = view.Craft;
         var recipe = layout.Recipe;
         var ready = session.IsReady(inventory);
-        var cardCentreX = layout.CardCentre.X;
+        var cardCenterX = layout.CardCenter.X;
         var innerWidth = layout.InnerWidth;
 
-        var iconCentre = layout.IconCentre(scroll);
+        var iconCenter = layout.IconCenter(scroll);
         var spin = time * 0.9f;
         if (ItemRegistry.IsItem(recipe.ResultId))
-            DrawItemIcon(iconCentre, 56f, recipe.ResultId, spin);
+            DrawItemIcon(iconCenter, 56f, recipe.ResultId, spin);
         else
-            DrawBlockIconSpinning(iconCentre, 60f, recipe.ResultId, spin);
+            DrawBlockIconSpinning(iconCenter, 60f, recipe.ResultId, spin);
 
         var textX = layout.TextX;
         var titleY = layout.ContentY(layout.TitleY, scroll);
@@ -2197,10 +2197,10 @@ public class UIRenderer : IDisposable
 
         var batchTextY = layout.ContentY(layout.BatchTextY, scroll);
         DrawText("Batch", new Vector2(textX, batchTextY), _countScale, TextDim);
-        var batchMinus = layout.BatchMinusCentre(scroll);
-        var batchPlus = layout.BatchPlusCentre(scroll);
+        var batchMinus = layout.BatchMinusCenter(scroll);
+        var batchPlus = layout.BatchPlusCenter(scroll);
         DrawBoxButton(batchMinus, CraftCardLayout.StepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
-        DrawTextCentred(session.Batch.ToString(), layout.BatchCountCentre(scroll).X,
+        DrawTextCentered(session.Batch.ToString(), layout.BatchCountCenter(scroll).X,
             batchMinus.Y - 8f, _countScale, Rgba.White);
         DrawBoxButton(batchPlus, CraftCardLayout.StepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
         var maxBatch = session.MaxAffordable(inventory);
@@ -2211,14 +2211,14 @@ public class UIRenderer : IDisposable
             _countScale, maxBatch >= session.Batch ? ReadyGreen : DangerRed);
 
         var separatorY = layout.ContentY(pad + layout.HeaderHeight + CraftCardLayout.HeaderGap - 5f, scroll);
-        DrawRect(new Vector2(cardCentreX, separatorY), new Vector2(innerWidth, 1.5f), SlotBorderColor);
+        DrawRect(new Vector2(cardCenterX, separatorY), new Vector2(innerWidth, 1.5f), SlotBorderColor);
 
         var ingLeft = layout.Left + pad + ingPad;
         for (var i = 0; i < recipe.Ingredients.Length; i++)
         {
             var ing = layout.Ingredients[i];
             var cardTop = layout.ContentY(ing.Top, scroll);
-            DrawRect(new Vector2(cardCentreX, cardTop + ing.Height * 0.5f),
+            DrawRect(new Vector2(cardCenterX, cardTop + ing.Height * 0.5f),
                 new Vector2(innerWidth, ing.Height), CardBackground);
 
             var need = session.NeedAt(i);
@@ -2244,10 +2244,10 @@ public class UIRenderer : IDisposable
             if (fed.MemberId != 0)
                 DrawIdIcon(new Vector2(fedCx, fedCy), 30f, fed.MemberId, headingDegrees, time);
             else
-                DrawTextCentred("?", fedCx, fedCy - 8f, _countScale, TextDim);
+                DrawTextCentered("?", fedCx, fedCy - 8f, _countScale, TextDim);
 
-            var minus = layout.IngMinusCentre(i, scroll);
-            var plus = layout.IngPlusCentre(i, scroll);
+            var minus = layout.IngMinusCenter(i, scroll);
+            var plus = layout.IngPlusCenter(i, scroll);
             var fedText = $"{fed.Count} / {need} fed";
             var fedAvail = minus.X - CraftCardLayout.IngStepBox * 0.5f - (fedCx + 24f) - 8f;
             DrawText(FitText(fedText, _countScale, Math.Max(20f, fedAvail)),
@@ -2261,7 +2261,7 @@ public class UIRenderer : IDisposable
             const float chipSize = CraftCardLayout.ChipSize;
             for (var c = 0; c < ing.MemberCount; c++)
             {
-                var chipC = layout.ChipCentre(i, c, scroll);
+                var chipC = layout.ChipCenter(i, c, scroll);
                 var owned = inventory.CountFor(members[c]);
                 var isPicked = picked != 0 && picked == members[c];
                 DrawRect(chipC, new Vector2(chipSize), owned > 0 ? ChipBackground : SlotBackground);
@@ -2283,15 +2283,15 @@ public class UIRenderer : IDisposable
         var statusY = layout.ContentY(layout.StatusY, scroll);
         var statusColor = ready ? ReadyGreen : AccentGold;
         for (var k = 0; k < layout.StatusLines.Length; k++)
-            DrawTextCentred(layout.StatusLines[k], cardCentreX, statusY + k * CraftCardLayout.StatusLineH,
+            DrawTextCentered(layout.StatusLines[k], cardCenterX, statusY + k * CraftCardLayout.StatusLineH,
                 _countScale, statusColor);
 
-        var buttonC = layout.ButtonCentre(scroll);
+        var buttonC = layout.ButtonCenter(scroll);
         var buttonS = layout.ButtonSize;
         var total = recipe.ResultCount * session.Batch;
         DrawRect(buttonC, buttonS, ready ? ButtonReady : ButtonDisabled);
         DrawBorder(buttonC, buttonS, 2f, ready ? Rgba.White : SlotBorderColor);
-        DrawTextCentred(session.Batch > 1 ? $"CRAFT  x{total}" : "CRAFT",
+        DrawTextCentered(session.Batch > 1 ? $"CRAFT  x{total}" : "CRAFT",
             buttonC.X, buttonC.Y - 9f, _headScale,
             ready ? ButtonTextReady : ButtonTextDisabled);
     }
@@ -2301,17 +2301,17 @@ public class UIRenderer : IDisposable
     /// texture for a plain one. Falls back to the whole texture when the frame meshes are
     /// missing, so an icon never vanishes over a cache mismatch.
     /// </summary>
-    private void DrawItemSprite(Vector2 centre, Vector2 size, byte id, uint texture,
+    private void DrawItemSprite(Vector2 center, Vector2 size, byte id, uint texture,
         float headingDegrees, float timeSeconds)
     {
         if (_itemFrames.TryGetValue(id, out var frames)
             && ItemRegistry.TryGet(id) is { } type)
         {
             var frame = Math.Clamp(type.FrameAt(timeSeconds, headingDegrees), 0, frames.Length - 1);
-            DrawMesh(frames[frame], RectTransform(centre, size), Rgba.White, texture);
+            DrawMesh(frames[frame], RectTransform(center, size), Rgba.White, texture);
             return;
         }
-        DrawTexture(centre, size, texture);
+        DrawTexture(center, size, texture);
     }
 
     /// <summary>
@@ -2320,18 +2320,18 @@ public class UIRenderer : IDisposable
     /// inventory rows show; the item debugger uses it for its grid so icons read as sprites.
     /// Air, blocks and unknown ids draw nothing.
     /// </summary>
-    public void DrawItemSprite(Vector2 centre, float pixels, byte itemId, float headingDegrees,
+    public void DrawItemSprite(Vector2 center, float pixels, byte itemId, float headingDegrees,
         float timeSeconds)
     {
         if (!ItemRegistry.IsItem(itemId) || !_itemIcons.TryGetValue(itemId, out var texture)) return;
-        DrawItemSprite(centre, new Vector2(pixels), itemId, texture, headingDegrees, timeSeconds);
+        DrawItemSprite(center, new Vector2(pixels), itemId, texture, headingDegrees, timeSeconds);
     }
 
     /// <summary>
     /// A pure item as its extruded world-drop sprite, yawed like the block icons. Only the
     /// preview uses this; rows and hotbar draw the flat sprite.
     /// </summary>
-    public void DrawItemIcon(Vector2 centre, float size, byte itemId, float yaw)
+    public void DrawItemIcon(Vector2 center, float size, byte itemId, float yaw)
     {
         if (!_itemMeshes.TryGet(itemId, out var mesh, out var texture)) return;
 
@@ -2341,7 +2341,7 @@ public class UIRenderer : IDisposable
         var rotation = Matrix4x4.CreateRotationY(yaw) * Matrix4x4.CreateRotationX(IconPitch);
         var model = Matrix4x4.CreateScale(size)
                     * rotation
-                    * FlipToScreen(centre);
+                    * FlipToScreen(center);
 
         // Cut out the sprite's transparent texels so they write neither color nor depth:
         // without this the front face's invisible pixels depth-swallow the extrusion walls
@@ -2355,7 +2355,7 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>A block cube yawed by <paramref name="yaw"/> instead of the fixed icon angle.</summary>
-    public void DrawBlockIconSpinning(Vector2 centre, float size, byte blockId, float yaw)
+    public void DrawBlockIconSpinning(Vector2 center, float size, byte blockId, float yaw)
     {
         var mesh = _blockCubes.Get(blockId);
         if (mesh == null) return;
@@ -2366,7 +2366,7 @@ public class UIRenderer : IDisposable
         var rotation = Matrix4x4.CreateRotationY(yaw) * Matrix4x4.CreateRotationX(IconPitch);
         var model = Matrix4x4.CreateScale(size / IconExtent)
                     * rotation
-                    * FlipToScreen(centre);
+                    * FlipToScreen(center);
 
         // Same cutout discard as DrawBlockIcon: the spinning preview would otherwise
         // rasterize the sprite's transparent texels (and their depth) as black.
@@ -2383,11 +2383,11 @@ public class UIRenderer : IDisposable
         _gl.Disable(EnableCap.DepthTest);
     }
 
-    private void DrawTextCentred(string text, float centreX, float topY, float scale, Rgba color)
+    private void DrawTextCentered(string text, float centerX, float topY, float scale, Rgba color)
     {
         if (_font == null || string.IsNullOrEmpty(text)) return;
         var width = _font.MeasureSize(text.AsSpan(), scale).X;
-        DrawText(text, new Vector2(centreX - width * 0.5f, topY), scale, color);
+        DrawText(text, new Vector2(centerX - width * 0.5f, topY), scale, color);
     }
 
     private float TextWidth(string text, float scale) =>
@@ -2419,12 +2419,12 @@ public class UIRenderer : IDisposable
         return Math.Max(scale * 0.7f, scale * maxWidth / w);
     }
 
-    private void DrawTextCentredFitted(string text, float centreX, float topY, float scale,
+    private void DrawTextCenteredFitted(string text, float centerX, float topY, float scale,
         Rgba color, float maxWidth)
     {
         if (_font == null || string.IsNullOrEmpty(text)) return;
         var s = FitScale(text, scale, maxWidth);
-        DrawTextCentred(FitText(text, s, maxWidth), centreX, topY, s, color);
+        DrawTextCentered(FitText(text, s, maxWidth), centerX, topY, s, color);
     }
 
     private float RowNameAvail(string count, float countInset)
@@ -2459,9 +2459,9 @@ public class UIRenderer : IDisposable
 
     // Scales the unit square to pixel size and moves it into place. The negative Y scale is the
     // flip from the shape's Y-up space into this renderer's Y-down screen space.
-    private static Matrix4x4 RectTransform(Vector2 centre, Vector2 size) =>
+    private static Matrix4x4 RectTransform(Vector2 center, Vector2 size) =>
         Matrix4x4.CreateScale(size.X, -size.Y, 1f)
-        * Matrix4x4.CreateTranslation(centre.X, centre.Y, 0f);
+        * Matrix4x4.CreateTranslation(center.X, center.Y, 0f);
 
     /// <summary>
     /// Screen-space span of a rotated unit cube, taken as the larger of its width and height.
@@ -2474,9 +2474,9 @@ public class UIRenderer : IDisposable
         return MathF.Max(width, height);
     }
 
-    private static Matrix4x4 FlipToScreen(Vector2 centre) =>
+    private static Matrix4x4 FlipToScreen(Vector2 center) =>
         Matrix4x4.CreateScale(1f, -1f, 1f)
-        * Matrix4x4.CreateTranslation(centre.X, centre.Y, 0f);
+        * Matrix4x4.CreateTranslation(center.X, center.Y, 0f);
 
     public void Dispose()
     {

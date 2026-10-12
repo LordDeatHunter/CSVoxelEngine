@@ -30,7 +30,7 @@ public sealed class SlimeManager : IMobPopulation
     private readonly List<byte> _loot = [];
     // Reused by MergeTouching so a frame with merges allocates nothing once warm
     private readonly HashSet<Slime> _mergeUsed = [];
-    private readonly List<(Slime A, Slime B, Vector3 Centre, int Size)> _merges = [];
+    private readonly List<(Slime A, Slime B, Vector3 Center, int Size)> _merges = [];
     // The camera overload's one-element target list, reused so it allocates nothing per frame.
     private readonly List<IMobTarget> _singleTarget = new(1);
     private float _spawnTimer;
@@ -90,7 +90,7 @@ public sealed class SlimeManager : IMobPopulation
     public int DamageDealtThisFrame { get; private set; }
 
     /// <summary>
-    /// Adds a slime at an exact body-centre position: a forced spawn (scenarios, save restores, a
+    /// Adds a slime at an exact body-center position: a forced spawn (scenarios, save restores, a
     /// client's mirror, tests), which may go past the natural cap but never the hard cap. Null, and
     /// nothing added, once the hard cap is full. The ring spawner adds through here too, after its
     /// own natural-cap check. <paramref name="size"/> is clamped into the slime sizes.
@@ -220,20 +220,20 @@ public sealed class SlimeManager : IMobPopulation
                 var b = _slimes[j];
                 if (_mergeUsed.Contains(b) || !SlimeMerge.CanMerge(a, b)) continue;
                 var size = SlimeMerge.MergedSize(a.Size);
-                var centre = SlimeMerge.MergedCentre(a, b, size);
-                if (Slime.IsColliding(centre, Slime.HalfExtentFor(size), chunks)) continue;
+                var center = SlimeMerge.MergedCenter(a, b, size);
+                if (Slime.IsColliding(center, Slime.HalfExtentFor(size), chunks)) continue;
                 _mergeUsed.Add(a);
                 _mergeUsed.Add(b);
-                _merges.Add((a, b, centre, size));
+                _merges.Add((a, b, center, size));
                 break;
             }
         }
 
-        foreach (var (a, b, centre, size) in _merges)
+        foreach (var (a, b, center, size) in _merges)
         {
             _slimes.Remove(a);
             _slimes.Remove(b);
-            Spawn(centre, size)?.RestoreState(
+            Spawn(center, size)?.RestoreState(
                 SlimeMerge.MergedHealth(a.Health, a.MaxHealth, b.Health, b.MaxHealth, SlimeSize.Health(_type.MaxHealth, size)),
                 a.Facing, (a.Velocity + b.Velocity) * 0.5f);
         }
@@ -249,7 +249,7 @@ public sealed class SlimeManager : IMobPopulation
 
         var childSize = SlimeSize.ChildSize(parent.Size);
         var childHalf = Slime.HalfExtentFor(childSize);
-        // How far a child's centre may sit from the parent's while its body stays inside the
+        // How far a child's center may sit from the parent's while its body stays inside the
         // parent's, kept a hair inside on every side so float rounding never pushes a child's face
         // into the floor or a wall the parent was resting flush against
         var reach = MathF.Max(0f, parent.BodyHalfExtent - childHalf - SplitInset);
@@ -259,9 +259,9 @@ public sealed class SlimeManager : IMobPopulation
         {
             var angle = start + k * MathF.Tau / count;
             var spoke = new Vector3(MathF.Cos(angle), 0f, MathF.Sin(angle));
-            var centre = new Vector3(parent.Position.X + spoke.X * reach, feetY + childHalf,
+            var center = new Vector3(parent.Position.X + spoke.X * reach, feetY + childHalf,
                 parent.Position.Z + spoke.Z * reach);
-            Spawn(centre, childSize)?.Pop(spoke, WorldGenerationConfig.SlimeSplitShoveSpeed,
+            Spawn(center, childSize)?.Pop(spoke, WorldGenerationConfig.SlimeSplitShoveSpeed,
                 WorldGenerationConfig.SlimeSplitLift);
         }
     }
@@ -313,7 +313,7 @@ public sealed class SlimeManager : IMobPopulation
     /// from <see cref="SlimeSize.Roll"/> with <paramref name="night"/>, whether the ground cell is
     /// below its column's surface (<see cref="SlimeSize.IsUnderground"/>) and
     /// <paramref name="sizeRoll"/> (uniform in [0, 1)), and <paramref name="position"/> is that
-    /// size's body centre resting on the found ground cell. The ring only cleared the two cells above
+    /// size's body center resting on the found ground cell. The ring only cleared the two cells above
     /// one ground cell, so a larger body that would overlap a solid cell beside them steps down a
     /// size at a time until it fits; the smallest body sits inside that column and always does.
     /// </summary>

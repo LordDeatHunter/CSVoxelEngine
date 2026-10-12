@@ -10,7 +10,7 @@ namespace VoxelEngine.Networking;
 /// non-finite or far-out eye, an aim that is not (close to) a unit vector, a face normal component
 /// outside -1..1 or a non-finite charge is a malformed frame (<see cref="InvalidDataException"/>),
 /// which the server answers by dropping the sender; a short frame throws
-/// <see cref="EndOfStreamException"/> the same way. The aim is renormalised and the charge clamped
+/// <see cref="EndOfStreamException"/> the same way. The aim is renormalized and the charge clamped
 /// to 0..1. Values that merely fail a rule (a cell out of reach, a refused tool) parse fine and are
 /// refused by the server instead. GL-free and content-free.
 /// </summary>

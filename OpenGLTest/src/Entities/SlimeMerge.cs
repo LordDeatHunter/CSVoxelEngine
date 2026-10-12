@@ -44,10 +44,10 @@ public static class SlimeMerge
         return Math.Clamp((int)MathF.Round(share * mergedMax), 1, Math.Max(1, mergedMax));
     }
 
-    /// <summary>Where the merged slime's body centre goes: midway between the two horizontally,
+    /// <summary>Where the merged slime's body center goes: midway between the two horizontally,
     /// resting a hair above the lower of their two feet (so float rounding never sinks it into the
     /// floor they stood on).</summary>
-    public static Vector3 MergedCentre(Slime a, Slime b, int mergedSize)
+    public static Vector3 MergedCenter(Slime a, Slime b, int mergedSize)
     {
         var feet = MathF.Min(a.Position.Y - a.BodyHalfHeight, b.Position.Y - b.BodyHalfHeight) + 0.01f;
         return new Vector3((a.Position.X + b.Position.X) * 0.5f, feet + Slime.HalfExtentFor(mergedSize),

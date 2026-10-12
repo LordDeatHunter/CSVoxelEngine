@@ -93,7 +93,7 @@ public sealed class WorldIntentRuleTests
     }
 
     [Fact]
-    public void TheAimIsRenormalisedAndTheChargeClamped()
+    public void TheAimIsRenormalizedAndTheChargeClamped()
     {
         var back = RoundTrip(1, WorldIntent.Throw(Eye, new Vector3(0f, 0f, -1.3f), 7f), out _);
         Assert.Equal(1f, back.Direction.Length(), precision: 5);

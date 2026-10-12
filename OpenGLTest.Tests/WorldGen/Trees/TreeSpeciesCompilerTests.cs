@@ -245,7 +245,7 @@ public sealed class TreeSpeciesCompilerTests
         Rejects(d => d.Features = [new() { Type = "roots", Depth = 0 }]);
         Rejects(d => d.Features = [new() { Type = "roots" }]);
         Rejects(d => d.Features = [new() { Type = "buttress", Depth = 2 }]);
-        // Root-level fins are recognised by height, so a buttress species may not branch at the root.
+        // Root-level fins are recognized by height, so a buttress species may not branch at the root.
         Rejects(d => { d.Growth!.LowestBranchHeight = 0; d.Features = [new() { Type = "buttress" }]; });
         Rejects(d => d.Features = [new() { Type = "roots", Depth = 2 }, new() { Type = "roots", Depth = 3 }]);
 

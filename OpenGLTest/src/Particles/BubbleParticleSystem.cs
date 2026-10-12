@@ -43,7 +43,7 @@ public sealed class BubbleParticleSystem
         var rng = random ?? Random.Shared;
         var forward = facing.NormalizeSafeOr(-Vector3.UnitZ);
         // Out of the mouth: in front of the eye and a touch below it
-        var centre = head + forward * WorldGenerationConfig.SwimStrokeBubbleForward - Vector3.UnitY * 0.1f;
+        var center = head + forward * WorldGenerationConfig.SwimStrokeBubbleForward - Vector3.UnitY * 0.1f;
         var spread = WorldGenerationConfig.SwimStrokeBubbleSpread;
         for (var i = 0; i < WorldGenerationConfig.SwimStrokeBubbleCount; i++)
         {
@@ -51,7 +51,7 @@ public sealed class BubbleParticleSystem
                 (rng.NextSingle() * 2f - 1f) * spread,
                 (rng.NextSingle() * 2f - 1f) * spread * 0.6f,
                 (rng.NextSingle() * 2f - 1f) * spread);
-            Add(new BubbleParticle(centre + jitter, rng));
+            Add(new BubbleParticle(center + jitter, rng));
         }
         return WorldGenerationConfig.SwimStrokeBubbleCount;
     }

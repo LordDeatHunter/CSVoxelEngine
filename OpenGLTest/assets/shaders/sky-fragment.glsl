@@ -139,7 +139,7 @@ vec3 Stars(vec3 d, float px)
     uvec2 cell = uvec2(cellF);
     uint h = StarCellHash(face, cell);
 
-    // StarField.RelativeSolidAngle at the cell centre
+    // StarField.RelativeSolidAngle at the cell center
     vec2 uc = tan(((cellF + 0.5) / uStarCells * 2.0 - 1.0) * QuarterPi);
     vec2 uc2 = uc * uc;
     float weight = (1.0 + uc2.x) * (1.0 + uc2.y) / pow(1.0 + uc2.x + uc2.y, 1.5);

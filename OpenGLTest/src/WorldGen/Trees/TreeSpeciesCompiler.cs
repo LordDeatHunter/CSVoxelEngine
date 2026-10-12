@@ -136,7 +136,7 @@ internal static class TreeSpeciesCompiler
                     throw Fail(path, $"features[{i}] 'roots' needs a depth of at least 1, got {depth}.");
                 if (feature.Name == "buttress" && depth != 0)
                     throw Fail(path, $"features[{i}] 'buttress' takes no depth (0), got {depth}.");
-                // Reactive growth recognises root-level fins by height alone (TreeGraph.FromWorld),
+                // Reactive growth recognizes root-level fins by height alone (TreeGraph.FromWorld),
                 // which is only exact while growth never branches off the trunk at the root's level.
                 if (feature.Name == "buttress" && lowestBranch < 1)
                     throw Fail(path, $"features[{i}] 'buttress' needs growth.lowestBranchHeight of at least 1 "

@@ -7,19 +7,19 @@ namespace VoxelEngine.Rendering;
 /// <summary>
 /// One directional shadow cascade: an orthographic box of half-extent <see cref="RadiusBlocks"/>
 /// looking down the sun direction, its depth-only FBO and <c>sampler2DShadow</c> texture, and the
-/// box centre it carries forward frame to frame through <see cref="StepCentre"/>. Each cascade owns
-/// its own centre, so two cascades can never share (or corrupt) one another's texel lattice.
+/// box center it carries forward frame to frame through <see cref="StepCenter"/>. Each cascade owns
+/// its own center, so two cascades can never share (or corrupt) one another's texel lattice.
 /// The constructor and <see cref="Update"/> are GL-free; only <see cref="Create"/> and
 /// <see cref="Dispose"/> touch GL, and those only on the main thread.
 /// </summary>
 internal sealed class ShadowCascade(float radiusBlocks, int mapSize)
 {
-    /// <summary>How far ahead of the eye, as a fraction of the radius, the box is centred: most
+    /// <summary>How far ahead of the eye, as a fraction of the radius, the box is centered: most
     /// of what the player looks at is in front of them.</summary>
     public const float ForwardFraction = 0.35f;
 
-    private Vector3 _centre;
-    private bool _centreValid;
+    private Vector3 _center;
+    private bool _centerValid;
 
     public float RadiusBlocks { get; } = radiusBlocks;
     public int MapSize { get; } = mapSize;
@@ -27,8 +27,8 @@ internal sealed class ShadowCascade(float radiusBlocks, int mapSize)
     public uint DepthTex { get; private set; }
     public Matrix4x4 ViewProj { get; private set; } = Matrix4x4.Identity;
 
-    /// <summary>The current, texel-stepped box centre (for tests).</summary>
-    internal Vector3 Centre => _centre;
+    /// <summary>The current, texel-stepped box center (for tests).</summary>
+    internal Vector3 Center => _center;
 
     /// <summary>World size of one shadow texel across the box.</summary>
     public float WorldTexel => 2f * RadiusBlocks / MapSize;
@@ -81,26 +81,26 @@ internal sealed class ShadowCascade(float radiusBlocks, int mapSize)
     }
 
     /// <summary>
-    /// Builds this frame's light-space matrix: the box centred a little ahead of the eye and
-    /// looking down the sun direction. <see cref="StepCentre"/> carries that centre forward in
+    /// Builds this frame's light-space matrix: the box centered a little ahead of the eye and
+    /// looking down the sun direction. <see cref="StepCenter"/> carries that center forward in
     /// whole shadow texels, or the sub-texel drift as the player walks makes every shadow edge crawl.
     /// </summary>
     public void Update(Vector3 eye, Vector3 viewDir, Vector3 sunDir)
     {
         var target = eye + viewDir * (RadiusBlocks * ForwardFraction);
-        _centre = _centreValid
-            ? StepCentre(_centre, target, sunDir, RadiusBlocks, MapSize)
+        _center = _centerValid
+            ? StepCenter(_center, target, sunDir, RadiusBlocks, MapSize)
             : target;
-        _centreValid = true;
-        ViewProj = LightViewProj(_centre, sunDir, RadiusBlocks);
+        _centerValid = true;
+        ViewProj = LightViewProj(_center, sunDir, RadiusBlocks);
     }
 
     /// <summary>The orthographic light view-projection of a box of half-extent
-    /// <paramref name="radius"/> centred on <paramref name="centre"/>.</summary>
-    internal static Matrix4x4 LightViewProj(Vector3 centre, Vector3 sunDir, float radius)
+    /// <paramref name="radius"/> centered on <paramref name="center"/>.</summary>
+    internal static Matrix4x4 LightViewProj(Vector3 center, Vector3 sunDir, float radius)
     {
         var d = 2.5f * radius;
-        var lightView = Matrix4x4.CreateLookAt(centre + sunDir * d, centre, Vector3.UnitY);
+        var lightView = Matrix4x4.CreateLookAt(center + sunDir * d, center, Vector3.UnitY);
         // The sun's 0.35 Z tilt keeps it more than 19 degrees off vertical, so UnitY is
         // never parallel to the view direction and the look-at stays well defined
         var lightProj = Matrix4x4.CreateOrthographic(2f * radius, 2f * radius, d - 2f * radius, d + 2f * radius);
@@ -108,23 +108,23 @@ internal sealed class ShadowCascade(float radiusBlocks, int mapSize)
     }
 
     /// <summary>
-    /// Advances a shadow box centre towards the point this frame wants to centre on, so the light
-    /// view can be rebuilt around it. The centre is a running value rather than a fresh function of
+    /// Advances a shadow box center toward the point this frame wants to center on, so the light
+    /// view can be rebuilt around it. The center is a running value rather than a fresh function of
     /// the desired point, and that is the whole point: it follows the desired point in whole
     /// shadow-texel steps along the light's lateral axes and tracks its depth exactly.
     /// <para>
     /// Quantizing the movement (not the position) is what keeps the map still. Whole-texel lateral
     /// steps are invisible - geometry and lookup shift by the same integer count of texels - while
     /// anything with a fractional texel in it resamples the map and shimmers. Deriving the snapped
-    /// centre from scratch each frame instead compares the point against a lattice that rotates
+    /// center from scratch each frame instead compares the point against a lattice that rotates
     /// with the sun, so the "nearest" lattice vertex hops by a fractional texel every frame and
     /// every shadow edge twitches at the frame rate; the further the camera sits from the world
     /// origin, the faster the lattice sweeps past it and the worse it gets. Measuring the move from
-    /// the previous centre sidesteps that entirely: a camera that has not moved asks for a zero
+    /// the previous center sidesteps that entirely: a camera that has not moved asks for a zero
     /// move, so the projection is identical and nothing twitches, however the sun turns.
     /// </para>
     /// </summary>
-    internal static Vector3 StepCentre(Vector3 previous, Vector3 desired, Vector3 sunDir,
+    internal static Vector3 StepCenter(Vector3 previous, Vector3 desired, Vector3 sunDir,
         float radiusBlocks, int mapSize)
     {
         var texel = 2f * radiusBlocks / mapSize;

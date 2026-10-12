@@ -108,9 +108,9 @@ public sealed class CreativeCatalogTests
 
         for (var which = 0; which < InventoryPanelLayout.CatalogButtonCount; which++)
         {
-            var centre = InventoryPanelLayout.CatalogButtonCentre(0, 0f, screen, rowCount, which);
+            var center = InventoryPanelLayout.CatalogButtonCenter(0, 0f, screen, rowCount, which);
             Assert.Equal((InventoryPanelLayout.CatalogButton)which,
-                InventoryPanelLayout.CatalogButtonAt(centre, 0, 0f, rowCount, screen));
+                InventoryPanelLayout.CatalogButtonAt(center, 0, 0f, rowCount, screen));
         }
     }
 

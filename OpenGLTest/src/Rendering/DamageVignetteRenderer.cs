@@ -8,7 +8,7 @@ namespace VoxelEngine.Rendering;
 
 /// <summary>
 /// Full-screen damage vignette: one oversized triangle with a radial fragment gradient,
-/// drawn inside the UI pass. A single primitive is what fixes the old corner artefacts —
+/// drawn inside the UI pass. A single primitive is what fixes the old corner artifacts —
 /// overlapping bars multiplied their alpha where they met — and the shader's grain and pulse
 /// keep the reddening from reading as a flat fill. The UI pass already provides the GL state
 /// this needs (depth test off, straight alpha blending).

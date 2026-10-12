@@ -72,7 +72,7 @@ public static class WoodState
     /// <summary>Whether the cell belongs to no tree.</summary>
     public static bool IsDetached(byte state) => Parent(state) == ParentDetached;
 
-    /// <summary>Whether the parent field names a neighbouring cell (direction 0..5).</summary>
+    /// <summary>Whether the parent field names a neighboring cell (direction 0..5).</summary>
     public static bool HasParentCell(byte state) => Parent(state) < ParentRoot;
 
     /// <summary>Whether the shell flag is set.</summary>

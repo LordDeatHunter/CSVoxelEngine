@@ -74,7 +74,7 @@ public sealed class ContactAoTests
     private static float OcclusionAt(View v, Scene scene, Vector3 target, in ContactAoSettings s) =>
         OcclusionAtUv(v, scene, Project(v, target), s);
 
-    /// <summary>The pass at one pixel: the centre, its taps a rounded tap radius away and its four
+    /// <summary>The pass at one pixel: the center, its taps a rounded tap radius away and its four
     /// 1-pixel neighbors, read the way the shader reads them.</summary>
     private static float OcclusionAtUv(View v, Scene scene, Vector2 uv, in ContactAoSettings s)
     {

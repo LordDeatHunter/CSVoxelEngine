@@ -13,7 +13,7 @@ namespace VoxelEngine.Simulation;
 /// Reactive tree growth on the live world (TREES_PLAN phase 6): finds the tree rooted in a
 /// column (or plants a sapling root on the column's ground when it holds none), rebuilds its
 /// graph from the wood state bytes (<see cref="TreeGraph.FromWorld"/>),
-/// runs <see cref="TreeGrower.GrowFurther"/> in a <see cref="WorldTreeSpace"/>, rasterises the
+/// runs <see cref="TreeGrower.GrowFurther"/> in a <see cref="WorldTreeSpace"/>, rasterizes the
 /// result once and writes the difference back. GL-free; main thread only, since it writes block
 /// data and schedules remeshes.
 ///
@@ -44,7 +44,7 @@ namespace VoxelEngine.Simulation;
 /// the tree's <see cref="LeafCluster.ClusterRadius(TreeSpecies, TreeGraph)"/> (it follows the root
 /// diameter, so a thickening trunk widens the whole crown). Leaf cells outside every changed tip's
 /// cluster are never written, so a hole mined in an untouched part of the crown stays mined. A written leaf carries the full
-/// rasterised hydration (the best over every live tip), which is exactly what
+/// rasterized hydration (the best over every live tip), which is exactly what
 /// <see cref="LeafDecayManager"/> re-derives.</para>
 ///
 /// <para><b>Decay is the pruner.</b> Leaves an old tip fed lose hydration once that tip grows a
@@ -194,7 +194,7 @@ public sealed class TreeGrowthWriter
     }
 
     /// <summary>
-    /// The shared tail of every grow: grows <paramref name="graph"/> further, rasterises it once,
+    /// The shared tail of every grow: grows <paramref name="graph"/> further, rasterizes it once,
     /// writes wood then leaves under the write rules and fires the hooks. Nodes at or above
     /// <paramref name="originalCount"/> are new this call. <paramref name="log"/> may already hold
     /// writes made before growth (a cleared cover cell), which join the hooks.

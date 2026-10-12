@@ -4,7 +4,7 @@
   // Run from OpenGLTest/ with
   //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/cotton.json
   // Coordinates (default seed, headless probe over PlantClumps.TryGetClump + IsCottonClimate and
-  // the generated chunks): the nearest clump to spawn is centred at (81, 173) in an open meadow
+  // the generated chunks): the nearest clump to spawn is centered at (81, 173) in an open meadow
   // at ground 7-8, twelve plants over x 80..83, z 171..174, flowers and grass tufts around it.
   // Look for a tight cluster (never a lone stem every few blocks), every plant standing on grass,
   // the white bolls readable, no plant floating or sunk, and the flowers filling in around the

@@ -48,7 +48,7 @@ public struct DrawElementsIndirectCommand
 /// far ahead, and a GPU more than two frames behind would find the slot it is reading rewritten
 /// underneath it (silently corrupted draws, not an error). Each slot therefore carries a fence:
 /// <see cref="BeginFrame"/> signals one for the slot just finished and waits on the fence of the
-/// slot it is about to hand out. At rest the wait returns already-signalled immediately.
+/// slot it is about to hand out. At rest the wait returns already-signaled immediately.
 ///
 /// Passes share one slot: each pass occupies a contiguous run, so the run's start goes to the
 /// shader as <c>uDrawBase</c> and the vertex stage reads <c>draws[uDrawBase + gl_DrawID]</c>.

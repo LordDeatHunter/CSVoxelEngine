@@ -34,7 +34,7 @@ public static class BranchPileGenerator
     public static int CountWithState(byte state, int max) =>
         state >= 1 && state <= max ? state : 1;
 
-    /// <summary>Layout rotation (0-3 quarter turns) so neighbouring piles don't look identical.</summary>
+    /// <summary>Layout rotation (0-3 quarter turns) so neighboring piles don't look identical.</summary>
     public static int VariantAt(int x, int z) => (int)(UnitHash(x, z, VariantSalt) * 4f);
 
     /// <summary>Yaw of stick <paramref name="i"/> at (x, z): the pile's cross plus a small
@@ -47,7 +47,7 @@ public static class BranchPileGenerator
         0.8f + UnitHash(x, z, LengthSalt, i) * 0.1f;
 
     /// <summary>
-    /// Cell-local centre of stick <paramref name="i"/>. Base offsets are defined once, then
+    /// Cell-local center of stick <paramref name="i"/>. Base offsets are defined once, then
     /// rotated by the variant and nudged by the position hash.
     /// </summary>
     public static void GetCenter(int x, int z, int variant, int i, out float cx, out float cz)

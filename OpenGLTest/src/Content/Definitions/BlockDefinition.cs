@@ -105,7 +105,7 @@ public sealed class BlockDefinition
     public bool? Sway { get; set; }
 
     /// <summary>
-    /// Climate-coloured faces (grass, leaves): which faces wear a grey tile tinted by the
+    /// Climate-colored faces (grass, leaves): which faces wear a gray tile tinted by the
     /// <see cref="VoxelEngine.Effects.Climate.BiomeTint"/> field, and from which palette. Omitted, every face is
     /// drawn exactly as the model says. Only legal on a block whose model bakes to a plain full
     /// cube; the model's own tiles stay the block's icon, drop and held look.
@@ -118,7 +118,7 @@ public sealed class BlockDefinition
     /// <see cref="BiomeTint"/>: a cross-shaped plant has no cube faces to map per face, so it
     /// names the one palette and the mesher multiplies each of its model quads by the
     /// <see cref="VoxelEngine.Effects.Climate.BiomeTint"/> field. Only legal on a non-full-cube
-    /// <c>model</c>-renderer block, and the model must wear a grey textureless tile (see
+    /// <c>model</c>-renderer block, and the model must wear a gray textureless tile (see
     /// <c>tools/generate-leaf-textureless.ps1</c>), since the tint multiplies the texel.
     /// </summary>
     public string? ModelTint { get; set; }
@@ -345,7 +345,7 @@ public sealed class BlockDefinition
     /// </summary>
     public sealed class PaneDefinition
     {
-        /// <summary>The full-height centre post's width, 1..16 px. Default 2.</summary>
+        /// <summary>The full-height center post's width, 1..16 px. Default 2.</summary>
         public int? Post { get; set; }
 
         /// <summary>Every arm's width, 1..post px. Default: the post's width.</summary>

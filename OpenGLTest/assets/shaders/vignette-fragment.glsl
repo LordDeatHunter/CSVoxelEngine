@@ -6,7 +6,7 @@ uniform float uStrength;
 // (LowHealthVignette), so this pass only shapes it into a broad edge glow.
 uniform float uLowHealth;
 // Damage direction arc, 0..1 (DamageDirection): a red glow on the screen edge toward where the
-// last blow came from. uHitArcDir is its unit screen direction from the centre, x right and y up.
+// last blow came from. uHitArcDir is its unit screen direction from the center, x right and y up.
 // 0 draws nothing.
 uniform float uHitArc;
 uniform vec2 uHitArcDir;
@@ -62,15 +62,15 @@ vec4 Droplets(vec2 p)
         float delay = 0.25 * Hash(key * 4.7 + 2.9);
         float slide = max(uDropletTime - delay, 0.0);
         float fall = mix(DropSlideMin, DropSlideMax, size * size) * slide * sqrt(slide);
-        vec2 centre = origin - vec2(0.0, fall);
+        vec2 center = origin - vec2(0.0, fall);
 
-        vec2 q = (p - centre) / vec2(r, r * 1.2);
+        vec2 q = (p - center) / vec2(r, r * 1.2);
         float len = length(q);
         float body = 1.0 - smoothstep(0.85, 1.0, len);
         float rim = smoothstep(0.55, 0.95, len) * body;
         float glint = 1.0 - smoothstep(0.0, 0.32, length(q - vec2(-0.32, 0.38)));
-        float above = p.y - centre.y;
-        float trail = (1.0 - smoothstep(r * 0.22, r * 0.42, abs(p.x - centre.x)))
+        float above = p.y - center.y;
+        float trail = (1.0 - smoothstep(r * 0.22, r * 0.42, abs(p.x - center.x)))
             * step(0.0, above) * step(above, fall) * (1.0 - above / max(fall, 1e-4)) * (1.0 - body);
 
         float bodyA = body * 0.10;
@@ -89,12 +89,12 @@ vec4 Droplets(vec2 p)
 
 void main()
 {
-    // Screen coords normalised to the viewport, deliberately NOT aspect-corrected: all four
+    // Screen coords normalized to the viewport, deliberately NOT aspect-corrected: all four
     // edges then redden by the same amount and the corners, being farthest, are strongest.
     vec2 uv = gl_FragCoord.xy / uResolution;
     float radius = length((uv - 0.5) * 2.0);
 
-    // Smooth radial falloff, squared so the clear centre opens up and the red hugs the
+    // Smooth radial falloff, squared so the clear center opens up and the red hugs the
     // corners instead of washing the whole frame.
     float vignette = smoothstep(0.55, 1.70, radius);
     vignette *= vignette;
@@ -112,7 +112,7 @@ void main()
     float low = uLowHealth * edge * (0.9 + 0.1 * grain) * 1.6;
 
     // The direction arc is measured in aspect-corrected units (the half height is 1), so its size
-    // and thickness read the same on any window: a soft spot centred where the arc's direction
+    // and thickness read the same on any window: a soft spot centered where the arc's direction
     // leaves the frame, cut down to a band hugging the edge, so it wraps round a corner when the
     // blow came from a diagonal.
     float arc = 0.0;

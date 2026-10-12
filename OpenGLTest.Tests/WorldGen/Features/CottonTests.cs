@@ -91,10 +91,10 @@ public sealed class CottonTests
     }
 
     [Fact]
-    public void CottonClumpsCentreOnForestThatTheSandDitherNeverReaches()
+    public void CottonClumpsCenterOnForestThatTheSandDitherNeverReaches()
     {
         // The fringe's top end is the start of the grass/sand dither, so the column a clump is
-        // centred on always keeps the forest surface (the per-column biome is the dithered one)
+        // centered on always keeps the forest surface (the per-column biome is the dithered one)
         var spec = CottonGenerator.Clumps;
         var gated = 0;
         for (var cellX = -60; cellX <= 60; cellX++)

@@ -384,7 +384,7 @@ public class LodRegion : IDisposable
     /// shore weight and gravel patches, <see cref="TerrainGenerator.ColdWeight"/>, the canopy and
     /// the climate tint lattice), so a generated region is byte-identical to the build without a
     /// source. For a column the source supplies (<see cref="IWorldSource.Supplies"/>), those come
-    /// from its <see cref="ColumnData"/> instead: the biome and water level at the cell centre,
+    /// from its <see cref="ColumnData"/> instead: the biome and water level at the cell center,
     /// snow from a Taiga or Frozen biome and sea ice from a Frozen one, beaches from
     /// <see cref="TerrainGenerator.IsBeachHeight"/> in the Ocean biome, bare rock from a zero
     /// <see cref="ColumnData.DirtDepth"/> in the Forest biome, and the tint lattice from the
@@ -508,13 +508,13 @@ public class LodRegion : IDisposable
         var groundTop = ArrayPool<int>.Shared.Rent(gridSize);
         var topCell = ArrayPool<int>.Shared.Rent(gridSize);
         // The level each cell's water sits at (TerrainGenerator.NoWater where it holds none), read
-        // at the cell centre. Wetness is measured as the max over the cell's OWN footprint, with
+        // at the cell center. Wetness is measured as the max over the cell's OWN footprint, with
         // no erosion margin: the eroded minimum would paint water across every beach whose
-        // neighbourhood dips below the waterline. A level rather than a flag, because a lake's
+        // neighborhood dips below the waterline. A level rather than a flag, because a lake's
         // sheet sits at the lake's own surface instead of at sea level.
         var waterLevels = ArrayPool<int>.Shared.Rent(gridSize);
         // Beaches and gravel caps read from the same uneroded max for the same reason, the
-        // gravel with one noise eval at the cell centre per cell.
+        // gravel with one noise eval at the cell center per cell.
         var beachTop = ArrayPool<bool>.Shared.Rent(gridSize);
         var gravelTop = ArrayPool<bool>.Shared.Rent(gridSize);
         // Cold cells: snow covers their land surface, and the coldest freeze the sea sheet on top
@@ -715,25 +715,25 @@ public class LodRegion : IDisposable
                     topBlockGrid[(i + 1) * heightGrid + (j + 1)] = topBlock;
                 }
 
-                // Biome read at the cell centre, like the gravel patch below: the coarse cell
+                // Biome read at the cell center, like the gravel patch below: the coarse cell
                 // wears one material even where its footprint straddles a border.
-                var centreX = baseFineX + i * cellSize + cellSize / 2;
-                var centreZ = baseFineZ + j * cellSize + cellSize / 2;
+                var centerX = baseFineX + i * cellSize + cellSize / 2;
+                var centerZ = baseFineZ + j * cellSize + cellSize / 2;
 
-                // The column the cell centre stands in, when the source supplies it. Cells are
+                // The column the cell center stands in, when the source supplies it. Cells are
                 // aligned to chunk columns (cellSize divides Chunk.Size), so the whole footprint
                 // stands in it, and the 1-cell border stays inside the prefetched span exactly as
                 // FineHeight's reads do.
                 ColumnData? suppliedColumn = null;
-                var centreLocal = 0;
+                var centerLocal = 0;
                 if (anySupplied)
                 {
-                    var k = ((centreX >> Chunk.SizeShift) - baseChunkX) * chunkSpan
-                        + ((centreZ >> Chunk.SizeShift) - baseChunkZ);
+                    var k = ((centerX >> Chunk.SizeShift) - baseChunkX) * chunkSpan
+                        + ((centerZ >> Chunk.SizeShift) - baseChunkZ);
                     if (supplied[k])
                     {
                         suppliedColumn = columns[k];
-                        centreLocal = ((centreX & Chunk.SizeMask) << Chunk.SizeShift) | (centreZ & Chunk.SizeMask);
+                        centerLocal = ((centerX & Chunk.SizeMask) << Chunk.SizeShift) | (centerZ & Chunk.SizeMask);
                     }
                 }
 
@@ -751,22 +751,22 @@ public class LodRegion : IDisposable
 
                 if (suppliedColumn == null)
                 {
-                    var cellBiome = TerrainGenerator.BiomeAt(centreX, centreZ);
+                    var cellBiome = TerrainGenerator.BiomeAt(centerX, centerZ);
                     biomeGrid[(i + 1) * heightGrid + (j + 1)] = cellBiome;
 
                     // A cell holds water only where the chunk mesher would actually flood it: an
                     // ocean, or a lake/river bed. maxOwn is the uneroded cell max, matching the
                     // beach sampling.
-                    var cellLevel = TerrainGenerator.WaterLevelAt(centreX, centreZ);
+                    var cellLevel = TerrainGenerator.WaterLevelAt(centerX, centerZ);
                     if (maxOwn >= cellLevel) cellLevel = TerrainGenerator.NoWater;
 
                     // An oasis: the same pure site the chunk fill and Compute read turns the
                     // cell's material to grass and its pond to the oasis' own surface
                     if (WorldGenerationConfig.OasesEnabled
-                        && OasisGenerator.TryGetDisc(centreX, centreZ, out _, out _, out var oasisSurface))
+                        && OasisGenerator.TryGetDisc(centerX, centerZ, out _, out _, out var oasisSurface))
                     {
                         cellBiome = Biome.Forest;
-                        if (OasisGenerator.IsPond(centreX, centreZ)) cellLevel = oasisSurface;
+                        if (OasisGenerator.IsPond(centerX, centerZ)) cellLevel = oasisSurface;
                     }
                     waterLevels[(i + 1) * heightGrid + (j + 1)] = cellLevel;
                     seaFloor[(i + 1) * heightGrid + (j + 1)] = FloorMaterial(maxOwn, cellLevel, cellBiome);
@@ -777,13 +777,13 @@ public class LodRegion : IDisposable
                     beachTop[(i + 1) * heightGrid + (j + 1)] = TerrainGenerator.IsBeachHeight(maxOwn)
                         && (cellBiome == Biome.Ocean
                             || ((cellBiome == Biome.Forest || cellBiome == Biome.Taiga)
-                                && TerrainGenerator.SurfaceWaterWeight(centreX, centreZ) > 0f));
+                                && TerrainGenerator.SurfaceWaterWeight(centerX, centerZ) > 0f));
                     gravelTop[(i + 1) * heightGrid + (j + 1)] =
-                        beachTop[(i + 1) * heightGrid + (j + 1)] && TerrainGenerator.IsGravelPatch(centreX, centreZ);
+                        beachTop[(i + 1) * heightGrid + (j + 1)] && TerrainGenerator.IsGravelPatch(centerX, centerZ);
                     rockTop[(i + 1) * heightGrid + (j + 1)] =
                         cellBiome == Biome.Forest && maxOwn >= WorldGenerationConfig.MountainRockHeight;
 
-                    var cold = SnowGenerator.ColdWeightAt(centreX, centreZ, maxOwn);
+                    var cold = SnowGenerator.ColdWeightAt(centerX, centerZ, maxOwn);
                     snowTop[(i + 1) * heightGrid + (j + 1)] = cold > WorldGenerationConfig.SnowColdThreshold;
                     iceTop[(i + 1) * heightGrid + (j + 1)] = cold > WorldGenerationConfig.FreezeColdThreshold;
 
@@ -804,10 +804,10 @@ public class LodRegion : IDisposable
                 {
                     // A supplied column: every decision comes from the source's ColumnData, never
                     // from worldgen, and its trees are already in its blocks (no canopy bumps).
-                    var cellBiome = suppliedColumn.Biomes[centreLocal];
+                    var cellBiome = suppliedColumn.Biomes[centerLocal];
                     biomeGrid[(i + 1) * heightGrid + (j + 1)] = cellBiome;
 
-                    var cellLevel = suppliedColumn.WaterLevel[centreLocal];
+                    var cellLevel = suppliedColumn.WaterLevel[centerLocal];
                     if (maxOwn >= cellLevel) cellLevel = TerrainGenerator.NoWater;
                     waterLevels[(i + 1) * heightGrid + (j + 1)] = cellLevel;
                     seaFloor[(i + 1) * heightGrid + (j + 1)] = FloorMaterial(maxOwn, cellLevel, cellBiome);
@@ -818,7 +818,7 @@ public class LodRegion : IDisposable
                     // The column-level bare-rock truth the chunk mesher's column fill follows, so a
                     // supplied grass plateau above the mountain rock line keeps its grass.
                     rockTop[(i + 1) * heightGrid + (j + 1)] =
-                        cellBiome == Biome.Forest && suppliedColumn.DirtDepth[centreLocal] == 0;
+                        cellBiome == Biome.Forest && suppliedColumn.DirtDepth[centerLocal] == 0;
                     snowTop[(i + 1) * heightGrid + (j + 1)] = cellBiome is Biome.Taiga or Biome.Frozen;
                     iceTop[(i + 1) * heightGrid + (j + 1)] = cellBiome == Biome.Frozen;
                 }
@@ -831,7 +831,7 @@ public class LodRegion : IDisposable
         }
 
         // Which chunks must be drawn for a full-detail column to hide this shell: everything
-        // from the lowest side face (set by the neighbouring cells' tops, hence the 1-cell ring)
+        // from the lowest side face (set by the neighboring cells' tops, hence the 1-cell ring)
         // up to the top face and the real terrain surface above it. The low end reads the
         // ground grid (canopy bumps must not lift it, or shell sides would show with no chunk
         // behind them); the high end reads the bumped grid so the canopy is covered too.

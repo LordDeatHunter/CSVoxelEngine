@@ -42,7 +42,7 @@ public sealed class TreeWoodShapeGeometryTests
     [InlineData(5, 2)]
     [InlineData(9, 9)]
     [InlineData(14, 3)]
-    public void TubeBoxRunsFromTheNodeFaceToTheCellFaceAndIsCentredAcross(int nodeThickness, int tubeThickness)
+    public void TubeBoxRunsFromTheNodeFaceToTheCellFaceAndIsCenteredAcross(int nodeThickness, int tubeThickness)
     {
         var nodeHalf = TreeWoodShape.HalfWidth(nodeThickness);
         var tubeHalf = TreeWoodShape.HalfWidth(tubeThickness);
@@ -65,7 +65,7 @@ public sealed class TreeWoodShapeGeometryTests
                 }
                 else
                 {
-                    // Across the tube: symmetric about the cell centre, tubeHalf either side
+                    // Across the tube: symmetric about the cell center, tubeHalf either side
                     Assert.Equal(1f, min[axis] + max[axis], Eps);
                     Assert.Equal(2f * tubeHalf, max[axis] - min[axis], Eps);
                 }
@@ -113,7 +113,7 @@ public sealed class TreeWoodShapeGeometryTests
         return dst[..n];
     }
 
-    // How many boxes cover each pixel column centre [x, z] of the cell's 16x16 footprint
+    // How many boxes cover each pixel column center [x, z] of the cell's 16x16 footprint
     private static int[,] Coverage(int mask)
     {
         var cover = new int[Px, Px];

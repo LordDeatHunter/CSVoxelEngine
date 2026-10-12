@@ -25,14 +25,14 @@ public static class SpritePose
     /// <summary>Half the extrusion depth <see cref="Primitives.CreateExtrudedSprite"/> gives a
     /// sprite of <paramref name="size"/> built from a <paramref name="pixelWidth"/>-wide
     /// texture (its depth is <c>size / width * 2</c>), i.e. how far the front and back faces
-    /// stand off the sprite's centre plane.</summary>
+    /// stand off the sprite's center plane.</summary>
     public static float HalfThickness(float size, int pixelWidth) => size / pixelWidth;
 
     /// <summary>Gap kept between a face-up sprite's back face and the surface it rests on, so
     /// neither face z-fights that surface.</summary>
     public const float RestingClearance = 0.004f;
 
-    /// <summary>Height of a face-up sprite's centre over the surface it rests on: half its own
+    /// <summary>Height of a face-up sprite's center over the surface it rests on: half its own
     /// thickness plus <see cref="RestingClearance"/>, so a wider sprite - which
     /// <see cref="Primitives.CreateExtrudedSprite"/> extrudes thicker - is lifted further.</summary>
     public static float RestingLift(float size) =>

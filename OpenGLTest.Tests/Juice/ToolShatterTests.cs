@@ -13,11 +13,11 @@ public sealed class ToolShatterTests
     public ToolShatterTests() => TestContent.EnsureLoaded();
 
     [Fact]
-    public void TheShatterColourIsTheSpritesMeanOpaqueColour()
+    public void TheShatterColorIsTheSpritesMeanOpaqueColor()
     {
         var firestarter = ContentRegistry.RequireItem("firestarter");
         var fallback = new Vector3(0.75f, 0.7f, 0.6f);
-        var color = ToolShatter.ColourOf(firestarter, fallback);
+        var color = ToolShatter.ColorOf(firestarter, fallback);
 
         Assert.True(color != fallback, "the sprite's mean color was not read");
         Assert.InRange(color.X, 0f, 1f);
@@ -25,6 +25,6 @@ public sealed class ToolShatterTests
         Assert.InRange(color.Z, 0f, 1f);
 
         // Cached: the fallback of a later call never wins once a color was read
-        Assert.Equal(color, ToolShatter.ColourOf(firestarter, Vector3.Zero));
+        Assert.Equal(color, ToolShatter.ColorOf(firestarter, Vector3.Zero));
     }
 }

@@ -7,7 +7,7 @@ using static VoxelEngine.Chunks.Chunk;
 namespace VoxelEngine.Chunks;
 
 /// <summary>
-/// GL-free voxel lighting: the wide light-volume BFS flood (sun + coloured lamp light) and the
+/// GL-free voxel lighting: the wide light-volume BFS flood (sun + colored lamp light) and the
 /// per-corner light/AO queries the mesher samples. Extracted from <see cref="Chunk"/>; reads
 /// Chunk's shared geometry tables and light-volume constants through <c>using static Chunk</c>.
 /// </summary>
@@ -106,7 +106,7 @@ internal static class ChunkLighting
             : SmoothFaceLight(face, padded, pIdx, sunLight, blockLight, lightBase);
 
     /// <summary>
-    /// Per-axis map from a light-volume coordinate (0..LightSize-1) to the neighbourhood chunk
+    /// Per-axis map from a light-volume coordinate (0..LightSize-1) to the neighborhood chunk
     /// index (0..2) and the block index inside it (0..Size-1). The volume spans LightBorder cells
     /// into each neighbor: [1, LightBorder) of the previous chunk, all of this one, then
     /// [0, LightBorder) of the next. Shared by FillLightSnapshot and ComputeLight so the block
@@ -148,7 +148,7 @@ internal static class ChunkLighting
     /// it brightest, and at an equal level the lower slot wins. A tie re-enqueues the cell so the
     /// lower slot keeps spreading; that terminates because at a fixed level a cell's slot only ever
     /// decreases. Both rules are order-free, so the result is a function of the seed set alone -
-    /// not of BFS order or where the volume starts - and neighbouring chunks agree at their seams
+    /// not of BFS order or where the volume starts - and neighboring chunks agree at their seams
     /// wherever both volumes see the same seeds.
     /// <para>
     /// Because a cell can be enqueued more than once here, bit 7 of its byte marks "waiting in the

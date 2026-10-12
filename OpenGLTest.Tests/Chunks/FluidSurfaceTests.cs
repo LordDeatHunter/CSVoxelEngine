@@ -30,8 +30,8 @@ public class FluidSurfaceTests
         ((int)chunk.Position.X * Chunk.Size + x, (int)chunk.Position.Y * Chunk.Size + y,
             (int)chunk.Position.Z * Chunk.Size + z);
 
-    /// <summary>Water sources from centre y 12 up through the chunk above to its y 2, open air
-    /// above, so the column crosses the centre/upper chunk border.</summary>
+    /// <summary>Water sources from center y 12 up through the chunk above to its y 2, open air
+    /// above, so the column crosses the center/upper chunk border.</summary>
     private (ChunkManager Manager, Chunk Center, Chunk Upper) BorderColumn()
     {
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);

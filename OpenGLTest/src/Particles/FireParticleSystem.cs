@@ -14,7 +14,7 @@ namespace VoxelEngine.Particles;
 public sealed class FireParticleSystem
 {
     /// <summary>
-    /// Where the flame of a lit cell sits inside it: centred, a little above the floor. A caller
+    /// Where the flame of a lit cell sits inside it: centered, a little above the floor. A caller
     /// whose flame is not at a cell's own origin (the kiln, whose fire burns inside its hearth)
     /// subtracts this from the point it wants so the particles rise from exactly there.
     /// Deliberately not the same as <see cref="RenderManager.FireLightOffset"/>, which lifts the

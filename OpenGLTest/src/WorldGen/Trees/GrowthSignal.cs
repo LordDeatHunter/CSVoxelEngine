@@ -36,7 +36,7 @@ public readonly struct GrowthSignal(
     /// <summary>Cell of that node, copied when the signal was built.</summary>
     public readonly int NodeX = nodeX, NodeY = nodeY, NodeZ = nodeZ;
 
-    /// <summary>Direction the signal travelled to reach the node (<see cref="TreeDirections.Up"/> at the root).</summary>
+    /// <summary>Direction the signal traveled to reach the node (<see cref="TreeDirections.Up"/> at the root).</summary>
     public readonly int IncomingDir = incomingDir;
 
     /// <summary>Energy left before this step.</summary>

@@ -1,6 +1,6 @@
 {
   // A cobblestone wall: the fence's pane renderer with a wall's dimensions, an 8 px pillar and
-  // 6 px arms reaching the full height toward every neighbouring wall (any pane of the same
+  // 6 px arms reaching the full height toward every neighboring wall (any pane of the same
   // shape) or solid full cube, so stacked walls meet seamlessly. Six from six cobblestone
   // (recipes/cobblestone_wall.json).
   "name": "Cobblestone Wall",

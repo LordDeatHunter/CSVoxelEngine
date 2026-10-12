@@ -172,7 +172,7 @@ public class TopplingTree : IDisposable
     /// full daylight (a falling tree is out in the open; sampling its old nook's light would
     /// freeze stale cave shade onto it). The scratch chunk sits in a throwaway manager holding
     /// nothing but empty neighbors, so everything around it reads as air and severed ends cap
-    /// themselves. Its local 0..16 is one origin computed once: horizontally centred on the
+    /// themselves. Its local 0..16 is one origin computed once: horizontally centered on the
     /// pivot's column (<see cref="ScratchOrigin"/>), vertically from the lowest collected cell,
     /// so a crown spreads evenly around its trunk; cells outside it still drop their loot but
     /// skip the falling mesh. The biome tint is the field over that same footprint
@@ -210,11 +210,11 @@ public class TopplingTree : IDisposable
         // to cap themselves against.
         foreach (var offset in Vector3Directions.CardinalDirections)
         {
-            var emptyNeighbour = new Chunk(null!, scratch.Position + offset, generateBlockData: false)
+            var emptyNeighbor = new Chunk(null!, scratch.Position + offset, generateBlockData: false)
             {
                 IsBlockDataReady = true
             };
-            scratchManager.Chunks[emptyNeighbour.Position] = emptyNeighbour;
+            scratchManager.Chunks[emptyNeighbor.Position] = emptyNeighbor;
         }
 
         var meshData = scratch.GenerateMeshData(scratchManager, greedy: true, tintFields) ?? new ChunkMeshData([], [], [], [], false);
@@ -291,7 +291,7 @@ public class TopplingTree : IDisposable
             into.Add(block with { Cell = RestCell(block, landed) });
     }
 
-    // The floored cell a block's centre comes to rest in after the swing
+    // The floored cell a block's center comes to rest in after the swing
     private Vector3 RestCell(FellBlock block, Matrix4x4 landed) =>
         (_pivot + Vector3.Transform(block.Cell + new Vector3(0.5f) - _pivot, landed)).Floor();
 

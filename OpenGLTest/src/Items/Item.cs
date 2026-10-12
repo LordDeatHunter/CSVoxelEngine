@@ -80,7 +80,7 @@ public abstract class Item
     /// <summary>Seconds one unit of this item keeps a kiln lit (coal 60); 0 = not a fuel.</summary>
     public float FuelSeconds { get; internal init; }
 
-    /// <summary>Millilitres of molten metal one vessel holds, melted and pending together;
+    /// <summary>Milliliters of molten metal one vessel holds, melted and pending together;
     /// 0 = not a crucible. See <see cref="CrucibleItem"/>.</summary>
     public int CrucibleCapacityMl { get; internal init; }
 

@@ -13,7 +13,7 @@
 // wall-clock driven (angle = (Window.Time + VOXEL_TIME)/1200*tau + 0.8, RenderManager.cs:639),
 // and the mirror wants daylight. At 120 this ~25 s run sits in high sun for all of it.
 //
-// THE TWO TRAPS. Both were hit while building this file, not theorised:
+// THE TWO TRAPS. Both were hit while building this file, not theorized:
 //
 //  1. A bare teleport+screenshot burst with no wait between the shots ticks NO physics -
 //     VisualDirector.Drive calls world.Update only for wait/walk/mine (VisualDirector.cs:50-66),

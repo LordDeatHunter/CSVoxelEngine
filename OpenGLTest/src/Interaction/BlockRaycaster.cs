@@ -26,8 +26,8 @@ public static class BlockRaycaster
         var distance = delta.Length();
         if (distance < 1e-4f) return false;
 
-        // A diagonal segment crosses up to 3 cells per block travelled; cap the walk on cells
-        // and stop on travelled distance, exactly like the capped shoulder-camera walk. The walk
+        // A diagonal segment crosses up to 3 cells per block traveled; cap the walk on cells
+        // and stop on traveled distance, exactly like the capped shoulder-camera walk. The walk
         // is sight-only: a plant never stops a punch (BlockType.BlocksSightAt).
         var steps = Math.Max(1, (int)MathF.Ceiling(distance * 3f) + 2);
         return Raycast(from, delta / distance, distance, steps, stopAtRange: true,
@@ -39,16 +39,16 @@ public static class BlockRaycaster
     /// cell by cell and reports the first targetable cell. A fluid is targetable only when
     /// <paramref name="includeFluids"/> is set and the cell is a source, and a cell only counts
     /// when the ray enters one of its <see cref="BlockHitbox"/>es. <paramref name="stopAtRange"/>
-    /// chooses a cell-count cap (<paramref name="cellCap"/>) for capped walks or a travelled
+    /// chooses a cell-count cap (<paramref name="cellCap"/>) for capped walks or a traveled
     /// distance cap for first-person walks; <paramref name="hitT"/> is the distance along the
     /// ray to the hit.
     /// </summary>
     public static bool Raycast(Vector3 origin, Vector3 direction, float range, float cellCap, bool stopAtRange,
         ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal, out int hitBoxIndex,
         out float hitT, bool includeFluids, bool sightOnly = false)
-    {        // A diagonal ray crosses up to 3 cells per block travelled, so a walk counted in
+    {        // A diagonal ray crosses up to 3 cells per block traveled, so a walk counted in
         // iterations starves rays that travel further (shoulder camera) or aim steeply.
-        // Capped walks therefore count cells generously and stop on travelled distance
+        // Capped walks therefore count cells generously and stop on traveled distance
         // instead; the uncapped walk is first person exactly as it always was. tMax holds
         // the distance to the next cell boundary per axis, so its minimum is where the
         // current cell ends.

@@ -4,7 +4,7 @@ namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free rule of the throw charge zoom: the view narrows a few degrees as a throw winds up and
-/// springs back when it is released (or cancelled). <see cref="Camera"/> steps a
+/// springs back when it is released (or canceled). <see cref="Camera"/> steps a
 /// <see cref="Spring"/> from <see cref="CreateSpring"/> toward <see cref="TargetDegrees"/> through
 /// <see cref="Step"/> and adds the result to the base FOV, the sprint widening and the punch pinch,
 /// so the terms compose instead of one overwriting another. The spring is under-damped, so the

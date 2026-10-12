@@ -9,7 +9,7 @@ namespace VoxelEngine.Content.Shapes;
 /// <summary>
 /// The one shape rule of a <see cref="BlockRenderer.Pane"/> block (the glass pane, the fence, the
 /// wall), derived from its four horizontal neighbors at mesh time and never stored: a full-height
-/// centre post, plus an arm reaching the cell edge toward every neighbor it connects to
+/// center post, plus an arm reaching the cell edge toward every neighbor it connects to
 /// (<see cref="ConnectsTo(PaneProfile, byte, byte)"/>: a pane of the same shape, or a solid full
 /// cube). A lone pane is just the post, as in Minecraft. How wide the post and arms are and which
 /// height bands an arm fills is the block's <see cref="PaneProfile"/> (its <c>pane</c> JSON; the
@@ -87,7 +87,7 @@ public static class PaneShape
         return mask;
     }
 
-    /// <summary>The default full-height centre post, cell-local.</summary>
+    /// <summary>The default full-height center post, cell-local.</summary>
     public static void PostBox(out Vector3 min, out Vector3 max) => PaneProfile.Default.PostBox(out min, out max);
 
     /// <summary>The default full-height arm from the post to the cell edge toward

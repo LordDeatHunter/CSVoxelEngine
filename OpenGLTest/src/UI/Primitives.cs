@@ -12,7 +12,7 @@ namespace VoxelEngine.UI;
 
 /// <summary>
 /// Mesh factories for simple shapes, built in the same <see cref="Vertex"/> layout the world
-/// meshes use so any of the existing shaders can draw them. Every shape is centred on the
+/// meshes use so any of the existing shaders can draw them. Every shape is centered on the
 /// origin and sized in local units, leaving placement to the caller's model matrix — a single
 /// unit shape can therefore be built once and reused at any size.
 ///
@@ -26,13 +26,13 @@ public static class Primitives
     private const int CornersPerFace = 4;
 
     /// <summary>
-    /// A square in the XY plane at z = 0, centred on the origin. Y grows upwards in the
+    /// A square in the XY plane at z = 0, centered on the origin. Y grows upwards in the
     /// shape's own space; a UI projection with a flipped Y axis renders it upright.
     /// </summary>
     public static Mesh CreateSquare(GL gl, float size = 1f, Rgba? color = null, UvRect? uv = null)
         => CreateRectangle(gl, size, size, color, uv);
 
-    /// <summary>A rectangle in the XY plane at z = 0, centred on the origin.</summary>
+    /// <summary>A rectangle in the XY plane at z = 0, centered on the origin.</summary>
     public static Mesh CreateRectangle(GL gl, float width, float height, Rgba? color = null, UvRect? uv = null)
     {
         var tint = color ?? Rgba.White;
@@ -55,7 +55,7 @@ public static class Primitives
         return new Mesh(gl, vertices, indices);
     }
 
-    /// <summary>A cube centred on the origin, with the same <see cref="UvRect"/> on all faces.</summary>
+    /// <summary>A cube centered on the origin, with the same <see cref="UvRect"/> on all faces.</summary>
     public static Mesh CreateCube(GL gl, float size = 1f, Rgba? color = null, UvRect? uv = null)
     {
         Span<UvRect> faceUvs = stackalloc UvRect[FaceCount];
@@ -64,7 +64,7 @@ public static class Primitives
     }
 
     /// <summary>
-    /// A cube centred on the origin with a per-face texture region, indexed in
+    /// A cube centered on the origin with a per-face texture region, indexed in
     /// <see cref="Chunk.CubeFaces"/> order: -Z, +Z, -X, +X, +Y, -Y.
     /// </summary>
     /// <param name="faceShades">
@@ -87,7 +87,7 @@ public static class Primitives
             faceUvs[face].CornersTo(corners);
 
             var shaded = faceShades.IsEmpty ? tint : Shade(tint, faceShades[face]);
-            // CubeFaces positions span the 0..1 unit cube, so recentre before scaling
+            // CubeFaces positions span the 0..1 unit cube, so recenter before scaling
             var positions = Chunk.CubeFaces[face].face;
             var normal = Chunk.CubeFaces[face].normal;
 
@@ -111,7 +111,7 @@ public static class Primitives
     }
 
     /// <summary>
-    /// A unit square lying flat in the XZ plane at y = 0, facing +Y and centred on the origin —
+    /// A unit square lying flat in the XZ plane at y = 0, facing +Y and centered on the origin —
     /// the surface of a liquid in a vessel, scaled and lifted by the caller's model matrix.
     /// Tinted by <paramref name="color"/> and lit as fully sun- and block-lit, so a molten pool
     /// reads as self-lit at night instead of going black inside a kiln.
@@ -121,7 +121,7 @@ public static class Primitives
         Span<Vector2> corners = stackalloc Vector2[CornersPerFace];
         uv.CornersTo(corners);
 
-        // The +Y face of the unit cube, recentred on the origin and flattened onto y = 0
+        // The +Y face of the unit cube, recentered on the origin and flattened onto y = 0
         var positions = Chunk.CubeFaces[4].face;
         var vertices = new Vertex[CornersPerFace];
         for (var corner = 0; corner < CornersPerFace; corner++)
@@ -136,7 +136,7 @@ public static class Primitives
     }
 
     /// <summary>
-    /// A block's baked model as a standalone mesh, centred on the origin, so drops,
+    /// A block's baked model as a standalone mesh, centered on the origin, so drops,
     /// primed TNT and inventory icons all show the same shape the world does. Faces are
     /// shaded as fully unoccluded (AO 3) — nothing stands beside a floating copy of a block.
     /// (The mining pop draws tile-cropped hitbox boxes instead; see PopBoxEmitter.)
@@ -145,9 +145,9 @@ public static class Primitives
         CreateBlockModel(gl, model.Quads, size);
 
     /// <summary>
-    /// A subset of a baked model's quads as a standalone mesh, centred on the origin like the
+    /// A subset of a baked model's quads as a standalone mesh, centered on the origin like the
     /// full-model variant above. The quern's spinning top is built this way: the plate and
-    /// handle quads above its model's air gap, rotating about the cell centre.
+    /// handle quads above its model's air gap, rotating about the cell center.
     /// </summary>
     public static Mesh CreateBlockModel(GL gl, IReadOnlyList<BakedQuad> quads, float size = 1f)
     {
@@ -164,7 +164,7 @@ public static class Primitives
 
             for (var corner = 0; corner < CornersPerFace; corner++)
             {
-                // Baked positions span the 0..1 cell, so recentre before scaling
+                // Baked positions span the 0..1 cell, so recenter before scaling
                 var position = (quad.Positions[corner] - new Vector3(0.5f)) * size;
                 vertices[q * CornersPerFace + corner] =
                     Vert(position, tint, quad.Uvs[corner], quad.Tile, quad.Normal);
@@ -227,7 +227,7 @@ public static class Primitives
         indices.AddRange([(ushort)(backBase + 0), (ushort)(backBase + 2), (ushort)(backBase + 1),
             (ushort)(backBase + 0), (ushort)(backBase + 3), (ushort)(backBase + 2)]);
 
-        // Side walls, one quad per exposed pixel edge, UV'd to the edge texel's centre so
+        // Side walls, one quad per exposed pixel edge, UV'd to the edge texel's center so
         // nearest filtering paints the wall the texel's own color.
         for (var y = 0; y < height; y++)
         for (var x = 0; x < width; x++)

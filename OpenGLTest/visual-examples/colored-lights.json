@@ -1,6 +1,6 @@
 {
-  // Coloured block light check: run with VOXEL_TIME=700 (night) and
-  // VOXEL_SCRIPT=visual-examples/coloured-lights.json. Shots land in visual/coloured-lights/.
+  // Colored block light check: run with VOXEL_TIME=700 (night) and
+  // VOXEL_SCRIPT=visual-examples/colored-lights.json. Shots land in visual/colored-lights/.
   //
   // Same start as night-lights.json (the open dunes at (-62, 118)): lays a warm lamp, a
   // blue_lamp and another warm lamp along a row close enough that the pools overlap, then

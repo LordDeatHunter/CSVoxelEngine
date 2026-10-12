@@ -10,7 +10,7 @@ using static VoxelEngine.Chunks.ChunkLighting;
 namespace VoxelEngine.Chunks;
 
 /// <summary>
-/// Emits a <see cref="BlockRenderer.Pane"/> cell from the padded snapshot: the centre post plus an
+/// Emits a <see cref="BlockRenderer.Pane"/> cell from the padded snapshot: the center post plus an
 /// arm toward every neighbor <see cref="PaneShape.ConnectsTo(PaneProfile, byte, byte)"/> reaches,
 /// exactly the boxes <see cref="PaneProfile.Boxes"/> hands the raycast and collision, in the
 /// block's own <see cref="PaneProfile"/> (post and arm widths, and the rails an arm fills). An arm

@@ -15,7 +15,7 @@ namespace VoxelEngine.Rendering;
 /// offset, so the sky reads as infinite; the surviving copies ride one instance stream (a
 /// per-instance offset attribute), so a sweep is one instanced draw rather than one draw per copy.
 /// Because the noise and the mesh both wrap at the field edge, a mass crossing the seam continues
-/// into the neighbouring copy unbroken. Each frame draws the copies twice: a depth pre-pass, then
+/// into the neighboring copy unbroken. Each frame draws the copies twice: a depth pre-pass, then
 /// color, so the rounded surface blends once per pixel however its fillet pieces overlap.
 /// The draw is translucent, so <see cref="RenderManager.RenderClouds"/> owns the blend state.
 /// </summary>

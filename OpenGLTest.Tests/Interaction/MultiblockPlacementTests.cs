@@ -18,7 +18,7 @@ public sealed class MultiblockPlacementTests
 
     private static byte Bricks => ContentRegistry.RequireBlock("mud_bricks").Id;
 
-    /// <summary>A 3x3x3 block of source cells at the origin, every volume around its centre fits.</summary>
+    /// <summary>A 3x3x3 block of source cells at the origin, every volume around its center fits.</summary>
     private static Dictionary<(int, int, int), byte> Cube()
     {
         var cells = new Dictionary<(int, int, int), byte>();
@@ -36,7 +36,7 @@ public sealed class MultiblockPlacementTests
     public void RightDownWinsWhenSeveralVolumesFit()
     {
         var cells = Cube();
-        // Clicking the centre of the cube's +Z face while looking along -Z: screen-right is +X
+        // Clicking the center of the cube's +Z face while looking along -Z: screen-right is +X
         // (Cross(+Y, +Z)), and the volume grows away from the camera into z = 1
         var clicked = new Vector3(1, 1, 2);
         var normal = Vector3.UnitZ;

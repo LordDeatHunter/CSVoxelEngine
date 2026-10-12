@@ -8,7 +8,7 @@ namespace VoxelEngine.Entities;
 
 /// <summary>
 /// A living hostile entity: the state every mob kind shares (its <see cref="EntityType"/>,
-/// body centre, health, facing and hit flash) plus the body dimensions the targeting, projectile
+/// body center, health, facing and hit flash) plus the body dimensions the targeting, projectile
 /// and healthbar code reads, so those paths serve every mob kind through one list instead of one
 /// code path per kind. Main thread only.
 /// </summary>
@@ -36,7 +36,7 @@ public abstract class Mob
 
     public EntityType Type { get; }
 
-    /// <summary>Body centre.</summary>
+    /// <summary>Body center.</summary>
     public Vector3 Position { get; protected set; }
 
     public int Health { get; protected set; }
@@ -55,7 +55,7 @@ public abstract class Mob
     /// ease-out (quick drop, soft tail). The entity pass tints the skin red by this (non-emissive).</summary>
     public float HitFlash => _hitFlash * _hitFlash;
 
-    /// <summary>A springy 0-centred recoil the last hit started (positive = pushed in); the renderer
+    /// <summary>A springy 0-centered recoil the last hit started (positive = pushed in); the renderer
     /// squashes or leans the body by it.</summary>
     public float HitKick => _kick.Value;
 
@@ -161,7 +161,7 @@ public abstract class Mob
     private float _wanderTimer;
     private bool _hasWanderGoal;
 
-    /// <summary>Where the mob looks from for its line of sight: a little above the body centre.</summary>
+    /// <summary>Where the mob looks from for its line of sight: a little above the body center.</summary>
     public Vector3 SightOrigin => Position + new Vector3(0f, BodyHalfHeight * 0.6f, 0f);
 
     /// <summary>This mob's interest in what it noticed (lost after a while out of sight, idle time).</summary>
@@ -212,7 +212,7 @@ public abstract class Mob
 
     /// <summary>
     /// Ledge caution (<see cref="LedgeProbe"/>): whether moving along the horizontal
-    /// <paramref name="direction"/> to <paramref name="distance"/> blocks from the body centre would step
+    /// <paramref name="direction"/> to <paramref name="distance"/> blocks from the body center would step
     /// off a drop of more than <see cref="WorldGenerationConfig.MobLedgeMaxDropBlocks"/>, with
     /// <paramref name="targetEye"/> (the chased target's eye, or null) not standing below it.
     /// </summary>
@@ -257,7 +257,7 @@ public abstract class Mob
 
     /// <summary>Height of the top of the drawn body above <see cref="Position"/>, where the
     /// healthbar is placed.</summary>
-    public abstract float HeadAboveCentre { get; }
+    public abstract float HeadAboveCenter { get; }
 
     /// <summary>Counts the hits <see cref="TakeDamage"/> accepted, so a caller can tell whether its
     /// hit landed by comparing it before and after (the world shows each landed hit as a floating

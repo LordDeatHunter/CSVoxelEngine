@@ -47,10 +47,10 @@ public sealed class LavaTests
 
         fluids.Update(WorldGenerationConfig.FluidTickSeconds, manager, drops);
 
-        Assert.True(manager.TryGetCell(5, 1, 8, out var lavaNeighbour, out _));
-        Assert.NotEqual(lava, lavaNeighbour);
-        Assert.True(manager.TryGetCell(13, 1, 8, out var waterNeighbour, out _));
-        Assert.Equal(water, waterNeighbour);
+        Assert.True(manager.TryGetCell(5, 1, 8, out var lavaNeighbor, out _));
+        Assert.NotEqual(lava, lavaNeighbor);
+        Assert.True(manager.TryGetCell(13, 1, 8, out var waterNeighbor, out _));
+        Assert.Equal(water, waterNeighbor);
     }
 
     [Fact]

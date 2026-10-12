@@ -686,7 +686,7 @@ public static class Program
                 var healthBefore = w.Health;
                 w.ApplyNetworkHealth(status.Health);
                 var knockback = status.Knockback;
-                // AddKnockback normalises the direction itself and keeps a lift-only hit's pop
+                // AddKnockback normalizes the direction itself and keeps a lift-only hit's pop
                 if (knockback.LengthSquared() > 0f || status.Lift > 0f)
                     w.Camera.AddKnockback(knockback, knockback.Length(), status.Lift);
                 // A shove that came with lost health was a blow: the damage arc points back at it
@@ -1727,7 +1727,7 @@ public static class Program
         {
             case ScrollbarHit.Thumb:
                 var thumb = InventoryPanelLayout.ThumbRect(canvas, offset, rowCount);
-                inventoryView.ThumbDragGrab = p.Y - (thumb.Centre.Y - thumb.Size.Y / 2f);
+                inventoryView.ThumbDragGrab = p.Y - (thumb.Center.Y - thumb.Size.Y / 2f);
                 inventoryView.ThumbDragRowCount = rowCount;
                 break;
             case ScrollbarHit.TrackAbove:

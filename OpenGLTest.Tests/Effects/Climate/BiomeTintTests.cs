@@ -52,7 +52,7 @@ public sealed class BiomeTintTests
             WorldGenerationConfig.FoliageColorColdDry, WorldGenerationConfig.FoliageColorColdWet,
             WorldGenerationConfig.FoliageColorWarmDry, WorldGenerationConfig.FoliageColorWarmWet,
         ];
-        var ceiling = ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGrey) * BiomeTint.Gain;
+        var ceiling = ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGray) * BiomeTint.Gain;
         foreach (var corner in corners)
         {
             var needed = ColorSpace.SrgbToLinear(corner) / ceiling;
@@ -119,7 +119,7 @@ public sealed class BiomeTintTests
     }
 
     [Fact]
-    public void CellTintIsTheOwningChunksFieldAtTheCellCentre()
+    public void CellTintIsTheOwningChunksFieldAtTheCellCenter()
     {
         int[] coords = [-33, -17, -16, -15, -1, 0, 1, 15, 16, 17, 47, 48];
         foreach (var palette in Palettes)
@@ -195,11 +195,11 @@ public sealed class BiomeTintTests
         // The four corners are all a chunk's tint needs
         Assert.True(BiomeTint.TryFieldsFor(all, cx, cz, out var fields));
 
-        var neighbourhood = new ColumnTerrain[9];
+        var neighborhood = new ColumnTerrain[9];
         for (var dx = 0; dx < 3; dx++)
         for (var dz = 0; dz < 3; dz++)
-            all.TryGet(cx - 1 + dx, cz - 1 + dz, out neighbourhood[dx * 3 + dz]);
-        Assert.Equal(fields, BiomeTint.FieldsFromNeighbourhood(neighbourhood));
+            all.TryGet(cx - 1 + dx, cz - 1 + dz, out neighborhood[dx * 3 + dz]);
+        Assert.Equal(fields, BiomeTint.FieldsFromNeighborhood(neighborhood));
 
         // Each local corner of the field is exactly the tint of the column owning that corner
         (float X, float Z)[] local = [(0f, 0f), (16f, 0f), (0f, 16f), (16f, 16f)];

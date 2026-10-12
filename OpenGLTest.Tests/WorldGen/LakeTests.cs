@@ -79,9 +79,9 @@ public sealed class LakeTests
             var nz = cell.Z + (d == 2 ? 1 : d == 3 ? -1 : 0);
             var column = ColumnCache.Get(nx >> Chunk.SizeShift, nz >> Chunk.SizeShift);
             var local = ((nx & Chunk.SizeMask) << Chunk.SizeShift) | (nz & Chunk.SizeMask);
-            var neighbourLevel = column.WaterLevel[local];
-            if (neighbourLevel == level) continue;
-            if (column.Bed[local] < neighbourLevel) continue;
+            var neighborLevel = column.WaterLevel[local];
+            if (neighborLevel == level) continue;
+            if (column.Bed[local] < neighborLevel) continue;
             if (column.Heights[local] >= level) continue;
             leaks++;
         }

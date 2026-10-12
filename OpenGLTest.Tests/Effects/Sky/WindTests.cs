@@ -5,7 +5,7 @@ using Xunit;
 
 namespace VoxelEngine.Tests.Effects.Sky;
 
-/// <summary>SH-27: the shared wind is a unit heading that turns slowly, and its travelled offset is its integral.</summary>
+/// <summary>SH-27: the shared wind is a unit heading that turns slowly, and its traveled offset is its integral.</summary>
 public sealed class WindTests
 {
     private static readonly double[] Times = [0.0, 1.0, 147.0, 447.0, 1200.0, 9999.5, 1e6];

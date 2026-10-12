@@ -18,7 +18,7 @@ public sealed class WorldLoadGateTests
 
     private static readonly Vector3 CameraChunk = new(0f, 8f, 0f);
 
-    /// <summary>The seven chunk positions of the radius-1 sphere: the centre and its six faces.</summary>
+    /// <summary>The seven chunk positions of the radius-1 sphere: the center and its six faces.</summary>
     private static List<Vector3> RadiusOneSphere() =>
     [
         CameraChunk,

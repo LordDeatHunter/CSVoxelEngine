@@ -24,7 +24,7 @@ public sealed class LodSurfaceTests
     public LodSurfaceTests() => TestContent.EnsureLoaded();
 
     private const int ChunksPerLevel1Region = 8;   // 128 / 16
-    private const int CentreChunk = 4;
+    private const int CenterChunk = 4;
 
     private static int HeightAt(int x, int z) =>
         ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
@@ -32,7 +32,7 @@ public sealed class LodSurfaceTests
 
     /// <summary>
     /// The first level-1 region in row <paramref name="rz"/>, walking east from 777, that is frozen
-    /// at its centre chunk column and grows no canopy anywhere near it: frozen land carries none,
+    /// at its center chunk column and grows no canopy anywhere near it: frozen land carries none,
     /// and a canopy bump would stand over the ground the edits move (LodColumnCapTests' recipe).
     /// </summary>
     internal static int FindQuietFrozenRx(int rz)
@@ -40,8 +40,8 @@ public sealed class LodSurfaceTests
         var spec = LodRegion.Levels[1];
         for (var rx = 777; rx < 777 + 400; rx++)
         {
-            var x0 = rx * spec.RegionBlocks + CentreChunk * Chunk.Size;
-            var z0 = rz * spec.RegionBlocks + CentreChunk * Chunk.Size;
+            var x0 = rx * spec.RegionBlocks + CenterChunk * Chunk.Size;
+            var z0 = rz * spec.RegionBlocks + CenterChunk * Chunk.Size;
             if (TerrainGenerator.BiomeAt(x0, z0) != Biome.Frozen) continue;
 
             var quiet = true;
@@ -103,7 +103,7 @@ public sealed class LodSurfaceTests
     private sealed record Plateau(int Rx, int Rz, int Cx, int Cz, int Y, bool[] Recorded, ChunkManager Manager);
 
     /// <summary>
-    /// Stone over the whole 16x16 centre chunk column of a quiet frozen level-1 region, eight
+    /// Stone over the whole 16x16 center chunk column of a quiet frozen level-1 region, eight
     /// blocks above its highest terrain column, each column recorded through
     /// <see cref="LodSurface.RecordEdit"/>. That covers the level-1 windows of two cells and six
     /// level-0 windows completely, and no 22-wide level-2 window.
@@ -111,8 +111,8 @@ public sealed class LodSurfaceTests
     private static Plateau BuildPlateau(int rz, Action<int, int>? beforeRecord = null)
     {
         var rx = FindQuietFrozenRx(rz);
-        var cx = rx * ChunksPerLevel1Region + CentreChunk;
-        var cz = rz * ChunksPerLevel1Region + CentreChunk;
+        var cx = rx * ChunksPerLevel1Region + CenterChunk;
+        var cz = rz * ChunksPerLevel1Region + CenterChunk;
         var y = ColumnCache.GetHeights(cx, cz).Max() + 8;
 
         var (manager, chunk) = EmptyReadyChunk(new Vector3(cx, y >> Chunk.SizeShift, cz));
@@ -147,7 +147,7 @@ public sealed class LodSurfaceTests
 
         var after = BuildAllLevels(plateau.Rx, plateau.Rz);
 
-        // The chunk column's centre, half a block off the cell grid so exactly one quad contains it.
+        // The chunk column's center, half a block off the cell grid so exactly one quad contains it.
         var px = (plateau.Cx << Chunk.SizeShift) + 8.5f;
         var pz = (plateau.Cz << Chunk.SizeShift) + 8.5f;
         var b = before!.Select(d => TopFaceYAt(d, px, pz)).ToArray();
@@ -163,7 +163,7 @@ public sealed class LodSurfaceTests
         Assert.True(a[0] <= plateau.Y + 1, $"level 0 at {a[0]} stands above the plateau top {plateau.Y + 1}");
 
         // The raised structure is covered by the chunk-Y range the burial test demands.
-        Assert.True(after[1].ColumnCyMax[CentreChunk * ChunksPerLevel1Region + CentreChunk]
+        Assert.True(after[1].ColumnCyMax[CenterChunk * ChunksPerLevel1Region + CenterChunk]
                     >= plateau.Y >> Chunk.SizeShift);
     }
 
@@ -196,8 +196,8 @@ public sealed class LodSurfaceTests
         const int Rz = 780;
         var spec = LodRegion.Levels[1];
         var rx = FindQuietFrozenRx(Rz);
-        var cx = rx * ChunksPerLevel1Region + CentreChunk;
-        var cz = Rz * ChunksPerLevel1Region + CentreChunk;
+        var cx = rx * ChunksPerLevel1Region + CenterChunk;
+        var cz = Rz * ChunksPerLevel1Region + CenterChunk;
         var window = spec.CellSize + 2 * spec.SampleMargin;
         var (x, z) = FindColumnNeverUniqueWindowMin(cx, cz, window);
         var y = HeightAt(x, z) + 1;
@@ -209,14 +209,14 @@ public sealed class LodSurfaceTests
 
         var edited = LodRegion.BuildMeshData(1, rx, Rz);
         Assert.True(edited.Vertices.SequenceEqual(baseline.Vertices), "a lone block changed the shell");
-        Assert.True(edited.ColumnCyMax[CentreChunk * ChunksPerLevel1Region + CentreChunk] >= y >> Chunk.SizeShift);
+        Assert.True(edited.ColumnCyMax[CenterChunk * ChunksPerLevel1Region + CenterChunk] >= y >> Chunk.SizeShift);
 
         // (b) A whole chunk column raised above the water in a sea region: the shell moves, but the
         // sheet is decided from the generated heights and must survive untouched.
         const int SeaRz = 781;
         var (seaRx, seaBaseline) = FindSeaRegion(SeaRz);
-        var scx = seaRx * ChunksPerLevel1Region + CentreChunk;
-        var scz = SeaRz * ChunksPerLevel1Region + CentreChunk;
+        var scx = seaRx * ChunksPerLevel1Region + CenterChunk;
+        var scz = SeaRz * ChunksPerLevel1Region + CenterChunk;
         var column = ColumnCache.Get(scx, scz);
         for (var lx = 0; lx < Chunk.Size; lx++)
         for (var lz = 0; lz < Chunk.Size; lz++)
@@ -236,8 +236,8 @@ public sealed class LodSurfaceTests
     [Fact]
     public void PlacementAboveRaisesReplacementSwapsAndRemovalRescans()
     {
-        var cx = 777 * ChunksPerLevel1Region + CentreChunk;
-        var cz = 782 * ChunksPerLevel1Region + CentreChunk;
+        var cx = 777 * ChunksPerLevel1Region + CenterChunk;
+        var cz = 782 * ChunksPerLevel1Region + CenterChunk;
         var manager = new ChunkManager(null!);
         var heights = ColumnCache.GetHeights(cx, cz);
         var cyMin = (heights.Min() - 2) >> Chunk.SizeShift;
@@ -311,8 +311,8 @@ public sealed class LodSurfaceTests
     [Fact]
     public void SetOfAnIdenticalOverrideIsANoOp()
     {
-        var x = (777 * ChunksPerLevel1Region + CentreChunk) * Chunk.Size + 3;
-        var z = (789 * ChunksPerLevel1Region + CentreChunk) * Chunk.Size + 9;
+        var x = (777 * ChunksPerLevel1Region + CenterChunk) * Chunk.Size + 3;
+        var z = (789 * ChunksPerLevel1Region + CenterChunk) * Chunk.Size + 9;
         var stone = TerrainGenerator.RockBlock;
         var sand = TerrainGenerator.SandBlock;
 
@@ -334,8 +334,8 @@ public sealed class LodSurfaceTests
     [Fact]
     public void RescanStopsAtAnUnloadedChunkConservatively()
     {
-        var cx = 777 * ChunksPerLevel1Region + CentreChunk;
-        var cz = 783 * ChunksPerLevel1Region + CentreChunk;
+        var cx = 777 * ChunksPerLevel1Region + CenterChunk;
+        var cz = 783 * ChunksPerLevel1Region + CenterChunk;
         var cy = (ColumnCache.GetHeights(cx, cz).Max() >> Chunk.SizeShift) + 2;
         var (manager, chunk) = EmptyReadyChunk(new Vector3(cx, cy, cz));
         var x = (cx << Chunk.SizeShift) + 5;
@@ -403,14 +403,14 @@ public sealed class LodSurfaceTests
     }
 
     /// <summary>
-    /// The first level-1 region in row <paramref name="rz"/> (walking east from 777) whose centre
+    /// The first level-1 region in row <paramref name="rz"/> (walking east from 777) whose center
     /// chunk column is mostly wet and whose build draws a sea sheet, with its baseline build.
     /// </summary>
     private static (int Rx, LodMeshData Baseline) FindSeaRegion(int rz)
     {
         for (var rx = 777; rx < 777 + 400; rx++)
         {
-            var column = ColumnCache.Get(rx * ChunksPerLevel1Region + CentreChunk, rz * ChunksPerLevel1Region + CentreChunk);
+            var column = ColumnCache.Get(rx * ChunksPerLevel1Region + CenterChunk, rz * ChunksPerLevel1Region + CenterChunk);
             var wet = 0;
             for (var i = 0; i < column.Heights.Length; i++)
                 if (column.WaterLevel[i] > column.Heights[i]) wet++;

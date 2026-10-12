@@ -8,14 +8,14 @@ namespace VoxelEngine.Chunks;
 /// The shared resume point for the chunk-generation workers' closest-first offset scan
 /// (PERF_TODO C3). All <see cref="WorldGenerationConfig.MaxConcurrentBlockDataGenerations"/>
 /// threads of one <see cref="ChunkGenerationWorker"/> share one instance per streaming focus, so the
-/// ~17k-entry sorted-offset list is walked roughly once per focus centre instead of once per call
+/// ~17k-entry sorted-offset list is walked roughly once per focus center instead of once per call
 /// per thread.
 ///
 /// <para><b>1. The invariant.</b> The whole state is one immutable node
-/// <c>(Center C, Version V, Index K)</c>, swapped as a unit so a centre, a version and an index can
+/// <c>(Center C, Version V, Index K)</c>, swapped as a unit so a center, a version and an index can
 /// never be read apart. If the node is <c>(C, V, K)</c> then every offset index below <c>K</c> was
-/// observed not-needed by a call that had sampled exactly centre <c>C</c> and removal version
-/// <c>V</c>. A caller trusts that prefix only when its own freshly sampled <c>(centre, version)</c>
+/// observed not-needed by a call that had sampled exactly center <c>C</c> and removal version
+/// <c>V</c>. A caller trusts that prefix only when its own freshly sampled <c>(center, version)</c>
 /// pair matches the node's; on any mismatch it scans from index 0.</para>
 ///
 /// <para><b>2. Why the trusted prefix is still valid.</b> <see cref="ChunkManager.NeedsChunk"/> is
@@ -43,8 +43,8 @@ namespace VoxelEngine.Chunks;
 /// immediately. No position can be skipped permanently.</para>
 ///
 /// <para><b>4. The camera-reverses case.</b> C to C' and back to C, with a worker never observing
-/// C', is closed by the version and not by the centre: the unload pass at C' bumped the version, so
-/// the node is discarded even though the centre reads equal again. That also demotes the
+/// C', is closed by the version and not by the center: the unload pass at C' bumped the version, so
+/// the node is discarded even though the center reads equal again. That also demotes the
 /// coincidence that generation (ChunkGenerationWorker.BuildSortedOffsets) and unload
 /// (ChunkManager.cs:240) share <see cref="WorldGenerationConfig.ChunkRadiusSq"/> from a correctness
 /// premise to a performance one: the shared radius is now only why the frontier SURVIVES a still
@@ -62,14 +62,14 @@ namespace VoxelEngine.Chunks;
 /// current node is published. And <c>index &lt;= start</c> publishes nothing at all, so a converged
 /// worker polling every 200 ms allocates no node and executes no loop body.</para>
 ///
-/// <para><b>7. One frontier per focus, and threads disagreeing about the centre.</b> The worker keeps
+/// <para><b>7. One frontier per focus, and threads disagreeing about the center.</b> The worker keeps
 /// one frontier per index of the <see cref="StreamingFocus.Chunks"/> array (the camera in
-/// singleplayer, each connected player on a server), and each call hands a frontier the centre at
+/// singleplayer, each connected player on a server), and each call hands a frontier the center at
 /// that index of the focus snapshot it sampled. The main thread republishes that snapshot between
 /// frames, so the workers can sample different snapshots - a focus that crossed a chunk border, or a
 /// slot that now belongs to another player because someone joined or left. Either way the slot's
-/// centre no longer matches its node and the call resets to index 0 - the behavior this class
-/// replaced - so disagreement degrades to the pre-C3 full scan and never below it. A NaN centre
+/// center no longer matches its node and the call resets to index 0 - the behavior this class
+/// replaced - so disagreement degrades to the pre-C3 full scan and never below it. A NaN center
 /// never compares equal and therefore always full-scans.</para>
 ///
 /// <para><b>8. Safe publication.</b> The node's three fields are readonly and written before the
@@ -77,7 +77,7 @@ namespace VoxelEngine.Chunks;
 /// reader that sees the reference sees all three fields.</para>
 ///
 /// <para><b>9. The wake model is unchanged.</b> <see cref="FindNext"/> introduces no waiting, no
-/// signalling and no sleeping; ChunkGenerationWorker.WorkerLoop keeps its existing 200 ms idle
+/// signaling and no sleeping; ChunkGenerationWorker.WorkerLoop keeps its existing 200 ms idle
 /// poll. There is no wake to miss because there is no wake.</para>
 ///
 /// <para><b>10. Standing obligation.</b> If a future change removes a position from
@@ -92,8 +92,8 @@ namespace VoxelEngine.Chunks;
 internal sealed class ChunkScanFrontier(Vector3[] offsets)
 {
     /// <summary>
-    /// The centre, removal version and resume index, immutable and swapped together so no reader can
-    /// observe an index paired with the wrong centre or version.
+    /// The center, removal version and resume index, immutable and swapped together so no reader can
+    /// observe an index paired with the wrong center or version.
     /// </summary>
     private sealed class Node(Vector3 center, int version, int index)
     {
@@ -107,7 +107,7 @@ internal sealed class ChunkScanFrontier(Vector3[] offsets)
     /// <summary>
     /// The first offset from <paramref name="center"/>, in closest-first order, for which
     /// <paramref name="isNeeded"/> is true - or null when none is. Resumes from the shared frontier
-    /// when that frontier was computed for the same centre and the same removal version, and scans
+    /// when that frontier was computed for the same center and the same removal version, and scans
     /// from the closest offset otherwise. See the type doc for the invariant this rests on; the
     /// caller must sample both <paramref name="center"/> and <paramref name="version"/> ONCE, up
     /// front, before any probe.
@@ -148,11 +148,11 @@ internal sealed class ChunkScanFrontier(Vector3[] offsets)
 
     /// <summary>
     /// The published resume index, for the facts. It cannot distinguish "nothing published yet" from
-    /// "published index 0" - both read 0 - which is why the moved-centre fact keys on
+    /// "published index 0" - both read 0 - which is why the moved-center fact keys on
     /// <see cref="PublishedCenter"/> instead.
     /// </summary>
     internal int PublishedIndex => Volatile.Read(ref _node)?.Index ?? 0;
 
-    /// <summary>The centre the published node was computed for, or null when nothing is published.</summary>
+    /// <summary>The center the published node was computed for, or null when nothing is published.</summary>
     internal Vector3? PublishedCenter => Volatile.Read(ref _node)?.Center;
 }

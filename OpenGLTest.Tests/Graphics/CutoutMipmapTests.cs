@@ -103,7 +103,7 @@ public sealed class CutoutMipmapTests
     }
 
     [Fact]
-    public void ColourIsAlphaWeightedSoTransparentTexelsDoNotDarken()
+    public void ColorIsAlphaWeightedSoTransparentTexelsDoNotDarken()
     {
         // Opaque green checkered against transparent black.
         var tile = Tile(16, 16, (x, y) => ((x + y) % 2 == 0 ? ((byte)0, (byte)255, (byte)0, (byte)255) : ((byte)0, (byte)0, (byte)0, (byte)0)));

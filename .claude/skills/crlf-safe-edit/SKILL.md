@@ -10,7 +10,7 @@ Every source and doc file in this working tree is CRLF while git blobs are LF (`
 ## Rules
 - Prefer the Edit tool for ordinary changes. It preserves endings.
 - **Never `sed -i` a source file.** Never rewrite a file with Python text mode (`open(p).write(...)`).
-- Scripted edits: read **bytes**, normalise to `\n` for matching, write back with `\r\n` if the original had `\r\n`. Template:
+- Scripted edits: read **bytes**, normalize to `\n` for matching, write back with `\r\n` if the original had `\r\n`. Template:
 
 ```python
 import sys
@@ -26,7 +26,7 @@ open(p, 'wb').write(out)
 ```
 - Long scripts: write them with the Write tool and run `python -I script.py <args>`, not a long bash heredoc (quoting broke before). Keep scripts in the scratchpad.
 - `FastNoiseLite.cs` is vendored: never reformat it.
-- New files written by the Write tool or a heredoc are LF. If the neighbouring files are CRLF, either convert the new file or leave it for git to normalise; match the directory.
+- New files written by the Write tool or a heredoc are LF. If the neighboring files are CRLF, either convert the new file or leave it for git to normalize; match the directory.
 
 ## Verify after every scripted edit
 ```

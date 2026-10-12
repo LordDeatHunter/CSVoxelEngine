@@ -8,7 +8,7 @@ namespace VoxelEngine.WorldGen.Features;
 /// Cairns: a small cobblestone stack — three cells and a one-stone pebble hat — on a local height
 /// maximum above <see cref="WorldGenerationConfig.MountainRockHeight"/>, as a landmark on the
 /// peaks. Decided per 2^<see cref="WorldGenerationConfig.CairnCellShift"/>-block cell from a pure
-/// hash of (cell, seed); the centre column's height and its eight neighbors' come from
+/// hash of (cell, seed); the center column's height and its eight neighbors' come from
 /// <see cref="ColumnCache"/> like the pebble scatter's, so a cairn near a chunk border is whole.
 /// The far LOD shows none.
 /// </summary>

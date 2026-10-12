@@ -8,7 +8,7 @@ namespace VoxelEngine.Tests.WorldGen.Features;
 /// <summary>
 /// The clumped-plant rule (<see cref="PlantClumps"/> over a <see cref="PlantClumpSpec"/>), tested
 /// on the pattern itself, before any terrain can reject a member: every clump keeps its guaranteed
-/// core, members stay inside the disc and thin toward its rim, centres keep their cells and their
+/// core, members stay inside the disc and thin toward its rim, centers keep their cells and their
 /// spacing, the seed alone decides the result, and a clump crossing a cell or chunk border is the
 /// same clump seen from either side.
 /// </summary>
@@ -32,7 +32,7 @@ public sealed class PlantClumpTests
 
     public PlantClumpTests() => TestContent.EnsureLoaded();
 
-    /// <summary>Every accepted clump in a block of cells around the origin, with its centre.</summary>
+    /// <summary>Every accepted clump in a block of cells around the origin, with its center.</summary>
     private static List<(int CellX, int CellZ, int X, int Z)> Clumps(PlantClumpSpec spec, int seed, int cells = 24)
     {
         var found = new List<(int, int, int, int)>();
@@ -78,10 +78,10 @@ public sealed class PlantClumpTests
             if (!PlantClumps.TryGetMember(spec, SeedA, x, z, null, out var cx, out var cz)) continue;
             reported++;
             Assert.True(PlantClumps.TryGetClump(spec, SeedA, cx >> spec.CellShift, cz >> spec.CellShift, out var ax, out var az)
-                        && (ax, az) == (cx, cz), $"{name}: ({x}, {z}) reports a centre no cell holds");
+                        && (ax, az) == (cx, cz), $"{name}: ({x}, {z}) reports a center no cell holds");
             var dx = x - cx;
             var dz = z - cz;
-            Assert.True(dx * dx + dz * dz <= spec.Radius * spec.Radius, $"{name}: ({x}, {z}) is {dx},{dz} off its centre");
+            Assert.True(dx * dx + dz * dz <= spec.Radius * spec.Radius, $"{name}: ({x}, {z}) is {dx},{dz} off its center");
         }
 
         Assert.True(reported > 0, $"{name}: no member in the sampled area");
@@ -89,32 +89,32 @@ public sealed class PlantClumpTests
 
     [Theory]
     [MemberData(nameof(Specs))]
-    public void ClumpCentresStayInTheirCellAndKeepTheStatedSpacing(string name)
+    public void ClumpCentersStayInTheirCellAndKeepTheStatedSpacing(string name)
     {
         var spec = SpecNamed(name);
         var clumps = Clumps(spec, SeedA, cells: 16);
         foreach (var (cellX, cellZ, x, z) in clumps)
             Assert.Equal((cellX, cellZ), (x >> spec.CellShift, z >> spec.CellShift));
 
-        // MinCentreSpacing is the real bound with jitter; the cell size only without it
-        Assert.True(spec.MinCentreSpacing >= 1);
-        Assert.True(spec.MinCentreSpacing <= spec.CellSize);
+        // MinCenterSpacing is the real bound with jitter; the cell size only without it
+        Assert.True(spec.MinCenterSpacing >= 1);
+        Assert.True(spec.MinCenterSpacing <= spec.CellSize);
         for (var i = 0; i < clumps.Count; i++)
         for (var j = i + 1; j < clumps.Count; j++)
         {
             var spacing = Math.Max(Math.Abs(clumps[i].X - clumps[j].X), Math.Abs(clumps[i].Z - clumps[j].Z));
-            Assert.True(spacing >= spec.MinCentreSpacing,
-                $"{name}: centres ({clumps[i].X}, {clumps[i].Z}) and ({clumps[j].X}, {clumps[j].Z}) are {spacing} apart");
+            Assert.True(spacing >= spec.MinCenterSpacing,
+                $"{name}: centers ({clumps[i].X}, {clumps[i].Z}) and ({clumps[j].X}, {clumps[j].Z}) are {spacing} apart");
         }
     }
 
     [Fact]
     public void CottonClumpsNeverOverlap()
     {
-        // Two discs of the shipped spec can only touch if their centres come within 2 * radius
+        // Two discs of the shipped spec can only touch if their centers come within 2 * radius
         var spec = CottonGenerator.Clumps;
-        Assert.True(spec.MinCentreSpacing > 2 * spec.Radius,
-            $"cotton centres may come {spec.MinCentreSpacing} apart, so two radius-{spec.Radius} clumps can merge");
+        Assert.True(spec.MinCenterSpacing > 2 * spec.Radius,
+            $"cotton centers may come {spec.MinCenterSpacing} apart, so two radius-{spec.Radius} clumps can merge");
     }
 
     [Theory]
@@ -139,7 +139,7 @@ public sealed class PlantClumpTests
     public void AClumpStraddlingACellBorderHasMembersOnBothSides()
     {
         // The loose spec reaches past its cell, so its far-side members exist only because a
-        // column asks its neighbouring cells as well
+        // column asks its neighboring cells as well
         var spec = SpecNamed("loose");
         var checkedClumps = 0;
         foreach (var (cellX, cellZ, cx, cz) in Clumps(spec, SeedA))
@@ -156,7 +156,7 @@ public sealed class PlantClumpTests
                 else
                 {
                     across++;
-                    // Asked from the neighbouring cell's side, the column is still this clump's
+                    // Asked from the neighboring cell's side, the column is still this clump's
                     // (the loose spec can overlap, so another clump may answer first; it must
                     // still answer)
                     Assert.True(PlantClumps.TryGetMember(spec, SeedA, x, z, null, out _, out _),
@@ -174,7 +174,7 @@ public sealed class PlantClumpTests
     public void ACottonClumpOnAChunkBorderIsNotCutInHalf()
     {
         // Chunks stamp independently, so a clump that straddles a chunk line must report the same
-        // centre to the columns of both chunks
+        // center to the columns of both chunks
         var spec = CottonGenerator.Clumps;
         var straddling = 0;
         foreach (var (_, _, cx, cz) in Clumps(spec, SeedA, cells: 32))
@@ -237,10 +237,10 @@ public sealed class PlantClumpTests
     [Fact]
     public void ASpecThatCouldBreakItsGuaranteesIsRefused()
     {
-        // A centre jittered out of its cell would let two clumps share a cell
+        // A center jittered out of its cell would let two clumps share a cell
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new PlantClumpSpec(cellShift: 4, radius: 3, jitter: 8, minMembers: 1, chance: 1f, edgeDensity: 0f, salt: 1));
-        // More guaranteed members than the disc holds could never be honoured
+        // More guaranteed members than the disc holds could never be honored
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new PlantClumpSpec(cellShift: 4, radius: 1, jitter: 0, minMembers: 6, chance: 1f, edgeDensity: 0f, salt: 1));
         // The guaranteed core always holds at least the minimum

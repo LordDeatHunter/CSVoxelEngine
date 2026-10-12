@@ -41,10 +41,10 @@ namespace VoxelEngine.Tests.Chunks;
 /// is why the MIXED sequence is the one that decides anything.</para>
 ///
 /// <para><b>What the first run found, recorded so the next round does not re-derive it.</b> The
-/// feared level-1 loss did NOT materialise: on every ring sweep taken alone, misses came out equal
+/// feared level-1 loss did NOT materialize: on every ring sweep taken alone, misses came out equal
 /// to the distinct key count under both policies and every generation count, i.e. nothing was
 /// evicted before its last use. The reason is the emission order rather than the size - a ring is
-/// swept closest-first and neighbouring regions share their border columns, so a column's reuse is
+/// swept closest-first and neighboring regions share their border columns, so a column's reuse is
 /// local in the sequence and lands long before it can age out. The band is real arithmetic but the
 /// workload never sits in it. Where the policies actually separate is the MIXED sequence, and the
 /// separation is the mechanism D2 named: chunk generation's hot columns survive the sweep.</para>
@@ -89,7 +89,7 @@ public sealed class ColumnCacheReplayProbe
 
     /// <summary><c>WorldGenerationConfig.ChunkRadius</c>. The disc of chunk columns full-detail
     /// generation keeps live: 797 columns at radius 16, and 933 distinct once each build's 3x3
-    /// heightmap neighbourhood is included (both counted, not estimated).</summary>
+    /// heightmap neighborhood is included (both counted, not estimated).</summary>
     private const int ChunkDiscRadius = 16;
 
     /// <summary><c>Chunk.Size</c>.</summary>
@@ -283,7 +283,7 @@ public sealed class ColumnCacheReplayProbe
 
     /// <summary>
     /// (i) CHUNK-GEN. Every chunk column of the radius-16 disc, closest-first, each contributing the
-    /// 3x3 column neighbourhood a chunk build actually asks for (<c>ChunkLighting.FillColumns</c>,
+    /// 3x3 column neighborhood a chunk build actually asks for (<c>ChunkLighting.FillColumns</c>,
     /// dx outer / dz inner), replayed <see cref="ChunkGenPasses"/> times. This is the small,
     /// permanently-hot set D2 says the sweep was throwing away.
     /// </summary>

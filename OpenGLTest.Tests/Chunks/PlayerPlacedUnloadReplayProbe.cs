@@ -331,7 +331,7 @@ public sealed class PlayerPlacedUnloadReplayProbe
     }
 
     /// <summary>
-    /// C6's structure, modelled the same way: one bucket per chunk position, so an unload is one
+    /// C6's structure, modeled the same way: one bucket per chunk position, so an unload is one
     /// dictionary removal and examines no cell at all. The key is derived by flooring, which is
     /// what <c>VoxelCoords.ChunkPosOf</c> does - the deleted code's <c>(int)pos.X</c> truncation
     /// was only ever safe because it read <c>Chunks</c>' own integral keys.

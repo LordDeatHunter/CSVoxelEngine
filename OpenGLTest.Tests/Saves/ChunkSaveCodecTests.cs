@@ -265,7 +265,7 @@ public class ChunkSaveCodecTests
         var pos = new Vector3(cx, y >> Chunk.SizeShift, cz);
         var ly = y & Chunk.SizeMask;
 
-        // Air only beside it in the lower neighbouring column: open air above that column's terrain
+        // Air only beside it in the lower neighboring column: open air above that column's terrain
         var besideOpenAir = BlocksWithSource(water, lx, ly, lz);
         EncloseFiveFaces(besideOpenAir, stone, lx, ly, lz, leaveOpen: (nx - lx, 0, nz - lz));
         Assert.DoesNotContain((ushort)Chunk.Idx(lx, ly, lz), FrontierOf(pos, besideOpenAir));

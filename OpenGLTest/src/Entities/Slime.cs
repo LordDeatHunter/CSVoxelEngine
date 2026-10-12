@@ -77,7 +77,7 @@ public sealed class Slime : Mob
     private bool _splitPending;
 
     /// <summary>A slime of <paramref name="size"/> (clamped into <see cref="SlimeSize.Min"/>..
-    /// <see cref="SlimeSize.Max"/>) at full health; <paramref name="position"/> is the body centre,
+    /// <see cref="SlimeSize.Max"/>) at full health; <paramref name="position"/> is the body center,
     /// <see cref="HalfExtentFor"/> that size above the feet.</summary>
     public Slime(EntityType type, Vector3 position, int size = SlimeSize.Min) : base(type, position)
     {
@@ -96,7 +96,7 @@ public sealed class Slime : Mob
     public float SizeScale { get; }
 
     /// <summary>The collision body's half edge of a slime of <paramref name="size"/>, which is also
-    /// how far its body centre sits above its feet.</summary>
+    /// how far its body center sits above its feet.</summary>
     public static float HalfExtentFor(int size) => HalfExtent * SlimeSize.Scale(size);
 
     /// <inheritdoc />
@@ -115,7 +115,7 @@ public sealed class Slime : Mob
     public override float BodyHalfHeight => HalfExtent * SizeScale;
 
     /// <inheritdoc />
-    public override float HeadAboveCentre => BodyHalfHeight * VerticalScale;
+    public override float HeadAboveCenter => BodyHalfHeight * VerticalScale;
 
     /// <summary>Whether the slime currently rests on the ground.</summary>
     public bool IsGrounded { get; private set; }
@@ -423,7 +423,7 @@ public sealed class Slime : Mob
         };
     }
 
-    /// <summary>Whether a slime body of <paramref name="halfExtent"/> centred at
+    /// <summary>Whether a slime body of <paramref name="halfExtent"/> centered at
     /// <paramref name="center"/> overlaps a solid cell (unloaded cells read as air).</summary>
     internal static bool IsColliding(Vector3 center, float halfExtent, ChunkManager chunks)
     {

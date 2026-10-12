@@ -7,7 +7,7 @@ namespace VoxelEngine.WorldGen.Features;
 /// <summary>
 /// Meteor craters: a rare bowl cut into the land, its floor lined with obsidian — the scar of an
 /// old impact. Decided per 2^<see cref="WorldGenerationConfig.MeteorCellShift"/>-block cell from a
-/// pure hash of (cell, seed) (the centre column and a radius), so every chunk the bowl crosses
+/// pure hash of (cell, seed) (the center column and a radius), so every chunk the bowl crosses
 /// stamps the same cells; each column is cut from its own ground down the bowl profile, so a
 /// crater on a slope stays a bowl. Only the surface is cut (never fluids), and the far LOD shows
 /// the pre-crater height until a column's edits lower it.
@@ -20,7 +20,7 @@ public static class MeteorGenerator
     static MeteorGenerator() => ObsidianBlock = ContentRegistry.RequireBlock("obsidian").Id;
 
     /// <summary>
-    /// The crater a cell holds: its centre column (jittered inside the cell) and radius, or false
+    /// The crater a cell holds: its center column (jittered inside the cell) and radius, or false
     /// for the many cells without one. A pure function of the cell and the seed.
     /// </summary>
     public static bool TryGetCrater(int cellX, int cellZ, out int x, out int z, out int radius)

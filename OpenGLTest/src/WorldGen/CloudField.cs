@@ -56,7 +56,7 @@ public static class CloudField
     /// Bakes a level grid into the cloud-shadow coverage map: one byte per cell, row-major with index
     /// <c>z * cells + x</c> (so a GL texture row is one z), holding <c>255 * level / maxLevels</c>.
     /// It reads the same thresholded grid the mesh is built from, so a shadow follows the visible
-    /// silhouette rather than the raw density. Texel centres are cell centres, matching the +0.5
+    /// silhouette rather than the raw density. Texel centers are cell centers, matching the +0.5
     /// sample point of <see cref="BuildLevels(int, int, float, float, int)"/>, and linear filtering
     /// between them is what gives the shadow its penumbra.
     /// </summary>
@@ -96,7 +96,7 @@ public static class CloudField
     ///
     /// Every convex edge of the blocky level field is replaced by a fillet of radius
     /// <see cref="WorldGenerationConfig.CloudCornerRadius"/>, which is why the old run merging is
-    /// gone: a cell's surface now depends on all eight of its neighbors, so neighbouring cells no
+    /// gone: a cell's surface now depends on all eight of its neighbors, so neighboring cells no
     /// longer share a face that could be merged into a run. The pieces (cap tiles, quarter-cylinder
     /// fillets, sphere octants, horn-torus junctions, walls, vertical corner cylinders, ledges and
     /// riser patches) are laid out so that they meet on exactly the same boundary curves, which is
@@ -174,8 +174,8 @@ public static class CloudField
 
     /// <summary>
     /// One horizontal cap (top when <paramref name="sy"/> is +1, bottom when -1) as a 3x3 autotile:
-    /// a flat centre, four edge tiles that stay flat or bend into a quarter-cylinder fillet, and
-    /// four corner tiles that resolve to a flat quad, a straight continuation of one neighbouring
+    /// a flat center, four edge tiles that stay flat or bend into a quarter-cylinder fillet, and
+    /// four corner tiles that resolve to a flat quad, a straight continuation of one neighboring
     /// fillet, a sphere octant where two fillets meet convexly, or a horn torus where they meet
     /// concavely. Splitting the cap this way is what makes the rounding a pure per-cell decision:
     /// two cells that share an edge always pick the same profile for it.
@@ -281,21 +281,21 @@ public static class CloudField
     {
         var r = WorldGenerationConfig.CloudCornerRadius;
         var seg = WorldGenerationConfig.CloudFilletSegments;
-        var centre = new Vector3(cx, cy, cz);
+        var center = new Vector3(cx, cy, cz);
         var stride = seg + 1;
         Span<uint> grid = stackalloc uint[stride * stride];
 
         // The th = 0 row is the pole, one point with one normal however far ph has turned, so the
         // whole row indexes a single vertex and the quads that touch it collapse to triangles.
         var pole = Sphere(sx, sy, sz, 0f, 0f);
-        grid[0] = b.Add(centre + r * pole, pole);
+        grid[0] = b.Add(center + r * pole, pole);
         for (var j = 1; j <= seg; j++) grid[j] = grid[0];
 
         for (var i = 1; i <= seg; i++)
         for (var j = 0; j <= seg; j++)
         {
             var d = Sphere(sx, sy, sz, Angle(i), Angle(j));
-            grid[i * stride + j] = b.Add(centre + r * d, d);
+            grid[i * stride + j] = b.Add(center + r * d, d);
         }
 
         for (var i = 0; i < seg; i++)
@@ -574,12 +574,12 @@ public static class CloudField
         /// <summary>Triangle fan from an apex around a rim, every point stored exactly once.</summary>
         public void FlatFan(Vector3 apex, Vector3 normal, ReadOnlySpan<Vector3> rim)
         {
-            var centre = Add(apex, normal);
+            var center = Add(apex, normal);
             var previous = Add(rim[0], normal);
             for (var i = 1; i < rim.Length; i++)
             {
                 var next = Add(rim[i], normal);
-                Tri(centre, previous, next);
+                Tri(center, previous, next);
                 previous = next;
             }
         }
@@ -618,7 +618,7 @@ public static class CloudField
     }
 
     /// <summary>
-    /// Octave sum normalised back to 0..1. Every octave period divides <paramref name="cells"/>, so
+    /// Octave sum normalized back to 0..1. Every octave period divides <paramref name="cells"/>, so
     /// the sum is exactly periodic with period <paramref name="cells"/> and the field tiles.
     /// </summary>
     private static float Fbm(float cx, float cz, int cells, int baseSpacingCells, int octaves, int seed)

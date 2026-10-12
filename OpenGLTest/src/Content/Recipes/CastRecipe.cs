@@ -37,7 +37,7 @@ public sealed class CastRecipe
     /// <summary>Molten material poured in (<see cref="MoltenMaterial.Id"/>).</summary>
     public byte MaterialId { get; }
 
-    /// <summary>Millilitres the mold takes before it is full.</summary>
+    /// <summary>Milliliters the mold takes before it is full.</summary>
     public int AmountMl { get; }
 
     /// <summary>Seconds a full mold cools before the cast can be collected.</summary>

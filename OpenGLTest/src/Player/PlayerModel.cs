@@ -154,7 +154,7 @@ public class PlayerModel
     // side; the rest is the recovery back to the idle pose.
     //
     // The phases are uneven on purpose, with the same total duration: a slower wind-up that coils the
-    // body (to 0.26), a short, sharp strike that is centred on the impact (0.26..0.49, about twice as
+    // body (to 0.26), a short, sharp strike that is centered on the impact (0.26..0.49, about twice as
     // fast as before) and a long, eased recovery, so the contrast reads as a snap.
     private const float SliceWindupEnd = 0.26f;
     private const float SliceStrikeEnd = 0.49f;
@@ -218,7 +218,7 @@ public class PlayerModel
     private const float ThrowFollowElbow = 0.5f;
     private const float ThrowStrikeEnd = 0.3f;
 
-    // First-person framing: straight-hanging arms sit ~66 degrees below the view centre,
+    // First-person framing: straight-hanging arms sit ~66 degrees below the view center,
     // invisible until you pitch well down, and hide behind the chest when you do. Resting
     // them slightly forward with bent elbows and a touch of inward yaw parks the hands in
     // front of the chest, visible at the bottom of the view. Positive X rotation is
@@ -602,7 +602,7 @@ public class PlayerModel
     // the return mirrors the first swing.
     private float SliceSweep() => SlicePhase(SliceWindupRadians, SliceSweepRadians);
 
-    // The whole body's turn through the same phases, normalised: about 1 at the wind-up (toward the
+    // The whole body's turn through the same phases, normalized: about 1 at the wind-up (toward the
     // swing's start side) and -0.85 at the follow-through, with the sign of the swing's direction.
     private float SliceBodySweep() => SlicePhase(SliceBodyWindup, SliceBodyFar);
 
@@ -1167,7 +1167,7 @@ public class PlayerModel
     // FirstPersonBodyBack behind the eye - so the view-frame point has to be turned back out by the
     // pitch before the arm can be solved to it. The shoulder is where the torso's lean and twist
     // actually carry it (it rides on the torso), not where it rests, or the fist would miss the aim by
-    // the few centimetres the torso moved it. Y is the up axis and Z points forward out of the eye, so a
+    // the few centimeters the torso moved it. Y is the up axis and Z points forward out of the eye, so a
     // point in front has a negative Z here.
     private Vector3 PunchTargetFromShoulder(Vector3 viewFist, float pitchRad, float torsoPitch)
     {
@@ -1315,7 +1315,7 @@ public class PlayerModel
         void ArmFrames(Vector3 pivot, float shoulder, float sweep, float elbow,
             out Quaternion upper, out Quaternion fore)
         {
-            // Drift the hands toward the view centre so they read at the bottom of the
+            // Drift the hands toward the view center so they read at the bottom of the
             // frame instead of out at the edges. Right arm (+X) yaws one way, left the other.
             // The slice sweep rides that same yaw but is applied after the forward pitch
             // (System.Numerics is row-vector, so the leftmost factor runs first), carrying the

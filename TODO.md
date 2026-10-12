@@ -15,7 +15,7 @@ endgames, so it is built first and built to serve both.
 From that foundation the game branches into two parallel, open-ended arcs. Both live in the
 same world, and a player can move between them freely — neither arc gates the other:
 
-- **Arc A — Magicraft adventure RPG** (Skyrim-flavoured): dungeons, towers, spellcraft,
+- **Arc A — Magicraft adventure RPG** (Skyrim-flavored): dungeons, towers, spellcraft,
   skills, boss encounters.
 - **Arc B — Expert automation** (modded-Minecraft "expert" pack x Factorio): power,
   logistics, machine chains, up to fusion reactors and off-world colonies.
@@ -99,7 +99,7 @@ the other while still being faster together.
   station (crafting table, campfire, quern, furnace). The shapeless list-and-feed model stays;
   this is gating, not a grid rewrite (see `U-3`).
 - [ ] **`P-3` · Generic furnace / smelter** — P1, M.
-  A timed, fuel-consuming station modelled on the campfire's `cookSeconds` and the quern's
+  A timed, fuel-consuming station modeled on the campfire's `cookSeconds` and the quern's
   block-entity pattern. First jobs: `sand -> glass`, `mud -> brick`, and a plain
   `crushed_copper -> copper_ingot` route that does not need the full kiln. Feeds `P-6` and is
   step zero of the automation chain.
@@ -152,7 +152,7 @@ the other while still being faster together.
   (clothing/bedding). The missing Act I food source.
 - [ ] **`P-39` · Leatherworking & clothing** — P2, M.
   Leather/cloth clothing that gives warmth and the first *defense* layer before metal armor.
-  Vintage Story flavour; feeds `P-7` armor and `F-5` cold.
+  Vintage Story flavor; feeds `P-7` armor and `F-5` cold.
 - [ ] **`P-40` · Clay, pottery & bricks** — P2, M.
   Clay deposits + a pottery wheel/crucible craft, so crucibles and molds have a real supply
   chain instead of one recipe each. Feeds `P-3`, `P-44`.
@@ -162,7 +162,7 @@ the other while still being faster together.
   Branches as the tool handle and a general cheap component: makes the flint and copper tool
   recipes need a handle, and gives `P-4` its assembly step.
 - [ ] **`P-45` · Food spoilage & preservation** — P3, M. *(taste call; can be dropped)*
-  Ageing food, salt/smoking/drying, an ice box. Vintage Story depth; only worth it if survival
+  Aging food, salt/smoking/drying, an ice box. Vintage Story depth; only worth it if survival
   is meant to be a long act.
 - [ ] **`P-46` · Research / tech-tree unlock** — P2, L.
   Factorio-style unlock progression: some recipes are discovered rather than free. Shared spine —
@@ -314,7 +314,7 @@ single-arc player.
 - [ ] **`F-11` · Ambience moments** — P2, S.
   Rare animal calls, wind, cave drips; ties into `M-2`.
 - [ ] **`F-12` · Mounts** — P3, L.
-  Rideable horses/creatures (Skyrim-flavour); needs moving collision (`F-10`).
+  Rideable horses/creatures (Skyrim-flavor); needs moving collision (`F-10`).
 - [ ] **`F-13` · Taming & companions** — P3, M.
   Tame wild animals/pets that follow and fight; a non-tech combat support for Arc A.
 - [ ] **`F-14` · Villages & NPC traders** — P2, L.
@@ -365,7 +365,7 @@ single-arc player.
 - [ ] **`U-18` · Storage / logistics UI** — P3, M. Chests, sorting, filters; for `P-31`.
 - [ ] **`U-19` · Dedicated station UIs** — P3, M. Furnace, anvil, kiln, casting, enchanting.
 - [ ] **`U-20` · Accessibility options** — P2, M.
-  Colour-blind palettes, subtitles, FOV/motion toggles, UI scale, difficulty assists.
+  Color-blind palettes, subtitles, FOV/motion toggles, UI scale, difficulty assists.
 - [ ] **`U-21` · Crafting grid (optional)** — P3, M.
   Decide whether a shaped grid is ever wanted; the current system is deliberately shapeless.
   Parked, not planned — revisit only if content demands it.
@@ -407,7 +407,7 @@ single-arc player.
     direction, heading and length per slot, most slots empty), faded by `StarField.Visibility`
     and hidden by the cloud cover like the stars, with a GL-free twin of the slot hash beside
     `StarField`. No art needed.
-- [ ] **`V-7` · Sunrise/sunset colour grading** — P2, M.
+- [ ] **`V-7` · Sunrise/sunset color grading** — P2, M.
 - [ ] **`V-8` · Post-processing: bloom, underwater fog gradient, damage/heal flash** — P2, L.
   Bloom for lamps/campfire/sun.
 - [ ] **`V-9` · Third-person camera** — P1, M.
@@ -471,7 +471,7 @@ single-arc player.
 - [ ] **`M-6` · Per-world config + game rules** — P2, S.
   World name/seed/timestamps/format already live in `world.json`, and player settings persist.
   Still open: per-world game rules and difficulty (`M-5`, `M-18`).
-- [ ] **`M-7` · Localisation / text pipeline** — P3, M.
+- [ ] **`M-7` · Localization / text pipeline** — P3, M.
 - [ ] **`M-8` · Fix: falling blocks do not slide off a single block** — P2, S. Carried from the
   old TODO.
 - [ ] **`M-9` · Mod / data-pack behavior hooks** — P3, XL.
@@ -502,7 +502,7 @@ single-arc player.
 - [ ] **`M-14` · Wide-trunk residue (TREES_PLAN phase 7)** — P3, M.
   (1) a felled tree's mesh is truncated to one 16³ scratch chunk (`CellBatchMesher.Build` is a
   ready multi-chunk replacement); (2) cutting a wide core while its shells stand strands the
-  crown for reactive growth; (3) a bevelled shell's cap can go stale when an edit lands in an
+  crown for reactive growth; (3) a beveled shell's cap can go stale when an edit lands in an
   edge-diagonal chunk that face-adjacent dirtying does not remesh.
 - [ ] **`M-15` · Structure templates / schematic system** — P2, L.
   A loadable, placeable blueprint format (jigsaw or simple offsets) that `P-16`, `P-26`, `F-14`

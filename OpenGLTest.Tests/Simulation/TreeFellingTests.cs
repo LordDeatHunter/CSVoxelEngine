@@ -155,7 +155,7 @@ public sealed class TreeFellingTests
     }
 
     [Fact]
-    public void TheFelledMeshIsCentredOnItsPivot()
+    public void TheFelledMeshIsCenteredOnItsPivot()
     {
         // A crown whose outlying cell pulls the minimum corner more than a chunk from the far
         // side: the cells around the trunk column must still be meshed, the outlier is the one

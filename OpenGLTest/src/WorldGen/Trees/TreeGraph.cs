@@ -5,7 +5,7 @@ using VoxelEngine.WorldGen.Trees.Shape;
 namespace VoxelEngine.WorldGen.Trees;
 
 /// <summary>
-/// The virtual node graph one tree grows in before it is rasterised: one node per wood cell,
+/// The virtual node graph one tree grows in before it is rasterized: one node per wood cell,
 /// int-indexed, with the root (the base cell) at index <see cref="Root"/>. Every node but the
 /// root has a parent one face step away, and children always index above their parents, so a
 /// reverse index sweep is a valid post-order. Per-tree mutable state with a single owner; not
@@ -81,7 +81,7 @@ public sealed class TreeGraph
     /// <see cref="WoodState.ParentRoot"/> parent code; null otherwise. The walk is breadth-first
     /// over child edges only: a face neighbor is a child when it holds the species' wood, is
     /// not detached, is not a wide trunk's shell (<see cref="WoodState.IsShell"/>: shells are
-    /// rasterised around the trunk chain, never graph nodes) and its stored parent offset lands
+    /// rasterized around the trunk chain, never graph nodes) and its stored parent offset lands
     /// exactly on the current cell. Detached cells and cells whose parent no longer exists are
     /// therefore never reached, so a cut branch stays cut. A node below the root's level loads as
     /// a feature node (roots), which is exact because <see cref="TreeGrower.Pulse"/> never

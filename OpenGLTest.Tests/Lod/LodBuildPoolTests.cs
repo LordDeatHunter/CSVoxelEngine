@@ -46,7 +46,7 @@ namespace VoxelEngine.Tests.Lod;
 ///
 /// <para>Conventions, from <c>ChunkScanFrontierTests</c>: fixed <see cref="Thread"/> arrays rather
 /// than <c>Task.Run</c> or <c>Parallel.For</c> (the real workers are dedicated threads, and the
-/// ThreadPool would silently serialise or inject threads of its own), <c>IsBackground = true</c> and
+/// ThreadPool would silently serialize or inject threads of its own), <c>IsBackground = true</c> and
 /// a name per thread, a <see cref="Stopwatch"/> deadline rather than a fixed iteration count, and
 /// <c>Join()</c> on every thread before any assertion is read. Nothing is asserted on a worker
 /// thread — an xUnit assertion that throws there is swallowed and the fact would pass silently — so
@@ -311,7 +311,7 @@ public sealed class LodBuildPoolTests
     /// <summary>
     /// The stress fact. Three workers racing on the same claim paths must between them hand out
     /// every region exactly once: a key that comes out twice is two concurrent builds of one region
-    /// applying in completion order, which is the stale-LOD-shell artefact the TryAdd-gated claim
+    /// applying in completion order, which is the stale-LOD-shell artifact the TryAdd-gated claim
     /// exists to prevent. Also checks the invariants that only hold once the workers are done —
     /// no worker exception escaped, every key is a real offset of its level, and
     /// <c>BuildingClaimCount</c> is back to zero, i.e. every claim taken was released.

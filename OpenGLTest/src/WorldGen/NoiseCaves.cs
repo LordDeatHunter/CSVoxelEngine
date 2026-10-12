@@ -11,7 +11,7 @@ namespace VoxelEngine.WorldGen;
 /// caverns deep down. Every field is sampled on a coarse lattice per chunk and trilinearly
 /// interpolated per block before thresholding, so the cost is a few hundred noise evaluations
 /// per chunk instead of tens of thousands. All carving is a pure function of world position and
-/// the column data, so neighbouring chunks agree at their borders without any shared state.
+/// the column data, so neighboring chunks agree at their borders without any shared state.
 /// </summary>
 public static class NoiseCaves
 {

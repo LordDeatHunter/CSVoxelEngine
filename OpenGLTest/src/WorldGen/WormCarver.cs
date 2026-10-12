@@ -50,7 +50,7 @@ public static class WormCarver
 
     /// <summary>
     /// Carves every worm from the cells within reach through this chunk. Only <paramref name="blocks"/>
-    /// is written; neighbouring chunks carve their own share of the same worms.
+    /// is written; neighboring chunks carve their own share of the same worms.
     /// </summary>
     public static void Carve(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
@@ -80,7 +80,7 @@ public static class WormCarver
         var ry = r * WorldGenerationConfig.WormVerticalSquash;
         var c = node.Center;
 
-        // Block b spans [b, b + 1) and is tested at its centre, so both chunks sharing a border
+        // Block b spans [b, b + 1) and is tested at its center, so both chunks sharing a border
         // evaluate the identical expression for the identical block
         var xMin = Math.Max(0, (int)MathF.Floor(c.X - r - 0.5f) - worldX0);
         var xMax = Math.Min(Chunk.Size - 1, (int)MathF.Ceiling(c.X + r - 0.5f) - worldX0);

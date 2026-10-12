@@ -16,12 +16,12 @@ namespace VoxelEngine.Simulation;
 /// Owns the live primed TNT: spawns cubes where firestarter strikes and blasts light TNT,
 /// ticks their fuses, and detonates them. A blast clears a sphere of blocks (dropping nothing) and primes any dry TNT
 /// caught in it, so blasts chain; submerged TNT just clears. The player itself is never harmed, only
-/// shoved: everything loose in range is flung away from the centre (<see cref="BlastImpulse"/>).
+/// shoved: everything loose in range is flung away from the center (<see cref="BlastImpulse"/>).
 /// Main thread only.
 /// </summary>
 public class TntManager
 {
-    /// <summary>Blast radius in blocks, measured from the primed cube's centre.</summary>
+    /// <summary>Blast radius in blocks, measured from the primed cube's center.</summary>
     public const float BlastRadius = 4f;
 
     /// <summary>Fuse for a cube lit by hand (firestarter): a second, long enough to step back from,
@@ -36,17 +36,17 @@ public class TntManager
     // Spawned while iterating _primed (chained TNT), each with the shove of the blast that lit it;
     // drained after the tick
     private readonly List<(Vector3 Position, byte BlockId, Vector3 Impulse)> _pendingSpawns = [];
-    // Centres of the blasts of the last Update, for the world's camera shake
+    // Centers of the blasts of the last Update, for the world's camera shake
     private readonly List<Vector3> _blasts = [];
 
     public IReadOnlyList<PrimedTnt> Primed => _primed;
 
-    /// <summary>The centre of every blast the last <see cref="Update"/> set off, in detonation order;
+    /// <summary>The center of every blast the last <see cref="Update"/> set off, in detonation order;
     /// valid until the next one. The world shakes the local camera by them (<see cref="BlastShake"/>).</summary>
     public IReadOnlyList<Vector3> Blasts => _blasts;
 
     /// <summary>
-    /// Primes a cube at the centre of the cell the block occupied. The cube carries
+    /// Primes a cube at the center of the cell the block occupied. The cube carries
     /// <paramref name="blockId"/> so it renders as the block that primed, and burns for
     /// <paramref name="fuseSeconds"/> (<see cref="PlayerFuseSeconds"/> when lit by hand,
     /// <see cref="ChainFuseSeconds"/> when lit by a blast).
@@ -234,7 +234,7 @@ public class TntManager
             }
         }
 
-        // Everything loose in range is flung away from the centre: the other primed TNT, the drops
+        // Everything loose in range is flung away from the center: the other primed TNT, the drops
         // (this blast's own loot included, so it flies out of the crater) and the falling cubes
         // already in the air. Before the sweep below, so sand this blast undermines falls straight
         // and rebuilds instead of scattering. The world shoves the players and mobs (Blasts).

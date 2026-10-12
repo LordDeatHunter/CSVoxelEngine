@@ -6,7 +6,7 @@ using VoxelEngine.UI.InventoryPanel;
 namespace VoxelEngine.Rendering;
 
 /// <summary>
-/// The per-frame HUD string formatting, memoised (PERF_TODO R8). The FPS line, the compass
+/// The per-frame HUD string formatting, memoized (PERF_TODO R8). The FPS line, the compass
 /// readout, the coordinate line and every hotbar count used to run a <c>$"..."</c> interpolation
 /// or a <c>ToString()</c> on every single frame, allocating a fresh string each time even when the
 /// value on screen had not moved; this hands back the previous instance whenever the inputs are
@@ -19,7 +19,7 @@ namespace VoxelEngine.Rendering;
 /// <c>Camera</c>'s view-projection cache is (PERF_TODO R7).</item>
 /// <item><b>Only the formatting is cached, never the draw.</b> A cache hit skips the
 /// interpolation and nothing else: every caller still issues its <c>DrawText</c> /
-/// <c>DrawTextCentred</c> call every frame, so the glyph batching of PERF_TODO R9 sees exactly
+/// <c>DrawTextCentered</c> call every frame, so the glyph batching of PERF_TODO R9 sees exactly
 /// the same submissions it did before and is completely untouched by this class.</item>
 /// <item><b>Float keys are compared bit-for-bit</b> through
 /// <see cref="BitConverter.SingleToInt32Bits(float)"/>, following <c>Camera</c>'s

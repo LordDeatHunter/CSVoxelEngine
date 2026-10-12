@@ -131,7 +131,7 @@ public sealed class InventorySaveTests
     }
 
     [Fact]
-    public void CapsAreHonouredAndInstanceIdsStayUnique()
+    public void CapsAreHonoredAndInstanceIdsStayUnique()
     {
         var toolItem = ToolItem(_ => true);
         var toolName = SaveNames.NameOf(toolItem.Id)!;

@@ -60,7 +60,7 @@ public sealed class BiomeTintPopTests
 
     /// <summary>
     /// The tinted-tile rules shared by the pop and the debris cube: a vertex is flagged exactly
-    /// when it wears a tinted tile, the rgb is grey (shade only), and every overlay face draws
+    /// when it wears a tinted tile, the rgb is gray (shade only), and every overlay face draws
     /// its base quad before a coplanar tinted quad.
     /// </summary>
     private static void AssertTintedLayout(BiomeTintFaces bt, IReadOnlyList<Vertex> verts, IReadOnlyList<ushort> indices)
@@ -232,7 +232,7 @@ public sealed class BiomeTintPopTests
     }
 
     [Fact]
-    public void TintedCubeMeshIsCentredAndFlagsOnlyTintedQuads()
+    public void TintedCubeMeshIsCenteredAndFlagsOnlyTintedQuads()
     {
         var bt = TintOf(Grass);
         var (verts, indices) = BlockCubeCache.BuildTintedCube(Grass);

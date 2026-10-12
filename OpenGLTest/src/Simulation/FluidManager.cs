@@ -15,7 +15,7 @@ namespace VoxelEngine.Simulation;
 /// flowing skirt that thins by one level per block, columns that fall, and a slope search that
 /// makes water prefer the nearest hole.
 ///
-/// Only scheduled cells do any work, and a cell reschedules its neighbourhood exactly when it
+/// Only scheduled cells do any work, and a cell reschedules its neighborhood exactly when it
 /// changes or writes into a neighbor, so a settled body of water costs nothing. Every block
 /// edit path in the game therefore has to call <see cref="ScheduleAround(Vector3)"/>, or the
 /// water beside the edit will not notice it.
@@ -195,7 +195,7 @@ public class FluidManager
                 foreach (var index in frontier)
                 {
                     // Scheduling the fluid cell alone is enough: its tick runs Spread, and Flow
-                    // reschedules the neighbourhood of everything it writes into
+                    // reschedules the neighborhood of everything it writes into
                     ScheduleLocal(chunk,
                         index >> (2 * Chunk.SizeShift),
                         (index >> Chunk.SizeShift) & Chunk.SizeMask,
@@ -212,7 +212,7 @@ public class FluidManager
             // Note this is not the same test as an empty frontier: a chunk can be solid water
             // inside and still face air across a border.
             var column = chunks.WorldSource.GetColumn((int)chunk.Position.X, (int)chunk.Position.Z);
-            if (!chunk.IsRestored && !HasRestoredFaceNeighbour(chunk, chunks)
+            if (!chunk.IsRestored && !HasRestoredFaceNeighbor(chunk, chunks)
                 && chunk.LowerBoundY > Math.Max(column.MaxWaterLevel, WorldGenerationConfig.SeaLevel))
                 continue;
 
@@ -247,15 +247,15 @@ public class FluidManager
 
         foreach (var (dx, _, dz) in Horizontals)
         {
-            if (!TryGetLoadedNeighbour(chunks, cx, cy, cz, dx, 0, dz, out var neighbor)) continue;
+            if (!TryGetLoadedNeighbor(chunks, cx, cy, cz, dx, 0, dz, out var neighbor)) continue;
 
             // The two 16x16 planes that touch: this chunk's face cells sit at `near` on the
             // axis the face cuts, the neighbor's directly across at `far`
             var near = dx + dz > 0 ? Chunk.SizeMask : 0;
             var far = Chunk.SizeMask - near;
-            var neighbourColumn = chunks.WorldSource.GetColumn((int)neighbor.Position.X, (int)neighbor.Position.Z);
-            var neighbourHeights = neighbourColumn.Heights;
-            var neighbourWater = neighbourColumn.WaterLevel;
+            var neighborColumn = chunks.WorldSource.GetColumn((int)neighbor.Position.X, (int)neighbor.Position.Z);
+            var neighborHeights = neighborColumn.Heights;
+            var neighborWater = neighborColumn.WaterLevel;
 
             for (var ly = 0; ly < Chunk.Size; ly++)
             {
@@ -275,12 +275,12 @@ public class FluidManager
 
                     // The fluid side is judged against the column of the chunk that holds it
                     if (BlockType.IsFluid(here)
-                        && IsWakeTarget(there, worldY, neighbourHeights[ni],
+                        && IsWakeTarget(there, worldY, neighborHeights[ni],
                             worldY, ownHeights[hi], ownWater[hi]))
                         ScheduleLocal(chunk, hx, ly, hz);
                     else if (BlockType.IsFluid(there)
                         && IsWakeTarget(here, worldY, ownHeights[hi],
-                            worldY, neighbourHeights[ni], neighbourWater[ni]))
+                            worldY, neighborHeights[ni], neighborWater[ni]))
                         ScheduleLocal(neighbor, nx, ly, nz);
                 }
             }
@@ -288,7 +288,7 @@ public class FluidManager
 
         // Water only ever falls through a vertical face, so each of these schedules one side:
         // the fluid sitting over the hole, never the air sitting over the fluid.
-        if (TryGetLoadedNeighbour(chunks, cx, cy, cz, 0, -1, 0, out var below))
+        if (TryGetLoadedNeighbor(chunks, cx, cy, cz, 0, -1, 0, out var below))
         {
             for (var lx = 0; lx < Chunk.Size; lx++)
             for (var lz = 0; lz < Chunk.Size; lz++)
@@ -303,7 +303,7 @@ public class FluidManager
             }
         }
 
-        if (TryGetLoadedNeighbour(chunks, cx, cy, cz, 0, 1, 0, out var above))
+        if (TryGetLoadedNeighbor(chunks, cx, cy, cz, 0, 1, 0, out var above))
         {
             for (var lx = 0; lx < Chunk.Size; lx++)
             for (var lz = 0; lz < Chunk.Size; lz++)
@@ -320,14 +320,14 @@ public class FluidManager
     }
 
     /// <summary>Whether any of the chunk's six loaded face neighbors was restored from a save.</summary>
-    private static bool HasRestoredFaceNeighbour(Chunk chunk, ChunkManager chunks)
+    private static bool HasRestoredFaceNeighbor(Chunk chunk, ChunkManager chunks)
     {
         var cx = MathUtils.FloorToInt(chunk.Position.X);
         var cy = MathUtils.FloorToInt(chunk.Position.Y);
         var cz = MathUtils.FloorToInt(chunk.Position.Z);
         foreach (var d in Vector3Directions.CardinalOffsets)
         {
-            if (TryGetLoadedNeighbour(chunks, cx, cy, cz, d.X, d.Y, d.Z, out var neighbor)
+            if (TryGetLoadedNeighbor(chunks, cx, cy, cz, d.X, d.Y, d.Z, out var neighbor)
                 && neighbor.IsRestored)
                 return true;
         }
@@ -336,7 +336,7 @@ public class FluidManager
     }
 
     /// <summary>The face neighbor at the offset, when it exists and its blocks are generated.</summary>
-    private static bool TryGetLoadedNeighbour(ChunkManager chunks, int cx, int cy, int cz,
+    private static bool TryGetLoadedNeighbor(ChunkManager chunks, int cx, int cy, int cz,
         int dx, int dy, int dz, out Chunk neighbor)
     {
         return chunks.Chunks.TryGetValue(cx + dx, cy + dy, cz + dz, out neighbor)
@@ -356,7 +356,7 @@ public class FluidManager
     /// cells are processed in slices of <see cref="WorldGenerationConfig.MaxFluidCellsPerFrame"/>
     /// so a chunk-load wake storm spreads over several frames instead of running in one.
     /// Leftover time past the tick budget is dropped, so a hitch can never leave the simulation
-    /// spiralling to catch up.
+    /// spiraling to catch up.
     /// </summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, LodManager? lod = null)
     {
@@ -430,7 +430,7 @@ public class FluidManager
 
     /// <summary>
     /// Writes a cell outside the tick and remeshes it right away: what a bucket does. Also
-    /// schedules the neighbourhood, so the flow starts on the next tick. Returns false when the
+    /// schedules the neighborhood, so the flow starts on the next tick. Returns false when the
     /// cell's chunk is not loaded.
     /// </summary>
     public bool SetCellImmediate(Vector3 cell, byte id, byte state, ChunkManager chunks)
@@ -493,7 +493,7 @@ public class FluidManager
         }
 
         // Mud watches settled water, so it runs after the early-outs: skipped slow-fluid
-        // ticks and hardening cells never pay the 26-neighbourhood scan, and non-water
+        // ticks and hardening cells never pay the 26-neighborhood scan, and non-water
         // fluids skip it inside (water neighbors convert the dirt on their own tick).
         TryConvertMudAround(x, y, z, id);
 
@@ -575,7 +575,7 @@ public class FluidManager
             Flow(x, y - 1, z, fluid, drops);
 
             // A cell ringed by sources keeps its skirt even while draining downwards
-            if (SourceNeighbourCount(x, y, z, fluid) >= 3)
+            if (SourceNeighborCount(x, y, z, fluid) >= 3)
                 SpreadSides(x, y, z, fluid, state, drops);
         }
         else if (FluidState.IsSource(state) || !IsWaterHole(x, y - 1, z, fluid))
@@ -585,7 +585,7 @@ public class FluidManager
         }
     }
 
-    /// <summary>Flows into the neighbouring cells the slope search picked out.</summary>
+    /// <summary>Flows into the neighboring cells the slope search picked out.</summary>
     private void SpreadSides(int x, int y, int z, byte fluid, byte state, DropManager drops)
     {
         // Level 7 has nothing left to give
@@ -697,7 +697,7 @@ public class FluidManager
 
     /// <summary>
     /// Fills a cell with fluid at the level its surroundings support, popping whatever fragile
-    /// block the flow washed away (a pebble drops its flint) and rescheduling the neighbourhood.
+    /// block the flow washed away (a pebble drops its flint) and rescheduling the neighborhood.
     /// </summary>
     private void Flow(int x, int y, int z, byte fluid, DropManager drops)
     {
@@ -722,7 +722,7 @@ public class FluidManager
             // ...and so does a flow settling against a fluid that hardens on its touch:
             // water reaching lava crusts to cobblestone too, whichever side ticks first,
             // so the outcome never depends on the schedule's iteration order
-            var crust = HardenedByNeighbour(x, y, z, fluid);
+            var crust = HardenedByNeighbor(x, y, z, fluid);
             if (crust != 0)
             {
                 writeId = crust;
@@ -904,10 +904,10 @@ public class FluidManager
 
     /// <summary>
     /// Block id a flow of <paramref name="fluid"/> settling at a cell hardens into when a
-    /// neighbouring fluid hardens on its touch (water reaching lava crusts to the lava's
+    /// neighboring fluid hardens on its touch (water reaching lava crusts to the lava's
     /// cobblestone), or 0 when no neighbor does. Unloaded neighbors harden nothing.
     /// </summary>
-    private byte HardenedByNeighbour(int x, int y, int z, byte fluid)
+    private byte HardenedByNeighbor(int x, int y, int z, byte fluid)
     {
         foreach (var (dx, dy, dz) in Horizontals)
         {
@@ -934,7 +934,7 @@ public class FluidManager
     }
 
     /// <summary>Horizontally adjacent source cells of the same fluid.</summary>
-    private int SourceNeighbourCount(int x, int y, int z, byte fluid)
+    private int SourceNeighborCount(int x, int y, int z, byte fluid)
     {
         var count = 0;
         foreach (var (dx, dy, dz) in Horizontals)
@@ -949,7 +949,7 @@ public class FluidManager
 
     /// <summary>
     /// Turns the dirt around a ticked fluid cell to mud wherever it meets the mud condition
-    /// (water above, enough water across the 26-neighbourhood). Instant: no wet-time is kept,
+    /// (water above, enough water across the 26-neighborhood). Instant: no wet-time is kept,
     /// so drying out needs no handling — mud simply stays mud. Conversions write through
     /// <see cref="Write"/> like any fluid edit, so their remeshes join the tick's batch.
     /// </summary>
@@ -976,7 +976,7 @@ public class FluidManager
 
     /// <summary>
     /// Whether a dirt cell counts as submerged: a water cell directly above it, and enough
-    /// water across the whole 26-neighbourhood. Unloaded neighbors read as absent.
+    /// water across the whole 26-neighborhood. Unloaded neighbors read as absent.
     /// </summary>
     private bool IsMudWet(int x, int y, int z, byte water)
     {
@@ -989,7 +989,7 @@ public class FluidManager
         {
             if (dx == 0 && dy == 0 && dz == 0) continue;
             if (TryGetCell(x + dx, y + dy, z + dz, out var id, out _) && id == water
-                && ++count >= WorldGenerationConfig.MudWaterNeighbours)
+                && ++count >= WorldGenerationConfig.MudWaterNeighbors)
                 return true;
         }
 

@@ -37,7 +37,7 @@ Start-Process OpenGLTest/bin/Release/net9.0/VoxelEngine.exe -WorkingDirectory Op
 | 700 | night |
 
 ## Scenario ops
-`teleport`, `look`, `wait`, `walk`, `mine`, `place`, `fly`, `give`, `spawn`, `grow`, `screenshot` (`hideHud` optional). Parsing is covered by `VisualScenarioTests`. Existing scenarios live in `OpenGLTest/visual-examples/` (basic, water, flow-water, ponds, lava, trees, goblins, grass-tint, ores, sky, clouds, cloud-shadows, linear-lighting, coloured-lights, night-lights, lod-horizon, cold, biomes, particles, ...). **Extend or copy a matching one before writing a new one.**
+`teleport`, `look`, `wait`, `walk`, `mine`, `place`, `fly`, `give`, `spawn`, `grow`, `screenshot` (`hideHud` optional). Parsing is covered by `VisualScenarioTests`. Existing scenarios live in `OpenGLTest/visual-examples/` (basic, water, flow-water, ponds, lava, trees, goblins, grass-tint, ores, sky, clouds, cloud-shadows, linear-lighting, colored-lights, night-lights, lod-horizon, cold, biomes, particles, ...). **Extend or copy a matching one before writing a new one.**
 
 ## Pitfalls (all hit before)
 - Early waits: at `wait 5` the spawn is still embedded in unloaded terrain, so every `place` misses and shots are black. Wait ~12 s, `teleport` to a known open spot (`[0.5, 5.0, 0.5]`), wait ~2 s, then act.

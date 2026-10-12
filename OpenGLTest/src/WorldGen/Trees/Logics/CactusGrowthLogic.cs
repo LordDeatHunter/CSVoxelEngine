@@ -8,7 +8,7 @@ namespace VoxelEngine.WorldGen.Trees.Logics;
 /// then turn sharply straight up into a prong that runs parallel to the stem with a clear air gap
 /// between them, and never climbs level with the stem's current top. A stem node carries at most
 /// one arm, arms leave from distinct sides at least <see cref="ArmSpacing"/> stem cells apart, the
-/// side opposite an existing arm is favoured (<see cref="OppositeArmBonus"/>), and an arm only
+/// side opposite an existing arm is favored (<see cref="OppositeArmBonus"/>), and an arm only
 /// leaves where the signal's remaining energy covers its level run plus a <see cref="MinProng"/>
 /// prong, so no arm ends as a stub. Turning costs nothing beyond the step itself; the energy the
 /// signal has left where it leaves the stem is what bounds the prong.

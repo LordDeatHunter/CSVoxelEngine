@@ -1,7 +1,7 @@
 {
   "name": "Glass Pane",
   // The model is the plain slab the icon, the held pane and the drop show; in the world the
-  // pane renderer draws a post plus an arm toward every neighbouring pane or solid full cube
+  // pane renderer draws a post plus an arm toward every neighboring pane or solid full cube
   // (PaneShape), and the raycast, the outline and the body collide with exactly those arms
   "model": "block/glass_pane",
   "renderer": "pane",

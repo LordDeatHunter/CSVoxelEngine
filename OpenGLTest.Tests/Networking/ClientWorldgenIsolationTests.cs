@@ -20,7 +20,7 @@ namespace VoxelEngine.Tests.Networking;
 /// The client's seed is poisoned (<see cref="WorldSeed.Apply"/> with a seed the server never
 /// used), which also empties the column cache, so any worldgen read on the client path would both
 /// be counted and yield different terrain. The counter and the LOD edit versions are
-/// process-global, which is one reason this class runs in the serialised Worldgen seed collection.
+/// process-global, which is one reason this class runs in the serialized Worldgen seed collection.
 /// </remarks>
 [Collection("Worldgen seed")]
 public sealed class ClientWorldgenIsolationTests
@@ -32,7 +32,7 @@ public sealed class ClientWorldgenIsolationTests
 
     /// <summary>What a server under the default seed streams for a target, and its own mesh of it.</summary>
     private sealed record ServerCapture(
-        Vector3 Centre,
+        Vector3 Center,
         Vector3 Top,
         List<(Vector3 Pos, byte[] Payload)> Chunks,
         List<(int X, int Z, byte[] Payload)> Columns,
@@ -42,13 +42,13 @@ public sealed class ClientWorldgenIsolationTests
     {
         // The seed-hashed emitters (pebbles, branch piles, untouched snow) are the one place a mesh
         // still reads the world seed, so the mesh comparison needs a chunk without them.
-        var (centre, top) = StreamedTerrainMeshTests.FindTarget(target, withoutSeedHashedCells: true);
-        var worldgen = StreamedTerrainMeshTests.GenerateNeighbourhood(centre);
-        var mesh = worldgen.Chunks[centre].GenerateMeshData(worldgen, greedy: true);
+        var (center, top) = StreamedTerrainMeshTests.FindTarget(target, withoutSeedHashedCells: true);
+        var worldgen = StreamedTerrainMeshTests.GenerateNeighborhood(center);
+        var mesh = worldgen.Chunks[center].GenerateMeshData(worldgen, greedy: true);
         Assert.NotNull(mesh);
-        StreamedTerrainMeshTests.AssertExercises(target, centre, mesh);
-        return new ServerCapture(centre, top, StreamedTerrainMeshTests.CaptureChunks(worldgen, centre),
-            StreamedTerrainMeshTests.CaptureColumns(centre), mesh);
+        StreamedTerrainMeshTests.AssertExercises(target, center, mesh);
+        return new ServerCapture(center, top, StreamedTerrainMeshTests.CaptureChunks(worldgen, center),
+            StreamedTerrainMeshTests.CaptureColumns(center), mesh);
     }
 
     /// <summary>
@@ -93,16 +93,16 @@ public sealed class ClientWorldgenIsolationTests
             var before = WorldgenReads.Count;
 
             // The chunks first, then their columns, as the wire may deliver them; the columns'
-            // arrival is what lets the centre mesh
+            // arrival is what lets the center mesh
             StreamedTerrainMeshTests.StreamChunks(streamer, server.Chunks);
             Frames(client, manager);
             StreamedTerrainMeshTests.StreamColumns(streamer, server.Columns);
-            var centre = manager.Chunks[server.Centre];
-            for (var i = 0; i < 20 && !centre.IsMeshed; i++)
+            var center = manager.Chunks[server.Center];
+            for (var i = 0; i < 20 && !center.IsMeshed; i++)
                 Frames(client, manager);
-            Assert.True(centre.IsMeshed, "the streamed centre chunk never meshed");
+            Assert.True(center.IsMeshed, "the streamed center chunk never meshed");
 
-            var mesh = centre.GenerateMeshData(manager, greedy: true);
+            var mesh = center.GenerateMeshData(manager, greedy: true);
             Assert.Equal(before, WorldgenReads.Count);
             Assert.NotNull(mesh);
             StreamedTerrainMeshTests.AssertSameMesh(server.Mesh, mesh);
@@ -110,8 +110,8 @@ public sealed class ClientWorldgenIsolationTests
             // The poison is real: the client's own worldgen would have made other terrain of this
             // column, so the equal meshes above cannot come from reading it
             WorldgenReads.Enabled = false;
-            Assert.True(WorldgenColumnSource.Instance.TryGet((int)server.Centre.X, (int)server.Centre.Z, out var poisoned));
-            Assert.True(streamer.TryGet((int)server.Centre.X, (int)server.Centre.Z, out var streamed));
+            Assert.True(WorldgenColumnSource.Instance.TryGet((int)server.Center.X, (int)server.Center.Z, out var poisoned));
+            Assert.True(streamer.TryGet((int)server.Center.X, (int)server.Center.Z, out var streamed));
             Assert.False(poisoned.ContentEquals(streamed), "the poisoned seed generates the server's column");
         }
         finally
@@ -134,10 +134,10 @@ public sealed class ClientWorldgenIsolationTests
             world = client;
             StreamedTerrainMeshTests.StreamChunks(streamer, server.Chunks);
             StreamedTerrainMeshTests.StreamColumns(streamer, server.Columns);
-            var centre = manager.Chunks[server.Centre];
-            for (var i = 0; i < 20 && !centre.IsMeshed; i++)
+            var center = manager.Chunks[server.Center];
+            for (var i = 0; i < 20 && !center.IsMeshed; i++)
                 Frames(client, manager);
-            Assert.True(centre.IsMeshed, "the streamed centre chunk never meshed");
+            Assert.True(center.IsMeshed, "the streamed center chunk never meshed");
 
             var player = new PlayerContext(client.Inventory) { Camera = client.Camera, IsCreative = true };
             var dirt = ContentRegistry.RequireBlock("dirt").Id;

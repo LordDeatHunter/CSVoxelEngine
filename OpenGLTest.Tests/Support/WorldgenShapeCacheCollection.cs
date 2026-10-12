@@ -3,7 +3,7 @@ using Xunit;
 namespace VoxelEngine.Tests.Support;
 
 /// <summary>
-/// Serialises the tests that depend on <c>TreeGenerator.ShapeCache</c> instance identity or reset
+/// Serializes the tests that depend on <c>TreeGenerator.ShapeCache</c> instance identity or reset
 /// it. <c>WorldgenTests.TrunkShapeIsCachedAcrossChunks</c> asserts that two adjacent
 /// <c>ShapeOf</c> calls return the same instance, and <c>TreeWorldgenTests</c> calls
 /// <c>TreeGenerator.ResetCaches</c> between two generation passes, which would falsify the

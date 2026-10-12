@@ -10,7 +10,7 @@ namespace VoxelEngine.WorldGen.Trees.Features;
 /// the first cell the graph already holds, that the space does not leave free, or that would hang
 /// over a free cell, so every fin cell rests on the ground. Fins are feature nodes (never leaf
 /// tips) and are full cubes, so the on-axis fin cells stand in for the on-axis shells and the
-/// off-axis shells chain through them (the rasteriser's full-cube feature-parent rule). A root
+/// off-axis shells chain through them (the rasterizer's full-cube feature-parent rule). A root
 /// under one block of shell radius grows none. Stateless: the random draws are made for every
 /// side whatever the obstacles, so the stream never depends on the surroundings.
 /// </summary>

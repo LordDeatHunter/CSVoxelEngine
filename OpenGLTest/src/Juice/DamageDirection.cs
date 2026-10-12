@@ -69,7 +69,7 @@ public sealed class DamageDirection
 
     /// <summary>
     /// Where on screen the arc sits for a view facing <paramref name="yawDegrees"/>, as a unit
-    /// direction from the screen centre with x to the right and y up: a blow from ahead points at
+    /// direction from the screen center with x to the right and y up: a blow from ahead points at
     /// the top edge, from the right at the right edge and from behind at the bottom edge.
     /// </summary>
     public Vector2 ScreenDirection(float yawDegrees)

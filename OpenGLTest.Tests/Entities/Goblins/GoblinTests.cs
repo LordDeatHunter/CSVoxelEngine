@@ -21,7 +21,7 @@ public sealed class GoblinTests
 
     private static ChunkManager StoneFloor() => MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
 
-    // Body centre of a goblin standing on the y = 0 floor.
+    // Body center of a goblin standing on the y = 0 floor.
     private static Vector3 GroundBody(float x, float z) => new(x, 1f + Goblin.Height * 0.5f, z);
 
     // A camera whose eye stands on the y = 0 floor at (x, z).

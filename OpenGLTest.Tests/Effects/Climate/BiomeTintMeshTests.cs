@@ -11,7 +11,7 @@ namespace VoxelEngine.Tests.Effects.Climate;
 
 /// <summary>
 /// The chunk mesher's biome tint: a <c>biomeTint</c> block's tinted quads carry shade * the
-/// field's tint and the bit-4 flag, untinted quads stay grey, an overlay is drawn after its
+/// field's tint and the bit-4 flag, untinted quads stay gray, an overlay is drawn after its
 /// base, the tint never splits a greedy merge, and a field override replaces the chunk's own.
 /// </summary>
 public sealed class BiomeTintMeshTests
@@ -66,7 +66,7 @@ public sealed class BiomeTintMeshTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void TintedTopCarriesTheFieldColourAndFlag(bool greedy)
+    public void TintedTopCarriesTheFieldColorAndFlag(bool greedy)
     {
         var (manager, center) = Slab(Grass.Id);
         var mesh = center.GenerateMeshData(manager, greedy);
@@ -87,7 +87,7 @@ public sealed class BiomeTintMeshTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void UntintedFacesStayGrey(bool greedy)
+    public void UntintedFacesStayGray(bool greedy)
     {
         var (stoneManager, stoneCenter) = Slab(ContentRegistry.RequireBlock("stone").Id);
         var stone = stoneCenter.GenerateMeshData(stoneManager, greedy);
@@ -107,7 +107,7 @@ public sealed class BiomeTintMeshTests
         {
             Assert.False(v.IsBiomeTinted, $"untinted vertex at {v.Position} face {Face(v)} is flagged");
             var (r, g, b) = Rgb(v);
-            Assert.True(r == g && g == b, $"untinted vertex at {v.Position} face {Face(v)} is coloured {Rgb(v)}");
+            Assert.True(r == g && g == b, $"untinted vertex at {v.Position} face {Face(v)} is colored {Rgb(v)}");
         });
     }
 

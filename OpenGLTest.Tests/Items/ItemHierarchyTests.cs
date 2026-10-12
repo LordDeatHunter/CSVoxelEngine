@@ -11,7 +11,7 @@ public sealed class ItemHierarchyTests
     private static byte ItemId(string name) => ContentRegistry.RequireItem(name).Id;
 
     [Fact]
-    public void FactoryMapsActionsToBehaviourFamilies()
+    public void FactoryMapsActionsToBehaviorFamilies()
     {
         Assert.IsType<BucketPickupItem>(ItemRegistry.TryGet(ItemId("bucket")));
         Assert.IsType<BucketPlaceItem>(ItemRegistry.TryGet(ItemId("water_bucket")));

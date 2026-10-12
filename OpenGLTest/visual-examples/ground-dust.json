@@ -13,7 +13,7 @@
     { "op": "view", "mode": "shoulder" },
 
     // LEG 1 — grass: the spawn clearing (ground top y 10 at x 8, z 8). Stand, then drop 10 blocks.
-    // The chips wear the grass's biome tint, so they must come out green, not grey.
+    // The chips wear the grass's biome tint, so they must come out green, not gray.
     { "op": "teleport", "pos": [8.5, 12.7, 8.5], "yaw": 0, "pitch": -25 },
     { "op": "wait", "seconds": 1.5 },
     { "op": "teleport", "pos": [8.5, 22.7, 8.5], "yaw": 0, "pitch": -25 },

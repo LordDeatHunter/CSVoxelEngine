@@ -11,7 +11,7 @@ namespace VoxelEngine.Content.Shapes;
 /// layered snow its stack depth (<see cref="SnowShape"/>), a pane its arms (<see cref="PaneShape"/>),
 /// a facing block its facing (<see cref="BlockType.RotatedHitboxes"/>, plus the open bit of an
 /// openable block, <see cref="DoorState"/>), and everything else its
-/// registered <see cref="BlockType.Hitboxes"/>. Only thin and bevelled tree wood allocate.
+/// registered <see cref="BlockType.Hitboxes"/>. Only thin and beveled tree wood allocate.
 /// </summary>
 public static class BlockShape
 {

@@ -9,7 +9,7 @@ namespace VoxelEngine.WorldGen;
 /// <see cref="ColumnCache"/> miss (once per column, never per cache hit) and
 /// <see cref="TerrainGenerator.Climate"/>. Off by default, so production pays one volatile bool
 /// read there; only <c>ClientWorldgenIsolationTests</c> sets <see cref="Enabled"/>, which runs
-/// serialised in the "Worldgen seed" test collection and clears it again in a finally.
+/// serialized in the "Worldgen seed" test collection and clears it again in a finally.
 /// </summary>
 internal static class WorldgenReads
 {

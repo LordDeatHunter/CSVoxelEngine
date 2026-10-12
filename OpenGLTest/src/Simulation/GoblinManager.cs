@@ -159,7 +159,7 @@ public sealed class GoblinManager : IMobPopulation
     public int DamageDealtThisFrame { get; private set; }
 
     /// <summary>
-    /// Adds a goblin at an exact body-centre position: a forced spawn (scenarios, save restores, a
+    /// Adds a goblin at an exact body-center position: a forced spawn (scenarios, save restores, a
     /// client's mirror, tests), which may go past the natural cap but never the hard cap. Null, and
     /// nothing added, once the hard cap is full. The ring spawner adds through here too, after its
     /// own natural-cap check. A null <paramref name="ammo"/> rolls the stone count it carries, and
@@ -474,7 +474,7 @@ public sealed class GoblinManager : IMobPopulation
     }
 
     /// <summary>The goblin's spawn ring through <see cref="MobSpawner.TryFindSurfaceSpawn"/>,
-    /// returning the body centre standing on the found ground cell.</summary>
+    /// returning the body center standing on the found ground cell.</summary>
     internal static bool TryFindSpawn(ChunkManager chunks, Vector3 playerPosition, out Vector3 position)
     {
         if (!MobSpawner.TryFindSurfaceSpawn(chunks, playerPosition,

@@ -14,7 +14,7 @@
 //
 // The shafts are display-space light, added to the ENCODED scene and clipped at 1 the way the
 // pre-SH-10 8-bit target did, then decoded again: added straight onto the linear HDR target the
-// same march read far weaker toward the sun and greyed the water elsewhere. uScene is the HDR
+// same march read far weaker toward the sun and grayed the water elsewhere. uScene is the HDR
 // target this pass draws into, read texel-for-texel after a glTextureBarrier with blending off
 // (one full-screen triangle writes each pixel once).
 in vec2 fUv;
@@ -55,7 +55,7 @@ void main() {
     vec4 h = uInvViewProj * vec4(fUv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
     float len = min(length(h.xyz / h.w - uCameraPos), uMaxDistance);
 
-    // The 2x2 half-res neighbourhood a bilinear tap at fUv would blend, fetched explicitly so the
+    // The 2x2 half-res neighborhood a bilinear tap at fUv would blend, fetched explicitly so the
     // bilinear weights can be reweighted per tap. textureSize means no texel-size uniform.
     ivec2 size = textureSize(uRays, 0);
     vec2 t = fUv * vec2(size) - 0.5;
@@ -88,7 +88,7 @@ void main() {
         if (d < bestD) { bestD = d; best = s.rgb; }
     }
 
-    // The weights are normalised, so the common 0-to-a-few-blocks mismatch is just a soft
+    // The weights are normalized, so the common 0-to-a-few-blocks mismatch is just a soft
     // bilateral blend. Since the bilinear weights sum to 1, wsum only collapses below 1e-4 when
     // EVERY one of the four taps mismatches by more than roughly uTolerance * ln(1e4) (about 18
     // blocks at the default tolerance) - i.e. a thin full-res feature that no half-res sample

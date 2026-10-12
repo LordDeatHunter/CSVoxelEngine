@@ -27,7 +27,7 @@ public sealed class LightTintTests
     private static Vector3 Decode(int code) => LightTint.Decode(code, BlockLightPalette.Linear);
 
     [Fact]
-    public void ASingleSlotDecodesExactlyToItsColour()
+    public void ASingleSlotDecodesExactlyToItsColor()
     {
         for (var slot = 0; slot < BlockLightPalette.Count; slot++)
         {
@@ -61,7 +61,7 @@ public sealed class LightTintTests
     }
 
     [Fact]
-    public void ATwoSlotMixLiesBetweenTheColoursNearerTheHeavier()
+    public void ATwoSlotMixLiesBetweenTheColorsNearerTheHeavier()
     {
         var a = BlockLightPalette.Linear[0];
         var b = BlockLightPalette.Linear[_other];

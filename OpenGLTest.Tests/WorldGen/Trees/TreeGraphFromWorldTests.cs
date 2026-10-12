@@ -269,7 +269,7 @@ public sealed class TreeGraphFromWorldTests
     }
 
     [Fact]
-    public void AnUnloadedNeighbourRefusesTheRebuild()
+    public void AnUnloadedNeighborRefusesTheRebuild()
     {
         var species = StampedTree.WorldgenSpecies.First();
         var chunks = new ChunkManager(null!);

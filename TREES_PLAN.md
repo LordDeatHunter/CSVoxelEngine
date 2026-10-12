@@ -13,7 +13,7 @@ tracked in `TODO.md` (`M-10`, `M-13`, `M-14`).
 Trees are hardcoded C# today: `TreeGenerator.BuildShape` (broadleaf) and `BuildSpruceShape`,
 plus a parallel copy of the same pattern in `CactusGenerator`. Wood thickness is one block id
 per taper step (log/branch/limb/sprig/switch/twig, 4 cactus ids, `wood.taperLevel`), and
-`WoodShape` welds neighbours by the heuristic "levels differ by exactly 1". Goal:
+`WoodShape` welds neighbors by the heuristic "levels differ by exactly 1". Goal:
 
 - one generic, data-driven, **step-based** tree generator;
 - species defined in JSON;
@@ -38,8 +38,8 @@ bits 0-3  thickness n -> diameter (n+1) px; 15 = full cube
 bits 4-6  parent dir: 0-5 = CubeFaces order (-Z +Z -X +X +Y -Y), 6 = root, 7 = detached
 bit  7    shell (girth cell of a wide trunk, see below)
 ```
-- **Connection rule:** a cell connects to its parent and to any neighbour whose parent is it.
-  This replaces the level-diff welding in `WoodShape`, ends sibling and neighbour-tree welds,
+- **Connection rule:** a cell connects to its parent and to any neighbor whose parent is it.
+  This replaces the level-diff welding in `WoodShape`, ends sibling and neighbor-tree welds,
   and lets in-world growth rebuild the graph from the blocks.
 - **Placed wood:** a wood item placed by the player is a full detached cube (parent 7). It
   never welds and is never felled with a tree.
@@ -57,8 +57,8 @@ bit  7    shell (girth cell of a wide trunk, see below)
   diagonal shell chains through an edge shell), laid out per species as a block-resolution
   voxel circle or an NxN square.
 
-A species with `rim: "pixel"` gets its outer shells bevelled by the mesher from their 8
-horizontal neighbours (marching-squares, pixel-stepped quarter-rounds). This is stateless and
+A species with `rim: "pixel"` gets its outer shells beveled by the mesher from their 8
+horizontal neighbors (marching-squares, pixel-stepped quarter-rounds). This is stateless and
 uses the existing 18³ padded snapshot. Buttresses and flared roots are a post-growth feature
 stage that writes ordinary wood cells along the ground.
 
@@ -119,7 +119,7 @@ bands }`:
 - **Placement** keeps today's rules (density hash, lowest-hash spacing, biome, slope, soil,
   water, spawn clear radius), with the per-species `worldgen` block driving them.
 - **Cell batches:** every tree of a 64×64 XZ cell grows together, in placement-hash order, in
-  one `VirtualTreeSpace` (terrain plus the trees already grown). Trees in the 8 neighbouring
+  one `VirtualTreeSpace` (terrain plus the trees already grown). Trees in the 8 neighboring
   cells count as obstacles only as their cached **solo** shapes, which keeps the result
   deterministic and independent of chunk order. Both caches are `GenerationalCache` sites
   (pure functions of their keys, static factory delegates), with capacity/generation knobs in
@@ -131,7 +131,7 @@ bands }`:
 
 ### Mesh, collision, felling, decay
 - **`tree_wood` renderer** (per-voxel path, not greedy): a node box sized by thickness and a
-  tube toward every connection at min(this, neighbour). It crops UVs through
+  tube toward every connection at min(this, neighbor). It crops UVs through
   `Chunk.TiledUv`, keeps smooth light and AO through `FaceLight`, and bevels pixel-rim shells.
   The biome tint and sway rules stay as they are. Full-thickness cells emit culled cube faces
   like today's log.
@@ -205,7 +205,7 @@ bands }`:
    non-occluding, non-AO and light-passing, never greedy. `TreeWoodShape` is the one connection
    rule (same id, neither side detached, my parent points at you or yours at me) plus node and
    tube boxes (`HalfWidth = (t+1)/32`); the `Chunk` per-voxel `EmitTreeWood` emitter draws a thin
-   cell as a node box plus one capless tube per connection at min(this, neighbour) width through
+   cell as a node box plus one capless tube per connection at min(this, neighbor) width through
    `EmitBoxFace`/`CropUv` and `EmitterFaceLight`, while a full-thickness or detached cell takes the
    model path and culls against a same-id full cube. Raycast, selection outline and
    `Camera.IsColliding` read `TreeWoodShape.GetBoxesAt`/`OverlapsShape`. `Mining.HardnessOf(id,
@@ -214,14 +214,14 @@ bands }`:
    trees pass; placing tree wood writes `WoodState.Detached`. `TreeGenerator` keeps the placement
    gates, now per species (`TryGetTree`: one hash stream, biome -> species in ordinal name order,
    optional `worldgen.openness`/`spawnClear`), grows each tree solo (`ShapeOf`: a
-   `GenerationalCache` of rasterised `TreeCell[]` over the terrain heightmap raised to flooded
+   `GenerationalCache` of rasterized `TreeCell[]` over the terrain heightmap raised to flooded
    water) and `Stamp`s wood with state into air or leaves, then leaves into air, in a fixed scan
    order; the root walk extends the trunk down through cave air but only inside the chunk holding
-   the base and never past its floor. The far LOD canopy reads the rasterised leaf cells;
+   the base and never past its floor. The far LOD canopy reads the rasterized leaf cells;
    `PoisonCanopy` takes a radius (1 for a single edit, the species reach on a fell; the disturbed
    set's cap is `CanopyDisturbedLimit`). `TopplingTree.Collect` fells the cut cell's subtree over
    child edges (root: the whole tree; limb: its descendants; detached never follows) plus leaves
-   within Chebyshev 2, meshed in a scratch chunk centred on the pivot (`ScratchOrigin`) with the
+   within Chebyshev 2, meshed in a scratch chunk centered on the pivot (`ScratchOrigin`) with the
    state bytes. Save formats bumped (`ChunkSaveCodec.Version`, `WorldStore.CurrentVersion` 2;
    PLAY refuses another format with a notice). Instrumentation: `WorldgenStats` and the
    profiler's `wgen` console token; scenarios `visual-examples/tree-perf.json` (perf fly-through)
@@ -237,14 +237,14 @@ bands }`:
    `BatchShapeOf(x, z)` for tests and probes. Trunks come from `TryGetTree` over the cell and are
    sorted by (`PlacementHash`, x, z), a total order (`TreeGrower.SeedFor` keeps each tree's RNG
    independent of it). Obstacles are the SOLO shapes (`ShapeOf`, unchanged, still the solo cache)
-   of the neighbour trunks in the 2R ring around the cell that pass a Chebyshev filter (distance
-   <= own reach + neighbour reach), never another batch, so a batch is a pure function of (cell,
+   of the neighbor trunks in the 2R ring around the cell that pass a Chebyshev filter (distance
+   <= own reach + neighbor reach), never another batch, so a batch is a pure function of (cell,
    seed); the static ctor throws if 2R exceeds the cell. Each grown tree's wood and leaf cells
    are occupied (`VirtualTreeSpace.OccupyAll`) before the next grows; the one residual overlap is a
    later tree's unchecked base cell landing in an earlier tree's leaves (or rarely wood).
    `Stamp` and `BuildCanopyTops` walk the cells whose reach-expanded box meets the chunk in
    (cellX, cellZ) order, then tree order, with the unchanged two passes (wood into air/leaves +
-   roots, then leaves into air), so border residue (a neighbour stamps its batch shapes, which
+   roots, then leaves into air), so border residue (a neighbor stamps its batch shapes, which
    grew against this cell's solo shapes) settles deterministically by stamp order; the first LOD
    ring therefore shows exactly the stamped canopy. Farther rings read a proxy:
    `LodLevelSpec.ProxyCanopy` (true on the cell-4 and cell-8 rings), `TryGetCanopy(x, z, proxy,
@@ -262,7 +262,7 @@ bands }`:
    under the 10 % gate; see "Phase 4 result"). Known residue for later phases: in a dense taiga
    batch a few late trees have no room left and grow a bare post (8 of 708 sampled, none of them a
    stump when grown solo). Tests: `TreeBatchTests` (order independence, disjoint grown cells, no entry into earlier
-   or neighbour-solo cells, trunks = placement, reach, whole trees across cell borders, first ring
+   or neighbor-solo cells, trunks = placement, reach, whole trees across cell borders, first ring
    = stamped canopy), `LodCanopyProxyTests` (proxy placement = real placement, proxy within reach,
    profiles non-increasing, deterministic roll, far rings never grow), `VirtualTreeSpaceTests.
    OccupyAllMatchesPerCellOccupy`, and the shared `TreeWorldgenFixture`.
@@ -275,9 +275,9 @@ bands }`:
    rule: a scheduled non-persistent leaf re-derives its hydration as the max of
    `LeafCluster.HydrationFromTip` (the one per-tip formula, now shared with `HydrationAt` and
    `Collect`) over the live tips in its species' cluster box — a non-detached cell of the
-   species' wood with `DiameterPx <= tipMaxPx` and no face neighbour whose parent points at it —
+   species' wood with `DiameterPx <= tipMaxPx` and no face neighbor whose parent points at it —
    so a settled canopy reads back bit for bit and costs nothing. The adjacency chain rule
-   ("a neighbouring leaf minus one") was rejected: leaves reachable from their tip only through
+   ("a neighboring leaf minus one") was rejected: leaves reachable from their tip only through
    the branch's own wood (behind a bend) would re-derive to 0 on an intact tree. Hydration
    rewrites never remesh (the mesher never reads `LeafState`); a 0 decays to air under
    `LeafDecayMaxRemovalsPerTick`, the tick's cells taken in a `SplitMix64`-scattered order so a
@@ -310,7 +310,7 @@ bands }`:
    already guards Y through the batch and shape `MinY`/`MaxY`). Tests: `LeafDecayTests` (intact
    canopy re-derives bit for bit and then schedules nothing, a cut tip's leaves decay within the
    budget bound, a second live tip holds a leaf, persistent leaves never decay, unloaded
-   neighbours freeze, decay rolls the leaf loot under the per-tick budget, decayed leaves schedule
+   neighbors freeze, decay rolls the leaf loot under the per-tick budget, decayed leaves schedule
    nothing further, a whole tree's box is never truncated by the backlog, orphaned thin wood
    crumbles while the connected rest stays), the shared `StampedTree` harness. Known residue: the
    world cannot tell a root-walk feature node from a branch, so a thin childless root counts as a
@@ -320,8 +320,8 @@ bands }`:
    the last loaded chunk (one main-thread growth call, no unloads, not thread-safe): a cell is free
    when it is loaded, not `reserved` (World passes `FallingBlockManager.OverlapsAny`), air or a
    non-persistent leaf of the species, and not the missing parent of an orphan (no non-detached
-   face neighbour of the species' wood names it as its parent — the rule that keeps a cut branch
-   cut); any unloaded cell or neighbour read refuses. `IsPlantable` also accepts a non-solid
+   face neighbor of the species' wood names it as its parent — the rule that keeps a cut branch
+   cut); any unloaded cell or neighbor read refuses. `IsPlantable` also accepts a non-solid
    placement-replaceable cover (a partial snow layer) for the sapling root. `TreeCellReader` (a
    delegate `ChunkManager.TryGetCell` binds to, so the engine stays storage-agnostic) feeds
    `TreeGraph.FromWorld`: from a root cell (parent code 6) a breadth-first walk with the node index
@@ -348,7 +348,7 @@ bands }`:
    plantable root cell above (a cover there is cleared to air, dropping nothing); biome and
    ground-height rules are not applied. Planting and an existing tree share one `GrowAndWrite`
    tail: RNG `GrowSeed(SeedFor(root, worldSeed, species), nodeCount, call counter)` so a repeated
-   grow never replays the same pulses, `GrowFurther`, rasterise once, then wood (existing nodes
+   grow never replays the same pulses, `GrowFurther`, rasterize once, then wood (existing nodes
    only re-coded for thickness, new nodes only into air or own leaves that are free, never thinning,
    a skipped parent skips its subtree) and then leaves only around changed tips (new tips or
    re-coded live tips): a new leaf only into free air, an existing own non-persistent leaf only
@@ -369,7 +369,7 @@ bands }`:
    the felled column (Planted +4, Grew +16, Grew +59). `FluidManager.PendingCells` is a new test
    seam. Tests: `TreeGraphFromWorldTests` (round trip of every species, Thicken reproduces the
    stamped states, a cut tree never thins, cut and detached subtrees stay out, below-root nodes are
-   features, an unloaded neighbour and a non-root cell refuse), `WorldTreeSpaceTests` (air and own
+   features, an unloaded neighbor and a non-root cell refuse), `WorldTreeSpaceTests` (air and own
    leaves free, persistent/foreign/terrain/fluid/unloaded/reserved not, the orphan-parent rule,
    cover plantable but not free), `TreeGrowthTests` (an intact tree and a mined crown rewrite
    nothing, growth only appends and never thins, foreign blocks survive, a cut branch stays cut,
@@ -380,7 +380,7 @@ bands }`:
    (`LoadAround`, `Fill`, `Snapshot`, `Min`/`Max`). Known residue: the far-LOD hook only removes
    stale canopy bumps, so a grown column shows no far canopy until reload (no add path, `TODO.md`
    `M-13`); the call counter is not persisted; growth does not avoid the player or mob bodies; a
-   target column that crosses only a branch, not the root, plants a sapling; unmodified neighbour
+   target column that crosses only a branch, not the root, plants a sapling; unmodified neighbor
    chunks re-stamp the original worldgen tree on load (the same residue as cutting); the World's
    immediate remesh duplicates one async rebuild.
 7. **Done — wide trunks + new species.** `TreeRasterizer` is the only place a wide node becomes
@@ -400,7 +400,7 @@ bands }`:
    `woodCount`. `ITreeSpace.AcceptsShell` (default `IsFree`) is the shell placement test,
    `LeafCluster.Collect` takes an `exclude` set so no leaf lands on a shell, and `ReachOf` widens
    Horizontal by `BlockRadius(MaxPx)` (plus `TreeButtressMaxReach` for a buttress species). A
-   species that never passes 16 px rasterises byte-identically, so oak, spruce and cactus
+   species that never passes 16 px rasterizes byte-identically, so oak, spruce and cactus
    worldgen is unchanged. `girthProfile` multiplies the grower's thickness by height fraction.
    `TreeGraph.FromWorld` skips shells, recovers a trunk core's floor as `MinDiameterPx(R)` from
    the longest shell run along the eight lines `(±k,0)`, `(0,±k)`, `(±k,±1)` (only when
@@ -419,7 +419,7 @@ bands }`:
    `TopplingTree.Collect` fells the components that lose every anchor once the cut cell is gone
    (unloaded reads are no link; identical to the old subtree walk on thin trees; the canopy sweep
    skips shells), so a wide trunk falls only once a whole slice is cut;
-   `LeafDecayManager.TickWood` crumbles by the same rule through a memoised parent-chain fast
+   `LeafDecayManager.TickWood` crumbles by the same rule through a memoized parent-chain fast
    path (`WalkParentChain`) and a full search on a broken chain (unloaded = freeze), with
    per-frame `_supported`/`_unsupported` memos, and shells are never live tips. The caps
    decouple: `TreeGrowNodeCap` 512 (FromWorld and grown nodes), `TreeFellWoodCap` 2048 (nodes plus
@@ -435,14 +435,14 @@ bands }`:
    or multiply weights. The pixel rim: `BlockType.PixelRimById`/`HasPixelRim`, filled from each
    species' `rim` in `ContentRegistry.LoadTreeSpecies` (two species sharing a wood must agree, or
    load throws naming both files); `TreeWoodShape.CanBevel`, `IsRimMass`, `RimCornerMask` (a
-   corner is carved when neither of its two edge neighbours is same-id attached full-cube wood —
+   corner is carved when neither of its two edge neighbors is same-id attached full-cube wood —
    the marching-squares outcome, and diagonals never matter because a cell only removes its own
    material), `RimInsetPx`, `RimBoxes` (stair-stepped full-height boxes, at most `MaxRimBoxes`,
    `TreeRimBevelPx` 8) and `RimSideFull` (the culling predicate) feed `GetBoxes`/`GetBoxesAt`/
    `OverlapsShape` (allocation-free; non-rim cells keep the zero-read path), and through them the
-   raycast, outline and collision. `Chunk.EmitRimWood` meshes a bevelled shell from the 18³
-   snapshot (`RimMaskInSnapshot`, `RimFaceFull`; exact caps that subtract a bevelled cell above or
-   below), and the plain cube path culls a same-wood face only when the neighbour's facing side
+   raycast, outline and collision. `Chunk.EmitRimWood` meshes a beveled shell from the 18³
+   snapshot (`RimMaskInSnapshot`, `RimFaceFull`; exact caps that subtract a beveled cell above or
+   below), and the plain cube path culls a same-wood face only when the neighbor's facing side
    is full. Content: `assets/data/trees/baobab.json` (logic baobab, maxPx 80, circle, pixel rim,
    buttress) and `stone_pine.json` (logic umbrella, maxPx 24, circle, block rim, roots), both
    **without** a `worldgen` block, the blocks `baobab_log`, `baobab_leaves`, `stone_pine_log`,
@@ -477,7 +477,7 @@ bands }`:
    felled mesh is drawn only inside its 16³ scratch chunk (the drops are intact); a wide core cut
    while its slice's shells stand leaves the crown unreachable for reactive growth, because
    `FromWorld` stops at the missing core, which cannot be refilled since the core above names it;
-   a bevelled shell's vertical cull reads the edge neighbours of the cell above, which can lie in
+   a beveled shell's vertical cull reads the edge neighbors of the cell above, which can lie in
    an edge-diagonal chunk that face-adjacent dirtying does not remesh, so a rare cap can go stale;
    cutting a wide trunk's root core drops only its root walk and fins (plus a couple of leaves the
    canopy sweep finds); buttress fins apply only at maturity or planting; mined shells never
@@ -506,7 +506,7 @@ bands }`:
    `ITEM_DEBUGGER_SELECT` now tries items, entities, then species (`tree/` forces the species,
    e.g. `tree/cactus`), and `ITEM_DEBUGGER_TREE_STEP` takes an integer or `mature`. Captures of
    oak, baobab and `tree/cactus` at step 10 rendered whole trees with no seam clipping, tinted
-   grass and leaves, the oak's thin tubes and the baobab's bevelled core/shell trunk with its
+   grass and leaves, the oak's thin tubes and the baobab's beveled core/shell trunk with its
    buttress fins. `visual-examples/trees.json` already covered the whole Verification list, so
    it needed no change. AGENTS.md was rewritten for the tree rework: the `grow` op, the TREES
    tab and its env vars, tree-wood hardness, the mesher and biome-tint mentions, the Layout tree,
@@ -522,7 +522,7 @@ bands }`:
    root was only 11-13 px), the cactus was a stub with side knobs, and the stone pine's blob crown
    swallowed every limb. **The crown follows the trunk.** The support signal is the root cell's
    stored diameter: `LeafCluster.SupportPx(graph)` = `ThicknessCode(graph[Root].ThicknessPx) + 1`,
-   exactly the `WoodState.DiameterPx` the rasteriser writes for the root, so it is capped at one
+   exactly the `WoodState.DiameterPx` the rasterizer writes for the root, so it is capped at one
    block (16 px). `LeafCluster.ClusterRadius(species, supportPx)` (and the `TreeGraph` overload) is
    `minRadius + (radius - minRadius) * min(support, fullRadiusPx) / fullRadiusPx` in integer math,
    from the two new optional `leafCluster` knobs `minRadius` (1..`radius`, default `radius`, i.e.
@@ -537,7 +537,7 @@ bands }`:
    cheaper). Decay re-derives the support in the world through `LeafDecayManager.TryTipSupport`,
    which walks the live tip's parent chain under the same link rules as `WalkParentChain`, at most
    `TreeFellWoodCap` steps, to a `WoodState.IsRoot` cell (a broken chain answers the last cell
-   reached; an unloaded read freezes the leaf), memoising every walked cell in a per-`Update`
+   reached; an unloaded read freezes the leaf), memoizing every walked cell in a per-`Update`
    `_tipSupport` table. `TreeGrowthWriter.GrowAndWrite` compares the radius before and after
    `GrowFurther`: when it changed, every **original** live tip still in the world regrows its
    cluster at the new radius, but never a node the wood pass skipped (unloaded cell, skipped
@@ -674,7 +674,7 @@ the same picture (0.62 ms/chunk, 1694 misses, dup 6.9 %, brot 22).
 
 Overall ms/chunk is unchanged (median 0.68 vs 0.67, range 0.61-0.70 vs 0.65-0.69), so the 25 %
 rule did not trip. The expected doubling of grows did not happen. Every tree is still grown twice
-on the near side, solo as a neighbour obstacle and again in its batch, but the far rings no longer
+on the near side, solo as a neighbor obstacle and again in its batch, but the far rings no longer
 grow anything, and that more than pays for it: grows fell from 132-145k to 111-115k, solo
 misses/s to about a third (694-757 vs 2281-2448) and grow ms/s from 705-768 to 370-497, while
 grow ms/tree stays at ~0.3 ms (growing against more obstacles costs no more). The stamp itself is

@@ -232,12 +232,12 @@ public class RenderManager : IDisposable
     // Directional sun shadows: RenderShadows fills _nearShadow's depth texture (a depth-only FBO
     // attachment, sampled as a comparison sampler on unit 1) through its ViewProj, and every
     // world draw hands both to test-fragment.glsl's SampleShadow. The cascade also carries its
-    // own texel-stepped box centre (ShadowCascade.StepCentre) from frame to frame.
+    // own texel-stepped box center (ShadowCascade.StepCenter) from frame to frame.
     private readonly ShadowCascade _nearShadow =
         new(WorldGenerationConfig.ShadowRadiusBlocks, WorldGenerationConfig.ShadowMapSize);
 
     // The coarse far cascade (unit 7): chunk casters only, sampled by SampleShadow where the near
-    // box fades out. Its own ShadowCascade, so it steps its own centre on its own texel lattice.
+    // box fades out. Its own ShadowCascade, so it steps its own center on its own texel lattice.
     private readonly ShadowCascade _farShadow =
         new(WorldGenerationConfig.FarShadowRadiusBlocks, WorldGenerationConfig.FarShadowMapSize);
     private Vector2D<int> _viewportSize;
@@ -1207,7 +1207,7 @@ public class RenderManager : IDisposable
             }
         }
         // Lit campfires each add a warm flickering point light above the pile, each on its own
-        // phase hashed from its cell so neighbouring fires do not pulse in unison
+        // phase hashed from its cell so neighboring fires do not pulse in unison
         _fireLightStart = _pointCount;
         if (campfires != null)
         {
@@ -1325,10 +1325,10 @@ public class RenderManager : IDisposable
     /// <summary>
     /// Builds the light-space matrices for this frame: the near cascade's ortho box of half-extent
     /// <see cref="WorldGenerationConfig.ShadowRadiusBlocks"/> and the far cascade's of
-    /// <see cref="WorldGenerationConfig.FarShadowRadiusBlocks"/>, each centred a little ahead of
-    /// the camera and looking down the sun direction. <see cref="ShadowCascade.StepCentre"/> carries
-    /// that centre forward in whole shadow texels, or the sub-texel drift as the player walks
-    /// makes every shadow edge crawl. Each cascade steps its own centre on its own texel lattice.
+    /// <see cref="WorldGenerationConfig.FarShadowRadiusBlocks"/>, each centered a little ahead of
+    /// the camera and looking down the sun direction. <see cref="ShadowCascade.StepCenter"/> carries
+    /// that center forward in whole shadow texels, or the sub-texel drift as the player walks
+    /// makes every shadow edge crawl. Each cascade steps its own center on its own texel lattice.
     /// </summary>
     private void UpdateShadowCamera(Camera? camera)
     {
@@ -1740,7 +1740,7 @@ public class RenderManager : IDisposable
         unsafe
         {
             // Half-float, not Rgba8: alpha carries a marched distance in blocks (up to
-            // WaterRayMaxDistance), which a normalised 8-bit channel cannot hold, and 8-bit
+            // WaterRayMaxDistance), which a normalized 8-bit channel cannot hold, and 8-bit
             // rgb would re-band the deliberately dithered, dim additive term.
             gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba16f,
                 (uint)desired.Width, (uint)desired.Height, 0, PixelFormat.Rgba, PixelType.Float, null);
@@ -2343,7 +2343,7 @@ public class RenderManager : IDisposable
     /// The quad is placed 100 blocks along <see cref="_skySunDir"/> under a view matrix with the
     /// translation removed, so it effectively sits at infinity and never parallaxes as the
     /// player walks. And it blends additively (One, One), so the shader's black background
-    /// contributes nothing and the glow brightens the sky rather than greying it.
+    /// contributes nothing and the glow brightens the sky rather than graying it.
     /// Takes the facing and projection rather than a camera, so the reflection pass can draw
     /// the same disc through its mirrored forward vector.
     /// </summary>
@@ -3082,7 +3082,7 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Draws the floating item drops, each spinning about its own centre and pulsing in scale.
+    /// Draws the floating item drops, each spinning about its own center and pulsing in scale.
     /// Block drops draw their atlas cube; pure items (see <see cref="Item"/>) draw their
     /// extruded sprite with its own texture bound (the shader's sampler just reads unit 0).
     /// </summary>
@@ -3123,7 +3123,7 @@ public class RenderManager : IDisposable
                 if (mesh == null) continue;
             }
 
-            // The shape is centred on its own origin, so it spins in place
+            // The shape is centered on its own origin, so it spins in place
             var model = Matrix4x4.CreateScale(drop.Scale)
                         * Matrix4x4.CreateRotationY(drop.Spin)
                         * Matrix4x4.CreateTranslation(drop.Position);
@@ -3178,8 +3178,8 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// The quern's spinning top as a standalone mesh: the plate and handle quads above the
-    /// air gap of its baked model (see <see cref="QuernRenderer"/>), centred on the origin
-    /// so the render pass can yaw it about the cell centre. Like the other content errors,
+    /// air gap of its baked model (see <see cref="QuernRenderer"/>), centered on the origin
+    /// so the render pass can yaw it about the cell center. Like the other content errors,
     /// a quern that baked with no top quads fails fast here rather than rendering half.
     /// </summary>
     private Mesh BuildQuernTopMesh()
@@ -3242,7 +3242,7 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Draws every touched quern's spinning top yawed about its cell centre, plus its waiting
+    /// Draws every touched quern's spinning top yawed about its cell center, plus its waiting
     /// input hovering over the plate. The chunk holds only the base (see
     /// <see cref="QuernRenderer"/>), so this entity is what completes the quern — at rest
     /// angle it sits exactly where the static model would. Tops skip the shadow pass, like
@@ -3260,7 +3260,7 @@ public class RenderManager : IDisposable
 
         foreach (var (cell, angle, inputId) in querns.QuernView())
         {
-            // The top mesh is centred on its own origin, so it yaws in place
+            // The top mesh is centered on its own origin, so it yaws in place
             var center = cell + new Vector3(0.5f, 0.5f, 0.5f);
             var model = Matrix4x4.CreateRotationY(angle) * Matrix4x4.CreateTranslation(center);
             // One sample per quern, shared by the plate and the input hovering over it
@@ -3357,7 +3357,7 @@ public class RenderManager : IDisposable
 
             if (state.HasCrucible)
             {
-                // CreateBlockModel centres a cell's model on the origin, so lift by half a block
+                // CreateBlockModel centers a cell's model on the origin, so lift by half a block
                 // to put the bowl's floor back on the hearth. The bowl is symmetric: no yaw.
                 var bowl = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.CrucibleLocal);
                 var model = Matrix4x4.CreateTranslation(bowl + new Vector3(0f, 0.5f, 0f));
@@ -3547,7 +3547,7 @@ public class RenderManager : IDisposable
             var mesh = blockCubes.Get(tnt.BlockId);
             if (mesh == null) continue;
 
-            // The cube is centred on its own origin, so it scales about its centre
+            // The cube is centered on its own origin, so it scales about its center
             var model = Matrix4x4.CreateScale(tnt.Scale)
                         * Matrix4x4.CreateTranslation(tnt.Position);
 
@@ -3583,7 +3583,7 @@ public class RenderManager : IDisposable
             var mesh = blockCubes.Get(block.BlockId);
             if (mesh == null) continue;
 
-            // The cube is centred on its own origin, like the primed TNT above
+            // The cube is centered on its own origin, like the primed TNT above
             var model = Matrix4x4.CreateTranslation(block.Position);
 
             SetDrawUniforms(model, model * viewProj, 1f, LightAt(block.Position));
@@ -3628,7 +3628,7 @@ public class RenderManager : IDisposable
         BindEntityTextures(mirror);
     }
 
-    // The model's base sits on y = 0 while Position is the body centre, so the feet offset lifts
+    // The model's base sits on y = 0 while Position is the body center, so the feet offset lifts
     // it onto the ground; scaling about the origin then squashes it from its base, not its middle.
     // The size scale rides the same scale, so a large slime grows from its feet like its body box.
     private static Matrix4x4 SlimeTransform(Slime slime) =>
@@ -3698,7 +3698,7 @@ public class RenderManager : IDisposable
         BindEntityTextures(mirror);
     }
 
-    // Position is the body centre and the model stands on y = 0, so the rig roots at the feet.
+    // Position is the body center and the model stands on y = 0, so the rig roots at the feet.
     private static Vector3 GoblinFeet(Goblin goblin) =>
         goblin.Position - new Vector3(0f, Goblin.Height * 0.5f, 0f);
 
@@ -3813,7 +3813,7 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Draws the live mining debris as small cubes textured as the block they broke off
-    /// from (dust chips as its surface, <see cref="DebrisLook"/>). Each cube spins and tumbles about its centre and fades through the world
+    /// from (dust chips as its surface, <see cref="DebrisLook"/>). Each cube spins and tumbles about its center and fades through the world
     /// shader's alpha, like the item drops but smaller and never collected.
     /// </summary>
     public void RenderBlockDebris(Camera camera, IReadOnlyList<BlockDebris> debris)
@@ -3830,7 +3830,7 @@ public class RenderManager : IDisposable
             var mesh = cube.Look switch
             {
                 DebrisLook.Surface => blockCubes.GetSurface(cube.BlockId),
-                DebrisLook.Color => blockCubes.GetColourChip(),
+                DebrisLook.Color => blockCubes.GetColorChip(),
                 _ => blockCubes.GetTinted(cube.BlockId),
             };
             if (mesh == null) continue;
@@ -4296,7 +4296,7 @@ public class RenderManager : IDisposable
             var wet = MathUtils.SmoothStep(_underwaterT);
             var tint = _eyeInLava ? LavaFogColor : UnderwaterFogColor;
             var alpha = (_eyeInLava ? 0.35f : 0.18f) * wet;
-            ui.DrawRect(ui.ScreenCentre, ui.ScreenSize,
+            ui.DrawRect(ui.ScreenCenter, ui.ScreenSize,
                 Rgba.FromFloat(tint.X, tint.Y, tint.Z, alpha));
         }
 
@@ -4312,7 +4312,7 @@ public class RenderManager : IDisposable
                 camera?.DamageArcScreenDirection ?? Vector2.Zero,
                 droplets, camera?.Droplets.Seconds ?? 0f, camera?.Droplets.Seed ?? 0);
 
-        // The compass and the clock share the top-centre strip; the look-at label rides below it
+        // The compass and the clock share the top-center strip; the look-at label rides below it
         var hasCompass = camera != null && HasCompassEquipped(inventory);
         var hasClock = camera != null && HasClockEquipped(inventory);
         if (!view.IsOpen && (menu == null || !menu.IsOpen))

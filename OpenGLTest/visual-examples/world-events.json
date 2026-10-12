@@ -5,17 +5,17 @@
   // never a pixel instrument.
   //
   // Stands on the flat, bare desert patch torches.json uses (sand at y 9, so the feet are at 10; the
-  // desert spawns no mobs of its own). From the eye (253.5, 11.62, -4.5) a ground-top cell centre dz
+  // desert spawns no mobs of its own). From the eye (253.5, 11.62, -4.5) a ground-top cell center dz
   // cells ahead is pitch -atan(1.62 / dz) at yaw -90.
   //   tnt-fuse   a TNT block three cells ahead, primed (the `prime` op is a firestarter strike that
   //              never misses), seen from nine blocks back while the 1 s fuse strobes, a goblin two
   //              blocks east of it and a slime two blocks west
   //   tnt-blast  the frames right after the blast: the crater, its loot flung out of it, the goblin and
-  //              the slime shoved away from the centre, and the camera shaken off its line (compare
+  //              the slime shoved away from the center, and the camera shaken off its line (compare
   //              the horizon with tnt-fuse)
   //   sand-settle a sand cube placed against the top of a four-high dirt pillar falls three blocks
   //              and settles in a skirt of its own chips (FallingBlockManager.Landings)
-  //   steam      lava poured into the crater and water run down onto it: grey smoke off every cell
+  //   steam      lava poured into the crater and water run down onto it: gray smoke off every cell
   //              that hardens to cobblestone
   //   thud       a forest oak felled at its base hits the ground: a leaf burst off the crown, dust
   //              under the trunk and a camera shake (TopplingTree.TryTakeLanding)
@@ -85,7 +85,7 @@
 
     // LEG 3 — steam: lava poured into the bottom of the leg 1 crater, then water poured on its slope
     // two blocks east, which runs down onto the lava: every cell that hardens to cobblestone puffs
-    // grey smoke (FluidManager.HardenedCells). Each pour looks straight down from a hovering eye.
+    // gray smoke (FluidManager.HardenedCells). Each pour looks straight down from a hovering eye.
     { "op": "teleport", "pos": [253.5, 14.5, -7.5], "yaw": 0, "pitch": -89 },
     { "op": "wait", "seconds": 0.3 },
     { "op": "give", "block": "item/lava_bucket" },

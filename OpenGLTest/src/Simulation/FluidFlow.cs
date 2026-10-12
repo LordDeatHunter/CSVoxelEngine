@@ -6,7 +6,7 @@ namespace VoxelEngine.Simulation;
 /// <summary>
 /// Reads one cell's block id and state byte for <see cref="FluidFlow"/>. Returns false when
 /// the cell is not available (an unloaded chunk), which the flow treats like a dam. Implemented
-/// by small structs so the generic flow code is specialised per reader and never boxes.
+/// by small structs so the generic flow code is specialized per reader and never boxes.
 /// </summary>
 internal interface IFluidCellReader
 {
@@ -22,7 +22,7 @@ internal interface IFluidCellReader
 internal static class FluidFlow
 {
     // The four horizontal neighbors a flow can be pulled toward, as (dx, dz)
-    private static readonly (int X, int Z)[] FlowNeighbours = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+    private static readonly (int X, int Z)[] FlowNeighbors = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
     /// <summary>
     /// How strongly the fluid <paramref name="id"/> at (x, y, z), whose own surface sits at
@@ -35,20 +35,20 @@ internal static class FluidFlow
         int dx, int dz, out float term) where T : struct, IFluidCellReader
     {
         term = 0f;
-        if (!cells.TryGetCell(x + dx, y, z + dz, out var neighbourId, out var neighbourState))
+        if (!cells.TryGetCell(x + dx, y, z + dz, out var neighborId, out var neighborState))
             return false;
 
-        float neighbourHeight;
-        if (neighbourId == id)
+        float neighborHeight;
+        if (neighborId == id)
         {
-            neighbourHeight = FluidState.SurfaceHeight(neighbourState);
+            neighborHeight = FluidState.SurfaceHeight(neighborState);
         }
-        else if (BlockType.IsReplaceable(neighbourId))
+        else if (BlockType.IsReplaceable(neighborId))
         {
             // Air or a fragile block: the fluid only gets pulled that way if it would drop
             // off there, and a drop counts as a full source lower than any level could be
             if (cells.TryGetCell(x + dx, y - 1, z + dz, out var belowId, out var belowState) && belowId == id)
-                neighbourHeight = FluidState.SurfaceHeight(belowState) - FluidState.SourceHeight;
+                neighborHeight = FluidState.SurfaceHeight(belowState) - FluidState.SourceHeight;
             else
                 return false;
         }
@@ -57,12 +57,12 @@ internal static class FluidFlow
             return false; // a solid neighbor dams the flow instead of steering it
         }
 
-        term = ownHeight - neighbourHeight;
+        term = ownHeight - neighborHeight;
         return true;
     }
 
     /// <summary>
-    /// THE flow definition: the un-normalised horizontal flow of the fluid in the cell
+    /// THE flow definition: the un-normalized horizontal flow of the fluid in the cell
     /// (x, y, z), or <see cref="Vector3.Zero"/> when the cell holds no fluid. Mirrors
     /// Minecraft's <c>FlowingFluid.getFlow</c>: every horizontal neighbor pulls the flow toward
     /// itself in proportion to how much lower its own surface sits, a replaceable cell the fluid
@@ -80,7 +80,7 @@ internal static class FluidFlow
         var ownHeight = FluidState.SurfaceHeight(state);
         var flow = Vector3.Zero;
 
-        foreach (var (dx, dz) in FlowNeighbours)
+        foreach (var (dx, dz) in FlowNeighbors)
         {
             if (PairTerm(cells, x, y, z, id, ownHeight, dx, dz, out var term))
                 flow += new Vector3(dx, 0f, dz) * term;

@@ -7,7 +7,7 @@ namespace VoxelEngine.Tests.Lod;
 /// <summary>
 /// Covers items C1 and C9. <see cref="LodRegion.BuildMeshData"/> now takes each LOD cell's
 /// eroded height from a separable rectangular min — a per-cell-row horizontal pass over a
-/// materialised fine-height grid, then a vertical scan per cell — instead of the fused
+/// materialized fine-height grid, then a vertical scan per cell — instead of the fused
 /// O(window^2) nested scan it replaced. Integer min is associative and commutative, so the two
 /// must agree bit for bit; that is the entire acceptance criterion for the change, and it is
 /// what these facts pin: at every level, at several region coordinates, with column caps active,
@@ -25,7 +25,7 @@ public sealed class LodHeightSamplingTests
     /// The lowest terrain height anywhere the given region can sample — its chunk columns plus the
     /// 1-chunk border BuildMeshData prefetches. Capping a column below this is guaranteed to become
     /// the minimum of every sample window that covers it, so a test never has to guess whether a
-    /// relative cap survives a 22x22 min and the &gt;&gt; cellShift quantisation.
+    /// relative cap survives a 22x22 min and the &gt;&gt; cellShift quantization.
     /// </summary>
     private static int RegionFloor(int level, int rx, int rz)
     {
@@ -135,7 +135,7 @@ public sealed class LodHeightSamplingTests
 
         // Derived from a measured floor, not guessed as a relative offset: each stored cap is at
         // least 33 below the lowest terrain the region can sample, so it IS the minimum of every
-        // 22x22 window that covers it and survives the >> cellShift quantisation. A relative cap
+        // 22x22 window that covers it and survives the >> cellShift quantization. A relative cap
         // (h - 3 - k, say) would prove nothing — it need not beat a min taken over 484 real
         // terrain columns.
         var floor = RegionFloor(Level, Rx, Rz);
@@ -164,7 +164,7 @@ public sealed class LodHeightSamplingTests
         // The off-by-one a naive separable rewrite gets wrong. Level 0 is cellSize 2, margin 1,
         // so fineMargin is 3 and the westernmost fine column any window reaches is baseFineX - 3
         // (cell i = -1, dx = -margin). The grid is sized to exactly that one-cell overrun rather
-        // than clamped against it, so a wrong origin reads a neighbouring row — a wrong height,
+        // than clamped against it, so a wrong origin reads a neighboring row — a wrong height,
         // not an exception — and only a column-by-column reach test catches it.
         const int Level = 0;
         // The forest refactor moved the terrain under (999, 0), so scan for an all-land region

@@ -53,7 +53,7 @@ public sealed class FoliageTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ModelTintColoursEveryModelQuad(bool greedy)
+    public void ModelTintColorsEveryModelQuad(bool greedy)
     {
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
         for (var x = 0; x < Chunk.Size; x++)
@@ -80,7 +80,7 @@ public sealed class FoliageTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void AnUntintedCrossBlockStaysUncoloured(bool greedy)
+    public void AnUntintedCrossBlockStaysUncolored(bool greedy)
     {
         var flower = ContentRegistry.RequireBlock("flower");
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);

@@ -7,7 +7,7 @@ namespace VoxelEngine.Effects.Lighting;
 /// <summary>
 /// GL-free flicker curves for the warm fire lights. Every campfire used to share one global
 /// flicker, so a row of fires pulsed in lockstep; each now takes a phase hashed from its own
-/// cell, which desynchronises them while keeping any one fire's flicker stable frame to frame.
+/// cell, which desynchronizes them while keeping any one fire's flicker stable frame to frame.
 /// The shader's block-light flicker (<c>BlockFlicker</c> in test-fragment.glsl) does the same
 /// per lattice corner on the GPU.
 /// </summary>

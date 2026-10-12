@@ -141,8 +141,8 @@ public static class PebbleGenerator
     }
 
     /// <summary>
-    /// Cell-local centre of one stone's slot. Base layouts are defined once, then rotated by
-    /// the variant; the stone itself is a SizeAt cube on that centre, spun by AngleAt.
+    /// Cell-local center of one stone's slot. Base layouts are defined once, then rotated by
+    /// the variant; the stone itself is a SizeAt cube on that center, spun by AngleAt.
     /// </summary>
     public static void GetCenter(int count, int variant, int i, out float cx, out float cz)
     {

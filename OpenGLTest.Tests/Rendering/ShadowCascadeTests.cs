@@ -6,7 +6,7 @@ using Xunit;
 namespace VoxelEngine.Tests.Rendering;
 
 /// <summary>
-/// The two shadow cascades together: each steps its own centre on its own texel lattice, and the
+/// The two shadow cascades together: each steps its own center on its own texel lattice, and the
 /// near box's fade band always lies inside the far box's unfaded core, so <c>SampleShadow</c>'s
 /// hand-over from near to far never passes through a region where neither cascade applies (a
 /// bright ring around the near box). GL-free: the cascades are constructed and updated but never
@@ -34,8 +34,8 @@ public sealed class ShadowCascadeTests
     [Fact]
     public void TheCascadesSnapIndependently()
     {
-        var sun = ShadowCentreTests.SunAt(2.1f);
-        var (right, up) = ShadowCentreTests.LightAxes(sun);
+        var sun = ShadowCenterTests.SunAt(2.1f);
+        var (right, up) = ShadowCenterTests.LightAxes(sun);
         var near = Near();
         var far = Far();
         var nearTexel = near.WorldTexel;
@@ -54,17 +54,17 @@ public sealed class ShadowCascadeTests
         for (var frame = 0; frame < 1500; frame++)
         {
             eye += step;
-            var nearBefore = near.Centre;
-            var farBefore = far.Centre;
+            var nearBefore = near.Center;
+            var farBefore = far.Center;
             near.Update(eye, viewDir, sun);
             far.Update(eye, viewDir, sun);
-            var dn = near.Centre - nearBefore;
-            var df = far.Centre - farBefore;
+            var dn = near.Center - nearBefore;
+            var df = far.Center - farBefore;
 
-            Assert.InRange(MathF.Abs(ShadowCentreTests.TexelFraction(dn, right, nearTexel)), 0f, 0.02f);
-            Assert.InRange(MathF.Abs(ShadowCentreTests.TexelFraction(dn, up, nearTexel)), 0f, 0.02f);
-            Assert.InRange(MathF.Abs(ShadowCentreTests.TexelFraction(df, right, farTexel)), 0f, 0.02f);
-            Assert.InRange(MathF.Abs(ShadowCentreTests.TexelFraction(df, up, farTexel)), 0f, 0.02f);
+            Assert.InRange(MathF.Abs(ShadowCenterTests.TexelFraction(dn, right, nearTexel)), 0f, 0.02f);
+            Assert.InRange(MathF.Abs(ShadowCenterTests.TexelFraction(dn, up, nearTexel)), 0f, 0.02f);
+            Assert.InRange(MathF.Abs(ShadowCenterTests.TexelFraction(df, right, farTexel)), 0f, 0.02f);
+            Assert.InRange(MathF.Abs(ShadowCenterTests.TexelFraction(df, up, farTexel)), 0f, 0.02f);
 
             if (LateralLength(dn, sun) > nearTexel * 0.5f)
             {
@@ -90,8 +90,8 @@ public sealed class ShadowCascadeTests
         (delta - sun * Vector3.Dot(delta, sun)).Length();
 
     private static bool OffLattice(Vector3 delta, Vector3 right, Vector3 up, float texel) =>
-        MathF.Abs(ShadowCentreTests.TexelFraction(delta, right, texel)) > 0.05f
-        || MathF.Abs(ShadowCentreTests.TexelFraction(delta, up, texel)) > 0.05f;
+        MathF.Abs(ShadowCenterTests.TexelFraction(delta, right, texel)) > 0.05f
+        || MathF.Abs(ShadowCenterTests.TexelFraction(delta, up, texel)) > 0.05f;
 
     [Fact]
     public void TheNearBoxsFadeBandLiesInsideTheFarBoxsUnfadedCore()
@@ -101,7 +101,7 @@ public sealed class ShadowCascadeTests
         float[] depths = [0f, 0.5f, 1f];
         float[] along = [-1f, -0.5f, 0f, 0.5f, 1f];
 
-        foreach (var sun in ShadowCentreTests.Suns)
+        foreach (var sun in ShadowCenterTests.Suns)
         foreach (var eye in eyes)
         foreach (var yaw in new[] { 0f, 90f, 180f, 270f })
         foreach (var pitch in new[] { -60f, 0f, 45f })

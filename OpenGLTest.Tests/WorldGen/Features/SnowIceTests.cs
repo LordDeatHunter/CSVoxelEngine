@@ -290,7 +290,7 @@ public sealed class SnowIceTests
         var ice = BlockType.ById[Ice]!;
         Assert.True(ice.Translucent);
         Assert.True(ice.Solid);
-        Assert.False(ice.OccludesNeighbours);
+        Assert.False(ice.OccludesNeighbors);
     }
 
     [Fact]

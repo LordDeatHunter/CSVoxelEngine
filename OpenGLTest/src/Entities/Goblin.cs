@@ -56,7 +56,7 @@ public sealed class Goblin : Mob
     /// <summary>Half the collision body's horizontal edge.</summary>
     public const float HalfExtent = 0.3f;
 
-    /// <summary>Height of the collision body; <see cref="Mob.Position"/> is its centre, so the
+    /// <summary>Height of the collision body; <see cref="Mob.Position"/> is its center, so the
     /// feet are at <c>Position.Y - Height / 2</c>.</summary>
     public const float Height = 1.3f;
 
@@ -242,7 +242,7 @@ public sealed class Goblin : Mob
 
     /// <summary>
     /// The pose the clips cannot give: about the feet, a forward lean into the walk (backward when
-    /// backpedalling), a flinch recoil while the hit spring rings, the fall backward and shrink of
+    /// backpedaling), a flinch recoil while the hit spring rings, the fall backward and shrink of
     /// the death, and the spawn pop. Multiply it after the part matrix (row-vector order).
     /// </summary>
     public Matrix4x4 BodyEffect(Vector3 feet)
@@ -272,7 +272,7 @@ public sealed class Goblin : Mob
     public override float BodyHalfHeight => Height * 0.5f;
 
     /// <inheritdoc />
-    public override float HeadAboveCentre => Height * 0.5f;
+    public override float HeadAboveCenter => Height * 0.5f;
 
     /// <summary>Unit horizontal direction the goblin faces (the model faces -Z at yaw 0).</summary>
     private Vector3 Forward => new(-MathF.Sin(Facing), 0f, -MathF.Cos(Facing));
@@ -286,10 +286,10 @@ public sealed class Goblin : Mob
     public static Vector3 ChestOf(Vector3 eye) => eye - new Vector3(0f, 0.4f, 0f);
 
     /// <summary>
-    /// Whether a goblin body centred at <paramref name="goblinPosition"/> can land a swing on a
+    /// Whether a goblin body centered at <paramref name="goblinPosition"/> can land a swing on a
     /// player whose eye is at <paramref name="playerEye"/>: horizontally within
     /// <see cref="WorldGenerationConfig.GoblinMeleeReach"/> and roughly level with the player's
-    /// body centre.
+    /// body center.
     /// </summary>
     public static bool InMeleeReach(Vector3 goblinPosition, Vector3 playerEye)
     {

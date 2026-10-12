@@ -347,7 +347,7 @@ public static class ItemDebuggerProgram
         CaptureScreenshot(size);
     }
 
-    // Orbits the tree's framing centre at the distance that fits its framing sphere in view, so a
+    // Orbits the tree's framing center at the distance that fits its framing sphere in view, so a
     // baobab and a cactus both fill the frame; the far plane grows with it so the crown never clips.
     private static void RenderTreeScene(float aspect, Vector2D<int> size)
     {
@@ -355,7 +355,7 @@ public static class ItemDebuggerProgram
         var distance = TreeViewDistance(aspect);
         var projection = Matrix4x4.CreatePerspectiveFieldOfView(FieldOfViewY, aspect, NearPlane,
             MathF.Max(FarPlane, distance + 2f * radius));
-        var view = BuildView(_trees.FramingCentre, distance, out var eye);
+        var view = BuildView(_trees.FramingCenter, distance, out var eye);
         _scene.RenderTree(view * projection, eye, _trees, (float)_time, size);
     }
 

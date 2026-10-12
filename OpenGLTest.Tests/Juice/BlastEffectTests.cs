@@ -36,7 +36,7 @@ public sealed class BlastEffectTests
         Assert.Equal(0f, ShakeFalloff.Trauma(Strength, Near, Range, Range));
         Assert.Equal(0f, ShakeFalloff.Trauma(Strength, Near, Range, Range * 3f));
         Assert.True(ShakeFalloff.Trauma(Strength, Near, Range, 0f) > ShakeFalloff.Trauma(Strength, Near, Range, Near * 3f));
-        // A strength under the cap is honoured as is right at the event
+        // A strength under the cap is honored as is right at the event
         Assert.Equal(0.5f, ShakeFalloff.Trauma(0.5f, Near, Range, 0f), 3);
     }
 
@@ -47,12 +47,12 @@ public sealed class BlastEffectTests
     [InlineData(0.6f, 0.3f, -0.74f)]
     public void TheBlastPushNeverGrowsWithDistanceAndIsZeroOutsideTheRadius(float dx, float dy, float dz)
     {
-        var centre = new Vector3(3f, 7f, -2f);
+        var center = new Vector3(3f, 7f, -2f);
         var direction = Vector3.Normalize(new Vector3(dx, dy, dz));
         var previous = float.MaxValue;
         for (var d = 0f; d <= TntManager.BlastRadius + 2f; d += 0.1f)
         {
-            var speed = BlastImpulse.At(centre, centre + direction * d, TntManager.BlastRadius).Length();
+            var speed = BlastImpulse.At(center, center + direction * d, TntManager.BlastRadius).Length();
             Assert.True(speed <= previous + 1e-5f, $"the push grew at {d} blocks");
             Assert.True(speed <= WorldGenerationConfig.BlastPushMaxSpeed + 1e-4f);
             if (d >= TntManager.BlastRadius)
@@ -62,16 +62,16 @@ public sealed class BlastEffectTests
     }
 
     [Fact]
-    public void TheBlastPushPointsAwayFromTheCentre()
+    public void TheBlastPushPointsAwayFromTheCenter()
     {
-        var centre = new Vector3(0.5f, 10.5f, 0.5f);
+        var center = new Vector3(0.5f, 10.5f, 0.5f);
         foreach (var offset in new[] { new Vector3(2f, 0f, 0f), new Vector3(-1f, 0.5f, 1.5f), new Vector3(0f, -2f, 0.5f) })
         {
-            var impulse = BlastImpulse.At(centre, centre + offset, TntManager.BlastRadius);
-            Assert.True(Vector3.Dot(impulse, offset) > 0f, $"pushed toward the centre from {offset}");
+            var impulse = BlastImpulse.At(center, center + offset, TntManager.BlastRadius);
+            Assert.True(Vector3.Dot(impulse, offset) > 0f, $"pushed toward the center from {offset}");
         }
-        // Right on the centre it still goes somewhere: straight up
-        Assert.True(BlastImpulse.At(centre, centre, TntManager.BlastRadius).Y > 0f);
+        // Right on the center it still goes somewhere: straight up
+        Assert.True(BlastImpulse.At(center, center, TntManager.BlastRadius).Y > 0f);
     }
 
     [Fact]

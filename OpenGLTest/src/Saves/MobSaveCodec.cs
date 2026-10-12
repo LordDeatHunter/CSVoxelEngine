@@ -3,7 +3,7 @@ using VoxelEngine.Entities;
 namespace VoxelEngine.Saves;
 
 /// <summary>
-/// Serialises a live <see cref="Mob"/> into its <see cref="EntitySaveData"/> form. Extracted
+/// Serializes a live <see cref="Mob"/> into its <see cref="EntitySaveData"/> form. Extracted
 /// from <see cref="World"/> so the per-kind fields (a goblin's ammo, a slime's size) are a pure
 /// function of the mob, not a detail of the world's save loop.
 /// </summary>

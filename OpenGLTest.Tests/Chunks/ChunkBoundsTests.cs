@@ -49,7 +49,7 @@ public sealed class ChunkBoundsTests
     }
 
     [Fact]
-    public void WaterCentreMatchesThePreChangeExpression()
+    public void WaterCenterMatchesThePreChangeExpression()
     {
         foreach (var pos in Positions)
         {

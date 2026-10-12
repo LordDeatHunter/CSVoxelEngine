@@ -25,7 +25,7 @@ namespace VoxelEngine.Content.Models;
 public static class ModelBaker
 {
     // Faces must land on their plane within this to count as covering it; model coordinates
-    // are 1/16ths, so anything looser than a texel is a modelling mistake, not rounding.
+    // are 1/16ths, so anything looser than a texel is a modeling mistake, not rounding.
     private const float Epsilon = 1e-4f;
 
     private static readonly string[] FaceNames = ["north", "south", "west", "east", "up", "down"];

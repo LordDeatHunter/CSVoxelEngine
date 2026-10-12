@@ -71,7 +71,7 @@ public class Camera : IMobTarget
     /// <summary>How strongly the damage direction arc shows, 0..1 (see <see cref="DamageDirection"/>).</summary>
     public float DamageArcStrength => _damageArc.Intensity;
     /// <summary>
-    /// Where on screen the damage direction arc sits: a unit direction from the screen centre, x to
+    /// Where on screen the damage direction arc sits: a unit direction from the screen center, x to
     /// the right and y up, recomputed from the current view yaw so it keeps pointing at the attacker
     /// while the player turns.
     /// </summary>

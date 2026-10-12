@@ -78,10 +78,10 @@
   //              pads only at their ends (y 25..30); crown x -100..-79, z 33..53, 16 tall. Filmed
   //              from 24 blocks south at y 22, where the whole tree fits the frame; open ground,
   //              no worldgen tree cell inside its crown box grown by one.
-  // baobab_grown should show a wide round trunk with stair-stepped bevelled corners on its outer
+  // baobab_grown should show a wide round trunk with stair-stepped beveled corners on its outer
   // shells and the fins resting on the ground; baobab_rim is the close look at the trunk base:
   // each rim must match its outline (aim at it in a manual run), with no hole above or below a
-  // bevelled shell and full faces where a shell meets the core or another shell. stone_pine_grown
+  // beveled shell and full faces where a shell meets the core or another shell. stone_pine_grown
   // shows the wide umbrella crown on its bare trunk. stone_pine_limbs, appended after every
   // grow and cut so the writer's call counter for the two grows above is unchanged, looks up
   // 20 degrees at the trunk from 9 blocks out on the south-east diagonal at y 22.5 (root + 8.5,

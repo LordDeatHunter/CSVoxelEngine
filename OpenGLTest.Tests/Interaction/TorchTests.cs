@@ -47,7 +47,7 @@ public sealed class TorchTests : IDisposable
         }
     }
 
-    private static Vector3 WorldCentre(Chunk chunk, int x, int y, int z) =>
+    private static Vector3 WorldCenter(Chunk chunk, int x, int y, int z) =>
         chunk.Position * Chunk.Size + new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
 
     // Block light at three cells along the floor row, nearest the torch's column first
@@ -64,9 +64,9 @@ public sealed class TorchTests : IDisposable
         Assert.NotNull(mesh);
         center.PublishLight(mesh!.Light);
 
-        return (EntityLight.Sample(manager, WorldCentre(center, 3, FloorY + 1, 8)).Block,
-            EntityLight.Sample(manager, WorldCentre(center, 8, FloorY + 1, 8)).Block,
-            EntityLight.Sample(manager, WorldCentre(center, 14, FloorY + 1, 8)).Block);
+        return (EntityLight.Sample(manager, WorldCenter(center, 3, FloorY + 1, 8)).Block,
+            EntityLight.Sample(manager, WorldCenter(center, 8, FloorY + 1, 8)).Block,
+            EntityLight.Sample(manager, WorldCenter(center, 14, FloorY + 1, 8)).Block);
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public sealed class TorchTests : IDisposable
         Assert.True(_world.Place(_torch, new Vector3(x, ground, z), Vector3.UnitY));
         Assert.Equal(_torch, _world.IdAt(x, ground + 1, z));
 
-        // Mining a neighbouring ground block leaves it standing
+        // Mining a neighboring ground block leaves it standing
         Assert.True(_world.Break(x + 1, ground, z));
         Assert.Equal(_torch, _world.IdAt(x, ground + 1, z));
 
@@ -168,7 +168,7 @@ public sealed class TorchTests : IDisposable
             {
                 Assert.True(Vector3.Min(box.Min, Vector3.Zero) == Vector3.Zero && Vector3.Max(box.Max, Vector3.One) == Vector3.One,
                     $"facing {facing}: box {box} leaves its cell");
-                // How far the box reaches from the cell centre toward the wall (behind the front)
+                // How far the box reaches from the cell center toward the wall (behind the front)
                 var reach = Vector3.Dot(-front, box.Center - new Vector3(0.5f)) + Vector3.Dot(Vector3.Abs(front), box.Size * 0.5f);
                 Assert.True(MathF.Abs(reach - 0.5f) < 1e-4f, $"facing {facing}: box {box} does not reach the wall");
             }
@@ -203,7 +203,7 @@ public sealed class TorchTests : IDisposable
     }
 
     [Fact]
-    public void TheRegistryRefusesAFacingOrSupportItCannotHonour()
+    public void TheRegistryRefusesAFacingOrSupportItCannotHonor()
     {
         const string path = "data/blocks/x.json";
         (bool, bool) Parse(BlockDefinition d, BlockRenderer renderer = BlockRenderer.Model, bool fluid = false,
@@ -284,7 +284,7 @@ public sealed class TorchTests : IDisposable
         for (var z = 0; z < Chunk.Size; z++)
             Set(x, FloorY, z, _stone);
 
-        // The blast centre sits on (7, FloorY + 1, 9). Every torch below stands outside its radius,
+        // The blast center sits on (7, FloorY + 1, 9). Every torch below stands outside its radius,
         // while some of them hang on, or stand on, a block inside it; no cell sits within a few
         // tenths of a block of the radius, so the primed cube's first nudge decides nothing.
         // A wall torch on the east face of a pillar inside the blast, its own floor outside it

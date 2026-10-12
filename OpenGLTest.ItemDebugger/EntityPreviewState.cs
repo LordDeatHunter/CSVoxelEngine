@@ -163,7 +163,7 @@ public sealed class EntityPreviewState : IPreviewDriver
     /// on the +Z side.</summary>
     public float FacingYaw => MathF.PI;
 
-    /// <summary>Where the model's feet are relative to the orbit centre: the origin, except for a hopping slime,
+    /// <summary>Where the model's feet are relative to the orbit center: the origin, except for a hopping slime,
     /// which travels (and rises) with its hop.</summary>
     public Vector3 DrawOffset => _slime is { } s
         ? new Vector3(s.Position.X - SlimeStart.X, s.Position.Y - (1f + Slime.HalfExtent), s.Position.Z - SlimeStart.Z)

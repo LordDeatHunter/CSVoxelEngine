@@ -278,10 +278,10 @@ public sealed class WorldLifecycleTests : IDisposable
         var slimeHealth = slime.MaxHealth - 1;
         var slimeVelocity = new Vector3(0.5f, 0f, -0.25f);
         slime.RestoreState(slimeHealth, 1.25f, slimeVelocity);
-        // The body centre as the mob reports it, not the feet handed to SpawnEntity
-        var slimeCentre = slime.Position;
+        // The body center as the mob reports it, not the feet handed to SpawnEntity
+        var slimeCenter = slime.Position;
         var slimeFacing = slime.Facing;
-        var goblinCentre = goblin.Position;
+        var goblinCenter = goblin.Position;
         var goblinAmmo = goblin.Ammo;
         var goblinHealth = goblin.Health;
 
@@ -301,13 +301,13 @@ public sealed class WorldLifecycleTests : IDisposable
         // and one more Update would let gravity pull everything down through the all-air chunks.
         var restoredSlime = Assert.Single(second.Slimes);
         Assert.Equal(slime.Size, restoredSlime.Size);
-        Assert.Equal(slimeCentre, restoredSlime.Position);
+        Assert.Equal(slimeCenter, restoredSlime.Position);
         Assert.Equal(slimeHealth, restoredSlime.Health);
         Assert.Equal(slimeFacing, restoredSlime.Facing);
         Assert.Equal(slimeVelocity, restoredSlime.Velocity);
 
         var restoredGoblin = Assert.Single(second.Goblins);
-        Assert.Equal(goblinCentre, restoredGoblin.Position);
+        Assert.Equal(goblinCenter, restoredGoblin.Position);
         Assert.Equal(goblinAmmo, restoredGoblin.Ammo);
         Assert.Equal(goblinHealth, restoredGoblin.Health);
         Assert.Equal(2, second.Mobs.Count); // RefreshMobs ran at the flip
