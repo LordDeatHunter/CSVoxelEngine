@@ -34,7 +34,7 @@ public readonly record struct GeometrySlice(int UnitOffset, int UnitCount, int V
 /// therefore covers both buffers: chunk geometry is entirely quads, exactly 4 vertices to 6
 /// indices, so the paired units waste nothing and there is only one free list to reason about
 /// (and to test). Fixed units also bound fragmentation, since every hole is a whole number of
-/// units and coalesces with its neighbours.
+/// units and coalesces with its neighbors.
 ///
 /// The buffers are immutable-size <c>glBufferStorage</c> allocations, so growing means allocating
 /// a bigger pair and copying the old contents across on the GPU with <c>glCopyBufferSubData</c>:

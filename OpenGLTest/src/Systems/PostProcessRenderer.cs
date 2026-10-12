@@ -65,7 +65,7 @@ public sealed class PostProcessRenderer : IDisposable
     /// every pixel with blending and the depth test off, then restores the state the UI pass
     /// expects (depth on and writable, SrcAlpha/OneMinusSrcAlpha blending). <paramref name="viewport"/>
     /// is the scene texture's size in pixels, which FXAA clamps its taps to. <paramref name="effects"/>
-    /// are the frame's camera effects: the exposure (eye adaptation) and the colour grade.
+    /// are the frame's camera effects: the exposure (eye adaptation) and the color grade.
     /// </summary>
     public void Render(Vector2D<int> viewport, in PostEffects effects)
     {

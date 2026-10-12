@@ -5,7 +5,7 @@ using Xunit;
 namespace silkgltriangle.Tests;
 
 /// <summary>
-/// The biome colour grade (<see cref="BiomeGrade"/>): neutral in the temperate lands, warm only where
+/// The biome color grade (<see cref="BiomeGrade"/>): neutral in the temperate lands, warm only where
 /// it is warm and dry, cool where it is cold, always faint, and eased back to neutral when the eye's
 /// climate is unknown.
 /// </summary>

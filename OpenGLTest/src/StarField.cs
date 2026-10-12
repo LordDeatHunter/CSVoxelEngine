@@ -152,7 +152,7 @@ public static class StarField
     /// The twinkle of the star in cell (<paramref name="face"/>, <paramref name="x"/>, <paramref name="y"/>):
     /// its rate in cycles per second (between <see cref="WorldGenerationConfig.StarTwinkleRateMin"/>
     /// and <see cref="WorldGenerationConfig.StarTwinkleRateMax"/>) and its phase in [0, tau), both
-    /// hashed from the cell, so a star keeps its own flicker frame to frame and its neighbours do
+    /// hashed from the cell, so a star keeps its own flicker frame to frame and its neighbors do
     /// not flicker in step. Twin of the rate and phase in sky-fragment.glsl's <c>Stars</c>.
     /// </summary>
     public static (float Rate, float Phase) TwinkleOf(int face, int x, int y)

@@ -1,11 +1,12 @@
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
 
 /// <summary>
 /// The mob death poof (<see cref="GroundDust.DeathPoof"/>): a mob whose death animation ends bursts
-/// into chips of its own skin colour, and a manager with nothing to draw them into (a headless
+/// into chips of its own skin color, and a manager with nothing to draw them into (a headless
 /// server) spawns none.
 /// </summary>
 public sealed class MobDeathPoofTests
@@ -43,9 +44,9 @@ public sealed class MobDeathPoofTests
         Assert.Empty(goblins.Goblins);
         Assert.Equal(WorldGenerationConfig.MobDeathPoofCount, debris.Debris.Count);
         foreach (var chip in debris.Debris)
-            Assert.Equal(DebrisLook.Colour, chip.Look);
+            Assert.Equal(DebrisLook.Color, chip.Look);
 
-        // The chips wear the goblin's own mean skin colour, not the fallback
+        // The chips wear the goblin's own mean skin color, not the fallback
         var skin = LandingDust.SkinColour(EntityRegistry.Require("goblin").Model, Vector3.Zero);
         Assert.True(skin != Vector3.Zero, "the goblin model has no skin to read");
         Assert.Equal(BiomeTint.VertexTint(skin), debris.Debris[0].Tint);

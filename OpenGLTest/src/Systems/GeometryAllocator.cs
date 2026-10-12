@@ -11,7 +11,7 @@ namespace silkgltriangle;
 ///
 /// Why a free structure in fixed units rather than a bump allocator or a per-chunk buffer:
 /// chunks are remeshed constantly, so the space must be reusable; fixed units bound the
-/// fragmentation (a hole is always a whole number of units and coalesces with its neighbours),
+/// fragmentation (a hole is always a whole number of units and coalesces with its neighbors),
 /// and first fit keeps the low offsets packed so growth stays rare.
 ///
 /// The free blocks live in an offset-keyed treap, each node carrying the maximum free
@@ -27,7 +27,7 @@ namespace silkgltriangle;
 /// The treap is keyed by <c>Offset</c> and heap-ordered by a priority hashed from the offset the
 /// block had when it was created. Priorities are never recomputed: <see cref="TryAllocate"/>
 /// shaves units off the FRONT of a block, which raises its key but can never move it past its
-/// neighbour (free blocks are coalesced, so they are never adjacent), so the search order stays
+/// neighbor (free blocks are coalesced, so they are never adjacent), so the search order stays
 /// correct and the heap order is untouched — and the allocation stays a single descent.
 /// Ties in priority are broken by offset, so the structure is fully deterministic and the unit
 /// tests can assert exact values.
@@ -199,7 +199,7 @@ internal sealed class GeometryAllocator
     /// <summary>
     /// Returns a range to the free structure, merging it with an immediately preceding and/or
     /// following free block so two adjacent blocks never coexist. One descent finds both
-    /// neighbours; the merge cases then mutate a neighbour in place (and fix the subtree maxima
+    /// neighbors; the merge cases then mutate a neighbor in place (and fix the subtree maxima
     /// along its path), and only the no-merge case inserts a node.
     /// </summary>
     /// <exception cref="InvalidOperationException">The range overlaps a free block (double free).</exception>
@@ -212,7 +212,7 @@ internal sealed class GeometryAllocator
 
         _steps = 0;
 
-        // The search path for a key visits both its neighbours: the last node we passed going
+        // The search path for a key visits both its neighbors: the last node we passed going
         // right is the predecessor, the last we passed going left is the successor.
         Node? pred = null;
         Node? succ = null;
@@ -233,7 +233,7 @@ internal sealed class GeometryAllocator
         }
 
         // Free blocks are disjoint and sorted, so if anything overlaps this range then one of the
-        // two neighbours does. Thrown before anything is mutated or counted, as the flat list did.
+        // two neighbors does. Thrown before anything is mutated or counted, as the flat list did.
         if ((pred is not null && pred.Offset + pred.Count > offset) ||
             (succ is not null && succ.Offset < offset + units))
             throw new InvalidOperationException(

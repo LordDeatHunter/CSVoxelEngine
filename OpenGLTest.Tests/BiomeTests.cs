@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -459,14 +460,14 @@ public sealed class BiomeTests
             band++;
 
             var nx = x + step;
-            var neighbour = ColumnCache.Get(nx >> Chunk.SizeShift, z >> Chunk.SizeShift);
+            var neighbor = ColumnCache.Get(nx >> Chunk.SizeShift, z >> Chunk.SizeShift);
             var neighbourLocal = ((nx & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
-            if (neighbour.Biomes[neighbourLocal] != here) differingNeighbour++;
+            if (neighbor.Biomes[neighbourLocal] != here) differingNeighbour++;
         }
 
         Assert.True(band > 0, "no forest/desert dither band found in the scanned area");
         Assert.True(differingNeighbour * 3 < band,
-            $"the dither flips single columns: {differingNeighbour} of {band} samples differ from a neighbour");
+            $"the dither flips single columns: {differingNeighbour} of {band} samples differ from a neighbor");
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using silkgltriangle;
+using silkgltriangle.Content;
 
 namespace silkgltriangle.Tests;
 

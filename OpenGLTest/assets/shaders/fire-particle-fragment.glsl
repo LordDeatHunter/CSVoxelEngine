@@ -22,12 +22,12 @@ void main() {
     if (alpha < 0.01) discard;
 
     float core = 1.0 - smoothstep(0.0, 1.0, d);
-    // The ember and smoke colours are authored as sRGB bytes; decode them for the linear target
+    // The ember and smoke colors are authored as sRGB bytes; decode them for the linear target
     vec3 col = SrgbToLinear(fTint.rgb) * mix(0.6, 1.0 + 1.6 * core, fEmissive);
 
     float f = clamp((fDist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
     if (fEmissive > 0.5) {
-        // Embers are drawn additively: added light cannot blend toward the fog colour, so
+        // Embers are drawn additively: added light cannot blend toward the fog color, so
         // fade the contribution out with distance instead.
         alpha *= 1.0 - f * f;
     } else {

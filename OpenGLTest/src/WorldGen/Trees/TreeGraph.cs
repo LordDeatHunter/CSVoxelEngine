@@ -78,7 +78,7 @@ public sealed class TreeGraph
     /// Rebuilds a tree's graph from the world's wood state bytes, starting at the root cell
     /// (x, y, z), which must hold <see cref="TreeSpecies.WoodId"/> with the
     /// <see cref="WoodState.ParentRoot"/> parent code; null otherwise. The walk is breadth-first
-    /// over child edges only: a face neighbour is a child when it holds the species' wood, is
+    /// over child edges only: a face neighbor is a child when it holds the species' wood, is
     /// not detached, is not a wide trunk's shell (<see cref="WoodState.IsShell"/>: shells are
     /// rasterised around the trunk chain, never graph nodes) and its stored parent offset lands
     /// exactly on the current cell. Detached cells and cells whose parent no longer exists are

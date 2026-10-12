@@ -3,7 +3,7 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// Straight (non-premultiplied) 8-bit RGBA colour, matching the packing <see cref="Vertex"/>
+/// Straight (non-premultiplied) 8-bit RGBA color, matching the packing <see cref="Vertex"/>
 /// expects. Alpha is carried like any other channel, so a translucent primitive only needs
 /// blending enabled — no separate shader path.
 /// </summary>
@@ -13,7 +13,7 @@ public readonly record struct Rgba(byte R, byte G, byte B, byte A = 255)
     public static readonly Rgba Black = new(0, 0, 0);
     public static readonly Rgba Transparent = new(0, 0, 0, 0);
 
-    /// <summary>Builds a colour from 0..1 components, clamping each.</summary>
+    /// <summary>Builds a color from 0..1 components, clamping each.</summary>
     public static Rgba FromFloat(float r, float g, float b, float a = 1f) =>
         new(ToByte(r), ToByte(g), ToByte(b), ToByte(a));
 

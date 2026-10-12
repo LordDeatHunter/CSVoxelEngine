@@ -16,7 +16,7 @@ namespace silkgltriangle;
 /// outward from the sun, and adds it in display space over the scene.
 /// Unlike the underwater pass it reads the HDR scene's own depth texture rather than a copy: the
 /// march draws into the half-res target, which does not have that depth attached, so sampling it is
-/// no feedback loop; the composite draws into the colour-only HDR framebuffer.
+/// no feedback loop; the composite draws into the color-only HDR framebuffer.
 /// Texture units read: 1 (the near shadow map) and 4 (the scene depth) by the march, bound by the
 /// caller, 8 (the cloud-shadow coverage, bound for the whole run), and 5 and <see cref="SceneUnit"/>,
 /// bound here around the composite. Owns its blend and depth state and puts the world's back on the
@@ -27,7 +27,7 @@ public sealed class GodraysRenderer : IDisposable
     private readonly GL _gl;
     private readonly Shader _march;
     private readonly Shader _composite;
-    // Unit the composite reads the HDR scene colour from; bound only around that draw
+    // Unit the composite reads the HDR scene color from; bound only around that draw
     private const int SceneUnit = 9;
     private readonly uint _vao;
     private readonly uint _vbo;
@@ -87,8 +87,8 @@ public sealed class GodraysRenderer : IDisposable
 
     /// <summary>
     /// Marches into <paramref name="halfResFbo"/> at <paramref name="halfResSize"/>, then composites
-    /// <paramref name="halfResTex"/> into <paramref name="sceneFbo"/> (the colour-only HDR framebuffer)
-    /// at <paramref name="viewportSize"/>, reading the scene colour <paramref name="sceneTex"/> it draws
+    /// <paramref name="halfResTex"/> into <paramref name="sceneFbo"/> (the color-only HDR framebuffer)
+    /// at <paramref name="viewportSize"/>, reading the scene color <paramref name="sceneTex"/> it draws
     /// into after a texture barrier. <paramref name="invViewProj"/> inverts exactly the matrix that
     /// wrote the depth on unit 4; <paramref name="lightViewProj"/> is the near cascade's, whose map is
     /// on unit 1. <paramref name="sunColor"/> is display-space; <paramref name="strength"/> is
@@ -126,7 +126,7 @@ public sealed class GodraysRenderer : IDisposable
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, sceneFbo);
         _gl.Viewport(0, 0, (uint)viewportSize.X, (uint)viewportSize.Y);
 
-        // Only now is the march output safe to sample; the scene colour is read where it is written,
+        // Only now is the march output safe to sample; the scene color is read where it is written,
         // texel for texel, after the barrier makes this frame's earlier writes visible
         _gl.ActiveTexture(TextureUnit.Texture5);
         _gl.BindTexture(TextureTarget.Texture2D, halfResTex);

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;

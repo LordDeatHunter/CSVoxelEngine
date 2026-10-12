@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -58,7 +59,7 @@ public sealed class SnowCanopyTests
         // The leaf crown wears snow, and the ground under it keeps its own layer
         Assert.Equal(snow, blocks[Chunk.Idx(lx, 15, lz)]);
         Assert.Equal(snow, blocks[Chunk.Idx(lx, 11, lz)]);
-        // A neighbour column with no crown takes only the ground layer
+        // A neighbor column with no crown takes only the ground layer
         var otherX = (lx + 1) & Chunk.SizeMask;
         Assert.Equal(snow, blocks[Chunk.Idx(otherX, 11, lz)]);
         Assert.Equal(BlockType.Air, blocks[Chunk.Idx(otherX, 12, lz)]);

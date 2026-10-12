@@ -4,9 +4,9 @@
 // translation-free view-projection, graded from the horizon haze band up to the zenith by
 // elevation, with a warm azimuthal glow toward the sun while it is low. The world and cloud
 // fog sample the very same SkySample in their view direction, so a fully fogged fragment is
-// exactly the colour of the dome behind it. The sun disc is added on top by sun-fragment.glsl.
+// exactly the color of the dome behind it. The sun disc is added on top by sun-fragment.glsl.
 // The stars are added in main only, after SkySample, so the fog and SkySample's twins never see
-// them: a fogged fragment melts into the starless dome colour, which near the horizon (where fog
+// them: a fogged fragment melts into the starless dome color, which near the horizon (where fog
 // is thick) is what the dome shows anyway, since the stars fade out into the haze.
 in vec2 fUv;
 
@@ -53,7 +53,7 @@ uniform vec2 uCloudDrift;
 uniform float uCloudBlocking; // CloudCover.Blocking: 1 at the default cloud opacity, 0 clouds off
 uniform vec3 uEye;            // the eye the dome is seen from (the mirrored one in the mirror)
 
-// The sun's lens glare (SunGlare is the C# twin): the linear sun colour times this frame's
+// The sun's lens glare (SunGlare is the C# twin): the linear sun color times this frame's
 // intensity, worked out on the CPU from the camera's facing, the sun's height and the cloud over
 // it; zero in the mirror, underwater and in lava. Spread as cos(angle to the sun)^uGlareExponent.
 uniform vec3 uGlareColor;
@@ -158,7 +158,7 @@ vec3 Stars(vec3 d, float px)
     vec3 off = d - star;
     float point = exp(-dot(off, off) / (sigma * sigma));
 
-    // A faint colour temperature per star, from cool blue-white to warm yellow-white.
+    // A faint color temperature per star, from cool blue-white to warm yellow-white.
     vec3 tint = mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.88, 0.7), StarUnit(StarHash(h3)));
 
     // The twinkle: a rate and phase of the star's own (StarField.TwinkleOf), two sines at an

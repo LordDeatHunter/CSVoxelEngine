@@ -5,7 +5,7 @@
   // (MultiblockShape.Rotate), so this file is the only orientation ever written by hand.
   //
   // Two rules the bake validation enforces: no face may carry a "cullface" (a multiblock's
-  // cell neighbours are its own part cells, so a cullface would test the wrong thing), and no
+  // cell neighbors are its own part cells, so a cullface would test the wrong thing), and no
   // face may cover a whole cell face (a rotated quad's corners leave Chunk.CubeFaces order, so
   // every multiblock quad has to shade flat).
   //

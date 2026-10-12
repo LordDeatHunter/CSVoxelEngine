@@ -15,7 +15,7 @@ namespace silkgltriangle;
 /// calls inside one instance method and nothing about them was testable.
 ///
 /// What is NOT covered: the draw itself — the vertex-array binding, the two sweeps and their
-/// colour/depth mask toggles, and the per-copy submission — which is only reachable by running the
+/// color/depth mask toggles, and the per-copy submission — which is only reachable by running the
 /// game.
 ///
 /// Two properties are worth stating because they are what make the caller correct:

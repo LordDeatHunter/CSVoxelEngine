@@ -4,8 +4,8 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// GL-free biome tint: the grass and foliage colour as a pure function of world (x, z). The
-/// climate (<see cref="TerrainGenerator.Climate"/>) picks an sRGB colour from a four-corner
+/// GL-free biome tint: the grass and foliage color as a pure function of world (x, z). The
+/// climate (<see cref="TerrainGenerator.Climate"/>) picks an sRGB color from a four-corner
 /// palette, which is turned into the linear multiplier a vertex carries against the grey
 /// textureless tiles. Meshes sample it on the 16-block lattice of chunk-column corners and
 /// interpolate bilinearly, so neighbouring chunks agree bit for bit at their shared borders and
@@ -35,7 +35,7 @@ public static class BiomeTint
     /// <summary>log2 of the lattice spacing: the 16-block lattice of chunk-column corners.</summary>
     public const int LatticeShift = Chunk.SizeShift;
 
-    /// <summary>The sRGB target colour of <paramref name="palette"/> at the given climate,
+    /// <summary>The sRGB target color of <paramref name="palette"/> at the given climate,
     /// bilinear over its four corners (first axis warmth, second wetness).</summary>
     public static Vector3 PaletteSrgb(BiomeTintPalette palette, float warmth01, float wetness01) =>
         palette == BiomeTintPalette.Foliage
@@ -154,7 +154,7 @@ public static class BiomeTint
     }
 
     /// <summary>A chunk column's fields over its four lattice corners from worldgen, shared bit
-    /// for bit with its neighbours and with <see cref="FieldsAt"/> at the chunk origin.</summary>
+    /// for bit with its neighbors and with <see cref="FieldsAt"/> at the chunk origin.</summary>
     public static BiomeTintFields FieldsFor(int chunkX, int chunkZ) =>
         TryFieldsFor(WorldgenColumnSource.Instance, chunkX, chunkZ, out var fields)
             ? fields

@@ -7,7 +7,7 @@ namespace silkgltriangle;
 /// </summary>
 /// <param name="Quads">Every quad of the model, in cell-local space.</param>
 /// <param name="IsFullCube">Whether all six cube faces are fully covered, which is what lets a
-/// block occlude its neighbours and block light by default.</param>
+/// block occlude its neighbors and block light by default.</param>
 /// <param name="HasFullFace">Per engine face index, whether that cube face is fully covered.</param>
 /// <param name="FaceTiles">Per engine face index, the tile of that side's full face — or the
 /// first quad's tile as a fallback, so tile-based emitters (LOD, pebbles, tree wood) always

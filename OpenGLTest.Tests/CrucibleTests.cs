@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -73,7 +74,7 @@ public sealed class CrucibleTests
         Assert.Equal(0.5f + KilnRenderer.CrucibleOuterHalf, positions.Max(p => p.X), precision: 4);
         Assert.Equal(0.5f + KilnRenderer.CrucibleOuterHalf, positions.Max(p => p.Z), precision: 4);
 
-        // An entity mesh has no cell neighbours, so nothing may be culled away
+        // An entity mesh has no cell neighbors, so nothing may be culled away
         Assert.All(quads, q => Assert.Equal(-1, q.CullFace));
 
         // The floor the metal pools on covers at least the whole inside of the walls...

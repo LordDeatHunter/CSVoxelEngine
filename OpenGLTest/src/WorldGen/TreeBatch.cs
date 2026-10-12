@@ -3,7 +3,7 @@ namespace silkgltriangle;
 /// <summary>
 /// Every tree of one 64x64 XZ cell (<see cref="WorldGenerationConfig.TreeCellBlocks"/>), grown
 /// together in placement-hash order in one <see cref="VirtualTreeSpace"/>: over the terrain, with
-/// the cells of the trees already grown in this batch and the neighbour cells' SOLO shapes
+/// the cells of the trees already grown in this batch and the neighbor cells' SOLO shapes
 /// (<see cref="TreeGenerator.ShapeOf"/>) as obstacles. Immutable after build and shared across
 /// threads; a pure function of the cell key and the world seed, never of which cell was asked
 /// for first. The one residual overlap inside a batch is a tree's BASE cell, which the grower

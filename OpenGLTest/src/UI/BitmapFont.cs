@@ -21,7 +21,7 @@ public readonly record struct GlyphInstance(Vector2 Centre, Vector2 Size, UvRect
 /// into one batched draw instead of a per-glyph mesh and draw call.
 ///
 /// The atlas holds white texels with coverage in alpha, so the draw tint fully controls the
-/// text colour (see the ui-fragment shader). Owned and drawn by <see cref="UIRenderer"/>.
+/// text color (see the ui-fragment shader). Owned and drawn by <see cref="UIRenderer"/>.
 /// </summary>
 public sealed class BitmapFont : IDisposable
 {

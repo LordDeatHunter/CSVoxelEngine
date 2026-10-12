@@ -166,7 +166,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     private readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq)> _completedMeshQueue = new();
     private long _meshSequence;
     // Keyed on ChunkKey.Pack rather than the Vector3 chunk position: every probe here sits on a
-    // hot path (the dirty scan, QueueChunk's six-neighbour fan-out, NeedsChunk on the generation
+    // hot path (the dirty scan, QueueChunk's six-neighbor fan-out, NeedsChunk on the generation
     // workers' scan frontier) and a packed long hashes once where a Vector3 hashes three floats
     // and compares twelve bytes per node visit (PERF_TODO D1). FluidManager's cell keys are the
     // in-repo precedent; ChunkKey deliberately reuses its 21-bit budget at chunk scale.
@@ -532,7 +532,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         // dictionary probes, so the scan itself is capped: leftovers wait for the next
         // frames, which meshgen (DirtyStartBudget starts/frame, 4 concurrent builds) cannot outrun
         // anyway. Drops do not need a second visit — out-of-range entries are removed
-        // on sight and missing-neighbour ones are re-added by QueueChunk on arrival.
+        // on sight and missing-neighbor ones are re-added by QueueChunk on arrival.
         var scanned = 0;
 
         // Lock-free enumeration, no snapshot; removing through it while enumerating is safe
@@ -566,13 +566,13 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             if (!chunk.IsBlockDataReady)
                 continue;
 
-            // Claim the entry BEFORE the neighbour test, and drop a chunk that is still
-            // missing a face neighbour instead of retrying it every frame. QueueChunk
-            // re-dirties all six neighbours of a chunk when it arrives (with its block data
-            // already generated), so the missing neighbour's arrival is what wakes this chunk
+            // Claim the entry BEFORE the neighbor test, and drop a chunk that is still
+            // missing a face neighbor instead of retrying it every frame. QueueChunk
+            // re-dirties all six neighbors of a chunk when it arrives (with its block data
+            // already generated), so the missing neighbor's arrival is what wakes this chunk
             // back up. Removing first closes the race where that TryAdd would be a no-op
             // because this entry still existed. This is what lets _dirtyChunks reach empty at
-            // rest: the rim chunks of the load sphere never get their outer neighbour until
+            // rest: the rim chunks of the load sphere never get their outer neighbor until
             // the camera moves, and used to be rescanned every single frame. A chunk whose
             // streamed columns have not arrived is dropped the same way:
             // ClientChunkStreamer.ApplyColumn re-dirties the 3x3 chunk columns around every
@@ -866,7 +866,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     private void BuildMeshFor(Vector3 pos, Chunk chunk)
     {
-        // One pack for the whole call: the re-dirty on a vanished neighbour and the finally's
+        // One pack for the whole call: the re-dirty on a vanished neighbor and the finally's
         // dedupe release both take it. The work queue carries the position, not the key.
         var key = ChunkKey.Pack(pos);
 
@@ -878,7 +878,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             var meshData = chunk.GenerateMeshData(this);
             if (meshData == null)
             {
-                // A face neighbour was unloaded between the scheduling check and this
+                // A face neighbor was unloaded between the scheduling check and this
                 // snapshot, or one of the nine streamed columns is missing; meshing across
                 // that hole would bake border artifacts (or dark light and no water), so the
                 // build is dropped and the chunk retried once the world settles
@@ -926,7 +926,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         _dirtyChunks.TryAdd(key, 0);
         
         // CardinalOffsets is the integer companion to CardinalDirections, in the same order, so
-        // the six neighbour keys come from ints in hand instead of six Vector3 additions
+        // the six neighbor keys come from ints in hand instead of six Vector3 additions
         var px = MathUtils.FloorToInt(pos.X);
         var py = MathUtils.FloorToInt(pos.Y);
         var pz = MathUtils.FloorToInt(pos.Z);
@@ -991,7 +991,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
     /// <summary>
     /// Registers a chunk streamed from the server, restored with no worldgen (see
-    /// <see cref="Chunk.RestoreFrom(ChunkSnapshot, bool)"/>), and schedules it and its neighbours
+    /// <see cref="Chunk.RestoreFrom(ChunkSnapshot, bool)"/>), and schedules it and its neighbors
     /// for meshing. Main thread only. An already-present chunk is left alone: a client-side edit
     /// must not be overwritten by a snapshot that merely arrived late.
     /// </summary>
@@ -1084,7 +1084,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         var meshData = chunk.GenerateMeshData(this);
         if (meshData == null)
         {
-            // Lost a face neighbour to an unload mid-call: retry rather than bake a hole in
+            // Lost a face neighbor to an unload mid-call: retry rather than bake a hole in
             _dirtyChunks.TryAdd(key, 0);
             return;
         }
@@ -1099,9 +1099,9 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     }
 
     /// <summary>
-    /// Synchronously remeshes the edited chunk plus every face neighbour sharing the edited
+    /// Synchronously remeshes the edited chunk plus every face neighbor sharing the edited
     /// cell, so a block broken or placed on a chunk border never leaves a one-frame hole in
-    /// the neighbour's mesh while the async dirty budget catches up (the neighbour's border
+    /// the neighbor's mesh while the async dirty budget catches up (the neighbor's border
     /// face was culled against the old block and only a rebuild brings it back). Chunks in
     /// light radius still rebuild async through <see cref="MarkAreaDirty"/>.
     /// </summary>
@@ -1297,7 +1297,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     private bool HasAllNeighbors(Vector3 pos)
     {
         // Hoisted once, then six probes from ints in hand. CardinalOffsets is in the same order
-        // as CardinalDirections, so the early return still fires on the same neighbour.
+        // as CardinalDirections, so the early return still fires on the same neighbor.
         var cx = MathUtils.FloorToInt(pos.X);
         var cy = MathUtils.FloorToInt(pos.Y);
         var cz = MathUtils.FloorToInt(pos.Z);
@@ -1317,7 +1317,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// yes, so singleplayer pays nine trivial virtual calls per dirty entry. An all-air chunk is
     /// exempt, since its build returns before it reads any column and a sky chunk at a client's
     /// rim must keep meshing at once; a fully enclosed chunk cannot be told apart without its
-    /// neighbours and so waits for its columns too, which only delays <see cref="Chunk.IsMeshed"/>
+    /// neighbors and so waits for its columns too, which only delays <see cref="Chunk.IsMeshed"/>
     /// for <c>LodManager.IsCoveredByChunks</c> at a client's load-sphere rim.
     /// </summary>
     private bool HasColumnNeighbourhood(Chunk chunk, int cx, int cz)

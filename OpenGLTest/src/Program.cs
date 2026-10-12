@@ -8,6 +8,7 @@ using System.Runtime;
 using System.Threading;
 using Silk.NET.Input;
 using Silk.NET.Maths;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 

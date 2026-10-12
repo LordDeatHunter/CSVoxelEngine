@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -135,7 +136,7 @@ public sealed class MeshingTests
         Assert.Empty(mesh.TranslucentVertices);
     }
 
-    // One air cell in the neighbour plane that touches the centre exposes exactly one face,
+    // One air cell in the neighbor plane that touches the centre exposes exactly one face,
     // which also pins the orientation of each boundary plane the fast path inspects.
     [Theory]
     [InlineData(1, 0, 0, 0, 8, 8)]
@@ -594,7 +595,7 @@ public sealed class MeshingTests
         center.SetBlockRaw(8, 8, 8, stone, 0);
 
         // Ring the top-face AO neighbourhood with canopy and thin wood: every side/corner
-        // sample around the +Y face sits on leaves or a branch. A full-cube neighbour here
+        // sample around the +Y face sits on leaves or a branch. A full-cube neighbor here
         // would drag corners to AO 0 (black); these must leave it at full brightness.
         var ring = new (int x, int z, byte id)[]
         {
@@ -642,7 +643,7 @@ public sealed class MeshingTests
         var east = manager.Chunks[eastPos];
         east.SetBlockRaw(0, 8, 8, stone, 0);
 
-        // The neighbour's west face is culled against the border cell: five faces remain.
+        // The neighbor's west face is culled against the border cell: five faces remain.
         var before = east.GenerateMeshData(manager);
         Assert.NotNull(before);
         Assert.Equal(20, before.Vertices.Count);

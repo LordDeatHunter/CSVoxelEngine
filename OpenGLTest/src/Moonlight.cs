@@ -16,7 +16,7 @@ namespace silkgltriangle;
 /// </summary>
 public static class Moonlight
 {
-    /// <summary>The moonlight's cool hue, authored in sRGB like every palette colour.</summary>
+    /// <summary>The moonlight's cool hue, authored in sRGB like every palette color.</summary>
     public static readonly Vector3 ColorSrgb = new(0.55f, 0.66f, 0.95f);
 
     /// <summary><see cref="ColorSrgb"/> decoded, for the linear world shader.</summary>

@@ -5,7 +5,7 @@ namespace silkgltriangle;
 /// <summary>
 /// GL-free support rule of the <see cref="BlockType.NeedsSupport"/> blocks, shared by placement,
 /// every path that pops an unsupported block (mining, blasts, felling) and the tests: which
-/// neighbour holds a cell up. A floor block (a pebble pile, a flower, a floor torch) stands on the
+/// neighbor holds a cell up. A floor block (a pebble pile, a flower, a floor torch) stands on the
 /// cell below; a <see cref="BlockType.SupportAttached"/> block (a wall torch) hangs off the cell
 /// behind its front, opposite the horizontal facing in its state byte's low two bits; a
 /// <see cref="BlockType.SupportAbove"/> block (a hanging lantern) hangs from the cell above it,

@@ -1,10 +1,11 @@
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
 
 /// <summary>
-/// The tool break shatter's colour rule (<see cref="ToolShatter"/>): the chips wear the mean colour
+/// The tool break shatter's color rule (<see cref="ToolShatter"/>): the chips wear the mean color
 /// of the item's sprite, read once and cached per item.
 /// </summary>
 public sealed class ToolShatterTests
@@ -16,14 +17,14 @@ public sealed class ToolShatterTests
     {
         var firestarter = ContentRegistry.RequireItem("firestarter");
         var fallback = new Vector3(0.75f, 0.7f, 0.6f);
-        var colour = ToolShatter.ColourOf(firestarter, fallback);
+        var color = ToolShatter.ColourOf(firestarter, fallback);
 
-        Assert.True(colour != fallback, "the sprite's mean colour was not read");
-        Assert.InRange(colour.X, 0f, 1f);
-        Assert.InRange(colour.Y, 0f, 1f);
-        Assert.InRange(colour.Z, 0f, 1f);
+        Assert.True(color != fallback, "the sprite's mean color was not read");
+        Assert.InRange(color.X, 0f, 1f);
+        Assert.InRange(color.Y, 0f, 1f);
+        Assert.InRange(color.Z, 0f, 1f);
 
-        // Cached: the fallback of a later call never wins once a colour was read
-        Assert.Equal(colour, ToolShatter.ColourOf(firestarter, Vector3.Zero));
+        // Cached: the fallback of a later call never wins once a color was read
+        Assert.Equal(color, ToolShatter.ColourOf(firestarter, Vector3.Zero));
     }
 }

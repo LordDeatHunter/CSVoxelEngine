@@ -12,7 +12,7 @@ namespace silkgltriangle;
 /// </summary>
 public static class Placement
 {
-    /// <summary>The cell a placement aimed at <paramref name="hit"/> fills: the neighbour across
+    /// <summary>The cell a placement aimed at <paramref name="hit"/> fills: the neighbor across
     /// the hit face, or the hit cell itself when it holds a stack a placement may take over.
     /// <paramref name="hit"/> is the integral cell the raycast reported.</summary>
     public static Vector3 TargetCell(Vector3 hit, Vector3 normal, byte targetId, byte targetState) =>

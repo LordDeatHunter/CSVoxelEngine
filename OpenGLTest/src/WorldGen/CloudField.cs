@@ -20,7 +20,7 @@ public struct CloudVertex(Vector3 position, Vector3 normal)
 /// arrays, so the headless tests cover the shape of the sky without a GL context.
 ///
 /// Levels come from periodic value noise whose every octave period divides the field width, so the
-/// field tiles with no seam; the mesher wraps its neighbour lookups for the same reason, which lets
+/// field tiles with no seam; the mesher wraps its neighbor lookups for the same reason, which lets
 /// a cloud straddling the field edge join its own copy one field over instead of growing a wall.
 /// </summary>
 public static class CloudField
@@ -92,11 +92,11 @@ public static class CloudField
 
     /// <summary>
     /// Meshes a level grid of any size; cell size and heights come from WorldGenerationConfig.
-    /// Neighbour lookups wrap, so no faces land on the field seam.
+    /// Neighbor lookups wrap, so no faces land on the field seam.
     ///
     /// Every convex edge of the blocky level field is replaced by a fillet of radius
     /// <see cref="WorldGenerationConfig.CloudCornerRadius"/>, which is why the old run merging is
-    /// gone: a cell's surface now depends on all eight of its neighbours, so neighbouring cells no
+    /// gone: a cell's surface now depends on all eight of its neighbors, so neighbouring cells no
     /// longer share a face that could be merged into a run. The pieces (cap tiles, quarter-cylinder
     /// fillets, sphere octants, horn-torus junctions, walls, vertical corner cylinders, ledges and
     /// riser patches) are laid out so that they meet on exactly the same boundary curves, which is
@@ -138,14 +138,14 @@ public static class CloudField
         public readonly int Level = level;
         public readonly float X0 = x0, X1 = x1, Z0 = z0, Z1 = z1;
 
-        /// <summary>Level of the neighbour <paramref name="dx"/>, <paramref name="dz"/> cells away.</summary>
+        /// <summary>Level of the neighbor <paramref name="dx"/>, <paramref name="dz"/> cells away.</summary>
         public int At(int dx, int dz) => _nb[dx + 1, dz + 1];
 
         public float CornerX(int sx) => sx > 0 ? X1 : X0;
         public float CornerZ(int sz) => sz > 0 ? Z1 : Z0;
 
         /// <summary>
-        /// A vertical corner is convex in band <paramref name="k"/> only when both neighbours that
+        /// A vertical corner is convex in band <paramref name="k"/> only when both neighbors that
         /// meet there are air in that band; otherwise their material fills the corner and there is
         /// nothing to round off. Monotone in k, which is what lets <see cref="EmitCornerColumns"/>
         /// place a single ledge at the height where the corner starts being rounded.
@@ -183,8 +183,8 @@ public static class CloudField
     private static void EmitCap(MeshBuilder b, in Cell c, float yb, float sy, bool top)
     {
         var r = WorldGenerationConfig.CloudCornerRadius;
-        // The top of a cell is buried wherever the neighbour stacks at least as high; the bottom is
-        // buried wherever the neighbour has any layer at all, since every cell starts at CloudHeight.
+        // The top of a cell is buried wherever the neighbor stacks at least as high; the bottom is
+        // buried wherever the neighbor has any layer at all, since every cell starts at CloudHeight.
         var need = top ? c.Level : 1;
 
         if (c.At(1, 0) >= need && c.At(-1, 0) >= need && c.At(0, 1) >= need && c.At(0, -1) >= need &&
@@ -222,9 +222,9 @@ public static class CloudField
             else if (openX) AddFilletX(b, cx, sx, yb, sy, iz, cz);
             else if (openZ) AddFilletZ(b, cz, sz, yb, sy, ix, cx);
             else if (c.At(sx, sz) >= need) AddFlat(b, ix, cx, iz, cz, yb, sy);
-            // Both sides are buried but the diagonal is not, so the two neighbours' fillets turn the
+            // Both sides are buried but the diagonal is not, so the two neighbors' fillets turn the
             // corner into an inside curve. That only happens when they sit at exactly this cap: a
-            // taller neighbour's wall runs through here instead and the tile stays flat.
+            // taller neighbor's wall runs through here instead and the tile stays flat.
             else if (!top || (c.At(sx, 0) == c.Level && c.At(0, sz) == c.Level))
                 AddTorus(b, cx, cz, sx, sy, sz, yb);
             else AddFlat(b, ix, cx, iz, cz, yb, sy);
@@ -309,10 +309,10 @@ public static class CloudField
         new(sx * MathF.Sin(th) * MathF.Cos(ph), sy * MathF.Cos(th), sz * MathF.Sin(th) * MathF.Sin(ph));
 
     /// <summary>
-    /// Horn-torus patch plus its flat remainder for an inside corner: both neighbours reach this cap
+    /// Horn-torus patch plus its flat remainder for an inside corner: both neighbors reach this cap
     /// but the diagonal does not, so their fillets have to be joined around the corner point. Sweeping
     /// the fillet profile along the quarter circle of radius r about that point reproduces each
-    /// neighbour's profile exactly at ph = 0 and ph = pi/2, which is what makes the seam invisible.
+    /// neighbor's profile exactly at ph = 0 and ph = pi/2, which is what makes the seam invisible.
     /// </summary>
     private static void AddTorus(MeshBuilder b, float cx, float cz, int sx, float sy, int sz, float yb)
     {
@@ -466,10 +466,10 @@ public static class CloudField
     private static Vector3 Ring(int sx, int sz, float a) => new(sx * MathF.Cos(a), 0f, sz * MathF.Sin(a));
 
     /// <summary>
-    /// Closes the sliver a lower neighbour's cap fillet uncovers against our side face. Where that
-    /// neighbour's own edge is exposed at its top, its fillet curls away from our wall plane just
+    /// Closes the sliver a lower neighbor's cap fillet uncovers against our side face. Where that
+    /// neighbor's own edge is exposed at its top, its fillet curls away from our wall plane just
     /// below its cap, and the square-minus-quarter-disc it leaves behind is part of our face. The
-    /// same happens against an equally tall neighbour when the corner is squared off by a taller
+    /// same happens against an equally tall neighbor when the corner is squared off by a taller
     /// third cell, which is the only case there where our cap does not already meet that fillet.
     /// </summary>
     private static void EmitRiserPatches(MeshBuilder b, in Cell c)
@@ -496,7 +496,7 @@ public static class CloudField
         }
     }
 
-    /// <summary>Point on the neighbour's fillet arc as it crosses our wall plane.</summary>
+    /// <summary>Point on the neighbor's fillet arc as it crosses our wall plane.</summary>
     private static Vector3 PatchPoint(in Cell c, int sx, int sz, int axis, float yd, float a)
     {
         var r = WorldGenerationConfig.CloudCornerRadius;
@@ -507,7 +507,7 @@ public static class CloudField
             : new Vector3(c.CornerX(sx) - sx * across, y, c.CornerZ(sz));
     }
 
-    /// <summary>Unit steps to the four edge neighbours, in the order E, W, N, S.</summary>
+    /// <summary>Unit steps to the four edge neighbors, in the order E, W, N, S.</summary>
     private static readonly (int X, int Z)[] Dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
     /// <summary>

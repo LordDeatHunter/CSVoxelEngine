@@ -4,7 +4,7 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// GL-free biome colour grade: a faint warm tint over the desert and a cool one over the snow,
+/// GL-free biome color grade: a faint warm tint over the desert and a cool one over the snow,
 /// multiplied over the finished image in the post pass (post-fragment.glsl's <c>uGrade</c>, display
 /// space). It is keyed to the climate at the eye (<see cref="EyeClimate"/>, the column source's stored
 /// corner climate, so a client reads what its server streamed) and eased, so it drifts in and out as

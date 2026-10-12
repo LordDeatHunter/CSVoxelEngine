@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -67,7 +68,7 @@ public class EntityLightTests
         Assert.NotNull(top);
 
         var sample = EntityLight.Sample(manager, WorldCentre(center, 6, FloorY + 1, 8));
-        // Each corner averages the cell with its neighbours, so the cell's own level lies
+        // Each corner averages the cell with its neighbors, so the cell's own level lies
         // between the face's darkest and brightest corner
         var sun = (byte)MathF.Round(sample.Sun * 15f * 17f);
         var block = (byte)MathF.Round(sample.Block * 15f * 17f);

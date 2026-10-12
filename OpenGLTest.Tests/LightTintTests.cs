@@ -15,12 +15,12 @@ public sealed class LightTintTests
     public LightTintTests()
     {
         TestContent.EnsureLoaded();
-        // A registered slot whose colour differs from the default, so two-slot mixes are not vacuous
+        // A registered slot whose color differs from the default, so two-slot mixes are not vacuous
         _other = -1;
         var palette = BlockLightPalette.Linear;
         for (var i = 1; i < BlockLightPalette.Count; i++)
             if (Vector3.Distance(palette[i], palette[0]) > 1e-3f) { _other = i; break; }
-        Assert.True(_other > 0, "content registers no light colour distinct from the default");
+        Assert.True(_other > 0, "content registers no light color distinct from the default");
     }
 
     private static Vector3 Decode(int code) => LightTint.Decode(code, BlockLightPalette.Linear);

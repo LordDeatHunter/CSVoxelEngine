@@ -45,7 +45,7 @@ internal static class ChunkLighting
     /// blocked cell always stores 0, so counting it would darken the corner a second time on top
     /// of the AO that cell already casts. The corner sample likewise counts only if it passes
     /// light and at least one side is open, so light never leaks in through a sealed diagonal. A
-    /// substituted sample counts with the front cell's colour slot as well as its level.
+    /// substituted sample counts with the front cell's color slot as well as its level.
     /// <paramref name="j"/> follows the <c>CubeFaces[face].face</c> corner order, the same
     /// assumption the per-corner AO makes of a quad's positions.
     /// </summary>
@@ -93,7 +93,7 @@ internal static class ChunkLighting
 
     /// <summary>
     /// An emitter's light for face <paramref name="face"/>: the cell face's smooth corner light
-    /// when the neighbour in front of it is open, otherwise the flat light of
+    /// when the neighbor in front of it is open, otherwise the flat light of
     /// <paramref name="fallbackCell"/> - a face backed against an occluder must not average the
     /// occluder's zero light, or it renders black.
     /// </summary>
@@ -107,7 +107,7 @@ internal static class ChunkLighting
     /// <summary>
     /// Per-axis map from a light-volume coordinate (0..LightSize-1) to the neighbourhood chunk
     /// index (0..2) and the block index inside it (0..Size-1). The volume spans LightBorder cells
-    /// into each neighbour: [1, LightBorder) of the previous chunk, all of this one, then
+    /// into each neighbor: [1, LightBorder) of the previous chunk, all of this one, then
     /// [0, LightBorder) of the next. Shared by FillLightSnapshot and ComputeLight so the block
     /// snapshot and the sun seeds can never disagree about which column a cell sits in.
     /// </summary>
@@ -142,8 +142,8 @@ internal static class ChunkLighting
     }
 
     /// <summary>
-    /// <see cref="SpreadLight"/> for lamp light that carries a colour slot (<c>level | slot
-    /// &lt;&lt; 4</c>). The dominant-colour rule: a cell takes the slot of whichever source reaches
+    /// <see cref="SpreadLight"/> for lamp light that carries a color slot (<c>level | slot
+    /// &lt;&lt; 4</c>). The dominant-color rule: a cell takes the slot of whichever source reaches
     /// it brightest, and at an equal level the lower slot wins. A tie re-enqueues the cell so the
     /// lower slot keeps spreading; that terminates because at a fixed level a cell's slot only ever
     /// decreases. Both rules are order-free, so the result is a function of the seed set alone -
@@ -193,10 +193,10 @@ internal static class ChunkLighting
     // Bit 7 of a blockLight byte while SpreadBlockLight has the cell waiting in its queue
     private const byte QueuedMark = 0x80;
 
-    // Colour slot bits of a blockLight byte
+    // Color slot bits of a blockLight byte
     private const int BlockSlotMask = 0x70;
 
-    /// <summary>One neighbour step of <see cref="SpreadBlockLight"/>: a dimmer neighbour, or an
+    /// <summary>One neighbor step of <see cref="SpreadBlockLight"/>: a dimmer neighbor, or an
     /// equally lit one holding a higher slot, takes <c>next | slotBits</c>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void RaiseTinted(byte[] light, byte[] levels, int[] queue, ref int tail, ref int count,

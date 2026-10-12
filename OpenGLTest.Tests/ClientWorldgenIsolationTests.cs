@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 using Target = silkgltriangle.Tests.StreamedTerrainMeshTests.Target;
 

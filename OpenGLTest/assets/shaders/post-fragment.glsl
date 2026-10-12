@@ -20,7 +20,7 @@ uniform float uFxaaReduceMul;  // WorldGenerationConfig.FxaaReduceMul
 uniform float uFxaaSpanMax;    // WorldGenerationConfig.FxaaSpanMax, in pixels
 uniform float uFxaaEdgeThreshold;     // WorldGenerationConfig.FxaaEdgeThreshold
 uniform float uFxaaEdgeThresholdMin;  // WorldGenerationConfig.FxaaEdgeThresholdMin
-// The biome colour grade (BiomeGrade): a faint display-space multiplier over the finished image,
+// The biome color grade (BiomeGrade): a faint display-space multiplier over the finished image,
 // warm over the desert and cool over the snow; (1, 1, 1) leaves the image alone.
 uniform vec3 uGrade;
 // The damage chromatic fringe (DamageFringe): for a moment after a hit the screen edges split into
@@ -71,7 +71,7 @@ vec3 DisplayAt(ivec2 p)
 // Manual bilinear filter at pixelPos (pixel units, texel centres at .5). Each of the four texels
 // is converted to display space before they are mixed, so a filtered tap is an average of
 // tonemapped, encoded values. A hardware bilinear sample of the HDR buffer would instead average
-// a highlight far above 1 with its dark neighbours before the tonemap, and the clamp would
+// a highlight far above 1 with its dark neighbors before the tonemap, and the clamp would
 // turn that mix into a bright halo around the sun disc, lava and ore highlights.
 vec3 DisplayBilinear(vec2 pixelPos)
 {
@@ -121,7 +121,7 @@ vec3 Fxaa(vec2 pos)
     // what keeps the pass near a millisecond at 1080p; it also stops low-contrast texture
     // detail from being blurred along a false edge.
     // A swayed point (the underwater wobble) sits between texel centres, so it keeps its exact
-    // filtered colour instead of the nearest texel's, or the sway would step a whole pixel at a time
+    // filtered color instead of the nearest texel's, or the sway would step a whole pixel at a time
     if (lumaMax - lumaMin < max(uFxaaEdgeThresholdMin, lumaMax * uFxaaEdgeThreshold))
         return uUnderwater > 0.0 ? DisplayBilinear(pos) : rgbM;
 

@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -46,7 +47,7 @@ internal sealed class SupportTestWorld : IDisposable
 
     public byte Stone { get; }
 
-    /// <summary>Streams in the chunk holding the cell and its six face neighbours.</summary>
+    /// <summary>Streams in the chunk holding the cell and its six face neighbors.</summary>
     public void Load(int x, int y, int z)
     {
         var centre = VoxelCoords.ChunkPosOf(x, y, z);

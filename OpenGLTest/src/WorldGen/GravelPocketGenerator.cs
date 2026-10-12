@@ -1,4 +1,5 @@
 using System;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -6,7 +7,7 @@ namespace silkgltriangle;
 /// Gravel and sand pockets: blobs of loose rock buried inside stone, so mining into one can bring
 /// a small collapse down (both are <c>falls</c> blocks, which <see cref="FallingBlockManager"/>
 /// topples). A low-frequency 3D noise decides the blobs and a per-cell hash picks gravel or sand,
-/// so the pockets are a pure function of world position and neighbours agree without shared state.
+/// so the pockets are a pure function of world position and neighbors agree without shared state.
 /// Only stone within a depth band under the surface is replaced — soil, ore and rock caps are left
 /// alone. Runs on a generation worker thread after the carvers, like <see cref="LavaGenerator"/>.
 /// </summary>

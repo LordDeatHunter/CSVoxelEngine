@@ -22,7 +22,7 @@ public static class SurfaceFresnel
     /// <summary>
     /// How wet a fragment is, 0 or 1: a fragment of a submerged face is wet at or below that
     /// face's own baked water surface (<paramref name="heightAboveSurface"/> at most 0) and dry
-    /// above it, so the top of a side face poking out of a thin flow keeps its colour; a dry face
+    /// above it, so the top of a side face poking out of a thin flow keeps its color; a dry face
     /// is never wet. The twin of the shader's <c>step(fWorldPos.y, fWaterSurfaceY)</c>.
     /// </summary>
     public static float WetWeight(bool submerged, float heightAboveSurface) =>

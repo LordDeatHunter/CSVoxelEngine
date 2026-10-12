@@ -181,7 +181,7 @@ public sealed class LodManagerTests
         lods.UpdateCoverFlags(chunks, Vector3.Zero);
         Assert.False(coarse.IsBuried);
 
-        // A neighbour one coarse region over, whose real parent is (1,-2,-1), so it must not
+        // A neighbor one coarse region over, whose real parent is (1,-2,-1), so it must not
         // count here. A parent key built with a truncating divide collapses -3 and -2 onto the
         // same parent x (-3 / 2 == -1 == -2 / 2) and mis-buckets children like this one.
         lods.AddRegion((0, -3, -1), HeadlessRegion(-3, -1, 7));

@@ -1,7 +1,7 @@
 {
     // A fence as the icon, the held fence and the drop show it: a 4 px post with its two rails
     // reaching across the cell along X, at the heights the fence's pane.rails give them. In the
-    // world the pane renderer draws the post and an arm toward every connected neighbour instead
+    // world the pane renderer draws the post and an arm toward every connected neighbor instead
     // (PaneShape) and only takes the tile from here. UVs are left to the defaults, which crop the
     // tile to each face.
     "textures": {

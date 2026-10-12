@@ -6,7 +6,7 @@
   "castsAO": false,
   // The tile is a stick on transparent texels: alpha-tested, and it gets the coverage-keeping mips
   "cutout": true,
-  // The default warm block-light colour, so the torch costs no palette slot
+  // The default warm block-light color, so the torch costs no palette slot
   "light": { "emission": 14 },
   // The flame flickers half a pixel above the head of the stick (block/torch tops out at y 10)
   "flame": [8, 10.5, 8],

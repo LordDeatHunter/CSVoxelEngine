@@ -23,7 +23,7 @@ namespace silkgltriangle;
 /// (<see cref="LeafCluster.ClusterRadius(TreeSpecies, int)"/>): the world re-derives it as the
 /// <see cref="WoodState.DiameterPx"/> of the root cell the tip's parent chain ends at, the very
 /// number <see cref="LeafCluster.SupportPx"/> reads off the graph. A live tip in the world is a non-detached cell of the
-/// species' wood block no thicker than its <c>tipMaxPx</c> that no face neighbour of the same
+/// species' wood block no thicker than its <c>tipMaxPx</c> that no face neighbor of the same
 /// wood names as its parent (it has no child). Because this reproduces the stamped value bit for
 /// bit, an intact canopy re-derives to exactly what it holds and is never rewritten, and a leaf
 /// held by another live tip of the same species survives by construction. (The world cannot
@@ -56,7 +56,7 @@ namespace silkgltriangle;
 ///
 /// <para><b>Freezing.</b> Cells are read through <see cref="TryGetCell"/>, never
 /// <c>GetBlockGlobal</c>, which reports unloaded chunks as air. Whenever a decision needs a cell
-/// in an unloaded chunk — the cell itself, any candidate tip or a tip's neighbour in a leaf's
+/// in an unloaded chunk — the cell itself, any candidate tip or a tip's neighbor in a leaf's
 /// cluster box, or any cell an orphan candidate's support walk or search reads — the scheduled cell is dropped silently and
 /// never decayed; the next nearby edit reschedules it.</para>
 ///
@@ -446,8 +446,8 @@ public class LeafDecayManager
 
     /// <summary>
     /// Whether a cell of the species' wood is a live tip: not detached, no thicker than the
-    /// species' tip limit, and no face neighbour of the same wood naming it as its parent.
-    /// <paramref name="unloaded"/> reports a neighbour read that hit an unloaded chunk.
+    /// species' tip limit, and no face neighbor of the same wood naming it as its parent.
+    /// <paramref name="unloaded"/> reports a neighbor read that hit an unloaded chunk.
     /// </summary>
     private bool IsLiveTip(TreeSpecies species, int tx, int ty, int tz, byte tstate, out bool unloaded)
     {
@@ -467,7 +467,7 @@ public class LeafDecayManager
                 return false;
             }
 
-            // A child: the neighbour's parent points back at the candidate tip
+            // A child: the neighbor's parent points back at the candidate tip
             if (nid == species.WoodId && !WoodState.IsDetached(nstate)
                 && WoodState.TryParentOffset(nstate, out var px, out var py, out var pz)
                 && nx + px == tx && ny + py == ty && nz + pz == tz)
@@ -636,7 +636,7 @@ public class LeafDecayManager
     /// Pops, with its loot, every support-fragile block the removed cell <paramref name="holder"/>
     /// held up (see <see cref="BlockSupport"/>): a torch hanging on a decayed leaf, or a pebble on
     /// crumbled wood, would otherwise float. A popped block may emit light (a torch), so the light
-    /// radius around it rebuilds, not just its own chunk. An unloaded neighbour is left alone.
+    /// radius around it rebuilds, not just its own chunk. An unloaded neighbor is left alone.
     /// </summary>
     private void PopUnsupportedAround(Vector3 holder)
     {

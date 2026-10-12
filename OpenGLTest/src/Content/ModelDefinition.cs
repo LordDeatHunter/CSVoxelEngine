@@ -55,7 +55,7 @@ public sealed class ModelDefinition
         public string? Axis { get; set; }
         public float Angle { get; set; }
 
-        /// <summary>Scale the box back out so rotated faces still meet their neighbours.</summary>
+        /// <summary>Scale the box back out so rotated faces still meet their neighbors.</summary>
         public bool? Rescale { get; set; }
     }
 }

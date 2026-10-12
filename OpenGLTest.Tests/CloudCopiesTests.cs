@@ -8,7 +8,7 @@ namespace silkgltriangle.Tests;
 /// <summary>
 /// <c>CloudCopies</c> is the GL-free arithmetic behind the cloud layer's 3x3 sweep: the per-copy
 /// offsets, the cull AABB, and the packing of the survivors. The GL half — the vertex-array binding,
-/// the two sweeps with their colour/depth mask toggles, and the draw submission itself — is
+/// the two sweeps with their color/depth mask toggles, and the draw submission itself — is
 /// deliberately NOT covered here, exactly as HalfResTargetTests says of the half-res target's
 /// texture and framebuffer: it needs a live GL context and is only reachable by running the game.
 ///

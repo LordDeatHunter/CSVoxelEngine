@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -154,7 +155,7 @@ public sealed class WaterRavineTests
                 if (h < 1 || h > Chunk.Size - 2) continue;
                 // The source must sit inside its own column's terrain, where generated fluid
                 // lives (a carved pocket); a source above both its terrain top and water level
-                // is poured water, which wakes against any replaceable neighbour by design
+                // is poured water, which wakes against any replaceable neighbor by design
                 if (a.Heights[(Chunk.SizeMask << Chunk.SizeShift) | t] < h + 1) continue;
                 cx = ax;
                 cz = az;

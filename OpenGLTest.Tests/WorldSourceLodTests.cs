@@ -214,7 +214,7 @@ public sealed class WorldSourceLodTests : IDisposable
         var cold = LodRegion.BuildMeshData(Level, rx, rz, source: Over(rx, rz, top, Biome.Forest, coldWarmth, wetness));
         var warm = LodRegion.BuildMeshData(Level, rx, rz, source: Over(rx, rz, top, Biome.Forest, warmWarmth, wetness));
 
-        // The two sources differ only in their stored climate, so the meshes differ only in colour
+        // The two sources differ only in their stored climate, so the meshes differ only in color
         Assert.Equal(cold.Vertices.Count, warm.Vertices.Count);
         var compared = 0;
         for (var i = 0; i < cold.Vertices.Count; i++)

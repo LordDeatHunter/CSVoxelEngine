@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -159,7 +160,7 @@ public sealed class MoldTests
         });
         Assert.Equal(1f, quads.Where(q => q.Face == 5).Sum(Area), precision: 3);
 
-        // A cullface culls against the world neighbour, never a sibling element, so every
+        // A cullface culls against the world neighbor, never a sibling element, so every
         // pocket wall carries none and therefore sits strictly inside the cell.
         foreach (var quad in quads.Where(q => q.Face <= 3 && q.CullFace < 0))
         {

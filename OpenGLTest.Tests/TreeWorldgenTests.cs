@@ -6,7 +6,7 @@ using Xunit;
 namespace silkgltriangle.Tests;
 
 /// <summary>
-/// Rules of the worldgen tree front-end (<see cref="TreeGenerator"/>): placement honours each
+/// Rules of the worldgen tree front-end (<see cref="TreeGenerator"/>): placement honors each
 /// species' rules, the stamp is a pure function of position whatever order chunks generate in,
 /// every stamped wood cell carries a consistent graph state, and wood only reaches below the
 /// heightmap as the in-chunk root walk under a trunk. In the shape-cache collection because one

@@ -226,7 +226,7 @@ public static class ModelBaker
     }
 
     // A quad counts as a full face when it sits on that cube face's plane and spans the whole
-    // cell in the other two axes: only then do per-corner AO and neighbour lighting apply.
+    // cell in the other two axes: only then do per-corner AO and neighbor lighting apply.
     private static bool IsFullFace(Vector3[] positions, int face)
     {
         var planeAxis = face < 2 ? 2 : face < 4 ? 0 : 1;

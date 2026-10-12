@@ -7,7 +7,7 @@ namespace silkgltriangle;
 /// corner climate (the biome-tint lattice, <see cref="ColumnTerrain.Warmth"/> and
 /// <see cref="ColumnTerrain.Wetness"/>) rather than from worldgen noise, so a multiplayer client
 /// (whose columns stream from the server) never evaluates <see cref="TerrainGenerator"/>. The
-/// camera effects keyed to the eye's climate (the aurora's coldness, the biome colour grade) read it.
+/// camera effects keyed to the eye's climate (the aurora's coldness, the biome color grade) read it.
 /// </summary>
 public static class EyeClimate
 {

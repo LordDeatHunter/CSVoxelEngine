@@ -6,7 +6,7 @@ namespace silkgltriangle;
 /// Builds the mip chain of an alpha-tested (cutout) tile so its coverage survives minification.
 /// A plain box filter averages a leaf's opaque texels with the holes between them, so once the
 /// atlas samples its mips the averaged alpha drops below the cutoff and distant canopies thin out
-/// to nothing. Each level here is filtered like a normal mip (colour alpha-weighted, so transparent
+/// to nothing. Each level here is filtered like a normal mip (color alpha-weighted, so transparent
 /// texels do not darken the edges), then its alpha is rescaled so the fraction of texels passing
 /// the cutoff matches level 0. GL-free: <see cref="TextureAtlas"/> uploads the result.
 /// </summary>

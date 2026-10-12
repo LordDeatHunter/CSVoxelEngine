@@ -6,7 +6,7 @@
   // crown still standing after the limb cut and nothing left standing after the base cut.
   //
   // Trees are grown per 64-block cell (TreeBatch: every tree of a cell together, avoiding the
-  // earlier trees of the batch and the neighbour cells' solo shapes), so the coordinates below
+  // earlier trees of the batch and the neighbor cells' solo shapes), so the coordinates below
   // were probed through TreeGenerator.BatchShapeOf / BatchOf, which is what the chunks stamp.
   // Coordinates (default seed, headless probe over TreeGenerator.TryGetTree / BatchShapeOf):
   //   oak    base (-79, 14, -2), 12 tall, 69 wood cells and 278 leaves, crown x -84..-74,
@@ -19,7 +19,7 @@
   //          grazes; no wood within one cell of the eye). base_aim's first hit is the root cell.
   //   spruce base (-291, 13, -252), top leaf 11 above it, 35 wood cells, about 130 blocks south of
   //          tree-perf.json's taiga vantage: one of the few spruces of that dense wood standing
-  //          clear of its neighbours. Filmed from 14 blocks west at base + 6.5, where every
+  //          clear of its neighbors. Filmed from 14 blocks west at base + 6.5, where every
   //          sampled cell of the tree is seen with no other tree's cell and no terrain on the
   //          sight line; its own conical crown reaches the ground and hides the trunk.
   //   cactus base (601, 17, 1282), 9 above its base, by the desert vantage of tree-perf.json: a

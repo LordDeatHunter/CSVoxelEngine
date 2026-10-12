@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -11,7 +12,7 @@ namespace silkgltriangle.Tests;
 /// live tips of its species around it, so an intact canopy reads back bit for bit and schedules
 /// nothing further, a leaf whose tips are gone decays over a bounded number of ticks (and no
 /// faster than the per-tick budget allows), rolling its loot; a leaf held by another live tip
-/// survives, a persistent leaf never decays, an unloaded neighbour freezes a cell instead of
+/// survives, a persistent leaf never decays, an unloaded neighbor freezes a cell instead of
 /// decaying it, and thin wood orphaned by a cut crumbles outward while the connected rest stands.
 /// Grown trees are stamped through <see cref="StampedTree"/>. In the LOD column caps collection,
 /// because a decay poisons the process-global felled-canopy markers of its column; the

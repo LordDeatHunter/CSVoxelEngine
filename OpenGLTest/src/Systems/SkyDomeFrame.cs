@@ -12,7 +12,7 @@ namespace silkgltriangle;
 /// <param name="StarTime">The twinkle clock in seconds (<see cref="StarField.Twinkle"/>), wrapped to keep float precision.</param>
 /// <param name="Eye">Where the dome is seen from, for the cloud cover along each view ray.</param>
 /// <param name="CloudDrift">The cloud layer's wrapped drift this frame (<see cref="CloudCopies.Drift"/>).</param>
-/// <param name="GlareColor">The linear sun colour times <see cref="SunGlare.Intensity"/>; zero turns the glare off.</param>
+/// <param name="GlareColor">The linear sun color times <see cref="SunGlare.Intensity"/>; zero turns the glare off.</param>
 /// <param name="MoonVisibility">How visible the moon is (<see cref="MoonPhase.Visibility"/>): the stars behind its disc are hidden by that much.</param>
 /// <param name="Aurora">How strongly the aurora shows (<see cref="silkgltriangle.Aurora.Visibility"/>); zero draws none.</param>
 /// <param name="AuroraDrift">The aurora's noise drift this frame (<see cref="silkgltriangle.Aurora.Drift"/>).</param>

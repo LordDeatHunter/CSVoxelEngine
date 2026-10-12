@@ -8,7 +8,7 @@ namespace silkgltriangle.Tests;
 /// The content-free geometry of <see cref="TreeWoodShape"/>: node width by thickness, the tube
 /// box toward each direction, the direction pairing the connection rule relies on, and the
 /// pixel-rim bevel: the stair-stepped rim boxes of each corner mask and the side-fullness
-/// predicate neighbours cull against.
+/// predicate neighbors cull against.
 /// </summary>
 public sealed class TreeWoodShapeGeometryTests
 {

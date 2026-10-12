@@ -7,7 +7,7 @@
   "renderer": "pane",
   "hardness": 1,
   // Glass's flags: drawn blended in the translucent pass, fused with its own kind, never
-  // hiding a neighbour, darkening nothing and letting light through
+  // hiding a neighbor, darkening nothing and letting light through
   "translucent": true,
   "cullSelf": true,
   "occludes": false,

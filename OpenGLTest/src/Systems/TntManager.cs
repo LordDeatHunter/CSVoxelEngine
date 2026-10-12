@@ -69,7 +69,7 @@ public class TntManager
 
     /// <summary>
     /// Whether the cell touches fluid on any face, in which case its fuse is wet and it
-    /// clears instead of priming. Unloaded neighbours read as absent, never as contact.
+    /// clears instead of priming. Unloaded neighbors read as absent, never as contact.
     /// </summary>
     public static bool IsSubmerged(ChunkManager chunks, int x, int y, int z)
     {

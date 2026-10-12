@@ -12,15 +12,15 @@ namespace silkgltriangle;
 /// that merely touches it.
 ///
 /// Three shapes exist. A thin cell is a centred node box <see cref="HalfWidth"/> wide plus one
-/// tube per connected neighbour, running from the node face out to the cell face at the thinner
-/// of the two cells' widths, so the neighbour's tube meets it flush; toward a solid occluding
-/// neighbour that is not wood - the ground, a wall - it instead runs a same-width plug out to the
+/// tube per connected neighbor, running from the node face out to the cell face at the thinner
+/// of the two cells' widths, so the neighbor's tube meets it flush; toward a solid occluding
+/// neighbor that is not wood - the ground, a wall - it instead runs a same-width plug out to the
 /// cell face (<see cref="PlugMask"/>), so a thin trunk or root rooted on the ground meets it
 /// rather than floating the node clear of it. A full-thickness (or
 /// detached) cell is a plain cube. A trunk shell of a <c>rim: "pixel"</c> species
 /// (<see cref="BlockType.HasPixelRim"/>) is a cube with each exposed corner bevelled into a
 /// pixel-stepped quarter round: the stair-stepped full-height <see cref="RimBoxes"/> of its
-/// <see cref="RimCornerMask"/>, decided statelessly from its four edge neighbours. The mesher
+/// <see cref="RimCornerMask"/>, decided statelessly from its four edge neighbors. The mesher
 /// (<see cref="Chunk"/>), the raycast and selection outline (<see cref="Camera"/>,
 /// <see cref="World"/>) and body collision all read these boxes, so what is drawn and what is
 /// hit can never disagree. The outline draws every rim box, so a bevelled shell shows the seams
@@ -60,7 +60,7 @@ public static class TreeWoodShape
     public static int Opposite(int dir) => dir ^ 1;
 
     /// <summary>
-    /// Whether cell A connects to its neighbour B lying in direction <paramref name="dirAtoB"/>:
+    /// Whether cell A connects to its neighbor B lying in direction <paramref name="dirAtoB"/>:
     /// both are the same tree-wood block, neither is detached, and A's parent is B or B's
     /// parent is A. Symmetric by construction: swapping the cells and flipping the direction
     /// asks the same two parent questions.
@@ -73,8 +73,8 @@ public static class TreeWoodShape
                || (WoodState.HasParentCell(stateB) && WoodState.Parent(stateB) == Opposite(dirAtoB));
     }
 
-    /// <summary>Bit <c>i</c> set when the cell connects to its neighbour in direction
-    /// <c>i</c>; the spans hold the six neighbour ids and states in CubeFaces order.</summary>
+    /// <summary>Bit <c>i</c> set when the cell connects to its neighbor in direction
+    /// <c>i</c>; the spans hold the six neighbor ids and states in CubeFaces order.</summary>
     public static int ConnectionMask(byte id, byte state, ReadOnlySpan<byte> nbIds, ReadOnlySpan<byte> nbStates)
     {
         var mask = 0;
@@ -85,11 +85,11 @@ public static class TreeWoodShape
     }
 
     /// <summary>
-    /// Bit <c>i</c> set when a thin cell plugs into its neighbour in direction <c>i</c>: the
-    /// neighbour is a solid occluding block that is not tree wood (the ground, a wall), so the
+    /// Bit <c>i</c> set when a thin cell plugs into its neighbor in direction <c>i</c>: the
+    /// neighbor is a solid occluding block that is not tree wood (the ground, a wall), so the
     /// node geometry runs out to the cell face there instead of ending in mid-air. The plug is
     /// the node's own width, so it continues the node face; a full-cube or detached cell never
-    /// plugs, and a tree-wood neighbour is handled by <see cref="Connects"/> instead.
+    /// plugs, and a tree-wood neighbor is handled by <see cref="Connects"/> instead.
     /// </summary>
     public static int PlugMask(byte state, ReadOnlySpan<byte> nbIds)
     {
@@ -143,35 +143,35 @@ public static class TreeWoodShape
         max = new Vector3(hi[0], hi[1], hi[2]);
     }
 
-    /// <summary>The tube half width toward a connected neighbour: the thinner of the two.</summary>
+    /// <summary>The tube half width toward a connected neighbor: the thinner of the two.</summary>
     public static float TubeHalf(byte state, byte neighbourState) =>
         MathF.Min(HalfWidth(WoodState.Thickness(state)), HalfWidth(WoodState.Thickness(neighbourState)));
 
-    /// <summary>Whether a neighbour counts as rim mass for <paramref name="id"/>'s bevel: the
+    /// <summary>Whether a neighbor counts as rim mass for <paramref name="id"/>'s bevel: the
     /// same wood, a full cube and attached to a tree. A detached log or a thin limb beside a
     /// shell leaves its edge exposed, so the shell rounds off there.</summary>
     public static bool IsRimMass(byte id, byte nbId, byte nbState) =>
         nbId == id && WoodState.IsFullCube(nbState) && !WoodState.IsDetached(nbState);
 
     /// <summary>Whether a cell bevels at all: an attached full-cube trunk shell of a pixel-rim
-    /// species. Everything else keeps its plain shape and never reads its neighbours.</summary>
+    /// species. Everything else keeps its plain shape and never reads its neighbors.</summary>
     public static bool CanBevel(byte id, byte state) =>
         BlockType.HasPixelRim(id) && WoodState.IsShell(state) && WoodState.IsFullCube(state)
         && !WoodState.IsDetached(state);
 
     /// <summary>
     /// The bevelled corners of a pixel-rim shell, as <see cref="CornerMinXMinZ"/>-style bits; 0
-    /// for any cell that cannot bevel (<see cref="CanBevel"/>). The spans hold the six neighbour
+    /// for any cell that cannot bevel (<see cref="CanBevel"/>). The spans hold the six neighbor
     /// ids and states in CubeFaces order, of which only the four horizontal ones (0..3) are read.
     ///
-    /// A corner is carved when neither of its two edge neighbours (the X-side and the Z-side one)
+    /// A corner is carved when neither of its two edge neighbors (the X-side and the Z-side one)
     /// is rim mass (<see cref="IsRimMass"/>). That is the marching-squares outcome for the
     /// trunk's outline: with the cell present, the 2x2 sample square around a corner has the
-    /// convex-corner case exactly when both edge neighbours are absent, and the diagonal sample
+    /// convex-corner case exactly when both edge neighbors are absent, and the diagonal sample
     /// never changes it. A present diagonal with both edges absent is the saddle, which each cell
     /// resolves by carving only its own material, so the diagonal cell rounds its own corner and
     /// the two quarter rounds face each other. Because a cell only ever removes its own material,
-    /// the diagonal never matters and no diagonal neighbour has to be read or remeshed.
+    /// the diagonal never matters and no diagonal neighbor has to be read or remeshed.
     /// </summary>
     public static int RimCornerMask(byte id, byte state, ReadOnlySpan<byte> nbIds, ReadOnlySpan<byte> nbStates)
     {
@@ -192,7 +192,7 @@ public static class TreeWoodShape
     /// Whether a rim cell with corner mask <paramref name="mask"/> fills its whole face toward
     /// <paramref name="dirFromCellToViewer"/> (CubeFaces order). A top or bottom face is whole
     /// only with no corner carved; a side face is whole unless one of the two corners on that
-    /// side is carved. This is the culling predicate a neighbour uses: a face that butts onto a
+    /// side is carved. This is the culling predicate a neighbor uses: a face that butts onto a
     /// whole rim face is hidden, one that butts onto a carved face is drawn.
     /// </summary>
     public static bool RimSideFull(int mask, int dirFromCellToViewer) => dirFromCellToViewer switch
@@ -294,7 +294,7 @@ public static class TreeWoodShape
     }
 
     /// <summary>
-    /// <see cref="GetBoxes"/> for a world cell, reading its state and six neighbours from the
+    /// <see cref="GetBoxes"/> for a world cell, reading its state and six neighbors from the
     /// chunk manager. A full cube that cannot bevel reads nothing beyond its own state and
     /// allocates nothing.
     /// </summary>
@@ -318,7 +318,7 @@ public static class TreeWoodShape
     /// live boxes (<see cref="BlockShape.BoxesAt"/>: the mould slab's registered ones, a pane's
     /// arms), full tree-wood cubes their registered hitboxes, thin wood its node and tube
     /// boxes and a bevelled pixel-rim shell its rim boxes, all without allocating. Only thin
-    /// wood and bevel-capable shells read their neighbours. Touching a face exactly counts,
+    /// wood and bevel-capable shells read their neighbors. Touching a face exactly counts,
     /// matching the cell-granular collision test this refines.
     /// </summary>
     public static bool OverlapsShape(byte id, ChunkManager chunks, int x, int y, int z, Vector3 min, Vector3 max)
@@ -329,7 +329,7 @@ public static class TreeWoodShape
         var bevels = type != null && BlockType.IsTreeWood(id) && CanBevel(id, state);
         if (type == null || !BlockType.IsTreeWood(id) || (!IsThin(state) && !bevels))
         {
-            // Any other shape-colliding block's live boxes (a pane's arms follow its neighbours)
+            // Any other shape-colliding block's live boxes (a pane's arms follow its neighbors)
             var boxes = type == null ? FullCubeBoxes
                 : BlockType.IsTreeWood(id) ? type.Hitboxes
                 : BlockShape.BoxesAt(id, chunks, x, y, z);
@@ -370,7 +370,7 @@ public static class TreeWoodShape
         return false;
     }
 
-    // Six face neighbours in CubeFaces order, read through the manager (unloaded reads air)
+    // Six face neighbors in CubeFaces order, read through the manager (unloaded reads air)
     private static void ReadNeighbours(ChunkManager chunks, int x, int y, int z, Span<byte> ids, Span<byte> states)
     {
         for (var dir = 0; dir < 6; dir++)

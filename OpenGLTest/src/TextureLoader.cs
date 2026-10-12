@@ -12,7 +12,7 @@ namespace silkgltriangle;
 /// single slice — so all the shaders sample one sampler type and a merged chunk quad can
 /// tile its texture through the sampler's REPEAT instead of atlas arithmetic.
 ///
-/// Colour space: every loader takes an <c>srgb</c> flag. Colour data sampled before the
+/// Color space: every loader takes an <c>srgb</c> flag. Color data sampled before the
 /// tonemap (the block atlas, item meshes, skins, the sun, particle and world sprites) is
 /// uploaded as <c>SRGB8_ALPHA8</c>, so the sampler decodes it to linear for lighting. Data
 /// textures (the material/normal atlas) and UI-only textures (font, crosshair, HUD icons),
@@ -35,7 +35,7 @@ public static class TextureLoader
 
     /// <summary>
     /// Uploads a grid spritesheet as one slice per frame (row-major from the top-left), so each
-    /// frame mipmaps in isolation instead of bleeding into its neighbours. Every failure names
+    /// frame mipmaps in isolation instead of bleeding into its neighbors. Every failure names
     /// <paramref name="path"/>, like the content errors in <c>ContentRegistry</c>.
     /// </summary>
     public static uint LoadSpritesheet(GL gl, string path, int cols, int rows, int frames, bool srgb = false)
@@ -87,7 +87,7 @@ public static class TextureLoader
     /// distant ground from sparkling while magnification stays <c>Nearest</c> and close blocks
     /// keep their crisp pixels.
     ///
-    /// With <paramref name="srgb"/> true the internal format is <c>SRGB8_ALPHA8</c> (colour
+    /// With <paramref name="srgb"/> true the internal format is <c>SRGB8_ALPHA8</c> (color
     /// sampled before the tonemap, decoded to linear by the sampler; alpha stays linear);
     /// otherwise plain <c>RGBA8</c> (data and UI-only textures). Mipmap generation works on both.
     /// </summary>

@@ -5,6 +5,7 @@ using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
 using System.Numerics;
 using Silk.NET.Maths;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -82,7 +83,7 @@ public class RenderManager : IDisposable
     // (see CrucibleItem): it is an item, so nothing meshes it into a chunk.
     private Mesh? _crucibleMesh;
 
-    // One flat liquid quad per molten material, tinted with the material's colour and built on
+    // One flat liquid quad per molten material, tinted with the material's color and built on
     // first sight. Both the crucible's pool and a mold's fill draw it, scaled and lifted.
     private readonly Dictionary<byte, Mesh> _moltenQuads = new();
     private uint _playerPaletteTex;
@@ -167,7 +168,7 @@ public class RenderManager : IDisposable
     private float _godrayStrength;
 
     // The sky dome, one full-screen pass drawn before the sun disc (RenderSky). Null until
-    // LoadResources builds it; the clear colour stands in for it until then.
+    // LoadResources builds it; the clear color stands in for it until then.
     private SkyRenderer? _skyDome;
 
     // The frame's resolve pass: tonemaps the HDR scene target into the default framebuffer at
@@ -176,13 +177,13 @@ public class RenderManager : IDisposable
     private ContactAoRenderer? _contactAo;
 
     // The linear HDR scene target every world pass renders into (BindSceneTarget): an RGBA16F
-    // colour texture plus a DepthComponent24 depth *texture* (sampleable, compare mode off), sized
+    // color texture plus a DepthComponent24 depth *texture* (sampleable, compare mode off), sized
     // to the viewport by CreateHdrTarget. Only the post pass and the UI touch framebuffer 0.
     private uint _hdrFbo;
     private uint _hdrColorTex;
     private uint _hdrDepthTex;
     // The same _hdrColorTex on ColorAttachment0 with no depth attachment: a full-screen pass can
-    // blend into the scene colour here while sampling _hdrDepthTex, with no feedback loop,
+    // blend into the scene color here while sampling _hdrDepthTex, with no feedback loop,
     // because the depth texture it reads is not attached to the framebuffer it writes.
     private uint _hdrColorOnlyFbo;
     private Vector2D<int> _hdrSize;
@@ -247,7 +248,7 @@ public class RenderManager : IDisposable
     private readonly List<Goblin> _mirrorGoblins = new(8);
     private readonly List<TopplingTree> _mirrorToppling = new(4);
 
-    // The scene copies the water pass refracts through: the HDR scene target's colour on
+    // The scene copies the water pass refracts through: the HDR scene target's color on
     // unit 3 and its depth on unit 4, snapshotted by CopyScene just before the water draws.
     private uint _sceneColorTex;
     private uint _sceneDepthTex;
@@ -255,7 +256,7 @@ public class RenderManager : IDisposable
 
     // The half-resolution target the underwater sun-shaft march renders into before a
     // full-res depth-aware upsample composites it back (see CreateRaysTarget). Layout is
-    // RGBA16F at half the viewport per axis: rgb is the additive shaft colour and a is the
+    // RGBA16F at half the viewport per axis: rgb is the additive shaft color and a is the
     // world-space distance that pixel marched, capped at
     // WorldGenerationConfig.WaterRayMaxDistance, which the upsample keys its depth-aware
     // weights off. No depth attachment - the march is a full-screen triangle with the depth
@@ -277,12 +278,12 @@ public class RenderManager : IDisposable
     // the sun and moon discs, the stars' turn, the glare) reads the true sun, _skySunDir.
     private Vector3 _sunDir = Vector3.UnitY;
     private Vector3 _skySunDir = Vector3.UnitY;
-    // The sun disc's own colour (linear); _sunColor is the key light's, the moonlight's at night
+    // The sun disc's own color (linear); _sunColor is the key light's, the moonlight's at night
     private Vector3 _sunDiscColor = Vector3.One;
     private Vector3 _sunColor = Vector3.One;
     private float _sunIntensity = 1f;
     private Vector3 _ambient = new(0.42f, 0.45f, 0.52f);
-    // The voxel block-light colours by palette slot, already linear: copied once from
+    // The voxel block-light colors by palette slot, already linear: copied once from
     // BlockLightPalette in LoadResources, after ContentRegistry.Load has settled it
     private Vector3[] _blockLightPalette = [];
     private const float TorchIntensity = 1.2f;
@@ -310,9 +311,9 @@ public class RenderManager : IDisposable
     // The eye adaptation's exposure multiplier (EyeAdaptation), eased toward the voxel light at the
     // eye each frame by SetLighting and applied by RenderPostProcess; 1 in any lit place
     private float _eyeExposure = 1f;
-    // The biome colour grade (BiomeGrade), eased toward the climate at the eye; (1, 1, 1) is neutral
+    // The biome color grade (BiomeGrade), eased toward the climate at the eye; (1, 1, 1) is neutral
     private Vector3 _grade = Vector3.One;
-    // Display-space (sRGB) light at the pre-SH-10 values, set by SetLighting: the sun colour
+    // Display-space (sRGB) light at the pre-SH-10 values, set by SetLighting: the sun color
     // (the cloud layer and the underwater shafts), and the cloud layer's sun intensity and
     // ambient (see CloudRenderer.Render and RenderUnderwaterRays).
     private Vector3 _sunSrgb = Vector3.One;
@@ -336,7 +337,7 @@ public class RenderManager : IDisposable
     /// <summary>Unit downwind direction (x, z) this frame, for wind consumers such as future rain or snow.</summary>
     public Vector2 WindDirection => _wind;
 
-    // Average opaque colour of the leaves tile, uploaded as uLodLeafColor: far LOD crowns
+    // Average opaque color of the leaves tile, uploaded as uLodLeafColor: far LOD crowns
     // sample the cutout leaf texture stretched over whole cells, so their transparent texels
     // fall back to this instead of discarding to sky.
     private Vector3 _lodLeafColor = new(0.17f, 0.29f, 0.07f);
@@ -412,7 +413,7 @@ public class RenderManager : IDisposable
     private static readonly Vector3 UnderwaterAmbientTint = new(0.55f, 0.75f, 1f);
     private static readonly Vector3 LavaFogColor = new(0.55f, 0.12f, 0.02f);
     private static readonly Vector3 LavaAmbientTint = new(1.2f, 0.6f, 0.4f);
-    // Linear twins for SetLighting, which feeds pre-tonemap shaders. The gamma fog colours above
+    // Linear twins for SetLighting, which feeds pre-tonemap shaders. The gamma fog colors above
     // stay for RenderUI's wash rect, which draws after the tonemap onto the gamma framebuffer.
     private static readonly Vector3 UnderwaterFogColorLinear = ColorSpace.SrgbToLinear(UnderwaterFogColor);
     private static readonly Vector3 UnderwaterAmbientTintLinear = ColorSpace.SrgbToLinear(UnderwaterAmbientTint);
@@ -426,7 +427,7 @@ public class RenderManager : IDisposable
     private static readonly Vector3 GroundBounceTintLinear = ColorSpace.SrgbToLinear(GroundBounceTint);
 
     /// <summary>
-    /// The ambient colour a downward face sees, derived from the final sky ambient so the
+    /// The ambient color a downward face sees, derived from the final sky ambient so the
     /// underwater and lava tints carry over to the ground bounce.
     /// </summary>
     public static Vector3 GroundAmbientOf(Vector3 skyAmbient) => skyAmbient * GroundBounceTintLinear;
@@ -440,7 +441,7 @@ public class RenderManager : IDisposable
     private double _prevTime;
     private float _underwaterT;
     private bool _eyeInLava;
-    // Eases the lava-only fades (sky clear colour, sun disc) exactly as _underwaterT eases the
+    // Eases the lava-only fades (sky clear color, sun disc) exactly as _underwaterT eases the
     // water ones: _eyeInLava is a hard flag that drops the frame the eye leaves lava while
     // _underwaterT is still fading out, which would otherwise pop the sky back in one frame.
     private float _lavaT;
@@ -709,7 +710,7 @@ public class RenderManager : IDisposable
         selectionShader = new Shader(gl, selectionVs, selectionFs);
         breakShader = new Shader(gl, breakVs, breakFs);
         // The crack sprite is a single column of BreakOverlayFrames stacked 32x32 frames, so
-        // each frame becomes its own array slice and no mip level bleeds a neighbour in.
+        // each frame becomes its own array slice and no mip level bleeds a neighbor in.
         _breakProgressTexture = TextureLoader.LoadSpritesheet(gl, "assets/textures/environment/break_progress.png",
             1, WorldGenerationConfig.BreakOverlayFrames, WorldGenerationConfig.BreakOverlayFrames, srgb: true);
         breakShader.Use();
@@ -1111,8 +1112,8 @@ public class RenderManager : IDisposable
 
         _sunColor = Mix(new Vector3(0.3f, 0.4f, 0.7f), new Vector3(1f, 0.96f, 0.88f), dayness);
         _sunColor = Mix(_sunColor, new Vector3(1f, 0.5f, 0.25f), duskAmount * 0.55f);
-        // Every palette colour here is authored in sRGB (display) space and decoded once, where
-        // it is computed, so fog, the clear colour, clouds, the mirror and the rays all see linear
+        // Every palette color here is authored in sRGB (display) space and decoded once, where
+        // it is computed, so fog, the clear color, clouds, the mirror and the rays all see linear
         // light (SH-10).
         // The cloud layer and the underwater shafts are still lit in display space
         // (cloud-fragment.glsl, rays-upsample-fragment.glsl), with the exact pre-SH-10 sun,
@@ -1161,7 +1162,7 @@ public class RenderManager : IDisposable
         // precision; their cloud cover follows the drawn clouds' drift
         _skyFrame = new SkyDomeFrame(StarField.Visibility(elevation), (float)(_timeD % 3600.0), _cameraPos,
             CloudCopies.Drift(_timeD, WorldGenerationConfig.CloudFieldSize), Vector3.Zero);
-        // The flat sky/fog colour is the dome's no-glow horizon sample
+        // The flat sky/fog color is the dome's no-glow horizon sample
         _skyColor = _sky.HazedHorizon;
         // Fog melts the far terrain (and the LOD edge) into the sky, day and night
         _fogColor = _skyColor;
@@ -1202,7 +1203,7 @@ public class RenderManager : IDisposable
 
         // Underwater the fog closes in to a few blocks and goes blue-green and the light dims
         // and cools, so a submerged view reads as being inside the water rather than looking
-        // at a blue filter. Scaled by dayness so night water stays dark. The clear colour and
+        // at a blue filter. Scaled by dayness so night water stays dark. The clear color and
         // the sun disc stay dry in water: they are what the surface's Snell window shows from
         // below, so only the fog closes in. Lava is an opaque glow, so it still fades both to
         // red (eased through _lavaT) and stays bright at night.
@@ -1253,7 +1254,7 @@ public class RenderManager : IDisposable
         if (columns != null && camera != null)
             eyeClimateKnown = EyeClimate.TryAt(columns, camera.Position.X, camera.Position.Z, out eyeWarmth, out eyeWetness);
         _eyeColdness = Aurora.Ease(_eyeColdness, Aurora.TargetColdness(eyeClimateKnown, eyeWarmth), dt);
-        // The biome colour grade reads the same climate (neutral, eased back, when it is unknown)
+        // The biome color grade reads the same climate (neutral, eased back, when it is unknown)
         _grade = BiomeGrade.Ease(_grade, BiomeGrade.Target(eyeClimateKnown, eyeWarmth, eyeWetness), dt);
         // Eye adaptation: the exposure eases up in the dark, read from the voxel light at the eye's
         // cell (no GPU readback); open sky and lit rooms keep it at 1
@@ -1281,14 +1282,14 @@ public class RenderManager : IDisposable
 
         var underwaterColor = _eyeInLava
             // The dayness dims were tuned as display-space factors; raised to 1.6 (matched against the
-            // old night shots) they dim the linear colours about as much on screen as they used to
+            // old night shots) they dim the linear colors about as much on screen as they used to
             ? LavaFogColorLinear * MathF.Pow(0.6f + 0.4f * dayness, 1.6f)
             : UnderwaterFogColorLinear * MathF.Pow(0.15f + 0.85f * dayness, 1.6f);
         _skyTint = underwaterColor;
         _skyTintAmount = lavaWet;
         _fogColor = Mix(_fogColor, underwaterColor, wet);
         // _fogColor was copied from the dry _skyColor earlier, so this leaves the fog tint alone;
-        // afterwards _skyColor only feeds the clear colour, which the window shows from below.
+        // afterwards _skyColor only feeds the clear color, which the window shows from below.
         _skyColor = Mix(_skyColor, underwaterColor, lavaWet);
         _ambient = Mix(_ambient, _ambient * (_eyeInLava ? LavaAmbientTintLinear : UnderwaterAmbientTintLinear), wet);
         // 0.25 in linear light is the old display-space 0.5 raised to ~2.2 (SH-10): the sun is
@@ -1341,7 +1342,7 @@ public class RenderManager : IDisposable
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, _nearShadow.Fbo);
         gl.Viewport(0, 0, size, size);
         gl.Clear(ClearBufferMask.DepthBufferBit);
-        // No colour is written, so blending would only cost fill rate
+        // No color is written, so blending would only cost fill rate
         gl.Disable(EnableCap.Blend);
 
         shadowShader.Use();
@@ -1543,11 +1544,11 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Builds the half-res reflection texture: a colour target plus a depth texture, sized
+    /// Builds the half-res reflection texture: a color target plus a depth texture, sized
     /// from the viewport. Called from <see cref="LoadResources"/> and
     /// <see cref="SetViewport"/>; recreating only when the size actually changed.
     /// Returns true when the target was actually (re)created, which also invalidates the
-    /// temporal-reuse cache in <see cref="RenderReflection"/> - the fresh colour texture holds
+    /// temporal-reuse cache in <see cref="RenderReflection"/> - the fresh color texture holds
     /// nothing a water fragment may sample.
     /// It runs every frame from <see cref="RenderReflection"/>, including frames that then take
     /// that method's early return, so its recreate path must restore the HDR scene target, never
@@ -1563,7 +1564,7 @@ public class RenderManager : IDisposable
         if (_reflFbo != 0 && _reflSize.X == w && _reflSize.Y == h) return false;
 
         DeleteReflectionTarget();
-        // The new colour texture is TexImage2D'd with null data below, so its contents are
+        // The new color texture is TexImage2D'd with null data below, so its contents are
         // undefined: the cached mirror is gone and the next eligible frame must render one.
         // Clearing the flag here (rather than relying on the return value) is what covers the
         // SetViewport call site, whose recreation happens outside RenderReflection entirely.
@@ -1686,7 +1687,7 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Builds the half-resolution colour target the underwater ray march writes into, sized
+    /// Builds the half-resolution color target the underwater ray march writes into, sized
     /// from the viewport by <see cref="HalfResTarget"/>. Called from
     /// <see cref="LoadResources"/> and <see cref="SetViewport"/>, recreating only when the
     /// half-res size actually changed - two adjacent viewport widths often share one, which is
@@ -1753,9 +1754,9 @@ public class RenderManager : IDisposable
     }
 
     /// <summary>
-    /// Builds the linear HDR scene target every world pass renders into: an RGBA16F colour
+    /// Builds the linear HDR scene target every world pass renders into: an RGBA16F color
     /// texture and a sampleable DepthComponent24 depth texture (nothing uses stencil), plus a
-    /// colour-only FBO over the same colour texture, all sized to the viewport.
+    /// color-only FBO over the same color texture, all sized to the viewport.
     /// Called first from <see cref="LoadResources"/> and <see cref="SetViewport"/>, so the other
     /// target creators restore to it, and recreating only on a resize. Nearest filtering: the
     /// post pass reads it with <c>texelFetch</c> only. Leaves framebuffer 0 bound, like the
@@ -1808,7 +1809,7 @@ public class RenderManager : IDisposable
         if (status != GLEnum.FramebufferComplete)
             throw new Exception($"HDR framebuffer incomplete: {status}");
 
-        // Colour-only view of the same target (see _hdrColorOnlyFbo).
+        // Color-only view of the same target (see _hdrColorOnlyFbo).
         _hdrColorOnlyFbo = gl.GenFramebuffer();
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, _hdrColorOnlyFbo);
         gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
@@ -1816,7 +1817,7 @@ public class RenderManager : IDisposable
 
         status = gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
         if (status != GLEnum.FramebufferComplete)
-            throw new Exception($"HDR colour-only framebuffer incomplete: {status}");
+            throw new Exception($"HDR color-only framebuffer incomplete: {status}");
 
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
         gl.BindTexture(TextureTarget.Texture2D, 0);
@@ -1876,11 +1877,11 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Multiplies the screen-space contact AO (SH-28, <see cref="ContactAoRenderer"/>) into the
-    /// HDR scene colour. World.Render calls it mid entity pass: after everything that writes
+    /// HDR scene color. World.Render calls it mid entity pass: after everything that writes
     /// honest depth (terrain, drops, stations, TNT, falling blocks, slimes) and before the
     /// depth-less or blended draws (healthbars, the first-person head, debris, player, held item),
     /// the selection outline, water, clouds and particles, none of which own the depth it reads.
-    /// It draws through <see cref="_hdrColorOnlyFbo"/>, which shares the colour texture but not the
+    /// It draws through <see cref="_hdrColorOnlyFbo"/>, which shares the color texture but not the
     /// depth, so sampling <see cref="_hdrDepthTex"/> is no feedback loop, and puts the world's
     /// depth, blend and target state back on the way out.
     /// </summary>
@@ -1908,13 +1909,13 @@ public class RenderManager : IDisposable
         BindSceneTarget();
     }
 
-    /// <summary>Snapshots the HDR scene target's colour and depth into the scene textures so the
+    /// <summary>Snapshots the HDR scene target's color and depth into the scene textures so the
     /// water pass can refract what is behind the surface and measure how thick the water is. Two
     /// texture copies, no extra FBO: CopyTexSubImage2D reads the bound read framebuffer, which is
     /// the HDR FBO (read buffer ColorAttachment0, the default for an FBO) during the world passes.</summary>
-    private void CopyScene(bool colour)
+    private void CopyScene(bool color)
     {
-        if (colour)
+        if (color)
         {
             BindUnit(3, TextureTarget.Texture2D, _sceneColorTex);
             gl.CopyTexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, 0, 0, (uint)_sceneSize.X, (uint)_sceneSize.Y);
@@ -2204,10 +2205,10 @@ public class RenderManager : IDisposable
     private static Vector3 Mix(Vector3 a, Vector3 b, float t) => a.Lerp(b, t);
 
     /// <summary>
-    /// Binds and clears the HDR scene target (colour to the flat sky fallback, and depth), paints the sky dome and the sun over
+    /// Binds and clears the HDR scene target (color to the flat sky fallback, and depth), paints the sky dome and the sun over
     /// it (<see cref="RenderSky"/>), and leaves the GL state the world passes expect.
     /// <paramref name="camera"/> only orients the dome and the sun quad; a null camera skips
-    /// both and leaves the flat clear colour.
+    /// both and leaves the flat clear color.
     /// </summary>
     public void BeginFrame(Camera? camera)
     {
@@ -2306,7 +2307,7 @@ public class RenderManager : IDisposable
         gl.Enable(EnableCap.DepthTest);
     }
 
-    // The moon's cool white tint, authored in sRGB like every palette colour and decoded once
+    // The moon's cool white tint, authored in sRGB like every palette color and decoded once
     private static readonly Vector3 MoonColorLinear = ColorSpace.SrgbToLinear(new Vector3(0.9f, 0.94f, 1f));
 
     /// <summary>
@@ -2440,7 +2441,7 @@ public class RenderManager : IDisposable
     /// state, and the program they switch is handled by <c>Shader.Use</c>'s own cache.
     /// <see cref="RenderBlockBreaking"/> binds its crack sprite through <see cref="BindUnit"/>,
     /// which updates the cache rather than invalidating it, so it needs no call either; so does
-    /// <see cref="RenderPostProcess"/> with the HDR colour texture on unit 0 (and its unbind).
+    /// <see cref="RenderPostProcess"/> with the HDR color texture on unit 0 (and its unbind).
     /// <c>ChunkDrawBatch</c>, <c>ChunkGeometryPool</c> and <c>Mesh.Render</c> touch VAO/VBO/indirect
     /// state only. <see cref="CopyScene"/>'s <c>glCopyTexSubImage2D</c> changes texture
     /// <em>contents</em>, not bindings (its own select/bind pair is routed through
@@ -2456,7 +2457,7 @@ public class RenderManager : IDisposable
 
     /// <summary>
     /// Binds the world textures for a world draw: the atlas on unit 0, the near shadow map on
-    /// unit 1, the reflection texture on unit 2, the scene colour/depth copies on units 3
+    /// unit 1, the reflection texture on unit 2, the scene color/depth copies on units 3
     /// and 4, the material atlas on unit 6 and the far shadow map on unit 7. Unit 0 is left active on the way out, because <see cref="RenderItemDrops"/>
     /// binds an item's own texture assuming that; the trailing unconditional
     /// <see cref="ActiveUnit"/> call is what upholds that postcondition now that the five binds
@@ -2668,12 +2669,12 @@ public class RenderManager : IDisposable
         if (camera == null || _rays == null || _eyeInLava) return;
         var wet = MathUtils.SmoothStep(_underwaterT);
         // The shafts are added in display space (rays-upsample-fragment.glsl), so they take the
-        // display-space sun colour and the pre-SH-10 strength, as they did before the scene went
+        // display-space sun color and the pre-SH-10 strength, as they did before the scene went
         // linear.
         var strength = wet * _shadowStrengthDry * _dayness * GameSettings.WaterSunShafts;
         if (strength <= 0.0005f) return;
         if (_raysFbo == 0) return;             // no target to march into (never happens after LoadResources)
-        CopyScene(colour: false);
+        CopyScene(color: false);
         BindUnit(1, TextureTarget.Texture2D, _nearShadow.DepthTex);
         BindUnit(4, TextureTarget.Texture2D, _sceneDepthTex);
         ActiveUnit(0);
@@ -2690,7 +2691,7 @@ public class RenderManager : IDisposable
     /// shafts, whose half-resolution target it borrows (the two never need it at once: the godrays
     /// fade out as the eye goes under). It reads the HDR scene's own depth texture, marching it
     /// through the near shadow cascade, so it needs no scene copy, and composites through the
-    /// colour-only HDR framebuffer so that read is no feedback loop. Skipped when the frame's strength
+    /// color-only HDR framebuffer so that read is no feedback loop. Skipped when the frame's strength
     /// (<see cref="Godrays.Intensity"/>, set by <see cref="SetLighting"/>) is negligible, when the
     /// shadow passes did not run (shadows off, or the sun too low for them), and when
     /// <see cref="WorldGenerationConfig.GodraysEnabled"/> is off.
@@ -2892,7 +2893,7 @@ public class RenderManager : IDisposable
         // The refraction reads the frame as it stands right now: everything opaque plus the
         // entities, and nothing translucent yet. Depth comes along for the thickness measure.
         // Skipped for far-only water: the cheap shader path samples neither copy.
-        if (_nearWaterVisible) CopyScene(colour: true);
+        if (_nearWaterVisible) CopyScene(color: true);
 
         chunkShader.Use();
         // No cutout here: glass's faint interior must blend instead of discarding away.
@@ -3804,7 +3805,7 @@ public class RenderManager : IDisposable
             var mesh = cube.Look switch
             {
                 DebrisLook.Surface => blockCubes.GetSurface(cube.BlockId),
-                DebrisLook.Colour => blockCubes.GetColourChip(),
+                DebrisLook.Color => blockCubes.GetColourChip(),
                 _ => blockCubes.GetTinted(cube.BlockId),
             };
             if (mesh == null) continue;
@@ -3815,7 +3816,7 @@ public class RenderManager : IDisposable
                         * Matrix4x4.CreateTranslation(cube.Position);
 
             SetDrawUniforms(model, model * viewProj, MathUtils.Clamp01(cube.Alpha), LightAt(cube.Position));
-            // One cached cube per block id serves every cell, so a tinted chip's colour rides
+            // One cached cube per block id serves every cell, so a tinted chip's color rides
             // the per-draw uniform (white for an untinted block, whose mesh sets no bit 4)
             worldShader.SetUniform(_locBiomeTint, cube.Tint);
             mesh.Render();
@@ -4013,7 +4014,7 @@ public class RenderManager : IDisposable
         gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
         boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
-        // sRGB-authored outline colours, decoded: the selection draws into the linear HDR target
+        // sRGB-authored outline colors, decoded: the selection draws into the linear HDR target
         selectionShader.SetUniform("uColor", SelectionOutlineColor);
         // Full at the top of each breath: SelectionPulse dips it to SelectionPulseMinOpacity
         selectionShader.SetUniform("uOpacity", 1f);
@@ -4060,7 +4061,7 @@ public class RenderManager : IDisposable
                             * Matrix4x4.CreateScale(hitBox.Size + new Vector3(grow))
                             * Matrix4x4.CreateTranslation(hitCenter + hitNormal * 0.003f);
             selectionShader.SetUniform("uMVP", faceModel * viewProj);
-            // The face highlight mixes in display space (selection-fragment.glsl), so its colour
+            // The face highlight mixes in display space (selection-fragment.glsl), so its color
             // stays sRGB and it reads the very target it writes: one quad touches each texel
             // once, which is what glTextureBarrier makes legal. Blending is off for that draw.
             selectionShader.SetUniform("uColor", SelectionFaceColorSrgb);
@@ -4363,7 +4364,7 @@ public class RenderManager : IDisposable
         InvalidateTextureUnits();
     }
 
-    // Clear colour of a menu frame; the menu and loading backdrops cover it anyway.
+    // Clear color of a menu frame; the menu and loading backdrops cover it anyway.
     private static readonly Vector4 MenuClearColor = new(0.06f, 0.07f, 0.09f, 1f);
 
     /// <summary>

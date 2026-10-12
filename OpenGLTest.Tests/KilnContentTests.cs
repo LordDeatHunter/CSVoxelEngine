@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -38,7 +39,7 @@ public sealed class KilnContentTests
             // A structure is built from its source block, never held
             Assert.False(cell.HasItem);
             Assert.Null(ItemRegistry.TryGet(cell.Id));
-            // The surface really covers its neighbours, but light must still reach the anchor
+            // The surface really covers its neighbors, but light must still reach the anchor
             // cell, which is where every quad of the model is lit from
             Assert.True(cell.OccludesNeighbours);
             Assert.True(cell.PassesLight);

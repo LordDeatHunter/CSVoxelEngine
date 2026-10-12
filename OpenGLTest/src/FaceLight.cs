@@ -35,7 +35,7 @@ internal readonly struct FaceLight
 
     /// <summary>Uniform light of one cell: every corner holds four samples of the same level, so
     /// <see cref="Sample"/> returns exactly <c>level / 15</c>. <paramref name="block"/> is the lamp
-    /// level alone; <paramref name="slot"/> is its colour slot.</summary>
+    /// level alone; <paramref name="slot"/> is its color slot.</summary>
     public static FaceLight Flat(byte sun, byte block, byte slot = 0)
     {
         var code = 4 * sun | 4 * block << 6 | LightTint.Flat(block, slot) << 12;
@@ -50,9 +50,9 @@ internal readonly struct FaceLight
     /// <summary>
     /// <see cref="Sample(Vector3, out float, out float)"/> plus the block-light tint code at the
     /// same point: when the four corners share one tint code it is returned exactly (a sun or
-    /// level gradient does not change the colour); otherwise each corner's two slots are weighted
+    /// level gradient does not change the color); otherwise each corner's two slots are weighted
     /// by the bilinear weight times its block level and <see cref="LightTint.FromWeights"/>
-    /// resolves the mix, so an unlit corner contributes no colour.
+    /// resolves the mix, so an unlit corner contributes no color.
     /// </summary>
     public void Sample(Vector3 local, out float sun, out float block, out ushort tint)
     {

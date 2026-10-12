@@ -6,7 +6,7 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// <see cref="ColorSpace"/> is the exact sRGB transfer pair the linear pipeline decodes CPU
-/// colours with; the GLSL twins in the post and UI shaders mirror its encode.
+/// colors with; the GLSL twins in the post and UI shaders mirror its encode.
 /// </summary>
 public sealed class ColorSpaceTests
 {
@@ -75,7 +75,7 @@ public sealed class ColorSpaceTests
 
 /// <summary>
 /// <see cref="Tonemap"/> is the C# twin of the post pass's tonemap: a per-channel clamp after
-/// exposure, so in-range colour passes through and each over-bright channel clips on its own.
+/// exposure, so in-range color passes through and each over-bright channel clips on its own.
 /// </summary>
 public sealed class TonemapTests
 {
@@ -89,7 +89,7 @@ public sealed class TonemapTests
     [Fact]
     public void EachOverBrightChannelClipsOnItsOwn()
     {
-        // An over-bright warm colour clips toward white/yellow like the old 8-bit target,
+        // An over-bright warm color clips toward white/yellow like the old 8-bit target,
         // instead of keeping its ratios: the clipped channels meet at 1, the rest are untouched.
         var hdr = new Vector3(3f, 1.5f, 0.3f);
         Vector3 c = Tonemap.Apply(hdr, 1f);

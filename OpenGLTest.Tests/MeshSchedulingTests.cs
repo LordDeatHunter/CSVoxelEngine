@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -26,7 +27,7 @@ public sealed class MeshSchedulingTests
     public MeshSchedulingTests() => TestContent.EnsureLoaded();
 
     // A 6x6x6 block of empty, ready chunks (positions -2..3 on each axis) so the inner 4x4x4
-    // (positions -1..2, exactly 64 chunks) have all six face neighbours and are therefore the
+    // (positions -1..2, exactly 64 chunks) have all six face neighbors and are therefore the
     // ones ProcessDirtyChunks schedules. 64 == MaxDirtyChunksPerFrame, so one Update schedules
     // all of them through the un-sorted branch; MaxMeshUploadsPerFrame is 32, so applying them
     // takes two more Update calls.

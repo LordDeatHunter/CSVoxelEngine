@@ -18,7 +18,7 @@
 // into the view and hides the band. The scores are a guide, not a guarantee: the probe assumes
 // the eye ends up at terrain height, while the player actually lands wherever physics puts it,
 // so every vantage here was also confirmed by opening the rendered frame. Moving D to its
-// nominally better neighbour (-610, 96) put the landing inside a canopy and blacked the shot
+// nominally better neighbor (-610, 96) put the landing inside a canopy and blacked the shot
 // out - hence the verified point below rather than the top-scoring one.
 //
 // Four teleports rather than teleport + 90 deg look: the director has no flight op and

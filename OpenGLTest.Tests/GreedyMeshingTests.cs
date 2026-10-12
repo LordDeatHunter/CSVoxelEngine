@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -205,7 +206,7 @@ public sealed class GreedyMeshingTests
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
             center.SetBlockRaw(x, 0, z, stone, 0);
-        // A wall along X at z = 0, continued into the X neighbours so every strip cell sees
+        // A wall along X at z = 0, continued into the X neighbors so every strip cell sees
         // the same corners
         for (var x = 0; x < Chunk.Size; x++) center.SetBlockRaw(x, 1, 0, stone, 0);
         manager.Chunks[MeshTestWorld.HighAbove - Vector3.UnitX].SetBlockRaw(Chunk.Size - 1, 1, 0, stone, 0);
@@ -259,7 +260,7 @@ public sealed class GreedyMeshingTests
 
     /// <summary>What one unit cell face looks like once rendered, independent of how many
     /// quads it was drawn with: attributes plus the shade, sun and lamp light, decoded lamp tint
-    /// colour and UV interpolated at its four corners. <c>Flags</c> is the packed normal above the face index
+    /// color and UV interpolated at its four corners. <c>Flags</c> is the packed normal above the face index
     /// (submerged bit 3, biome tint bit 4, sway bit 5, ...), so comparing it compares IsBiomeTinted too.</summary>
     private sealed record CellFace(int Face, int Flags, int Alpha, int Layer, bool Sway, int WaterSurface, int List,
         Vector3[] Shade, float[] Sun, float[] Block, Vector3[] Tint, float[] U, float[] V);
@@ -428,7 +429,7 @@ public sealed class GreedyMeshingTests
     [InlineData(4, 8)]
     public void GreedyMeshDrawsExactlyWhatThePerQuadPathDraws(int seed, int chunkY)
     {
-        // Random soup of every kind of block, in the centre and in the six neighbours (so halo
+        // Random soup of every kind of block, in the centre and in the six neighbors (so halo
         // culling and cross-border AO are exercised), at chunk heights where sunlight varies
         var centre = new Vector3(0, chunkY, 0);
         var (manager, center) = MeshTestWorld.WalledArea(centre);
@@ -523,7 +524,7 @@ public sealed class GreedyMeshingTests
 
         AssertGreedyMatchesPerQuad(manager, center);
 
-        // Anti-vacuity: the floor really carries a two-slot blend, so the parity compared colours
+        // Anti-vacuity: the floor really carries a two-slot blend, so the parity compared colors
         var mesh = center.GenerateMeshData(manager, greedy: true);
         Assert.NotNull(mesh);
         Assert.Contains(mesh.Vertices, v => (v.Normal & 7) == 4 && v.Position.Y == 1f

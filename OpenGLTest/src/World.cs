@@ -4,6 +4,7 @@ using System.Numerics;
 using Silk.NET.OpenGL;
 using Silk.NET.Input;
 using Silk.NET.Windowing;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -4338,7 +4339,7 @@ public class World : IItemUseWorld
     void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();
     #endregion
 
-    // A tool that ran out of durability shatters: chips of its sprite's colour burst off the hand
+    // A tool that ran out of durability shatters: chips of its sprite's color burst off the hand
     // and its hotbar slot flashes (cosmetic: a server draws nothing)
     private void ToolBroke(byte itemId, int slot)
     {
@@ -4668,7 +4669,7 @@ public class World : IItemUseWorld
     /// <summary>
     /// Guards and grounds one block against a raycast hit face: live cubes and a player's
     /// body refuse solid entries, fragile blocks need solid ground, and a placement into
-    /// water displaces it. The filled cell is the neighbour across the hit face, or the hit
+    /// water displaces it. The filled cell is the neighbor across the hit face, or the hit
     /// cell itself when it holds a stack a placement may take over (layered snow), which it
     /// overwrites in place. <paramref name="state"/> rides into the state byte (a fresh rock
     /// pile starts at 1) and <paramref name="placedCell"/> reports the cell that was filled.
@@ -4731,7 +4732,7 @@ public class World : IItemUseWorld
         if (BlockType.ById[blockId]?.Renderer == BlockRenderer.Quern)
             _querns.Ensure((int)placePos.X, (int)placePos.Y, (int)placePos.Z);
 
-        // A block placed into water displaces it, so the neighbours recompute their levels
+        // A block placed into water displaces it, so the neighbors recompute their levels
         _fluidManager.ScheduleAround(placePos);
         _leafDecay.ScheduleAround(placePos);
         BlockEdited?.Invoke((int)placePos.X, (int)placePos.Y, (int)placePos.Z, blockId, state);

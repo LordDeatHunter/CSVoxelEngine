@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -418,7 +419,7 @@ public sealed class ImportedWorldStreamingTests : IDisposable
                 world.SaveAndDispose();
         }
 
-        // The save holds the edited chunk of the map and not its untouched neighbour
+        // The save holds the edited chunk of the map and not its untouched neighbor
         string SavedChunk(int cx) => Path.Combine(SaveDir, WorldStore.ChunksDirectoryName, WorldStore.ChunkFileName(cx, topCy, 0));
         Assert.True(File.Exists(SavedChunk(0)), "the edited imported chunk was not saved");
         Assert.False(File.Exists(SavedChunk(1)), "an imported chunk nobody edited was saved");

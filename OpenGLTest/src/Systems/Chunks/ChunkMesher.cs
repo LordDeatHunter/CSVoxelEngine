@@ -56,7 +56,7 @@ internal static class ChunkMesher
         }
 
         // Still fluid in the snapshot's top row: the surface lies above what this build sees.
-        // Arithmetic shift: padded 0 is the -X/-Z neighbour column (-1 >> 4 = -1), 1..16 this
+        // Arithmetic shift: padded 0 is the -X/-Z neighbor column (-1 >> 4 = -1), 1..16 this
         // one, 17 the +X/+Z one; the mask then picks the cell inside that column.
         var dx = ((px - 1) >> SizeShift) + 1;
         var dz = ((pz - 1) >> SizeShift) + 1;
@@ -96,7 +96,7 @@ internal static class ChunkMesher
     /// Binary greedy pass over every <see cref="BlockType.IsGreedy"/> cell. Faces are found with
     /// bit columns (a cell shows a face when its greedy bit is set and the occluder bit one
     /// step along the face normal is not — the halo bits cull border faces exactly as the
-    /// per-voxel neighbour read does), keyed by everything that would make two cells' quads
+    /// per-voxel neighbor read does), keyed by everything that would make two cells' quads
     /// differ (block, the four corner AO values, the four corner smooth sun/lamp light sums of
     /// <see cref="SmoothCornerLight"/> in a parallel 48-bit key, the submerged flag and, for a
     /// submerged face, its water surface code from <see cref="SubmergedSurfaceCode"/>),
@@ -211,10 +211,10 @@ internal static class ChunkMesher
 
                     var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
                     var id = padded[pIdx];
-                    var neighbour = padded[pIdx + faceDelta];
+                    var neighbor = padded[pIdx + faceDelta];
                     // Glass panes fuse: a face against the same block is hidden (the occluder
-                    // mask already handled opaque neighbours)
-                    if (neighbour == id && BlockType.ById[id]!.CullSelf) continue;
+                    // mask already handled opaque neighbors)
+                    if (neighbor == id && BlockType.ById[id]!.CullSelf) continue;
 
                     var lightBase = LightIdx(x, y, z);
                     var ao = 0;
@@ -238,10 +238,10 @@ internal static class ChunkMesher
                     // negative; that is safe because the slot hash reads it as (uint)key and an
                     // empty slot is table entry 0, never a key value. The light travels in a
                     // parallel 48-bit key: four 12-bit SmoothCornerLight codes, corner j at 12j,
-                    // and the colour in a second parallel 40-bit key: the four 10-bit LightTint
+                    // and the color in a second parallel 40-bit key: the four 10-bit LightTint
                     // codes, corner j at 10j (all zero wherever the lamp light is default-coloured).
                     var key = id | ao << 8;
-                    if (BlockType.IsFluid(neighbour))
+                    if (BlockType.IsFluid(neighbor))
                         key |= 1 << 24 | SubmergedSurfaceCode(padded, paddedState, pIdx + faceDelta,
                             chunkBaseY, columns) << 25;
 
@@ -295,16 +295,16 @@ internal static class ChunkMesher
     /// Merges one key's bit plane into rectangles and emits them. Every cell in the plane has the
     /// same four corner AO values and the same four corner smooth sun/lamp light sums
     /// (<paramref name="light"/>), but that alone does not make them continuous across two cells:
-    /// for ordinary occluders the shared-vertex geometry makes AO so, while a neighbour that
+    /// for ordinary occluders the shared-vertex geometry makes AO so, while a neighbor that
     /// casts AO without occluding (leaves) can leave a step at a shared edge, and
     /// light has a gradient wherever a lamp or a shadow edge is near. So a run only grows along an
     /// axis where the key's per-corner code (AO and both lights together) is the same at both
     /// ends of that axis — then the two cells' shared corners carry the same values, shade and
     /// light inside every cell are affine along it, and the merged quad interpolates to exactly
     /// the per-cell result. Uniformly lit terrain merges both ways; a strip beside a wall merges
-    /// along the wall. The colour tint code (<paramref name="tint"/>) joins the per-corner code
+    /// along the wall. The color tint code (<paramref name="tint"/>) joins the per-corner code
     /// too: the shader decodes each corner's code to an RGB tint and lerps that linearly across the
-    /// quad, so equal corner codes along a merged axis give the identical colour gradient.
+    /// quad, so equal corner codes along a merged axis give the identical color gradient.
     /// </summary>
     internal static void EmitGreedyRun(int f, int axis, int depth, int chunkBaseY, int key, ulong light, ulong tint,
         BlockType type,
@@ -511,7 +511,7 @@ internal static class ChunkMesher
     /// <summary>
     /// Emits one fluid cell's surface into the translucent lists. The top face is a quad whose
     /// four corners sit at <see cref="CornerHeight"/>, so a flow slopes away from its source
-    /// and - the average being symmetric between neighbours - adjacent tops meet exactly with
+    /// and - the average being symmetric between neighbors - adjacent tops meet exactly with
     /// no crack. No face is ever emitted between two fluid cells, so a body of water reads as
     /// a single skin instead of a stack of blended cubes.
     /// </summary>
@@ -521,7 +521,7 @@ internal static class ChunkMesher
     {
         // Smooth light per (X, Z) corner, averaged over the same 2x2 cells CornerHeight reads.
         // That set is identical for every fluid cell meeting at the corner and the fill of a
-        // blocked sample is order-independent, so neighbours agree at shared corners exactly as
+        // blocked sample is order-independent, so neighbors agree at shared corners exactly as
         // their heights do and a shoreline shows no light step along a cell edge. (Full cube
         // faces use SmoothCornerLight's asymmetric front-substitution rule instead.) Side and
         // bottom vertices sit on integer X/Z, so they take the corner values unchanged.
@@ -560,14 +560,14 @@ internal static class ChunkMesher
 
         for (var face = 0; face < 6; face++)
         {
-            var neighbour = padded[pIdx + FaceNeighborDelta[face]];
+            var neighbor = padded[pIdx + FaceNeighborDelta[face]];
 
             // Two fluid cells share no face: their sloped tops already meet at the corners
-            if (BlockType.IsFluid(neighbour)) continue;
-            if (face != 4 && BlockType.Occludes(neighbour)) continue;
+            if (BlockType.IsFluid(neighbor)) continue;
+            if (face != 4 && BlockType.Occludes(neighbor)) continue;
             // A full column pressed against a ceiling has a coplanar top face - drop it
             // instead of z-fighting the block above
-            if (face == 4 && BlockType.Occludes(neighbour) && minCorner >= 0.999f) continue;
+            if (face == 4 && BlockType.Occludes(neighbor) && minCorner >= 0.999f) continue;
 
             // Meshes are indexed with ushort (mirrors LodRegion.AddQuad): stop emitting
             // instead of wrapping the offset if a chunk somehow runs past the limit
@@ -694,7 +694,7 @@ internal static class ChunkMesher
         var sun = s0 + (o1 ? s1 : sMax) + (o2 ? s2 : sMax) + (o3 ? s3 : sMax);
         var block = b0 + (o1 ? b1 : bMax) + (o2 ? b2 : bMax) + (o3 ? b3 : bMax);
 
-        // A blocked sample takes the brightest open sample's colour too; on a level tie the
+        // A blocked sample takes the brightest open sample's color too; on a level tie the
         // lowest slot among the open samples at that level, so the fill never depends on which
         // of the four cells is the own one and neighbouring fluid cells agree at the corner
         int sl0 = (r0 >> 4) & 7, sl1 = (r1 >> 4) & 7, sl2 = (r2 >> 4) & 7, sl3 = (r3 >> 4) & 7;
@@ -730,7 +730,7 @@ internal static class ChunkMesher
     /// toward the corner). Nearly full cells outweigh thin ones ten to one, so a source next
     /// to a skirt keeps its own level; air and cutouts pull the corner down toward 0; an
     /// occluding solid is skipped, because a wall must not lower the water beside it. The
-    /// diagonal cell counts only when at least one of the two orthogonal neighbours is fluid
+    /// diagonal cell counts only when at least one of the two orthogonal neighbors is fluid
     /// (Minecraft's rule), so two bodies of water touching across a corner with solids in both
     /// orthogonal cells stay separate instead of visually joining. The cell itself is fluid, so
     /// the weight is never zero.
@@ -739,13 +739,13 @@ internal static class ChunkMesher
     {
         var total = 0f;
         var weight = 0f;
-        // The diagonal is only reachable through a fluid orthogonal neighbour; with neither of
+        // The diagonal is only reachable through a fluid orthogonal neighbor; with neither of
         // them fluid it is ignored outright - no height, no full-column pin, no weight
         var orthogonalFluid = false;
 
         for (var i = 0; i < 4; i++)
         {
-            // i: 0 = own cell, 1 = the dx neighbour, 2 = the dz neighbour, 3 = the diagonal
+            // i: 0 = own cell, 1 = the dx neighbor, 2 = the dz neighbor, 3 = the diagonal
             if (i == 3 && !orthogonalFluid) break;
 
             var q = p + ((i & 1) != 0 ? dx : 0) + ((i & 2) != 0 ? dz : 0);
@@ -804,7 +804,7 @@ internal static class ChunkMesher
         for (var i = 0; i < 6; i++)
         {
             // A face backed against rock or wood (a slope, a trunk) must not sample the
-            // neighbour's zero light, or it renders black: light it from the pebble's own
+            // neighbor's zero light, or it renders black: light it from the pebble's own
             // cell instead, which sits open to the sky above the ground it rests on.
             lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
         }
@@ -934,11 +934,11 @@ internal static class ChunkMesher
 
     /// <summary>
     /// Emits a thin <see cref="BlockRenderer.TreeWood"/> cell: a centred node box sized by its
-    /// <see cref="WoodState"/> thickness and one square tube toward every neighbour it connects
+    /// <see cref="WoodState"/> thickness and one square tube toward every neighbor it connects
     /// to (<see cref="TreeWoodShape.Connects"/>), at the thinner of the two widths, plus a
-    /// same-width plug toward every solid occluding neighbour (<see cref="TreeWoodShape.PlugMask"/>)
+    /// same-width plug toward every solid occluding neighbor (<see cref="TreeWoodShape.PlugMask"/>)
     /// so a root or trunk on the ground meets it. Tubes and plugs carry
-    /// only their four walls - the neighbour emits the matching tube from its side, so the two
+    /// only their four walls - the neighbor emits the matching tube from its side, so the two
     /// meet flush with no cap between them - and a node face is dropped where a tube or plug of its
     /// own full width leaves it. The geometry is exactly <see cref="TreeWoodShape.GetBoxes"/>,
     /// so the hitboxes cover what is drawn. UVs are cropped (<see cref="CropUv"/>), so bark
@@ -1000,10 +1000,10 @@ internal static class ChunkMesher
 
     /// <summary>
     /// <see cref="TreeWoodShape.RimCornerMask"/> of the cell at padded index
-    /// <paramref name="idx"/>, read out of the snapshot. Only the four horizontal neighbours are
+    /// <paramref name="idx"/>, read out of the snapshot. Only the four horizontal neighbors are
     /// read (the diagonals never change a cell's bevel, because a cell only ever carves its own
-    /// material), so <paramref name="idx"/> must be a cell whose horizontal neighbours lie inside
-    /// the 18^3 snapshot: the meshed cell itself or its vertical neighbours.
+    /// material), so <paramref name="idx"/> must be a cell whose horizontal neighbors lie inside
+    /// the 18^3 snapshot: the meshed cell itself or its vertical neighbors.
     /// </summary>
     internal static int RimMaskInSnapshot(byte[] padded, byte[] paddedState, int idx, byte id)
     {
@@ -1023,10 +1023,10 @@ internal static class ChunkMesher
     /// Whether the full-cube <paramref name="id"/> cell at padded index <paramref name="nbIdx"/>
     /// fills its whole face toward <paramref name="side"/> (the direction from it to the viewing
     /// cell): <see cref="TreeWoodShape.RimSideFull"/> of its rim mask, read without leaving the
-    /// snapshot. A side face is carved only at a corner whose two edge neighbours are both
+    /// snapshot. A side face is carved only at a corner whose two edge neighbors are both
     /// missing, and the viewing cell is one of the two for both corners on that side, so the
-    /// neighbour's far side is never read; a cap needs the whole mask, whose horizontal reads
-    /// stay inside the snapshot for a vertical neighbour.
+    /// neighbor's far side is never read; a cap needs the whole mask, whose horizontal reads
+    /// stay inside the snapshot for a vertical neighbor.
     /// </summary>
     internal static bool RimFaceFull(byte[] padded, byte[] paddedState, int nbIdx, byte id, int side)
     {
@@ -1034,7 +1034,7 @@ internal static class ChunkMesher
         if (side >= 4) return RimMaskInSnapshot(padded, paddedState, nbIdx, id) == 0;
         var toward = nbIdx + FaceNeighborDelta[side];
         if (TreeWoodShape.IsRimMass(id, padded[toward], paddedState[toward])) return true;
-        // The two edge neighbours across the other axis: X for a Z side, Z for an X side
+        // The two edge neighbors across the other axis: X for a Z side, Z for an X side
         var across = side < 2 ? 2 : 0;
         var a = nbIdx + FaceNeighborDelta[across];
         var b = nbIdx + FaceNeighborDelta[across + 1];
@@ -1081,7 +1081,7 @@ internal static class ChunkMesher
     /// the outline and collision match what is drawn. Faces on the cell boundary cull like a
     /// cube's (<see cref="RimBoundaryHidden"/>); the X walls inside the cell and the Z steps
     /// between two boxes are always drawn, the steps only where one box sticks out past its
-    /// neighbour. Top and bottom draw only the part of the footprint that the same-wood cell
+    /// neighbor. Top and bottom draw only the part of the footprint that the same-wood cell
     /// above or below does not cover, so a stack of equal bevels shows no buried caps and a
     /// shell under a narrower one keeps its exposed rim.
     /// </summary>

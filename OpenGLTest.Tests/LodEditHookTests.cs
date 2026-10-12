@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -254,7 +255,7 @@ public sealed class LodEditHookTests
     /// <summary>
     /// A column near the centre of a level-1 region in row <paramref name="rz"/> (walking east
     /// from 777) whose whole blast neighbourhood is dry land, so no fluid is left standing in
-    /// the crater, and whose neighbour two chunks east is dry too, for the buried blast.
+    /// the crater, and whose neighbor two chunks east is dry too, for the buried blast.
     /// </summary>
     private static (int X, int Z, int Height) FindDryColumn(int rz)
     {

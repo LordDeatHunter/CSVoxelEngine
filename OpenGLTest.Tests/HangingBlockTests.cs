@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -48,8 +49,8 @@ public sealed class HangingBlockTests : IDisposable
             Assert.Equal(cell + Vector3.UnitY, support);
             for (var face = 0; face < 6; face++)
             {
-                var neighbour = cell + Chunk.CubeFaces[face].normal;
-                Assert.Equal(neighbour == support, BlockSupport.IsHeldUpBy(type.Id, 0, cell, neighbour));
+                var neighbor = cell + Chunk.CubeFaces[face].normal;
+                Assert.Equal(neighbor == support, BlockSupport.IsHeldUpBy(type.Id, 0, cell, neighbor));
             }
         }
     }

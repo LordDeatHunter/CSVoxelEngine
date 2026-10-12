@@ -100,7 +100,7 @@ public interface IItemUseWorld
     /// <summary>Spawns the live primed cube.</summary>
     void SpawnPrimedTnt(Vector3 cell, byte blockId);
 
-    /// <summary>Neighbours of an edit recompute their fluid levels.</summary>
+    /// <summary>Neighbors of an edit recompute their fluid levels.</summary>
     void ScheduleFluidAround(Vector3 cell);
 
     /// <summary>Destroyed blocks expose the buried LOD, which rebuilds below the hole.</summary>

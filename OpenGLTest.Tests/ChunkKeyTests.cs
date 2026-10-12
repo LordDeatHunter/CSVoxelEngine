@@ -190,7 +190,7 @@ public sealed class ChunkKeyTests
         }
     }
 
-    // CardinalOffsets exists only to stop the six neighbour literals being retyped per call site,
+    // CardinalOffsets exists only to stop the six neighbor literals being retyped per call site,
     // so it is worthless unless it stays in lockstep with CardinalDirections.
     [Fact]
     public void TheIntegerCardinalOffsetsMatchTheVectorCardinalDirections()

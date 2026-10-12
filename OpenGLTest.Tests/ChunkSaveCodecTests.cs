@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -251,7 +252,7 @@ public class ChunkSaveCodecTests
         // is still generated-style water, so it keeps the carved rule
         Assert.True(TryFindWetColumn(out var cx, out var cz, out var lx, out var lz, out var nx, out var nz,
                 out var y),
-            "no wet column with a neighbour no higher than itself within the search radius");
+            "no wet column with a neighbor no higher than itself within the search radius");
 
         var column = ColumnCache.Get(cx, cz);
         var i = (lx << Chunk.SizeShift) | lz;
@@ -302,7 +303,7 @@ public class ChunkSaveCodecTests
 
     /// <summary>
     /// A chunk column holding a cell <c>i</c> whose water level stands above its terrain top, with
-    /// an in-chunk horizontal neighbour <c>n</c> no higher than it, and a test height
+    /// an in-chunk horizontal neighbor <c>n</c> no higher than it, and a test height
     /// <c>y = Heights[i] + 1</c> that leaves room for all five tested faces inside one chunk.
     /// </summary>
     private static bool TryFindWetColumn(out int cx, out int cz, out int lx, out int lz,

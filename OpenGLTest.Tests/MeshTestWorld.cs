@@ -4,7 +4,7 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// Builds the smallest world a chunk can be meshed in: the centre chunk plus its six face
-/// neighbours, all empty and marked ready. Shared by the meshing test classes.
+/// neighbors, all empty and marked ready. Shared by the meshing test classes.
 /// </summary>
 internal static class MeshTestWorld
 {
@@ -26,9 +26,9 @@ internal static class MeshTestWorld
         manager.Chunks[centre] = center;
         foreach (var offset in Vector3Directions.CardinalDirections)
         {
-            var neighbour = new Chunk(null!, centre + offset, generateBlockData: false);
-            neighbour.IsBlockDataReady = true;
-            manager.Chunks[centre + offset] = neighbour;
+            var neighbor = new Chunk(null!, centre + offset, generateBlockData: false);
+            neighbor.IsBlockDataReady = true;
+            manager.Chunks[centre + offset] = neighbor;
         }
         return (manager, center);
     }

@@ -19,9 +19,9 @@
   //   taiga_aerial / taiga_spruce   - spruce in the cold, wet taiga: the cooler foliage corner.
   //   mine_pop                      - mid-hit on the side of the rise, HUD on: the pop wears the
   //     terrain's tint (dirt + band on its side) while the held grass block and its hotbar icon
-  //     keep the default colours.
+  //     keep the default colors.
   //   felled_tree_falling / felled_tree_fallen - a forest tree toppling: the falling canopy keeps
-  //     the colour of the standing canopies beside it. A copper axe is given first only so the hand
+  //     the color of the standing canopies beside it. A copper axe is given first only so the hand
   //     holds something that belongs in the frame instead of the grass block.
   //
   // The vantage points come from biomes.json's probe (forest (-80, 8), mountain

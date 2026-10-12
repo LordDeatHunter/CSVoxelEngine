@@ -14,7 +14,7 @@ namespace silkgltriangle;
 /// +Y=4, -Y=5.</param>
 /// <param name="CullFace">Cell side this quad is culled against, or -1 when it always draws.</param>
 /// <param name="IsFullFace">Whether the quad exactly covers its cube face, which is what makes
-/// per-corner AO and neighbour-cell lighting meaningful.</param>
+/// per-corner AO and neighbor-cell lighting meaningful.</param>
 /// <param name="Shade">Whether directional shading applies (Minecraft's per-element
 /// <c>shade</c>).</param>
 /// <param name="Tile">Atlas slice the UVs sample.</param>

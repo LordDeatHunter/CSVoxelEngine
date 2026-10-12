@@ -44,8 +44,8 @@ uniform vec2 uWindOffset; // Wind.Offset(time, WindGustSpeed): how far the gusts
 uniform vec3 uCameraPos;
 // Atlas slice of the lava tile (RenderManager.InitWorldProgram): picks lava's own swell.
 uniform float uLavaLayer;
-// Linear block-light colours by palette slot (BlockLightPalette.Linear); slot 0 is the default
-// warm torch colour.
+// Linear block-light colors by palette slot (BlockLightPalette.Linear); slot 0 is the default
+// warm torch color.
 uniform vec3 uBlockLightPalette[8];
 
 out vec4 fColor;
@@ -53,7 +53,7 @@ out vec2 fTexCoord;
 flat out uint fLayer;
 out float fSun;
 out float fBlock;
-// Linear colour of the block light reaching this vertex (smooth: a corner blend of two slots).
+// Linear color of the block light reaching this vertex (smooth: a corner blend of two slots).
 out vec3 fBlockTint;
 out vec3 fNormal;
 // The tile's u and v directions in world space, for the reflective tiles' normal maps. Flat

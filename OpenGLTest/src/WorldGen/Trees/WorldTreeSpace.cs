@@ -9,7 +9,7 @@ namespace silkgltriangle;
 /// <para>A cell is free when it is air or a non-persistent leaf of this species (growth may
 /// write only there; every other block is an obstacle), is not <c>reserved</c> (a cell a live
 /// falling block owns), and is not the missing parent of an orphan: no non-detached face
-/// neighbour of the species' wood names it as its parent cell, because filling that cell would
+/// neighbor of the species' wood names it as its parent cell, because filling that cell would
 /// re-attach a cut branch. An unloaded cell is never free, and a cell beside one is refused too,
 /// since the orphan rule cannot be checked there.</para>
 /// <para>A wide trunk's shells (<see cref="WoodState.IsShell"/>) are the tree's own wood: never

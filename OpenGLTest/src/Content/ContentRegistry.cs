@@ -5,7 +5,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 
-namespace silkgltriangle;
+namespace silkgltriangle.Content;
 
 /// <summary>
 /// Loads every block, item, loot table, tag and model from <c>assets/data</c> and
@@ -33,7 +33,7 @@ public static class ContentRegistry
     {
         PropertyNameCaseInsensitive = true,
         ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
+        AllowTrailingCommas = true
     };
 
     // Texture variables the built-in parents leave to their children; the startup self-check
@@ -135,10 +135,11 @@ public static class ContentRegistry
     /// </summary>
     private static void PublishBlockItems()
     {
-        var blocks = new List<BlockItem>();
-        foreach (var type in BlockType.Types.Values)
-            if (type is { HasItem: true, Fluid: false })
-                blocks.Add(new BlockItem(type));
+        var blocks = BlockType.Types.Values
+            .Where(type => type is { HasItem: true, Fluid: false })
+            .Select(type => new BlockItem(type))
+            .ToList();
+
         ItemRegistry.PublishBlockItems(blocks);
     }
 
@@ -170,40 +171,40 @@ public static class ContentRegistry
             type.Bottom = baked.FaceTiles[5];
             type.Side = baked.FaceTiles[0];
 
-            // A cutout block must never hide a neighbour's face, whatever the author wrote:
+            // A cutout block must never hide a neighbor's face, whatever the author wrote:
             // a face culled behind one shows through the texture's holes as an X-ray.
-            // A translucent block must never hide a neighbour's face either, or the
-            // neighbour shows a hole through the glass.
+            // A translucent block must never hide a neighbor's face either, or the
+            // neighbor shows a hole through the glass.
             type.OccludesNeighbours = !type.Cutout && !type.Translucent && (definition.Occludes ?? baked.IsFullCube);
             type.PassesLight = definition.Light?.Passes ?? !baked.IsFullCube;
 
             // A fluid's model is a full cube (it only supplies the tile), but its surface sits
-            // below the cell top and it must never hide a neighbour or shade its own cell dark
+            // below the cell top and it must never hide a neighbor or shade its own cell dark
             if (type.Fluid)
             {
                 type.OccludesNeighbours = false;
                 type.PassesLight = true;
             }
 
-            // A multiblock cell's model says nothing about the cell it sits in: the anchor holds
-            // the whole 2x2x2 structure (so its bake is never a full cube of its own cell) and a
-            // part draws nothing at all. The surface of the structure really does cover its
-            // neighbours, so it occludes by default; and its quads carry no cullface, so they
-            // are lit from the anchor's own cell, which means light has to reach that cell.
-            // Explicit JSON still wins, and the cutout/translucent guard above is kept.
-            // Tree wood is a full cube at full thickness and a thin node and tubes below it, and
-            // the per-id mirrors cannot see the state byte: it never hides a neighbour (the mesher
-            // culls same-block full-thickness faces itself) and always lets light through
-            if (type.Renderer == BlockRenderer.TreeWood)
+            switch (type.Renderer)
             {
-                type.OccludesNeighbours = false;
-                type.PassesLight = true;
-            }
-
-            if (type.Renderer is BlockRenderer.Multiblock or BlockRenderer.MultiblockPart)
-            {
-                type.OccludesNeighbours = !type.Cutout && !type.Translucent && (definition.Occludes ?? true);
-                type.PassesLight = definition.Light?.Passes ?? true;
+                // A multiblock cell's model says nothing about the cell it sits in: the anchor holds
+                // the whole 2x2x2 structure (so its bake is never a full cube of its own cell) and a
+                // part draws nothing at all. The surface of the structure really does cover its
+                // neighbors, so it occludes by default; and its quads carry no cullface, so they
+                // are lit from the anchor's own cell, which means light has to reach that cell.
+                // Explicit JSON still wins, and the cutout/translucent guard above is kept.
+                // Tree wood is a full cube at full thickness and a thin node and tubes below it, and
+                // the per-id mirrors cannot see the state byte: it never hides a neighbor (the mesher
+                // culls same-block full-thickness faces itself) and always lets light through
+                case BlockRenderer.TreeWood:
+                    type.OccludesNeighbours = false;
+                    type.PassesLight = true;
+                    break;
+                case BlockRenderer.Multiblock or BlockRenderer.MultiblockPart:
+                    type.OccludesNeighbours = !type.Cutout && !type.Translucent && (definition.Occludes ?? true);
+                    type.PassesLight = definition.Light?.Passes ?? true;
+                    break;
             }
 
             if (type.Renderer == BlockRenderer.Multiblock)
@@ -219,7 +220,7 @@ public static class ContentRegistry
             }
 
             // A swaying sub-cell model is a plant standing on the ground, not a canopy cube hung
-            // between its neighbours: its sway grows from its own base to its own top.
+            // between its neighbors: its sway grows from its own base to its own top.
             if (type.Sway && type.Renderer == BlockRenderer.Model && !baked.IsFullCube && baked.Quads.Length > 0)
             {
                 var minY = float.MaxValue;
@@ -408,17 +409,18 @@ public static class ContentRegistry
     /// </summary>
     private static void ValidateFacingBake(BlockType type, BakedModel baked)
     {
-        foreach (var quad in baked.Quads)
-            if (quad.IsFullFace)
-                throw new InvalidOperationException(
-                    $"The model of facing block '{type.Name}' has a face covering a whole cell face; a turned model shades flat on every facing, so no face may span a full cell side.");
+        if (baked.Quads.Any(quad => quad.IsFullFace))
+        {
+            throw new InvalidOperationException(
+                $"The model of facing block '{type.Name}' has a face covering a whole cell face; a turned model shades flat on every facing, so no face may span a full cell side.");
+        }
     }
 
     /// <summary>
     /// Checks that a multiblock anchor's model can actually be drawn as a structure: it must stay
     /// inside its 2x2x2 volume, cull against nothing (a cullface tests the anchor's world
-    /// neighbour, which is the structure's own part cell) and carry no full-cell face (the
-    /// per-corner AO path indexes its neighbour deltas by <see cref="Chunk.CubeFaces"/> corner
+    /// neighbor, which is the structure's own part cell) and carry no full-cell face (the
+    /// per-corner AO path indexes its neighbor deltas by <see cref="Chunk.CubeFaces"/> corner
     /// order, which rotation breaks, so a multiblock shades flat on every facing).
     /// </summary>
     private static void ValidateMultiblockBake(BlockType type, BakedModel baked)
@@ -428,7 +430,7 @@ public static class ContentRegistry
         {
             if (quad.CullFace >= 0)
                 throw new InvalidOperationException(
-                    $"The model of multiblock '{type.Name}' has a face with a cullface; a multiblock's faces are culled against nothing, since the anchor's neighbours are its own part cells.");
+                    $"The model of multiblock '{type.Name}' has a face with a cullface; a multiblock's faces are culled against nothing, since the anchor's neighbors are its own part cells.");
             if (quad.IsFullFace)
                 throw new InvalidOperationException(
                     $"The model of multiblock '{type.Name}' has a face covering a whole cell face; a multiblock must shade flat on every facing, so no face may sit on a cell plane spanning the full cell.");
@@ -544,9 +546,6 @@ public static class ContentRegistry
     /// <see cref="RequireBlock"/>.</summary>
     public static Item RequireItem(string name) => ItemRegistry.RequireItem(name);
 
-    /// <summary>The entity kind registered under that JSON file name.</summary>
-    public static EntityType RequireEntity(string name) => EntityRegistry.Require(name);
-
     /// <summary>The compiled loot table of that name, or null when there is none.</summary>
     public static LootTable? LootTableFor(string name) =>
         LootTables.GetValueOrDefault(name);
@@ -562,15 +561,9 @@ public static class ContentRegistry
     public static CraftingRecipe? RecipeByName(string name) =>
         Recipes.FirstOrDefault(r => r.Name.Equals(name, StringComparison.Ordinal));
 
-    /// <summary>Every compiled campfire recipe, in file-name order.</summary>
-    public static IReadOnlyList<CookRecipe> CookRecipesList => CookRecipes;
-
     /// <summary>First cook recipe taking this id, or null when it is not cookable.</summary>
     public static CookRecipe? CookRecipeForInput(byte id) =>
         CookRecipes.FirstOrDefault(r => r.InputId == id);
-
-    /// <summary>Every compiled quern recipe, in file-name order.</summary>
-    public static IReadOnlyList<CrushRecipe> CrushRecipesList => CrushRecipes;
 
     /// <summary>First crush recipe taking this id, or null when it is not crushable.</summary>
     public static CrushRecipe? CrushRecipeForInput(byte id) =>
@@ -587,9 +580,6 @@ public static class ContentRegistry
     public static MoltenMaterial? MoltenMaterialById(byte id) =>
         id >= 1 && id <= MoltenMaterialsList.Count ? MoltenMaterialsList[id - 1] : null;
 
-    /// <summary>Every compiled melt recipe, in file-name order.</summary>
-    public static IReadOnlyList<MeltRecipe> MeltRecipesList => MeltRecipes;
-
     /// <summary>The melt recipe taking this id, or null when it does not melt.</summary>
     public static MeltRecipe? MeltRecipeForInput(byte id) =>
         MeltRecipes.FirstOrDefault(r => r.InputId == id);
@@ -604,12 +594,6 @@ public static class ContentRegistry
     /// <summary>Whether any cast recipe pours into this block, i.e. whether it is a usable mold.</summary>
     public static bool IsCastMold(byte id) =>
         id != BlockType.Air && CastRecipes.Any(r => r.MoldId == id);
-
-    /// <summary>Member ids of a loaded tag, sorted ascending, or null when there is no such tag.</summary>
-    public static byte[]? TagMembers(string tag) =>
-        Tags.TryGetValue(tag, out var members)
-            ? members.OrderBy(id => id).ToArray()
-            : null;
 
     private static void Reset()
     {
@@ -763,8 +747,7 @@ public static class ContentRegistry
 
             var attack = definition.Attack?.Trim().ToLowerInvariant() switch
             {
-                null or "" => AttackPattern.Punch,
-                "punch" => AttackPattern.Punch,
+                null or "" or "punch" => AttackPattern.Punch,
                 "slice" => AttackPattern.Slice,
                 _ => throw new InvalidOperationException(
                     $"Item '{path}' has unknown attack '{definition.Attack}'; expected punch or slice."),
@@ -848,6 +831,14 @@ public static class ContentRegistry
         if (display == null)
             return new ParsedDisplay(new Vector3(-30f, 10f, 0f), Vector3.Zero, 1f);
 
+        var scale = display.Scale ?? 1f;
+        if (!float.IsFinite(scale) || scale <= 0f)
+            throw new InvalidOperationException(
+                $"Item '{path}' has display.scale {display.Scale}; expected a positive number.");
+
+        return new ParsedDisplay(ReadTriple(display.Rotation, "rotation"),
+            ReadTriple(display.Translation, "translation"), scale);
+
         Vector3 ReadTriple(float[]? values, string field)
         {
             if (values == null) return field == "rotation" ? new Vector3(-30f, 10f, 0f) : Vector3.Zero;
@@ -856,14 +847,6 @@ public static class ContentRegistry
                     $"Item '{path}' has display.{field} with {values?.Length ?? 0} entries; expected 3 finite numbers.");
             return new Vector3(values[0], values[1], values[2]);
         }
-
-        var scale = display.Scale ?? 1f;
-        if (!float.IsFinite(scale) || scale <= 0f)
-            throw new InvalidOperationException(
-                $"Item '{path}' has display.scale {display.Scale}; expected a positive number.");
-
-        return new ParsedDisplay(ReadTriple(display.Rotation, "rotation"),
-            ReadTriple(display.Translation, "translation"), scale);
     }
 
     // Items are parsed before blocks, so only the id maps exist here; what those ids turn out
@@ -884,13 +867,14 @@ public static class ContentRegistry
         if (!TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
             throw new InvalidOperationException(
                 $"Block '{path}' names '{name}' in {field}, which is not a registered block.");
-        if (requireFluid && (!BlockType.FluidById[id] || id == ownerId))
-            throw new InvalidOperationException(
-                $"Block '{path}' names '{name}' in {field}, which is not a different fluid block.");
-        if (!requireFluid && BlockType.FluidById[id])
-            throw new InvalidOperationException(
-                $"Block '{path}' names '{name}' in {field}, which is a fluid; hardening must produce a solid block.");
-        return id;
+        return requireFluid switch
+        {
+            true when !BlockType.FluidById[id] || id == ownerId => throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in {field}, which is not a different fluid block."),
+            false when BlockType.FluidById[id] => throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in {field}, which is a fluid; hardening must produce a solid block."),
+            _ => id
+        };
     }
 
     /// <summary>
@@ -984,12 +968,15 @@ public static class ContentRegistry
             _ => throw new InvalidOperationException(
                 $"Block '{path}' has unknown facing '{definition.Facing}'; expected horizontal."),
         };
-        if (facing && renderer != BlockRenderer.Model)
-            throw new InvalidOperationException(
-                $"Block '{path}' sets facing on renderer '{definition.Renderer}'; only a model block turns its model by the state byte.");
-        if (facing && (fluid || falls || stackMax >= 2))
-            throw new InvalidOperationException(
-                $"Block '{path}' sets facing with fluid, falls or stackMax; each of those owns the state byte the facing lives in.");
+        switch (facing)
+        {
+            case true when renderer != BlockRenderer.Model:
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets facing on renderer '{definition.Renderer}'; only a model block turns its model by the state byte.");
+            case true when fluid || falls || stackMax >= 2:
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets facing with fluid, falls or stackMax; each of those owns the state byte the facing lives in.");
+        }
 
         var attached = definition.Support switch
         {
@@ -1009,7 +996,7 @@ public static class ContentRegistry
     }
 
     /// <summary>
-    /// Validates a <c>pane</c> block: its shape comes from its neighbours (<see cref="PaneShape"/>),
+    /// Validates a <c>pane</c> block: its shape comes from its neighbors (<see cref="PaneShape"/>),
     /// so it declares no hitbox, and its state byte stays free, so it is no fluid, falling block,
     /// stack or support-fragile block either (a pane stands on its own like glass).
     /// </summary>
@@ -1160,106 +1147,98 @@ public static class ContentRegistry
         foreach (var (name, path) in files)
         {
             var item = ItemRegistry.ById[ItemIds[name]];
-            if (item.UseAction == ItemUseAction.None) continue;
-
-            if (item.UseAction == ItemUseAction.PlaceStack)
+            switch (item.UseAction)
             {
-                var target = BlockType.ById[item.UseBlockId];
-                if (target == null)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'place_stack' but its use.block is not a block.");
-                if (target.Fluid)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'place_stack' but '{target.Name}' is a fluid, whose state byte holds levels.");
-                if (target.StackMax < 2)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'place_stack' but block '{target.Name}' sets no stackMax.");
-                if (item.UseResultId != 0)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'place_stack' with a use.result: a stack action spends from its stack, it never morphs.");
-                if (item.UseFluidId != 0)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'place_stack' with a use.fluid: that field belongs to the bucket actions.");
-                continue;
-            }
-
-            if (item.UseAction == ItemUseAction.IgniteCampfire)
-            {
-                var target = BlockType.ById[item.UseBlockId];
-                if (target == null)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'ignite_campfire' but its use.block is not a block.");
-                if (target.StackMax < 2)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'ignite_campfire' but block '{target.Name}' sets no stackMax: the firepit must be a max-count pile.");
-                if (item.UseResultId != 0)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'ignite_campfire' with a use.result: an ignite action spends durability, it never morphs.");
-                if (item.UseFluidId != 0)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'ignite_campfire' with a use.fluid: that field belongs to the bucket actions.");
-                if (item.MaxDurability < 1)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'ignite_campfire' without durability: ignite items must declare uses before breaking.");
-                continue;
-            }
-
-            if (item.UseAction == ItemUseAction.Heal)
-            {
-                if (item.UseResultId != 0)
+                case ItemUseAction.None:
+                    continue;
+                case ItemUseAction.PlaceStack:
+                {
+                    var target = BlockType.ById[item.UseBlockId];
+                    if (target == null)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'place_stack' but its use.block is not a block.");
+                    if (target.Fluid)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'place_stack' but '{target.Name}' is a fluid, whose state byte holds levels.");
+                    if (target.StackMax < 2)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'place_stack' but block '{target.Name}' sets no stackMax.");
+                    if (item.UseResultId != 0)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'place_stack' with a use.result: a stack action spends from its stack, it never morphs.");
+                    if (item.UseFluidId != 0)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'place_stack' with a use.fluid: that field belongs to the bucket actions.");
+                    continue;
+                }
+                case ItemUseAction.IgniteCampfire:
+                {
+                    var target = BlockType.ById[item.UseBlockId];
+                    if (target == null)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'ignite_campfire' but its use.block is not a block.");
+                    if (target.StackMax < 2)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'ignite_campfire' but block '{target.Name}' sets no stackMax: the firepit must be a max-count pile.");
+                    if (item.UseResultId != 0)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'ignite_campfire' with a use.result: an ignite action spends durability, it never morphs.");
+                    if (item.UseFluidId != 0)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'ignite_campfire' with a use.fluid: that field belongs to the bucket actions.");
+                    if (item.MaxDurability < 1)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'ignite_campfire' without durability: ignite items must declare uses before breaking.");
+                    continue;
+                }
+                case ItemUseAction.Heal when item.UseResultId != 0:
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'heal' with a use.result: a heal spends from its stack, it never morphs.");
-                if (item.UseFluidId != 0 || item.UseBlockId != 0)
+                case ItemUseAction.Heal when item.UseFluidId != 0 || item.UseBlockId != 0:
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'heal' with a use.fluid or use.block: a heal targets nobody.");
-                continue;
-            }
-
-            if (item.UseAction == ItemUseAction.GrowTree)
-            {
-                if (item.UseResultId != 0)
+                case ItemUseAction.Heal:
+                    continue;
+                case ItemUseAction.GrowTree when item.UseResultId != 0:
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'grow_tree' with a use.result: a growth spends from its stack, it never morphs.");
-                if (item.UseFluidId != 0 || item.UseBlockId != 0)
+                case ItemUseAction.GrowTree when item.UseFluidId != 0 || item.UseBlockId != 0:
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'grow_tree' with a use.fluid or use.block: the tree is read from the aimed cell.");
-                continue;
-            }
-
-            if (item.UseAction == ItemUseAction.PlantTree)
-            {
-                if (string.IsNullOrWhiteSpace(item.UseTreeName))
+                case ItemUseAction.GrowTree:
+                    continue;
+                case ItemUseAction.PlantTree when string.IsNullOrWhiteSpace(item.UseTreeName):
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'plant_tree' without use.tree: name the species file under assets/data/trees/.");
-                if (item.UseResultId != 0)
+                case ItemUseAction.PlantTree when item.UseResultId != 0:
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'plant_tree' with a use.result: planting spends from its stack, it never morphs.");
-                if (item.UseFluidId != 0 || item.UseBlockId != 0)
+                case ItemUseAction.PlantTree when item.UseFluidId != 0 || item.UseBlockId != 0:
                     throw new InvalidOperationException(
                         $"Item '{path}' has use.action 'plant_tree' with a use.fluid or use.block: the ground is read from the aimed cell.");
-                continue;
-            }
-
-            if (item.UseAction == ItemUseAction.ConvertMultiblock)
-            {
-                var source = BlockType.ById[item.UseBlockId];
-                if (source == null)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'convert_multiblock' but its use.block is not a block.");
-                var anchor = BlockType.ById[item.UseResultId];
-                if (anchor == null)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'convert_multiblock' but its use.result is not a block.");
-                if (anchor.Renderer != BlockRenderer.Multiblock)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'convert_multiblock' but block '{anchor.Name}' is not a multiblock anchor.");
-                if (anchor.MultiblockSourceId != item.UseBlockId)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'convert_multiblock' naming '{source.Name}' in use.block, but '{anchor.Name}' is built from '{BlockType.ById[anchor.MultiblockSourceId]?.Name}'.");
-                if (item.UseFluidId != 0)
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'convert_multiblock' with a use.fluid: that field belongs to the bucket actions.");
-                continue;
+                case ItemUseAction.PlantTree:
+                    continue;
+                case ItemUseAction.ConvertMultiblock:
+                {
+                    var source = BlockType.ById[item.UseBlockId];
+                    if (source == null)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'convert_multiblock' but its use.block is not a block.");
+                    var anchor = BlockType.ById[item.UseResultId];
+                    if (anchor == null)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'convert_multiblock' but its use.result is not a block.");
+                    if (anchor.Renderer != BlockRenderer.Multiblock)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'convert_multiblock' but block '{anchor.Name}' is not a multiblock anchor.");
+                    if (anchor.MultiblockSourceId != item.UseBlockId)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'convert_multiblock' naming '{source.Name}' in use.block, but '{anchor.Name}' is built from '{BlockType.ById[anchor.MultiblockSourceId]?.Name}'.");
+                    if (item.UseFluidId != 0)
+                        throw new InvalidOperationException(
+                            $"Item '{path}' has use.action 'convert_multiblock' with a use.fluid: that field belongs to the bucket actions.");
+                    continue;
+                }
             }
 
             if (item.UseBlockId != 0)
@@ -1438,8 +1417,8 @@ public static class ContentRegistry
 
     /// <summary>
     /// The block-light palette slot of a block's <c>light.color</c>: 0 (the default warm
-    /// colour) when none is declared, else the colour's registered slot. Validated like a
-    /// molten material's colour; a colour on a block that emits nothing is an error.
+    /// color) when none is declared, else the color's registered slot. Validated like a
+    /// molten material's color; a color on a block that emits nothing is an error.
     /// </summary>
     private static byte ResolveLightColor(float[]? color, int emission, string path)
     {
@@ -1467,11 +1446,12 @@ public static class ContentRegistry
             throw new InvalidOperationException($"Molten material '{path}' names no texture; one atlas tile is required.");
         if (definition.Color is not { Length: 3 })
             throw new InvalidOperationException(
-                $"Molten material '{path}' has {definition.Color?.Length ?? 0} colour components; expected exactly 3 (r, g, b in 0..255).");
-        foreach (var component in definition.Color)
-            if (!float.IsFinite(component) || component < 0f || component > 255f)
-                throw new InvalidOperationException(
-                    $"Molten material '{path}' has colour component {component}; expected 0..255.");
+                $"Molten material '{path}' has {definition.Color?.Length ?? 0} color components; expected exactly 3 (r, g, b in 0..255).");
+        if (definition.Color.Any(component => !float.IsFinite(component) || component < 0f || component > 255f))
+        {
+            throw new InvalidOperationException(
+                $"Molten material '{path}' has an invalid color component; expected 0..255.");
+        }
 
         var color = new Rgba((byte)definition.Color[0], (byte)definition.Color[1], (byte)definition.Color[2]);
         return new MoltenMaterial(
@@ -1645,7 +1625,7 @@ public static class ContentRegistry
             // that fills the other seven and the plain block it is built from and reverts to,
             // and only an anchor can be a kiln. Both halves are ordinary solid full cells to
             // everything but the mesher, so the anchor's surface really does cover its
-            // neighbours - which cutout, translucent and fluid would all break.
+            // neighbors - which cutout, translucent and fluid would all break.
             var isMultiblock = renderer is BlockRenderer.Multiblock or BlockRenderer.MultiblockPart;
             if ((renderer == BlockRenderer.Multiblock) != (definition.Multiblock != null))
                 throw new InvalidOperationException(
@@ -1660,7 +1640,7 @@ public static class ContentRegistry
                         $"Block '{path}' uses a multiblock renderer without hasItem: false; a structure is built from its source block, never held.");
                 if ((definition.Cutout ?? false) || (definition.Translucent ?? false) || (definition.Fluid ?? false))
                     throw new InvalidOperationException(
-                        $"Block '{path}' uses a multiblock renderer with cutout, translucent or fluid; a multiblock cell must be an opaque solid so the structure occludes its neighbours.");
+                        $"Block '{path}' uses a multiblock renderer with cutout, translucent or fluid; a multiblock cell must be an opaque solid so the structure occludes its neighbors.");
             }
 
             var onBreak = definition.OnBreak switch
@@ -1693,11 +1673,11 @@ public static class ContentRegistry
                 throw new InvalidOperationException(
                     $"Block '{path}' sets flow.* without fluid: true; flow tuning only applies to fluids.");
             var tickDivisor = flow?.TickDivisor ?? 1;
-            if (tickDivisor < 1 || tickDivisor > 8)
+            if (tickDivisor is < 1 or > 8)
                 throw new InvalidOperationException(
                     $"Block '{path}' has flow.tickDivisor {tickDivisor}; expected 1..8.");
             var range = flow?.Range ?? 7;
-            if (range < 1 || range > 7)
+            if (range is < 1 or > 7)
                 throw new InvalidOperationException(
                     $"Block '{path}' has flow.range {range}; expected 1..7 (the state byte holds levels 1..7).");
 
@@ -1742,7 +1722,7 @@ public static class ContentRegistry
                     $"Block '{path}' sets stackSolidAt on a solid block; state-dependent solidity needs solid: false.");
 
             // A placement only takes over a non-solid cell, so an always-solid block could never
-            // honour the flag: the author's intent cannot work, so it is a content error rather
+            // honor the flag: the author's intent cannot work, so it is a content error rather
             // than an inert extra
             var replaceableByPlacement = !fluid && (definition.ReplaceableByPlacement ?? false);
             if (replaceableByPlacement && solid)
@@ -1836,7 +1816,7 @@ public static class ContentRegistry
                 ContactDamage = contactDamage,
                 CullSelf = definition.CullSelf ?? false,
                 // Tree wood is drawn at any thickness down to a 1 px twig, so it never darkens
-                // its neighbours, whatever the file says (forced here, where CastsAoById is mirrored)
+                // its neighbors, whatever the file says (forced here, where CastsAoById is mirrored)
                 CastsAmbientOcclusion = !fluid && (definition.CastsAO ?? solid) && renderer != BlockRenderer.TreeWood,
                 Cutout = definition.Cutout ?? false,
                 Translucent = definition.Translucent ?? false,
@@ -1869,9 +1849,9 @@ public static class ContentRegistry
                 LootTable = fluid ? LootTable.None : ResolveLoot(name, definition.Loot, path),
                 Hitboxes = hitboxes ?? [BlockHitbox.FullCube],
                 CollidesByHitbox = collidesByHitbox,
+                HardensToId = 0,
+                HardensTouchingId = 0
             };
-            type.HardensToId = 0;
-            type.HardensTouchingId = 0;
             if ((flow?.HardensTo == null) != (flow?.HardensTouching == null))
                 throw new InvalidOperationException(
                     $"Block '{path}' sets only one of flow.hardensTo / flow.hardensTouching; hardening needs both.");
@@ -2070,23 +2050,29 @@ public static class ContentRegistry
             if (min is < 0 or > WoodState.MaxThickness)
                 throw new InvalidOperationException(
                     $"Block '{path}' has wood.loot[{i}].minThickness {min}; expected 0..{WoodState.MaxThickness}.");
-            if (i == 0 && min != 0)
-                throw new InvalidOperationException(
-                    $"Block '{path}' has wood.loot[0].minThickness {min}; the first band must start at 0 so every thickness has loot.");
-            if (i > 0 && min <= bands[i - 1].MinThickness)
-                throw new InvalidOperationException(
-                    $"Block '{path}' has wood.loot[{i}].minThickness {min}; bands must be strictly ascending.");
-
-            var loot = band.Loot ?? "self";
-            bands[i] = loot switch
+            switch (i)
             {
-                "self" => new WoodLootBand(min, null, true),
-                "none" => new WoodLootBand(min, LootTable.None, false),
-                _ => LootTables.TryGetValue(loot, out var table)
-                    ? new WoodLootBand(min, table, false)
-                    : throw new InvalidOperationException(
-                        $"Block '{path}' has wood.loot[{i}].loot '{loot}', which is neither self, none nor an existing loot table."),
-            };
+                case 0 when min != 0:
+                    throw new InvalidOperationException(
+                        $"Block '{path}' has wood.loot[0].minThickness {min}; the first band must start at 0 so every thickness has loot.");
+                case > 0 when min <= bands[i - 1].MinThickness:
+                    throw new InvalidOperationException(
+                        $"Block '{path}' has wood.loot[{i}].minThickness {min}; bands must be strictly ascending.");
+                default:
+                {
+                    var loot = band.Loot ?? "self";
+                    bands[i] = loot switch
+                    {
+                        "self" => new WoodLootBand(min, null, true),
+                        "none" => new WoodLootBand(min, LootTable.None, false),
+                        _ => LootTables.TryGetValue(loot, out var table)
+                            ? new WoodLootBand(min, table, false)
+                            : throw new InvalidOperationException(
+                                $"Block '{path}' has wood.loot[{i}].loot '{loot}', which is neither self, none nor an existing loot table."),
+                    };
+                    break;
+                }
+            }
         }
 
         return (tip, bands);
@@ -2116,24 +2102,25 @@ public static class ContentRegistry
 
     private static BlockHitbox[]? ParseHitboxes(JsonElement hitbox, string path)
     {
-        if (hitbox.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
-            return null;
-
-        if (hitbox.ValueKind == JsonValueKind.Array)
+        switch (hitbox.ValueKind)
         {
-            if (hitbox.GetArrayLength() == 0)
+            case JsonValueKind.Undefined or JsonValueKind.Null:
+                return null;
+            case JsonValueKind.Array when hitbox.GetArrayLength() == 0:
                 throw new InvalidOperationException($"Block '{path}' has an empty hitbox array; omit hitbox for a full cube.");
-            var boxes = new BlockHitbox[hitbox.GetArrayLength()];
-            var i = 0;
-            foreach (var element in hitbox.EnumerateArray())
-                boxes[i++] = ParseOneBox(element, path);
-            return boxes;
+            case JsonValueKind.Array:
+            {
+                var boxes = new BlockHitbox[hitbox.GetArrayLength()];
+                var i = 0;
+                foreach (var element in hitbox.EnumerateArray())
+                    boxes[i++] = ParseOneBox(element, path);
+                return boxes;
+            }
+            case JsonValueKind.Object:
+                return [ParseOneBox(hitbox, path)];
+            default:
+                throw new InvalidOperationException($"Block '{path}' has a hitbox that is neither an object nor an array.");
         }
-
-        if (hitbox.ValueKind == JsonValueKind.Object)
-            return [ParseOneBox(hitbox, path)];
-
-        throw new InvalidOperationException($"Block '{path}' has a hitbox that is neither an object nor an array.");
     }
 
     private static BlockHitbox ParseOneBox(JsonElement element, string path)
@@ -2169,13 +2156,16 @@ public static class ContentRegistry
 
     private static LootTable? ResolveLoot(string blockName, string? loot, string path)
     {
-        // Omitted: the table sharing this block's name, or "drop yourself" when there is none
-        if (loot == null) return LootTables.GetValueOrDefault(blockName);
-        if (loot == "none") return LootTable.None;
-
-        return LootTables.TryGetValue(loot, out var table)
-            ? table
-            : throw new InvalidOperationException($"Block '{path}' names loot table '{loot}', which does not exist.");
+        return loot switch
+        {
+            // Omitted: the table sharing this block's name, or "drop yourself" when there is none
+            null => LootTables.GetValueOrDefault(blockName),
+            "none" => LootTable.None,
+            _ => LootTables.TryGetValue(loot, out var table)
+                ? table
+                : throw new InvalidOperationException(
+                    $"Block '{path}' names loot table '{loot}', which does not exist.")
+        };
     }
 
     // A block's sfx is non-fatal: an unknown group is a warning and the default, not a crash,
@@ -2349,10 +2339,12 @@ public static class ContentRegistry
         if (!Directory.Exists(folder))
             throw new DirectoryNotFoundException($"Content folder '{folder}' does not exist.");
 
-        return Directory.GetFiles(folder, "*.json")
-            .Select(path => (Name: Path.GetFileNameWithoutExtension(path), Path: path))
-            .OrderBy(file => file.Name, StringComparer.Ordinal)
-            .ToList();
+        return
+        [
+            .. Directory.GetFiles(folder, "*.json")
+                .Select(path => (Name: Path.GetFileNameWithoutExtension(path), Path: path))
+                .OrderBy(file => file.Name, StringComparer.Ordinal)
+        ];
     }
 
     private static T ReadJson<T>(string path)

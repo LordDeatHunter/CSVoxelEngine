@@ -4,7 +4,7 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// Exact sRGB transfer functions. CPU colours (sun, ambient, sky palette, fog, tints) are
+/// Exact sRGB transfer functions. CPU colors (sun, ambient, sky palette, fog, tints) are
 /// authored in sRGB (display) space and must pass through <see cref="SrgbToLinear(float)"/>
 /// before they reach a shader that runs ahead of the tonemap, since the world is lit in
 /// linear light. <c>post-fragment.glsl</c> and <c>ui-fragment.glsl</c> carry GLSL twins of

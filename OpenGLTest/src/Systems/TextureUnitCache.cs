@@ -30,7 +30,7 @@ namespace silkgltriangle;
 /// </summary>
 internal sealed class TextureUnitCache
 {
-    /// <summary>Units 0-4: the world-texture set (atlas, shadow map, reflection, scene colour and
+    /// <summary>Units 0-4: the world-texture set (atlas, shadow map, reflection, scene color and
     /// scene depth). Higher units are deliberately untracked - see the class remarks.</summary>
     internal const int TrackedUnits = 5;
 

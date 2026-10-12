@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -35,7 +36,7 @@ public sealed class FluidTests
     }
 
     // The whole chunk floored: with no hole in slope-search range every direction
-    // ties and water spreads evenly, and unloaded neighbours read as walls.
+    // ties and water spreads evenly, and unloaded neighbors read as walls.
     // A smaller floor has open edges the search correctly prefers (Minecraft getSpread).
     private static ChunkManager FullFloorBasin(out byte water)
     {
@@ -89,7 +90,7 @@ public sealed class FluidTests
         Assert.True(FluidState.IsFalling(state));
     }
 
-    // A source sitting on the last column of a chunk, with its +X neighbour in a loaded
+    // A source sitting on the last column of a chunk, with its +X neighbor in a loaded
     // second chunk: the spread has to read across the border, which is the tick's chunk
     // cache's miss-then-hit path (every other fluid test lives in a single chunk).
     [Fact]
@@ -157,7 +158,7 @@ public sealed class FluidTests
 
     private static readonly TimeSpan StoreShutdownTimeout = TimeSpan.FromSeconds(10);
 
-    // The restored chunk and its +X neighbour, both far above every terrain top and water level
+    // The restored chunk and its +X neighbor, both far above every terrain top and water level
     // of their columns: anything fluid up there was poured by a player
     private static readonly Vector3 RestoredPos = MeshTestWorld.HighAbove;
     private static readonly Vector3 GeneratedPos = MeshTestWorld.HighAbove + Vector3.UnitX;
@@ -247,16 +248,16 @@ public sealed class FluidTests
     [Fact]
     public void RestoredPouredWaterWakesWhenTheGeneratedNeighbourLoadsLater()
     {
-        // The restored chunk streams in last: its own border scan finds the loaded neighbour
+        // The restored chunk streams in last: its own border scan finds the loaded neighbor
         AssertFlowingWater(PouredWaterAcrossBorder(restoredFirst: false, wakeAfterEachLoad: true));
-        // The generated chunk streams in last: the restored chunk's own wake saw no neighbour,
+        // The generated chunk streams in last: the restored chunk's own wake saw no neighbor,
         // so only the generated side's scan (it borders a restored chunk) can wake the water
         AssertFlowingWater(PouredWaterAcrossBorder(restoredFirst: true, wakeAfterEachLoad: true));
     }
 
     /// <summary>
     /// A generated sea keeps the carved rule across a border: a source at its own column's water
-    /// level does not wake into open air above the neighbour's terrain, while the same pair one
+    /// level does not wake into open air above the neighbor's terrain, while the same pair one
     /// cell higher (the source above both its terrain top and water level, i.e. poured) does, so
     /// the fluid side really is judged against the column that holds it.
     /// </summary>
@@ -278,7 +279,7 @@ public sealed class FluidTests
                 var li = (Chunk.SizeMask << Chunk.SizeShift) | z;
                 var y = a.WaterLevel[li];
                 if (y == TerrainGenerator.NoWater || y <= a.Heights[li]) continue;
-                // Open air above the neighbour's terrain at the water's height
+                // Open air above the neighbor's terrain at the water's height
                 if (b.Heights[z] >= y) continue;
                 // Room in one chunk for a floor under the source and the same pair one higher
                 var ly = y & Chunk.SizeMask;
@@ -286,7 +287,7 @@ public sealed class FluidTests
                 (cx, cz, t, level, found) = (ax, az, z, y, true);
             }
         }
-        Assert.True(found, "no wet border column beside a lower neighbour found near the origin");
+        Assert.True(found, "no wet border column beside a lower neighbor found near the origin");
 
         var water = ContentRegistry.RequireBlock("water").Id;
         Assert.NotEqual(water, SourceAcrossBorder(cx, cz, t, level).Id);

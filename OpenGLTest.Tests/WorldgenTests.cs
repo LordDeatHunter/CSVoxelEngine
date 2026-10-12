@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -174,7 +175,7 @@ public sealed class WorldgenTests
     public void LodLeavesAreOpaque()
     {
         // A canopy column's LOD cell must wear leaves flagged opaque (alpha 253), so
-        // magnified cutout texels fall back to solid leaf colour instead of
+        // magnified cutout texels fall back to solid leaf color instead of
         // discarding to sky.
         var found = false;
         var tx = 0;

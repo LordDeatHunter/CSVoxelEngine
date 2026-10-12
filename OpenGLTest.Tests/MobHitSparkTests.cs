@@ -58,7 +58,7 @@ public sealed class MobHitSparkTests : IDisposable
         Assert.Equal(WorldGenerationConfig.HitSparkCount, world.Debris.Count);
         foreach (var chip in world.Debris)
         {
-            Assert.Equal(DebrisLook.Colour, chip.Look);
+            Assert.Equal(DebrisLook.Color, chip.Look);
             Assert.Equal(BiomeTint.VertexTint(WorldGenerationConfig.HitSparkColor), chip.Tint);
         }
     }

@@ -1,4 +1,5 @@
 using System;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -6,7 +7,7 @@ namespace silkgltriangle;
 /// Cairns: a small cobblestone stack — three cells and a one-stone pebble hat — on a local height
 /// maximum above <see cref="WorldGenerationConfig.MountainRockHeight"/>, as a landmark on the
 /// peaks. Decided per 2^<see cref="WorldGenerationConfig.CairnCellShift"/>-block cell from a pure
-/// hash of (cell, seed); the centre column's height and its eight neighbours' come from
+/// hash of (cell, seed); the centre column's height and its eight neighbors' come from
 /// <see cref="ColumnCache"/> like the pebble scatter's, so a cairn near a chunk border is whole.
 /// The far LOD shows none.
 /// </summary>
@@ -44,7 +45,7 @@ public static class CairnGenerator
     /// <summary>
     /// Whether the column (x, z) is a summit a cairn may stand on: above
     /// <see cref="WorldGenerationConfig.MountainRockHeight"/> and at least as high as its eight
-    /// neighbours.
+    /// neighbors.
     /// </summary>
     public static bool IsSummit(int x, int z)
     {

@@ -2,7 +2,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Sun and block light (each 0..1) one entity draw is lit with, plus the
-/// <see cref="BlockLightPalette"/> slot of that block light (0, the default warm colour, unless a
+/// <see cref="BlockLightPalette"/> slot of that block light (0, the default warm color, unless a
 /// coloured lamp lights the cell), fed to the plain world vertex path as per-draw uniforms (see
 /// <see cref="EntityLight"/>).
 /// </summary>

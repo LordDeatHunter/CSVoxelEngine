@@ -1,4 +1,5 @@
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -62,7 +63,7 @@ public sealed class FallingBlockTests
 
         SettleAll(falling, chunks, drops, fluids);
 
-        // A lone pillar always slides (0 of 8 neighbours): the cube must end up beside the
+        // A lone pillar always slides (0 of 8 neighbors): the cube must end up beside the
         // pillar on the floor, on an orthogonal side or a corner
         Assert.Empty(falling.Falling);
         Assert.Equal(BlockType.Air, chunks.GetBlockGlobal(2, 3, 2));
@@ -280,7 +281,7 @@ public sealed class FallingBlockTests
     [Fact]
     public void HalfChanceSlidesAboutHalfTheTime()
     {
-        // Four solid ring neighbours: every pick is a 50/50 roll, and every success lands on
+        // Four solid ring neighbors: every pick is a 50/50 roll, and every success lands on
         // a corner (the orthogonal below-sides are the solid ring itself)
         var solid = new System.Collections.Generic.HashSet<(int, int, int)>
             { (0, 1, 0), (1, 1, 0), (-1, 1, 0), (0, 1, 1), (0, 1, -1) };

@@ -10,7 +10,7 @@ namespace silkgltriangle;
 /// XZ cells and each cell deterministically spawns its worms from a hash of its coordinates, so
 /// any chunk can rebuild the exact worm set of every nearby cell and carve the part that crosses
 /// it. Worm paths are cached per cell (like the column cache) because a vertical stack of chunks
-/// and all their neighbours ask for the same cells.
+/// and all their neighbors ask for the same cells.
 /// </summary>
 public static class WormCarver
 {

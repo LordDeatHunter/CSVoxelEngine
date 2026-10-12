@@ -6,7 +6,7 @@ namespace silkgltriangle;
 /// Cold weather: freezes a cold column's surface water into a walkable ice sheet and lays layered
 /// snow on top of whatever solid surface is left. Both read <see cref="TerrainGenerator.ColdWeight"/>,
 /// a biome-generation input, so the snow line and the freeze line fade in as a column cools instead
-/// of snapping at a biome border. A pure function of (x, z) like the other generators, so neighbours
+/// of snapping at a biome border. A pure function of (x, z) like the other generators, so neighbors
 /// agree without shared state; it runs after the trees and cacti so it only fills cells they left air.
 /// </summary>
 public static class SnowGenerator

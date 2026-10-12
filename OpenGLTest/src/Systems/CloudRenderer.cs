@@ -12,7 +12,7 @@ namespace silkgltriangle;
 /// per-instance offset attribute), so a sweep is one instanced draw rather than one draw per copy.
 /// Because the noise and the mesh both wrap at the field edge, a mass crossing the seam continues
 /// into the neighbouring copy unbroken. Each frame draws the copies twice: a depth pre-pass, then
-/// colour, so the rounded surface blends once per pixel however its fillet pieces overlap.
+/// color, so the rounded surface blends once per pixel however its fillet pieces overlap.
 /// The draw is translucent, so <see cref="RenderManager.RenderClouds"/> owns the blend state.
 /// </summary>
 public sealed class CloudRenderer : IDisposable
@@ -72,7 +72,7 @@ public sealed class CloudRenderer : IDisposable
         gl.BufferData<uint>(BufferTargetARB.ElementArrayBuffer,
             (nuint)(indices.Length * sizeof(uint)), indices, BufferUsageARB.StaticDraw);
 
-        // Clouds need no atlas, colour or light, so they get their own slim format: position and
+        // Clouds need no atlas, color or light, so they get their own slim format: position and
         // flat face normal, nothing shared with the packed world Vertex.
         unsafe
         {
@@ -111,8 +111,8 @@ public sealed class CloudRenderer : IDisposable
     /// the flat <paramref name="fogColor"/> by <paramref name="fogWet"/> underwater or in lava).
     /// <paramref name="sunColor"/>, <paramref name="sunIntensity"/> and <paramref name="ambient"/>
     /// are display-space (sRGB) light, not the world's linear uniforms; fog and sky stay linear.
-    /// The colour pass mixes over the scene in display space by reading the render target it
-    /// draws into (cloud-fragment.glsl): the caller binds that target's colour texture to
+    /// The color pass mixes over the scene in display space by reading the render target it
+    /// draws into (cloud-fragment.glsl): the caller binds that target's color texture to
     /// <paramref name="sceneUnit"/> and unbinds it afterwards, and this method issues the
     /// <c>glTextureBarrier</c> and turns blending off around that one sweep.
     /// </summary>
@@ -161,7 +161,7 @@ public sealed class CloudRenderer : IDisposable
         _gl.NamedBufferSubData(_instanceVbo, 0, offsets[..count]);
         _gl.BindVertexArray(_vao);
 
-        // Pass 1: depth only. Pass 2: colour, depth test only. Whatever the fillet pieces overlap,
+        // Pass 1: depth only. Pass 2: color, depth test only. Whatever the fillet pieces overlap,
         // each pixel blends exactly the nearest cloud surface once, so overlaps never darken and
         // draw order never matters. The second pass relies on the global DepthFunc of Lequal (set
         // in the RenderManager constructor) to let each nearest fragment through again.
@@ -170,7 +170,7 @@ public sealed class CloudRenderer : IDisposable
         DrawCopies(count);
         _gl.ColorMask(true, true, true, true);
         _gl.DepthMask(false);
-        // The colour sweep reads the target it writes (one surviving surface per pixel, thanks
+        // The color sweep reads the target it writes (one surviving surface per pixel, thanks
         // to the pre-pass), so earlier writes must be made visible and the blender kept out.
         _gl.TextureBarrier();
         _gl.Disable(EnableCap.Blend);

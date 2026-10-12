@@ -47,7 +47,7 @@ public static class MultiblockShape
     /// instead of transforming quads per cell (see <see cref="HorizontalFacing.RotateModel"/>).
     ///
     /// Every output quad has <c>IsFullFace</c> cleared: the per-corner AO path indexes its
-    /// neighbour deltas by <see cref="Chunk.CubeFaces"/> corner order, which a rotated quad's
+    /// neighbor deltas by <see cref="Chunk.CubeFaces"/> corner order, which a rotated quad's
     /// corners no longer follow, so a multiblock quad must always shade flat (the bake
     /// additionally rejects a full-face quad on a multiblock model, so facing 0 shades the same).
     /// A multiblock carries no cullface, so the one the shared rotation turns never applies.

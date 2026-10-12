@@ -108,17 +108,17 @@ public sealed class GroundDust
         }
     }
 
-    // Each splatting kind's skin colour, read once from its model
+    // Each splatting kind's skin color, read once from its model
     private readonly Dictionary<EntityType, Vector3> _splatColours = new();
 
     private Vector3 SplatColourOf(EntityType type)
     {
-        if (!_splatColours.TryGetValue(type, out var colour))
+        if (!_splatColours.TryGetValue(type, out var color))
         {
-            colour = LandingDust.SkinColour(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor);
-            _splatColours[type] = colour;
+            color = LandingDust.SkinColour(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor);
+            _splatColours[type] = color;
         }
-        return colour;
+        return color;
     }
 
     /// <summary>
@@ -140,15 +140,15 @@ public sealed class GroundDust
     }
 
     /// <summary>
-    /// A mob whose death animation just ended bursts into chips of its own skin colour
-    /// (<see cref="LandingDust.SkinColour"/> of its model: a goblin's mean skin colour, a slime's
+    /// A mob whose death animation just ended bursts into chips of its own skin color
+    /// (<see cref="LandingDust.SkinColour"/> of its model: a goblin's mean skin color, a slime's
     /// green), spread by its body width. Returns how many chips it spawned.
     /// </summary>
     public static int DeathPoof(Mob mob, BlockDebrisSystem debris, Random? random = null)
     {
-        var colour = LandingDust.SkinColour(mob.Type.Model, WorldGenerationConfig.MobDeathPoofFallbackColor);
+        var color = LandingDust.SkinColour(mob.Type.Model, WorldGenerationConfig.MobDeathPoofFallbackColor);
         var count = WorldGenerationConfig.MobDeathPoofCount;
-        debris.Splat(mob.Position, colour, mob.BodyHalfExtent, count,
+        debris.Splat(mob.Position, color, mob.BodyHalfExtent, count,
             WorldGenerationConfig.MobDeathPoofSpeed, WorldGenerationConfig.MobDeathPoofSize, random);
         return count;
     }

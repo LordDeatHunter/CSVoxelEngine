@@ -17,7 +17,7 @@
   "tools": { "pickaxe": 1 },
   "sfx": "hit_rock",
   "loot": "mud_brick_kiln",
-  // The anchor's surface really does cover its neighbours, so it occludes and casts AO like a
+  // The anchor's surface really does cover its neighbors, so it occludes and casts AO like a
   // full cube - but its quads carry no cullface and are lit from the anchor cell itself, so
   // light has to reach that cell or the whole structure renders black.
   "occludes": true,

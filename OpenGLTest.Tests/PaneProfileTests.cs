@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -158,7 +159,7 @@ public sealed class PaneProfileTests
             for (var x = 0; x < Chunk.Size; x++)
             for (var z = 0; z < Chunk.Size; z++)
                 center.SetBlockRaw(x, FloorY, z, stone, 0);
-            // Arms toward a neighbour of its own kind (west) and a stone block (north)
+            // Arms toward a neighbor of its own kind (west) and a stone block (north)
             center.SetBlockRaw(8, y, 8, type.Id, 0);
             center.SetBlockRaw(7, y, 8, type.Id, 0);
             center.SetBlockRaw(8, y, 7, stone, 0);

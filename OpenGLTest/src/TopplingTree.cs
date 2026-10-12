@@ -85,7 +85,7 @@ public class TopplingTree : IDisposable
         var standing = new HashSet<long>();
         var support = new TreeSupport(WorldGenerationConfig.TreeFellWoodCap);
 
-        // Each neighbour the cut cell linked to heads a candidate component: it falls exactly
+        // Each neighbor the cut cell linked to heads a candidate component: it falls exactly
         // when the search from it, with the cut cell gone, finds no anchor
         for (var dir = 0; dir < TreeDirections.Count; dir++)
         {
@@ -117,7 +117,7 @@ public class TopplingTree : IDisposable
             }
         }
 
-        // The canopy comes along without chain-felling neighbours: leaves near falling wood
+        // The canopy comes along without chain-felling neighbors: leaves near falling wood
         // join (the leaf clusters hug the wood that feeds them), but the walk never goes
         // leaf-to-leaf into the next tree. The wood count is fixed first: leaves append to
         // collected, which must not be enumerated while it grows.
@@ -164,13 +164,13 @@ public class TopplingTree : IDisposable
     /// UVs) inside one scratch chunk, then rebases positions to pivot-relative and bakes
     /// full daylight (a falling tree is out in the open; sampling its old nook's light would
     /// freeze stale cave shade onto it). The scratch chunk sits in a throwaway manager holding
-    /// nothing but empty neighbours, so everything around it reads as air and severed ends cap
+    /// nothing but empty neighbors, so everything around it reads as air and severed ends cap
     /// themselves. Its local 0..16 is one origin computed once: horizontally centred on the
     /// pivot's column (<see cref="ScratchOrigin"/>), vertically from the lowest collected cell,
     /// so a crown spreads evenly around its trunk; cells outside it still drop their loot but
     /// skip the falling mesh. The biome tint is the field over that same footprint
     /// (<see cref="BiomeTint.FieldsAt"/> at the origin), not the scratch chunk's, so a felled
-    /// canopy keeps the colour it stood in.
+    /// canopy keeps the color it stood in.
     /// </summary>
     public static ChunkMeshData BuildMeshData(List<FellBlock> blocks, Vector3 pivot)
     {
@@ -197,9 +197,9 @@ public class TopplingTree : IDisposable
             scratch.SetBlockRaw((int)local.X, (int)local.Y, (int)local.Z, block.Id, block.State);
         }
 
-        // GenerateMeshData refuses to build without its six face neighbours (a real chunk
+        // GenerateMeshData refuses to build without its six face neighbors (a real chunk
         // meshed across an unloaded one bakes border artifacts), so the scratch chunk gets six
-        // empty ones. All air, which is exactly the "missing neighbours" the severed ends want
+        // empty ones. All air, which is exactly the "missing neighbors" the severed ends want
         // to cap themselves against.
         foreach (var offset in Vector3Directions.CardinalDirections)
         {

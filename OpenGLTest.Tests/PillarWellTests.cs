@@ -3,7 +3,7 @@ using Xunit;
 namespace silkgltriangle.Tests;
 
 /// <summary>
-/// Ruined pillars and desert wells: the pillar's stack honours its height and gap bits with the
+/// Ruined pillars and desert wells: the pillar's stack honors its height and gap bits with the
 /// bottom cell always standing, and the well writes a sandstone wall around a sunken pool.
 /// </summary>
 public sealed class PillarWellTests

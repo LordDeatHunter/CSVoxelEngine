@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;

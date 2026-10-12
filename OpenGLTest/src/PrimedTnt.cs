@@ -14,7 +14,7 @@ public class PrimedTnt
     public float FuseDuration { get; }
 
     // Slightly inside a full block so a cube spawned where a block just was rests in the freed
-    // cell instead of clipping its solid neighbours
+    // cell instead of clipping its solid neighbors
     internal const float HalfExtent = 0.49f;
 
     /// <summary>The cube's water-splash memory, stepped by the world from its bottom each frame

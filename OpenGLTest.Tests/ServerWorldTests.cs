@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Numerics;
 using System.Threading;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -230,7 +231,7 @@ public sealed class ServerWorldTests : IDisposable
         Assert.Null(written.RespawnEye);
     }
 
-    // The six face-neighbour steps, in chunks
+    // The six face-neighbor steps, in chunks
     private static readonly (int X, int Y, int Z)[] FaceSteps =
         [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)];
 
@@ -277,8 +278,8 @@ public sealed class ServerWorldTests : IDisposable
             return manager.ChunkAt(x, y, z);
         }
 
-        // The chunk under the feet, its six face neighbours, and every cell of the pocket the edit
-        // below clears (which may reach into an edge neighbour)
+        // The chunk under the feet, its six face neighbors, and every cell of the pocket the edit
+        // below clears (which may reach into an edge neighbor)
         bool Loaded(ServerPlayer player)
         {
             var (fx, fy, fz) = FeetCell(player);

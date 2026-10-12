@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -1081,7 +1082,7 @@ public sealed class GameServer : IDisposable
     /// Sends the authoritative state of every loaded cell within <paramref name="radius"/> (on each
     /// axis) of (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>), tagged with the
     /// intent <paramref name="seq"/> it answers: whatever the client predicted around that target
-    /// (the cell itself, the face neighbour it placed into, a popped pebble above, a structure's
+    /// (the cell itself, the face neighbor it placed into, a popped pebble above, a structure's
     /// cells) snaps to what the server has, accepted or not.
     /// </summary>
     private void SendCellCorrection(ClientConnection client, int seq, int x, int y, int z, int radius)

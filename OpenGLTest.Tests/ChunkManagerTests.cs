@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -17,9 +18,9 @@ public sealed class ChunkManagerTests
         manager.Chunks[Vector3.Zero] = center;
         foreach (var offset in Vector3Directions.CardinalDirections)
         {
-            var neighbour = new Chunk(null!, offset, generateBlockData: false);
-            neighbour.IsBlockDataReady = true;
-            manager.Chunks[offset] = neighbour;
+            var neighbor = new Chunk(null!, offset, generateBlockData: false);
+            neighbor.IsBlockDataReady = true;
+            manager.Chunks[offset] = neighbor;
         }
 
         var before = manager.MeshVersion;
@@ -41,7 +42,7 @@ public sealed class ChunkManagerTests
         var manager = new ChunkManager(null!);
         var h = MeshTestWorld.HighAbove;
         var eastPos = h + Vector3.UnitX;
-        // The edited chunk and its eastern neighbour each need all six face neighbours
+        // The edited chunk and its eastern neighbor each need all six face neighbors
         // loaded for a synchronous build.
         var positions = new HashSet<Vector3> { h, eastPos };
         foreach (var offset in Vector3Directions.CardinalDirections)
@@ -60,7 +61,7 @@ public sealed class ChunkManagerTests
         var center = manager.Chunks[h];
         center.SetBlockRaw(15, 8, 8, stone, 0);
 
-        // Breaking the border cell remeshes the neighbour in the same call: its mesh is
+        // Breaking the border cell remeshes the neighbor in the same call: its mesh is
         // current without waiting for the async dirty budget.
         Assert.True(center.RemoveBlockAt(new Vector3(15, 136, 8), manager));
         Assert.True(center.IsMeshed);

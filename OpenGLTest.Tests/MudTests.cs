@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -160,7 +161,7 @@ public sealed class MudTests
 
                 // A wet floor that is actually dirt: a lake or river bed in a forest. An ocean
                 // floor wears sand and gravel instead, so it never turns to mud, and the bed has to
-                // keep its water cell in the same chunk for the in-chunk neighbour test to see it.
+                // keep its water cell in the same chunk for the in-chunk neighbor test to see it.
                 if ((h & Chunk.SizeMask) == Chunk.SizeMask) continue;
                 if (column.DirtDepth[i] == 0) continue;
                 if (column.Biomes[i] is not (Biome.Forest or Biome.Taiga)) continue;
@@ -183,7 +184,7 @@ public sealed class MudTests
     }
 
     /// <summary>
-    /// How many of the 26 neighbours hold water. Ice counts: the snow pass runs after the mud pass,
+    /// How many of the 26 neighbors hold water. Ice counts: the snow pass runs after the mud pass,
     /// so a cold pond's single surface cell was water when the mud was stamped and only froze later.
     /// </summary>
     private static int CountWaterAround(ChunkManager manager, int x, int y, int z, byte water, byte ice)

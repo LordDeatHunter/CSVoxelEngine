@@ -12,7 +12,7 @@ namespace silkgltriangle;
 public class FallingBlock
 {
     // Slightly inside a full block so a cube spawned where a block just was rests in the freed
-    // cell instead of clipping its solid neighbours
+    // cell instead of clipping its solid neighbors
     public const float HalfExtent = 0.49f;
 
     private const float Gravity = 28f;
@@ -233,7 +233,7 @@ public class FallingBlock
 
     /// <summary>
     /// Sand-simulator slide: a cube landing on a support with exposed sides may keep going.
-    /// The chance scales with how alone the support is — solid neighbours of the support
+    /// The chance scales with how alone the support is — solid neighbors of the support
     /// around its own level, diagonals included, each remove an eighth: a buried support
     /// never slides, a lone pillar always does. The target side may be orthogonal or diagonal;
     /// once a direction is chosen it is kept across landings while it stays clear.
@@ -276,7 +276,7 @@ public class FallingBlock
     /// stays. <paramref name="solidOrMissing"/> reports whether a cell is solid (unloaded
     /// counts as solid: it must dam the slide, not invite it off the world edge).
     /// A committed <paramref name="previous"/> direction is kept while its way stays clear;
-    /// otherwise the (8 - neighbours) / 8 chance rolls and the pick is uniform over every
+    /// otherwise the (8 - neighbors) / 8 chance rolls and the pick is uniform over every
     /// clear side, corners included.
     /// </summary>
     public static (int X, int Z)? PickSlideDirection(int rx, int ry, int rz,
@@ -286,16 +286,16 @@ public class FallingBlock
             return previous;
 
         var sy = ry - 1;
-        var neighbours = 0;
+        var neighbors = 0;
         for (var dx = -1; dx <= 1; dx++)
         for (var dz = -1; dz <= 1; dz++)
         {
             if (dx == 0 && dz == 0) continue;
-            if (solidOrMissing(rx + dx, sy, rz + dz)) neighbours++;
+            if (solidOrMissing(rx + dx, sy, rz + dz)) neighbors++;
         }
 
-        if (neighbours >= 8) return null;
-        if (random.NextSingle() >= (8 - neighbours) / 8f) return null;
+        if (neighbors >= 8) return null;
+        if (random.NextSingle() >= (8 - neighbors) / 8f) return null;
 
         Span<(int X, int Z)> eligible = stackalloc (int X, int Z)[8];
         var count = 0;

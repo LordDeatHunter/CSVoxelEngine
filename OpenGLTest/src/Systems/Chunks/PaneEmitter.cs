@@ -8,7 +8,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Emits a <see cref="BlockRenderer.Pane"/> cell from the padded snapshot: the centre post plus an
-/// arm toward every neighbour <see cref="PaneShape.ConnectsTo(PaneProfile, byte, byte)"/> reaches,
+/// arm toward every neighbor <see cref="PaneShape.ConnectsTo(PaneProfile, byte, byte)"/> reaches,
 /// exactly the boxes <see cref="PaneProfile.Boxes"/> hands the raycast and collision, in the
 /// block's own <see cref="PaneProfile"/> (post and arm widths, and the rails an arm fills). An arm
 /// reaches the cell edge and carries no end cap, and the post drops its side where an arm covering
@@ -26,7 +26,7 @@ internal static class PaneEmitter
     private const int PostBit = 1 << PaneShape.Directions;
 
     /// <summary>The arm mask of the pane at padded index <paramref name="idx"/>, in its own shape,
-    /// read from its four horizontal neighbours, which must lie inside the 18^3 snapshot: the
+    /// read from its four horizontal neighbors, which must lie inside the 18^3 snapshot: the
     /// meshed cell itself or the cell right above or below it.</summary>
     internal static int MaskInSnapshot(byte[] padded, byte[] paddedState, int idx)
     {
@@ -87,7 +87,7 @@ internal static class PaneEmitter
             Face(vertices, indices, ref indexOffset, basePos, postMin, postMax, 5, type.Bottom, lights);
 
         // Each arm's rails: their two long walls (across X for a north/south arm, across Z for a
-        // west/east one) and their caps; never an end, which meets the neighbour it connects to
+        // west/east one) and their caps; never an end, which meets the neighbor it connects to
         for (var dir = 0; dir < PaneShape.Directions; dir++)
         {
             if ((mask & 1 << dir) == 0) continue;

@@ -1,5 +1,5 @@
 #version 460 core
-// World surface shading. Opaque terrain gets atlas colour, baked voxel light, a directional
+// World surface shading. Opaque terrain gets atlas color, baked voxel light, a directional
 // sun with shadow-map lookup, torch light and point lights, then fog.
 //
 // Water (flagged by vertex alpha 254) is a small physical model instead of a tint. Its normal
@@ -8,7 +8,7 @@
 // of the frame taken just before the water pass (uSceneColor/uSceneDepth), offset sideways
 // along the wave normal for refraction; the distance from the surface to what that copy saw
 // is how thick the water is, and Beer-Lambert absorption over that thickness plus an
-// in-scattered water colour is what makes shallows read clear and depth read teal; where that
+// in-scattered water color is what makes shallows read clear and depth read teal; where that
 // thickness runs out against a block or a bank a thin foam band rises. The planar
 // reflection is mixed in by a Schlick fresnel, so the surface is transparent underfoot and a
 // mirror at a graze. Opaque faces that look into water (bit 3 of the packed normal) get the
@@ -16,7 +16,7 @@
 // Seen from below (a per-fragment side test against the face normal, not the sea plane, since
 // a pond stands above sea level) the surface is a Snell window: the scene copy is shown through
 // it distorted by the wave normal, the inside fresnel goes to total internal reflection past the
-// critical angle, and that band fades to the underwater fog colour instead of sampling the
+// critical angle, and that band fades to the underwater fog color instead of sampling the
 // sea-level mirror, which is never valid from that side.
 in vec4 fColor;
 in vec2 fTexCoord;
@@ -100,7 +100,7 @@ uniform float uSunIntensity;
 uniform vec3 uAmbient;
 // Ambient a downward face sees (RenderManager.GroundAmbientOf(uAmbient))
 uniform vec3 uGroundAmbient;
-// The block-light colour arrives per vertex (test-vertex.glsl, decoded from the palette)
+// The block-light color arrives per vertex (test-vertex.glsl, decoded from the palette)
 in vec3 fBlockTint;
 uniform float uTorchIntensity;
 uniform vec3 uFogColor;
@@ -114,7 +114,7 @@ uniform vec3 uSkyGlow;
 uniform vec4 uSkyShape;       // x horizon band, y haze width, z haze strength, w glow exponent
 // 0 dry, 1 fully underwater/in lava: blends the dome-sampled fog back to the flat uFogColor.
 uniform float uFogWet;
-// Deep-water darkness (DeepWaterFog): how much the wet fog colour is dimmed per channel with the
+// Deep-water darkness (DeepWaterFog): how much the wet fog color is dimmed per channel with the
 // eye's depth below the water surface; 0 (dry, in lava, and the ItemDebugger's default) leaves it.
 uniform vec3 uDeepWaterDim;
 uniform int uNumPointLights;
@@ -151,7 +151,7 @@ uniform float uCloudHeight;
 uniform float uCloudField;
 uniform vec2 uCloudDrift;
 
-// The frame as it stood just before the water pass: colour to refract, depth to measure the
+// The frame as it stood just before the water pass: color to refract, depth to measure the
 // water's thickness with. Plain samplers, no compare mode - uSceneDepth is read for its value.
 uniform sampler2D uSceneColor;
 uniform sampler2D uSceneDepth;
@@ -186,7 +186,7 @@ uniform vec3 uWaterAbsorb;
 uniform vec3 uWaterScatter;
 uniform float uWaterCausticStrength;
 // Wet albedo (SH-22): a submerged face darkens its albedo by uWetDarken, but only below its
-// own baked water surface, so dry ground beside or above the water keeps its colour.
+// own baked water surface, so dry ground beside or above the water keeps its color.
 uniform float uWetDarken;
 uniform float uWaterFancyNear;
 uniform float uWaterFancyFar;
@@ -210,7 +210,7 @@ uniform float uWaterGlitterDensity;
 uniform float uWaterGlitterTilt;
 uniform float uWaterGlitterRate;
 uniform vec2 uWaterGlitterFade;
-// Average opaque colour of the leaves tile, for LOD foliage below: far crowns are
+// Average opaque color of the leaves tile, for LOD foliage below: far crowns are
 // drawn opaque (no cutout holes) and transparent texels fall back to this.
 uniform vec3 uLodLeafColor;
 // Atlas slice of the lava tile: fluid fragments on this layer glow instead of refracting.
@@ -276,7 +276,7 @@ vec3 WaterSsr(vec3 P, vec3 R, vec3 miss)
         if (ndc.z * 0.5 + 0.5 > sd) {
             vec4 sp = uInvViewProj * vec4(uv * 2.0 - 1.0, sd * 2.0 - 1.0, 1.0);
             if (distance(sp.xyz / sp.w, p) < stepLen * uWaterSsrThickness) {
-                // Fade toward the miss colour near the screen border, where the copy runs out.
+                // Fade toward the miss color near the screen border, where the copy runs out.
                 vec2 e2 = min(uv, 1.0 - uv);
                 float edge = smoothstep(0.0, 0.08, min(e2.x, e2.y));
                 return mix(miss, texture(uSceneColor, uv).rgb, edge);
@@ -631,7 +631,7 @@ void main() {
     // Leaf tiles have transparent holes; cut them out so the canopy sees through instead of
     // blending ghosts. The cutoff is a uniform: the opaque pass uses 0.5 for the leaf holes,
     // the translucent pass uses 0 so glass's faint interior blends instead of vanishing.
-    // Far LOD crowns are opaque instead: holes fall back to the average leaf colour so no
+    // Far LOD crowns are opaque instead: holes fall back to the average leaf color so no
     // sky shows through the magnified texels.
     if (lodLeaves) {
         // A biome-tinted canopy falls back to its textureless tile's grey (sRGB 98/255,
@@ -690,7 +690,7 @@ void main() {
     bool oreTile = !isWater && uMaterialCount > 0 && int(fLayer) < uMaterialCount
         && uTileMaterials[fLayer].x > 0.0;
     // Wet albedo: a submerged face is wet only at or below its own baked water surface
-    // (fWaterSurfaceY), so the dry top of a side face poking out of a thin flow keeps its colour.
+    // (fWaterSurfaceY), so the dry top of a side face poking out of a thin flow keeps its color.
     // Water darkens what it soaks, so the albedo drops exactly once, here before the light
     // multiply, and the caustics below see the wet albedo too. GL-free twin:
     // SurfaceFresnel.WetWeight.
@@ -736,13 +736,13 @@ void main() {
 
             // Metals tint what they reflect. Taking the albedo's hue at full brightness rather
             // than the albedo itself matters here: these ores are very dark (obsidian's luma sits
-            // near 0.1), so tinting by the raw colour would extinguish the highlight it is meant
-            // to colour.
+            // near 0.1), so tinting by the raw color would extinguish the highlight it is meant
+            // to color.
             float peak = max(max(albedo.r, albedo.g), max(albedo.b, 0.001));
             vec3 tint = mix(vec3(1.0), albedo / peak, metallic);
 
             // Grazing-weighted Schlick, the same one the water surface uses. An F0 derived from
-            // metallic would instead mirror the flat sky colour at full strength head-on and
+            // metallic would instead mirror the flat sky color at full strength head-on and
             // flatten obsidian into a pale slab with no material left in it. Dimmed by skylight
             // so there is no sky to reflect underground.
             float F = Schlick(max(dot(Vm, Nm), 0.0));
@@ -755,7 +755,7 @@ void main() {
             // The sky is mixed in, not added. A reflection replaces what the surface would
             // otherwise show, and adding it instead piled a whole extra sky on top of the albedo
             // at grazing angles, where F approaches 1 - obsidian came out pale blue rather than
-            // black glass catching the sky. Capped below a full mirror so it keeps its own colour.
+            // black glass catching the sky. Capped below a full mirror so it keeps its own color.
             col = mix(col, skyColor, F * metallic * 0.65 * nearFade);
             // Added in linear light, where the display encode lifts a small add on these
             // near-black texels far more than the same add did in display space; uOreSpecScale
@@ -848,8 +848,8 @@ void main() {
 
     // Glass sheen, on the glass tile only (glass blocks and panes), which draws blended in the
     // translucent pass: at a graze the pane mirrors the sky. Glass is mostly see-through, so tinting
-    // its colour alone would vanish under its low alpha; instead the sky is folded into the blend
-    // itself, raising the alpha to a + F - aF and the colour to (c a (1 - F) + sky F) / alpha, which
+    // its color alone would vanish under its low alpha; instead the sky is folded into the blend
+    // itself, raising the alpha to a + F - aF and the color to (c a (1 - F) + sky F) / alpha, which
     // over any background is exactly the plain glass composite mixed toward the sky by F (the Schlick
     // fresnel times uGlassSheen). abs() reads a face seen from inside the cube the same way, and the
     // mirrored sky is dimmed by skylight, so there is nothing to mirror underground. GL-free twin:
@@ -893,7 +893,7 @@ void main() {
         // constant, so applying it to every texel lifted the dark rock blobs in the lava
         // tile into a pale salmon (their near-neutral albedo plus the orange floor adds a
         // near-equal amount to all three channels). Weigh it by how orange the texel is -
-        // rock stays near-neutral, so it keeps its own dark colour and only magma glows.
+        // rock stays near-neutral, so it keeps its own dark color and only magma glows.
         // The glow is evaluated on the display-space (sRGB) albedo and clipped to 1 there, then
         // decoded, exactly as 28198cc's 8-bit target saw it: doubling the *linear* albedo and
         // adding a decoded floor pushes red far past green, so the tonemap clamp left the lava
@@ -1044,7 +1044,7 @@ void main() {
                   + uWaterScatter * waterLight * (1.0 - exp(-0.1 * thickness));
 
         // From behind, this fallback IS the look: past the critical angle the underside mirrors
-        // the water body below, and the underwater fog colour (already blended to the tint by
+        // the water body below, and the underwater fog color (already blended to the tint by
         // SetLighting, dimmed by skylight just below) stands in for that scene. The sea-level
         // mirror is only valid for a face seen from above, whatever height the eye is at.
         // (darkened with the eye's depth like the fog it stands in for: the deep-water darkness)
@@ -1062,8 +1062,8 @@ void main() {
         // Off the sea plane (a pond above sea level) the planar mirror reflects the wrong
         // height, so a short screen-space march takes over by the surface's plane error.
         // Fluid quads carry flow codes rather than fWaterSurfaceY, so the fragment's own Y is
-        // its local surface. Hits are already-lit scene colour and stay undimmed - a torch-lit
-        // cave pool must not reflect black; only the miss colour takes the skylight dim.
+        // its local surface. Hits are already-lit scene color and stay undimmed - a torch-lit
+        // cave pool must not reflect black; only the miss color takes the skylight dim.
         if (!fromBehind && uWaterSsrMode > 0.5) {
             float planeErr = abs(fWorldPos.y - uWaterPlaneY);
             float ssrW = uWaterSsrMode > 1.5 ? 1.0 : smoothstep(uWaterSsrPlaneNear, uWaterSsrPlaneFar, planeErr);
@@ -1107,12 +1107,12 @@ void main() {
     }
 
     float f = clamp((dist - uFogNear) / (uFogFar - uFogNear), 0.0, 1.0);
-    // Fog toward the dome's own colour in the view direction, so a fully fogged fragment is
+    // Fog toward the dome's own color in the view direction, so a fully fogged fragment is
     // exactly the sky behind it (seamless LOD edge against the graded sky). The outer branch
     // keeps the cost at zero inside FogNear; underwater (uFogWet ~1) the sample would be
     // thrown away, so it is skipped. In the mirror pass uCameraPos is the mirrored eye.
     if (f > 0.0) {
-        // Deep-water darkness: underwater the flat fog colour darkens and loses red with the eye's
+        // Deep-water darkness: underwater the flat fog color darkens and loses red with the eye's
         // depth below the surface (uDeepWaterDim, from DeepWaterFog; zero dry and in lava).
         vec3 wetFogColor = uFogColor * (1.0 - uDeepWaterDim);
         vec3 fogCol = wetFogColor;
@@ -1123,7 +1123,7 @@ void main() {
         // Squared ramp, mixed in display space in dry air: the same f*f mix done in linear
         // light reads visibly hazier (a half-fogged dark forest lands far brighter once
         // encoded), so the dry mix encodes both ends, mixes, and decodes again - the pre-SH-10
-        // look. The display mix clamps the fogged colour to 1 first (only fogged fragments pay
+        // look. The display mix clamps the fogged color to 1 first (only fogged fragments pay
         // that clamp). Underwater and in lava (uFogWet 1) it stays the linear mix; the two are
         // blended by uFogWet rather than branched, so the wet transition never pops. Both still
         // reach exactly fogCol at uFogFar, which is what keeps the LOD edge seamless.

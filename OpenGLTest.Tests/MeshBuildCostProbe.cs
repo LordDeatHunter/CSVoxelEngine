@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
+using silkgltriangle.Content;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -19,7 +20,7 @@ namespace silkgltriangle.Tests;
 /// and warm, so it reads one builder's cost with nothing competing for the cores; quote it as a
 /// relative before/after figure, never as an in-game rate.
 ///
-/// Case A is the default-colour scene (every lamp on the warm palette slot). Case B swaps
+/// Case A is the default-color scene (every lamp on the warm palette slot). Case B swaps
 /// every second lamp for <c>blue_lamp</c> and only runs once that block exists.
 /// </summary>
 public sealed class MeshBuildCostProbe
@@ -62,7 +63,7 @@ public sealed class MeshBuildCostProbe
                 chunk.SetBlockRaw(x, y, z, id, 0);
             }
 
-        Measure("A (default-colour lamps)", manager, center);
+        Measure("A (default-color lamps)", manager, center);
 
         byte blueLamp;
         try

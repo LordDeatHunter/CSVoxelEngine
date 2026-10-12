@@ -1,10 +1,12 @@
+using silkgltriangle.Content;
+
 namespace silkgltriangle;
 
 /// <summary>
 /// Coal ore veins: the same threshold-on-3D-noise deposits as <see cref="MalachiteGenerator"/>,
 /// but hostable in sandstone as well as stone (so a desert column's shallow band carries coal)
 /// and slightly larger per deposit. A pure function of world position like the other generators,
-/// so neighbours agree without shared state. Runs on a generation worker thread after the
+/// so neighbors agree without shared state. Runs on a generation worker thread after the
 /// carvers, for the same reason malachite does: carving first leaves cave walls rimmed with
 /// exposed ore instead of eating half of every deposit the caves cross.
 /// </summary>

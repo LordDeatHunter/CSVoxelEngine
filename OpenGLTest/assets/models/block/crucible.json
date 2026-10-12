@@ -3,7 +3,7 @@
   // Item.BakedModel and drawn as an entity mesh wherever a crucible is standing in a station.
   // It is never a block in the world, so it never goes through MultiblockShape.Rotate and the
   // multiblock bake rules do not apply - but it carries no "cullface" all the same, because an
-  // entity mesh has no cell neighbours to cull against.
+  // entity mesh has no cell neighbors to cull against.
   //
   // Authored in the usual 0..16 model units, centred on x/z 8 and 8 units tall, so the bowl is
   // a 8x8x8 box hugging the middle of its cell. KilnRenderer mirrors those numbers:

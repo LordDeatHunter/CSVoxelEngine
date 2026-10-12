@@ -84,36 +84,36 @@ public class BlockDebrisSystem
 
     /// <summary>
     /// Throws <paramref name="count"/> chips of one flat sRGB <paramref name="colourSrgb"/> (a
-    /// slime's goo, <see cref="DebrisLook.Colour"/>) out of a body whose feet are at
+    /// slime's goo, <see cref="DebrisLook.Color"/>) out of a body whose feet are at
     /// <paramref name="origin"/> and which is <paramref name="radius"/> across: they burst from under
     /// its rim at about <paramref name="speed"/> blocks per second, higher than dust, so the landing
     /// reads as a splat.
     /// </summary>
     public void Splat(Vector3 origin, Vector3 colourSrgb, float radius, int count, float speed, float size,
         Random? random = null) =>
-        Spray(origin, BlockType.Air, DebrisLook.Colour, BiomeTint.VertexTint(colourSrgb), count, speed, size,
+        Spray(origin, BlockType.Air, DebrisLook.Color, BiomeTint.VertexTint(colourSrgb), count, speed, size,
             radius, lift: 0.6f, random ?? Random.Shared);
 
     /// <summary>
     /// Throws <paramref name="count"/> droplets of one flat sRGB <paramref name="colourSrgb"/> (pale water,
-    /// <see cref="DebrisLook.Colour"/>) up off a water surface at <paramref name="origin"/>, from a ring
+    /// <see cref="DebrisLook.Color"/>) up off a water surface at <paramref name="origin"/>, from a ring
     /// <paramref name="radius"/> across: steeper than a splat, so a body crossing the surface reads as a
     /// splash (<see cref="WaterSplash"/>).
     /// </summary>
     public void Splash(Vector3 origin, Vector3 colourSrgb, float radius, int count, float speed, float size,
         Random? random = null) =>
-        Spray(origin, BlockType.Air, DebrisLook.Colour, BiomeTint.VertexTint(colourSrgb), count, speed, size,
+        Spray(origin, BlockType.Air, DebrisLook.Color, BiomeTint.VertexTint(colourSrgb), count, speed, size,
             radius, lift: 1.3f, random ?? Random.Shared);
 
     /// <summary>
     /// Throws <paramref name="count"/> pale chips of one flat <paramref name="colourSrgb"/> (a
-    /// connecting hit's spark, <see cref="DebrisLook.Colour"/>) out of a body at
+    /// connecting hit's spark, <see cref="DebrisLook.Color"/>) out of a body at
     /// <paramref name="origin"/> that is <paramref name="radius"/> across: they burst from around
     /// it at about <paramref name="speed"/> blocks per second, mostly sideways.
     /// </summary>
     public void Spark(Vector3 origin, Vector3 colourSrgb, float radius, int count, float speed, float size,
         Random? random = null) =>
-        Spray(origin, BlockType.Air, DebrisLook.Colour, BiomeTint.VertexTint(colourSrgb), count, speed, size,
+        Spray(origin, BlockType.Air, DebrisLook.Color, BiomeTint.VertexTint(colourSrgb), count, speed, size,
             radius, lift: 0.8f, random ?? Random.Shared);
 
     // The ring launch Puff, Skirt and Splat share: headings spread round the ring with a jitter (so

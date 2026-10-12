@@ -4,6 +4,7 @@ using System.IO;
 using System.Numerics;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -31,7 +32,7 @@ public class UIRenderer : IDisposable
 
     // Hearts row above the hotbar, in pixels. The sprites are 32px wide with 1px of empty
     // padding down each side, so only the middle 30px are drawn and the stride matches it:
-    // neighbours sit exactly edge to edge with no double-padding gap.
+    // neighbors sit exactly edge to edge with no double-padding gap.
     private const float HeartDrawWidth = 30f;
     private const float HeartDrawHeight = 32f;
     private const float HeartStride = 30f;
@@ -157,7 +158,7 @@ public class UIRenderer : IDisposable
     private readonly Dictionary<byte, uint> _itemIcons = new();
     // One unit square per sheet frame, UV'd to that frame's array slice (see UvRect.Tile):
     // the icon texture of a spritesheet item holds one slice per frame, so picking a frame
-    // is picking a mesh, and every frame mipmaps without bleeding into its neighbours.
+    // is picking a mesh, and every frame mipmaps without bleeding into its neighbors.
     private readonly Dictionary<byte, Mesh[]> _itemFrames = new();
     private readonly int _locAlphaCutoff;
     private readonly int _locSrgbTex;
@@ -165,7 +166,7 @@ public class UIRenderer : IDisposable
     // decides whether its icons are re-encoded for the gamma framebuffer.
     private readonly bool _atlasIsSrgb;
 
-    // Unit shapes, scaled per draw so a colour or size change costs no buffer work
+    // Unit shapes, scaled per draw so a color or size change costs no buffer work
     private readonly Mesh _unitSquare;
 
     // Heart sprites with the 1px side padding cropped out of their UVs (see the Heart
@@ -402,7 +403,7 @@ public class UIRenderer : IDisposable
     /// first <see cref="Begin(Vector2D{int}, Vector2D{int}, float)"/>.</summary>
     public Vector2 ToCanvas(Vector2 windowPoint) => UiCanvas.WindowToCanvas(windowPoint, _scale);
 
-    /// <summary>Solid-colour rectangle centred on <paramref name="centre"/>.</summary>
+    /// <summary>Solid-color rectangle centred on <paramref name="centre"/>.</summary>
     public void DrawRect(Vector2 centre, Vector2 size, Rgba color) =>
         DrawMesh(_unitSquare, RectTransform(centre, size), color);
 
@@ -443,7 +444,7 @@ public class UIRenderer : IDisposable
 
     /// <summary>
     /// Clears the depth buffer once per UI pass, the first time a 3D icon needs it. A glClear
-    /// honours the scissor, so this must never first run while the list scissor is on — the
+    /// honors the scissor, so this must never first run while the list scissor is on — the
     /// inventory panel calls it before enabling the scissor for exactly that reason.
     /// </summary>
     private void EnsureDepthCleared()
@@ -476,7 +477,7 @@ public class UIRenderer : IDisposable
                     * FlipToScreen(centre);
 
         // Cutout blocks (flower, leaves) carry transparent texels: discard them so they
-        // draw neither colour nor depth, exactly like the world opaque pass and DrawItemIcon.
+        // draw neither color nor depth, exactly like the world opaque pass and DrawItemIcon.
         // Without this the invisible pixels depth-swallow geometry behind them.
         var cutout = BlockType.ById[blockId]?.Cutout == true;
         if (cutout)
@@ -550,14 +551,14 @@ public class UIRenderer : IDisposable
         var mark = MathUtils.Clamp01(hitMarker);
         if (mark > 0.001f)
         {
-            var colour = new Rgba(255, 96, 96, (byte)(mark * 255f + 0.5f));
+            var color = new Rgba(255, 96, 96, (byte)(mark * 255f + 0.5f));
             for (var i = 0; i < 2; i++)
             {
                 var rotation = Matrix4x4.CreateRotationZ((i == 0 ? 1f : -1f) * MathF.PI * 0.25f);
                 var model = Matrix4x4.CreateScale(CrosshairMarkerLength, CrosshairMarkerWidth, 1f)
                             * rotation
                             * Matrix4x4.CreateTranslation(centre.X, centre.Y, 0f);
-                DrawMesh(_unitSquare, model, colour);
+                DrawMesh(_unitSquare, model, color);
             }
         }
     }
@@ -924,7 +925,7 @@ public class UIRenderer : IDisposable
         if (n == 0)
             return;
 
-        // _textFade is 1 outside the loading overlay, so ordinary text keeps its exact colours.
+        // _textFade is 1 outside the loading overlay, so ordinary text keeps its exact colors.
         var shadow = _textFade >= 1f ? CountShadow : Faded(CountShadow, _textFade);
         var face = _textFade >= 1f ? color : Faded(color, _textFade);
         for (var i = 0; i < n; i++)
@@ -998,7 +999,7 @@ public class UIRenderer : IDisposable
 
     /// <summary>
     /// Uploads the first <paramref name="quadCount"/> quads of <see cref="_textVerts"/> and
-    /// draws them in one call. Colour rides per-vertex (see <see cref="WriteGlyphQuad"/>), so
+    /// draws them in one call. Color rides per-vertex (see <see cref="WriteGlyphQuad"/>), so
     /// <c>uColor</c> stays white here: ui-fragment.glsl computes <c>fColor * uColor * texel</c>
     /// and a white <c>uColor</c> is an exact identity, so the per-vertex tint reproduces the
     /// old per-draw tint uniform exactly. That identity depends on the fragment shader keeping
@@ -1174,7 +1175,7 @@ public class UIRenderer : IDisposable
         var listHeight = InventoryPanelLayout.ListHeight(_screenSize);
         var (first, end) = ScrollList.VisibleRange(offset, RowHeight, rowCount, listHeight);
 
-        // A glClear honours the scissor, so the pass's one full-screen depth clear must happen
+        // A glClear honors the scissor, so the pass's one full-screen depth clear must happen
         // before the scissor goes on; otherwise the latch would record a clear that covered only
         // the list, and the preview and crafting-card icons would z-fight the world's depth.
         EnsureDepthCleared();
@@ -1671,7 +1672,7 @@ public class UIRenderer : IDisposable
         DrawInputField(centre, MainMenuLayout.FieldSize, field, focused, placeholder, time);
     }
 
-    /// <summary>A <see cref="DrawMenuButton"/> of any size, with an optional border colour.</summary>
+    /// <summary>A <see cref="DrawMenuButton"/> of any size, with an optional border color.</summary>
     private void DrawSmallButton(Vector2 centre, Vector2 size, string label, Rgba? border = null)
     {
         DrawRect(centre, size, SlotBackground);
@@ -1746,7 +1747,7 @@ public class UIRenderer : IDisposable
                 else
                     _chatWrap.Add(text);
                 // Wrapped top to bottom, collected bottom-up: push the message's last line first.
-                // A fading line's alpha rides its colour, and a fully faded one is skipped so the
+                // A fading line's alpha rides its color, and a fully faded one is skipped so the
                 // log shrinks with it.
                 var alpha = view.AlphaAt(m);
                 if (alpha <= 0.004f) continue;
@@ -1845,7 +1846,7 @@ public class UIRenderer : IDisposable
         }
     }
 
-    // A colour with its alpha multiplied by factor (clamped to 0..1).
+    // A color with its alpha multiplied by factor (clamped to 0..1).
     private static Rgba Faded(Rgba color, float factor) =>
         color with { A = (byte)(color.A * MathUtils.Clamp01(factor) + 0.5f) };
 
@@ -1984,7 +1985,7 @@ public class UIRenderer : IDisposable
         if (_font == null) return;
 
         // Cap-sized, then shrunk to fit the button's inner width so "+100" never spills into
-        // its neighbour; the measured ink size centres the label on both axes.
+        // its neighbor; the measured ink size centres the label on both axes.
         var scale = _font.ScaleForCapHeight(CatalogButtonCapHeight);
         var maxWidth = InventoryPanelLayout.CatalogButtonWidth - 8f;
         var width = _font.MeasureSize(label.AsSpan(), scale).X;
@@ -2331,7 +2332,7 @@ public class UIRenderer : IDisposable
                     * rotation
                     * FlipToScreen(centre);
 
-        // Cut out the sprite's transparent texels so they write neither colour nor depth:
+        // Cut out the sprite's transparent texels so they write neither color nor depth:
         // without this the front face's invisible pixels depth-swallow the extrusion walls
         // behind them for half of every turn
         _shader.Use();
@@ -2424,7 +2425,7 @@ public class UIRenderer : IDisposable
 
     /// <summary>
     /// Draws any primitive with an explicit model matrix. <paramref name="texture"/> of 0 draws
-    /// the mesh as flat colour without sampling. <paramref name="srgb"/> says the texture is
+    /// the mesh as flat color without sampling. <paramref name="srgb"/> says the texture is
     /// <c>SRGB8_ALPHA8</c> (the shared atlas or an <see cref="ItemMeshCache"/> texture), so the
     /// shader re-encodes the decoded texel; UIRenderer's own sprites are linear and pass false.
     /// </summary>

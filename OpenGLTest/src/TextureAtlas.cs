@@ -187,7 +187,7 @@ public static class TextureAtlas
         }
 
         // Plain RGBA, never sRGB: a tangent-space normal plus a metallic multiplier is data,
-        // not colour, and an sRGB decode would bend every normal and the metallic scale.
+        // not color, and an sRGB decode would bend every normal and the metallic scale.
         return TextureLoader.UploadArray(gl, layers, TileWidth, TileHeight, sampleMips: true);
     }
 

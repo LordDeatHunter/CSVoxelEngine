@@ -174,7 +174,7 @@ public sealed class CloudTests(ITestOutputHelper output)
                              MathF.Abs(c.X - 2f * S) < 1e-3f;
             if (!atBoundary) continue;
 
-            Assert.True(n.X > -0.5f, "The taller cell faces its lower neighbour with an inward wall");
+            Assert.True(n.X > -0.5f, "The taller cell faces its lower neighbor with an inward wall");
             if (n.X < 0.5f) continue;
 
             var low = MathF.Min(a.Y, MathF.Min(b.Y, c.Y));
@@ -188,7 +188,7 @@ public sealed class CloudTests(ITestOutputHelper output)
     [Fact]
     public void MeshWrapsAtSeam()
     {
-        // Cells on opposite edges are neighbours, so the shared boundary carries no wall at all.
+        // Cells on opposite edges are neighbors, so the shared boundary carries no wall at all.
         var levels = new byte[4, 3];
         levels[0, 1] = 1;
         levels[3, 1] = 1;

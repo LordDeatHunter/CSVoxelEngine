@@ -7,7 +7,7 @@ namespace silkgltriangle;
 /// How much the underwater fog darkens with the eye's depth below the water surface: the deeper the
 /// eye, the darker the fog and the more of its red is lost, red first. A pure function of depth that
 /// the renderer evaluates once a frame (<c>uDeepWaterDim</c>); the world fragment multiplies the wet
-/// fog colour by <c>1 - Dim</c>, so the water body reads darker and bluer the deeper the swimmer goes.
+/// fog color by <c>1 - Dim</c>, so the water body reads darker and bluer the deeper the swimmer goes.
 /// </summary>
 public static class DeepWaterFog
 {
@@ -30,6 +30,6 @@ public static class DeepWaterFog
             max * (1f - MathF.Exp(-loss.Z * d)));
     }
 
-    /// <summary>The colour the wet fog is multiplied by at <paramref name="depthBlocks"/>: <c>1 - Dim</c>.</summary>
+    /// <summary>The color the wet fog is multiplied by at <paramref name="depthBlocks"/>: <c>1 - Dim</c>.</summary>
     public static Vector3 Tint(float depthBlocks) => Vector3.One - Dim(depthBlocks);
 }

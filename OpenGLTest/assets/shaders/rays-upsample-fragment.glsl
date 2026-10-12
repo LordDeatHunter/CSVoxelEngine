@@ -1,6 +1,6 @@
 #version 460 core
 // Depth-aware upsample for the underwater sun shafts. The march in rays-fragment.glsl now
-// runs into a half-resolution RGBA16F target (rgb = additive shaft colour, a = the world-space
+// runs into a half-resolution RGBA16F target (rgb = additive shaft color, a = the world-space
 // distance in blocks that half-res pixel marched, capped at uMaxDistance); this pass draws one
 // full-resolution additive full-screen triangle that reconstructs the shafts at native
 // resolution. The half-res target covers exactly the same NDC region as the screen, so screen UV
@@ -80,7 +80,7 @@ void main() {
     for (int i = 0; i < 4; i++) {
         vec4 s = taps[i];
         // A tap whose alpha says it marched to a very different distance saw the other side of a
-        // silhouette; its shaft colour belongs to different geometry and must not bleed across.
+        // silhouette; its shaft color belongs to different geometry and must not bleed across.
         float d = abs(s.a - len);
         float w = bw[i] * exp(-d / uTolerance);
         weighted += s.rgb * w;

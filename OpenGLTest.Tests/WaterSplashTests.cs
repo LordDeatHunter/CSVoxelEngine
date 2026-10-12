@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -114,7 +115,7 @@ public sealed class WaterSplashTests
         var top = manager.GetFluidColumnTopGlobal(4, 2, 4);
         foreach (var droplet in debris.Debris)
         {
-            Assert.Equal(DebrisLook.Colour, droplet.Look);
+            Assert.Equal(DebrisLook.Color, droplet.Look);
             Assert.True(MathF.Abs(droplet.Position.Y - top) < 0.01f);
         }
 

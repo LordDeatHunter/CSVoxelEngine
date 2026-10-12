@@ -29,7 +29,7 @@ vec3 LinearToSrgb(vec3 c)
 
 void main()
 {
-    // Vertex colour bakes in per-face shading, uColor is the per-draw tint. Solid shapes skip
+    // Vertex color bakes in per-face shading, uColor is the per-draw tint. Solid shapes skip
     // the sampler entirely so they don't need a texture bound.
     vec4 texel = vec4(1.0);
 

@@ -12,17 +12,17 @@ namespace silkgltriangle;
 public class BlockDebris
 {
     /// <summary>Block the cube renders as (see <see cref="BlockCubeCache"/>); air for a
-    /// <see cref="DebrisLook.Colour"/> chip.</summary>
+    /// <see cref="DebrisLook.Color"/> chip.</summary>
     public byte BlockId { get; }
 
     /// <summary>Which cached cube draws the chip: the whole block (a mining chip), its surface
-    /// (dust) or a plain colour (goo).</summary>
+    /// (dust) or a plain color (goo).</summary>
     public DebrisLook Look { get; }
 
     /// <summary>
     /// The plain path's <c>uBiomeTint</c> for this cube: a biome-tinted block's tint sampled at
     /// the cell it chipped off (<see cref="BiomeTint.CellTint"/>), so the chips match the
-    /// terrain they fly out of; a colour chip's own colour (<see cref="BiomeTint.VertexTint"/>);
+    /// terrain they fly out of; a color chip's own color (<see cref="BiomeTint.VertexTint"/>);
     /// white for every other block.
     /// </summary>
     public Vector3 Tint { get; }

@@ -35,7 +35,7 @@ public sealed class PlayerRig
     public const float ShoulderX = TorsoWidth / 2f + LimbWidth / 2f;
     public const float HipX = LimbWidth / 2f;
 
-    // Palette swatches (see PalettePixels): solid Blockbench-style colours behind one UV map.
+    // Palette swatches (see PalettePixels): solid Blockbench-style colors behind one UV map.
     public const int Skin = 0;
     public const int Shirt = 1;
     public const int Pants = 2;
@@ -143,7 +143,7 @@ public sealed class PlayerRig
     }
 
     /// <summary>
-    /// The 4x2 solid-colour palette texture (top-first RGBA): skin, shirt, pants, hair,
+    /// The 4x2 solid-color palette texture (top-first RGBA): skin, shirt, pants, hair,
     /// shoe, then white spares. Every cuboid face UVs to one swatch centre, so the model
     /// is UV-mapped Blockbench-style with zero image assets to author.
     /// </summary>
@@ -188,7 +188,7 @@ public sealed class PlayerRig
 
     /// <summary>
     /// One mesh per rig part: every present face of every cuboid in the shared
-    /// <see cref="Vertex"/> layout, textured from the rig's skin. The vertex colour stays
+    /// <see cref="Vertex"/> layout, textured from the rig's skin. The vertex color stays
     /// white; asymmetric sculpts get their own left/right meshes automatically.
     /// </summary>
     public static Dictionary<string, Mesh> BuildMeshes(GL gl, PlayerRig rig)

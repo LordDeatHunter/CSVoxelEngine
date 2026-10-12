@@ -22,21 +22,21 @@ public readonly record struct ContactAoSettings(
 
 /// <summary>
 /// GL-free twin of contact-ao-fragment.glsl (SH-28): a cheap screen-space contact AO read from the
-/// HDR scene depth, four taps and four 1-pixel neighbours per pixel. Keep the two in step.
+/// HDR scene depth, four taps and four 1-pixel neighbors per pixel. Keep the two in step.
 ///
 /// The measure is a crease: for each opposite tap pair (left/right, down/up) the midpoint of their
 /// raw window depths is reconstructed on the centre pixel's own ray and compared with the centre
 /// depth. Raw depth is affine in screen space over any plane (it is a + b/w, and 1/w is affine
 /// over a plane), so on a flat surface the midpoint is exactly the centre depth and a plane never
 /// darkens, whatever the viewing angle. In a concave corner the centre sits farther than the
-/// midpoint of its two neighbours, giving a positive crease in blocks; a convex edge or a
+/// midpoint of its two neighbors, giving a positive crease in blocks; a convex edge or a
 /// silhouette gives a negative one, or a jump far past <see cref="ContactAoSettings.RangeBlocks"/>,
 /// and both are ignored.
 ///
 /// A thin object standing in front of the ground (a torch, a drop, a mob) puts one tap of a ground
 /// pixel a tap radius beside it on the object, which creases exactly like a corner and would draw
 /// a displaced copy of its silhouette. So the crease is split between the two taps along the
-/// centre surface's own slope, read from its 1-pixel neighbours (<see cref="Held"/>): a tap in
+/// centre surface's own slope, read from its 1-pixel neighbors (<see cref="Held"/>): a tap in
 /// front of that surface is an occluder, and it only counts while its surface lies within a few tap
 /// radii of the centre point (<see cref="Reach"/>). A wall or pebble rising beside the centre is
 /// that close; the part of a post well above the ground behind it is not. With every occluder in
@@ -79,7 +79,7 @@ public static class ContactAo
     /// <paramref name="dA"/> (at <c>uv - tapUv</c>) and <paramref name="dB"/> (at
     /// <c>uv + tapUv</c>), both measured along the centre ray, with each occluding tap's share
     /// scaled by its <see cref="Reach"/>. <paramref name="dMinus1"/> and <paramref name="dPlus1"/>
-    /// are the centre's 1-pixel neighbours on the same axis, and <paramref name="tapPx"/> the tap
+    /// are the centre's 1-pixel neighbors on the same axis, and <paramref name="tapPx"/> the tap
     /// offset in pixels. 0 on any plane, positive in a concave corner, and 0 when either tap sees
     /// the sky or the taps sit on the centre (at the screen edge).</summary>
     public static float Crease(Matrix4x4 invViewProj, Vector3 eye, Vector2 uv, float dC,
@@ -89,10 +89,10 @@ public static class ContactAo
         if (dA >= 1f || dB >= 1f || tapPx <= 0f) return 0f;
         var reachA = Reach(invViewProj, uv - tapUv, dA, centre, tapBlocks, s);
         var reachB = Reach(invViewProj, uv + tapUv, dB, centre, tapBlocks, s);
-        // The centre surface's slope, read from one neighbour or the other. A slope read across a
+        // The centre surface's slope, read from one neighbor or the other. A slope read across a
         // silhouette right beside the centre misses its own side's tap by the whole jump, so the
         // one that carries the surface out to its tap wins; at the very pixel of a crease both do
-        // (each neighbour on its own face), and the stronger crease is kept.
+        // (each neighbor on its own face), and the stronger crease is kept.
         var minusSlope = (dC - dMinus1) * tapPx;
         var plusSlope = (dPlus1 - dC) * tapPx;
         var minusMiss = MathF.Abs(dC - minusSlope - dA);

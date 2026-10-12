@@ -7,7 +7,7 @@ namespace silkgltriangle;
 /// ground, laid alternately across each other campfire-style. Player-only (nothing stamps
 /// them during worldgen): the count rides the chunk state byte, written 1..max by the
 /// place_stack use, and a bare block with no state reads as a single stick. A pure
-/// function of world position like <see cref="PebbleGenerator"/>, so neighbours agree
+/// function of world position like <see cref="PebbleGenerator"/>, so neighbors agree
 /// without shared state.
 /// </summary>
 public static class BranchPileGenerator

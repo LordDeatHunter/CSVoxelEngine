@@ -8,7 +8,7 @@
   // and an arm off the pillar's top toward the camera, (0, 12, -2); then, from the eye at 11.63,
   // it aims up at the arm's underside and hangs a lantern from it at (0, 11, -2):
   //   lantern-front    the lantern under the arm, its chain reaching the block it hangs from,
-  //                    lighting the pillar and the sand in the default warm torch colour
+  //                    lighting the pillar and the sand in the default warm torch color
   //   lantern-oblique  the same from the front left
   //   lantern-popped   the arm mined: the lantern loses what held it up and pops
   "steps": [

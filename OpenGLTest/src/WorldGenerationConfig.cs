@@ -185,7 +185,7 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>How fast the exposure falls back in the light (per second): much quicker than adapting to the dark.</summary>
     public const float EyeAdaptToLightRate = 2.5f;
 
-    // --- Biome colour grade (BiomeGrade, post-fragment.glsl's uGrade) ---
+    // --- Biome color grade (BiomeGrade, post-fragment.glsl's uGrade) ---
     /// <summary>Most any channel of the final image moves under the desert's warm or the snow's cool grade (0.04 = 4 %).</summary>
     public const float BiomeGradeStrength = 0.04f;
     /// <summary>Coldness at the eye (EyeClimate.Coldness) from which the cool grade starts: about where snow begins to settle.</summary>
@@ -223,7 +223,7 @@ public const float DayLengthSeconds = 1200f;
     public const float FxaaSpanMax = 8f;
 
     /// <summary>FXAA's relative contrast gate (uFxaaEdgeThreshold, FXAA 3.11's "quality"
-    /// value): a pixel whose 3x3 luma range is below this fraction of its brightest neighbour is
+    /// value): a pixel whose 3x3 luma range is below this fraction of its brightest neighbor is
     /// left as it is. Skipping those flat pixels is most of the pass's cost saving.</summary>
     public const float FxaaEdgeThreshold = 0.125f;
 
@@ -348,14 +348,14 @@ public const float DayLengthSeconds = 1200f;
     // bigger than the disc and the extra ring is pure falloff around it.
     public const float SunGlowScale = 4f;
 
-    // Peak brightness the glow adds at the disc's edge, before the sun colour tints it
+    // Peak brightness the glow adds at the disc's edge, before the sun color tints it
     public const float SunGlowIntensity = 0.55f;
 
     // Falloff exponent of the glow from the disc outwards; higher means a tighter halo
     public const float SunGlowExponent = 2.5f;
 
     // Lens glare (SunGlare): a much wider, fainter glow around the sun that grows as the camera
-    // faces it. Linear HDR brightness it adds right at the sun, times the sun colour, at its peak.
+    // faces it. Linear HDR brightness it adds right at the sun, times the sun color, at its peak.
     // Kept below the point where the sky round the disc washes out to white, so the disc stays crisp.
     public const float SunGlareStrength = 0.28f;
 
@@ -374,7 +374,7 @@ public const float DayLengthSeconds = 1200f;
     public const float SunGlareCloudEaseRate = 2.5f;
 
     // --- Sky dome (SkyPalette, SkySample in the sky/world/cloud shaders) ---
-    /// <summary>Sine of the view elevation at which the zenith colour has fully taken over from the horizon.</summary>
+    /// <summary>Sine of the view elevation at which the zenith color has fully taken over from the horizon.</summary>
     public const float SkyHorizonBand = 0.35f;
 
     /// <summary>Sine of the view elevation over which the brighter horizon haze band fades out.</summary>
@@ -382,15 +382,15 @@ public const float DayLengthSeconds = 1200f;
 
     /// <summary>
     /// How much brighter the haze band makes the horizon right at elevation 0 (0.2 = 20 %).
-    /// 0 while the palette is the flat 28198cc sky colour: the haze multiplies the (linearised)
-    /// horizon, which would push the low sky and every fogged fragment away from that colour.
+    /// 0 while the palette is the flat 28198cc sky color: the haze multiplies the (linearised)
+    /// horizon, which would push the low sky and every fogged fragment away from that color.
     /// </summary>
     public const float SkyHazeStrength = 0f;
 
     /// <summary>Azimuthal falloff exponent of the dusk glow toward the sun; higher is a narrower lobe.</summary>
     public const float SkyGlowExponent = 4f;
 
-    /// <summary>How far the flat sky colour moves toward the dusk orange at full dusk (the 28198cc mix).</summary>
+    /// <summary>How far the flat sky color moves toward the dusk orange at full dusk (the 28198cc mix).</summary>
     public const float SkyDuskMix = 0.5f;
 
     /// <summary>Brightness of the sunset glow band toward the sun at its peak (a scale on its sRGB hue in SkyPalette).</summary>
@@ -419,7 +419,7 @@ public const float DayLengthSeconds = 1200f;
     public const float StarDensity = 0.16f;
 
     /// <summary>
-    /// Linear HDR brightness of the brightest star, before its colour tint and twinkle (which dims
+    /// Linear HDR brightness of the brightest star, before its color tint and twinkle (which dims
     /// a star by StarTwinkleDepth / 2 on average). The night dome is near black and the post pass
     /// only clamps and encodes, so 1 already reads as a display-white point.
     /// </summary>
@@ -622,7 +622,7 @@ public const float DayLengthSeconds = 1200f;
     // Cells a removal of a column's top block scans down for the new LOD surface before giving up.
     public const int LodSurfaceRescanDepth = 64;
     // Chunks around the camera that must be generated and meshed before a loaded world starts
-    // playing; the sphere is ~123 chunks, kept far below ChunkRadius so meshing always has its neighbours.
+    // playing; the sphere is ~123 chunks, kept far below ChunkRadius so meshing always has its neighbors.
     public const int LoadReadyRadiusChunks = 3;
     // A loading world starts playing anyway after this much accumulated update time.
     public const double LoadTimeoutSeconds = 30.0;
@@ -746,7 +746,7 @@ public const float DayLengthSeconds = 1200f;
     public const float WaterWindowRefractScale = 1.75f;
     // Beer-Lambert absorption per block of water, per channel (red dies first, so depth reads teal)
     public static readonly Vector3 WaterAbsorb = new(0.20f, 0.07f, 0.04f);
-    // In-scattered water colour that replaces the seabed as the water thickens
+    // In-scattered water color that replaces the seabed as the water thickens
     public static readonly Vector3 WaterScatter = new(0.05f, 0.30f, 0.40f);
     // Brightness of the sunlight caustics on submerged faces
     public const float WaterCausticStrength = 0.6f;
@@ -764,7 +764,7 @@ public const float DayLengthSeconds = 1200f;
     // How far apart two marched distances have to be, in blocks, before the half-res sun-shaft
     // upsample (rays-upsample-fragment.glsl) stops letting one bleed into the other. The falloff
     // is exponential, so ~2 blocks of mismatch keeps about a third of a tap's weight and a
-    // silhouette several blocks deep rejects its neighbours outright.
+    // silhouette several blocks deep rejects its neighbors outright.
     public const float WaterRayUpsampleToleranceBlocks = 2f;
 
     // Godrays (Godrays, GodraysRenderer, godrays-fragment.glsl): light shafts through trees, clouds
@@ -1160,8 +1160,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // How far a spreading fluid looks for a hole to fall into before spreading evenly
     public const int FluidSlopeSearchDistance = 4;
 
-    // --- Biome tint (BiomeTint: grass and foliage colour from climate) ---
-    // sRGB target colours of a flat, fully lit tinted face, one palette per tint kind. The four
+    // --- Biome tint (BiomeTint: grass and foliage color from climate) ---
+    // sRGB target colors of a flat, fully lit tinted face, one palette per tint kind. The four
     // corners sit on the biome lines of TerrainGenerator.Climate (ColdDry = frozen, ColdWet =
     // taiga, WarmDry = desert, WarmWet = warm forest); the temperate band is the midpoint of the
     // two rows, and at full wetness the grass midpoint (70, 132, 77) lands near grass_top's
@@ -1445,7 +1445,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
 
     // The tree batch cell: every tree rooted in one 64x64 XZ cell grows together (TreeBatch), the
     // same 64-block cell size as CarverCellShift's worm cells. TreeGenerator's static constructor
-    // requires 2 * ReachHorizontal <= TreeCellBlocks, so a batch's neighbour obstacles always come
+    // requires 2 * ReachHorizontal <= TreeCellBlocks, so a batch's neighbor obstacles always come
     // from the 8 adjacent cells.
     public const int TreeCellShift = 6;
     public const int TreeCellBlocks = 1 << TreeCellShift;
@@ -1539,7 +1539,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float SlimeSplatMinLaunch = 1.2f;
     public const float SlimeSplatMaxLaunch = 3.2f;
     public const float SlimeSplatSize = 0.1f;
-    // sRGB colour of the goo when the slime's model has no skin to read its green from
+    // sRGB color of the goo when the slime's model has no skin to read its green from
     public static readonly Vector3 SlimeSplatFallbackColor = new(0.45f, 0.78f, 0.35f);
 
     // --- Mob hit sparks (BlockDebrisSystem.Spark): a punch, slice or thrown hit that connects
@@ -1552,16 +1552,16 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public static readonly Vector3 HitSparkColor = new(1f, 0.96f, 0.8f);
 
     // --- Mob death poof (GroundDust.DeathPoof): a mob whose death animation just ended bursts
-    // into chips of its own skin colour (LandingDust.SkinColour of its model), so a goblin throws
+    // into chips of its own skin color (LandingDust.SkinColour of its model), so a goblin throws
     // goblin-coloured chips and a slime its green. Cosmetic: singleplayer and a client, never a server. ---
     public const int MobDeathPoofCount = 12;
     // Blocks per second the chips fly out at, between a landing splat and a mining burst
     public const float MobDeathPoofSpeed = 2.4f;
     public const float MobDeathPoofSize = 0.1f;
-    // sRGB colour of the chips when the mob's model has no skin to read one from
+    // sRGB color of the chips when the mob's model has no skin to read one from
     public static readonly Vector3 MobDeathPoofFallbackColor = new(0.62f, 0.5f, 0.42f);
-    // A grey textureless block tile (its mean grey is BiomeTintTextureGrey) that a plain-colour chip
-    // wears on every face, so BiomeTint.VertexTint lands the chip on its target colour
+    // A grey textureless block tile (its mean grey is BiomeTintTextureGrey) that a plain-color chip
+    // wears on every face, so BiomeTint.VertexTint lands the chip on its target color
     public const string ColourChipTile = "grass_top_textureless";
 
     // --- Sprint footstep dust (FootstepDust rules, GroundDust): while sprinting on foot over loose
@@ -1652,7 +1652,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // How big a splash each kind of body throws, against the player's 1 (a mob's comes from its width)
     public const float WaterSplashSmallScale = 0.35f;
     public const float WaterSplashCubeScale = 1.4f;
-    // sRGB colour of a droplet: a pale water-blue
+    // sRGB color of a droplet: a pale water-blue
     public static readonly Vector3 WaterSplashColor = new(0.72f, 0.86f, 1f);
 
     // --- Wind (Wind.cs, SH-27) ---
@@ -2031,7 +2031,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // The buffers are sized for the most mobs that can ever be alive together: the hard cap.
     public const int MobsMaxAlive = MobHardCap;
     public const int EntityHealthbarHearts = 5;
-    // Width (and height) of one heart in blocks; neighbours sit edge to edge like the HUD row.
+    // Width (and height) of one heart in blocks; neighbors sit edge to edge like the HUD row.
     public const float EntityHeartSizeBlocks = 0.2f;
     // How far above the mob's head (Position + Mob.HeadAboveCentre) the row's centre floats.
     public const float EntityHealthbarLiftBlocks = 0.22f;
@@ -2075,12 +2075,12 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float HotbarPopScale = 1.3f;
 
     // --- Tool break shatter (ToolShatter): a tool whose durability runs out bursts into chips of
-    // its sprite's mean colour at the hand, and its hotbar slot flashes. Cosmetic: never a server. ---
+    // its sprite's mean color at the hand, and its hotbar slot flashes. Cosmetic: never a server. ---
     public const int ToolShatterCount = 10;
     // Blocks per second the chips fly out at
     public const float ToolShatterSpeed = 3f;
     public const float ToolShatterSize = 0.08f;
-    // sRGB colour of the chips when the item's sprite cannot be read
+    // sRGB color of the chips when the item's sprite cannot be read
     public static readonly Vector3 ToolShatterFallbackColor = new(0.75f, 0.7f, 0.6f);
     // How long a broken tool's hotbar slot flashes, and the strength of its white overlay at the start
     public const float HotbarFlashSeconds = 0.35f;

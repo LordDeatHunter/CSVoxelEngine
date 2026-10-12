@@ -73,7 +73,7 @@ public sealed class ContactAoTests
         OcclusionAtUv(v, scene, Project(v, target), s);
 
     /// <summary>The pass at one pixel: the centre, its taps a rounded tap radius away and its four
-    /// 1-pixel neighbours, read the way the shader reads them.</summary>
+    /// 1-pixel neighbors, read the way the shader reads them.</summary>
     private static float OcclusionAtUv(View v, Scene scene, Vector2 uv, in ContactAoSettings s)
     {
         var dC = DepthAt(v, scene, uv);

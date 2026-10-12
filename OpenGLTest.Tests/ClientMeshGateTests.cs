@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -31,7 +32,7 @@ public sealed class ClientMeshGateTests
 
     /// <summary>
     /// A headless client manager with its streamer, the centre chunk (one stone block, or all air)
-    /// and its six empty face neighbours streamed in, and no column yet.
+    /// and its six empty face neighbors streamed in, and no column yet.
     /// </summary>
     private (ChunkManager Manager, ClientChunkStreamer Streamer, Chunk Centre) StreamedNeighbourhood(bool centreHasStone)
     {

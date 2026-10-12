@@ -119,7 +119,7 @@ public class Chunk : IDisposable
     /// <summary>
     /// Whether this chunk's translucent mesh actually holds fluid. Glass shares that mesh, so
     /// <see cref="HasTranslucentMesh"/> cannot answer this, and the water-only work — the
-    /// planar reflection and the scene colour/depth copies — keys on this instead.
+    /// planar reflection and the scene color/depth copies — keys on this instead.
     /// </summary>
     public bool HasWaterMesh { get; private set; }
 
@@ -164,7 +164,7 @@ public class Chunk : IDisposable
     /// (see <see cref="FluidManager.IsWakeTarget"/>), so a ravine, beach or hillside never wakes
     /// the sea. A restored chunk can hold fluid the player poured, so a non-source (mid-flow)
     /// cell always counts, and so does a source above both its column's terrain top and water
-    /// level (only ever poured) wherever it has a replaceable neighbour. Written once by the
+    /// level (only ever poured) wherever it has a replaceable neighbor. Written once by the
     /// generation worker before <see cref="IsBlockDataReady"/> goes true and read once on the
     /// main thread afterwards, so it needs no locking.
     /// </summary>
@@ -277,7 +277,7 @@ public class Chunk : IDisposable
     /// <para>
     /// <paramref name="block"/> stores <c>level | slot &lt;&lt; 4</c>: the lamp level in bits 0-3
     /// (<see cref="BlockLevelMask"/>) and the <see cref="BlockLightPalette"/> slot of the light's
-    /// colour in bits 4-6, so every read of a level must mask. <paramref name="sun"/> is plain
+    /// color in bits 4-6, so every read of a level must mask. <paramref name="sun"/> is plain
     /// levels. Returns whether any lamp seed carries a non-default slot; when none does, every
     /// slot is 0 and the byte is exactly the old level.
     /// </para>
@@ -327,7 +327,7 @@ public class Chunk : IDisposable
         SpreadLight(light, sun, queue, ref head, ref tail);
 
         // Lamp seeds: emissive cells glow at full strength, then spread like sunlight, each
-        // carrying its colour slot in bits 4-6.
+        // carrying its color slot in bits 4-6.
         head = 0;
         tail = 0;
         var anyTinted = false;
@@ -597,19 +597,19 @@ public class Chunk : IDisposable
     /// cave or an entrance that breached it would leave a wall of water standing beside worldgen
     /// air forever — nothing schedules those cells, since only block edits do.
     ///
-    /// Generated water keeps the carved rule: only neighbours at or below their column's natural
+    /// Generated water keeps the carved rule: only neighbors at or below their column's natural
     /// terrain top count (see <see cref="FluidManager.IsWakeTarget"/>), since that is what a
     /// carver opened, and open air above the terrain is deliberately excluded so a generated sea
     /// never wakes across a ravine, a beach or a hillside. Minecraft's generated water is static
     /// the same way. A restored chunk can also hold fluid the player poured: a non-source
     /// (mid-flow) cell is always reported, and a source above both its own column's terrain top
     /// and water level — which generated water and lava never are — wakes against any
-    /// replaceable neighbour. Generated fluid is always a source at or below one of those two,
+    /// replaceable neighbor. Generated fluid is always a source at or below one of those two,
     /// so a generated chunk's frontier is exactly the carved rule's.
     ///
     /// +Y is deliberately not tested: every sea-surface cell has air above it and water never
     /// flows upward, so including it would report a useless 256 cells per surface chunk.
-    /// Neighbours across a chunk border are left to the main-thread pass, which can wait until
+    /// Neighbors across a chunk border are left to the main-thread pass, which can wait until
     /// both chunks are loaded, so this only ever reads this chunk's own blocks and stays as
     /// thread-safe as the rest of worldgen.
     /// </summary>
@@ -644,7 +644,7 @@ public class Chunk : IDisposable
         FluidFrontier = frontier?.ToArray();
     }
 
-    /// <summary>Whether a chunk-local neighbour is somewhere the fluid beside it may wake into
+    /// <summary>Whether a chunk-local neighbor is somewhere the fluid beside it may wake into
     /// (<see cref="FluidManager.IsWakeTarget"/> with this chunk's column data).</summary>
     private bool IsWakeTarget(ColumnData column, int lowerBoundY, int x, int y, int z,
         int fluidY, int fluidColumnHeight, int fluidColumnWaterLevel) =>
@@ -662,7 +662,7 @@ public class Chunk : IDisposable
     /// <c>TerrainGenerator.RavineCutFade</c>). Generated water is always a source (state 0), which
     /// is what an untouched
     /// state byte reads as, so nothing is written to <c>_state</c> here. A pure per-column function
-    /// of world position like the rest of worldgen: neighbours agree at their borders with no shared
+    /// of world position like the rest of worldgen: neighbors agree at their borders with no shared
     /// state. Returns whether any cell was flooded, which is what decides if this chunk can have a
     /// fluid frontier to report.
     /// </summary>
@@ -694,9 +694,9 @@ public class Chunk : IDisposable
 
     /// <summary>
     /// Rots dirt touching the fresh sea to mud on the spot, so worldgen ground spawns muddy
-    /// instead of waiting for the fluid tick's watch to convert it. In-chunk neighbours read
+    /// instead of waiting for the fluid tick's watch to convert it. In-chunk neighbors read
     /// straight off this chunk's blocks; across a chunk border the sea is a pure function of
-    /// the neighbour column's height, so that is tested analytically. A cave flood breaching
+    /// the neighbor column's height, so that is tested analytically. A cave flood breaching
     /// across a border is left to the fluid tick, the same split <see cref="ScanFluidFrontier"/>
     /// uses: worldgen stays a pure per-chunk function with no cross-chunk block reads.
     /// </summary>
@@ -746,9 +746,9 @@ public class Chunk : IDisposable
             var wx = worldX0 + x + dx;
             var wy = lowerBoundY + y + dy;
             var wz = worldZ0 + z + dz;
-            var neighbour = ColumnCache.Get(wx >> SizeShift, wz >> SizeShift);
+            var neighbor = ColumnCache.Get(wx >> SizeShift, wz >> SizeShift);
             var local = ((wx & SizeMask) << SizeShift) | (wz & SizeMask);
-            if (wy > neighbour.Heights[local] && wy <= neighbour.WaterLevel[local])
+            if (wy > neighbor.Heights[local] && wy <= neighbor.WaterLevel[local])
                 return true;
         }
 
@@ -791,7 +791,7 @@ public class Chunk : IDisposable
 
     /// <summary>
     /// <see cref="TryGetLocalLight(int, int, int, out byte, out byte)"/> plus the block light's
-    /// colour slot (<see cref="BlockLightPalette"/>). Only a chunk that had a tinted seed publishes
+    /// color slot (<see cref="BlockLightPalette"/>). Only a chunk that had a tinted seed publishes
     /// the slot half (the snapshot is then twice as long), so every other chunk answers slot 0.
     /// </summary>
     public bool TryGetLocalLight(int x, int y, int z, out byte sun, out byte block, out byte slot)
@@ -1104,11 +1104,11 @@ public class Chunk : IDisposable
         => x >= 0 && y >= 0 && z >= 0 && x < Size && y < Size && z < Size;
 
     /// <summary>
-    /// Builds this chunk's mesh, or returns null when a face neighbour, or one of the nine chunk
+    /// Builds this chunk's mesh, or returns null when a face neighbor, or one of the nine chunk
     /// columns' terrain (<see cref="ChunkManager.ColumnSource"/>, a streamed column that has not
     /// arrived), is missing.
     /// The whole 3x3x3 neighbourhood is resolved once, up front: the caller checked for face
-    /// neighbours before scheduling, but this runs on a pool thread behind a semaphore and can
+    /// neighbors before scheduling, but this runs on a pool thread behind a semaphore and can
     /// start seconds later, by which time an unload may have taken one away. Meshing against
     /// that hole reads solid ground as air and bakes bogus side faces, sunk fluid corners and
     /// sunlight leaks along the border, which then stay until something re-dirties the chunk —
@@ -1139,7 +1139,7 @@ public class Chunk : IDisposable
             return null;
         }
 
-        // Nothing to draw: either all air, or a solid block of occluders whose six neighbours
+        // Nothing to draw: either all air, or a solid block of occluders whose six neighbors
         // seal every boundary face. The second case is most of the deep terrain in the load
         // sphere, and skipping it saves the light flood and the per-voxel walk below.
         if (_solidCount == 0 || IsFullyEnclosed(neighbors))
@@ -1147,7 +1147,7 @@ public class Chunk : IDisposable
 
         // The nine chunk columns' terrain (heights, water levels, corner climate), resolved once
         // for the light flood, the water-surface codes and the tint. False is a streamed column
-        // that has not arrived: the caller re-dirties exactly as for a vanished neighbour. Nothing
+        // that has not arrived: the caller re-dirties exactly as for a vanished neighbor. Nothing
         // has been rented yet, so this exit needs no finally.
         if (!ChunkLighting.FillColumns(chunkManager.ColumnSource, (int)Position.X, (int)Position.Z, scratch.Columns))
         {
@@ -1175,7 +1175,7 @@ public class Chunk : IDisposable
             var anyTinted = ComputeLight(lightBlocks, sunLight, blockLight, queue);
             // Keep the chunk's own cells of the flood for entity lighting: a fresh array owned
             // by this build alone, published by UpdateMesh with the mesh it belongs to. A chunk
-            // lit by coloured light appends a second half holding each cell's colour slot.
+            // lit by coloured light appends a second half holding each cell's color slot.
             var packed = new byte[anyTinted ? BlockCount * 2 : BlockCount];
             for (var x = 0; x < Size; x++)
             for (var y = 0; y < Size; y++)
@@ -1210,10 +1210,10 @@ public class Chunk : IDisposable
     /// <summary>
     /// Resolves the 3x3x3 chunk neighbourhood once per mesh build, so both snapshot fills work
     /// from the same picture of the world instead of each racing the loader on its own. A
-    /// neighbour that exists but has no block data yet counts as absent, exactly like one that
-    /// was never loaded. Returns false when any of the six FACE neighbours is missing, which
+    /// neighbor that exists but has no block data yet counts as absent, exactly like one that
+    /// was never loaded. Returns false when any of the six FACE neighbors is missing, which
     /// makes the mesh unbuildable (see <see cref="GenerateMeshData"/>); edge and corner
-    /// neighbours are allowed to stay null and read as air.
+    /// neighbors are allowed to stay null and read as air.
     /// </summary>
     private bool TryResolveNeighbors(ChunkManager chunkManager, Chunk?[] neighbors, byte[]?[] neighborStates)
     {
@@ -1235,7 +1235,7 @@ public class Chunk : IDisposable
                 continue;
             }
 
-            // Each neighbour's state array is read once into the array: the field is volatile
+            // Each neighbor's state array is read once into the array: the field is volatile
             // and may be allocated by a main-thread fluid edit while the snapshot is filled
             if (chunkManager.Chunks.TryGetValue(px + cx - 1, py + cy - 1, pz + cz - 1, out var neighbor)
                 && neighbor.IsBlockDataReady)
@@ -1256,9 +1256,9 @@ public class Chunk : IDisposable
 
     /// <summary>
     /// True when every cell of this chunk occludes and the 16x16 plane of each face
-    /// neighbour that touches this chunk occludes too, so no face of any block can be seen.
+    /// neighbor that touches this chunk occludes too, so no face of any block can be seen.
     /// An air pocket anywhere inside (<c>_solidCount &lt; BlockCount</c>) has real faces around
-    /// it and fails the test. Reads neighbour block arrays directly, the same tolerated race as
+    /// it and fails the test. Reads neighbor block arrays directly, the same tolerated race as
     /// the snapshot fills: an edit's own remesh of both chunks wins afterwards.
     /// </summary>
     private bool IsFullyEnclosed(Chunk?[] neighbors)
@@ -1271,8 +1271,8 @@ public class Chunk : IDisposable
             if (!occludes[_blocks[i]]) return false;
         }
 
-        // Face neighbours (slot = (cx*3+cy)*3+cz): the plane that faces this chunk is the
-        // neighbour's far plane along that axis.
+        // Face neighbors (slot = (cx*3+cy)*3+cz): the plane that faces this chunk is the
+        // neighbor's far plane along that axis.
         var negX = neighbors[4]!._blocks;
         var posX = neighbors[22]!._blocks;
         var negY = neighbors[10]!._blocks;
@@ -1294,8 +1294,8 @@ public class Chunk : IDisposable
     /// Copies this chunk plus a 1-block border from the 26 surrounding chunks into a flat
     /// snapshot, so meshing does zero dictionary lookups. <paramref name="paddedState"/> is
     /// filled the same way with the per-block state bytes the fluid emitter needs (0 where the
-    /// neighbour chunk is missing or has no state array yet). The arrays come pre-resolved from
-    /// <see cref="TryResolveNeighbors"/>, so the 6 face neighbours are always present; a null
+    /// neighbor chunk is missing or has no state array yet). The arrays come pre-resolved from
+    /// <see cref="TryResolveNeighbors"/>, so the 6 face neighbors are always present; a null
     /// edge or corner slot reads as air, which only affects fluid corner heights.
     /// </summary>
     private void FillPaddedSnapshot(byte[] padded, byte[] paddedState, Chunk?[] neighbors, byte[]?[] neighborStates)
@@ -1396,9 +1396,9 @@ public class Chunk : IDisposable
             var pIdx = (x + 1) * PaddedSq + (y + 1) * Padded + (z + 1);
 
             // Tree wood thinner than a full cube is a node box plus a tube toward every
-            // connected neighbour (see EmitTreeWood); a full-thickness or detached cell falls
+            // connected neighbor (see EmitTreeWood); a full-thickness or detached cell falls
             // through to the plain model path below, which then also culls its faces against
-            // a same-block full-thickness neighbour, since tree wood never occludes
+            // a same-block full-thickness neighbor, since tree wood never occludes
             var cullSameFullWood = false;
             if (type.Renderer == BlockRenderer.TreeWood)
             {
@@ -1410,7 +1410,7 @@ public class Chunk : IDisposable
                 }
 
                 // A pixel-rim trunk shell with an exposed corner is bevelled from its four edge
-                // neighbours (TreeWoodShape.RimCornerMask; the diagonals never change it, since a
+                // neighbors (TreeWoodShape.RimCornerMask; the diagonals never change it, since a
                 // cell only carves its own material); see EmitRimWood. Mask 0 is a plain cube.
                 if (BlockType.HasPixelRim(blockId))
                 {
@@ -1521,27 +1521,27 @@ public class Chunk : IDisposable
                 var cullFace = quad.CullFace;
                 int lightCell;
                 // Bit 3 of the packed normal: this face looks into water, so the fragment
-                // shader paints caustics on it. Interior sub-cell quads have no neighbour to
+                // shader paints caustics on it. Interior sub-cell quads have no neighbor to
                 // look into and stay false.
                 var submerged = false;
                 ushort waterSurface = 0;
 
                 if (cullFace >= 0)
                 {
-                    var neighbour = padded[pIdx + FaceNeighborDelta[cullFace]];
-                    // Only opaque neighbours hide a face. Leaves are cutout, so they never
+                    var neighbor = padded[pIdx + FaceNeighborDelta[cullFace]];
+                    // Only opaque neighbors hide a face. Leaves are cutout, so they never
                     // hide: a face culled behind one shows through its texture holes as an
                     // X-ray into the ground. Leaf-vs-leaf keeps both sides (Minecraft
                     // fancy-style) so the canopy still reads solid through the holes, while
                     // leaf-vs-rock draws the rock side only (the leaf side culls as before,
                     // so no coplanar double quad z-fights). CullSelf additionally hides a
                     // face against the same block, the way glass panes fuse.
-                    if (BlockType.Occludes(neighbour) || (type.CullSelf && neighbour == blockId)) continue;
+                    if (BlockType.Occludes(neighbor) || (type.CullSelf && neighbor == blockId)) continue;
                     // Stacked full-thickness tree wood hides its shared faces itself - unless the
-                    // neighbour is a bevelled pixel-rim shell whose face toward this cell is
+                    // neighbor is a bevelled pixel-rim shell whose face toward this cell is
                     // carved, which would open a hole (a core, a detached log or a mask-0 shell
                     // beside a rounded corner keeps its face). Non-rim species never read a mask.
-                    if (cullSameFullWood && neighbour == blockId
+                    if (cullSameFullWood && neighbor == blockId
                         && WoodState.IsFullCube(paddedState[pIdx + FaceNeighborDelta[cullFace]])
                         && (!BlockType.HasPixelRim(blockId)
                             || ChunkMesher.RimFaceFull(padded, paddedState, pIdx + FaceNeighborDelta[cullFace], blockId,
@@ -1550,10 +1550,10 @@ public class Chunk : IDisposable
                     // Light of the air cell in front of the face, from the wide light volume
                     // (so lamps across the chunk border still reach): the flat fallback for
                     // quads that do not smooth; a full face averages per corner below.
-                    // A neighbour that would read as black light is exactly one that occludes,
+                    // A neighbor that would read as black light is exactly one that occludes,
                     // and that face is already gone, so no fallback is needed here.
                     lightCell = lightBase + LightFaceDelta[cullFace];
-                    submerged = BlockType.IsFluid(neighbour);
+                    submerged = BlockType.IsFluid(neighbor);
                     // The water surface the caustics measure depth from: this face's own body
                     // of water, resolved exactly as the greedy pass keys it
                     if (submerged)
@@ -1562,7 +1562,7 @@ public class Chunk : IDisposable
                 }
                 else
                 {
-                    // An interior quad of a sub-cell model has no neighbour to read: light it
+                    // An interior quad of a sub-cell model has no neighbor to read: light it
                     // from its own cell, which passes light precisely because the model is not
                     // a full cube (the generalised form of the pebble trick).
                     lightCell = lightBase;
@@ -1599,7 +1599,7 @@ public class Chunk : IDisposable
                 }
                 else if (quad.IsFullFace)
                 {
-                    // Only a quad that fills its cube face has meaningful corner neighbours,
+                    // Only a quad that fills its cube face has meaningful corner neighbors,
                     // so per-corner AO applies exactly as it did for hand-written cubes. A face
                     // that culls against its own side (exactly the set the greedy pass takes,
                     // see ContentRegistry.BakesGreedy) also averages its light per corner.
@@ -1659,7 +1659,7 @@ public class Chunk : IDisposable
                 else
                 {
                     // A sub-cell quad floats inside the cell, where corner sampling would
-                    // darken it by neighbours it does not touch: shade it flat and unoccluded
+                    // darken it by neighbors it does not touch: shade it flat and unoccluded
                     var shade = ShadeLut[(face << 2) | 3];
                     for (var j = 0; j < 4; j++)
                     {

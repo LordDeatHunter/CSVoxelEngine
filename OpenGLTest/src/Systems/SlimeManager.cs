@@ -66,7 +66,7 @@ public sealed class SlimeManager : IMobPopulation
 
     /// <summary>Advances the death and spawn clocks of the slimes without simulating them (a
     /// client never ticks the AI), dropping the ones whose death is over. A finished death bursts
-    /// into the mob's skin colour (<paramref name="debris"/>, null when nothing draws it).</summary>
+    /// into the mob's skin color (<paramref name="debris"/>, null when nothing draws it).</summary>
     public void AnimateMirrors(float deltaTime, BlockDebrisSystem? debris = null)
     {
         for (var i = _slimes.Count - 1; i >= 0; i--)

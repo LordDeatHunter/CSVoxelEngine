@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Text.Json;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -126,7 +127,7 @@ public sealed class BlockDefinition
     public bool? FlowResistant { get; set; }
 
     /// <summary>
-    /// Which neighbour holds a <see cref="NeedsSupport"/> block up: <c>"below"</c> (the default: a
+    /// Which neighbor holds a <see cref="NeedsSupport"/> block up: <c>"below"</c> (the default: a
     /// flower, a floor torch), <c>"above"</c> (a hanging lantern: the cell over it, so it is placed
     /// against a block's underside) or <c>"attached"</c> (a wall torch): the cell behind the
     /// block's front, opposite the horizontal facing its state byte carries. Only legal with
@@ -391,8 +392,8 @@ public sealed class BlockDefinition
         /// <summary>Light this block emits, 0-15.</summary>
         public byte? Emission { get; set; }
 
-        /// <summary>Colour of the emitted light, sRGB [r, g, b] in 0..255; defaults to the warm
-        /// torch colour (<see cref="BlockLightPalette.DefaultSrgb"/>). Only legal with emission &gt; 0.</summary>
+        /// <summary>Color of the emitted light, sRGB [r, g, b] in 0..255; defaults to the warm
+        /// torch color (<see cref="BlockLightPalette.DefaultSrgb"/>). Only legal with emission &gt; 0.</summary>
         public float[]? Color { get; set; }
 
         /// <summary>Whether voxel light travels through it; defaults to "not a full cube".</summary>

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -206,7 +207,7 @@ public sealed class BiomeTintPopTests
         Assert.True(lattice.SetEquals(real.Asked), "the debris read columns other than the cell's lattice corners");
 
         // And it is the passed source that decides, not worldgen behind it: a climate opposite to
-        // the real one at every corner tints the chips with that climate's palette colour
+        // the real one at every corner tints the chips with that climate's palette color
         Assert.True(WorldgenColumnSource.Instance.TryGet(cx, cz, out var here));
         var warmth = here.Warmth < 0.5f ? 1f : 0f;
         var wetness = here.Wetness < 0.5f ? 1f : 0f;

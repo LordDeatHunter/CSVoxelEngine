@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -137,7 +138,7 @@ public sealed class TreeFellingTests
             var detached = FreeCellBesideWood(tree);
             tree.Write(detached, species.WoodId, WoodState.Detached);
 
-            // A tree-wood neighbour whose parent pointer lands on the detached cell still does
+            // A tree-wood neighbor whose parent pointer lands on the detached cell still does
             // not make it a tree: the detached cell never fells anything
             var (dxn, dyn, dzn) = detached;
             var pointer = (dxn, dyn + 1, dzn);

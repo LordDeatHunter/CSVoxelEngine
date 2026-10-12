@@ -40,10 +40,10 @@ internal sealed class ShadowCascade(float radiusBlocks, int mapSize)
     public float BiasScale => 1f / (8f * RadiusBlocks);
 
     /// <summary>
-    /// Allocates the cascade's shadow map: one depth texture, no colour attachment. It is sampled
+    /// Allocates the cascade's shadow map: one depth texture, no color attachment. It is sampled
     /// as a <c>sampler2DShadow</c>, so the compare mode does the depth test in hardware and Linear
     /// filtering gives free 2x2 bilinear PCF on top of the shader's own kernel. Outside the ortho
-    /// box the border colour reads as depth 1 (farthest), i.e. fully lit. Leaves this FBO and the
+    /// box the border color reads as depth 1 (farthest), i.e. fully lit. Leaves this FBO and the
     /// texture bound; the caller rebinds the scene target and resets its unit tracking.
     /// </summary>
     public void Create(GL gl)

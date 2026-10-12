@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
+using silkgltriangle.Content;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -15,7 +16,7 @@ namespace silkgltriangle.Tests;
 ///
 /// <para><b>Why a replay and not a transcription.</b> D1 is a pure rekeying: the same chunks must
 /// load, unload and mesh at the same times, and the only honest way to show that is to drive the
-/// REAL <see cref="ChunkManager"/> through a REAL load / unload / neighbour-resolution sequence on
+/// REAL <see cref="ChunkManager"/> through a REAL load / unload / neighbor-resolution sequence on
 /// both trees and compare the resulting state to the bit. Nothing here re-implements production, so
 /// nothing here can re-implement it wrongly: the two trees either print the same hash line or they
 /// do not. This file is written and its hashes recorded BEFORE the first production edit, so it is
@@ -161,7 +162,7 @@ public sealed class ChunkRekeyReplayProbe
     /// assumed.</b> Mesh dispatch is asynchronous: <c>StartMeshGeneration</c> enqueues and
     /// <c>ThreadPool.UnsafeQueueUserWorkItem</c>s a runner, and <c>BuildMeshFor</c> removes its
     /// <c>_generatingMeshes</c> entry from a pool thread in a <c>finally</c>, re-adding to
-    /// <c>_dirtyChunks</c> when a face neighbour vanished mid-build. So <c>DirtyCount</c> and
+    /// <c>_dirtyChunks</c> when a face neighbor vanished mid-build. So <c>DirtyCount</c> and
     /// <c>GeneratingMeshCount</c> are NOT deterministic at an arbitrary fold point, and this fact
     /// never folds them as data. It registers its chunks DIRECTLY through the <c>Chunks</c> indexer,
     /// so <c>_dirtyChunks</c> stays empty and <c>ProcessDirtyChunks</c> returns at its
@@ -335,8 +336,8 @@ public sealed class ChunkRekeyReplayProbe
 
         // PHASE 4 - a real synchronous mesh build on the test thread, the pattern MeshingTests uses.
         // This is what exercises Chunk.TryResolveNeighbors' 26 chunk probes deterministically: the
-        // centre chunk has all six face neighbours registered and must build, while (17,0,0) is
-        // missing its (18,0,0) neighbour and must abandon the build and return null.
+        // centre chunk has all six face neighbors registered and must build, while (17,0,0) is
+        // missing its (18,0,0) neighbor and must abandon the build and return null.
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var meshedChunk = manager.Chunks[Vector3.Zero];
         meshedChunk.SetBlockRaw(8, 8, 8, stone, 0);
@@ -454,14 +455,14 @@ public sealed class ChunkRekeyReplayProbe
     /// distance alone, so ties - which are everywhere on a chunk lattice - break by insertion order.
     /// D1 changes bucket layout and therefore both. What D1 must preserve is the CONVERGED result:
     /// nothing is lost, only deferred, because out-of-range and unloaded entries are dropped on
-    /// sight and missing-neighbour ones are re-added by <c>QueueChunk</c> when the neighbour
+    /// sight and missing-neighbor ones are re-added by <c>QueueChunk</c> when the neighbor
     /// arrives. This fact therefore folds the set of chunks that ended up meshed, sorted, which is
     /// order-independent.</para>
     ///
     /// <para>The grid is deliberately all air: <c>Chunk.UpdateMesh</c> throws on a non-empty mesh
     /// without a geometry pool, and this fact drives the real upload path with the headless
     /// <c>null</c> pools the rest of the suite uses. The dirtied subset is exactly the chunks with
-    /// all six face neighbours present, so every marked chunk must reach <c>IsMeshed</c> and the rim
+    /// all six face neighbors present, so every marked chunk must reach <c>IsMeshed</c> and the rim
     /// must not - and that count is asserted, so the fold cannot pass by meshing nothing.</para>
     /// </summary>
     [Fact]
@@ -484,7 +485,7 @@ public sealed class ChunkRekeyReplayProbe
 
         Assert.Equal(grid.Count, manager.Chunks.Count);
 
-        // The interior: every chunk whose six face neighbours are all inside the grid. Marked in
+        // The interior: every chunk whose six face neighbors are all inside the grid. Marked in
         // scripted order, so the dirty set is populated the same way on both trees even though the
         // order it is later enumerated in is not the order it was filled in.
         var toDirty = new List<Vector3>();
@@ -539,7 +540,7 @@ public sealed class ChunkRekeyReplayProbe
         // Non-vacuity, both ways: the marked interior meshed, and the rim did not.
         Assert.Equal(toDirty.Count, meshedPositions.Count);
         Assert.True(meshedPositions.Count < manager.Chunks.Count,
-            "every chunk meshed, including the rim that has no outer neighbour - the fold is vacuous");
+            "every chunk meshed, including the rim that has no outer neighbor - the fold is vacuous");
 
         var hash = FnvOffsetBasis;
         hash = FoldInt(hash, meshedPositions.Count);

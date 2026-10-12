@@ -1,4 +1,5 @@
 using System;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -165,7 +166,7 @@ public static class TerrainGenerator
         && height <= WorldGenerationConfig.SeaLevel + WorldGenerationConfig.BeachAboveSeaLevel;
 
     /// <summary>Whether the beach column at (x, z) is capped with gravel. Pure function of
-    /// world position like everything else here, so neighbours agree without shared state.</summary>
+    /// world position like everything else here, so neighbors agree without shared state.</summary>
     public static bool IsGravelPatch(float x, float z) =>
         GravelNoise.GetNoise(x, z) > WorldGenerationConfig.GravelThreshold;
 

@@ -53,7 +53,7 @@ public sealed class Slime : Mob
     private const float HopIntervalJitter = 0.3f;
 
     /// <summary>Half the collision body's edge at size 1; a hair inside the 0.75-block drawn body
-    /// so a slime resting on a freed cell does not clip its neighbours. A larger slime's is this
+    /// so a slime resting on a freed cell does not clip its neighbors. A larger slime's is this
     /// times its <see cref="SizeScale"/> (<see cref="HalfExtentFor"/>).</summary>
     public const float HalfExtent = 0.36f;
 

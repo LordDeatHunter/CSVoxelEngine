@@ -48,7 +48,7 @@ public sealed class LightVolumeHeightTests
 
     /// <summary>
     /// The structural precondition the whole precompute rests on: the volume reaches at most one
-    /// chunk into each neighbour, so nine columns cover it. Raising
+    /// chunk into each neighbor, so nine columns cover it. Raising
     /// WorldGenerationConfig.LightPropagationRadius to Size or more silently breaks that, and
     /// this is what says so.
     /// </summary>
@@ -86,7 +86,7 @@ public sealed class LightVolumeHeightTests
 
     /// <summary>
     /// A build's column fill takes every column from its source and nowhere else: a source that
-    /// lacks any of the nine (the centre's neighbours included, the far diagonal too) makes the
+    /// lacks any of the nine (the centre's neighbors included, the far diagonal too) makes the
     /// fill fail, so the build is abandoned rather than lit, watered and tinted from a substitute,
     /// and a source that has all nine lands each one in its dx * 3 + dz slot. The source is only
     /// ever asked about the nine columns around the chunk.

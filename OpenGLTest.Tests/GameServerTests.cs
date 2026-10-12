@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;

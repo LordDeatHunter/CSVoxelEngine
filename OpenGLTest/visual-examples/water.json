@@ -55,7 +55,7 @@
     { "op": "wait", "seconds": 0.5 },
     { "op": "screenshot", "name": "water_under_window", "hideHud": true },
     // Grazing toward the shallower bank at -X: the bank through the window, and past the
-    // critical angle the total-internal-reflection band fading to the underwater fog colour.
+    // critical angle the total-internal-reflection band fading to the underwater fog color.
     { "op": "teleport", "pos": [360.5, -2.5, 136.5], "yaw": 180, "pitch": 20 },
     { "op": "wait", "seconds": 0.5 },
     { "op": "screenshot", "name": "water_under_graze", "hideHud": true },

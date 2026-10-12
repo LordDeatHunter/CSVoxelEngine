@@ -6,7 +6,7 @@
   // blue_lamp and another warm lamp along a row close enough that the pools overlap, then
   // flies up behind them. `pools` should show a blue pool between two warm ones, meeting at
   // soft borders with no block-sized seams (a red and a blue pool meet rather than add up to
-  // purple - each cell carries its dominant colour). `hand` is taken first, on foot beside the
+  // purple - each cell carries its dominant color). `hand` is taken first, on foot beside the
   // blue lamp with a copper pickaxe and the HUD on (on the ground, where the arm shows): the
   // arm and the pickaxe should read blue-tinted (EntityLight's tint slot).
   "steps": [

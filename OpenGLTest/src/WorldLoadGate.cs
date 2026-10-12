@@ -13,7 +13,7 @@ namespace silkgltriangle;
 /// A chunk counts once <see cref="Chunk.IsMeshed"/> is true, not once it has a mesh: IsMeshed is
 /// also true for an all-air or fully enclosed chunk whose mesh is empty, so a spawn in the sky, an
 /// ocean or a cave is ready as soon as it has been built. Meshing a chunk needs all six face
-/// neighbours generated, which the <see cref="WorldGenerationConfig.ChunkRadius"/> load sphere
+/// neighbors generated, which the <see cref="WorldGenerationConfig.ChunkRadius"/> load sphere
 /// provides for any radius up to <c>ChunkRadius - 1</c>, so the sphere can always complete.
 /// </para>
 /// <para>

@@ -1,9 +1,11 @@
+using silkgltriangle.Content;
+
 namespace silkgltriangle;
 
 /// <summary>
 /// Lava pockets deep underground: cave floors at or below <see cref="WorldGenerationConfig.LavaMaxY"/>
 /// pond over with lava sources where a low-frequency patch mask and a per-cell roll agree.
-/// A pure function of world position like the other generators, so neighbours agree without
+/// A pure function of world position like the other generators, so neighbors agree without
 /// shared state. Runs on a generation worker thread after the carvers and <c>FillWater</c>:
 /// flooded cells are water, not air, so sea caves never pond lava, and the height check keeps
 /// ravine floors and entrances (which reach deep but open to the sky) dry.

@@ -257,7 +257,7 @@ public sealed class GeometryAllocatorTests
         Assert.Equal((ResidentRegions - departed) * SliceUnits * 2, allocator.UsedUnits);
 
         // A survivor's own rebuild still fits without growing, because a whole region-sized
-        // hole is exactly what a departed neighbour leaves.
+        // hole is exactly what a departed neighbor leaves.
         Assert.True(allocator.TryAllocate(SliceUnits * 2, out var reused));
         Assert.Equal(0, reused);
         Assert.Equal(379, allocator.FreeBlockCount);
@@ -281,15 +281,15 @@ public sealed class GeometryAllocatorTests
     ///
     /// The five opening allocations run against a single-node tree and each shaves the front off
     /// that node: 1 node visited each, 5 steps — unchanged, because a one-block free structure is
-    /// the same whichever way it is stored. <c>Free(0, 1)</c> costs 2: one node for the neighbour
+    /// the same whichever way it is stored. <c>Free(0, 1)</c> costs 2: one node for the neighbor
     /// descent (the 49-unit tail, which neither abuts nor overlaps) and one for the insert descent.
-    /// <c>Free(3, 3)</c> costs 4: the tree now holds two nodes, and both the neighbour descent and
+    /// <c>Free(3, 3)</c> costs 4: the tree now holds two nodes, and both the neighbor descent and
     /// the insert descent walk both of them — 11 so far, with the blocks
     /// <c>(0,1), (3,3), (15,49)</c>. Then a <c>TryAllocate(4)</c> costs 2, NOT the 3 the flat list
     /// charged: it visits the 1-unit block, whose subtree maximum sends it right, and then the
     /// 49-unit tail it takes — the 3-unit hole is never looked at, because the augmented maximum
     /// already ruled its subtree out. That elision is the whole point of the structure. Finally
-    /// <c>Free(6, 4)</c> costs 6: a three-node neighbour descent finds the 3-unit block abutting
+    /// <c>Free(6, 4)</c> costs 6: a three-node neighbor descent finds the 3-unit block abutting
     /// the freed range, so nothing is inserted — the block is widened in place and a three-node
     /// path walk restores the subtree maxima above it. Total 19.</summary>
     [Fact]
@@ -315,7 +315,7 @@ public sealed class GeometryAllocatorTests
         Assert.Equal(5, allocator.ScanSteps);
 
         // Two non-adjacent holes, deliberately too small for the allocation below. One node in
-        // the tree for the first free (neighbour descent + insert descent), two for the second.
+        // the tree for the first free (neighbor descent + insert descent), two for the second.
         allocator.Free(a, 1);
         Assert.Equal(7, allocator.ScanSteps);
         allocator.Free(c, 3);
@@ -330,7 +330,7 @@ public sealed class GeometryAllocatorTests
         Assert.Equal(2, allocator.ScanSteps - beforeAllocate);
 
         // Abuts the 3-unit hole, so the block is widened in place and nothing is inserted: a
-        // three-node neighbour descent plus a three-node walk to restore the subtree maxima.
+        // three-node neighbor descent plus a three-node walk to restore the subtree maxima.
         var beforeFree = allocator.ScanSteps;
         allocator.Free(d, 4);
         Assert.Equal(6, allocator.ScanSteps - beforeFree);
@@ -359,7 +359,7 @@ public sealed class GeometryAllocatorTests
     /// order, so every descent walks to the largest key — the tree's right spine, whose expected
     /// length over k random priorities is the harmonic number H_k, not the k entries a list walk
     /// charged. Each departed region pays four such descents (two frees, and each free walks the
-    /// neighbour path and then either an insert path or a maxima-restoring path), so the storm
+    /// neighbor path and then either an insert path or a maxima-restoring path), so the storm
     /// totals about 4 * Sum(H_k) for k = 1..380 = 4 * (381 * H_380 - 380) ~= 8415 against the 8372
     /// measured here — the residual being the difference between the expected spine length and the
     /// one this fixed priority hash actually produces.

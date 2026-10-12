@@ -14,7 +14,7 @@ namespace silkgltriangle;
 /// </summary>
 public static class Log
 {
-    // Optional colour for a line; null keeps the terminal's default. The colour is applied by
+    // Optional color for a line; null keeps the terminal's default. The color is applied by
     // the writer thread, so setting Console.ForegroundColor never races another writer.
     private readonly record struct Entry(string Line, ConsoleColor? Color);
 
@@ -74,7 +74,7 @@ public static class Log
         }
     }
 
-    // A redirected or detached console can refuse colour changes; in that case the line is
+    // A redirected or detached console can refuse color changes; in that case the line is
     // still written, just without the tint. The write itself is never retried, so a broken
     // pipe cannot double up a line.
     private static void WriteDirect(Entry entry)

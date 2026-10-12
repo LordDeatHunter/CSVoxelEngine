@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -43,7 +44,7 @@ public sealed class TreeWoodShapeTests
             Assert.Equal(TreeWoodShape.Connects(oak, a, oak, b, dir),
                 TreeWoodShape.Connects(oak, b, oak, a, TreeWoodShape.Opposite(dir)));
 
-        // A cell's mask bit toward a neighbour equals that neighbour's mask bit back toward it
+        // A cell's mask bit toward a neighbor equals that neighbor's mask bit back toward it
         Span<byte> ids = stackalloc byte[6];
         Span<byte> nbStates = stackalloc byte[6];
         Span<byte> backIds = stackalloc byte[6];
@@ -54,7 +55,7 @@ public sealed class TreeWoodShapeTests
             var centre = states[(int)(Next(ref seed) % (uint)states.Length)];
             for (var dir = 0; dir < 6; dir++)
             {
-                // Mostly oak, sometimes air or spruce, so foreign neighbours are in the sweep too
+                // Mostly oak, sometimes air or spruce, so foreign neighbors are in the sweep too
                 var pick = Next(ref seed) % 8;
                 ids[dir] = pick == 0 ? (byte)0 : pick == 1 ? Spruce : oak;
                 nbStates[dir] = states[(int)(Next(ref seed) % (uint)states.Length)];
@@ -135,8 +136,8 @@ public sealed class TreeWoodShapeTests
         var oak = Oak;
         var (manager, chunk) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
 
-        // The parent is the lowest connected direction; every other connected neighbour is a
-        // child whose own parent points back here. One unconnected oak neighbour (parent
+        // The parent is the lowest connected direction; every other connected neighbor is a
+        // child whose own parent points back here. One unconnected oak neighbor (parent
         // pointing away) sits in the first free direction, to show touching is not joining.
         var parent = -1;
         for (var dir = 0; dir < 6; dir++)
@@ -352,7 +353,7 @@ public sealed class TreeWoodShapeTests
 
     private static byte PixelRimWood => TreeSpeciesRegistry.All.First(s => s.Rim == TrunkRim.Pixel).WoodId;
 
-    // The boxes of one placed cell, from its neighbours in the configuration
+    // The boxes of one placed cell, from its neighbors in the configuration
     private static BlockHitbox[] BoxesOf(byte wood, Dictionary<(int, int, int), byte> cells, RimCell c)
     {
         Span<byte> ids = stackalloc byte[6];

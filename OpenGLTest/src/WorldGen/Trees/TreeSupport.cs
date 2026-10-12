@@ -31,7 +31,7 @@ public sealed class TreeSupport(int cap)
     /// <summary>Packed keys of every cell the last search reached.</summary>
     public IEnumerable<long> VisitedKeys => _visited;
 
-    /// <summary>Whether cell A links to its neighbour B lying in direction
+    /// <summary>Whether cell A links to its neighbor B lying in direction
     /// <paramref name="dirAtoB"/>: a parent edge, or two attached shells of the same tree wood
     /// stacked vertically. Symmetric, like <see cref="TreeWoodShape.Connects"/>.</summary>
     public static bool Links(byte idA, byte stateA, byte idB, byte stateB, int dirAtoB)
@@ -99,7 +99,7 @@ public sealed class TreeSupport(int cap)
             if (!(WoodState.HasParentCell(state) && WoodState.Parent(state) == TreeDirections.Up))
                 _order[orderCount++] = TreeDirections.Up;
 
-            // Read every neighbour before pushing, then push in reverse so the stack pops them
+            // Read every neighbor before pushing, then push in reverse so the stack pops them
             // in _order: Down, parent, sides, Up
             var pushFrom = _component.Count;
             for (var i = 0; i < orderCount; i++)

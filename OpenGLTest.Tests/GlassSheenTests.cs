@@ -29,7 +29,7 @@ public sealed class GlassSheenTests
     [Fact]
     public void FoldingTheSkyIntoTheBlendIsTheGlassMixedTowardTheSky()
     {
-        // Over any background, the folded colour and alpha composite to exactly the plain glass
+        // Over any background, the folded color and alpha composite to exactly the plain glass
         // composite mixed toward the sky by the sheen weight: the sheen shows even where the glass
         // texel is nearly transparent.
         var glass = new Vector3(0.6f, 0.7f, 0.7f);
@@ -39,7 +39,7 @@ public sealed class GlassSheenTests
         {
             var f = GlassSheen.Weight(cos);
             var alpha = GlassSheen.Alpha(texAlpha, f);
-            var folded = GlassSheen.Over(GlassSheen.Colour(glass, texAlpha, Sky, f), alpha, background);
+            var folded = GlassSheen.Over(GlassSheen.Color(glass, texAlpha, Sky, f), alpha, background);
             var expected = Vector3.Lerp(GlassSheen.Over(glass, texAlpha, background), Sky, f);
             Assert.Equal(expected.X, folded.X, 4);
             Assert.Equal(expected.Y, folded.Y, 4);
@@ -66,7 +66,7 @@ public sealed class GlassSheenTests
         foreach (var a in new[] { 0.1f, 0.5f, 1f })
         {
             Assert.Equal(a, GlassSheen.Alpha(a, 0f));
-            var c = GlassSheen.Colour(glass, a, Sky, 0f);
+            var c = GlassSheen.Color(glass, a, Sky, 0f);
             Assert.Equal(glass.X, c.X, 5);
             Assert.Equal(glass.Y, c.Y, 5);
             Assert.Equal(glass.Z, c.Z, 5);

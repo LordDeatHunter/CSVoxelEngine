@@ -1,7 +1,7 @@
 {
     // A wall as the icon, the held wall and the drop show it: an 8 px pillar with its 6 px arm
     // reaching across the cell along X, the dimensions of the wall's pane object. In the world
-    // the pane renderer draws the pillar and an arm toward every connected neighbour instead
+    // the pane renderer draws the pillar and an arm toward every connected neighbor instead
     // (PaneShape) and only takes the tile from here. UVs are left to the defaults, which crop the
     // tile to each face.
     "textures": {

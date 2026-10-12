@@ -45,7 +45,7 @@ public class BlockCubeCache : IDisposable
     /// <summary>
     /// The cube a standalone world copy of the block draws (the break debris): the same as
     /// <see cref="Get"/> for an untinted block, and for a biome-tinted one the cube built by
-    /// <see cref="BuildTintedCube"/>, whose tinted quads take their colour from the plain
+    /// <see cref="BuildTintedCube"/>, whose tinted quads take their color from the plain
     /// path's per-draw <c>uBiomeTint</c>, so one cached mesh serves every cell.
     /// </summary>
     public Mesh? GetTinted(byte blockId)
@@ -127,7 +127,7 @@ public class BlockCubeCache : IDisposable
     }
 
     /// <summary>
-    /// The one cube every plain-colour chip draws (<see cref="DebrisLook.Colour"/>, a slime's goo):
+    /// The one cube every plain-color chip draws (<see cref="DebrisLook.Color"/>, a slime's goo):
     /// <see cref="BuildColourChip"/> over <see cref="WorldGenerationConfig.ColourChipTile"/>, painted per
     /// draw by <c>uBiomeTint</c>.
     /// </summary>
@@ -141,7 +141,7 @@ public class BlockCubeCache : IDisposable
 
     /// <summary>
     /// A unit cube centred on the origin wearing <paramref name="greyTile"/> on every face, every quad
-    /// flagged biome-tinted, so the plain path's <c>uBiomeTint</c> paints the whole cube one colour.
+    /// flagged biome-tinted, so the plain path's <c>uBiomeTint</c> paints the whole cube one color.
     /// GL-free.
     /// </summary>
     public static (Vertex[] Vertices, ushort[] Indices) BuildColourChip(ushort greyTile)

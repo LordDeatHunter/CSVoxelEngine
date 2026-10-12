@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 using Silk.NET.Input;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;

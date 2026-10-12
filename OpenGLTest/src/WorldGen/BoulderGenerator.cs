@@ -1,4 +1,5 @@
 using System;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -82,7 +83,7 @@ public static class BoulderGenerator
             var ly = height + 1 - worldY0;
             if ((uint)ly >= Chunk.Size) continue;
 
-            // The blob's cells: the centre first, then its neighbours in a fixed order, one row of
+            // The blob's cells: the centre first, then its neighbors in a fixed order, one row of
             // the shape hash per count so a small boulder is a subset of a larger one's cells
             var shape = SplitMix64.Mix(SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x80D1) + ShapeStream);
             dx[0] = 0;
@@ -95,7 +96,7 @@ public static class BoulderGenerator
             dz[3] = 0;
             for (var i = 0; i < count && i < 4; i++)
             {
-                // The neighbours' order is turned per boulder, so the blob is not always the same L
+                // The neighbors' order is turned per boulder, so the blob is not always the same L
                 var turn = (int)(shape >> (i * 8) & 3);
                 var (ox, oz) = ((turn + 0) & 3) switch
                 {

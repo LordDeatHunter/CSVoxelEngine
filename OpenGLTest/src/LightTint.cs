@@ -93,7 +93,7 @@ internal static class LightTint
         }
     }
 
-    /// <summary>The linear colour a code stands for; mirrors the shader's decode.</summary>
+    /// <summary>The linear color a code stands for; mirrors the shader's decode.</summary>
     public static Vector3 Decode(int code, ReadOnlySpan<Vector3> palette) =>
         Vector3.Lerp(palette[code & 7], palette[(code >> 3) & 7], (code >> 6) / (float)WeightDivisor);
 }

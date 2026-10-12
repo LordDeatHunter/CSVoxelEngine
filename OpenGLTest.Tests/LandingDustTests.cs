@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -230,7 +231,7 @@ public sealed class LandingDustTests
         var expected = BiomeTint.VertexTint(LandingDust.SkinColour(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor));
         Assert.All(debris.Debris, chip =>
         {
-            Assert.Equal(DebrisLook.Colour, chip.Look);
+            Assert.Equal(DebrisLook.Color, chip.Look);
             Assert.Equal(BlockType.Air, chip.BlockId);
             Assert.Equal(expected, chip.Tint);
         });
@@ -331,10 +332,10 @@ public sealed class LandingDustTests
             TextureWidth = 3,
             TextureHeight = 1,
         };
-        var colour = LandingDust.SkinColour(model, fallback);
-        Assert.Equal(0f, colour.X, 4);
-        Assert.Equal(150f / 255f, colour.Y, 4);
-        Assert.Equal(25f / 255f, colour.Z, 4);
+        var color = LandingDust.SkinColour(model, fallback);
+        Assert.Equal(0f, color.X, 4);
+        Assert.Equal(150f / 255f, color.Y, 4);
+        Assert.Equal(25f / 255f, color.Z, 4);
 
         var clear = new BbmodelData { TexturePixels = [255, 0, 0, 0], TextureWidth = 1, TextureHeight = 1 };
         Assert.Equal(fallback, LandingDust.SkinColour(clear, fallback));

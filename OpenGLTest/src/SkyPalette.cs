@@ -4,19 +4,19 @@ using System.Numerics;
 namespace silkgltriangle;
 
 /// <summary>
-/// The sky dome's colours for one moment of the day: a zenith, a horizon and an additive dusk
+/// The sky dome's colors for one moment of the day: a zenith, a horizon and an additive dusk
 /// glow toward the sun. Computed once a frame on the CPU from the sun's elevation terms and
 /// uploaded as uniforms; <see cref="Sample"/> is the C# reference of the GLSL <c>SkySample</c>
 /// helper shared by the sky dome, the world fog and the cloud fog, so a fully fogged fragment
-/// comes out exactly the colour of the dome behind it. The palette is the flat sky colour of
-/// 28198cc (the look before the SH-11 dome): zenith and horizon are the same colour, so every
-/// direction samples that one colour and its dusk/night mix, except for the sunset glow
+/// comes out exactly the color of the dome behind it. The palette is the flat sky color of
+/// 28198cc (the look before the SH-11 dome): zenith and horizon are the same color, so every
+/// direction samples that one color and its dusk/night mix, except for the sunset glow
 /// (<see cref="GlowAmount"/>): a warm band low toward the sun that only lights up while the sun
 /// crosses the horizon, so the day sky stays flat.
 /// </summary>
 public readonly record struct SkyPalette(Vector3 Zenith, Vector3 Horizon, Vector3 Glow)
 {
-    // sRGB, exactly the old RenderManager.SetLighting sky colours; RenderManager decodes the
+    // sRGB, exactly the old RenderManager.SetLighting sky colors; RenderManager decodes the
     // computed palette to linear light where it uploads it
     private static readonly Vector3 NightSky = new(0.012f, 0.018f, 0.045f);
     private static readonly Vector3 DaySky = new(0.3f, 0.6f, 0.9f);
@@ -30,7 +30,7 @@ public readonly record struct SkyPalette(Vector3 Zenith, Vector3 Horizon, Vector
     /// night mixed toward day by dayness, then toward the dusk orange by
     /// <c>duskAmount * SkyDuskMix</c>, used for both zenith and horizon.
     /// <paramref name="glowAmount"/> (<see cref="GlowAmount"/>, 0..1) scales the warm glow toward
-    /// the sun; 0 leaves the sky the same colour in every direction.
+    /// the sun; 0 leaves the sky the same color in every direction.
     /// </summary>
     public static SkyPalette Compute(float dayness, float duskAmount, float glowAmount = 0f)
     {
@@ -65,13 +65,13 @@ public readonly record struct SkyPalette(Vector3 Zenith, Vector3 Horizon, Vector
         WorldGenerationConfig.SkyGlowExponent);
 
     /// <summary>
-    /// The horizon sample with no glow (facing away from the sun): the flat fog colour the
+    /// The horizon sample with no glow (facing away from the sun): the flat fog color the
     /// consumers that cannot sample the dome per direction use.
     /// </summary>
     public Vector3 HazedHorizon => Horizon * (1f + WorldGenerationConfig.SkyHazeStrength);
 
     /// <summary>
-    /// The dome colour in direction <paramref name="dir"/> (need not be normalized in XZ, but
+    /// The dome color in direction <paramref name="dir"/> (need not be normalized in XZ, but
     /// its Y must be the sine of the elevation). Every downward direction clamps to the
     /// horizon at the same azimuth, which is what keeps fogged terrain seamless against the sky.
     /// Twin copies: sky-fragment.glsl, test-fragment.glsl, cloud-fragment.glsl (SkySample) -

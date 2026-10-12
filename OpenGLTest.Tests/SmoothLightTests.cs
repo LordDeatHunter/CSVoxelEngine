@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
@@ -177,7 +178,7 @@ public sealed class SmoothLightTests
 
     private static Vector3 Decode(Vertex v) => LightTint.Decode(v.BlockTint, BlockLightPalette.Linear);
 
-    private static Vector3 Colour(byte id) => BlockLightPalette.Linear[BlockType.LightSlot[id]];
+    private static Vector3 Color(byte id) => BlockLightPalette.Linear[BlockType.LightSlot[id]];
 
     /// <summary>The coloured proof lamp, with the preconditions the tests below lean on.</summary>
     private static (byte Lamp, byte Blue) Lamps()
@@ -186,7 +187,7 @@ public sealed class SmoothLightTests
         var blue = Block("blue_lamp");
         Assert.Equal(BlockType.Emission[lamp], BlockType.Emission[blue]);
         Assert.NotEqual(BlockType.LightSlot[lamp], BlockType.LightSlot[blue]);
-        Assert.NotEqual(Colour(lamp), Colour(blue));
+        Assert.NotEqual(Color(lamp), Color(blue));
         return (lamp, blue);
     }
 
@@ -246,7 +247,7 @@ public sealed class SmoothLightTests
         center.SetBlockRaw(3, 3, 8, lamp, 0);
         center.SetBlockRaw(12, 3, 8, blue, 0);
         var row = FloorRow(Mesh(manager, center), 8);
-        var target = Colour(blue);
+        var target = Color(blue);
 
         float Distance(Vertex v) => Vector3.Distance(Decode(v), target);
         var previous = float.MaxValue;
@@ -259,7 +260,7 @@ public sealed class SmoothLightTests
             previous = here.Max(Distance);
         }
 
-        // Anti-vacuity: the row really goes from one colour to the other
+        // Anti-vacuity: the row really goes from one color to the other
         Assert.True(row[3].Min(Distance) > row[13].Max(Distance) + 1e-3f);
     }
 
@@ -316,7 +317,7 @@ public sealed class SmoothLightTests
         var snow = Block("snow");
 
         // A snow layer and a pool beside the lamp under test; a warm lamp across the pool mixes
-        // a second colour into the far cells, so the emitters resolve real two-slot corners
+        // a second color into the far cells, so the emitters resolve real two-slot corners
         (ChunkManager, Chunk) Build(byte near)
         {
             var (manager, center) = FloorWorld();
@@ -332,7 +333,7 @@ public sealed class SmoothLightTests
         var (bm, bc) = Build(blue);
         var mesh = Mesh(bm, bc);
         bool NearerBlue(Vertex v) =>
-            Vector3.Distance(Decode(v), Colour(blue)) < Vector3.Distance(Decode(v), Colour(lamp));
+            Vector3.Distance(Decode(v), Color(blue)) < Vector3.Distance(Decode(v), Color(lamp));
 
         var snowTop = TopOver(mesh.Vertices, mesh.Indices, 6, 8, 1f, 1.99f);
         Assert.All(snowTop, v => Assert.True(v.Block > 0 && NearerBlue(v), $"snow tint {v.BlockTint}"));

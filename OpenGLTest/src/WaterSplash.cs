@@ -10,7 +10,7 @@ namespace silkgltriangle;
 /// along <see cref="MathUtils.ImpactStrength"/> to their caps at
 /// <see cref="WorldGenerationConfig.WaterSplashFullSpeed"/>; the count also scales with the body's size.
 /// <see cref="Track"/> steps one body's <see cref="WaterSplashTracker"/> and throws the droplets: pale
-/// <see cref="DebrisLook.Colour"/> chips from the water top of the column it crossed
+/// <see cref="DebrisLook.Color"/> chips from the water top of the column it crossed
 /// (<see cref="ChunkManager.GetFluidColumnTopGlobal"/>), never off lava. Cosmetic: the world runs it in
 /// singleplayer and on a client, never on a headless server.
 /// </summary>

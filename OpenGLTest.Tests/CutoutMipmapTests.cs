@@ -7,7 +7,7 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// <c>CutoutMipmap</c> is the GL-free half of the atlas's cutout mips: the level dimensions,
-/// the alpha-weighted colour filter and the per-level alpha rescale that keeps an alpha-tested
+/// the alpha-weighted color filter and the per-level alpha rescale that keeps an alpha-tested
 /// tile's coverage at level 0's. The upload itself needs a live GL context.
 /// </summary>
 public sealed class CutoutMipmapTests

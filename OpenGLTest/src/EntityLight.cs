@@ -13,9 +13,9 @@ public static class EntityLight
     /// Light at the cell holding <paramref name="world"/>. A cell that passes light answers with
     /// its own levels. An entity's anchor may sit inside a solid cell, though (a pop's own block,
     /// a part clipped into a wall), whose flood level is 0, so an opaque cell instead takes the
-    /// per-channel maximum over its six face neighbours that are loaded and pass light, and the
-    /// colour slot of the neighbour with the most block light (the lowest slot on a tie, so the
-    /// answer does not depend on the order the neighbours are visited in). Anything
+    /// per-channel maximum over its six face neighbors that are loaded and pass light, and the
+    /// color slot of the neighbor with the most block light (the lowest slot on a tie, so the
+    /// answer does not depend on the order the neighbors are visited in). Anything
     /// unknown (no manager, unloaded chunk, no published snapshot) reads as
     /// <see cref="EntityLightSample.Default"/>, the light every entity drew with before.
     /// </summary>
@@ -36,7 +36,7 @@ public static class EntityLight
         foreach (var (dx, dy, dz) in Vector3Directions.CardinalOffsets)
         {
             int nx = x + dx, ny = y + dy, nz = z + dz;
-            // Most neighbours share the owning chunk; only a border step pays a lookup.
+            // Most neighbors share the owning chunk; only a border step pays a lookup.
             var owner = (nx >> Chunk.SizeShift) == (x >> Chunk.SizeShift)
                         && (ny >> Chunk.SizeShift) == (y >> Chunk.SizeShift)
                         && (nz >> Chunk.SizeShift) == (z >> Chunk.SizeShift)

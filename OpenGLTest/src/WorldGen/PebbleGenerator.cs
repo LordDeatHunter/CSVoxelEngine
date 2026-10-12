@@ -1,4 +1,5 @@
 using System;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -107,7 +108,7 @@ public static class PebbleGenerator
         return total >= 1 && total <= max && obsidian >= 0 && obsidian <= total;
     }
 
-    /// <summary>Layout rotation (0-3 quarter turns) so same-count neighbours don't look identical.</summary>
+    /// <summary>Layout rotation (0-3 quarter turns) so same-count neighbors don't look identical.</summary>
     public static int VariantAt(int x, int z) => (int)(UnitHash(x, z, VariantSalt) * 4f);
 
     /// <summary>

@@ -70,7 +70,7 @@ public sealed class UITextBatchTests
             for (var k = 0; k < pattern.Length; k++)
             {
                 Assert.Equal(v + pattern[k], (int)indices[q * 6 + k]);
-                // A quad never reaches into a neighbour's vertices.
+                // A quad never reaches into a neighbor's vertices.
                 Assert.InRange((int)indices[q * 6 + k], v, v + 3);
             }
         }

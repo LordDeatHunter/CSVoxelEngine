@@ -1,9 +1,11 @@
+using silkgltriangle.Content;
+
 namespace silkgltriangle;
 
 /// <summary>
 /// Malachite ore veins: sparse large blobs where a low-frequency 3D OpenSimplex2 field
 /// exceeds its threshold, stamped over stone at any depth. A pure function of world
-/// position like the other generators, so neighbours agree without shared state. Runs
+/// position like the other generators, so neighbors agree without shared state. Runs
 /// on a generation worker thread after the carvers: carving first leaves cave walls
 /// rimmed with exposed ore instead of eating half of every deposit the caves cross.
 /// </summary>

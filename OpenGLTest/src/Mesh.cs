@@ -44,7 +44,7 @@ public class Mesh : IDisposable
     /// </summary>
     internal static unsafe void ConfigureVertexAttribs(GL gl)
     {
-        // Offsets follow the Vertex field order: position 0, colour 12, uv 16, sun 24,
+        // Offsets follow the Vertex field order: position 0, color 12, uv 16, sun 24,
         // block 25, normal bits + tint 26-27 (one ushort), layer 28,
         // water surface 30 (see Vertex for the semantics)
         gl.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, Vertex.Size, (void*)0);

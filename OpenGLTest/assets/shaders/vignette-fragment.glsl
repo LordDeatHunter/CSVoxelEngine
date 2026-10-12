@@ -38,7 +38,7 @@ const float DropSlideMin = 0.04;
 const float DropSlideMax = 0.40;
 const int DropReachCells = 6;
 
-// The surfacing drops over this pixel as (colour, alpha): one hashed drop per occupied grid cell,
+// The surfacing drops over this pixel as (color, alpha): one hashed drop per occupied grid cell,
 // a little taller than wide, with a dark refracting rim, a pale body and a bright glint, sliding
 // down (bigger ones faster, each after its own short delay) and leaving a thin fading trail.
 // p is in screen heights from the bottom-left corner, so drops stay round on any window.
@@ -140,7 +140,7 @@ void main()
     vec3 color = mix(vec3(0.85, 0.06, 0.04), vec3(0.50, 0.0, 0.0), max(vignette, edge));
     // The arc keeps a brighter red than the dark edge glow, by its share of the coverage
     color = mix(color, vec3(0.95, 0.10, 0.06), arc / max(red, 1e-4));
-    // ...and the drops their own pale colours, by theirs
+    // ...and the drops their own pale colors, by theirs
     color = mix(color, drops.rgb, drops.a / max(red + drops.a, 1e-4));
     FragColor = vec4(color, alpha);
 }

@@ -12,9 +12,9 @@ namespace silkgltriangle;
 /// rules), grows every tree to maturity over the terrain heightmap and stamps the rasterised
 /// cells into chunks. The trees of one 64x64 XZ cell grow together (<see cref="TreeBatch"/>),
 /// each avoiding the cells of the batch's earlier trees and the SOLO shapes (one tree grown
-/// alone, cached per trunk) of the neighbour cells' trees. Like <see cref="WormCarver"/>'s
+/// alone, cached per trunk) of the neighbor cells' trees. Like <see cref="WormCarver"/>'s
 /// cells, a batch is a pure function of its cell key: any chunk stamps the share of every
-/// nearby batch that crosses it, so neighbours agree without shared state. Growth only uses cells above the terrain
+/// nearby batch that crosses it, so neighbors agree without shared state. Growth only uses cells above the terrain
 /// heightmap, wood only replaces air or leaves and leaves only settle into air, so trees never
 /// bury terrain and caves (carved before this runs) never lose rock to them.
 /// </summary>
@@ -118,7 +118,7 @@ public static class TreeGenerator
         if (2 * ReachHorizontal > WorldGenerationConfig.TreeCellBlocks)
             throw new InvalidOperationException(
                 $"Tree reach {ReachHorizontal} x 2 exceeds the {WorldGenerationConfig.TreeCellBlocks}-block batch cell; " +
-                "a batch's neighbour obstacles must come from the 8 adjacent cells only.");
+                "a batch's neighbor obstacles must come from the 8 adjacent cells only.");
     }
 
     /// <summary>
@@ -167,7 +167,7 @@ public static class TreeGenerator
 
     // A tree is a pure function of its trunk's (x, z), but every chunk in reach (and the far-LOD
     // canopy sweep) needs it, and growing one costs far more than reading it. These are the SOLO
-    // shapes: BuildBatch reads them as the neighbour cells' obstacles, on the generation workers
+    // shapes: BuildBatch reads them as the neighbor cells' obstacles, on the generation workers
     // and (through the first LOD ring's batch canopy) the LOD builder thread; the safety
     // argument lives in GenerationalCache, the sizing knobs in WorldGenerationConfig.
     private static readonly GenerationalCache<(int X, int Z), TreeShape> ShapeCache =
@@ -301,7 +301,7 @@ public static class TreeGenerator
             // The solo build's water-raised ground, so a batch tree sees the same terrain
             var space = new VirtualTreeSpace(GrowthGround);
 
-            // Neighbour obstacles: the SOLO shapes of the neighbour cells' trunks, never their
+            // Neighbor obstacles: the SOLO shapes of the neighbor cells' trunks, never their
             // batches (that would recurse and make the result depend on which cell was asked
             // first). The ring is 2R wide because both trees reach R from their trunks, and the
             // static constructor guarantees it stays inside the 8 adjacent cells. A pair farther
@@ -365,7 +365,7 @@ public static class TreeGenerator
     /// cell whose reach-expanded box meets it, visited in cell order (x, then z) and within a
     /// cell in placement-hash order. Every wood cell goes in first (into air or leaves), then the
     /// leaves (into air only), so a crossing canopy never overwrites wood. That fixed order is
-    /// what settles the leftover overlap deterministically: a cell's trees and a neighbour cell's
+    /// what settles the leftover overlap deterministically: a cell's trees and a neighbor cell's
     /// trees (which grew against this cell's SOLO shapes, not its batch) can still meet at the
     /// border, and a tree's unchecked base cell can sit in an earlier tree's leaves -- wood is
     /// first-come, leaves never go over anything.

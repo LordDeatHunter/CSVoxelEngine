@@ -50,7 +50,7 @@ public static class HorizontalFacing
     /// ride along unchanged.
     ///
     /// Every output quad has <c>IsFullFace</c> cleared: the per-corner AO path indexes its
-    /// neighbour deltas by <see cref="Chunk.CubeFaces"/> corner order, which a rotated quad's
+    /// neighbor deltas by <see cref="Chunk.CubeFaces"/> corner order, which a rotated quad's
     /// corners no longer follow, so a turned quad must always shade flat (the bake rejects a
     /// full-face quad on every model it turns, so facing 0 shades the same).
     /// </summary>

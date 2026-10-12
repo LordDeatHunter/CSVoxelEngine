@@ -9,7 +9,7 @@ namespace silkgltriangle.Tests;
 /// Rules of the per-cell tree batches (<see cref="TreeBatch"/>, <see cref="TreeGenerator.BatchOf"/>):
 /// a batch is a pure function of its cell whatever order cells are asked for in, its trunks are
 /// exactly the cell's placement in placement-hash order, no grown cell of one tree enters a cell
-/// already held by an earlier tree of the batch or a neighbour cell's solo shape, and every tree
+/// already held by an earlier tree of the batch or a neighbor cell's solo shape, and every tree
 /// stays inside its species' reach, a tree crossing a cell border is stamped whole, and the
 /// first LOD ring's canopy is the canopy the chunks stamp. In the shape-cache collection because
 /// one fact resets the tree caches.
@@ -51,7 +51,7 @@ public sealed class TreeBatchTests
         throw new InvalidOperationException($"no forest cell with {minTrunks} trunks within {maxRadius} cells");
     }
 
-    /// <summary>The forest cell and its +X neighbour, the cells every fact samples.</summary>
+    /// <summary>The forest cell and its +X neighbor, the cells every fact samples.</summary>
     private static (int CellX, int CellZ)[] SampleCells()
     {
         var (cx, cz) = FindForestCellWithTrunks();
@@ -225,7 +225,7 @@ public sealed class TreeBatchTests
 
     /// <summary>
     /// A forest trunk within <see cref="TreeGenerator.ReachHorizontal"/> of a cell border whose
-    /// batch shape crosses into a neighbour cell and whose 3x3 chunk-column neighbourhood is forest,
+    /// batch shape crosses into a neighbor cell and whose 3x3 chunk-column neighbourhood is forest,
     /// searched in rings of cells outward from the origin, then by column.
     /// </summary>
     private static (int X, int Z) FindForestTrunkNearCellBorder()

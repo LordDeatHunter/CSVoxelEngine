@@ -2,13 +2,13 @@
 // Near-flat cartoon shading: uniform skydome light plus a small sun term for form, then a
 // normal band that keeps tops white, sides bright and bottoms cool grey. The faces are flat
 // and axis-aligned, so the band reduces to three tones and the silhouette stays hard-edged.
-// Alpha fades with fog on top of the colour blend, so distant clouds thin into the sky
+// Alpha fades with fog on top of the color blend, so distant clouds thin into the sky
 // instead of ending in a visible band at the far plane.
 // Everything is done in display space, the way it looked before the scene went linear: the
 // light is summed from the display-space sun and ambient, fogged and then mixed over the scene
 // behind it by hand. uScene is the HDR target this pass draws into, read texel-for-texel after a
 // glTextureBarrier with blending off; the depth pre-pass in CloudRenderer lets exactly one cloud
-// surface through per pixel, which is what makes that read legal. Blending the same colour in
+// surface through per pixel, which is what makes that read legal. Blending the same color in
 // linear light left the clouds opaque slabs that hid the ground and sky texture behind them.
 in vec3 fWorldPos;
 in vec3 fNormal;

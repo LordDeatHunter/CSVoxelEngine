@@ -1,13 +1,14 @@
 using System;
 using System.Numerics;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
 /// <summary>
-/// The small palette of block-light colours (SH-26). A block's JSON may declare
-/// <c>light.color</c>; <see cref="ContentRegistry"/> registers each distinct colour here and the
+/// The small palette of block-light colors (SH-26). A block's JSON may declare
+/// <c>light.color</c>; <see cref="ContentRegistry"/> registers each distinct color here and the
 /// block carries the resulting slot (<see cref="BlockType.LightSlot"/>). Slot 0 is always the
-/// default warm torch colour, so every emitter that declares no colour looks as it always has.
+/// default warm torch color, so every emitter that declares no color looks as it always has.
 /// GL-free: the renderer uploads <see cref="Linear"/> as <c>uBlockLightPalette</c>.
 /// </summary>
 public static class BlockLightPalette
@@ -15,10 +16,10 @@ public static class BlockLightPalette
     /// <summary>Slots the palette holds; the vertex tint code has 3 bits per slot index.</summary>
     public const int MaxSlots = 8;
 
-    /// <summary>The old single torch colour, sRGB (1, 0.62, 0.25): slot 0, the default of every emitter.</summary>
+    /// <summary>The old single torch color, sRGB (1, 0.62, 0.25): slot 0, the default of every emitter.</summary>
     public static readonly Vector3 DefaultSrgb = new(1f, 0.62f, 0.25f);
 
-    // Registering a colour within this of an existing slot, per channel, reuses that slot
+    // Registering a color within this of an existing slot, per channel, reuses that slot
     private const float MatchTolerance = 0.5f / 255f;
 
     private static readonly Vector3[] _srgb = new Vector3[MaxSlots];
@@ -29,13 +30,13 @@ public static class BlockLightPalette
 
     static BlockLightPalette() => Reset();
 
-    /// <summary>Linear-light colour of every slot; unused slots hold the default.</summary>
+    /// <summary>Linear-light color of every slot; unused slots hold the default.</summary>
     public static ReadOnlySpan<Vector3> Linear => _linear;
 
-    /// <summary>The sRGB colour a slot was registered with.</summary>
+    /// <summary>The sRGB color a slot was registered with.</summary>
     public static Vector3 SrgbOf(int slot) => _srgb[slot];
 
-    /// <summary>Back to the default slot alone; every slot is set to the default colour.</summary>
+    /// <summary>Back to the default slot alone; every slot is set to the default color.</summary>
     internal static void Reset()
     {
         Count = 1;

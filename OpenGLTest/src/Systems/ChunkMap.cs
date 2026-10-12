@@ -14,7 +14,7 @@ namespace silkgltriangle;
 /// <see cref="Vector3"/> chunk position callers used before, and this wrapper is the whole of the
 /// public-surface change: no call site had to be edited to keep compiling. The <c>int</c>
 /// overloads exist purely for the sites that already hold the chunk coordinates as integers
-/// (<see cref="ChunkManager.GetBlockGlobal"/>, <see cref="Chunk"/>'s neighbour resolve, the LOD
+/// (<see cref="ChunkManager.GetBlockGlobal"/>, <see cref="Chunk"/>'s neighbor resolve, the LOD
 /// column prefetch) and skip the float-to-int conversion the <see cref="Vector3"/> overloads do.
 /// </para>
 /// <para>

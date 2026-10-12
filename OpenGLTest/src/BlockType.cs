@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -30,8 +31,8 @@ public sealed record BlockType
     /// <summary>Light emitted by each block id (0-15), indexed like <see cref="ById"/>.</summary>
     public static readonly byte[] Emission = new byte[256];
 
-    /// <summary>Block-light palette slot of each block id's emitted colour (0 = the default
-    /// warm colour), indexed like <see cref="ById"/>; see <see cref="BlockLightPalette"/>.</summary>
+    /// <summary>Block-light palette slot of each block id's emitted color (0 = the default
+    /// warm color), indexed like <see cref="ById"/>; see <see cref="BlockLightPalette"/>.</summary>
     public static readonly byte[] LightSlot = new byte[256];
 
     /// <summary>Whether voxel light travels through each block id; see Chunk's light passes.</summary>
@@ -41,7 +42,7 @@ public sealed record BlockType
     public static IReadOnlyDictionary<byte, BlockType> Types { get; internal set; } =
         new Dictionary<byte, BlockType>();
 
-    // bool[256] mirrors of the per-block flags the mesher asks about by neighbour id
+    // bool[256] mirrors of the per-block flags the mesher asks about by neighbor id
     internal static readonly bool[] SolidById = new bool[256];
     internal static readonly bool[] CollidesByHitboxById = new bool[256];
     internal static readonly bool[] OccludesById = new bool[256];
@@ -82,11 +83,11 @@ public sealed record BlockType
     internal static readonly bool[] PixelRimById = new bool[256];
 
     // Whether the block is a pane (the pane renderer), which reaches arms toward neighbouring
-    // panes: read per neighbour by the pane emitter and the pane shape
+    // panes: read per neighbor by the pane emitter and the pane shape
     internal static readonly bool[] PaneById = new bool[256];
 
     // Each pane's post, arm and rail dimensions (its "pane" JSON), null for every other block:
-    // read per neighbour by the pane emitter and the pane shape, beside PaneById
+    // read per neighbor by the pane emitter and the pane shape, beside PaneById
     internal static readonly PaneProfile?[] PaneProfileById = new PaneProfile?[256];
 
     // Whether the binary greedy mesher may merge this block's faces: a plain full cube whose
@@ -94,12 +95,12 @@ public sealed record BlockType
     // else goes through the per-quad scalar path.
     internal static readonly bool[] GreedyById = new bool[256];
 
-    // The fluid simulation asks these of every neighbour cell it looks at, so they get the
+    // The fluid simulation asks these of every neighbor cell it looks at, so they get the
     // same flat-array treatment as the mesher's flags
     internal static readonly bool[] FluidById = new bool[256];
     internal static readonly bool[] ReplaceableById = new bool[256];
 
-    // Whether a placement takes this block's own cell over instead of filling the neighbour
+    // Whether a placement takes this block's own cell over instead of filling the neighbor
     // across the hit face (layered snow); only ever fires on a non-solid state.
     internal static readonly bool[] ReplaceableByPlacementById = new bool[256];
 
@@ -182,7 +183,7 @@ public sealed record BlockType
     /// model is a full cube and it is not cutout", so it is only known after baking.</summary>
     public bool OccludesNeighbours { get; internal set; }
 
-    /// <summary>Whether faces are also culled against a neighbour of the same block (glass).</summary>
+    /// <summary>Whether faces are also culled against a neighbor of the same block (glass).</summary>
     public bool CullSelf { get; init; }
 
     /// <summary>Whether the block darkens neighbouring faces via ambient occlusion. Defaults to
@@ -252,7 +253,7 @@ public sealed record BlockType
     /// <summary>Light this block emits, 0-15.</summary>
     public byte LightEmission { get; init; }
 
-    /// <summary><see cref="BlockLightPalette"/> slot of the emitted light's colour; 0 is the default.</summary>
+    /// <summary><see cref="BlockLightPalette"/> slot of the emitted light's color; 0 is the default.</summary>
     public byte LightColorSlot { get; init; }
 
     /// <summary>Where the block's flame burns (its JSON <c>flame</c>), cell-local 0..1, one point per
@@ -564,7 +565,7 @@ public sealed record BlockType
     public static bool HasPixelRim(byte blockId) => PixelRimById[blockId];
 
     /// <summary>Whether a block id is a pane (<see cref="BlockRenderer.Pane"/>), whose shape
-    /// follows its neighbours (<see cref="PaneShape"/>).</summary>
+    /// follows its neighbors (<see cref="PaneShape"/>).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsPane(byte blockId) => PaneById[blockId];
 
@@ -586,7 +587,7 @@ public sealed record BlockType
     public static bool IsReplaceable(byte blockId) => ReplaceableById[blockId];
 
     /// <summary>Whether a placement aimed at this block fills the block's own cell and discards it,
-    /// instead of filling the neighbour across the hit face. Opted into with the block's
+    /// instead of filling the neighbor across the hit face. Opted into with the block's
     /// <c>replaceableByPlacement</c> JSON, and only while the cell is not solid: a partial
     /// layered-snow drift is taken over, a full stack is a real block (see
     /// <see cref="IsSolidCell"/>). Independent of <see cref="IsReplaceable"/>, which is the fluid

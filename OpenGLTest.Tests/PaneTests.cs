@@ -2,13 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using silkgltriangle.Content;
 using Xunit;
 
 namespace silkgltriangle.Tests;
 
 /// <summary>
-/// A glass pane is a thin translucent block on glass's path: it never hides a neighbour's face,
-/// lets light through and is drawn in the blended pass. Its shape follows its neighbours
+/// A glass pane is a thin translucent block on glass's path: it never hides a neighbor's face,
+/// lets light through and is drawn in the blended pass. Its shape follows its neighbors
 /// (<see cref="PaneShape"/>): a post plus an arm toward every neighbouring pane or solid full
 /// cube, drawn with no face between two connected panes, and hit and collided with by exactly
 /// those arms.
@@ -47,7 +48,7 @@ public sealed class PaneTests
                                  && q.Average(v => v.Position.Y) is var cy && cy > y && cy < y + 1
                                  && q.Average(v => v.Position.Z) is var cz && cz > z && cz < z + 1);
 
-    // The arm mask of a pane whose four horizontal neighbours (north, south, west, east) hold ids
+    // The arm mask of a pane whose four horizontal neighbors (north, south, west, east) hold ids
     private static int Mask(params byte[] ids) => PaneShape.ConnectionMask(ids, new byte[ids.Length]);
 
     private static (Vector3 Min, Vector3 Max) Union(IEnumerable<BlockHitbox> boxes) =>
@@ -58,8 +59,8 @@ public sealed class PaneTests
     {
         foreach (var type in BlockType.Types.Values.Where(t => t.Renderer == BlockRenderer.Pane))
         {
-            Assert.False(BlockType.Occludes(type.Id), $"{type.Name} occludes its neighbours");
-            Assert.False(BlockType.OccludesAO(type.Id), $"{type.Name} darkens its neighbours");
+            Assert.False(BlockType.Occludes(type.Id), $"{type.Name} occludes its neighbors");
+            Assert.False(BlockType.OccludesAO(type.Id), $"{type.Name} darkens its neighbors");
             Assert.True(BlockType.PassesLightById[type.Id], $"{type.Name} blocks light");
         }
 

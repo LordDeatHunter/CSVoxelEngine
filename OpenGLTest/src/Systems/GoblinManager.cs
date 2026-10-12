@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -77,7 +78,7 @@ public sealed class GoblinManager : IMobPopulation
 
     /// <summary>Advances the death and spawn clocks of the goblins without simulating them (a
     /// client never ticks the AI), dropping the ones whose death is over. A finished death bursts
-    /// into the mob's skin colour (<paramref name="debris"/>, null when nothing draws it).</summary>
+    /// into the mob's skin color (<paramref name="debris"/>, null when nothing draws it).</summary>
     public void AnimateMirrors(float deltaTime, BlockDebrisSystem? debris = null)
     {
         for (var i = _goblins.Count - 1; i >= 0; i--)

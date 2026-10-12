@@ -53,7 +53,7 @@ public sealed class ReflectionReuseTests
     [Fact]
     public void RecreatedTargetAlwaysRenders()
     {
-        // The recreated colour texture is TexImage2D'd with null data, so its contents are
+        // The recreated color texture is TexImage2D'd with null data, so its contents are
         // undefined and nothing may be sampled out of it until a real mirror render lands.
         // This Fact pins the pure function only: whether the caller ever passes true is a
         // RenderManager concern (the invalidation inside CreateReflectionTarget) and is NOT

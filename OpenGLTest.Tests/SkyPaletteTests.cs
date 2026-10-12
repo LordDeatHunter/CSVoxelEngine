@@ -6,7 +6,7 @@ namespace silkgltriangle.Tests;
 
 /// <summary>
 /// The sky palette and its C# reference sampler (the GLSL SkySample twins transcribe it):
-/// relations only, so re-tuning a colour never breaks a test.
+/// relations only, so re-tuning a color never breaks a test.
 /// </summary>
 public sealed class SkyPaletteTests
 {

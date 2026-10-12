@@ -1,6 +1,6 @@
 #version 460 core
 // Falling-leaf billboards. Reuses the shared Vertex layout (positions are world-space
-// quad corners baked on the CPU), but fades per vertex through the colour alpha —
+// quad corners baked on the CPU), but fades per vertex through the color alpha —
 // the world shader's water flag rides there, so leaves get their own program.
 layout (location = 0) in vec3 vPosition;
 layout (location = 1) in vec4 vColor;

@@ -123,7 +123,7 @@ public sealed class ClientChunkStreamer : IColumnSource
 
     /// <summary>
     /// Stores a column's terrain from a <c>ColumnTerrain</c> payload and re-meshes the loaded chunks
-    /// whose build reads it (its own column and the eight neighbours), so their sunlight, water
+    /// whose build reads it (its own column and the eight neighbors), so their sunlight, water
     /// surface codes and tint follow the server's terrain. A repeat answer equal in heights, water
     /// levels and climate changes nothing and re-meshes nothing. Returns whether the stored terrain
     /// changed.

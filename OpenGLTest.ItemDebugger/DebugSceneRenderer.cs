@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
+using silkgltriangle.Content;
 
 namespace silkgltriangle;
 
@@ -235,7 +236,7 @@ public sealed class DebugSceneRenderer : IDisposable
     // The chunk mesher bakes a biome tint as a *linear* multiplier against the decoded grey of the
     // textureless tiles (BiomeTint.VertexTint). The debugger samples its atlas undecoded and never
     // encodes, so that multiplier would lift a tinted face about three times too bright here. Rebake
-    // it so the grey texel times Gain lands on the colour the game displays: encode(greyLin * v * Gain).
+    // it so the grey texel times Gain lands on the color the game displays: encode(greyLin * v * Gain).
     private static void ToDisplaySpaceTint(List<Vertex> vertices)
     {
         var greyLinear = ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGrey) * BiomeTint.Gain;

@@ -11,7 +11,7 @@ namespace silkgltriangle;
 /// origin and sized in local units, leaving placement to the caller's model matrix — a single
 /// unit shape can therefore be built once and reused at any size.
 ///
-/// Shapes carry a vertex colour with alpha. A solid-colour shape is just an untextured draw
+/// Shapes carry a vertex color with alpha. A solid-color shape is just an untextured draw
 /// (see uUseTexture in ui-fragment.glsl); a textured one takes a <see cref="UvRect"/>, either
 /// the full image (layer 0 of a single-slice texture) or one tile of the block atlas.
 /// </summary>
@@ -223,7 +223,7 @@ public static class Primitives
             (ushort)(backBase + 0), (ushort)(backBase + 3), (ushort)(backBase + 2)]);
 
         // Side walls, one quad per exposed pixel edge, UV'd to the edge texel's centre so
-        // nearest filtering paints the wall the texel's own colour.
+        // nearest filtering paints the wall the texel's own color.
         for (var y = 0; y < height; y++)
         for (var x = 0; x < width; x++)
         {

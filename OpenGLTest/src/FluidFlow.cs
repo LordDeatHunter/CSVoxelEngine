@@ -20,14 +20,14 @@ internal interface IFluidCellReader
 /// </summary>
 internal static class FluidFlow
 {
-    // The four horizontal neighbours a flow can be pulled toward, as (dx, dz)
+    // The four horizontal neighbors a flow can be pulled toward, as (dx, dz)
     private static readonly (int X, int Z)[] FlowNeighbours = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
     /// <summary>
     /// How strongly the fluid <paramref name="id"/> at (x, y, z), whose own surface sits at
-    /// <paramref name="ownHeight"/>, is pulled toward its neighbour (x+dx, y, z+dz): the height
-    /// difference to a neighbour of the same fluid, or to a whole source lower still when the
-    /// neighbour is replaceable and the fluid would drop off into it. False (no term) past a
+    /// <paramref name="ownHeight"/>, is pulled toward its neighbor (x+dx, y, z+dz): the height
+    /// difference to a neighbor of the same fluid, or to a whole source lower still when the
+    /// neighbor is replaceable and the fluid would drop off into it. False (no term) past a
     /// solid, a different block, a replaceable cell with no drop, or an unavailable cell.
     /// </summary>
     private static bool PairTerm<T>(in T cells, int x, int y, int z, byte id, float ownHeight,
@@ -53,7 +53,7 @@ internal static class FluidFlow
         }
         else
         {
-            return false; // a solid neighbour dams the flow instead of steering it
+            return false; // a solid neighbor dams the flow instead of steering it
         }
 
         term = ownHeight - neighbourHeight;
@@ -63,9 +63,9 @@ internal static class FluidFlow
     /// <summary>
     /// THE flow definition: the un-normalised horizontal flow of the fluid in the cell
     /// (x, y, z), or <see cref="Vector3.Zero"/> when the cell holds no fluid. Mirrors
-    /// Minecraft's <c>FlowingFluid.getFlow</c>: every horizontal neighbour pulls the flow toward
+    /// Minecraft's <c>FlowingFluid.getFlow</c>: every horizontal neighbor pulls the flow toward
     /// itself in proportion to how much lower its own surface sits, a replaceable cell the fluid
-    /// can drop off into counting as a whole source lower still, and a solid neighbour
+    /// can drop off into counting as a whole source lower still, and a solid neighbor
     /// contributing nothing. A pool of sources therefore cancels out to zero, while a skirt
     /// points away from its source and toward the edge it pours over.
     /// </summary>
