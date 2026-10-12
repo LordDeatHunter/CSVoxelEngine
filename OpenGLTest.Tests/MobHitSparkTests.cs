@@ -51,12 +51,12 @@ public sealed class MobHitSparkTests : IDisposable
     {
         var world = NewWorld(out var eye);
         Assert.True(world.SpawnEntity("goblin", eye + new Vector3(0f, -Goblin.Height * 0.5f, -2f)));
-        Assert.Empty(world.Debris);
+        Assert.Empty(world.GetDebrisSystem().Debris);
 
         Punch(world);
 
-        Assert.Equal(WorldGenerationConfig.HitSparkCount, world.Debris.Count);
-        foreach (var chip in world.Debris)
+        Assert.Equal(WorldGenerationConfig.HitSparkCount, world.GetDebrisSystem().Debris.Count);
+        foreach (var chip in world.GetDebrisSystem().Debris)
         {
             Assert.Equal(DebrisLook.Color, chip.Look);
             Assert.Equal(BiomeTint.VertexTint(WorldGenerationConfig.HitSparkColor), chip.Tint);
@@ -76,7 +76,7 @@ public sealed class MobHitSparkTests : IDisposable
 
         Punch(_world);
 
-        Assert.Equal(WorldGenerationConfig.HitSparkCount, _world.Debris.Count);
+        Assert.Equal(WorldGenerationConfig.HitSparkCount, _world.GetDebrisSystem().Debris.Count);
         // The prediction is cosmetic: the mirrored mob took no damage.
         Assert.Equal(3, _world.Slimes[0].Health);
     }
@@ -86,6 +86,6 @@ public sealed class MobHitSparkTests : IDisposable
     {
         var world = NewWorld(out _);
         Punch(world);
-        Assert.Empty(world.Debris);
+        Assert.Empty(world.GetDebrisSystem().Debris);
     }
 }

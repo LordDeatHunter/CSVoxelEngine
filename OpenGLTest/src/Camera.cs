@@ -122,7 +122,7 @@ public class Camera : IMobTarget
     /// the server's first-person ray from the same eye lands on the same cell.
     /// </summary>
     public Vector3 LastAimDirection { get; private set; } = -Vector3.UnitZ;
-    [Obsolete("Renamed to IsCreative.")]
+    /// <summary>The body's vertical speed in blocks per second (negative falls).</summary>
     public float VerticalVelocity => _physics.VerticalVelocity;
 
     /// <summary>

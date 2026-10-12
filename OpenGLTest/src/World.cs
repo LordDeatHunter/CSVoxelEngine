@@ -4661,4 +4661,6 @@ public class World : IItemUseWorld
     public ChunkManager GetChunkManager() => _chunkManager;
 
     internal LodManager GetLodManager() => _lodManager;
+
+    internal BlockDebrisSystem GetDebrisSystem() => _debris;
 }
