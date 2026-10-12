@@ -21,7 +21,7 @@ Worker-thread costs (meshing, worldgen) never show in the per-frame profiler.
 1. `git worktree add --detach <scratchpad>/before HEAD`, build it Release.
 2. Build your change Release.
 3. Run **both** exes the same way, interleaved, so they share GPU clock state:
-   `Start-Process <root>/OpenGLTest/bin/Release/net9.0/silkgltriangle.exe -WorkingDirectory <root>/OpenGLTest` with `VOXEL_SPAWN=0,30,0 VOXEL_TIME=60 VOXEL_LOOK=...` (spawn high so the player lands on loaded terrain), stdout redirected to a file.
+   `Start-Process <root>/OpenGLTest/bin/Release/net9.0/VoxelEngine.exe -WorkingDirectory <root>/OpenGLTest` with `VOXEL_SPAWN=0,30,0 VOXEL_TIME=60 VOXEL_LOOK=...` (spawn high so the player lands on loaded terrain), stdout redirected to a file.
 4. Wait until `chunks N/M` stops changing (~20 s), then read the last 3 `perf` lines. For a fly capture, use a scenario with `fly` (`perf-fly.json`, `tree-perf.json`, `lod-horizon.json` exist) rather than injected keys.
 5. Report both numbers per pair plus GPU/CPU ms, GC/s and frame ms. Record in the `PERF_TODO.md` table and tick the box.
 6. `git worktree remove --force <scratchpad>/before` afterwards.

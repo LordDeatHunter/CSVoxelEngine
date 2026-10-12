@@ -11,7 +11,7 @@ This skill is the procedure for applying them without breaking the world.
 ## Non-negotiables
 
 - **Release only.** `DOTNET_ROLL_FORWARD=LatestMajor dotnet build OpenGLTest.sln -c Release` and
-  `dotnet test OpenGLTest.Tests/silkgltriangle.Tests.csproj -c Release` (~50 s, 2400+ tests).
+  `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release` (~50 s, 2400+ tests).
   Never verify in Debug; the game's behavior claims are Release measurements.
 - **The build and tests stay green between commits.** A cleanup commit that leaves the tree
   red is worse than no cleanup. Run the full test suite before every commit that touches code.

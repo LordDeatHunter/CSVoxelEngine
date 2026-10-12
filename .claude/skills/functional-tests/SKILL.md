@@ -8,7 +8,7 @@ description: Rules and recipes for writing xUnit tests in CSVoxelEngine (OpenGLT
 Tests live in `OpenGLTest.Tests/` (headless, no window). Run:
 
 ```
-~/.dotnet/dotnet.exe test OpenGLTest.Tests/silkgltriangle.Tests.csproj -c Release
+~/.dotnet/dotnet.exe test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release
 ```
 
 (Plain `dotnet` has no SDK on this machine. Release only.) There is no CI, so a feature's tests are the only regression net.

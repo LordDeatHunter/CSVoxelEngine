@@ -17,11 +17,11 @@ Build/test cannot prove a rendering or feel change. Use a scripted scenario, not
 ~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release
 $env:VOXEL_SCRIPT = "<abs path to scenario.json>"   # e.g. OpenGLTest/visual-examples/water.json
 $env:VOXEL_TIME = "147"                              # optional, see table
-Start-Process OpenGLTest/bin/Release/net9.0/silkgltriangle.exe -WorkingDirectory OpenGLTest `
+Start-Process OpenGLTest/bin/Release/net9.0/VoxelEngine.exe -WorkingDirectory OpenGLTest `
   -RedirectStandardOutput <scratchpad>/run.log
 ```
 - The working directory MUST contain `assets/` (`OpenGLTest/` or the output dir). Shaders load from `OpenGLTest/assets/shaders` source, not bin.
-- A scenario saves numbered PNGs to `visual/<name>/` (gitignored; `"output"` overrides the folder; an absolute scratchpad path works). The window may not close itself when done: sleep, then `Stop-Process silkgltriangle`.
+- A scenario saves numbered PNGs to `visual/<name>/` (gitignored; `"output"` overrides the folder; an absolute scratchpad path works). The window may not close itself when done: sleep, then `Stop-Process VoxelEngine`.
 - Do not run `dotnet build` while an instance is running (locked exe).
 - Read the PNGs with the Read tool and say what you actually saw. Never claim a visual result you did not look at.
 - Copy screenshot folders into the scratchpad instead of deleting them in-repo (the PowerShell layer blocks recursive deletes on repo paths).

@@ -21,12 +21,11 @@ const dryRun = !!(args && args.dryRun)
 
 const REPO = `
 Repository: C# / .NET 9 Minecraft-style voxel engine using Silk.NET. Working directory is the repo root.
-Read AGENTS.md before anything else — it is the authoritative guide (all code lives in the "silkgltriangle"
-namespace even though the solution is OpenGLTest.sln; Release builds only; GL calls only on the render thread;
+Read AGENTS.md before anything else — it is the authoritative guide (all code lives under the "VoxelEngine" root namespace with one sub-namespace per folder; Release builds only; GL calls only on the render thread;
 chunk work happens on worker threads). MESHER_PLAN.md, TODO.md and PERF_TODO.md hold in-flight plans and known debt.
 The system "dotnet" has no SDK — always use ~/.dotnet/dotnet.exe:
   build: ~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release
-  tests: ~/.dotnet/dotnet.exe test OpenGLTest.Tests/silkgltriangle.Tests.csproj -c Release
+  tests: ~/.dotnet/dotnet.exe test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release
 `.trim()
 
 const TASK = `TASK:\n${task}${extraContext ? `\n\nADDITIONAL CONTEXT FROM THE USER:\n${extraContext}` : ''}`
@@ -258,7 +257,7 @@ You may read any file to check the scouts' claims, but do NOT modify files.
 Produce a plan an implementer can execute step by step without asking questions:
 - Steps are ordered and each must leave the solution building (~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release).
 - Name exact files, types and methods. Say what to add, change or delete, and why.
-- Respect the constraints the scouts found (threading, perf, namespace "silkgltriangle", Release-only).
+- Respect the constraints the scouts found (threading, perf, namespace "VoxelEngine", Release-only).
 - Every step has an acceptance check. Non-trivial behaviour gets an xUnit test in OpenGLTest.Tests/.
 - Keep steps small enough for one focused agent each (roughly one to four files per step).
 - Put only questions whose answer would CHANGE the plan in openQuestions; otherwise state an assumption.`
