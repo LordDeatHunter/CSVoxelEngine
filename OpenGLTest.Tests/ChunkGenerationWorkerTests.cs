@@ -144,7 +144,7 @@ public sealed class ChunkGenerationWorkerTests
     /// non-decreasing distance and is exactly the set of integer offsets inside the radius.
     /// Tie order among equidistant offsets is deliberately NOT pinned - <c>BuildSortedOffsets</c>
     /// uses an unstable <c>List.Sort</c>, so that order is arbitrary (though fixed for the process,
-    /// since the array is built once in a static initialiser).
+    /// since the array is built once in a static initializer).
     /// </summary>
     [Fact]
     public void SortedOffsetsAreClosestFirstAndCoverTheRadius()

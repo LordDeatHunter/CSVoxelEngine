@@ -5,7 +5,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Name -> <see cref="ITreeFeature"/> table a species' feature <c>type</c> is resolved through.
-/// Features are code, not content: the table is built once by the static initialiser and never
+/// Features are code, not content: the table is built once by the static initializer and never
 /// changes afterwards, so it needs no Publish/Reset and is safe to read from the generation
 /// worker threads without locking.
 /// </summary>

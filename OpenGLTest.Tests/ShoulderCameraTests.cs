@@ -121,7 +121,7 @@ public sealed class ShoulderCameraTests
         var offset = camera.RenderEye - camera.Position;
         Assert.True(offset.X < -2f, $"offset.X {offset.X} should reach behind (+X facing)");
         Assert.True(offset.Y > 0.3f, $"offset.Y {offset.Y} should sit above the head");
-        Assert.True(offset.Z > 0.3f, $"offset.Z {offset.Z} should favour the right shoulder");
+        Assert.True(offset.Z > 0.3f, $"offset.Z {offset.Z} should favor the right shoulder");
 
         var facing = camera.Forward;
         var alignment = Vector3.Dot(camera.ViewDirection, facing);

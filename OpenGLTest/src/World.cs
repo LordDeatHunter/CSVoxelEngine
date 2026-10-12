@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using Silk.NET.Input;
@@ -17,11 +18,6 @@ public class World : IItemUseWorld
 {
     // How far the player can target blocks (10 blocks)
     public const float InteractionReach = 10f;
-
-    // Seconds of holding left-click per bare-hand mining hit. Each hit removes the held
-    // tool's power from the block's hardness; time short of a full interval deals nothing
-    // (creative breaks instantly). A tool declares its own pace through item JSON.
-    public const float BlockHitSeconds = Mining.DefaultHitGapMs / 1000f;
 
     // A hit makes the block jump out and settle back. Kept below BlockHitSeconds so the
     // pop always finishes before the next hit restarts it.
@@ -121,7 +117,7 @@ public class World : IItemUseWorld
     // autosave always writes it
     private int _lodStateVersionSaved = -1;
 
-    // Inventory is assigned in its own initialiser and never replaced, so the method group is the
+    // Inventory is assigned in its own initializer and never replaced, so the method group is the
     // same closed delegate every frame; passing `Inventory.CanAccept` inline at the DropManager call
     // allocated a fresh one per frame (PERF_TODO C7).
     private readonly Func<byte, bool> _canAcceptDrop;
@@ -197,11 +193,9 @@ public class World : IItemUseWorld
     // Every airborne projectile to draw and mirror this frame: the player's throws followed by
     // the goblins' stones, rebuilt after both updated. Drawing only - hit tests stay per owner.
     private readonly List<ThrownProjectile> _projectiles = [];
-    private bool _throwCharging;
     private float _throwChargeSeconds;
     private byte _throwItemId;
     private float _throwBaseDamage;
-    private bool _useCharging;
     private float _useChargeSeconds;
     private byte _useItemId;
     private float _contactTimer;
@@ -269,7 +263,6 @@ public class World : IItemUseWorld
     private readonly HotbarPickupPop _hotbarPops = new();
 
     // Floating damage numbers: from landed hits in singleplayer, from snapshot health drops on a client
-    private readonly DamageNumberPool _damageNumbers = new(WorldGenerationConfig.DamageNumberCapacity);
 
     /// <summary>
     /// Server mode: the connected players, owned by the server and read once a frame by the drop
@@ -411,10 +404,10 @@ public class World : IItemUseWorld
     public IReadOnlyList<FallingBlock> Falling => _falling.Falling;
 
     /// <summary>Live slimes, feeding the entity and shadow passes.</summary>
-    public IReadOnlyList<Slime> Slimes => _slimes?.Slimes ?? (IReadOnlyList<Slime>)Array.Empty<Slime>();
+    public IReadOnlyList<Slime> Slimes => _slimes?.Slimes ?? [];
 
     /// <summary>Live goblins, feeding the entity, shadow and mirror passes.</summary>
-    public IReadOnlyList<Goblin> Goblins => _goblins?.Goblins ?? (IReadOnlyList<Goblin>)Array.Empty<Goblin>();
+    public IReadOnlyList<Goblin> Goblins => _goblins?.Goblins ?? [];
 
     // Every live mob of every kind, rebuilt once a frame after the mob managers ran
     // (RefreshMobs), so punch, slice, thrown items and healthbars target them all.
@@ -423,43 +416,12 @@ public class World : IItemUseWorld
     /// <summary>Every live mob (slimes, goblins), feeding targeting and the healthbars.</summary>
     public IReadOnlyList<Mob> Mobs => _mobs;
 
-    /// <summary>Live falling leaves, feeding the batched billboard pass.</summary>
-    public IReadOnlyList<LeafParticle> LeafParticles => _leaves.Particles;
-
-    /// <summary>Live mining debris, feeding the small-cube entity pass.</summary>
-    public IReadOnlyList<BlockDebris> Debris => _debris.Debris;
-
-    /// <summary>Lit campfire block entities, feeding lights and fire particles.</summary>
-    public CampfireManager Campfires => _campfires;
-
-    /// <summary>Quern block entities: waiting inputs and spinning tops.</summary>
-    public QuernManager Querns => _querns;
-
-    /// <summary>Kiln structures: stored fuel and burn state.</summary>
-    public KilnManager Kilns => _kilns;
-
-    /// <summary>Cast molds: molten metal being poured, cooling and waiting to be collected.</summary>
-    public CastingManager Castings => _casting;
-
     /// <summary>Every burning cell this frame (campfires and lit kilns), feeding both the fire
     /// particles and the warm point lights.</summary>
     public IReadOnlyList<Vector3> FireCells => _fireCells;
 
-    /// <summary>Live campfire embers and smoke, feeding the fire billboard pass.</summary>
-    public IReadOnlyList<FireParticle> FireParticles => _fire.Particles;
+    public bool IsThrowCharging { get; private set; }
 
-    /// <summary>Live torch flame embers and smoke (a third fire instance).</summary>
-    public IReadOnlyList<FireParticle> TorchFlameParticles => _torchFire.Particles;
-
-    /// <summary>Live exhaled bubbles, feeding the bubble billboard pass.</summary>
-    public IReadOnlyList<BubbleParticle> Bubbles => _bubbles.Particles;
-
-    public IReadOnlyList<ThrownProjectile> Thrown => _thrown;
-
-    /// <summary>Every projectile in flight this frame - the player's throws and the goblins'
-    /// stones - feeding the thrown-item pass and the water mirror.</summary>
-    public IReadOnlyList<ThrownProjectile> Projectiles => _projectiles;
-    public bool IsThrowCharging => _throwCharging;
     public float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / WorldGenerationConfig.ThrowChargeSeconds);
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
@@ -679,17 +641,10 @@ public class World : IItemUseWorld
     {
         _mobs.Clear();
         if (_slimes != null)
-        {
-            var slimes = _slimes.Slimes;
-            for (var i = 0; i < slimes.Count; i++)
-                if (!slimes[i].IsDying) _mobs.Add(slimes[i]);
-        }
+            _mobs.AddRange(_slimes.Slimes.Where(t => !t.IsDying));
+
         if (_goblins != null)
-        {
-            var goblins = _goblins.Goblins;
-            for (var i = 0; i < goblins.Count; i++)
-                if (!goblins[i].IsDying) _mobs.Add(goblins[i]);
-        }
+            _mobs.AddRange(_goblins.Goblins.Where(t => !t.IsDying));
     }
 
     /// <summary>Rebuilds <see cref="Projectiles"/> from the player's throws and the goblins'
@@ -1066,9 +1021,8 @@ public class World : IItemUseWorld
     {
         _netTouchedChunks.Clear();
         _netHardened.Clear();
-        for (var i = 0; i < changes.Count; i++)
+        foreach (var change in changes)
         {
-            var change = changes[i];
             var chunk = _chunkManager.ChunkAt(change.X, change.Y, change.Z);
             if (chunk == null)
                 continue;
@@ -1113,9 +1067,8 @@ public class World : IItemUseWorld
     public void ApplyNetworkEntities(IReadOnlyList<NetEntity> entities)
     {
         _netMobsSeen.Clear();
-        for (var i = 0; i < entities.Count; i++)
+        foreach (var entry in entities)
         {
-            var entry = entities[i];
             if (!NetEntity.IsMob(entry.Kind))
                 continue;
             _netMobsSeen.Add(entry.Id);
@@ -1137,9 +1090,9 @@ public class World : IItemUseWorld
         }
 
         _netMobRemovals.Clear();
-        foreach (var id in _netMobs.Keys)
-            if (!_netMobsSeen.Contains(id))
-                _netMobRemovals.Add(id);
+        foreach (var id in _netMobs.Keys.Where(id => !_netMobsSeen.Contains(id)))
+            _netMobRemovals.Add(id);
+
         foreach (var id in _netMobRemovals)
         {
             // The server stops listing a mob the moment it dies, so the killing blow never shows as a
@@ -1153,11 +1106,10 @@ public class World : IItemUseWorld
         }
 
         _dropManager.Clear();
-        for (var i = 0; i < entities.Count; i++)
+        foreach (var netEntity in entities)
         {
-            var entry = entities[i];
-            if (entry.Kind == NetEntityKind.Drop)
-                _dropManager.SpawnRestored(entry.ItemId, entry.Position, entry.Velocity, 0f);
+            if (netEntity.Kind == NetEntityKind.Drop)
+                _dropManager.SpawnRestored(netEntity.ItemId, netEntity.Position, netEntity.Velocity, 0f);
         }
 
         if (_clientMode)
@@ -1181,32 +1133,31 @@ public class World : IItemUseWorld
         _netFallingPrevious.Clear();
         _netFallingPrevious.AddRange(_netFalling);
         _netFalling.Clear();
-        for (var i = 0; i < entities.Count; i++)
+        foreach (var netEntity in entities)
         {
-            var entry = entities[i];
-            if (entry.Kind == NetEntityKind.FallingBlock)
+            if (netEntity.Kind == NetEntityKind.FallingBlock)
             {
-                _netFalling.Add((entry.Position, entry.ItemId));
+                _netFalling.Add((netEntity.Position, netEntity.ItemId));
                 continue;
             }
-            if (entry.Kind != NetEntityKind.PrimedTnt)
+            if (netEntity.Kind != NetEntityKind.PrimedTnt)
                 continue;
 
             // Milliseconds on the wire; a fuse is never shorter than what is left of it, so a bad
             // pair cannot divide the flash by zero
-            var duration = Math.Max(entry.Ammo, 1) / 1000f;
-            var remaining = Math.Clamp(entry.Health, 0, Math.Max(entry.Ammo, 1)) / 1000f;
-            _netTntSeen.Add(entry.Id);
-            if (_netTnt.TryGetValue(entry.Id, out var existing))
-                existing.MirrorSetState(entry.Position, remaining);
+            var duration = Math.Max(netEntity.Ammo, 1) / 1000f;
+            var remaining = Math.Clamp(netEntity.Health, 0, Math.Max(netEntity.Ammo, 1)) / 1000f;
+            _netTntSeen.Add(netEntity.Id);
+            if (_netTnt.TryGetValue(netEntity.Id, out var existing))
+                existing.MirrorSetState(netEntity.Position, remaining);
             else
-                _netTnt[entry.Id] = silkgltriangle.PrimedTnt.Mirror(entry.Position, entry.ItemId, duration, remaining);
+                _netTnt[netEntity.Id] = silkgltriangle.PrimedTnt.Mirror(netEntity.Position, netEntity.ItemId, duration, remaining);
         }
 
         _netTntRemovals.Clear();
-        foreach (var id in _netTnt.Keys)
-            if (!_netTntSeen.Contains(id))
-                _netTntRemovals.Add(id);
+        foreach (var id in _netTnt.Keys.Where(id => !_netTntSeen.Contains(id)))
+            _netTntRemovals.Add(id);
+
         foreach (var id in _netTntRemovals)
         {
             // The server drops a cube only when it detonates, so a mirror leaving the snapshot with
@@ -1247,13 +1198,9 @@ public class World : IItemUseWorld
     {
         var centre = new Vector3(x + 0.5f, y + 0.5f, z + 0.5f);
         const float reach = 1.5f * 1.5f;
-        foreach (var (cube, id) in _netFalling)
-            if (id == blockId && Vector3.DistanceSquared(cube, centre) <= reach)
-                return true;
-        foreach (var (cube, id) in _netFallingPrevious)
-            if (id == blockId && Vector3.DistanceSquared(cube, centre) <= reach)
-                return true;
-        return false;
+        return
+            _netFalling.Any(c => c.BlockId == blockId && Vector3.DistanceSquared(c.Centre, centre) <= reach)
+            || _netFallingPrevious.Any(c => c.BlockId == blockId && Vector3.DistanceSquared(c.Centre, centre) <= reach);
     }
 
     /// <summary>Shakes the local camera for a TNT blast at <paramref name="centre"/>, by its distance
@@ -1283,12 +1230,11 @@ public class World : IItemUseWorld
             PushTargetFromBlast(Camera, centre);
         }
 
-        for (var i = 0; i < _mobs.Count; i++)
+        foreach (var mob in _mobs)
         {
-            var mob = _mobs[i];
             if (mob.IsDying) continue;
             var impulse = BlastImpulse.At(centre, mob.Position, TntManager.BlastRadius);
-            var sideways = new Vector3(impulse.X, 0f, impulse.Z);
+            var sideways = impulse with { Y = 0f };
             if (sideways.LengthSquared() > 1e-6f)
                 mob.Shove(sideways, sideways.Length());
         }
@@ -1301,7 +1247,7 @@ public class World : IItemUseWorld
         var body = target.Eye - new Vector3(0f, Camera.EyeHeight * 0.5f, 0f);
         var impulse = BlastImpulse.At(centre, body, TntManager.BlastRadius);
         if (impulse == Vector3.Zero) return;
-        var sideways = new Vector3(impulse.X, 0f, impulse.Z);
+        var sideways = impulse with { Y = 0f };
         target.TakeHit(0, sideways, sideways.Length(), MathF.Max(0f, impulse.Y));
     }
 
@@ -1382,9 +1328,8 @@ public class World : IItemUseWorld
     public void SyncRemotePlayers(IReadOnlyList<RemotePlayerSnapshot> snapshot, int selfId)
     {
         _remoteIdsSeen.Clear();
-        for (var i = 0; i < snapshot.Count; i++)
+        foreach (var entry in snapshot)
         {
-            var entry = snapshot[i];
             if (entry.Id == selfId)
                 continue;
             _remoteIdsSeen.Add(entry.Id);
@@ -1410,13 +1355,7 @@ public class World : IItemUseWorld
 
     public void ClearRemotePlayers() => _remotePlayers.Clear();
 
-    private int IndexOfRemote(int id)
-    {
-        for (var i = 0; i < _remotePlayers.Count; i++)
-            if (_remotePlayers[i].Id == id)
-                return i;
-        return -1;
-    }
+    private int IndexOfRemote(int id) => _remotePlayers.FindIndex(p => p.Id == id);
 
     /// <summary>
     /// One multiplayer-client frame: no local simulation, only the camera (and only once the chunk
@@ -1437,8 +1376,8 @@ public class World : IItemUseWorld
 
         UpdatePlayerModel(deltaTime);
 
-        for (var i = 0; i < _remotePlayers.Count; i++)
-            _remotePlayers[i].Update(deltaTime);
+        foreach (var remotePlayer in _remotePlayers)
+            remotePlayer.Update(deltaTime);
 
         // The purely cosmetic systems a client's own edits still feed (mining debris, leaf
         // bursts and the ambient leaf fall) run locally, or what Render draws would hang in
@@ -1470,7 +1409,7 @@ public class World : IItemUseWorld
 
         _hotbarPops.Update(Inventory, (float)deltaTime);
         _hotbarName.Update(Inventory, (float)deltaTime);
-        _damageNumbers.Update((float)deltaTime);
+        DamageNumbers.Update((float)deltaTime);
         // The pool itself is the server's (ApplyNetworkHealth mirrors it); only the damage flash
         // fades here
         _health.Update((float)deltaTime);
@@ -1562,28 +1501,30 @@ public class World : IItemUseWorld
             return;
         WaterSplash.Track(_playerSplash, Camera.Position - new Vector3(0f, Camera.EyeHeight, 0f), deltaTime, 1f,
             _chunkManager, _debris, inWater: Camera.IsInWater);
-        for (var i = 0; i < _mobs.Count; i++)
+        foreach (var mob in _mobs)
         {
-            var mob = _mobs[i];
             WaterSplash.Track(mob.Splash, mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f), deltaTime,
                 mob.BodyHalfExtent / PlayerPhysics.PlayerRadius, _chunkManager, _debris);
         }
         // Index loops over the read-only lists, so a frame allocates no enumerator
         var drops = _dropManager.Drops;
-        for (var i = 0; i < drops.Count; i++)
-            if (!drops[i].IsAttracted)
-                WaterSplash.Track(drops[i].Splash, drops[i].Position - new Vector3(0f, ItemDrop.Size * 0.5f, 0f),
+        foreach (var itemDrop in drops)
+            if (!itemDrop.IsAttracted)
+                WaterSplash.Track(itemDrop.Splash, itemDrop.Position - new Vector3(0f, ItemDrop.Size * 0.5f, 0f),
                     deltaTime, WorldGenerationConfig.WaterSplashSmallScale, _chunkManager, _debris);
-        for (var i = 0; i < _projectiles.Count; i++)
-            WaterSplash.Track(_projectiles[i].Splash, _projectiles[i].Position, deltaTime,
+
+        foreach (var t in _projectiles)
+            WaterSplash.Track(t.Splash, t.Position, deltaTime,
                 WorldGenerationConfig.WaterSplashSmallScale, _chunkManager, _debris);
+
         var falling = _falling.Falling;
-        for (var i = 0; i < falling.Count; i++)
-            WaterSplash.Track(falling[i].Splash, falling[i].Position - new Vector3(0f, FallingBlock.HalfExtent, 0f),
+        foreach (var fallingBlock in falling)
+            WaterSplash.Track(fallingBlock.Splash, fallingBlock.Position - new Vector3(0f, FallingBlock.HalfExtent, 0f),
                 deltaTime, WorldGenerationConfig.WaterSplashCubeScale, _chunkManager, _debris);
+
         var primed = _tntManager.Primed;
-        for (var i = 0; i < primed.Count; i++)
-            WaterSplash.Track(primed[i].Splash, primed[i].Position - new Vector3(0f, silkgltriangle.PrimedTnt.HalfExtent, 0f),
+        foreach (var primedTnt in primed)
+            WaterSplash.Track(primedTnt.Splash, primedTnt.Position - new Vector3(0f, silkgltriangle.PrimedTnt.HalfExtent, 0f),
                 deltaTime, WorldGenerationConfig.WaterSplashCubeScale, _chunkManager, _debris);
     }
 
@@ -1607,11 +1548,11 @@ public class World : IItemUseWorld
     internal void DamageAllMobs(int amount)
     {
         RefreshMobs();
-        for (var i = 0; i < _mobs.Count; i++)
+        foreach (var mob in _mobs)
         {
-            var hits = _mobs[i].HitsTaken;
-            _mobs[i].TakeDamage(amount);
-            ShowLandedHit(_mobs[i], hits);
+            var hits = mob.HitsTaken;
+            mob.TakeDamage(amount);
+            ShowLandedHit(mob, hits);
         }
     }
 
@@ -1684,12 +1625,12 @@ public class World : IItemUseWorld
 
         Mob? nearest = null;
         var best = 8f * 8f;
-        for (var i = 0; i < _mobs.Count; i++)
+        foreach (var mob in _mobs)
         {
-            var d = Vector3.DistanceSquared(_mobs[i].Position, Camera.Position);
+            var d = Vector3.DistanceSquared(mob.Position, Camera.Position);
             if (d >= best) continue;
             best = d;
-            nearest = _mobs[i];
+            nearest = mob;
         }
 
         if (nearest == null)
@@ -1772,7 +1713,7 @@ public class World : IItemUseWorld
         FrameProfiler.Begin(ProfileSection.Entities);
 
         // Saved mobs and drops whose chunk has streamed in since the flip; RefreshMobs below
-        // picks the new mobs up this same frame. Returns at once once nothing is pending.
+        // picks the new mobs up this same frame. Returns at once, once nothing is pending.
         RestorePendingEntities(deltaTime);
 
         // Drops collected this tick land in the inventory pools. A full pool ignores the
@@ -1784,8 +1725,8 @@ public class World : IItemUseWorld
         if (_serverMode)
         {
             var players = ServerPlayers;
-            for (var i = 0; i < players.Count; i++)
-                _dropCollectors.Add(new DropCollector(players[i].Position, players[i].CanAcceptDrop));
+            foreach (var serverPlayer in players)
+                _dropCollectors.Add(new DropCollector(serverPlayer.Position, serverPlayer.CanAcceptDrop));
         }
         else
         {
@@ -1867,7 +1808,7 @@ public class World : IItemUseWorld
         _fireCells.Clear();
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
-        // A goblin's lit torch: its flame rides the off hand, a few blocks of radius like a campfire
+        // A goblin's lit torch: its flame rides the offhand, a few blocks of radius like a campfire
         if (_goblins != null)
         {
             foreach (var goblin in _goblins.Goblins)
@@ -1999,7 +1940,7 @@ public class World : IItemUseWorld
 
         _hotbarPops.Update(Inventory, (float)deltaTime);
         _hotbarName.Update(Inventory, (float)deltaTime);
-        _damageNumbers.Update((float)deltaTime);
+        DamageNumbers.Update((float)deltaTime);
         Toast.Update((float)deltaTime);
         _hitMarker.Update((float)deltaTime);
 
@@ -2053,7 +1994,7 @@ public class World : IItemUseWorld
     /// <summary>
     /// The Loading -> Playing flip: the play budgets and mouse look come back, the saved lighting
     /// clock is applied against the clock as it stands now (so the day did not advance while
-    /// loading), and the walk cycle forgets the pre-load position so the whole load never reads
+    /// loading), and the walk cycle forgets the preload position so the whole load never reads
     /// as one enormous step. The saved mobs and drops whose chunks the ready sphere already covers
     /// spawn here, before any manager has run; the rest keep waiting for their chunks.
     /// </summary>
@@ -2151,13 +2092,12 @@ public class World : IItemUseWorld
         if (dropped != null)
             Log.Warn($"Entity save: dropped {dropped.Count} unrestorable entr{(dropped.Count == 1 ? "y" : "ies")}: {string.Join(", ", dropped)}");
 
-        if (_entityRestoreTimer >= WorldGenerationConfig.EntityRestoreTimeoutSeconds
-            && (_pendingMobs.Count > 0 || _pendingDrops.Count > 0))
-        {
-            Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s) and {_pendingDrops.Count} drop(s) whose chunk never loaded or that the full mob hard cap kept out");
-            _pendingMobs.Clear();
-            _pendingDrops.Clear();
-        }
+        if (!(_entityRestoreTimer >= WorldGenerationConfig.EntityRestoreTimeoutSeconds)
+            || (_pendingMobs.Count <= 0 && _pendingDrops.Count <= 0)) return;
+
+        Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s) and {_pendingDrops.Count} drop(s) whose chunk never loaded or that the full mob hard cap kept out");
+        _pendingMobs.Clear();
+        _pendingDrops.Clear();
     }
 
     // Whether the chunk owning the cell under a world position is loaded
@@ -2229,35 +2169,30 @@ public class World : IItemUseWorld
     /// had none gets no pose, no creative or flight, no respawn eye and no inventory, so opening it
     /// in singleplayer later searches the surface for a survival spawn as a new world would.
     /// </summary>
-    private PlayerSaveData CaptureHostedPlayer()
-    {
-        var hosted = _hostedPlayer;
-        return new PlayerSaveData
+    private PlayerSaveData CaptureHostedPlayer() =>
+        new()
         {
-            Position = hosted?.Position,
-            Yaw = hosted?.Yaw,
-            Pitch = hosted?.Pitch,
-            Creative = hosted?.Creative ?? false,
-            Flying = hosted?.Flying ?? false,
-            Health = hosted?.Health ?? _health.Health,
+            Position = _hostedPlayer?.Position,
+            Yaw = _hostedPlayer?.Yaw,
+            Pitch = _hostedPlayer?.Pitch,
+            Creative = _hostedPlayer?.Creative ?? false,
+            Flying = _hostedPlayer?.Flying ?? false,
+            Health = _hostedPlayer?.Health ?? _health.Health,
             // Like a game world: until the flip has applied the saved clock, keep the saved one
-            LightingClock = Phase == WorldPhase.Loading ? hosted?.LightingClock ?? LightingTime : LightingTime,
-            RespawnEye = hosted?.RespawnEye,
-            Inventory = hosted?.Inventory
+            LightingClock = Phase == WorldPhase.Loading ? _hostedPlayer?.LightingClock ?? LightingTime : LightingTime,
+            RespawnEye = _hostedPlayer?.RespawnEye,
+            Inventory = _hostedPlayer?.Inventory
         };
-    }
 
     /// <summary>Enqueues <see cref="PlayerSaveCodec.FileName"/>; does nothing without a save store.</summary>
     private void SavePlayerState()
     {
-        if (_saveStore == null)
-            return;
-        _saveStore.EnqueueFile(PlayerSaveCodec.FileName, PlayerSaveCodec.ToBytes(CapturePlayer()));
+        _saveStore?.EnqueueFile(PlayerSaveCodec.FileName, PlayerSaveCodec.ToBytes(CapturePlayer()));
     }
 
     /// <summary>
     /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime and
-    /// goblin (kind by <see cref="EntityType.Name"/>, body centre, health, facing, velocity, a
+    /// goblin (kind by <see cref="EntityType.Name"/>, body center, health, facing, velocity, a
     /// goblin's ammo, a slime's size) and the item drops nearest the player first, capped at
     /// <see cref="WorldGenerationConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
     /// with no name is skipped with one warning). Entries still pending a restore are appended, so a
@@ -2265,22 +2200,18 @@ public class World : IItemUseWorld
     /// </summary>
     private EntitySaveData CaptureEntities()
     {
-        var mobs = new List<EntitySaveData.MobData>();
         var slimes = Slimes;
-        for (var i = 0; i < slimes.Count; i++)
-            if (!slimes[i].IsDead)
-                mobs.Add(MobSaveCodec.Capture(slimes[i], null, slimes[i].Size));
+        var mobs = (from t in slimes where !t.IsDead select MobSaveCodec.Capture(t, null, t.Size)).ToList();
         var goblins = Goblins;
-        for (var i = 0; i < goblins.Count; i++)
-            if (!goblins[i].IsDead)
-                mobs.Add(MobSaveCodec.Capture(goblins[i], goblins[i].Ammo, torches: goblins[i].Torches));
+        mobs.AddRange(from t in goblins where !t.IsDead select MobSaveCodec.Capture(t, t.Ammo, torches: t.Torches));
         mobs.AddRange(_pendingMobs);
 
         _dropSort.Clear();
         var eye = Camera.Position;
         var liveDrops = _dropManager.Drops;
-        for (var i = 0; i < liveDrops.Count; i++)
-            _dropSort.Add((Vector3.DistanceSquared(liveDrops[i].Position, eye), liveDrops[i]));
+        foreach (var itemDrop in liveDrops)
+            _dropSort.Add((Vector3.DistanceSquared(itemDrop.Position, eye), itemDrop));
+
         _dropSort.Sort(static (a, b) => a.dist2.CompareTo(b.dist2));
 
         var drops = new List<EntitySaveData.DropData>();
@@ -2314,9 +2245,7 @@ public class World : IItemUseWorld
     /// <summary>Enqueues <see cref="EntitySaveCodec.FileName"/>; does nothing without a save store.</summary>
     private void SaveEntityState()
     {
-        if (_saveStore == null)
-            return;
-        _saveStore.EnqueueFile(EntitySaveCodec.FileName, EntitySaveCodec.ToBytes(CaptureEntities()));
+        _saveStore?.EnqueueFile(EntitySaveCodec.FileName, EntitySaveCodec.ToBytes(CaptureEntities()));
     }
 
     /// <summary>
@@ -2451,9 +2380,7 @@ public class World : IItemUseWorld
         foreach (var (_, chunk) in _lavaVentChunks)
         {
             var origin = chunk.Position * Chunk.Size;
-            foreach (var idx in chunk.HotFluidVents!)
-                if (Vector3.DistanceSquared(origin + Chunk.LocalOfIdx(idx), eye) <= radius * radius)
-                    candidates++;
+            candidates += chunk.HotFluidVents!.Count(idx => Vector3.DistanceSquared(origin + Chunk.LocalOfIdx(idx), eye) <= radius * radius);
         }
         if (candidates == 0) return;
         var keep = MathF.Min(1f, WorldGenerationConfig.LavaVentMaxEmitters / (float)candidates);
@@ -2484,9 +2411,9 @@ public class World : IItemUseWorld
     {
         _springVents.Clear();
         _springVentChunks.Clear();
-        var radius = WorldGenerationConfig.SpringSteamRadius;
-        var chunkReach = radius + Chunk.Size;
-        var half = Chunk.Size * 0.5f;
+        const float radius = WorldGenerationConfig.SpringSteamRadius;
+        const float chunkReach = radius + Chunk.Size;
+        const float half = Chunk.Size * 0.5f;
         foreach (var chunk in _chunkManager.Renderable)
         {
             if (chunk.SpringVents is null) continue;
@@ -2545,9 +2472,8 @@ public class World : IItemUseWorld
         const float chunkReach = radius + Chunk.Size;
         const float half = Chunk.Size * 0.5f;
         var chunks = _chunkManager.Renderable;
-        for (var i = 0; i < chunks.Count; i++)
+        foreach (var chunk in chunks)
         {
-            var chunk = chunks[i];
             if (chunk.FlamePoints is null) continue;
             var d2 = Vector3.DistanceSquared(chunk.Position * Chunk.Size + new Vector3(half), eye);
             if (d2 <= chunkReach * chunkReach)
@@ -2731,7 +2657,7 @@ public class World : IItemUseWorld
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.RenderEntityHealthbars(Camera, Mobs);
-        renderManager.RenderDamageNumbers(Camera, _damageNumbers);
+        renderManager.RenderDamageNumbers(Camera, DamageNumbers);
         if (_goblins != null)
             renderManager.RenderNoticePips(Camera, _goblins.Goblins);
         renderManager.RenderBlockDebris(Camera, _debris.Debris);
@@ -3097,11 +3023,9 @@ public class World : IItemUseWorld
             return true;
         }
 
-        if (!_hasSelectedBlock && _punchTimer >= _punchGap)
-        {
-            _punchTimer = 0f;
-            PunchSwing();
-        }
+        if (_hasSelectedBlock || !(_punchTimer >= _punchGap)) return false;
+        _punchTimer = 0f;
+        PunchSwing();
 
         return false;
     }
@@ -3115,25 +3039,21 @@ public class World : IItemUseWorld
     private bool TryFindPunchTarget(Vector3 origin, Vector3 direction, out Mob target)
     {
         target = null!;
-        var mobs = _mobs;
-        if (mobs.Count == 0)
+        if (_mobs.Count == 0)
             return false;
 
         var bestDistance = float.PositiveInfinity;
         Mob? best = null;
 
-        for (var i = 0; i < mobs.Count; i++)
+        foreach (var mob in _mobs)
         {
-            var mob = mobs[i];
             if (!Combat.InPunchCone(origin, direction, mob.Position, out var distance))
                 continue;
             if (BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
                 continue;
-            if (distance < bestDistance)
-            {
-                bestDistance = distance;
-                best = mob;
-            }
+            if (!(distance < bestDistance)) continue;
+            bestDistance = distance;
+            best = mob;
         }
 
         if (best == null)
@@ -3189,11 +3109,9 @@ public class World : IItemUseWorld
         if (Player.IsSlicing)
             return;
 
-        if (_sliceCombo.Advance())
-        {
-            Player.StartSlice(_sliceCombo.Direction);
-            _sliceImpactDone = false;
-        }
+        if (!_sliceCombo.Advance()) return;
+        Player.StartSlice(_sliceCombo.Direction);
+        _sliceImpactDone = false;
     }
 
     /// <summary>
@@ -3215,9 +3133,8 @@ public class World : IItemUseWorld
         var firstDistance = float.PositiveInfinity;
         var secondDistance = float.PositiveInfinity;
 
-        for (var i = 0; i < mobs.Count; i++)
+        foreach (var mob in mobs)
         {
-            var mob = mobs[i];
             if (!Combat.InFrontHemisphere(origin, direction, mob.Position, out var distance))
                 continue;
             if (BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
@@ -3244,11 +3161,10 @@ public class World : IItemUseWorld
             StrikeMob(first, damage, origin);
             struck++;
         }
-        if (second != null)
-        {
-            StrikeMob(second, damage, origin);
-            struck++;
-        }
+
+        if (second == null) return struck;
+        StrikeMob(second, damage, origin);
+        struck++;
         return struck;
     }
 
@@ -3259,15 +3175,12 @@ public class World : IItemUseWorld
     private bool HasSliceTarget(Vector3 origin, Vector3 direction, out Mob? first)
     {
         first = null;
-        for (var i = 0; i < _mobs.Count; i++)
+        foreach (var mob in _mobs)
         {
-            var mob = _mobs[i];
-            if (Combat.InFrontHemisphere(origin, direction, mob.Position, out _)
-                && !BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
-            {
-                first = mob;
-                return true;
-            }
+            if (!Combat.InFrontHemisphere(origin, direction, mob.Position, out _)
+                || BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager)) continue;
+            first = mob;
+            return true;
         }
         return false;
     }
@@ -3299,7 +3212,7 @@ public class World : IItemUseWorld
     }
 
     /// <summary>The floating damage numbers over struck mobs (see <see cref="DamageNumberPool"/>).</summary>
-    internal DamageNumberPool DamageNumbers => _damageNumbers;
+    internal DamageNumberPool DamageNumbers { get; } = new(WorldGenerationConfig.DamageNumberCapacity);
 
     // Floats the damage of a hit over the mob when TakeDamage accepted it (its hit count moved). A
     // headless server draws nothing, so it shows none.
@@ -3310,9 +3223,8 @@ public class World : IItemUseWorld
     }
 
     private void ShowDamageNumber(Mob mob, int amount) =>
-        _damageNumbers.Spawn(new Vector3(mob.Position.X,
-            EntityHealthbarRenderer.BarCentreY(mob.Position.Y, mob.HeadAboveCentre)
-            + WorldGenerationConfig.DamageNumberLiftBlocks, mob.Position.Z), amount);
+        DamageNumbers.Spawn(mob.Position with { Y = EntityHealthbarRenderer.BarCentreY(mob.Position.Y, mob.HeadAboveCentre)
+                                                    + WorldGenerationConfig.DamageNumberLiftBlocks }, amount);
 
     /// <summary>
     /// Block id at a world position; 0 (air) for unloaded chunks.
@@ -3559,10 +3471,9 @@ public class World : IItemUseWorld
         }
 
         List<Vector3>? felledLeaves = null;
-        foreach (var block in collected)
+        foreach (var block in collected.Where(block => TreeGenerator.IsLeaf(block.Id)))
         {
-            if (!TreeGenerator.IsLeaf(block.Id)) continue;
-            felledLeaves ??= new List<Vector3>();
+            felledLeaves ??= [];
             felledLeaves.Add(block.Cell);
         }
         if (felledLeaves != null)
@@ -3838,14 +3749,14 @@ public class World : IItemUseWorld
         // A connected client predicted the click; the server replays it for this player. A
         // placement names the face it went against (the server checks the player can see it), any
         // other claim only the cell under the crosshair, which scopes the correction sent back.
-        if (claimed && _clientMode)
-        {
-            if (outcome == RightClickOutcome.Place)
-                RaiseIntent(WorldIntent.Place(Camera.Position, Camera.LastAimDirection, _lastPlaceHit, _lastPlaceNormal));
-            else
-                RaiseIntent(WorldIntent.Use(Camera.Position, Camera.LastAimDirection,
-                    _hasSelectedBlock ? _selectedBlockPosition : null));
-        }
+        if (!claimed || !_clientMode) return claimed;
+
+        if (outcome == RightClickOutcome.Place)
+            RaiseIntent(WorldIntent.Place(Camera.Position, Camera.LastAimDirection, _lastPlaceHit, _lastPlaceNormal));
+        else
+            RaiseIntent(WorldIntent.Use(Camera.Position, Camera.LastAimDirection,
+                _hasSelectedBlock ? _selectedBlockPosition : null));
+
         return claimed;
     }
 
@@ -3863,12 +3774,18 @@ public class World : IItemUseWorld
         outcome = RightClickOutcome.None;
         if (!IsPlaying) return false;
         var local = player.Camera != null;
-        if (local && _throwCharging) return false;
-        if (local)
-            Camera.NotifyPlayerAction();
+        switch (local)
+        {
+            case true when IsThrowCharging:
+                return false;
+            case true:
+                Camera.NotifyPlayerAction();
+                break;
+        }
+
         if (TryCookOrCollect(maxDistance, player) || TryQuernInteract(maxDistance, player)
-            || TryKilnInteract(maxDistance, player) || TryCastInteract(maxDistance, player)
-            || TryToggleOpenable(maxDistance, player))
+                                                  || TryKilnInteract(maxDistance, player) || TryCastInteract(maxDistance, player)
+                                                  || TryToggleOpenable(maxDistance, player))
         {
             PunchSwing();
             outcome = RightClickOutcome.Station;
@@ -3891,11 +3808,11 @@ public class World : IItemUseWorld
     public bool TryBeginThrowCharge()
     {
         if (!IsPlaying) return false;
-        if (_throwCharging) return true;
+        if (IsThrowCharging) return true;
         var id = Inventory.SelectedBlockId;
         if (id == 0 || Inventory.SelectedCount <= 0) return false;
         if (ItemRegistry.TryGet(id) is not { IsThrowable: true } item) return false;
-        _throwCharging = true;
+        IsThrowCharging = true;
         _throwChargeSeconds = 0f;
         _throwItemId = id;
         _throwBaseDamage = item.ThrowDamage ?? 0f;
@@ -3904,7 +3821,7 @@ public class World : IItemUseWorld
     }
 
     /// <summary>Whether a timed use is charging (see <see cref="TryBeginUseCharge"/>).</summary>
-    public bool IsUseCharging => _useCharging;
+    public bool IsUseCharging { get; private set; }
 
     /// <summary>
     /// Starts the timed use of the selected item when it declares <see cref="Item.UseSeconds"/>:
@@ -3915,11 +3832,11 @@ public class World : IItemUseWorld
     public bool TryBeginUseCharge()
     {
         if (!IsPlaying) return false;
-        if (_useCharging) return true;
+        if (IsUseCharging) return true;
         var id = Inventory.SelectedBlockId;
         if (id == 0 || Inventory.SelectedCount <= 0) return false;
         if (ItemRegistry.TryGet(id) is not { } item || item.UseSeconds <= 0f) return false;
-        _useCharging = true;
+        IsUseCharging = true;
         _useChargeSeconds = 0f;
         _useItemId = id;
         Player.StartUseCharge();
@@ -3933,7 +3850,7 @@ public class World : IItemUseWorld
     public void UpdateUseCharge(float deltaTime)
     {
         if (!IsPlaying) return;
-        if (!_useCharging) return;
+        if (!IsUseCharging) return;
         var seconds = ItemRegistry.TryGet(_useItemId)?.UseSeconds ?? 0f;
         if (Inventory.SelectedBlockId != _useItemId || Inventory.SelectedCount <= 0 || seconds <= 0f)
         {
@@ -3949,7 +3866,7 @@ public class World : IItemUseWorld
         }
 
         // Completed: the use runs now, on the same path a click would have taken
-        _useCharging = false;
+        IsUseCharging = false;
         Player.CancelUseCharge();
         TryUseSelected(InteractionReach);
     }
@@ -3958,7 +3875,7 @@ public class World : IItemUseWorld
     public void CancelUseCharge()
     {
         if (!IsPlaying) return;
-        _useCharging = false;
+        IsUseCharging = false;
         Player.CancelUseCharge();
     }
 
@@ -3967,11 +3884,11 @@ public class World : IItemUseWorld
     public void UpdateThrowCharge(float deltaTime)
     {
         if (!IsPlaying) return;
-        if (!_throwCharging) return;
+        if (!IsThrowCharging) return;
         _throwChargeSeconds = Math.Min(_throwChargeSeconds + Math.Max(0f, deltaTime), WorldGenerationConfig.ThrowChargeSeconds);
         if (Inventory.SelectedBlockId != _throwItemId || Inventory.SelectedCount <= 0)
         {
-            _throwCharging = false;
+            IsThrowCharging = false;
             Player.CancelThrowCharge();
             return;
         }
@@ -3983,7 +3900,7 @@ public class World : IItemUseWorld
     public void CancelThrowCharge()
     {
         if (!IsPlaying) return;
-        _throwCharging = false;
+        IsThrowCharging = false;
         Player.CancelThrowCharge();
     }
 
@@ -3993,8 +3910,8 @@ public class World : IItemUseWorld
     public bool ReleaseThrow()
     {
         if (!IsPlaying) return false;
-        if (!_throwCharging) return false;
-        _throwCharging = false;
+        if (!IsThrowCharging) return false;
+        IsThrowCharging = false;
         var charge01 = MathUtils.Clamp01(_throwChargeSeconds / WorldGenerationConfig.ThrowChargeSeconds);
         if (!TryLaunchThrow(Inventory, _throwItemId, _throwBaseDamage, charge01, Camera.Position,
                 Camera.ViewDirection, Camera.IsCreative))
@@ -4050,12 +3967,11 @@ public class World : IItemUseWorld
                 _thrown.RemoveAt(i);
                 continue;
             }
-            if (!alive)
-            {
-                if (!_clientMode)
-                    _dropManager.SpawnAt(projectile.ItemId, projectile.Position);
-                _thrown.RemoveAt(i);
-            }
+
+            if (alive) continue;
+            if (!_clientMode)
+                _dropManager.SpawnAt(projectile.ItemId, projectile.Position);
+            _thrown.RemoveAt(i);
         }
     }
 
@@ -4114,12 +4030,10 @@ public class World : IItemUseWorld
         var changed = _fluidManager.SetCellImmediate(pos, 0, 0, _chunkManager);
         // Scheduled for uniformity with every other edit path; a flow itself never overwrites a
         // leaf, since leaves are not replaceable
-        if (changed)
-        {
-            _leafDecay.ScheduleAround(pos);
-            RaiseBlockEdited(pos);
-        }
-        return changed;
+        if (!changed) return false;
+        _leafDecay.ScheduleAround(pos);
+        RaiseBlockEdited(pos);
+        return true;
     }
 
     bool IItemUseWorld.PourFluidCell(Vector3 pos, byte fluidId)
@@ -4127,12 +4041,10 @@ public class World : IItemUseWorld
         var changed = _fluidManager.SetCellImmediate(pos, fluidId, FluidState.Source, _chunkManager);
         // Scheduled for uniformity with every other edit path; a flow itself never overwrites a
         // leaf, since leaves are not replaceable
-        if (changed)
-        {
-            _leafDecay.ScheduleAround(pos);
-            RaiseBlockEdited(pos);
-        }
-        return changed;
+        if (!changed) return false;
+        _leafDecay.ScheduleAround(pos);
+        RaiseBlockEdited(pos);
+        return true;
     }
 
     /// <summary>
@@ -4185,9 +4097,7 @@ public class World : IItemUseWorld
     int IItemUseWorld.PileSecondaryFor(byte blockId, int x, int y, int z, byte state)
     {
         var pile = BlockType.ById[blockId];
-        if (pile?.Renderer != BlockRenderer.Pebbles)
-            return 0;
-        return PebbleGenerator.ObsidianCountWithState(x, z, state, pile.StackMax);
+        return pile?.Renderer != BlockRenderer.Pebbles ? 0 : PebbleGenerator.ObsidianCountWithState(x, z, state, pile.StackMax);
     }
 
     bool IItemUseWorld.SetPileComposition(Vector3 pos, byte blockId, int total, int secondary)
@@ -4195,7 +4105,7 @@ public class World : IItemUseWorld
         var chunk = _chunkManager.ChunkAt((int)pos.X, (int)pos.Y, (int)pos.Z);
         if (chunk == null)
             return false;
-        byte state = BlockType.ById[blockId]?.Renderer == BlockRenderer.Pebbles
+        var state = BlockType.ById[blockId]?.Renderer == BlockRenderer.Pebbles
             ? PebbleGenerator.StateFor(total, secondary)
             : (byte)total;
         var changed = chunk.SetStateAt(pos, state, _chunkManager);
@@ -4232,12 +4142,10 @@ public class World : IItemUseWorld
     {
         var removed = _chunkManager.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)?.RemoveBlockAt(cell, _chunkManager) == true;
         // Scheduled for uniformity with every other edit path
-        if (removed)
-        {
-            _leafDecay.ScheduleAround(cell);
-            RaiseBlockEdited(cell);
-        }
-        return removed;
+        if (!removed) return false;
+        _leafDecay.ScheduleAround(cell);
+        RaiseBlockEdited(cell);
+        return true;
     }
 
     void IItemUseWorld.SpawnPrimedTnt(Vector3 cell, byte blockId)
@@ -4307,11 +4215,11 @@ public class World : IItemUseWorld
         var context = _activeContext;
         if (context == null) return false;
         var players = ServerPlayers;
-        for (var i = 0; i < players.Count; i++)
+        foreach (var serverPlayer in players)
         {
-            if (!ReferenceEquals(players[i].Context, context)) continue;
-            if (!players[i].Status.Heal(amount)) return false;
-            players[i].StatusDirty = true;
+            if (!ReferenceEquals(serverPlayer.Context, context)) continue;
+            if (!serverPlayer.Status.Heal(amount)) return false;
+            serverPlayer.StatusDirty = true;
             return true;
         }
         return false;
@@ -4453,26 +4361,28 @@ public class World : IItemUseWorld
 
         var held = HeldItem(inventory);
 
-        // The firestarter lights the kiln from its own OnUse, which also spends its durability
-        if (held is { UseAction: ItemUseAction.IgniteCampfire }) return false;
-
-        // An empty hand lifts the crucible out; a full tools pool puts it straight back
-        if (held == null)
+        switch (held)
         {
-            if (_kilns.TryTakeCrucible(anchor, out var takenId, out var takenContents)
-                && CrucibleInventory.Add(inventory, takenId, takenContents) == null)
-                _kilns.TryPlaceCrucible(anchor, takenId, takenContents);
-            return true;
-        }
-
-        // A crucible in hand stands in the hearth, carrying whatever that instance held
-        if (held is CrucibleItem crucible)
-        {
-            var instance = inventory.SelectedToolInstance;
-            var stack = instance > 0 ? inventory.GetToolStack(instance) : null;
-            if (stack != null && _kilns.TryPlaceCrucible(anchor, crucible.Id, stack.Get<CrucibleComponent>()))
-                inventory.RemoveTool(instance);
-            return true;
+            // The firestarter lights the kiln from its own OnUse, which also spends its durability
+            case { UseAction: ItemUseAction.IgniteCampfire }:
+                return false;
+            // An empty hand lifts the crucible out; a full tools pool puts it straight back
+            case null:
+            {
+                if (_kilns.TryTakeCrucible(anchor, out var takenId, out var takenContents)
+                    && CrucibleInventory.Add(inventory, takenId, takenContents) == null)
+                    _kilns.TryPlaceCrucible(anchor, takenId, takenContents);
+                return true;
+            }
+            // A crucible in hand stands in the hearth, carrying whatever that instance held
+            case CrucibleItem crucible:
+            {
+                var instance = inventory.SelectedToolInstance;
+                var stack = instance > 0 ? inventory.GetToolStack(instance) : null;
+                if (stack != null && _kilns.TryPlaceCrucible(anchor, crucible.Id, stack.Get<CrucibleComponent>()))
+                    inventory.RemoveTool(instance);
+                return true;
+            }
         }
 
         // Ore (or anything else that melts) charges the crucible standing inside
@@ -4483,14 +4393,11 @@ public class World : IItemUseWorld
             return true;
         }
 
-        if (held is { FuelSeconds: > 0f } && _kilns.TryAddFuel(anchor, held))
-        {
-            if (!player.IsCreative)
-                inventory.ConsumeSelected();
-            return true;
-        }
+        if (held is not { FuelSeconds: > 0f } || !_kilns.TryAddFuel(anchor, held)) return held is not BlockItem;
+        if (!player.IsCreative)
+            inventory.ConsumeSelected();
 
-        return held is not BlockItem;
+        return true;
     }
 
     /// <summary>
@@ -4520,17 +4427,14 @@ public class World : IItemUseWorld
             return true;
         }
 
-        if (HeldItem(inventory) is CrucibleItem)
-        {
-            var instance = inventory.SelectedToolInstance;
-            var stack = instance > 0 ? inventory.GetToolStack(instance) : null;
-            if (stack != null)
-                // A connected player's pour drains that player's crucible and follows its eye
-                _casting.TryStartPour(cell, hitId, stack, player.Camera == null ? player : null);
-            return true;
-        }
+        if (HeldItem(inventory) is not CrucibleItem) return false;
+        var instance = inventory.SelectedToolInstance;
+        var stack = instance > 0 ? inventory.GetToolStack(instance) : null;
+        if (stack != null)
+            // A connected player's pour drains that player's crucible and follows its eye
+            _casting.TryStartPour(cell, hitId, stack, player.Camera == null ? player : null);
 
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -4566,14 +4470,6 @@ public class World : IItemUseWorld
         RaiseBlockEdited(cell);
     }
 
-    /// <summary>
-    /// Places the hotbar's selected block against the face the player is looking at and spends
-    /// one from that slot � except in creative mode, where placing is free. Does nothing
-    /// when the slot is empty or holds no blocks. Returns whether one was placed; false unless the
-    /// world is playing, since nothing may edit an unloaded world.
-    /// </summary>
-    public bool TryPlaceSelectedBlock(float maxDistance) => TryPlaceSelectedBlock(maxDistance, LocalContext());
-
     /// <summary><see cref="TryPlaceSelectedBlock(float)"/> for <paramref name="player"/>: aimed by
     /// its raycast, placing from and spending out of its inventory unless it is creative.</summary>
     public bool TryPlaceSelectedBlock(float maxDistance, PlayerContext player)
@@ -4588,10 +4484,6 @@ public class World : IItemUseWorld
             inventory.ConsumeSelected();
         return true;
     }
-
-    /// <summary>Picks the targeted block into the hotbar. False unless the world is playing:
-    /// nothing may edit an unloaded world.</summary>
-    public bool TryPickTargetedBlock() => TryPickTargetedBlock(Inventory, out _);
 
     /// <summary>
     /// <see cref="TryPickTargetedBlock()"/> into <paramref name="inventory"/>, reporting the picked
@@ -4609,11 +4501,6 @@ public class World : IItemUseWorld
         pickedId = id;
         return inventory.PickBlock(id);
     }
-
-    /// <summary>Places a block against the face the local player targets. Returns whether one was
-    /// placed; false unless the world is playing, since nothing may edit an unloaded world.</summary>
-    public bool TryPlaceBlockFromRaycast(float maxDistance, byte blockId) =>
-        TryPlaceBlockFromRaycast(maxDistance, blockId, LocalContext());
 
     /// <summary>Places a block against the face <paramref name="player"/> targets, recording the
     /// hit (the face a client's placement intent names).</summary>

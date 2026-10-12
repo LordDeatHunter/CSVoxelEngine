@@ -5,7 +5,7 @@ namespace silkgltriangle;
 
 /// <summary>
 /// Name -> <see cref="IGrowthLogic"/> table a species' <c>growth.logic</c> is resolved through.
-/// Growth logics are code, not content: the table is built once by the static initialiser and
+/// Growth logics are code, not content: the table is built once by the static initializer and
 /// never changes afterwards, so it needs no Publish/Reset and is safe to read from the
 /// generation worker threads without locking.
 /// </summary>

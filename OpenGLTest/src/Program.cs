@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Runtime;
 using System.Threading;
@@ -132,7 +133,7 @@ public static class Program
     public static void Main()
     {
         // PERF_TODO item 10: keep full blocking Gen2s off the frame path. SustainedLowLatency
-        // defers them in favour of background collections; the startup line already logs the
+        // defers them in favor of background collections; the startup line already logs the
         // effective latency mode via PrintBuildDiagnostics, so a perf capture records it.
         GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
 
@@ -211,37 +212,44 @@ public static class Program
                 settingsMenuView.DragRow = null;
                 return;
             }
-            if (button == MouseButton.Right) placeTimer = MAX_PLACE_TIMER;
-            if (button == MouseButton.Left && inventoryView.IsOpen && inputManager.Mouse != null)
+            switch (button)
             {
-                // Releasing a thumb drag ends it here and nowhere else while the panel is
-                // open, so the release never equips or picks whatever is under the cursor.
-                if (inventoryView.ThumbDragGrab.HasValue)
+                case MouseButton.Right:
+                    placeTimer = MAX_PLACE_TIMER;
+                    break;
+                case MouseButton.Left when inventoryView.IsOpen && inputManager.Mouse != null:
                 {
-                    inventoryView.EndThumbDrag();
-                    return;
+                    // Releasing a thumb drag ends it here and nowhere else while the panel is
+                    // open, so the release never equips or picks whatever is under the cursor.
+                    if (inventoryView.ThumbDragGrab.HasValue)
+                    {
+                        inventoryView.EndThumbDrag();
+                        return;
+                    }
+                    HandleInventoryClick(inputManager.Mouse.Position);
+                    break;
                 }
-                HandleInventoryClick(inputManager.Mouse.Position);
             }
         };
 
         inputManager.Mouse?.MouseDown += (_, button) =>
         {
-            if (screen is AppScreen.Loading or AppScreen.Saving) return;
-            if (screen == AppScreen.Playing && inventoryView.IsOpen && !pauseMenuView.IsOpen
-                && button == MouseButton.Left && inputManager.Mouse != null)
+            switch (screen)
             {
-                HandleInventoryScrollbarPress(inputManager.Mouse.Position);
-                return;
+                case AppScreen.Loading or AppScreen.Saving:
+                    return;
+                case AppScreen.Playing when inventoryView.IsOpen && !pauseMenuView.IsOpen
+                                                                 && button == MouseButton.Left && inputManager.Mouse != null:
+                    HandleInventoryScrollbarPress(inputManager.Mouse.Position);
+                    return;
             }
+
             if (!SettingsPageOpen || button != MouseButton.Left || inputManager.Mouse == null)
                 return;
             var hit = renderManager.UiSettingsHitAt(inputManager.Mouse.Position, settingsMenuView);
-            if (hit.Kind == SettingsHitKind.Slider && SettingsRows.All[hit.Row] is SliderRow slider)
-            {
-                settingsMenuView.DragRow = hit.Row;
-                slider.Set(SettingsLayout.SliderValue(slider, hit.Fraction));
-            }
+            if (hit.Kind != SettingsHitKind.Slider || SettingsRows.All[hit.Row] is not SliderRow slider) return;
+            settingsMenuView.DragRow = hit.Row;
+            slider.Set(SettingsLayout.SliderValue(slider, hit.Fraction));
         };
 
         inputManager.Mouse?.Scroll += (_, wheel) =>
@@ -261,34 +269,38 @@ public static class Program
             var w = world!;
 
             if (chatView.IsOpen) return;
-            if (!inventoryView.IsOpen && !pauseMenuView.IsOpen)
+            switch (inventoryView.IsOpen)
             {
-                w.Inventory.Scroll(wheel.Y);
-                // While connected the server owns the selection: mirror the step as an intent, or
-                // the next inventory sync would put the slot straight back.
-                MirrorSelection(w.Inventory.SelectedIndex);
-            }
-            else if (inventoryView.IsOpen && !pauseMenuView.IsOpen && inputManager.Mouse != null)
-            {
-                // The wheel scrolls the list only while hovering it; wheel.Y > 0 is toward the top.
-                var canvas = renderManager.UiCanvasSize;
-                var p = renderManager.UiToCanvas(inputManager.Mouse.Position);
-                if (InventoryPanelLayout.IsOverList(p, canvas))
+                case false when !pauseMenuView.IsOpen:
+                    w.Inventory.Scroll(wheel.Y);
+                    // While connected the server owns the selection: mirror the step as an intent, or
+                    // the next inventory sync would put the slot straight back.
+                    MirrorSelection(w.Inventory.SelectedIndex);
+                    break;
+                case true when !pauseMenuView.IsOpen && inputManager.Mouse != null:
                 {
-                    var searching = !inventoryView.Search.IsEmpty;
-                    var rowCount = searching
-                        ? InventorySearch.Search(inventoryView.Search.Query, w.Inventory, w.Camera.IsCreative).Count
-                        : RowCountFor(inventoryView.Tab);
-                    var delta = -wheel.Y * InventoryPanelLayout.WheelStepRows * InventoryPanelLayout.RowHeight;
-                    SetListScroll(InventoryPanelLayout.ClampedOffset(
-                        (searching ? inventoryView.Search.ScrollOffset : inventoryView.ScrollOffset) + delta,
-                        rowCount, canvas), searching);
-                }
-                else if (inventoryView.Tab == InventoryCategory.Crafting
-                         && renderManager.UiIsOverCraftCard(inputManager.Mouse.Position))
-                {
-                    inventoryView.CraftScrollOffset = renderManager.UiClampCraftScroll(
-                        inventoryView.CraftScrollOffset - wheel.Y * CraftCardLayout.WheelStep);
+                    // The wheel scrolls the list only while hovering it; wheel.Y > 0 is toward the top.
+                    var canvas = renderManager.UiCanvasSize;
+                    var p = renderManager.UiToCanvas(inputManager.Mouse.Position);
+                    if (InventoryPanelLayout.IsOverList(p, canvas))
+                    {
+                        var searching = !inventoryView.Search.IsEmpty;
+                        var rowCount = searching
+                            ? InventorySearch.Search(inventoryView.Search.Query, w.Inventory, w.Camera.IsCreative).Count
+                            : RowCountFor(inventoryView.Tab);
+                        var delta = -wheel.Y * InventoryPanelLayout.WheelStepRows * InventoryPanelLayout.RowHeight;
+                        SetListScroll(InventoryPanelLayout.ClampedOffset(
+                            (searching ? inventoryView.Search.ScrollOffset : inventoryView.ScrollOffset) + delta,
+                            rowCount, canvas), searching);
+                    }
+                    else if (inventoryView.Tab == InventoryCategory.Crafting
+                             && renderManager.UiIsOverCraftCard(inputManager.Mouse.Position))
+                    {
+                        inventoryView.CraftScrollOffset = renderManager.UiClampCraftScroll(
+                            inventoryView.CraftScrollOffset - wheel.Y * CraftCardLayout.WheelStep);
+                    }
+
+                    break;
                 }
             }
         };
@@ -301,12 +313,18 @@ public static class Program
         {
             keyboard.KeyChar += (_, c) =>
             {
-                if (screen == AppScreen.Menu)
-                    menu.Type(c);
-                else if (screen == AppScreen.Playing && chatView.IsOpen && !pauseMenuView.IsOpen)
-                    chatView.Type(c);
-                else if (screen == AppScreen.Playing && inventoryView.IsOpen && !pauseMenuView.IsOpen)
-                    HandleInventoryType(c);
+                switch (screen)
+                {
+                    case AppScreen.Menu:
+                        menu.Type(c);
+                        break;
+                    case AppScreen.Playing when chatView.IsOpen && !pauseMenuView.IsOpen:
+                        chatView.Type(c);
+                        break;
+                    case AppScreen.Playing when inventoryView.IsOpen && !pauseMenuView.IsOpen:
+                        HandleInventoryType(c);
+                        break;
+                }
             };
             keyboard.KeyDown += (_, key, _) =>
             {
@@ -327,14 +345,20 @@ public static class Program
                     Key.Escape => MenuKey.Escape,
                     _ => (MenuKey?)null,
                 };
-                if (menuKey == null) return;
-                // ESC leaves the settings page; a live slider drag is saved like a release would
-                if (menuKey == MenuKey.Escape && menu.View.Page == MainMenuPage.Settings)
+                switch (menuKey)
                 {
-                    if (settingsMenuView.DragRow.HasValue)
-                        GameSettings.Save();
-                    settingsMenuView.DragRow = null;
+                    case null:
+                        return;
+                    // ESC leaves the settings page; a live slider drag is saved like a release would
+                    case MenuKey.Escape when menu.View.Page == MainMenuPage.Settings:
+                    {
+                        if (settingsMenuView.DragRow.HasValue)
+                            GameSettings.Save();
+                        settingsMenuView.DragRow = null;
+                        break;
+                    }
                 }
+
                 HandleMenuAction(menu.Key(menuKey.Value));
             };
         }
@@ -350,17 +374,16 @@ public static class Program
         }
 
         var script = Environment.GetEnvironmentVariable(LaunchMode.ScriptVariable);
-        if (!string.IsNullOrWhiteSpace(script))
+        if (string.IsNullOrWhiteSpace(script)) return;
+
+        try
         {
-            try
-            {
-                visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!);
-            }
-            catch (Exception e)
-            {
-                Log.WriteLine($"Ignoring {LaunchMode.ScriptVariable}=\"{script}\": {e.Message}");
-                visualScriptFailed = true;
-            }
+            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!);
+        }
+        catch (Exception e)
+        {
+            Log.WriteLine($"Ignoring {LaunchMode.ScriptVariable}=\"{script}\": {e.Message}");
+            visualScriptFailed = true;
         }
     }
 
@@ -462,12 +485,17 @@ public static class Program
             world = new World(renderManager.gl, renderManager.OpaqueChunkGeometry,
                 renderManager.TranslucentChunkGeometry, renderManager.LodGeometry,
                 windowManager.Window, inputManager.InputContext, sfx, null,
-                serverMode: false, clientMode: true, spawn: server.Spawn);
-            world.Player.Rig = renderManager.PlayerRig;
-            // Every action is predicted locally and sent as an intent; the cells it changed are
-            // tagged with that intent, so the server's answer to it is told from older messages
-            world.BlockEdited = StagePredictedCell;
-            world.IntentRaised = SendWorldIntent;
+                serverMode: false, clientMode: true, spawn: server.Spawn)
+            {
+                Player =
+                {
+                    Rig = renderManager.PlayerRig
+                },
+                // Every action is predicted locally and sent as an intent; the cells it changed are
+                // tagged with that intent, so the server's answer to it is told from older messages
+                BlockEdited = StagePredictedCell,
+                IntentRaised = SendWorldIntent
+            };
             renderManager.LightSource = world.GetChunkManager();
             var fb = windowManager.Window.FramebufferSize;
             if (fb.Y > 0)
@@ -559,8 +587,8 @@ public static class Program
             {
                 HandleNetworkMessage(w, payload);
             }
-            catch (Exception e) when (e is System.IO.EndOfStreamException or System.IO.IOException
-                                          or System.IO.InvalidDataException or FormatException
+            catch (Exception e) when (e is EndOfStreamException or IOException
+                                          or InvalidDataException or FormatException
                                           or ArgumentException)
             {
                 Log.Warn($"Multiplayer: bad message from the server: {e.Message}");
@@ -614,9 +642,8 @@ public static class Program
                 var seq = reader.ReadInt();
                 ReadCellChanges(reader);
                 netApplyScratch.Clear();
-                foreach (var change in netCellsScratch)
-                    if (prediction.Offer(change, seq))
-                        netApplyScratch.Add(change);
+                foreach (var change in netCellsScratch.Where(change => prediction.Offer(change, seq)))
+                    netApplyScratch.Add(change);
                 w.ApplyNetworkBlockChanges(netApplyScratch);
                 break;
             }
@@ -725,9 +752,8 @@ public static class Program
                 // predicted waits until the server has answered that prediction
                 ReadCellChanges(reader);
                 netApplyScratch.Clear();
-                foreach (var change in netCellsScratch)
-                    if (prediction.Offer(change, null))
-                        netApplyScratch.Add(change);
+                foreach (var change in netCellsScratch.Where(change => prediction.Offer(change, null)))
+                    netApplyScratch.Add(change);
                 w.ApplyNetworkBlockChanges(netApplyScratch);
                 break;
             }
@@ -741,8 +767,6 @@ public static class Program
                     w.Inventory.Import(InventoryNetCodec.Decode(data));
                 break;
             }
-            default:
-                break;
         }
     }
 
@@ -751,7 +775,7 @@ public static class Program
     {
         var count = reader.ReadInt();
         if (count < 0)
-            throw new System.IO.InvalidDataException($"cell batch of {count}");
+            throw new InvalidDataException($"cell batch of {count}");
         netCellsScratch.Clear();
         for (var i = 0; i < count; i++)
         {
@@ -825,13 +849,13 @@ public static class Program
             return (position, ItemTooltip.Lines(rowTool != 0 ? stack!.DefinitionId : rowId, stack));
         }
 
-        if (renderManager.UiHotbarSlotAt(position) is { } slot && slot >= 0 && inventory.IdAt(slot) != 0)
+        if (renderManager.UiHotbarSlotAt(position) is not { } slot || slot < 0 || inventory.IdAt(slot) == 0)
+            return null;
         {
             var tool = inventory.ToolInstanceAt(slot);
             var stack = tool != 0 ? inventory.GetToolStack(tool) : null;
             return (position, ItemTooltip.Lines(inventory.IdAt(slot), stack));
         }
-        return null;
     }
 
     /// <summary>
@@ -986,12 +1010,10 @@ public static class Program
         netDead = false;
         netRespawnTimer = 0f;
         prediction = new ClientPrediction();
-        if (world != null)
-        {
-            world.ClearRemotePlayers();
-            world.BlockEdited = null;
-            world.IntentRaised = null;
-        }
+        if (world == null) return;
+        world.ClearRemotePlayers();
+        world.BlockEdited = null;
+        world.IntentRaised = null;
     }
 
     /// <summary>
@@ -1265,53 +1287,51 @@ public static class Program
             return;
         }
 
-        if (screen == AppScreen.Menu)
+        switch (screen)
         {
-            FrameProfiler.Begin(ProfileSection.ProgramUpdate);
-            SyncWindowSettings();
-            TrackSettingsDrag();
-            FrameProfiler.End(ProfileSection.ProgramUpdate);
-            return;
-        }
-
-        if (screen == AppScreen.Loading)
-        {
-            FrameProfiler.Begin(ProfileSection.ProgramUpdate);
-            SyncWindowSettings();
-            FrameProfiler.End(ProfileSection.ProgramUpdate);
-            // Connecting to a server: no world exists yet; the handshake builds it.
-            if (world == null)
+            case AppScreen.Menu:
+                FrameProfiler.Begin(ProfileSection.ProgramUpdate);
+                SyncWindowSettings();
+                TrackSettingsDrag();
+                FrameProfiler.End(ProfileSection.ProgramUpdate);
+                return;
+            case AppScreen.Loading:
             {
-                UpdateConnecting((float)deltaTime);
+                FrameProfiler.Begin(ProfileSection.ProgramUpdate);
+                SyncWindowSettings();
+                FrameProfiler.End(ProfileSection.ProgramUpdate);
+                // Connecting to a server: no world exists yet; the handshake builds it.
+                if (world == null)
+                {
+                    UpdateConnecting((float)deltaTime);
+                    return;
+                }
+
+                // The world streams on its own raised budgets; no key, mouse, pause menu or panel
+                // reaches it, so Camera.SuppressLook stays the World's until its Playing flip.
+                var loading = world;
+                loading.Update((float)deltaTime, inputManager.Keyboard);
+                loadingView.Update(loading.LoadProgress, loading.IsLoaded, (float)deltaTime);
+                if (loading.IsLoaded)
+                    screen = AppScreen.Playing;
+                FrameProfiler.Begin(ProfileSection.DebugLog);
+                LogDebugLine(deltaTime);
+                FrameProfiler.End(ProfileSection.DebugLog);
                 return;
             }
-
-            // The world streams on its own raised budgets; no key, mouse, pause menu or panel
-            // reaches it, so Camera.SuppressLook stays the World's until its Playing flip.
-            var loading = world;
-            loading.Update((float)deltaTime, inputManager.Keyboard);
-            loadingView.Update(loading.LoadProgress, loading.IsLoaded, (float)deltaTime);
-            if (loading.IsLoaded)
-                screen = AppScreen.Playing;
-            FrameProfiler.Begin(ProfileSection.DebugLog);
-            LogDebugLine(deltaTime);
-            FrameProfiler.End(ProfileSection.DebugLog);
-            return;
         }
 
         if (screen != AppScreen.Playing) return;
         var w = world!;
-        // The server connection, if any: send our state and apply what it broadcast.
-        if (netClient is { Status: NetworkStatus.Handshaken } connectedClient)
+        switch (netClient)
         {
-            if (!UpdateNetwork(connectedClient, (float)deltaTime))
+            // The server connection, if any: send our state and apply what it broadcast.
+            case { Status: NetworkStatus.Handshaken } connectedClient when !UpdateNetwork(connectedClient, (float)deltaTime):
                 return;
-        }
-        else if (netClient is { Status: NetworkStatus.Disconnected or NetworkStatus.Failed } lostClient)
-        {
-            lostClient.Dispose();
-            DisconnectToMenu("Lost connection to the server");
-            return;
+            case { Status: NetworkStatus.Disconnected or NetworkStatus.Failed } lostClient:
+                lostClient.Dispose();
+                DisconnectToMenu("Lost connection to the server");
+                return;
         }
         // The loading overlay fades out over the first playing frames
         if (!loadingView.IsFinished)
@@ -1362,12 +1382,16 @@ public static class Program
                 chatView.Close();
             else if (inventoryView.IsOpen)
                 SetInventoryOpen(false);
-            else if (pauseMenuView.Page == PauseMenuPage.Closed)
-                SetPauseMenu(PauseMenuPage.Main);
-            else if (pauseMenuView.Page == PauseMenuPage.Settings)
-                SetPauseMenu(PauseMenuPage.Main);
-            else
-                SetPauseMenu(PauseMenuPage.Closed);
+            else switch (pauseMenuView.Page)
+            {
+                case PauseMenuPage.Closed:
+                case PauseMenuPage.Settings:
+                    SetPauseMenu(PauseMenuPage.Main);
+                    break;
+                default:
+                    SetPauseMenu(PauseMenuPage.Closed);
+                    break;
+            }
         }
         escWasPressed = escPressed;
 
@@ -1428,34 +1452,37 @@ public static class Program
         var rightDown = inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true;
         var rightHeld = rightDown && !inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen;
         var rightPressed = rightHeld && !rightWasDown;
-        if (rightHeld && w.IsUseCharging)
+        switch (rightHeld)
         {
-            w.UpdateUseCharge((float)deltaTime);
-        }
-        else if (rightHeld && w.IsThrowCharging)
-        {
-            w.UpdateThrowCharge((float)deltaTime);
-        }
-        else if (rightHeld && (rightPressed || placeTimer >= MAX_PLACE_TIMER))
-        {
-            placeTimer = 0;
-            FrameProfiler.Begin(ProfileSection.UsePlace);
-            // A timed use (use.seconds) charges instead of firing on the click, and runs only
-            // when the hold completes; anything else uses or places on the click
-            var claimed = w.TryBeginUseCharge() || w.TryUseSelected(World.InteractionReach);
-            FrameProfiler.End(ProfileSection.UsePlace);
-            if (!claimed)
-                w.TryBeginThrowCharge();
-        }
-        else if (!rightHeld && (w.IsThrowCharging || w.IsUseCharging))
-        {
-            FrameProfiler.Begin(ProfileSection.UsePlace);
-            if (w.IsUseCharging)
-                w.CancelUseCharge();
-            else
-                w.ReleaseThrow();
-            placeTimer = 0;
-            FrameProfiler.End(ProfileSection.UsePlace);
+            case true when w.IsUseCharging:
+                w.UpdateUseCharge((float)deltaTime);
+                break;
+            case true when w.IsThrowCharging:
+                w.UpdateThrowCharge((float)deltaTime);
+                break;
+            case true when rightPressed || placeTimer >= MAX_PLACE_TIMER:
+            {
+                placeTimer = 0;
+                FrameProfiler.Begin(ProfileSection.UsePlace);
+                // A timed use (use.seconds) charges instead of firing on the click, and runs only
+                // when the hold completes; anything else uses or places on the click
+                var claimed = w.TryBeginUseCharge() || w.TryUseSelected(World.InteractionReach);
+                FrameProfiler.End(ProfileSection.UsePlace);
+                if (!claimed)
+                    w.TryBeginThrowCharge();
+                break;
+            }
+            case false when w.IsThrowCharging || w.IsUseCharging:
+            {
+                FrameProfiler.Begin(ProfileSection.UsePlace);
+                if (w.IsUseCharging)
+                    w.CancelUseCharge();
+                else
+                    w.ReleaseThrow();
+                placeTimer = 0;
+                FrameProfiler.End(ProfileSection.UsePlace);
+                break;
+            }
         }
         rightWasDown = rightDown;
         if (!rightHeld && (inventoryView.IsOpen || pauseMenuView.IsOpen || chatView.IsOpen))
@@ -1528,8 +1555,7 @@ public static class Program
             inventoryView.EndThumbDrag();
         }
         world.Camera.SuppressLook = open;
-        if (inputManager.Mouse != null)
-            inputManager.Mouse.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
+        inputManager.Mouse?.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
     }
 
     private static void SetPauseMenu(PauseMenuPage page)
@@ -1545,8 +1571,7 @@ public static class Program
         }
         var open = page != PauseMenuPage.Closed;
         world.Camera.SuppressLook = open;
-        if (inputManager.Mouse != null)
-            inputManager.Mouse.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
+        inputManager.Mouse?.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
     }
 
     /// <summary>
@@ -1573,14 +1598,13 @@ public static class Program
                 Math.Clamp(appliedResolution, 0, GameSettings.Resolutions.Length - 1)];
             windowManager.Window.Size = new Vector2D<int>(w, h);
         }
-        if (GameSettings.MaxFpsIndex != appliedMaxFps)
-        {
-            appliedMaxFps = GameSettings.MaxFpsIndex;
-            var fps = GameSettings.MaxFpsOptions[
-                Math.Clamp(appliedMaxFps, 0, GameSettings.MaxFpsOptions.Length - 1)];
-            windowManager.Window.UpdatesPerSecond = fps;
-            windowManager.Window.FramesPerSecond = fps;
-        }
+
+        if (GameSettings.MaxFpsIndex == appliedMaxFps) return;
+        appliedMaxFps = GameSettings.MaxFpsIndex;
+        var fps = GameSettings.MaxFpsOptions[
+            Math.Clamp(appliedMaxFps, 0, GameSettings.MaxFpsOptions.Length - 1)];
+        windowManager.Window.UpdatesPerSecond = fps;
+        windowManager.Window.FramesPerSecond = fps;
     }
 
     /// <summary>
@@ -1608,7 +1632,7 @@ public static class Program
         }
     }
 
-    private static void HandleSettingsClick(System.Numerics.Vector2 position)
+    private static void HandleSettingsClick(Vector2 position)
     {
         var hit = renderManager.UiSettingsHitAt(position, settingsMenuView);
         switch (hit.Kind)
@@ -1638,7 +1662,7 @@ public static class Program
         }
     }
 
-    private static void HandleMenuClick(System.Numerics.Vector2 position)
+    private static void HandleMenuClick(Vector2 position)
     {
         switch (renderManager.UiPauseMenuHitAt(position, pauseMenuView))
         {
@@ -1676,7 +1700,7 @@ public static class Program
     /// and row count are latched so the per-frame drag never re-sorts the list), the track
     /// above or below it pages by one viewport.
     /// </summary>
-    private static void HandleInventoryScrollbarPress(System.Numerics.Vector2 position)
+    private static void HandleInventoryScrollbarPress(Vector2 position)
     {
         var canvas = renderManager.UiCanvasSize;
         var p = renderManager.UiToCanvas(position);
@@ -1783,9 +1807,9 @@ public static class Program
     {
         _playerNames.Clear();
         _playerNames.Add($"{chatView.LocalName} (you)");
-        if (world != null)
-            foreach (var remote in world.RemotePlayers)
-                _playerNames.Add(remote.Name);
+        if (world == null) return _playerNames;
+        foreach (var remote in world.RemotePlayers)
+            _playerNames.Add(remote.Name);
         return _playerNames;
     }
 
@@ -1965,7 +1989,7 @@ public static class Program
     /// counts, the row body grants one.
     /// </summary>
     private static void ApplyCatalogButton(byte id, int row, float offset, int rowCount,
-        System.Numerics.Vector2 position)
+        Vector2 position)
     {
         var button = InventoryPanelLayout.CatalogButtonAt(renderManager.UiToCanvas(position),
             row, offset, rowCount, renderManager.UiCanvasSize);
@@ -2004,7 +2028,7 @@ public static class Program
     /// pick for preview (or act on a search result), crafting controls feed the open recipe, and
     /// hotbar slots equip the pick (clicking what the slot already shows clears it).
     /// </summary>
-    private static void HandleInventoryClick(System.Numerics.Vector2 position)
+    private static void HandleInventoryClick(Vector2 position)
     {
         var inventory = world!.Inventory;
         var creative = world.Camera.IsCreative;
@@ -2027,7 +2051,7 @@ public static class Program
         }
 
         var searching = !inventoryView.Search.IsEmpty;
-        IReadOnlyList<SearchHit>? hits = searching
+        var hits = searching
             ? InventorySearch.Search(inventoryView.Search.Query, inventory, creative)
             : null;
         var rowCount = hits?.Count ?? RowCountFor(inventoryView.Tab);
@@ -2053,24 +2077,26 @@ public static class Program
                 if (row.Value < entries.Count)
                     ApplyCatalogButton(entries[row.Value].Id, row.Value, offset, rowCount, position);
             }
-            else if (inventoryView.Tab == InventoryCategory.Tools)
+            else switch (inventoryView.Tab)
             {
-                inventoryView.SelectedToolInstance = inventory.ToolEntries()[row.Value].InstanceId;
-                inventoryView.SelectedId = 0;
-            }
-            else if (inventoryView.Tab == InventoryCategory.Crafting)
-            {
-                inventoryView.Craft.Select(ContentRegistry.CraftingRecipes[row.Value]);
-                // A newly opened recipe starts at the top of its card.
-                inventoryView.CraftScrollOffset = 0f;
-            }
-            else
-            {
-                var picked = inventory.StackEntries(inventoryView.Tab)[row.Value].Id;
-                inventoryView.SelectedId = picked;
-                inventoryView.SelectedToolInstance = 0;
-                if (inventoryView.Craft.Recipe != null)
-                    inventoryView.Craft.FeedFromInventory(picked, inventory);
+                case InventoryCategory.Tools:
+                    inventoryView.SelectedToolInstance = inventory.ToolEntries()[row.Value].InstanceId;
+                    inventoryView.SelectedId = 0;
+                    break;
+                case InventoryCategory.Crafting:
+                    inventoryView.Craft.Select(ContentRegistry.CraftingRecipes[row.Value]);
+                    // A newly opened recipe starts at the top of its card.
+                    inventoryView.CraftScrollOffset = 0f;
+                    break;
+                default:
+                {
+                    var picked = inventory.StackEntries(inventoryView.Tab)[row.Value].Id;
+                    inventoryView.SelectedId = picked;
+                    inventoryView.SelectedToolInstance = 0;
+                    if (inventoryView.Craft.Recipe != null)
+                        inventoryView.Craft.FeedFromInventory(picked, inventory);
+                    break;
+                }
             }
             return;
         }
@@ -2117,18 +2143,16 @@ public static class Program
         // Equipped here at once and, while connected, sent as an intent: the server applies the
         // same equip to its copy (only for something this player owns), so the next sync keeps it.
         var hotbar = renderManager.UiHotbarSlotAt(position);
-        if (hotbar.HasValue)
+        if (!hotbar.HasValue) return;
+        if (inventoryView.Tab == InventoryCategory.Tools && inventoryView.SelectedToolInstance != 0)
         {
-            if (inventoryView.Tab == InventoryCategory.Tools && inventoryView.SelectedToolInstance != 0)
-            {
-                inventory.EquipTool(hotbar.Value, inventoryView.SelectedToolInstance);
-                SendInventoryIntent(InventoryIntent.EquipTool(hotbar.Value, inventoryView.SelectedToolInstance));
-            }
-            else if (inventoryView.SelectedId != 0)
-            {
-                inventory.EquipStackable(hotbar.Value, inventoryView.SelectedId);
-                SendInventoryIntent(InventoryIntent.EquipStackable(hotbar.Value, inventoryView.SelectedId));
-            }
+            inventory.EquipTool(hotbar.Value, inventoryView.SelectedToolInstance);
+            SendInventoryIntent(InventoryIntent.EquipTool(hotbar.Value, inventoryView.SelectedToolInstance));
+        }
+        else if (inventoryView.SelectedId != 0)
+        {
+            inventory.EquipStackable(hotbar.Value, inventoryView.SelectedId);
+            SendInventoryIntent(InventoryIntent.EquipStackable(hotbar.Value, inventoryView.SelectedId));
         }
     }
 

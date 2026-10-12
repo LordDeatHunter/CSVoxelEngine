@@ -136,7 +136,7 @@ internal sealed class CactusGrowthLogic : IGrowthLogic
                 weights[dir] = 0f;
         }
 
-        // Balance: favour the side opposite an existing arm, but only if it is still open.
+        // Balance: favor the side opposite an existing arm, but only if it is still open.
         for (var dir = 0; dir < TreeDirections.Up; dir++)
         {
             var opposite = TreeDirections.Opposite(dir);
