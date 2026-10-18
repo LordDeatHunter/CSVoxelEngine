@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Slimes;
 
 namespace VoxelEngine.Saves;
 

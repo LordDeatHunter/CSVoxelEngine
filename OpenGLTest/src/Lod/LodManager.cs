@@ -4,8 +4,10 @@ using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
 using VoxelEngine.Chunks;
+using VoxelEngine.Chunks.Sources;
+using VoxelEngine.Chunks.Streaming;
 using VoxelEngine.Player;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Geometry;
 
 namespace VoxelEngine.Lod;
 

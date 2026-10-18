@@ -13,6 +13,7 @@ using VoxelEngine.Audio;
 using VoxelEngine.Content;
 using VoxelEngine.Interaction;
 using VoxelEngine.Networking;
+using VoxelEngine.Networking.Client;
 using VoxelEngine.Platform;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering;

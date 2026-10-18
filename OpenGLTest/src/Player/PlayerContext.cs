@@ -1,7 +1,7 @@
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Interaction;
-using VoxelEngine.Networking;
+using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Player;

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
 

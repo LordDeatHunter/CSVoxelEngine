@@ -2226,7 +2226,7 @@ instance); that is a director change and belongs to whichever round wants it.
 change can break.** *If a future change removes a position from `ChunkManager.Chunks` or from
 `_queuedChunkPositions` anywhere other than `UnloadDistantChunks` without bumping
 `ChunkRemovalVersion`, the frontier can starve that chunk.* Nothing structurally prevents it:
-`Chunks` is a **public** `ConcurrentDictionary` and `OpenGLTest.Tests/Chunks/MeshingTests.cs` already removes
+`Chunks` is a **public** `ConcurrentDictionary` and `OpenGLTest.Tests/Chunks/Meshing/MeshingTests.cs` already removes
 through it. The single-site property is a convention, not an enforced invariant. Two related rules
 travel with it: the version bump is published **after** the unload loop and must never be moved up
 (a loaded chunk lives in **both** dictionaries, so a position becomes needed at the

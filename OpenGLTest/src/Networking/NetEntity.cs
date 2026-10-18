@@ -1,5 +1,5 @@
 using System.Numerics;
-using VoxelEngine.Entities;
+using VoxelEngine.Entities.Slimes;
 
 namespace VoxelEngine.Networking;
 

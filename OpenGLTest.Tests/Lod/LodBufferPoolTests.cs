@@ -1,6 +1,6 @@
 using System.Linq;
 using VoxelEngine.Lod;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Geometry;
 using Xunit;
 
 namespace VoxelEngine.Tests.Lod;

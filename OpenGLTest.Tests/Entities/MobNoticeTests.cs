@@ -1,6 +1,7 @@
 using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Networking;
+using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using Xunit;
 

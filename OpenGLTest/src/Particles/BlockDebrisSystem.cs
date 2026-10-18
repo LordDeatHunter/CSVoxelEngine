@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Effects.Climate;
 
 namespace VoxelEngine.Particles;

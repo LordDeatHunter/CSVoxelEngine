@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Numerics;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Simulation;
 using Xunit;
 

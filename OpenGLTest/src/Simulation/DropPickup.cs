@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
-using VoxelEngine.Networking;
+using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.UI.Hud;

@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Effects.Climate;
-using VoxelEngine.Entities;
+using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Networking;
 using VoxelEngine.Particles;
 using Xunit;

@@ -7,7 +7,7 @@ using VoxelEngine.Content.Shapes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Lod;
-using VoxelEngine.Networking;
+using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;

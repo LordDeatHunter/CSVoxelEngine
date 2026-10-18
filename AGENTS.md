@@ -130,7 +130,7 @@ STEP + move one pulse, MATURE jumps to the step this seed rolls for maturity
 bumps the seed and keeps the step. Features (the buttress fins) apply only from that maturity step
 on, so the mature step is exactly the worldgen tree (`GrowToMaturity`). Flat ground has no carved
 cells, so the roots feature never shows here. The tree is rasterized with `TreeRasterizer` and meshed
-by `CellBatchMesher` (`OpenGLTest/src/Chunks/CellBatchMesher.cs`): the real chunk mesher run over scratch
+by `CellBatchMesher` (`OpenGLTest/src/Chunks/Meshing/CellBatchMesher.cs`): the real chunk mesher run over scratch
 chunks at the cells' real chunk positions, padded by a ring of empty chunks, so thin tree-wood tubes,
 wide-trunk shells, the pixel-rim bevel, leaves and the biome tint look as in game, with no clipping at
 16-block seams. `DebugSceneRenderer.RenderTree` rebuilds the meshes only when the state's `Version`
@@ -861,41 +861,44 @@ OpenGLTest/
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups
       SfxManager.cs            # one-shot sound effects built on the same NAudio stack as AmbienceManager
       SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline
-    Chunks/                    # chunk storage, generation workers, meshing and lighting, column terrain and
-                               #   world sources, the streaming foci, the light query entities read (EntityLight)
-      CellBatchMesher.cs       # GL-free: meshes any TreeCell set with the real chunk mesher over scratch chunks
-                               #   at their real positions inside an empty ring (the item debugger's TREES tab)
+    Chunks/                    # chunk storage and lifecycle, the column cache and column terrain, the light
+                               #   query entities read (EntityLight); meshing, world sources and streaming below
       Chunk.cs                 # 16^3 block storage (byte IDs), state/snapshot save-restore and mesh upload; worldgen
-                               #   column fill and mesh/light generation live in Chunks/ (ColumnCache/ChunkMesher/ChunkLighting)
-      ChunkGenerationWorker.cs # background threads creating chunks around every streaming focus (one
-                               #   ChunkScanFrontier per focus, served round-robin)
+                               #   column fill and mesh/light generation live in ColumnCache and Meshing/ (ChunkMesher/ChunkLighting)
       ChunkKey.cs              # packs a chunk position into one long, so the chunk
                                #   dictionaries hash one integer instead of three floats
-      ChunkLighting.cs         # the wide light-volume flood (sun + colored lamp) + corner light queries
       ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling, all against
                                #   a focus list (unload only outside every focus's radius)
       ChunkMap.cs              # the loaded-chunk table (ChunkManager.Chunks): a ConcurrentDictionary keyed on a packed ChunkKey long
-      ChunkMesher.cs           # the greedy pass + per-voxel procedural emitters + water-surface codes
-      ChunkScanFrontier.cs     # the shared resume point for the chunk-generation workers' closest-first offset scan (PERF_TODO C3)
       ColumnCache.cs           # the process-global column-data cache, its accessors and the column fill
       ColumnTerrain.cs         # one chunk column's terrain: heights, water levels, corner climate (warmth, wetness)
       EntityLight.cs           # GL-free world light query for entity draws (drops, pops, debris, the player, ...)
       EntityLightSample.cs     # sun and block light (each 0..1) one entity draw is lit with
-      FaceLight.cs             # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
-      GeneratedWorldSource.cs  # the default IWorldSource: ColumnCache.Get + Chunk.GenerateBlockData, byte-identical
-                               #   to the path before world sources existed
       IColumnSource.cs         # the seam a mesh build, the fluid-surface query and the pop/debris tint read
                                #   chunk-column terrain through (ChunkManager.ColumnSource): IsReady + TryGet
-      ImportedMapSource.cs     # an IWorldSource over a pre-built map folder (<world>/import/), worldgen outside it
-      IWorldSource.cs          # where a world's terrain comes from (extends IColumnSource): GetColumn (a complete
-                               #   ColumnData), Supplies, Fill(chunk); thread-safe, deterministic (see "World sources")
-      MeshScratch.cs           # per-thread scratch buffers of the binary greedy mesh pass
-      PaneEmitter.cs           # a pane cell from the padded snapshot: post + arms, no face between
+      Meshing/                 # the mesh build: the greedy pass, the procedural emitters, the light volume and corner light
+        CellBatchMesher.cs     # GL-free: meshes any TreeCell set with the real chunk mesher over scratch chunks
+                               #   at their real positions inside an empty ring (the item debugger's TREES tab)
+        ChunkLighting.cs       # the wide light-volume flood (sun + colored lamp) + corner light queries
+        ChunkMesher.cs         # the greedy pass + per-voxel procedural emitters + water-surface codes
+        FaceLight.cs           # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
+        MeshScratch.cs         # per-thread scratch buffers of the binary greedy mesh pass
+        PaneEmitter.cs         # a pane cell from the padded snapshot: post + arms, no face between
                                #   connected panes, caps culled against a same-shaped pane above/below
-      StreamingFocus.cs        # the published focus chunks (camera, or every connected player on a server):
+      Sources/                 # where a world's terrain comes from: IWorldSource and its implementations (see "World sources")
+        GeneratedWorldSource.cs # the default IWorldSource: ColumnCache.Get + Chunk.GenerateBlockData, byte-identical
+                                #   to the path before world sources existed
+        ImportedMapSource.cs   # an IWorldSource over a pre-built map folder (<world>/import/), worldgen outside it
+        IWorldSource.cs        # where a world's terrain comes from (extends IColumnSource): GetColumn (a complete
+                               #   ColumnData), Supplies, Fill(chunk); thread-safe, deterministic (see "World sources")
+        WorldgenColumnSource.cs # the singleplayer/generated-server IColumnSource over ColumnCache; a server
+                                #   with a custom world source uses that source, the client's is the ClientChunkStreamer
+      Streaming/               # the chunk-generation workers, their shared scan frontier and the streaming foci
+        ChunkGenerationWorker.cs # background threads creating chunks around every streaming focus (one
+                                 #   ChunkScanFrontier per focus, served round-robin)
+        ChunkScanFrontier.cs   # the shared resume point for the chunk-generation workers' closest-first offset scan (PERF_TODO C3)
+        StreamingFocus.cs      # the published focus chunks (camera, or every connected player on a server):
                                #   an immutable array swapped only when a focus changes chunk
-      WorldgenColumnSource.cs  # the singleplayer/generated-server IColumnSource over ColumnCache; a server
-                               #   with a custom world source uses that source, the client's is the ClientChunkStreamer
     Content/                   # the data-driven content pipeline (ContentRegistry) — see "Content" below
       ContentRegistry.cs       # loads assets/data + assets/models, assigns byte ids, fills the tables
       Blocks/                  # block-side enums and resolved tables (renderer, break, attack, use, biome tint faces)
@@ -1031,7 +1034,7 @@ OpenGLTest/
         SurfaceFresnel.cs      # GL-free twin of the surface fresnel terms in test-fragment.glsl:
                                #   the shared Schlick helper the ore path reads
         WaterGlitter.cs        # GL-free twin of the sun glitter on water: mirror lobe, sparkle life and spot, gate
-    Entities/                  # mobs (Mob base, Slime, Goblin and their GL-free rules), item drops, projectiles,
+    Entities/                  # mobs (the Mob base and the shared GL-free mob rules; the goblin and the slime below), item drops, projectiles,
                                #   primed TNT, falling blocks, damage numbers, the entity animator and clips
       AnimationClip.cs         # GL-free Blockbench keyframe clip: per-bone rotation/position/scale
                                #   tracks, linear/catmull-rom/step, loop/once/hold, timeline events
@@ -1044,10 +1047,6 @@ OpenGLTest/
       EntityType.cs            # one entity kind loaded from assets/data/entities/<name>.json: its display name, health pool
       FallingBlock.cs          # a gravity-affected block (sand, gravel) in flight
       FallingBlockLanding.cs   # a falling cube written back as a block: cell, block, fall, submerged (its dust)
-      Goblin.cs                # the goblin: body physics, throw-then-melee AI, clip/event contract
-                               #   (ValidateContent), animation-driven release/impact events
-      GoblinAim.cs             # GL-free low-arc ballistic solver for the thrown stones
-      GoblinTorches.cs         # GL-free torch roll for a goblin spawn (night, depth, one uniform roll)
       MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
                                      #   living count each registered manager reports
       IMobTarget.cs            # what a mob chases and hurts: eye, immunity, TakeHit (Camera, ServerPlayer)
@@ -1063,13 +1062,19 @@ OpenGLTest/
       MobTargets.cs            # GL-free target rules: body contact, nearest non-immune target, min distance
       PrimedTnt.cs             # a primed TNT block: a full-size cube that falls under gravity and
                                #   collides with blocks axis by axis like the player and the item drops
-      Slime.cs                 # a slime: a gel cube that hops toward the player and only hurts on contact while it is off the ground
-      SlimeMerge.cs            # GL-free slime merge: who merges (same size, touching, past the cooldown),
-                               #   the merged size, center and health
-      SlimeSize.cs             # GL-free per-size slime stats: body scale, health, contact damage,
-                               #   loot rolls, each 1 + (size - 1) * its config step; the spawn size roll
       ThrownProjectile.cs      # a thrown item or a goblin stone in flight: falls under Gravity,
                                #   its damage scaled by the charge, hits a mob or stops on a block
+      Goblins/                 # the goblin: the mob, its stone aim and its torch roll
+        Goblin.cs              # the goblin: body physics, throw-then-melee AI, clip/event contract
+                               #   (ValidateContent), animation-driven release/impact events
+        GoblinAim.cs           # GL-free low-arc ballistic solver for the thrown stones
+        GoblinTorches.cs       # GL-free torch roll for a goblin spawn (night, depth, one uniform roll)
+      Slimes/                  # the slime: the mob, its sizes and its merge
+        Slime.cs               # a slime: a gel cube that hops toward the player and only hurts on contact while it is off the ground
+        SlimeMerge.cs          # GL-free slime merge: who merges (same size, touching, past the cooldown),
+                               #   the merged size, center and health
+        SlimeSize.cs           # GL-free per-size slime stats: body scale, health, contact damage,
+                               #   loot rolls, each 1 + (size - 1) * its config step; the spawn size roll
     Graphics/                  # GL resource wrappers: Mesh, Shader, textures and the atlases,
                                #   the block/item mesh caches, cutout mips, tile materials
       BlockCubeCache.cs        # lazily built cube meshes, one per block type
@@ -1169,44 +1174,47 @@ OpenGLTest/
       LodRegion.cs             # far-terrain LOD: region columns meshed at reduced resolution from heightmaps; per-column chunk-Y ranges for burial
       LodSkyExposure.cs        # GL-free coarse sky exposure the LOD mesher bakes into Vertex.Sun from its column-top grids
       LodSurface.cs            # per-column far-LOD surface overrides (edited top height + tile), beside LodRegion's caps
-    Networking/                # the GL-free multiplayer protocol, client, server-side player and
-                               #   the intent/validation rules (see "Multiple players and chat")
-      AttackPacing.cs          # GL-free: the shortest gap between two punches or slice swings
-      BreakProgress.cs         # GL-free: a player's mining on the server, judged against the held item's hits
+    Networking/                # the GL-free multiplayer protocol and codecs both sides share
+                               #   (see "Multiple players and chat"); the client and the server side below
       ChunkNetCodec.cs         # chunk blocks/state and column terrain (heights, water levels, corner climate),
                                #   Deflate-compressed
-      ClientChunkStreamer.cs   # requests streamed chunks/columns and applies them, no worldgen; the
-                               #   client's IColumnSource
-      ClientLodStreamer.cs     # requests and applies server-built far regions
-      ClientMirror.cs          # World component, client mode: applies the server's cells, entities, stations,
-                               #   health and player list (ApplyNetwork*, SyncRemotePlayers)
-      ClientPrediction.cs      # GL-free: a client's pending predictions vs the server's answers (sequence ids)
       InventoryIntent.cs       # one client inventory intent (select, drop, equip, craft, creative grant/clear, pick)
       InventoryIntentCodec.cs  # its bounds-checked wire form
-      InventoryIntentRules.cs  # GL-free: what the server accepts of an intent, against that player's inventory
       InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)
       LodNetCodec.cs           # a far-LOD region's mesh on the wire
-      MovementRules.cs         # GL-free movement rubberband: speed clamp, then collision, rise and hover checks
-      MovementState.cs         # a player's per-connection movement memory (airborne-still time)
-      MoveVerdict.cs           # Accepted / Clamped / Rejected
       NetEntity.cs             # NetEntityKind/NetEntity and NetCellChange
       NetPlayerAction.cs       # the swing a player just made, as the server rebroadcasts it in each
                                #   player list entry (with a counter that moves on every new one)
       NetPlayerFlags.cs        # the PlayerState flags byte (creative, flying), a request to the server
       NetProtocol.cs           # NetMessage ids, length-prefixed framing, PacketWriter/PacketReader
-      NetValidation.cs         # server movement, edit-reach, intent-eye and visible-face sanity rules
-      NetworkClient.cs         # the client: connect + handshake, reader thread, inbound queue, sends
-      OperatorList.cs          # who may be creative: ops.json in the world folder plus --op, matched by save slug
       PlayerStatusCodec.cs     # PlayerStatusData (modes, health, dead, knockback) and its bounds-checked wire form
-      RateLimiter.cs           # GL-free token bucket (a player's edit rate)
-      RemotePlayer.cs          # another player as the client sees them: pose smoothing + a PlayerModel
       ServerAddress.cs         # host[:port] parsing and formatting (the default port)
-      ServerPlayer.cs          # a connected player on the server: own Inventory, creative/flight flags, pose,
-                               #   its PlayerContext, newest sequence id, mining progress, edit rate, attack pace,
-                               #   its PlayerHealth/fall tracking/respawn eye, mob-hit sink, correction numbers
       StationNetCodec.cs       # the StationState snapshot: campfires, querns, kilns, cast molds
       WorldIntent.cs           # one client world intent (break start/complete, place, use, throw, attack)
       WorldIntentCodec.cs      # its bounds-checked wire form, with the sequence id
+      Client/                  # the client: connection, streamed chunks and far LOD, the World mirror, predictions, remote players
+        ClientChunkStreamer.cs # requests streamed chunks/columns and applies them, no worldgen; the
+                               #   client's IColumnSource
+        ClientLodStreamer.cs   # requests and applies server-built far regions
+        ClientMirror.cs        # World component, client mode: applies the server's cells, entities, stations,
+                               #   health and player list (ApplyNetwork*, SyncRemotePlayers)
+        ClientPrediction.cs    # GL-free: a client's pending predictions vs the server's answers (sequence ids)
+        NetworkClient.cs       # the client: connect + handshake, reader thread, inbound queue, sends
+        RemotePlayer.cs        # another player as the client sees them: pose smoothing + a PlayerModel
+      ServerSide/              # the server's side of a session: the connected player and the rules its intents and
+                               #   moves are judged by (the dedicated server itself is OpenGLTest.Server, VoxelEngine.Server)
+        AttackPacing.cs        # GL-free: the shortest gap between two punches or slice swings
+        BreakProgress.cs       # GL-free: a player's mining on the server, judged against the held item's hits
+        InventoryIntentRules.cs # GL-free: what the server accepts of an intent, against that player's inventory
+        MovementRules.cs       # GL-free movement rubberband: speed clamp, then collision, rise and hover checks
+        MovementState.cs       # a player's per-connection movement memory (airborne-still time)
+        MoveVerdict.cs         # Accepted / Clamped / Rejected
+        NetValidation.cs       # server movement, edit-reach, intent-eye and visible-face sanity rules
+        OperatorList.cs        # who may be creative: ops.json in the world folder plus --op, matched by save slug
+        RateLimiter.cs         # GL-free token bucket (a player's edit rate)
+        ServerPlayer.cs        # a connected player on the server: own Inventory, creative/flight flags, pose,
+                               #   its PlayerContext, newest sequence id, mining progress, edit rate, attack pace,
+                               #   its PlayerHealth/fall tracking/respawn eye, mob-hit sink, correction numbers
     Particles/                 # every particle system (debris, bubbles, fire, leaves,
                                #   splashes, dust) and its renderer; the ParticleRing buffer
       AmbientEffects.cs        # World component: cosmetic world effects (steam puffs, lava vents, spring steam,
@@ -1257,34 +1265,9 @@ OpenGLTest/
                                #   with the sprint-toggle setting on, else it follows the key
       WaterImmersion.cs, WaterPhase.cs  # GL-free water depth states: the submerged share of the body and
                                         #   its phase (Dry / Wade / Float / Swim)
-    Rendering/                 # the GL render passes and their GL-free gates: RenderManager,
-                               #   UIRenderer, the chunk draw batch and geometry pools,
-                               #   shadows, clouds, sky dome, post, rays, healthbars
-      ChunkDrawBatch.cs        # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +
-                               #   the vec4(origin, alpha) ChunkInfo SSBO read via gl_DrawID
-      ChunkGeometryPool.cs     # the two shared chunk vertex/index buffers (opaque, translucent):
-                               #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy
-      CloudCopies.cs           # the GL-free arithmetic behind the cloud layer's 3x3
-                               #   sweep: where each copy of the field sits this frame
-      CloudCover.cs            # whether the cloud layer, as CloudRenderer draws it, stands between an eye and the sky along a ray
-      CloudRenderer.cs         # draws the cloud layer: one static mesh built once from CloudField
-      CloudShadowTexture.cs    # the cloud-shadow coverage map: one R8 GL_TEXTURE_2D of CloudField.Cells texels per side
-      ContactAoRenderer.cs     # the screen-space contact AO pass (SH-28, contact-ao-fragment.glsl, twin ContactAo)
-      DamageNumberRenderer.cs  # draws the floating damage numbers (DamageNumberPool)
-                               #   as world-space text that always faces the camera
-      DamageVignetteRenderer.cs # full-screen damage vignette: one oversized triangle with
-                                #   a radial fragment gradient, drawn inside the UI pass
-      EntityHealthbarRenderer.cs # five hearts floating above every live mob, always facing the camera
-      GeometryAllocator.cs     # GL-free first-fit free list with coalescing, in units of
-                               #   64 vertices / 96 indices; hands out the pools' GeometrySlices
-      GodraysRenderer.cs       # the godrays: a half-res shadow-map march over dry air, then a radial composite toward the sun
+    Rendering/                 # the GL render passes and their GL-free gates: RenderManager, WorldRenderer,
+                               #   GPU timing, the texture-unit cache, shadow cascades, reflection reuse
       GpuTimingGate.cs         # the GL-free decision behind the per-pass GPU timer queries
-      HalfResTarget.cs         # the GL-free sizing arithmetic behind the half-resolution underwater-rays render target
-      MeshBufferPool.cs        # recycles the vertex and index lists a mesh build fills
-      NoticePipRenderer.cs     # draws the "!" a goblin pops over its head the moment it first notices a player
-      PostEffects.cs           # the post pass's per-frame camera effects (exposure, grade, ...) handed to PostProcessRenderer
-      PostProcessRenderer.cs   # the frame's final full-screen pass: one oversized triangle
-                               #   (the shape SkyRenderer draws) shaded by post-fragment.glsl
       ReflectionEntities.cs    # the live entities RenderManager.RenderReflection may draw into the water mirror
       ReflectionReuse.cs       # the GL-free decision behind the reflection pass's temporal reuse
       RenderManager.cs         # GL state, world/selection/UI passes, viewport
@@ -1325,14 +1308,43 @@ OpenGLTest/
                                #   (ContactAoRenderer) drawn through the color-only HDR FBO while
                                #   sampling the HDR depth texture, placed mid entity pass
       ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped center (StepCenter) and light view-proj
-      SkyDomeFrame.cs          # what the sky dome needs each frame beyond its SkyPalette: the night sky's stars
-      SkyRenderer.cs           # the full-screen sky dome pass (sky-fragment.glsl)
       TextureUnitCache.cs      # the GL-free bookkeeping behind the render-state rebind cache (PERF_TODO R5)
-      UIRenderer.cs            # every UI draw: HUD, hotbar, inventory, pause/settings menus,
-                               #   DrawMainMenu (all main-menu pages) and DrawLoadingScreen
-      UITextCache.cs           # memoized per-frame HUD strings (FPS, compass, coordinates, counts)
-      UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
       WorldRenderer.cs         # World component: the world's frame (Render, every pass in order) and its UI (RenderUI)
+      Atmosphere/              # the sky dome and the cloud layer: their passes, GL-free twins and the cloud-shadow map
+        CloudCopies.cs         # the GL-free arithmetic behind the cloud layer's 3x3
+                               #   sweep: where each copy of the field sits this frame
+        CloudCover.cs          # whether the cloud layer, as CloudRenderer draws it, stands between an eye and the sky along a ray
+        CloudRenderer.cs       # draws the cloud layer: one static mesh built once from CloudField
+        CloudShadowTexture.cs  # the cloud-shadow coverage map: one R8 GL_TEXTURE_2D of CloudField.Cells texels per side
+        SkyDomeFrame.cs        # what the sky dome needs each frame beyond its SkyPalette: the night sky's stars
+        SkyRenderer.cs         # the full-screen sky dome pass (sky-fragment.glsl)
+      Geometry/                # chunk draw plumbing: the geometry pools and their allocator, the indirect draw batch, the mesh list pool
+        ChunkDrawBatch.cs      # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +
+                               #   the vec4(origin, alpha) ChunkInfo SSBO read via gl_DrawID
+        ChunkGeometryPool.cs   # the two shared chunk vertex/index buffers (opaque, translucent):
+                               #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy
+        GeometryAllocator.cs   # GL-free first-fit free list with coalescing, in units of
+                               #   64 vertices / 96 indices; hands out the pools' GeometrySlices
+        MeshBufferPool.cs      # recycles the vertex and index lists a mesh build fills
+      Overlays/                # drawn over the scene: the UI pass (UIRenderer, its text cache), the damage vignette
+                               #   and the world-space healthbars, damage numbers and notice pips
+        DamageNumberRenderer.cs # draws the floating damage numbers (DamageNumberPool)
+                                #   as world-space text that always faces the camera
+        DamageVignetteRenderer.cs # full-screen damage vignette: one oversized triangle with
+                                  #   a radial fragment gradient, drawn inside the UI pass
+        EntityHealthbarRenderer.cs # five hearts floating above every live mob, always facing the camera
+        NoticePipRenderer.cs   # draws the "!" a goblin pops over its head the moment it first notices a player
+        UIRenderer.cs          # every UI draw: HUD, hotbar, inventory, pause/settings menus,
+                               #   DrawMainMenu (all main-menu pages) and DrawLoadingScreen
+        UITextCache.cs         # memoized per-frame HUD strings (FPS, compass, coordinates, counts)
+      ScreenSpace/             # full-screen and screen-space passes: post (tonemap, FXAA), contact AO, godrays, underwater rays
+        ContactAoRenderer.cs   # the screen-space contact AO pass (SH-28, contact-ao-fragment.glsl, twin ContactAo)
+        GodraysRenderer.cs     # the godrays: a half-res shadow-map march over dry air, then a radial composite toward the sun
+        HalfResTarget.cs       # the GL-free sizing arithmetic behind the half-resolution underwater-rays render target
+        PostEffects.cs         # the post pass's per-frame camera effects (exposure, grade, ...) handed to PostProcessRenderer
+        PostProcessRenderer.cs # the frame's final full-screen pass: one oversized triangle
+                               #   (the shape SkyRenderer draws) shaded by post-fragment.glsl
+        UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
     Saves/                     # GL-free world saves: stores, codecs, names, world sources (see "Saves")
       ChunkSaveCodec.cs        # the chunk file format: block-name palette + Deflate body
       ChunkSaveStore.cs        # one world's chunk files + side cars: pending map, index, async writer thread
@@ -1464,26 +1476,17 @@ OpenGLTest/
       WorldgenStats.cs         # lock-free worldgen timing from the generation workers and
                                #   the LOD builder, drained once a second by FrameProfiler
       WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere
-      Features/                # every surface and underground feature generator (see "Biomes")
+      Features/                # every surface feature generator (see "Biomes"); the underground ones below
         BoulderGenerator.cs    # a rare 2-4 cell stone or cobblestone blob on the forest/taiga floor
         BranchPileGenerator.cs # crossed-stick branch piles: up to 4 long thin logs sharing one air cell above the ground
         CairnGenerator.cs      # a 3-cell cobblestone stack with a pebble hat on a local summit
-        CaveFormationGenerator.cs # stalactites and stalagmites in cave rooms
-        CoalGenerator.cs       # coal ore veins: the same threshold-on-3D-noise deposits as MalachiteGenerator
         CottonGenerator.cs     # wild cotton clumps on the dry forest fringe (PlantClumps + a climate gate)
         DesertWellGenerator.cs # the desert's ring-and-roof well, dug into sand over sandstone
         FallenLogGenerator.cs  # a rare 3-5 cell detached oak log lying on the forest floor
         FlowerGenerator.cs     # meadow flowers on warm, open grass
         FoliageGenerator.cs    # ground cover: a grass tuft on dry forest grass and a dead shrub on desert sand
-        GeodeGenerator.cs      # a hollow, crystal-lined sphere deep in solid stone
-        GlowMushroomGenerator.cs # lit mushrooms on dry, dark cave floors
-        GravelPocketGenerator.cs # gravel and sand pockets buried in stone (falls blocks, see "Gravel pockets")
-        HotSpringGenerator.cs  # steaming cave water bodies
         IceSpikeGenerator.cs   # rare single-column ice spikes on the barren frozen plains
-        LavaGenerator.cs       # deep lava pockets: cave floors at/below LavaMaxY pond over inside patch mask + pool roll
         LilyPadGenerator.cs    # lily pads floating on ponds (PlantClumps)
-        MalachiteGenerator.cs  # malachite ore veins: sparse large blobs where a
-                               #   low-frequency 3D OpenSimplex2 field exceeds its threshold
         MeteorGenerator.cs     # a blast crater with scattered meteor rock
         OasisGenerator.cs      # a desert oasis: a water disc, a grass ring and palms (worldgen.oasis)
         PebbleGenerator.cs     # ankle-high stones in rare patches: 1-3 small boxes sharing one air cell above the surface
@@ -1494,7 +1497,17 @@ OpenGLTest/
         RuinedPillarGenerator.cs # broken stone columns standing on the surface
         SeaStackGenerator.cs   # stone stacks rising out of the sea near a shore
         SnowGenerator.cs       # cold weather: freezes surface water to ice, lays one layered-snow cell per cold column
-        UndergroundPoolGenerator.cs # still cave pools on carved floors
+        Underground/           # below the surface: ores, geodes, gravel pockets, lava, cave formations and mushrooms, hot springs, pools
+          CaveFormationGenerator.cs # stalactites and stalagmites in cave rooms
+          CoalGenerator.cs     # coal ore veins: the same threshold-on-3D-noise deposits as MalachiteGenerator
+          GeodeGenerator.cs    # a hollow, crystal-lined sphere deep in solid stone
+          GlowMushroomGenerator.cs # lit mushrooms on dry, dark cave floors
+          GravelPocketGenerator.cs # gravel and sand pockets buried in stone (falls blocks, see "Gravel pockets")
+          HotSpringGenerator.cs # steaming cave water bodies
+          LavaGenerator.cs     # deep lava pockets: cave floors at/below LavaMaxY pond over inside patch mask + pool roll
+          MalachiteGenerator.cs # malachite ore veins: sparse large blobs where a
+                                #   low-frequency 3D OpenSimplex2 field exceeds its threshold
+          UndergroundPoolGenerator.cs # still cave pools on carved floors
       Trees/                   # the tree growth engine (see "Trees")
         GrowthSignal.cs, TreeDirections.cs, TreeCellKey.cs  # a pulse step, the six face dirs, cell keys
         ITreeSpace.cs, VirtualTreeSpace.cs,
@@ -1582,9 +1595,12 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
                                #   WideTreeSpecies, TreeWorldgenFixture and the three [CollectionDefinition]s
   Audio/                       # the sfx library and the ambience bed
-  Chunks/                      # chunk storage, keys and map, generation workers, meshing
-                               #   (greedy, smooth light, sway), the column cache, world sources,
-                               #   streaming foci, EntityLight; the replay and mesh-cost probes
+  Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
+                               #   column cache, fluid surfaces, lava vents, EntityLight; the replay probes
+    Meshing/                   # greedy and per-voxel meshing, smooth light, the light volume, plant sway,
+                               #   cell batches; the mesh-cost probe
+    Sources/                   # the generated and imported world sources
+    Streaming/                 # the generation workers, the scan frontier, the streaming foci
   Content/                     # the registry and its baked tables: blocks, models, shapes (panes,
                                #   tree wood, multiblocks), loot, recipes, kiln and molds (flat)
   Core/                        # the Core utilities and the src-root types (World lifecycle, WorldSeed, WorldLoadGate)
@@ -1598,8 +1614,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Entities/                    # the Mob base and the shared mob rules (caps, targets, notice, interest, fall,
                                #   lava, ledge, loot), clips and the animator, drops, projectiles, damage numbers
     Goblins/                   # goblin AI, aim and stones, flee, dodge, pack alert,
-                               #   torches, the content contract (a size split of Entities)
-    Slimes/                    # slime sizes, hops, knockback, split and merge (a size split of Entities)
+                               #   torches, the content contract (mirrors src/Entities/Goblins)
+    Slimes/                    # slime sizes, hops, knockback, split and merge (mirrors src/Entities/Slimes)
   Graphics/                    # shader defines and the chunk-draw shader guard, cutout mips, tile materials
   Interaction/                 # raycast and targeting, mining, combat and the slice combo,
                                #   placement, support, doors and stairs, multiblocks, the selection
@@ -1612,14 +1628,19 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   hit-stop, the vignette, pops, FOV and tilt, droplets, tool shatter
   Lod/                         # far-LOD regions, the manager, build pool and buffers, column caps, surface
                                #   overrides and their save state, sky exposure; the build-cost probe
-  Networking/                  # protocol and codecs, client streaming and prediction, the server,
-                               #   intent and movement rules, loopback client/server tests (flat)
+  Networking/                  # protocol and codecs, end-to-end chunk and imported-world streaming
+    Client/                    # client streaming, the mesh gate, predictions and intent flow, the entity
+                               #   mirror, remote players, worldgen isolation
+    ServerSide/                # the server player and its status, movement and intent rules, operators,
+                               #   the loopback GameServer and the server-mode World
   Particles/                   # every particle system and the dust, splash and pop emitters
   Player/                      # camera, physics, water phases and swimming, health and fall tracking,
                                #   the player model, creative, sprint, the saved-player restore
-  Rendering/                   # render-pass gates and buffers: geometry pools and the allocator,
-                               #   shadows, clouds, reflection reuse, GPU timing, half-res targets,
-                               #   text batching, healthbars; the geometry-layout probe
+  Rendering/                   # render-pass gates: GPU timing, reflection reuse, shadow cascades, the texture-unit cache
+    Atmosphere/                # cloud copies, cover and shadow
+    Geometry/                  # the geometry allocator and the LOD pool; the geometry-layout probe
+    Overlays/                  # healthbars, text batching, the HUD text cache
+    ScreenSpace/               # the half-res target
   Saves/                       # codecs and stores of world, chunk, player, entity
                                #   and server saves, names, seed parsing, world sources
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
@@ -1633,6 +1654,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   WorldGen/                    # terrain, biomes, lakes, ravines, clouds, the generational
                                #   cache, the tree front end and batches, worldgen stats
     Features/                  # every feature generator (mirrors src/WorldGen/Features)
+      Underground/             # coal, malachite, gravel pockets, cave life (mirrors src/WorldGen/Features/Underground)
     Trees/                     # the tree growth engine, flat over src's Trees/Shape, Logics and Features
 tools/                                # asset generators: tiles, sprites, models and clips, each re-run byte-identical
   generate-acorn-texture.py           # deterministic generator of the acorn sprite (acorn.png)
@@ -2234,7 +2256,7 @@ leaves a half-grown sapling standing until it is grown again by hand (see the kn
 
 **The item debugger's TREES tab** (`OpenGLTest.ItemDebugger/TreePreviewState.cs`, see "Build and
 run") grows any species pulse by pulse over flat grass at a fixed seed through `GrowSteps`, and
-meshes it with `CellBatchMesher` (`src/Chunks/CellBatchMesher.cs`): the real chunk mesher over as many
+meshes it with `CellBatchMesher` (`src/Chunks/Meshing/CellBatchMesher.cs`): the real chunk mesher over as many
 scratch chunks as the cells span, each at its real position inside an empty one-chunk ring, so a
 wide or tall tree is never clipped at a chunk seam and wears the real biome tint.
 
@@ -2520,7 +2542,7 @@ game, which is what lets a headless World run `Update` over real terrain (the LO
 drops real builds when its pool is null). `ServerWorldTests` locks this down.
 
 **World sources.** Where a world's terrain comes from is one seam, `IWorldSource`
-(`Chunks/IWorldSource.cs`). It extends `IColumnSource`, so the mesher's column reads and
+(`Chunks/Sources/IWorldSource.cs`). It extends `IColumnSource`, so the mesher's column reads and
 the server's column answers read the same object, and adds three members: `GetColumn(cx, cz)`, the
 complete `ColumnData` of a chunk column (heights, bed, water levels, biomes, dirt depth, corner
 climate; never null); `Supplies(cx, cz)`, whether the source supplies that column and its whole
@@ -2568,7 +2590,7 @@ starts at the generated origin surface, harmless since it is creative and flying
 settle then re-settles it on the source's terrain). A generated chunk beside a supplied column
 therefore generates as if the source were not there (see the known gaps).
 
-**`ImportedMapSource`** (`Chunks/ImportedMapSource.cs`) is the non-generating source: a map
+**`ImportedMapSource`** (`Chunks/Sources/ImportedMapSource.cs`) is the non-generating source: a map
 folder (`<world>/import/` on a server, `ImportedMapSource.DirectoryName`) holding
 `columns/<cx>_<cz>.col` and `chunks/<cx>_<cy>_<cz>.bin`. A column file is `ColumnFileCodec`
 (`Saves/ColumnFileCodec.cs`): the magic `CVXL`, a version byte (1), then a Deflate body of 256
@@ -2693,7 +2715,7 @@ moves the ones that have not said hello into `_pending`, and once a second sweep
 connection, hello'd or pending, whose reader saw no frame for `NetIdleTimeoutSeconds`
 (`ClientConnection.LastInboundAt`, `Volatile` ticks; clients send `KeepAlive` every
 `NetKeepAliveSeconds` and their state at 20 Hz). `Stop` closes the pending ones too. Every
-connected player is a **`ServerPlayer`** (`OpenGLTest/src/Networking/ServerPlayer.cs`): id, a name
+connected player is a **`ServerPlayer`** (`OpenGLTest/src/Networking/ServerSide/ServerPlayer.cs`): id, a name
 unique among the players online by its save slug (a second "Player" joins as "Player 2"), its
 **own** `Inventory` (`Inventory.Empty()` for a newcomer), server-owned `Creative`/`Flying` flags
 (survival by default), its own health and respawn eye (see "Player status" below), the accepted
@@ -2806,7 +2828,7 @@ slack. On top of that clamp the movement rubberband rejects an illegal move (bel
 player is removed on disconnect (its context marked absent, so a pour bound to it pauses).
 
 **Streaming around every player.** Chunks load around **every** connected player, not around the
-server camera: `World.Focus` (`Chunks/StreamingFocus.cs`) publishes an immutable array of focus
+server camera: `World.Focus` (`Chunks/Streaming/StreamingFocus.cs`) publishes an immutable array of focus
 chunks — every `ServerPlayer`'s chunk on a server with players online (players sharing a chunk
 count once), the camera otherwise (singleplayer, a client, and a server while nobody is online) —
 swapped with `Volatile.Write` only when a focus changes chunk or the set changes, so a still frame
@@ -2859,7 +2881,7 @@ snaps the client there with a `PlayerCorrection` and sends the fresh status. The
 screen: the respawn is automatic, as in singleplayer.
 
 **The movement rubberband.** Every accepted-for-position `PlayerState` goes through
-`MovementRules.Judge` (`Networking/MovementRules.cs`, GL-free, verdict `MoveVerdict` Accepted /
+`MovementRules.Judge` (`Networking/ServerSide/MovementRules.cs`, GL-free, verdict `MoveVerdict` Accepted /
 Clamped / Rejected, per-player memory in `ServerPlayer.Movement`, a `MovementState`): first the
 converging speed clamp above (`Clamped`, never a correction), then, on the bounded point and only
 without the flight flag and over loaded chunks (`PlayerBodyProbe.IsKnown`; unknown means accept):
@@ -2880,7 +2902,7 @@ snapped can never trip a second correction. A respawn uses the same correction.
 **Creative permission** is per player: a client's creative bit is only a request, granted (with
 flight only alongside it, and flight is noclip to the movement rules) while
 `GameServer.MayBeCreative(name)` holds — everyone when `AllowCreative` (`--allow-creative`) is on,
-otherwise only an operator. `OperatorList` (`Networking/OperatorList.cs`, GL-free) holds the
+otherwise only an operator. `OperatorList` (`Networking/ServerSide/OperatorList.cs`, GL-free) holds the
 operators by save slug (`WorldNames.Slug`, the same normalization that names a player's file, so
 a name matches exactly when it would load the same save file — case and punctuation fold away —
 and a duplicate joiner's "Name 2" is not an operator); `ServerProgram` builds it from every repeatable `--op <name>` plus
@@ -2925,7 +2947,7 @@ visible face, the respawn intent), `ClientPredictionTests`, `StationNetCodecTest
 `StreamingFocusTests`, `ChunkManagerTests.UnloadKeepsAChunkInsideAnyFocusRadius` and
 `ChunkGenerationWorkerTests.TwoFociAreBothServed` for the GL-free rules.
 
-**The client** (`OpenGLTest/src/Networking/NetworkClient.cs`) connects on a background thread from
+**The client** (`OpenGLTest/src/Networking/Client/NetworkClient.cs`) connects on a background thread from
 `Program.BeginConnect` (the CONNECT click records `PendingWork.Connect` and presents the
 "Connecting..." loading screen, like PLAY), handshakes, then a reader thread queues frames. The
 handshake read is bounded by `NetConnectTimeoutSeconds` (cleared before play), the socket is
@@ -3778,8 +3800,10 @@ touch a file that violates one of them, fixing it is in scope.
   and `PushFromBlast`.
 - **No god directories.** Keep any one folder under ~30 files and group by domain. The `src/`
   root holds the app entry and core types only; a new file goes into the folder of its area
-  (a new feature area gets a new folder), never into a catch-all. `Networking/` is at 30
-  files: split it into `Client/` and `Server/` subfolders before adding another.
+  (a new feature area gets a new folder), never into a catch-all. `Networking/` is split into
+  its shared protocol (the folder root), `Client/` and `ServerSide/` (not `Server/`, which would read
+  as the dedicated server's `VoxelEngine.Server`); every src folder holds 22 files or fewer, so the
+  god-class split-outs land in their area's folder without crowding it.
 - **Namespaces mirror the folder tree.** Root namespace is `VoxelEngine`; a file in
   `OpenGLTest/src/WorldGen/Trees/` declares `namespace VoxelEngine.WorldGen.Trees;`, and only
   the six files directly in `src/` (Program, World, WorldPhase, WorldLoadGate, WorldSeed,

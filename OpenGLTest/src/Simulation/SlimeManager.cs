@@ -5,6 +5,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 

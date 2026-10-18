@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.IO.Compression;
 using VoxelEngine.Chunks;
+using VoxelEngine.Chunks.Sources;
 using VoxelEngine.WorldGen;
 
 namespace VoxelEngine.Saves;

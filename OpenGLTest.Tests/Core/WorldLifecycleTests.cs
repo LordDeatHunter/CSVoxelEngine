@@ -5,7 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
-using VoxelEngine.Entities;
+using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.InventoryPanel;

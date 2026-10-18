@@ -8,7 +8,7 @@ using System.Threading;
 using VoxelEngine.Data;
 using VoxelEngine.Lod;
 using VoxelEngine.Player;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Geometry;
 using Xunit;
 
 namespace VoxelEngine.Tests.Lod;

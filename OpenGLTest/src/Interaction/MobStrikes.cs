@@ -1,7 +1,7 @@
 using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Particles;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.Interaction;
 

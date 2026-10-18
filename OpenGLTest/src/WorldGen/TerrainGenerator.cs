@@ -3,6 +3,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Features.Underground;
 
 namespace VoxelEngine.WorldGen;
 

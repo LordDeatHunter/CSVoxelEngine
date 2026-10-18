@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using Xunit;

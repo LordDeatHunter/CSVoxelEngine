@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Items;
 using Xunit;
 

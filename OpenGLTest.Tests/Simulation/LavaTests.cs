@@ -1,7 +1,7 @@
 using System.Numerics;
 using VoxelEngine.Simulation;
 using VoxelEngine.WorldGen;
-using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Features.Underground;
 using Xunit;
 
 namespace VoxelEngine.Tests.Simulation;

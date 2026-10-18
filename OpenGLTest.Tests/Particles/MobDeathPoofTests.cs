@@ -1,6 +1,7 @@
 using System.Numerics;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;

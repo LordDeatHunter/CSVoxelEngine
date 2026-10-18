@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using VoxelEngine.Networking;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.Saves;
 
 namespace VoxelEngine.UI.Menus;

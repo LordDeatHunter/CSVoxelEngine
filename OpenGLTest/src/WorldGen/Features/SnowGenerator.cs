@@ -1,6 +1,7 @@
 using System;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.WorldGen.Features.Underground;
 
 namespace VoxelEngine.WorldGen.Features;
 

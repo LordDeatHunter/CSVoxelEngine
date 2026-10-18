@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Content.Recipes;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.UI.InventoryPanel;
 

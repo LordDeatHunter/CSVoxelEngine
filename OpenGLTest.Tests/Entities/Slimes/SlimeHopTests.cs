@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Slimes;
 using Xunit;
 
 namespace VoxelEngine.Tests.Entities.Slimes;

@@ -5,6 +5,8 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 

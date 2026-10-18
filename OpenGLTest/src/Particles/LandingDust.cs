@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Content.Models;
-using VoxelEngine.Entities;
+using VoxelEngine.Entities.Slimes;
 
 namespace VoxelEngine.Particles;
 

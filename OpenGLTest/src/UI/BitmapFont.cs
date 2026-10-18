@@ -5,7 +5,7 @@ using Silk.NET.OpenGL;
 using StbTrueTypeSharp;
 using VoxelEngine.Data;
 using VoxelEngine.Graphics;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.UI;
 

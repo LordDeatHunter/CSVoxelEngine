@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.Numerics;
 using System.Text;
+using VoxelEngine.Networking.ServerSide;
 
 namespace VoxelEngine.Networking;
 

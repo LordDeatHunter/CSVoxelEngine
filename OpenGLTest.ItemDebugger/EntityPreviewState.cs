@@ -4,6 +4,8 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Slimes;
 
 namespace VoxelEngine.ItemDebugger;
 

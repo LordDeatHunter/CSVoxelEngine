@@ -1,4 +1,4 @@
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.UI.Hud;
 using Xunit;
 

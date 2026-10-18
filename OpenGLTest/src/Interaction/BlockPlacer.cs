@@ -6,6 +6,7 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Juice;
 using VoxelEngine.Lod;
 using VoxelEngine.Networking;
+using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.UI.InventoryPanel;

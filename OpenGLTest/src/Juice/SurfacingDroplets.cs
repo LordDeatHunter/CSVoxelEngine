@@ -1,6 +1,6 @@
 using System;
 using VoxelEngine.Player;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.Juice;
 

@@ -1,6 +1,6 @@
 using System;
 using System.Numerics;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Atmosphere;
 
 namespace VoxelEngine.Effects.Sky;
 

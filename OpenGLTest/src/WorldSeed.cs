@@ -4,6 +4,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Features.Underground;
 
 namespace VoxelEngine;
 

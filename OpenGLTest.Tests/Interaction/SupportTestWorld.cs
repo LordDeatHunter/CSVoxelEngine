@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
 using VoxelEngine.Data;
-using VoxelEngine.Networking;
+using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using VoxelEngine.WorldGen;
 using Xunit;

@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Player;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.Juice;
 

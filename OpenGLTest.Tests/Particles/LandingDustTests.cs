@@ -3,6 +3,8 @@ using System.Numerics;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Graphics;
 using VoxelEngine.Particles;
 using Xunit;

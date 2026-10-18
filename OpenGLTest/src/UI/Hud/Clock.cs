@@ -1,6 +1,6 @@
 using System;
 using VoxelEngine.Effects.Sky;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.UI.Hud;
 

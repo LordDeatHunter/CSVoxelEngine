@@ -5,6 +5,8 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using VoxelEngine.Chunks.Meshing;
+using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
@@ -13,13 +15,14 @@ using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Interaction;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Trees;
-using static VoxelEngine.Chunks.ChunkLighting;
+using static VoxelEngine.Chunks.Meshing.ChunkLighting;
 
 namespace VoxelEngine.Chunks;
 

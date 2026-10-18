@@ -5,6 +5,7 @@ using System.IO;
 using System.Numerics;
 using System.Threading;
 using VoxelEngine.Networking;
+using VoxelEngine.Networking.Client;
 using VoxelEngine.Player;
 using VoxelEngine.Server;
 using VoxelEngine.UI.Hud;

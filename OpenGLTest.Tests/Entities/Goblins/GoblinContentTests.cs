@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Items;
 using Xunit;
 

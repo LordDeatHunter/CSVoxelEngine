@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Data;

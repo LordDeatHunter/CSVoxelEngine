@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Player;
 using Xunit;
 

@@ -1,6 +1,6 @@
 using System;
 using System.Numerics;
-using VoxelEngine.Entities;
+using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using Xunit;

@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Numerics;
 using VoxelEngine.Data;
 using VoxelEngine.Items;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.ItemDebugger;
 

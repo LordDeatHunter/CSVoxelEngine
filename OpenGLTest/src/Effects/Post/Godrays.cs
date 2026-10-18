@@ -1,6 +1,6 @@
 using System;
 using VoxelEngine.Effects.Sky;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.ScreenSpace;
 
 namespace VoxelEngine.Effects.Post;
 

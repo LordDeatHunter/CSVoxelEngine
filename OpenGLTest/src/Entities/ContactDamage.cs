@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
-using VoxelEngine.Networking;
+using VoxelEngine.Networking.ServerSide;
 
 namespace VoxelEngine.Entities;
 

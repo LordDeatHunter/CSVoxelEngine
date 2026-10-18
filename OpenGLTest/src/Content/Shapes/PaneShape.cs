@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.WorldGen.Trees;
 

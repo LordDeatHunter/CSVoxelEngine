@@ -1,4 +1,4 @@
-using VoxelEngine.Networking;
+using VoxelEngine.Networking.ServerSide;
 
 namespace VoxelEngine.Saves;
 

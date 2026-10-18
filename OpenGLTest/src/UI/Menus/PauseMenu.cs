@@ -1,5 +1,5 @@
 using System.Numerics;
-using VoxelEngine.Rendering;
+using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.UI.Menus;
 
