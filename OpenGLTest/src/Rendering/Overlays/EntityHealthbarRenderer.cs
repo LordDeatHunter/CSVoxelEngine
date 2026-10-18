@@ -30,7 +30,7 @@ public sealed class EntityHealthbarRenderer : IDisposable
     public const string HeartEmptySpritePath = "assets/textures/ui/heart_empty.png";
 
     // The HUD sprites are 32px wide with 1px of empty padding down each side; only the
-    // middle 30px are drawn, exactly like UIRenderer.DrawHearts.
+    // middle 30px are drawn, exactly like HudRenderer.DrawHearts.
     private const float HeartUMin = 1f / 32f;
     private const float HeartUMax = 31f / 32f;
 

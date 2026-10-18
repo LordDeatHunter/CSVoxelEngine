@@ -43,7 +43,7 @@ and, on a machine that only has the 10 runtime, prefix every `dotnet` command wi
 
 **Launch flow.** The game boots to the **main menu** with the cursor free (`Program` owns an
 explicit `AppScreen` of Menu / Loading / Playing / Saving; every page rule, key rule and store
-call lives in the GL-free, tested `MainMenuController`, drawn by `UIRenderer.DrawMainMenu`
+call lives in the GL-free, tested `MainMenuController`, drawn by `MenuRenderer.DrawMainMenu`
 through `UiPasses.RenderMenuFrame`, which writes framebuffer 0 directly with no HDR pass,
 lighting or GPU timer). START opens the worlds page, a scrollable list of `WorldStore.List()`
 (most recently played first) with PLAY / EDIT (rename) / DELETE (a confirm popup, DELETE /
@@ -58,7 +58,7 @@ and its save on both menus). PLAY / CREATE never block inside the click: the cli
 pending work, `OnRender` presents one loading-screen frame, and the next update runs
 `WorldSeed.Apply(seed)` -> `new ChunkSaveStore(dir)` -> `new World(..., store)`. The world then
 streams in `WorldPhase.Loading` behind an animated loading screen (`LoadingScreenView` /
-`UIRenderer.DrawLoadingScreen`: a progress bar eased monotonically toward `World.LoadProgress`, a
+`LoadingScreenRenderer.DrawLoadingScreen`: a progress bar eased monotonically toward `World.LoadProgress`, a
 wall-clock spinner, the world name and `Generating terrain...` for a new world vs `Loading
 world...` for a saved one) and is **never rendered** until `IsLoaded`; after that the overlay
 fades out over `WorldGenerationConfig.LoadingFadeSeconds` (`UiPasses.RenderLoadingOverlay`).
@@ -175,7 +175,7 @@ is charged, a ring of dots around it fills with `LeftClickAction.Crosshair.Break
 with no target), and the hit marker flashes an X at the two connecting-hit sites the hit-stop uses (a
 landed punch or slice), fading over `HitMarker.Seconds` (`HitMarkerTests`). At the top of the
 screen the **look-at label** shows the targeted block: its name and a small spinning 3D render of
-it, pushed below the compass or clock strip while one is equipped (`UIRenderer.DrawLookLabel` and
+it, pushed below the compass or clock strip while one is equipped (`TopStripRenderer.DrawLookLabel` and
 its `LookLabelTop` over `BlockCubeCache`), the name in red while the held item cannot mine
 it, and "Unknown" with a flat dark silhouette until its item has been obtained; creative mode and a
 block with no item at all always know, and `X` adds id, state, sun/block light and cell debug lines
@@ -285,7 +285,7 @@ paths, the `UnderwaterRaysRenderer` composite); only `CreateHdrTarget`/`DeleteHd
 before the tonemap are uploaded as `SRGB8_ALPHA8` (the `srgb` flag on `TextureLoader` and
 `TextureAtlas.Build`: the block atlas, `ItemMeshCache`, skins, sun, break progress, bubbles, the
 world healthbar hearts) so the sampler decodes them; the material/normal atlas is data and stays
-plain `Rgba`, and so do UI-only textures (font, crosshair, HUD hearts, `UIRenderer`'s own icons).
+plain `Rgba`, and so do UI-only textures (font, the crosshair and HUD hearts `HudRenderer` loads, `UIRenderer`'s own item icons).
 CPU colors are authored in sRGB and go through `ColorSpace.SrgbToLinear` where they are computed
 or uploaded (the sun, ambient and sky palette in `FrameLighting.SetLighting`, torch, point lights,
 water scatter, molten tints, selection outline); the selection *face* highlight is the one overlay
@@ -1351,25 +1351,36 @@ OpenGLTest/
         GeometryAllocator.cs   # GL-free first-fit free list with coalescing, in units of
                                #   64 vertices / 96 indices; hands out the pools' GeometrySlices
         MeshBufferPool.cs      # recycles the vertex and index lists a mesh build fills
-      Overlays/                # drawn over the scene: the UI pass (UiPasses, UIRenderer, its text cache), the damage vignette, the
+      Overlays/                # drawn over the scene: the UI pass (UiPasses, UIRenderer and its page renderers, the text cache), the damage vignette, the
                                #   selection outline and mining pop, and the world-space healthbars, damage numbers, notice pips and particles
         BillboardPasses.cs     # the world-space billboard draws: healthbars, damage numbers, notice pips and the
                                #   leaf, fire and bubble particles
+        ChatRenderer.cs        # the chat HUD: the word-wrapped log and the input line
+        CraftCardRenderer.cs   # the [E] panel's crafting card and its hit-tests over the last drawn
+                               #   CraftCardLayout
         DamageNumberRenderer.cs # draws the floating damage numbers (DamageNumberPool)
                                 #   as world-space text that always faces the camera
         DamageVignetteRenderer.cs # full-screen damage vignette: one oversized triangle with
                                   #   a radial fragment gradient, drawn inside the UI pass
         EntityHealthbarRenderer.cs # five hearts floating above every live mob, always facing the camera
+        HudRenderer.cs         # crosshair, hearts, hotbar and its feedback, toasts, FPS and profiler, tooltip,
+                               #   player list; owns the crosshair and heart sprites
+        InventoryPanelRenderer.cs # the [E] panel: tabs, search field, rows, creative catalog buttons,
+                                  #   preview, and its hit-tests
+        LoadingScreenRenderer.cs # the loading/saving screen and the fade over the first playing frames
+        MenuRenderer.cs        # the pause and settings menus and every main-menu page, with their hit-tests
         NoticePipRenderer.cs   # draws the "!" a goblin pops over its head the moment it first notices a player
         SelectionPasses.cs     # the mining and placement pop (RenderBlockPop), the selection outline and face
                                #   highlight (RenderBlockSelection) and the crack overlay (RenderBlockBreaking)
+        TopStripRenderer.cs    # the top-center HUD strip (compass or clock) and the look-at label below it
+                               #   (LookLabelTop)
         UiPasses.cs            # the UI hand-off: RenderUI, RenderChat, RenderTooltip, RenderPlayerList;
                                #   RenderMenuFrame: a world-less frame (main menu or the opaque
                                #   loading/saving screen) straight into framebuffer 0, no HDR,
                                #   lighting or GPU timer; RenderLoadingOverlay: the fade over the
                                #   first playing frames
-        UIRenderer.cs          # every UI draw: HUD, hotbar, inventory, pause/settings menus,
-                               #   DrawMainMenu (all main-menu pages) and DrawLoadingScreen
+        UIRenderer.cs          # the UI's GL resources (ui program, count font, text batch, item icons) and shared
+                               #   primitives (rects, text, icons, input field); builds the page renderers as internal properties
         UITextCache.cs         # memoized per-frame HUD strings (FPS, compass, coordinates, counts)
       ScreenSpace/             # full-screen and screen-space passes: post (tonemap, FXAA), contact AO, godrays, underwater rays
         ContactAoRenderer.cs   # the screen-space contact AO pass (SH-28, contact-ao-fragment.glsl, twin ContactAo)
@@ -1447,7 +1458,7 @@ OpenGLTest/
       TreeGrowthWriter.cs      # reactive growth on the live world: rebuild a column's tree from its wood
                                #   state bytes (or plant a sapling), GrowFurther in a WorldTreeSpace, write
                                #   the difference back; TreeGrowthResult.cs / TreeGrowthStatus.cs are its result
-    UI/                        # UI state, layout and rules, mostly GL-free (UIRenderer draws them): canvas, font, settings
+    UI/                        # UI state, layout and rules, mostly GL-free (UIRenderer's page renderers in Rendering/Overlays draw them): canvas, font, settings
       BitmapFont.cs            # TrueType font baked into a GL atlas; CPU glyph layout (printable ASCII)
       GameSettings.cs          # player settings with JSON persistence (settings.json)
       Primitives.cs            # Vertex-layout mesh factories for simple shapes
@@ -1457,7 +1468,7 @@ OpenGLTest/
       Hud/                     # HUD widgets: chat, clock, compass, crosshair state,
                                #   toasts, hotbar feedback, look label, tooltips, screenshots
         Chat.cs                # ChatKind/ChatMessage, ChatView (log/input/history) and ChatLayout
-        Clock.cs               # pure clock math behind the HUD's held-clock readout (see UIRenderer.DrawClock)
+        Clock.cs               # pure clock math behind the HUD's held-clock readout (see TopStripRenderer.DrawClock)
         Compass.cs             # HUD compass heading math
         CrosshairState.cs      # throw charge, break progress and hit marker, handed to the UI pass
         DayToast.cs            # the dawn watch behind "Day N"
@@ -3096,7 +3107,7 @@ multiplayer page.
 a 100-line log, a 200-char input, arrow-key history and the open flag. `T` opens it from a clean
 play state, `Enter` sends, `Escape` closes; while it is open the keyboard is withheld from the
 camera exactly like a focused inventory field, and the log sits bottom-left above the hotbar
-(`UIRenderer.DrawChat`, its own `UiPasses.RenderChat` UI pass). In singleplayer `Program.
+(`ChatRenderer.DrawChat`, its own `UiPasses.RenderChat` UI pass). In singleplayer `Program.
 SendChat` echoes locally; in multiplayer it sends `ChatSend` and the server's broadcast is the
 only copy, so a line never appears twice.
 
@@ -3828,8 +3839,8 @@ touch a file that violates one of them, fixing it is in scope.
 - **No god classes.** One class, one coherent job. Past roughly 700 lines a class is a smell:
   move the stray responsibilities out into a well-named class (composition, not `partial`).
   No source file goes past ~1000 lines without a stated reason. `World.cs`,
-  `UIRenderer.cs`, `ContentRegistry.cs`, `Program.cs`, `Chunk.cs`, `Camera.cs`,
-  `ChunkManager.cs` are the current offenders — keep shrinking them, never
+  `ContentRegistry.cs`, `Program.cs`, `Chunk.cs`, `Camera.cs`, `ChunkManager.cs`
+  are the current offenders — keep shrinking them, never
   grow them. `World.cs` (about 1,140 lines, down from 4,700) has a stated reason: it is the
   composition root that builds and owns the per-job components (`BlockEditor`, `BlockPlacer`,
   `LeftClickAction`, `RightClickAction`, `ThrowAction`, `BlockInteractions`, `WorldItemUse`,
@@ -3843,8 +3854,13 @@ touch a file that violates one of them, fixing it is in scope.
   components it builds and exposes as internal properties (`GpuPassTimer`, `TextureUnits`,
   `RenderTargets`, `FrameLighting`, `SkyPasses`, `ScreenPasses`, `BillboardPasses`,
   `SelectionPasses`, `StationPasses`, `ObjectPasses`, `PlayerPasses`, `MobPasses`,
-  `ShadowPass`, `TerrainPasses`, `ReflectionPass`, `UiPasses`). `UIRenderer.cs` (about
-  2,500 lines) is the next rendering offender to split.
+  `ShadowPass`, `TerrainPasses`, `ReflectionPass`, `UiPasses`). `UIRenderer.cs` (802
+  lines, down from 2,504) has a stated reason too: it owns the UI's GL resources and their
+  creation and disposal order (the ui program, the count font, the text batch buffers, the
+  item-icon textures and frame meshes) and the shared draw primitives every page and the item
+  debugger use; its pages live in the components it builds and exposes as internal properties
+  (`HudRenderer`, `TopStripRenderer`, `InventoryPanelRenderer`, `CraftCardRenderer`,
+  `MenuRenderer`, `LoadingScreenRenderer`, `ChatRenderer`).
 - **No god directories.** Keep any one folder under ~30 files and group by domain. The `src/`
   root holds the app entry and core types only; a new file goes into the folder of its area
   (a new feature area gets a new folder), never into a catch-all. `Networking/` is split into

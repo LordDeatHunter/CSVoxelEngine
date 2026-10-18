@@ -4,17 +4,10 @@ using System.IO;
 using System.Numerics;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
-using VoxelEngine.Chunks;
-using VoxelEngine.Content;
-using VoxelEngine.Content.Recipes;
 using VoxelEngine.Data;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
-using VoxelEngine.Player;
-using VoxelEngine.Saves;
 using VoxelEngine.UI;
-using VoxelEngine.UI.Hud;
-using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.Rendering.Overlays;
@@ -24,7 +17,7 @@ namespace VoxelEngine.Rendering.Overlays;
 /// origin at the top-left corner. The canvas is the window divided by a uniform scale the caller
 /// picks (see <see cref="UiCanvas"/>), so every layout constant here is laid out against a
 /// 1920x1080-ish reference and scales with the window; at scale 1 canvas units are window pixels.
-/// One rule keeps input honest: public <c>*At</c> hit-test methods take a <b>window-pixel</b>
+/// One rule keeps input honest: the page renderers' <c>*At</c> hit-test methods take a <b>window-pixel</b>
 /// point and convert it once through <see cref="ToCanvas"/>; everything else (draws, private
 /// geometry, <see cref="ScreenSize"/>) works in canvas units. Shapes come from <see cref="Primitives"/> in their own Y-up space and
 /// are flipped into that Y-down frame by the model matrix, so the same geometry works here and
@@ -32,6 +25,16 @@ namespace VoxelEngine.Rendering.Overlays;
 ///
 /// Flat shapes draw with depth testing off, in call order. <see cref="DrawBlockIcon"/> turns it
 /// back on against a cleared depth buffer, which is safe because UI is the last pass of a frame.
+///
+/// <para>This class owns the UI's GL resources and their creation and disposal order (the ui
+/// program, the count font, the text batch buffers, the item-icon textures and frame meshes; the
+/// HUD's crosshair and heart sprites are created and deleted through <see cref="HudRenderer"/> at
+/// their original points) and the shared draw primitives every page and the item debugger use.
+/// The pages are the components it builds and exposes as internal properties -
+/// <see cref="HudRenderer"/>, <see cref="TopStripRenderer"/>, <see cref="InventoryPanelRenderer"/>,
+/// <see cref="CraftCardRenderer"/>, <see cref="MenuRenderer"/>, <see cref="LoadingScreenRenderer"/>
+/// and <see cref="ChatRenderer"/> - each drawing through these primitives and reading the per-pass
+/// state live. Render thread only.</para>
 /// </summary>
 public class UIRenderer : IDisposable
 {
@@ -39,105 +42,31 @@ public class UIRenderer : IDisposable
     // kept generous since nothing here depends on depth precision.
     private const float DepthRange = 512f;
 
-    private const float CrosshairSize = 32f;
-
-    // Hearts row above the hotbar, in pixels. The sprites are 32px wide with 1px of empty
-    // padding down each side, so only the middle 30px are drawn and the stride matches it:
-    // neighbors sit exactly edge to edge with no double-padding gap.
-    private const float HeartDrawWidth = 30f;
-    private const float HeartDrawHeight = 32f;
-    private const float HeartStride = 30f;
-    private const float HeartGap = 10f;
-    // The selected item's name (DrawHotbarName) sits this far above the hearts row, leaving room
-    // for descenders.
-    private const float HotbarNameGap = 12f;
-
-    // Hotbar metrics, in pixels
-    // Aliases of the shared hotbar geometry (HotbarLayout), so the HUD draws read short names.
-    private const float SlotSize = HotbarLayout.SlotSize;
-    private const float SlotGap = HotbarLayout.SlotGap;
-    private const float BottomMargin = HotbarLayout.BottomMargin;
-    // The toast row sits this far above the item-name row, so the two never overlap
-    private const float ToastRowGap = 26f;
-    // Smallest width of the Tab player list panel; a long name widens it
-    private const float PlayerListWidth = 200f;
-
-    private const float SlotBorder = 2f;
-    private const float SelectedBorder = 3f;
-
-    // Fraction of a slot the icon's footprint fills, leaving a margin inside the border
-    private const float IconFill = 0.72f;
+    internal const float SlotBorder = 2f;
 
     // Hotbar count text, in pixels. Counts sit in the slot's bottom-right corner, sized
     // by digit cap-height so the size survives swapping the font file.
     private const string CountFontPath = "assets/fonts/kongtext.ttf";
-    private const float CountCapHeight = 14f;
-    private const float CountPadRight = 5f;
-    private const float CountPadBottom = 4f;
-    // Catalog button labels are smaller than the count font, and shrink further to fit "+100".
-    private const float CatalogButtonCapHeight = 12f;
+    internal const float CountCapHeight = 14f;
     private static readonly Rgba CountShadow = new(0, 0, 0, 180);
 
-    // The FPS counter's top-left corner, in pixels; the profiler table starts one line below it
-    private const float FpsTop = 10f;
-
-    // [E] inventory panel, in pixels: a Skyrim-style list on the left, preview on the right
-    // Aliases of InventoryPanelLayout, which owns the panel geometry; they serve the list, its
-    // rows and the non-crafting preview only. The crafting card reads CraftCardLayout.
-    private const float PanelLeft = InventoryPanelLayout.PanelLeft;
-    private const float PanelTop = InventoryPanelLayout.PanelTop;
-    private float PanelWidth => InventoryPanelLayout.PanelWidth(_screenSize);
-    private const float PanelPad = InventoryPanelLayout.PanelPad;
-    private const float TabHeight = InventoryPanelLayout.TabHeight;
-    private const float RowHeight = InventoryPanelLayout.RowHeight;
-    private const float RowIcon = 30f;
-    private const float PreviewSize = 190f;
-    private const float PreviewRight = 300f;
+    // Title text cap height, and the translucent fill every HUD and menu panel shares
     private const float HeadCapHeight = 22f;
-    private static readonly Rgba PanelBackground = Rgba.Gray(0.03f, 0.72f);
-    private static readonly Rgba RowSelected = Rgba.Gray(0.22f, 0.8f);
+    internal static readonly Rgba PanelBackground = Rgba.Gray(0.03f, 0.72f);
 
     // Inventory prettify palette: warm gold accents, green ready states, muted dims
-    private static readonly Rgba AccentGold = new(232, 184, 72);
-    private static readonly Rgba AccentDim = new(150, 120, 60);
-    private static readonly Rgba ReadyGreen = new(126, 217, 87);
-    private static readonly Rgba DangerRed = new(230, 110, 110);
-    private static readonly Rgba TextDim = Rgba.Gray(0.55f, 1f);
-    private static readonly Rgba CardBackground = Rgba.Gray(0.07f, 0.85f);
-    private static readonly Rgba ChipBackground = Rgba.Gray(0.12f, 0.9f);
-    private static readonly Rgba ButtonReady = new(232, 184, 72);
-    private static readonly Rgba ButtonDisabled = Rgba.Gray(0.12f, 0.9f);
-    private static readonly Rgba ButtonTextReady = new(30, 26, 20);
-    private static readonly Rgba ButtonTextDisabled = Rgba.Gray(0.45f, 1f);
+    internal static readonly Rgba AccentGold = new(232, 184, 72);
+    internal static readonly Rgba ReadyGreen = new(126, 217, 87);
+    internal static readonly Rgba DangerRed = new(230, 110, 110);
+    internal static readonly Rgba TextDim = Rgba.Gray(0.55f, 1f);
+    internal static readonly Rgba CardBackground = Rgba.Gray(0.07f, 0.85f);
+    internal static readonly Rgba ChipBackground = Rgba.Gray(0.12f, 0.9f);
 
     // Durability bar under a tool icon: fraction of the slot width, a few px tall.
-    private const float DurabilityHeight = 5f;
-    private const float DurabilityFill = 0.8f;
-    private const float DurabilityPadBottom = 6f;
+    internal const float DurabilityHeight = 5f;
+    internal const float DurabilityFill = 0.8f;
+    internal const float DurabilityPadBottom = 6f;
     private static readonly Rgba DurabilityBack = Rgba.Gray(0.05f, 0.9f);
-
-    // Frame-timing overlay (DrawProfiler), in pixels
-    private const float ProfilerLeft = 10f;
-    private const float ProfilerPadding = 6f;
-    private static readonly Rgba ProfilerBackground = Rgba.Gray(0.04f, 0.6f);
-
-    // Top-center compass bar (DrawCompass), in pixels: a scrolling 120-degree window
-    // of the horizon with cardinals every 45 degrees and minor ticks every 15
-    private const float CompassTop = 10f;
-    private const float CompassWidth = 440f;
-    private const float CompassHeight = 42f;
-    private const float CompassSidePad = 14f;
-    private const float CompassHalfSpan = 60f;
-    private const float CompassTickStep = 15f;
-    private const float CompassCardinalStep = 45f;
-    private const float CompassReadoutTop = 2f;
-    private const float CompassTickTop = 20f;
-    private const float CompassCoordsGap = 4f;
-    private const float CompassSpawnDot = 8f;
-    private const float CompassHideSpawnWithin = 1f;
-    private static readonly Rgba CompassNorth = new(255, 92, 92);
-    private static readonly Rgba CompassSpawn = new(140, 210, 255);
-    private static readonly Rgba CompassTick = Rgba.Gray(0.75f, 0.9f);
 
     // Three-quarter view: yaw swings a side face toward the viewer, pitch tilts the top down
     private const float IconYaw = 45f * MathF.PI / 180f;
@@ -150,17 +79,14 @@ public class UIRenderer : IDisposable
     // and divided by this, so retuning the angles above never changes how much room they take.
     private static readonly float IconExtent = UnitCubeExtent(IconRotation);
 
-    private static readonly Rgba SlotBackground = Rgba.Gray(0.08f, 0.55f);
-    private static readonly Rgba SlotBorderColor = Rgba.Gray(0.65f, 0.45f);
-    private static readonly Rgba SelectedBackground = Rgba.Gray(0.18f, 0.65f);
-    private static readonly Rgba SelectedBorderColor = Rgba.White;
+    internal static readonly Rgba SlotBackground = Rgba.Gray(0.08f, 0.55f);
+    internal static readonly Rgba SlotBorderColor = Rgba.Gray(0.65f, 0.45f);
+    internal static readonly Rgba SelectedBackground = Rgba.Gray(0.18f, 0.65f);
+    internal static readonly Rgba SelectedBorderColor = Rgba.White;
 
     private readonly GL _gl;
     private readonly Shader _shader;
     private readonly uint _atlasTexture;
-    private readonly uint _crosshairTexture;
-    private readonly uint _heartTexture;
-    private readonly uint _heartEmptyTexture;
     private readonly BlockCubeCache _blockCubes;
     private readonly ItemMeshCache _itemMeshes;
 
@@ -180,16 +106,6 @@ public class UIRenderer : IDisposable
     // Unit shapes, scaled per draw so a color or size change costs no buffer work
     private readonly Mesh _unitSquare;
 
-    // Heart sprites with the 1px side padding cropped out of their UVs (see the Heart
-    // metrics above): full width for empty/full, left half for a half heart.
-    private readonly Mesh _heartEmptyMesh;
-    private readonly Mesh _heartFullMesh;
-    private readonly Mesh _heartHalfMesh;
-
-    // The crosshair's five cropped pieces (see DrawCrosshair)
-    private readonly Mesh _crosshairCenterMesh;
-    private readonly Mesh[] _crosshairArmMeshes;
-
     // Count font, baked once from the TTF. Null when the file is missing or broken, in
     // which case the hotbar simply draws no counts.
     private readonly BitmapFont? _font;
@@ -199,15 +115,6 @@ public class UIRenderer : IDisposable
     // Formats the per-frame HUD strings only when their values change; the draws still happen
     // every frame (PERF_TODO R8).
     private readonly UITextCache _textCache = new();
-
-    // Crafting card text measures, bound once in the constructor so neither the cache nor a
-    // frame ever allocates a delegate; the "Batch" label is measured once for the same reason.
-    private readonly TextMeasure _measureHead;
-    private readonly TextMeasure _measureBody;
-    private readonly float _batchLabelWidth;
-    // The crafting card's wrapped layout, rebuilt only when its screen, recipe or status changes;
-    // its Current is also what CraftHitAt hits, so a click reads the geometry that was drawn.
-    private readonly CraftCardLayoutCache _craftLayouts;
 
     // Longest run DrawText draws. BitmapFont.Layout clamps its output to the scratch span it
     // is handed, so this single constant bounds all three text buffers at once — the glyph
@@ -237,21 +144,30 @@ public class UIRenderer : IDisposable
     private float _scale = 1f;
     private bool _depthCleared;
 
-    // Alpha multiplier DrawText applies to both the face and the shadow; only the loading
-    // overlay lowers it (inside a try/finally), and Begin resets it to 1.
+    // Alpha multiplier DrawText applies to both the face and the shadow; the loading overlay, the
+    // HUD toast and the hotbar item name lower it and restore 1 afterwards, and Begin resets it to 1.
     private float _textFade = 1f;
 
     // Main-menu and loading-screen string caches, render thread only, so an idle menu allocates
-    // nothing per frame: FitText allocates a Substring per trial length, and the seed and
-    // percentage strings would otherwise be formatted every frame. Fitted strings are keyed by
+    // nothing per frame: FitText allocates a Substring per trial length, and the seed
+    // strings would otherwise be formatted every frame. Fitted strings are keyed by
     // the raw text, scale and width they were fitted to, and cleared when the canvas size changes.
     private const int MaxFittedTexts = 256;
     private readonly Dictionary<(string Text, float Scale, float Width), string> _fittedTexts = new();
     private Vector2 _fitCacheScreen;
-    private readonly string?[] _percentTexts = new string?[101];
 
     // The opaque backdrop behind every menu and loading frame: nothing is rendered behind those.
-    private static readonly Rgba MenuBackdrop = Rgba.Gray(0.08f);
+    internal static readonly Rgba MenuBackdrop = Rgba.Gray(0.08f);
+
+    // The pages, built in the constructor; each draws through this renderer's primitives and reads
+    // its per-pass state through the accessors below ToCanvas.
+    internal ChatRenderer Chat { get; }
+    internal LoadingScreenRenderer LoadingScreen { get; }
+    internal MenuRenderer Menu { get; }
+    internal CraftCardRenderer CraftCard { get; }
+    internal InventoryPanelRenderer Panel { get; }
+    internal TopStripRenderer TopStrip { get; }
+    internal HudRenderer Hud { get; }
 
     /// <param name="atlasIsSrgb">Whether <paramref name="atlasTexture"/> was uploaded as
     /// <c>SRGB8_ALPHA8</c>: its icons are then re-encoded in the shader so they write the same
@@ -272,25 +188,8 @@ public class UIRenderer : IDisposable
         _locSrgbTex = _shader.GetUniformLocation("uSrgbTex");
         _shader.SetUniform(_locSrgbTex, false);
 
-        _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
-        _heartTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/heart.png");
-        _heartEmptyTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/heart_empty.png");
-        var heartUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(31f / 32f, 1f));
-        var heartHalfUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(16f / 32f, 1f));
-        _heartEmptyMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
-        _heartFullMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
-        _heartHalfMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartHalfUv);
-
-        // The crosshair's five pieces, cropped out of the 16x16 texture: a 4x4 center dot and four
-        // 5x4 pills with an empty row and column between them (see DrawCrosshair)
-        _crosshairCenterMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(6f, 6f, 10f, 10f));
-        _crosshairArmMeshes =
-        [
-            Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(6f, 0f, 10f, 5f)),
-            Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(6f, 11f, 10f, 16f)),
-            Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(0f, 6f, 5f, 10f)),
-            Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(11f, 6f, 16f, 10f)),
-        ];
+        // The HUD loads its crosshair and heart textures and meshes here, exactly where they always loaded.
+        Hud = new HudRenderer(gl, this);
         foreach (var (id, type) in ItemRegistry.ById)
         {
             if (type is BlockItem) continue;
@@ -318,22 +217,7 @@ public class UIRenderer : IDisposable
             Log.WriteLine($"Warning: count font '{CountFontPath}' not loaded ({e.Message}); hotbar counts hidden.");
         }
 
-        if (_font is { } font)
-        {
-            var headScale = _headScale;
-            var countScale = _countScale;
-            _measureHead = s => font.MeasureSize(s, headScale).X;
-            _measureBody = s => font.MeasureSize(s, countScale).X;
-            _batchLabelWidth = font.MeasureSize("Batch".AsSpan(), countScale).X;
-        }
-        else
-        {
-            // No font: everything lays out as one line, and DrawText draws nothing anyway.
-            _measureHead = static _ => 0f;
-            _measureBody = static _ => 0f;
-            _batchLabelWidth = 44f;
-        }
-        _craftLayouts = new CraftCardLayoutCache(_measureHead, _measureBody, _batchLabelWidth);
+        CraftCard = new CraftCardRenderer(gl, this);
 
         // Text batch buffers: a dynamic VBO refilled per run (DrawTextBatch) and a static EBO
         // whose indices never change — quad q always draws vertices [4q, 4q+4) — exactly the
@@ -356,6 +240,12 @@ public class UIRenderer : IDisposable
 
         Mesh.ConfigureVertexAttribs(_gl);
         _gl.BindVertexArray(0);
+
+        Chat = new ChatRenderer(this);
+        LoadingScreen = new LoadingScreenRenderer(this);
+        Menu = new MenuRenderer(gl, this);
+        Panel = new InventoryPanelRenderer(gl, this);
+        TopStrip = new TopStripRenderer(gl, this);
     }
 
     /// <summary>Starts a UI pass at scale 1, the canvas being the window itself. Must be paired
@@ -414,6 +304,26 @@ public class UIRenderer : IDisposable
     /// first <see cref="Begin(Vector2D{int}, Vector2D{int}, float)"/>.</summary>
     public Vector2 ToCanvas(Vector2 windowPoint) => UiCanvas.WindowToCanvas(windowPoint, _scale);
 
+    // The per-pass state and shared resources the page renderers draw with. They read it live,
+    // never as copies: Begin rewrites the canvas and the text fade every pass.
+    internal float CountScale => _countScale;
+    internal float HeadScale => _headScale;
+    internal Vector2 WindowSize => _windowSize;
+    internal Vector2 FramebufferSize => _framebufferSize;
+    internal float TextFade
+    {
+        get => _textFade;
+        set => _textFade = value;
+    }
+    internal UITextCache TextCache => _textCache;
+    internal Shader UiShader => _shader;
+    internal int AlphaCutoffLocation => _locAlphaCutoff;
+    internal uint AtlasTexture => _atlasTexture;
+    internal bool AtlasIsSrgb => _atlasIsSrgb;
+    internal BlockCubeCache BlockCubes => _blockCubes;
+    internal Mesh UnitSquare => _unitSquare;
+    internal IReadOnlyDictionary<byte, uint> ItemIcons => _itemIcons;
+
     /// <summary>Solid-color rectangle centered on <paramref name="center"/>.</summary>
     public void DrawRect(Vector2 center, Vector2 size, Rgba color) =>
         DrawMesh(_unitSquare, RectTransform(center, size), color);
@@ -443,7 +353,7 @@ public class UIRenderer : IDisposable
         DrawRect(center with { X = center.X + half.X + inset }, vertical, color);
     }
 
-    private void DrawDurabilityBar(Vector2 center, float width, float fraction)
+    internal void DrawDurabilityBar(Vector2 center, float width, float fraction)
     {
         var f = MathUtils.Clamp01(fraction);
         DrawRect(center, new Vector2(width, DurabilityHeight), DurabilityBack);
@@ -458,7 +368,7 @@ public class UIRenderer : IDisposable
     /// honors the scissor, so this must never first run while the list scissor is on — the
     /// inventory panel calls it before enabling the scissor for exactly that reason.
     /// </summary>
-    private void EnsureDepthCleared()
+    internal void EnsureDepthCleared()
     {
         if (_depthCleared) return;
         _gl.Clear(ClearBufferMask.DepthBufferBit);
@@ -503,418 +413,6 @@ public class UIRenderer : IDisposable
         _gl.Disable(EnableCap.DepthTest);
     }
 
-    // One crosshair piece's pixel rect (y measured from the texture's top) as a UV rect
-    private static UvRect CrosshairUv(float x0, float y0, float x1, float y1) =>
-        new(new Vector2(x0 / CrosshairTextureSize, 1f - y1 / CrosshairTextureSize),
-            new Vector2(x1 / CrosshairTextureSize, 1f - y0 / CrosshairTextureSize));
-
-    /// <summary>
-    /// The crosshair, cropped out of the 16x16 texture into its five pieces: the center dot stays
-    /// put while the four arms slide outward with a throw's charge (snapping back on release), a
-    /// ring of segments around them fills with <paramref name="breakProgress"/> while a block is
-    /// mined (nothing at zero, so creative never shows it) and an X flashes at
-    /// <paramref name="hitMarker"/> when a hit lands.
-    /// </summary>
-    public void DrawCrosshair(float throwCharge = 0f, float breakProgress = 0f, float hitMarker = 0f)
-    {
-        var center = ScreenCenter;
-        var unit = CrosshairSize / CrosshairTextureSize;
-        var spread = MathUtils.SmoothStep(MathUtils.Clamp01(throwCharge)) * CrosshairSpreadPx;
-
-        // The pieces' pixel rects in the texture: the dot at the middle, one pill per direction,
-        // an empty row and column between each
-        DrawMesh(_crosshairCenterMesh, RectTransform(center, new Vector2(4f * unit)), Rgba.White, _crosshairTexture);
-        for (var i = 0; i < _crosshairArmMeshes.Length; i++)
-        {
-            var (size, offset) = i switch
-            {
-                0 => (new Vector2(4f, 5f), new Vector2(0f, -5.5f)),
-                1 => (new Vector2(4f, 5f), new Vector2(0f, 5.5f)),
-                2 => (new Vector2(5f, 4f), new Vector2(-5.5f, 0f)),
-                _ => (new Vector2(5f, 4f), new Vector2(5.5f, 0f)),
-            };
-            var position = center + new Vector2(offset.X * unit, offset.Y * unit)
-                + (i switch
-                {
-                    0 => new Vector2(0f, -spread),
-                    1 => new Vector2(0f, spread),
-                    2 => new Vector2(-spread, 0f),
-                    _ => new Vector2(spread, 0f),
-                });
-            DrawMesh(_crosshairArmMeshes[i], RectTransform(position, size * unit), Rgba.White, _crosshairTexture);
-        }
-
-        // The mining ring: segments around the crosshair, the lit share of them following the
-        // block's break progress
-        var progress = MathUtils.Clamp01(breakProgress);
-        if (progress > 0.001f)
-        {
-            var lit = (int)MathF.Ceiling(progress * CrosshairRingSegments);
-            for (var i = 0; i < CrosshairRingSegments; i++)
-            {
-                var angle = i / (float)CrosshairRingSegments * MathF.Tau - MathF.PI * 0.5f;
-                var position = center + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * CrosshairRingRadius;
-                DrawRect(position, new Vector2(CrosshairRingDot), i < lit ? Rgba.White : Rgba.Gray(1f, 0.22f));
-            }
-        }
-
-        // The hit marker: two bars crossed at 45 degrees, fading out with the mark
-        var mark = MathUtils.Clamp01(hitMarker);
-        if (mark > 0.001f)
-        {
-            var color = new Rgba(255, 96, 96, (byte)(mark * 255f + 0.5f));
-            for (var i = 0; i < 2; i++)
-            {
-                var rotation = Matrix4x4.CreateRotationZ((i == 0 ? 1f : -1f) * MathF.PI * 0.25f);
-                var model = Matrix4x4.CreateScale(CrosshairMarkerLength, CrosshairMarkerWidth, 1f)
-                            * rotation
-                            * Matrix4x4.CreateTranslation(center.X, center.Y, 0f);
-                DrawMesh(_unitSquare, model, color);
-            }
-        }
-    }
-
-    // The crosshair texture's edge in pixels (its pieces' rects are authored against it)
-    private const float CrosshairTextureSize = 16f;
-    // How far a fully charged throw pushes the arms outward, in canvas units
-    private const float CrosshairSpreadPx = 7f;
-    // The mining ring: segments around the crosshair and the ring's radius and dot size
-    private const int CrosshairRingSegments = 12;
-    private const float CrosshairRingRadius = 18f;
-    private const float CrosshairRingDot = 3.5f;
-    // The hit marker's bars: their length and thickness
-    private const float CrosshairMarkerLength = 26f;
-    private const float CrosshairMarkerWidth = 3f;
-
-    /// <summary>
-    /// The survival hearts: 10 in a row centered above the hotbar, 1 heart per 10 HP.
-    /// Every heart draws its empty shell first and the red heart over it — full, left
-    /// half (5 HP steps), or nothing — so damage reads heart by heart like Minecraft.
-    /// </summary>
-    public void DrawHearts(int health)
-    {
-        var hp = Math.Clamp(health, 0, PlayerHealth.MaxHealth);
-        var rowWidth = HeartDrawWidth + (PlayerHealth.HeartCount - 1) * HeartStride;
-        var firstX = (_screenSize.X - rowWidth) * 0.5f + HeartDrawWidth * 0.5f;
-        var hotbarTop = _screenSize.Y - BottomMargin - SlotSize;
-        var centerY = hotbarTop - HeartGap - HeartDrawHeight * 0.5f;
-        var fullSize = new Vector2(HeartDrawWidth, HeartDrawHeight);
-        var halfSize = new Vector2(HeartDrawWidth * 0.5f, HeartDrawHeight);
-
-        for (var i = 0; i < PlayerHealth.HeartCount; i++)
-        {
-            var center = new Vector2(firstX + i * HeartStride, centerY);
-            DrawMesh(_heartEmptyMesh, RectTransform(center, fullSize), Rgba.White, _heartEmptyTexture);
-
-            var fill = Math.Clamp(hp - i * PlayerHealth.HpPerHeart, 0, PlayerHealth.HpPerHeart);
-            if (fill >= PlayerHealth.HpPerHeart)
-                DrawMesh(_heartFullMesh, RectTransform(center, fullSize), Rgba.White, _heartTexture);
-            else if (fill >= PlayerHealth.HpPerHeart / 2)
-                DrawMesh(_heartHalfMesh,
-                    RectTransform(center with { X = center.X - HeartDrawWidth * 0.25f }, halfSize),
-                    Rgba.White, _heartTexture);
-        }
-    }
-
-    /// <summary>
-    /// The Tab player list: a centered panel with a header and one line per online player (the local
-    /// one first), drawn over the HUD while Tab is held.
-    /// </summary>
-    public void DrawPlayerList(IReadOnlyList<string> names)
-    {
-        if (_font == null || names.Count == 0) return;
-
-        var lineHeight = CountCapHeight + 6f;
-        var width = PlayerListWidth;
-        foreach (var name in names)
-            width = MathF.Max(width, _font.MeasureSize(name, _countScale).X + 32f);
-        var height = lineHeight * (names.Count + 1) + 16f;
-        var center = new Vector2(_screenSize.X * 0.5f, _screenSize.Y * 0.28f);
-        DrawRect(center, new Vector2(width, height), PanelBackground);
-
-        var top = center.Y - height * 0.5f + 8f;
-        DrawTextCentered($"Players ({names.Count})", center.X, top, _countScale, AccentGold);
-        for (var i = 0; i < names.Count; i++)
-        {
-            DrawText(names[i], new Vector2(center.X - width * 0.5f + 16f, top + lineHeight * (i + 1)),
-                _countScale, Rgba.White);
-        }
-    }
-
-    /// <summary>
-    /// The look-at label at the top of the screen: a small 3D render of the targeted block (its
-    /// own cube mesh and atlas tile, or a flat dark silhouette while the player has not obtained
-    /// it) with its name below it — red when the held item cannot mine it — and, with the
-    /// profiler on, the debug lines (id, state byte, sun and block light, chunk and cell).
-    /// <paramref name="top"/> is the y its layout starts at; <see cref="LookLabelTop"/> gives the
-    /// value for the frame's compass/clock state, so the strip pushes the label below it.
-    /// </summary>
-    public void DrawLookLabel(LookLabelState label, float time, bool debug, float top)
-    {
-        if (_font == null || string.IsNullOrEmpty(label.Text)) return;
-
-        var center = ScreenCenter;
-        // Anchored by the spinning cube's largest half-height, so no yaw ever rises above `top`
-        var cubeCenter = new Vector2(center.X, top + LookLabelCubeHalfHeight);
-        if (_blockCubes.Get(label.BlockId) is { } cube)
-        {
-            // The shape is centered on its own origin, so it spins in place; an unknown block is
-            // the same mesh with uUseTexture off, a flat dark silhouette. FlipToScreen mirrors
-            // the Y-up model into the Y-down canvas with the tilt then tipping its top face
-            // toward the viewer, like the icons; the model's faces overlap on screen, so the
-            // draw needs the depth test the flat shapes skip, or its back faces blend over the
-            // front ones.
-            _gl.Enable(EnableCap.DepthTest);
-            EnsureDepthCleared();
-
-            var model = Matrix4x4.CreateScale(LookLabelCubeSize)
-                        * Matrix4x4.CreateRotationY(time * 0.6f)
-                        * Matrix4x4.CreateRotationX(LookLabelCubeTilt)
-                        * FlipToScreen(cubeCenter);
-
-            // Same cutout discard as DrawBlockIcon: a leaf's transparent texels would
-            // otherwise write depth and swallow the faces behind them.
-            var cutout = label.Known && BlockType.ById[label.BlockId]?.Cutout == true;
-            if (cutout)
-            {
-                _shader.Use();
-                _shader.SetUniform(_locAlphaCutoff, 0.5f);
-            }
-            DrawMesh(cube, model, label.Known ? Rgba.White : new Rgba(26, 26, 30),
-                label.Known ? _atlasTexture : 0, srgb: label.Known && _atlasIsSrgb);
-            if (cutout)
-                _shader.SetUniform(_locAlphaCutoff, 0f);
-
-            _gl.Disable(EnableCap.DepthTest);
-        }
-
-        var name = FittedText(label.Text, _countScale, LookLabelMaxWidth);
-        DrawTextCentered(name, center.X, cubeCenter.Y + LookLabelNameGap, _countScale,
-            label.Mineable ? Rgba.White : DangerRed);
-        if (!debug) return;
-
-        var chunkPos = VoxelCoords.ChunkPosOf(label.Cell);
-        var lines = new[]
-        {
-            $"id {label.BlockId}   state {label.BlockState}",
-            $"sun {label.Light.Sun:0}   block {label.Light.Block:0}",
-            $"chunk {(int)chunkPos.X} {(int)chunkPos.Y} {(int)chunkPos.Z}   cell {(int)label.Cell.X & Chunk.SizeMask} {(int)label.Cell.Y & Chunk.SizeMask} {(int)label.Cell.Z & Chunk.SizeMask}",
-        };
-        var linesTop = cubeCenter.Y + LookLabelNameGap + CountCapHeight + 6f;
-        for (var i = 0; i < lines.Length; i++)
-            DrawTextCentered(lines[i], center.X, linesTop + i * (CountCapHeight + 4f), _countScale, TextDim);
-    }
-
-    /// <summary>
-    /// The y the look-at label's layout starts at: below the compass or the clock while either
-    /// occupies the top-center strip, the compass as low as its coordinates line when one is
-    /// shown, and the strip's own top margin with neither — so equipping the compass pushes the
-    /// label down instead of overlapping it. The compass wins when both are equipped, like the
-    /// draw itself, and a clock has no coordinates line.
-    /// </summary>
-    public static float LookLabelTop(bool compass, bool clock, bool coordinates)
-    {
-        if (compass)
-            return CompassTop + CompassHeight
-                + (coordinates ? CompassCoordsGap + CountCapHeight : 0f) + LookLabelTopGap;
-        return clock ? CompassTop + CompassHeight + LookLabelTopGap : CompassTop;
-    }
-
-    // The look-at label: its cube's size and tilt, the spinning cube's largest screen half-height
-    // (its layout anchor), the gap below the top HUD strip and the gap from the cube to the name
-    private const float LookLabelCubeSize = 34f;
-    // Positive tips the mesh's top face at the viewer once FlipToScreen has mirrored it
-    private const float LookLabelCubeTilt = 0.45f;
-    // The cube's vertical half extent: half the size times cos(tilt) + sin(tilt) * (|sin yaw| +
-    // |cos yaw|), whose worst yaw is the sqrt(2) diagonal
-    private static readonly float LookLabelCubeHalfHeight = LookLabelCubeSize * 0.5f
-        * (MathF.Cos(LookLabelCubeTilt) + MathF.Sin(LookLabelCubeTilt) * MathF.Sqrt(2f));
-    private const float LookLabelTopGap = 6f;
-    private const float LookLabelNameGap = 14f;
-    private const float LookLabelMaxWidth = 200f;
-
-    /// <summary>
-    /// One hover tooltip (see <see cref="ItemTooltip"/>): a panel just below-right of the cursor
-    /// with the hovered item's lines, clamped inside the canvas.
-    /// </summary>
-    public void DrawTooltip(Vector2 anchor, IReadOnlyList<string> lines)
-    {
-        if (_font == null || lines.Count == 0) return;
-
-        var lineHeight = CountCapHeight + 6f;
-        var width = TooltipWidth;
-        foreach (var line in lines)
-            width = MathF.Max(width, _font.MeasureSize(line, _countScale).X + 24f);
-        var height = lineHeight * lines.Count + 16f;
-        var center = anchor + new Vector2(16f + width * 0.5f, 18f + height * 0.5f);
-        center.X = Math.Clamp(center.X, width * 0.5f + 4f, _screenSize.X - width * 0.5f - 4f);
-        center.Y = Math.Clamp(center.Y, height * 0.5f + 4f, _screenSize.Y - height * 0.5f - 4f);
-        DrawRect(center, new Vector2(width, height), PanelBackground);
-        DrawBorder(center, new Vector2(width, height), SlotBorder, SlotBorderColor);
-
-        var top = center.Y - height * 0.5f + 8f;
-        for (var i = 0; i < lines.Count; i++)
-        {
-            DrawText(lines[i], new Vector2(center.X - width * 0.5f + 12f, top + lineHeight * i),
-                _countScale, i == 0 ? Rgba.White : TextDim);
-        }
-    }
-
-    // Smallest width of a tooltip panel; a long line widens it
-    private const float TooltipWidth = 120f;
-
-    /// <summary>
-    /// One toast line (<see cref="HudToast"/>) centered a little above the item-name row, at
-    /// <paramref name="alpha"/>. The chat log sits bottom-left, clear of the centered hotbar.
-    /// </summary>
-    public void DrawToast(string text, float alpha)
-    {
-        var a = MathUtils.Clamp01(alpha);
-        if (_font == null || a <= 0.004f || string.IsNullOrEmpty(text)) return;
-
-        var heartsTop = HotbarLayout.Top(_screenSize) - HeartGap - HeartDrawHeight;
-        var top = heartsTop - HotbarNameGap - CountCapHeight - ToastRowGap;
-        _textFade = a;
-        var size = _font.MeasureSize(text, _countScale);
-        DrawText(text, new Vector2((_screenSize.X - size.X) * 0.5f, top), _countScale, Rgba.White);
-        _textFade = 1f;
-    }
-
-    /// <summary>
-    /// The selected item's name centered over the hearts row (see <see cref="HotbarNameFade"/>),
-    /// at <paramref name="alpha"/>, fitted to the hotbar's width. The chat log sits bottom-left,
-    /// clear of the centered hotbar, so the two never overlap.
-    /// </summary>
-    public void DrawHotbarName(string name, float alpha)
-    {
-        var a = MathUtils.Clamp01(alpha);
-        if (_font == null || a <= 0.004f || string.IsNullOrEmpty(name)) return;
-
-        var heartsTop = HotbarLayout.Top(_screenSize) - HeartGap - HeartDrawHeight;
-        var top = heartsTop - HotbarNameGap - CountCapHeight;
-        _textFade = a;
-        try
-        {
-            DrawTextCenteredFitted(name, _screenSize.X * 0.5f, top, _countScale, Rgba.White, HotbarLayout.RowWidth());
-        }
-        finally
-        {
-            _textFade = 1f;
-        }
-    }
-
-    public void DrawFps(int fps) =>
-        DrawText(_textCache.Fps(fps), new Vector2(ProfilerLeft, FpsTop), _countScale, Rgba.White);
-
-    /// <summary>
-    /// Draws the frame-timing table under the FPS text: a translucent panel sized to the block
-    /// so it reads over bright terrain, then one <see cref="DrawText"/> line per row. The lines
-    /// are already formatted by <see cref="FrameProfiler"/> (rebuilt once a second), so this
-    /// allocates nothing per frame.
-    /// </summary>
-    public void DrawProfiler(IReadOnlyList<string> lines)
-    {
-        if (_font == null || lines.Count == 0) return;
-
-        // Cap height of a glyph, so the spacing follows the font rather than a magic number
-        var lineStep = _font.MeasureSize("X".AsSpan(), _countScale).Y * 1.5f;
-        var top = FpsTop + lineStep;
-
-        // Only the longest line is measured — the count font is monospaced, so character
-        // count orders the rows by width, and measuring all of them every frame would cost
-        // as much again as drawing them
-        var longest = 0;
-        for (var i = 1; i < lines.Count; i++)
-            if (lines[i].Length > lines[longest].Length)
-                longest = i;
-
-        var size = new Vector2(
-            _font.MeasureSize(lines[longest].AsSpan(), _countScale).X + ProfilerPadding * 2f,
-            lines.Count * lineStep + ProfilerPadding * 2f);
-        DrawRect(new Vector2(ProfilerLeft - ProfilerPadding + size.X * 0.5f,
-            top - ProfilerPadding + size.Y * 0.5f), size, ProfilerBackground);
-
-        for (var i = 0; i < lines.Count; i++)
-            DrawText(lines[i], new Vector2(ProfilerLeft, top + i * lineStep), _countScale, Rgba.White);
-    }
-
-    /// <summary>
-    /// The held clock's readout: the same top-center panel the compass uses, showing the day
-    /// number and the time of day (see <see cref="Clock"/>). Drawn only while the clock is in
-    /// the hotbar, like the compass.
-    /// </summary>
-    public void DrawClock(int day, string timeOfDay)
-    {
-        var cx = _screenSize.X * 0.5f;
-        DrawRect(new Vector2(cx, CompassTop + CompassHeight * 0.5f),
-            new Vector2(CompassWidth, CompassHeight), PanelBackground);
-        DrawTextCentered($"Day {day}   {timeOfDay}", cx, CompassTop + CompassReadoutTop,
-            _countScale, Rgba.White);
-    }
-
-    /// <summary>
-    /// RPG-style compass: a translucent bar across the top center showing a 120-degree
-    /// window of the horizon around the camera heading, with cardinal labels every 45
-    /// degrees (N in red), minor ticks every 15, a center caret, the numeric heading on
-    /// top and a light-blue dot at the bearing toward the world spawn. The font only
-    /// covers printable ASCII, so the readout is "N 005" rather than using a degree sign.
-    /// <paramref name="yaw"/> is the camera yaw in degrees (0 looks down +X);
-    /// <paramref name="position"/> is the eye position, also feeding the optional
-    /// coordinates line under the bar.
-    /// </summary>
-    public void DrawCompass(float yaw, Vector3 position, bool showCoordinates = true)
-    {
-        var heading = Compass.HeadingFromYaw(yaw);
-        var cx = _screenSize.X * 0.5f;
-        var halfInner = CompassWidth * 0.5f - CompassSidePad;
-
-        DrawRect(new Vector2(cx, CompassTop + CompassHeight * 0.5f),
-            new Vector2(CompassWidth, CompassHeight), PanelBackground);
-
-        var readout = _textCache.CompassReadout(heading);
-        DrawTextCentered(readout, cx, CompassTop + CompassReadoutTop, _countScale, Rgba.White);
-
-        var tickTop = CompassTop + CompassTickTop;
-        var start = MathF.Floor((heading - CompassHalfSpan) / CompassTickStep) * CompassTickStep;
-        for (var d = start; d <= heading + CompassHalfSpan + 0.01f; d += CompassTickStep)
-        {
-            var rel = Compass.WrapDelta(d - heading);
-            if (MathF.Abs(rel) > CompassHalfSpan) continue;
-            var x = cx + rel / CompassHalfSpan * halfInner;
-            var norm = ((d % 360f) + 360f) % 360f;
-            if (MathF.Abs(norm % CompassCardinalStep) < 0.01f)
-            {
-                var name = Compass.CardinalName(norm);
-                DrawTextCentered(name, x, tickTop, _countScale,
-                    name == "N" ? CompassNorth : Rgba.White);
-            }
-            else
-            {
-                DrawRect(new Vector2(x, tickTop + 7f), new Vector2(2f, 10f), CompassTick);
-            }
-        }
-
-        var spawnDx = Compass.SpawnX - position.X;
-        var spawnDz = Compass.SpawnZ - position.Z;
-        if (MathF.Sqrt(spawnDx * spawnDx + spawnDz * spawnDz) > CompassHideSpawnWithin)
-        {
-            var spawnRel = Compass.WrapDelta(
-                Compass.BearingTo(position.X, position.Z, Compass.SpawnX, Compass.SpawnZ) - heading);
-            if (MathF.Abs(spawnRel) <= CompassHalfSpan)
-                DrawSquare(new Vector2(cx + spawnRel / CompassHalfSpan * halfInner, tickTop + 16f),
-                    CompassSpawnDot, CompassSpawn);
-        }
-
-        DrawRect(new Vector2(cx, tickTop + 8f), new Vector2(2f, 22f), Rgba.White);
-
-        if (showCoordinates && _font != null)
-        {
-            var coords = _textCache.Coords(position);
-            DrawTextCentered(coords, cx, CompassTop + CompassHeight + CompassCoordsGap,
-                _countScale, Rgba.White);
-        }
-    }
-
     /// <summary>
     /// Screen-space text with its top-left corner at <paramref name="topLeft"/> (pixels, Y
     /// down). A one-pixel dark shadow is drawn under each glyph so the text reads over
@@ -936,7 +434,7 @@ public class UIRenderer : IDisposable
         if (n == 0)
             return;
 
-        // _textFade is 1 outside the loading overlay, so ordinary text keeps its exact colors.
+        // _textFade is 1 outside the fading draws, so ordinary text keeps its exact colors.
         var shadow = _textFade >= 1f ? CountShadow : Faded(CountShadow, _textFade);
         var face = _textFade >= 1f ? color : Faded(color, _textFade);
         for (var i = 0; i < n; i++)
@@ -1045,652 +543,6 @@ public class UIRenderer : IDisposable
         _gl.BindVertexArray(0);
     }
 
-    /// <summary>Draws the hotbar centered along the bottom edge, highlighting the selected slot.</summary>
-    /// <param name="headingDegrees">Compass heading (0 = north), picking heading-driven sheet frames.</param>
-    /// <param name="timeSeconds">Scene clock, picking loop-driven sheet frames.</param>
-    /// <param name="pops">Per-slot pickup pops scaling each icon and its count; null draws every slot at rest.</param>
-    public void DrawHotbar(Inventory inventory, float headingDegrees, float timeSeconds, HotbarPickupPop? pops = null)
-    {
-        var stride = SlotSize + SlotGap;
-        var firstCenterX = HotbarLayout.FirstCenterX(_screenSize);
-        var centerY = HotbarLayout.CenterY(_screenSize);
-        var slotSize = new Vector2(SlotSize);
-
-        for (var i = 0; i < Inventory.SlotCount; i++)
-        {
-            var center = new Vector2(firstCenterX + i * stride, centerY);
-            var selected = i == inventory.SelectedIndex;
-
-            DrawRect(center, slotSize, selected ? SelectedBackground : SlotBackground);
-            DrawBorder(center, slotSize,
-                selected ? SelectedBorder : SlotBorder,
-                selected ? SelectedBorderColor : SlotBorderColor);
-            // A broken tool's slot flashes: a bright panel fading out (HotbarPickupPop.FlashAt)
-            var flash = pops?.FlashAt(i) ?? 0f;
-            if (flash > 0f)
-                DrawRect(center, slotSize, new Rgba(255, 255, 255,
-                    (byte)Math.Clamp(flash * WorldGenerationConfig.HotbarFlashAlpha * 255f, 0f, 255f)));
-        }
-
-        // Icons come after every background so the depth clear can't erase a later slot's panel
-        for (var i = 0; i < Inventory.SlotCount; i++)
-        {
-            var id = inventory.IdAt(i);
-            if (id == 0) continue;
-            var center = new Vector2(firstCenterX + i * stride, centerY);
-            // The pop marks a pickup; IconFill leaves enough margin for it to stay in the slot
-            var iconSize = SlotSize * IconFill * (pops?.ScaleAt(i) ?? 1f);
-            // Items show their flat sprites here like the list rows; blocks keep 3D cubes
-            if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
-                DrawItemSprite(center, new Vector2(iconSize), id, icon, headingDegrees, timeSeconds);
-            else
-                DrawBlockIcon(center, iconSize, id);
-        }
-
-        // Durability bars sit along the slot bottom, under the icons so they stay visible.
-        for (var i = 0; i < Inventory.SlotCount; i++)
-        {
-            var slot = inventory.SlotAt(i);
-            if (!slot.IsTool) continue;
-            var fraction = inventory.ToolDurabilityFraction(slot.ToolInstance);
-            if (fraction == null) continue;
-            var center = new Vector2(firstCenterX + i * stride,
-                centerY + SlotSize * 0.5f - DurabilityPadBottom - DurabilityHeight * 0.5f);
-            DrawDurabilityBar(center, SlotSize * DurabilityFill, fraction.Value);
-        }
-
-        // Counts overlay the slot's bottom-right corner, after the icons so text is on top.
-        // Slots share pool totals, so two slots showing one block show the same number.
-        if (_font != null)
-        {
-            for (var i = 0; i < Inventory.SlotCount; i++)
-            {
-                if (inventory.IdAt(i) == 0) continue;
-                var text = _textCache.SlotCount(i, inventory.CountAt(i));
-                // The count pops with its icon, growing out of the slot's corner
-                var countScale = _countScale * (pops?.ScaleAt(i) ?? 1f);
-                var size = _font.MeasureSize(text.AsSpan(), countScale);
-                var slotRight = firstCenterX + i * stride + SlotSize * 0.5f;
-                var slotBottom = centerY + SlotSize * 0.5f;
-                DrawText(text,
-                    new Vector2(slotRight - CountPadRight - size.X, slotBottom - CountPadBottom - size.Y),
-                    countScale, Rgba.White);
-            }
-        }
-    }
-
-    /// <summary>
-    /// The [E] panel: tabs and a name-sorted list on the left, a rotating preview with the
-    /// picked name on the right. The hotbar stays visible underneath so picks can be aimed
-    /// at slots. <paramref name="time"/> spins the preview.
-    /// </summary>
-    public void DrawInventoryPanel(Inventory inventory, InventoryView view, float time,
-        float headingDegrees, bool creative)
-    {
-        var top = PanelTop;
-        var height = InventoryPanelLayout.PanelHeight(_screenSize);
-        var panel = new Vector2(PanelLeft + PanelWidth * 0.5f, top + height * 0.5f);
-        DrawRect(panel, new Vector2(PanelWidth, height), PanelBackground);
-
-        var tabs = InventoryPanelLayout.Tabs;
-        var tabWidth = InventoryPanelLayout.TabWidth(_screenSize);
-        for (var t = 0; t < tabs.Length; t++)
-        {
-            var center = InventoryPanelLayout.TabCenter(t, _screenSize);
-            var active = view.Tab == tabs[t];
-            DrawRect(center, new Vector2(tabWidth - 4f, TabHeight),
-                active ? SelectedBackground : SlotBackground);
-            if (active)
-                DrawBorder(center, new Vector2(tabWidth - 4f, TabHeight), SlotBorder, SelectedBorderColor);
-            DrawTextCenteredFitted(TabTitle(tabs[t]),
-                center.X, top + PanelPad + 6f, _countScale, Rgba.White, tabWidth - 8f);
-            DrawTextCenteredFitted(TabSubtitle(inventory, tabs[t]),
-                center.X, top + PanelPad + 30f, _countScale, Rgba.White, tabWidth - 8f);
-        }
-
-        var (searchCenter, searchSize) = InventoryPanelLayout.SearchBoxRect(_screenSize);
-        DrawInputField(searchCenter, searchSize, view.Search.Text,
-            view.Focus == InventoryFocus.Search, "Search items and recipes", time);
-
-        // A query replaces the tab's list with search results; the list region below doubles as
-        // the field's dropdown, and Program.HandleInventoryClick reads the same InventorySearch
-        // call, so the drawn rows and the click always agree.
-        IReadOnlyList<SearchHit>? hits = view.Search.IsEmpty
-            ? null
-            : InventorySearch.Search(view.Search.Query, inventory, creative);
-
-        // One list per frame for the active tab (never re-query StackEntries/ToolEntries for
-        // the visible range: that would double the LINQ sort). In creative the Blocks/Tools/Misc
-        // tabs list the whole catalog instead of the player's stock.
-        IReadOnlyList<CreativeCatalog.CatalogEntry>? catalog = null;
-        IReadOnlyList<Inventory.ToolRow>? tools = null;
-        IReadOnlyList<CraftingRecipe>? recipes = null;
-        IReadOnlyList<Inventory.StackRow>? rows = null;
-        int rowCount;
-        if (hits != null)
-            rowCount = hits.Count;
-        else if (creative && view.Tab != InventoryCategory.Crafting)
-            rowCount = (catalog = CreativeCatalog.Entries(view.Tab, inventory)).Count;
-        else if (view.Tab == InventoryCategory.Tools)
-            rowCount = (tools = inventory.ToolEntries()).Count;
-        else if (view.Tab == InventoryCategory.Crafting)
-            rowCount = (recipes = ContentRegistry.CraftingRecipes).Count;
-        else
-            rowCount = (rows = inventory.StackEntries(view.Tab)).Count;
-
-        // Clamp the stored offset with this frame's row count, exactly as
-        // Program.HandleInventoryClick does, so the drawn list and the click always agree.
-        var offset = hits != null
-            ? InventoryPanelLayout.ClampedOffset(view.Search.ScrollOffset, rowCount, _screenSize)
-            : InventoryPanelLayout.ClampedOffset(view.ScrollOffset, rowCount, _screenSize);
-        var listHeight = InventoryPanelLayout.ListHeight(_screenSize);
-        var (first, end) = ScrollList.VisibleRange(offset, RowHeight, rowCount, listHeight);
-
-        // A glClear honors the scissor, so the pass's one full-screen depth clear must happen
-        // before the scissor goes on; otherwise the latch would record a clear that covered only
-        // the list, and the preview and crafting-card icons would z-fight the world's depth.
-        EnsureDepthCleared();
-
-        // glScissor takes framebuffer pixels with a bottom-left origin, hence the conversion
-        // from the canvas rect. Nothing but the row loops may run while it is enabled (the
-        // preview, crafting card, pause menu and later passes all assume it off, and Begin
-        // disables it as a belt-and-braces), and nothing may return from inside this block.
-        var (sx, sy, sw, sh) = UiCanvas.ScissorRect(
-            new Vector2(InventoryPanelLayout.PanelLeft, InventoryPanelLayout.ListTop),
-            new Vector2(InventoryPanelLayout.PanelWidth(_screenSize), listHeight),
-            _scale, _windowSize, _framebufferSize);
-        _gl.Enable(EnableCap.ScissorTest);
-        _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
-        try
-        {
-            if (hits != null)
-            {
-                for (var i = first; i < end; i++)
-                    DrawSearchRow(i, offset, hits[i], i == view.Search.Highlight, headingDegrees, time);
-            }
-            else if (catalog != null)
-            {
-                for (var i = first; i < end; i++)
-                    DrawCatalogRow(i, offset, rowCount, catalog[i], headingDegrees, time);
-            }
-            else if (tools != null)
-            {
-                for (var i = first; i < end; i++)
-                {
-                    var selected = view.SelectedToolInstance == tools[i].InstanceId;
-                    DrawEntryRow(i, offset, tools[i].ItemId, tools[i].Name, "1", selected, false, headingDegrees,
-                        time, null, inventory.ToolDurabilityFraction(tools[i].InstanceId));
-                }
-            }
-            else if (recipes != null)
-            {
-                for (var i = first; i < end; i++)
-                {
-                    var ready = inventory.CanCraft(recipes[i]);
-                    DrawEntryRow(i, offset, recipes[i].ResultId,
-                        Inventory.DisplayName(recipes[i].ResultId),
-                        $"x{recipes[i].ResultCount}",
-                        view.Craft.Recipe != null && view.Craft.Recipe.Name == recipes[i].Name,
-                        !ready, headingDegrees, time,
-                        ready ? ReadyGreen : null);
-                }
-            }
-            else if (rows != null)
-            {
-                for (var i = first; i < end; i++)
-                    DrawEntryRow(i, offset, rows[i].Id, rows[i].Name, rows[i].Count.ToString(),
-                        view.SelectedId == rows[i].Id, false, headingDegrees, time);
-            }
-        }
-        finally
-        {
-            _gl.Disable(EnableCap.ScissorTest);
-        }
-
-        // The scrollbar sits in the panel's right padding and only exists while the list
-        // overflows; the thumb is highlighted while it is being dragged.
-        if (ScrollList.Overflows(InventoryPanelLayout.ContentHeight(rowCount), listHeight))
-        {
-            var track = InventoryPanelLayout.TrackRect(_screenSize);
-            DrawRect(track.Center, track.Size, SlotBackground);
-            var thumb = InventoryPanelLayout.ThumbRect(_screenSize, offset, rowCount);
-            DrawRect(thumb.Center, thumb.Size,
-                view.ThumbDragGrab.HasValue ? SelectedBorderColor : SlotBorderColor);
-        }
-
-        DrawPreview(inventory, view, time, headingDegrees);
-    }
-
-    /// <summary>
-    /// The ESC pause menu over the still-rendered game: a fullscreen dim standing in for a
-    /// blur (this pass has no blur target; the dark translucency keeps the scene visible
-    /// but unreadable, like the Godot reference's BlurOverlay in overlay mode), then a
-    /// centered title with RESUME / SETTINGS / SAVE &amp; QUIT buttons, or the settings title with a
-    /// BACK button. Click targets come from <see cref="PauseMenuLayout"/> so drawing and
-    /// hit-testing can never drift apart (the third button is still <see cref="PauseMenuHit.Exit"/>).
-    /// </summary>
-    public void DrawPauseMenu(PauseMenuView view, SettingsMenuView settings)
-    {
-        if (view.Page == PauseMenuPage.Closed) return;
-
-        DrawRect(_screenSize * 0.5f, _screenSize, Rgba.Gray(0f, 0.62f));
-
-        var screen = _screenSize;
-        if (view.Page == PauseMenuPage.Main)
-        {
-            DrawTextCentered("PAUSED", screen.X * 0.5f,
-                PauseMenuLayout.TitleTop(screen, view.Page), _headScale, Rgba.White);
-            DrawMenuButton(PauseMenuLayout.MainButtonCenter(screen, 0), "RESUME");
-            DrawMenuButton(PauseMenuLayout.MainButtonCenter(screen, 1), "SETTINGS");
-            DrawMenuButton(PauseMenuLayout.MainButtonCenter(screen, 2), "SAVE & QUIT");
-            return;
-        }
-
-        DrawSettingsMenu(settings);
-    }
-
-    /// <summary>
-    /// The settings page: title, one tab strip (Display/Graphics/Water/Audio/Controls), the
-    /// active tab's widget rows, BACK button. The busiest tab holds six rows, so the whole
-    /// page fits without scrolling.
-    /// </summary>
-    public void DrawSettingsMenu(SettingsMenuView view)
-    {
-        var screen = _screenSize;
-        var left = SettingsLayout.PanelLeft(screen);
-        DrawTextCentered("SETTINGS", screen.X * 0.5f, SettingsLayout.PanelTop, _headScale, Rgba.White);
-
-        for (var t = 0; t < SettingsRows.Tabs.Length; t++)
-        {
-            var center = SettingsLayout.TabCenter(t, screen);
-            var size = new Vector2(SettingsLayout.TabWidth() - 4f, SettingsLayout.TabHeight);
-            var active = SettingsRows.Tabs[t] == view.Tab;
-            DrawRect(center, size, active ? SelectedBackground : SlotBackground);
-            if (active)
-                DrawBorder(center, size, SlotBorder, SelectedBorderColor);
-            DrawTextCentered(SettingsRows.Tabs[t], center.X, center.Y - 8f, _countScale, Rgba.White);
-        }
-
-        var rows = SettingsRows.RowsInTab(view.Tab);
-        for (var r = 0; r < rows.Length; r++)
-        {
-            var row = SettingsRows.All[rows[r]];
-            var center = SettingsLayout.RowCenter(r, screen);
-            DrawText(FitText(row.Label, _countScale, SettingsLayout.LabelWidth - 16f),
-                new Vector2(left + 8f, center.Y - 8f), _countScale, Rgba.White);
-
-            switch (row)
-            {
-                case ToggleRow t:
-                    DrawToggle(SettingsLayout.ToggleCenter(r, screen), t.Get());
-                    DrawValueRight(center.Y, SettingsRows.FormatValue(row), screen);
-                    break;
-                case SliderRow s:
-                    DrawSlider(r, screen, s, view.DragRow == rows[r]);
-                    DrawValueRight(center.Y, SettingsRows.FormatValue(row), screen);
-                    break;
-                case OptionsRow:
-                    // The GUI Scale row names the effective scale (this frame's Begin scale) while capped.
-                    var value = ReferenceEquals(row, SettingsRows.GuiScaleRow)
-                        ? UiCanvas.ScaleLabel(GameSettings.RequestedGuiScale, _scale)
-                        : SettingsRows.FormatValue(row);
-                    DrawTextCentered($"< {value} >",
-                        SettingsLayout.TrackRect(r, screen).Center.X,
-                        center.Y - 8f, _countScale, Rgba.White);
-                    break;
-            }
-        }
-
-        DrawMenuButton(SettingsLayout.BackCenter(screen), "BACK");
-    }
-
-    /// <summary>Settings widget under a window-pixel point (top-left origin), if any.</summary>
-    public SettingsHit SettingsHitAt(Vector2 point, SettingsMenuView view)
-    {
-        point = ToCanvas(point);
-        return SettingsLayout.HitAt(point, view.Tab, _screenSize);
-    }
-
-    private void DrawValueRight(float centerY, string text, Vector2 screen)
-    {
-        var w = TextWidth(text, _countScale);
-        DrawText(text, new Vector2(SettingsLayout.ValueRight(screen) - w, centerY - 8f),
-            _countScale, TextDim);
-    }
-
-    private void DrawToggle(Vector2 center, bool on)
-    {
-        var size = new Vector2(SettingsLayout.ToggleSize);
-        DrawRect(center, size, SlotBackground);
-        DrawBorder(center, size, SlotBorder, SlotBorderColor);
-        if (on)
-            DrawSquare(center, SettingsLayout.ToggleSize - 8f, AccentGold);
-    }
-
-    private void DrawSlider(int tabRow, Vector2 screen, SliderRow def, bool active)
-    {
-        var (center, size) = SettingsLayout.TrackRect(tabRow, screen);
-        var fraction = MathUtils.Clamp01((def.Get() - def.Min) / (def.Max - def.Min));
-        DrawRect(center, size, SlotBackground);
-        if (fraction > 0f)
-        {
-            var fillW = size.X * fraction;
-            DrawRect(new Vector2(center.X - size.X * 0.5f + fillW * 0.5f, center.Y),
-                new Vector2(fillW, size.Y), active ? Rgba.White : AccentGold);
-        }
-        DrawSquare(new Vector2(center.X - size.X * 0.5f + size.X * fraction, center.Y),
-            14f, active ? Rgba.White : SelectedBorderColor);
-    }
-
-    /// <summary>Menu button or BACK under a window-pixel point (top-left origin), if any.</summary>
-    public PauseMenuHit PauseMenuHitAt(Vector2 point, PauseMenuView view)
-    {
-        point = ToCanvas(point);
-        return PauseMenuLayout.HitAt(point, _screenSize, view.Page);
-    }
-
-    private void DrawMenuButton(Vector2 center, string label)
-    {
-        DrawRect(center, PauseMenuLayout.ButtonSize, SlotBackground);
-        DrawBorder(center, PauseMenuLayout.ButtonSize, SlotBorder, SelectedBorderColor);
-        DrawTextCentered(label, center.X, center.Y - 9f, _countScale, Rgba.White);
-    }
-
-    /// <summary>
-    /// The main menu the game boots to, over an opaque backdrop (no world is rendered behind a
-    /// menu frame). Every rectangle comes from <see cref="MainMenuLayout"/> (the main page from
-    /// <see cref="PauseMenuLayout"/>), which <see cref="MainMenuHitAt"/> also reads, so drawing and
-    /// hit-testing cannot drift apart. The settings page is the pause menu's, shared as is.
-    /// <paramref name="time"/> is the window clock, for the text caret's blink.
-    /// </summary>
-    public void DrawMainMenu(MainMenuView view, SettingsMenuView settings, float time)
-    {
-        var screen = _screenSize;
-        DrawRect(screen * 0.5f, screen, MenuBackdrop);
-
-        switch (view.Page)
-        {
-            case MainMenuPage.Main:
-                DrawTextCentered("CSVOXELENGINE", screen.X * 0.5f,
-                    MainMenuLayout.TitleTop(screen, MainMenuPage.Main), _headScale, Rgba.White);
-                DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 0), "START");
-                DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 1), "MULTIPLAYER");
-                DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 2), "SETTINGS");
-                DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 3), "EXIT");
-                break;
-
-            case MainMenuPage.Multiplayer:
-                DrawMultiplayerPage(view, screen);
-                break;
-
-            case MainMenuPage.AddServer:
-                DrawTextCentered("ADD SERVER", screen.X * 0.5f,
-                    MainMenuLayout.TitleTop(screen, MainMenuPage.AddServer), _headScale, Rgba.White);
-                DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "NAME", view.ServerName,
-                    view.Focus == MenuField.ServerName, WorldNames.DefaultName, time);
-                DrawLabeledField(MainMenuLayout.SeedFieldCenter(screen), "ADDRESS", view.Address,
-                    view.Focus == MenuField.Address, "192.168.1.10 or host:25566", time);
-                DrawNotice(view, screen);
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "ADD");
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
-                break;
-
-            case MainMenuPage.DirectConnect:
-                DrawTextCentered("DIRECT CONNECT", screen.X * 0.5f,
-                    MainMenuLayout.TitleTop(screen, MainMenuPage.DirectConnect), _headScale, Rgba.White);
-                DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "ADDRESS", view.Address,
-                    view.Focus == MenuField.Address, "192.168.1.10 or host:25566", time);
-                DrawNotice(view, screen);
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CONNECT");
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
-                break;
-
-            case MainMenuPage.ConfirmDeleteServer:
-                DrawMultiplayerPage(view, screen);
-                DrawConfirmDeleteServer(view, screen);
-                break;
-
-            case MainMenuPage.Worlds:
-                DrawWorldsPage(view, screen);
-                break;
-
-            case MainMenuPage.Create:
-                DrawTextCentered("NEW WORLD", screen.X * 0.5f,
-                    MainMenuLayout.TitleTop(screen, MainMenuPage.Create), _headScale, Rgba.White);
-                DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "NAME", view.Name,
-                    view.Focus == MenuField.Name, WorldNames.DefaultName, time);
-                DrawLabeledField(MainMenuLayout.SeedFieldCenter(screen), "SEED", view.Seed,
-                    view.Focus == MenuField.Seed, "random", time);
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CREATE");
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
-                break;
-
-            case MainMenuPage.Edit:
-                DrawTextCentered("EDIT WORLD", screen.X * 0.5f,
-                    MainMenuLayout.TitleTop(screen, MainMenuPage.Edit), _headScale, Rgba.White);
-                DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "NAME", view.Name,
-                    view.Focus == MenuField.Name, WorldNames.DefaultName, time);
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "SAVE");
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
-                break;
-
-            case MainMenuPage.ConfirmDelete:
-                DrawWorldsPage(view, screen);
-                DrawConfirmDelete(view, screen);
-                break;
-
-            case MainMenuPage.Settings:
-                DrawSettingsMenu(settings);
-                break;
-        }
-    }
-
-    // The worlds list: title, panel, the scissored rows (name and seed on their own lines, never
-    // concatenated since a layout run stops at MaxLayoutChars), the empty-state line, the notice
-    // and the CREATE / BACK buttons.
-    private void DrawWorldsPage(MainMenuView view, Vector2 screen)
-    {
-        DrawTextCentered("WORLDS", screen.X * 0.5f,
-            MainMenuLayout.TitleTop(screen, MainMenuPage.Worlds), _headScale, Rgba.White);
-
-        var left = MainMenuLayout.PanelLeft(screen);
-        var top = MainMenuLayout.ListTop(screen);
-        var listHeight = MainMenuLayout.ListHeight(screen);
-        var panelCenter = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
-        var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
-        DrawRect(panelCenter, panelSize, SlotBackground);
-        DrawBorder(panelCenter, panelSize, SlotBorder, SlotBorderColor);
-
-        var count = view.Worlds.Count;
-        if (count == 0)
-        {
-            DrawTextCentered("No worlds yet - create one", panelCenter.X, panelCenter.Y - 8f,
-                _countScale, TextDim);
-        }
-        else
-        {
-            // Clamped with this frame's row count, exactly as MainMenuLayout.HitAt clamps it.
-            var offset = MainMenuLayout.ClampedOffset(view.ScrollOffset, count, screen);
-            var (first, end) = MainMenuLayout.VisibleRows(offset, count, screen);
-            var nameLeft = MainMenuLayout.NameLeft(screen);
-            var nameWidth = MainMenuLayout.NameMaxWidth(screen);
-
-            // glScissor takes framebuffer pixels with a bottom-left origin, hence the conversion.
-            // Only the row loop runs while it is enabled, and nothing returns from inside it.
-            var (sx, sy, sw, sh) = UiCanvas.ScissorRect(new Vector2(left, top), panelSize,
-                _scale, _windowSize, _framebufferSize);
-            _gl.Enable(EnableCap.ScissorTest);
-            _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
-            try
-            {
-                for (var i = first; i < end; i++)
-                {
-                    var world = view.Worlds[i];
-                    var rowTop = MainMenuLayout.RowTop(i, offset, screen);
-                    if (i > 0)
-                        DrawRect(new Vector2(panelCenter.X, rowTop),
-                            new Vector2(MainMenuLayout.PanelWidth - 2f * MainMenuLayout.RowPad, 1.5f),
-                            SlotBorderColor);
-                    DrawText(FittedText(world.Name, _countScale, nameWidth),
-                        new Vector2(nameLeft, rowTop + 8f), _countScale, Rgba.White);
-                    DrawText(MainMenuLayout.WorldDetailText(world.Seed, world.LastPlayedUnixMs),
-                        new Vector2(nameLeft, rowTop + 36f), _countScale, TextDim);
-                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 0),
-                        MainMenuLayout.RowButtonSize, "PLAY");
-                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 1),
-                        MainMenuLayout.RowButtonSize, "EDIT");
-                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 2),
-                        MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
-                }
-            }
-            finally
-            {
-                _gl.Disable(EnableCap.ScissorTest);
-            }
-        }
-
-        if (!string.IsNullOrEmpty(view.Notice))
-            DrawTextCentered(FittedText(view.Notice, _countScale, MainMenuLayout.PanelWidth),
-                screen.X * 0.5f, MainMenuLayout.NoticeTop(screen), _countScale, AccentGold);
-
-        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CREATE");
-        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
-    }
-
-    // The multiplayer list, shaped exactly like the worlds list: title, panel, the scissored rows
-    // (name over address) with CONNECT / DELETE, the empty state, the notice and the three bottom
-    // buttons ADD SERVER / DIRECT CONNECT / BACK.
-    private void DrawMultiplayerPage(MainMenuView view, Vector2 screen)
-    {
-        DrawTextCentered("MULTIPLAYER", screen.X * 0.5f,
-            MainMenuLayout.TitleTop(screen, MainMenuPage.Multiplayer), _headScale, Rgba.White);
-
-        var left = MainMenuLayout.PanelLeft(screen);
-        var top = MainMenuLayout.ListTop(screen);
-        var listHeight = MainMenuLayout.ListHeight(screen);
-        var panelCenter = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
-        var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
-        DrawRect(panelCenter, panelSize, SlotBackground);
-        DrawBorder(panelCenter, panelSize, SlotBorder, SlotBorderColor);
-
-        var count = view.Servers.Count;
-        if (count == 0)
-        {
-            DrawTextCentered("No servers yet - add one", panelCenter.X, panelCenter.Y - 8f,
-                _countScale, TextDim);
-        }
-        else
-        {
-            var offset = MainMenuLayout.ClampedOffset(view.ServerScrollOffset, count, screen);
-            var (first, end) = MainMenuLayout.VisibleRows(offset, count, screen);
-            var nameLeft = MainMenuLayout.NameLeft(screen);
-            var nameWidth = MainMenuLayout.NameMaxWidth(screen);
-
-            var (sx, sy, sw, sh) = UiCanvas.ScissorRect(new Vector2(left, top), panelSize,
-                _scale, _windowSize, _framebufferSize);
-            _gl.Enable(EnableCap.ScissorTest);
-            _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
-            try
-            {
-                for (var i = first; i < end; i++)
-                {
-                    var server = view.Servers[i];
-                    var rowTop = MainMenuLayout.RowTop(i, offset, screen);
-                    if (i > 0)
-                        DrawRect(new Vector2(panelCenter.X, rowTop),
-                            new Vector2(MainMenuLayout.PanelWidth - 2f * MainMenuLayout.RowPad, 1.5f),
-                            SlotBorderColor);
-                    DrawText(FittedText(server.Name, _countScale, nameWidth),
-                        new Vector2(nameLeft, rowTop + 8f), _countScale, Rgba.White);
-                    DrawText(server.Address.ToString(), new Vector2(nameLeft, rowTop + 36f), _countScale, TextDim);
-                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 0, 2),
-                        MainMenuLayout.RowButtonSize, "CONNECT");
-                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 1, 2),
-                        MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
-                }
-            }
-            finally
-            {
-                _gl.Disable(EnableCap.ScissorTest);
-            }
-        }
-
-        DrawNotice(view, screen);
-
-        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 0), MainMenuLayout.TripleButtonSize, "ADD SERVER");
-        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 1), MainMenuLayout.TripleButtonSize, "DIRECT CONNECT");
-        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 2), MainMenuLayout.TripleButtonSize, "BACK");
-    }
-
-    private void DrawNotice(MainMenuView view, Vector2 screen)
-    {
-        if (!string.IsNullOrEmpty(view.Notice))
-            DrawTextCentered(FittedText(view.Notice, _countScale, MainMenuLayout.PanelWidth),
-                screen.X * 0.5f, MainMenuLayout.NoticeTop(screen), _countScale, AccentGold);
-    }
-
-    // The delete confirmation over the dimmed multiplayer page: question, the server's name on its
-    // own line, DELETE / CANCEL.
-    private void DrawConfirmDeleteServer(MainMenuView view, Vector2 screen)
-    {
-        DrawRect(screen * 0.5f, screen, Rgba.Gray(0f, 0.62f));
-
-        var center = MainMenuLayout.ConfirmBoxCenter(screen);
-        var size = MainMenuLayout.ConfirmBoxSize;
-        DrawRect(center, size, CardBackground);
-        DrawBorder(center, size, SlotBorder, SelectedBorderColor);
-
-        var top = center.Y - size.Y * 0.5f;
-        DrawTextCentered("Delete this server?", center.X, top + 32f, _headScale, Rgba.White);
-        if (view.SelectedServer is { } server)
-            DrawTextCentered(FittedText(server.Name, _countScale, size.X - 48f),
-                center.X, top + 84f, _countScale, AccentGold);
-
-        DrawSmallButton(MainMenuLayout.ConfirmYesCenter(screen), MainMenuLayout.ConfirmButtonSize,
-            "DELETE", DangerRed);
-        DrawSmallButton(MainMenuLayout.ConfirmNoCenter(screen), MainMenuLayout.ConfirmButtonSize, "CANCEL");
-    }
-
-    // The delete confirmation over the dimmed worlds page: question, the world's name on its own
-    // line, DELETE / CANCEL.
-    private void DrawConfirmDelete(MainMenuView view, Vector2 screen)
-    {
-        DrawRect(screen * 0.5f, screen, Rgba.Gray(0f, 0.62f));
-
-        var center = MainMenuLayout.ConfirmBoxCenter(screen);
-        var size = MainMenuLayout.ConfirmBoxSize;
-        // CardBackground rather than the translucent SlotBackground, so the rows under the dim
-        // do not show through the box.
-        DrawRect(center, size, CardBackground);
-        DrawBorder(center, size, SlotBorder, SelectedBorderColor);
-
-        var top = center.Y - size.Y * 0.5f;
-        DrawTextCentered("Delete this world?", center.X, top + 32f, _headScale, Rgba.White);
-        if (view.SelectedWorld is { } world)
-            DrawTextCentered(FittedText(world.Name, _countScale, size.X - 48f),
-                center.X, top + 84f, _countScale, AccentGold);
-
-        DrawSmallButton(MainMenuLayout.ConfirmYesCenter(screen), MainMenuLayout.ConfirmButtonSize,
-            "DELETE", DangerRed);
-        DrawSmallButton(MainMenuLayout.ConfirmNoCenter(screen), MainMenuLayout.ConfirmButtonSize, "CANCEL");
-    }
-
-    private void DrawLabeledField(Vector2 center, string label, TextFieldState field, bool focused,
-        string placeholder, float time)
-    {
-        DrawText(label, new Vector2(center.X - MainMenuLayout.FieldSize.X * 0.5f,
-            MainMenuLayout.FieldLabelTop(center)), _countScale, TextDim);
-        DrawInputField(center, MainMenuLayout.FieldSize, field, focused, placeholder, time);
-    }
-
-    /// <summary>A <see cref="DrawMenuButton"/> of any size, with an optional border color.</summary>
-    private void DrawSmallButton(Vector2 center, Vector2 size, string label, Rgba? border = null)
-    {
-        DrawRect(center, size, SlotBackground);
-        DrawBorder(center, size, SlotBorder, border ?? SelectedBorderColor);
-        DrawTextCentered(label, center.X, center.Y - 9f, _countScale, Rgba.White);
-    }
-
     /// <summary>
     /// A one-line text field: the text left-aligned, the placeholder dimmed while it is empty,
     /// and while focused a caret after the text blinking twice a second on the window clock.
@@ -1732,137 +584,12 @@ public class UIRenderer : IDisposable
         return start == 0 ? text : text[start..];
     }
 
-    /// <summary>
-    /// The chat HUD over a playing world: the most recent lines bottom-left over a translucent
-    /// backdrop (sender and text together, one line per message) and, while the input is open, the
-    /// single-line input field above the hotbar. Geometry comes from <see cref="ChatLayout"/>.
-    /// </summary>
-    public void DrawChat(ChatView view, float time)
-    {
-        var screen = _screenSize;
-        var messages = view.Messages;
-        if (messages.Count > 0)
-        {
-            // A message may be longer than one text run (BitmapFont.MaxLayoutChars) or wider than
-            // the log, so it is word-wrapped and the log shows the last VisibleMessages *lines*,
-            // newest at the bottom, rather than cutting a long line off at the run cap.
-            _chatLines.Clear();
-            for (var m = messages.Count - 1; m >= 0 && _chatLines.Count < ChatLayout.VisibleMessages; m--)
-            {
-                var message = messages[m];
-                var text = message.Kind == ChatKind.Player ? $"{message.Sender}: {message.Text}" : message.Text;
-                var color = message.Kind == ChatKind.Player ? Rgba.White : AccentGold;
-                _chatWrap.Clear();
-                if (_font != null)
-                    TextWrap.Wrap(text, ChatLayout.MaxWidth, s => _font.MeasureSize(s, _countScale).X, _chatWrap);
-                else
-                    _chatWrap.Add(text);
-                // Wrapped top to bottom, collected bottom-up: push the message's last line first.
-                // A fading line's alpha rides its color, and a fully faded one is skipped so the
-                // log shrinks with it.
-                var alpha = view.AlphaAt(m);
-                if (alpha <= 0.004f) continue;
-                for (var l = _chatWrap.Count - 1; l >= 0 && _chatLines.Count < ChatLayout.VisibleMessages; l--)
-                    _chatLines.Add((_chatWrap[l], color.WithAlpha(alpha)));
-            }
-
-            var visible = _chatLines.Count;
-            var bottom = ChatLayout.LogBottom(screen, view.IsOpen);
-            var blockCenter = new Vector2(ChatLayout.Left + ChatLayout.MaxWidth * 0.5f,
-                bottom - visible * ChatLayout.LineHeight * 0.5f);
-            DrawRect(blockCenter, new Vector2(ChatLayout.MaxWidth + 16f, visible * ChatLayout.LineHeight + 8f),
-                Rgba.Gray(0f, 0.35f));
-
-            // _chatLines[0] is the newest line and sits at the bottom
-            for (var i = 0; i < visible; i++)
-                DrawText(_chatLines[i].Text,
-                    new Vector2(ChatLayout.Left, ChatLayout.LineTop(screen, view.IsOpen, i)),
-                    _countScale, _chatLines[i].Color);
-        }
-
-        if (view.IsOpen)
-            DrawInputField(ChatLayout.InputCenter(screen), ChatLayout.InputSize, view.Input, true,
-                "Say something...", time, showTail: true);
-    }
-
-    // Scratch for DrawChat's wrapping, reused every frame
-    private readonly List<string> _chatWrap = new();
-    private readonly List<(string Text, Rgba Color)> _chatLines = new();
-
-    /// <summary>Main-menu widget under a window-pixel point (top-left origin).</summary>
-    public MainMenuHit MainMenuHitAt(Vector2 windowPoint, MainMenuView view) =>
-        MainMenuLayout.HitAt(ToCanvas(windowPoint), _screenSize, view);
-    /// <summary>Whether a window-pixel point is over the worlds list (the mouse-wheel target).</summary>
-    public bool IsOverWorldList(Vector2 windowPoint) =>
-        MainMenuLayout.IsOverList(ToCanvas(windowPoint), _screenSize);
-
-    /// <summary>Whether a window-pixel point is over the multiplayer server list (the mouse-wheel target).</summary>
-    public bool IsOverServerList(Vector2 windowPoint) =>
-        MainMenuLayout.IsOverList(ToCanvas(windowPoint), _screenSize);
-
-    /// <summary>
-    /// The loading screen: the world name, an animated spinner (a pure function of the window
-    /// clock, so a hitch never stalls it), the caption and, for <see cref="LoadingScreenKind.Loading"/>,
-    /// a progress bar with its percentage. <paramref name="opaque"/> draws a fully opaque backdrop
-    /// (a loading or saving frame, with nothing behind it); otherwise the backdrop takes
-    /// <see cref="LoadingScreenView.FadeAlpha"/>, which is the fade over the first playing frames.
-    /// Every other element is multiplied by the fade alpha either way. Geometry comes from
-    /// <see cref="LoadingScreenLayout"/>.
-    /// </summary>
-    public void DrawLoadingScreen(LoadingScreenView view, double time, bool opaque)
-    {
-        var fade = MathUtils.Clamp01(view.FadeAlpha);
-        var screen = _screenSize;
-        DrawRect(screen * 0.5f, screen, opaque ? MenuBackdrop : Faded(MenuBackdrop, fade));
-        if (fade <= 0f) return;
-
-        _textFade = fade;
-        try
-        {
-            var barSize = LoadingScreenLayout.BarSize;
-            if (!string.IsNullOrEmpty(view.WorldName))
-                DrawTextCentered(FittedText(view.WorldName, _headScale, barSize.X), screen.X * 0.5f,
-                    LoadingScreenLayout.TitleTop(screen), _headScale, Rgba.White);
-            DrawTextCentered(view.Caption, screen.X * 0.5f, LoadingScreenLayout.CaptionTop(screen),
-                _countScale, TextDim);
-
-            const int dots = WorldGenerationConfig.LoadingSpinnerDots;
-            var phase = LoadingScreenLayout.SpinnerPhase(time);
-            for (var d = 0; d < dots; d++)
-            {
-                var brightness = LoadingScreenLayout.DotBrightness(d, dots, phase);
-                DrawSquare(LoadingScreenLayout.DotCenter(screen, d, dots), LoadingScreenLayout.DotSize,
-                    Faded(AccentGold, brightness * fade));
-            }
-
-            if (view.Kind == LoadingScreenKind.Loading)
-            {
-                var center = LoadingScreenLayout.BarCenter(screen);
-                DrawRect(center, barSize, Faded(SlotBackground, fade));
-                DrawBorder(center, barSize, SlotBorder, Faded(SlotBorderColor, fade));
-                var progress = MathUtils.Clamp01(view.ShownProgress);
-                if (progress > 0f)
-                {
-                    var fillW = barSize.X * progress;
-                    DrawRect(new Vector2(center.X - barSize.X * 0.5f + fillW * 0.5f, center.Y),
-                        new Vector2(fillW, barSize.Y), Faded(AccentGold, fade));
-                }
-                DrawTextCentered(PercentText(progress), screen.X * 0.5f,
-                    LoadingScreenLayout.PercentTop(screen), _countScale, Rgba.White);
-            }
-        }
-        finally
-        {
-            _textFade = 1f;
-        }
-    }
-
     // A color with its alpha multiplied by factor (clamped to 0..1).
-    private static Rgba Faded(Rgba color, float factor) =>
+    internal static Rgba Faded(Rgba color, float factor) =>
         color with { A = (byte)(color.A * MathUtils.Clamp01(factor) + 0.5f) };
 
     // FitText through the cache: each (text, width) pair is fitted once per canvas size.
-    private string FittedText(string text, float scale, float maxWidth)
+    internal string FittedText(string text, float scale, float maxWidth)
     {
         if (_fittedTexts.TryGetValue((text, scale, maxWidth), out var fitted)) return fitted;
         if (_fittedTexts.Count >= MaxFittedTexts) _fittedTexts.Clear();
@@ -1871,238 +598,7 @@ public class UIRenderer : IDisposable
         return fitted;
     }
 
-    private string PercentText(float progress)
-    {
-        var p = Math.Clamp((int)MathF.Round(progress * 100f), 0, 100);
-        return _percentTexts[p] ??= $"{p}%";
-    }
-
-    /// <summary>Hotbar slot under a window-pixel point (top-left origin), if any.</summary>
-    public int? HotbarSlotAt(Vector2 point)
-    {
-        point = ToCanvas(point);
-        return HotbarLayout.SlotAt(point, _screenSize);
-    }
-
-    /// <summary>Panel tab under a window-pixel point, if any.</summary>
-    public InventoryCategory? PanelTabAt(Vector2 point)
-    {
-        point = ToCanvas(point);
-        return InventoryPanelLayout.TabAt(point, _screenSize);
-    }
-
-    /// <summary>
-    /// List row index under a window-pixel point for a tab holding this many rows, scrolled by
-    /// <paramref name="scrollOffset"/> canvas pixels, if any. Only the row rectangle hits; the
-    /// panel's right padding is reserved for the scrollbar.
-    /// </summary>
-    public int? PanelRowAt(Vector2 point, float scrollOffset, int rowCount)
-    {
-        point = ToCanvas(point);
-        return InventoryPanelLayout.RowAt(point, _screenSize, scrollOffset, rowCount);
-    }
-
-    /// <summary>Whether a window-pixel point is over the panel's search field box.</summary>
-    public bool SearchBoxAt(Vector2 windowPoint) =>
-        InventoryPanelLayout.SearchBoxAt(ToCanvas(windowPoint), _screenSize);
-
-    private static string TabTitle(InventoryCategory tab) => tab switch
-    {
-        InventoryCategory.Blocks => "Blocks",
-        InventoryCategory.Tools => "Tools",
-        InventoryCategory.Crafting => "Craft",
-        _ => "Misc",
-    };
-
-    private static string TabSubtitle(Inventory inventory, InventoryCategory tab) =>
-        tab == InventoryCategory.Crafting
-            ? $"{inventory.Craftable().Count}/{ContentRegistry.CraftingRecipes.Count}"
-            : $"{inventory.UsedOf(tab)}/{Inventory.CapacityOf(tab)}";
-
-    private void DrawEntryRow(int row, float offset, byte id, string name, string count, bool selected,
-        bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null, float? durability = null,
-        float countInset = 0f)
-    {
-        var centerY = InventoryPanelLayout.RowCenterY(row, offset, _screenSize);
-        var center = new Vector2(PanelLeft + PanelWidth * 0.5f, centerY);
-        DrawRect(center, new Vector2(PanelWidth - PanelPad * 2f, RowHeight - 4f),
-            selected ? RowSelected : SlotBackground);
-
-        var barColor = accent ?? (selected ? SelectedBorderColor : SlotBorderColor);
-        DrawRect(new Vector2(PanelLeft + PanelPad + 2f, centerY),
-            new Vector2(4f, RowHeight - 4f), dim ? TextDim : barColor);
-
-        var iconCenter = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 8f, centerY);
-        if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
-            DrawItemSprite(iconCenter, new Vector2(RowIcon), id, icon, headingDegrees, timeSeconds);
-        else
-            DrawBlockIcon(iconCenter, RowIcon, id);
-
-        DrawText(FitText(name, _countScale, RowNameAvail(count, countInset)), new Vector2(iconCenter.X + RowIcon * 0.5f + 8f, centerY - 9f),
-            _countScale, dim && !selected ? TextDim : Rgba.White);
-
-        if (_font != null)
-        {
-            var size = _font.MeasureSize(count.AsSpan(), _countScale);
-            DrawText(count,
-                new Vector2(PanelLeft + PanelWidth - PanelPad - 8f - countInset - size.X, centerY - 9f),
-                _countScale, dim && !selected ? TextDim : Rgba.White);
-        }
-
-        if (durability != null)
-        {
-            var barLeft = iconCenter.X + RowIcon * 0.5f + 8f;
-            const float barWidth = 140f;
-            DrawDurabilityBar(new Vector2(barLeft + barWidth * 0.5f, centerY + 11f),
-                barWidth, durability.Value);
-        }
-    }
-
-    private void DrawSearchRow(int row, float offset, SearchHit hit, bool selected,
-        float headingDegrees, float timeSeconds)
-    {
-        var detail = hit.IsRecipe ? $"recipe x{hit.Count}"
-            : hit.ToolInstance != 0 ? "tool"
-            : hit.Count.ToString();
-        DrawEntryRow(row, offset, hit.Id, hit.Name, detail, selected, false,
-            headingDegrees, timeSeconds, hit.IsRecipe ? AccentGold : null);
-    }
-
-    private void DrawCatalogRow(int row, float offset, int rowCount, CreativeCatalog.CatalogEntry entry,
-        float headingDegrees, float timeSeconds)
-    {
-        DrawEntryRow(row, offset, entry.Id, entry.Name, entry.Count.ToString(), false, false,
-            headingDegrees, timeSeconds, null, null, InventoryPanelLayout.CatalogButtonGroupWidth + 12f);
-        for (var which = 0; which < InventoryPanelLayout.CatalogButtonCount; which++)
-        {
-            var center = InventoryPanelLayout.CatalogButtonCenter(row, offset, _screenSize, rowCount, which);
-            var label = (InventoryPanelLayout.CatalogButton)which switch
-            {
-                InventoryPanelLayout.CatalogButton.AddOne => "+1",
-                InventoryPanelLayout.CatalogButton.AddTen => "+10",
-                InventoryPanelLayout.CatalogButton.AddHundred => "+100",
-                _ => "X",
-            };
-            var danger = (InventoryPanelLayout.CatalogButton)which == InventoryPanelLayout.CatalogButton.Clear;
-            DrawCatalogButton(center, label, danger);
-        }
-    }
-
-    private void DrawCatalogButton(Vector2 center, string label, bool danger)
-    {
-        var size = new Vector2(InventoryPanelLayout.CatalogButtonWidth, InventoryPanelLayout.CatalogButtonHeight);
-        DrawRect(center, size, ChipBackground);
-        DrawBorder(center, size, SlotBorder, danger ? DangerRed : AccentGold);
-        if (_font == null) return;
-
-        // Cap-sized, then shrunk to fit the button's inner width so "+100" never spills into
-        // its neighbor; the measured ink size centers the label on both axes.
-        var scale = _font.ScaleForCapHeight(CatalogButtonCapHeight);
-        var maxWidth = InventoryPanelLayout.CatalogButtonWidth - 8f;
-        var width = _font.MeasureSize(label.AsSpan(), scale).X;
-        if (width > maxWidth)
-            scale *= maxWidth / width;
-        var textSize = _font.MeasureSize(label.AsSpan(), scale);
-        DrawText(label,
-            new Vector2(center.X - textSize.X * 0.5f, center.Y - textSize.Y * 0.5f),
-            scale, danger ? DangerRed : Rgba.White);
-    }
-
-    private void DrawPreview(Inventory inventory, InventoryView view, float time, float headingDegrees)
-    {
-        if (view.Tab == InventoryCategory.Crafting)
-        {
-            DrawCraftDetail(inventory, view, time, headingDegrees);
-            return;
-        }
-
-        byte id = 0;
-        string name = "";
-        string stock = "";
-        if (view.Tab == InventoryCategory.Tools)
-        {
-            if (view.SelectedToolInstance != 0)
-            {
-                id = inventory.ToolItemId(view.SelectedToolInstance);
-                if (id != 0)
-                {
-                    name = Inventory.DisplayName(id);
-                    stock = "tool in hand";
-                }
-            }
-        }
-        else if (view.SelectedId != 0 && inventory.CountFor(view.SelectedId) > 0)
-        {
-            id = view.SelectedId;
-            name = Inventory.DisplayName(id);
-            stock = $"x{inventory.CountFor(id)} in stock";
-        }
-        if (id == 0) return;
-
-        var center = new Vector2(_screenSize.X - PreviewRight, _screenSize.Y * 0.38f);
-        var cardSize = new Vector2(PreviewSize + 40f, PreviewSize + 96f);
-        DrawRect(center, cardSize, PanelBackground);
-        DrawBorder(center, cardSize, SlotBorder, SlotBorderColor);
-        DrawRect(new Vector2(center.X, center.Y - cardSize.Y * 0.5f + 3f),
-            new Vector2(cardSize.X - 4f, 2f), AccentGold);
-
-        var spin = time * 0.9f;
-        if (ItemRegistry.IsItem(id))
-            DrawItemIcon(center with { Y = center.Y - 12f }, PreviewSize * 0.7f, id, spin);
-        else
-            DrawBlockIconSpinning(center with { Y = center.Y - 12f }, PreviewSize * 0.7f, id, spin);
-
-        DrawTextCenteredFitted(name, center.X, center.Y + PreviewSize * 0.5f + 12f, _headScale, Rgba.White,
-            cardSize.X - 16f);
-        DrawTextCentered(stock, center.X, center.Y + PreviewSize * 0.5f + 40f, _countScale, TextDim);
-        DrawTextCentered("Click a hotbar slot to equip", center.X,
-            center.Y + PreviewSize * 0.5f + 58f, _countScale, TextDim);
-    }
-
-    /// <summary>
-    /// This frame's crafting card layout, or null (and the cache cleared, so a stale layout is
-    /// never hit-tested) when no recipe is open.
-    /// </summary>
-    private CraftCardLayout? CraftLayoutFor(Inventory inventory, InventoryView view)
-    {
-        if (view.Craft.Recipe is not { } recipe)
-        {
-            _craftLayouts.Clear();
-            return null;
-        }
-        return _craftLayouts.Get(_screenSize, recipe, view.Craft.StatusLine(inventory));
-    }
-
-    /// <summary>
-    /// Which crafting control sits under a window-pixel point, if any. Hits the layout that was
-    /// last drawn, so a click can never disagree with the pixels; a layout that no longer matches
-    /// the open recipe or the canvas size hits nothing.
-    /// </summary>
-    public CraftHit CraftHitAt(Vector2 point, InventoryView view)
-    {
-        point = ToCanvas(point);
-        var layout = _craftLayouts.Current;
-        if (layout == null || view.Craft.Recipe == null
-            || !ReferenceEquals(layout.Recipe, view.Craft.Recipe) || layout.Screen != _screenSize)
-            return new CraftHit(CraftHitKind.None);
-        return layout.HitAt(point, layout.ClampScroll(view.CraftScrollOffset));
-    }
-
-    /// <summary>Whether a window-pixel point lies on the last drawn crafting card.</summary>
-    public bool IsOverCraftCard(Vector2 windowPoint) =>
-        _craftLayouts.Current?.Contains(ToCanvas(windowPoint)) ?? false;
-
-    /// <summary>Clamps a crafting card scroll offset against the last drawn layout (0 without one).</summary>
-    public float ClampCraftScroll(float offset) => _craftLayouts.Current?.ClampScroll(offset) ?? 0f;
-
-    private void DrawBoxButton(Vector2 center, float size, string label, Rgba bg, Rgba border, Rgba text)
-    {
-        DrawRect(center, new Vector2(size), bg);
-        DrawBorder(center, new Vector2(size), 1.5f, border);
-        DrawTextCentered(label, center.X, center.Y - 8f, _countScale, text);
-    }
-
-    private void DrawIdIcon(Vector2 center, float size, byte id, float headingDegrees, float timeSeconds)
+    internal void DrawIdIcon(Vector2 center, float size, byte id, float headingDegrees, float timeSeconds)
     {
         if (ItemRegistry.IsItem(id) && _itemIcons.TryGetValue(id, out var icon))
             DrawItemSprite(center, new Vector2(size), id, icon, headingDegrees, timeSeconds);
@@ -2110,198 +606,12 @@ public class UIRenderer : IDisposable
             DrawBlockIcon(center, size, id);
     }
 
-    private void DrawCraftDetail(Inventory inventory, InventoryView view, float time, float headingDegrees)
-    {
-        const float top = CraftCardLayout.Top;
-        var layout = CraftLayoutFor(inventory, view);
-        if (layout == null)
-        {
-            var width = CraftCardLayout.WidthFor(_screenSize);
-            var center = new Vector2(CraftCardLayout.LeftFor(_screenSize) + width * 0.5f,
-                top + CraftCardLayout.EmptyHeight * 0.5f);
-            var size = new Vector2(width, CraftCardLayout.EmptyHeight);
-            DrawRect(center, size, PanelBackground);
-            DrawBorder(center, size, SlotBorder, SlotBorderColor);
-            DrawRect(new Vector2(center.X, top + 3f), new Vector2(width - 4f, 2f), AccentGold);
-            var avail = CraftCardLayout.InnerWidthFor(_screenSize) - 8f;
-            DrawTextCenteredFitted("Crafting", center.X, top + CraftCardLayout.Pad, _headScale, Rgba.White, avail);
-            DrawTextCenteredFitted("Pick a recipe on the left", center.X,
-                top + CraftCardLayout.Pad + 34f, _countScale, TextDim, avail);
-            DrawTextCenteredFitted("then feed it items and hit CRAFT", center.X,
-                top + CraftCardLayout.Pad + 54f, _countScale, TextDim, avail);
-            return;
-        }
-
-        var scroll = layout.ClampScroll(view.CraftScrollOffset);
-        DrawRect(layout.CardCenter, layout.CardSize, PanelBackground);
-        DrawBorder(layout.CardCenter, layout.CardSize, SlotBorder, SlotBorderColor);
-        DrawRect(new Vector2(layout.CardCenter.X, top + 3f), new Vector2(layout.Width - 4f, 2f), AccentGold);
-
-        if (layout.Overflows)
-        {
-            // Same idiom as DrawInventoryPanel's row loop: DrawInventoryPanel already ran
-            // EnsureDepthCleared before its own list scissor, so the spinning icons' latched
-            // depth clear never happens under this scissor. Nothing may return from inside.
-            var (sx, sy, sw, sh) = UiCanvas.ScissorRect(
-                new Vector2(layout.Left, top + 2f), new Vector2(layout.Width, layout.ViewHeight - 4f),
-                _scale, _windowSize, _framebufferSize);
-            _gl.Enable(EnableCap.ScissorTest);
-            _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
-        }
-        try
-        {
-            DrawCraftContent(inventory, view, layout, scroll, time, headingDegrees);
-        }
-        finally
-        {
-            if (layout.Overflows) _gl.Disable(EnableCap.ScissorTest);
-        }
-
-        if (layout.Overflows)
-        {
-            var track = layout.TrackRect();
-            DrawRect(track.Center, track.Size, SlotBackground);
-            var thumb = layout.ThumbRect(scroll);
-            DrawRect(thumb.Center, thumb.Size, SlotBorderColor);
-        }
-    }
-
-    /// <summary>The crafting card's content, every Y read from the layout and offset by the scroll.</summary>
-    private void DrawCraftContent(Inventory inventory, InventoryView view, CraftCardLayout layout,
-        float scroll, float time, float headingDegrees)
-    {
-        const float pad = CraftCardLayout.Pad;
-        const float ingPad = CraftCardLayout.IngPad;
-        var session = view.Craft;
-        var recipe = layout.Recipe;
-        var ready = session.IsReady(inventory);
-        var cardCenterX = layout.CardCenter.X;
-        var innerWidth = layout.InnerWidth;
-
-        var iconCenter = layout.IconCenter(scroll);
-        var spin = time * 0.9f;
-        if (ItemRegistry.IsItem(recipe.ResultId))
-            DrawItemIcon(iconCenter, 56f, recipe.ResultId, spin);
-        else
-            DrawBlockIconSpinning(iconCenter, 60f, recipe.ResultId, spin);
-
-        var textX = layout.TextX;
-        var titleY = layout.ContentY(layout.TitleY, scroll);
-        for (var k = 0; k < layout.TitleLines.Length; k++)
-            DrawText(layout.TitleLines[k], new Vector2(textX, titleY + k * CraftCardLayout.TitleLineH),
-                _headScale, Rgba.White);
-        var makesY = layout.ContentY(layout.MakesY, scroll);
-        for (var k = 0; k < layout.MakesLines.Length; k++)
-            DrawText(layout.MakesLines[k], new Vector2(textX, makesY + k * CraftCardLayout.BodyLineH),
-                _countScale, TextDim);
-
-        var batchTextY = layout.ContentY(layout.BatchTextY, scroll);
-        DrawText("Batch", new Vector2(textX, batchTextY), _countScale, TextDim);
-        var batchMinus = layout.BatchMinusCenter(scroll);
-        var batchPlus = layout.BatchPlusCenter(scroll);
-        DrawBoxButton(batchMinus, CraftCardLayout.StepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
-        DrawTextCentered(session.Batch.ToString(), layout.BatchCountCenter(scroll).X,
-            batchMinus.Y - 8f, _countScale, Rgba.White);
-        DrawBoxButton(batchPlus, CraftCardLayout.StepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
-        var maxBatch = session.MaxAffordable(inventory);
-        var maxX = layout.BatchMaxX(scroll);
-        var maxRight = layout.Left + layout.Width - pad;
-        DrawText(FitText($"max {maxBatch}", _countScale, Math.Max(20f, maxRight - maxX)),
-            new Vector2(maxX, batchTextY),
-            _countScale, maxBatch >= session.Batch ? ReadyGreen : DangerRed);
-
-        var separatorY = layout.ContentY(pad + layout.HeaderHeight + CraftCardLayout.HeaderGap - 5f, scroll);
-        DrawRect(new Vector2(cardCenterX, separatorY), new Vector2(innerWidth, 1.5f), SlotBorderColor);
-
-        var ingLeft = layout.Left + pad + ingPad;
-        for (var i = 0; i < recipe.Ingredients.Length; i++)
-        {
-            var ing = layout.Ingredients[i];
-            var cardTop = layout.ContentY(ing.Top, scroll);
-            DrawRect(new Vector2(cardCenterX, cardTop + ing.Height * 0.5f),
-                new Vector2(innerWidth, ing.Height), CardBackground);
-
-            var need = session.NeedAt(i);
-            var fed = session.FedAt(i);
-            var ingTitleY = layout.ContentY(ing.TitleY, scroll);
-            var titleLines = layout.IngredientTitleLines[i];
-            for (var k = 0; k < titleLines.Length; k++)
-                DrawText(titleLines[k], new Vector2(ingLeft, ingTitleY + k * CraftCardLayout.IngTitleLineH),
-                    _countScale, Rgba.White);
-
-            var barY = layout.ContentY(ing.BarY, scroll);
-            var barW = innerWidth - ingPad * 2f;
-            DrawRect(new Vector2(ingLeft + barW * 0.5f, barY + CraftCardLayout.IngBarH * 0.5f),
-                new Vector2(barW, CraftCardLayout.IngBarH), SlotBackground);
-            var fill = MathUtils.Clamp01(need > 0 ? fed.Count / (float)need : 1f);
-            if (fill > 0f)
-                DrawRect(new Vector2(ingLeft + barW * fill * 0.5f, barY + CraftCardLayout.IngBarH * 0.5f),
-                    new Vector2(barW * fill, CraftCardLayout.IngBarH), fill >= 1f ? ReadyGreen : AccentGold);
-
-            var fedY = layout.ContentY(ing.FedY, scroll);
-            var fedCx = ingLeft + 16f;
-            var fedCy = fedY + CraftCardLayout.IngFedH * 0.5f;
-            if (fed.MemberId != 0)
-                DrawIdIcon(new Vector2(fedCx, fedCy), 30f, fed.MemberId, headingDegrees, time);
-            else
-                DrawTextCentered("?", fedCx, fedCy - 8f, _countScale, TextDim);
-
-            var minus = layout.IngMinusCenter(i, scroll);
-            var plus = layout.IngPlusCenter(i, scroll);
-            var fedText = $"{fed.Count} / {need} fed";
-            var fedAvail = minus.X - CraftCardLayout.IngStepBox * 0.5f - (fedCx + 24f) - 8f;
-            DrawText(FitText(fedText, _countScale, Math.Max(20f, fedAvail)),
-                new Vector2(fedCx + 24f, fedCy - 8f), _countScale,
-                fed.Count >= need ? ReadyGreen : Rgba.White);
-            DrawBoxButton(minus, CraftCardLayout.IngStepBox, "-", ChipBackground, SlotBorderColor, Rgba.White);
-            DrawBoxButton(plus, CraftCardLayout.IngStepBox, "+", ChipBackground, SlotBorderColor, Rgba.White);
-
-            var members = recipe.Ingredients[i].AcceptedIds;
-            var picked = fed.MemberId;
-            const float chipSize = CraftCardLayout.ChipSize;
-            for (var c = 0; c < ing.MemberCount; c++)
-            {
-                var chipC = layout.ChipCenter(i, c, scroll);
-                var owned = inventory.CountFor(members[c]);
-                var isPicked = picked != 0 && picked == members[c];
-                DrawRect(chipC, new Vector2(chipSize), owned > 0 ? ChipBackground : SlotBackground);
-                DrawBorder(chipC, new Vector2(chipSize), isPicked ? 2.5f : 1.5f,
-                    isPicked ? AccentGold : SlotBorderColor);
-                DrawIdIcon(chipC with { Y = chipC.Y - 3f }, 26f, members[c], headingDegrees, time);
-                var ownedText = owned.ToString();
-                if (_font != null)
-                {
-                    var size = _font.MeasureSize(ownedText.AsSpan(), _countScale);
-                    DrawText(ownedText,
-                        new Vector2(chipC.X + chipSize * 0.5f - 3f - size.X,
-                            chipC.Y + chipSize * 0.5f - 3f - size.Y),
-                        _countScale, owned > 0 ? Rgba.White : TextDim);
-                }
-            }
-        }
-
-        var statusY = layout.ContentY(layout.StatusY, scroll);
-        var statusColor = ready ? ReadyGreen : AccentGold;
-        for (var k = 0; k < layout.StatusLines.Length; k++)
-            DrawTextCentered(layout.StatusLines[k], cardCenterX, statusY + k * CraftCardLayout.StatusLineH,
-                _countScale, statusColor);
-
-        var buttonC = layout.ButtonCenter(scroll);
-        var buttonS = layout.ButtonSize;
-        var total = recipe.ResultCount * session.Batch;
-        DrawRect(buttonC, buttonS, ready ? ButtonReady : ButtonDisabled);
-        DrawBorder(buttonC, buttonS, 2f, ready ? Rgba.White : SlotBorderColor);
-        DrawTextCentered(session.Batch > 1 ? $"CRAFT  x{total}" : "CRAFT",
-            buttonC.X, buttonC.Y - 9f, _headScale,
-            ready ? ButtonTextReady : ButtonTextDisabled);
-    }
-
     /// <summary>
     /// A flat item sprite: the sheet frame the moment picks for an animated item, the whole
     /// texture for a plain one. Falls back to the whole texture when the frame meshes are
     /// missing, so an icon never vanishes over a cache mismatch.
     /// </summary>
-    private void DrawItemSprite(Vector2 center, Vector2 size, byte id, uint texture,
+    internal void DrawItemSprite(Vector2 center, Vector2 size, byte id, uint texture,
         float headingDegrees, float timeSeconds)
     {
         if (_itemFrames.TryGetValue(id, out var frames)
@@ -2383,21 +693,21 @@ public class UIRenderer : IDisposable
         _gl.Disable(EnableCap.DepthTest);
     }
 
-    private void DrawTextCentered(string text, float centerX, float topY, float scale, Rgba color)
+    internal void DrawTextCentered(string text, float centerX, float topY, float scale, Rgba color)
     {
         if (_font == null || string.IsNullOrEmpty(text)) return;
         var width = _font.MeasureSize(text.AsSpan(), scale).X;
         DrawText(text, new Vector2(centerX - width * 0.5f, topY), scale, color);
     }
 
-    private float TextWidth(string text, float scale) =>
+    internal float TextWidth(string text, float scale) =>
         _font == null || string.IsNullOrEmpty(text)
             ? 0f
             : _font.MeasureSize(text.AsSpan(), scale).X;
 
     // Truncates text with "..." to fit maxWidth at scale. ASCII dots because the font
     // only covers printable ASCII (U+2026 would vanish).
-    private string FitText(string text, float scale, float maxWidth)
+    internal string FitText(string text, float scale, float maxWidth)
     {
         if (_font == null || string.IsNullOrEmpty(text)) return text;
         if (maxWidth <= 0f) return "";
@@ -2419,19 +729,12 @@ public class UIRenderer : IDisposable
         return Math.Max(scale * 0.7f, scale * maxWidth / w);
     }
 
-    private void DrawTextCenteredFitted(string text, float centerX, float topY, float scale,
+    internal void DrawTextCenteredFitted(string text, float centerX, float topY, float scale,
         Rgba color, float maxWidth)
     {
         if (_font == null || string.IsNullOrEmpty(text)) return;
         var s = FitScale(text, scale, maxWidth);
         DrawTextCentered(FitText(text, s, maxWidth), centerX, topY, s, color);
-    }
-
-    private float RowNameAvail(string count, float countInset)
-    {
-        var nameX = PanelLeft + PanelPad + RowIcon + 16f;
-        var countW = TextWidth(count, _countScale);
-        return PanelLeft + PanelWidth - PanelPad - 8f - countInset - countW - nameX - 8f;
     }
 
     /// <summary>
@@ -2459,7 +762,7 @@ public class UIRenderer : IDisposable
 
     // Scales the unit square to pixel size and moves it into place. The negative Y scale is the
     // flip from the shape's Y-up space into this renderer's Y-down screen space.
-    private static Matrix4x4 RectTransform(Vector2 center, Vector2 size) =>
+    internal static Matrix4x4 RectTransform(Vector2 center, Vector2 size) =>
         Matrix4x4.CreateScale(size.X, -size.Y, 1f)
         * Matrix4x4.CreateTranslation(center.X, center.Y, 0f);
 
@@ -2474,7 +777,7 @@ public class UIRenderer : IDisposable
         return MathF.Max(width, height);
     }
 
-    private static Matrix4x4 FlipToScreen(Vector2 center) =>
+    internal static Matrix4x4 FlipToScreen(Vector2 center) =>
         Matrix4x4.CreateScale(1f, -1f, 1f)
         * Matrix4x4.CreateTranslation(center.X, center.Y, 0f);
 
@@ -2487,12 +790,7 @@ public class UIRenderer : IDisposable
         _gl.DeleteBuffer(_textVbo);
         _gl.DeleteBuffer(_textEbo);
         _gl.DeleteVertexArray(_textVao);
-        _gl.DeleteTexture(_crosshairTexture);
-        _gl.DeleteTexture(_heartTexture);
-        _gl.DeleteTexture(_heartEmptyTexture);
-        _heartEmptyMesh.Dispose();
-        _heartFullMesh.Dispose();
-        _heartHalfMesh.Dispose();
+        Hud.Dispose();
         foreach (var icon in _itemIcons.Values)
             _gl.DeleteTexture(icon);
         foreach (var frames in _itemFrames.Values)

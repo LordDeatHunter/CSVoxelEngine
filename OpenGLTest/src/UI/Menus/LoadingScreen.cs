@@ -17,7 +17,7 @@ public enum LoadingScreenKind
 /// <summary>
 /// State of the loading screen shown while a world streams in (and the short "Saving..." frame
 /// of a save and quit). Owned by <see cref="Program"/>, which drives <see cref="Update"/> from
-/// <see cref="World.LoadProgress"/> and <see cref="World.IsLoaded"/>; <see cref="UIRenderer"/>
+/// <see cref="World.LoadProgress"/> and <see cref="World.IsLoaded"/>; <see cref="LoadingScreenRenderer"/>
 /// only reads it. A load that timed out still reports IsLoaded, so the bar completes either way.
 /// The shown progress eases toward the real one and never moves backwards, so a load whose
 /// progress estimate dips never makes the bar jump back; once complete the overlay fades out

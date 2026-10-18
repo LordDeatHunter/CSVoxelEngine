@@ -8,7 +8,7 @@ namespace VoxelEngine.Tests.UI.Hud;
 /// The look-at label's rules (<see cref="LookLabel"/>): a block reads as "Unknown" until its item
 /// has been obtained, a block with no item is always known, creative mode always knows everything,
 /// the name is flagged red only when the held item cannot mine the block, and the label's
-/// top-of-screen placement (<see cref="UIRenderer.LookLabelTop"/>) sits below the compass or clock
+/// top-of-screen placement (<see cref="TopStripRenderer.LookLabelTop"/>) sits below the compass or clock
 /// strip while one is equipped.
 /// </summary>
 public sealed class LookLabelTests
@@ -69,10 +69,10 @@ public sealed class LookLabelTests
     [Fact]
     public void TheCompassStripPushesTheLabelBelowIt()
     {
-        var free = UIRenderer.LookLabelTop(compass: false, clock: false, coordinates: false);
-        var clock = UIRenderer.LookLabelTop(compass: false, clock: true, coordinates: false);
-        var compass = UIRenderer.LookLabelTop(compass: true, clock: false, coordinates: false);
-        var withCoords = UIRenderer.LookLabelTop(compass: true, clock: false, coordinates: true);
+        var free = TopStripRenderer.LookLabelTop(compass: false, clock: false, coordinates: false);
+        var clock = TopStripRenderer.LookLabelTop(compass: false, clock: true, coordinates: false);
+        var compass = TopStripRenderer.LookLabelTop(compass: true, clock: false, coordinates: false);
+        var withCoords = TopStripRenderer.LookLabelTop(compass: true, clock: false, coordinates: true);
 
         // Equipping the compass, or the clock, which shares the strip, pushes the label down;
         // the compass's coordinates line pushes it further; with neither it takes the free top
@@ -82,7 +82,7 @@ public sealed class LookLabelTests
 
         // The compass owns the strip when both are equipped, like the draw itself, and a clock
         // has no coordinates line to clear
-        Assert.Equal(compass, UIRenderer.LookLabelTop(compass: true, clock: true, coordinates: false));
-        Assert.Equal(clock, UIRenderer.LookLabelTop(compass: false, clock: true, coordinates: true));
+        Assert.Equal(compass, TopStripRenderer.LookLabelTop(compass: true, clock: true, coordinates: false));
+        Assert.Equal(clock, TopStripRenderer.LookLabelTop(compass: false, clock: true, coordinates: true));
     }
 }

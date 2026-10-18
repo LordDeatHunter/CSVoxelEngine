@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
+using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.UI.Hud;
@@ -9,7 +10,7 @@ namespace VoxelEngine.UI.Hud;
 /// The hover tooltip's lines, GL-free: the display name, what the thing is (a block, a tool, a
 /// plain pickup) and whichever of the item's own numbers it actually has — tool power and hit
 /// pace, block and entity damage, durability left, fuel seconds, a crucible's capacity. A slice of
-/// the UI work (U-1); the panel that draws these lives in <see cref="Systems.UIRenderer"/>.
+/// the UI work (U-1); the panel that draws these lives in <see cref="HudRenderer.DrawTooltip"/>.
 /// </summary>
 public static class ItemTooltip
 {

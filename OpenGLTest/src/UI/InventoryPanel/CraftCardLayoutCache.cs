@@ -9,12 +9,12 @@ namespace VoxelEngine.UI.InventoryPanel;
 /// Memoizes the crafting card's <see cref="CraftCardLayout"/>, so the word wrap and every text
 /// measurement behind it run only when something on the card actually changed: the canvas size,
 /// the open recipe or the status line. The previous layout is also what
-/// <see cref="UIRenderer.CraftHitAt"/> hit-tests (<see cref="Current"/>), so a click always reads
+/// <see cref="CraftCardRenderer.CraftHitAt"/> hit-tests (<see cref="Current"/>), so a click always reads
 /// the geometry that was drawn.
 ///
 /// <para>Three properties the callers' correctness rests on:</para>
 /// <list type="bullet">
-/// <item><b>Render-thread only, no locking.</b> The only caller is <see cref="UIRenderer"/>, which
+/// <item><b>Render-thread only, no locking.</b> The only caller is <see cref="CraftCardRenderer"/>, which
 /// runs on the render thread (AGENTS.md), so these are plain fields — exactly as
 /// <see cref="UITextCache"/> is.</item>
 /// <item><b>Only the layout is cached, never the draw.</b> A hit skips wrapping and measuring and

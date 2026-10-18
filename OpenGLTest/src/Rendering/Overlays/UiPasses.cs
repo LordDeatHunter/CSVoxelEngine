@@ -75,34 +75,34 @@ internal sealed class UiPasses
         var hasClock = camera != null && HasClockEquipped(inventory);
         if (!view.IsOpen && (menu == null || !menu.IsOpen))
         {
-            _owner.Ui.DrawCrosshair(crosshair.ThrowCharge, crosshair.BreakProgress, crosshair.HitMarker);
+            _owner.Ui.Hud.DrawCrosshair(crosshair.ThrowCharge, crosshair.BreakProgress, crosshair.HitMarker);
             // The look-at label (its debug lines ride the profiler overlay, i.e. X)
             if (lookAt is { } label)
-                _owner.Ui.DrawLookLabel(label, time, showProfiler,
-                    UIRenderer.LookLabelTop(hasCompass, hasClock, showCoordinates));
+                _owner.Ui.TopStrip.DrawLookLabel(label, time, showProfiler,
+                    TopStripRenderer.LookLabelTop(hasCompass, hasClock, showCoordinates));
         }
         if (hasCompass)
-            _owner.Ui.DrawCompass(camera!.Yaw, camera.Position, showCoordinates);
+            _owner.Ui.TopStrip.DrawCompass(camera!.Yaw, camera.Position, showCoordinates);
         else if (hasClock)
-            _owner.Ui.DrawClock(Clock.DayNumber(lightingTime), Clock.Readout(lightingTime));
-        _owner.Ui.DrawFps(fps);
+            _owner.Ui.TopStrip.DrawClock(Clock.DayNumber(lightingTime), Clock.Readout(lightingTime));
+        _owner.Ui.Hud.DrawFps(fps);
         if (showProfiler)
-            _owner.Ui.DrawProfiler(FrameProfiler.Lines);
+            _owner.Ui.Hud.DrawProfiler(FrameProfiler.Lines);
         var heading = camera != null ? Compass.HeadingFromYaw(camera.Yaw) : 0f;
-        _owner.Ui.DrawHotbar(inventory, heading, time, hotbarPops);
+        _owner.Ui.Hud.DrawHotbar(inventory, heading, time, hotbarPops);
         // The day/first-pickup/full-inventory toast rides above the item-name row
         if (toast is { Alpha: > 0f, Text.Length: > 0 })
-            _owner.Ui.DrawToast(toast.Text, toast.Alpha);
+            _owner.Ui.Hud.DrawToast(toast.Text, toast.Alpha);
         if (!view.IsOpen && (menu == null || !menu.IsOpen))
         {
-            _owner.Ui.DrawHearts(health);
+            _owner.Ui.Hud.DrawHearts(health);
             if (hotbarName != null)
-                _owner.Ui.DrawHotbarName(hotbarName.Name, hotbarName.Alpha);
+                _owner.Ui.Hud.DrawHotbarName(hotbarName.Name, hotbarName.Alpha);
         }
         if (view.IsOpen)
-            _owner.Ui.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true);
+            _owner.Ui.Panel.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true);
         if (menu != null && settings != null)
-            _owner.Ui.DrawPauseMenu(menu, settings);
+            _owner.Ui.Menu.DrawPauseMenu(menu, settings);
         _owner.Ui.End();
         // The font and the item icons take unit 0, and this pass sits across the frame boundary.
         Units.InvalidateTextureUnits();
@@ -114,12 +114,12 @@ internal sealed class UiPasses
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
-        _owner.Ui.DrawChat(chat, (float)time);
+        _owner.Ui.Chat.DrawChat(chat, (float)time);
         _owner.Ui.End();
         Units.InvalidateTextureUnits();
     }
 
-    /// <summary>Draws one hover tooltip (see <see cref="UIRenderer.DrawTooltip"/>), or nothing when
+    /// <summary>Draws one hover tooltip (see <see cref="HudRenderer.DrawTooltip"/>), or nothing when
     /// the cursor hovers nothing.</summary>
     internal void RenderTooltip(IWindow window, (Vector2 Anchor, IReadOnlyList<string> Lines)? tooltip)
     {
@@ -127,13 +127,13 @@ internal sealed class UiPasses
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
-        _owner.Ui.DrawTooltip(hover.Anchor, hover.Lines);
+        _owner.Ui.Hud.DrawTooltip(hover.Anchor, hover.Lines);
         _owner.Ui.End();
         Units.InvalidateTextureUnits();
     }
 
     /// <summary>
-    /// Draws the Tab player list (see <see cref="UIRenderer.DrawPlayerList"/>) over the HUD while
+    /// Draws the Tab player list (see <see cref="HudRenderer.DrawPlayerList"/>) over the HUD while
     /// the key is held: the local player first, then every other player on the server.
     /// </summary>
     internal void RenderPlayerList(IWindow window, IReadOnlyList<string> names)
@@ -142,7 +142,7 @@ internal sealed class UiPasses
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
-        _owner.Ui.DrawPlayerList(names);
+        _owner.Ui.Hud.DrawPlayerList(names);
         _owner.Ui.End();
         Units.InvalidateTextureUnits();
     }
@@ -171,9 +171,9 @@ internal sealed class UiPasses
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
         if (loading != null)
-            _owner.Ui.DrawLoadingScreen(loading, time, opaque: true);
+            _owner.Ui.LoadingScreen.DrawLoadingScreen(loading, time, opaque: true);
         else if (menu != null)
-            _owner.Ui.DrawMainMenu(menu, settings, (float)time);
+            _owner.Ui.Menu.DrawMainMenu(menu, settings, (float)time);
         _owner.Ui.End();
         // The font takes unit 0, and this pass sits across the frame boundary.
         Units.InvalidateTextureUnits();
@@ -189,7 +189,7 @@ internal sealed class UiPasses
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
-        _owner.Ui.DrawLoadingScreen(loading, time, opaque: false);
+        _owner.Ui.LoadingScreen.DrawLoadingScreen(loading, time, opaque: false);
         _owner.Ui.End();
         Units.InvalidateTextureUnits();
     }

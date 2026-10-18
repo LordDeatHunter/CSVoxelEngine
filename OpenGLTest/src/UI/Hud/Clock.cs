@@ -5,7 +5,7 @@ using VoxelEngine.Rendering.Overlays;
 namespace VoxelEngine.UI.Hud;
 
 /// <summary>
-/// Pure clock math behind the HUD's held-clock readout (see <see cref="UIRenderer.DrawClock"/>):
+/// Pure clock math behind the HUD's held-clock readout (see <see cref="TopStripRenderer.DrawClock"/>):
 /// the lighting clock's time of day and day number. The day is the game day
 /// (<see cref="WorldGenerationConfig.DayLengthSeconds"/> seconds, one sun orbit); its first
 /// midnight is half a cycle after <see cref="DayCycle.NoonTime"/>, and day 1 runs from the

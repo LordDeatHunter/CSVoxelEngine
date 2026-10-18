@@ -14,7 +14,7 @@ namespace VoxelEngine.Rendering.Overlays;
 ///
 /// <para>Three properties the callers' correctness rests on:</para>
 /// <list type="bullet">
-/// <item><b>Render-thread only, no locking.</b> Every caller is <see cref="UIRenderer"/>, which
+/// <item><b>Render-thread only, no locking.</b> Every caller (<see cref="HudRenderer"/> and <see cref="TopStripRenderer"/>, through UIRenderer.TextCache)
 /// runs on the render thread (AGENTS.md), so these are plain fields — exactly as
 /// <c>Camera</c>'s view-projection cache is (PERF_TODO R7).</item>
 /// <item><b>Only the formatting is cached, never the draw.</b> A cache hit skips the
@@ -56,7 +56,7 @@ internal sealed class UITextCache
     private readonly int[] _slotCounts = new int[Inventory.SlotCount];
     private readonly string?[] _slotTexts = new string?[Inventory.SlotCount];
 
-    /// <summary>The FPS line, <c>UIRenderer.DrawFps</c>'s text. Changes about once a second.</summary>
+    /// <summary>The FPS line, <c>HudRenderer.DrawFps</c>'s text. Changes about once a second.</summary>
     internal string Fps(int fps)
     {
         if (_fpsText is null || _fpsValue != fps)

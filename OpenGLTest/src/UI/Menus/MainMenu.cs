@@ -91,7 +91,7 @@ public readonly record struct ConnectTarget(string Name, ServerAddress Address);
 
 /// <summary>
 /// Selection and text state of the main menu. Owned by Program's <see cref="MainMenuController"/>;
-/// <see cref="UIRenderer"/> only reads it.
+/// <see cref="MenuRenderer"/> only reads it.
 /// </summary>
 public sealed class MainMenuView
 {

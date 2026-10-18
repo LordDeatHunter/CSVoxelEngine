@@ -187,12 +187,12 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **Hotbar item name fade.** `HotbarNameFade` over the hearts; `select` scenario op (`hotbar.json`).
 - [x] **Floating damage numbers.** `DamageNumberPool` + `DamageNumberRenderer`; a client reads the health drop between snapshots (`damage-numbers.json`).
 
-- [x] **Crosshair hit marker.** `HitMarker` flashes at the two connecting-hit sites the hit-stop uses (a landed punch or slice) and `UIRenderer.DrawCrosshair` draws the X, fading over `HitMarker.Seconds` (`HitMarkerTests`).
+- [x] **Crosshair hit marker.** `HitMarker` flashes at the two connecting-hit sites the hit-stop uses (a landed punch or slice) and `HudRenderer.DrawCrosshair` draws the X, fading over `HitMarker.Seconds` (`HitMarkerTests`).
 - [x] **Crosshair spreads while charging.** the crosshair is drawn as five pieces cropped out of its 16x16 texture (a center dot and four pills); the arms slide outward with `Camera.ThrowCharge` (eased) while the dot stays put, and snap back on release.
 - [x] **Mining progress ring.** a ring of `CrosshairRingSegments` dots around the crosshair, the lit share following `LeftClickAction.Crosshair.BreakProgress` (0 in creative or with no target, so it never shows there).
 - [x] **Look-at label.** The block under the crosshair shows its name and a small spinning 3D
   render of it at the top of the screen, below the compass or clock strip while one is equipped
-  (`UIRenderer.DrawLookLabel` and its `LookLabelTop` over `BlockCubeCache`), the name in red while
+  (`TopStripRenderer.DrawLookLabel` and its `LookLabelTop` over `BlockCubeCache`), the name in red while
   the held item cannot mine it, and "Unknown" with a flat dark silhouette until its item has been
   obtained; creative mode and a block with no item at all (`hasItem` false) always know, and `X`
   adds id, state byte, sun/block light and chunk/cell debug lines. `LookLabel` is the rule,
@@ -205,7 +205,7 @@ files waits in TODO.md instead, since there are none to use yet.
 - [x] **New item toast.** The drop pickup and `World.CreditItem` (the /give path) toast "New: <name>" on a first credit, read off the inventory's own obtained set (`Inventory.Knows`, the same one the look-at label reads) before the add marks it, and a restored inventory comes back with its obtained names so loading never toasts (`InventoryTests`).
 - [x] **Screenshot key.** F2 reads the finished frame back through `VisualCapture` and saves it to `ScreenshotPaths.Directory` as a millisecond-stamped PNG (`ScreenshotPathTests`).
 - [x] **Hide-HUD key.** F1 toggles `hudVisible`, the same gate the scenario screenshot's `hideHud` drives (`ScreenshotPathTests` covers the shared path naming).
-- [x] **Tab player list.** holding Tab over the HUD draws the panel (`UIRenderer.DrawPlayerList` over `World.RemotePlayers`, the local player first), a server session only, and never while the chat, a menu or the panel owns the keyboard.
+- [x] **Tab player list.** holding Tab over the HUD draws the panel (`HudRenderer.DrawPlayerList` over `World.RemotePlayers`, the local player first), a server session only, and never while the chat, a menu or the panel owns the keyboard.
 - [x] **Chat commands: help, tp, give.** `/help` answers with `ChatCommands.HelpText`, `/tp x y z` teleports (creative locally, `ServerPlayer.Teleport` + a correction on a server) and `/give <item> [count]` grants through `Inventory.Add` with the name resolved by block then item; both need rights (`ChatCommandsTests`).
 - [x] **Item tooltips.** `ItemTooltip.Lines` builds the hover panel from the fields the item already has (name, kind, tool power and hit pace, block/entity damage, durability left from the hovered stack, fuel seconds, a crucible's capacity), and Program shows it over the [E] panel's rows and the hotbar slots (`ItemTooltipTests`).
 - [x] **Inventory sort.** already covered: `Inventory.StackEntries` builds the panel rows sorted by display name, now with the fuller stack first as the count tiebreak (`InventoryTests`); a sort button would be a no-op, since the rows are sorted by construction and the pools are keyed by id.

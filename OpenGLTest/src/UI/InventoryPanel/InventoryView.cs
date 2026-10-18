@@ -12,7 +12,7 @@ public enum InventoryFocus
 /// <summary>
 /// Selection state of the [E] inventory panel: which tab is open and which list row is
 /// picked for preview (a stackable id, or a tool instance). Owned by <see cref="Program"/>;
-/// the panel in <see cref="UIRenderer"/> only reads it.
+/// the panel in <see cref="InventoryPanelRenderer"/> only reads it.
 /// </summary>
 public sealed class InventoryView
 {
@@ -47,7 +47,7 @@ public sealed class InventoryView
     /// and both the draw and the hit-test clamp on read through
     /// <see cref="InventoryPanelLayout.ClampedOffset"/> with that frame's row count, so the two
     /// always agree. A list that shrinks without input keeps the stored number and resumes it
-    /// if it grows back. <see cref="UIRenderer"/> never writes it.
+    /// if it grows back. <see cref="InventoryPanelRenderer"/> never writes it.
     /// </summary>
     public float ScrollOffset
     {
@@ -59,7 +59,7 @@ public sealed class InventoryView
     /// Canvas pixels the crafting card's content is scrolled by. Both the draw and the hit-test
     /// clamp on read through <see cref="CraftCardLayout.ClampScroll"/> with that frame's layout, so
     /// a card that shrinks below its viewport simply reads as 0. <see cref="Program"/> resets it to
-    /// 0 when another recipe is opened; <see cref="UIRenderer"/> never writes it.
+    /// 0 when another recipe is opened; <see cref="CraftCardRenderer"/> never writes it.
     /// </summary>
     public float CraftScrollOffset { get; set; }
 

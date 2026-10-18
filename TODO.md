@@ -379,7 +379,7 @@ single-arc player.
   items by display name and file name, owned items first), `/tp` offers nothing (numbers) and later
   commands can offer online player names. `ChatView` owns the suggestion state (GL-free, tested: the
   completion of a prefix, the cycle order and wrap, no completion for an unknown command);
-  `UIRenderer.DrawChat` draws the row. Multiplayer: complete against the client's own content, and
+  `ChatRenderer.DrawChat` draws the row. Multiplayer: complete against the client's own content, and
   against the player list for names; the server still judges every command.
 
 ---

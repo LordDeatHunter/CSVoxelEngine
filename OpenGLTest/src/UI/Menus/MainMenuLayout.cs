@@ -7,7 +7,7 @@ namespace VoxelEngine.UI.Menus;
 /// <summary>
 /// Pure screen layout of the main menu in canvas units (see <see cref="UiCanvas"/>; origin
 /// top-left, Y down): button, list-row, field and popup rectangles plus click hit-testing, with
-/// no GL dependency. <see cref="UIRenderer"/>'s drawing and <see cref="HitAt"/> both read these
+/// no GL dependency. <see cref="MenuRenderer"/>'s drawing and <see cref="HitAt"/> both read these
 /// methods, so what is drawn and what is clicked cannot drift apart (the DrawPauseMenu rule).
 /// The main page reuses <see cref="PauseMenuLayout"/>'s three-button stack.
 /// </summary>

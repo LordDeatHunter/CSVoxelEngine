@@ -202,7 +202,7 @@ public static class Program
                     if (menu.View.Page == MainMenuPage.Settings)
                         HandleSettingsClick(pos);
                     else
-                        HandleMenuAction(menu.Click(renderManager.Ui.MainMenuHitAt(pos, menu.View)));
+                        HandleMenuAction(menu.Click(renderManager.Ui.Menu.MainMenuHitAt(pos, menu.View)));
                 }
                 if (settingsMenuView.DragRow.HasValue)
                     GameSettings.Save();
@@ -259,7 +259,7 @@ public static class Program
 
             if (!SettingsPageOpen || button != MouseButton.Left || inputManager.Mouse == null)
                 return;
-            var hit = renderManager.Ui.SettingsHitAt(inputManager.Mouse.Position, settingsMenuView);
+            var hit = renderManager.Ui.Menu.SettingsHitAt(inputManager.Mouse.Position, settingsMenuView);
             if (hit.Kind != SettingsHitKind.Slider || SettingsRows.All[hit.Row] is not SliderRow slider) return;
             settingsMenuView.DragRow = hit.Row;
             slider.Set(SettingsLayout.SliderValue(slider, hit.Fraction));
@@ -271,10 +271,10 @@ public static class Program
             {
                 // wheel.Y > 0 is toward the top, i.e. a smaller offset
                 if (inputManager.Mouse != null && menu.View.Page == MainMenuPage.Worlds
-                    && renderManager.Ui.IsOverWorldList(inputManager.Mouse.Position))
+                    && renderManager.Ui.Menu.IsOverWorldList(inputManager.Mouse.Position))
                     menu.Scroll(-wheel.Y * MainMenuLayout.WheelStepRows, renderManager.Ui.ScreenSize);
                 else if (inputManager.Mouse != null && menu.View.Page == MainMenuPage.Multiplayer
-                    && renderManager.Ui.IsOverServerList(inputManager.Mouse.Position))
+                    && renderManager.Ui.Menu.IsOverServerList(inputManager.Mouse.Position))
                     menu.Scroll(-wheel.Y * MainMenuLayout.WheelStepRows, renderManager.Ui.ScreenSize);
                 return;
             }
@@ -307,9 +307,9 @@ public static class Program
                             rowCount, canvas), searching);
                     }
                     else if (inventoryView.Tab == InventoryCategory.Crafting
-                             && renderManager.Ui.IsOverCraftCard(inputManager.Mouse.Position))
+                             && renderManager.Ui.CraftCard.IsOverCraftCard(inputManager.Mouse.Position))
                     {
-                        inventoryView.CraftScrollOffset = renderManager.Ui.ClampCraftScroll(
+                        inventoryView.CraftScrollOffset = renderManager.Ui.CraftCard.ClampCraftScroll(
                             inventoryView.CraftScrollOffset - wheel.Y * CraftCardLayout.WheelStep);
                     }
 
@@ -862,7 +862,7 @@ public static class Program
             return (position, ItemTooltip.Lines(rowTool != 0 ? stack!.DefinitionId : rowId, stack));
         }
 
-        if (renderManager.Ui.HotbarSlotAt(position) is not { } slot || slot < 0 || inventory.IdAt(slot) == 0)
+        if (renderManager.Ui.Hud.HotbarSlotAt(position) is not { } slot || slot < 0 || inventory.IdAt(slot) == 0)
             return null;
         {
             var tool = inventory.ToolInstanceAt(slot);
@@ -889,7 +889,7 @@ public static class Program
         var rowCount = RowCountFor(inventoryView.Tab);
         var offset = InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount,
             renderManager.Ui.ScreenSize);
-        var row = renderManager.Ui.PanelRowAt(
+        var row = renderManager.Ui.Panel.PanelRowAt(
             new Vector2(inputManager.Mouse.Position.X, inputManager.Mouse.Position.Y), offset, rowCount);
         if (row == null) return false;
 
@@ -1647,7 +1647,7 @@ public static class Program
 
     private static void HandleSettingsClick(Vector2 position)
     {
-        var hit = renderManager.Ui.SettingsHitAt(position, settingsMenuView);
+        var hit = renderManager.Ui.Menu.SettingsHitAt(position, settingsMenuView);
         switch (hit.Kind)
         {
             case SettingsHitKind.Back:
@@ -1677,7 +1677,7 @@ public static class Program
 
     private static void HandleMenuClick(Vector2 position)
     {
-        switch (renderManager.Ui.PauseMenuHitAt(position, pauseMenuView))
+        switch (renderManager.Ui.Menu.PauseMenuHitAt(position, pauseMenuView))
         {
             case PauseMenuHit.Resume:
                 SetPauseMenu(PauseMenuPage.Closed);
@@ -2047,14 +2047,14 @@ public static class Program
         var creative = world.Camera.IsCreative;
 
         // The search box takes the click before anything else; clicking elsewhere drops focus.
-        if (renderManager.Ui.SearchBoxAt(position))
+        if (renderManager.Ui.Panel.SearchBoxAt(position))
         {
             inventoryView.Focus = InventoryFocus.Search;
             return;
         }
         inventoryView.Focus = InventoryFocus.None;
 
-        var tab = renderManager.Ui.PanelTabAt(position);
+        var tab = renderManager.Ui.Panel.PanelTabAt(position);
         if (tab.HasValue)
         {
             inventoryView.Tab = tab.Value;
@@ -2076,7 +2076,7 @@ public static class Program
         if (InventoryPanelLayout.ScrollbarHitAt(renderManager.Ui.ToCanvas(position),
                 renderManager.Ui.ScreenSize, offset, rowCount) != ScrollbarHit.None)
             return;
-        var row = renderManager.Ui.PanelRowAt(position, offset, rowCount);
+        var row = renderManager.Ui.Panel.PanelRowAt(position, offset, rowCount);
         if (row.HasValue)
         {
             if (hits != null)
@@ -2116,7 +2116,7 @@ public static class Program
 
         if (inventoryView.Tab == InventoryCategory.Crafting)
         {
-            var hit = renderManager.Ui.CraftHitAt(position, inventoryView);
+            var hit = renderManager.Ui.CraftCard.CraftHitAt(position, inventoryView);
             var craft = inventoryView.Craft;
             switch (hit.Kind)
             {
@@ -2155,7 +2155,7 @@ public static class Program
 
         // Equipped here at once and, while connected, sent as an intent: the server applies the
         // same equip to its copy (only for something this player owns), so the next sync keeps it.
-        var hotbar = renderManager.Ui.HotbarSlotAt(position);
+        var hotbar = renderManager.Ui.Hud.HotbarSlotAt(position);
         if (!hotbar.HasValue) return;
         if (inventoryView.Tab == InventoryCategory.Tools && inventoryView.SelectedToolInstance != 0)
         {

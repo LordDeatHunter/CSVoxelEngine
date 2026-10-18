@@ -4,7 +4,7 @@ using VoxelEngine.Rendering.Overlays;
 namespace VoxelEngine.UI.Hud;
 
 /// <summary>
-/// Pure heading math behind the HUD compass (see <see cref="UIRenderer.DrawCompass"/>):
+/// Pure heading math behind the HUD compass (see <see cref="TopStripRenderer.DrawCompass"/>):
 /// yaw-to-heading mapping, spawn bearings and cardinal names. No GL calls, so headless
 /// tests cover it here instead of through a window.
 /// </summary>

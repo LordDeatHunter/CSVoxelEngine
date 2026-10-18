@@ -23,7 +23,7 @@ public enum PauseMenuHit
 
 /// <summary>
 /// Selection state of the ESC pause menu. Owned by <see cref="Program"/>;
-/// <see cref="UIRenderer"/> only reads it. While open the game keeps rendering
+/// <see cref="MenuRenderer"/> only reads it. While open the game keeps rendering
 /// behind a dim overlay but stops simulating (see Program.OnUpdate).
 /// </summary>
 public sealed class PauseMenuView

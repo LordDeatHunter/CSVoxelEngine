@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace VoxelEngine.UI;
 
 /// <summary>Width in canvas units of a run of text at some fixed draw scale. Injected so the wrap is
-/// GL-free: UIRenderer binds it to BitmapFont.MeasureSize(text, scale).X, tests to a synthetic width.</summary>
+/// GL-free: ChatRenderer and CraftCardRenderer bind it to BitmapFont.MeasureSize(text, scale).X, tests to a synthetic width.</summary>
 public delegate float TextMeasure(ReadOnlySpan<char> text);
 
 /// <summary>Greedy word wrap of UI text against an injected measure; GL-free.</summary>
