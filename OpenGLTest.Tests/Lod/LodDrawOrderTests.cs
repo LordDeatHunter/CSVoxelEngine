@@ -8,7 +8,7 @@ namespace VoxelEngine.Tests.Lod;
 /// <summary>
 /// Since R10 the LOD passes submit through <c>ChunkDrawBatch</c>, and
 /// <c>glMultiDrawElementsIndirect</c> executes its commands in array order — so the two sorts
-/// in <c>RenderManager</c> (<c>RenderLod</c>'s opaque list and <c>CullWater</c>'s water list)
+/// in <c>TerrainPasses</c> (<c>RenderLod</c>'s opaque list and <c>CullWater</c>'s water list)
 /// ARE the submission order. They were lifted onto <see cref="LodRegion"/> as plain scalar
 /// comparisons so the ordering can be pinned exactly, with no GL, no region instance and no
 /// content load, exactly as GeometryAllocatorTests / CloudCopies / HalfResTarget /

@@ -18,7 +18,7 @@ namespace VoxelEngine.Particles;
 /// every frame (<c>Array.Sort</c> over a depth array, then indexed access through that permutation -
 /// LeafParticleRenderer.cs:122-127, BubbleParticleRenderer.cs:92-99, FireParticleRenderer.cs:85-93),
 /// so source order reaches the GPU through a depth sort and is discarded. The fourth does care:
-/// <c>RenderManager.RenderBlockDebris</c> (RenderManager.cs:2114) walks its list with a plain
+/// <c>ObjectPasses.RenderBlockDebris</c> walks its list with a plain
 /// <c>foreach</c> and submits each cube in exactly that order.</para>
 ///
 /// <para><b>The debris blend state.</b> Debris always draws with depth WRITES ON - the leaf

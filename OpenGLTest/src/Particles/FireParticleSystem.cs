@@ -17,7 +17,7 @@ public sealed class FireParticleSystem
     /// Where the flame of a lit cell sits inside it: centered, a little above the floor. A caller
     /// whose flame is not at a cell's own origin (the kiln, whose fire burns inside its hearth)
     /// subtracts this from the point it wants so the particles rise from exactly there.
-    /// Deliberately not the same as <see cref="RenderManager.FireLightOffset"/>, which lifts the
+    /// Deliberately not the same as <see cref="FrameLighting.FireLightOffset"/>, which lifts the
     /// point light well above the flame.
     /// </summary>
     public static readonly Vector3 SpawnOffset = new(0.5f, 0.35f, 0.5f);

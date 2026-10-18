@@ -8,7 +8,7 @@ using VoxelEngine.Simulation;
 namespace VoxelEngine.Rendering;
 
 /// <summary>
-/// The live entities <see cref="RenderManager.RenderReflection"/> may draw into the water mirror,
+/// The live entities <see cref="ReflectionPass.RenderReflection"/> may draw into the water mirror,
 /// handed over in one bundle so the mirror pass can filter them (near the eye, above the plane)
 /// and feed their positions to the reuse cache's motion signal
 /// (<see cref="ReflectionReuse.EntitiesMoved"/>). The lists are the world's own, read only.

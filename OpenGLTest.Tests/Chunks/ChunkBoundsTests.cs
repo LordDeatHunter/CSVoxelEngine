@@ -17,10 +17,10 @@ namespace VoxelEngine.Tests.Chunks;
 /// stored bounds are bit-identical to what the passes computed before, and therefore that the
 /// culling decision and the per-draw base offset cannot have moved.
 ///
-/// What is NOT covered here: the call sites themselves. Whether <c>RenderManager</c> actually reads
+/// What is NOT covered here: the call sites themselves. Whether each render pass actually reads
 /// <c>chunk.WorldMin</c> where it used to read the local is a GL-bound edit with no headless seam —
 /// it is covered by the acceptance greps (no <c>Position * Chunk.Size</c> and no
-/// <c>new Vector3(Chunk.Size)</c> left in RenderManager.cs) and by the visual gate, exactly as
+/// <c>new Vector3(Chunk.Size)</c> left in the render pass classes) and by the visual gate, exactly as
 /// HalfResTargetTests says of the half-res target's framebuffer.
 /// </summary>
 public sealed class ChunkBoundsTests

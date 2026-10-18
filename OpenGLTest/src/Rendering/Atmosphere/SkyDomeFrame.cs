@@ -6,7 +6,7 @@ namespace VoxelEngine.Rendering.Atmosphere;
 /// <summary>
 /// What the sky dome needs each frame beyond its <see cref="SkyPalette"/>: the night sky's
 /// stars, the eye the cloud cover in front of them is measured from, and the sun's lens glare.
-/// Built once a frame by <c>RenderManager.SetLighting</c>; the water mirror redraws the dome from
+/// Built once a frame by <c>FrameLighting.SetLighting</c>; the water mirror redraws the dome from
 /// the same frame with its own mirrored <see cref="Eye"/> and no glare.
 /// </summary>
 /// <param name="StarVisibility">0 by day .. 1 at night (<see cref="StarField.Visibility"/>).</param>

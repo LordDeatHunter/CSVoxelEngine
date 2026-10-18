@@ -17,7 +17,7 @@ namespace VoxelEngine.Rendering.Atmosphere;
 /// Because the noise and the mesh both wrap at the field edge, a mass crossing the seam continues
 /// into the neighboring copy unbroken. Each frame draws the copies twice: a depth pre-pass, then
 /// color, so the rounded surface blends once per pixel however its fillet pieces overlap.
-/// The draw is translucent, so <see cref="RenderManager.RenderClouds"/> owns the blend state.
+/// The draw is translucent, so <see cref="SkyPasses.RenderClouds"/> owns the blend state.
 /// </summary>
 public sealed class CloudRenderer : IDisposable
 {
@@ -35,7 +35,7 @@ public sealed class CloudRenderer : IDisposable
 
     /// <summary>
     /// This frame's silver-lining strength (<see cref="CloudSilverLining.Strength"/> of the sun's
-    /// elevation), set by <see cref="RenderManager.SetLighting"/>; 0, the default, draws none.
+    /// elevation), set by <see cref="FrameLighting.SetLighting"/>; 0, the default, draws none.
     /// </summary>
     public float SilverLining { get; set; }
 

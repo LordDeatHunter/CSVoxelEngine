@@ -24,7 +24,7 @@ namespace VoxelEngine.Rendering.ScreenSpace;
 /// Texture units read: 1 (shadow map) and 4 (full-res scene depth) by the march, 4 and 5 (its
 /// own half-res output, bound here) by the composite.
 /// The draws are additive, so this owns its own blend state and puts the world's back on the
-/// way out (<see cref="RenderManager.RenderUnderwaterRays"/> runs right before the selection
+/// way out (<see cref="ScreenPasses.RenderUnderwaterRays"/> runs right before the selection
 /// pass, which needs the depth test).
 /// </summary>
 public sealed class UnderwaterRaysRenderer : IDisposable
@@ -130,9 +130,9 @@ public sealed class UnderwaterRaysRenderer : IDisposable
         _gl.Viewport(0, 0, (uint)viewportSize.X, (uint)viewportSize.Y);
 
         // Only NOW is the march output safe to sample: binding it to a unit while it was still
-        // the draw target would be a feedback loop, the hazard RenderReflection documents for
-        // unit 2. Unit 4 stays bound to the full-res scene depth across both draws - the
-        // composite reconstructs its own marched distance from it.
+        // the draw target would be a feedback loop, the hazard ReflectionPass.RenderReflection
+        // documents for unit 2. Unit 4 stays bound to the full-res scene depth across both draws -
+        // the composite reconstructs its own marched distance from it.
         _gl.ActiveTexture(TextureUnit.Texture5);
         _gl.BindTexture(TextureTarget.Texture2D, halfResTex);
         // The composite adds the shafts in display space over the very target it draws into
@@ -153,7 +153,7 @@ public sealed class UnderwaterRaysRenderer : IDisposable
 
         // Leave no unit holding this pass's own render target, so next frame's march never runs
         // with it bound - defined behavior either way (the march reads only units 1 and 4), but
-        // it matches the convention CopyScene and every other pass here follows.
+        // it matches the convention RenderTargets.CopyScene and every other pass here follows.
         _gl.ActiveTexture(TextureUnit.Texture5);
         _gl.BindTexture(TextureTarget.Texture2D, 0);
         _gl.ActiveTexture(TextureUnit.Texture0 + SceneUnit);

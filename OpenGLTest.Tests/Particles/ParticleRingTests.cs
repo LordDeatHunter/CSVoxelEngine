@@ -15,7 +15,7 @@ namespace VoxelEngine.Tests.Particles;
 /// system and the compiler checks the shapes, but it cannot check the SEQUENCE: a subtly wrong
 /// <c>RemoveAt</c> - a swap-remove, an off-by-one on the shorter-side shift, a head that advances on
 /// the wrong branch - compiles perfectly and silently corrupts all four systems at once. The one
-/// consumer whose submission order reaches the GPU is <c>RenderManager.RenderBlockDebris</c>, which
+/// consumer whose submission order reaches the GPU is <c>ObjectPasses.RenderBlockDebris</c>, which
 /// composites overlapping semi-transparent cubes in list order whenever leaves drew that frame (the
 /// conditional blend-state argument is on <see cref="ParticleRing{T}"/> itself), so a reordering bug
 /// would show up as a subtle, intermittent compositing difference rather than as a crash.</para>
@@ -158,7 +158,7 @@ public sealed class ParticleRingTests
 
     /// <summary>
     /// Enumeration is oldest-first and agrees with the indexer, through both the generic and the
-    /// non-generic interface - the sequence <c>RenderManager.RenderBlockDebris</c>'s <c>foreach</c>
+    /// non-generic interface - the sequence <c>ObjectPasses.RenderBlockDebris</c>'s <c>foreach</c>
     /// submits. Checked after evictions, so the head is not at slot 0 and a physical-order enumerator
     /// would produce a rotated sequence.
     /// </summary>

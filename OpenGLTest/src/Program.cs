@@ -186,7 +186,7 @@ public static class Program
                 windowManager.Window, inputManager.InputContext, sfx);
             world = devWorld;
             devWorld.TimeOffset = timeOffset;
-            devWorld.Player.Rig = renderManager.PlayerRig;
+            devWorld.Player.Rig = renderManager.Players.PlayerRig;
             // Entity draws sample their light from the live chunks from here on
             renderManager.LightSource = devWorld.GetChunkManager();
             screen = AppScreen.Playing;
@@ -202,7 +202,7 @@ public static class Program
                     if (menu.View.Page == MainMenuPage.Settings)
                         HandleSettingsClick(pos);
                     else
-                        HandleMenuAction(menu.Click(renderManager.UiMainMenuHitAt(pos, menu.View)));
+                        HandleMenuAction(menu.Click(renderManager.Ui.MainMenuHitAt(pos, menu.View)));
                 }
                 if (settingsMenuView.DragRow.HasValue)
                     GameSettings.Save();
@@ -259,7 +259,7 @@ public static class Program
 
             if (!SettingsPageOpen || button != MouseButton.Left || inputManager.Mouse == null)
                 return;
-            var hit = renderManager.UiSettingsHitAt(inputManager.Mouse.Position, settingsMenuView);
+            var hit = renderManager.Ui.SettingsHitAt(inputManager.Mouse.Position, settingsMenuView);
             if (hit.Kind != SettingsHitKind.Slider || SettingsRows.All[hit.Row] is not SliderRow slider) return;
             settingsMenuView.DragRow = hit.Row;
             slider.Set(SettingsLayout.SliderValue(slider, hit.Fraction));
@@ -271,11 +271,11 @@ public static class Program
             {
                 // wheel.Y > 0 is toward the top, i.e. a smaller offset
                 if (inputManager.Mouse != null && menu.View.Page == MainMenuPage.Worlds
-                    && renderManager.UiIsOverWorldList(inputManager.Mouse.Position))
-                    menu.Scroll(-wheel.Y * MainMenuLayout.WheelStepRows, renderManager.UiCanvasSize);
+                    && renderManager.Ui.IsOverWorldList(inputManager.Mouse.Position))
+                    menu.Scroll(-wheel.Y * MainMenuLayout.WheelStepRows, renderManager.Ui.ScreenSize);
                 else if (inputManager.Mouse != null && menu.View.Page == MainMenuPage.Multiplayer
-                    && renderManager.UiIsOverServerList(inputManager.Mouse.Position))
-                    menu.Scroll(-wheel.Y * MainMenuLayout.WheelStepRows, renderManager.UiCanvasSize);
+                    && renderManager.Ui.IsOverServerList(inputManager.Mouse.Position))
+                    menu.Scroll(-wheel.Y * MainMenuLayout.WheelStepRows, renderManager.Ui.ScreenSize);
                 return;
             }
             if (screen != AppScreen.Playing) return;
@@ -293,8 +293,8 @@ public static class Program
                 case true when !pauseMenuView.IsOpen && inputManager.Mouse != null:
                 {
                     // The wheel scrolls the list only while hovering it; wheel.Y > 0 is toward the top.
-                    var canvas = renderManager.UiCanvasSize;
-                    var p = renderManager.UiToCanvas(inputManager.Mouse.Position);
+                    var canvas = renderManager.Ui.ScreenSize;
+                    var p = renderManager.Ui.ToCanvas(inputManager.Mouse.Position);
                     if (InventoryPanelLayout.IsOverList(p, canvas))
                     {
                         var searching = !inventoryView.Search.IsEmpty;
@@ -307,9 +307,9 @@ public static class Program
                             rowCount, canvas), searching);
                     }
                     else if (inventoryView.Tab == InventoryCategory.Crafting
-                             && renderManager.UiIsOverCraftCard(inputManager.Mouse.Position))
+                             && renderManager.Ui.IsOverCraftCard(inputManager.Mouse.Position))
                     {
-                        inventoryView.CraftScrollOffset = renderManager.UiClampCraftScroll(
+                        inventoryView.CraftScrollOffset = renderManager.Ui.ClampCraftScroll(
                             inventoryView.CraftScrollOffset - wheel.Y * CraftCardLayout.WheelStep);
                     }
 
@@ -502,7 +502,7 @@ public static class Program
             {
                 Player =
                 {
-                    Rig = renderManager.PlayerRig
+                    Rig = renderManager.Players.PlayerRig
                 },
                 // Every action is predicted locally and sent as an intent; the cells it changed are
                 // tagged with that intent, so the server's answer to it is told from older messages
@@ -862,7 +862,7 @@ public static class Program
             return (position, ItemTooltip.Lines(rowTool != 0 ? stack!.DefinitionId : rowId, stack));
         }
 
-        if (renderManager.UiHotbarSlotAt(position) is not { } slot || slot < 0 || inventory.IdAt(slot) == 0)
+        if (renderManager.Ui.HotbarSlotAt(position) is not { } slot || slot < 0 || inventory.IdAt(slot) == 0)
             return null;
         {
             var tool = inventory.ToolInstanceAt(slot);
@@ -888,8 +888,8 @@ public static class Program
 
         var rowCount = RowCountFor(inventoryView.Tab);
         var offset = InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount,
-            renderManager.UiCanvasSize);
-        var row = renderManager.UiPanelRowAt(
+            renderManager.Ui.ScreenSize);
+        var row = renderManager.Ui.PanelRowAt(
             new Vector2(inputManager.Mouse.Position.X, inputManager.Mouse.Position.Y), offset, rowCount);
         if (row == null) return false;
 
@@ -1119,7 +1119,7 @@ public static class Program
         var fb = windowManager.Window.FramebufferSize;
         if (fb.Y > 0)
             opened.Camera.SetAspectRatio(fb.X / (float)fb.Y);
-        opened.Player.Rig = renderManager.PlayerRig;
+        opened.Player.Rig = renderManager.Players.PlayerRig;
         renderManager.LightSource = opened.GetChunkManager();
         currentWorld = info;
         TryTouch(info);
@@ -1415,8 +1415,8 @@ public static class Program
         // panel) ends it, so there is deliberately no button-released branch here.
         if (inventoryView.IsOpen && inventoryView.ThumbDragGrab is { } grab && inputManager.Mouse != null)
         {
-            var canvas = renderManager.UiCanvasSize;
-            var p = renderManager.UiToCanvas(inputManager.Mouse.Position);
+            var canvas = renderManager.Ui.ScreenSize;
+            var p = renderManager.Ui.ToCanvas(inputManager.Mouse.Position);
             var value = InventoryPanelLayout.OffsetForThumbTop(
                 p.Y - grab, inventoryView.ThumbDragRowCount, canvas);
             SetListScroll(value, !inventoryView.Search.IsEmpty);
@@ -1639,15 +1639,15 @@ public static class Program
         }
         else
         {
-            var canvas = renderManager.UiCanvasSize;
+            var canvas = renderManager.Ui.ScreenSize;
             drag.Set(SettingsLayout.SliderValue(drag,
-                SettingsLayout.SliderFraction(renderManager.UiToCanvas(inputManager.Mouse.Position).X, tabRow, canvas)));
+                SettingsLayout.SliderFraction(renderManager.Ui.ToCanvas(inputManager.Mouse.Position).X, tabRow, canvas)));
         }
     }
 
     private static void HandleSettingsClick(Vector2 position)
     {
-        var hit = renderManager.UiSettingsHitAt(position, settingsMenuView);
+        var hit = renderManager.Ui.SettingsHitAt(position, settingsMenuView);
         switch (hit.Kind)
         {
             case SettingsHitKind.Back:
@@ -1677,7 +1677,7 @@ public static class Program
 
     private static void HandleMenuClick(Vector2 position)
     {
-        switch (renderManager.UiPauseMenuHitAt(position, pauseMenuView))
+        switch (renderManager.Ui.PauseMenuHitAt(position, pauseMenuView))
         {
             case PauseMenuHit.Resume:
                 SetPauseMenu(PauseMenuPage.Closed);
@@ -1715,8 +1715,8 @@ public static class Program
     /// </summary>
     private static void HandleInventoryScrollbarPress(Vector2 position)
     {
-        var canvas = renderManager.UiCanvasSize;
-        var p = renderManager.UiToCanvas(position);
+        var canvas = renderManager.Ui.ScreenSize;
+        var p = renderManager.Ui.ToCanvas(position);
         var searching = !inventoryView.Search.IsEmpty;
         var rowCount = searching
             ? InventorySearch.Search(inventoryView.Search.Query, world!.Inventory, world.Camera.IsCreative).Count
@@ -1930,7 +1930,7 @@ public static class Program
 
     private static void EnsureSearchHighlightVisible(int count)
     {
-        var screen = renderManager.UiCanvasSize;
+        var screen = renderManager.Ui.ScreenSize;
         var viewport = InventoryPanelLayout.ListHeight(screen);
         var rowTop = inventoryView.Search.Highlight * InventoryPanelLayout.RowHeight;
         var offset = inventoryView.Search.ScrollOffset;
@@ -2004,8 +2004,8 @@ public static class Program
     private static void ApplyCatalogButton(byte id, int row, float offset, int rowCount,
         Vector2 position)
     {
-        var button = InventoryPanelLayout.CatalogButtonAt(renderManager.UiToCanvas(position),
-            row, offset, rowCount, renderManager.UiCanvasSize);
+        var button = InventoryPanelLayout.CatalogButtonAt(renderManager.Ui.ToCanvas(position),
+            row, offset, rowCount, renderManager.Ui.ScreenSize);
         switch (button)
         {
             case InventoryPanelLayout.CatalogButton.AddOne:
@@ -2047,14 +2047,14 @@ public static class Program
         var creative = world.Camera.IsCreative;
 
         // The search box takes the click before anything else; clicking elsewhere drops focus.
-        if (renderManager.UiSearchBoxAt(position))
+        if (renderManager.Ui.SearchBoxAt(position))
         {
             inventoryView.Focus = InventoryFocus.Search;
             return;
         }
         inventoryView.Focus = InventoryFocus.None;
 
-        var tab = renderManager.UiPanelTabAt(position);
+        var tab = renderManager.Ui.PanelTabAt(position);
         if (tab.HasValue)
         {
             inventoryView.Tab = tab.Value;
@@ -2069,14 +2069,14 @@ public static class Program
             : null;
         var rowCount = hits?.Count ?? RowCountFor(inventoryView.Tab);
         var offset = searching
-            ? InventoryPanelLayout.ClampedOffset(inventoryView.Search.ScrollOffset, rowCount, renderManager.UiCanvasSize)
-            : InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount, renderManager.UiCanvasSize);
+            ? InventoryPanelLayout.ClampedOffset(inventoryView.Search.ScrollOffset, rowCount, renderManager.Ui.ScreenSize)
+            : InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount, renderManager.Ui.ScreenSize);
         // The scrollbar is handled on press; its release must not fall through to the
         // crafting card or hotbar tests below.
-        if (InventoryPanelLayout.ScrollbarHitAt(renderManager.UiToCanvas(position),
-                renderManager.UiCanvasSize, offset, rowCount) != ScrollbarHit.None)
+        if (InventoryPanelLayout.ScrollbarHitAt(renderManager.Ui.ToCanvas(position),
+                renderManager.Ui.ScreenSize, offset, rowCount) != ScrollbarHit.None)
             return;
-        var row = renderManager.UiPanelRowAt(position, offset, rowCount);
+        var row = renderManager.Ui.PanelRowAt(position, offset, rowCount);
         if (row.HasValue)
         {
             if (hits != null)
@@ -2116,7 +2116,7 @@ public static class Program
 
         if (inventoryView.Tab == InventoryCategory.Crafting)
         {
-            var hit = renderManager.UiCraftHitAt(position, inventoryView);
+            var hit = renderManager.Ui.CraftHitAt(position, inventoryView);
             var craft = inventoryView.Craft;
             switch (hit.Kind)
             {
@@ -2155,7 +2155,7 @@ public static class Program
 
         // Equipped here at once and, while connected, sent as an intent: the server applies the
         // same equip to its copy (only for something this player owns), so the next sync keeps it.
-        var hotbar = renderManager.UiHotbarSlotAt(position);
+        var hotbar = renderManager.Ui.HotbarSlotAt(position);
         if (!hotbar.HasValue) return;
         if (inventoryView.Tab == InventoryCategory.Tools && inventoryView.SelectedToolInstance != 0)
         {
@@ -2177,10 +2177,10 @@ public static class Program
         if (screen != AppScreen.Playing)
         {
             FrameProfiler.Begin(ProfileSection.RenderShell);
-            renderManager.RenderMenuFrame(windowManager.Window,
+            renderManager.UiPasses.RenderMenuFrame(windowManager.Window,
                 screen == AppScreen.Menu ? menu.View : null, settingsMenuView,
                 screen == AppScreen.Menu ? null : loadingView, windowManager.Window.Time);
-            ambience?.Update(renderManager.Dayness, (float)MathUtils.Clamp(deltaTime, 0.0, 0.25));
+            ambience?.Update(renderManager.Lighting.Dayness, (float)MathUtils.Clamp(deltaTime, 0.0, 0.25));
             sfx?.Update();
             if (pending != PendingWork.None)
                 pendingFramePresented = true;
@@ -2196,17 +2196,17 @@ public static class Program
         // per-pass averages. debugEnabled is the live X-overlay state and this is the render thread,
         // so the gate reads it directly.
         FrameProfiler.Begin(ProfileSection.RenderShell);
-        renderManager.BeginGpuFrame(debugEnabled);
+        renderManager.GpuTimer.BeginGpuFrame(debugEnabled);
         FrameProfiler.End(ProfileSection.RenderShell);
 
         FrameProfiler.Begin(ProfileSection.Lighting);
-        renderManager.BeginGpuPass(ProfileSection.Lighting);
-        renderManager.SetLighting(world.LightingTime, world.Camera, world.PrimedTnt,
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.Lighting);
+        renderManager.Lighting.SetLighting(world.LightingTime, world.Camera, world.PrimedTnt,
             world.Camera.IsEyeInWater, world.Camera.IsEyeInLava, world.FireCells);
-        ambience?.Update(renderManager.Dayness, (float)MathUtils.Clamp(deltaTime, 0.0, 0.25));
+        ambience?.Update(renderManager.Lighting.Dayness, (float)MathUtils.Clamp(deltaTime, 0.0, 0.25));
         sfx?.Update();
         renderManager.BeginFrame(world.Camera);
-        renderManager.EndGpuPass(ProfileSection.Lighting);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.Lighting);
         FrameProfiler.End(ProfileSection.Lighting);
 
         world.Renderer.Render(renderManager);
@@ -2223,7 +2223,7 @@ public static class Program
         FrameProfiler.End(ProfileSection.RenderShell);
 
         FrameProfiler.Begin(ProfileSection.UiPass);
-        renderManager.BeginGpuPass(ProfileSection.UiPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.UiPass);
         var hideHud = !hudVisible
             || (visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud);
         if (!hideHud)
@@ -2232,17 +2232,17 @@ public static class Program
                 showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView);
         // The chat log and input draw over the HUD; hidden with the HUD and behind the pause menu.
         if (!hideHud && !pauseMenuView.IsOpen)
-            renderManager.RenderChat(windowManager.Window, chatView, windowManager.Window.Time);
+            renderManager.UiPasses.RenderChat(windowManager.Window, chatView, windowManager.Window.Time);
         // The Tab player list rides over the HUD while the key is held (a server session only)
         if (!hideHud && !pauseMenuView.IsOpen && tabHeld && netClient != null)
-            renderManager.RenderPlayerList(windowManager.Window, PlayerListNames());
+            renderManager.UiPasses.RenderPlayerList(windowManager.Window, PlayerListNames());
         // A hover tooltip over the [E] panel's rows and the hotbar slots
         if (!hideHud && !pauseMenuView.IsOpen)
-            renderManager.RenderTooltip(windowManager.Window, HoveredTooltip());
+            renderManager.UiPasses.RenderTooltip(windowManager.Window, HoveredTooltip());
         // The loading screen fades out over the world's first playing frames
         if (!loadingView.IsFinished)
-            renderManager.RenderLoadingOverlay(windowManager.Window, loadingView, windowManager.Window.Time);
-        renderManager.EndGpuPass(ProfileSection.UiPass);
+            renderManager.UiPasses.RenderLoadingOverlay(windowManager.Window, loadingView, windowManager.Window.Time);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.UiPass);
         FrameProfiler.End(ProfileSection.UiPass);
 
         // Timed even when no screenshot is due, so the pairing stays obvious; an empty span
@@ -2262,7 +2262,7 @@ public static class Program
         FrameProfiler.End(ProfileSection.Screenshot);
 
         FrameProfiler.Begin(ProfileSection.RenderShell);
-        renderManager.EndGpuFrame();
+        renderManager.GpuTimer.EndGpuFrame();
         FrameProfiler.End(ProfileSection.RenderShell);
         FrameProfiler.EndFrame();
     }

@@ -36,8 +36,9 @@ public class ItemMeshCache : IDisposable
     /// Raised after this cache has uploaded a texture, i.e. after it has bound (and unbound) a
     /// Texture2DArray on whatever texture unit happened to be active. Textures are built lazily,
     /// on first sight of an item frame, which means this can fire in the middle of a render pass;
-    /// <c>RenderManager</c> hooks it up to its texture-unit cache so that clobbering is recorded
-    /// rather than merely survived by luck (PERF_TODO R5). Null by default - nothing here needs it.
+    /// <c>RenderManager</c> wires it to <c>TextureUnits.InvalidateTextureUnits</c>, the texture-unit
+    /// cache's reset, so that clobbering is recorded rather than merely survived by luck
+    /// (PERF_TODO R5). Null by default - nothing here needs it.
     /// </summary>
     internal Action? GlStateChanged { get; set; }
 

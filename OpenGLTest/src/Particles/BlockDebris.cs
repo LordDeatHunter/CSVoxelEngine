@@ -9,7 +9,7 @@ namespace VoxelEngine.Particles;
 /// <summary>
 /// One chunk of mining debris: a small cube textured as the block it broke off from.
 /// Pops out on a mining hit, falls under gravity, bounces off the terrain and fades out.
-/// Pure CPU state — <see cref="Systems.RenderManager"/> draws the live set through the
+/// Pure CPU state — <see cref="Rendering.Actors.ObjectPasses"/> draws the live set through the
 /// shared <see cref="BlockCubeCache"/>. Main thread only, like every other entity.
 /// </summary>
 public class BlockDebris

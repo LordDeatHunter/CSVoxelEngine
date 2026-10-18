@@ -8,7 +8,7 @@ namespace VoxelEngine.Tests.Rendering;
 /// (PERF_TODO R5): which unit the context has selected and what is bound to each tracked unit. Only
 /// the bookkeeping is covered here. The GL half — that a <em>skipped</em> <c>glActiveTexture</c> or
 /// <c>glBindTexture</c> really did leave the context in the state the cache claims, and that no site
-/// changes a unit behind <c>RenderManager</c>'s three primitives without invalidating — needs a live
+/// changes a unit behind <c>TextureUnits</c>' three primitives without invalidating — needs a live
 /// GL context and is not reachable from a test, exactly as <c>HalfResTargetTests</c> and
 /// <c>CloudCopiesTests</c> say of their own GL halves. It was proved instead by a temporary
 /// readback harness run over the scripted visual scenarios, and is re-checked by the screenshot gate.
@@ -31,7 +31,7 @@ public sealed class TextureUnitCacheTests
     // Stand-ins for the five world textures, in BindWorldTextures' own order.
     private const uint Shadow = 11, Refl = 22, SceneColor = 33, SceneDepth = 44, Atlas = 55;
 
-    /// <summary><c>RenderManager.BindLazy</c>, reimplemented: returns how many GL calls it would
+    /// <summary><c>TextureUnits.BindLazy</c>, reimplemented: returns how many GL calls it would
     /// issue (0 on a full match, otherwise the optional select plus the always-issued bind).</summary>
     private static int BindLazy(TextureUnitCache cache, int unit, int target, uint texture)
     {
@@ -42,7 +42,7 @@ public sealed class TextureUnitCacheTests
         return calls;
     }
 
-    /// <summary><c>RenderManager.BindUnit</c>, reimplemented: the select is unconditional work for
+    /// <summary><c>TextureUnits.BindUnit</c>, reimplemented: the select is unconditional work for
     /// the cache even when the GL call is skipped, which is the trajectory guarantee.</summary>
     private static int BindUnit(TextureUnitCache cache, int unit, int target, uint texture)
     {

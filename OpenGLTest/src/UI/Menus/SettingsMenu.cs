@@ -30,7 +30,7 @@ public sealed record OptionsRow(string Section, string Label, string[] Options,
 /// The settings page's rows: section, label, widget kind and the getter/setter into
 /// <see cref="GameSettings"/>. Setters only mutate + save (via <see cref="Program"/>); the
 /// engine reads the values live, and window-level ones are synced per frame, so no row
-/// needs its own apply hook. The GUI Scale row is read by <c>RenderManager.RenderUI</c> every
+/// needs its own apply hook. The GUI Scale row is read by <c>UiPasses.RenderUI</c> every
 /// frame through <see cref="GameSettings.RequestedGuiScale"/>.
 /// </summary>
 public static class SettingsRows

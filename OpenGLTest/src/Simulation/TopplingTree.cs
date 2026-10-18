@@ -251,8 +251,8 @@ public class TopplingTree : IDisposable
     }
 
     /// <summary>Model matrix swinging the pivot-relative mesh around its base. Row-vector
-    /// convention like the other world draws (see RenderBlockPop): rotate first, then move
-    /// to the pivot.</summary>
+    /// convention like the other world draws (see SelectionPasses.RenderBlockPop): rotate first,
+    /// then move to the pivot.</summary>
     public Matrix4x4 Model =>
         Matrix4x4.CreateFromAxisAngle(_axis, AngleNow) * Matrix4x4.CreateTranslation(_pivot);
 

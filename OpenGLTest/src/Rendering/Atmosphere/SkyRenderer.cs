@@ -14,7 +14,7 @@ namespace VoxelEngine.Rendering.Atmosphere;
 /// <see cref="SkyPalette"/>. It is drawn first, straight after the clear and before the sun
 /// disc, with the depth test and depth writes off, so everything after it occludes it, which is
 /// also what keeps its stars behind every piece of terrain.
-/// Binds no textures, so <see cref="RenderManager"/>'s texture-unit cache stays valid: the star
+/// Binds no textures, so the texture-unit cache (<see cref="TextureUnits"/>) stays valid: the star
 /// occlusion samples the cloud-shadow map on the unit given to the constructor, which the caller
 /// keeps bound for the whole run.
 /// </summary>

@@ -5,7 +5,7 @@ namespace VoxelEngine.Rendering.ScreenSpace;
 
 /// <summary>
 /// The post pass's per-frame camera effects (<see cref="PostProcessRenderer.Render"/>), built by
-/// <see cref="RenderManager.RenderPostProcess"/>. <see cref="Neutral"/> is the pass with every effect off.
+/// <see cref="ScreenPasses.RenderPostProcess"/>. <see cref="Neutral"/> is the pass with every effect off.
 /// </summary>
 /// <param name="Exposure">The tonemap exposure: <see cref="WorldGenerationConfig.TonemapExposure"/> times the eye adaptation (<see cref="EyeAdaptation"/>).</param>
 /// <param name="Grade">The display-space color grade multiplied over the image (<see cref="BiomeGrade"/>); (1, 1, 1) leaves it alone.</param>

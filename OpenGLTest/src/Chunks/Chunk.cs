@@ -106,8 +106,8 @@ public class Chunk : IDisposable
     /// <summary>
     /// Where this chunk's fluid and glass geometry lives in the render manager's translucent
     /// <see cref="ChunkGeometryPool"/>, or <c>null</c> when there is nothing to draw. Fluid
-    /// surfaces live apart from the opaque geometry so RenderManager can draw them blended,
-    /// after everything opaque (see RenderManager.RenderWorldTranslucent).
+    /// surfaces live apart from the opaque geometry so the terrain passes can draw them blended,
+    /// after everything opaque (see TerrainPasses.RenderWorldTranslucent).
     /// </summary>
     public GeometrySlice? TranslucentSlice { get; private set; }
 

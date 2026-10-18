@@ -10,8 +10,8 @@ namespace VoxelEngine.Rendering.ScreenSpace;
 /// The frame's final full-screen pass: one oversized triangle (the shape <see cref="SkyRenderer"/>
 /// draws) shaded by post-fragment.glsl, which reads the linear HDR scene target and writes the
 /// tonemapped, sRGB-encoded, FXAA-smoothed, dithered image. It binds no framebuffer and no texture - the caller
-/// (<see cref="RenderManager.RenderPostProcess"/>) binds the destination and puts the scene
-/// texture on unit 0 - so <see cref="RenderManager"/>'s texture-unit cache stays its own business.
+/// (<see cref="ScreenPasses.RenderPostProcess"/>) binds the destination and puts the scene
+/// texture on unit 0 - so the texture-unit cache (<see cref="TextureUnits"/>) stays its own business.
 /// </summary>
 public sealed class PostProcessRenderer : IDisposable
 {

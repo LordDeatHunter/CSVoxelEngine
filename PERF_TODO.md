@@ -221,7 +221,7 @@ needs, not the history.
 - **R6 · GPU timer queries are gated with an idle keep-alive, and the either/or the bullet framed was
   not forced.** The bullet said gating on `X` gives up "the first second after X already has data" and
   told a reader to decide that trade. Read against the code it mis-stated its own cost **twice**.
-  First, `GpuRingSize = 3` (`RenderManager.cs:220`), so a query issued on the frame `X` is pressed
+  First, `GpuRingSize = 3` (`GpuPassTimer.GpuRingSize`), so a query issued on the frame `X` is pressed
   drains **three frames later, not a second later**. Second, and this is the one that matters, the
   property the overlay actually delivers is **not sample recency**: `FrameProfiler.Publish`
   (`FrameProfiler.cs:297`) rebuilds `_lines` and `_consoleLine` only **once a second** and clears the
@@ -230,11 +230,11 @@ needs, not the history.
   already carries GPU figures instead of `--`", and a fixed duty cycle preserves it **by
   construction**. **What shipped:** `GpuTimingGate.ShouldTime(bool overlayOn, long frameIndex)`
   (`src/Rendering/GpuTimingGate.cs:52`) — GL-free and unit-tested on the `ReflectionReuse` precedent,
-  because `RenderManager` needs a live GL context and **no test in this suite has one**;
+  because the GL pass classes need a live GL context and **no test in this suite has one**;
   `WorldGenerationConfig.GpuTimingIdleInterval = 8` (`:291`), which keeps
   `ceil(fps / GpuTimingIdleInterval)` samples per always-run pass in every publish window (~12 at
-  100 fps); the gate **latched once per frame** in `RenderManager.BeginGpuFrame(bool overlayOn)`
-  (`:308`) and read by `BeginGpuPass` (`:355`) and `EndGpuPass` (`:371`). The single call site is
+  100 fps); the gate **latched once per frame** in `GpuPassTimer.BeginGpuFrame(bool overlayOn)`
+  and read by `BeginGpuPass` and `EndGpuPass`. The single call site is
   `Program.cs:571`, passing the live `debugEnabled` X-toggle state on the render thread — no new
   cross-thread mechanism. The interval is **chosen, not measured**: it is a one-token lever, and by
   this file's own rule (`Generations`, C5's pool size) moving it owes a counted capture, which is said
@@ -250,7 +250,8 @@ needs, not the history.
   of the saving and is worth stating: **the drain frame is not free** — with `GpuRingSize == 3` the
   queries issued on timed frame k are drained on frame **k+3**, which is itself a gate-closed frame.
 - **R6 · what it costs, MEASURED as a count and not as a time.** R6's quantity is countable, so it was
-  counted. `RenderManager.Dispose` (`:2863`) logs one cumulative line before any GL teardown —
+  counted. `GpuPassTimer.LogQueryCounts`, called first in `RenderManager.Dispose`, logs one
+  cumulative line before any GL teardown —
   `GPU timer queries: N GL calls over F frames, T timed (X per frame)` — which prints in **every** run
   (see the instrument note in the hand-off for why it is a shutdown line and not a console token).
   Same scenario both times (`entity-binds`, `VOXEL_TIME=120`, run from `OpenGLTest/`, scenario copies
@@ -343,7 +344,7 @@ needs, not the history.
   `AGENTS.md:55-62` said "Timings are collected every frame whether or not the overlay is up, so the
   first second after pressing `X` already has data" — false for the GPU half the moment the gate
   landed — and now states the CPU/GPU split, names `GpuTimingGate.ShouldTime` and
-  `RenderManager.BeginGpuFrame`, and carries the `selectPass` caveat. `FrameProfiler`'s class doc
+  `GpuPassTimer.BeginGpuFrame`, and carries the `selectPass` caveat. `FrameProfiler`'s class doc
   opened "always collected"; it now splits the same claim and records the sampling-rate consequence.
   **This is NOT the ruled-out *GL debug context* item**, which is a different entry under **Ruled
   out**.
@@ -532,8 +533,8 @@ needs, not the history.
   alone and takes the first `MaxDirtyChunksPerFrame` (64), and distance ties are everywhere on a
   chunk lattice, so ties break by insertion order; (3) `UnloadDistantChunks`'s
   `foreach (var kvp in Chunks.Packed)` (`ChunkManager.cs:236`) feeds `RemoveRenderable`'s
-  swap-remove, setting `Renderable` / `TranslucentRenderable` order, which `RenderManager`'s
-  **unstable** back-to-front translucent sort (`RenderManager.cs:1781`) then observes for
+  swap-remove, setting `Renderable` / `TranslucentRenderable` order, which
+  `TerrainPasses.CullWater`'s **unstable** back-to-front translucent sort then observes for
   equidistant chunks. Each is order-insensitive in its *converged* result — nothing is lost, only
   deferred: out-of-range and unloaded dirty entries are dropped on sight, and missing-neighbor ones
   are re-added by `QueueChunk` when the neighbor arrives. So **D1 is output-preserving at
@@ -731,13 +732,13 @@ needs, not the history.
 - **R10 · LOD regions no longer own GL objects; all three ring walks are one multi-draw each.**
   `LodRegion` had a `Mesh` (VAO + VBO + EBO) for its terrain shell and a second `Mesh` for its sea
   sheet. Both are gone. A region now holds `OpaqueSlice` / `WaterSlice` — two `GeometrySlice?`s in
-  one shared `ChunkGeometryPool` — and `RenderManager.RenderLod`, the mirror's region loop in
-  `RenderReflection` and the water sheets in `RenderWorldTranslucent` each became `BeginPass` + an
-  `Add` loop + one `ChunkDrawBatch.Draw(LodGeometry.Vao, chunkShader, …)`, i.e. one
-  `glMultiDrawElementsIndirect`. The CPU frustum cull did **not** move — this is not the ruled-out
+  one shared `ChunkGeometryPool` — and `TerrainPasses.RenderLod`, the mirror's region loop in
+  `ReflectionPass.RenderReflection` and the water sheets in `TerrainPasses.RenderWorldTranslucent`
+  each became `BeginPass` + an `Add` loop + one `ChunkDrawBatch.Draw(LodGeometry.Vao, chunkShader, …)`,
+  i.e. one `glMultiDrawElementsIndirect`. The CPU frustum cull did **not** move — this is not the ruled-out
   *compute frustum cull*.
-- **R10 · One LOD pool, not two, and why.** `RenderManager.LodGeometry` (`RenderManager.cs:42`,
-  constructed at `:382`, disposed at `:2562`) holds **both** the shells and the sheets. The chunk
+- **R10 · One LOD pool, not two, and why.** `RenderManager.LodGeometry` (constructed in
+  `LoadResources`, disposed in `Dispose`) holds **both** the shells and the sheets. The chunk
   side's opaque/translucent split exists for a *sizing* reason (512 MB vs 64 MB, stated in the
   constants' own comments), not a correctness one, and it does not transfer: a region's two meshes
   are born from one `LodMeshData` and die in the same `Dispose`, so their lifetimes never diverge.
@@ -775,7 +776,7 @@ needs, not the history.
   and `ANonEmptyRegionMeshWithoutAPoolThrows` (which covers **both** guards). **Do not "tidy" those
   parameter orders** — roughly 500 lines of burial and cover-flag coverage stop compiling.
   `LodManager`'s `GL` parameter is gone entirely; it had exactly one use.
-- **R10 · LOD shares `RenderManager`'s single `_chunkDraws` instance, and the reason is a hazard
+- **R10 · LOD shares `RenderManager`'s single `ChunkDrawBatch` with every pass, and the reason is a hazard
   worth recording accurately.** A second `ChunkDrawBatch` is **possible** — it would simply have to
   `glBindBufferBase` inside `Draw`, or take its own binding point. Today's class does **neither**:
   `Allocate` binds the SSBO to `SsboBinding = 0` once at construction (`ChunkDrawBatch.cs:259`) and
@@ -795,9 +796,9 @@ needs, not the history.
   variant, no shader edit** — and the compatibility argument is recorded here so a future round need
   not re-derive it line by line. `worldShader` and `chunkShader` are the **same**
   `test-vertex.glsl` / `test-fragment.glsl` pair, differing only by `#define CHUNK_DRAW`
-  (`RenderManager.cs:24`, `:329-332`). A region's model matrix was always a pure translation, so the
-  variant's `TO_WORLD(p) = p + chunkOrigin` (`test-vertex.glsl:18`) reproduces
-  `(uModel * vec4(p,1)).xyz` (`:23`) exactly; the vertex shader's own comment at
+  (`RenderManager.ChunkDrawDefines`, `RenderManager.LoadResources`). A region's model matrix was
+  always a pure translation, so the variant's `TO_WORLD(p) = p + chunkOrigin` (`test-vertex.glsl:18`)
+  reproduces `(uModel * vec4(p,1)).xyz` (`:23`) exactly; the vertex shader's own comment at
   `test-vertex.glsl:95` — *"uModel is a pure translation for chunks/LOD, so the normal is
   unchanged"* — is precisely the assumption the `CHUNK_DRAW` branch makes when it sets
   `fNormal = vNormal`. The water and `lodLeaves` alpha flags live in the **shared** fragment shader,
@@ -810,23 +811,23 @@ needs, not the history.
 - **R10 · the `uAlphaCutoff` restore moved programs, and `SetDrawUniforms` is now entity-only.** In
   `RenderWorldTranslucent` the two `worldShader.SetUniform(_locAlphaCutoff, 0f/0.5f)` lines are
   gone; instead `chunkShader.SetUniform(_locChunkAlphaCutoff, 0.5f)` **moved** from just after the
-  chunk translucent `Draw` to just after the LOD water `Draw` (`RenderManager.cs:1738`, `:1768`), so
+  chunk translucent `Draw` to just after the LOD water `Draw` (`TerrainPasses.RenderWorldTranslucent`), so
   the sheets still submit at cutoff 0 and the chunk path still ends at 0.5. Pass order is unchanged:
   chunk translucent multi-draw first, LOD water multi-draw second. `worldShader`'s cutoff is no
-  longer touched by that pass at all and stays at the 0.5 `BeginFrame` sets. `SetDrawUniforms`
-  (`RenderManager.cs:1498`) is now reached only by entity, block-cube, item and outline draws, and
+  longer touched by that pass at all and stays at the 0.5 `BeginFrame` sets.
+  `RenderManager.SetDrawUniforms` is now reached only by entity, block-cube, item and outline draws, and
   its doc comment says so. `Mesh` stays in the tree for exactly those consumers.
 - **R10 · the two LOD sort comparators are now `LodRegion.CompareOpaqueDraw` /
   `CompareWaterDraw`** (`LodRegion.cs:184`, `:198`), taking plain scalars so they can be pinned with
-  no `LodRegion` instance, no `LodMeshData` and no `TestContent`. `RenderLod`'s and `CullWater`'s
-  `Sort` lambdas delegate to them (`RenderManager.cs:1816`, `:1715`) with their original rationale
+  no `LodRegion` instance, no `LodMeshData` and no `TestContent`. `TerrainPasses.RenderLod`'s and
+  `TerrainPasses.CullWater`'s `Sort` lambdas delegate to them with their original rationale
   comments carried verbatim. **This matters more than it looks:** `glMultiDrawElementsIndirect`
   executes commands in array order, so since R10 these orderings **are** the submission order — a
   future refactor that reorders an `Add` loop silently changes depth resolution and water blending.
   `LodDrawOrderTests` pins both, mutation-checked (inverting the level comparison in either
   comparator fails its own fact and the disagreement fact with it). The mirror's region list is
-  **deliberately unsorted** (it adds `(region, 0f)`, as it always has) and now carries a comment at
-  `RenderManager.cs:1183` saying so — do not "fix" it into a comparator.
+  **deliberately unsorted** (it adds `(region, 0f)`, as it always has) and now carries a comment in
+  `ReflectionPass.RenderReflection` saying so — do not "fix" it into a comparator.
 - **R10 · `ApplyCompletedMeshes` frees a replaced region *before* uploading its rebuild**
   (`LodManager.cs:501-508`). The `Regions.TryRemove` block moved above the construction, carrying
   `replaced.Lifetime` across in an object initializer. The reason is pool occupancy: a same-sized
@@ -931,8 +932,8 @@ needs, not the history.
   weaker, and the corrected argument is the reason no renderer was touched: `LeafParticleRenderer`,
   `BubbleParticleRenderer` and `FireParticleRenderer` each **re-derive their own back-to-front order
   every frame** (`Array.Sort` over a depth array, then indexed access), so source order is already
-  discarded by three of the four consumers. `RenderManager.RenderBlockDebris`
-  (`RenderManager.cs:2131`) is the one path where submission order reaches the GPU — it walks its
+  discarded by three of the four consumers. `ObjectPasses.RenderBlockDebris`
+  is the one path where submission order reaches the GPU — it walks its
   list with a plain `foreach`. Its blend state is **conditional and must be stated as such**: debris
   always draws with depth writes **on** (`LeafParticleRenderer` restores `DepthMask(true)` at `:174`
   and `RenderBlockDebris` sets no blend state of its own), and it inherits `Blend` still enabled at
@@ -2261,7 +2262,7 @@ One BCL detail worth keeping: **`int.ToString()` returns a shared cached instanc
 vacuously; `SlotCountsAreCachedPerSlot` uses counts above 299 for exactly that reason.
 
 **On the R5 program and texture-unit caches**, whose design a future reader is most likely to try to
-"simplify": `RenderManager`'s `BindUnit(unit, target, tex)` **stays eager** — it always makes the unit
+"simplify": `TextureUnits.BindUnit(unit, target, tex)` **stays eager** — it always makes the unit
 active and skips only a redundant `glBindTexture` — because three things bind on *whatever unit is
 live* (`CopyScene`'s `glCopyTexSubImage2D`, the three `Create*Target` methods, and
 `TextureLoader.Upload`, reached lazily from `ItemMeshCache` inside the entity pass). `BindLazy` skips
@@ -2295,7 +2296,7 @@ catch is a *new* `Camera` field wired into `GetViewMatrix` tomorrow with no matc
   number of physics steps for a given simulated duration is **frame-rate dependent**. Any round that
   makes the engine faster lands at a slightly different camera depth and streaming state, and a naive
   pixel gate reads that as a regression.
-- **Chunks and LOD regions fade in on the wall clock** (`RenderManager.cs:1162-1163`, `:1822-1826`,
+- **Chunks and LOD regions fade in on the wall clock** (`TerrainPasses.RenderWorld`, `TerrainPasses.RenderLod`,
   `MAX_LIFETIME` 0.5 s), so a region caught mid-fade differs by up to ~208 levels between runs of the
   **same** build. `clouds-mirror.json`'s `14-sky_level` and `16-sky_closeup` frame such a region and
   their full-frame p99 flips between 1 and 122 depending on which side of the percentile it lands —
@@ -3048,7 +3049,7 @@ this file's own instruments — see the carried-debt bullet below.
   `(int)Math.Round(frames / seconds)`, a rounded rate. The token does **not** carry `AllocatorCalls`;
   a future round wanting steps-per-call must add it to `FrameProfiler.SetGeometryCounts`.
 - **The `GPU timer queries:` shutdown line is R6's standing instrument, and it is a *shutdown* line on
-  purpose.** `RenderManager.Dispose` (`RenderManager.cs:2863`) logs
+  purpose.** `GpuPassTimer.LogQueryCounts`, called first in `RenderManager.Dispose`, logs
   `GPU timer queries: {calls} GL calls over {frames} frames, {timed} timed ({perFrame} per frame)`
   before any GL teardown, and `Program.OnClosing` disposes the render manager before `Log.Shutdown()`,
   so it is drained in **every** run — scripted or interactive, with `VOXEL_DEBUG` or without. It is
@@ -3121,19 +3122,19 @@ noisy fields is an artifact, not a separation. Compare fields, not tuples.
   upload — all audited, not the problem.
 
 - **R3 · Half-res scene copies for water — resolved, PARKED, and closed rather than unparked** —
-  `CopyScene` (`RenderManager.cs:1046-1056`), called with color+depth at `:1734` and
-  depth-only at `:1550`. The condition R2 left on this bullet was resolved against the code
-  rather than implemented, and it settles three ways.
+  `RenderTargets.CopyScene`, called with color+depth in `TerrainPasses.RenderWorldTranslucent` and
+  depth-only in `ScreenPasses.RenderUnderwaterRays`. The condition R2 left on this bullet was
+  resolved against the code rather than implemented, and it settles three ways.
   **(a) The depth copy cannot move.** `CopyScene(bool color)` copies depth
   *unconditionally* — only the color half is gated by the parameter — and both call sites
   write the same `_sceneDepthTex`, which R2's depth-aware upsample pins at full res. So the
-  `:1734` call keeps paying a full-res `DepthComponent24` `CopyTexSubImage2D` whatever R3
+  color+depth call keeps paying a full-res `DepthComponent24` `CopyTexSubImage2D` whatever R3
   does, and a second, half-res depth used only by the water pass is the same *additive* cost
   (an extra texture plus an extra reduction, on top of a full-res copy that still has to
   happen) that R2 already rejected on the rays side. Only the RGBA8 color copy is left.
   **(b) The shader claim holds.** `test-fragment.glsl`'s refraction really is
   resolution-independent: `uv = gl_FragCoord.xy * uInvViewport` (`:267`) against
-  `uInvViewport = 1/_viewportSize` (`RenderManager.cs:1483-1484`), bilinear `texture()` fetches
+  `uInvViewport = 1/_viewportSize` (`RenderManager.ApplyFrameUniformsTo`), bilinear `texture()` fetches
   (`:270-272`), a `uInvViewProj` unprojection (`:276`) — no `texelFetch` and no pixel indices
   anywhere in the file. The shader would need zero changes.
   **(c) But the ceiling is tiny and the change is not "sample less".** The color copy is
@@ -3141,8 +3142,8 @@ noisy fields is an artifact, not a separation. Compare fields, not tuples.
   GPU total** (the compute-frustum-cull capture in this same section, above) — a figure that
   also contains every translucent chunk draw and every LOD water sheet. That capture
   demonstrably *included* the color copy: the same line reports `reflect 0.83 ms`, and
-  `RenderReflection` early-returns unless `_nearWaterVisible`
-  (`RenderManager.cs:1081-1082`) — the very flag that gates the copy — so near water was on
+  `ReflectionPass.RenderReflection` early-returns unless `_nearWaterVisible`
+  (`TerrainPasses.NearWaterVisible`) — the very flag that gates the copy — so near water was on
   screen when it was taken. 0.09 ms is therefore a real ceiling for the whole pass, not a
   figure that might have excluded the work. And `CopyTexSubImage2D` cannot downscale, so this
   is not a sampling change but new plumbing: an FBO, a texture, sizing and teardown across

@@ -35,7 +35,7 @@ public sealed class ShadowCenterTests
 
     internal static float TexelOf(float radius, int mapSize) => 2f * radius / mapSize;
 
-    /// <summary>The same orbit <c>RenderManager.SetLighting</c> runs, whose fixed Z tilt keeps the
+    /// <summary>The same orbit <c>FrameLighting.SetLighting</c> runs, whose fixed Z tilt keeps the
     /// sun clear of vertical so the light look-at stays well defined.</summary>
     internal static Vector3 SunAt(float angle) =>
         Vector3.Normalize(new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0.35f));

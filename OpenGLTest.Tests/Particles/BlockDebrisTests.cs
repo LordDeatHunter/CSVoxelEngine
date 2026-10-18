@@ -82,7 +82,7 @@ public sealed class BlockDebrisTests
 
     /// <summary>
     /// C12(a), and the load-bearing one of the four order facts: debris is the ONLY particle
-    /// system whose source order reaches the GPU. RenderManager.RenderBlockDebris walks
+    /// system whose source order reaches the GPU. ObjectPasses.RenderBlockDebris walks
     /// <see cref="BlockDebrisSystem.Debris"/> with a plain foreach and submits each cube in that
     /// order, with depth writes on and - on any frame where leaves also drew - blending still
     /// enabled at SrcAlpha/OneMinusSrcAlpha, so overlapping semi-transparent cubes composite in

@@ -54,7 +54,7 @@ public static class Vector3Utils
     public static Vector3 NormalizeHorizontalOr(this Vector3 v, Vector3 fallback, float minLengthSquared = NormalizeEpsilonSquared) =>
         new Vector3(v.X, 0f, v.Z).NormalizeSafeOr(fallback, minLengthSquared);
 
-    /// <summary>Clamped lerp between two positions (RenderManager.Mix, animation blends).</summary>
+    /// <summary>Clamped lerp between two positions (FrameLighting.Mix, animation blends).</summary>
     public static Vector3 Lerp(this Vector3 a, Vector3 b, float t) =>
         a + (b - a) * MathUtils.Clamp01(t);
 

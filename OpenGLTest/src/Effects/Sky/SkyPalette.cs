@@ -16,8 +16,8 @@ namespace VoxelEngine.Effects.Sky;
 /// </summary>
 public readonly record struct SkyPalette(Vector3 Zenith, Vector3 Horizon, Vector3 Glow)
 {
-    // sRGB, exactly the old RenderManager.SetLighting sky colors; RenderManager decodes the
-    // computed palette to linear light where it uploads it
+    // sRGB, exactly the old SetLighting sky colors; FrameLighting.SetLighting decodes the
+    // computed palette to linear light before the dome and the fog read it
     private static readonly Vector3 NightSky = new(0.012f, 0.018f, 0.045f);
     private static readonly Vector3 DaySky = new(0.3f, 0.6f, 0.9f);
     private static readonly Vector3 DuskSky = new(0.98f, 0.45f, 0.2f);

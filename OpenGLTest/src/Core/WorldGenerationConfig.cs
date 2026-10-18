@@ -172,11 +172,11 @@ public const float DayLengthSeconds = 1200f;
 
     /// <summary>Linear multiplier applied to the HDR scene before the tonemap
     /// (post-fragment.glsl's uExposure). Left at 1: the brightness retune lives in
-    /// RenderManager's sun/ambient constants instead, where each term could be matched against
+    /// FrameLighting's sun/ambient constants instead, where each term could be matched against
     /// the pre-SH-10 shots separately, and a global exposure would have moved them all at once.</summary>
     public const float TonemapExposure = 1.0f;
 
-    // --- Eye adaptation (EyeAdaptation, RenderManager.RenderPostProcess) ---
+    // --- Eye adaptation (EyeAdaptation, ScreenPasses.RenderPostProcess) ---
     /// <summary>Most the exposure rises in total darkness (a multiplier on TonemapExposure).</summary>
     public const float EyeAdaptMaxExposure = 1.8f;
     /// <summary>Voxel light at the eye (0..1, the brighter of sky and block light) from which the exposure stays at 1, so a lamp-lit room is never brightened.</summary>
@@ -236,7 +236,7 @@ public const float DayLengthSeconds = 1200f;
     // --- Contact AO (ContactAo, contact-ao-fragment.glsl, SH-28) ---
 
     /// <summary>Master switch for the screen-space contact AO pass run mid entity pass
-    /// (RenderManager.RenderContactAo). Off, the frame is exactly what it was without it.</summary>
+    /// (ScreenPasses.RenderContactAo). Off, the frame is exactly what it was without it.</summary>
     public const bool ContactAoEnabled = true;
 
     /// <summary>Most a pixel is darkened by the contact AO (1 - this is the darkest multiplier);
@@ -466,7 +466,7 @@ public const float DayLengthSeconds = 1200f;
     public const float StarTwinkleRateMin = 0.25f;
     public const float StarTwinkleRateMax = 1.2f;
 
-    // --- Moon (MoonPhase, RenderManager.RenderMoon, moon-fragment.glsl) ---
+    // --- Moon (MoonPhase, SkyPasses.RenderMoon, moon-fragment.glsl) ---
     /// <summary>Days from one full moon to the next; the phase steps once a day, at noon.</summary>
     public const int MoonCycleDays = 8;
 
@@ -507,7 +507,7 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>How fast the curtains drift and ripple along the sky (noise cells per second).</summary>
     public const float AuroraDriftSpeed = 0.035f;
 
-    // --- Moonlight (Moonlight, RenderManager.SetLighting) ---
+    // --- Moonlight (Moonlight, FrameLighting.SetLighting) ---
     /// <summary>
     /// Sine of the sun's elevation at and below which the moon lights the world instead of the sun.
     /// Must stay at or below SkyGlowBelowSunElevation, so the sunset glow is gone by then
@@ -718,7 +718,7 @@ public const float DayLengthSeconds = 1200f;
     /// </summary>
     public const float ReflectionEntityRadius = 64f;
 
-    // --- GPU timer queries (RenderManager.BeginGpuFrame / BeginGpuPass, item R6) ---
+    // --- GPU timer queries (GpuPassTimer.BeginGpuFrame / BeginGpuPass, item R6) ---
     // One frame in this many still issues its TIME_ELAPSED queries while the X overlay is down,
     // so the once-a-second snapshot standing when X is pressed already carries GPU figures
     // instead of "--". Chosen, not measured: ~12 samples per publish window at 100 fps for an

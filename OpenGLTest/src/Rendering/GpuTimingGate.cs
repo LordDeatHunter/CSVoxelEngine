@@ -3,11 +3,11 @@ namespace VoxelEngine.Rendering;
 /// <summary>
 /// The GL-free decision behind the per-pass GPU timer queries: given whether the <c>X</c> profiler
 /// overlay is up and the renderer's own frame counter, decide whether this frame issues its
-/// <c>TIME_ELAPSED</c> queries at all. <c>RenderManager.BeginGpuFrame</c> latches the answer once
+/// <c>TIME_ELAPSED</c> queries at all. <c>GpuPassTimer.BeginGpuFrame</c> latches the answer once
 /// per frame and every <c>BeginGpuPass</c>/<c>EndGpuPass</c> inside that frame reads the latch.
 ///
-/// The class is deliberately dependency-free — no GL, no <c>RenderManager</c>, no window — for the
-/// same reason <c>ReflectionReuse</c> cites: <c>RenderManager</c> needs a live GL context to
+/// The class is deliberately dependency-free — no GL, no <c>GpuPassTimer</c>, no window — for the
+/// same reason <c>ReflectionReuse</c> cites: <c>GpuPassTimer</c> needs a live GL context to
 /// construct and no test in the suite has one, so the only way to pin this policy headlessly is to
 /// keep it out here. The duty cycle lives in
 /// <see cref="WorldGenerationConfig.GpuTimingIdleInterval"/>.
@@ -46,7 +46,7 @@ internal static class GpuTimingGate
     /// <param name="overlayOn">The <c>X</c> profiler overlay is up this frame.</param>
     /// <param name="frameIndex">
     /// The renderer's own frame counter: monotonically increasing from 0, never reset and never
-    /// negative. The only caller is <c>RenderManager</c>'s private field, so no wrap or sign dance
+    /// negative. The only caller is <c>GpuPassTimer</c>'s private field, so no wrap or sign dance
     /// is done here for a case that cannot occur.
     /// </param>
     internal static bool ShouldTime(bool overlayOn, long frameIndex)

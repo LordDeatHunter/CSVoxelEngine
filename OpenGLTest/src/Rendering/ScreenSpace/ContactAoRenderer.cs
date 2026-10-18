@@ -10,7 +10,7 @@ namespace VoxelEngine.Rendering.ScreenSpace;
 /// The screen-space contact AO pass (SH-28, contact-ao-fragment.glsl, twin <see cref="ContactAo"/>):
 /// one oversized full-screen triangle, the shape <see cref="PostProcessRenderer"/> draws, that
 /// reads the HDR scene depth on unit 0 and outputs a darkening multiplier. It binds no framebuffer,
-/// no texture and no blend state - <see cref="RenderManager.RenderContactAo"/> owns all of that - so
+/// no texture and no blend state - <see cref="ScreenPasses.RenderContactAo"/> owns all of that - so
 /// the render manager's texture-unit cache stays its own business.
 /// </summary>
 public sealed class ContactAoRenderer : IDisposable

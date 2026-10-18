@@ -64,10 +64,10 @@ public enum ProfileSection
 /// A section may be entered several times in one frame; its ticks accumulate. Sections must not
 /// nest into themselves, since a single start slot is kept per section.
 ///
-/// GPU time arrives per render pass from <see cref="RenderManager"/>'s consecutive
+/// GPU time arrives per render pass from <see cref="GpuPassTimer"/>'s consecutive
 /// TIME_ELAPSED ranges (one query object per pass, drained a few frames late so it never
 /// stalls). Update-side sections never get GPU samples and show "--" in that column. That timing
-/// is gated: <see cref="RenderManager.BeginGpuFrame"/> latches
+/// is gated: <see cref="GpuPassTimer.BeginGpuFrame"/> latches
 /// <see cref="GpuTimingGate.ShouldTime"/> once per frame, so while the overlay is down only one
 /// frame in <see cref="WorldGenerationConfig.GpuTimingIdleInterval"/> issues its queries and each
 /// always-run pass contributes about fps / GpuTimingIdleInterval samples to the window instead of
@@ -216,7 +216,7 @@ public static class FrameProfiler
 
     /// <summary>
     /// Feeds one completed per-pass GPU TIME_ELAPSED result (see
-    /// <see cref="RenderManager.BeginGpuPass"/>). Results arrive a few frames late and some
+    /// <see cref="GpuPassTimer.BeginGpuPass"/>). Results arrive a few frames late and some
     /// are dropped, so they are simply averaged over the publish window.
     /// </summary>
     public static void ReportGpuPass(ProfileSection section, long nanoseconds)

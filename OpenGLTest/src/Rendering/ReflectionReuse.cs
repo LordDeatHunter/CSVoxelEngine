@@ -10,7 +10,7 @@ namespace VoxelEngine.Rendering;
 /// produced it) is still good enough.
 ///
 /// The class is deliberately dependency-free — <c>Vector3</c> and <c>MathF</c> only, no GL, no
-/// <c>Camera</c>, no <c>RenderManager</c> — because <c>RenderManager</c> needs a live GL context to
+/// <c>Camera</c>, no <c>ReflectionPass</c> — because <c>ReflectionPass</c> needs a live GL context to
 /// construct, so the only way to pin this policy headlessly is to keep it out here. Thresholds live
 /// in <c>WorldGenerationConfig</c> (ReflectionReuseMax*) so they can be retuned in one place.
 /// </summary>

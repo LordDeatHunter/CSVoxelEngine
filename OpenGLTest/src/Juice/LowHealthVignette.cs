@@ -1,11 +1,10 @@
-using VoxelEngine.Rendering;
 using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.Juice;
 
 /// <summary>
 /// The low-health warning: how strongly the screen edge pulses red, as a pure function of the
-/// health fraction that feeds the hearts and the clock. GL-free; <see cref="RenderManager"/>
+/// health fraction that feeds the hearts and the clock. GL-free; <see cref="UiPasses"/>
 /// hands the result to <see cref="DamageVignetteRenderer"/> as a second term of the damage
 /// vignette's one full-screen pass. Nothing at or above
 /// <see cref="WorldGenerationConfig.LowHealthThreshold"/>, while dead or in creative; below it a

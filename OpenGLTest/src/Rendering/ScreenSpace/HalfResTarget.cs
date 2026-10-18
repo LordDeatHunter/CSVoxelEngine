@@ -8,7 +8,7 @@ namespace VoxelEngine.Rendering.ScreenSpace;
 /// be torn down and re-created?
 ///
 /// The class is deliberately dependency-free — <c>System</c> only, no GL, no Silk.NET types, no
-/// <c>RenderManager</c> — for the same reason <c>ReflectionReuse</c> is: <c>RenderManager</c> needs a
+/// <c>RenderTargets</c> — for the same reason <c>ReflectionReuse</c> is: <c>RenderTargets</c> needs a
 /// live GL context to construct, so the only way to pin this resize arithmetic headlessly is to keep
 /// it out here. The GL half (texture allocation, framebuffer completeness) is not covered by tests at
 /// all; it is only reachable by running the game.
@@ -31,8 +31,9 @@ internal static class HalfResTarget
 {
     /// <summary>
     /// Smallest half-res dimension on either axis. Matches the <c>Math.Max(2, ...)</c> floor every
-    /// other render target in <c>RenderManager</c> uses (see CreateReflectionTarget /
-    /// CreateSceneCopy), so a minimized or degenerate window never asks GL for a 0-sized texture.
+    /// other render target uses (see <c>ReflectionPass.CreateReflectionTarget</c> /
+    /// <c>RenderTargets.CreateSceneCopy</c>; <c>RenderTargets.CreateRaysTarget</c> sizes this one), so
+    /// a minimized or degenerate window never asks GL for a 0-sized texture.
     /// </summary>
     internal const int MinDimension = 2;
 

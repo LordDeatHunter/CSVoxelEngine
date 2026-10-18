@@ -5,7 +5,7 @@ namespace VoxelEngine.Rendering;
 /// the context has selected, and what is bound to each of the tracked units. It issues no GL call
 /// and holds no GL handle - the caller does that, and only when one of the <c>Mark*</c> methods says
 /// the call is actually needed. The split exists for the same reason <c>ReflectionReuse</c> and
-/// <c>HalfResTarget</c> are separate types: <c>RenderManager</c> needs a live GL context to
+/// <c>HalfResTarget</c> are separate types: <c>TextureUnits</c> needs a live GL context to
 /// construct, so the only way to pin this arithmetic headlessly is to keep it out here. The GL half
 /// - that a skipped <c>glBindTexture</c> really did leave the right texture bound - is not covered
 /// by tests at all and is only reachable by running the game.
@@ -14,8 +14,8 @@ namespace VoxelEngine.Rendering;
 /// <list type="bullet">
 /// <item><see cref="MarkActive"/> records the unit as selected whether or not it tells the caller to
 /// issue <c>glActiveTexture</c>. Skipping a redundant select leaves the same unit selected as
-/// issuing it would have, so <see cref="ActiveUnit"/> is truthful either way. <c>BindUnit</c>'s
-/// eager select relies on exactly this.</item>
+/// issuing it would have, so <see cref="ActiveUnit"/> is truthful either way.
+/// <c>TextureUnits.BindUnit</c>'s eager select relies on exactly this.</item>
 /// <item>A bind of a <em>different target</em> on a unit replaces that unit's whole record rather
 /// than keeping one slot per target. That is conservative, not wrong: the next request for the
 /// displaced pair misses and rebinds. GL does keep a separate binding per target per unit, but the

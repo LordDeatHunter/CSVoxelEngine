@@ -57,7 +57,7 @@ public sealed class ReflectionReuseTests
         // The recreated color texture is TexImage2D'd with null data, so its contents are
         // undefined and nothing may be sampled out of it until a real mirror render lands.
         // This Fact pins the pure function only: whether the caller ever passes true is a
-        // RenderManager concern (the invalidation inside CreateReflectionTarget) and is NOT
+        // ReflectionPass concern (the invalidation inside CreateReflectionTarget) and is NOT
         // covered by any test here.
         var pose = Pose(new Vector3(10f, 5f, -3f), Yawed(0f));
 

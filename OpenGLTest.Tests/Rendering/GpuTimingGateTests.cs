@@ -7,7 +7,7 @@ namespace VoxelEngine.Tests.Rendering;
 /// <c>GpuTimingGate</c> is the GL-free gate in front of the per-pass <c>TIME_ELAPSED</c> queries:
 /// it decides whether a frame issues them at all. The GL half — <c>BeginGpuPass</c>,
 /// <c>EndGpuPass</c> and the three-deep drain ring — needs a live GL context that no test in this
-/// suite has, so the <em>decision</em> is pinned here instead: no <c>RenderManager</c>, no window
+/// suite has, so the <em>decision</em> is pinned here instead: no <c>GpuPassTimer</c>, no window
 /// and no GL anywhere in this file.
 ///
 /// Every magnitude below is expressed as a multiple of

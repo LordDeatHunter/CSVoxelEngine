@@ -13,7 +13,7 @@ public sealed class SkyPaletteTests
 {
     private const float Eps = 1e-5f;
 
-    // Replicates RenderManager.SetLighting's sun orbit and the terms it derives from it.
+    // Replicates FrameLighting.SetLighting's sun orbit and the terms it derives from it.
     private static Vector3 SunDirAt(float angle) =>
         Vector3.Normalize(new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0.35f));
 

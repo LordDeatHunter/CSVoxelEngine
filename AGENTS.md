@@ -44,7 +44,7 @@ and, on a machine that only has the 10 runtime, prefix every `dotnet` command wi
 **Launch flow.** The game boots to the **main menu** with the cursor free (`Program` owns an
 explicit `AppScreen` of Menu / Loading / Playing / Saving; every page rule, key rule and store
 call lives in the GL-free, tested `MainMenuController`, drawn by `UIRenderer.DrawMainMenu`
-through `RenderManager.RenderMenuFrame`, which writes framebuffer 0 directly with no HDR pass,
+through `UiPasses.RenderMenuFrame`, which writes framebuffer 0 directly with no HDR pass,
 lighting or GPU timer). START opens the worlds page, a scrollable list of `WorldStore.List()`
 (most recently played first) with PLAY / EDIT (rename) / DELETE (a confirm popup, DELETE /
 CANCEL) on every row, plus CREATE and BACK; an empty list says so. CREATE opens a name field
@@ -61,7 +61,7 @@ streams in `WorldPhase.Loading` behind an animated loading screen (`LoadingScree
 `UIRenderer.DrawLoadingScreen`: a progress bar eased monotonically toward `World.LoadProgress`, a
 wall-clock spinner, the world name and `Generating terrain...` for a new world vs `Loading
 world...` for a saved one) and is **never rendered** until `IsLoaded`; after that the overlay
-fades out over `WorldGenerationConfig.LoadingFadeSeconds` (`RenderManager.RenderLoadingOverlay`).
+fades out over `WorldGenerationConfig.LoadingFadeSeconds` (`UiPasses.RenderLoadingOverlay`).
 While `!World.IsPlaying` Program runs no gameplay input, no pause menu and no inventory, and the
 cursor stays captured from the World constructor on, so the Loading -> Playing flip never jumps
 the look. A menu-launched world's lighting clock is rebased at construction, so a new world
@@ -166,7 +166,7 @@ Environment variables for scripted captures:
   off the body shows.
 - `ITEM_DEBUGGER_LOOK=yaw,pitch` pins the first-person look angles.
 
-The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `RenderManager.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (a search field sits over the tabs: typing names the owned items and the recipes that make or consume a matching thing, ranked with prefix hits and owned items first, and clicking a result picks the item or opens its recipe; blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it, and a focused field takes the keyboard so typing never moves the player). A new survival world starts with **nothing** (`Inventory.Empty`); `C` creative mode turns the same Blocks/Tools/Misc tabs into the **whole item catalog** (`CreativeCatalog`) - clicking a row grants one, each row's `[+1]` / `[+10]` / `[+100]` button grants that many, and a red `[X]` clears the id's counts (`Inventory.RemoveAll`), all through the ordinary            `Inventory.Add` - while the Craft tab keeps listing every recipe. `T` opens the chat (type, Enter sends, Escape closes, the arrow keys walk sent messages; while it is open the keyboard is captured so the player never moves while typing) and works in singleplayer and on a server. `X` to toggle debug logging               
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `SelectionPasses.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (a search field sits over the tabs: typing names the owned items and the recipes that make or consume a matching thing, ranked with prefix hits and owned items first, and clicking a result picks the item or opens its recipe; blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it, and a focused field takes the keyboard so typing never moves the player). A new survival world starts with **nothing** (`Inventory.Empty`); `C` creative mode turns the same Blocks/Tools/Misc tabs into the **whole item catalog** (`CreativeCatalog`) - clicking a row grants one, each row's `[+1]` / `[+10]` / `[+100]` button grants that many, and a red `[X]` clears the id's counts (`Inventory.RemoveAll`), all through the ordinary            `Inventory.Add` - while the Craft tab keeps listing every recipe. `T` opens the chat (type, Enter sends, Escape closes, the arrow keys walk sent messages; while it is open the keyboard is captured so the player never moves while typing) and works in singleplayer and on a server. `X` to toggle debug logging               
            (FPS/position/water state to console), Escape to open the pause menu (RESUME / SETTINGS / SAVE & QUIT;        Escape on its settings page steps back to it, and on the main page resumes). SAVE & QUIT presents a `Saving...` frame, calls `World.SaveAndDispose` on the next update and returns to the main menu's worlds page. None of these keys act while a world is still loading.
 
 **HUD and feedback.** The crosshair is drawn as five pieces cropped out of its 16x16 texture (a
@@ -209,7 +209,7 @@ section claimed (buffer swap, window pump, OS/GC jitter). The header carries the
 sum against the GPU's own `TIME_ELAPSED` measurement of the whole frame (`--` until the first
 query comes back), GC collections per second and the loaded/visible chunk counts. CPU timings are
 collected every frame; per-pass GPU timing is gated (`GpuTimingGate.ShouldTime`, latched once per
-frame in `RenderManager.BeginGpuFrame`) — every frame while the overlay is up, and one frame in
+frame in `GpuPassTimer.BeginGpuFrame`) — every frame while the overlay is up, and one frame in
 `WorldGenerationConfig.GpuTimingIdleInterval` while it is down, which keeps enough samples in each
 once-a-second window that the snapshot standing when `X` is pressed already carries GPU figures.
 The caveat is that a pass which does not run every frame (`selectPass`) can collect no samples at
@@ -244,7 +244,7 @@ Space strokes up as before. The server needs nothing new: a body resting at the 
 `PlayerBodyProbe.InWater`, so the hover rule never trips (`MovementRulesTests` feeds it the client's own
 simulated float and stroke hop).
 
-**Water rendering** lives in the shared world shader plus two extra passes in `RenderManager`. Just before `RenderWorldTranslucent` draws, `CopyScene` snapshots the HDR scene target's color and depth (see "Linear lighting" below; the color copy is `Rgba16f`, like the reflection mirror) into two textures on units 3 and 4 (`CopyTexSubImage2D` from the bound HDR FBO — the water pass depth-tests while sampling, so it cannot read the target directly); the water fragment then composes its own look out of them: a refracted lookup offset along the analytic wave normal, Beer-Lambert absorption over the water's measured thickness (`WaterAbsorb`) plus in-scattered `WaterScatter`, and a Schlick fresnel mix into the planar reflection. Where that view-ray depth thins below `WaterFoamWidthBlocks` (a wall, a bank, a thin trickle) a pale **shore foam** band is mixed over the composed surface in linear light, lit by the shared opaque `light` term and fogged with it, broken up by a value-noise field the ripple phases jiggle and `FlowFoam` (the same two-phase flow map) carries downstream; top faces only, never from below or with the eye submerged, faded out by 160 blocks. The width must stay under a full cell's surface less the swell (`WaterFoamTests`), so open water over a block floor never foams; being screen-space, only contacts the depth copy sees foam (the camera-facing side of a block; a wall seen straight down shows none). `visual-examples/water-foam.json` frames liquid shores at `VOXEL_TIME` 360 and 147. Flowing water carries its baked flow into that normal (`FlowWaveNormal`: a bounded two-phase flow map that scrolls the ripples downstream and stretches them along the flow, identical to `WaveNormal` when the flow is zero), and falling side faces add fast vertical streaks; generated rivers and lakes are all source cells, so they bake no flow and stay still until the simulation makes them flow (`visual-examples/flow-water.json`, `VOXEL_TIME=147`, pours some). The mirror plane itself is the single `RenderManager.WaterPlaneY` at sea level, so a lake whose surface stands above it reflects against that plane rather than its own - an accepted approximation, since only one plane can be mirrored per frame. Seen from below — decided per fragment from the face normal (`fromBehind` in `test-fragment.glsl`), never from the sea plane, since a pond stands above it — the surface is a Snell window: the same scene copy shows through it distorted by the wave normal, the inside fresnel goes to total internal reflection past the critical angle and that band fades to the underwater fog color, and the mirror is never sampled from that side; `ReflectionReuse.MirrorApplies` also skips rendering it whenever `Camera.IsEyeInWater`, and the sky dome (`SkyRenderer`) and the sun disc stay dry in water (lava still fades the dome via `_skyTintAmount`, eased through `_lavaT`) so the window shows real sky. World, cloud and sky fog share `SkySample`, duplicated verbatim in `sky-fragment.glsl`, `test-fragment.glsl` and `cloud-fragment.glsl`, with `SkyPalette.Sample` as the tested C# reference, so change all four together. The dome currently samples the flat 28198cc sky color: `SkyPalette.Compute` returns the old night/day mix, pulled toward the dusk orange by `SkyDuskMix`, as both zenith and horizon with zero glow, and `SkyHazeStrength` is 0, so every direction (and every fully fogged fragment) is that one color. The reflection pass now also draws the sun disc and the cloud layer into the mirror, and both it and the scene copies are skipped whenever `CullWater` (one frustum pass a frame, feeding the water pass its draw lists) found no water on screen — glass shares the translucent mesh, so `Chunk.HasWaterMesh` is the flag that decides, not `HasTranslucentMesh`. Opaque faces that look into water are flagged by the mesher in bit 3 of `Vertex.Normal` (bits 0-2 stay the face index, bit 5 is the leaf-sway flag, bits 6-7 the low bits of the block-light tint code) and get the animated Voronoi caustic net; bit 4 is the biome-tint flag (see "Biome-tinted grass and leaves" below). The world fragment darkens a submerged face's albedo by `WetDarken` once, before the light multiply, and only at or below that face's own baked surface (`step(fWorldPos.y, fWaterSurfaceY)`; the caustics stop at the same line), so a dry face beside water — a beach top, a bank wall over the waterline — is never darkened or tinted; ore tiles (a non-zero `material.metallic`) are excluded. `SurfaceFresnel` is the GL-free twin (`Schlick`, `WetWeight`). While the eye is submerged, `UnderwaterRaysRenderer` adds one full-screen ray-march for sun shafts, composited in display space (the upsample reads the HDR target it draws into, adds the shafts to the encoded scene with the pre-SH-10 sRGB sun color and strength, clips at 1 and decodes), since the same add in linear light lost the glare toward the sun. Both measure depth from the **local** water surface, never the sea plane: the caustics from the surface baked into each submerged face's vertex (`Vertex.WaterSurface`, read as `fWaterSurfaceY`), the rays from `Camera.EyeWaterSurfaceY` (`ChunkManager.GetFluidColumnTopGlobal` over the eye's column), so a pond above sea level gets both — only the planar mirror still uses the sea plane. The rays are why the shadow map keeps rendering underwater (`_shadowStrengthDry`, the strength before the underwater fade) even though the world diffuse no longer uses it. **Depth convention**: `Camera.GetProjectionMatrix` comes from `System.Numerics`, which is Direct3D-style (clip depth 0..1), so window depth is *not* the GL -1..1 mapping — never write a near/far linearization. Reconstruct a world position by inverting the very matrix that wrote the depth (`uInvViewProj`), and compare raw depth values directly for "which is nearer". `visual-examples/water.json` (run it with `VOXEL_TIME=360`) frames the shallows, the grazing surface, deep water from height and the underwater shots, including the surface seen from below in the sea and in a pond above sea level (a liquid one — a frozen pond has an ice lid, not a water top face).
+**Water rendering** lives in the shared world shader plus two extra passes, the planar mirror (`ReflectionPass.RenderReflection`) and the scene copy. Just before `TerrainPasses.RenderWorldTranslucent` draws, `RenderTargets.CopyScene` snapshots the HDR scene target's color and depth (see "Linear lighting" below; the color copy is `Rgba16f`, like the reflection mirror) into two textures on units 3 and 4 (`CopyTexSubImage2D` from the bound HDR FBO — the water pass depth-tests while sampling, so it cannot read the target directly); the water fragment then composes its own look out of them: a refracted lookup offset along the analytic wave normal, Beer-Lambert absorption over the water's measured thickness (`WaterAbsorb`) plus in-scattered `WaterScatter`, and a Schlick fresnel mix into the planar reflection. Where that view-ray depth thins below `WaterFoamWidthBlocks` (a wall, a bank, a thin trickle) a pale **shore foam** band is mixed over the composed surface in linear light, lit by the shared opaque `light` term and fogged with it, broken up by a value-noise field the ripple phases jiggle and `FlowFoam` (the same two-phase flow map) carries downstream; top faces only, never from below or with the eye submerged, faded out by 160 blocks. The width must stay under a full cell's surface less the swell (`WaterFoamTests`), so open water over a block floor never foams; being screen-space, only contacts the depth copy sees foam (the camera-facing side of a block; a wall seen straight down shows none). `visual-examples/water-foam.json` frames liquid shores at `VOXEL_TIME` 360 and 147. Flowing water carries its baked flow into that normal (`FlowWaveNormal`: a bounded two-phase flow map that scrolls the ripples downstream and stretches them along the flow, identical to `WaveNormal` when the flow is zero), and falling side faces add fast vertical streaks; generated rivers and lakes are all source cells, so they bake no flow and stay still until the simulation makes them flow (`visual-examples/flow-water.json`, `VOXEL_TIME=147`, pours some). The mirror plane itself is the single `RenderManager.WaterPlaneY` at sea level, so a lake whose surface stands above it reflects against that plane rather than its own - an accepted approximation, since only one plane can be mirrored per frame. Seen from below — decided per fragment from the face normal (`fromBehind` in `test-fragment.glsl`), never from the sea plane, since a pond stands above it — the surface is a Snell window: the same scene copy shows through it distorted by the wave normal, the inside fresnel goes to total internal reflection past the critical angle and that band fades to the underwater fog color, and the mirror is never sampled from that side; `ReflectionReuse.MirrorApplies` also skips rendering it whenever `Camera.IsEyeInWater`, and the sky dome (`SkyRenderer`) and the sun disc stay dry in water (lava still fades the dome via `FrameLighting.SkyTintAmount`, eased through its `_lavaT`) so the window shows real sky. World, cloud and sky fog share `SkySample`, duplicated verbatim in `sky-fragment.glsl`, `test-fragment.glsl` and `cloud-fragment.glsl`, with `SkyPalette.Sample` as the tested C# reference, so change all four together. The dome currently samples the flat 28198cc sky color: `SkyPalette.Compute` returns the old night/day mix, pulled toward the dusk orange by `SkyDuskMix`, as both zenith and horizon with zero glow, and `SkyHazeStrength` is 0, so every direction (and every fully fogged fragment) is that one color. The reflection pass now also draws the sun disc and the cloud layer into the mirror, and both it and the scene copies are skipped whenever `TerrainPasses.CullWater` (one frustum pass a frame, feeding the water pass its draw lists) found no water on screen — glass shares the translucent mesh, so `Chunk.HasWaterMesh` is the flag that decides, not `HasTranslucentMesh`. Opaque faces that look into water are flagged by the mesher in bit 3 of `Vertex.Normal` (bits 0-2 stay the face index, bit 5 is the leaf-sway flag, bits 6-7 the low bits of the block-light tint code) and get the animated Voronoi caustic net; bit 4 is the biome-tint flag (see "Biome-tinted grass and leaves" below). The world fragment darkens a submerged face's albedo by `WetDarken` once, before the light multiply, and only at or below that face's own baked surface (`step(fWorldPos.y, fWaterSurfaceY)`; the caustics stop at the same line), so a dry face beside water — a beach top, a bank wall over the waterline — is never darkened or tinted; ore tiles (a non-zero `material.metallic`) are excluded. `SurfaceFresnel` is the GL-free twin (`Schlick`, `WetWeight`). While the eye is submerged, `UnderwaterRaysRenderer` adds one full-screen ray-march for sun shafts, composited in display space (the upsample reads the HDR target it draws into, adds the shafts to the encoded scene with the pre-SH-10 sRGB sun color and strength, clips at 1 and decodes), since the same add in linear light lost the glare toward the sun. Both measure depth from the **local** water surface, never the sea plane: the caustics from the surface baked into each submerged face's vertex (`Vertex.WaterSurface`, read as `fWaterSurfaceY`), the rays from `Camera.EyeWaterSurfaceY` (`ChunkManager.GetFluidColumnTopGlobal` over the eye's column), so a pond above sea level gets both — only the planar mirror still uses the sea plane. The rays are why the shadow map keeps rendering underwater (`FrameLighting.ShadowStrengthDry`, the strength before the underwater fade) even though the world diffuse no longer uses it. **Depth convention**: `Camera.GetProjectionMatrix` comes from `System.Numerics`, which is Direct3D-style (clip depth 0..1), so window depth is *not* the GL -1..1 mapping — never write a near/far linearization. Reconstruct a world position by inverting the very matrix that wrote the depth (`uInvViewProj`), and compare raw depth values directly for "which is nearer". `visual-examples/water.json` (run it with `VOXEL_TIME=360`) frames the shallows, the grazing surface, deep water from height and the underwater shots, including the surface seen from below in the sea and in a pond above sea level (a liquid one — a frozen pond has an ice lid, not a water top face).
 
 **Deep-water darkness.** The underwater fog darkens and loses red the deeper the eye is below its
 own water surface: `RenderManager.BeginFrame` reads the depth as `Camera.EyeWaterSurfaceY` minus the
@@ -273,21 +273,22 @@ underwater. `WaterGlitter` is the GL-free twin (`Sparkle`, `Life`, `Spot`, `Gate
 (`VOXEL_TIME=360`) frames the reflection path over the warm sea twice 0.3 s apart, away from the sun
 and from below.
 
-**Linear lighting (SH-10).** The world is lit in linear light and rendered into
-`RenderManager`'s HDR scene target — an `RGBA16F` color texture plus a sampleable `DepthComponent24`
-depth texture (`CreateHdrTarget`, which also builds `_hdrColorOnlyFbo` over the color alone for the
-contact-AO pass; recreated with the viewport like the reflection, scene-copy and
-rays targets). `BeginFrame` binds and clears it, and **every mid-frame restore goes back to it,
-never to framebuffer 0** (`BindSceneTarget` at the tails of `RenderShadows` and
-`RenderReflection`, the `Create*Target` recreate paths, the `UnderwaterRaysRenderer` composite);
-only `CreateHdrTarget`/`DeleteHdrTarget` and `RenderPostProcess` bind 0. Color textures sampled
+**Linear lighting (SH-10).** The world is lit in linear light and rendered into the HDR scene
+target `RenderTargets` owns — an `RGBA16F` color texture plus a sampleable `DepthComponent24`
+depth texture (`RenderTargets.CreateHdrTarget`, which also builds `HdrColorOnlyFbo` over the color
+alone for the contact-AO pass; recreated with the viewport like the reflection, scene-copy and
+rays targets). `RenderManager.BeginFrame` binds and clears it, and **every mid-frame restore goes
+back to it, never to framebuffer 0** (`RenderTargets.BindSceneTarget` at the tails of
+`ShadowPass.RenderShadows` and `ReflectionPass.RenderReflection`, the `Create*Target` recreate
+paths, the `UnderwaterRaysRenderer` composite); only `CreateHdrTarget`/`DeleteHdrTarget`,
+`ScreenPasses.RenderPostProcess` and the world-less `UiPasses.RenderMenuFrame` bind 0. Color textures sampled
 before the tonemap are uploaded as `SRGB8_ALPHA8` (the `srgb` flag on `TextureLoader` and
 `TextureAtlas.Build`: the block atlas, `ItemMeshCache`, skins, sun, break progress, bubbles, the
 world healthbar hearts) so the sampler decodes them; the material/normal atlas is data and stays
 plain `Rgba`, and so do UI-only textures (font, crosshair, HUD hearts, `UIRenderer`'s own icons).
 CPU colors are authored in sRGB and go through `ColorSpace.SrgbToLinear` where they are computed
-or uploaded (the sun, ambient and sky palette in `SetLighting`, torch, point lights, water
-scatter, molten tints, selection outline); the selection *face* highlight is the one overlay
+or uploaded (the sun, ambient and sky palette in `FrameLighting.SetLighting`, torch, point lights,
+water scatter, molten tints, selection outline); the selection *face* highlight is the one overlay
 mixed in display space instead (`selection-fragment.glsl`'s `uDisplayMix`: it reads the HDR target
 it draws into after a `glTextureBarrier`, blend off), since a linear 15% blend turned any dark
 targeted face into a flat gray, and the cloud layer does the same (`cloud-fragment.glsl` lights,
@@ -300,7 +301,7 @@ smooth `fBlockTint` (mirroring `LightTint.Decode`), the plain (entity) path read
 `uBlockLightPalette[uEntityTint]`, and the fragment's torch term is `fBlockTint * pow(...)` in
 place of the old single `uTorchColor`; a GLSL constant that stands for one is written as its
 decoded value with the sRGB original in a comment. At the end of `WorldRenderer.Render` the `postPass`
-section calls `RenderManager.RenderPostProcess`, which binds framebuffer 0 and runs
+section calls `ScreenPasses.RenderPostProcess`, which binds framebuffer 0 and runs
 `PostProcessRenderer` (`post-fragment.glsl`): exposure (`WorldGenerationConfig.TonemapExposure`),
 a per-channel clamp to 0..1 (what the old 8-bit target did, so snow and white sand clip to white
 rather than staying cream; `Tonemap.cs` is its tested C# twin), the exact sRGB encode, and the frame's one
@@ -363,31 +364,31 @@ times how thin the cloud is behind the lit surface along the view ray (`CloudThi
 `CloudSilverLining.Samples` points `CloudSilverLiningStepBlocks` apart that are out of the cloud
 volume, read cell by cell from the cloud-shadow coverage map on unit 8 like the stars' cloud cover,
 so `CloudRenderer` now takes that unit). The frame's strength is `CloudSilverLining.Strength` of the
-sun's elevation (zero at and below the horizon), set on `CloudRenderer.SilverLining` by `SetLighting`;
-the lobe and thinness are computed only where the lobe is non-zero. GL-free twin `CloudSilverLining`
-(`CloudSilverLiningTests`); `visual-examples/cloud-silver-lining.json` (`VOXEL_TIME` 343, 400, 147)
-frames it.
+sun's elevation (zero at and below the horizon), set on `CloudRenderer.SilverLining` by
+`FrameLighting.SetLighting`; the lobe and thinness are computed only where the lobe is non-zero.
+GL-free twin `CloudSilverLining` (`CloudSilverLiningTests`); `visual-examples/cloud-silver-lining.json`
+(`VOXEL_TIME` 343, 400, 147) frames it.
 
-**Moon (V-6).** `RenderManager.RenderMoon`, called by `RenderSky` right after `RenderSun` (so the
+**Moon (V-6).** `SkyPasses.RenderMoon`, called by `SkyPasses.RenderSky` right after `RenderSun` (so the
 mirror draws it too and the Snell window shows it through the scene copy), draws the sun's quad and
-`sun-vertex.glsl` again opposite the sun (`-_sunDir`), additively and depth-free, with the full-disc
-sprite `assets/textures/environment/moon.png` and `moon-fragment.glsl`, which shades the phase over
-it: each disc point gets a sphere normal and is lit where it faces `MoonPhase.LightDirection`,
-softened over `MoonTerminatorSoftness`, the unlit part keeping `MoonEarthshine`; a faint halo grows
-with the lit share. `MoonPhase` (GL-free) picks the phase: `DayIndex` counts whole days from the
-first noon (`DayCycle.NoonTime`), so it steps at noon while the moon is below the horizon, day 0 (a
-new world's first night) is full and the cycle is `MoonCycleDays` long. It fades in and out with
-the stars (`MoonPhase.Visibility` = `StarField.Visibility`) and out in lava, and the dome hides the
-stars behind its disc (`uMoonMask`, `SkyDomeFrame.MoonVisibility`). `MoonPhaseTests` (the phase
-never changes in view, the shaded share matches `IlluminatedFraction`, waxing lit on the right);
-`visual-examples/moon.json` (`VOXEL_TIME` 700 full, 3100 last quarter, 4300 crescent, 5500 new,
-7900 first quarter) frames it.
+`sun-vertex.glsl` again opposite the sun (`-FrameLighting.SkySunDir`), additively and depth-free,
+with the full-disc sprite `assets/textures/environment/moon.png` and `moon-fragment.glsl`, which
+shades the phase over it: each disc point gets a sphere normal and is lit where it faces
+`MoonPhase.LightDirection`, softened over `MoonTerminatorSoftness`, the unlit part keeping
+`MoonEarthshine`; a faint halo grows with the lit share. `MoonPhase` (GL-free) picks the phase:
+`DayIndex` counts whole days from the first noon (`DayCycle.NoonTime`), so it steps at noon while
+the moon is below the horizon, day 0 (a new world's first night) is full and the cycle is
+`MoonCycleDays` long. It fades in and out with the stars (`MoonPhase.Visibility` =
+`StarField.Visibility`) and out in lava, and the dome hides the stars behind its disc (`uMoonMask`,
+`SkyDomeFrame.MoonVisibility`). `MoonPhaseTests` (the phase never changes in view, the shaded share
+matches `IlluminatedFraction`, waxing lit on the right); `visual-examples/moon.json` (`VOXEL_TIME`
+700 full, 3100 last quarter, 4300 crescent, 5500 new, 7900 first quarter) frames it.
 
-**Moonlight.** At night the moon is the world's **key light**: `RenderManager._sunDir` (what
+**Moonlight.** At night the moon is the world's **key light**: `FrameLighting.SunDir` (what
 `uSunDir`, the shadow cascades, the clouds, the leaves and the rays read) is `Moonlight.Direction`,
 the sun by day and the moon (the sun negated) once the sun is at or below
 `MoonlightSwitchSunElevation`, while the sky (the dome, the sun and moon discs, the stars' turn, the
-glare) keeps the true sun in `_skySunDir`, and the sun disc its own `_sunDiscColor`. So the world
+glare) keeps the true sun in `SkySunDir`, and the sun disc its own `SunDiscColor`. So the world
 shader's `uSunColor`/`uSunIntensity` are the moonlight's at night: `Moonlight.ColorSrgb` (cool) at
 `Moonlight.Intensity` (`MoonlightIntensity`, eased in by `Moonlight.Rise` as the moon climbs and
 scaled by the phase, `MoonlightNewMoonShare` at a new moon), and the shadow strength follows the key
@@ -415,8 +416,8 @@ redraws the dome, so it reflects, and the Snell window shows it. `AuroraTests`;
 temperate origin, where it has faded out.
 
 **Eye adaptation.** The post pass's exposure (`uExposure`, now set per frame by
-`PostProcessRenderer.Render(viewport, exposure)`) is `TonemapExposure` times `RenderManager._eyeExposure`,
-which `SetLighting` eases each frame (`EyeAdaptation.Step`: `EyeAdaptToDarkRate` while it rises, the
+`PostProcessRenderer.Render(viewport, exposure)`) is `TonemapExposure` times `FrameLighting.EyeExposure`,
+which its `SetLighting` eases each frame (`EyeAdaptation.Step`: `EyeAdaptToDarkRate` while it rises, the
 faster `EyeAdaptToLightRate` while it falls) toward `EyeAdaptation.Target` of the voxel light at the
 eye's cell (`EntityLight.Sample(LightSource, camera.Position)`, sky and block light, no GPU readback):
 exactly 1 once the brighter of the two reaches `EyeAdaptFullLight` (open sky at any hour, a lamp-lit
@@ -428,7 +429,7 @@ arrival and adapted, then the over-bright step back outside settling within a co
 `uGrade` (`PostEffects.Grade`, (1, 1, 1) by default): `BiomeGrade.Tint` of the eye's climate (the same
 `EyeClimate.TryAt` sample the aurora reads), warm where it is warm and dry (the desert's own
 weighting) and cool where it is cold enough for snow (`BiomeGradeColdStart..ColdFull`), each channel
-moving at most `BiomeGradeStrength`; exactly neutral across the temperate band. `RenderManager._grade`
+moving at most `BiomeGradeStrength`; exactly neutral across the temperate band. `FrameLighting.Grade`
 eases toward it (`BiomeGradeEaseRate`) and back to neutral over an unknown column, so a client
 without its column yet never guesses. `BiomeGradeTests`; `visual-examples/biome-grade.json`
 (`VOXEL_TIME` 147) compares the noon sky over the origin, a deep desert and a frozen plain.
@@ -438,7 +439,7 @@ post-fragment.glsl reads red and blue from either side of each pixel along the l
 center (`DisplayBilinear`, after FXAA, before the grade), by `uDamageFringe` times
 `DamageFringe.EdgeWeight` (nothing in the middle, full at the corners) times `DamageFringeScreenShare`
 of the screen height. The strength is `DamageFringe.Strength` of the vignette's own damage flash
-(`PlayerHealth.DamageFlash`, which `WorldRenderer.Render` now hands to `RenderManager.RenderPostProcess`), so
+(`PlayerHealth.DamageFlash`, which `WorldRenderer.Render` now hands to `ScreenPasses.RenderPostProcess`), so
 it lasts only the first `DamageFringeSeconds` of the flash; a client mirrors the flash with its health.
 `DamageFringeTests`; `visual-examples/damage-fringe.json` (`VOXEL_TIME` 147).
 
@@ -452,7 +453,7 @@ common period (`UnderwaterWobble.WrapTime`), so it never jumps. `UnderwaterWobbl
 `visual-examples/underwater-wobble.json` (`VOXEL_TIME` 147).
 
 **Godrays.** Light shafts through trees, clouds and gaps in dry air when the sun is in view:
-`RenderManager.RenderGodrays` (`GodraysRenderer`), its own `godPass` profiler row right after
+`ScreenPasses.RenderGodrays` (`GodraysRenderer`), its own `godPass` profiler row right after
 `raysPass`, switched off by `GodraysEnabled`. Two draws. The march (`godrays-fragment.glsl`) is the
 underwater shafts' march run over air into their half-resolution target (borrowed: the two never
 need it at once): each pixel's ray up to `GodraysMaxDistance` (inside the near cascade) in
@@ -464,8 +465,8 @@ scene's own depth texture (no scene copy). The composite (`godrays-composite-fra
 averages that along the line from each pixel toward the sun's place on screen (`GodraysBlur*`), so
 the contrast between long sunlit rays and short or shadowed ones streaks outward from the sun as
 beams, and adds it in display space through the color-only HDR framebuffer like the underwater
-shafts. The frame's strength is `Godrays.Intensity` (set by `SetLighting`): facing the sun within
-`GodraysFacingDegrees`, strongest for a sun near `GodraysPeakElevation` and `GodraysNoonShare` of
+shafts. The frame's strength is `Godrays.Intensity` (set by `FrameLighting.SetLighting`): facing the sun
+within `GodraysFacingDegrees`, strongest for a sun near `GodraysPeakElevation` and `GodraysNoonShare` of
 that overhead, zero at and below the horizon, dimmed by the eased cloud over the sun's disc and
 zero under water (where the underwater shafts take over); the pass is also skipped while the
 shadow passes do not run. Cost on the dev GPU at 1080p: about 0.35 ms GPU (under 0.8 ms worst)
@@ -483,18 +484,18 @@ motion into it, pushed by the canopy's own gusts (`LeafParticleSystem.Update`'s 
 `visual-examples/leaf-wind.json` at `VOXEL_TIME` 147 and 1347), and the cloud layer and its shadows are carried by it
 (`CloudCopies.Drift`, wrapped modulo the field on both axes; `uCloudDrift` is a `vec2`). `World`
 gets the same lighting clock through `World.TimeOffset`, which `Program` sets from `VOXEL_TIME`, so
-leaves, smoke and clouds agree; `RenderManager.WindDirection` exposes the unit direction for future
+leaves, smoke and clouds agree; `FrameLighting.WindDirection` exposes the unit direction for future
 rain and snow.
 
 **Contact AO (SH-28).** A cheap screen-space contact AO darkens the crevices the baked vertex AO
 cannot see — where pebbles, branch piles and other per-quad emitters meet the ground, and inner
-corners between greedy quads. `RenderManager.RenderContactAo` (`ContactAoRenderer`,
+corners between greedy quads. `ScreenPasses.RenderContactAo` (`ContactAoRenderer`,
 `contact-ao-fragment.glsl`, GL-free twin `ContactAo`) runs mid entity pass as its own `aoPass`:
 after everything that writes honest depth (terrain, drops, stations, TNT, falling blocks, slimes, goblins)
 and before the depth-less or blended draws (healthbars, the first-person head, debris, toppling
 trees, player, held item), the selection outline, water (whose refraction copy then carries the AO),
 clouds and particles. It samples the HDR depth texture through the color-only
-`_hdrColorOnlyFbo` (no feedback loop) with multiplicative blending (`Zero, SrcColor`). Four taps
+`RenderTargets.HdrColorOnlyFbo` (no feedback loop) with multiplicative blending (`Zero, SrcColor`). Four taps
 (plus the four 1-pixel neighbors) per pixel, `ContactAoRadiusBlocks` wide in the world (clamped to `ContactAoMaxPx`): for each opposite
 pair, the midpoint of their raw depths is reconstructed on the center ray and compared with the
 center. Raw depth is affine in screen space over a plane, so planes never darken at any angle;
@@ -514,13 +515,13 @@ keeps a band about that reach wide in the world rather than a tap radius wide on
 **Selection outline pulse.** The targeted block's outline breathes between
 `SelectionPulseMinOpacity` (70 %) and full opacity, one breath every `SelectionPulsePeriodSeconds`:
 `selection-fragment.glsl` scales the outline's `uOpacity` by `1 - uPulseDepth * (0.5 + 0.5 sin)` of
-`uTime`, and `SelectionPulse` is its GL-free twin (`Depth(mining)` is what `RenderBlockSelection`
-uploads, `Opacity` the curve). While the block is being mined (`LeftClickAction.IsBreaking`, passed as
-`RenderBlockSelection`'s `mining`) the depth is 0, so the outline holds steady at full and the crack
-overlay stays readable; the face highlight (`uDisplayMix` 1) never pulses. The outline beams draw
-with back faces culled, so each pixel blends exactly one face of a beam: with both faces blended an
-alpha `a` read as `1-(1-a)^2` and the breath all but vanished. `SelectionPulseTests`,
-`visual-examples/selection-pulse.json` (`VOXEL_TIME=147`).
+`uTime`, and `SelectionPulse` is its GL-free twin (`Depth(mining)` is what
+`SelectionPasses.RenderBlockSelection` uploads, `Opacity` the curve). While the block is being mined
+(`LeftClickAction.IsBreaking`, passed as `RenderBlockSelection`'s `mining`) the depth is 0, so the
+outline holds steady at full and the crack overlay stays readable; the face highlight (`uDisplayMix`
+1) never pulses. The outline beams draw with back faces culled, so each pixel blends exactly one
+face of a beam: with both faces blended an alpha `a` read as `1-(1-a)^2` and the breath all but
+vanished. `SelectionPulseTests`, `visual-examples/selection-pulse.json` (`VOXEL_TIME=147`).
 
 **Leaf backlight.** A leaf-sway face (bit 5: canopy leaves and rooted plants; `test-vertex.glsl`
 hands the fragment the flag as the flat `fSwayFlag`, outside the guarded sway block) standing
@@ -829,7 +830,7 @@ with `FenceSync`/`ClientWaitSync`, since VSync is off) and issues one
 (`Shader`'s `defines` prefix): the `#define CHUNK_DRAW` variant reads the `ChunkInfo` SSBO at
 binding 0 at `uDrawBase + gl_DrawID` and transforms with `uViewProj`, while the plain variant
 keeps `uModel`/`uMVP`/`uAlpha` for drops, TNT, falling blocks, toppling trees, block pops and debris
-(`SetDrawUniforms`; the far LOD draws through the `CHUNK_DRAW` program too, `RenderLod` -> `chunkShader`), and takes its light per draw as `uEntitySun`/`uEntityBlock`, sampled from the
+(`SetDrawUniforms`; the far LOD draws through the `CHUNK_DRAW` program too, `TerrainPasses.RenderLod` -> `chunkShader`), and takes its light per draw as `uEntitySun`/`uEntityBlock`, sampled from the
 world at the entity's cell by `EntityLight.Sample` (each chunk keeps its mesh-time light snapshot
 for that) and passed through `SetDrawUniforms`'s required `EntityLightSample` argument. Per-draw fade alpha reaches the fragment stage as the `flat` varying
 `fAlpha`, because a uniform cannot vary between the sub-draws of one multi-draw. The wave and
@@ -1014,7 +1015,7 @@ OpenGLTest/
         Aurora.cs              # GL-free twin of the aurora's fade (eye coldness x star visibility) and its wrapped noise drift
         CloudSilverLining.cs   # GL-free twin of the clouds' silver lining: sun gate, forward lobe, thinness along the view
         DayCycle.cs            # GL-free sun direction, dayness and night factor of the lighting clock
-                               #   (RenderManager.SetLighting and the slime size roll both read it)
+                               #   (FrameLighting.SetLighting and the slime size roll both read it)
         Moonlight.cs           # GL-free key-light rule: sun by day, moon at night, handed over with both dark
         MoonPhase.cs           # GL-free moon: the day's phase (steps at noon), its light direction, lit share, visibility
         SkyPalette.cs          # GL-free zenith/horizon/glow sky palette and the C# reference of SkySample
@@ -1159,7 +1160,7 @@ OpenGLTest/
       DamageFringe.cs          # GL-free twin of the post pass's damage chromatic fringe: strength from the flash, edge weight
       LowHealthVignette.cs     # the low-health warning: how strongly the screen edge pulses red
       PlacePop.cs              # GL-free twin of the placement pop: the growth a freshly placed
-                               #   block's pop box is drawn with (RenderManager.RenderBlockPop)
+                               #   block's pop box is drawn with (SelectionPasses.RenderBlockPop)
       ShakeFalloff.cs          # GL-free camera-shake trauma of a world event (blast, tree thud) by its distance
       SprintFov.cs             # GL-free rule of the sprint FOV widening: how many
                                #   degrees the view eases out by while the player sprints
@@ -1265,17 +1266,41 @@ OpenGLTest/
                                #   with the sprint-toggle setting on, else it follows the key
       WaterImmersion.cs, WaterPhase.cs  # GL-free water depth states: the submerged share of the body and
                                         #   its phase (Dry / Wade / Float / Swim)
-    Rendering/                 # the GL render passes and their GL-free gates: RenderManager, WorldRenderer,
-                               #   GPU timing, the texture-unit cache, shadow cascades, reflection reuse
+    Rendering/                 # the GL render passes and their GL-free gates: RenderManager plus its pass components,
+                               #   WorldRenderer, GPU timing, the texture-unit cache, shadow cascades, reflection reuse
+      FrameLighting.cs         # the frame's light, sky, fog and eye state, computed once a frame by SetLighting (the
+                               #   sun/moon key light, eye adaptation, biome grade, glare, godrays strength, point lights,
+                               #   WindDirection) and read live by every pass; FireLightOffset
+      GpuPassTimer.cs          # the per-pass TIME_ELAPSED query ring and its once-a-frame GpuTimingGate latch
+                               #   (BeginGpuFrame, BeginGpuPass/EndGpuPass, EndGpuFrame, LogQueryCounts)
       GpuTimingGate.cs         # the GL-free decision behind the per-pass GPU timer queries
-      ReflectionEntities.cs    # the live entities RenderManager.RenderReflection may draw into the water mirror
+      ReflectionEntities.cs    # the live entities ReflectionPass.RenderReflection may draw into the water mirror
+      ReflectionPass.cs        # the planar water mirror: its target (CreateReflectionTarget), the temporal reuse and
+                               #   RenderReflection (the mirrored chunks, LOD, sky, clouds and entities)
       ReflectionReuse.cs       # the GL-free decision behind the reflection pass's temporal reuse
-      RenderManager.cs         # GL state, world/selection/UI passes, viewport
-                               #   RenderMenuFrame: a world-less frame (main menu or the opaque
-                               #   loading/saving screen) straight into framebuffer 0, no HDR,
-                               #   lighting or GPU timer; RenderLoadingOverlay: the fade over the
-                               #   first playing frames; ForgetWorld drops a disposed world's refs
-                               #   depth-only directional shadow passes (RenderShadows) run first
+      RenderManager.cs         # the composition root of the frame's GL state: owns every GL resource and fixes
+                               #   their creation and disposal order (LoadResources, Dispose); the world programs,
+                               #   their one-time and per-frame uniforms (InitWorldProgram, ApplyFrameUniforms,
+                               #   SetDrawUniforms) and the CHUNK_DRAW variants of the world/shadow programs;
+                               #   BeginFrame (binds and clears the HDR target, draws the sky), BindWorldTextures,
+                               #   SetViewport; ForgetWorld drops a disposed world's refs
+                               #   cloud shadows: CloudShadowTexture bakes CloudField's level
+                               #   grid into an R8 map bound ONCE on unit 8 (nothing else may
+                               #   bind that unit); CloudShadow in test-fragment.glsl projects
+                               #   each fragment up the sun ray to CloudHeight and dims the sun
+                               #   term there, off while uCloudShadowStrength is 0 (ItemDebugger,
+                               #   clouds turned off); visual-examples/cloud-shadows.json
+                               #   owns the two ChunkGeometryPools and the ChunkDrawBatch every chunk
+                               #   pass draws through; builds the pass components below and carries
+                               #   the static facade the item debugger and tests read (PlayerModelPath,
+                               #   the held-item sizing, PoseHeldItem, FireLightOffset, GroundAmbientOf)
+      RenderTargets.cs         # the HDR scene target (RGBA16F color, sampleable depth, the color-only FBO the
+                               #   contact AO draws through), the scene copies and the half-res rays target, all
+                               #   recreated with the viewport; BindSceneTarget (every mid-frame restore);
+                               #   CopyScene snapshots the frame's color/depth to units 3/4
+                               #   for the water pass's refraction (see Water rendering above)
+      ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped center (StepCenter) and light view-proj
+      ShadowPass.cs            # depth-only directional shadow passes (RenderShadows) run first
                                #   each frame into two cascades: the near one (90 blocks, unit 1)
                                #   with chunk and entity casters, then a coarse far one (352
                                #   blocks, unit 7) with chunk casters plus the non-buried LOD
@@ -1283,33 +1308,28 @@ OpenGLTest/
                                #   SampleShadow in test-fragment.glsl reads the near map and
                                #   blends in one far tap where the near box fades out, and LOD
                                #   fragments receive the far cascade through the same path
-                               #   the sky dome is drawn first, right after the clear (RenderSky:
-                               #   SkyRenderer, then the additive sun disc from
-                               #   assets/textures/environment/sun.png via RenderSun), depth off,
-                               #   so the terrain that follows occludes it
-                               #   CopyScene snapshots the frame's color/depth to units 3/4
-                               #   for the water pass's refraction (see Water rendering above)
-                               #   cloud shadows: CloudShadowTexture bakes CloudField's level
-                               #   grid into an R8 map bound ONCE on unit 8 (nothing else may
-                               #   bind that unit); CloudShadow in test-fragment.glsl projects
-                               #   each fragment up the sun ray to CloudHeight and dims the sun
-                               #   term there, off while uCloudShadowStrength is 0 (ItemDebugger,
-                               #   clouds turned off); visual-examples/cloud-shadows.json
-                               #   owns the two ChunkGeometryPools, the ChunkDrawBatch and the
-                               #   CHUNK_DRAW variants of the world/shadow programs; the four
-                               #   chunk passes are one MultiDrawElementsIndirect each
-                               #   the station passes ride inside entityPass: RenderQuerns,
-                               #   RenderKilns (crucible mesh, molten pool, the last charged
+                               #   (the two ShadowCascades are RenderManager's, built by CreateShadowMap)
+      TerrainPasses.cs         # the chunk and far-LOD draws: RenderLod (coarsest level first, buried regions
+                               #   skipped), RenderWorld (opaque, front to back), CullWater (the translucent and
+                               #   water draw lists) and RenderWorldTranslucent (back to front); the four chunk
+                               #   passes are one MultiDrawElementsIndirect each, and the mirror shares its scratch lists
+      TextureUnitCache.cs      # the GL-free bookkeeping behind the render-state rebind cache (PERF_TODO R5)
+      TextureUnits.cs          # the one texture-unit binder every pass binds through (ActiveUnit, BindUnit,
+                               #   BindLazy, InvalidateTextureUnits) over the one TextureUnitCache
+      WorldRenderer.cs         # World component: the world's frame (Render, every pass in order) and its UI (RenderUI)
+      Actors/                  # the entity and station draws: mobs, loose objects, the player, the stations
+        MobPasses.cs           # the slime and goblin draws (RenderSlimes, RenderGoblins), their meshes and skins,
+                               #   SlimeTransform and GoblinFeet
+        ObjectPasses.cs        # drops, thrown items, primed TNT, falling blocks, mining debris and toppling trees
+                               #   (Render*/Draw* pairs; the mirror reuses the Draw* cores)
+        PlayerPasses.cs        # the player body, held item and remote players (RenderPlayer, RenderHeldItem, RenderRemotePlayers),
+                               #   the player rig and its meshes, the held-item sizing and PoseHeldItem
+        StationPasses.cs       # the station passes ride inside entityPass: RenderCampfireCooking,
+                               #   RenderQuerns, RenderKilns (crucible mesh, molten pool, the last charged
                                #   input hovering over the rim and shrinking into it, stored
                                #   fuel lying flat) and RenderCastings (the pouring liquid
                                #   dissolving into the cast, drawn at CastingRenderer.ResultSize
                                #   — the pocket's width — not drop size)
-                               #   RenderContactAo: the multiplicative screen-space contact AO
-                               #   (ContactAoRenderer) drawn through the color-only HDR FBO while
-                               #   sampling the HDR depth texture, placed mid entity pass
-      ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped center (StepCenter) and light view-proj
-      TextureUnitCache.cs      # the GL-free bookkeeping behind the render-state rebind cache (PERF_TODO R5)
-      WorldRenderer.cs         # World component: the world's frame (Render, every pass in order) and its UI (RenderUI)
       Atmosphere/              # the sky dome and the cloud layer: their passes, GL-free twins and the cloud-shadow map
         CloudCopies.cs         # the GL-free arithmetic behind the cloud layer's 3x3
                                #   sweep: where each copy of the field sits this frame
@@ -1317,6 +1337,11 @@ OpenGLTest/
         CloudRenderer.cs       # draws the cloud layer: one static mesh built once from CloudField
         CloudShadowTexture.cs  # the cloud-shadow coverage map: one R8 GL_TEXTURE_2D of CloudField.Cells texels per side
         SkyDomeFrame.cs        # what the sky dome needs each frame beyond its SkyPalette: the night sky's stars
+        SkyPasses.cs           # the sky dome is drawn first, right after the clear (RenderSky,
+                               #   called by RenderManager.BeginFrame: SkyRenderer, then the additive sun
+                               #   disc from assets/textures/environment/sun.png via RenderSun and the
+                               #   moon via RenderMoon), depth off, so the terrain that follows occludes
+                               #   it; RenderClouds draws the cloud layer
         SkyRenderer.cs         # the full-screen sky dome pass (sky-fragment.glsl)
       Geometry/                # chunk draw plumbing: the geometry pools and their allocator, the indirect draw batch, the mesh list pool
         ChunkDrawBatch.cs      # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +
@@ -1326,14 +1351,23 @@ OpenGLTest/
         GeometryAllocator.cs   # GL-free first-fit free list with coalescing, in units of
                                #   64 vertices / 96 indices; hands out the pools' GeometrySlices
         MeshBufferPool.cs      # recycles the vertex and index lists a mesh build fills
-      Overlays/                # drawn over the scene: the UI pass (UIRenderer, its text cache), the damage vignette
-                               #   and the world-space healthbars, damage numbers and notice pips
+      Overlays/                # drawn over the scene: the UI pass (UiPasses, UIRenderer, its text cache), the damage vignette, the
+                               #   selection outline and mining pop, and the world-space healthbars, damage numbers, notice pips and particles
+        BillboardPasses.cs     # the world-space billboard draws: healthbars, damage numbers, notice pips and the
+                               #   leaf, fire and bubble particles
         DamageNumberRenderer.cs # draws the floating damage numbers (DamageNumberPool)
                                 #   as world-space text that always faces the camera
         DamageVignetteRenderer.cs # full-screen damage vignette: one oversized triangle with
                                   #   a radial fragment gradient, drawn inside the UI pass
         EntityHealthbarRenderer.cs # five hearts floating above every live mob, always facing the camera
         NoticePipRenderer.cs   # draws the "!" a goblin pops over its head the moment it first notices a player
+        SelectionPasses.cs     # the mining and placement pop (RenderBlockPop), the selection outline and face
+                               #   highlight (RenderBlockSelection) and the crack overlay (RenderBlockBreaking)
+        UiPasses.cs            # the UI hand-off: RenderUI, RenderChat, RenderTooltip, RenderPlayerList;
+                               #   RenderMenuFrame: a world-less frame (main menu or the opaque
+                               #   loading/saving screen) straight into framebuffer 0, no HDR,
+                               #   lighting or GPU timer; RenderLoadingOverlay: the fade over the
+                               #   first playing frames
         UIRenderer.cs          # every UI draw: HUD, hotbar, inventory, pause/settings menus,
                                #   DrawMainMenu (all main-menu pages) and DrawLoadingScreen
         UITextCache.cs         # memoized per-frame HUD strings (FPS, compass, coordinates, counts)
@@ -1344,6 +1378,11 @@ OpenGLTest/
         PostEffects.cs         # the post pass's per-frame camera effects (exposure, grade, ...) handed to PostProcessRenderer
         PostProcessRenderer.cs # the frame's final full-screen pass: one oversized triangle
                                #   (the shape SkyRenderer draws) shaded by post-fragment.glsl
+        ScreenPasses.cs        # the full-screen passes: RenderPostProcess (tonemap, FXAA, the post
+                               #   effects), RenderUnderwaterRays, RenderGodrays and
+                               #   RenderContactAo: the multiplicative screen-space contact AO
+                               #   (ContactAoRenderer) drawn through the color-only HDR FBO while
+                               #   sampling the HDR depth texture, placed mid entity pass
         UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
     Saves/                     # GL-free world saves: stores, codecs, names, world sources (see "Saves")
       ChunkSaveCodec.cs        # the chunk file format: block-name palette + Deflate body
@@ -2385,7 +2424,7 @@ Other invariants:
 - World/chunk coordinates: `Chunk.Position` is in chunk units; world pos = chunk pos × `Chunk.Size` (16). Chunks are cubic and stacked vertically too (3D chunk grid, not 2D columns).
 - Blocks are `byte` IDs; `0` is air. Everything else about a block comes from `assets/data/blocks/<name>.json` through `ContentRegistry` (see "Content" above), never from a new `switch` on the id. Hot paths read the flat mirrors (`BlockType.IsSolid/Occludes/CastsAO`, `BlockType.Emission`, `BlockType.PassesLightById`) rather than `BlockType.ById[...]`, so keep new per-id flags in that shape.
 - **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Six features share it, one per block: a **horizontal facing** (a `facing: "horizontal"` block such as the wall torch: bits 0-1 the facing, rest 0, written by placement through `Placement.TryMount`), **fluid levels** (`FluidState` decodes it as source `0`, falling `8` or flowing level `1..7`), **stack counts** (a `stackMax` block's 0 = untouched worldgen, 1..`stackMax` an explicit pile), a **multiblock's facing and offset** (`Multiblock.EncodeState`, `facing | dx<<2 | dy<<3 | dz<<4`, written by `Multiblock.Convert` through `SetBlockRaw`), **tree wood** (`WoodState` on a `tree_wood` block: bits 0-3 the thickness code, `FullCube` = 15 being a whole 16 px cell, bits 4-6 the parent direction in `Chunk.CubeFaces` order or `ParentRoot`/`ParentDetached`, bit 7 the shell flag) and **leaves** (`LeafState` on a leaf block: bits 0-2 the hydration, bit 3 the persistent flag) — see `### Trees`. The tree states are written by `TreeGenerator.Stamp` into the generated state array, by `TreeGrowthWriter` and `LeafDecayManager` through `SetBlockRaw`, and by placement, which passes an explicit state to `PlaceBlockAt` (`BlockPlacer.PlaceBlockAtFace` gives a placed log `WoodState.Detached` and a placed leaf a persistent `LeafState`). Which meaning a byte carries is decided entirely by the block id that owns the cell, so a new user must pick a block kind, never a spare bit. **Every write that is not one of those zeroes it** (`RemoveBlockAt`, `ClearBlockAt` and `PlaceBlockAt` with its default state `0` — which also treats a fluid cell as replaceable), and `Multiblock.Revert` likewise writes its source block with an explicit `0`, so a stale level, count, offset, thickness or hydration can never outlive the block that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates)`, filled from the neighborhood `TryResolveNeighbors` resolved for the build; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air. A seventh meaning belongs to the **openable** blocks (an `open` object in their JSON: the trapdoor, and both halves of a door, which always carry the same byte): `DoorState`, the facing in bits 0-1 like any facing block plus `DoorState.OpenBit` (bit 2), the rest zero; placement writes it closed, and the right-click toggle (`BlockInteractions.TryToggleOpenable`, through `ToggleOpenCell`) flips the bit alone through `Chunk.SetStateAt`. The mesher and `BlockShape` index a facing block's pre-turned models and boxes with `BlockType.ShapeIndex(state, count)` (`state & (count - 1)`), so four-shape blocks keep reading the facing and an openable block's eight read the open bit too.
-- **Station block entities**: `CampfireManager`, `QuernManager`, `KilnManager` and `CastingManager` are all owned by `World`, all **main thread only** and all in-memory only — a lit campfire, a spinning quern, a kiln's fuel and crucible and a mold's cast progress are lost on a restart, a save & quit or a chunk reload, even though the chunk's blocks and state bytes around them are saved (see "Saves"). Each is keyed by the cell (the kiln by its structure's anchor), each is ticked from `World.Update` and each has a `NotifyBlockRemoved` that `BlockEditor.RemoveBlock` calls so a broken station drops what it held. `World.FireCells` gathers every burning cell (campfires and lit kilns) once a frame and feeds both the fire billboards (`FireParticleSystem.SpawnOffset`) and the warm point lights (`RenderManager.FireLightOffset`), so a new fire source only has to appear in that list. Their render passes — `RenderQuerns`, `RenderKilns`, `RenderCastings` — sit inside the existing `entityPass` profiler span rather than adding sections of their own. On a multiplayer server they tick in the server's `World.Update` and a pour is bound to the pouring player (`CastState.PourSource`, its `PlayerContext`, which pauses once the player left); a client never ticks them: its managers are display-only mirrors replaced by the server's `StationState` snapshot (each manager's `WriteNet`/`ReadNet`, `StationNetCodec`), and only a quern top keeps turning between snapshots (`QuernManager.Animate`).
+- **Station block entities**: `CampfireManager`, `QuernManager`, `KilnManager` and `CastingManager` are all owned by `World`, all **main thread only** and all in-memory only — a lit campfire, a spinning quern, a kiln's fuel and crucible and a mold's cast progress are lost on a restart, a save & quit or a chunk reload, even though the chunk's blocks and state bytes around them are saved (see "Saves"). Each is keyed by the cell (the kiln by its structure's anchor), each is ticked from `World.Update` and each has a `NotifyBlockRemoved` that `BlockEditor.RemoveBlock` calls so a broken station drops what it held. `World.FireCells` gathers every burning cell (campfires and lit kilns) once a frame and feeds both the fire billboards (`FireParticleSystem.SpawnOffset`) and the warm point lights (`FrameLighting.FireLightOffset`, which `RenderManager` still forwards for the tests), so a new fire source only has to appear in that list. Their render passes — `StationPasses.RenderQuerns`, `RenderKilns`, `RenderCastings` — sit inside the existing `entityPass` profiler span rather than adding sections of their own. On a multiplayer server they tick in the server's `World.Update` and a pour is bound to the pouring player (`CastState.PourSource`, its `PlayerContext`, which pauses once the player left); a client never ticks them: its managers are display-only mirrors replaced by the server's `StationState` snapshot (each manager's `WriteNet`/`ReadNet`, `StationNetCodec`), and only a quern top keeps turning between snapshots (`QuernManager.Animate`).
 - **Fluid tick**: `Simulation/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `BlockEditor.UpdateToppling`; it runs whole ticks every `WorldGenerationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiraling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis — the same budget `ChunkKey` (`src/Chunks/ChunkKey.cs`) uses to pack a **chunk** position for `ChunkMap` and for `ChunkManager`'s dirty/queued/generating/placement dictionaries; `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale, and neither floors nor truncates differently from `VoxelCoords.ChunkPosOf`), recomputes every **non-source** fluid cell from its neighbors (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbor, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). The level rules are per-fluid data (`flow.*` on the block: lava updates every other tick, spreads 3 instead of 7 and never forms new sources). Contact hardening runs before all of it: a fluid cell touching its `hardensTouching` fluid becomes `hardensTo` (lava beside water becomes cobblestone), and a flow settling against a fluid that hardens on its touch crusts over the same way, so water reaching lava also yields cobblestone whichever side ticks first. Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighborhood exactly when it changed or wrote into a neighbor, so settled water costs nothing.
 - **Waking worldgen water**: the sea is generated as static source cells, so a cave or entrance carved into a land column beside it would leave a wall of water standing against worldgen air that nothing ever schedules. `FluidManager.WakeLoadedChunks(chunks)` — called from `World.Update` each frame, immediately before the fluid tick — fixes that by scheduling the frontier of its water against a carved cavity when it loads, so the sea pours into whatever breached it exactly like Minecraft water does when you dig into an ocean. Only cells at or below their column's natural terrain top count (`FluidManager.IsCarvedFlowTarget`), so open air above the terrain — a ravine, a beach, a hillside — is never woken and generated water stays static across it. It has two halves: the **interior**, collected on the generation worker at the end of `Chunk.GenerateBlockData` into `Chunk.FluidFrontier` (local block indices of every fluid cell with a `FluidManager.IsCarvedFlowTarget` neighbor in -X/+X/-Z/+Z/-Y — never +Y, since water does not flow upward and every sea-surface cell has air above it; only its own `_blocks` are read, so worldgen stays a pure per-chunk function), and the **borders**, which need both chunks loaded and are therefore scanned on the main thread over the shared 16x16 plane of each face neighbor, scheduling whichever side holds the fluid when the other side is a carved cavity (the vertical faces only ever schedule the fluid above the hole). Chunks entirely above every level they could share with a neighbor (`ColumnData.MaxWaterLevel`, never below `SeaLevel`) skip the border scan — generated water cannot reach them, and player-placed water is woken by the edit paths. The queue of newly generated chunks is `ChunkManager.TryDequeueLoaded`; a consumer must re-check that the chunk is still the live one at its position, because an unload can race the queue. Once the frontier has settled, it costs nothing again. Deep lava pockets wake through the same path: the frontier scan is fluid-generic, and chunks at or below `LavaMaxY` report theirs even when they never held sea water.
 - **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `BlockEditor.RemoveBlock`, `BlockEditor.FellWood` (per cleared cell, and in both single-block branches), `BlockPlacer.PlaceBlockAtFace` (which every placement ends in: `BlockPlacer.TryPlaceBlockFromRaycast` through `PlaceAgainstFace`, and the item-use `IItemUseWorld.PlaceBlockAtFace`), `BlockInteractions.ToggleOpenCell`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate` (`WorldItemUse`'s `ScoopFluidCell`/`PourFluidCell`), which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `BlockEditor.RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes fluids.
@@ -2400,7 +2439,7 @@ Other invariants:
   - Caves fade out within ~`CaveSurfaceFadeEnd` blocks of the surface (`WormSurfaceMargin` for worms), except inside entrance zones — sparse patches where `ColumnData.EntranceWeight` lifts the fade and caves reach the sky. The entrance weight fades out before the shore band (`EntranceShoreFade`, see `OceanShoreWeight`), so a cave never breaches a beach or the sea floor into a water-filled hole.
   - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbors agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `ColumnCache.Get`, and so are the four tree caches in `TreeGenerator` (see `### Trees`): the cell batches (`BatchCache`, every tree rooted in one 64x64 XZ cell grown together, shared by `Stamp` on the generation workers and the first LOD ring's canopy on the LOD builder), the solo tree shapes (`ShapeCache`, which `BuildBatch` reads as the neighboring cells' obstacles), the grown canopy tops (`CanopyCache`) and the far rings' crown-proxy canopy (`ProxyCanopyCache`), the last two read by their one engine caller `LodRegion.BuildMeshData` once per *fine* column of a region. All six go through `GenerationalCache<TKey, TValue>` (`WorldGen/GenerationalCache.cs`): the cache is split into G generation dictionaries published as one immutable node swapped by `Interlocked.CompareExchange`, a read probes the newest first, a miss computes into the newest, and when the newest fills its `capacity / G` insert budget the node rotates and the *oldest* generation is dropped — so eviction retains the most recently used generations instead of clearing wholesale, and an entry read while it sits in the oldest generation is promoted forward (a second chance). Entries are deterministic, so a race, an eviction or a duplicate yields identical values, and the worst an evicted entry can ever cost is a recompute. Capacities and generation counts all live in `WorldGenerationConfig`, one pair per site: `ColumnCacheCapacity`/`ColumnCacheGenerations`, `CellCacheCapacity`/`CellCacheGenerations`, `TreeBatchCacheCapacity`/`TreeBatchCacheGenerations`, `TreeShapeCacheCapacity`/`TreeShapeCacheGenerations`, `TreeCanopyCacheCapacity`/`TreeCanopyCacheGenerations` and `TreeProxyCanopyCacheCapacity`/`TreeProxyCanopyCacheGenerations` — every site ships at 4 generations, and that count is a re-pricing lever that may only be moved against a real capture, never blind. The factory a site passes to `GetOrAdd` must be a `static`, non-capturing delegate *field* (`ColumnCache.Compute`, `WormCarver.BuildCellFor`, `TreeGenerator.BuildShapeFor`, `BuildBatchFor`, `BuildCanopyFor`, `BuildProxyCanopyFor`), because the factory takes the key alone: a lambda written at the call site that captured locals would allocate a closure on every call, hits included, on the generation workers — recomputing those values from the key on a miss is the cheaper trade. **Standing rule: only values that are a pure function of the key may live in that type.** State carrying *player edits* must never be moved into it, because there eviction is data loss rather than a recompute — `LodRegion.ColumnCaps` (mined-column LOD caps) and `TreeGenerator.CanopyDisturbed` (felled-canopy markers) are the two current examples, and both are tracked as their own items rather than converted. They are still plain process-global tables; `LodEditState` exports and imports them per world (with the `LodSurface` overrides) and `WorldSeed.Apply` resets them between worlds.
   - 3D cave noise is sampled on a `CaveNoiseStride` lattice (aligned to world coordinates so adjacent chunks share boundary samples) and trilinearly interpolated per block before thresholding.
-- **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (no block data; a column a server's world source supplies is read from that source's `ColumnData` instead, see "World sources"). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodManager.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodManager.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones; a desert cell wears sand over sandstone and a sea-floor cell the sand/gravel/stone band its depth picks (`LodRegion.BuildMeshData` reads `ColumnCache.GetBiomes`). The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`RenderManager.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing. All of this runs where the LOD is built (singleplayer and the server): a multiplayer client's far LOD is the server's, streamed as finished vertices, so its edits return before these hooks (see "Multiple players and chat"). Canopy bumps come from `TreeGenerator.TryGetCanopy(x, z, proxy, out top, out leaf)`, read once per fine column with the level's `LodLevelSpec.ProxyCanopy`: the first ring reads the grown canopy of the same cell batches the chunks stamp, and the farther rings read each species' `lod` crown proxy (`LodCrownProxy.TopOffset` over its `LodCrownProfile`), which never grows a tree. Either way a bump wears the leaf block that owns its top cell (the species' `LeavesId`, resolved generically via `BlockType.ById` in `LodRegion.BuildMeshData`, falling back to `TreeGenerator.LeavesBlock`), so a new tree species only needs its species file — never a new LOD branch. An edited canopy reads as open sky: mining or blasting a wood or leaf cell, every fell, every column `LeafDecayManager` clears or `TreeGrowthWriter` writes call `TreeGenerator.PoisonCanopy`, whose `CanopyDisturbed` markers `TryGetCanopy` and `CanopyLeafBlock` consult before either cache. LOD vertices bake a coarse sky exposure from those same column heights into `Vertex.Sun` (`LodSkyExposure`, tuned by the `LodSky*`/`LodValleyShade`/`LodCanopyShade` constants): a vertex darkens by how far the columns in front of or around it rise above it, and a canopy bump darkens toward its base, while open ground, straight walls under open sky and the water sheet keep full sun so the ring matches the near chunks.
+- **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (no block data; a column a server's world source supplies is read from that source's `ColumnData` instead, see "World sources"). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodManager.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `TerrainPasses.RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodManager.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones; a desert cell wears sand over sandstone and a sea-floor cell the sand/gravel/stone band its depth picks (`LodRegion.BuildMeshData` reads `ColumnCache.GetBiomes`). The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`TerrainPasses.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodRegion.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing. All of this runs where the LOD is built (singleplayer and the server): a multiplayer client's far LOD is the server's, streamed as finished vertices, so its edits return before these hooks (see "Multiple players and chat"). Canopy bumps come from `TreeGenerator.TryGetCanopy(x, z, proxy, out top, out leaf)`, read once per fine column with the level's `LodLevelSpec.ProxyCanopy`: the first ring reads the grown canopy of the same cell batches the chunks stamp, and the farther rings read each species' `lod` crown proxy (`LodCrownProxy.TopOffset` over its `LodCrownProfile`), which never grows a tree. Either way a bump wears the leaf block that owns its top cell (the species' `LeavesId`, resolved generically via `BlockType.ById` in `LodRegion.BuildMeshData`, falling back to `TreeGenerator.LeavesBlock`), so a new tree species only needs its species file — never a new LOD branch. An edited canopy reads as open sky: mining or blasting a wood or leaf cell, every fell, every column `LeafDecayManager` clears or `TreeGrowthWriter` writes call `TreeGenerator.PoisonCanopy`, whose `CanopyDisturbed` markers `TryGetCanopy` and `CanopyLeafBlock` consult before either cache. LOD vertices bake a coarse sky exposure from those same column heights into `Vertex.Sun` (`LodSkyExposure`, tuned by the `LodSky*`/`LodValleyShade`/`LodCanopyShade` constants): a vertex darkens by how far the columns in front of or around it rise above it, and a canopy bump darkens toward its base, while open ground, straight walls under open sky and the water sheet keep full sun so the ring matches the near chunks.
 
 ## Saves
 
@@ -3049,7 +3088,7 @@ try/catch, and a malformed one (`EndOfStreamException`, `IOException`, `InvalidD
 `FormatException`, `ArgumentException`) leaves the server with "The server sent bad data" instead
 of crashing the game. Remote players are `RemotePlayer`s whose
 `PlayerModel` walk cycle runs off the distance they moved; `World` updates them each frame and
-`RenderManager.RenderRemotePlayers` draws each as the player body at its broadcast eye. A lost
+`PlayerPasses.RenderRemotePlayers` draws each as the player body at its broadcast eye. A lost
 connection, or SAVE & QUIT while connected, disposes the client world and returns to the
 multiplayer page.
 
@@ -3057,7 +3096,7 @@ multiplayer page.
 a 100-line log, a 200-char input, arrow-key history and the open flag. `T` opens it from a clean
 play state, `Enter` sends, `Escape` closes; while it is open the keyboard is withheld from the
 camera exactly like a focused inventory field, and the log sits bottom-left above the hotbar
-(`UIRenderer.DrawChat`, its own `RenderManager.RenderChat` UI pass). In singleplayer `Program.
+(`UIRenderer.DrawChat`, its own `UiPasses.RenderChat` UI pass). In singleplayer `Program.
 SendChat` echoes locally; in multiplayer it sends `ChatSend` and the server's broadcast is the
 only copy, so a line never appears twice.
 
@@ -3331,14 +3370,14 @@ spawns appear on dry forest surface in a 20-40 block ring around the player; `Sl
 cadence, damage and shove numbers via `WorldGenerationConfig.Slime*`. Slimes come in **sizes**
 (`Slime.Size`, `SlimeSize.Min`..`Max`, fixed for life): every scaled stat is the size-1 value times
 `1 + (size - 1) * step`, one `SlimeSize*Step` per stat — the body scale (`SizeScale`: the drawn model
-in `RenderManager.SlimeTransform`, multiplied over the squash spring, the collision box
+in `MobPasses.SlimeTransform`, multiplied over the squash spring, the collision box
 `BodyHalfExtent`/`BodyHalfHeight`, the healthbar height), the health pool (`Mob.MaxHealth`, virtual,
 over the JSON `hp`; the save and net clamps read it), the contact damage and the loot rolls (the table
 rolled `LootRolls` times). The size is saved (`EntitySaveData.MobData.Size`, absent = 1) and sent (a
 slime entry's `NetEntity.Ammo`). A ring spawn rolls its size (`SlimeSize.Roll`, a pure function of the
 night, an underground flag and one uniform roll): each size past 1 is reached with the large-size
 chance again, which eases from `SlimeLargeChanceDay` to `SlimeLargeChanceNight` with
-`DayCycle.NightFactor(World.LightingTime)` — the same sun `RenderManager.SetLighting` lights the world
+`DayCycle.NightFactor(World.LightingTime)` — the same sun `FrameLighting.SetLighting` lights the world
 by — and is the night value for ground at least `SlimeUndergroundDepthBlocks` under its column's
 surface (`SlimeSize.IsUnderground`; the surface-only ring never finds such a spot today). A rolled body
 that would overlap a block beside the cleared column steps down a size until it fits. A slime larger
@@ -3648,7 +3687,7 @@ overshoot or jiggle.
   (`BlockDebrisSystem` + `DebrisLook.Color`, `LandingDust.SkinColor`), the same pool the slime
   splat uses.
 - **Placement pop.** A placed block pops in a little too big and settles with one small overshoot
-  (`RenderManager.RenderBlockPop`, `PopBoxEmitter`).
+  (`SelectionPasses.RenderBlockPop`, `PopBoxEmitter`).
 - **Mob hit sparks.** A punch, slice or throw that connects throws pale chips from the wound point
   on top of the floating damage number.
 - **Drop landing bounce.** A drop that lands hops back up once or twice, damped by `BounceDamping`,
@@ -3789,15 +3828,23 @@ touch a file that violates one of them, fixing it is in scope.
 - **No god classes.** One class, one coherent job. Past roughly 700 lines a class is a smell:
   move the stray responsibilities out into a well-named class (composition, not `partial`).
   No source file goes past ~1000 lines without a stated reason. `World.cs`,
-  `RenderManager.cs`, `UIRenderer.cs`, `ContentRegistry.cs`, `Program.cs`, `Chunk.cs`,
-  `Camera.cs`, `ChunkManager.cs` are the current offenders — keep shrinking them, never
+  `UIRenderer.cs`, `ContentRegistry.cs`, `Program.cs`, `Chunk.cs`, `Camera.cs`,
+  `ChunkManager.cs` are the current offenders — keep shrinking them, never
   grow them. `World.cs` (about 1,140 lines, down from 4,700) has a stated reason: it is the
   composition root that builds and owns the per-job components (`BlockEditor`, `BlockPlacer`,
   `LeftClickAction`, `RightClickAction`, `ThrowAction`, `BlockInteractions`, `WorldItemUse`,
   `MobStrikes`, `AmbientEffects`, `LocalPlayer`, `ClientMirror`, `WorldPersistence`,
   `DropPickup`, `WorldRenderer`) and keeps the order-sensitive `Update`/`UpdateClient` frame
   orchestration. The next candidates to move out of it are `Update`'s mob target/damage block
-  and `PushFromBlast`.
+  and `PushFromBlast`. `RenderManager.cs` (1,032 lines, down from 4,588) has a stated reason
+  too: it is the GL resource owner whose `LoadResources`/`Dispose` fix the creation and
+  disposal order, plus the world programs' one-time and per-frame uniforms
+  (`InitWorldProgram`, `ApplyFrameUniforms`, `SetDrawUniforms`); its passes live in the
+  components it builds and exposes as internal properties (`GpuPassTimer`, `TextureUnits`,
+  `RenderTargets`, `FrameLighting`, `SkyPasses`, `ScreenPasses`, `BillboardPasses`,
+  `SelectionPasses`, `StationPasses`, `ObjectPasses`, `PlayerPasses`, `MobPasses`,
+  `ShadowPass`, `TerrainPasses`, `ReflectionPass`, `UiPasses`). `UIRenderer.cs` (about
+  2,500 lines) is the next rendering offender to split.
 - **No god directories.** Keep any one folder under ~30 files and group by domain. The `src/`
   root holds the app entry and core types only; a new file goes into the folder of its area
   (a new feature area gets a new folder), never into a catch-all. `Networking/` is split into

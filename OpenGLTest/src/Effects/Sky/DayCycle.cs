@@ -6,7 +6,7 @@ namespace VoxelEngine.Effects.Sky;
 
 /// <summary>
 /// GL-free day/night clock: where the sun is at a given lighting time (<see cref="World.LightingTime"/>)
-/// and how much daylight that gives. <see cref="RenderManager.SetLighting"/> lights the world from
+/// and how much daylight that gives. <see cref="FrameLighting.SetLighting"/> lights the world from
 /// it and gameplay that depends on the hour (the slime size roll) reads the same numbers, so the
 /// two can never disagree about whether it is night.
 /// </summary>

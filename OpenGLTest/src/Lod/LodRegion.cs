@@ -122,7 +122,7 @@ public class LodRegion : IDisposable
     /// <summary>
     /// Where this region's sea sheet lives in the same pool, or <c>null</c> when no cell of the
     /// region is below sea level. The sea sheet is a separate slice so the renderer can draw it
-    /// blended, after everything opaque (see RenderManager.RenderWorldTranslucent).
+    /// blended, after everything opaque (see TerrainPasses.RenderWorldTranslucent).
     /// </summary>
     public GeometrySlice? WaterSlice { get; private set; }
 

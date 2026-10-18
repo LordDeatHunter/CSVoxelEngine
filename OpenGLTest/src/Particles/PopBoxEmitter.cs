@@ -17,16 +17,16 @@ namespace VoxelEngine.Particles;
 /// partial block is covered with no per-renderer branches: a new one only needs sensible
 /// <c>FaceTiles</c> (the baker falls back to the first quad's tile). A biome-tinted block's
 /// pop wears its <see cref="BiomeTintFaces"/> tiles instead (a base quad, then the tinted quad
-/// flagged by Vertex bit 4) and takes its tint from RenderManager's <c>uBiomeTint</c> uniform
-/// (the field at the mined cell), so it keeps matching the terrain it jumps out of; the
-/// vertex rgb stays the shade alone. GL-free; the caller streams the lists into its own
-/// dynamic buffers.
+/// flagged by Vertex bit 4) and takes its tint from the <c>uBiomeTint</c> uniform
+/// <c>SelectionPasses.RenderBlockPop</c> sets (the field at the mined cell), so it keeps matching
+/// the terrain it jumps out of; the vertex rgb stays the shade alone. GL-free; the caller streams
+/// the lists into its own dynamic buffers.
 /// </summary>
 public static class PopBoxEmitter
 {
     /// <summary>
     /// The most quads one box can emit: six faces, each at most a base and a tinted quad.
-    /// RenderManager sizes the pop's streaming VBO and its static index pattern by it.
+    /// SelectionPasses sizes the pop's streaming VBO and its static index pattern by it.
     /// </summary>
     public const int MaxQuadsPerBox = 12;
 

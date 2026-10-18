@@ -105,37 +105,37 @@ internal sealed class WorldRenderer
     {
         // Depth-only sun pass first: every world draw below samples the shadow map it fills
         FrameProfiler.Begin(ProfileSection.Shadows);
-        renderManager.BeginGpuPass(ProfileSection.Shadows);
-        renderManager.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.Shadows);
+        renderManager.Shadows.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
             _lodManager.RegionList, goblins: Goblins);
-        renderManager.EndGpuPass(ProfileSection.Shadows);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.Shadows);
         FrameProfiler.End(ProfileSection.Shadows);
 
         FrameProfiler.Begin(ProfileSection.Reflection);
-        renderManager.BeginGpuPass(ProfileSection.Reflection);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.Reflection);
         // One frustum pass over the translucent draws feeds both this and the water pass, and
         // tells the reflection whether there is any water on screen to be worth rendering
-        renderManager.CullWater(Camera, _chunkManager.TranslucentRenderable, _lodManager.RegionList);
-        renderManager.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList,
+        renderManager.Terrain.CullWater(Camera, _chunkManager.TranslucentRenderable, _lodManager.RegionList);
+        renderManager.Reflection.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList,
             new ReflectionEntities(_dropManager.Drops, _projectiles, _tntManager.Primed, _falling.Falling, Slimes, Goblins,
                 _toppling, Player));
-        renderManager.EndGpuPass(ProfileSection.Reflection);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.Reflection);
         FrameProfiler.End(ProfileSection.Reflection);
 
         FrameProfiler.Begin(ProfileSection.LodPass);
-        renderManager.BeginGpuPass(ProfileSection.LodPass);
-        renderManager.RenderLod(Camera, _lodManager.RegionList);
-        renderManager.EndGpuPass(ProfileSection.LodPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.LodPass);
+        renderManager.Terrain.RenderLod(Camera, _lodManager.RegionList);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.LodPass);
         FrameProfiler.End(ProfileSection.LodPass);
 
         FrameProfiler.Begin(ProfileSection.WorldPass);
-        renderManager.BeginGpuPass(ProfileSection.WorldPass);
-        renderManager.RenderWorld(Camera, _chunkManager.Renderable, Now);
-        renderManager.EndGpuPass(ProfileSection.WorldPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.WorldPass);
+        renderManager.Terrain.RenderWorld(Camera, _chunkManager.Renderable, Now);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.WorldPass);
         FrameProfiler.End(ProfileSection.WorldPass);
 
         // The frustum test inside RenderWorld has just counted what is on screen
-        FrameProfiler.SetCounts(_chunkManager.LoadedChunkCount, renderManager.LastVisibleChunkCount,
+        FrameProfiler.SetCounts(_chunkManager.LoadedChunkCount, renderManager.Terrain.LastVisibleChunkCount,
             _lodManager.CompletedBuildCount, _lodManager.RegionList.Count);
 
         // Free-list instrument for item D5, in the fixed order opaque/translucent/lod. Same call
@@ -153,19 +153,19 @@ internal sealed class WorldRenderer
             renderManager.LodGeometry.ScanSteps);
 
         FrameProfiler.Begin(ProfileSection.EntityPass);
-        renderManager.BeginGpuPass(ProfileSection.EntityPass);
-        renderManager.RenderItemDrops(Camera, _dropManager.Drops);
-        renderManager.RenderThrown(Camera, _projectiles);
-        renderManager.RenderCampfireCooking(Camera, _campfires);
-        renderManager.RenderQuerns(Camera, _querns);
-        renderManager.RenderKilns(Camera, _kilns);
-        renderManager.RenderCastings(Camera, _casting);
-        renderManager.RenderPrimedTnt(Camera, _tntManager.Primed);
-        renderManager.RenderFallingBlocks(Camera, _falling.Falling);
-        renderManager.RenderSlimes(Camera, Slimes);
-        renderManager.RenderGoblins(Camera, Goblins);
-        renderManager.RenderRemotePlayers(Camera, _remotePlayers);
-        renderManager.EndGpuPass(ProfileSection.EntityPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.EntityPass);
+        renderManager.Objects.RenderItemDrops(Camera, _dropManager.Drops);
+        renderManager.Objects.RenderThrown(Camera, _projectiles);
+        renderManager.Stations.RenderCampfireCooking(Camera, _campfires);
+        renderManager.Stations.RenderQuerns(Camera, _querns);
+        renderManager.Stations.RenderKilns(Camera, _kilns);
+        renderManager.Stations.RenderCastings(Camera, _casting);
+        renderManager.Objects.RenderPrimedTnt(Camera, _tntManager.Primed);
+        renderManager.Objects.RenderFallingBlocks(Camera, _falling.Falling);
+        renderManager.Mobs.RenderSlimes(Camera, Slimes);
+        renderManager.Mobs.RenderGoblins(Camera, Goblins);
+        renderManager.Players.RenderRemotePlayers(Camera, _remotePlayers);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 
         // Contact AO reads the scene depth, so it goes after everything above (which writes
@@ -173,24 +173,24 @@ internal sealed class WorldRenderer
         // terrain AO would smudge them) and every later pass. Debris, toppling trees, the player
         // and the held item simply receive none.
         FrameProfiler.Begin(ProfileSection.AoPass);
-        renderManager.BeginGpuPass(ProfileSection.AoPass);
-        renderManager.RenderContactAo(Camera);
-        renderManager.EndGpuPass(ProfileSection.AoPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.AoPass);
+        renderManager.Screen.RenderContactAo(Camera);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.AoPass);
         FrameProfiler.End(ProfileSection.AoPass);
 
         FrameProfiler.Begin(ProfileSection.EntityPass);
-        renderManager.BeginGpuPass(ProfileSection.EntityPass);
-        renderManager.RenderEntityHealthbars(Camera, Mobs);
-        renderManager.RenderDamageNumbers(Camera, DamageNumbers);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.EntityPass);
+        renderManager.Billboards.RenderEntityHealthbars(Camera, Mobs);
+        renderManager.Billboards.RenderDamageNumbers(Camera, DamageNumbers);
         if (_goblins != null)
-            renderManager.RenderNoticePips(Camera, _goblins.Goblins);
-        renderManager.RenderBlockDebris(Camera, _debris.Debris);
+            renderManager.Billboards.RenderNoticePips(Camera, _goblins.Goblins);
+        renderManager.Objects.RenderBlockDebris(Camera, _debris.Debris);
         foreach (var tree in _toppling)
-            renderManager.RenderTopplingTree(Camera, tree);
-        renderManager.RenderPlayer(Camera, Player);
-        renderManager.RenderHeldItem(Camera, Player, LocalPlayer.HeldId, LocalPlayer.HasHeld,
+            renderManager.Objects.RenderTopplingTree(Camera, tree);
+        renderManager.Players.RenderPlayer(Camera, Player);
+        renderManager.Players.RenderHeldItem(Camera, Player, LocalPlayer.HeldId, LocalPlayer.HasHeld,
             (float)Now, Compass.HeadingFromYaw(Camera.Yaw));
-        renderManager.EndGpuPass(ProfileSection.EntityPass);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 
         // The selection/breaking overlay is world geometry on the targeted block, so it draws with
@@ -203,7 +203,7 @@ internal sealed class WorldRenderer
         if (LeftClick.HasSelectedBlock || placePopGrow > 0f)
         {
             FrameProfiler.Begin(ProfileSection.SelectPass);
-            renderManager.BeginGpuPass(ProfileSection.SelectPass);
+            renderManager.GpuTimer.BeginGpuPass(ProfileSection.SelectPass);
 
             if (LeftClick.HasSelectedBlock)
             {
@@ -213,41 +213,41 @@ internal sealed class WorldRenderer
                 // The chunk mesh still holds the block at rest size, so the popped cube is only
                 // needed (and only hides it) while it is grown
                 if (popGrow > 0f)
-                    renderManager.RenderBlockPop(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId, popGrow,
+                    renderManager.Selection.RenderBlockPop(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId, popGrow,
                         HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
 
                 var selectedId = Edits.BlockIdAt(LeftClick.SelectedBlockPosition);
-                renderManager.RenderBlockSelection(Camera, LeftClick.SelectedBlockPosition, LeftClick.SelectedFaceNormal, popGrow,
+                renderManager.Selection.RenderBlockSelection(Camera, LeftClick.SelectedBlockPosition, LeftClick.SelectedFaceNormal, popGrow,
                     selectedId, LeftClick.SelectedBoxIndex, HitboxesAt(LeftClick.SelectedBlockPosition, selectedId), mining: LeftClick.IsBreaking);
 
                 if (LeftClick.IsBreaking)
-                    renderManager.RenderBlockBreaking(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakProgress, popGrow, LeftClick.BreakingBlockId,
+                    renderManager.Selection.RenderBlockBreaking(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakProgress, popGrow, LeftClick.BreakingBlockId,
                         HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
             }
 
             // A just-placed block pops in; skipped while that same cell is the one being mined,
             // whose own out-and-back pop is already playing there
             if (placePopGrow > 0f && !(LeftClick.IsBreaking && LeftClick.BreakingBlockPosition == Placer.PlacePopPosition))
-                renderManager.RenderBlockPop(Camera, Placer.PlacePopPosition, Placer.PlacePopId, placePopGrow,
+                renderManager.Selection.RenderBlockPop(Camera, Placer.PlacePopPosition, Placer.PlacePopId, placePopGrow,
                     HitboxesAt(Placer.PlacePopPosition, Placer.PlacePopId));
 
-            renderManager.EndGpuPass(ProfileSection.SelectPass);
+            renderManager.GpuTimer.EndGpuPass(ProfileSection.SelectPass);
             FrameProfiler.End(ProfileSection.SelectPass);
         }
 
         // Water draws after the world and entities: it blends, so everything it can cover has to be
         // in the depth buffer already
         FrameProfiler.Begin(ProfileSection.WaterPass);
-        renderManager.BeginGpuPass(ProfileSection.WaterPass);
-        renderManager.RenderWorldTranslucent(Camera);
-        renderManager.EndGpuPass(ProfileSection.WaterPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.WaterPass);
+        renderManager.Terrain.RenderWorldTranslucent(Camera);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.WaterPass);
         FrameProfiler.End(ProfileSection.WaterPass);
 
         // Clouds blend too, so they go after water has written its depth
         FrameProfiler.Begin(ProfileSection.CloudPass);
-        renderManager.BeginGpuPass(ProfileSection.CloudPass);
-        renderManager.RenderClouds(Camera, Camera.IsEyeInWater);
-        renderManager.EndGpuPass(ProfileSection.CloudPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.CloudPass);
+        renderManager.Sky.RenderClouds(Camera, Camera.IsEyeInWater);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.CloudPass);
         FrameProfiler.End(ProfileSection.CloudPass);
 
         // The depthless blended particles draw last, after the clouds, because none of them writes
@@ -259,40 +259,40 @@ internal sealed class WorldRenderer
         // Bubbles ride along: they need the water pass' depth (they only exist submerged, where
         // the clouds are skipped anyway) and used to be the only pass drawn at this point.
         FrameProfiler.Begin(ProfileSection.EntityPass);
-        renderManager.BeginGpuPass(ProfileSection.EntityPass);
-        renderManager.RenderLeafParticles(Camera, _leaves.Particles);
-        renderManager.RenderFireParticles(Camera, _fire.Particles);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.EntityPass);
+        renderManager.Billboards.RenderLeafParticles(Camera, _leaves.Particles);
+        renderManager.Billboards.RenderFireParticles(Camera, _fire.Particles);
         // Lava embers are a second batch; the renderer re-uploads with BufferSubData, so two
         // calls a frame are safe. The batches are not depth-sorted against each other, which
         // only matters where campfire and lava smoke overlap (cosmetic).
-        renderManager.RenderFireParticles(Camera, _lavaFire.Particles);
-        renderManager.RenderFireParticles(Camera, _torchFire.Particles);
-        renderManager.RenderBubbleParticles(Camera, _bubbles.Particles);
-        renderManager.EndGpuPass(ProfileSection.EntityPass);
+        renderManager.Billboards.RenderFireParticles(Camera, _lavaFire.Particles);
+        renderManager.Billboards.RenderFireParticles(Camera, _torchFire.Particles);
+        renderManager.Billboards.RenderBubbleParticles(Camera, _bubbles.Particles);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 
         // Additive sun shafts on top of the finished underwater view; it re-reads the depth
         // buffer, so it has to follow everything that writes depth
         FrameProfiler.Begin(ProfileSection.RaysPass);
-        renderManager.BeginGpuPass(ProfileSection.RaysPass);
-        renderManager.RenderUnderwaterRays(Camera);
-        renderManager.EndGpuPass(ProfileSection.RaysPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.RaysPass);
+        renderManager.Screen.RenderUnderwaterRays(Camera);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.RaysPass);
         FrameProfiler.End(ProfileSection.RaysPass);
 
         // Godrays: the same march over dry air when the sun is in view; also after everything that
         // writes depth, since it reads the scene depth
         FrameProfiler.Begin(ProfileSection.GodraysPass);
-        renderManager.BeginGpuPass(ProfileSection.GodraysPass);
-        renderManager.RenderGodrays(Camera);
-        renderManager.EndGpuPass(ProfileSection.GodraysPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.GodraysPass);
+        renderManager.Screen.RenderGodrays(Camera);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.GodraysPass);
         FrameProfiler.End(ProfileSection.GodraysPass);
 
         // Last world pass: tonemap the linear HDR scene target into the default framebuffer.
         // The UI draws after this, straight onto that gamma framebuffer.
         FrameProfiler.Begin(ProfileSection.PostPass);
-        renderManager.BeginGpuPass(ProfileSection.PostPass);
-        renderManager.RenderPostProcess(_health.DamageFlash);
-        renderManager.EndGpuPass(ProfileSection.PostPass);
+        renderManager.GpuTimer.BeginGpuPass(ProfileSection.PostPass);
+        renderManager.Screen.RenderPostProcess(_health.DamageFlash);
+        renderManager.GpuTimer.EndGpuPass(ProfileSection.PostPass);
         FrameProfiler.End(ProfileSection.PostPass);
     }
 
@@ -304,7 +304,7 @@ internal sealed class WorldRenderer
         int fps, bool showProfiler, bool showCoordinates = true, PauseMenuView? menu = null,
         SettingsMenuView? settings = null)
     {
-        renderManager.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
+        renderManager.UiPasses.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
             _health.Health, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, LeftClick.Crosshair, LeftClick.LookAt);
     }
 
