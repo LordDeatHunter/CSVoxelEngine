@@ -83,6 +83,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `f01c883` | Split `UIRenderer` (2,504 lines to 802) into 7 page renderers (Hud, Menu, InventoryPanel, CraftCard, TopStrip, LoadingScreen, Chat) |
 | `3d45be4` | Split Program.cs (2,297 -> 628 lines) into App/ (AppScreen, DevDiagnostics, InventoryPanelInput, ChatInput, MenuInput, GameplayInput, InputEvents) and Networking/Client/ClientSession; Program keeps Main, OnLoad wiring, the AppScreen flow, the world lifecycle and the OnUpdate/OnRender orchestration; docs and crefs retargeted |
 | `d79f434` | Split WorldGenerationConfig (2,401 lines, 921 members) into 17 per-domain static classes under src/Config/ (VoxelEngine.Config, globally imported in all four projects); WorldGenerationConfig keeps its 199 worldgen knobs (480 lines), every call site, cref, shader/tool comment and doc mention retargeted |
+| `ad27efd` | Split ContentRegistry (2,383 -> 475 lines) into ContentFiles, ItemLoader, TagLoader, EntityLoader, TreeSpeciesLoader, Blocks/BlockLoader, Blocks/BlockSchemaParser, Loot/LootTableCompiler, Recipes/RecipeLoader and Models/ModelBakeSteps; ContentRegistry stays the static facade and the owner of the tables |
 
 ## In progress
 
@@ -98,7 +99,6 @@ update the docs. Folders now have headroom: `Chunks/` holds 9 files plus `Meshin
 
 | File | Lines | Notes |
 |---|---|---|
-| `src/Content/ContentRegistry.cs` | 2,383 | Loading, id assignment, baking, validation, recipes, tree species. The `Content/` subfolders exist. |
 | `src/Chunks/Chunk.cs` | 1,944 | Storage, state, snapshots, generation fill, mesh upload. Respect the threading model and the state-byte invariants. |
 | `src/Player/PlayerModel.cs` | 1,468 | Pose, arm frames, slice, swim, float, mods. Use the ItemDebugger modes as a mental check. |
 | `OpenGLTest.Server/GameServer.cs` | 1,393 | Accept loop, Pump, intent handling, streaming answers, status. The Server project is flat and namespaced `VoxelEngine.Server`. |
@@ -156,7 +156,12 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `InventoryPanelInput.cs` was re-encoded from cp1252 to UTF-8 during the Program split. Spot-check its non-ASCII comment characters (em dashes etc.) against HEAD's old `Program.cs` (`git show 3d45be4^:OpenGLTest/src/Program.cs`) for mojibake.
 - The doc-generation build (`-p:GenerateDocumentationFile=true`) was not run after the cref retargets in `Chat.cs` and `SettingsMenu.cs`. A future run should confirm no new cref warnings.
 - The `// TODO: move this to player class` `placeTimer` still relies on the static-initializer ordering quirk: it starts at 0.0, not 0.2. This affects only the storeless dev-override path. A later behavior task could make the intent explicit; it was out of scope for the cleanup.
-- Next extractions named in `AGENTS.md` remain: `World.Update`'s mob target/damage block and `PushFromBlast`; `Chunk.cs`, `Camera.cs`, `ChunkManager.cs` and `ContentRegistry.cs` are still on the offender list.
+- Next extractions named in `AGENTS.md` remain: `World.Update`'s mob target/damage block and `PushFromBlast`; `Program.cs`, `Chunk.cs`, `Camera.cs` and `ChunkManager.cs` are still on the offender list.
+- `ContentRegistry.Reset` does not clear `StackSolidStateById`, `BounceById`, `BlocksSightById`, `ContactDamageById`, `GreedyById`, `BlockType.Types` or `ModelFiles`. It was like that before the ContentRegistry split and was left as is; a candidate bug fix outside the cleanup campaign.
+- The play-time content lookups (`RecipeForResult`, `RecipeByName`, `CastRecipeFor`, `IsCastMold`, ...) allocate LINQ closures on every call. Candidate perf cleanup.
+- `BlockLoader.LoadBlocks` (`Blocks/BlockLoader.cs`, 569 lines) is still a single ~370-line method; a candidate for a later early-return and extract-method step.
+- `Chunk.cs` has a CS1574 doc-build warning for an `EmitGreedyFaces` cref. It predates the ContentRegistry split; retarget the cref to `ChunkMesher`.
+- ContentRegistry split line counts: ContentRegistry 475, ContentFiles 56, EntityLoader 62, ItemLoader 339, TagLoader 65, TreeSpeciesLoader 72, Blocks/BlockLoader 569, Blocks/BlockSchemaParser 349, Models/ModelBakeSteps 219, Loot/LootTableCompiler 100, Recipes/RecipeLoader 204.
 - Section headers attached to the first member below them kept their old titles in their new config classes: `// --- Lighting ---` above `DayLengthSeconds` in `SkyConfig`, `// --- Ambience ---` in `AudioConfig` and `// --- GPU timer queries ---` in `PostProcessConfig`. Retitle them to match the class they now head.
 - Judgment-call config placements could be revisited (a pure call-site rewrite): `TonemapExposure` and `EyeAdapt*` in `LightingConfig` rather than `PostProcessConfig`; `SelectionOutline`/`SelectionPulse` in `HudConfig`; the `Steam*` lava-hardening knobs in `JuiceConfig` while `SpringSteam*` is in `ParticleConfig`.
 - git sees `WorldGenerationConfig.cs` as a rename (now `src/Config/`) plus a heavy rewrite; blame for the moved members needs `git blame -C -C`.
