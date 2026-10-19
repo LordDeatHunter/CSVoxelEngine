@@ -68,15 +68,15 @@ public sealed class GreedyMeshingTests
     [Fact]
     public void OnlyPlainCubeFacesBakeGreedy()
     {
-        Assert.True(ContentRegistry.BakesGreedy(BakeCube()));
-        Assert.True(ContentRegistry.BakesGreedy(ContentRegistry.RequireBlock("grass").BakedModel!));
+        Assert.True(ModelBakeSteps.BakesGreedy(BakeCube()));
+        Assert.True(ModelBakeSteps.BakesGreedy(ContentRegistry.RequireBlock("grass").BakedModel!));
 
         // A cropped or rotated face UV cannot be rebuilt from (face, extent), so the block
         // stays on the per-quad path; so does an unshaded or uncullable face
-        Assert.False(ContentRegistry.BakesGreedy(BakeCube((n, f) => { if (n == "up") f.Uv = [0, 0, 8, 8]; })));
-        Assert.False(ContentRegistry.BakesGreedy(BakeCube((n, f) => { if (n == "north") f.Rotation = 90; })));
-        Assert.False(ContentRegistry.BakesGreedy(BakeCube((n, f) => { if (n == "east") f.Cullface = null; })));
-        Assert.False(ContentRegistry.BakesGreedy(BakeCube(shade: false)));
+        Assert.False(ModelBakeSteps.BakesGreedy(BakeCube((n, f) => { if (n == "up") f.Uv = [0, 0, 8, 8]; })));
+        Assert.False(ModelBakeSteps.BakesGreedy(BakeCube((n, f) => { if (n == "north") f.Rotation = 90; })));
+        Assert.False(ModelBakeSteps.BakesGreedy(BakeCube((n, f) => { if (n == "east") f.Cullface = null; })));
+        Assert.False(ModelBakeSteps.BakesGreedy(BakeCube(shade: false)));
     }
 
     // ---------------------------------------------------------------- tiled UVs

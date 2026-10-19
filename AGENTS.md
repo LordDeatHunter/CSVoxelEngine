@@ -683,7 +683,7 @@ streamed column makes the build return `null`, which the caller treats like a va
 `Chunk.GenerateMeshDataFromSnapshot` runs two passes over the padded 18³
 block snapshot. The binary greedy pass (`EmitGreedyFaces`, scratch in the `[ThreadStatic]`
 `MeshScratch`) takes every block flagged `BlockType.IsGreedy`: a `Model`-renderer block whose
-baked model is exactly the six untransformed cube faces (`ContentRegistry.BakesGreedy`; all four
+baked model is exactly the six untransformed cube faces (`ModelBakeSteps.BakesGreedy`; all four
 built-in parents qualify, so stone, dirt, grass, logs, TNT, lamps, leaves and glass all do). It
 builds per-axis bit columns of greedy and occluding cells, finds visible faces with one
 shift-and-mask per column (the halo bits cull border faces exactly like the neighbor read),
@@ -741,8 +741,8 @@ default, or `foliage`) and a `faces` map keyed by face name (`north`..`down`, or
 `side` and `all`). A face entry is either `{ "tile" }`, a tinted tile drawn *instead of* the
 model's face (one quad; the leaves use it on every face), or `{ "overlay", "base"? }`, a tinted
 cutout tile drawn *over* the face with `base` optionally replacing the untinted tile beneath (the
-grass side: a `dirt` base, then `grass_side_textureless`). `ContentRegistry.ResolveBiomeTints`
-resolves it in `BakeModels` into `BlockType.BiomeTint` (`Content/Blocks/BiomeTintFaces.cs`: `Palette` plus
+grass side: a `dirt` base, then `grass_side_textureless`). `ModelBakeSteps.ResolveBiomeTints`
+resolves it in `ContentRegistry.BakeModels` into `BlockType.BiomeTint` (`Content/Blocks/BiomeTintFaces.cs`: `Palette` plus
 per-face `Base`/`Tinted` tiles, `NoTile` where a face has none) and throws naming the file unless
 the block `BakesGreedy` and is not translucent, so both mesh paths can treat every tinted face as a
 plain cube face; an `overlay` is further refused on a cutout block, which has no opaque base quad.
@@ -941,11 +941,19 @@ OpenGLTest/
       WorldGenerationConfig.cs # the seed and every worldgen knob: terrain, water levels, biomes, snow and ice, ores,
                                #   lava, ravines, caves, worms, tree placement, worldgen cache sizes
     Content/                   # the data-driven content pipeline (ContentRegistry) — see "Content" below
-      ContentRegistry.cs       # loads assets/data + assets/models, assigns byte ids, fills the tables
+      ContentRegistry.cs       # the static facade: owns the content tables, assigns byte ids, runs Load / BakeModels /
+                               #   Reset in order and serves the public lookups (RequireBlock, recipes, tags, ...)
+      ContentFiles.cs          # the one JsonSerializerOptions, JSON file listing and reading, name -> id resolution
+      EntityLoader.cs          # data/entities -> EntityRegistry (hp, loot table, the parsed .bbmodel)
+      ItemLoader.cs            # data/items -> ItemRegistry (use, tool, display, spritesheet); the item-use check
+      TagLoader.cs             # data/tags -> the tag sets; warns on a tool tag no item provides
+      TreeSpeciesLoader.cs     # data/trees -> TreeSpeciesRegistry (TreeSpeciesCompiler) and the pixel-rim table
       Blocks/                  # block-side enums and resolved tables (renderer, break, attack, use, biome tint faces)
         BlockRenderer.cs, BlockBreakAction.cs,
           AttackPattern.cs, ItemUseAction.cs  # geometry/break/attack/use enums
         BiomeTintFaces.cs      # a block's resolved biomeTint: palette + per-face base/tinted tiles
+        BlockLoader.cs         # data/blocks -> BlockType and the per-id tables: LoadBlocks and its cross-block resolvers
+        BlockSchemaParser.cs   # a block JSON's shape fields: material, flame, facing/support, pane, open, hitboxes, tree wood
       Definitions/             # the JSON DTOs
         BlockDefinition.cs, ItemDefinition.cs,
           LootTableDefinition.cs, ModelDefinition.cs  # JSON DTOs
@@ -960,6 +968,7 @@ OpenGLTest/
         TreeSpeciesDefinition.cs # JSON DTO of assets/data/trees/<species>.json
       Loot/                    # compiled loot tables, loot context, wood loot bands
         LootTable.cs, LootContext.cs  # compiled loot tables and the world cell they roll at
+        LootTableCompiler.cs   # data/loot -> compiled LootTables (pools, rolls, ranges)
         WoodLootBand.cs        # one thickness band of a tree_wood block's loot (self or a table)
       Models/                  # Minecraft model format and Blockbench projects: parents, baking, quads
         ModelBaker.cs, BakedModel.cs, BakedQuad.cs  # elements -> atlas-ready quads + full-cube flags
@@ -969,12 +978,14 @@ OpenGLTest/
                                #   (the player's posing is procedural, entities
                                #   animate from their clips)
         BlockModel.cs, ModelLoader.cs  # Minecraft model format: parent chains, #texture refs
+        ModelBakeSteps.cs      # BakeModels' steps: facing/multiblock bake checks, BakesGreedy, tint resolution, parent self-check
       Recipes/                 # compiled craft, cook, crush, melt and cast recipes
         CastRecipe.cs          # (fired mold, material) -> result + cooling
         CookRecipe.cs          # one compiled campfire recipe: raw input, cooked result and seconds on the fire
         CraftingRecipe.cs      # one compiled crafting recipe: what it makes and what one craft consumes
         CrushRecipe.cs         # one compiled quern recipe: crushable input and the crushed result
         MeltRecipe.cs          # block/item -> (material, ml)
+        RecipeLoader.cs        # data/recipes (craft, cook, crush, melt, cast) and data/molten -> the compiled lists
       Shapes/                  # hitboxes and the shape resolvers (pane, multiblock, tree wood, snow, facing, break overlay)
         BlockHitbox.cs         # one axis-aligned selection box in cell-local 0..1 space
         BlockShape.cs          # the one live-world box resolver (raycast, outline, pop,
@@ -1884,7 +1895,7 @@ model is baked **four times** at startup into `BlockType.RotatedModels` (`Multib
 a quarter turn about the vertical axis through `(1, y, 1)`, which maps the volume onto itself),
 so the mesher picks a pre-rotated model instead of rotating anything per frame. That rotation is
 also why a multiblock face may carry no `cullface` and may not cover a whole cell plane
-(`ContentRegistry.ValidateMultiblockBake`): its quads are culled against nothing and the
+(`ModelBakeSteps.ValidateMultiblockBake`): its quads are culled against nothing and the
 per-corner AO path indexes neighbor deltas by `Chunk.CubeFaces` corner order, which rotation
 breaks, so a multiblock shades flat on every facing.
 
@@ -1939,7 +1950,7 @@ as far as its boxes reach on every facing, and a floor slab is stood on at its t
 bits (`BlockPlacer.PlaceBlockAtFace` takes the view from the placing player, the item-use path from
 `WorldItemUse.ActiveContext`), so the step rises the way the player looked. The `block/stairs` parent is
 authored facing north (tall step over the north half) and split into three boxes so no face
-covers a whole cell side (`ValidateFacingBake`); the two `hitbox` boxes turn with it
+covers a whole cell side (`ModelBakeSteps.ValidateFacingBake`); the two `hitbox` boxes turn with it
 (`RotatedHitboxes`) and the body collides with them, so the walk step climbs them. On a client
 in third person the predicted facing reads the camera's view while the server reads the aim,
 so a placement near a 45-degree look may be corrected. `StairTests` covers the rules.
@@ -2060,7 +2071,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 | `tool` | optional mining numbers: `power` (the item's mining *tier* — the number a block's `tools` requirement is compared against, default 0.5, the bare-hand baseline; it is **not** a damage number, damage is `blockDamage`) and `hitDelayMs` (milliseconds between hits). Writing the object marks the item as a tool; which block `tools` tags it satisfies comes from the tag files, not the item — `assets/data/tags/pickaxe.json` listing `item/primitive_pickaxe` is what makes a block gating on `"pickaxe"` accept it (`Mining.CanMine`). Bare hand and non-tool items mine at the defaults, and creative ignores the gate |
 
 Both names resolve like a loot entry (`block/` / `item/` prefixes pin the namespace).
-`ContentRegistry.ValidateItemUses` runs after the blocks are loaded and throws, naming the file,
+`ItemLoader.ValidateItemUses` runs after the blocks are loaded and throws, naming the file,
 if the fluid is not a fluid block or the result is not an item. A successful use goes through
 `Inventory.MorphTool`, which turns the tool instance into its result in place, so every hotbar
 slot holding that bucket flips with it and scooping and pouring alternate on the same button.
@@ -2125,7 +2136,7 @@ to six full faces.
 
 One file per species; the file name is the species name (`TreeSpeciesRegistry.ByName`, which
 `ITEM_DEBUGGER_SELECT` and the `grow` op match). `ContentRegistry.Load` reads the folder **after
-the blocks** (`LoadTreeSpecies`; a missing folder is an empty registry), compiles each file through
+the blocks** (`TreeSpeciesLoader.LoadTreeSpecies`; a missing folder is an empty registry), compiles each file through
 the pure `TreeSpeciesCompiler.Compile` (DTO `TreeSpeciesDefinition.cs`) into an immutable
 `TreeSpecies`, and every error starts `Tree species '<path>'`. Block references take an optional
 `block/` prefix and never resolve to an item. Seven species ship: `oak` (the forest), `spruce` (the
@@ -2258,7 +2269,7 @@ ground, a wall), so a thin trunk or root meets the ground it rests on instead of
 clear of it, with cropped
 UVs and smooth light; a full-thickness or detached cell takes the model path and culls against a
 same-id full cube. A wood block whose species sets `rim: "pixel"` (`BlockType.PixelRimById`, filled
-by `ContentRegistry.LoadTreeSpecies`) gets its outer shells beveled from their eight horizontal
+by `TreeSpeciesLoader.LoadTreeSpecies`) gets its outer shells beveled from their eight horizontal
 neighbors: `TreeWoodShape.RimCornerMask` carves a corner when neither of its two edge neighbors
 is same-id attached full-cube wood (a cell only ever removes its own material, so diagonals never
 matter), `RimBoxes` turns the mask into stair-stepped full-height boxes (`RimInsetPx`, at most
@@ -2362,11 +2373,11 @@ edit lands in an edge-diagonal chunk that face-adjacent dirtying does not remesh
 
 Crafting recipes live in `assets/data/recipes/<name>.json` as `{ "result", "count", "ingredients":
 [ { "item" | "tag", "count" } ] }` (DTO `RecipeDefinition.cs`, compiled by
-`ContentRegistry.CompileRecipe` into a `CraftingRecipe`), campfire recipes in
+`RecipeLoader.CompileRecipe` into a `CraftingRecipe`), campfire recipes in
 `recipes/cook/<name>.json` as `{ "input", "result", "count", "cookSeconds" }`
 (`CookRecipeDefinition.cs` -> `CookRecipe`, one recipe per input, enforced) and quern recipes in
 `recipes/crush/<name>.json` (`CrushRecipe`, likewise one per input). Every name resolves
-like a loot entry, with `block/` and `item/` prefixes pinning the namespace (`TryResolve`), so
+like a loot entry, with `block/` and `item/` prefixes pinning the namespace (`ContentFiles.TryResolve`), so
 blocks and items are interchangeable as ingredients, results, inputs and outputs. Craft files are
 named by their result, cook files by their input, and a reverse recipe by
 `<result>_from_<ingredient>`.
@@ -3880,7 +3891,7 @@ touch a file that violates one of them, fixing it is in scope.
 - **No god classes.** One class, one coherent job. Past roughly 700 lines a class is a smell:
   move the stray responsibilities out into a well-named class (composition, not `partial`).
   No source file goes past ~1000 lines without a stated reason. `World.cs`,
-  `ContentRegistry.cs`, `Program.cs`, `Chunk.cs`, `Camera.cs`, `ChunkManager.cs`
+  `Program.cs`, `Chunk.cs`, `Camera.cs`, `ChunkManager.cs`
   are the current offenders — keep shrinking them, never
   grow them. `World.cs` (about 1,140 lines, down from 4,700) has a stated reason: it is the
   composition root that builds and owns the per-job components (`BlockEditor`, `BlockPlacer`,

@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Interaction;
 using Xunit;
@@ -98,13 +99,13 @@ public sealed class StairTests : IDisposable
     {
         const string path = "data/blocks/x.json";
         var look = new BlockDefinition { FacingFromLook = true };
-        Assert.True(ContentRegistry.ParseFacingFromLook(look, horizontalFacing: true, supportAttached: false, path));
-        Assert.False(ContentRegistry.ParseFacingFromLook(new BlockDefinition(), true, false, path));
+        Assert.True(BlockSchemaParser.ParseFacingFromLook(look, horizontalFacing: true, supportAttached: false, path));
+        Assert.False(BlockSchemaParser.ParseFacingFromLook(new BlockDefinition(), true, false, path));
         // No facing to turn, or a facing that already names a wall
         Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
-            ContentRegistry.ParseFacingFromLook(look, horizontalFacing: false, supportAttached: false, path)).Message);
+            BlockSchemaParser.ParseFacingFromLook(look, horizontalFacing: false, supportAttached: false, path)).Message);
         Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
-            ContentRegistry.ParseFacingFromLook(look, horizontalFacing: true, supportAttached: true, path)).Message);
+            BlockSchemaParser.ParseFacingFromLook(look, horizontalFacing: true, supportAttached: true, path)).Message);
     }
 
     [Fact]

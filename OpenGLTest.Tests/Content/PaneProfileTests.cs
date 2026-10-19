@@ -83,15 +83,15 @@ public sealed class PaneProfileTests
     public void APaneWithoutDimensionsKeepsTheDefaultShapeAndEqualShapesAreOne()
     {
         const string path = "data/blocks/x.json";
-        Assert.Same(PaneProfile.Default, ContentRegistry.ParsePaneProfile(null, path));
-        Assert.Same(PaneProfile.Default, ContentRegistry.ParsePaneProfile(new BlockDefinition.PaneDefinition(), path));
+        Assert.Same(PaneProfile.Default, BlockSchemaParser.ParsePaneProfile(null, path));
+        Assert.Same(PaneProfile.Default, BlockSchemaParser.ParsePaneProfile(new BlockDefinition.PaneDefinition(), path));
         Assert.True(PaneProfile.Default.FullArms);
 
         var rails = new[] { (5, 7), (11, 13) };
         Assert.Same(PaneProfile.Create(5, 3, rails), PaneProfile.Create(5, 3, rails));
         Assert.NotSame(PaneProfile.Create(5, 3, rails), PaneProfile.Create(5, 1, rails));
         // An arm left out is as wide as the post
-        Assert.Equal(7, ContentRegistry.ParsePaneProfile(new BlockDefinition.PaneDefinition { Post = 7 }, path).ArmPx);
+        Assert.Equal(7, BlockSchemaParser.ParsePaneProfile(new BlockDefinition.PaneDefinition { Post = 7 }, path).ArmPx);
     }
 
     [Fact]
@@ -110,7 +110,7 @@ public sealed class PaneProfileTests
                      new BlockDefinition.PaneDefinition { Rails = [[2, 8, 9]] },
                  })
             Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
-                ContentRegistry.ParsePaneProfile(definition, path)).Message);
+                BlockSchemaParser.ParsePaneProfile(definition, path)).Message);
     }
 
     [Fact]

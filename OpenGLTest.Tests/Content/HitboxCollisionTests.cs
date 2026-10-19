@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 using Silk.NET.Input;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Player;
@@ -68,17 +69,17 @@ public sealed class HitboxCollisionTests
         var flagged = new BlockDefinition { CollidesByHitbox = true };
 
         Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
-            ContentRegistry.ResolveCollidesByHitbox(flagged, null, solid: true, fluid: false, stackMax: 0, path)).Message);
+            BlockSchemaParser.ResolveCollidesByHitbox(flagged, null, solid: true, fluid: false, stackMax: 0, path)).Message);
         Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
-            ContentRegistry.ResolveCollidesByHitbox(flagged, slab, solid: true, fluid: true, stackMax: 0, path)).Message);
+            BlockSchemaParser.ResolveCollidesByHitbox(flagged, slab, solid: true, fluid: true, stackMax: 0, path)).Message);
         Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
-            ContentRegistry.ResolveCollidesByHitbox(flagged, slab, solid: true, fluid: false, stackMax: 16, path)).Message);
+            BlockSchemaParser.ResolveCollidesByHitbox(flagged, slab, solid: true, fluid: false, stackMax: 16, path)).Message);
         Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
-            ContentRegistry.ResolveCollidesByHitbox(flagged, slab, solid: false, fluid: false, stackMax: 0, path)).Message);
+            BlockSchemaParser.ResolveCollidesByHitbox(flagged, slab, solid: false, fluid: false, stackMax: 0, path)).Message);
 
-        Assert.True(ContentRegistry.ResolveCollidesByHitbox(flagged, slab, solid: true, fluid: false, stackMax: 0, path));
+        Assert.True(BlockSchemaParser.ResolveCollidesByHitbox(flagged, slab, solid: true, fluid: false, stackMax: 0, path));
         // The flag absent is false whatever the rest says, so no hitbox is required.
-        Assert.False(ContentRegistry.ResolveCollidesByHitbox(new BlockDefinition(), null, solid: true, fluid: false, stackMax: 0, path));
+        Assert.False(BlockSchemaParser.ResolveCollidesByHitbox(new BlockDefinition(), null, solid: true, fluid: false, stackMax: 0, path));
     }
 
     [Fact]

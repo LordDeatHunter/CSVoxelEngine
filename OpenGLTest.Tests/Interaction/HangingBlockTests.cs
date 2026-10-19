@@ -62,17 +62,17 @@ public sealed class HangingBlockTests : IDisposable
     {
         const string path = "data/blocks/x.json";
         var above = new BlockDefinition { Support = "above" };
-        Assert.Equal((false, false), ContentRegistry.ParseFacingAndSupport(above, BlockRenderer.Model,
+        Assert.Equal((false, false), BlockSchemaParser.ParseFacingAndSupport(above, BlockRenderer.Model,
             fluid: false, falls: false, stackMax: 0, needsSupport: true, path, out var supportAbove));
         Assert.True(supportAbove);
 
-        ContentRegistry.ParseFacingAndSupport(new BlockDefinition(), BlockRenderer.Model, false, false, 0, true, path,
+        BlockSchemaParser.ParseFacingAndSupport(new BlockDefinition(), BlockRenderer.Model, false, false, 0, true, path,
             out supportAbove);
         Assert.False(supportAbove);
 
         // Support means nothing on a block that never pops
         Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
-            ContentRegistry.ParseFacingAndSupport(above, BlockRenderer.Model, false, false, 0, needsSupport: false, path,
+            BlockSchemaParser.ParseFacingAndSupport(above, BlockRenderer.Model, false, false, 0, needsSupport: false, path,
                 out _)).Message);
     }
 

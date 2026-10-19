@@ -208,7 +208,7 @@ public sealed class TorchTests : IDisposable
         const string path = "data/blocks/x.json";
         (bool, bool) Parse(BlockDefinition d, BlockRenderer renderer = BlockRenderer.Model, bool fluid = false,
             bool falls = false, int stackMax = 0, bool needsSupport = true) =>
-            ContentRegistry.ParseFacingAndSupport(d, renderer, fluid, falls, stackMax, needsSupport, path);
+            BlockSchemaParser.ParseFacingAndSupport(d, renderer, fluid, falls, stackMax, needsSupport, path);
 
         var wallTorch = new BlockDefinition { Facing = "horizontal", Support = "attached" };
         Assert.Equal((true, true), Parse(wallTorch));

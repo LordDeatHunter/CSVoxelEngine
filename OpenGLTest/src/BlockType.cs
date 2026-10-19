@@ -106,7 +106,7 @@ public sealed record BlockType
     internal static readonly PaneProfile?[] PaneProfileById = new PaneProfile?[256];
 
     // Whether the binary greedy mesher may merge this block's faces: a plain full cube whose
-    // six faces are the untransformed cube faces (see ContentRegistry.BakesGreedy). Anything
+    // six faces are the untransformed cube faces (see ModelBakeSteps.BakesGreedy). Anything
     // else goes through the per-quad scalar path.
     internal static readonly bool[] GreedyById = new bool[256];
 
@@ -253,7 +253,7 @@ public sealed record BlockType
     /// Climate palette for a sub-cell model block whose file declared <c>modelTint</c>, or null.
     /// Unlike <see cref="BiomeTint"/>'s per-face tiles, this tints every quad of the block's own
     /// model in place (shade * the palette's field, bit 4 set). Set in
-    /// <c>ContentRegistry.ResolveModelTints</c>.
+    /// <c>ModelBakeSteps.ResolveModelTints</c>.
     /// </summary>
     public BiomeTintPalette? ModelBiomeTint { get; internal set; }
 

@@ -11,7 +11,7 @@ using Xunit;
 namespace VoxelEngine.Tests.Content;
 
 /// <summary>
-/// Torch flames: the <c>flame</c> block field (parsed by <see cref="ContentRegistry.ParseFlame"/>,
+/// Torch flames: the <c>flame</c> block field (parsed by <see cref="BlockSchemaParser.ParseFlame"/>,
 /// turned with a facing block), the flame points the mesher records per chunk
 /// (<see cref="ChunkMeshData.FlamePoints"/>), and the tight, small particles the flame instance of
 /// <see cref="FireParticleSystem"/> spawns.
@@ -63,17 +63,17 @@ public sealed class TorchFlameTests
     public void AFacingBlocksFlameTurnsWithItAndAPlainBlockKeepsOnePoint()
     {
         var definition = new BlockDefinition { Flame = [8f, 12f, 3f], Facing = "horizontal" };
-        var points = ContentRegistry.ParseFlame(definition, BlockRenderer.Model, "test")!;
+        var points = BlockSchemaParser.ParseFlame(definition, BlockRenderer.Model, "test")!;
         Assert.Equal(4, points.Length);
         for (var facing = 0; facing < 4; facing++)
             Assert.Equal(HorizontalFacing.RotatePoint(points[0], facing, 1f), points[facing]);
         // North-authored: the point nearer the front (-Z) moves to the +Z side facing south
         Assert.True(points[1].Z > 0.5f && points[0].Z < 0.5f);
 
-        var plain = ContentRegistry.ParseFlame(new BlockDefinition { Flame = [8f, 10f, 8f] },
+        var plain = BlockSchemaParser.ParseFlame(new BlockDefinition { Flame = [8f, 10f, 8f] },
             BlockRenderer.Model, "test")!;
         Assert.Single(plain);
-        Assert.Null(ContentRegistry.ParseFlame(new BlockDefinition(), BlockRenderer.Model, "test"));
+        Assert.Null(BlockSchemaParser.ParseFlame(new BlockDefinition(), BlockRenderer.Model, "test"));
     }
 
     [Theory]
@@ -84,7 +84,7 @@ public sealed class TorchFlameTests
     public void AFlameIsRefusedOffAModelOrOutsideTheCell(BlockRenderer renderer, float[] flame)
     {
         var ex = Assert.Throws<InvalidOperationException>(() =>
-            ContentRegistry.ParseFlame(new BlockDefinition { Flame = flame }, renderer, "blocks/x.json"));
+            BlockSchemaParser.ParseFlame(new BlockDefinition { Flame = flame }, renderer, "blocks/x.json"));
         Assert.Contains("blocks/x.json", ex.Message);
     }
 

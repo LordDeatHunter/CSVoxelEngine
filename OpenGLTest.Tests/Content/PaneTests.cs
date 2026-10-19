@@ -123,7 +123,7 @@ public sealed class PaneTests
     public void TheRegistryRefusesAPaneThatDeclaresBoxesOrAStateOfItsOwn()
     {
         const string path = "data/blocks/x.json";
-        ContentRegistry.ValidatePane(new BlockDefinition(), path);
+        BlockSchemaParser.ValidatePane(new BlockDefinition(), path);
 
         var box = System.Text.Json.JsonDocument.Parse("""{ "min": [0, 0, 0], "max": [1, 1, 1] }""").RootElement;
         foreach (var definition in new[]
@@ -134,7 +134,7 @@ public sealed class PaneTests
                      new BlockDefinition { StackMax = 4 },
                      new BlockDefinition { NeedsSupport = true },
                  })
-            Assert.Contains(path, Assert.Throws<InvalidOperationException>(() => ContentRegistry.ValidatePane(definition, path)).Message);
+            Assert.Contains(path, Assert.Throws<InvalidOperationException>(() => BlockSchemaParser.ValidatePane(definition, path)).Message);
     }
 
     [Fact]

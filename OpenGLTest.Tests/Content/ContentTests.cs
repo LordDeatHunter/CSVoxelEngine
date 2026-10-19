@@ -318,7 +318,7 @@ public sealed class ContentTests
     }
 
     private static Vector3? DeclaredSrgb(byte id) =>
-        ContentRegistry.DeclaredLightColor(id) is { } c ? new Vector3(c[0], c[1], c[2]) / 255f : null;
+        BlockLoader.DeclaredLightColor(id) is { } c ? new Vector3(c[0], c[1], c[2]) / 255f : null;
 
     [Fact]
     public void EmittersDeclaringNoColorTakeTheDefaultSlot()

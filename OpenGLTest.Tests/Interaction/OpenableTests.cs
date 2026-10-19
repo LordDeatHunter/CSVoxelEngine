@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Interaction;
@@ -84,8 +85,8 @@ public sealed class OpenableTests : IDisposable
         var model = System.Text.Json.JsonDocument.Parse("\"block/cube_all\"").RootElement;
         var box = System.Text.Json.JsonDocument.Parse("""{ "min": [0, 0, 0], "max": [1, 1, 0.2] }""").RootElement;
 
-        Assert.Null(ContentRegistry.ParseOpen(new BlockDefinition(), horizontalFacing: true, path));
-        var boxes = ContentRegistry.ParseOpen(new BlockDefinition { Open = new() { Model = model, Hitbox = box } }, true, path);
+        Assert.Null(BlockSchemaParser.ParseOpen(new BlockDefinition(), horizontalFacing: true, path));
+        var boxes = BlockSchemaParser.ParseOpen(new BlockDefinition { Open = new() { Model = model, Hitbox = box } }, true, path);
         Assert.Single(boxes!);
 
         foreach (var (definition, facing) in new[]
@@ -95,7 +96,7 @@ public sealed class OpenableTests : IDisposable
                      (new BlockDefinition { Open = new() { Model = model } }, true),
                  })
             Assert.Contains(path, Assert.Throws<InvalidOperationException>(() =>
-                ContentRegistry.ParseOpen(definition, facing, path)).Message);
+                BlockSchemaParser.ParseOpen(definition, facing, path)).Message);
     }
 
     [Fact]

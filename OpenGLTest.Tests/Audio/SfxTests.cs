@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using VoxelEngine.Audio;
+using VoxelEngine.Content.Blocks;
 using Xunit;
 
 namespace VoxelEngine.Tests.Audio;
@@ -60,10 +61,10 @@ public sealed class SfxTests
     [Fact]
     public void UnknownSfxNameFallsBackToTheDefault()
     {
-        Assert.Equal(SfxLibrary.DefaultGroup, ContentRegistry.ResolveSfx("test.json", null));
-        Assert.Equal(SfxLibrary.DefaultGroup, ContentRegistry.ResolveSfx("test.json", "  "));
-        Assert.Equal(SfxLibrary.DefaultGroup, ContentRegistry.ResolveSfx("test.json", "not_a_group"));
-        Assert.Equal(SfxLibrary.StoneGroup, ContentRegistry.ResolveSfx("test.json", SfxLibrary.StoneGroup));
+        Assert.Equal(SfxLibrary.DefaultGroup, BlockLoader.ResolveSfx("test.json", null));
+        Assert.Equal(SfxLibrary.DefaultGroup, BlockLoader.ResolveSfx("test.json", "  "));
+        Assert.Equal(SfxLibrary.DefaultGroup, BlockLoader.ResolveSfx("test.json", "not_a_group"));
+        Assert.Equal(SfxLibrary.StoneGroup, BlockLoader.ResolveSfx("test.json", SfxLibrary.StoneGroup));
     }
 
     [Fact]

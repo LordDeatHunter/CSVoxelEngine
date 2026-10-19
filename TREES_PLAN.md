@@ -433,7 +433,7 @@ bands }`:
    turns back out) and `UmbrellaGrowthLogic` (trunk stops at `LowestBranchHeight + CrownLift`,
    limbs run straight and rarely climb) replace `PlaceholderGrowthLogic`; both only lower, zero
    or multiply weights. The pixel rim: `BlockType.PixelRimById`/`HasPixelRim`, filled from each
-   species' `rim` in `ContentRegistry.LoadTreeSpecies` (two species sharing a wood must agree, or
+   species' `rim` in `TreeSpeciesLoader.LoadTreeSpecies` (two species sharing a wood must agree, or
    load throws naming both files); `TreeWoodShape.CanBevel`, `IsRimMass`, `RimCornerMask` (a
    corner is carved when neither of its two edge neighbors is same-id attached full-cube wood —
    the marching-squares outcome, and diagonals never matter because a cell only removes its own

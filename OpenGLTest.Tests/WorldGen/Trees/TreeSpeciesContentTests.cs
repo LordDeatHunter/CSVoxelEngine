@@ -106,7 +106,7 @@ public sealed class TreeSpeciesContentTests
             var ok = Path.Combine(dir, "ok.json");
             File.WriteAllText(ok, ValidSpecies("block/oak_log"));
             Assert.Equal(ContentRegistry.RequireBlock("oak_log").Id,
-                ContentRegistry.CompileTreeSpeciesFile("ok", ok).WoodId);
+                TreeSpeciesLoader.CompileTreeSpeciesFile("ok", ok).WoodId);
         }
         finally
         {
@@ -119,7 +119,7 @@ public sealed class TreeSpeciesContentTests
         var path = Path.Combine(dir, file);
         File.WriteAllText(path, body);
         var e = Assert.Throws<InvalidOperationException>(
-            () => ContentRegistry.CompileTreeSpeciesFile(Path.GetFileNameWithoutExtension(file), path));
+            () => TreeSpeciesLoader.CompileTreeSpeciesFile(Path.GetFileNameWithoutExtension(file), path));
         Assert.Contains(path, e.Message);
     }
 

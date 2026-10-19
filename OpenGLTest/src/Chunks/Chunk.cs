@@ -1618,7 +1618,7 @@ public class Chunk : IDisposable
                     // Only a quad that fills its cube face has meaningful corner neighbors,
                     // so per-corner AO applies exactly as it did for hand-written cubes. A face
                     // that culls against its own side (exactly the set the greedy pass takes,
-                    // see ContentRegistry.BakesGreedy) also averages its light per corner.
+                    // see ModelBakeSteps.BakesGreedy) also averages its light per corner.
                     var aoDeltas = AODeltas[face];
                     var smooth = cullFace == face;
 
