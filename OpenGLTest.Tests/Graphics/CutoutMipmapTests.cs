@@ -13,7 +13,7 @@ namespace VoxelEngine.Tests.Graphics;
 /// </summary>
 public sealed class CutoutMipmapTests
 {
-    private const float Cutoff = WorldGenerationConfig.AlphaCutoff;
+    private const float Cutoff = LightingConfig.AlphaCutoff;
 
     private static byte[] Tile(int w, int h, Func<int, int, (byte r, byte g, byte b, byte a)> texel)
     {

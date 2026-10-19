@@ -113,20 +113,20 @@ public sealed class Goblin : Mob
     // Set on the frame the goblin first noticed a target, read (and cleared) by the manager, which
     // alerts the pack with it
     private bool _justNoticed;
-    private float _noticePipElapsed = WorldGenerationConfig.GoblinNoticePipSeconds;
+    private float _noticePipElapsed = MobConfig.GoblinNoticePipSeconds;
     private bool _noticed;
 
     public Goblin(EntityType type, Vector3 position, int ammo, bool spawnIn = true, int torches = 0) : base(type, position)
     {
         Ammo = Math.Max(0, ammo);
-        Torches = Math.Clamp(torches, 0, WorldGenerationConfig.GoblinTorchMaxCount);
-        Animation = new EntityAnimator(type.Model.Animations, WorldGenerationConfig.GoblinWalkSpeed);
+        Torches = Math.Clamp(torches, 0, MobConfig.GoblinTorchMaxCount);
+        Animation = new EntityAnimator(type.Model.Animations, MobConfig.GoblinWalkSpeed);
         // The dodge side: fixed at spawn from the starting cell, so the same goblin always breaks
         // the same way out of a charged throw's line
         _dodgeSide = ((MathUtils.FloorToInt(position.X) + MathUtils.FloorToInt(position.Z)) & 1) == 0 ? 1f : -1f;
         // A fresh goblin notices the player before its first throw rather than throwing on its
         // first grounded frame; unjittered so scripted shots repeat.
-        _throwCooldown = WorldGenerationConfig.GoblinFirstThrowDelaySeconds;
+        _throwCooldown = MobConfig.GoblinFirstThrowDelaySeconds;
         if (spawnIn) Animation.Play(SpawnClip);
         else FinishSpawn();
     }
@@ -157,9 +157,9 @@ public sealed class Goblin : Mob
     public int Ammo { get; private set; }
 
     /// <summary>Adds scavenged stones (flint picked up off the ground), clamped at
-    /// <see cref="WorldGenerationConfig.GoblinStoneMax"/>.</summary>
+    /// <see cref="MobConfig.GoblinStoneMax"/>.</summary>
     public void AddAmmo(int amount) =>
-        Ammo = Math.Clamp(Ammo + amount, 0, WorldGenerationConfig.GoblinStoneMax);
+        Ammo = Math.Clamp(Ammo + amount, 0, MobConfig.GoblinStoneMax);
 
     /// <summary>Torches this goblin still carries; it equips one while it is dark and they drop on
     /// death.</summary>
@@ -195,17 +195,17 @@ public sealed class Goblin : Mob
     public bool IsGrounded { get; private set; }
 
     /// <summary>
-    /// Whether the goblin has given up: at or below <see cref="WorldGenerationConfig.GoblinFleeHealthShare"/>
+    /// Whether the goblin has given up: at or below <see cref="MobConfig.GoblinFleeHealthShare"/>
     /// of its pool it turns and runs from the player instead of fighting, faster than its walk
-    /// (<see cref="WorldGenerationConfig.GoblinFleeSpeedFactor"/>); it still despawns by distance
+    /// (<see cref="MobConfig.GoblinFleeSpeedFactor"/>); it still despawns by distance
     /// like any goblin.
     /// </summary>
-    public bool IsFleeing => Health > 0 && Health <= MaxHealth * WorldGenerationConfig.GoblinFleeHealthShare;
+    public bool IsFleeing => Health > 0 && Health <= MaxHealth * MobConfig.GoblinFleeHealthShare;
 
     /// <summary>
     /// Takes whether this goblin first noticed a target since the last call (true once): the
     /// manager uses it to alert the pack (goblins within
-    /// <see cref="WorldGenerationConfig.GoblinPackAlertRadiusBlocks"/> skip their first-throw delay).
+    /// <see cref="MobConfig.GoblinPackAlertRadiusBlocks"/> skip their first-throw delay).
     /// </summary>
     public bool TakeJustNoticed()
     {
@@ -228,11 +228,11 @@ public sealed class Goblin : Mob
     /// <summary>
     /// The notice pip's clock: 0 on the frame the goblin first had a player to chase (the same
     /// moment its first-throw delay starts), rising to 1 over
-    /// <see cref="WorldGenerationConfig.GoblinNoticePipSeconds"/>; 1 for a goblin that never
+    /// <see cref="MobConfig.GoblinNoticePipSeconds"/>; 1 for a goblin that never
     /// noticed anyone, and never restarted when a target is lost and regained.
     /// </summary>
     public float NoticePipProgress =>
-        MathUtils.Clamp01(_noticePipElapsed / WorldGenerationConfig.GoblinNoticePipSeconds);
+        MathUtils.Clamp01(_noticePipElapsed / MobConfig.GoblinNoticePipSeconds);
 
     /// <summary>The goblin's own animation state, driven by its speed and actions.</summary>
     public EntityAnimator Animation { get; }
@@ -288,14 +288,14 @@ public sealed class Goblin : Mob
     /// <summary>
     /// Whether a goblin body centered at <paramref name="goblinPosition"/> can land a swing on a
     /// player whose eye is at <paramref name="playerEye"/>: horizontally within
-    /// <see cref="WorldGenerationConfig.GoblinMeleeReach"/> and roughly level with the player's
+    /// <see cref="MobConfig.GoblinMeleeReach"/> and roughly level with the player's
     /// body center.
     /// </summary>
     public static bool InMeleeReach(Vector3 goblinPosition, Vector3 playerEye)
     {
         var dx = playerEye.X - goblinPosition.X;
         var dz = playerEye.Z - goblinPosition.Z;
-        var reach = WorldGenerationConfig.GoblinMeleeReach;
+        var reach = MobConfig.GoblinMeleeReach;
         if (dx * dx + dz * dz > reach * reach) return false;
         return MathF.Abs(goblinPosition.Y - (playerEye.Y - Camera.EyeHeight * 0.5f)) <= 1.5f;
     }
@@ -357,8 +357,8 @@ public sealed class Goblin : Mob
 
     /// <summary>
     /// Advances the AI, the physics and the animation. With stones left the goblin keeps to the
-    /// throw band (<see cref="WorldGenerationConfig.GoblinThrowMinRange"/>..
-    /// <see cref="WorldGenerationConfig.GoblinThrowMaxRange"/>) and starts a throw whenever it
+    /// throw band (<see cref="MobConfig.GoblinThrowMinRange"/>..
+    /// <see cref="MobConfig.GoblinThrowMaxRange"/>) and starts a throw whenever it
     /// stands on the ground with a clear line to the player's chest; out of stones it closes to
     /// the standoff distance and starts a swing when in reach. It stands still while a throw or
     /// swing plays. A null <paramref name="player"/> (nobody to chase) leaves the goblin standing
@@ -375,7 +375,7 @@ public sealed class Goblin : Mob
         _throwCooldown = MathF.Max(0f, _throwCooldown - deltaTime);
         _meleeCooldown = MathF.Max(0f, _meleeCooldown - deltaTime);
         _losRetry = MathF.Max(0f, _losRetry - deltaTime);
-        _noticePipElapsed = MathF.Min(WorldGenerationConfig.GoblinNoticePipSeconds,
+        _noticePipElapsed = MathF.Min(MobConfig.GoblinNoticePipSeconds,
             _noticePipElapsed + deltaTime);
 
         var move = Vector3.Zero;
@@ -421,17 +421,17 @@ public sealed class Goblin : Mob
             // Nobody chased (none noticed, or interest lost): stroll toward the wander goal
             var to = new Vector3(goal.X - Position.X, 0f, goal.Z - Position.Z);
             var dist = to.Length();
-            if (dist > WorldGenerationConfig.MobWanderArriveBlocks)
+            if (dist > MobConfig.MobWanderArriveBlocks)
             {
                 TurnToward(MathF.Atan2(-to.X, -to.Z), TurnRate, deltaTime);
                 _facingKnown = true;
-                move = to / dist * WorldGenerationConfig.MobWanderSpeedFactor;
+                move = to / dist * MobConfig.MobWanderSpeedFactor;
             }
         }
 
         // Ledge caution: never step off a drop the fall would punish unless the target is down there
         if (move != Vector3.Zero && IsGrounded
-            && IsLedgeAhead(move, HalfExtent + WorldGenerationConfig.MobLedgeProbeBlocks, chunks, player?.Eye))
+            && IsLedgeAhead(move, HalfExtent + MobConfig.MobLedgeProbeBlocks, chunks, player?.Eye))
             move = Vector3.Zero;
 
         // Walking: ease the horizontal velocity toward the chosen move (or friction toward a
@@ -439,9 +439,9 @@ public sealed class Goblin : Mob
         if (IsGrounded || _inWater)
         {
             var speed = IsGrounded
-                ? WorldGenerationConfig.GoblinWalkSpeed
-                  * (IsFleeing ? WorldGenerationConfig.GoblinFleeSpeedFactor : 1f)
-                : WorldGenerationConfig.GoblinWalkSpeed * SwimSpeedFactor;
+                ? MobConfig.GoblinWalkSpeed
+                  * (IsFleeing ? MobConfig.GoblinFleeSpeedFactor : 1f)
+                : MobConfig.GoblinWalkSpeed * SwimSpeedFactor;
             var moving = move != Vector3.Zero;
             var rate = moving ? MoveAccel : IsGrounded ? GroundFriction : 0f;
             if (rate > 0f)
@@ -458,7 +458,7 @@ public sealed class Goblin : Mob
             // Auto-jump a one-block step the goblin walked into last frame.
             if (moving && _hitWall)
             {
-                _velocity.Y = WorldGenerationConfig.GoblinJumpSpeed;
+                _velocity.Y = MobConfig.GoblinJumpSpeed;
                 IsGrounded = false;
             }
         }
@@ -490,8 +490,8 @@ public sealed class Goblin : Mob
 
         if (Ammo > 0)
         {
-            if (dist > WorldGenerationConfig.GoblinThrowMaxRange) return toward;
-            if (dist < WorldGenerationConfig.GoblinThrowMinRange) return -toward;
+            if (dist > MobConfig.GoblinThrowMaxRange) return toward;
+            if (dist < MobConfig.GoblinThrowMinRange) return -toward;
 
             // Grounded only, so the auto-jump can never lift the throw origin over a wall the
             // goblin is walking into; the LOS test is throttled while it stays blocked.
@@ -504,13 +504,13 @@ public sealed class Goblin : Mob
                     _aimTarget = chest;
                     _thrownOnce = true;
                     Animation.Play(ThrowClip);
-                    _throwCooldown = WorldGenerationConfig.GoblinThrowCooldownSeconds
-                                     + (Random.Shared.NextSingle() - 0.5f) * 2f * WorldGenerationConfig.GoblinThrowCooldownJitter;
+                    _throwCooldown = MobConfig.GoblinThrowCooldownSeconds
+                                     + (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.GoblinThrowCooldownJitter;
                     return Vector3.Zero;
                 }
 
                 _losBlocked = true;
-                _losRetry = WorldGenerationConfig.GoblinLosRetrySeconds;
+                _losRetry = MobConfig.GoblinLosRetrySeconds;
             }
 
             // Inside the band: hold, unless the last look found the line blocked, in which case
@@ -521,11 +521,11 @@ public sealed class Goblin : Mob
         if (InMeleeReach(Position, player.Eye) && _meleeCooldown <= 0f)
         {
             Animation.Play(MeleeClip);
-            _meleeCooldown = WorldGenerationConfig.GoblinMeleeCooldownSeconds;
+            _meleeCooldown = MobConfig.GoblinMeleeCooldownSeconds;
             return Vector3.Zero;
         }
 
-        return dist > WorldGenerationConfig.GoblinStandoffBlocks ? toward : Vector3.Zero;
+        return dist > MobConfig.GoblinStandoffBlocks ? toward : Vector3.Zero;
     }
 
     /// <summary>
@@ -541,7 +541,7 @@ public sealed class Goblin : Mob
 
         origin = ThrowOrigin;
         // The bool is ignored: an out-of-range player still gets the fallback toss.
-        GoblinAim.TryLaunchVelocity(origin, _aimTarget, WorldGenerationConfig.GoblinStoneSpeed,
+        GoblinAim.TryLaunchVelocity(origin, _aimTarget, MobConfig.GoblinStoneSpeed,
             ThrownProjectile.Gravity, out velocity);
         Ammo--;
         return true;

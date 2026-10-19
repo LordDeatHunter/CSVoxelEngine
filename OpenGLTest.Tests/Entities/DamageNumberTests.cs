@@ -168,7 +168,7 @@ public sealed class DamageNumberTests : IDisposable
         world.GetChunkManager().Headless = true;
         var near = world.Camera.Position + new Vector3(2f, 0f, 0f);
         var far = world.Camera.Position
-                  + new Vector3(WorldGenerationConfig.DamageNumberDeathRangeBlocks * 2f, 0f, 0f);
+                  + new Vector3(MobConfig.DamageNumberDeathRangeBlocks * 2f, 0f, 0f);
 
         world.ClientMirror.ApplyNetworkEntities([Slime(7, near, 4), Slime(8, far, 4)]);
         // The server stops listing both: the near one died, the far one is out of sight

@@ -71,15 +71,15 @@ internal sealed class SkyPasses
         _owner.MoonShader.SetUniform("uViewProj", viewRot * projection);
         _owner.MoonShader.SetUniform("uSunDir", -Lighting.SkySunDir);
         _owner.MoonShader.SetUniform("uHalfSize", 2f * 100f * MathF.Tan(MathUtils.ToRadians(
-            WorldGenerationConfig.MoonAngularRadiusDeg * WorldGenerationConfig.MoonGlowScale)));
-        _owner.MoonShader.SetUniform("uDiscFraction", 1f / WorldGenerationConfig.MoonGlowScale);
+            SkyConfig.MoonAngularRadiusDeg * SkyConfig.MoonGlowScale)));
+        _owner.MoonShader.SetUniform("uDiscFraction", 1f / SkyConfig.MoonGlowScale);
         _owner.MoonShader.SetUniform("uPhaseLight", MoonPhase.LightDirection(Lighting.MoonPhaseFraction));
         _owner.MoonShader.SetUniform("uLitFraction", MoonPhase.IlluminatedFraction(Lighting.MoonPhaseFraction));
-        _owner.MoonShader.SetUniform("uTerminator", WorldGenerationConfig.MoonTerminatorSoftness);
-        _owner.MoonShader.SetUniform("uEarthshine", WorldGenerationConfig.MoonEarthshine);
-        _owner.MoonShader.SetUniform("uGlowIntensity", WorldGenerationConfig.MoonGlowIntensity);
-        _owner.MoonShader.SetUniform("uGlowExponent", WorldGenerationConfig.MoonGlowExponent);
-        _owner.MoonShader.SetUniform("uMoonColor", MoonColorLinear * WorldGenerationConfig.MoonIntensity);
+        _owner.MoonShader.SetUniform("uTerminator", SkyConfig.MoonTerminatorSoftness);
+        _owner.MoonShader.SetUniform("uEarthshine", SkyConfig.MoonEarthshine);
+        _owner.MoonShader.SetUniform("uGlowIntensity", SkyConfig.MoonGlowIntensity);
+        _owner.MoonShader.SetUniform("uGlowExponent", SkyConfig.MoonGlowExponent);
+        _owner.MoonShader.SetUniform("uMoonColor", MoonColorLinear * SkyConfig.MoonIntensity);
         _owner.MoonShader.SetUniform("uVisibility", Lighting.MoonVisibility);
 
         _owner.SunQuad.Render();
@@ -124,10 +124,10 @@ internal sealed class SkyPasses
         // the shader keeps the textured disc inside the inner uDiscFraction of it. The unit
         // square's corners sit at +-0.5, hence the factor 2 to make uHalfSize the true radius.
         _owner.SunShader.SetUniform("uHalfSize", 2f * 100f * MathF.Tan(GameSettings.SunSize
-            * WorldGenerationConfig.SunGlowScale * MathF.PI / 180f));
-        _owner.SunShader.SetUniform("uDiscFraction", 1f / WorldGenerationConfig.SunGlowScale);
+            * SkyConfig.SunGlowScale * MathF.PI / 180f));
+        _owner.SunShader.SetUniform("uDiscFraction", 1f / SkyConfig.SunGlowScale);
         _owner.SunShader.SetUniform("uGlowIntensity", GameSettings.SunGlow);
-        _owner.SunShader.SetUniform("uGlowExponent", WorldGenerationConfig.SunGlowExponent);
+        _owner.SunShader.SetUniform("uGlowExponent", SkyConfig.SunGlowExponent);
         // An HDR intensity: the disc plus the sky behind it has to clear the tonemap knee by a
         // wide margin to read as display white, and the additive glow needs the same lift to show
         // over a bright linear sky as it did added in display space.

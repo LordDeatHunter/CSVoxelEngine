@@ -150,7 +150,7 @@ internal sealed class SelectionPasses : IDisposable
         _owner.SelectionShader.SetUniform("uDisplayMix", 0);
         _owner.SelectionShader.SetUniform("uTime", Lighting.Time);
         _owner.SelectionShader.SetUniform("uPulseDepth", SelectionPulse.Depth(mining));
-        _owner.SelectionShader.SetUniform("uPulsePeriod", WorldGenerationConfig.SelectionPulsePeriodSeconds);
+        _owner.SelectionShader.SetUniform("uPulsePeriod", HudConfig.SelectionPulsePeriodSeconds);
 
         // The outline is twelve edge beams (SelectionOutlineMesh) rather than GL lines, since
         // LineWidth is unreliable in a core profile. The vertices are already in world space.
@@ -169,8 +169,8 @@ internal sealed class SelectionPasses : IDisposable
             var half = (box.Size + outlinePad) * 0.5f;
             var center = blockPosition + box.Center;
             // Thickness grows with distance so the beam keeps roughly the same on-screen width
-            var thickness = MathF.Max(WorldGenerationConfig.SelectionOutlineMinThickness,
-                WorldGenerationConfig.SelectionOutlinePixelScale * Vector3.Distance(camera.Position, center));
+            var thickness = MathF.Max(HudConfig.SelectionOutlineMinThickness,
+                HudConfig.SelectionOutlinePixelScale * Vector3.Distance(camera.Position, center));
             SelectionOutlineMesh.BuildVertices(center - half, center + half, thickness, _outlineVertices);
             _gl.BufferSubData<Vector3>(BufferTargetARB.ArrayBuffer, 0, _outlineVertices);
             unsafe
@@ -216,7 +216,7 @@ internal sealed class SelectionPasses : IDisposable
 
     /// <summary>
     /// Draws the block-breaking crack overlay on every face of each of the block's hitboxes:
-    /// the sprite steps through <see cref="WorldGenerationConfig.BreakOverlayFrames"/> stacked
+    /// the sprite steps through <see cref="PlayerConfig.BreakOverlayFrames"/> stacked
     /// frames as progress goes 0 -> 1, the first frame being blank (see break-fragment.glsl).
     /// <paramref name="grow"/> is the block's current pop growth so the overlay tracks it while
     /// mining.
@@ -232,8 +232,8 @@ internal sealed class SelectionPasses : IDisposable
         _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
         boxes ??= BlockType.ById[blockId]?.Hitboxes ?? [BlockHitbox.FullCube];
-        var frame = Math.Clamp((int)(progress * WorldGenerationConfig.BreakOverlayFrames), 0,
-            WorldGenerationConfig.BreakOverlayFrames - 1);
+        var frame = Math.Clamp((int)(progress * PlayerConfig.BreakOverlayFrames), 0,
+            PlayerConfig.BreakOverlayFrames - 1);
         _owner.BreakShader.SetUniform("uFrame", (float)frame);
         Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.BreakProgressTexture);
 

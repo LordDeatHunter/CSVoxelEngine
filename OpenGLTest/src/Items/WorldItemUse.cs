@@ -326,7 +326,7 @@ internal sealed class WorldItemUse : IItemUseWorld
         // the tree's root in that column and grows it, or plants a sapling when there is none
         if (TreeSpeciesRegistry.ForBlock(Edits.BlockIdAt(cell)) is not { } species) return false;
         return _world.TryGrowTree(species.Name, (int)cell.X, (int)cell.Y, (int)cell.Z,
-            WorldGenerationConfig.AshGrowthPulses).Succeeded;
+            SimulationConfig.AshGrowthPulses).Succeeded;
     }
 
     bool IItemUseWorld.PlantTree(string species, Vector3 hit, Vector3 normal)
@@ -351,8 +351,8 @@ internal sealed class WorldItemUse : IItemUseWorld
         if (itemId == 0 || ItemRegistry.TryGet(itemId) is not { } item) return;
         var hand = Player.GetHandAnchorMatrix(Camera.Position, Camera.PlayerYaw,
             PlayerModel.FirstPersonBodyBack * (1f - Camera.ShoulderBlend), Camera.Pitch).Translation;
-        _debris.Spark(hand, ToolShatter.ColorOf(item, WorldGenerationConfig.ToolShatterFallbackColor),
-            0.12f, WorldGenerationConfig.ToolShatterCount, WorldGenerationConfig.ToolShatterSpeed,
-            WorldGenerationConfig.ToolShatterSize);
+        _debris.Spark(hand, ToolShatter.ColorOf(item, JuiceConfig.ToolShatterFallbackColor),
+            0.12f, JuiceConfig.ToolShatterCount, JuiceConfig.ToolShatterSpeed,
+            JuiceConfig.ToolShatterSize);
     }
 }

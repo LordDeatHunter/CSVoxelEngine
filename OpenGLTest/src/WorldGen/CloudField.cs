@@ -26,11 +26,11 @@ public struct CloudVertex(Vector3 position, Vector3 normal)
 public static class CloudField
 {
     /// <summary>Cells per field side, e.g. 2048 / 8 = 256.</summary>
-    public static int Cells => (int)(WorldGenerationConfig.CloudFieldSize / WorldGenerationConfig.CloudCellSize);
+    public static int Cells => (int)(SkyConfig.CloudFieldSize / SkyConfig.CloudCellSize);
 
     /// <summary>Levels[x, z] in 0..CloudMaxLevels for the configured field.</summary>
-    public static byte[,] BuildLevels() => BuildLevels(Cells, WorldGenerationConfig.CloudSeed,
-        WorldGenerationConfig.CloudThreshold, WorldGenerationConfig.CloudLevelStep, WorldGenerationConfig.CloudMaxLevels);
+    public static byte[,] BuildLevels() => BuildLevels(Cells, SkyConfig.CloudSeed,
+        SkyConfig.CloudThreshold, SkyConfig.CloudLevelStep, SkyConfig.CloudMaxLevels);
 
     /// <summary>
     /// Thresholds the density field into stacked layers: below <paramref name="threshold"/> the sky
@@ -78,7 +78,7 @@ public static class CloudField
         // These are the values the two bands were tuned to at the original 8-block cell: a macro
         // mass roughly every 512 blocks and outlines down to ~64. Every octave period must still
         // divide the field, which the power-of-two cell sizes guarantee.
-        var cellSize = WorldGenerationConfig.CloudFieldSize / cells;
+        var cellSize = SkyConfig.CloudFieldSize / cells;
         var macroSpacing = Math.Max(1, (int)MathF.Round(MacroWavelengthBlocks / cellSize));
         var detailSpacing = Math.Max(1, (int)MathF.Round(DetailWavelengthBlocks / cellSize));
         var macro = Fbm(cx, cz, cells, macroSpacing, 2, seed);
@@ -91,11 +91,11 @@ public static class CloudField
     private const float DetailWavelengthBlocks = 64f;
 
     /// <summary>
-    /// Meshes a level grid of any size; cell size and heights come from WorldGenerationConfig.
+    /// Meshes a level grid of any size; cell size and heights come from SkyConfig.
     /// Neighbor lookups wrap, so no faces land on the field seam.
     ///
     /// Every convex edge of the blocky level field is replaced by a fillet of radius
-    /// <see cref="WorldGenerationConfig.CloudCornerRadius"/>, which is why the old run merging is
+    /// <see cref="SkyConfig.CloudCornerRadius"/>, which is why the old run merging is
     /// gone: a cell's surface now depends on all eight of its neighbors, so neighboring cells no
     /// longer share a face that could be merged into a run. The pieces (cap tiles, quarter-cylinder
     /// fillets, sphere octants, horn-torus junctions, walls, vertical corner cylinders, ledges and
@@ -106,7 +106,7 @@ public static class CloudField
     {
         var sizeX = levels.GetLength(0);
         var sizeZ = levels.GetLength(1);
-        var s = WorldGenerationConfig.CloudCellSize;
+        var s = SkyConfig.CloudCellSize;
         var builder = new MeshBuilder();
         var nb = new int[3, 3];
 
@@ -121,8 +121,8 @@ public static class CloudField
                 nb[dx + 1, dz + 1] = levels[((x + dx) % sizeX + sizeX) % sizeX, ((z + dz) % sizeZ + sizeZ) % sizeZ];
 
             var cell = new Cell(nb, level, x * s, (x + 1) * s, z * s, (z + 1) * s);
-            EmitCap(builder, cell, WorldGenerationConfig.CloudHeight + level * WorldGenerationConfig.CloudLayerThickness, 1f, true);
-            EmitCap(builder, cell, WorldGenerationConfig.CloudHeight, -1f, false);
+            EmitCap(builder, cell, SkyConfig.CloudHeight + level * SkyConfig.CloudLayerThickness, 1f, true);
+            EmitCap(builder, cell, SkyConfig.CloudHeight, -1f, false);
             EmitWalls(builder, cell);
             EmitCornerColumns(builder, cell);
             EmitRiserPatches(builder, cell);
@@ -163,14 +163,14 @@ public static class CloudField
     private static (float Across, float Up, float NAcross, float NUp) Profile(
         float edge, int sEdge, float yb, float sy, float a)
     {
-        var r = WorldGenerationConfig.CloudCornerRadius;
+        var r = SkyConfig.CloudCornerRadius;
         var sin = MathF.Sin(a);
         var cos = MathF.Cos(a);
         return (edge - sEdge * r * (1f - sin), yb - sy * r + sy * r * cos, sEdge * sin, sy * cos);
     }
 
-    /// <summary>Angle of fillet step <paramref name="i"/> out of <see cref="WorldGenerationConfig.CloudFilletSegments"/>.</summary>
-    private static float Angle(int i) => i * MathF.PI / (2f * WorldGenerationConfig.CloudFilletSegments);
+    /// <summary>Angle of fillet step <paramref name="i"/> out of <see cref="SkyConfig.CloudFilletSegments"/>.</summary>
+    private static float Angle(int i) => i * MathF.PI / (2f * SkyConfig.CloudFilletSegments);
 
     /// <summary>
     /// One horizontal cap (top when <paramref name="sy"/> is +1, bottom when -1) as a 3x3 autotile:
@@ -182,7 +182,7 @@ public static class CloudField
     /// </summary>
     private static void EmitCap(MeshBuilder b, in Cell c, float yb, float sy, bool top)
     {
-        var r = WorldGenerationConfig.CloudCornerRadius;
+        var r = SkyConfig.CloudCornerRadius;
         // The top of a cell is buried wherever the neighbor stacks at least as high; the bottom is
         // buried wherever the neighbor has any layer at all, since every cell starts at CloudHeight.
         var need = top ? c.Level : 1;
@@ -241,7 +241,7 @@ public static class CloudField
     /// <summary>Quarter cylinder rolling the cap edge at x = <paramref name="cx"/> onto the x wall.</summary>
     private static void AddFilletX(MeshBuilder b, float cx, int sx, float yb, float sy, float za, float zb)
     {
-        var seg = WorldGenerationConfig.CloudFilletSegments;
+        var seg = SkyConfig.CloudFilletSegments;
         Span<uint> near = stackalloc uint[seg + 1];
         Span<uint> far = stackalloc uint[seg + 1];
         for (var i = 0; i <= seg; i++)
@@ -258,7 +258,7 @@ public static class CloudField
     /// <summary>Quarter cylinder rolling the cap edge at z = <paramref name="cz"/> onto the z wall.</summary>
     private static void AddFilletZ(MeshBuilder b, float cz, int sz, float yb, float sy, float xa, float xb)
     {
-        var seg = WorldGenerationConfig.CloudFilletSegments;
+        var seg = SkyConfig.CloudFilletSegments;
         Span<uint> near = stackalloc uint[seg + 1];
         Span<uint> far = stackalloc uint[seg + 1];
         for (var i = 0; i <= seg; i++)
@@ -279,8 +279,8 @@ public static class CloudField
     /// </summary>
     private static void AddOctant(MeshBuilder b, float cx, float cy, float cz, int sx, float sy, int sz)
     {
-        var r = WorldGenerationConfig.CloudCornerRadius;
-        var seg = WorldGenerationConfig.CloudFilletSegments;
+        var r = SkyConfig.CloudCornerRadius;
+        var seg = SkyConfig.CloudFilletSegments;
         var center = new Vector3(cx, cy, cz);
         var stride = seg + 1;
         Span<uint> grid = stackalloc uint[stride * stride];
@@ -316,8 +316,8 @@ public static class CloudField
     /// </summary>
     private static void AddTorus(MeshBuilder b, float cx, float cz, int sx, float sy, int sz, float yb)
     {
-        var r = WorldGenerationConfig.CloudCornerRadius;
-        var seg = WorldGenerationConfig.CloudFilletSegments;
+        var r = SkyConfig.CloudCornerRadius;
+        var seg = SkyConfig.CloudFilletSegments;
         var stride = seg + 1;
         Span<uint> grid = stackalloc uint[stride * stride];
         Span<Vector3> rim = stackalloc Vector3[stride];
@@ -348,7 +348,7 @@ public static class CloudField
     /// <summary>Point and unit normal on the horn torus wrapped around the corner (cx, yb, cz).</summary>
     private static (Vector3 P, Vector3 N) Torus(float cx, float cz, int sx, float sy, int sz, float yb, float ph, float th)
     {
-        var r = WorldGenerationConfig.CloudCornerRadius;
+        var r = SkyConfig.CloudCornerRadius;
         var ring = new Vector3(cx - sx * r * MathF.Cos(ph), yb - sy * r, cz - sz * r * MathF.Sin(ph));
         var d = Sphere(sx, sy, sz, th, ph);
         return (ring + r * d, d);
@@ -362,9 +362,9 @@ public static class CloudField
     /// </summary>
     private static void EmitWalls(MeshBuilder b, in Cell c)
     {
-        var t = WorldGenerationConfig.CloudLayerThickness;
-        var y0 = WorldGenerationConfig.CloudHeight;
-        var r = WorldGenerationConfig.CloudCornerRadius;
+        var t = SkyConfig.CloudLayerThickness;
+        var y0 = SkyConfig.CloudHeight;
+        var r = SkyConfig.CloudCornerRadius;
         var yt = y0 + c.Level * t;
 
         foreach (var (dx, dz) in Dirs)
@@ -406,10 +406,10 @@ public static class CloudField
     /// </summary>
     private static void EmitCornerColumns(MeshBuilder b, in Cell c)
     {
-        var t = WorldGenerationConfig.CloudLayerThickness;
-        var y0 = WorldGenerationConfig.CloudHeight;
-        var r = WorldGenerationConfig.CloudCornerRadius;
-        var seg = WorldGenerationConfig.CloudFilletSegments;
+        var t = SkyConfig.CloudLayerThickness;
+        var y0 = SkyConfig.CloudHeight;
+        var r = SkyConfig.CloudCornerRadius;
+        var seg = SkyConfig.CloudFilletSegments;
         var yt = y0 + c.Level * t;
         Span<uint> below = stackalloc uint[seg + 1];
         Span<uint> above = stackalloc uint[seg + 1];
@@ -454,7 +454,7 @@ public static class CloudField
     /// <summary>One horizontal ring of the corner cylinder at height <paramref name="y"/>.</summary>
     private static void AddRing(MeshBuilder b, Span<uint> ring, float ax, float az, int sx, int sz, float y)
     {
-        var r = WorldGenerationConfig.CloudCornerRadius;
+        var r = SkyConfig.CloudCornerRadius;
         for (var i = 0; i < ring.Length; i++)
         {
             var d = Ring(sx, sz, Angle(i));
@@ -474,9 +474,9 @@ public static class CloudField
     /// </summary>
     private static void EmitRiserPatches(MeshBuilder b, in Cell c)
     {
-        var t = WorldGenerationConfig.CloudLayerThickness;
-        var y0 = WorldGenerationConfig.CloudHeight;
-        var seg = WorldGenerationConfig.CloudFilletSegments;
+        var t = SkyConfig.CloudLayerThickness;
+        var y0 = SkyConfig.CloudHeight;
+        var seg = SkyConfig.CloudFilletSegments;
         Span<Vector3> rim = stackalloc Vector3[seg + 1];
 
         for (var sx = -1; sx <= 1; sx += 2)
@@ -499,7 +499,7 @@ public static class CloudField
     /// <summary>Point on the neighbor's fillet arc as it crosses our wall plane.</summary>
     private static Vector3 PatchPoint(in Cell c, int sx, int sz, int axis, float yd, float a)
     {
-        var r = WorldGenerationConfig.CloudCornerRadius;
+        var r = SkyConfig.CloudCornerRadius;
         var across = r * (1f - MathF.Sin(a));
         var y = yd - r + r * MathF.Cos(a);
         return axis == 0

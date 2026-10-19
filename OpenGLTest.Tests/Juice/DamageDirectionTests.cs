@@ -11,7 +11,7 @@ public sealed class DamageDirectionTests
     public DamageDirectionTests() => TestContent.EnsureLoaded();
 
     private const float Dt = 1f / 60f;
-    private const float ShowSeconds = WorldGenerationConfig.DamageArcHoldSeconds + WorldGenerationConfig.DamageArcFadeSeconds;
+    private const float ShowSeconds = JuiceConfig.DamageArcHoldSeconds + JuiceConfig.DamageArcFadeSeconds;
 
     // The knockback a blow from a source standing along `from` gives: away from it
     private static Vector3 AwayFrom(Vector3 from) => -from;
@@ -58,7 +58,7 @@ public sealed class DamageDirectionTests
         Assert.Equal(0f, arc.Intensity);
 
         arc.Hit(AwayFrom(Vector3.UnitZ));
-        Step(arc, WorldGenerationConfig.DamageArcHoldSeconds + WorldGenerationConfig.DamageArcFadeSeconds * 0.5f);
+        Step(arc, JuiceConfig.DamageArcHoldSeconds + JuiceConfig.DamageArcFadeSeconds * 0.5f);
         var fading = arc.Intensity;
         var direction = arc.ScreenDirection(0f);
         Assert.InRange(fading, 0.001f, 0.999f);

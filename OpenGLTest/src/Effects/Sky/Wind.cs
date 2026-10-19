@@ -17,8 +17,8 @@ public static class Wind
 
     /// <summary>Wind heading in radians at lighting time <paramref name="t"/>, measured from +X toward +Z.</summary>
     public static double AngleRad(double t) =>
-        WorldGenerationConfig.WindStartDegrees * DegToRad
-        + WorldGenerationConfig.WindTurnDegreesPerSecond * DegToRad * t;
+        SkyConfig.WindStartDegrees * DegToRad
+        + SkyConfig.WindTurnDegreesPerSecond * DegToRad * t;
 
     /// <summary>Unit downwind direction at time <paramref name="t"/>, as (x, z).</summary>
     public static Vector2 Direction(double t)
@@ -35,8 +35,8 @@ public static class Wind
     /// </summary>
     public static Vector2 Offset(double t, float speed)
     {
-        var omega = WorldGenerationConfig.WindTurnDegreesPerSecond * DegToRad;
-        var a0 = WorldGenerationConfig.WindStartDegrees * DegToRad;
+        var omega = SkyConfig.WindTurnDegreesPerSecond * DegToRad;
+        var a0 = SkyConfig.WindStartDegrees * DegToRad;
         if (Math.Abs(omega) < 1e-9)
             return new Vector2((float)(speed * t * Math.Cos(a0)), (float)(speed * t * Math.Sin(a0)));
         var a = a0 + omega * t;
@@ -50,7 +50,7 @@ public static class Wind
     /// rate stays the same everywhere in the (unbounded) world.
     /// </summary>
     public static float GustPhase(Vector2 anchorXZ, double t) =>
-        GustPhase(anchorXZ, t, Offset(t, WorldGenerationConfig.WindGustSpeed));
+        GustPhase(anchorXZ, t, Offset(t, SkyConfig.WindGustSpeed));
 
     /// <summary><see cref="GustPhase(Vector2, double)"/> with the gust offset
     /// (<c>Offset(t, WindGustSpeed)</c>) already in hand, so a caller sampling many anchors in one

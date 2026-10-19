@@ -8,7 +8,7 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 /// Cave formations: stone points hanging from cave ceilings and rising from cave floors, decided
 /// per cell from a pure hash of (cell, seed) so chunks agree at borders. A ceiling cell (air under
 /// solid rock) takes a stalactite, a floor cell (air over solid rock) a stalagmite, both at least
-/// <see cref="WorldGenerationConfig.CaveFormationMinDepth"/> under the column's height; a
+/// <see cref="WorldFeatureConfig.CaveFormationMinDepth"/> under the column's height; a
 /// stalactite also drips a stalagmite onto the floor of its own column when that cell is free, so
 /// the two read as a pair. Both blocks carry needsSupport (above and below), so mining the rock
 /// they hang from or stand on pops them; the far LOD shows none.
@@ -33,7 +33,7 @@ public static class CaveFormationGenerator
     {
         var h = SplitMix64.Hash(x, y ^ z, WorldGenerationConfig.Seed ^ 0x5A1A);
         return (SplitMix64.Mix(h + StalactiteStream) >> 40) * (1f / (1 << 24))
-               < WorldGenerationConfig.StalactiteChance;
+               < WorldFeatureConfig.StalactiteChance;
     }
 
     /// <summary>Whether a floor cell (x, y, z) carries a stalagmite, before the terrain checks.</summary>
@@ -41,7 +41,7 @@ public static class CaveFormationGenerator
     {
         var h = SplitMix64.Hash(x, y ^ z, WorldGenerationConfig.Seed ^ 0x5A1A);
         return (SplitMix64.Mix(h + StalagmiteStream) >> 40) * (1f / (1 << 24))
-               < WorldGenerationConfig.StalagmiteChance;
+               < WorldFeatureConfig.StalagmiteChance;
     }
 
     /// <summary>
@@ -56,7 +56,7 @@ public static class CaveFormationGenerator
         for (var z = 0; z < Chunk.Size; z++)
         {
             var height = column.Heights[(x << Chunk.SizeShift) | z];
-            var top = Math.Min(height - WorldGenerationConfig.CaveFormationMinDepth,
+            var top = Math.Min(height - WorldFeatureConfig.CaveFormationMinDepth,
                 worldY0 + Chunk.Size - 2);
             for (var y = top; y >= worldY0; y--)
             {

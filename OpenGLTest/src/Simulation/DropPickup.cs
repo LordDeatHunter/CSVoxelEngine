@@ -115,8 +115,8 @@ internal sealed class DropPickup
         {
             _sfx?.Play(SfxLibrary.PickupGroup);
             // Bright motes pop where the drop was collected, at the chest
-            _fire.Puff(Camera.Position - new Vector3(0f, WorldGenerationConfig.PickupSparkleDrop, 0f),
-                WorldGenerationConfig.PickupSparkleCount, WorldGenerationConfig.PickupSparkleSpread,
+            _fire.Puff(Camera.Position - new Vector3(0f, JuiceConfig.PickupSparkleDrop, 0f),
+                JuiceConfig.PickupSparkleCount, JuiceConfig.PickupSparkleSpread,
                 FireParticleKind.Spark);
         }
 

@@ -61,8 +61,8 @@ public sealed class ServerPlayer : IMobTarget
     public BreakProgress Breaking { get; } = new();
 
     /// <summary>Paces this player's edits (breaks, placements, uses and throws).</summary>
-    public RateLimiter EditLimiter { get; } = new(WorldGenerationConfig.NetEditIntentsPerSecond,
-        WorldGenerationConfig.NetEditIntentBurst);
+    public RateLimiter EditLimiter { get; } = new(NetworkConfig.NetEditIntentsPerSecond,
+        NetworkConfig.NetEditIntentBurst);
 
     private double _lastAttackAt = double.NegativeInfinity;
 
@@ -257,7 +257,7 @@ public sealed class ServerPlayer : IMobTarget
         var feet = Position.Y - Camera.EyeHeight;
         var fall = _fall.Observe(feet, PlayerBodyProbe.Grounded(Position, chunks), Flying,
             PlayerBodyProbe.InWater(Position, chunks), Creative,
-            NetValidation.AllowedDistance(stateGapSeconds, WorldGenerationConfig.NetMaxMoveBlocksPerSecond));
+            NetValidation.AllowedDistance(stateGapSeconds, NetworkConfig.NetMaxMoveBlocksPerSecond));
         if (fall > 0)
         {
             Status.TakeDamage(fall);

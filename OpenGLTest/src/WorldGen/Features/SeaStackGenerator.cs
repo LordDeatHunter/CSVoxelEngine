@@ -4,7 +4,7 @@ namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Sea stacks: rock pillars rising out of the shallow ocean near a coast, decided per
-/// 2^<see cref="WorldGenerationConfig.SeaStackCellShift"/>-block cell from a pure hash of
+/// 2^<see cref="WorldFeatureConfig.SeaStackCellShift"/>-block cell from a pure hash of
 /// (cell, seed). A site raises every column of its disc to a tapered top above the waterline, so
 /// the raise is part of the heightmap itself (<see cref="TerrainGenerator.Compute"/>): the far LOD
 /// reads the same heights, the columns become land (stone above the beach band, sand at the
@@ -21,11 +21,11 @@ public static class SeaStackGenerator
     {
         if (biome != Biome.Ocean) return height;
         if (height > WorldGenerationConfig.SeaLevel - 1
-            || height < WorldGenerationConfig.SeaLevel - WorldGenerationConfig.SeaStackShallowDepth)
+            || height < WorldGenerationConfig.SeaLevel - WorldFeatureConfig.SeaStackShallowDepth)
             return height;
 
-        var radius = WorldGenerationConfig.SeaStackRadius;
-        var shift = WorldGenerationConfig.SeaStackCellShift;
+        var radius = WorldFeatureConfig.SeaStackRadius;
+        var shift = WorldFeatureConfig.SeaStackCellShift;
         var minCellX = (x - radius) >> shift;
         var maxCellX = (x + radius) >> shift;
         var minCellZ = (z - radius) >> shift;
@@ -55,13 +55,13 @@ public static class SeaStackGenerator
         z = 0;
         top = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x57AC);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldGenerationConfig.SeaStackChance) return false;
+        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.SeaStackChance) return false;
 
-        var span = (ulong)(1 << WorldGenerationConfig.SeaStackCellShift);
-        x = (cellX << WorldGenerationConfig.SeaStackCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
-        z = (cellZ << WorldGenerationConfig.SeaStackCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
-        var tops = WorldGenerationConfig.SeaStackMaxHeight - WorldGenerationConfig.SeaStackMinHeight + 1;
-        top = WorldGenerationConfig.SeaLevel + WorldGenerationConfig.SeaStackMinHeight
+        var span = (ulong)(1 << WorldFeatureConfig.SeaStackCellShift);
+        x = (cellX << WorldFeatureConfig.SeaStackCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
+        z = (cellZ << WorldFeatureConfig.SeaStackCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        var tops = WorldFeatureConfig.SeaStackMaxHeight - WorldFeatureConfig.SeaStackMinHeight + 1;
+        top = WorldGenerationConfig.SeaLevel + WorldFeatureConfig.SeaStackMinHeight
               + (int)(SplitMix64.Mix(h + 3) % (ulong)tops);
         return true;
     }

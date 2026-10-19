@@ -11,11 +11,11 @@ namespace VoxelEngine.Tests.Effects.Sky;
 /// </summary>
 public sealed class MoonlightTests
 {
-    private static float Switch => WorldGenerationConfig.MoonlightSwitchSunElevation;
+    private static float Switch => SkyConfig.MoonlightSwitchSunElevation;
 
     // The key light's strength as a share of its own peak, on either side of the handover.
     private static float KeyShare(float sunElevation, float phase) => Moonlight.IsMoonLit(sunElevation)
-        ? Moonlight.Intensity(sunElevation, phase) / WorldGenerationConfig.MoonlightIntensity
+        ? Moonlight.Intensity(sunElevation, phase) / SkyConfig.MoonlightIntensity
         : Moonlight.SunFade(sunElevation);
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class MoonlightTests
     [Fact]
     public void TheWorldIsLitByTheSunByDayAndFromAboveTheHorizonByTheMoonAtNight()
     {
-        for (var t = 0.0; t < WorldGenerationConfig.DayLengthSeconds; t += 2.0)
+        for (var t = 0.0; t < SkyConfig.DayLengthSeconds; t += 2.0)
         {
             var sun = DayCycle.SunDirection(t);
             var key = Moonlight.Direction(sun);
@@ -100,7 +100,7 @@ public sealed class MoonlightTests
             previous = i;
         }
 
-        Assert.Equal(WorldGenerationConfig.MoonlightIntensity, previous, 5);
+        Assert.Equal(SkyConfig.MoonlightIntensity, previous, 5);
     }
 
     [Fact]

@@ -13,7 +13,7 @@ namespace VoxelEngine.UI.Hud;
 /// </summary>
 public sealed class HotbarNameFade
 {
-    private static float Total => WorldGenerationConfig.HotbarNameHoldSeconds + WorldGenerationConfig.HotbarNameFadeSeconds;
+    private static float Total => HudConfig.HotbarNameHoldSeconds + HudConfig.HotbarNameFadeSeconds;
 
     private bool _tracked;
     private int _slot;
@@ -31,8 +31,8 @@ public sealed class HotbarNameFade
     /// <summary>Opacity of the name: 1 right after a switch, fading to 0; always 0 for an empty slot.</summary>
     public float Alpha => ShownId == 0
         ? 0f
-        : MathUtils.HoldThenFade(Elapsed, WorldGenerationConfig.HotbarNameHoldSeconds,
-            WorldGenerationConfig.HotbarNameFadeSeconds);
+        : MathUtils.HoldThenFade(Elapsed, HudConfig.HotbarNameHoldSeconds,
+            HudConfig.HotbarNameFadeSeconds);
 
     /// <summary>
     /// Observes the selected slot once a frame. A change of the slot, or of the item it shows,

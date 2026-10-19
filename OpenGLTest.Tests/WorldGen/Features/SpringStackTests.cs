@@ -32,8 +32,8 @@ public sealed class SpringStackTests
 
         var shallow = WorldGenerationConfig.SeaLevel - 3;
         Assert.Equal(top, SeaStackGenerator.TopAt(centerX, centerZ, shallow, Biome.Ocean));
-        Assert.InRange(top, WorldGenerationConfig.SeaLevel + WorldGenerationConfig.SeaStackMinHeight,
-            WorldGenerationConfig.SeaLevel + WorldGenerationConfig.SeaStackMaxHeight);
+        Assert.InRange(top, WorldGenerationConfig.SeaLevel + WorldFeatureConfig.SeaStackMinHeight,
+            WorldGenerationConfig.SeaLevel + WorldFeatureConfig.SeaStackMaxHeight);
 
         // The pillar tapers: a column a block off the center sits lower
         Assert.True(SeaStackGenerator.TopAt(centerX + 1, centerZ, shallow, Biome.Ocean) < top);
@@ -56,8 +56,8 @@ public sealed class SpringStackTests
         for (var cellX = -60; cellX <= 60 && !found; cellX++)
         for (var cellZ = -60; cellZ <= 60 && !found; cellZ++)
         {
-            if (!HotSpringGenerator.TryGetSite(cellX << WorldGenerationConfig.SpringCellShift,
-                    cellZ << WorldGenerationConfig.SpringCellShift, out level))
+            if (!HotSpringGenerator.TryGetSite(cellX << WorldFeatureConfig.SpringCellShift,
+                    cellZ << WorldFeatureConfig.SpringCellShift, out level))
                 continue;
             found = true;
         }
@@ -70,17 +70,17 @@ public sealed class SpringStackTests
         for (var cellX = -60; cellX <= 60 && siteX == 0 && siteZ == 0; cellX++)
         for (var cellZ = -60; cellZ <= 60 && siteX == 0 && siteZ == 0; cellZ++)
         {
-            if (HotSpringGenerator.TryGetSite(cellX << WorldGenerationConfig.SpringCellShift,
-                    cellZ << WorldGenerationConfig.SpringCellShift, out var siteLevel))
+            if (HotSpringGenerator.TryGetSite(cellX << WorldFeatureConfig.SpringCellShift,
+                    cellZ << WorldFeatureConfig.SpringCellShift, out var siteLevel))
             {
-                siteX = cellX << WorldGenerationConfig.SpringCellShift;
-                siteZ = cellZ << WorldGenerationConfig.SpringCellShift;
+                siteX = cellX << WorldFeatureConfig.SpringCellShift;
+                siteZ = cellZ << WorldFeatureConfig.SpringCellShift;
                 level = siteLevel;
             }
         }
         Assert.True(HotSpringGenerator.IsSite(siteX, siteZ));
-        Assert.True(HotSpringGenerator.IsSite(siteX + WorldGenerationConfig.SpringRadius - 1, siteZ));
-        Assert.False(HotSpringGenerator.IsSite(siteX + WorldGenerationConfig.SpringRadius + 1, siteZ));
+        Assert.True(HotSpringGenerator.IsSite(siteX + WorldFeatureConfig.SpringRadius - 1, siteZ));
+        Assert.False(HotSpringGenerator.IsSite(siteX + WorldFeatureConfig.SpringRadius + 1, siteZ));
         // The level is one under the center's land height, so the pond digs in rather than floods
         Assert.True(level < (int)TerrainGenerator.LandHeight(siteX, siteZ, out _, out _, out _, out _));
     }

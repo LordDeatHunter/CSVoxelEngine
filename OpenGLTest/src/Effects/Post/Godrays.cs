@@ -16,52 +16,52 @@ namespace VoxelEngine.Effects.Post;
 public static class Godrays
 {
     /// <summary>
-    /// The godrays' strength, 0..<see cref="WorldGenerationConfig.GodraysStrength"/>, for a camera whose
+    /// The godrays' strength, 0..<see cref="PostProcessConfig.GodraysStrength"/>, for a camera whose
     /// forward has dot <paramref name="alignment"/> with the sun, a sun at sine-elevation
     /// <paramref name="sunElevation"/>, <paramref name="cloudCover"/> (0..1) of cloud over the sun's
     /// disc and an eye <paramref name="wet"/> (0 dry .. 1 fully under water): zero turned
-    /// <see cref="WorldGenerationConfig.GodraysFacingDegrees"/> or more from the sun, zero with the sun
+    /// <see cref="PostProcessConfig.GodraysFacingDegrees"/> or more from the sun, zero with the sun
     /// at or below the horizon, zero under water; peaking for a sun near
-    /// <see cref="WorldGenerationConfig.GodraysPeakElevation"/> and falling to
-    /// <see cref="WorldGenerationConfig.GodraysNoonShare"/> of that overhead.
+    /// <see cref="PostProcessConfig.GodraysPeakElevation"/> and falling to
+    /// <see cref="PostProcessConfig.GodraysNoonShare"/> of that overhead.
     /// </summary>
     public static float Intensity(float alignment, float sunElevation, float cloudCover, float wet)
     {
-        var facing = MathUtils.SmoothStep(MathUtils.CosDeg(WorldGenerationConfig.GodraysFacingDegrees), 1f, alignment);
-        return WorldGenerationConfig.GodraysStrength * facing * Height(sunElevation)
-               * (1f - WorldGenerationConfig.GodraysCloudDim * MathUtils.Clamp01(cloudCover))
+        var facing = MathUtils.SmoothStep(MathUtils.CosDeg(PostProcessConfig.GodraysFacingDegrees), 1f, alignment);
+        return PostProcessConfig.GodraysStrength * facing * Height(sunElevation)
+               * (1f - PostProcessConfig.GodraysCloudDim * MathUtils.Clamp01(cloudCover))
                * (1f - MathUtils.Clamp01(wet));
     }
 
     /// <summary>
     /// How the sun's height weights the shafts, 0..1: rising from 0 at the horizon to 1 at
-    /// <see cref="WorldGenerationConfig.GodraysPeakElevation"/>, then easing down to
-    /// <see cref="WorldGenerationConfig.GodraysNoonShare"/> with the sun straight overhead.
+    /// <see cref="PostProcessConfig.GodraysPeakElevation"/>, then easing down to
+    /// <see cref="PostProcessConfig.GodraysNoonShare"/> with the sun straight overhead.
     /// </summary>
     public static float Height(float sunElevation)
     {
-        var peak = WorldGenerationConfig.GodraysPeakElevation;
+        var peak = PostProcessConfig.GodraysPeakElevation;
         var rise = MathUtils.SmoothStep(0f, peak, sunElevation);
-        var fall = MathUtils.Lerp(1f, WorldGenerationConfig.GodraysNoonShare, MathUtils.SmoothStep(peak, 1f, sunElevation));
+        var fall = MathUtils.Lerp(1f, PostProcessConfig.GodraysNoonShare, MathUtils.SmoothStep(peak, 1f, sunElevation));
         return rise * fall;
     }
 
     /// <summary>
     /// The share of the light scattered toward the eye over <paramref name="litBlocks"/> blocks of
-    /// sunlit air along a view ray, 0..1: 1 - exp(-litBlocks * <see cref="WorldGenerationConfig.GodraysDensityPerBlock"/>).
+    /// sunlit air along a view ray, 0..1: 1 - exp(-litBlocks * <see cref="PostProcessConfig.GodraysDensityPerBlock"/>).
     /// Linear for short sunlit stretches (the shafts between shadows) and saturating for a long open
     /// ray toward the sun, so the sky round it is never washed out. Twin of the scatter in
-    /// godrays-fragment.glsl, which multiplies it by <see cref="WorldGenerationConfig.GodraysMaxAdd"/>.
+    /// godrays-fragment.glsl, which multiplies it by <see cref="PostProcessConfig.GodraysMaxAdd"/>.
     /// </summary>
     public static float Scatter(float litBlocks) =>
-        1f - MathF.Exp(-MathF.Max(litBlocks, 0f) * WorldGenerationConfig.GodraysDensityPerBlock);
+        1f - MathF.Exp(-MathF.Max(litBlocks, 0f) * PostProcessConfig.GodraysDensityPerBlock);
 
     /// <summary>
     /// How much of the light scattered along a view ray reaches the eye for a ray whose cosine to the
-    /// sun is <paramref name="cosToSun"/>: a floor of <see cref="WorldGenerationConfig.GodraysPhaseFloor"/>
+    /// sun is <paramref name="cosToSun"/>: a floor of <see cref="PostProcessConfig.GodraysPhaseFloor"/>
     /// looking away, rising to 1 straight at the sun. Twin of the phase in godrays-fragment.glsl.
     /// </summary>
     public static float Phase(float cosToSun) =>
-        MathUtils.Lerp(WorldGenerationConfig.GodraysPhaseFloor, 1f,
-            MathF.Pow(MathF.Max(cosToSun, 0f), WorldGenerationConfig.GodraysPhaseExponent));
+        MathUtils.Lerp(PostProcessConfig.GodraysPhaseFloor, 1f,
+            MathF.Pow(MathF.Max(cosToSun, 0f), PostProcessConfig.GodraysPhaseExponent));
 }

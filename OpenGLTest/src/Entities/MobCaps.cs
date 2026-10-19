@@ -6,10 +6,10 @@ namespace VoxelEngine.Entities;
 /// <summary>
 /// The two global mob caps every kind spawns under, judged against the living mobs of every
 /// registered <see cref="IMobPopulation"/> together. A natural spawn (a manager's ring spawner) is
-/// refused once <see cref="WorldGenerationConfig.MobNaturalCap"/> mobs live; a forced spawn (a slime
+/// refused once <see cref="MobConfig.MobNaturalCap"/> mobs live; a forced spawn (a slime
 /// splitting, a scenario, a save restore, a client mirroring its server) may pass that, but never
-/// <see cref="WorldGenerationConfig.MobHardCap"/>, which is also what the healthbar buffers are sized
-/// by (<see cref="WorldGenerationConfig.MobsMaxAlive"/>). <see cref="World"/> owns one and hands it to
+/// <see cref="MobConfig.MobHardCap"/>, which is also what the healthbar buffers are sized
+/// by (<see cref="MobConfig.MobsMaxAlive"/>). <see cref="World"/> owns one and hands it to
 /// every manager it builds; a manager built alone makes its own. Main thread only.
 /// </summary>
 public sealed class MobCaps
@@ -37,8 +37,8 @@ public sealed class MobCaps
     }
 
     /// <summary>Whether a ring spawner may add a mob: fewer than the natural cap are alive.</summary>
-    public bool AllowsNaturalSpawn => Living < WorldGenerationConfig.MobNaturalCap;
+    public bool AllowsNaturalSpawn => Living < MobConfig.MobNaturalCap;
 
     /// <summary>How many forced spawns still fit under the hard cap (0 once it is full).</summary>
-    public int ForcedRoom => Math.Max(0, WorldGenerationConfig.MobHardCap - Living);
+    public int ForcedRoom => Math.Max(0, MobConfig.MobHardCap - Living);
 }

@@ -18,17 +18,17 @@ internal static class CloudCover
 {
     /// <summary>
     /// How many layers the field cell under world column (<paramref name="x"/>, <paramref name="z"/>)
-    /// stacks this frame (0..<see cref="WorldGenerationConfig.CloudMaxLevels"/>),
+    /// stacks this frame (0..<see cref="SkyConfig.CloudMaxLevels"/>),
     /// <paramref name="drift"/> being the layer's wrapped drift (<see cref="CloudCopies.Drift"/>).
     /// The field repeats every field on both axes.
     /// </summary>
     public static int LevelAt(ReadOnlySpan<byte> coverage, int cells, float x, float z, Vector2 drift)
     {
-        var uv = CloudCopies.FieldUv(x, z, drift, WorldGenerationConfig.CloudFieldSize);
+        var uv = CloudCopies.FieldUv(x, z, drift, SkyConfig.CloudFieldSize);
         var i = MathUtils.Mod(MathUtils.FloorToInt(uv.X * cells), cells);
         var j = MathUtils.Mod(MathUtils.FloorToInt(uv.Y * cells), cells);
         // The bake stores round(255 * level / maxLevels), which this inverts exactly
-        return (int)MathF.Round(coverage[j * cells + i] * WorldGenerationConfig.CloudMaxLevels / 255f);
+        return (int)MathF.Round(coverage[j * cells + i] * SkyConfig.CloudMaxLevels / 255f);
     }
 
     /// <summary>
@@ -43,18 +43,18 @@ internal static class CloudCover
     public static float AlongRay(ReadOnlySpan<byte> coverage, int cells, Vector3 eye, Vector3 dir,
         Vector2 drift, float blocking)
     {
-        if (blocking <= 0f || dir.Y <= 1e-3f || eye.Y >= WorldGenerationConfig.CloudHeight) return 0f;
+        if (blocking <= 0f || dir.Y <= 1e-3f || eye.Y >= SkyConfig.CloudHeight) return 0f;
 
-        var tBase = (WorldGenerationConfig.CloudHeight - eye.Y) / dir.Y;
+        var tBase = (SkyConfig.CloudHeight - eye.Y) / dir.Y;
         var covered = false;
-        for (var k = 0; k <= WorldGenerationConfig.CloudMaxLevels && !covered; k++)
+        for (var k = 0; k <= SkyConfig.CloudMaxLevels && !covered; k++)
         {
-            var t = tBase + k * WorldGenerationConfig.CloudLayerThickness / dir.Y;
+            var t = tBase + k * SkyConfig.CloudLayerThickness / dir.Y;
             covered = LevelAt(coverage, cells, eye.X + dir.X * t, eye.Z + dir.Z * t, drift) >= Math.Max(k, 1);
         }
 
         if (!covered) return 0f;
-        var f = MathUtils.InverseLerp(WorldGenerationConfig.FogNearBlocks, WorldGenerationConfig.FogFarBlocks, tBase);
+        var f = MathUtils.InverseLerp(LightingConfig.FogNearBlocks, LightingConfig.FogFarBlocks, tBase);
         return blocking * (1f - f * f * f);
     }
 
@@ -96,7 +96,7 @@ internal static class CloudCover
     /// is behind it at its opacity, which would leave a bright star glinting through the middle of
     /// a cloud, so these point lights are dimmed by this first.
     /// </summary>
-    public static float Blocking(float opacity) => WorldGenerationConfig.CloudOpacity <= 0f
+    public static float Blocking(float opacity) => SkyConfig.CloudOpacity <= 0f
         ? 0f
-        : MathUtils.Clamp01(opacity / WorldGenerationConfig.CloudOpacity);
+        : MathUtils.Clamp01(opacity / SkyConfig.CloudOpacity);
 }

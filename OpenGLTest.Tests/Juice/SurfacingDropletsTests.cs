@@ -54,7 +54,7 @@ public sealed class SurfacingDropletsTests
 
         var previous = droplets.Intensity;
         var previousSeconds = droplets.Seconds;
-        for (var t = 0f; t < WorldGenerationConfig.SurfacingDropletSeconds + 0.5f; t += Dt)
+        for (var t = 0f; t < JuiceConfig.SurfacingDropletSeconds + 0.5f; t += Dt)
         {
             Frame(droplets, eyeInFluid: false);
             Assert.True(droplets.Intensity <= previous);

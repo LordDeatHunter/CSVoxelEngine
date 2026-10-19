@@ -78,14 +78,14 @@ public class World
     private readonly FireParticleSystem _fire = new();
     // Embers and smoke over exposed lava: a separately tuned instance so a lava lake never
     // competes with campfires for spawn rate or ring slots
-    private readonly FireParticleSystem _lavaFire = new(WorldGenerationConfig.LavaEmberPerSecond,
-        WorldGenerationConfig.LavaSmokePerSecond, WorldGenerationConfig.LavaParticleMax,
+    private readonly FireParticleSystem _lavaFire = new(ParticleConfig.LavaEmberPerSecond,
+        ParticleConfig.LavaSmokePerSecond, ParticleConfig.LavaParticleMax,
         new Vector3(0.5f, FluidState.SourceHeight, 0.5f));
     // Torch flames: a third instance with tiny, tight particles spawned exactly at each flame point
     // (Chunk.FlamePoints, already world-exact, so no spawn offset)
-    private readonly FireParticleSystem _torchFire = new(WorldGenerationConfig.TorchEmberPerSecond,
-        WorldGenerationConfig.TorchSmokePerSecond, WorldGenerationConfig.TorchParticleMax, Vector3.Zero,
-        WorldGenerationConfig.TorchFlameJitter, WorldGenerationConfig.TorchFlameScale);
+    private readonly FireParticleSystem _torchFire = new(ParticleConfig.TorchEmberPerSecond,
+        ParticleConfig.TorchSmokePerSecond, ParticleConfig.TorchParticleMax, Vector3.Zero,
+        ParticleConfig.TorchFlameJitter, ParticleConfig.TorchFlameScale);
 
     // Every cell whose flame the particle system and the point lights draw: campfires plus kilns,
     // rebuilt once per update so both consumers read one list
@@ -187,7 +187,7 @@ public class World
 
     /// <summary>The floating damage numbers over struck mobs (see <see cref="DamageNumberPool"/>): from
     /// landed hits in singleplayer, from snapshot health drops on a client.</summary>
-    internal DamageNumberPool DamageNumbers { get; } = new(WorldGenerationConfig.DamageNumberCapacity);
+    internal DamageNumberPool DamageNumbers { get; } = new(MobConfig.DamageNumberCapacity);
 
     /// <summary>
     /// Server mode: the connected players, owned by the server and read once a frame by the drop
@@ -255,7 +255,7 @@ public class World
     public float LoadProgress => _loadGate?.Progress ?? 1f;
 
     /// <summary>
-    /// True when the world started playing because <see cref="WorldGenerationConfig.LoadTimeoutSeconds"/>
+    /// True when the world started playing because <see cref="StreamingConfig.LoadTimeoutSeconds"/>
     /// ran out rather than because its ready sphere was meshed. A loading screen can report it; the
     /// lifecycle tests assert it stays false.
     /// </summary>
@@ -421,11 +421,11 @@ public class World
             Phase = saveStore != null ? WorldPhase.Loading : WorldPhase.Playing;
             if (Phase == WorldPhase.Loading)
             {
-                _loadGate = new WorldLoadGate(WorldGenerationConfig.LoadReadyRadiusChunks,
-                    WorldGenerationConfig.LoadTimeoutSeconds);
-                _chunkManager.MeshUploadBudget = WorldGenerationConfig.LoadingMeshUploadsPerFrame;
-                _chunkManager.DirtyStartBudget = WorldGenerationConfig.LoadingDirtyChunksPerFrame;
-                _lodManager.UploadBudget = WorldGenerationConfig.LoadingLodUploadsPerFrame;
+                _loadGate = new WorldLoadGate(StreamingConfig.LoadReadyRadiusChunks,
+                    StreamingConfig.LoadTimeoutSeconds);
+                _chunkManager.MeshUploadBudget = StreamingConfig.LoadingMeshUploadsPerFrame;
+                _chunkManager.DirtyStartBudget = StreamingConfig.LoadingDirtyChunksPerFrame;
+                _lodManager.UploadBudget = StreamingConfig.LoadingLodUploadsPerFrame;
                 Camera.SuppressLook = true;
             }
 
@@ -1060,9 +1060,9 @@ public class World
     /// </summary>
     private void FinishLoading()
     {
-        _chunkManager.MeshUploadBudget = WorldGenerationConfig.MaxMeshUploadsPerFrame;
-        _chunkManager.DirtyStartBudget = WorldGenerationConfig.MaxDirtyChunksPerFrame;
-        _lodManager.UploadBudget = WorldGenerationConfig.MaxLodUploadsPerFrame;
+        _chunkManager.MeshUploadBudget = StreamingConfig.MaxMeshUploadsPerFrame;
+        _chunkManager.DirtyStartBudget = StreamingConfig.MaxDirtyChunksPerFrame;
+        _lodManager.UploadBudget = StreamingConfig.MaxLodUploadsPerFrame;
         Camera.SuppressLook = false;
         if (Persistence.SavedPlayer?.LightingClock is { } clock)
             TimeOffset = clock - Now;
@@ -1077,9 +1077,9 @@ public class World
     /// <summary>
     /// Saves and tears the world down so a second <see cref="World"/> (with any seed) can be built
     /// in this process. Main thread only, and blocking: up to
-    /// <see cref="WorldGenerationConfig.WorkerStopJoinTimeoutMs"/> per worker thread, plus
-    /// <see cref="WorldGenerationConfig.MeshDrainTimeoutMs"/> and
-    /// <see cref="WorldGenerationConfig.SaveWriterShutdownTimeoutSeconds"/>.
+    /// <see cref="SaveConfig.WorkerStopJoinTimeoutMs"/> per worker thread, plus
+    /// <see cref="SaveConfig.MeshDrainTimeoutMs"/> and
+    /// <see cref="SaveConfig.SaveWriterShutdownTimeoutSeconds"/>.
     /// <list type="number">
     /// <item>The camera stops listening to the window and mouse.</item>
     /// <item>The generation and LOD workers are stopped and joined and the mesh runners drained
@@ -1111,9 +1111,9 @@ public class World
         Camera.Detach();
         var genStopped = _generationWorker.Stop();
         var lodStopped = _lodManager.Stop();
-        var drained = _chunkManager.DrainMeshWork(TimeSpan.FromMilliseconds(WorldGenerationConfig.MeshDrainTimeoutMs));
+        var drained = _chunkManager.DrainMeshWork(TimeSpan.FromMilliseconds(SaveConfig.MeshDrainTimeoutMs));
         Persistence.FlushAll();
-        var written = _saveStore?.Shutdown(TimeSpan.FromSeconds(WorldGenerationConfig.SaveWriterShutdownTimeoutSeconds)) ?? true;
+        var written = _saveStore?.Shutdown(TimeSpan.FromSeconds(SaveConfig.SaveWriterShutdownTimeoutSeconds)) ?? true;
 
         var quiet = genStopped && lodStopped && drained;
         if (quiet)

@@ -35,7 +35,7 @@ public static class ServerProgram
 
     public static void Main(string[] args)
     {
-        var allowCreative = WorldGenerationConfig.ServerAllowCreative
+        var allowCreative = NetworkConfig.ServerAllowCreative
             || Array.Exists(args, a => a.Equals("--allow-creative", StringComparison.OrdinalIgnoreCase));
         var sourceArg = ArgValue(args, SourceFlag);
         if (sourceArg == null && Array.Exists(args, a => a.Equals(SourceFlag, StringComparison.OrdinalIgnoreCase)))
@@ -137,7 +137,7 @@ public static class ServerProgram
         // Set by the main loop's finally once the world is saved, so a shutdown signal can wait
         // for the save before letting the process end.
         var stopped = new ManualResetEventSlim(false);
-        var shutdownWait = TimeSpan.FromSeconds(WorldGenerationConfig.ServerShutdownWaitSeconds);
+        var shutdownWait = TimeSpan.FromSeconds(NetworkConfig.ServerShutdownWaitSeconds);
         Console.CancelKeyPress += (_, e) =>
         {
             e.Cancel = true;

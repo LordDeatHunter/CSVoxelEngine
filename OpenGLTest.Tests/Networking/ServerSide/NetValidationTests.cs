@@ -11,7 +11,7 @@ namespace VoxelEngine.Tests.Networking.ServerSide;
 /// </summary>
 public sealed class NetValidationTests
 {
-    private const float MaxSpeed = WorldGenerationConfig.NetMaxMoveBlocksPerSecond;
+    private const float MaxSpeed = NetworkConfig.NetMaxMoveBlocksPerSecond;
 
     [Fact]
     public void APlausibleMoveIsAcceptedVerbatim()
@@ -63,7 +63,7 @@ public sealed class NetValidationTests
     public void AnEditIsOnlyInReachWithinTheClientsInteractionReach()
     {
         var eye = new Vector3(0.5f, 64.5f, 0.5f);
-        var reach = WorldGenerationConfig.NetMaxEditReachBlocks;
+        var reach = NetworkConfig.NetMaxEditReachBlocks;
         var near = (int)World.InteractionReach - 1;
         var far = (int)(reach * 3f);
 

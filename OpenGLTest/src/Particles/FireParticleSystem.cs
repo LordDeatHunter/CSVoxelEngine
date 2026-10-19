@@ -32,12 +32,12 @@ public sealed class FireParticleSystem
     private float _emberDebt;
     private float _smokeDebt;
 
-    /// <summary>The campfire tuning: <see cref="WorldGenerationConfig.FireEmberPerSecond"/>,
-    /// <see cref="WorldGenerationConfig.FireSmokePerSecond"/>, <see cref="WorldGenerationConfig.FireParticleMax"/>
+    /// <summary>The campfire tuning: <see cref="ParticleConfig.FireEmberPerSecond"/>,
+    /// <see cref="ParticleConfig.FireSmokePerSecond"/>, <see cref="ParticleConfig.FireParticleMax"/>
     /// and <see cref="SpawnOffset"/>.</summary>
     public FireParticleSystem()
-        : this(WorldGenerationConfig.FireEmberPerSecond, WorldGenerationConfig.FireSmokePerSecond,
-            WorldGenerationConfig.FireParticleMax, SpawnOffset)
+        : this(ParticleConfig.FireEmberPerSecond, ParticleConfig.FireSmokePerSecond,
+            ParticleConfig.FireParticleMax, SpawnOffset)
     {
     }
 
@@ -76,7 +76,7 @@ public sealed class FireParticleSystem
         {
             var dx = cell.X + 0.5f - cameraPos.X;
             var dz = cell.Z + 0.5f - cameraPos.Z;
-            if (dx * dx + dz * dz > WorldGenerationConfig.FireParticleRadius * WorldGenerationConfig.FireParticleRadius)
+            if (dx * dx + dz * dz > ParticleConfig.FireParticleRadius * ParticleConfig.FireParticleRadius)
                 continue;
             _emberDebt += deltaTime * _embersPerSecond;
             _smokeDebt += deltaTime * _smokePerSecond;

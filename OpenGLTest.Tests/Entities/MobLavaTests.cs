@@ -78,7 +78,7 @@ public sealed class MobLavaTests
     {
         var chunks = HalfLava();
         var slime = new Slime(EntityRegistry.Require("slime"), new Vector3(3.5f, 1.05f + Slime.HalfExtent, 8.5f));
-        var almost = WorldGenerationConfig.MobLavaTickSeconds * 0.8f;
+        var almost = MobConfig.MobLavaTickSeconds * 0.8f;
         for (var t = 0f; t < almost; t += Dt)
             slime.UpdateHazards(Dt, chunks);
 

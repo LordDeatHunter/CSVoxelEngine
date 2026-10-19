@@ -21,7 +21,7 @@ uniform float uSkyTintAmount;
 
 // Stars (StarField is the C# twin). Per frame: how visible they are (0 by day) and the cos of
 // the outer and inner radius of the starless disc around the sun. The rest is
-// WorldGenerationConfig tuning, set once by SkyRenderer.
+// SkyConfig tuning, set once by SkyRenderer.
 uniform float uStarVisibility;
 uniform vec2 uStarSunMask;
 uniform float uStarCells;

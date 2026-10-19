@@ -21,7 +21,7 @@ public sealed class HotbarPickupPopTests
         Assert.False(pops.Observe(2, 5, 10));
         Assert.True(pops.Observe(2, 5, 11));
 
-        pops.Advance(WorldGenerationConfig.HotbarPopSeconds * 0.25f);
+        pops.Advance(HudConfig.HotbarPopSeconds * 0.25f);
         Assert.True(pops.ScaleAt(2) > 1f);
         // Only the slot that rose pops
         Assert.Equal(1f, pops.ScaleAt(3));
@@ -66,11 +66,11 @@ public sealed class HotbarPickupPopTests
         Assert.Equal(1f, pops.FlashAt(3));
         Assert.Equal(0f, pops.FlashAt(4));
 
-        pops.Advance(WorldGenerationConfig.HotbarFlashSeconds * 0.5f);
+        pops.Advance(HudConfig.HotbarFlashSeconds * 0.5f);
         var half = pops.FlashAt(3);
         Assert.True(half > 0f && half < 1f, $"a half-flashed slot read {half}");
 
-        pops.Advance(WorldGenerationConfig.HotbarFlashSeconds);
+        pops.Advance(HudConfig.HotbarFlashSeconds);
         Assert.Equal(0f, pops.FlashAt(3));
         // An out-of-range slot never flashes and never throws
         pops.Flash(-1);
@@ -86,7 +86,7 @@ public sealed class HotbarPickupPopTests
         pops.Observe(0, 5, 2);
 
         var grew = false;
-        var frames = (int)(WorldGenerationConfig.HotbarPopSeconds / Dt) + 5;
+        var frames = (int)(HudConfig.HotbarPopSeconds / Dt) + 5;
         for (var i = 0; i < frames; i++)
         {
             pops.Advance(Dt);

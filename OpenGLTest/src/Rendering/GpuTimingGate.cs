@@ -10,14 +10,14 @@ namespace VoxelEngine.Rendering;
 /// same reason <c>ReflectionReuse</c> cites: <c>GpuPassTimer</c> needs a live GL context to
 /// construct and no test in the suite has one, so the only way to pin this policy headlessly is to
 /// keep it out here. The duty cycle lives in
-/// <see cref="WorldGenerationConfig.GpuTimingIdleInterval"/>.
+/// <see cref="PostProcessConfig.GpuTimingIdleInterval"/>.
 ///
 /// <para>What the keep-alive preserves.</para>
 /// The property worth keeping is not sample recency. <c>FrameProfiler</c> rebuilds its overlay rows
 /// only inside <c>Publish</c>, once a second, clearing the GPU accumulators there — so what a player
 /// sees the instant <c>X</c> is pressed is the <em>last published snapshot</em>, and the property is
 /// that that standing snapshot already carries GPU figures instead of <c>--</c>. With one timed
-/// frame in <see cref="WorldGenerationConfig.GpuTimingIdleInterval"/>, every publish window still
+/// frame in <see cref="PostProcessConfig.GpuTimingIdleInterval"/>, every publish window still
 /// holds <c>ceil(fps / GpuTimingIdleInterval)</c> samples for each always-run pass — about 12 at
 /// 100 fps — so the snapshot is populated by construction, at an eighth of the GL query traffic.
 ///
@@ -41,7 +41,7 @@ internal static class GpuTimingGate
     /// <summary>
     /// True when this frame issues its per-pass <c>TIME_ELAPSED</c> queries: always while the
     /// overlay is up, otherwise on one frame in
-    /// <see cref="WorldGenerationConfig.GpuTimingIdleInterval"/> as the keep-alive.
+    /// <see cref="PostProcessConfig.GpuTimingIdleInterval"/> as the keep-alive.
     /// </summary>
     /// <param name="overlayOn">The <c>X</c> profiler overlay is up this frame.</param>
     /// <param name="frameIndex">
@@ -52,7 +52,7 @@ internal static class GpuTimingGate
     internal static bool ShouldTime(bool overlayOn, long frameIndex)
     {
         if (overlayOn) return true;
-        var interval = WorldGenerationConfig.GpuTimingIdleInterval;
+        var interval = PostProcessConfig.GpuTimingIdleInterval;
         // <= 1 disables the gate entirely, which is also what keeps the modulo below safe.
         if (interval <= 1) return true;
         return frameIndex % interval == 0;

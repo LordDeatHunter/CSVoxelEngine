@@ -748,25 +748,25 @@ public static class TerrainGenerator
 
                 // An oasis: a hashed deep-desert site marks its disc (the fill and the far LOD
                 // wear grass there) and carves its flat pond into the heightmap
-                if (WorldGenerationConfig.OasesEnabled
+                if (WorldFeatureConfig.OasesEnabled
                     && OasisGenerator.TryGetDisc((int)worldX, (int)worldZ, out var oasisX, out var oasisZ,
                         out var oasisSurface))
                 {
                     oasis[i] = true;
                     if (OasisGenerator.IsPond((int)worldX, (int)worldZ) && oasisSurface < heightF)
                     {
-                        heightF = MathF.Min(heightF, oasisSurface - WorldGenerationConfig.OasisDepth);
+                        heightF = MathF.Min(heightF, oasisSurface - WorldFeatureConfig.OasisDepth);
                         waterLevel[i] = oasisSurface;
                     }
                 }
 
                 // A hot spring: a cold, hashed site carves its small pond and holds its own warm
                 // surface, which SnowGenerator never freezes and whose vents steam
-                if (WorldGenerationConfig.HotSpringsEnabled
+                if (WorldFeatureConfig.HotSpringsEnabled
                     && HotSpringGenerator.TryGetSite((int)worldX, (int)worldZ, out var springLevel)
                     && springLevel < heightF)
                 {
-                    heightF = MathF.Min(heightF, springLevel - WorldGenerationConfig.SpringDepth);
+                    heightF = MathF.Min(heightF, springLevel - WorldFeatureConfig.SpringDepth);
                     waterLevel[i] = springLevel;
                 }
 
@@ -774,7 +774,7 @@ public static class TerrainGenerator
 
                 // A sea stack: a hashed site in the shallow ocean raises the column into a tapered
                 // rock pillar, part of the heightmap so the far LOD reads it too
-                if (WorldGenerationConfig.SeaStacksEnabled)
+                if (WorldFeatureConfig.SeaStacksEnabled)
                 {
                     var stackTop = SeaStackGenerator.TopAt((int)worldX, (int)worldZ, height, biome);
                     if (stackTop > height) height = stackTop;

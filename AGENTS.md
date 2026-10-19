@@ -61,7 +61,7 @@ streams in `WorldPhase.Loading` behind an animated loading screen (`LoadingScree
 `LoadingScreenRenderer.DrawLoadingScreen`: a progress bar eased monotonically toward `World.LoadProgress`, a
 wall-clock spinner, the world name and `Generating terrain...` for a new world vs `Loading
 world...` for a saved one) and is **never rendered** until `IsLoaded`; after that the overlay
-fades out over `WorldGenerationConfig.LoadingFadeSeconds` (`UiPasses.RenderLoadingOverlay`).
+fades out over `HudConfig.LoadingFadeSeconds` (`UiPasses.RenderLoadingOverlay`).
 While `!World.IsPlaying` Program runs no gameplay input, no pause menu and no inventory, and the
 cursor stays captured from the World constructor on, so the Loading -> Playing flip never jumps
 the look. A menu-launched world's lighting clock is rebased at construction, so a new world
@@ -86,7 +86,7 @@ while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the liv
 goblins with health, facing, velocity, ammo and a slime's size plus still-pending entries, and up to
 `MaxSavedDrops` item drops, nearest first). See "Saves" below for the rules.
 
-Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `WorldGenerationConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; `damage` hurts every live mob, or the player's own pool with `"target": "player"`, then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, and an optional `"size"` (an integer from 1, default 1) is a slime's size; the entity name (`slime` or `goblin`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `SkyConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; `damage` hurts every live mob, or the player's own pool with `"target": "player"`, then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, and an optional `"size"` (an integer from 1, default 1) is a slime's size; the entity name (`slime` or `goblin`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
@@ -210,7 +210,7 @@ sum against the GPU's own `TIME_ELAPSED` measurement of the whole frame (`--` un
 query comes back), GC collections per second and the loaded/visible chunk counts. CPU timings are
 collected every frame; per-pass GPU timing is gated (`GpuTimingGate.ShouldTime`, latched once per
 frame in `GpuPassTimer.BeginGpuFrame`) — every frame while the overlay is up, and one frame in
-`WorldGenerationConfig.GpuTimingIdleInterval` while it is down, which keeps enough samples in each
+`PostProcessConfig.GpuTimingIdleInterval` while it is down, which keeps enough samples in each
 once-a-second window that the snapshot standing when `X` is pressed already carries GPU figures.
 The caveat is that a pass which does not run every frame (`selectPass`) can collect no samples at
 all across an overlay-down window and read `--` in that first snapshot. The overlay's own glyph
@@ -302,12 +302,12 @@ smooth `fBlockTint` (mirroring `LightTint.Decode`), the plain (entity) path read
 place of the old single `uTorchColor`; a GLSL constant that stands for one is written as its
 decoded value with the sRGB original in a comment. At the end of `WorldRenderer.Render` the `postPass`
 section calls `ScreenPasses.RenderPostProcess`, which binds framebuffer 0 and runs
-`PostProcessRenderer` (`post-fragment.glsl`): exposure (`WorldGenerationConfig.TonemapExposure`),
+`PostProcessRenderer` (`post-fragment.glsl`): exposure (`LightingConfig.TonemapExposure`),
 a per-channel clamp to 0..1 (what the old 8-bit target did, so snow and white sand clip to white
 rather than staying cream; `Tonemap.cs` is its tested C# twin), the exact sRGB encode, and the frame's one
 half-LSB dither. FXAA (SH-9) runs unconditionally inside the same pass, on display-space
 (tonemapped, encoded) taps filtered by hand from `texelFetch`, before the dither (knobs
-`WorldGenerationConfig.Fxaa*`; its contrast early-out keeps it near 1 ms at 1080p). The UI draws
+`PostProcessConfig.Fxaa*`; its contrast early-out keeps it near 1 ms at 1080p). The UI draws
 after it, straight into the gamma default framebuffer, so text and icons stay crisp and HUD
 colors stay display-space; the two textures it shares with the world (the atlas and the item
 meshes) are re-encoded in `ui-fragment.glsl` behind `uSrgbTex` (`UIRenderer`'s `atlasIsSrgb`
@@ -474,7 +474,7 @@ and 0.02-0.05 ms CPU while active, nothing otherwise. `GodraysTests`;
 `visual-examples/godrays.json` (`VOXEL_TIME` 395, 425, 147, with `VOXEL_DEBUG=1` for the cost).
 
 **Wind (SH-27).** `Wind.cs` is the one wind: a GL-free pure function of the lighting clock whose
-heading turns slowly (`WorldGenerationConfig.Wind*`), with `Wind.Offset` its bounded closed-form
+heading turns slowly (`SkyConfig.Wind*`), with `Wind.Offset` its bounded closed-form
 integral. Leaf sway reads it in both vertex shaders (`uWind`, the direction scaled by `WindLean`,
 leans the canopy downwind; `uWindOffset` advects the gust pattern, so the gust phase rate is the
 same anywhere in the world — keep the two sway blocks byte-identical), fire smoke and embers drift
@@ -608,7 +608,7 @@ so close blocks keep crisp pixels while distant ground stops sparkling); every o
 plain `Nearest`. Right after `ContentRegistry.BakeModels`, `TextureAtlas.ApplyCutoutMips`
 overwrites levels 1..n of every tile a cutout block wears (`BlockType.CutoutTiles`) with a
 `CutoutMipmap` chain whose alpha is rescaled per level to keep the coverage at
-`WorldGenerationConfig.AlphaCutoff` that level 0 has, so leaf canopies do not thin with distance.
+`LightingConfig.AlphaCutoff` that level 0 has, so leaf canopies do not thin with distance.
 
 **The material atlas.** `assets/textures/blocks_material/` holds a second `TEXTURE_2D_ARRAY`
 (`TextureAtlas.BuildMaterial`, texture unit 6) that is *index-parallel* to the block atlas: slice
@@ -632,7 +632,7 @@ UV orientation or the relief comes out rotated or mirrored per face. Regenerate 
 `tools/generate-ore-materials.ps1` (deterministic, byte-identical re-runs);
 `visual-examples/ores.json` is the screenshot check, and wants a `VOXEL_TIME` since the highlight
 tracks the sun. The ore body darkens by `metallic * 0.6` and the sun highlight, added in linear light,
-is scaled by `WorldGenerationConfig.OreSpecLinearScale` (`uOreSpecScale`), because the sRGB encode
+is scaled by `SurfaceShadingConfig.OreSpecLinearScale` (`uOreSpecScale`), because the sRGB encode
 lifts an add on the near-black body far more than it did in display space and smeared coal's
 specks into gray. Every other (non-ore, non-water) tile is plain diffuse: the SH-23 grazing sky
 rim was removed because it tinted grazing foliage teal. The one exception is the **snow sparkle**,
@@ -750,7 +750,7 @@ The alpha-tested tint tiles (every overlay, and a cutout block's replacement til
 `BlockType.CutoutTiles`, so they get the coverage-preserving mips a leaf tile gets. The color is
 `TerrainGenerator.Climate`, the temperature and humidity noises normalized through the biome ramps
 to warmth 0..1 (exactly 0.5 across the temperate band) and wetness 0..1, so the palette's four
-sRGB corners (`WorldGenerationConfig.GrassColorColdDry/ColdWet/WarmDry/WarmWet` and the slightly
+sRGB corners (`SurfaceShadingConfig.GrassColorColdDry/ColdWet/WarmDry/WarmWet` and the slightly
 darker `FoliageColor*`) sit on the biome lines. `BiomeTint` samples it on a 16-block lattice of
 chunk-column corners: `TintsAt` reads the climate once and returns both palettes (through
 `TintsFromClimate`), `FieldsFor(cx, cz)` gives a chunk column's `BiomeTintFields` (a grass and a
@@ -773,7 +773,7 @@ over 16 blocks of a field with a wavelength of thousands that cross term is far 
 and it is accepted). The tint rides the vertex rgb as `shade * tint` (`BiomeTint.Shade`), flagged by
 `Vertex.Normal` bit 4 (`IsBiomeTinted`), and the world fragment multiplies a flagged face by
 `BiomeTint.Gain` (4, mirrored by the literal `4.0` behind `fTintGain` in `test-vertex.glsl` — keep
-the two together): the textureless tiles are gray around `WorldGenerationConfig.BiomeTintTextureGray`
+the two together): the textureless tiles are gray around `SurfaceShadingConfig.BiomeTintTextureGray`
 (sRGB 98), so a byte rgb capped at 1 needs that headroom to reach grass green. The two grass tiles
 are supplied art; `tools/generate-leaf-textureless.ps1` writes each leaf one,
 `<name>_leaves_textureless.png`, from its `<name>_leaves.png` (Rec. 601 luminance, alpha copied,
@@ -909,6 +909,37 @@ OpenGLTest/
         ChunkScanFrontier.cs   # the shared resume point for the chunk-generation workers' closest-first offset scan (PERF_TODO C3)
         StreamingFocus.cs      # the published focus chunks (camera, or every connected player on a server):
                                #   an immutable array swapped only when a focus changes chunk
+    Config/                    # every tuning constant, one static class per domain (all const or static
+                               #   readonly, read concurrently by every thread; namespace VoxelEngine.Config)
+      AudioConfig.cs           # ambience bed paths, volumes and fades; the sfx volume
+      HudConfig.cs             # selection outline and pulse, hotbar name fade, pop and flash, the loading screen
+      JuiceConfig.cs           # landing and footstep dust, slime splat, hit sparks, death poof, blast shake and
+                               #   push, falling-block dust, lava steam, tree thud, splashes, tool shatter, pickup
+                               #   sparkle, low-health vignette, damage arc, surfacing droplets
+      LightingConfig.cs        # alpha cutoff, atlas anisotropy, light spread, shadow cascades, point and fire
+                               #   lights, fog, tonemap exposure, eye adaptation
+      MobConfig.cs             # mob caps and shared mob rules, slimes, goblins (flee, dodge, pack, torches, notice
+                               #   pip), healthbars, damage numbers
+      NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules, timeouts, LOD streaming,
+                               #   ServerAllowCreative
+      ParticleConfig.cs        # falling leaves, mining debris, campfire, lava and torch embers and smoke, bubbles,
+                               #   spring steam
+      PlayerConfig.cs          # break overlay, camera and swing feel (sprint FOV, strafe tilt, hit-stop, throw
+                               #   zoom), water depth states, throws, slime block, bandage
+      PostProcessConfig.cs     # biome grade, damage fringe, underwater wobble, FXAA, contact AO, godrays, GPU timer
+                               #   gate
+      SaveConfig.cs            # autosave, save writer retries and shutdown, teardown joins and drain, entity restore
+      SimulationConfig.cs      # fluid tick, tree felling, reactive growth, leaf decay, ash, saplings
+      SkyConfig.cs             # day length, sun and glare, sky dome, stars, moon, moonlight, aurora, clouds, wind
+      StreamingConfig.cs       # view radius, per-frame mesh, dirty and scan budgets, thread counts, LOD build and
+                               #   upload budgets, loading budgets and gate
+      SurfaceShadingConfig.cs  # per-tile shader terms (ore, snow, leaf backlight, grass shimmer, ice, glass, wet
+                               #   albedo, lava), biome tint palette, LOD sky exposure, leaf sway
+      WaterRenderConfig.cs     # reflection and its reuse, waves, refraction, absorption, caustics, underwater rays
+                               #   and fog, flow, foam, glitter, SSR, deep-water fog, LOD water sheet
+      WorldFeatureConfig.cs    # pebbles, flowers, foliage, cotton and the scenery generators
+      WorldGenerationConfig.cs # the seed and every worldgen knob: terrain, water levels, biomes, snow and ice, ores,
+                               #   lava, ravines, caves, worms, tree placement, worldgen cache sizes
     Content/                   # the data-driven content pipeline (ContentRegistry) — see "Content" below
       ContentRegistry.cs       # loads assets/data + assets/models, assigns byte ids, fills the tables
       Blocks/                  # block-side enums and resolved tables (renderer, break, attack, use, biome tint faces)
@@ -973,8 +1004,8 @@ OpenGLTest/
                                #   shared by every item sprite lying on a station
                                #   (the cooled cast, kiln fuel)
     Core/                      # GL-free utilities: math, springs, vectors, color space, logging, the frame
-                               #   profiler, launch mode, voxel coordinates, file IO, the vendored FastNoiseLite
-                               #   (never reformat) and every tuning constant (WorldGenerationConfig)
+                               #   profiler, launch mode, voxel coordinates, file IO and the vendored
+                               #   FastNoiseLite (never reformat)
       ColorSpace.cs            # exact sRGB transfer functions
       FastNoiseLite.cs         # vendored, don't reformat
       FileUtils.cs             # ReadFile: reads a file by path (assets are opened relative to the working directory)
@@ -987,7 +1018,6 @@ OpenGLTest/
       Vector2Utils.cs          # extension operations on Vector2 mirroring Vector3Utils
       Vector3Utils.cs          # extension operations on Vector3 that are repeated across gameplay, physics and render code
       VoxelCoords.cs           # chunk/world coordinate math shared by generation, physics and scheduling code
-      WorldGenerationConfig.cs # all tuning constants (view radius, per-frame budgets, thread counts) and every worldgen knob (seed, ravine, cave, carver)
     Data/                      # Vertex struct (32 B: float pos, rgba, float tile-local UV, sun/block bytes, a normal/sway/tint
                                #   ushort, ushort array-texture layer), cube geometry, frustum/plane math, direction tables
       CubeVertexPositions.cs   # the eight named corner positions of the unit cube
@@ -1147,7 +1177,7 @@ OpenGLTest/
       FirestarterItem.cs       # the firestarter's own code class: the worked example of a per-item override
       GrowTreeItem.cs          # grows the tree the targeted cell belongs to by a few pulses (ash on a trunk or a canopy)
       HealItem.cs              # restores health (a bandage): heals the player the use
-                               #   runs for by WorldGenerationConfig.BandageHealAmount
+                               #   runs for by PlayerConfig.BandageHealAmount
       IgniteItem.cs            # strikes a spark at the aimed block: a dry TNT block primes, a fully built firepit lights
       IItemUseWorld.cs         # what an Item override may query and change during Item.OnUse
       Item.cs, ItemFactory.cs  # the abstract item; the per-use.action factory building the singletons
@@ -2438,7 +2468,7 @@ Rules that follow from this:
 - A chunk is only meshed when its block data is ready **and all 6 cardinal neighbors exist with ready data** (`HasAllNeighbors`) — meshing reads neighbor blocks for face culling and cross-chunk AO. Breaking this reintroduces holes/seams at chunk borders (see git history). That scheduling check can go stale (the mesh task waits on the semaphore and an unload may take a neighbor away meanwhile), so `Chunk.GenerateMeshData` re-resolves the whole 3x3x3 neighborhood once up front and returns `null` when a face neighbor is gone; callers must then re-mark the chunk dirty rather than apply anything. Only the edge/corner neighbors may be absent, and those read as air (they feed light and fluid corner heights only). The same holds for the 3x3 chunk **columns** a build reads (`ChunkManager.ColumnSource`, see "Chunk meshing"): `ProcessDirtyChunks` drops, and `ImmediateRemesh` re-adds once, a chunk whose nine columns are not all `IColumnSource.IsReady` (an all-air chunk, whose build reads no column, is exempt; a fully enclosed one cannot be told apart without its columns and waits too), `ClientChunkStreamer.ApplyColumn` re-dirties the 3x3 chunk columns on arrival, which is what wakes it, and a build that still finds a column missing returns `null` like a vanished neighbor. The worldgen source is always ready, so singleplayer and the server never wait. A mesh build reaches worldgen only through `WorldgenColumnSource` and the seed-hashed pebble, branch-pile and snow emitters, which is why a seed swap still waits for `ChunkManager.DrainMeshWork`.
 - Shared state uses `ConcurrentDictionary`/`ConcurrentQueue`; `Chunk.IsBlockDataReady` is `volatile`. Keep new shared state lock-free in the same style. `ChunkManager.Chunks` is a `ChunkMap` (`Chunks/ChunkMap.cs`) wrapping a `ConcurrentDictionary<long, Chunk>` — it is a wrapper, never a `Dictionary` behind a lock, because chunk-gen workers write it and mesh-build pool workers read it.
 - Editing a block on a chunk border must also remesh the affected neighbor chunk(s) — block edits use `ChunkManager.ImmediateRemesh` / `MarkDirty`.
-- Performance tuning knobs all live in `WorldGenerationConfig`; change constants there rather than hardcoding budgets elsewhere.
+- Performance tuning knobs all live in the per-domain config classes under `src/Config/` (per-frame budgets and thread counts in `StreamingConfig`, worldgen knobs in `WorldGenerationConfig`, and so on); change constants there rather than hardcoding budgets elsewhere.
 - Animation curves (interpolation, easing, one-shot pulses) belong in `MathUtils`, not inline in gameplay or render code — everything time-driven should be lerped through one of those helpers rather than snapped.
 
 Other invariants:
@@ -2447,7 +2477,7 @@ Other invariants:
 - Blocks are `byte` IDs; `0` is air. Everything else about a block comes from `assets/data/blocks/<name>.json` through `ContentRegistry` (see "Content" above), never from a new `switch` on the id. Hot paths read the flat mirrors (`BlockType.IsSolid/Occludes/CastsAO`, `BlockType.Emission`, `BlockType.PassesLightById`) rather than `BlockType.ById[...]`, so keep new per-id flags in that shape.
 - **Per-block state byte**: alongside `Chunk._blocks` each chunk has a lazily allocated `volatile byte[]? _state` (null = all zero), read through `Chunk.GetLocalState` / `ChunkManager.GetStateGlobal` / `TryGetCell` and written only by `Chunk.SetBlockRaw` (no remesh, no scheduling — the fluid tick batches those). Six features share it, one per block: a **horizontal facing** (a `facing: "horizontal"` block such as the wall torch: bits 0-1 the facing, rest 0, written by placement through `Placement.TryMount`), **fluid levels** (`FluidState` decodes it as source `0`, falling `8` or flowing level `1..7`), **stack counts** (a `stackMax` block's 0 = untouched worldgen, 1..`stackMax` an explicit pile), a **multiblock's facing and offset** (`Multiblock.EncodeState`, `facing | dx<<2 | dy<<3 | dz<<4`, written by `Multiblock.Convert` through `SetBlockRaw`), **tree wood** (`WoodState` on a `tree_wood` block: bits 0-3 the thickness code, `FullCube` = 15 being a whole 16 px cell, bits 4-6 the parent direction in `Chunk.CubeFaces` order or `ParentRoot`/`ParentDetached`, bit 7 the shell flag) and **leaves** (`LeafState` on a leaf block: bits 0-2 the hydration, bit 3 the persistent flag) — see `### Trees`. The tree states are written by `TreeGenerator.Stamp` into the generated state array, by `TreeGrowthWriter` and `LeafDecayManager` through `SetBlockRaw`, and by placement, which passes an explicit state to `PlaceBlockAt` (`BlockPlacer.PlaceBlockAtFace` gives a placed log `WoodState.Detached` and a placed leaf a persistent `LeafState`). Which meaning a byte carries is decided entirely by the block id that owns the cell, so a new user must pick a block kind, never a spare bit. **Every write that is not one of those zeroes it** (`RemoveBlockAt`, `ClearBlockAt` and `PlaceBlockAt` with its default state `0` — which also treats a fluid cell as replaceable), and `Multiblock.Revert` likewise writes its source block with an explicit `0`, so a stale level, count, offset, thickness or hydration can never outlive the block that owned it. Meshing gets it as a second padded snapshot from `FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates)`, filled from the neighborhood `TryResolveNeighbors` resolved for the build; the fluid simulation must read cells through `TryGetCell`/`ChunkAt`, never `GetBlockGlobal`, which reports unloaded chunks as air. A seventh meaning belongs to the **openable** blocks (an `open` object in their JSON: the trapdoor, and both halves of a door, which always carry the same byte): `DoorState`, the facing in bits 0-1 like any facing block plus `DoorState.OpenBit` (bit 2), the rest zero; placement writes it closed, and the right-click toggle (`BlockInteractions.TryToggleOpenable`, through `ToggleOpenCell`) flips the bit alone through `Chunk.SetStateAt`. The mesher and `BlockShape` index a facing block's pre-turned models and boxes with `BlockType.ShapeIndex(state, count)` (`state & (count - 1)`), so four-shape blocks keep reading the facing and an openable block's eight read the open bit too.
 - **Station block entities**: `CampfireManager`, `QuernManager`, `KilnManager` and `CastingManager` are all owned by `World`, all **main thread only** and all in-memory only — a lit campfire, a spinning quern, a kiln's fuel and crucible and a mold's cast progress are lost on a restart, a save & quit or a chunk reload, even though the chunk's blocks and state bytes around them are saved (see "Saves"). Each is keyed by the cell (the kiln by its structure's anchor), each is ticked from `World.Update` and each has a `NotifyBlockRemoved` that `BlockEditor.RemoveBlock` calls so a broken station drops what it held. `World.FireCells` gathers every burning cell (campfires and lit kilns) once a frame and feeds both the fire billboards (`FireParticleSystem.SpawnOffset`) and the warm point lights (`FrameLighting.FireLightOffset`, which `RenderManager` still forwards for the tests), so a new fire source only has to appear in that list. Their render passes — `StationPasses.RenderQuerns`, `RenderKilns`, `RenderCastings` — sit inside the existing `entityPass` profiler span rather than adding sections of their own. On a multiplayer server they tick in the server's `World.Update` and a pour is bound to the pouring player (`CastState.PourSource`, its `PlayerContext`, which pauses once the player left); a client never ticks them: its managers are display-only mirrors replaced by the server's `StationState` snapshot (each manager's `WriteNet`/`ReadNet`, `StationNetCodec`), and only a quern top keeps turning between snapshots (`QuernManager.Animate`).
-- **Fluid tick**: `Simulation/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `BlockEditor.UpdateToppling`; it runs whole ticks every `WorldGenerationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiraling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis — the same budget `ChunkKey` (`src/Chunks/ChunkKey.cs`) uses to pack a **chunk** position for `ChunkMap` and for `ChunkManager`'s dirty/queued/generating/placement dictionaries; `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale, and neither floors nor truncates differently from `VoxelCoords.ChunkPosOf`), recomputes every **non-source** fluid cell from its neighbors (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbor, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). The level rules are per-fluid data (`flow.*` on the block: lava updates every other tick, spreads 3 instead of 7 and never forms new sources). Contact hardening runs before all of it: a fluid cell touching its `hardensTouching` fluid becomes `hardensTo` (lava beside water becomes cobblestone), and a flow settling against a fluid that hardens on its touch crusts over the same way, so water reaching lava also yields cobblestone whichever side ticks first. Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighborhood exactly when it changed or wrote into a neighbor, so settled water costs nothing.
+- **Fluid tick**: `Simulation/FluidManager.cs` (owned by `World`, main thread only) is a *scheduled-cell* simulation, not a scan. `World.Update` calls it once per frame after `BlockEditor.UpdateToppling`; it runs whole ticks every `SimulationConfig.FluidTickSeconds` (0.25 s), at most `MaxFluidTicksPerFrame` of them per frame, and drops the leftover time so a hitch never leaves it spiraling. Each tick takes the set of cells scheduled by the previous one (packed as `long`, 21 bits per axis — the same budget `ChunkKey` (`src/Chunks/ChunkKey.cs`) uses to pack a **chunk** position for `ChunkMap` and for `ChunkManager`'s dirty/queued/generating/placement dictionaries; `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale, and neither floors nor truncates differently from `VoxelCoords.ChunkPosOf`), recomputes every **non-source** fluid cell from its neighbors (Minecraft's `getNewLiquid`: two adjacent sources over ground that cannot drain become a source themselves, fluid directly above means falling, otherwise one level thinner than the fullest neighbor, and nothing left means the cell drains to air), then spreads it downwards, or sideways toward the nearest hole within `FluidSlopeSearchDistance` (ties spread evenly). The level rules are per-fluid data (`flow.*` on the block: lava updates every other tick, spreads 3 instead of 7 and never forms new sources). Contact hardening runs before all of it: a fluid cell touching its `hardensTouching` fluid becomes `hardensTo` (lava beside water becomes cobblestone), and a flow settling against a fluid that hardens on its touch crusts over the same way, so water reaching lava also yields cobblestone whichever side ticks first. Spreading only ever writes into non-fluid `IsReplaceable` cells, popping the fragile block it washes away through `DropManager.SpawnLoot`; a cell that already holds fluid recomputes itself on its own tick. Writes go through `Chunk.SetBlockRaw` and dirty only the cell's own chunk plus the face-adjacent chunk on each axis where the cell sits on a border, batched into `MarkDirty` at the end of the tick — not `ImmediateRemesh`, and never `MarkAreaDirty`, because a fluid passes light and casts no AO. A cell reschedules itself and its neighborhood exactly when it changed or wrote into a neighbor, so settled water costs nothing.
 - **Waking worldgen water**: the sea is generated as static source cells, so a cave or entrance carved into a land column beside it would leave a wall of water standing against worldgen air that nothing ever schedules. `FluidManager.WakeLoadedChunks(chunks)` — called from `World.Update` each frame, immediately before the fluid tick — fixes that by scheduling the frontier of its water against a carved cavity when it loads, so the sea pours into whatever breached it exactly like Minecraft water does when you dig into an ocean. Only cells at or below their column's natural terrain top count (`FluidManager.IsCarvedFlowTarget`), so open air above the terrain — a ravine, a beach, a hillside — is never woken and generated water stays static across it. It has two halves: the **interior**, collected on the generation worker at the end of `Chunk.GenerateBlockData` into `Chunk.FluidFrontier` (local block indices of every fluid cell with a `FluidManager.IsCarvedFlowTarget` neighbor in -X/+X/-Z/+Z/-Y — never +Y, since water does not flow upward and every sea-surface cell has air above it; only its own `_blocks` are read, so worldgen stays a pure per-chunk function), and the **borders**, which need both chunks loaded and are therefore scanned on the main thread over the shared 16x16 plane of each face neighbor, scheduling whichever side holds the fluid when the other side is a carved cavity (the vertical faces only ever schedule the fluid above the hole). Chunks entirely above every level they could share with a neighbor (`ColumnData.MaxWaterLevel`, never below `SeaLevel`) skip the border scan — generated water cannot reach them, and player-placed water is woken by the edit paths. The queue of newly generated chunks is `ChunkManager.TryDequeueLoaded`; a consumer must re-check that the chunk is still the live one at its position, because an unload can race the queue. Once the frontier has settled, it costs nothing again. Deep lava pockets wake through the same path: the frontier scan is fluid-generic, and chunks at or below `LavaMaxY` report theirs even when they never held sea water.
 - **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `BlockEditor.RemoveBlock`, `BlockEditor.FellWood` (per cleared cell, and in both single-block branches), `BlockPlacer.PlaceBlockAtFace` (which every placement ends in: `BlockPlacer.TryPlaceBlockFromRaycast` through `PlaceAgainstFace`, and the item-use `IItemUseWorld.PlaceBlockAtFace`), `BlockInteractions.ToggleOpenCell`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate` (`WorldItemUse`'s `ScoopFluidCell`/`PourFluidCell`), which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `BlockEditor.RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes fluids.
 - **Every block edit path must also call `LeafDecayManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the leaves near the edit never re-derive their hydration: a cut limb's canopy would hang forever, and an orphaned wood cell would never crumble. `Simulation/LeafDecayManager.cs` (owned by `World` as `_leafDecay`, main thread only) grows each scheduled box by its `ScheduleReach` itself, so a caller passes only the edited cells. The current call sites: `BlockEditor.RemoveBlock`; `BlockEditor.FellWood` (`ScheduleAround` in both single-block branches, one `ScheduleBox` over the whole felled batch, never one per cell); `BlockPlacer.PlaceBlockAtFace`, which every placement goes through (`BlockPlacer.TryPlaceBlockFromRaycast` and the item-use `IItemUseWorld.PlaceBlockAtFace`); the `IItemUseWorld` bucket and TNT-prime wrappers on `WorldItemUse` (`ScoopFluidCell`, `PourFluidCell`, `RemoveCellForPrime`), scheduled for uniformity; `BlockInteractions.ToggleOpenCell`; `TntManager.Detonate` (`ScheduleBox` over the blast box); and `TreeGrowthWriter` (one `ScheduleBox` over the box it wrote). A new edit path adds its call next to its `FluidManager.ScheduleAround`.
@@ -2573,7 +2603,7 @@ paths resolve). It is a **CLI**: it loads content headlessly (`ContentRegistry.L
 `TextureAtlas.RegisterTilesWithoutUpload` + `ContentRegistry.BakeModels`, the `TestContent`
 recipe), lists `WorldStore.List()` and asks for a world number or `N` for a new one (name and
 optional seed), asks for a port (default `ServerAddress.DefaultPort`, 25566; `--allow-creative` on
-the command line sets `GameServer.AllowCreative`, default `WorldGenerationConfig.ServerAllowCreative`,
+the command line sets `GameServer.AllowCreative`, default `NetworkConfig.ServerAllowCreative`,
 off, and every repeatable `--op <name>` joins `GameServer.Operators` with the names in the world
 folder's `ops.json` — see the creative permission below — and the server prints one line saying
 who may be creative), resolves the world source (`--source <name>`, else `world.json`'s
@@ -3319,7 +3349,7 @@ center), `Health`/`IsDead`, `Facing` (yaw, the model faces -Z at 0), `HitFlash`,
 manager has run and before `ThrowAction.UpdateThrown`, so a mob killed or despawned this frame is never hit or given
 a healthbar. The punch, the slice, the player's thrown items (`ThrownProjectile.Update`, an AABB overlap
 against each mob's body box, so a tall goblin is hit through its head and shins) and the healthbars
-(`EntityHealthbarRenderer`, buffers sized by `WorldGenerationConfig.MobsMaxAlive`, the hard cap
+(`EntityHealthbarRenderer`, buffers sized by `MobConfig.MobsMaxAlive`, the hard cap
 below) all read that one list. The render passes keep one list per kind, because the meshes differ; `ReflectionEntities`
 carries both. Ring spawning on dry, loaded forest surface goes through `Simulation/MobSpawner.cs`
 (`TryFindSurfaceSpawn`), and each manager wraps it with its own radii and body-center offset.
@@ -3389,7 +3419,7 @@ harmless), is shoved (harmlessly) by the player when grounded, floats to the sur
 item drop (its water hops keep a land hop's total speed but halve the vertical and move it into the
 horizontal, so it skims forward as a low jumping slide), and rolls its `loot` table on death. Natural
 spawns appear on dry forest surface in a 20-40 block ring around the player; `SlimeManager` holds the
-cadence, damage and shove numbers via `WorldGenerationConfig.Slime*`. Slimes come in **sizes**
+cadence, damage and shove numbers via `MobConfig.Slime*`. Slimes come in **sizes**
 (`Slime.Size`, `SlimeSize.Min`..`Max`, fixed for life): every scaled stat is the size-1 value times
 `1 + (size - 1) * step`, one `SlimeSize*Step` per stat — the body scale (`SizeScale`: the drawn model
 in `MobPasses.SlimeTransform`, multiplied over the squash spring, the collision box
@@ -3483,7 +3513,7 @@ range of a stone is `v²/g` (`GoblinStoneSpeed` 20 against gravity 28 gives abou
 throw band must stay inside it, with margin for a chest-height target and the semi-implicit Euler drop.
 `GoblinAimTests` locks that relation down, so retuning the speed or the band cannot silently make edge
 throws fall short. An out-of-range target still gets a 45-degree maximum-range toss toward it. Every
-goblin number lives under `WorldGenerationConfig.Goblin*`.
+goblin number lives under `MobConfig.Goblin*`.
 
 A goblin's life has more rules than its AI. **Flee**: below `GoblinFleeHealthShare` (a quarter) of
 its pool it turns and runs from the player at `GoblinFleeSpeedFactor` of its walk, never throwing or
@@ -3680,7 +3710,7 @@ overshoot or jiggle.
   the view cache is already keyed on, so none needs a key of its own: a landing dip, a directional
   hit kick (`AddHitKick`), an FOV pinch on a swing (`PunchFov`), a crouch eye drop and the death view
   (`DeathProgress`). The **sprint FOV** widening (`SprintFov`, knobs `SprintFov*` in
-  `WorldGenerationConfig`) is its own eased term *added* to the base FOV and the pinch: the sprint key
+  `PlayerConfig`) is its own eased term *added* to the base FOV and the pinch: the sprint key
   with movement on foot or flying, never sneaking or swimming, scaled by the speed and clamped at the
   on-foot sprint, so the 10x flight sprint widens no further. The **strafe tilt** (`StrafeTilt`,
   `StrafeTilt*` knobs) is likewise an eased term *added* to `_roll`: positive roll tips the view's up
@@ -3730,7 +3760,7 @@ overshoot or jiggle.
   (singleplayer only: a client's mobs are mirrors and never land). A slime splats its own goo instead,
   on every hop (`LandingDust.SplatCount`/`SplatSpeed`, linear in the impact like its squash kick, scaled
   by the slime's body scale `SlimeSize.Scale(size)`): `DebrisLook.Color` chips with an air id, one gray cube
-  (`BlockCubeCache.GetColorChip`, `WorldGenerationConfig.ColorChipTile`) painted through `uBiomeTint`
+  (`BlockCubeCache.GetColorChip`, `JuiceConfig.ColorChipTile`) painted through `uBiomeTint`
   with `BiomeTint.VertexTint` of the mean opaque skin color (`LandingDust.SkinColor`). Sprinting
   on foot over a `footstepDust` block (grounded, not sneaking, not in water, really moving) puffs once
   per foot strike of the gait: `PlayerModel.WalkPhase` crossing π/2 + kπ (`FootstepDust.FootfallsBetween`).
@@ -3899,7 +3929,8 @@ touch a file that violates one of them, fixing it is in scope.
   `OpenGLTest.Tests/GlobalUsings.cs`, `OpenGLTest.Server/GlobalUsings.cs`,
   `OpenGLTest.ItemDebugger/GlobalUsings.cs`) listing only the namespaces most of that
   project's files need: `VoxelEngine.Core` everywhere (the `Vector2Utils`/`Vector3Utils`
-  extension methods, `MathUtils`, `WorldGenerationConfig`, `Log`), plus `VoxelEngine.Chunks`,
+  extension methods, `MathUtils`, `Log`) and `VoxelEngine.Config` everywhere (the per-domain tuning
+  constants, read by the game, the server, the item debugger and the tests alike), plus `VoxelEngine.Chunks`,
   `VoxelEngine.Content` and `VoxelEngine.Tests.Support` in the test project. Everything else is
   an explicit `using` in the files that use it, including a using that only an XML `cref`
   needs (a doc build, `-p:GenerateDocumentationFile=true`, counts it as used; the plain build

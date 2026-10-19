@@ -6,7 +6,7 @@ namespace VoxelEngine.Chunks.Streaming;
 
 /// <summary>
 /// The shared resume point for the chunk-generation workers' closest-first offset scan
-/// (PERF_TODO C3). All <see cref="WorldGenerationConfig.MaxConcurrentBlockDataGenerations"/>
+/// (PERF_TODO C3). All <see cref="StreamingConfig.MaxConcurrentBlockDataGenerations"/>
 /// threads of one <see cref="ChunkGenerationWorker"/> share one instance per streaming focus, so the
 /// ~17k-entry sorted-offset list is walked roughly once per focus center instead of once per call
 /// per thread.
@@ -37,7 +37,7 @@ namespace VoxelEngine.Chunks.Streaming;
 /// version can therefore skip a position that turned needed mid-pass. It is skipped by that one
 /// call: the bump discards the node (nobody matches its version any more) and the next call scans
 /// from 0. The worst case is latency - a worker that returned null just inside the window sleeps
-/// <see cref="WorldGenerationConfig.GenerationDelayIdleMs"/> (200 ms) before rescanning - which is
+/// <see cref="StreamingConfig.GenerationDelayIdleMs"/> (200 ms) before rescanning - which is
 /// exactly the hole the pre-change full scan already had (sweep past a position, the position turns
 /// needed, sleep 200 ms). Meanwhile the other three workers sample after the bump and find it
 /// immediately. No position can be skipped permanently.</para>
@@ -46,7 +46,7 @@ namespace VoxelEngine.Chunks.Streaming;
 /// C', is closed by the version and not by the center: the unload pass at C' bumped the version, so
 /// the node is discarded even though the center reads equal again. That also demotes the
 /// coincidence that generation (ChunkGenerationWorker.BuildSortedOffsets) and unload
-/// (ChunkManager.cs:240) share <see cref="WorldGenerationConfig.ChunkRadiusSq"/> from a correctness
+/// (ChunkManager.cs:240) share <see cref="StreamingConfig.ChunkRadiusSq"/> from a correctness
 /// premise to a performance one: the shared radius is now only why the frontier SURVIVES a still
 /// camera, not why it is safe.</para>
 ///

@@ -49,7 +49,7 @@ Two profiler traps, read before trusting a number:
 
 The `reflect` row above predates reflection temporal reuse: the mirror is now
 re-rendered at most every other frame, gated by
-`WorldGenerationConfig.ReflectionReuseMaxDegrees` (1.0 °/frame),
+`WaterRenderConfig.ReflectionReuseMaxDegrees` (1.0 °/frame),
 `ReflectionReuseMaxMoveBlocks` (0.35), `ReflectionReuseMaxFovDegrees` (0.1) and
 `ReflectionReuseMaxAspect` (0.001), plus a forced refresh on target recreation, on
 the first eligible frame and after any skipped frame (never two skips in a row).
@@ -123,13 +123,13 @@ were all closed on **2026-09-20**, under an explicit human instruction to finish
 remaining bullet, and none of them is backlog any more.
 
 **R6 was implemented** — GPU timer queries now run every frame while the `X` overlay is up and on one
-frame in `WorldGenerationConfig.GpuTimingIdleInterval` while it is down; its entries under **What
+frame in `PostProcessConfig.GpuTimingIdleInterval` while it is down; its entries under **What
 landed** record what shipped, what it measured and what the gate gives up. **R3 moved to Ruled out
 (do not retry without new evidence)** with findings (a)/(b)/(c) intact: it had been resolved against
 the code and parked in an earlier round, it was not re-litigated here, and the human closing this
 round chose to stop carrying it rather than unpark it. **C5 was split** — the mechanism that shipped
 is under **What landed**, the *pool-size lever alone* is under **Ruled out** with the capture that
-killed it, and `WorldGenerationConfig.MaxConcurrentLodGenerations` ships at **1**. **D2b was
+killed it, and `StreamingConfig.MaxConcurrentLodGenerations` ships at **1**. **D2b was
 relocated to `TODO.md` `M-11`**, because its entries are irreproducible player edits, which makes it
 a correctness item entangled with save/load (`M-1`) rather than a perf item; the one-line pointer
 under **Not chasing** below keeps the part that still costs this file something.
@@ -231,7 +231,7 @@ needs, not the history.
   construction**. **What shipped:** `GpuTimingGate.ShouldTime(bool overlayOn, long frameIndex)`
   (`src/Rendering/GpuTimingGate.cs:52`) — GL-free and unit-tested on the `ReflectionReuse` precedent,
   because the GL pass classes need a live GL context and **no test in this suite has one**;
-  `WorldGenerationConfig.GpuTimingIdleInterval = 8` (`:291`), which keeps
+  `PostProcessConfig.GpuTimingIdleInterval = 8` (`:291`), which keeps
   `ceil(fps / GpuTimingIdleInterval)` samples per always-run pass in every publish window (~12 at
   100 fps); the gate **latched once per frame** in `GpuPassTimer.BeginGpuFrame(bool overlayOn)`
   and read by `BeginGpuPass` and `EndGpuPass`. The single call site is
@@ -358,7 +358,7 @@ needs, not the history.
   fixed at 3 and **not** read from the shipped constant (or lowering the constant would have silently
   defused them). The detail is in the three C5 bullets further down this section and in **The C5
   concurrency argument**. **What did not ship is the pool itself:**
-  `WorldGenerationConfig.MaxConcurrentLodGenerations` ships at **1**, the pool-size lever alone is
+  `StreamingConfig.MaxConcurrentLodGenerations` ships at **1**, the pool-size lever alone is
   under **Ruled out**, and its capture stands under **"Measurement: C5"**, untouched. Do not
   re-propose "a bigger pool".
 - **D5 · The geometry free list is an offset-keyed, max-augmented treap, and exact first fit survived
@@ -429,7 +429,7 @@ needs, not the history.
 - **D5 · The scouts' open correction, confirmed: the chunk side has no per-frame FREE cap either.**
   `ChunkManager.UnloadDistantChunks` (`ChunkManager.cs:228-267`) walks the whole `Chunks.Packed` table
   and disposes **every** out-of-range chunk in one frame; only the **upload** paths are capped
-  (`WorldGenerationConfig.MaxMeshUploadsPerFrame`, 32). So the bullet's "one free per disposed chunk"
+  (`StreamingConfig.MaxMeshUploadsPerFrame`, 32). So the bullet's "one free per disposed chunk"
   was an **unbounded burst on the chunk pools exactly as on the LOD pool**, and the 17077 -> 4991
   teleport figure is what one frame can hand to `Free`. The two sides also differ in a way that
   matters: chunks arrive in `ConcurrentDictionary` **hash order**, which bears no relation to
@@ -527,7 +527,7 @@ needs, not the history.
   are order-insensitive at convergence — so a per-frame output comparison is the WRONG gate.** This
   is the paragraph a later round needs so it does not rediscover an inherent consequence. Bucket
   layout changes by construction when the key type changes, and (1) `ProcessDirtyChunks` caps its
-  scan at `WorldGenerationConfig.MaxDirtyScanPerFrame` (1024) over `foreach (var kvp in
+  scan at `StreamingConfig.MaxDirtyScanPerFrame` (1024) over `foreach (var kvp in
   _dirtyChunks)`, so *which* dirty chunks a frame even considers is a function of bucket order;
   (2) the over-budget branch sorts `_dirtyCandidates` with an **unstable** `List.Sort` on `distSq`
   alone and takes the first `MaxDirtyChunksPerFrame` (64), and distance ties are everywhere on a
@@ -709,7 +709,7 @@ needs, not the history.
   ever cleared wholesale. **Capacities are unchanged** (16384 columns, 4096 cells), so peak
   residency does not move; the knobs moved into `WorldGenerationConfig` (`ColumnCacheCapacity` /
   `ColumnCacheGenerations`, `CellCacheCapacity` / `CellCacheGenerations`), which removes a standing
-  deviation from AGENTS.md's "tuning knobs live in `WorldGenerationConfig`" rule rather than adding
+  deviation from AGENTS.md's "tuning knobs live in the per-domain classes under `src/Config/`" rule rather than adding
   one. Ships at **G = 4**.
 - **D2 · Promotion is restricted to the oldest generation, and that is the design's load-bearing
   decision.** A hit in the newest or any middle generation is a **pure read with no write** — which
@@ -864,7 +864,7 @@ needs, not the history.
   a bisect landing on it is not mistaken for a leak.
 
 - **C5 · the LodGen pool.** `LodManager.Start` now spawns
-  `WorldGenerationConfig.MaxConcurrentLodGenerations` dedicated `Thread`s named `LodGen-{i}`,
+  `StreamingConfig.MaxConcurrentLodGenerations` dedicated `Thread`s named `LodGen-{i}`,
   `IsBackground = true`, `Priority = ThreadPriority.BelowNormal`, all running the same `WorkerLoop`;
   `Stop()` needed **no change**, because every worker polls the same volatile `_isRunning`. One
   `Log.WriteLine` of the pool size after the loop is the only way to confirm what a running build
@@ -887,7 +887,7 @@ needs, not the history.
   the only token that changed.
 - **C5 · the claim protocol, the in-flight cap and the retention ceilings.** `_building` (a
   `ConcurrentDictionary` claim set) gated on the **result** of `TryAdd` inside both claim paths;
-  `WorldGenerationConfig.MaxLodBuildsInFlight = 8` checked *before* any claim;
+  `StreamingConfig.MaxLodBuildsInFlight = 8` checked *before* any claim;
   `LodBuildThrottleDelayMs = 1`; `LodManager.MeshBuffers`' retention ceilings 4 -> **16**. The full
   argument is the next section — it is the round's reusable artifact and is the part worth keeping
   whatever happens to the pool size.
@@ -2496,7 +2496,7 @@ Body verbatim:
 ```
 
 Six thousand blocks clears **every** retention set with room to spare, which is the point: chunk
-retention is 256 blocks (`WorldGenerationConfig.ChunkRadius` 16 chunks), and LOD retention is
+retention is 256 blocks (`StreamingConfig.ChunkRadius` 16 chunks), and LOD retention is
 `RegionRadius + 1` = 9 regions at each level (`LodRegion.Levels`, all three specs at
 `RegionRadius: 8`), so even level 2 with its 256-block regions reaches only 2304 blocks. Both legs
 therefore evict the whole resident set in one frame on the chunk side and on all three LOD levels,
@@ -2853,7 +2853,7 @@ other three by decision rather than by code: **R3** to **Ruled out** carrying it
 **C5** split between **What landed** (the mechanism) and **Ruled out** (the pool-size lever alone),
 **D2b** relocated to `TODO.md` `M-11` because it is a correctness item entangled with save/load and
 never belonged in a perf file. R6 shipped a **per-frame-latched gate with an idle keep-alive**
-(`GpuTimingGate.ShouldTime`, `WorldGenerationConfig.GpuTimingIdleInterval = 8`), measured at
+(`GpuTimingGate.ShouldTime`, `PostProcessConfig.GpuTimingIdleInterval = 8`), measured at
 **37.8 -> 4.3 GL query calls a frame** on the same scenario — counted, never timed — with a
 zero-residue cross-tree pixel gate that, as its own entry says plainly, **could not have seen the only
 surface this change can touch**. The full account is the R6 bullets under **What landed**. The rounds
@@ -2967,7 +2967,7 @@ is in the R6 bullets under **What landed**, along with the finding that the alwa
 is *already* only about half reliable for passes after `lodPass` on this machine.
 
 **C5 — closed, and now filed as closed rather than listed as open.**
-`WorldGenerationConfig.MaxConcurrentLodGenerations` ships at **1**. The mechanism landed and stays —
+`StreamingConfig.MaxConcurrentLodGenerations` ships at **1**. The mechanism landed and stays —
 the TryAdd-gated claim protocol, the in-flight cap, the Idle/Throttled split, `CompletedBuildCount` and
 the raised retention ceilings, all correct at any N — and it is under **What landed**; the **pool-size
 lever alone** is under **Ruled out**, with its capture under **"Measurement: C5"**. It sat in the open
@@ -3172,7 +3172,7 @@ noisy fields is an artifact, not a separation. Compare fields, not tuples.
   linear is the reusable half: a LOD build is **terrain generation in disguise** (36 / 100 / 324 column
   prefetches at levels 0 / 1 / 2, each miss generated on the spot through `Chunk.ColumnCache`), so
   LodGen workers do not add throughput to an idle resource — they contend with the four chunk-gen
-  threads for the one the burst is already saturating. `WorldGenerationConfig.MaxConcurrentLodGenerations`
+  threads for the one the burst is already saturating. `StreamingConfig.MaxConcurrentLodGenerations`
   ships at **1**. The capture is under **"Measurement: C5"** and the argument under **"The C5
   concurrency argument"**; **everything except the extra threads landed and stays** (see **What
   landed**). Only the pool size is ruled out, and re-proposing it needs a capture that answers this one.

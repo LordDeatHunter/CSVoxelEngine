@@ -77,7 +77,7 @@ public sealed class SprintFovTests
         }
 
         Assert.True(widest > rest);
-        Assert.True(widest <= rest + WorldGenerationConfig.SprintFovExtraDegrees + 1e-4f);
+        Assert.True(widest <= rest + PlayerConfig.SprintFovExtraDegrees + 1e-4f);
         Assert.Equal(onFoot.CurrentFov, flying.CurrentFov, 3);
     }
 

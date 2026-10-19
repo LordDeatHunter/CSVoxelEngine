@@ -87,7 +87,7 @@ public sealed class TreeGrowthWriter
     /// <summary>
     /// Grows the tree of <paramref name="species"/> rooted in column (x, z) by up to
     /// <paramref name="steps"/> pulses (clamped to
-    /// <see cref="WorldGenerationConfig.TreeGrowMaxPulsesPerCall"/>) and writes the result. The root
+    /// <see cref="SimulationConfig.TreeGrowMaxPulsesPerCall"/>) and writes the result. The root
     /// is the first cell of the species' wood with the root parent code met scanning the column
     /// top-down over the species' reach window around <paramref name="yHint"/>. A column with no
     /// root plants a sapling on its ground instead (<see cref="TreeGrowthStatus.Planted"/>, or
@@ -226,7 +226,7 @@ public sealed class TreeGrowthWriter
         var radiusBefore = species.HasLeaves ? LeafCluster.ClusterRadius(species, graph) : 0;
 
         var added = TreeGrower.GrowFurther(graph, species, space, rng, energy,
-            Math.Clamp(steps, 0, WorldGenerationConfig.TreeGrowMaxPulsesPerCall), WorldGenerationConfig.TreeGrowNodeCap,
+            Math.Clamp(steps, 0, SimulationConfig.TreeGrowMaxPulsesPerCall), SimulationConfig.TreeGrowNodeCap,
             applyFeatures: status == TreeGrowthStatus.Planted);
         var cells = TreeRasterizer.Rasterize(graph, species, space, out var woodCount);
 

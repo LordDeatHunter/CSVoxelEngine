@@ -9,8 +9,8 @@ namespace VoxelEngine.Networking.Client;
 /// Requests far-LOD regions from the server and hands the built meshes to the client's
 /// <see cref="LodManager"/>. A client generates no LOD itself, so this is how it sees terrain past
 /// the streamed chunks, for any server worldgen. At most
-/// <see cref="WorldGenerationConfig.NetLodInFlightMax"/> requests are outstanding at once, and an
-/// unanswered one is only re-sent after <see cref="WorldGenerationConfig.NetLodResendSeconds"/>
+/// <see cref="NetworkConfig.NetLodInFlightMax"/> requests are outstanding at once, and an
+/// unanswered one is only re-sent after <see cref="NetworkConfig.NetLodResendSeconds"/>
 /// (TCP is reliable; the resend only covers a server that dropped the request). Main thread only.
 /// </summary>
 public sealed class ClientLodStreamer
@@ -41,7 +41,7 @@ public sealed class ClientLodStreamer
     {
         _time += deltaTime;
         ExpireStale();
-        var budget = Math.Min(MaxRequestsPerUpdate, WorldGenerationConfig.NetLodInFlightMax - _asked.Count);
+        var budget = Math.Min(MaxRequestsPerUpdate, NetworkConfig.NetLodInFlightMax - _asked.Count);
 
         for (var level = 0; level < LodRegion.Levels.Length; level++)
         {
@@ -79,7 +79,7 @@ public sealed class ClientLodStreamer
     {
         _expired.Clear();
         foreach (var (key, at) in _asked)
-            if (_time - at >= WorldGenerationConfig.NetLodResendSeconds)
+            if (_time - at >= NetworkConfig.NetLodResendSeconds)
                 _expired.Add(key);
         foreach (var key in _expired)
             _asked.Remove(key);

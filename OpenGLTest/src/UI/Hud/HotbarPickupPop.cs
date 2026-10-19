@@ -22,8 +22,8 @@ public sealed class HotbarPickupPop
 
     public HotbarPickupPop()
     {
-        Array.Fill(_elapsed, WorldGenerationConfig.HotbarPopSeconds);
-        Array.Fill(_flashElapsed, WorldGenerationConfig.HotbarFlashSeconds);
+        Array.Fill(_elapsed, HudConfig.HotbarPopSeconds);
+        Array.Fill(_flashElapsed, HudConfig.HotbarFlashSeconds);
     }
 
     /// <summary>Advances the running pops, then observes every hotbar slot of <paramref name="inventory"/>.</summary>
@@ -56,8 +56,8 @@ public sealed class HotbarPickupPop
         var step = MathF.Max(0f, deltaTime);
         for (var i = 0; i < _elapsed.Length; i++)
         {
-            _elapsed[i] = MathF.Min(WorldGenerationConfig.HotbarPopSeconds, _elapsed[i] + step);
-            _flashElapsed[i] = MathF.Min(WorldGenerationConfig.HotbarFlashSeconds, _flashElapsed[i] + step);
+            _elapsed[i] = MathF.Min(HudConfig.HotbarPopSeconds, _elapsed[i] + step);
+            _flashElapsed[i] = MathF.Min(HudConfig.HotbarFlashSeconds, _flashElapsed[i] + step);
         }
     }
 
@@ -70,14 +70,14 @@ public sealed class HotbarPickupPop
     }
 
     /// <summary>Flash strength of a hotbar slot: 1 right after its tool broke, easing out to 0 over
-    /// <see cref="WorldGenerationConfig.HotbarFlashSeconds"/> (0 for a slot that never flashed).</summary>
+    /// <see cref="HudConfig.HotbarFlashSeconds"/> (0 for a slot that never flashed).</summary>
     public float FlashAt(int slot) =>
         slot < 0 || slot >= _flashElapsed.Length
             ? 0f
-            : MathUtils.EaseOutCubic(1f - _flashElapsed[slot] / WorldGenerationConfig.HotbarFlashSeconds);
+            : MathUtils.EaseOutCubic(1f - _flashElapsed[slot] / HudConfig.HotbarFlashSeconds);
 
     /// <summary>Icon scale for a hotbar slot: exactly 1 at rest, briefly larger just after its count rose.</summary>
     public float ScaleAt(int slot) =>
-        1f + (WorldGenerationConfig.HotbarPopScale - 1f)
-        * MathUtils.BackPulse(_elapsed[slot] / WorldGenerationConfig.HotbarPopSeconds);
+        1f + (HudConfig.HotbarPopScale - 1f)
+        * MathUtils.BackPulse(_elapsed[slot] / HudConfig.HotbarPopSeconds);
 }

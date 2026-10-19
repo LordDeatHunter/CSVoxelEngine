@@ -46,7 +46,7 @@ public static class PebbleGenerator
     /// Builds the noise from the current <see cref="WorldGenerationConfig.Seed"/>: once from the
     /// static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker thread runs.
     /// </summary>
-    internal static void Reseed() => PatchNoise = TerrainGenerator.MakeNoise(61, WorldGenerationConfig.PebblePatchFrequency);
+    internal static void Reseed() => PatchNoise = TerrainGenerator.MakeNoise(61, WorldFeatureConfig.PebblePatchFrequency);
 
     /// <summary>
     /// Whether the surface column (x, z) grows pebbles, and how many stones share its cell.
@@ -59,8 +59,8 @@ public static class PebbleGenerator
     {
         count = 0;
         if (surfaceWeight <= 0f) return false;
-        if (PatchNoise.GetNoise(x, z) <= WorldGenerationConfig.PebblePatchThreshold) return false;
-        if (UnitHash(x, z, DensitySalt) >= WorldGenerationConfig.PebbleDensity * surfaceWeight) return false;
+        if (PatchNoise.GetNoise(x, z) <= WorldFeatureConfig.PebblePatchThreshold) return false;
+        if (UnitHash(x, z, DensitySalt) >= WorldFeatureConfig.PebbleDensity * surfaceWeight) return false;
         count = CountAt(x, z);
         return true;
     }
@@ -93,7 +93,7 @@ public static class PebbleGenerator
 
     /// <summary>Whether this stone of a natural pile is obsidian (~1% per rock).</summary>
     public static bool IsObsidianAt(int x, int z, int i) =>
-        UnitHash(x, z, ObsidianSalt, i) < WorldGenerationConfig.PebbleObsidianChance;
+        UnitHash(x, z, ObsidianSalt, i) < WorldFeatureConfig.PebbleObsidianChance;
 
     /// <summary>Whether the held item builds obsidian-bearing piles.</summary>
     public static bool IsObsidianItem(byte itemId) => itemId == ObsidianItem;
@@ -163,8 +163,8 @@ public static class PebbleGenerator
     /// <summary>Edge length of one stone, in blocks: an integer 4-8 true texels.</summary>
     public static float SizeAt(int x, int z, int i)
     {
-        var range = WorldGenerationConfig.PebbleMaxSizeTexels - WorldGenerationConfig.PebbleMinSizeTexels + 1;
-        return (WorldGenerationConfig.PebbleMinSizeTexels + (int)(UnitHash(x, z, SizeSalt, i) * range)) / (float)TexelsPerBlock;
+        var range = WorldFeatureConfig.PebbleMaxSizeTexels - WorldFeatureConfig.PebbleMinSizeTexels + 1;
+        return (WorldFeatureConfig.PebbleMinSizeTexels + (int)(UnitHash(x, z, SizeSalt, i) * range)) / (float)TexelsPerBlock;
     }
 
     /// <summary>Spin of one stone about Y, in radians.</summary>

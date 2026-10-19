@@ -111,7 +111,7 @@ public sealed class LeafParticleTests
     {
         var (chunks, _) = Setup();
         // A day cycle apart the sun stands the same and the wind has turned right round
-        foreach (var t in new[] { 147.0, 147.0 + 180.0 / WorldGenerationConfig.WindTurnDegreesPerSecond })
+        foreach (var t in new[] { 147.0, 147.0 + 180.0 / SkyConfig.WindTurnDegreesPerSecond })
         {
             var system = new LeafParticleSystem();
             var rng = new Random(12);
@@ -187,8 +187,8 @@ public sealed class LeafParticleTests
     public void BurstRespectsMaxParticles()
     {
         var system = new LeafParticleSystem();
-        system.Burst(new Vector3(8f, 3f, 3f), WorldGenerationConfig.LeafParticleMax + 50, new Random(5));
-        Assert.Equal(WorldGenerationConfig.LeafParticleMax, system.Particles.Count);
+        system.Burst(new Vector3(8f, 3f, 3f), ParticleConfig.LeafParticleMax + 50, new Random(5));
+        Assert.Equal(ParticleConfig.LeafParticleMax, system.Particles.Count);
     }
 
     [Fact]
@@ -220,7 +220,7 @@ public sealed class LeafParticleTests
     public void EvictionDropsTheOldestLeafAndKeepsTheRestInSpawnOrder()
     {
         const int overflow = 50;
-        var max = WorldGenerationConfig.LeafParticleMax;
+        var max = ParticleConfig.LeafParticleMax;
         var system = new LeafParticleSystem();
         var rng = new Random(11);
 

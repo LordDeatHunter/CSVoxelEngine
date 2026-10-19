@@ -13,19 +13,19 @@ namespace VoxelEngine.Effects.Sky;
 public static class SunGlare
 {
     /// <summary>
-    /// The glare's strength, 0..<see cref="WorldGenerationConfig.SunGlareStrength"/>, for a camera
+    /// The glare's strength, 0..<see cref="SkyConfig.SunGlareStrength"/>, for a camera
     /// whose forward has dot <paramref name="alignment"/> with the sun direction, a sun at
     /// sine-elevation <paramref name="sunElevation"/> and <paramref name="cloudCover"/> (0..1) of
     /// cloud over the sun's disc. Zero once the view turns
-    /// <see cref="WorldGenerationConfig.SunGlareFacingDegrees"/> away from the sun, zero with the
+    /// <see cref="SkyConfig.SunGlareFacingDegrees"/> away from the sun, zero with the
     /// sun at or below the horizon, zero behind a full cloud; full only looking straight at a high,
     /// clear sun. Non-decreasing in the alignment.
     /// </summary>
     public static float Intensity(float alignment, float sunElevation, float cloudCover)
     {
-        var facing = MathUtils.SmoothStep(MathUtils.CosDeg(WorldGenerationConfig.SunGlareFacingDegrees), 1f, alignment);
-        var height = MathUtils.SmoothStep(0f, WorldGenerationConfig.SunGlareFullElevation, sunElevation);
-        return WorldGenerationConfig.SunGlareStrength * facing * height * (1f - MathUtils.Clamp01(cloudCover));
+        var facing = MathUtils.SmoothStep(MathUtils.CosDeg(SkyConfig.SunGlareFacingDegrees), 1f, alignment);
+        var height = MathUtils.SmoothStep(0f, SkyConfig.SunGlareFullElevation, sunElevation);
+        return SkyConfig.SunGlareStrength * facing * height * (1f - MathUtils.Clamp01(cloudCover));
     }
 
     /// <summary>
@@ -33,5 +33,5 @@ public static class SunGlare
     /// <paramref name="cosToSun"/>: 1 at the sun, falling off smoothly to 0 a quarter turn away.
     /// Twin of the falloff in sky-fragment.glsl.
     /// </summary>
-    public static float Radial(float cosToSun) => MathF.Pow(MathF.Max(cosToSun, 0f), WorldGenerationConfig.SunGlareExponent);
+    public static float Radial(float cosToSun) => MathF.Pow(MathF.Max(cosToSun, 0f), SkyConfig.SunGlareExponent);
 }

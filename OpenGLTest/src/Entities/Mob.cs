@@ -119,7 +119,7 @@ public abstract class Mob
 
     /// <summary>The drop in blocks this mob lands from unhurt (<see cref="MobFallDamage"/>); a slime
     /// adds its own hop's apex, so its hops never hurt it.</summary>
-    public virtual float SafeFallBlocks => WorldGenerationConfig.MobSafeFallBlocks;
+    public virtual float SafeFallBlocks => MobConfig.MobSafeFallBlocks;
 
     /// <summary>
     /// Records that the body just landed at <paramref name="impactSpeed"/> blocks per second under
@@ -170,7 +170,7 @@ public abstract class Mob
     /// <summary>
     /// The shared chase rule each manager asks once a frame before the mob's update: the target the
     /// notice rule picks (<see cref="MobTargets.Nearest"/>), unless this mob has lost interest in it
-    /// after <see cref="WorldGenerationConfig.MobLoseInterestSeconds"/> without a clear line of sight
+    /// after <see cref="MobConfig.MobLoseInterestSeconds"/> without a clear line of sight
     /// (<see cref="MobInterest"/>). The index into <paramref name="targets"/>, or -1 when it chases nobody.
     /// </summary>
     public int PickTarget(IReadOnlyList<IMobTarget> targets, float deltaTime, ChunkManager chunks)
@@ -184,7 +184,7 @@ public abstract class Mob
 
     /// <summary>
     /// Where a mob that chases nobody strolls to: a goal <see cref="MobInterest.WanderPoint"/> picks
-    /// around it, picked anew every <see cref="WorldGenerationConfig.MobWanderRepickSeconds"/> or once
+    /// around it, picked anew every <see cref="MobConfig.MobWanderRepickSeconds"/> or once
     /// reached. Null when there is nobody in play at all (<paramref name="targetCount"/> 0), so an empty
     /// server's mobs stand still.
     /// </summary>
@@ -194,11 +194,11 @@ public abstract class Mob
         _wanderTimer -= deltaTime;
         var dx = _wanderGoal.X - Position.X;
         var dz = _wanderGoal.Z - Position.Z;
-        var arrive = WorldGenerationConfig.MobWanderArriveBlocks;
+        var arrive = MobConfig.MobWanderArriveBlocks;
         if (!_hasWanderGoal || _wanderTimer <= 0f || dx * dx + dz * dz < arrive * arrive)
         {
             _wanderGoal = MobInterest.WanderPoint(Position, Random.Shared.NextSingle(), Random.Shared.NextSingle());
-            _wanderTimer = WorldGenerationConfig.MobWanderRepickSeconds * (0.75f + 0.5f * Random.Shared.NextSingle());
+            _wanderTimer = MobConfig.MobWanderRepickSeconds * (0.75f + 0.5f * Random.Shared.NextSingle());
             _hasWanderGoal = true;
         }
         return _wanderGoal;
@@ -213,7 +213,7 @@ public abstract class Mob
     /// <summary>
     /// Ledge caution (<see cref="LedgeProbe"/>): whether moving along the horizontal
     /// <paramref name="direction"/> to <paramref name="distance"/> blocks from the body center would step
-    /// off a drop of more than <see cref="WorldGenerationConfig.MobLedgeMaxDropBlocks"/>, with
+    /// off a drop of more than <see cref="MobConfig.MobLedgeMaxDropBlocks"/>, with
     /// <paramref name="targetEye"/> (the chased target's eye, or null) not standing below it.
     /// </summary>
     public bool IsLedgeAhead(Vector3 direction, float distance, ChunkManager chunks, Vector3? targetEye) =>
@@ -224,7 +224,7 @@ public abstract class Mob
     /// <summary>
     /// The shared world hazards, called by the owning manager once a frame right after the mob's own
     /// update, in the authoritative simulation only: a body box in lava (<see cref="MobLava"/>) burns
-    /// one damage tick per <see cref="WorldGenerationConfig.MobLavaTickSeconds"/> with the hit flash, and
+    /// one damage tick per <see cref="MobConfig.MobLavaTickSeconds"/> with the hit flash, and
     /// leaving it (or dying) clears the partial tick. A death it causes rolls the loot as usual, since the
     /// manager checks <see cref="IsDead"/> after this.
     /// </summary>
@@ -238,9 +238,9 @@ public abstract class Mob
         }
 
         _lavaTimer += deltaTime;
-        while (_lavaTimer >= WorldGenerationConfig.MobLavaTickSeconds && !IsDead)
+        while (_lavaTimer >= MobConfig.MobLavaTickSeconds && !IsDead)
         {
-            _lavaTimer -= WorldGenerationConfig.MobLavaTickSeconds;
+            _lavaTimer -= MobConfig.MobLavaTickSeconds;
             TakeDamage(MobLava.DamagePerTick(MaxHealth));
         }
     }

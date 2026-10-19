@@ -11,7 +11,7 @@ namespace VoxelEngine.Tests.Interaction;
 /// </summary>
 public sealed class SelectionPulseTests
 {
-    private static readonly float Period = WorldGenerationConfig.SelectionPulsePeriodSeconds;
+    private static readonly float Period = HudConfig.SelectionPulsePeriodSeconds;
 
     [Fact]
     public void TheOutlineBreathesBetweenItsFloorAndFullOpacityWithinOneBreath()
@@ -29,7 +29,7 @@ public sealed class SelectionPulseTests
 
         Assert.Equal(1f, highest, 3);
         Assert.Equal(floor, lowest, 3);
-        Assert.Equal(WorldGenerationConfig.SelectionPulseMinOpacity, floor, 5);
+        Assert.Equal(HudConfig.SelectionPulseMinOpacity, floor, 5);
     }
 
     [Fact]

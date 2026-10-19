@@ -70,18 +70,18 @@ internal sealed class AmbientEffects
     /// <summary>
     /// Puffs steam (smoke on the campfire particle instance, <see cref="FireParticleSystem.Puff"/>)
     /// off the top of each cell in <paramref name="cells"/> that contact hardening just turned solid,
-    /// for at most <see cref="WorldGenerationConfig.SteamPuffMaxCellsPerFrame"/> cells within
-    /// <see cref="WorldGenerationConfig.FireParticleRadius"/> of the eye. Cosmetic: singleplayer and a client.
+    /// for at most <see cref="JuiceConfig.SteamPuffMaxCellsPerFrame"/> cells within
+    /// <see cref="ParticleConfig.FireParticleRadius"/> of the eye. Cosmetic: singleplayer and a client.
     /// </summary>
     internal void PuffSteam(IReadOnlyList<Vector3> cells)
     {
-        const float reach = WorldGenerationConfig.FireParticleRadius * WorldGenerationConfig.FireParticleRadius;
+        const float reach = ParticleConfig.FireParticleRadius * ParticleConfig.FireParticleRadius;
         var puffed = 0;
-        for (var i = 0; i < cells.Count && puffed < WorldGenerationConfig.SteamPuffMaxCellsPerFrame; i++)
+        for (var i = 0; i < cells.Count && puffed < JuiceConfig.SteamPuffMaxCellsPerFrame; i++)
         {
             var top = cells[i] + new Vector3(0.5f, 1.05f, 0.5f);
             if (Vector3.DistanceSquared(top, Camera.RenderEye) > reach) continue;
-            _fire.Puff(top, WorldGenerationConfig.SteamPuffSmoke, WorldGenerationConfig.SteamPuffSpread,
+            _fire.Puff(top, JuiceConfig.SteamPuffSmoke, JuiceConfig.SteamPuffSpread,
                 FireParticleKind.Steam);
             puffed++;
         }
@@ -90,8 +90,8 @@ internal sealed class AmbientEffects
     /// <summary>Shakes the local camera for a TNT blast at <paramref name="center"/>, by its distance
     /// (<see cref="ShakeFalloff"/>). Cosmetic: singleplayer and a client.</summary>
     internal void ShakeForBlast(Vector3 center) =>
-        Camera.AddShake(ShakeFalloff.Trauma(WorldGenerationConfig.BlastShakeStrength, TntManager.BlastRadius,
-            WorldGenerationConfig.BlastShakeRangeBlocks, Vector3.Distance(Camera.Position, center)));
+        Camera.AddShake(ShakeFalloff.Trauma(JuiceConfig.BlastShakeStrength, TntManager.BlastRadius,
+            JuiceConfig.BlastShakeRangeBlocks, Vector3.Distance(Camera.Position, center)));
 
     // The local player's water-splash memory (its swim state, Camera.IsInWater)
     private readonly WaterSplashTracker _playerSplash = new();
@@ -119,21 +119,21 @@ internal sealed class AmbientEffects
         foreach (var itemDrop in drops)
             if (!itemDrop.IsAttracted)
                 WaterSplash.Track(itemDrop.Splash, itemDrop.Position - new Vector3(0f, ItemDrop.Size * 0.5f, 0f),
-                    deltaTime, WorldGenerationConfig.WaterSplashSmallScale, _chunkManager, _debris);
+                    deltaTime, JuiceConfig.WaterSplashSmallScale, _chunkManager, _debris);
 
         foreach (var t in _projectiles)
             WaterSplash.Track(t.Splash, t.Position, deltaTime,
-                WorldGenerationConfig.WaterSplashSmallScale, _chunkManager, _debris);
+                JuiceConfig.WaterSplashSmallScale, _chunkManager, _debris);
 
         var falling = _falling.Falling;
         foreach (var fallingBlock in falling)
             WaterSplash.Track(fallingBlock.Splash, fallingBlock.Position - new Vector3(0f, FallingBlock.HalfExtent, 0f),
-                deltaTime, WorldGenerationConfig.WaterSplashCubeScale, _chunkManager, _debris);
+                deltaTime, JuiceConfig.WaterSplashCubeScale, _chunkManager, _debris);
 
         var primed = _tntManager.Primed;
         foreach (var primedTnt in primed)
             WaterSplash.Track(primedTnt.Splash, primedTnt.Position - new Vector3(0f, VoxelEngine.Entities.PrimedTnt.HalfExtent, 0f),
-                deltaTime, WorldGenerationConfig.WaterSplashCubeScale, _chunkManager, _debris);
+                deltaTime, JuiceConfig.WaterSplashCubeScale, _chunkManager, _debris);
     }
 
     /// <summary>
@@ -152,8 +152,8 @@ internal sealed class AmbientEffects
 
     /// <summary>
     /// Fills <see cref="_lavaVents"/> with the world cells of the exposed hot-fluid vents
-    /// (<see cref="Chunk.HotFluidVents"/>) within <see cref="WorldGenerationConfig.LavaVentRadius"/>
-    /// of <paramref name="eye"/>, at most <see cref="WorldGenerationConfig.LavaVentMaxEmitters"/>
+    /// (<see cref="Chunk.HotFluidVents"/>) within <see cref="ParticleConfig.LavaVentRadius"/>
+    /// of <paramref name="eye"/>, at most <see cref="ParticleConfig.LavaVentMaxEmitters"/>
     /// of them. Chunks are walked nearest-first so a hard cap is spent on the pool beside the
     /// player, and when a lake offers more vents than the cap the set is thinned by a stable
     /// per-cell hash rather than truncated: truncating hands every emitter to the one chunk
@@ -163,7 +163,7 @@ internal sealed class AmbientEffects
     {
         _lavaVents.Clear();
         _lavaVentChunks.Clear();
-        const float radius = WorldGenerationConfig.LavaVentRadius;
+        const float radius = ParticleConfig.LavaVentRadius;
         const float chunkReach = radius + Chunk.Size;
         const float half = Chunk.Size * 0.5f;
         foreach (var chunk in _chunkManager.TranslucentRenderable)
@@ -184,7 +184,7 @@ internal sealed class AmbientEffects
             candidates += chunk.HotFluidVents!.Count(idx => Vector3.DistanceSquared(origin + Chunk.LocalOfIdx(idx), eye) <= radius * radius);
         }
         if (candidates == 0) return;
-        var keep = MathF.Min(1f, WorldGenerationConfig.LavaVentMaxEmitters / (float)candidates);
+        var keep = MathF.Min(1f, ParticleConfig.LavaVentMaxEmitters / (float)candidates);
         foreach (var (_, chunk) in _lavaVentChunks)
         {
             var origin = chunk.Position * Chunk.Size;
@@ -194,17 +194,17 @@ internal sealed class AmbientEffects
                 if (Vector3.DistanceSquared(cell, eye) > radius * radius) continue;
                 if (keep < 1f && VentHash01(cell) >= keep) continue;
                 _lavaVents.Add(cell);
-                if (_lavaVents.Count >= WorldGenerationConfig.LavaVentMaxEmitters) return;
+                if (_lavaVents.Count >= ParticleConfig.LavaVentMaxEmitters) return;
             }
         }
     }
 
     /// <summary>
     /// The hot-spring steam: gathers every spring water top (<see cref="Chunk.SpringVents"/>) within
-    /// <see cref="WorldGenerationConfig.SpringSteamRadius"/> of the eye, nearest chunks first and at
-    /// most <see cref="WorldGenerationConfig.SpringSteamMaxVents"/> of them, and puffs a pale
+    /// <see cref="ParticleConfig.SpringSteamRadius"/> of the eye, nearest chunks first and at
+    /// most <see cref="ParticleConfig.SpringSteamMaxVents"/> of them, and puffs a pale
     /// <see cref="FireParticleKind.Steam"/> wisp over each at
-    /// <see cref="WorldGenerationConfig.SpringSteamPerSecond"/> per vent (the campfire instance's
+    /// <see cref="ParticleConfig.SpringSteamPerSecond"/> per vent (the campfire instance's
     /// <see cref="FireParticleSystem.Puff"/>, like the hardening-lava steam). Cosmetic: a headless
     /// server never runs it.
     /// </summary>
@@ -212,7 +212,7 @@ internal sealed class AmbientEffects
     {
         _springVents.Clear();
         _springVentChunks.Clear();
-        const float radius = WorldGenerationConfig.SpringSteamRadius;
+        const float radius = ParticleConfig.SpringSteamRadius;
         const float chunkReach = radius + Chunk.Size;
         const float half = Chunk.Size * 0.5f;
         foreach (var chunk in _chunkManager.Renderable)
@@ -237,28 +237,28 @@ internal sealed class AmbientEffects
                 var cell = origin + Chunk.LocalOfIdx(idx);
                 if (Vector3.DistanceSquared(cell, eye) > radius * radius) continue;
                 _springVents.Add(cell);
-                if (_springVents.Count >= WorldGenerationConfig.SpringSteamMaxVents) break;
+                if (_springVents.Count >= ParticleConfig.SpringSteamMaxVents) break;
             }
-            if (_springVents.Count >= WorldGenerationConfig.SpringSteamMaxVents) break;
+            if (_springVents.Count >= ParticleConfig.SpringSteamMaxVents) break;
         }
 
-        _springSteamDebt += deltaTime * WorldGenerationConfig.SpringSteamPerSecond * _springVents.Count;
+        _springSteamDebt += deltaTime * ParticleConfig.SpringSteamPerSecond * _springVents.Count;
         var puffs = (int)_springSteamDebt;
         if (puffs <= 0) return;
         _springSteamDebt -= puffs;
-        puffs = Math.Min(puffs, WorldGenerationConfig.SpringSteamMaxPuffsPerFrame);
+        puffs = Math.Min(puffs, ParticleConfig.SpringSteamMaxPuffsPerFrame);
         for (var i = 0; i < puffs; i++)
         {
             var vent = _springVents[Random.Shared.Next(_springVents.Count)];
-            _fire.Puff(vent + new Vector3(0f, 1f, 0f), WorldGenerationConfig.SpringSteamCount,
-                WorldGenerationConfig.SpringSteamSpread, FireParticleKind.Steam);
+            _fire.Puff(vent + new Vector3(0f, 1f, 0f), ParticleConfig.SpringSteamCount,
+                ParticleConfig.SpringSteamSpread, FireParticleKind.Steam);
         }
     }
 
     /// <summary>
     /// The torch flames: gathers every flame point (<see cref="Chunk.FlamePoints"/>) within
-    /// <see cref="WorldGenerationConfig.TorchFlameRadius"/> of the eye, nearest chunks first and at most
-    /// <see cref="WorldGenerationConfig.TorchFlameMaxEmitters"/> of them, and burns them in the torch
+    /// <see cref="ParticleConfig.TorchFlameRadius"/> of the eye, nearest chunks first and at most
+    /// <see cref="ParticleConfig.TorchFlameMaxEmitters"/> of them, and burns them in the torch
     /// particle instance, drifting with <paramref name="wind"/>. No point lights: a torch's own block
     /// light already lights it. Cosmetic: a headless server never runs it.
     /// </summary>
@@ -269,7 +269,7 @@ internal sealed class AmbientEffects
         var eye = Camera.RenderEye;
         _torchFlames.Clear();
         _torchFlameChunks.Clear();
-        const float radius = WorldGenerationConfig.TorchFlameRadius;
+        const float radius = ParticleConfig.TorchFlameRadius;
         const float chunkReach = radius + Chunk.Size;
         const float half = Chunk.Size * 0.5f;
         var chunks = _chunkManager.Renderable;
@@ -291,9 +291,9 @@ internal sealed class AmbientEffects
                 var point = origin + local;
                 if (Vector3.DistanceSquared(point, eye) > radius * radius) continue;
                 _torchFlames.Add(point);
-                if (_torchFlames.Count >= WorldGenerationConfig.TorchFlameMaxEmitters) break;
+                if (_torchFlames.Count >= ParticleConfig.TorchFlameMaxEmitters) break;
             }
-            if (_torchFlames.Count >= WorldGenerationConfig.TorchFlameMaxEmitters) break;
+            if (_torchFlames.Count >= ParticleConfig.TorchFlameMaxEmitters) break;
         }
 
         _torchFire.Update(deltaTime, _torchFlames, eye, wind: wind);

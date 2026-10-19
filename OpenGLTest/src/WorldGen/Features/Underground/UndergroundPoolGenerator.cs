@@ -32,7 +32,7 @@ public static class UndergroundPoolGenerator
     /// Builds the noise from the current <see cref="WorldGenerationConfig.Seed"/>: once from the
     /// static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker thread runs.
     /// </summary>
-    internal static void Reseed() => PatchNoise = TerrainGenerator.MakeNoise(94, WorldGenerationConfig.PoolPatchFrequency);
+    internal static void Reseed() => PatchNoise = TerrainGenerator.MakeNoise(94, WorldFeatureConfig.PoolPatchFrequency);
 
     /// <summary>
     /// Whether the air cell (x, y, z) ponds water: inside the band between the lava and the sea,
@@ -42,9 +42,9 @@ public static class UndergroundPoolGenerator
     {
         if (y <= WorldGenerationConfig.LavaMaxY) return false;
         if (y > WorldGenerationConfig.SeaLevel) return false;
-        if (y > surfaceHeight - WorldGenerationConfig.PoolBurial) return false;
-        if (PatchNoise.GetNoise(x, z) <= WorldGenerationConfig.PoolPatchThreshold) return false;
-        return UnitHash(x, y, z) < WorldGenerationConfig.PoolChance;
+        if (y > surfaceHeight - WorldFeatureConfig.PoolBurial) return false;
+        if (PatchNoise.GetNoise(x, z) <= WorldFeatureConfig.PoolPatchThreshold) return false;
+        return UnitHash(x, y, z) < WorldFeatureConfig.PoolChance;
     }
 
     /// <summary>
@@ -58,7 +58,7 @@ public static class UndergroundPoolGenerator
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         {
-            if (PatchNoise.GetNoise(worldX0 + x, worldZ0 + z) <= WorldGenerationConfig.PoolPatchThreshold)
+            if (PatchNoise.GetNoise(worldX0 + x, worldZ0 + z) <= WorldFeatureConfig.PoolPatchThreshold)
                 continue;
             var surfaceHeight = column.Heights[(x << Chunk.SizeShift) | z];
 
@@ -67,13 +67,13 @@ public static class UndergroundPoolGenerator
                 var y = worldY0 + ly;
                 if (y > WorldGenerationConfig.SeaLevel) break;
                 if (y <= WorldGenerationConfig.LavaMaxY) continue;
-                if (y > surfaceHeight - WorldGenerationConfig.PoolBurial) continue;
+                if (y > surfaceHeight - WorldFeatureConfig.PoolBurial) continue;
 
                 var i = Chunk.Idx(x, ly, z);
                 if (blocks[i] != BlockType.Air) continue;
                 var floor = blocks[Chunk.Idx(x, ly - 1, z)];
                 if (floor == BlockType.Air || BlockType.IsFluid(floor)) continue;
-                if (UnitHash(worldX0 + x, y, worldZ0 + z) >= WorldGenerationConfig.PoolChance) continue;
+                if (UnitHash(worldX0 + x, y, worldZ0 + z) >= WorldFeatureConfig.PoolChance) continue;
 
                 blocks[i] = WaterBlock;
             }

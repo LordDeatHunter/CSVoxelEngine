@@ -23,7 +23,7 @@ public sealed class IceGlintTests
         }
 
         Assert.True(IceGlint.SheenWeight(0f) > IceGlint.SheenWeight(1f));
-        Assert.InRange(IceGlint.SheenWeight(0f), 0f, WorldGenerationConfig.IceSheenStrength + 1e-6f);
+        Assert.InRange(IceGlint.SheenWeight(0f), 0f, SurfaceShadingConfig.IceSheenStrength + 1e-6f);
     }
 
     [Fact]
@@ -37,7 +37,7 @@ public sealed class IceGlintTests
             previous = h;
         }
 
-        Assert.Equal(WorldGenerationConfig.IceGlintStrength, IceGlint.Highlight(1f, 0.5f, DaySun, 1f), 5);
+        Assert.Equal(SurfaceShadingConfig.IceGlintStrength, IceGlint.Highlight(1f, 0.5f, DaySun, 1f), 5);
     }
 
     [Fact]
@@ -55,6 +55,6 @@ public sealed class IceGlintTests
         for (var ndh = -1f; ndh <= 1f; ndh += 0.1f)
         for (var ndl = -1f; ndl <= 1f; ndl += 0.1f)
         for (var reach = 0f; reach <= 1.5f; reach += 0.25f)
-            Assert.InRange(IceGlint.Highlight(ndh, ndl, DaySun, reach), 0f, WorldGenerationConfig.IceGlintStrength + 1e-6f);
+            Assert.InRange(IceGlint.Highlight(ndh, ndl, DaySun, reach), 0f, SurfaceShadingConfig.IceGlintStrength + 1e-6f);
     }
 }

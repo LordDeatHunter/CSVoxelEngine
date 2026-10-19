@@ -7,7 +7,7 @@ namespace VoxelEngine.Entities.Slimes;
 /// <summary>
 /// The slime merge, GL-free: the inverse of the split (<see cref="SlimeSize.SplitsOnHit"/>). Two
 /// living slimes of the same size below <see cref="SlimeSize.Max"/> whose bodies touch, each past
-/// <see cref="WorldGenerationConfig.SlimeMergeCooldownSeconds"/> of life (so a split's children never
+/// <see cref="MobConfig.SlimeMergeCooldownSeconds"/> of life (so a split's children never
 /// merge straight back), become one slime of the next size. <see cref="SlimeManager"/> applies it in
 /// the authoritative simulation only, as a forced spawn under the global <see cref="MobCaps"/>.
 /// </summary>
@@ -17,7 +17,7 @@ public static class SlimeMerge
     /// largest size, and past the merge cooldown.</summary>
     public static bool IsReady(Slime slime) =>
         !slime.IsDying && !slime.IsDead && slime.Size < SlimeSize.Max
-        && slime.AgeSeconds >= WorldGenerationConfig.SlimeMergeCooldownSeconds;
+        && slime.AgeSeconds >= MobConfig.SlimeMergeCooldownSeconds;
 
     /// <summary>Whether <paramref name="a"/> and <paramref name="b"/> merge: both ready, the same size,
     /// and their collision boxes touch or overlap.</summary>

@@ -135,8 +135,8 @@ public sealed class SlimeManager : IMobPopulation
         DamageDealtThisFrame = 0;
         if (chunks == null || targets == null) return;
 
-        var despawnSquared = WorldGenerationConfig.SlimeDespawnRadiusBlocks
-            * WorldGenerationConfig.SlimeDespawnRadiusBlocks;
+        var despawnSquared = MobConfig.SlimeDespawnRadiusBlocks
+            * MobConfig.SlimeDespawnRadiusBlocks;
 
         for (var i = _slimes.Count - 1; i >= 0; i--)
         {
@@ -182,14 +182,14 @@ public sealed class SlimeManager : IMobPopulation
                     var damage = slime.ContactDamage;
                     DamageDealtThisFrame += damage;
                     var away = new Vector3(eye.X - slime.Position.X, 0f, eye.Z - slime.Position.Z);
-                    target.TakeHit(damage, away, WorldGenerationConfig.SlimeKnockbackSpeed,
-                        WorldGenerationConfig.SlimeKnockbackLift, _type.DisplayName);
+                    target.TakeHit(damage, away, MobConfig.SlimeKnockbackSpeed,
+                        MobConfig.SlimeKnockbackLift, _type.DisplayName);
                 }
                 else if (slime.IsGrounded)
                 {
                     // Grounded contact is harmless: the player shoves the slime off instead.
                     var away = new Vector3(slime.Position.X - eye.X, 0f, slime.Position.Z - eye.Z);
-                    slime.Shove(away, WorldGenerationConfig.SlimeShoveSpeed);
+                    slime.Shove(away, MobConfig.SlimeShoveSpeed);
                 }
             }
 
@@ -245,7 +245,7 @@ public sealed class SlimeManager : IMobPopulation
     // are forced spawns, so only as many as the hard cap still has room for, and none at the cap.
     private void Split(Slime parent)
     {
-        var count = Math.Min(WorldGenerationConfig.SlimeSplitChildren, _caps.ForcedRoom);
+        var count = Math.Min(MobConfig.SlimeSplitChildren, _caps.ForcedRoom);
         if (count <= 0) return;
 
         var childSize = SlimeSize.ChildSize(parent.Size);
@@ -262,8 +262,8 @@ public sealed class SlimeManager : IMobPopulation
             var spoke = new Vector3(MathF.Cos(angle), 0f, MathF.Sin(angle));
             var center = new Vector3(parent.Position.X + spoke.X * reach, feetY + childHalf,
                 parent.Position.Z + spoke.Z * reach);
-            Spawn(center, childSize)?.Pop(spoke, WorldGenerationConfig.SlimeSplitShoveSpeed,
-                WorldGenerationConfig.SlimeSplitLift);
+            Spawn(center, childSize)?.Pop(spoke, MobConfig.SlimeSplitShoveSpeed,
+                MobConfig.SlimeSplitLift);
         }
     }
 
@@ -290,7 +290,7 @@ public sealed class SlimeManager : IMobPopulation
         if (!_caps.AllowsNaturalSpawn) return;
 
         _spawnTimer += deltaTime;
-        if (_spawnTimer < WorldGenerationConfig.SlimeSpawnIntervalSeconds) return;
+        if (_spawnTimer < MobConfig.SlimeSpawnIntervalSeconds) return;
         _spawnTimer = 0f;
 
         if (targets.Count == 0) return;
@@ -350,14 +350,14 @@ public sealed class SlimeManager : IMobPopulation
 
     private static bool TryFindSurface(ChunkManager chunks, Vector3 playerPosition, out int x, out int groundY, out int z) =>
         MobSpawner.TryFindSurfaceSpawn(chunks, playerPosition,
-            WorldGenerationConfig.SlimeSpawnMinRadiusBlocks, WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks,
-            WorldGenerationConfig.SlimeSpawnTries, out x, out groundY, out z);
+            MobConfig.SlimeSpawnMinRadiusBlocks, MobConfig.SlimeSpawnMaxRadiusBlocks,
+            MobConfig.SlimeSpawnTries, out x, out groundY, out z);
 
     private static bool TryFindCave(ChunkManager chunks, Vector3 playerPosition, out int x, out int groundY, out int z) =>
         MobSpawner.TryFindCaveSpawn(chunks, playerPosition,
-            WorldGenerationConfig.SlimeSpawnMinRadiusBlocks, WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks,
-            WorldGenerationConfig.SlimeCaveSpawnTries, WorldGenerationConfig.SlimeCaveSearchHalfHeight,
-            WorldGenerationConfig.SlimeCaveScanDepth, WorldGenerationConfig.SlimeCaveMaxSkyLight,
+            MobConfig.SlimeSpawnMinRadiusBlocks, MobConfig.SlimeSpawnMaxRadiusBlocks,
+            MobConfig.SlimeCaveSpawnTries, MobConfig.SlimeCaveSearchHalfHeight,
+            MobConfig.SlimeCaveScanDepth, MobConfig.SlimeCaveMaxSkyLight,
             out x, out groundY, out z);
 
     // Whether the player's feet stand underground: well under its own column's terrain height

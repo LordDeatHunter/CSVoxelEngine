@@ -73,7 +73,7 @@ public static class ChatCommands
     /// <summary>
     /// The lighting time <c>/time &lt;argument&gt;</c> sets, or null when the argument is not
     /// <c>day</c>, <c>night</c> or a number of seconds (the units <c>VOXEL_TIME</c> uses: one full
-    /// cycle is <see cref="WorldGenerationConfig.DayLengthSeconds"/>).
+    /// cycle is <see cref="SkyConfig.DayLengthSeconds"/>).
     /// </summary>
     public static double? TimeSeconds(string argument) => argument.ToLowerInvariant() switch
     {

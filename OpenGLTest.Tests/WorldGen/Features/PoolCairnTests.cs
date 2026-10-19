@@ -114,10 +114,10 @@ public sealed class PoolCairnTests
             Assert.Equal(z, z2);
             if (!first) continue;
             candidates++;
-            Assert.InRange(x, cellX << WorldGenerationConfig.CairnCellShift,
-                ((cellX + 1) << WorldGenerationConfig.CairnCellShift) - 1);
-            Assert.InRange(z, cellZ << WorldGenerationConfig.CairnCellShift,
-                ((cellZ + 1) << WorldGenerationConfig.CairnCellShift) - 1);
+            Assert.InRange(x, cellX << WorldFeatureConfig.CairnCellShift,
+                ((cellX + 1) << WorldFeatureConfig.CairnCellShift) - 1);
+            Assert.InRange(z, cellZ << WorldFeatureConfig.CairnCellShift,
+                ((cellZ + 1) << WorldFeatureConfig.CairnCellShift) - 1);
         }
         Assert.True(candidates > 0, "no cairn candidate in the sampled cells");
     }

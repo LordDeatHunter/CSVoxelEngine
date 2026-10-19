@@ -21,7 +21,7 @@ public sealed class MovementRulesTests
     public MovementRulesTests() => TestContent.EnsureLoaded();
 
     // The client's state cadence
-    private const float Dt = (float)WorldGenerationConfig.NetPlayerStateSeconds;
+    private const float Dt = (float)NetworkConfig.NetPlayerStateSeconds;
 
     // Where a body resting on the y = 0 floor stands: the client's physics stops a landing before
     // the colliding step, a hair above the block top
@@ -115,11 +115,11 @@ public sealed class MovementRulesTests
         foreach (var rise in new[]
                  {
                      PlayerPhysics.JumpSpeed, PlayerPhysics.SwimUpSpeed, PlayerPhysics.SwimExitBoost,
-                     WorldGenerationConfig.SlimeKnockbackLift, WorldGenerationConfig.GoblinKnockbackLift,
+                     MobConfig.SlimeKnockbackLift, MobConfig.GoblinKnockbackLift,
                  })
-            Assert.True(rise <= WorldGenerationConfig.NetMaxRiseBlocksPerSecond);
-        Assert.True(PlayerPhysics.SprintStepHeight <= WorldGenerationConfig.NetRiseSlackBlocks);
-        Assert.True(PlayerPhysics.JumpSpeed / PlayerPhysics.Gravity < WorldGenerationConfig.NetHoverGraceSeconds);
+            Assert.True(rise <= NetworkConfig.NetMaxRiseBlocksPerSecond);
+        Assert.True(PlayerPhysics.SprintStepHeight <= NetworkConfig.NetRiseSlackBlocks);
+        Assert.True(PlayerPhysics.JumpSpeed / PlayerPhysics.Gravity < NetworkConfig.NetHoverGraceSeconds);
 
         var course = Course();
         var walk = PlayerPhysics.BaseSpeed;
@@ -145,8 +145,8 @@ public sealed class MovementRulesTests
 
         // A mob's hit on a sprinting player: the strongest shove on top of the sprint, the
         // strongest lift, then gravity
-        var shove = sprint + MathF.Max(WorldGenerationConfig.SlimeKnockbackSpeed, WorldGenerationConfig.GoblinKnockbackSpeed);
-        var lift = MathF.Max(WorldGenerationConfig.SlimeKnockbackLift, WorldGenerationConfig.GoblinKnockbackLift);
+        var shove = sprint + MathF.Max(MobConfig.SlimeKnockbackSpeed, MobConfig.GoblinKnockbackSpeed);
+        var lift = MathF.Max(MobConfig.SlimeKnockbackLift, MobConfig.GoblinKnockbackLift);
         AssertNeverRejected("knockback", course, Arc(Eye(2.5f, Resting, 1f), new Vector3(0f, 0f, shove), lift, 0.5f));
 
         // A fall from high up, landing on the floor
@@ -198,7 +198,7 @@ public sealed class MovementRulesTests
     public void HoverWithoutTheFlightFlagIsRejectedAfterTheGrace()
     {
         var course = Course();
-        var grace = WorldGenerationConfig.NetHoverGraceSeconds;
+        var grace = NetworkConfig.NetHoverGraceSeconds;
 
         // Standing still in mid-air: tolerated through the grace, rejected once it has run out, and
         // never while flying
@@ -233,7 +233,7 @@ public sealed class MovementRulesTests
         var climb = Line(ground, new Vector3(0f, 10f / ((float)grace * 1.5f), 0f), (float)grace * 1.5f);
         for (var i = 1; i < climb.Count; i++)
             Assert.True(climb[i].Y - climb[i - 1].Y
-                        <= WorldGenerationConfig.NetMaxRiseBlocksPerSecond * Dt + WorldGenerationConfig.NetRiseSlackBlocks);
+                        <= NetworkConfig.NetMaxRiseBlocksPerSecond * Dt + NetworkConfig.NetRiseSlackBlocks);
         var climbRejected = FirstRejection(course, climb);
         Assert.True(climbRejected > 0, "a slow climb without flight was never rejected");
         Assert.True(climbRejected * Dt > grace - Dt * 0.5);
@@ -256,7 +256,7 @@ public sealed class MovementRulesTests
         Assert.Equal(beyond, accepted);
 
         // Standing still in the air over unloaded cells, beside the chunk or above it, is never a hover
-        var grace = (float)WorldGenerationConfig.NetHoverGraceSeconds;
+        var grace = (float)NetworkConfig.NetHoverGraceSeconds;
         Assert.Equal(-1, FirstRejection(course, Line(Eye(Chunk.Size + 4.5f, 5f, 4.5f), Vector3.Zero, grace * 3f)));
         Assert.Equal(-1, FirstRejection(course, Line(Eye(2.5f, Chunk.Size + 4f, 4.5f), Vector3.Zero, grace * 3f)));
     }
@@ -298,7 +298,7 @@ public sealed class MovementRulesTests
 
         // Settling at the float and then floating still for longer than the hover grace: the body
         // rests in water, not in the air
-        var grace = (float)WorldGenerationConfig.NetHoverGraceSeconds;
+        var grace = (float)NetworkConfig.NetHoverGraceSeconds;
         var floating = Simulated(pool, start, 3f + grace * 2f, [], 0f);
         Assert.True(PlayerBodyProbe.InWater(floating[^1], pool));
         AssertNeverRejected("float at rest", pool, floating);

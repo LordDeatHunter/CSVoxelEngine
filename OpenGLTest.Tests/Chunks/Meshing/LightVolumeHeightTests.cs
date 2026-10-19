@@ -52,7 +52,7 @@ public sealed class LightVolumeHeightTests
     /// <summary>
     /// The structural precondition the whole precompute rests on: the volume reaches at most one
     /// chunk into each neighbor, so nine columns cover it. Raising
-    /// WorldGenerationConfig.LightPropagationRadius to Size or more silently breaks that, and
+    /// LightingConfig.LightPropagationRadius to Size or more silently breaks that, and
     /// this is what says so.
     /// </summary>
     [Fact]

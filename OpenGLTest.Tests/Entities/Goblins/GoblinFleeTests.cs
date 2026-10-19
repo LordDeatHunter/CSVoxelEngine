@@ -8,7 +8,7 @@ namespace VoxelEngine.Tests.Entities.Goblins;
 
 /// <summary>
 /// The goblin's flee (<see cref="Goblin.IsFleeing"/>): hurt below
-/// <see cref="WorldGenerationConfig.GoblinFleeHealthShare"/> of its pool it turns and runs from
+/// <see cref="MobConfig.GoblinFleeHealthShare"/> of its pool it turns and runs from
 /// the player instead of closing in, and it never throws while running.
 /// </summary>
 public sealed class GoblinFleeTests
@@ -65,7 +65,7 @@ public sealed class GoblinFleeTests
     {
         var goblin = new Goblin(EntityRegistry.Require("goblin"), Vector3.Zero, ammo: 0, spawnIn: false);
         var max = goblin.MaxHealth;
-        goblin.TakeDamage(max - (int)(max * WorldGenerationConfig.GoblinFleeHealthShare) - 1);
+        goblin.TakeDamage(max - (int)(max * MobConfig.GoblinFleeHealthShare) - 1);
         Assert.False(goblin.IsFleeing, "a goblin above the share is already fleeing");
         goblin.TakeDamage(1);
         Assert.True(goblin.IsFleeing, "a goblin at the share is not fleeing");

@@ -103,7 +103,7 @@ public sealed class SkyPaletteTests
     {
         for (var e = -1f; e <= 1f; e += 0.005f)
         {
-            if (e > WorldGenerationConfig.SkyGlowBelowSunElevation && e < WorldGenerationConfig.SkyGlowAboveSunElevation)
+            if (e > SkyConfig.SkyGlowBelowSunElevation && e < SkyConfig.SkyGlowAboveSunElevation)
                 continue;
             Assert.Equal(0f, SkyPalette.GlowAmount(e));
         }
@@ -112,10 +112,10 @@ public sealed class SkyPaletteTests
     [Fact]
     public void TheSunsetGlowRisesToItsPeakOnTheHorizonAndFallsAwayOnBothSides()
     {
-        var peak = WorldGenerationConfig.SkyGlowPeakSunElevation;
+        var peak = SkyConfig.SkyGlowPeakSunElevation;
         Assert.Equal(1f, SkyPalette.GlowAmount(peak), 5);
         var previous = 0f;
-        for (var e = WorldGenerationConfig.SkyGlowBelowSunElevation; e <= peak; e += 0.001f)
+        for (var e = SkyConfig.SkyGlowBelowSunElevation; e <= peak; e += 0.001f)
         {
             var g = SkyPalette.GlowAmount(e);
             Assert.True(g >= previous - 1e-6f, $"the glow fell from {previous} to {g} as the sun rose to the horizon ({e})");
@@ -123,7 +123,7 @@ public sealed class SkyPaletteTests
         }
 
         previous = 1f;
-        for (var e = peak; e <= WorldGenerationConfig.SkyGlowAboveSunElevation; e += 0.001f)
+        for (var e = peak; e <= SkyConfig.SkyGlowAboveSunElevation; e += 0.001f)
         {
             var g = SkyPalette.GlowAmount(e);
             Assert.True(g <= previous + 1e-6f, $"the glow rose from {previous} to {g} as the sun climbed ({e})");

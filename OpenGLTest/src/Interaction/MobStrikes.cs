@@ -35,7 +35,7 @@ internal sealed class MobStrikes
         ShowLandedHit(mob, hits);
         SpawnHitSparks(mob, from);
         var away = new Vector3(mob.Position.X - from.X, 0f, mob.Position.Z - from.Z);
-        mob.Shove(away, WorldGenerationConfig.SlimePunchShoveSpeed);
+        mob.Shove(away, MobConfig.SlimePunchShoveSpeed);
     }
 
     // A connecting hit throws a few pale chips off the mob's body where the striker faces it
@@ -47,9 +47,9 @@ internal sealed class MobStrikes
         toward.Y = 0f;
         var direction = toward.LengthSquared() > 1e-6f ? Vector3.Normalize(toward) : Vector3.UnitZ;
         var contact = mob.Position + direction * (mob.BodyHalfExtent * 0.6f);
-        _debris.Spark(contact, WorldGenerationConfig.HitSparkColor, mob.BodyHalfExtent * 0.5f,
-            WorldGenerationConfig.HitSparkCount, WorldGenerationConfig.HitSparkSpeed,
-            WorldGenerationConfig.HitSparkSize);
+        _debris.Spark(contact, JuiceConfig.HitSparkColor, mob.BodyHalfExtent * 0.5f,
+            JuiceConfig.HitSparkCount, JuiceConfig.HitSparkSpeed,
+            JuiceConfig.HitSparkSize);
     }
 
     // Floats the damage of a hit over the mob when TakeDamage accepted it (its hit count moved). A
@@ -62,5 +62,5 @@ internal sealed class MobStrikes
 
     internal void ShowDamageNumber(Mob mob, int amount) =>
         DamageNumbers.Spawn(mob.Position with { Y = EntityHealthbarRenderer.BarCenterY(mob.Position.Y, mob.HeadAboveCenter)
-                                                    + WorldGenerationConfig.DamageNumberLiftBlocks }, amount);
+                                                    + MobConfig.DamageNumberLiftBlocks }, amount);
 }

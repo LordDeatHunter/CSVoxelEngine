@@ -29,8 +29,8 @@ public sealed class ShadowCenterTests
     /// <summary>Every shadow cascade's (radius in blocks, map size in texels).</summary>
     public static TheoryData<float, int> Cascades => new()
     {
-        { WorldGenerationConfig.ShadowRadiusBlocks, WorldGenerationConfig.ShadowMapSize },
-        { WorldGenerationConfig.FarShadowRadiusBlocks, WorldGenerationConfig.FarShadowMapSize },
+        { LightingConfig.ShadowRadiusBlocks, LightingConfig.ShadowMapSize },
+        { LightingConfig.FarShadowRadiusBlocks, LightingConfig.FarShadowMapSize },
     };
 
     internal static float TexelOf(float radius, int mapSize) => 2f * radius / mapSize;

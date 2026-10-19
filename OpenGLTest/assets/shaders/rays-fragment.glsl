@@ -27,7 +27,7 @@ uniform float uStrength;
 // World Y of the water surface over the eye (Camera.EyeWaterSurfaceY): the eye's own body of
 // water, not the sea plane, so a lake above sea level gets shafts too.
 uniform float uSurfaceY;
-// Per-channel absorption per block of water depth: the same WorldGenerationConfig.WaterAbsorb
+// Per-channel absorption per block of water depth: the same WaterRenderConfig.WaterAbsorb
 // the world shader's water fragment uses, so shafts and water agree on the tint.
 uniform vec3 uWaterAbsorb;
 uniform float uMaxDistance;

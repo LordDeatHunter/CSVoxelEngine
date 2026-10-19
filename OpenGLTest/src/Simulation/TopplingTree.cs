@@ -44,7 +44,7 @@ public class TopplingTree : IDisposable
     /// <summary>GPU mesh, uploaded lazily by <see cref="EnsureMesh"/> on first render.</summary>
     public Mesh? Mesh { get; private set; }
 
-    /// <summary>True once the tree has lain still for <see cref="WorldGenerationConfig.TreeFellRestSeconds"/>.</summary>
+    /// <summary>True once the tree has lain still for <see cref="SimulationConfig.TreeFellRestSeconds"/>.</summary>
     public bool IsDone { get; private set; }
 
     public TopplingTree(List<FellBlock> blocks, Vector3 pivot, Vector3 fallDirection, bool drops = true)
@@ -74,7 +74,7 @@ public class TopplingTree : IDisposable
     /// own, since the nodes they ring already cover the canopy around them. Mining anything that
     /// is not tree wood, or detached wood, collects just that cell. An unloaded chunk reads as no
     /// link. Bounded by the fell caps: a component that would pass
-    /// <see cref="WorldGenerationConfig.TreeFellWoodCap"/>, or whose search hits it, stays
+    /// <see cref="SimulationConfig.TreeFellWoodCap"/>, or whose search hits it, stays
     /// standing (and still drops normally when mined). Pure CPU over live chunk data, main
     /// thread, and safe whether or not the broken cell was already cleared (it is seeded from
     /// the passed id and state, and the search reads it as absent).
@@ -90,7 +90,7 @@ public class TopplingTree : IDisposable
         var fallingWood = new List<FellBlock> { new(breakCell, brokenId, brokenState) };
         var taken = new HashSet<long> { TreeCellKey.Pack(cx, cy, cz) };
         var standing = new HashSet<long>();
-        var support = new TreeSupport(WorldGenerationConfig.TreeFellWoodCap);
+        var support = new TreeSupport(SimulationConfig.TreeFellWoodCap);
 
         // Each neighbor the cut cell linked to heads a candidate component: it falls exactly
         // when the search from it, with the cut cell gone, finds no anchor
@@ -109,7 +109,7 @@ public class TopplingTree : IDisposable
             var result = support.Search(chunks.TryGetCell, nx, ny, nz,
                 hasExcluded: true, cx, cy, cz, unloadedIsUnknown: false);
             if (result == TreeSupportResult.Unsupported
-                && fallingWood.Count + support.Component.Count <= WorldGenerationConfig.TreeFellWoodCap)
+                && fallingWood.Count + support.Component.Count <= SimulationConfig.TreeFellWoodCap)
             {
                 foreach (var (x, y, z, state) in support.Component)
                 {
@@ -131,7 +131,7 @@ public class TopplingTree : IDisposable
         var collected = new List<FellBlock>(fallingWood.Count + 64);
         foreach (var wood in fallingWood)
         {
-            if (collected.Count >= WorldGenerationConfig.TreeFellTotalCap)
+            if (collected.Count >= SimulationConfig.TreeFellTotalCap)
                 return collected;
             collected.Add(wood);
         }
@@ -149,7 +149,7 @@ public class TopplingTree : IDisposable
             for (var dy = -2; dy <= 2; dy++)
             for (var dz = -2; dz <= 2; dz++)
             {
-                if (collected.Count >= WorldGenerationConfig.TreeFellTotalCap)
+                if (collected.Count >= SimulationConfig.TreeFellTotalCap)
                     return collected;
 
                 int lx = wx + dx, ly = wy + dy, lz = wz + dz;
@@ -245,7 +245,7 @@ public class TopplingTree : IDisposable
     {
         get
         {
-            var t = MathUtils.Clamp01(_elapsed / WorldGenerationConfig.TreeToppleSeconds);
+            var t = MathUtils.Clamp01(_elapsed / SimulationConfig.TreeToppleSeconds);
             return MathF.PI * 0.5f * MathUtils.EaseInCubic(t);
         }
     }
@@ -257,16 +257,16 @@ public class TopplingTree : IDisposable
         Matrix4x4.CreateFromAxisAngle(_axis, AngleNow) * Matrix4x4.CreateTranslation(_pivot);
 
     /// <summary>Advances the swing, then the rest timer; <see cref="IsDone"/> fires once the
-    /// tree has lain still for <see cref="WorldGenerationConfig.TreeFellRestSeconds"/>.</summary>
+    /// tree has lain still for <see cref="SimulationConfig.TreeFellRestSeconds"/>.</summary>
     public void Update(float deltaTime)
     {
         if (IsDone) return;
 
-        var falling = _elapsed < WorldGenerationConfig.TreeToppleSeconds;
+        var falling = _elapsed < SimulationConfig.TreeToppleSeconds;
         _elapsed += deltaTime;
-        if (falling && _elapsed >= WorldGenerationConfig.TreeToppleSeconds)
+        if (falling && _elapsed >= SimulationConfig.TreeToppleSeconds)
             _landingPending = true;
-        if (_elapsed >= WorldGenerationConfig.TreeToppleSeconds + WorldGenerationConfig.TreeFellRestSeconds)
+        if (_elapsed >= SimulationConfig.TreeToppleSeconds + SimulationConfig.TreeFellRestSeconds)
             IsDone = true;
     }
 

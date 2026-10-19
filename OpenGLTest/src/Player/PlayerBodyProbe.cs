@@ -15,7 +15,7 @@ public static class PlayerBodyProbe
 {
     /// <summary>
     /// Whether the body's surroundings are loaded: the chunk of the feet cell and of the cell
-    /// <see cref="WorldGenerationConfig.NetGroundProbeBlocks"/> below the feet. When they are not,
+    /// <see cref="NetworkConfig.NetGroundProbeBlocks"/> below the feet. When they are not,
     /// nothing about the body can be judged (an unloaded cell would read as air), so callers treat
     /// the body as unknown and judge nothing.
     /// </summary>
@@ -25,17 +25,17 @@ public static class PlayerBodyProbe
         var x = MathUtils.FloorToInt(eye.X);
         var z = MathUtils.FloorToInt(eye.Z);
         return chunks.ChunkAt(x, MathUtils.FloorToInt(feet), z) != null
-               && chunks.ChunkAt(x, MathUtils.FloorToInt(feet - WorldGenerationConfig.NetGroundProbeBlocks), z) != null;
+               && chunks.ChunkAt(x, MathUtils.FloorToInt(feet - NetworkConfig.NetGroundProbeBlocks), z) != null;
     }
 
     /// <summary>
     /// Whether the body stands on something: the body box lowered by
-    /// <see cref="WorldGenerationConfig.NetGroundProbeBlocks"/> collides under the player-body rule
+    /// <see cref="NetworkConfig.NetGroundProbeBlocks"/> collides under the player-body rule
     /// (<see cref="PlayerPhysics.BodyCollides"/>). A body already inside a solid reads grounded
     /// too, so a buried player is never billed a fall.
     /// </summary>
     public static bool Grounded(Vector3 eye, ChunkManager chunks) =>
-        PlayerPhysics.BodyCollides(eye - new Vector3(0f, WorldGenerationConfig.NetGroundProbeBlocks, 0f), chunks);
+        PlayerPhysics.BodyCollides(eye - new Vector3(0f, NetworkConfig.NetGroundProbeBlocks, 0f), chunks);
 
     /// <summary>
     /// Whether the body swims: a fluid surface over its footprint reaches above the feet, within

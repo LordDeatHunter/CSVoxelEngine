@@ -8,9 +8,9 @@ namespace VoxelEngine.Particles;
 /// <summary>
 /// The water-splash rule, GL-free beside <see cref="LandingDust"/>: how many droplets a body
 /// crossing the water surface throws and how fast, from the speed it crossed at. Nothing under
-/// <see cref="WorldGenerationConfig.WaterSplashMinSpeed"/> (a body drifting across), then both grow
+/// <see cref="JuiceConfig.WaterSplashMinSpeed"/> (a body drifting across), then both grow
 /// along <see cref="MathUtils.ImpactStrength"/> to their caps at
-/// <see cref="WorldGenerationConfig.WaterSplashFullSpeed"/>; the count also scales with the body's size.
+/// <see cref="JuiceConfig.WaterSplashFullSpeed"/>; the count also scales with the body's size.
 /// <see cref="Track"/> steps one body's <see cref="WaterSplashTracker"/> and throws the droplets: pale
 /// <see cref="DebrisLook.Color"/> chips from the water top of the column it crossed
 /// (<see cref="ChunkManager.GetFluidColumnTopGlobal"/>), never off lava. Cosmetic: the world runs it in
@@ -22,16 +22,16 @@ public static class WaterSplash
     /// <paramref name="speed"/> blocks per second throws; 0 under the minimum speed.</summary>
     public static int Count(float speed, float scale = 1f)
     {
-        if (!(speed >= WorldGenerationConfig.WaterSplashMinSpeed) || !(scale > 0f)) return 0;
-        return (int)MathF.Round(MathUtils.Lerp(WorldGenerationConfig.WaterSplashMinCount,
-            WorldGenerationConfig.WaterSplashMaxCount, Strength(speed)) * scale);
+        if (!(speed >= JuiceConfig.WaterSplashMinSpeed) || !(scale > 0f)) return 0;
+        return (int)MathF.Round(MathUtils.Lerp(JuiceConfig.WaterSplashMinCount,
+            JuiceConfig.WaterSplashMaxCount, Strength(speed)) * scale);
     }
 
     /// <summary>Launch speed in blocks per second of those droplets; 0 under the minimum speed.</summary>
     public static float Speed(float speed)
     {
-        if (!(speed >= WorldGenerationConfig.WaterSplashMinSpeed)) return 0f;
-        return MathUtils.Lerp(WorldGenerationConfig.WaterSplashMinLaunch, WorldGenerationConfig.WaterSplashMaxLaunch,
+        if (!(speed >= JuiceConfig.WaterSplashMinSpeed)) return 0f;
+        return MathUtils.Lerp(JuiceConfig.WaterSplashMinLaunch, JuiceConfig.WaterSplashMaxLaunch,
             Strength(speed));
     }
 
@@ -54,8 +54,8 @@ public static class WaterSplash
         var count = Count(speed, scale);
         if (count <= 0 || !TryWaterTop(chunks, x, y, z, out var top)) return 0;
 
-        debris.Splash(new Vector3(bottom.X, top, bottom.Z), WorldGenerationConfig.WaterSplashColor,
-            PlayerPhysics.PlayerRadius * scale, count, Speed(speed), WorldGenerationConfig.WaterSplashSize, random);
+        debris.Splash(new Vector3(bottom.X, top, bottom.Z), JuiceConfig.WaterSplashColor,
+            PlayerPhysics.PlayerRadius * scale, count, Speed(speed), JuiceConfig.WaterSplashSize, random);
         return count;
     }
 
@@ -75,6 +75,6 @@ public static class WaterSplash
     }
 
     private static float Strength(float speed) =>
-        MathUtils.ImpactStrength(speed, WorldGenerationConfig.WaterSplashMinSpeed,
-            WorldGenerationConfig.WaterSplashFullSpeed);
+        MathUtils.ImpactStrength(speed, JuiceConfig.WaterSplashMinSpeed,
+            JuiceConfig.WaterSplashFullSpeed);
 }

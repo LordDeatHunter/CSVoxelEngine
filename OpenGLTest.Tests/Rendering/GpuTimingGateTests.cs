@@ -11,14 +11,14 @@ namespace VoxelEngine.Tests.Rendering;
 /// and no GL anywhere in this file.
 ///
 /// Every magnitude below is expressed as a multiple of
-/// <c>WorldGenerationConfig.GpuTimingIdleInterval</c>, never as an arithmetic literal over it, so
+/// <c>PostProcessConfig.GpuTimingIdleInterval</c>, never as an arithmetic literal over it, so
 /// retuning the duty cycle cannot turn a test into a tautology or into a spurious failure.
 /// </summary>
 public sealed class GpuTimingGateTests
 {
     // long so that every comparison below is long-to-long: the frame counter the gate reads is a
     // long, and an int/long mismatch in Assert.Equal is a compile error, not a silent widening.
-    private static long Interval => WorldGenerationConfig.GpuTimingIdleInterval;
+    private static long Interval => PostProcessConfig.GpuTimingIdleInterval;
 
     [Fact]
     public void OverlayOnTimesEveryFrame()

@@ -24,7 +24,7 @@ public sealed class MobFallDamageTests
     [InlineData(100)]
     public void AShortDropIsFreeAndTheDamageNeverFallsAsTheDropGrows(int maxHealth)
     {
-        var safe = WorldGenerationConfig.MobSafeFallBlocks;
+        var safe = MobConfig.MobSafeFallBlocks;
         Assert.Equal(0, MobFallDamage.Damage(0f, safe, maxHealth));
         Assert.Equal(0, MobFallDamage.Damage(safe, safe, maxHealth));
 

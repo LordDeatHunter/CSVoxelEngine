@@ -113,7 +113,7 @@ public sealed class PlayerPlacedUnloadReplayProbe
 
     /// <summary>
     /// Chunk coordinates used on every axis of the registered chunk grid. They straddle the unload
-    /// radius (<c>WorldGenerationConfig.ChunkRadius</c> = 16, tested as a squared distance) from
+    /// radius (<c>StreamingConfig.ChunkRadius</c> = 16, tested as a squared distance) from
     /// both sides and on both signs: +-1 and 0 stay loaded throughout, +-8 survive the first pass
     /// and leave on the second, and +-24 are already out of range on the first. Pinned literals -
     /// a gate whose geometry is read live from the radius it exercises stops exercising it the

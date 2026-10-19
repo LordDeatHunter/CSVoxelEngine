@@ -29,7 +29,7 @@ internal sealed class CloudShadowTexture : IDisposable
     {
         _gl = gl;
         var cells = CloudField.Cells;
-        var coverage = CloudField.BuildShadowCoverage(CloudField.BuildLevels(), WorldGenerationConfig.CloudMaxLevels);
+        var coverage = CloudField.BuildShadowCoverage(CloudField.BuildLevels(), SkyConfig.CloudMaxLevels);
         Coverage = coverage;
 
         Handle = gl.GenTexture();

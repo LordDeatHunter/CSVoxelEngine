@@ -146,7 +146,7 @@ public sealed class FluidTests
         var manager = new ChunkManager(null!);
         const int extra = 3;
         // Chunk y=10 sits above sea level, so the wake skips the border scan and stays cheap
-        for (var i = 0; i < WorldGenerationConfig.MaxWakeChunksPerFrame + extra; i++)
+        for (var i = 0; i < SimulationConfig.MaxWakeChunksPerFrame + extra; i++)
             manager.QueueChunk(new Vector3(i, 10, 0));
 
         new FluidManager().WakeLoadedChunks(manager);

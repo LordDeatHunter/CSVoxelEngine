@@ -84,7 +84,7 @@ public sealed class ColumnCacheEvictionTests
 
     /// <summary>
     /// Sweep width, also fixed. It matches
-    /// <c>WorldGenerationConfig.MaxConcurrentBlockDataGenerations</c> (4 as of 2026-09-19) so
+    /// <c>StreamingConfig.MaxConcurrentBlockDataGenerations</c> (4 as of 2026-09-19) so
     /// eviction is exercised under the concurrency production actually has, but it is NOT read
     /// from it - see <see cref="SweepColumns"/> for why.
     /// </summary>

@@ -12,7 +12,7 @@ namespace VoxelEngine.Rendering;
 /// The class is deliberately dependency-free — <c>Vector3</c> and <c>MathF</c> only, no GL, no
 /// <c>Camera</c>, no <c>ReflectionPass</c> — because <c>ReflectionPass</c> needs a live GL context to
 /// construct, so the only way to pin this policy headlessly is to keep it out here. Thresholds live
-/// in <c>WorldGenerationConfig</c> (ReflectionReuseMax*) so they can be retuned in one place.
+/// in <c>WaterRenderConfig</c> (ReflectionReuseMax*) so they can be retuned in one place.
 /// </summary>
 internal static class ReflectionReuse
 {
@@ -26,7 +26,7 @@ internal static class ReflectionReuse
 
     // Comparing dot products avoids an acos per frame; the threshold is a constant, so is the cosine.
     private static readonly float CosMaxAngle =
-        MathUtils.CosDeg(WorldGenerationConfig.ReflectionReuseMaxDegrees);
+        MathUtils.CosDeg(WaterRenderConfig.ReflectionReuseMaxDegrees);
 
     /// <summary>
     /// True when the mirror has to be re-rendered this frame; false when the cached texture and its
@@ -61,16 +61,16 @@ internal static class ReflectionReuse
             return true;
 
         // Projection change (sprint FOV ease) — it is baked into the cached view-projection.
-        if (MathF.Abs(current.FovDegrees - cached.FovDegrees) > WorldGenerationConfig.ReflectionReuseMaxFovDegrees)
+        if (MathF.Abs(current.FovDegrees - cached.FovDegrees) > WaterRenderConfig.ReflectionReuseMaxFovDegrees)
             return true;
 
         // The other projection input: a resize can change the aspect without changing the texture size.
-        if (MathF.Abs(current.Aspect - cached.Aspect) > WorldGenerationConfig.ReflectionReuseMaxAspect)
+        if (MathF.Abs(current.Aspect - cached.Aspect) > WaterRenderConfig.ReflectionReuseMaxAspect)
             return true;
 
         // Eye moved far enough that the parallax of the one-frame-old mirror would read as swimming.
         if (Vector3.DistanceSquared(current.Eye, cached.Eye) >
-            WorldGenerationConfig.ReflectionReuseMaxMoveBlocks * WorldGenerationConfig.ReflectionReuseMaxMoveBlocks)
+            WaterRenderConfig.ReflectionReuseMaxMoveBlocks * WaterRenderConfig.ReflectionReuseMaxMoveBlocks)
             return true;
 
         // Degenerate input: a zero forward has no angle to compare, so refuse to reuse.

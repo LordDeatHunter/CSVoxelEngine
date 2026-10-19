@@ -15,10 +15,10 @@ namespace VoxelEngine.Tests.Rendering;
 public sealed class ShadowCascadeTests
 {
     private static ShadowCascade Near() =>
-        new(WorldGenerationConfig.ShadowRadiusBlocks, WorldGenerationConfig.ShadowMapSize);
+        new(LightingConfig.ShadowRadiusBlocks, LightingConfig.ShadowMapSize);
 
     private static ShadowCascade Far() =>
-        new(WorldGenerationConfig.FarShadowRadiusBlocks, WorldGenerationConfig.FarShadowMapSize);
+        new(LightingConfig.FarShadowRadiusBlocks, LightingConfig.FarShadowMapSize);
 
     /// <summary>Where <c>SampleShadow</c> starts fading a cascade out, in NDC of its box.</summary>
     private const float FadeStart = 0.85f;

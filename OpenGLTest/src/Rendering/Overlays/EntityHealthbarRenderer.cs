@@ -21,7 +21,7 @@ namespace VoxelEngine.Rendering.Overlays;
 public sealed class EntityHealthbarRenderer : IDisposable
 {
     /// <summary>Hearts per row; the pool is spread proportionally across them.</summary>
-    public const int HeartCount = WorldGenerationConfig.EntityHealthbarHearts;
+    public const int HeartCount = MobConfig.EntityHealthbarHearts;
 
     /// <summary>Full-heart sprite, as a single-slice array texture like every other sprite.</summary>
     public const string HeartSpritePath = "assets/textures/ui/heart.png";
@@ -57,7 +57,7 @@ public sealed class EntityHealthbarRenderer : IDisposable
     public EntityHealthbarRenderer(GL gl)
     {
         _gl = gl;
-        _maxQuads = WorldGenerationConfig.MobsMaxAlive * HeartCount;
+        _maxQuads = MobConfig.MobsMaxAlive * HeartCount;
         _shader = new Shader(gl,
             FileUtils.ReadFile("assets/shaders/entity-healthbar-vertex.glsl"),
             FileUtils.ReadFile("assets/shaders/entity-healthbar-fragment.glsl"));
@@ -67,8 +67,8 @@ public sealed class EntityHealthbarRenderer : IDisposable
         _heartEmptyTexture = TextureLoader.LoadFromFile(gl, HeartEmptySpritePath, srgb: true);
 
         _verts = new Vertex[_maxQuads * 4];
-        _depths = new float[WorldGenerationConfig.MobsMaxAlive];
-        _order = new int[WorldGenerationConfig.MobsMaxAlive];
+        _depths = new float[MobConfig.MobsMaxAlive];
+        _order = new int[MobConfig.MobsMaxAlive];
 
         var indices = new ushort[_maxQuads * 6];
         for (var i = 0; i < _maxQuads; i++)
@@ -128,7 +128,7 @@ public sealed class EntityHealthbarRenderer : IDisposable
     /// above it (already scaled — pass <see cref="Mob.HeadAboveCenter"/>).
     /// </summary>
     public static float BarCenterY(float bodyCenterY, float headAboveCenter) =>
-        bodyCenterY + headAboveCenter + WorldGenerationConfig.EntityHealthbarLiftBlocks;
+        bodyCenterY + headAboveCenter + MobConfig.EntityHealthbarLiftBlocks;
 
     /// <summary>
     /// Draws one five-heart row above each mob as two blended, depth-tested batches with
@@ -137,12 +137,12 @@ public sealed class EntityHealthbarRenderer : IDisposable
     public void Render(IReadOnlyList<Mob> mobs, Matrix4x4 viewProj, Vector3 cameraPos,
         Vector3 forward, Vector3 fogColor, float fogNear, float fogFar)
     {
-        var count = Math.Min(mobs.Count, WorldGenerationConfig.MobsMaxAlive);
+        var count = Math.Min(mobs.Count, MobConfig.MobsMaxAlive);
         if (count == 0) return;
 
         forward.BillboardBasis(out var right, out var up);
 
-        var size = WorldGenerationConfig.EntityHeartSizeBlocks;
+        var size = MobConfig.EntityHeartSizeBlocks;
 
         for (var i = 0; i < count; i++)
         {
@@ -212,7 +212,7 @@ public sealed class EntityHealthbarRenderer : IDisposable
     private void WriteQuad(int baseVert, Vector3 center, float width, Vector3 right, Vector3 up,
         float uMin, float uMax)
     {
-        var size = WorldGenerationConfig.EntityHeartSizeBlocks;
+        var size = MobConfig.EntityHeartSizeBlocks;
         var halfW = width * 0.5f;
         var halfH = size * 0.5f;
         // V=0 is the image top (rows upload top-first), so the quad top takes V=0,

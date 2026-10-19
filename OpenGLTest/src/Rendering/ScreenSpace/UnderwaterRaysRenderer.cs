@@ -117,8 +117,8 @@ public sealed class UnderwaterRaysRenderer : IDisposable
         _shader.SetUniform("uStrength", strength);
         _shader.SetUniform("uSurfaceY", surfaceY);
         _shader.SetUniform("uWaterAbsorb", waterAbsorb);
-        _shader.SetUniform("uMaxDistance", WorldGenerationConfig.WaterRayMaxDistance);
-        _shader.SetUniform("uSteps", WorldGenerationConfig.WaterRaySteps);
+        _shader.SetUniform("uMaxDistance", WaterRenderConfig.WaterRayMaxDistance);
+        _shader.SetUniform("uSteps", WaterRenderConfig.WaterRaySteps);
         _shader.SetUniform("uTime", time);
 
         // One VAO, bound once and used by both draws.
@@ -146,8 +146,8 @@ public sealed class UnderwaterRaysRenderer : IDisposable
         _upsample.Use();
         _upsample.SetUniform("uInvViewProj", invViewProj);
         _upsample.SetUniform("uCameraPos", cameraPos);
-        _upsample.SetUniform("uMaxDistance", WorldGenerationConfig.WaterRayMaxDistance);
-        _upsample.SetUniform("uTolerance", WorldGenerationConfig.WaterRayUpsampleToleranceBlocks);
+        _upsample.SetUniform("uMaxDistance", WaterRenderConfig.WaterRayMaxDistance);
+        _upsample.SetUniform("uTolerance", WaterRenderConfig.WaterRayUpsampleToleranceBlocks);
         _gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
         _gl.BindVertexArray(0);
 

@@ -97,7 +97,7 @@ public sealed class TreeGraph
     /// around it, and its floor becomes at least <see cref="TreeRasterizer.MinDiameterPx"/>(R);
     /// species that never grow shells skip those reads. Returns null when a read hits an
     /// unloaded chunk (the tree may continue there, and a partial graph must never grow) or the
-    /// walk passes <see cref="WorldGenerationConfig.TreeGrowNodeCap"/> nodes.
+    /// walk passes <see cref="SimulationConfig.TreeGrowNodeCap"/> nodes.
     /// </summary>
     public static TreeGraph? FromWorld(TreeCellReader read, TreeSpecies species, int x, int y, int z)
     {
@@ -140,7 +140,7 @@ public sealed class TreeGraph
                     continue;
                 if (graph.Occupies(nx, ny, nz))
                     continue;
-                if (graph.Count >= WorldGenerationConfig.TreeGrowNodeCap)
+                if (graph.Count >= SimulationConfig.TreeGrowNodeCap)
                     return null;
 
                 float d = WoodState.DiameterPx(state);

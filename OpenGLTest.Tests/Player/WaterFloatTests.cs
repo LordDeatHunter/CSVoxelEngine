@@ -42,7 +42,7 @@ public sealed class WaterFloatTests
     }
 
     // The feet height at which WaterFloatRestShare of the body is under the deep pool's surface
-    private static float RestFeet => DeepSurface - WorldGenerationConfig.WaterFloatRestShare * PlayerPhysics.PlayerHeight;
+    private static float RestFeet => DeepSurface - PlayerConfig.WaterFloatRestShare * PlayerPhysics.PlayerHeight;
 
     [Fact]
     public void ABodyInDeepWaterComesToRestFloatingAndNeverWades()

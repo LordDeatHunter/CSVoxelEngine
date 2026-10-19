@@ -180,7 +180,7 @@ public static class LodSurface
     /// (a flower, a leaf, a pane of glass) changes nothing.</item>
     /// <item><b>At the top</b>: a surface-solid block is a replacement and swaps the override's
     /// block; anything else means the top was removed, and the column is rescanned downward through
-    /// loaded chunks for at most <see cref="WorldGenerationConfig.LodSurfaceRescanDepth"/> cells. An
+    /// loaded chunks for at most <see cref="StreamingConfig.LodSurfaceRescanDepth"/> cells. An
     /// unloaded cell is assumed solid (the conservative assumption <see cref="LodRegion.LowerColumnBelow"/>'s
     /// y - 1 cap makes too) and becomes the top with the generated tile rule (block 0).</item>
     /// <item><b>Below the top</b>: a dig falls through to the monotone removal cap
@@ -230,7 +230,7 @@ public static class LodSurface
                 return Set(x, z, y, id);
 
             // The top was removed: find the next surface below it.
-            var depth = WorldGenerationConfig.LodSurfaceRescanDepth;
+            var depth = StreamingConfig.LodSurfaceRescanDepth;
             for (var yy = y - 1; yy >= y - depth; yy--)
             {
                 if (!chunks.TryGetCell(x, yy, z, out var below, out _))

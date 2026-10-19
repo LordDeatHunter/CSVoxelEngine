@@ -12,18 +12,18 @@ namespace VoxelEngine.Effects.Water;
 public static class DeepWaterFog
 {
     /// <summary>
-    /// The per-channel dim (r, g, b), each 0..<see cref="WorldGenerationConfig.DeepWaterFogMaxDim"/>, at
+    /// The per-channel dim (r, g, b), each 0..<see cref="WaterRenderConfig.DeepWaterFogMaxDim"/>, at
     /// <paramref name="depthBlocks"/> below the surface: <c>MaxDim * (1 - exp(-loss * depth / scale))</c>
-    /// with the channel's <see cref="WorldGenerationConfig.DeepWaterFogLoss"/>. Zero at or above the
+    /// with the channel's <see cref="WaterRenderConfig.DeepWaterFogLoss"/>. Zero at or above the
     /// surface, never decreasing with depth, red never less dimmed than green nor green than blue, and
     /// never pitch black.
     /// </summary>
     public static Vector3 Dim(float depthBlocks)
     {
         if (!(depthBlocks > 0f)) return Vector3.Zero;
-        var loss = WorldGenerationConfig.DeepWaterFogLoss;
-        var d = depthBlocks / WorldGenerationConfig.DeepWaterFogScaleBlocks;
-        var max = WorldGenerationConfig.DeepWaterFogMaxDim;
+        var loss = WaterRenderConfig.DeepWaterFogLoss;
+        var d = depthBlocks / WaterRenderConfig.DeepWaterFogScaleBlocks;
+        var max = WaterRenderConfig.DeepWaterFogMaxDim;
         return new Vector3(
             max * (1f - MathF.Exp(-loss.X * d)),
             max * (1f - MathF.Exp(-loss.Y * d)),

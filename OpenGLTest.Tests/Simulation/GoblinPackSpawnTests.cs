@@ -11,8 +11,8 @@ namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// Goblin pack spawning: a ring spawn rolls one to
-/// <see cref="WorldGenerationConfig.GoblinPackMaxSize"/> goblins together, the rest of the pack
-/// landing within <see cref="WorldGenerationConfig.GoblinPackSpawnRadiusBlocks"/> of the found
+/// <see cref="MobConfig.GoblinPackMaxSize"/> goblins together, the rest of the pack
+/// landing within <see cref="MobConfig.GoblinPackSpawnRadiusBlocks"/> of the found
 /// cell, and every member respects the shared natural cap.
 /// </summary>
 public sealed class GoblinPackSpawnTests
@@ -36,21 +36,21 @@ public sealed class GoblinPackSpawnTests
 
         var cycles = 0;
         var sawPack = false;
-        for (var cycle = 0; cycle < 40 && goblins.LivingCount < WorldGenerationConfig.MobNaturalCap; cycle++)
+        for (var cycle = 0; cycle < 40 && goblins.LivingCount < MobConfig.MobNaturalCap; cycle++)
         {
             var before = goblins.Goblins.ToArray();
-            goblins.Update(WorldGenerationConfig.GoblinSpawnIntervalSeconds + 0.01f, chunks, drops, camera);
+            goblins.Update(MobConfig.GoblinSpawnIntervalSeconds + 0.01f, chunks, drops, camera);
             var fresh = goblins.Goblins.Where(g => !before.Contains(g)).ToList();
             if (fresh.Count == 0) continue;
             cycles++;
 
-            Assert.InRange(fresh.Count, 1, WorldGenerationConfig.GoblinPackMaxSize);
+            Assert.InRange(fresh.Count, 1, MobConfig.GoblinPackMaxSize);
             var leader = fresh[0].Position;
             foreach (var member in fresh)
             {
                 var dx = member.Position.X - leader.X;
                 var dz = member.Position.Z - leader.Z;
-                var limit = WorldGenerationConfig.GoblinPackSpawnRadiusBlocks + 1f;
+                var limit = MobConfig.GoblinPackSpawnRadiusBlocks + 1f;
                 Assert.True(dx * dx + dz * dz <= limit * limit,
                     $"a pack member spawned {MathF.Sqrt(dx * dx + dz * dz):0.0} blocks from the leader");
             }
@@ -60,7 +60,7 @@ public sealed class GoblinPackSpawnTests
 
         Assert.True(cycles > 0, "no spawn cycle produced a goblin");
         Assert.True(sawPack, "no cycle ever rolled a pack of more than one");
-        Assert.True(goblins.LivingCount <= WorldGenerationConfig.MobNaturalCap,
+        Assert.True(goblins.LivingCount <= MobConfig.MobNaturalCap,
             $"the pack spawns passed the natural cap: {goblins.LivingCount}");
     }
 }

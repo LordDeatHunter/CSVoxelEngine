@@ -157,12 +157,12 @@ public sealed class SlimeTests
         var camera = new Camera(null, null);
         camera.TestTeleport(new Vector3(0.5f, 100f, 0.5f), yaw: 0f, pitch: 0f);
 
-        for (var i = 0; i < WorldGenerationConfig.MobNaturalCap; i++)
+        for (var i = 0; i < MobConfig.MobNaturalCap; i++)
             manager.Spawn(new Vector3(0.5f, 1f + Slime.HalfExtent, 0.5f));
 
-        manager.Update(WorldGenerationConfig.SlimeSpawnIntervalSeconds + 0.01f, chunks, drops, camera);
+        manager.Update(MobConfig.SlimeSpawnIntervalSeconds + 0.01f, chunks, drops, camera);
 
-        Assert.Equal(WorldGenerationConfig.MobNaturalCap, manager.Slimes.Count);
+        Assert.Equal(MobConfig.MobNaturalCap, manager.Slimes.Count);
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public sealed class SlimeTests
         camera.TestTeleport(new Vector3(0.5f, 1.62f, 0.5f), yaw: 0f, pitch: 0f);
 
         var stray = manager.Spawn(new Vector3(
-            WorldGenerationConfig.SlimeDespawnRadiusBlocks + 4f, 1f + Slime.HalfExtent, 0.5f))!;
+            MobConfig.SlimeDespawnRadiusBlocks + 4f, 1f + Slime.HalfExtent, 0.5f))!;
         manager.Update(Dt, chunks, drops, camera);
 
         // It plays the death pose instead of vanishing, no longer counts, and drops nothing
@@ -243,7 +243,7 @@ public sealed class SlimeTests
             damaged = manager.DamageDealtThisFrame > 0;
         }
         Assert.True(damaged);
-        Assert.Equal(WorldGenerationConfig.SlimeContactDamage, manager.DamageDealtThisFrame);
+        Assert.Equal(MobConfig.SlimeContactDamage, manager.DamageDealtThisFrame);
 
         // The slime sits to the -X side, so the knockback must carry the player further +X.
         var beforeX = camera.Position.X;

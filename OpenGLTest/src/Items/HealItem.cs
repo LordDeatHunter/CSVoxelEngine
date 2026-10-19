@@ -5,7 +5,7 @@ namespace VoxelEngine.Items;
 
 /// <summary>
 /// Restores health (a bandage): heals the player the use runs for by
-/// <see cref="WorldGenerationConfig.BandageHealAmount"/>, spending one unit from its own stack.
+/// <see cref="PlayerConfig.BandageHealAmount"/>, spending one unit from its own stack.
 /// Refused at full health, so the stack is never spent for nothing. The pool is the local
 /// player's in singleplayer and a client's mirrored one; on a server the Use intent heals the
 /// sending player's own <see cref="PlayerHealth"/>.
@@ -19,7 +19,7 @@ public class HealItem : Item
     public override ItemUseResult OnUse(ItemUseContext ctx, ItemStack? stack)
     {
         var world = ctx.World;
-        if (!world.Heal(WorldGenerationConfig.BandageHealAmount))
+        if (!world.Heal(PlayerConfig.BandageHealAmount))
             return ItemUseResult.Ignored;
         if (!world.IsCreative)
             world.ConsumeSelected();

@@ -11,7 +11,7 @@ namespace VoxelEngine.Tests.Effects.Surfaces;
 /// </summary>
 public sealed class LavaPulseTests
 {
-    private static readonly float Strength = WorldGenerationConfig.LavaPulseStrength;
+    private static readonly float Strength = SurfaceShadingConfig.LavaPulseStrength;
 
     [Fact]
     public void TheBrightnessBreathesWithinItsStrengthAroundTheGlow()

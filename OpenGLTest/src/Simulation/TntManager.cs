@@ -278,6 +278,6 @@ public class TntManager
         leafDecay?.ScheduleBox(min, max);
 
         if (blastedLeaves != null)
-            leaves?.BurstCells(blastedLeaves, WorldGenerationConfig.LeafParticleBurstBlast);
+            leaves?.BurstCells(blastedLeaves, ParticleConfig.LeafParticleBurstBlast);
     }
 }

@@ -45,7 +45,7 @@ public sealed class GoblinTests
     {
         var chunks = StoneFloor();
         var goblin = new Goblin(Type, GroundBody(1.5f, 8.5f), ammo: 3);
-        var player = PlayerAt(1.5f + WorldGenerationConfig.GoblinThrowMaxRange + 2f, 8.5f);
+        var player = PlayerAt(1.5f + MobConfig.GoblinThrowMaxRange + 2f, 8.5f);
         var start = HorizontalDistance(goblin.Position, player.Position);
 
         for (var i = 0; i < 600 && HorizontalDistance(goblin.Position, player.Position) > start - 1f; i++)
@@ -60,7 +60,7 @@ public sealed class GoblinTests
         var chunks = StoneFloor();
         const int startAmmo = 5;
         var goblin = new Goblin(Type, GroundBody(2.5f, 8.5f), startAmmo);
-        var band = (WorldGenerationConfig.GoblinThrowMinRange + WorldGenerationConfig.GoblinThrowMaxRange) * 0.5f;
+        var band = (MobConfig.GoblinThrowMinRange + MobConfig.GoblinThrowMaxRange) * 0.5f;
         var player = PlayerAt(2.5f + band, 8.5f);
 
         var starts = 0;
@@ -141,7 +141,7 @@ public sealed class GoblinTests
 
         Assert.True(firstImpact >= 0, "the goblin never swung");
         Assert.True(secondImpact >= 0, "the goblin swung only once");
-        Assert.True(secondImpact - firstImpact >= (int)(WorldGenerationConfig.GoblinMeleeCooldownSeconds / Dt) - 1,
+        Assert.True(secondImpact - firstImpact >= (int)(MobConfig.GoblinMeleeCooldownSeconds / Dt) - 1,
             $"swings {secondImpact - firstImpact} frames apart");
     }
 
@@ -158,7 +158,7 @@ public sealed class GoblinTests
         Assert.True(goblin.IsGrounded);
 
         var before = goblin.Position.X;
-        goblin.Shove(Vector3.UnitX, WorldGenerationConfig.GoblinShoveSpeed);
+        goblin.Shove(Vector3.UnitX, MobConfig.GoblinShoveSpeed);
         for (var i = 0; i < 6; i++)
             goblin.Update(Dt, chunks, player);
         Assert.True(goblin.Position.X > before + 0.02f);

@@ -86,7 +86,7 @@ public sealed class MeshSchedulingTests
     {
         var (manager, meshable) = BuildBlock();
         // A fixture typo must not silently shrink the workload below the per-frame budget.
-        Assert.Equal(WorldGenerationConfig.MaxDirtyChunksPerFrame, meshable.Count);
+        Assert.Equal(StreamingConfig.MaxDirtyChunksPerFrame, meshable.Count);
 
         RunRound(manager, meshable, AtOrigin());
 

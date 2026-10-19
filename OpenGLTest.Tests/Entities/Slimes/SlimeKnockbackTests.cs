@@ -41,7 +41,7 @@ public sealed class SlimeKnockbackTests
             // A hair above the floor, so float rounding never starts the body inside it
             var start = new Vector3(4.5f, 1.05f + Slime.HalfExtentFor(size), 8.5f);
             var slime = new Slime(type, start, size);
-            slime.Shove(Vector3.UnitX, WorldGenerationConfig.SlimePunchShoveSpeed);
+            slime.Shove(Vector3.UnitX, MobConfig.SlimePunchShoveSpeed);
             Assert.True(slime.Velocity.X > 0f);
 
             // Nobody to chase, so the slime never hops: friction alone stops the slide

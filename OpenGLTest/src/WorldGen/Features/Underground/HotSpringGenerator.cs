@@ -4,7 +4,7 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 
 /// <summary>
 /// Hot springs: a small pond in a cold biome whose water never freezes, steaming where it meets
-/// the cold air. Decided per 2^<see cref="WorldGenerationConfig.SpringCellShift"/>-block cell from
+/// the cold air. Decided per 2^<see cref="WorldFeatureConfig.SpringCellShift"/>-block cell from
 /// a pure hash of (cell, seed) and <see cref="TerrainGenerator.ColdWeight"/> at the site's center,
 /// so the carve, the freeze exemption, the far LOD's water and the steam vents all read the same
 /// site. The pond's surface comes from the center's <see cref="TerrainGenerator.LandHeight"/>, so
@@ -19,8 +19,8 @@ public static class HotSpringGenerator
     public static bool TryGetSite(int x, int z, out int level)
     {
         level = 0;
-        var radius = WorldGenerationConfig.SpringRadius;
-        var shift = WorldGenerationConfig.SpringCellShift;
+        var radius = WorldFeatureConfig.SpringRadius;
+        var shift = WorldFeatureConfig.SpringCellShift;
         var minCellX = (x - radius) >> shift;
         var maxCellX = (x + radius) >> shift;
         var minCellZ = (z - radius) >> shift;
@@ -43,19 +43,19 @@ public static class HotSpringGenerator
 
     /// <summary>
     /// The spring a cell holds: its center column (jittered inside the cell), gated on the center's
-    /// climate being cold enough (<see cref="WorldGenerationConfig.SpringMinCold"/>), or false.
+    /// climate being cold enough (<see cref="WorldFeatureConfig.SpringMinCold"/>), or false.
     /// </summary>
     private static bool TryGetCenter(int cellX, int cellZ, out int x, out int z)
     {
         x = 0;
         z = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x5F1D);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldGenerationConfig.SpringChance) return false;
+        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.SpringChance) return false;
 
-        var span = (ulong)(1 << WorldGenerationConfig.SpringCellShift);
-        x = (cellX << WorldGenerationConfig.SpringCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
-        z = (cellZ << WorldGenerationConfig.SpringCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
-        if (TerrainGenerator.ColdWeight(x, z) < WorldGenerationConfig.SpringMinCold) return false;
+        var span = (ulong)(1 << WorldFeatureConfig.SpringCellShift);
+        x = (cellX << WorldFeatureConfig.SpringCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
+        z = (cellZ << WorldFeatureConfig.SpringCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        if (TerrainGenerator.ColdWeight(x, z) < WorldFeatureConfig.SpringMinCold) return false;
         // A spring is a land feature: a cold ocean column would dig the sea floor
         TerrainGenerator.LandHeight(x, z, out var biome, out _, out _, out _);
         return biome != Biome.Ocean;

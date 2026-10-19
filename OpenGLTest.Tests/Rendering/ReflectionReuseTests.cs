@@ -14,7 +14,7 @@ namespace VoxelEngine.Tests.Rendering;
 /// eye-side gate (<c>MirrorApplies</c>: no mirror below the plane or with the eye in water) is
 /// pinned here too.
 ///
-/// Every magnitude below is expressed as a multiple of the <c>WorldGenerationConfig</c> threshold
+/// Every magnitude below is expressed as a multiple of the <c>WaterRenderConfig</c> threshold
 /// it exercises, so retuning a constant cannot silently turn a test into a tautology.
 /// </summary>
 public sealed class ReflectionReuseTests
@@ -82,8 +82,8 @@ public sealed class ReflectionReuseTests
         var eye = new Vector3(10f, 5f, -3f);
         var cached = Pose(eye, Yawed(0f));
         var current = Pose(
-            eye + new Vector3(0.5f * WorldGenerationConfig.ReflectionReuseMaxMoveBlocks, 0f, 0f),
-            Yawed(0.5f * WorldGenerationConfig.ReflectionReuseMaxDegrees));
+            eye + new Vector3(0.5f * WaterRenderConfig.ReflectionReuseMaxMoveBlocks, 0f, 0f),
+            Yawed(0.5f * WaterRenderConfig.ReflectionReuseMaxDegrees));
 
         Assert.False(ReflectionReuse.ShouldRefresh(cached, current,
             hasCachedMirror: true, targetRecreated: false, reusedLastFrame: false));
@@ -94,7 +94,7 @@ public sealed class ReflectionReuseTests
     {
         var eye = new Vector3(10f, 5f, -3f);
         var cached = Pose(eye, Yawed(0f));
-        var current = Pose(eye, Yawed(3f * WorldGenerationConfig.ReflectionReuseMaxDegrees));
+        var current = Pose(eye, Yawed(3f * WaterRenderConfig.ReflectionReuseMaxDegrees));
 
         Assert.True(ReflectionReuse.ShouldRefresh(cached, current,
             hasCachedMirror: true, targetRecreated: false, reusedLastFrame: false));
@@ -106,7 +106,7 @@ public sealed class ReflectionReuseTests
         var eye = new Vector3(10f, 5f, -3f);
         var cached = Pose(eye, Yawed(0f));
         var current = Pose(
-            eye + new Vector3(0f, 0f, 2f * WorldGenerationConfig.ReflectionReuseMaxMoveBlocks),
+            eye + new Vector3(0f, 0f, 2f * WaterRenderConfig.ReflectionReuseMaxMoveBlocks),
             Yawed(0f));
 
         Assert.True(ReflectionReuse.ShouldRefresh(cached, current,
@@ -120,13 +120,13 @@ public sealed class ReflectionReuseTests
         var cached = Pose(eye, Yawed(0f));
 
         var eased = Pose(eye, Yawed(0f),
-            fov: 70f + 2f * WorldGenerationConfig.ReflectionReuseMaxFovDegrees);
+            fov: 70f + 2f * WaterRenderConfig.ReflectionReuseMaxFovDegrees);
         Assert.True(ReflectionReuse.ShouldRefresh(cached, eased,
             hasCachedMirror: true, targetRecreated: false, reusedLastFrame: false));
 
         // The tail of the same ease, once the damp has nearly converged, reuses again.
         var settled = Pose(eye, Yawed(0f),
-            fov: 70f + 0.25f * WorldGenerationConfig.ReflectionReuseMaxFovDegrees);
+            fov: 70f + 0.25f * WaterRenderConfig.ReflectionReuseMaxFovDegrees);
         Assert.False(ReflectionReuse.ShouldRefresh(cached, settled,
             hasCachedMirror: true, targetRecreated: false, reusedLastFrame: false));
     }
@@ -139,7 +139,7 @@ public sealed class ReflectionReuseTests
         var eye = new Vector3(10f, 5f, -3f);
         var cached = Pose(eye, Yawed(0f));
         var current = Pose(eye, Yawed(0f),
-            aspect: 1.6f + 10f * WorldGenerationConfig.ReflectionReuseMaxAspect);
+            aspect: 1.6f + 10f * WaterRenderConfig.ReflectionReuseMaxAspect);
 
         Assert.True(ReflectionReuse.ShouldRefresh(cached, current,
             hasCachedMirror: true, targetRecreated: false, reusedLastFrame: false));
@@ -180,27 +180,27 @@ public sealed class ReflectionReuseTests
     public void StillEntitiesDoNotForceRefresh()
     {
         Assert.False(ReflectionReuse.EntitiesMoved(Entities, (Vector3[])Entities.Clone(),
-            WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks));
+            WaterRenderConfig.ReflectionReuseMaxEntityMoveBlocks));
     }
 
     [Fact]
     public void SubThresholdEntityDriftStillReuses()
     {
         var current = Shifted(Entities, 1,
-            new Vector3(0f, 0.5f * WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks, 0f));
+            new Vector3(0f, 0.5f * WaterRenderConfig.ReflectionReuseMaxEntityMoveBlocks, 0f));
 
         Assert.False(ReflectionReuse.EntitiesMoved(Entities, current,
-            WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks));
+            WaterRenderConfig.ReflectionReuseMaxEntityMoveBlocks));
     }
 
     [Fact]
     public void MovingEntityForcesRefresh()
     {
         var current = Shifted(Entities, 2,
-            new Vector3(2f * WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks, 0f, 0f));
+            new Vector3(2f * WaterRenderConfig.ReflectionReuseMaxEntityMoveBlocks, 0f, 0f));
 
         Assert.True(ReflectionReuse.EntitiesMoved(Entities, current,
-            WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks));
+            WaterRenderConfig.ReflectionReuseMaxEntityMoveBlocks));
     }
 
     [Fact]
@@ -208,9 +208,9 @@ public sealed class ReflectionReuseTests
     {
         // A drop picked up (or a slime spawned) changes the mirror even if nothing else moved.
         Assert.True(ReflectionReuse.EntitiesMoved(Entities, Entities.AsSpan(0, Entities.Length - 1),
-            WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks));
+            WaterRenderConfig.ReflectionReuseMaxEntityMoveBlocks));
         Assert.True(ReflectionReuse.EntitiesMoved(ReadOnlySpan<Vector3>.Empty, Entities,
-            WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks));
+            WaterRenderConfig.ReflectionReuseMaxEntityMoveBlocks));
     }
 
     [Fact]

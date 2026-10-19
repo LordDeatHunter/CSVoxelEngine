@@ -11,7 +11,7 @@ namespace VoxelEngine.Juice;
 public static class SprintFov
 {
     /// <summary>
-    /// The widening the view eases toward this frame, 0..<see cref="WorldGenerationConfig.SprintFovExtraDegrees"/>.
+    /// The widening the view eases toward this frame, 0..<see cref="PlayerConfig.SprintFovExtraDegrees"/>.
     /// It needs the sprint key held with movement input, on foot or flying, and never widens while
     /// sneaking or swimming. On top of that gate it scales with how close the real horizontal speed
     /// is to the on-foot sprint speed and is clamped there, so the 10x flight sprint widens exactly as
@@ -26,10 +26,10 @@ public static class SprintFov
 
         const float walk = PlayerPhysics.BaseSpeed;
         const float run = PlayerPhysics.BaseSpeed * PlayerPhysics.SprintMultiplier;
-        return WorldGenerationConfig.SprintFovExtraDegrees * MathUtils.InverseLerp(walk, run, horizontalSpeed);
+        return PlayerConfig.SprintFovExtraDegrees * MathUtils.InverseLerp(walk, run, horizontalSpeed);
     }
 
     /// <summary>Eases the current widening toward <paramref name="target"/>, frame-rate independent.</summary>
     public static float Step(float current, float target, float deltaTime) =>
-        MathUtils.Damp(current, target, WorldGenerationConfig.SprintFovEaseRate, deltaTime);
+        MathUtils.Damp(current, target, PlayerConfig.SprintFovEaseRate, deltaTime);
 }

@@ -36,8 +36,8 @@ public sealed class AmbienceManager : IDisposable
     public float NightVolume => _nightVolume;
 
     public AmbienceManager(
-        string dayPath = WorldGenerationConfig.DayAmbiencePath,
-        string nightPath = WorldGenerationConfig.NightAmbiencePath)
+        string dayPath = AudioConfig.DayAmbiencePath,
+        string nightPath = AudioConfig.NightAmbiencePath)
     {
         Voice? day = null;
         Voice? night = null;
@@ -92,7 +92,7 @@ public sealed class AmbienceManager : IDisposable
 
     /// <summary>0 at launch, 1 once the startup fade has played out.</summary>
     internal static float StartupScale(float elapsedSeconds) =>
-        MathUtils.SmoothStep(0f, WorldGenerationConfig.AmbienceStartupFadeSeconds, elapsedSeconds);
+        MathUtils.SmoothStep(0f, AudioConfig.AmbienceStartupFadeSeconds, elapsedSeconds);
 
     /// <summary>
     /// Crossfades the two loops by the lighting pass's dayness, easing the crossfade shape
@@ -104,11 +104,11 @@ public sealed class AmbienceManager : IDisposable
         if (!Enabled || _disposed)
             return;
         _startupSeconds = Math.Min(_startupSeconds + Math.Max(0f, deltaTime),
-            WorldGenerationConfig.AmbienceStartupFadeSeconds);
+            AudioConfig.AmbienceStartupFadeSeconds);
 
         var targetDayness = MathUtils.Clamp01(dayness);
         _smoothedDayness = MathUtils.Damp(_smoothedDayness, targetDayness,
-            WorldGenerationConfig.AmbienceFadeRate, deltaTime);
+            AudioConfig.AmbienceFadeRate, deltaTime);
         if (MathF.Abs(_smoothedDayness - targetDayness) < 0.001f)
             _smoothedDayness = targetDayness;
 

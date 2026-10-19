@@ -4,7 +4,7 @@ namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Oases: a rare green pocket deep in the desert — a pond ringed by grass, its own palm and denser
-/// flora. Decided per 2^<see cref="WorldGenerationConfig.OasisCellShift"/>-block cell from a pure
+/// flora. Decided per 2^<see cref="WorldFeatureConfig.OasisCellShift"/>-block cell from a pure
 /// hash of (cell, seed), gated to the deep desert where <see cref="TerrainGenerator.SurfaceWaterGate"/>
 /// keeps ordinary lakes out. The pond carves the heightmap and the water level in
 /// <see cref="TerrainGenerator.Compute"/>, the ring's columns are marked in
@@ -24,11 +24,11 @@ public static class OasisGenerator
         centerZ = 0;
         surface = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x0A51);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldGenerationConfig.OasisChance) return false;
+        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.OasisChance) return false;
 
-        var span = (ulong)(1 << WorldGenerationConfig.OasisCellShift);
-        centerX = (cellX << WorldGenerationConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
-        centerZ = (cellZ << WorldGenerationConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        var span = (ulong)(1 << WorldFeatureConfig.OasisCellShift);
+        centerX = (cellX << WorldFeatureConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
+        centerZ = (cellZ << WorldFeatureConfig.OasisCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
 
         // The deep desert only: where SurfaceWaterGate keeps ordinary lakes out, so an oasis is
         // the one body of water there
@@ -49,8 +49,8 @@ public static class OasisGenerator
         centerX = 0;
         centerZ = 0;
         surface = 0;
-        var radius = WorldGenerationConfig.OasisRadius;
-        var shift = WorldGenerationConfig.OasisCellShift;
+        var radius = WorldFeatureConfig.OasisRadius;
+        var shift = WorldFeatureConfig.OasisCellShift;
         var minCellX = (x - radius) >> shift;
         var maxCellX = (x + radius) >> shift;
         var minCellZ = (z - radius) >> shift;
@@ -79,6 +79,6 @@ public static class OasisGenerator
         if (!TryGetDisc(x, z, out var cx, out var cz, out _)) return false;
         var dx = x - cx;
         var dz = z - cz;
-        return dx * dx + dz * dz <= WorldGenerationConfig.OasisPondRadius * WorldGenerationConfig.OasisPondRadius;
+        return dx * dx + dz * dz <= WorldFeatureConfig.OasisPondRadius * WorldFeatureConfig.OasisPondRadius;
     }
 }

@@ -17,12 +17,12 @@ public static class ReedGenerator
 
     /// <summary>The clump shape every reed is placed by.</summary>
     public static readonly PlantClumpSpec Clumps = new(
-        WorldGenerationConfig.ReedCellShift,
-        WorldGenerationConfig.ReedRadius,
-        WorldGenerationConfig.ReedJitter,
-        WorldGenerationConfig.ReedMinMembers,
-        WorldGenerationConfig.ReedClumpChance,
-        WorldGenerationConfig.ReedEdgeDensity,
+        WorldFeatureConfig.ReedCellShift,
+        WorldFeatureConfig.ReedRadius,
+        WorldFeatureConfig.ReedJitter,
+        WorldFeatureConfig.ReedMinMembers,
+        WorldFeatureConfig.ReedClumpChance,
+        WorldFeatureConfig.ReedEdgeDensity,
         ClumpSalt);
 
     /// <summary>Block this generator stamps; resolved once in the static constructor.</summary>
@@ -38,7 +38,7 @@ public static class ReedGenerator
 
     /// <summary>
     /// Stamps reeds at the water's edge: one cell above the ground where the ground sits within
-    /// <see cref="WorldGenerationConfig.ReedShallowDepth"/> under the column's water level (the
+    /// <see cref="WorldFeatureConfig.ReedShallowDepth"/> under the column's water level (the
     /// shallow water cell itself, or the dry edge level with it). Runs on a generation worker
     /// thread after the water, so a reed may replace the shallow cell it stands in.
     /// </summary>
@@ -50,7 +50,7 @@ public static class ReedGenerator
             var i2 = (x << Chunk.SizeShift) | z;
             var height = column.Heights[i2];
             var depth = column.WaterLevel[i2] - height;
-            if (depth < 0 || depth > WorldGenerationConfig.ReedShallowDepth) continue;
+            if (depth < 0 || depth > WorldFeatureConfig.ReedShallowDepth) continue;
             if (!TryGetReed(worldX0 + x, worldZ0 + z)) continue;
 
             var ly = height + 1 - worldY0;

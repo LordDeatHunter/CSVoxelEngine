@@ -125,7 +125,7 @@ public interface IItemUseWorld
 
     /// <summary>
     /// Grows the tree the targeted cell belongs to (ash on a trunk or a canopy) by a few pulses
-    /// (<see cref="WorldGenerationConfig.AshGrowthPulses"/>), through the same reactive growth
+    /// (<see cref="SimulationConfig.AshGrowthPulses"/>), through the same reactive growth
     /// path a sapling uses. False when the cell holds no tree, so the use is never spent for
     /// nothing.
     /// </summary>

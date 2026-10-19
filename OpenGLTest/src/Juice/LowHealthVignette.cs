@@ -7,7 +7,7 @@ namespace VoxelEngine.Juice;
 /// health fraction that feeds the hearts and the clock. GL-free; <see cref="UiPasses"/>
 /// hands the result to <see cref="DamageVignetteRenderer"/> as a second term of the damage
 /// vignette's one full-screen pass. Nothing at or above
-/// <see cref="WorldGenerationConfig.LowHealthThreshold"/>, while dead or in creative; below it a
+/// <see cref="JuiceConfig.LowHealthThreshold"/>, while dead or in creative; below it a
 /// slow <see cref="MathUtils.Heartbeat"/> whose envelope grows as health falls.
 /// </summary>
 public static class LowHealthVignette
@@ -18,15 +18,15 @@ public static class LowHealthVignette
     /// </summary>
     public static float Intensity(float health01, float time, bool dead, bool creative)
     {
-        const float threshold = WorldGenerationConfig.LowHealthThreshold;
+        const float threshold = JuiceConfig.LowHealthThreshold;
         // The negated test also refuses a NaN fraction
         if (dead || creative || !(health01 < threshold))
             return 0f;
 
         var severity = MathUtils.Clamp01((threshold - health01) / threshold);
-        var envelope = MathUtils.Lerp(WorldGenerationConfig.LowHealthMinStrength,
-            WorldGenerationConfig.LowHealthMaxStrength, severity);
-        var beat = MathUtils.Heartbeat(time, WorldGenerationConfig.LowHealthPulseSeconds);
-        return envelope * MathUtils.Lerp(WorldGenerationConfig.LowHealthPulseFloor, 1f, beat);
+        var envelope = MathUtils.Lerp(JuiceConfig.LowHealthMinStrength,
+            JuiceConfig.LowHealthMaxStrength, severity);
+        var beat = MathUtils.Heartbeat(time, JuiceConfig.LowHealthPulseSeconds);
+        return envelope * MathUtils.Lerp(JuiceConfig.LowHealthPulseFloor, 1f, beat);
     }
 }

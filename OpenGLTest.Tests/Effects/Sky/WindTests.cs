@@ -48,7 +48,7 @@ public sealed class WindTests
         const float speed = 3f;
         Assert.True(Wind.Offset(0.0, speed).Length() < 1e-4f);
         // It traces a circle, so it never gets further than one diameter from the start
-        var diameter = 2.0 * speed / (WorldGenerationConfig.WindTurnDegreesPerSecond * Math.PI / 180.0);
+        var diameter = 2.0 * speed / (SkyConfig.WindTurnDegreesPerSecond * Math.PI / 180.0);
         var furthest = 0f;
         for (var t = 0.0; t < 20000.0; t += 37.0)
             furthest = MathF.Max(furthest, Wind.Offset(t, speed).Length());
@@ -63,7 +63,7 @@ public sealed class WindTests
         var strongest = 0f;
         foreach (var t in Times)
         {
-            var offset = Wind.Offset(t, WorldGenerationConfig.WindGustSpeed);
+            var offset = Wind.Offset(t, SkyConfig.WindGustSpeed);
             for (var x = -200f; x <= 200f; x += 7.3f)
             {
                 var anchor = new Vector2(x, x * 0.37f - 11f);

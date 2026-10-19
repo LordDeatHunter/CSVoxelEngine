@@ -24,7 +24,7 @@ public sealed class UnderwaterWobbleTests
     [Fact]
     public void TheSwayIsGentleAndGrowsWithTheUnderwaterAmount()
     {
-        var cap = WorldGenerationConfig.UnderwaterWobbleScreenShare * Height + 1e-3f;
+        var cap = PostProcessConfig.UnderwaterWobbleScreenShare * Height + 1e-3f;
         var largest = 0f;
         for (var u = 0f; u <= 1f; u += 0.05f)
         for (var t = 0f; t < 30f; t += 0.37f)
@@ -51,8 +51,8 @@ public sealed class UnderwaterWobbleTests
 
         // A step can move the sway at most amplitude * speed * dt along each axis
         const double step = 0.05;
-        var amplitude = WorldGenerationConfig.UnderwaterWobbleScreenShare * Height;
-        var bound = 1.5f * MathF.Sqrt(2f) * amplitude * WorldGenerationConfig.UnderwaterWobbleSpeed * (float)step;
+        var amplitude = PostProcessConfig.UnderwaterWobbleScreenShare * Height;
+        var bound = 1.5f * MathF.Sqrt(2f) * amplitude * PostProcessConfig.UnderwaterWobbleSpeed * (float)step;
         var previous = UnderwaterWobble.Offset(uv, UnderwaterWobble.WrapTime(10_000.0), 1f, Height);
         for (var t = 10_000.0; t < 10_000.0 + 2.0 * UnderwaterWobble.Period; t += step)
         {

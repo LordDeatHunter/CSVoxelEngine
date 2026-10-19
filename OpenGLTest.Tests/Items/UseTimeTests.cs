@@ -66,7 +66,7 @@ public sealed class UseTimeTests : IDisposable
         for (var t = 0f; t < 0.4f; t += Dt)
             world.RightClick.UpdateUseCharge(Dt);
         Assert.False(world.RightClick.IsUseCharging);
-        Assert.Equal(40 + WorldGenerationConfig.BandageHealAmount, world.Health);
+        Assert.Equal(40 + PlayerConfig.BandageHealAmount, world.Health);
         Assert.Equal(0, world.Inventory.CountFor(bandage.Id));
     }
 

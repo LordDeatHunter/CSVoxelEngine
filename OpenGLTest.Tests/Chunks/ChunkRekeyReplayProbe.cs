@@ -135,7 +135,7 @@ public sealed class ChunkRekeyReplayProbe
 
     /// <summary>
     /// The X and Z chunk coordinates of the registered grid. They straddle the unload radius
-    /// (<c>WorldGenerationConfig.ChunkRadius</c> = 16, tested as a squared distance) from both sides
+    /// (<c>StreamingConfig.ChunkRadius</c> = 16, tested as a squared distance) from both sides
     /// and on both signs: 0 and +-1 stay loaded throughout, +-8 survive the first pass and leave on
     /// the second, +-17 sit just outside the radius on the first, and +-24 are far outside it.
     /// Pinned literals - a gate whose geometry is read live from the radius it exercises stops
@@ -449,7 +449,7 @@ public sealed class ChunkRekeyReplayProbe
     ///
     /// <para><b>Why convergence and not per frame.</b> Per-frame mesh selection is order-dependent
     /// by construction: <c>ProcessDirtyChunks</c> caps its scan at
-    /// <c>WorldGenerationConfig.MaxDirtyScanPerFrame</c> entries of a lock-free dictionary
+    /// <c>StreamingConfig.MaxDirtyScanPerFrame</c> entries of a lock-free dictionary
     /// enumeration, so WHICH dirty chunks a frame even considers depends on bucket order, and the
     /// over-budget branch then sorts the candidates with an unstable <c>List.Sort</c> on squared
     /// distance alone, so ties - which are everywhere on a chunk lattice - break by insertion order.

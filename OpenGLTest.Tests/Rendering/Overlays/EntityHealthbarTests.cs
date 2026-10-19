@@ -68,7 +68,7 @@ public sealed class EntityHealthbarTests
     public void BarCenterFloatsAboveTheHead()
     {
         Assert.Equal(
-            10f + Slime.HalfExtent + WorldGenerationConfig.EntityHealthbarLiftBlocks,
+            10f + Slime.HalfExtent + MobConfig.EntityHealthbarLiftBlocks,
             EntityHealthbarRenderer.BarCenterY(10f, Slime.HalfExtent),
             precision: 5);
     }

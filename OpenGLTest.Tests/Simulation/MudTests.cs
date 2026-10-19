@@ -57,7 +57,7 @@ public sealed class MudTests
         SetWater(manager, water, true);
         ScheduleWater(fluids);
 
-        fluids.Update(WorldGenerationConfig.FluidTickSeconds, manager, drops);
+        fluids.Update(SimulationConfig.FluidTickSeconds, manager, drops);
         Assert.Equal(mud, Cell(manager, 8, 1, 8));
     }
 
@@ -75,7 +75,7 @@ public sealed class MudTests
 
         manager.Chunks[Vector3.Zero].SetBlockRaw(8, 1, 8, dirt, 0);
         fluids.ScheduleAround(8, 1, 8);
-        fluids.Update(WorldGenerationConfig.FluidTickSeconds, manager, drops);
+        fluids.Update(SimulationConfig.FluidTickSeconds, manager, drops);
         Assert.Equal(mud, Cell(manager, 8, 1, 8));
     }
 
@@ -126,7 +126,7 @@ public sealed class MudTests
         var drops = new DropManager();
         SetWater(manager, water, true);
         ScheduleWater(fluids);
-        fluids.Update(WorldGenerationConfig.FluidTickSeconds, manager, drops);
+        fluids.Update(SimulationConfig.FluidTickSeconds, manager, drops);
         Assert.Equal(mud, Cell(manager, 8, 1, 8));
 
         SetWater(manager, water, false);

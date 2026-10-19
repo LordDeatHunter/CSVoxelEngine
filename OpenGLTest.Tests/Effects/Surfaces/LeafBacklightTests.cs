@@ -61,6 +61,6 @@ public sealed class LeafBacklightTests
         for (var elevation = -1f; elevation <= 1f; elevation += 0.1f)
         for (var through = 0f; through <= 1.5f; through += 0.25f)
             Assert.InRange(LeafBacklight.Weight(forward, elevation, DaySun, through),
-                0f, WorldGenerationConfig.LeafBacklightStrength);
+                0f, SurfaceShadingConfig.LeafBacklightStrength);
     }
 }

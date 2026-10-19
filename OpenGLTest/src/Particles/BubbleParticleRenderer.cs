@@ -36,7 +36,7 @@ public sealed class BubbleParticleRenderer : IDisposable
     public BubbleParticleRenderer(GL gl)
     {
         _gl = gl;
-        _max = WorldGenerationConfig.BubbleParticleMax;
+        _max = ParticleConfig.BubbleParticleMax;
         _shader = new Shader(gl,
             FileUtils.ReadFile("assets/shaders/bubble-particle-vertex.glsl"),
             FileUtils.ReadFile("assets/shaders/bubble-particle-fragment.glsl"));

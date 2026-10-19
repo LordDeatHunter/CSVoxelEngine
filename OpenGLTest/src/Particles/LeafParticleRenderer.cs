@@ -39,7 +39,7 @@ public sealed class LeafParticleRenderer : IDisposable
     public LeafParticleRenderer(GL gl)
     {
         _gl = gl;
-        _max = WorldGenerationConfig.LeafParticleMax;
+        _max = ParticleConfig.LeafParticleMax;
         _shader = new Shader(gl,
             FileUtils.ReadFile("assets/shaders/leaf-particle-vertex.glsl"),
             FileUtils.ReadFile("assets/shaders/leaf-particle-fragment.glsl"));
@@ -107,7 +107,7 @@ public sealed class LeafParticleRenderer : IDisposable
         if (!_cropResolved)
         {
             _leavesTile = TextureAtlas.TileOf("oak_leaves");
-            _crop = CenterCrop(_leavesTile, tilePixels, WorldGenerationConfig.LeafParticleCropPixels);
+            _crop = CenterCrop(_leavesTile, tilePixels, ParticleConfig.LeafParticleCropPixels);
             _cropResolved = true;
         }
 

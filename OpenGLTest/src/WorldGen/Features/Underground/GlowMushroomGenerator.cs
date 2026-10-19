@@ -6,7 +6,7 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 
 /// <summary>
 /// Glow mushrooms: a rare dim light on deep cave floors, decided per column from a pure hash of
-/// (x, z) and the seed. A cell at least <see cref="WorldGenerationConfig.GlowMushroomMinDepth"/>
+/// (x, z) and the seed. A cell at least <see cref="WorldFeatureConfig.GlowMushroomMinDepth"/>
 /// under the column's height whose own cell and headroom are air and whose floor is solid takes
 /// one — a cave floor, never the surface. The far LOD shows none.
 /// </summary>
@@ -21,12 +21,12 @@ public static class GlowMushroomGenerator
     public static bool TryGetMushroom(int x, int z)
     {
         var h = SplitMix64.Hash(x, z, WorldGenerationConfig.Seed ^ 0x6105);
-        return (SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) < WorldGenerationConfig.GlowMushroomChance;
+        return (SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) < WorldFeatureConfig.GlowMushroomChance;
     }
 
     /// <summary>
     /// Stamps mushrooms onto deep cave floors: air over a solid cell, with air above, at least
-    /// <see cref="WorldGenerationConfig.GlowMushroomMinDepth"/> under the column's height. Runs on
+    /// <see cref="WorldFeatureConfig.GlowMushroomMinDepth"/> under the column's height. Runs on
     /// a generation worker thread after the carvers and the water, so a flooded cave stays bare.
     /// </summary>
     public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
@@ -39,7 +39,7 @@ public static class GlowMushroomGenerator
 
             // Down from the deepest cell this chunk could hold to the depth line (one short of the
             // chunk top, so the headroom read stays inside the chunk)
-            var top = Math.Min(height - WorldGenerationConfig.GlowMushroomMinDepth,
+            var top = Math.Min(height - WorldFeatureConfig.GlowMushroomMinDepth,
                 worldY0 + Chunk.Size - 2);
             for (var y = top; y >= worldY0; y--)
             {

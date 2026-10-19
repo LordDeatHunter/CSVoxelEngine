@@ -78,14 +78,14 @@ public sealed class GroundDust
             || !FootstepDust.Kicks(sprinting, grounded, flying, sneaking, inWater, horizontalSpeed, blockId))
             return 0;
 
-        var kick = new Vector3(-runDirection.X * WorldGenerationConfig.FootstepDustKickBack,
-            WorldGenerationConfig.FootstepDustLift, -runDirection.Y * WorldGenerationConfig.FootstepDustKickBack);
+        var kick = new Vector3(-runDirection.X * JuiceConfig.FootstepDustKickBack,
+            JuiceConfig.FootstepDustLift, -runDirection.Y * JuiceConfig.FootstepDustKickBack);
         var puffs = Math.Min(footfalls, 2);
         for (var i = 0; i < puffs; i++)
-            debris.Puff(feet + new Vector3(0f, WorldGenerationConfig.FootstepDustSize, 0f), cell, blockId,
-                WorldGenerationConfig.FootstepDustCount, WorldGenerationConfig.FootstepDustSpeed,
-                WorldGenerationConfig.FootstepDustSize, random, chunks.ColumnSource, kick);
-        return puffs * WorldGenerationConfig.FootstepDustCount;
+            debris.Puff(feet + new Vector3(0f, JuiceConfig.FootstepDustSize, 0f), cell, blockId,
+                JuiceConfig.FootstepDustCount, JuiceConfig.FootstepDustSpeed,
+                JuiceConfig.FootstepDustSize, random, chunks.ColumnSource, kick);
+        return puffs * JuiceConfig.FootstepDustCount;
     }
 
     /// <summary>
@@ -120,7 +120,7 @@ public sealed class GroundDust
     {
         if (!_splatColors.TryGetValue(type, out var color))
         {
-            color = LandingDust.SkinColor(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor);
+            color = LandingDust.SkinColor(type.Model, JuiceConfig.SlimeSplatFallbackColor);
             _splatColors[type] = color;
         }
         return color;
@@ -138,7 +138,7 @@ public sealed class GroundDust
     {
         var count = LandingDust.SplatCount(impactSpeed, scale);
         if (count <= 0) return 0;
-        var size = WorldGenerationConfig.SlimeSplatSize * scale;
+        var size = JuiceConfig.SlimeSplatSize * scale;
         debris.Splat(feet + new Vector3(0f, size, 0f), colorSrgb, halfWidth * scale, count,
             LandingDust.SplatSpeed(impactSpeed, scale), size, random);
         return count;
@@ -151,10 +151,10 @@ public sealed class GroundDust
     /// </summary>
     public static int DeathPoof(Mob mob, BlockDebrisSystem debris, Random? random = null)
     {
-        var color = LandingDust.SkinColor(mob.Type.Model, WorldGenerationConfig.MobDeathPoofFallbackColor);
-        var count = WorldGenerationConfig.MobDeathPoofCount;
+        var color = LandingDust.SkinColor(mob.Type.Model, JuiceConfig.MobDeathPoofFallbackColor);
+        var count = JuiceConfig.MobDeathPoofCount;
         debris.Splat(mob.Position, color, mob.BodyHalfExtent, count,
-            WorldGenerationConfig.MobDeathPoofSpeed, WorldGenerationConfig.MobDeathPoofSize, random);
+            JuiceConfig.MobDeathPoofSpeed, JuiceConfig.MobDeathPoofSize, random);
         return count;
     }
 
@@ -169,8 +169,8 @@ public sealed class GroundDust
         var count = LandingDust.Count(fallBlocks);
         if (count <= 0) return 0;
         if (!TryFindSurface(chunks, feet, halfWidth, out var cell, out var blockId)) return 0;
-        debris.Puff(feet + new Vector3(0f, WorldGenerationConfig.LandingDustSize, 0f), cell, blockId, count,
-            LandingDust.Speed(fallBlocks), WorldGenerationConfig.LandingDustSize, random, chunks.ColumnSource);
+        debris.Puff(feet + new Vector3(0f, JuiceConfig.LandingDustSize, 0f), cell, blockId, count,
+            LandingDust.Speed(fallBlocks), JuiceConfig.LandingDustSize, random, chunks.ColumnSource);
         return count;
     }
 
@@ -187,14 +187,14 @@ public sealed class GroundDust
         var count = LandingDust.FallingBlockCount(fallBlocks);
         if (count <= 0) return 0;
         debris.Skirt(cell, blockId, count, LandingDust.FallingBlockSpeed(fallBlocks),
-            WorldGenerationConfig.FallingBlockDustSize, random, columns);
+            JuiceConfig.FallingBlockDustSize, random, columns);
         return count;
     }
 
     /// <summary>
     /// A felled tree's trunk just hit the ground lying in <paramref name="woodCells"/> (its landed wood,
     /// <see cref="TopplingTree.GatherLanded"/>): kicks up a puff of the ground's own chips under at most
-    /// <see cref="WorldGenerationConfig.TreeThudDustPoints"/> of them, spread evenly along the trunk. A
+    /// <see cref="JuiceConfig.TreeThudDustPoints"/> of them, spread evenly along the trunk. A
     /// stretch with no ground under it (a trunk lying over a drop) raises nothing. Returns how many
     /// chips it spawned.
     /// </summary>
@@ -202,17 +202,17 @@ public sealed class GroundDust
         Random? random = null)
     {
         if (woodCells.Count == 0) return 0;
-        var points = Math.Min(woodCells.Count, WorldGenerationConfig.TreeThudDustPoints);
+        var points = Math.Min(woodCells.Count, JuiceConfig.TreeThudDustPoints);
         var step = (float)woodCells.Count / points;
-        var size = WorldGenerationConfig.LandingDustSize;
+        var size = JuiceConfig.LandingDustSize;
         var spawned = 0;
         for (var i = 0; i < points; i++)
         {
             var feet = woodCells[(int)(i * step)] + new Vector3(0.5f, 0f, 0.5f);
             if (!TryFindSurface(chunks, feet, 0.45f, out var ground, out var groundId)) continue;
-            debris.Puff(feet + new Vector3(0f, size, 0f), ground, groundId, WorldGenerationConfig.TreeThudDustCount,
-                WorldGenerationConfig.TreeThudDustSpeed, size, random, chunks.ColumnSource);
-            spawned += WorldGenerationConfig.TreeThudDustCount;
+            debris.Puff(feet + new Vector3(0f, size, 0f), ground, groundId, JuiceConfig.TreeThudDustCount,
+                JuiceConfig.TreeThudDustSpeed, size, random, chunks.ColumnSource);
+            spawned += JuiceConfig.TreeThudDustCount;
         }
         return spawned;
     }

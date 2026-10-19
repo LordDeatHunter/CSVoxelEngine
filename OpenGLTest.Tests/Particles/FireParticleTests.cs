@@ -45,7 +45,7 @@ public sealed class FireParticleTests
     [Fact]
     public void EvictionDropsTheOldestFireParticleAndKeepsTheRestInSpawnOrder()
     {
-        var max = WorldGenerationConfig.FireParticleMax;
+        var max = ParticleConfig.FireParticleMax;
         var system = new FireParticleSystem();
         var rng = new Random(14);
 
@@ -82,7 +82,7 @@ public sealed class FireParticleTests
     [Fact]
     public void ZeroRateSystemSpawnsNothing()
     {
-        var system = new FireParticleSystem(0f, 0f, WorldGenerationConfig.FireParticleMax, FireParticleSystem.SpawnOffset);
+        var system = new FireParticleSystem(0f, 0f, ParticleConfig.FireParticleMax, FireParticleSystem.SpawnOffset);
         var cells = LitRow(8);
         var rng = new Random(3);
         for (var i = 0; i < 60; i++)
@@ -98,8 +98,8 @@ public sealed class FireParticleTests
     public void LowerRateSpawnsNoMore()
     {
         var campfire = new FireParticleSystem();
-        var sparse = new FireParticleSystem(WorldGenerationConfig.FireEmberPerSecond * 0.25f,
-            WorldGenerationConfig.FireSmokePerSecond * 0.25f, WorldGenerationConfig.FireParticleMax,
+        var sparse = new FireParticleSystem(ParticleConfig.FireEmberPerSecond * 0.25f,
+            ParticleConfig.FireSmokePerSecond * 0.25f, ParticleConfig.FireParticleMax,
             FireParticleSystem.SpawnOffset);
         var cells = LitRow(2);
         var rngA = new Random(9);
@@ -119,9 +119,9 @@ public sealed class FireParticleTests
     [Fact]
     public void InstanceCapIsRespected()
     {
-        var cap = WorldGenerationConfig.FireParticleMax / 8;
-        var system = new FireParticleSystem(WorldGenerationConfig.FireEmberPerSecond,
-            WorldGenerationConfig.FireSmokePerSecond, cap, FireParticleSystem.SpawnOffset);
+        var cap = ParticleConfig.FireParticleMax / 8;
+        var system = new FireParticleSystem(ParticleConfig.FireEmberPerSecond,
+            ParticleConfig.FireSmokePerSecond, cap, FireParticleSystem.SpawnOffset);
         var cells = LitRow(32);
         var rng = new Random(21);
         var peak = 0;

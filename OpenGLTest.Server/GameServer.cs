@@ -160,9 +160,9 @@ public sealed class GameServer : IDisposable
 
     /// <summary>
     /// Whether every player may be creative here. Without it only the <see cref="Operators"/> may
-    /// (<see cref="MayBeCreative"/>). Defaults to <see cref="WorldGenerationConfig.ServerAllowCreative"/>.
+    /// (<see cref="MayBeCreative"/>). Defaults to <see cref="NetworkConfig.ServerAllowCreative"/>.
     /// </summary>
-    public bool AllowCreative { get; set; } = WorldGenerationConfig.ServerAllowCreative;
+    public bool AllowCreative { get; set; } = NetworkConfig.ServerAllowCreative;
 
     /// <summary>
     /// The players who may be creative while <see cref="AllowCreative"/> is off: the world
@@ -246,7 +246,7 @@ public sealed class GameServer : IDisposable
         TickPlayers(deltaTime);
 
         _playerSaveTimer += deltaTime;
-        if (_playerSaveTimer >= WorldGenerationConfig.AutosaveIntervalSeconds)
+        if (_playerSaveTimer >= SaveConfig.AutosaveIntervalSeconds)
         {
             _playerSaveTimer = 0;
             SaveAllPlayers();
@@ -262,17 +262,17 @@ public sealed class GameServer : IDisposable
         _listTimer += deltaTime;
         _timeTimer += deltaTime;
         _entityTimer += deltaTime;
-        if (_listTimer >= WorldGenerationConfig.NetPlayerListSeconds)
+        if (_listTimer >= NetworkConfig.NetPlayerListSeconds)
         {
             _listTimer = 0;
             BroadcastPlayerList();
         }
-        if (_timeTimer >= WorldGenerationConfig.NetTimeSyncSeconds)
+        if (_timeTimer >= NetworkConfig.NetTimeSyncSeconds)
         {
             _timeTimer = 0;
             BroadcastTime();
         }
-        if (_entityTimer >= WorldGenerationConfig.NetEntitySyncSeconds)
+        if (_entityTimer >= NetworkConfig.NetEntitySyncSeconds)
         {
             _entityTimer = 0;
             BroadcastEntities();
@@ -435,7 +435,7 @@ public sealed class GameServer : IDisposable
                 reader.ReadByte();
                 Log.Warn($"net: refused a raw block edit from {client.Name} (#{client.Id})");
                 if (_players.TryGetValue(client.Id, out var player)
-                    && NetValidation.InEditReach(player.Position, x, y, z, WorldGenerationConfig.NetMaxEditReachBlocks))
+                    && NetValidation.InEditReach(player.Position, x, y, z, NetworkConfig.NetMaxEditReachBlocks))
                     SendCellCorrection(client, player.LastSeq, x, y, z, radius: 0);
                 break;
             }
@@ -543,7 +543,7 @@ public sealed class GameServer : IDisposable
                            ? intent.Kind == NetIntentKind.Respawn && RespawnFor(client, player)
                            : ApplyWorldIntent(client, player, intent));
         if (intent.EditsCells && intent.HasCell
-            && NetValidation.InEditReach(player.Position, intent.X, intent.Y, intent.Z, WorldGenerationConfig.NetMaxEditReachBlocks))
+            && NetValidation.InEditReach(player.Position, intent.X, intent.Y, intent.Z, NetworkConfig.NetMaxEditReachBlocks))
             SendCellCorrection(client, seq, intent.X, intent.Y, intent.Z, radius: 1);
         if (intent.PredictsInventory || !accepted)
             SendInventory(client, player);
@@ -561,7 +561,7 @@ public sealed class GameServer : IDisposable
             return false;
         if (!_world.IsPlaying)
             return false;
-        if (!NetValidation.EyeWithin(player.Position, intent.Eye, WorldGenerationConfig.NetMaxIntentEyeDriftBlocks))
+        if (!NetValidation.EyeWithin(player.Position, intent.Eye, NetworkConfig.NetMaxIntentEyeDriftBlocks))
             return false;
         if (intent.IsRateLimited && !player.EditLimiter.TryTake(_elapsed))
             return false;
@@ -639,7 +639,7 @@ public sealed class GameServer : IDisposable
 
         var inventory = player.Inventory;
         var verdict = player.Breaking.Complete(intent.X, intent.Y, intent.Z, id, inventory.SelectedBlockId,
-            inventory.SelectedToolInstance, player.Creative, _elapsed, WorldGenerationConfig.NetBreakSlackSeconds);
+            inventory.SelectedToolInstance, player.Creative, _elapsed, NetworkConfig.NetBreakSlackSeconds);
         return verdict == BreakVerdict.Break && _world.BreakBlockFor(player.Context, intent.Cell);
     }
 
@@ -664,7 +664,7 @@ public sealed class GameServer : IDisposable
         var slicing = held is { Attack: AttackPattern.Slice };
         if (slicing != (intent.Attack != NetAttackKind.Punch))
             return false;
-        if (!player.TryAttack(intent.Attack, held, _elapsed, WorldGenerationConfig.NetAttackSlackSeconds))
+        if (!player.TryAttack(intent.Attack, held, _elapsed, NetworkConfig.NetAttackSlackSeconds))
             return false;
         if (intent.Attack == NetAttackKind.Punch)
             _world.PunchFor(player.Context);
@@ -736,13 +736,13 @@ public sealed class GameServer : IDisposable
     }
 
     /// <summary>
-    /// Builds and sends at most <see cref="WorldGenerationConfig.NetLodBuildsPerPump"/> queued
+    /// Builds and sends at most <see cref="NetworkConfig.NetLodBuildsPerPump"/> queued
     /// far-LOD regions, oldest first; an entry whose client has gone since is dropped unbuilt.
     /// </summary>
     private void ServeLodRequests()
     {
         var built = 0;
-        while (built < WorldGenerationConfig.NetLodBuildsPerPump && _lodQueue.TryDequeue(out var request))
+        while (built < NetworkConfig.NetLodBuildsPerPump && _lodQueue.TryDequeue(out var request))
         {
             var client = request.Client;
             client.LodQueued.Remove((request.Level, request.Rx, request.Rz));
@@ -764,13 +764,13 @@ public sealed class GameServer : IDisposable
 
     /// <summary>
     /// Drops every connection, hello'd or still pending, that sent nothing for
-    /// <see cref="WorldGenerationConfig.NetIdleTimeoutSeconds"/>: a peer that vanished without a
+    /// <see cref="NetworkConfig.NetIdleTimeoutSeconds"/>: a peer that vanished without a
     /// FIN, or one that connected and never said hello. Runs about once a second.
     /// </summary>
     private void SweepIdleConnections()
     {
         var now = Environment.TickCount64;
-        var limitMs = (long)(WorldGenerationConfig.NetIdleTimeoutSeconds * 1000.0);
+        var limitMs = (long)(NetworkConfig.NetIdleTimeoutSeconds * 1000.0);
         _idleScratch.Clear();
         foreach (var client in _clients.Values)
             if (now - client.LastInboundAt > limitMs)
@@ -781,7 +781,7 @@ public sealed class GameServer : IDisposable
 
         foreach (var client in _idleScratch)
         {
-            Log.Warn($"net: dropping {client.Name} (#{client.Id}) from {client.Remote}: idle for {WorldGenerationConfig.NetIdleTimeoutSeconds:0} s");
+            Log.Warn($"net: dropping {client.Name} (#{client.Id}) from {client.Remote}: idle for {NetworkConfig.NetIdleTimeoutSeconds:0} s");
             client.Close();
             RemoveClient(client);
         }
@@ -1238,9 +1238,9 @@ public sealed class GameServer : IDisposable
                 tcp.NoDelay = true;
                 // A stalled peer must not freeze the main thread inside a blocking write: past the
                 // timeout the send throws and the connection is faulted and removed.
-                tcp.SendTimeout = WorldGenerationConfig.NetSendTimeoutMs;
+                tcp.SendTimeout = NetworkConfig.NetSendTimeoutMs;
                 client = new ClientConnection(tcp, Interlocked.Increment(ref _nextId), _inbound);
-                client.Stream.WriteTimeout = WorldGenerationConfig.NetSendTimeoutMs;
+                client.Stream.WriteTimeout = NetworkConfig.NetSendTimeoutMs;
             }
             catch (Exception e) when (e is SocketException or ObjectDisposedException or InvalidOperationException
                                           or System.IO.IOException)
@@ -1302,7 +1302,7 @@ public sealed class GameServer : IDisposable
         foreach (var client in clients)
             client.Close();
 
-        _acceptThread?.Join(WorldGenerationConfig.WorkerStopJoinTimeoutMs);
+        _acceptThread?.Join(SaveConfig.WorkerStopJoinTimeoutMs);
         _acceptThread = null;
 
         // Connections that never said hello, including any the accept thread queued after the

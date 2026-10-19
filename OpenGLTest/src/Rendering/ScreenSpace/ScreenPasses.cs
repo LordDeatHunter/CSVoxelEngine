@@ -66,7 +66,7 @@ internal sealed class ScreenPasses : IDisposable
         // the damage flash (the vignette's, PlayerHealth.DamageFlash) splits the screen edges for a
         // moment after a hit; the eye under water (not lava, an opaque glow) sways the image
         // (UnderwaterWobble)
-        _post.Render(Targets.ViewportSize, new PostEffects(WorldGenerationConfig.TonemapExposure * Lighting.EyeExposure, Lighting.Grade,
+        _post.Render(Targets.ViewportSize, new PostEffects(LightingConfig.TonemapExposure * Lighting.EyeExposure, Lighting.Grade,
             DamageFringe.Strength(damageFlash), Lighting.EyeInLava ? 0f : MathUtils.SmoothStep(Lighting.UnderwaterT),
             UnderwaterWobble.WrapTime(Lighting.TimeD)));
         Units.BindUnit(0, TextureTarget.Texture2D, 0);
@@ -84,7 +84,7 @@ internal sealed class ScreenPasses : IDisposable
     /// </summary>
     internal void RenderContactAo(Camera camera)
     {
-        if (!WorldGenerationConfig.ContactAoEnabled || _contactAo == null || Targets.HdrColorOnlyFbo == 0) return;
+        if (!PostProcessConfig.ContactAoEnabled || _contactAo == null || Targets.HdrColorOnlyFbo == 0) return;
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, Targets.HdrColorOnlyFbo);
         _gl.Viewport(Targets.ViewportSize);
         _gl.Disable(EnableCap.DepthTest);
@@ -135,7 +135,7 @@ internal sealed class ScreenPasses : IDisposable
         Units.BindUnit(4, TextureTarget.Texture2D, Targets.SceneDepthTex);
         Units.ActiveUnit(0);
         _rays.Render(Targets.RaysFbo, Targets.RaysTex, Targets.RaysSize, Targets.HdrFbo, Targets.HdrColorTex, Targets.ViewportSize, Lighting.InvViewProj, Lighting.CameraPos, Lighting.SunDir,
-            Lighting.SunSrgb, strength, camera.EyeWaterSurfaceY, WorldGenerationConfig.WaterAbsorb, _owner.NearShadow.ViewProj, Lighting.Time);
+            Lighting.SunSrgb, strength, camera.EyeWaterSurfaceY, WaterRenderConfig.WaterAbsorb, _owner.NearShadow.ViewProj, Lighting.Time);
         // UnderwaterRaysRenderer selects unit 5 for the upsample and puts unit 0 back. Unit 5 is
         // untracked so the records happen to survive, but the renderer does not promise that.
         Units.InvalidateTextureUnits();
@@ -150,11 +150,11 @@ internal sealed class ScreenPasses : IDisposable
     /// color-only HDR framebuffer so that read is no feedback loop. Skipped when the frame's strength
     /// (<see cref="Godrays.Intensity"/>, set by <see cref="FrameLighting.SetLighting"/>) is negligible, when the
     /// shadow passes did not run (shadows off, or the sun too low for them), and when
-    /// <see cref="WorldGenerationConfig.GodraysEnabled"/> is off.
+    /// <see cref="PostProcessConfig.GodraysEnabled"/> is off.
     /// </summary>
     internal void RenderGodrays(Camera? camera)
     {
-        if (camera == null || _godrays == null || !WorldGenerationConfig.GodraysEnabled) return;
+        if (camera == null || _godrays == null || !PostProcessConfig.GodraysEnabled) return;
         if (Lighting.GodrayStrength <= 0.0005f || Lighting.ShadowStrengthDry <= 0f) return;
         if (Targets.RaysFbo == 0 || Targets.HdrColorOnlyFbo == 0) return;
         // The sun's place on screen, which the composite blurs toward; none behind the eye
@@ -164,10 +164,10 @@ internal sealed class ScreenPasses : IDisposable
         Units.BindUnit(1, TextureTarget.Texture2D, _owner.NearShadow.DepthTex);
         Units.BindUnit(4, TextureTarget.Texture2D, Targets.HdrDepthTex);
         Units.ActiveUnit(0);
-        var cloudShadow = GameSettings.CloudOpacity > 0f ? WorldGenerationConfig.GodraysCloudShadow : 0f;
+        var cloudShadow = GameSettings.CloudOpacity > 0f ? PostProcessConfig.GodraysCloudShadow : 0f;
         _godrays.Render(Targets.RaysFbo, Targets.RaysTex, Targets.RaysSize, Targets.HdrColorOnlyFbo, Targets.HdrColorTex, Targets.ViewportSize, Lighting.InvViewProj,
             Lighting.CameraPos, Lighting.SunDir, Lighting.SunSrgb, Lighting.GodrayStrength,
-            _owner.NearShadow.ViewProj, CloudCopies.Drift(Lighting.TimeD, WorldGenerationConfig.CloudFieldSize), cloudShadow, sunUv);
+            _owner.NearShadow.ViewProj, CloudCopies.Drift(Lighting.TimeD, SkyConfig.CloudFieldSize), cloudShadow, sunUv);
         // The renderer bound units 5 and 9 behind the cache's back, and unit 4 must not keep the
         // scene depth (the next frame renders into it)
         Units.InvalidateTextureUnits();

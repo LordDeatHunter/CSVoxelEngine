@@ -6,7 +6,7 @@ namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// The desert well: a rare hand-stamped ruin — a sandstone wall ringing a sunken pool — out in the
-/// dunes. Decided per 2^<see cref="WorldGenerationConfig.WellCellShift"/>-block cell from a pure
+/// dunes. Decided per 2^<see cref="WorldFeatureConfig.WellCellShift"/>-block cell from a pure
 /// hash of (cell, seed), so every chunk the 5x5 footprint crosses stamps the same cells (clipped at
 /// its border, the way trees cross borders); no template system. Only a flat, dry desert site takes
 /// one, and the far LOD shows none.
@@ -32,11 +32,11 @@ public static class DesertWellGenerator
         x = 0;
         z = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x3117);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldGenerationConfig.WellChance) return false;
+        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.WellChance) return false;
 
-        var span = (ulong)(1 << WorldGenerationConfig.WellCellShift);
-        x = (cellX << WorldGenerationConfig.WellCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
-        z = (cellZ << WorldGenerationConfig.WellCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        var span = (ulong)(1 << WorldFeatureConfig.WellCellShift);
+        x = (cellX << WorldFeatureConfig.WellCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
+        z = (cellZ << WorldFeatureConfig.WellCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
         return true;
     }
 
@@ -48,7 +48,7 @@ public static class DesertWellGenerator
     /// </summary>
     public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
     {
-        var shift = WorldGenerationConfig.WellCellShift;
+        var shift = WorldFeatureConfig.WellCellShift;
         var minCellX = (worldX0 - 2) >> shift;
         var maxCellX = (worldX0 + Chunk.Size + 1) >> shift;
         var minCellZ = (worldZ0 - 2) >> shift;

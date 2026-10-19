@@ -24,7 +24,7 @@ public sealed class StarFieldTests
     public void StarsAreFullyOutOnceTheSunIsWellDown()
     {
         Assert.Equal(1f, StarField.Visibility(-1f));
-        Assert.Equal(1f, StarField.Visibility(WorldGenerationConfig.StarsFullBelowSunElevation));
+        Assert.Equal(1f, StarField.Visibility(SkyConfig.StarsFullBelowSunElevation));
     }
 
     [Fact]
@@ -46,13 +46,13 @@ public sealed class StarFieldTests
     {
         // The shader evaluates only the cell a pixel falls in, so a star must map back to its own
         // cell and keep CellMargin clear of every edge, or its soft point is clipped at a border.
-        var n = WorldGenerationConfig.StarCellsPerFace;
+        var n = SkyConfig.StarCellsPerFace;
         var stars = 0;
         for (var face = 0; face < 6; face++)
         for (var x = 0; x < n; x++)
         for (var y = 0; y < n; y++)
         {
-            if (!StarField.TryGetStar(face, x, y, n, WorldGenerationConfig.StarDensity, out var dir, out var brightness))
+            if (!StarField.TryGetStar(face, x, y, n, SkyConfig.StarDensity, out var dir, out var brightness))
                 continue;
             stars++;
             Assert.Equal((face, x, y), StarField.CellOf(dir, n));
@@ -74,7 +74,7 @@ public sealed class StarFieldTests
     {
         // Expected stars per steradian, cell by cell, against each cell's exact solid angle: a cube
         // map without the per-cell weighting crowds stars toward the face corners.
-        var n = WorldGenerationConfig.StarCellsPerFace;
+        var n = SkyConfig.StarCellsPerFace;
         var min = float.MaxValue;
         var max = 0f;
         for (var x = 0; x < n; x++)
@@ -92,7 +92,7 @@ public sealed class StarFieldTests
     public void EveryDirectionFallsInExactlyOneCell()
     {
         var rng = new Random(77);
-        var n = WorldGenerationConfig.StarCellsPerFace;
+        var n = SkyConfig.StarCellsPerFace;
         for (var i = 0; i < 5000; i++)
         {
             var d = Vector3.Normalize(new Vector3(
@@ -110,7 +110,7 @@ public sealed class StarFieldTests
     [Fact]
     public void ATwinkleOnlyEverDimsAStarByItsDepth()
     {
-        var depth = WorldGenerationConfig.StarTwinkleDepth;
+        var depth = SkyConfig.StarTwinkleDepth;
         foreach (var (rate, phase) in SomeTwinkles())
         for (var t = 0f; t < 120f; t += 0.0137f)
             Assert.InRange(StarField.Twinkle(t, rate, phase), 1f - depth - 1e-5f, 1f + 1e-5f);
@@ -122,7 +122,7 @@ public sealed class StarFieldTests
         // The curve is smooth: at 240 fps no frame may step further than its steepest slope allows,
         // the sum of both sines' amplitudes times their rates at the fastest twinkle.
         const float dt = 1f / 240f;
-        var steepest = WorldGenerationConfig.StarTwinkleDepth * MathF.Tau * WorldGenerationConfig.StarTwinkleRateMax
+        var steepest = SkyConfig.StarTwinkleDepth * MathF.Tau * SkyConfig.StarTwinkleRateMax
                        * (0.3f + 0.2f * 2.31f);
         foreach (var (rate, phase) in SomeTwinkles())
         for (var t = 0f; t < 60f; t += dt)
@@ -140,7 +140,7 @@ public sealed class StarFieldTests
         var mean = 0f;
         foreach (var (rate, phase) in twinkles)
         {
-            Assert.InRange(rate, WorldGenerationConfig.StarTwinkleRateMin, WorldGenerationConfig.StarTwinkleRateMax);
+            Assert.InRange(rate, SkyConfig.StarTwinkleRateMin, SkyConfig.StarTwinkleRateMax);
             Assert.InRange(phase, 0f, MathF.Tau);
             rates.Add(rate);
             mean += StarField.Twinkle(10f, rate, phase);
@@ -153,7 +153,7 @@ public sealed class StarFieldTests
         foreach (var (rate, phase) in twinkles)
             variance += MathF.Pow(StarField.Twinkle(10f, rate, phase) - mean, 2f);
         var spread = MathF.Sqrt(variance / twinkles.Length);
-        Assert.True(spread > 0.1f * WorldGenerationConfig.StarTwinkleDepth, $"the stars twinkle in step (spread {spread})");
+        Assert.True(spread > 0.1f * SkyConfig.StarTwinkleDepth, $"the stars twinkle in step (spread {spread})");
     }
 
     // The twinkles of a run of neighboring cells on one face.

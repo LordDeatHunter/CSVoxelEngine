@@ -31,7 +31,7 @@ public sealed class ThrownProjectile
 
     public float Spin => _age * 9f;
     public float Scale => ItemDrop.Size * (ItemRegistry.IsItem(ItemId) ? 1.5f : 1f);
-    public bool IsExpired => _age >= WorldGenerationConfig.ThrowLifetimeSeconds;
+    public bool IsExpired => _age >= PlayerConfig.ThrowLifetimeSeconds;
 
     public ThrownProjectile(byte itemId, Vector3 position, Vector3 velocity, float baseDamage, float charge01)
     {
@@ -44,7 +44,7 @@ public sealed class ThrownProjectile
     }
 
     public static float ChargeFactor(float charge01) =>
-        MathUtils.Lerp(WorldGenerationConfig.ThrowMinCharge, 1f, MathUtils.Clamp01(charge01));
+        MathUtils.Lerp(PlayerConfig.ThrowMinCharge, 1f, MathUtils.Clamp01(charge01));
 
     public static int DamageFor(float baseDamage, float charge01) =>
         (int)MathF.Round(baseDamage * ChargeFactor(charge01), MidpointRounding.AwayFromZero);
@@ -55,7 +55,7 @@ public sealed class ThrownProjectile
     {
         if (direction.LengthSquared() < 1e-8f) direction = Vector3.UnitX;
         direction = Vector3.Normalize(direction);
-        return direction * (WorldGenerationConfig.ThrowSpeed * ChargeFactor(charge01));
+        return direction * (PlayerConfig.ThrowSpeed * ChargeFactor(charge01));
     }
 
     public bool Update(float deltaTime, ChunkManager chunks, IReadOnlyList<Mob>? mobs, out Mob? hit,

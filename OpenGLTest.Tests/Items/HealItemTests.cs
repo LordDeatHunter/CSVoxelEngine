@@ -7,7 +7,7 @@ namespace VoxelEngine.Tests.Items;
 
 /// <summary>
 /// The bandage's heal (<see cref="ItemUseAction.Heal"/> / <see cref="HealItem"/>): a hurt player
-/// is healed by <see cref="WorldGenerationConfig.BandageHealAmount"/> and one unit is spent; a
+/// is healed by <see cref="PlayerConfig.BandageHealAmount"/> and one unit is spent; a
 /// full pool refuses the use and spends nothing.
 /// </summary>
 public sealed class HealItemTests
@@ -24,7 +24,7 @@ public sealed class HealItemTests
         var result = bandage.OnUse(new ItemUseContext(world, 4f, 0), null);
 
         Assert.True(result.Applied);
-        Assert.Equal(40 + WorldGenerationConfig.BandageHealAmount, world.Health);
+        Assert.Equal(40 + PlayerConfig.BandageHealAmount, world.Health);
         Assert.Equal(1, world.Consumed);
     }
 
@@ -45,14 +45,14 @@ public sealed class HealItemTests
     {
         var health = new PlayerHealth();
         health.TakeDamage(5);
-        Assert.True(health.Heal(WorldGenerationConfig.BandageHealAmount));
+        Assert.True(health.Heal(PlayerConfig.BandageHealAmount));
         Assert.Equal(PlayerHealth.MaxHealth, health.Health);
 
         // A dead pool is not healed back to life, and a full one refuses
         var dead = new PlayerHealth();
         dead.TakeDamage(PlayerHealth.MaxHealth);
-        Assert.False(dead.Heal(WorldGenerationConfig.BandageHealAmount));
-        Assert.False(new PlayerHealth().Heal(WorldGenerationConfig.BandageHealAmount));
+        Assert.False(dead.Heal(PlayerConfig.BandageHealAmount));
+        Assert.False(new PlayerHealth().Heal(PlayerConfig.BandageHealAmount));
     }
 
     [Fact]

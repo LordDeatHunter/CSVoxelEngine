@@ -9,10 +9,10 @@ namespace VoxelEngine.Effects.Climate;
 public enum BiomeTintPalette : byte
 {
     /// <summary>The grass top and the grass band of its sides
-    /// (<see cref="WorldGenerationConfig.GrassColorWarmWet"/> and its siblings).</summary>
+    /// (<see cref="SurfaceShadingConfig.GrassColorWarmWet"/> and its siblings).</summary>
     Grass,
 
     /// <summary>Leaves, a little darker than the grass
-    /// (<see cref="WorldGenerationConfig.FoliageColorWarmWet"/> and its siblings).</summary>
+    /// (<see cref="SurfaceShadingConfig.FoliageColorWarmWet"/> and its siblings).</summary>
     Foliage,
 }

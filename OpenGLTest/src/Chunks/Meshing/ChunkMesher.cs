@@ -620,7 +620,7 @@ internal static class ChunkMesher
 
     /// <summary>
     /// Fills the four per-corner flow codes of the fluid cell at <paramref name="pIdx"/>
-    /// (<see cref="FluidFlow.Corner{T}"/> scaled by <see cref="WorldGenerationConfig.WaterFlowFullStrength"/>,
+    /// (<see cref="FluidFlow.Corner{T}"/> scaled by <see cref="WaterRenderConfig.WaterFlowFullStrength"/>,
     /// plus the cell's falling flag) and reports whether any is nonzero. Falling is the cell's own
     /// state alone, never "fluid above": a stack of still sources is not a waterfall.
     /// </summary>
@@ -636,7 +636,7 @@ internal static class ChunkMesher
             var dir = v.NormalizeSafe();
             var strength = dir == Vector3.Zero
                 ? 0f
-                : MathF.Min(v.Length() / WorldGenerationConfig.WaterFlowFullStrength, 1f);
+                : MathF.Min(v.Length() / WaterRenderConfig.WaterFlowFullStrength, 1f);
             var code = Vertex.EncodeWaterFlow(new Vector2(dir.X, dir.Z) * strength, falling);
             codes[cx * 2 + cz] = code;
             any |= code != 0;

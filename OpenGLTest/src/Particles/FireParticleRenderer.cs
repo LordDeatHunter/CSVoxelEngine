@@ -37,7 +37,7 @@ public sealed class FireParticleRenderer : IDisposable
     public FireParticleRenderer(GL gl)
     {
         _gl = gl;
-        _max = WorldGenerationConfig.FireParticleMax;
+        _max = ParticleConfig.FireParticleMax;
         _shader = new Shader(gl,
             FileUtils.ReadFile("assets/shaders/fire-particle-vertex.glsl"),
             FileUtils.ReadFile("assets/shaders/fire-particle-fragment.glsl"));

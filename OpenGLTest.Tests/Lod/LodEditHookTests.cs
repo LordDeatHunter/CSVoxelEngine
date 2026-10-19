@@ -249,7 +249,7 @@ public sealed class LodEditHookTests
         fluids.ScheduleAround(x, y, z);
         fluids.ScheduleAround(x + 1, y, z);
         for (var i = 0; i < 8 && BlockAt(chunks, x, y, z) != cobble; i++)
-            fluids.Update(WorldGenerationConfig.FluidTickSeconds, chunks, drops, lod);
+            fluids.Update(SimulationConfig.FluidTickSeconds, chunks, drops, lod);
 
         return (x, y, z, cobble, chunks);
     }

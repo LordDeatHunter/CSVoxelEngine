@@ -43,7 +43,7 @@ internal sealed class RenderTargets
     // full-res depth-aware upsample composites it back (see CreateRaysTarget). Layout is
     // RGBA16F at half the viewport per axis: rgb is the additive shaft color and a is the
     // world-space distance that pixel marched, capped at
-    // WorldGenerationConfig.WaterRayMaxDistance, which the upsample keys its depth-aware
+    // WaterRenderConfig.WaterRayMaxDistance, which the upsample keys its depth-aware
     // weights off. No depth attachment - the march is a full-screen triangle with the depth
     // test off, so there is nothing to test against.
     private uint _raysFbo;

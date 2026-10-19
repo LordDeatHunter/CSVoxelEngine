@@ -42,7 +42,7 @@ public sealed class DeepWaterFogTests
             Assert.True(d.X >= d.Y && d.Y >= d.Z, $"at {depth} blocks the dim {d} does not take red first");
         }
 
-        var mid = DeepWaterFog.Dim(WorldGenerationConfig.DeepWaterFogScaleBlocks);
+        var mid = DeepWaterFog.Dim(WaterRenderConfig.DeepWaterFogScaleBlocks);
         Assert.True(mid.X > mid.Z, $"red {mid.X} is not dimmed more than blue {mid.Z}");
     }
 
@@ -53,7 +53,7 @@ public sealed class DeepWaterFogTests
         {
             var t = DeepWaterFog.Tint(depth);
             Assert.True(t.X > 0f && t.Y > 0f && t.Z > 0f, $"the fog went black at {depth} blocks ({t})");
-            Assert.True(t.X >= 1f - WorldGenerationConfig.DeepWaterFogMaxDim - 1e-6f);
+            Assert.True(t.X >= 1f - WaterRenderConfig.DeepWaterFogMaxDim - 1e-6f);
         }
     }
 }

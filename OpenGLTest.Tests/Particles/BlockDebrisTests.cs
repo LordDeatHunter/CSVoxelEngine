@@ -24,8 +24,8 @@ public sealed class BlockDebrisTests
     public void BurstSpawnsConfiguredCountWithBlockId()
     {
         var system = new BlockDebrisSystem();
-        system.Burst(new Vector3(8f, 3f, 8f), StoneId, WorldGenerationConfig.BlockDebrisPerHit, new Random(1));
-        Assert.Equal(WorldGenerationConfig.BlockDebrisPerHit, system.Debris.Count);
+        system.Burst(new Vector3(8f, 3f, 8f), StoneId, ParticleConfig.BlockDebrisPerHit, new Random(1));
+        Assert.Equal(ParticleConfig.BlockDebrisPerHit, system.Debris.Count);
         foreach (var d in system.Debris)
             Assert.Equal(StoneId, d.BlockId);
     }
@@ -76,8 +76,8 @@ public sealed class BlockDebrisTests
     public void BurstRespectsMax()
     {
         var system = new BlockDebrisSystem();
-        system.Burst(new Vector3(8f, 3f, 8f), StoneId, WorldGenerationConfig.BlockDebrisMax + 50, new Random(5));
-        Assert.Equal(WorldGenerationConfig.BlockDebrisMax, system.Debris.Count);
+        system.Burst(new Vector3(8f, 3f, 8f), StoneId, ParticleConfig.BlockDebrisMax + 50, new Random(5));
+        Assert.Equal(ParticleConfig.BlockDebrisMax, system.Debris.Count);
     }
 
     /// <summary>
@@ -98,7 +98,7 @@ public sealed class BlockDebrisTests
     public void EvictionDropsTheOldestCubeAndKeepsTheRestInSpawnOrder()
     {
         const int overflow = 50;
-        var max = WorldGenerationConfig.BlockDebrisMax;
+        var max = ParticleConfig.BlockDebrisMax;
         var system = new BlockDebrisSystem();
         var rng = new Random(12);
 

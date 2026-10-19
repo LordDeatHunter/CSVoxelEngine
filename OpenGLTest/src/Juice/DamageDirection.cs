@@ -45,12 +45,12 @@ public sealed class DamageDirection
     }
 
     /// <summary>
-    /// How strongly the arc shows, 0..1: full for <see cref="WorldGenerationConfig.DamageArcHoldSeconds"/>
-    /// after a hit, then a smooth fade over <see cref="WorldGenerationConfig.DamageArcFadeSeconds"/>, and
+    /// How strongly the arc shows, 0..1: full for <see cref="JuiceConfig.DamageArcHoldSeconds"/>
+    /// after a hit, then a smooth fade over <see cref="JuiceConfig.DamageArcFadeSeconds"/>, and
     /// 0 with no hit yet. It only ever falls between hits.
     /// </summary>
     public float Intensity => float.IsFinite(_age)
-        ? MathUtils.HoldThenFade(_age, WorldGenerationConfig.DamageArcHoldSeconds, WorldGenerationConfig.DamageArcFadeSeconds)
+        ? MathUtils.HoldThenFade(_age, JuiceConfig.DamageArcHoldSeconds, JuiceConfig.DamageArcFadeSeconds)
         : 0f;
 
     /// <summary>

@@ -38,32 +38,32 @@ public sealed class SkyRenderer : IDisposable
 
         // The star and cloud-cover tuning never changes at run time, so it goes up once.
         _shader.Use();
-        _shader.SetUniform("uStarCells", (float)WorldGenerationConfig.StarCellsPerFace);
-        _shader.SetUniform("uStarDensity", WorldGenerationConfig.StarDensity);
+        _shader.SetUniform("uStarCells", (float)SkyConfig.StarCellsPerFace);
+        _shader.SetUniform("uStarDensity", SkyConfig.StarDensity);
         _shader.SetUniform("uStarMargin", StarField.CellMargin);
-        _shader.SetUniform("uStarBrightness", WorldGenerationConfig.StarBrightness);
-        _shader.SetUniform("uStarFaintest", WorldGenerationConfig.StarFaintest);
-        _shader.SetUniform("uStarCurve", WorldGenerationConfig.StarBrightnessCurve);
-        _shader.SetUniform("uStarRadiusPx", WorldGenerationConfig.StarRadiusPixels);
-        _shader.SetUniform("uStarBrightRadius", WorldGenerationConfig.StarBrightRadiusScale);
-        _shader.SetUniform("uStarHorizonFade", WorldGenerationConfig.StarHorizonFade);
-        _shader.SetUniform("uStarTwinkleDepth", WorldGenerationConfig.StarTwinkleDepth);
+        _shader.SetUniform("uStarBrightness", SkyConfig.StarBrightness);
+        _shader.SetUniform("uStarFaintest", SkyConfig.StarFaintest);
+        _shader.SetUniform("uStarCurve", SkyConfig.StarBrightnessCurve);
+        _shader.SetUniform("uStarRadiusPx", SkyConfig.StarRadiusPixels);
+        _shader.SetUniform("uStarBrightRadius", SkyConfig.StarBrightRadiusScale);
+        _shader.SetUniform("uStarHorizonFade", SkyConfig.StarHorizonFade);
+        _shader.SetUniform("uStarTwinkleDepth", SkyConfig.StarTwinkleDepth);
         _shader.SetUniform("uStarTwinkleRate",
-            new Vector2(WorldGenerationConfig.StarTwinkleRateMin, WorldGenerationConfig.StarTwinkleRateMax));
+            new Vector2(SkyConfig.StarTwinkleRateMin, SkyConfig.StarTwinkleRateMax));
         _shader.SetUniform("uCloudShadowMap", cloudShadowUnit);
         _shader.SetUniform("uCloudCells", CloudField.Cells);
-        _shader.SetUniform("uCloudMaxLevels", WorldGenerationConfig.CloudMaxLevels);
-        _shader.SetUniform("uCloudHeight", WorldGenerationConfig.CloudHeight);
-        _shader.SetUniform("uCloudLayer", WorldGenerationConfig.CloudLayerThickness);
-        _shader.SetUniform("uCloudField", WorldGenerationConfig.CloudFieldSize);
-        _shader.SetUniform("uCloudFog", new Vector2(WorldGenerationConfig.FogNearBlocks, WorldGenerationConfig.FogFarBlocks));
-        _shader.SetUniform("uGlareExponent", WorldGenerationConfig.SunGlareExponent);
-        _shader.SetUniform("uAuroraBrightness", WorldGenerationConfig.AuroraBrightness);
+        _shader.SetUniform("uCloudMaxLevels", SkyConfig.CloudMaxLevels);
+        _shader.SetUniform("uCloudHeight", SkyConfig.CloudHeight);
+        _shader.SetUniform("uCloudLayer", SkyConfig.CloudLayerThickness);
+        _shader.SetUniform("uCloudField", SkyConfig.CloudFieldSize);
+        _shader.SetUniform("uCloudFog", new Vector2(LightingConfig.FogNearBlocks, LightingConfig.FogFarBlocks));
+        _shader.SetUniform("uGlareExponent", SkyConfig.SunGlareExponent);
+        _shader.SetUniform("uAuroraBrightness", SkyConfig.AuroraBrightness);
         _shader.SetUniform("uAuroraPeriods", Aurora.Periods);
         // The starless disc behind the moon: its own radius, feathered just past the edge
         _shader.SetUniform("uMoonMask", new Vector2(
-            MathUtils.CosDeg(WorldGenerationConfig.MoonAngularRadiusDeg * 1.08f),
-            MathUtils.CosDeg(WorldGenerationConfig.MoonAngularRadiusDeg * 0.98f)));
+            MathUtils.CosDeg(SkyConfig.MoonAngularRadiusDeg * 1.08f),
+            MathUtils.CosDeg(SkyConfig.MoonAngularRadiusDeg * 0.98f)));
 
         // One triangle covering NDC: the two off-screen corners keep the visible area seamless
         Span<float> vertices = [-1f, -1f, 3f, -1f, -1f, 3f];
@@ -110,7 +110,7 @@ public sealed class SkyRenderer : IDisposable
         _shader.SetUniform("uStarTime", frame.StarTime);
         // No star inside the sun's glow, feathered back in over half the radius again; the
         // glow follows the player's sun-size setting, so the mask does too.
-        var maskDeg = GameSettings.SunSize * WorldGenerationConfig.SunGlowScale * WorldGenerationConfig.StarSunMaskScale;
+        var maskDeg = GameSettings.SunSize * SkyConfig.SunGlowScale * SkyConfig.StarSunMaskScale;
         _shader.SetUniform("uStarSunMask", new Vector2(MathUtils.CosDeg(maskDeg * 1.5f), MathUtils.CosDeg(maskDeg)));
         _shader.SetUniform("uEye", frame.Eye);
         _shader.SetUniform("uCloudDrift", frame.CloudDrift);

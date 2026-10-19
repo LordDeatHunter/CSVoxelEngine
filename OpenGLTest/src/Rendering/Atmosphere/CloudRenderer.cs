@@ -54,14 +54,14 @@ public sealed class CloudRenderer : IDisposable
 
         // The silver lining's tuning and the coverage map never change at run time
         _shader.Use();
-        _shader.SetUniform("uSilverExponent", WorldGenerationConfig.CloudSilverLiningExponent);
-        _shader.SetUniform("uSilverStep", WorldGenerationConfig.CloudSilverLiningStepBlocks);
+        _shader.SetUniform("uSilverExponent", SkyConfig.CloudSilverLiningExponent);
+        _shader.SetUniform("uSilverStep", SkyConfig.CloudSilverLiningStepBlocks);
         _shader.SetUniform("uCloudShadowMap", cloudShadowUnit);
         _shader.SetUniform("uCloudCells", CloudField.Cells);
-        _shader.SetUniform("uCloudMaxLevels", WorldGenerationConfig.CloudMaxLevels);
-        _shader.SetUniform("uCloudHeight", WorldGenerationConfig.CloudHeight);
-        _shader.SetUniform("uCloudLayer", WorldGenerationConfig.CloudLayerThickness);
-        _shader.SetUniform("uCloudField", WorldGenerationConfig.CloudFieldSize);
+        _shader.SetUniform("uCloudMaxLevels", SkyConfig.CloudMaxLevels);
+        _shader.SetUniform("uCloudHeight", SkyConfig.CloudHeight);
+        _shader.SetUniform("uCloudLayer", SkyConfig.CloudLayerThickness);
+        _shader.SetUniform("uCloudField", SkyConfig.CloudFieldSize);
 
         _vao = gl.GenVertexArray();
         gl.BindVertexArray(_vao);
@@ -127,11 +127,11 @@ public sealed class CloudRenderer : IDisposable
         if (GameSettings.CloudOpacity <= 0f)
             return;
 
-        var field = WorldGenerationConfig.CloudFieldSize;
+        var field = SkyConfig.CloudFieldSize;
         var drift = CloudCopies.Drift(time, field);
         var snapX = CloudCopies.Snap(cameraPos.X, field);
         var snapZ = CloudCopies.Snap(cameraPos.Z, field);
-        var thickness = WorldGenerationConfig.CloudMaxLevels * WorldGenerationConfig.CloudLayerThickness;
+        var thickness = SkyConfig.CloudMaxLevels * SkyConfig.CloudLayerThickness;
 
         // Both sweeps draw the same surviving copies in the same order, so the cull runs once and
         // both sweeps draw the one packed array. The cull sits up here, beside the opacity guard and

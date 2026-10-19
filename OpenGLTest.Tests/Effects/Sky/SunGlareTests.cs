@@ -32,7 +32,7 @@ public sealed class SunGlareTests
     [Fact]
     public void ThereIsNoGlareFacingAwayFromTheSun()
     {
-        foreach (var alignment in new[] { -1f, -0.5f, 0f, MathUtils.CosDeg(WorldGenerationConfig.SunGlareFacingDegrees) })
+        foreach (var alignment in new[] { -1f, -0.5f, 0f, MathUtils.CosDeg(SkyConfig.SunGlareFacingDegrees) })
             Assert.Equal(0f, SunGlare.Intensity(alignment, HighSun, 0f));
     }
 
@@ -47,7 +47,7 @@ public sealed class SunGlareTests
     [Fact]
     public void TheGlareNeverExceedsItsCapAndReachesItOnlyLookingAtAClearHighSun()
     {
-        var cap = WorldGenerationConfig.SunGlareStrength;
+        var cap = SkyConfig.SunGlareStrength;
         for (var alignment = -1f; alignment <= 1f; alignment += 0.05f)
         for (var elevation = -1f; elevation <= 1f; elevation += 0.05f)
         for (var cover = 0f; cover <= 1f; cover += 0.1f)

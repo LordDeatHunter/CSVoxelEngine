@@ -54,11 +54,11 @@ public class BlockDebris
         {
             var fadeIn = MathUtils.Clamp01(_age / FadeInSeconds);
             var fadeOut = 1f - MathUtils.Clamp01(
-                (_age - (_lifetime - WorldGenerationConfig.BlockDebrisFadeSeconds))
-                / WorldGenerationConfig.BlockDebrisFadeSeconds);
+                (_age - (_lifetime - ParticleConfig.BlockDebrisFadeSeconds))
+                / ParticleConfig.BlockDebrisFadeSeconds);
             if (IsLanded)
                 fadeOut = MathF.Min(fadeOut,
-                    1f - MathUtils.Clamp01(_landAge / WorldGenerationConfig.BlockDebrisFadeSeconds));
+                    1f - MathUtils.Clamp01(_landAge / ParticleConfig.BlockDebrisFadeSeconds));
             return MathF.Min(fadeIn, fadeOut);
         }
     }
@@ -95,8 +95,8 @@ public class BlockDebris
         Look = look;
         Tint = tint ?? Vector3.One;
         Position = position;
-        Size = size ?? WorldGenerationConfig.BlockDebrisSize * (0.7f + 0.6f * rng.NextSingle());
-        _lifetime = WorldGenerationConfig.BlockDebrisLifetime * (0.7f + 0.6f * rng.NextSingle());
+        Size = size ?? ParticleConfig.BlockDebrisSize * (0.7f + 0.6f * rng.NextSingle());
+        _lifetime = ParticleConfig.BlockDebrisLifetime * (0.7f + 0.6f * rng.NextSingle());
 
         Spin = rng.NextSingle() * MathF.Tau;
         Tumble = rng.NextSingle() * MathF.Tau;
@@ -140,7 +140,7 @@ public class BlockDebris
         {
             _landAge += deltaTime;
             Spin += _spinSpeed * 0.2f * deltaTime;
-            if (_landAge >= WorldGenerationConfig.BlockDebrisFadeSeconds)
+            if (_landAge >= ParticleConfig.BlockDebrisFadeSeconds)
             {
                 IsAlive = false;
                 return false;

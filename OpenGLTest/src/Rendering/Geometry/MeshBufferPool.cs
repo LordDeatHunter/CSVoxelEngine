@@ -21,7 +21,7 @@ namespace VoxelEngine.Rendering.Geometry;
 /// LOD-sized pool for the four output lists of a region build (<c>LodRegion.BuildMeshData</c>):
 /// a region build is an order of magnitude larger than a chunk build, so one shared pool would
 /// either regrow on every LOD rent or drift the chunk rents upward. That pool follows the same
-/// contract — rented on the <see cref="WorldGenerationConfig.MaxConcurrentLodGenerations"/>
+/// contract — rented on the <see cref="StreamingConfig.MaxConcurrentLodGenerations"/>
 /// LodGen threads, returned on the main thread after the upload or on the out-of-range drop,
 /// never on a worker. Several concurrent renters are safe for the same reason the mesh workers
 /// are: every Rent and Return takes the instance lock, and its retention ceilings are sized

@@ -108,7 +108,7 @@ public sealed class GoblinManagerTests
 
         Assert.Equal(2, damageFrames.Count);
         Assert.True(damageFrames[1] - damageFrames[0]
-                    >= (int)(WorldGenerationConfig.GoblinMeleeCooldownSeconds / Dt) - 1);
+                    >= (int)(MobConfig.GoblinMeleeCooldownSeconds / Dt) - 1);
     }
 
     [Fact]
@@ -172,7 +172,7 @@ public sealed class GoblinManagerTests
     public void LivingCapAndDespawnRadiusApply()
     {
         var drops = new DropManager();
-        var interval = WorldGenerationConfig.GoblinSpawnIntervalSeconds + 0.01f;
+        var interval = MobConfig.GoblinSpawnIntervalSeconds + 0.01f;
 
         // Below the cap the spawn ring places a goblin on dry ground around the player.
         var surface = MobTestWorld.Surface();
@@ -185,7 +185,7 @@ public sealed class GoblinManagerTests
         // One ring spawn rolls a pack of up to GoblinPackMaxSize goblins: the leader stands in
         // the ring, its mates within GoblinPackSpawnRadiusBlocks of it, all on dry ground
         Assert.NotEmpty(spawning.Goblins);
-        Assert.True(spawning.Goblins.Count <= WorldGenerationConfig.GoblinPackMaxSize);
+        Assert.True(spawning.Goblins.Count <= MobConfig.GoblinPackMaxSize);
         var spawned = spawning.Goblins[0].Position;
         foreach (var goblin in spawning.Goblins)
         {
@@ -193,14 +193,14 @@ public sealed class GoblinManagerTests
             if (goblin == spawning.Goblins[0])
             {
                 var ring = MathF.Sqrt((at.X - 0.5f) * (at.X - 0.5f) + (at.Z - 0.5f) * (at.Z - 0.5f));
-                Assert.InRange(ring, WorldGenerationConfig.GoblinSpawnMinRadiusBlocks - 2f,
-                    WorldGenerationConfig.GoblinSpawnMaxRadiusBlocks + 2f);
+                Assert.InRange(ring, MobConfig.GoblinSpawnMinRadiusBlocks - 2f,
+                    MobConfig.GoblinSpawnMaxRadiusBlocks + 2f);
             }
             else
             {
                 var fromLeader = MathF.Sqrt((at.X - spawned.X) * (at.X - spawned.X)
                                             + (at.Z - spawned.Z) * (at.Z - spawned.Z));
-                Assert.True(fromLeader <= WorldGenerationConfig.GoblinPackSpawnRadiusBlocks + 2f,
+                Assert.True(fromLeader <= MobConfig.GoblinPackSpawnRadiusBlocks + 2f,
                     $"a pack mate spawned {fromLeader:0.0} blocks from the leader");
             }
 
@@ -211,17 +211,17 @@ public sealed class GoblinManagerTests
 
         // At the natural cap the ring spawns nothing more.
         var capped = Manager();
-        for (var i = 0; i < WorldGenerationConfig.MobNaturalCap; i++)
+        for (var i = 0; i < MobConfig.MobNaturalCap; i++)
             capped.Spawn(new Vector3(0.5f, 1f + Goblin.Height * 0.5f, 0.5f), ammo: 0);
         capped.Update(interval, surface, drops, high);
-        Assert.Equal(WorldGenerationConfig.MobNaturalCap, capped.Goblins.Count);
+        Assert.Equal(MobConfig.MobNaturalCap, capped.Goblins.Count);
 
         // Beyond the despawn radius a goblin is culled, inside it stays.
         var floor = StoneFloor();
         var camera = StandingPlayer(0.5f, 0.5f);
         var culling = Manager();
-        var far = culling.Spawn(GroundBody(WorldGenerationConfig.GoblinDespawnRadiusBlocks + 4f, 0.5f), ammo: 0);
-        var near = culling.Spawn(GroundBody(WorldGenerationConfig.GoblinDespawnRadiusBlocks - 4f, 0.5f), ammo: 0);
+        var far = culling.Spawn(GroundBody(MobConfig.GoblinDespawnRadiusBlocks + 4f, 0.5f), ammo: 0);
+        var near = culling.Spawn(GroundBody(MobConfig.GoblinDespawnRadiusBlocks - 4f, 0.5f), ammo: 0);
         culling.Update(Dt, floor, drops, camera);
         Assert.True(far!.IsDying);
         Assert.False(near!.IsDying);

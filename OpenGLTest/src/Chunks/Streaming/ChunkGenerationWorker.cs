@@ -75,7 +75,7 @@ public class ChunkGenerationWorker(ChunkManager chunkManager, StreamingFocus foc
         _wake.Reset();
         _isRunning = true;
 
-        var workerCount = WorldGenerationConfig.MaxConcurrentBlockDataGenerations;
+        var workerCount = StreamingConfig.MaxConcurrentBlockDataGenerations;
         var threads = new Thread[workerCount];
         for (int i = 0; i < workerCount; i++)
         {
@@ -95,7 +95,7 @@ public class ChunkGenerationWorker(ChunkManager chunkManager, StreamingFocus foc
 
     /// <summary>
     /// Stops the chunk generation workers and joins them, each for at most
-    /// <see cref="WorldGenerationConfig.WorkerStopJoinTimeoutMs"/>. A worker in the middle of
+    /// <see cref="SaveConfig.WorkerStopJoinTimeoutMs"/>. A worker in the middle of
     /// <c>QueueChunk</c> finishes that chunk first; one waiting out its idle poll is woken.
     /// <para>
     /// True means every ChunkGen thread has exited, so none can read the worldgen statics any
@@ -117,9 +117,9 @@ public class ChunkGenerationWorker(ChunkManager chunkManager, StreamingFocus foc
         var allJoined = true;
         foreach (var thread in threads)
         {
-            if (thread.Join(WorldGenerationConfig.WorkerStopJoinTimeoutMs)) continue;
+            if (thread.Join(SaveConfig.WorkerStopJoinTimeoutMs)) continue;
             allJoined = false;
-            Log.Warn($"ChunkGen: {thread.Name} did not stop within {WorldGenerationConfig.WorkerStopJoinTimeoutMs} ms");
+            Log.Warn($"ChunkGen: {thread.Name} did not stop within {SaveConfig.WorkerStopJoinTimeoutMs} ms");
         }
 
         if (!allJoined) return false;
@@ -145,7 +145,7 @@ public class ChunkGenerationWorker(ChunkManager chunkManager, StreamingFocus foc
                 }
                 else
                 {
-                    _wake.Wait(WorldGenerationConfig.GenerationDelayIdleMs);
+                    _wake.Wait(StreamingConfig.GenerationDelayIdleMs);
                 }
             }
             catch (Exception ex)
@@ -165,8 +165,8 @@ public class ChunkGenerationWorker(ChunkManager chunkManager, StreamingFocus foc
 
     private static Vector3[] BuildSortedOffsets()
     {
-        const int radius = WorldGenerationConfig.ChunkRadius;
-        const int maxDistSq = WorldGenerationConfig.ChunkRadiusSq;
+        const int radius = StreamingConfig.ChunkRadius;
+        const int maxDistSq = StreamingConfig.ChunkRadiusSq;
 
         var offsets = new List<(Vector3 offset, int distSq)>();
 

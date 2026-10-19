@@ -47,7 +47,7 @@ public sealed class SlimeSizeTests
         Assert.Equal(SlimeType.MaxHealth, slime.MaxHealth);
         Assert.Equal(slime.MaxHealth, slime.Health);
         Assert.Equal(Slime.HalfExtent, slime.BodyHalfExtent);
-        Assert.Equal(WorldGenerationConfig.SlimeContactDamage, slime.ContactDamage);
+        Assert.Equal(MobConfig.SlimeContactDamage, slime.ContactDamage);
         Assert.Equal(1, slime.LootRolls);
     }
 
@@ -185,7 +185,7 @@ public sealed class SlimeSizeTests
         var steps = 2400;
         for (var i = 0; i < steps; i++)
         {
-            var time = i * (double)WorldGenerationConfig.DayLengthSeconds / steps;
+            var time = i * (double)SkyConfig.DayLengthSeconds / steps;
             var elevation = DayCycle.SunDirection(time).Y;
             var night = DayCycle.NightFactor(time);
             Assert.InRange(night, 0f, 1f);

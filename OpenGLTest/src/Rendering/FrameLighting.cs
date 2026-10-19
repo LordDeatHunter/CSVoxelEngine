@@ -81,8 +81,8 @@ internal sealed class FrameLighting
     private Vector3 _skyTint;
     private float _skyTintAmount;
     private float _fogWet;
-    private float _fogNear = WorldGenerationConfig.FogNearBlocks;
-    private float _fogFar = WorldGenerationConfig.FogFarBlocks;
+    private float _fogNear = LightingConfig.FogNearBlocks;
+    private float _fogFar = LightingConfig.FogFarBlocks;
     private Vector3 _cameraPos;
     private float _time;
     // The same lighting clock in double, for the cloud drift: Wind.Offset needs the precision a
@@ -143,8 +143,8 @@ internal sealed class FrameLighting
     // _underwaterT is still fading out, which would otherwise pop the sky back in one frame.
     private float _lavaT;
 
-    private readonly Vector3[] _pointPos = new Vector3[WorldGenerationConfig.MaxPointLights];
-    private readonly Vector3[] _pointColors = new Vector3[WorldGenerationConfig.MaxPointLights];
+    private readonly Vector3[] _pointPos = new Vector3[LightingConfig.MaxPointLights];
+    private readonly Vector3[] _pointColors = new Vector3[LightingConfig.MaxPointLights];
     private int _pointCount;
     /// <summary>Index of the first fire point light; the TNT strobes fill the slots before it.</summary>
     private int _fireLightStart;
@@ -223,7 +223,7 @@ internal sealed class FrameLighting
         _timeD = time;
         // Both from the double clock: the offset is bounded but its phase needs the precision
         _wind = Wind.Direction(time);
-        _windOffset = Wind.Offset(time, WorldGenerationConfig.WindGustSpeed);
+        _windOffset = Wind.Offset(time, SkyConfig.WindGustSpeed);
         if (camera != null)
         {
             _cameraPos = camera.RenderEye;
@@ -314,7 +314,7 @@ internal sealed class FrameLighting
         // The stars twinkle on the lighting clock, wrapped hourly so the float keeps its
         // precision; their cloud cover follows the drawn clouds' drift
         _skyFrame = new SkyDomeFrame(StarField.Visibility(elevation), (float)(_timeD % 3600.0), _cameraPos,
-            CloudCopies.Drift(_timeD, WorldGenerationConfig.CloudFieldSize), Vector3.Zero);
+            CloudCopies.Drift(_timeD, SkyConfig.CloudFieldSize), Vector3.Zero);
         // The flat sky/fog color is the dome's no-glow horizon sample
         _skyColor = _sky.HazedHorizon;
         // Fog melts the far terrain (and the LOD edge) into the sky, day and night
@@ -326,7 +326,7 @@ internal sealed class FrameLighting
         {
             foreach (var tnt in primed)
             {
-                if (_pointCount >= WorldGenerationConfig.MaxPointLights) break;
+                if (_pointCount >= LightingConfig.MaxPointLights) break;
                 _pointPos[_pointCount] = tnt.Position;
                 var flash = tnt.WhiteFlash;
                 // Linear intensities: the hues are the old sRGB ones decoded, the gains retuned
@@ -341,14 +341,14 @@ internal sealed class FrameLighting
         {
             foreach (var cell in campfires)
             {
-                if (_pointCount >= WorldGenerationConfig.MaxPointLights) break;
+                if (_pointCount >= LightingConfig.MaxPointLights) break;
                 var flicker = LightFlicker.Campfire(_time, LightFlicker.CellPhase(cell));
                 _pointPos[_pointCount] = cell + FireLightOffset;
                 _pointColors[_pointCount] = CampfireLightColor * (2.0f * flicker);
                 _pointCount++;
             }
         }
-        for (var i = _pointCount; i < WorldGenerationConfig.MaxPointLights; i++)
+        for (var i = _pointCount; i < LightingConfig.MaxPointLights; i++)
         {
             _pointPos[i] = Vector3.Zero;
             _pointColors[i] = Vector3.Zero;
@@ -362,9 +362,9 @@ internal sealed class FrameLighting
         // red (eased through _lavaT) and stays bright at night.
         _eyeInLava = eyeInLava && underwater;
         _underwaterT = MathUtils.Clamp01(
-            _underwaterT + (underwater ? dt : -dt) / WorldGenerationConfig.UnderwaterFadeSeconds);
+            _underwaterT + (underwater ? dt : -dt) / WaterRenderConfig.UnderwaterFadeSeconds);
         var wet = MathUtils.SmoothStep(_underwaterT);
-        _lavaT = MathUtils.Clamp01(_lavaT + (_eyeInLava ? dt : -dt) / WorldGenerationConfig.UnderwaterFadeSeconds);
+        _lavaT = MathUtils.Clamp01(_lavaT + (_eyeInLava ? dt : -dt) / WaterRenderConfig.UnderwaterFadeSeconds);
         var lavaWet = wet * MathUtils.SmoothStep(_lavaT);
 
         // Underwater the sun is a diffuse glow, so the crisp shadow edges go with the tint.
@@ -389,13 +389,13 @@ internal sealed class FrameLighting
         if (_owner.CloudShadow != null && elevation > 0f)
             glareCover = CloudCover.AcrossDisc(_owner.CloudShadow.Coverage, CloudField.Cells, _cameraPos, _skySunDir,
                 MathUtils.ToRadians(GameSettings.SunSize), _skyFrame.CloudDrift, CloudCover.Blocking(GameSettings.CloudOpacity));
-        _glareCloud = MathUtils.Damp(_glareCloud, glareCover, WorldGenerationConfig.SunGlareCloudEaseRate, dt);
+        _glareCloud = MathUtils.Damp(_glareCloud, glareCover, SkyConfig.SunGlareCloudEaseRate, dt);
         var glare = camera == null
             ? 0f
             : SunGlare.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud) * (1f - wet);
         // Godrays: strongest facing a low sun, a fraction at noon, dimmed by the cloud over it and
         // gone under water, where the underwater shafts take over (Godrays.Intensity)
-        _godrayStrength = camera == null || !WorldGenerationConfig.GodraysEnabled
+        _godrayStrength = camera == null || !PostProcessConfig.GodraysEnabled
             ? 0f
             : Godrays.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud, wet);
         // The aurora shows only from cold lands: the climate at the eye's column, read from the stored
@@ -422,10 +422,10 @@ internal sealed class FrameLighting
             AuroraDrift = Aurora.Drift(time),
         };
 
-        _fogNear = MathUtils.Lerp(WorldGenerationConfig.FogNearBlocks,
-            WorldGenerationConfig.UnderwaterFogNearBlocks, wet);
-        _fogFar = MathUtils.Lerp(WorldGenerationConfig.FogFarBlocks,
-            WorldGenerationConfig.UnderwaterFogFarBlocks, wet);
+        _fogNear = MathUtils.Lerp(LightingConfig.FogNearBlocks,
+            WaterRenderConfig.UnderwaterFogNearBlocks, wet);
+        _fogFar = MathUtils.Lerp(LightingConfig.FogFarBlocks,
+            WaterRenderConfig.UnderwaterFogFarBlocks, wet);
 
         // Reset before the dry early-out, or a tint would stick after leaving water or lava
         _fogWet = wet;
@@ -453,8 +453,8 @@ internal sealed class FrameLighting
 
     /// <summary>
     /// Builds the light-space matrices for this frame: the near cascade's ortho box of half-extent
-    /// <see cref="WorldGenerationConfig.ShadowRadiusBlocks"/> and the far cascade's of
-    /// <see cref="WorldGenerationConfig.FarShadowRadiusBlocks"/>, each centered a little ahead of
+    /// <see cref="LightingConfig.ShadowRadiusBlocks"/> and the far cascade's of
+    /// <see cref="LightingConfig.FarShadowRadiusBlocks"/>, each centered a little ahead of
     /// the camera and looking down the sun direction. <see cref="ShadowCascade.StepCenter"/> carries
     /// that center forward in whole shadow texels, or the sub-texel drift as the player walks
     /// makes every shadow edge crawl. Each cascade steps its own center on its own texel lattice.

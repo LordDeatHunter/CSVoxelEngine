@@ -47,7 +47,7 @@ public sealed class MobDeathPoofTests
             goblins.Update(Dt, chunks, new DropManager(), camera, debris);
 
         Assert.Empty(goblins.Goblins);
-        Assert.Equal(WorldGenerationConfig.MobDeathPoofCount, debris.Debris.Count);
+        Assert.Equal(JuiceConfig.MobDeathPoofCount, debris.Debris.Count);
         foreach (var chip in debris.Debris)
             Assert.Equal(DebrisLook.Color, chip.Look);
 
@@ -69,7 +69,7 @@ public sealed class MobDeathPoofTests
             slimes.AnimateMirrors(Dt, debris);
 
         Assert.Empty(slimes.Slimes);
-        Assert.Equal(WorldGenerationConfig.MobDeathPoofCount, debris.Debris.Count);
+        Assert.Equal(JuiceConfig.MobDeathPoofCount, debris.Debris.Count);
     }
 
     [Fact]

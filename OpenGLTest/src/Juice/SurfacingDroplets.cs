@@ -6,7 +6,7 @@ namespace VoxelEngine.Juice;
 
 /// <summary>
 /// GL-free timing of the surfacing droplets: when the eye comes up out of water, droplets streak
-/// down the screen and fade out over <see cref="WorldGenerationConfig.SurfacingDropletSeconds"/>.
+/// down the screen and fade out over <see cref="JuiceConfig.SurfacingDropletSeconds"/>.
 /// <see cref="Camera"/> owns one, reports the eye's fluid state once a frame
 /// (<see cref="Observe"/>) and ages it (<see cref="Update"/>); <see cref="DamageVignetteRenderer"/>
 /// draws the drops as a hashed-disc term of the vignette's one full-screen pass from
@@ -51,8 +51,8 @@ public sealed class SurfacingDroplets
 
     /// <summary>
     /// How strongly the droplets show, 0..1: full for
-    /// <see cref="WorldGenerationConfig.SurfacingDropletHoldSeconds"/> after surfacing, then a smooth
-    /// fade that ends <see cref="WorldGenerationConfig.SurfacingDropletSeconds"/> after it. Only ever
+    /// <see cref="JuiceConfig.SurfacingDropletHoldSeconds"/> after surfacing, then a smooth
+    /// fade that ends <see cref="JuiceConfig.SurfacingDropletSeconds"/> after it. Only ever
     /// falls between surfacings.
     /// </summary>
     public float Intensity
@@ -61,8 +61,8 @@ public sealed class SurfacingDroplets
         {
             if (!float.IsFinite(_age))
                 return 0f;
-            const float hold = WorldGenerationConfig.SurfacingDropletHoldSeconds;
-            return MathUtils.HoldThenFade(_age, hold, WorldGenerationConfig.SurfacingDropletSeconds - hold);
+            const float hold = JuiceConfig.SurfacingDropletHoldSeconds;
+            return MathUtils.HoldThenFade(_age, hold, JuiceConfig.SurfacingDropletSeconds - hold);
         }
     }
 

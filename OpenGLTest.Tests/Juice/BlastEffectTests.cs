@@ -54,7 +54,7 @@ public sealed class BlastEffectTests
         {
             var speed = BlastImpulse.At(center, center + direction * d, TntManager.BlastRadius).Length();
             Assert.True(speed <= previous + 1e-5f, $"the push grew at {d} blocks");
-            Assert.True(speed <= WorldGenerationConfig.BlastPushMaxSpeed + 1e-4f);
+            Assert.True(speed <= JuiceConfig.BlastPushMaxSpeed + 1e-4f);
             if (d >= TntManager.BlastRadius)
                 Assert.Equal(0f, speed);
             previous = speed;

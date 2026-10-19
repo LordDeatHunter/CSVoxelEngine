@@ -12,8 +12,8 @@ namespace VoxelEngine.Juice;
 /// </summary>
 public static class StrafeTilt
 {
-    /// <summary>The largest tilt either way, in radians (<see cref="WorldGenerationConfig.StrafeTiltDegrees"/>).</summary>
-    public static float MaxRadians => MathUtils.ToRadians(WorldGenerationConfig.StrafeTiltDegrees);
+    /// <summary>The largest tilt either way, in radians (<see cref="PlayerConfig.StrafeTiltDegrees"/>).</summary>
+    public static float MaxRadians => MathUtils.ToRadians(PlayerConfig.StrafeTiltDegrees);
 
     /// <summary>
     /// The roll the view eases toward this frame. <paramref name="strafe"/> is the sideways movement
@@ -25,5 +25,5 @@ public static class StrafeTilt
 
     /// <summary>Eases the current tilt toward <paramref name="target"/>, frame-rate independent.</summary>
     public static float Step(float current, float target, float deltaTime) =>
-        MathUtils.Damp(current, target, WorldGenerationConfig.StrafeTiltEaseRate, deltaTime);
+        MathUtils.Damp(current, target, PlayerConfig.StrafeTiltEaseRate, deltaTime);
 }

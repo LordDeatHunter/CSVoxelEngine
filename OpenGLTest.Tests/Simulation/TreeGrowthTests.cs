@@ -260,7 +260,7 @@ public sealed class TreeGrowthTests
             decay.ScheduleBox(new Vector3(min.X, min.Y, min.Z), new Vector3(max.X, max.Y, max.Z));
             for (var tick = 0; tick < 200 && decay.PendingCells > 0; tick++)
             {
-                decay.Update(WorldGenerationConfig.LeafDecayTickSeconds, tree.Chunks, drops);
+                decay.Update(SimulationConfig.LeafDecayTickSeconds, tree.Chunks, drops);
                 while (decay.TickInProgress)
                     decay.Update(0f, tree.Chunks, drops);
             }
@@ -306,7 +306,7 @@ public sealed class TreeGrowthTests
                 Assert.True(calls++ < maxCalls,
                     $"{species.Name}: {maxCalls} grow calls never thickened the trunk into a wider crown");
                 var before = SnapshotReach(tree, rootX);
-                Grow(writer, tree, rootX, WorldGenerationConfig.TreeGrowMaxPulsesPerCall);
+                Grow(writer, tree, rootX, SimulationConfig.TreeGrowMaxPulsesPerCall);
                 graph = Rebuild(tree, rootX);
 
                 // No leaf this call wrote hangs off wood that never landed: each lies in the
@@ -346,7 +346,7 @@ public sealed class TreeGrowthTests
             decay.ScheduleBox(new Vector3(min.X, min.Y, min.Z), new Vector3(max.X, max.Y, max.Z));
             for (var tick = 0; tick < 200 && decay.PendingCells > 0; tick++)
             {
-                decay.Update(WorldGenerationConfig.LeafDecayTickSeconds, tree.Chunks, drops);
+                decay.Update(SimulationConfig.LeafDecayTickSeconds, tree.Chunks, drops);
                 while (decay.TickInProgress)
                     decay.Update(0f, tree.Chunks, drops);
             }
@@ -739,7 +739,7 @@ public sealed class TreeGrowthTests
             var rootX = RootXOf(test++);
             var chunks = FloorWorld(species, rootX, TerrainGenerator.SurfaceBlock);
             var writer = new TreeGrowthWriter();
-            var mature = Math.Min(species.MaturityStepsMax, WorldGenerationConfig.TreeGrowMaxPulsesPerCall);
+            var mature = Math.Min(species.MaturityStepsMax, SimulationConfig.TreeGrowMaxPulsesPerCall);
 
             // The node wood (never a shell) at and below the root's level: the root and its fins
             HashSet<(int X, int Y, int Z)> GroundNodes() => SnapshotReach(chunks, species, rootX)

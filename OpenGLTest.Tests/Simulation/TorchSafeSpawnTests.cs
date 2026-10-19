@@ -28,10 +28,10 @@ public sealed class TorchSafeSpawnTests
     public void BlockLightAtTheLimitMarksACellLitAndBelowItDoesNot()
     {
         var chunks = MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
-        LightEverything(chunks, 15, WorldGenerationConfig.MobSpawnBlockLightLimit);
+        LightEverything(chunks, 15, MobConfig.MobSpawnBlockLightLimit);
         Assert.True(MobSpawner.IsLitByBlocks(chunks, 4, 1, 4));
 
-        LightEverything(chunks, 15, WorldGenerationConfig.MobSpawnBlockLightLimit - 1);
+        LightEverything(chunks, 15, MobConfig.MobSpawnBlockLightLimit - 1);
         Assert.False(MobSpawner.IsLitByBlocks(chunks, 4, 1, 4));
 
         // Sunlight alone never counts

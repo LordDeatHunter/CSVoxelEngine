@@ -53,7 +53,7 @@ internal sealed class ThrowAction
 
     internal bool IsThrowCharging { get; private set; }
 
-    internal float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / WorldGenerationConfig.ThrowChargeSeconds);
+    internal float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / PlayerConfig.ThrowChargeSeconds);
 
     /// <summary>Rebuilds the projectile list (<c>_projectiles</c>) from the player's throws and the
     /// goblins' stones, with indexed loops for the same reason as <see cref="World.RefreshMobs"/>.</summary>
@@ -156,7 +156,7 @@ internal sealed class ThrowAction
     {
         if (!IsPlaying) return;
         if (!IsThrowCharging) return;
-        _throwChargeSeconds = Math.Min(_throwChargeSeconds + Math.Max(0f, deltaTime), WorldGenerationConfig.ThrowChargeSeconds);
+        _throwChargeSeconds = Math.Min(_throwChargeSeconds + Math.Max(0f, deltaTime), PlayerConfig.ThrowChargeSeconds);
         if (Inventory.SelectedBlockId != _throwItemId || Inventory.SelectedCount <= 0)
         {
             IsThrowCharging = false;
@@ -183,7 +183,7 @@ internal sealed class ThrowAction
         if (!IsPlaying) return false;
         if (!IsThrowCharging) return false;
         IsThrowCharging = false;
-        var charge01 = MathUtils.Clamp01(_throwChargeSeconds / WorldGenerationConfig.ThrowChargeSeconds);
+        var charge01 = MathUtils.Clamp01(_throwChargeSeconds / PlayerConfig.ThrowChargeSeconds);
         if (!TryLaunchThrow(Inventory, _throwItemId, _throwBaseDamage, charge01, Camera.Position,
                 Camera.ViewDirection, Camera.IsCreative))
         {

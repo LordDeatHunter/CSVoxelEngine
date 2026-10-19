@@ -7,7 +7,7 @@ namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Fallen logs: a rare detached oak log lying along X or Z on the forest floor, decided per
-/// 2^<see cref="WorldGenerationConfig.FallenLogCellShift"/>-block cell from a pure hash of
+/// 2^<see cref="WorldFeatureConfig.FallenLogCellShift"/>-block cell from a pure hash of
 /// (cell, seed), so every chunk the log reaches stamps the same cells (clipped at its border).
 /// <see cref="WoodState.Detached"/> cubes never weld, fell or feed leaves, so a log is scenery,
 /// not a tree; the far LOD shows none. The start column's ground is read from
@@ -38,14 +38,14 @@ public static class FallenLogGenerator
         length = 0;
         alongX = true;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x10A5);
-        if (Unit(SplitMix64.Mix(h + AcceptStream)) >= WorldGenerationConfig.FallenLogChance) return false;
+        if (Unit(SplitMix64.Mix(h + AcceptStream)) >= WorldFeatureConfig.FallenLogChance) return false;
 
-        var size = 1 << WorldGenerationConfig.FallenLogCellShift;
-        var span = (ulong)(size - WorldGenerationConfig.FallenLogMaxLength + 1);
-        startX = (cellX << WorldGenerationConfig.FallenLogCellShift) + (int)(SplitMix64.Mix(h + StartXStream) % span);
-        startZ = (cellZ << WorldGenerationConfig.FallenLogCellShift) + (int)(SplitMix64.Mix(h + StartZStream) % span);
-        var lengths = WorldGenerationConfig.FallenLogMaxLength - WorldGenerationConfig.FallenLogMinLength + 1;
-        length = WorldGenerationConfig.FallenLogMinLength + (int)(SplitMix64.Mix(h + LengthStream) % (ulong)lengths);
+        var size = 1 << WorldFeatureConfig.FallenLogCellShift;
+        var span = (ulong)(size - WorldFeatureConfig.FallenLogMaxLength + 1);
+        startX = (cellX << WorldFeatureConfig.FallenLogCellShift) + (int)(SplitMix64.Mix(h + StartXStream) % span);
+        startZ = (cellZ << WorldFeatureConfig.FallenLogCellShift) + (int)(SplitMix64.Mix(h + StartZStream) % span);
+        var lengths = WorldFeatureConfig.FallenLogMaxLength - WorldFeatureConfig.FallenLogMinLength + 1;
+        length = WorldFeatureConfig.FallenLogMinLength + (int)(SplitMix64.Mix(h + LengthStream) % (ulong)lengths);
         alongX = (SplitMix64.Mix(h + AxisStream) & 1) == 0;
         return true;
     }
@@ -57,8 +57,8 @@ public static class FallenLogGenerator
     /// </summary>
     public static void Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
-        var reach = WorldGenerationConfig.FallenLogMaxLength;
-        var shift = WorldGenerationConfig.FallenLogCellShift;
+        var reach = WorldFeatureConfig.FallenLogMaxLength;
+        var shift = WorldFeatureConfig.FallenLogCellShift;
         var minCellX = (worldX0 - reach) >> shift;
         var maxCellX = (worldX0 + Chunk.Size - 1) >> shift;
         var minCellZ = (worldZ0 - reach) >> shift;

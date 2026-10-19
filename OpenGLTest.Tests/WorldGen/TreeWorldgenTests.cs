@@ -82,8 +82,8 @@ public sealed class TreeWorldgenTests
     // length behind the cell on its own axis and lies at its start column's ground plus one
     private static bool IsFallenLogCell(int x, int y, int z)
     {
-        var shift = WorldGenerationConfig.FallenLogCellShift;
-        for (var back = 0; back < WorldGenerationConfig.FallenLogMaxLength; back++)
+        var shift = WorldFeatureConfig.FallenLogCellShift;
+        for (var back = 0; back < WorldFeatureConfig.FallenLogMaxLength; back++)
         for (var axis = 0; axis < 2; axis++)
         {
             var sx = axis == 0 ? x - back : x;

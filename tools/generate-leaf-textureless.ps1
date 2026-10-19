@@ -11,9 +11,9 @@
 # is copied unchanged, so the canopy keeps exactly the holes of the source art.
 #
 # Conventions that must not drift:
-#   * $TargetGray must equal WorldGenerationConfig.BiomeTintTextureGray * 255, and the LOD canopy
+#   * $TargetGray must equal SurfaceShadingConfig.BiomeTintTextureGray * 255, and the LOD canopy
 #     hole fallback in test-fragment.glsl is that gray decoded to linear.
-#   * $OpaqueAlpha is the first alpha byte at or above WorldGenerationConfig.AlphaCutoff (0.5) * 255,
+#   * $OpaqueAlpha is the first alpha byte at or above LightingConfig.AlphaCutoff (0.5) * 255,
 #     i.e. the texels the alpha test keeps; only those count toward the mean.
 #   * Every texel is written, transparent ones too, so the output never depends on what the
 #     encoder would make of skipped pixels.

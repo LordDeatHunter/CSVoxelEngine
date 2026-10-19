@@ -91,8 +91,8 @@ public sealed class BlockDefinition
 
     /// <summary>
     /// Whether the block springs a landing body back up (a slime block): the landing bills no fall
-    /// damage and the body is thrown up again at <see cref="WorldGenerationConfig.SlimeBlockBounceRestitution"/>
-    /// of its impact once that reaches <see cref="WorldGenerationConfig.SlimeBlockBounceMinSpeed"/>.
+    /// damage and the body is thrown up again at <see cref="PlayerConfig.SlimeBlockBounceRestitution"/>
+    /// of its impact once that reaches <see cref="PlayerConfig.SlimeBlockBounceMinSpeed"/>.
     /// Default false; only read for the block under a landing body's feet.
     /// </summary>
     public bool? Bounce { get; set; }

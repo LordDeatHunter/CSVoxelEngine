@@ -30,7 +30,7 @@ public sealed class LandingDustTests
     [Fact]
     public void AFallUnderTheMinimumKicksUpNothing()
     {
-        for (var fall = 0f; fall < WorldGenerationConfig.LandingDustMinFallBlocks; fall += 0.05f)
+        for (var fall = 0f; fall < JuiceConfig.LandingDustMinFallBlocks; fall += 0.05f)
         {
             Assert.Equal(0, LandingDust.Count(fall));
             Assert.Equal(0f, LandingDust.Speed(fall));
@@ -38,7 +38,7 @@ public sealed class LandingDustTests
 
         var chunks = MobTestWorld.Floor(Id("sand"));
         var debris = new BlockDebrisSystem();
-        var shortFall = WorldGenerationConfig.LandingDustMinFallBlocks * 0.9f;
+        var shortFall = JuiceConfig.LandingDustMinFallBlocks * 0.9f;
         Assert.Equal(0, GroundDust.Land(FloorFeet, shortFall, 0.3f, chunks, debris, new Random(1)));
         Assert.Empty(debris.Debris);
     }
@@ -59,7 +59,7 @@ public sealed class LandingDustTests
         }
 
         // Anti-vacuity: a landing at the minimum already puffs, and a long drop throws more, faster dust
-        var atMinimum = WorldGenerationConfig.LandingDustMinFallBlocks;
+        var atMinimum = JuiceConfig.LandingDustMinFallBlocks;
         Assert.True(LandingDust.Count(atMinimum) > 0);
         Assert.True(LandingDust.Count(atMinimum * 4f) > LandingDust.Count(atMinimum));
         Assert.True(LandingDust.Speed(atMinimum * 4f) > LandingDust.Speed(atMinimum));
@@ -70,8 +70,8 @@ public sealed class LandingDustTests
     {
         foreach (var fall in new[] { 5f, 20f, 100f, 1000f, float.MaxValue })
         {
-            Assert.InRange(LandingDust.Count(fall), 0, WorldGenerationConfig.LandingDustMaxCount);
-            Assert.InRange(LandingDust.Speed(fall), 0f, WorldGenerationConfig.LandingDustMaxSpeed);
+            Assert.InRange(LandingDust.Count(fall), 0, JuiceConfig.LandingDustMaxCount);
+            Assert.InRange(LandingDust.Speed(fall), 0f, JuiceConfig.LandingDustMaxSpeed);
         }
 
         // A non-number fall (a broken tracker) is no fall at all
@@ -83,7 +83,7 @@ public sealed class LandingDustTests
     {
         var chunks = MobTestWorld.Floor(Id("sand"));
         var debris = new BlockDebrisSystem();
-        var fall = WorldGenerationConfig.LandingDustMinFallBlocks * 3f;
+        var fall = JuiceConfig.LandingDustMinFallBlocks * 3f;
 
         var spawned = GroundDust.Land(FloorFeet, fall, 0.3f, chunks, debris, new Random(2));
 
@@ -148,9 +148,9 @@ public sealed class LandingDustTests
             return sum / debris.Debris.Count;
         }
 
-        var shortSpread = MeanSpread(WorldGenerationConfig.LandingDustMinFallBlocks);
+        var shortSpread = MeanSpread(JuiceConfig.LandingDustMinFallBlocks);
         Assert.True(shortSpread > 0.05f, $"chips stayed at the feet: {shortSpread}");
-        Assert.True(MeanSpread(WorldGenerationConfig.LandingDustFullFallBlocks) > shortSpread);
+        Assert.True(MeanSpread(JuiceConfig.LandingDustFullFallBlocks) > shortSpread);
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public sealed class LandingDustTests
         // An ordinary hop is far under the ground dust's minimum fall, yet it splats
         Assert.True(hopped);
         Assert.NotEmpty(debris.Debris);
-        var expected = BiomeTint.VertexTint(LandingDust.SkinColor(type.Model, WorldGenerationConfig.SlimeSplatFallbackColor));
+        var expected = BiomeTint.VertexTint(LandingDust.SkinColor(type.Model, JuiceConfig.SlimeSplatFallbackColor));
         Assert.All(debris.Debris, chip =>
         {
             Assert.Equal(DebrisLook.Color, chip.Look);
@@ -283,7 +283,7 @@ public sealed class LandingDustTests
     [Fact]
     public void TheSplatGrowsWithTheImpactNeverUnderTheMinimumAndABiggerSlimeSplatsMore()
     {
-        for (var speed = 0f; speed < WorldGenerationConfig.SlimeSplatMinImpact; speed += 0.05f)
+        for (var speed = 0f; speed < JuiceConfig.SlimeSplatMinImpact; speed += 0.05f)
         {
             Assert.Equal(0, LandingDust.SplatCount(speed));
             Assert.Equal(0f, LandingDust.SplatSpeed(speed));
@@ -297,16 +297,16 @@ public sealed class LandingDustTests
             var fling = LandingDust.SplatSpeed(speed);
             Assert.True(count >= lastCount, $"count fell to {count} at {speed} b/s");
             Assert.True(fling >= lastSpeed, $"fling fell to {fling} at {speed} b/s");
-            Assert.InRange(count, 0, WorldGenerationConfig.SlimeSplatMaxCount);
-            Assert.InRange(fling, 0f, WorldGenerationConfig.SlimeSplatMaxLaunch);
+            Assert.InRange(count, 0, JuiceConfig.SlimeSplatMaxCount);
+            Assert.InRange(fling, 0f, JuiceConfig.SlimeSplatMaxLaunch);
             Assert.True(LandingDust.SplatCount(speed, 2f) >= count);
             Assert.True(LandingDust.SplatSpeed(speed, 2f) >= fling);
             lastCount = count;
             lastSpeed = fling;
         }
 
-        var hard = WorldGenerationConfig.SlimeSplatFullImpact;
-        Assert.True(LandingDust.SplatCount(hard) > LandingDust.SplatCount(WorldGenerationConfig.SlimeSplatMinImpact));
+        var hard = JuiceConfig.SlimeSplatFullImpact;
+        Assert.True(LandingDust.SplatCount(hard) > LandingDust.SplatCount(JuiceConfig.SlimeSplatMinImpact));
         Assert.True(LandingDust.SplatCount(hard, 2f) > LandingDust.SplatCount(hard));
 
         // The scale reaches the spawned chips too: a bigger slime's goo is bigger

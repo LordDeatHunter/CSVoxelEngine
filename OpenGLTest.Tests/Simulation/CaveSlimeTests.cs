@@ -51,9 +51,9 @@ public sealed class CaveSlimeTests
 
     private static bool Search(ChunkManager chunks, out int x, out int groundY, out int z) =>
         MobSpawner.TryFindCaveSpawn(chunks, PlayerInCave,
-            WorldGenerationConfig.SlimeSpawnMinRadiusBlocks, WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks,
-            WorldGenerationConfig.SlimeCaveSpawnTries, WorldGenerationConfig.SlimeCaveSearchHalfHeight,
-            WorldGenerationConfig.SlimeCaveScanDepth, WorldGenerationConfig.SlimeCaveMaxSkyLight,
+            MobConfig.SlimeSpawnMinRadiusBlocks, MobConfig.SlimeSpawnMaxRadiusBlocks,
+            MobConfig.SlimeCaveSpawnTries, MobConfig.SlimeCaveSearchHalfHeight,
+            MobConfig.SlimeCaveScanDepth, MobConfig.SlimeCaveMaxSkyLight,
             out x, out groundY, out z);
 
     [Fact]
@@ -68,8 +68,8 @@ public sealed class CaveSlimeTests
             Assert.Equal(Floor, groundY);
             var ring = MathF.Sqrt((x + 0.5f - PlayerInCave.X) * (x + 0.5f - PlayerInCave.X)
                                   + (z + 0.5f - PlayerInCave.Z) * (z + 0.5f - PlayerInCave.Z));
-            Assert.InRange(ring, WorldGenerationConfig.SlimeSpawnMinRadiusBlocks - 2f,
-                WorldGenerationConfig.SlimeSpawnMaxRadiusBlocks + 2f);
+            Assert.InRange(ring, MobConfig.SlimeSpawnMinRadiusBlocks - 2f,
+                MobConfig.SlimeSpawnMaxRadiusBlocks + 2f);
         }
         Assert.True(found > 0, "no cave spawn was ever found");
     }
@@ -89,7 +89,7 @@ public sealed class CaveSlimeTests
     {
         var chunks = Cave(sun: 0, block: 0);
         // A roll that grows a slime under the night (underground) chance but not under the day one
-        var roll = (WorldGenerationConfig.SlimeLargeChanceDay + WorldGenerationConfig.SlimeLargeChanceNight) * 0.5f;
+        var roll = (MobConfig.SlimeLargeChanceDay + MobConfig.SlimeLargeChanceNight) * 0.5f;
         Assert.Equal(SlimeSize.Min, SlimeSize.Roll(night: 0f, underground: false, roll));
 
         var found = false;

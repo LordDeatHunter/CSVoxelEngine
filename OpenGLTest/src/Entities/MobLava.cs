@@ -8,8 +8,8 @@ namespace VoxelEngine.Entities;
 /// <summary>
 /// The mobs' lava rule, GL-free: the body box touches a burning fluid (a fluid with a light
 /// emission: lava), the same cell test <see cref="PlayerBodyProbe.InLava"/> runs over the player's
-/// box, and every <see cref="WorldGenerationConfig.MobLavaTickSeconds"/> spent in it costs
-/// <see cref="WorldGenerationConfig.MobLavaDamageShare"/> of the mob's full health (at least 1).
+/// box, and every <see cref="MobConfig.MobLavaTickSeconds"/> spent in it costs
+/// <see cref="MobConfig.MobLavaDamageShare"/> of the mob's full health (at least 1).
 /// <see cref="Mob.UpdateHazards"/> applies it in the authoritative simulation only.
 /// </summary>
 public static class MobLava
@@ -36,5 +36,5 @@ public static class MobLava
 
     /// <summary>Health one lava tick takes off a mob whose full health is <paramref name="maxHealth"/>.</summary>
     public static int DamagePerTick(int maxHealth) =>
-        Math.Max(1, (int)MathF.Ceiling(maxHealth * WorldGenerationConfig.MobLavaDamageShare));
+        Math.Max(1, (int)MathF.Ceiling(maxHealth * MobConfig.MobLavaDamageShare));
 }

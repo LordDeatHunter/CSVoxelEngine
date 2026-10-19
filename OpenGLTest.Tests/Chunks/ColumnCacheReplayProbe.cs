@@ -71,7 +71,7 @@ namespace VoxelEngine.Tests.Chunks;
 /// <para><b>Pinned, not read from production.</b> Every size below is a fixed constant with the
 /// production value it was read off named in its comment, following
 /// <c>LodBuildPoolTests.StressWorkers</c>: a sequence sized live from <c>LodRegion.Levels</c> or
-/// <c>WorldGenerationConfig.ChunkRadius</c> would silently change shape when an unrelated round
+/// <c>StreamingConfig.ChunkRadius</c> would silently change shape when an unrelated round
 /// retunes a ring, and the table in PERF_TODO would stop describing the run it claims to.</para>
 /// </summary>
 public sealed class ColumnCacheReplayProbe
@@ -87,7 +87,7 @@ public sealed class ColumnCacheReplayProbe
     /// comparable at all.</summary>
     private const int CacheCapacity = 16384;
 
-    /// <summary><c>WorldGenerationConfig.ChunkRadius</c>. The disc of chunk columns full-detail
+    /// <summary><c>StreamingConfig.ChunkRadius</c>. The disc of chunk columns full-detail
     /// generation keeps live: 797 columns at radius 16, and 933 distinct once each build's 3x3
     /// heightmap neighborhood is included (both counted, not estimated).</summary>
     private const int ChunkDiscRadius = 16;

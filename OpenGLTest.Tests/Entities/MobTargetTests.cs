@@ -91,7 +91,7 @@ public sealed class MobTargetTests
     {
         var chunks = StoneFloor();
         var drops = new DropManager();
-        var radius = WorldGenerationConfig.SlimeDespawnRadiusBlocks;
+        var radius = MobConfig.SlimeDespawnRadiusBlocks;
         var body = new Vector3(8.5f, 1f + Slime.HalfExtent, 8.5f);
 
         // Past A's radius but inside B's: B keeps it alive.

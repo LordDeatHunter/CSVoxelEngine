@@ -43,7 +43,7 @@ uniform sampler2DArray uMaterialAtlas;
 // Entries in the tile-material buffer below, and the switch for the whole reflective path:
 // it stays 0 wherever that buffer is not bound (the item debugger), so the buffer is never read.
 uniform int uMaterialCount;
-uniform float uOreSpecScale;  // WorldGenerationConfig.OreSpecLinearScale
+uniform float uOreSpecScale;  // SurfaceShadingConfig.OreSpecLinearScale
 // Ore twinkle (OreTwinkle is the twin): the flash strength (0, the default, switches it off), the
 // share of texels that twinkle at all, the min/max flashes per second, the flash's half-width in
 // cycles and the distance fade window.
@@ -215,7 +215,7 @@ uniform vec2 uWaterGlitterFade;
 uniform vec3 uLodLeafColor;
 // Atlas slice of the lava tile: fluid fragments on this layer glow instead of refracting.
 uniform float uLavaLayer;
-uniform float uLavaNormalScale;  // slope-to-normal gain of the lava swell (WorldGenerationConfig.LavaNormalScale)
+uniform float uLavaNormalScale;  // slope-to-normal gain of the lava swell (SurfaceShadingConfig.LavaNormalScale)
 uniform float uLavaCatchLight;   // strength of the point-light catch-light on lava
 uniform float uLavaCatchPower;   // Blinn exponent of that catch-light
 // How far the lava glow breathes above and below its own brightness on the slow noise field
@@ -635,7 +635,7 @@ void main() {
     // sky shows through the magnified texels.
     if (lodLeaves) {
         // A biome-tinted canopy falls back to its textureless tile's gray (sRGB 98/255,
-        // WorldGenerationConfig.BiomeTintTextureGray, decoded) so the tint still applies in the holes.
+        // SurfaceShadingConfig.BiomeTintTextureGray, decoded) so the tint still applies in the holes.
         vec3 leafRgb = texColor.a < 0.5 ? (fTintGain > 1.0 ? vec3(0.1221) : uLodLeafColor) : texColor.rgb;
         texColor = vec4(leafRgb, 1.0);
     } else if (texColor.a < uAlphaCutoff) discard;
@@ -759,7 +759,7 @@ void main() {
             col = mix(col, skyColor, F * metallic * 0.65 * nearFade);
             // Added in linear light, where the display encode lifts a small add on these
             // near-black texels far more than the same add did in display space; uOreSpecScale
-            // (WorldGenerationConfig.OreSpecLinearScale) brings the lift back to the old look.
+            // (SurfaceShadingConfig.OreSpecLinearScale) brings the lift back to the old look.
             col += uSunColor * (spec * uSunIntensity * uOreSpecScale) * tint * nearFade;
 
             // Ore twinkle: now and then a texel flashes with the sun (see OreTwinkle). Gated like the

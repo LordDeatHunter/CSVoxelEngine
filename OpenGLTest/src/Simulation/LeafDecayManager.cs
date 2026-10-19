@@ -14,7 +14,7 @@ namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Leaf decay and orphaned-wood crumbling: a fixed tick
-/// (<see cref="WorldGenerationConfig.LeafDecayTickSeconds"/>) over a set of scheduled cells, in
+/// (<see cref="SimulationConfig.LeafDecayTickSeconds"/>) over a set of scheduled cells, in
 /// the same shape as <see cref="FluidManager"/>. Only scheduled cells do any work, and only a
 /// crumbled wood cell reschedules its neighborhood (a decayed leaf feeds nothing), so a settled
 /// canopy costs nothing.
@@ -40,7 +40,7 @@ namespace VoxelEngine.Simulation;
 /// branch's own wood, behind a bend, would re-derive to 0 on an intact tree. A leaf whose
 /// hydration falls to 0 decays to air, rolling its loot through
 /// <see cref="DropManager.SpawnLoot"/>; at most
-/// <see cref="WorldGenerationConfig.LeafDecayMaxRemovalsPerTick"/> cells are removed per tick,
+/// <see cref="SimulationConfig.LeafDecayMaxRemovalsPerTick"/> cells are removed per tick,
 /// and a tick's cells are visited in a hash-scattered order, so a felled crown dissolves in
 /// speckles over a few seconds instead of sweeping in scan order or vanishing in one frame.
 /// Persistent leaves (player-placed) are never touched.</para>
@@ -139,7 +139,7 @@ public class LeafDecayManager
 
     // The orphan rule: TreeSupport's search over this manager's cached reads, shared with felling
     private readonly TreeCellReader _read;
-    private readonly TreeSupport _support = new(WorldGenerationConfig.TreeFellWoodCap);
+    private readonly TreeSupport _support = new(SimulationConfig.TreeFellWoodCap);
 
     // Wood cells (TreeCellKey) known anchored or known unanchored this frame; cleared at the top
     // of every Update, since an edit outside the decay can change either between frames
@@ -227,7 +227,7 @@ public class LeafDecayManager
     /// <summary>
     /// Schedules every cell of the inclusive box grown by <see cref="ScheduleReach"/> on all
     /// sides. Stops adding once the backlog reaches
-    /// <see cref="WorldGenerationConfig.MaxLeafDecayBacklogCells"/>; a stale leaf left behind is
+    /// <see cref="SimulationConfig.MaxLeafDecayBacklogCells"/>; a stale leaf left behind is
     /// picked up by the next nearby edit.
     /// </summary>
     public void ScheduleBox(Vector3 min, Vector3 max)
@@ -245,14 +245,14 @@ public class LeafDecayManager
         for (var y = y0; y <= y1; y++)
         for (var z = z0; z <= z1; z++)
         {
-            if (_next.Count >= WorldGenerationConfig.MaxLeafDecayBacklogCells) return;
+            if (_next.Count >= SimulationConfig.MaxLeafDecayBacklogCells) return;
             _next.Add(Pack(x, y, z));
         }
     }
 
     /// <summary>
     /// Advances the tick clock and runs whatever is due, in slices of
-    /// <see cref="WorldGenerationConfig.MaxLeafDecayCellsPerFrame"/> cells. Leftover time past
+    /// <see cref="SimulationConfig.MaxLeafDecayCellsPerFrame"/> cells. Leftover time past
     /// the tick budget is dropped. Removals remesh and reach the far LOD once, at the end.
     /// </summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, LodManager? lod = null,
@@ -277,23 +277,23 @@ public class LeafDecayManager
 
         var ticks = 0;
         var processed = 0;
-        while (processed < WorldGenerationConfig.MaxLeafDecayCellsPerFrame)
+        while (processed < SimulationConfig.MaxLeafDecayCellsPerFrame)
         {
             // The previous tick is fully processed, so start the next one when it is due
             if (_tickCursor >= _tickCells.Count)
             {
-                if (_accumulator < WorldGenerationConfig.LeafDecayTickSeconds
-                    || ticks >= WorldGenerationConfig.MaxLeafDecayTicksPerFrame)
+                if (_accumulator < SimulationConfig.LeafDecayTickSeconds
+                    || ticks >= SimulationConfig.MaxLeafDecayTicksPerFrame)
                     break;
 
-                _accumulator -= WorldGenerationConfig.LeafDecayTickSeconds;
+                _accumulator -= SimulationConfig.LeafDecayTickSeconds;
                 ticks++;
                 BeginTick();
                 if (_tickCells.Count == 0) continue;
             }
 
             // Spend what is left of the frame's cell budget on the current tick, then yield
-            var slice = Math.Min(WorldGenerationConfig.MaxLeafDecayCellsPerFrame - processed,
+            var slice = Math.Min(SimulationConfig.MaxLeafDecayCellsPerFrame - processed,
                 _tickCells.Count - _tickCursor);
             var end = _tickCursor + slice;
             for (; _tickCursor < end; _tickCursor++)
@@ -303,7 +303,7 @@ public class LeafDecayManager
             if (_tickCursor < _tickCells.Count) break;
         }
 
-        if (_accumulator >= WorldGenerationConfig.LeafDecayTickSeconds) _accumulator = 0f;
+        if (_accumulator >= SimulationConfig.LeafDecayTickSeconds) _accumulator = 0f;
 
         if (_dirtyChunks.Count > 0)
         {
@@ -399,7 +399,7 @@ public class LeafDecayManager
             Write(x, y, z, id, state, remesh: false);
         }
 
-        if (_removalsThisTick >= WorldGenerationConfig.LeafDecayMaxRemovalsPerTick)
+        if (_removalsThisTick >= SimulationConfig.LeafDecayMaxRemovalsPerTick)
         {
             _next.Add(key);
             return;
@@ -488,7 +488,7 @@ public class LeafDecayManager
     /// The support a live tip's tree gives its cluster: the <see cref="WoodState.DiameterPx"/> of
     /// the root cell its parent chain reaches, following the links <see cref="WalkParentChain"/>
     /// follows (<see cref="TreeSupport.Links"/>) for at most
-    /// <see cref="WorldGenerationConfig.TreeFellWoodCap"/> steps. A chain that stops first (no
+    /// <see cref="SimulationConfig.TreeFellWoodCap"/> steps. A chain that stops first (no
     /// parent cell, a broken link, the cap) answers with the last cell it reached, which only an
     /// orphaned branch does. Memoized for the frame on every walked cell, since they all end at
     /// the same cell. False when a read hit an unloaded chunk, which freezes the leaf.
@@ -501,7 +501,7 @@ public class LeafDecayManager
         var state = tstate;
         supportPx = WoodState.DiameterPx(state);
 
-        for (var step = 0; step < WorldGenerationConfig.TreeFellWoodCap; step++)
+        for (var step = 0; step < SimulationConfig.TreeFellWoodCap; step++)
         {
             var cellKey = TreeCellKey.Pack(x, y, z);
             if (_tipSupport.TryGetValue(cellKey, out var known))
@@ -556,7 +556,7 @@ public class LeafDecayManager
             foreach (var c in _support.Component) _unsupported.Add(TreeCellKey.Pack(c.X, c.Y, c.Z));
         }
 
-        if (_removalsThisTick >= WorldGenerationConfig.LeafDecayMaxRemovalsPerTick)
+        if (_removalsThisTick >= SimulationConfig.LeafDecayMaxRemovalsPerTick)
         {
             _next.Add(key);
             return;
@@ -576,7 +576,7 @@ public class LeafDecayManager
     private TreeSupportResult WalkParentChain(int x, int y, int z, byte id, byte state)
     {
         _chain.Clear();
-        for (var step = 0; step < WorldGenerationConfig.TreeFellWoodCap; step++)
+        for (var step = 0; step < SimulationConfig.TreeFellWoodCap; step++)
         {
             var cellKey = TreeCellKey.Pack(x, y, z);
             _chain.Add(cellKey);
@@ -632,7 +632,7 @@ public class LeafDecayManager
         // while a crown dissolves and crowd out the boxes real edits schedule.
         if (_speciesByLeaf[id] != null)
         {
-            _leaves?.Burst(cell, WorldGenerationConfig.LeafParticleBurstDecay);
+            _leaves?.Burst(cell, ParticleConfig.LeafParticleBurstDecay);
             return;
         }
 
@@ -656,7 +656,7 @@ public class LeafDecayManager
 
             Write(x, y, z, 0, 0, remesh: true);
             _chunks.UnmarkPlayerPlaced(x, y, z);
-            _chunks.MarkAreaDirty(cell, cell + Vector3.One, WorldGenerationConfig.LightPropagationRadius);
+            _chunks.MarkAreaDirty(cell, cell + Vector3.One, LightingConfig.LightPropagationRadius);
             _drops.SpawnLoot(id, cell,
                 DropManager.PileCount(id, x, z, state), DropManager.PileSecondary(id, x, z, state), state);
         }

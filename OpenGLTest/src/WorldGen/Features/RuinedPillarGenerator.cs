@@ -6,7 +6,7 @@ namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Ruined pillars: a broken stone-brick column of 2-4 cells, some bricks missing, scattered over
-/// the dry land as ruins. Decided per 2^<see cref="WorldGenerationConfig.PillarCellShift"/>-block
+/// the dry land as ruins. Decided per 2^<see cref="WorldFeatureConfig.PillarCellShift"/>-block
 /// cell from a pure hash of (cell, seed); the center column's ground comes from
 /// <see cref="ColumnCache"/> like the pebble scatter's, so a pillar near a chunk border is whole.
 /// The far LOD shows none.
@@ -30,13 +30,13 @@ public static class RuinedPillarGenerator
         height = 0;
         gaps = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x7111);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldGenerationConfig.PillarChance) return false;
+        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.PillarChance) return false;
 
-        var span = (ulong)(1 << WorldGenerationConfig.PillarCellShift);
-        x = (cellX << WorldGenerationConfig.PillarCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
-        z = (cellZ << WorldGenerationConfig.PillarCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
-        var heights = WorldGenerationConfig.PillarMaxHeight - WorldGenerationConfig.PillarMinHeight + 1;
-        height = WorldGenerationConfig.PillarMinHeight + (int)(SplitMix64.Mix(h + 3) % (ulong)heights);
+        var span = (ulong)(1 << WorldFeatureConfig.PillarCellShift);
+        x = (cellX << WorldFeatureConfig.PillarCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
+        z = (cellZ << WorldFeatureConfig.PillarCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        var heights = WorldFeatureConfig.PillarMaxHeight - WorldFeatureConfig.PillarMinHeight + 1;
+        height = WorldFeatureConfig.PillarMinHeight + (int)(SplitMix64.Mix(h + 3) % (ulong)heights);
         gaps = (uint)(SplitMix64.Mix(h + 4) & 0xF);
         return true;
     }
@@ -48,7 +48,7 @@ public static class RuinedPillarGenerator
     /// </summary>
     public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
     {
-        var shift = WorldGenerationConfig.PillarCellShift;
+        var shift = WorldFeatureConfig.PillarCellShift;
         var minCellX = worldX0 >> shift;
         var maxCellX = (worldX0 + Chunk.Size - 1) >> shift;
         var minCellZ = worldZ0 >> shift;

@@ -59,7 +59,7 @@ public sealed class ThrowZoomTests
 
         // Charge up over the throw's wind-up, then hold it: the view narrows toward the full zoom and
         // never past the clamp a long frame could fling it to.
-        var frames = (int)(WorldGenerationConfig.ThrowChargeSeconds / Dt);
+        var frames = (int)(PlayerConfig.ThrowChargeSeconds / Dt);
         for (var i = 0; i <= frames; i++)
         {
             camera.ThrowCharge = i / (float)frames;

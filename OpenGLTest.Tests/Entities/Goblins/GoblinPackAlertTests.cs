@@ -10,7 +10,7 @@ namespace VoxelEngine.Tests.Entities.Goblins;
 
 /// <summary>
 /// The goblin pack alert: a goblin that notices a player pulls every other goblin within
-/// <see cref="WorldGenerationConfig.GoblinPackAlertRadiusBlocks"/> forward, so they skip their
+/// <see cref="MobConfig.GoblinPackAlertRadiusBlocks"/> forward, so they skip their
 /// first-throw delay and throw sooner; one beyond the radius keeps waiting.
 /// </summary>
 public sealed class GoblinPackAlertTests
@@ -66,8 +66,8 @@ public sealed class GoblinPackAlertTests
         var noticed = goblins.Spawn(new Vector3(2.5f, 1f + Goblin.Height * 0.5f, 2.5f), ammo: 0)!;
         var near = goblins.Spawn(new Vector3(12.5f, 1f + Goblin.Height * 0.5f, 2.5f), ammo: 3)!;
         var far = goblins.Spawn(new Vector3(2.5f, 1f + Goblin.Height * 0.5f, 15.5f), ammo: 3)!;
-        Assert.True(MathF.Abs(near.Position.X - noticed.Position.X) <= WorldGenerationConfig.GoblinPackAlertRadiusBlocks);
-        Assert.True(MathF.Abs(far.Position.Z - noticed.Position.Z) > WorldGenerationConfig.GoblinPackAlertRadiusBlocks);
+        Assert.True(MathF.Abs(near.Position.X - noticed.Position.X) <= MobConfig.GoblinPackAlertRadiusBlocks);
+        Assert.True(MathF.Abs(far.Position.Z - noticed.Position.Z) > MobConfig.GoblinPackAlertRadiusBlocks);
 
         goblins.AlertPackAround(noticed);
 

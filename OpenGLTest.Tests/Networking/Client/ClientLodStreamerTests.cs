@@ -27,9 +27,9 @@ public sealed class ClientLodStreamerTests
             streamer.Update(Vector3.Zero, 0.016);
 
         Assert.NotEmpty(asked);
-        Assert.True(asked.Count <= WorldGenerationConfig.NetLodInFlightMax,
-            $"{asked.Count} requests outstanding, cap {WorldGenerationConfig.NetLodInFlightMax}");
-        Assert.True(streamer.InFlight <= WorldGenerationConfig.NetLodInFlightMax);
+        Assert.True(asked.Count <= NetworkConfig.NetLodInFlightMax,
+            $"{asked.Count} requests outstanding, cap {NetworkConfig.NetLodInFlightMax}");
+        Assert.True(streamer.InFlight <= NetworkConfig.NetLodInFlightMax);
         Assert.Equal(asked.Count, asked.Distinct().Count());
     }
 
@@ -42,7 +42,7 @@ public sealed class ClientLodStreamerTests
         var first = asked[0];
 
         // Just short of the resend age: still outstanding, never re-sent
-        var step = WorldGenerationConfig.NetLodResendSeconds / 10.0;
+        var step = NetworkConfig.NetLodResendSeconds / 10.0;
         for (var i = 0; i < 9; i++)
             streamer.Update(Vector3.Zero, step * 0.99);
         Assert.Equal(1, asked.Count(k => k == first));

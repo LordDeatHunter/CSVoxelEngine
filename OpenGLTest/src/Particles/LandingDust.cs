@@ -7,9 +7,9 @@ namespace VoxelEngine.Particles;
 
 /// <summary>
 /// The landing-dust rule, GL-free: how many chips a landing kicks up and how fast they fly, as a
-/// function of the fall that ended. Nothing below <see cref="WorldGenerationConfig.LandingDustMinFallBlocks"/>,
+/// function of the fall that ended. Nothing below <see cref="JuiceConfig.LandingDustMinFallBlocks"/>,
 /// then both grow with the drop along <see cref="MathUtils.ImpactStrength"/> and stop at their caps
-/// at <see cref="WorldGenerationConfig.LandingDustFullFallBlocks"/>. A slime splats its own goo
+/// at <see cref="JuiceConfig.LandingDustFullFallBlocks"/>. A slime splats its own goo
 /// instead (<see cref="SplatCount"/>, <see cref="SplatSpeed"/>, <see cref="SkinColor"/>).
 /// <see cref="GroundDust"/> spawns what this decides.
 /// </summary>
@@ -18,39 +18,39 @@ public static class LandingDust
     /// <summary>Chips a landing after a fall of <paramref name="fallBlocks"/> kicks up; 0 below the minimum fall.</summary>
     public static int Count(float fallBlocks)
     {
-        if (!(fallBlocks >= WorldGenerationConfig.LandingDustMinFallBlocks)) return 0;
-        return (int)MathF.Round(MathUtils.Lerp(WorldGenerationConfig.LandingDustMinCount,
-            WorldGenerationConfig.LandingDustMaxCount, Strength(fallBlocks)));
+        if (!(fallBlocks >= JuiceConfig.LandingDustMinFallBlocks)) return 0;
+        return (int)MathF.Round(MathUtils.Lerp(JuiceConfig.LandingDustMinCount,
+            JuiceConfig.LandingDustMaxCount, Strength(fallBlocks)));
     }
 
     /// <summary>Launch speed in blocks per second of those chips; 0 below the minimum fall.</summary>
     public static float Speed(float fallBlocks)
     {
-        if (!(fallBlocks >= WorldGenerationConfig.LandingDustMinFallBlocks)) return 0f;
-        return MathUtils.Lerp(WorldGenerationConfig.LandingDustMinSpeed,
-            WorldGenerationConfig.LandingDustMaxSpeed, Strength(fallBlocks));
+        if (!(fallBlocks >= JuiceConfig.LandingDustMinFallBlocks)) return 0f;
+        return MathUtils.Lerp(JuiceConfig.LandingDustMinSpeed,
+            JuiceConfig.LandingDustMaxSpeed, Strength(fallBlocks));
     }
 
     /// <summary>
     /// Chips a falling block (sand, gravel) throws when it settles after a fall of
-    /// <paramref name="fallBlocks"/>: none under <see cref="WorldGenerationConfig.FallingBlockDustMinFallBlocks"/>
+    /// <paramref name="fallBlocks"/>: none under <see cref="JuiceConfig.FallingBlockDustMinFallBlocks"/>
     /// (a cube that only slid off a ledge's lip), then growing with the drop along
-    /// <see cref="MathUtils.ImpactStrength"/> to the cap at <see cref="WorldGenerationConfig.FallingBlockDustFullFallBlocks"/>.
+    /// <see cref="MathUtils.ImpactStrength"/> to the cap at <see cref="JuiceConfig.FallingBlockDustFullFallBlocks"/>.
     /// A block is far heavier than a body, so a one-block drop already puffs.
     /// </summary>
     public static int FallingBlockCount(float fallBlocks)
     {
-        if (!(fallBlocks >= WorldGenerationConfig.FallingBlockDustMinFallBlocks)) return 0;
-        return (int)MathF.Round(MathUtils.Lerp(WorldGenerationConfig.FallingBlockDustMinCount,
-            WorldGenerationConfig.FallingBlockDustMaxCount, FallingBlockStrength(fallBlocks)));
+        if (!(fallBlocks >= JuiceConfig.FallingBlockDustMinFallBlocks)) return 0;
+        return (int)MathF.Round(MathUtils.Lerp(JuiceConfig.FallingBlockDustMinCount,
+            JuiceConfig.FallingBlockDustMaxCount, FallingBlockStrength(fallBlocks)));
     }
 
     /// <summary>Launch speed in blocks per second of those chips; 0 under the minimum fall.</summary>
     public static float FallingBlockSpeed(float fallBlocks)
     {
-        if (!(fallBlocks >= WorldGenerationConfig.FallingBlockDustMinFallBlocks)) return 0f;
-        return MathUtils.Lerp(WorldGenerationConfig.FallingBlockDustMinSpeed,
-            WorldGenerationConfig.FallingBlockDustMaxSpeed, FallingBlockStrength(fallBlocks));
+        if (!(fallBlocks >= JuiceConfig.FallingBlockDustMinFallBlocks)) return 0f;
+        return MathUtils.Lerp(JuiceConfig.FallingBlockDustMinSpeed,
+            JuiceConfig.FallingBlockDustMaxSpeed, FallingBlockStrength(fallBlocks));
     }
 
     /// <summary>The height a body under <paramref name="gravity"/> fell from rest to reach
@@ -60,24 +60,24 @@ public static class LandingDust
 
     /// <summary>
     /// Goo chips a slime's landing at <paramref name="impactSpeed"/> blocks per second throws: none
-    /// under <see cref="WorldGenerationConfig.SlimeSplatMinImpact"/>, then growing linearly with the
-    /// impact, as its squash kick does, to the cap at <see cref="WorldGenerationConfig.SlimeSplatFullImpact"/>.
+    /// under <see cref="JuiceConfig.SlimeSplatMinImpact"/>, then growing linearly with the
+    /// impact, as its squash kick does, to the cap at <see cref="JuiceConfig.SlimeSplatFullImpact"/>.
     /// <paramref name="scale"/> is the slime's body scale (<see cref="SlimeSize.Scale"/>, 1 for the
     /// smallest), and a bigger slime throws proportionally more.
     /// </summary>
     public static int SplatCount(float impactSpeed, float scale = 1f)
     {
-        if (!(impactSpeed >= WorldGenerationConfig.SlimeSplatMinImpact) || !(scale > 0f)) return 0;
-        return (int)MathF.Round(MathUtils.Lerp(WorldGenerationConfig.SlimeSplatMinCount,
-            WorldGenerationConfig.SlimeSplatMaxCount, SplatStrength(impactSpeed)) * scale);
+        if (!(impactSpeed >= JuiceConfig.SlimeSplatMinImpact) || !(scale > 0f)) return 0;
+        return (int)MathF.Round(MathUtils.Lerp(JuiceConfig.SlimeSplatMinCount,
+            JuiceConfig.SlimeSplatMaxCount, SplatStrength(impactSpeed)) * scale);
     }
 
     /// <summary>Launch speed in blocks per second of those chips, 0 under the minimum impact; a bigger
     /// slime (<paramref name="scale"/>) flings them further, by the square root of its size.</summary>
     public static float SplatSpeed(float impactSpeed, float scale = 1f)
     {
-        if (!(impactSpeed >= WorldGenerationConfig.SlimeSplatMinImpact) || !(scale > 0f)) return 0f;
-        return MathUtils.Lerp(WorldGenerationConfig.SlimeSplatMinLaunch, WorldGenerationConfig.SlimeSplatMaxLaunch,
+        if (!(impactSpeed >= JuiceConfig.SlimeSplatMinImpact) || !(scale > 0f)) return 0f;
+        return MathUtils.Lerp(JuiceConfig.SlimeSplatMinLaunch, JuiceConfig.SlimeSplatMaxLaunch,
             SplatStrength(impactSpeed)) * MathF.Sqrt(scale);
     }
 
@@ -110,14 +110,14 @@ public static class LandingDust
     }
 
     private static float Strength(float fallBlocks) =>
-        MathUtils.ImpactStrength(fallBlocks, WorldGenerationConfig.LandingDustMinFallBlocks,
-            WorldGenerationConfig.LandingDustFullFallBlocks);
+        MathUtils.ImpactStrength(fallBlocks, JuiceConfig.LandingDustMinFallBlocks,
+            JuiceConfig.LandingDustFullFallBlocks);
 
     private static float FallingBlockStrength(float fallBlocks) =>
-        MathUtils.ImpactStrength(fallBlocks, WorldGenerationConfig.FallingBlockDustMinFallBlocks,
-            WorldGenerationConfig.FallingBlockDustFullFallBlocks);
+        MathUtils.ImpactStrength(fallBlocks, JuiceConfig.FallingBlockDustMinFallBlocks,
+            JuiceConfig.FallingBlockDustFullFallBlocks);
 
     private static float SplatStrength(float impactSpeed) =>
-        MathUtils.InverseLerp(WorldGenerationConfig.SlimeSplatMinImpact, WorldGenerationConfig.SlimeSplatFullImpact,
+        MathUtils.InverseLerp(JuiceConfig.SlimeSplatMinImpact, JuiceConfig.SlimeSplatFullImpact,
             impactSpeed);
 }

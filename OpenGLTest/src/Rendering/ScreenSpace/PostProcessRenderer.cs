@@ -32,19 +32,19 @@ public sealed class PostProcessRenderer : IDisposable
         // until the first Render sets the frame's).
         _shader.Use();
         _shader.SetUniform("uScene", 0);
-        _shader.SetUniform("uExposure", WorldGenerationConfig.TonemapExposure);
+        _shader.SetUniform("uExposure", LightingConfig.TonemapExposure);
         _shader.SetUniform("uGrade", System.Numerics.Vector3.One);
         _shader.SetUniform("uDamageFringe", 0f);
-        _shader.SetUniform("uFringeShare", WorldGenerationConfig.DamageFringeScreenShare);
+        _shader.SetUniform("uFringeShare", PostProcessConfig.DamageFringeScreenShare);
         _shader.SetUniform("uUnderwater", 0f);
-        _shader.SetUniform("uWobbleShare", WorldGenerationConfig.UnderwaterWobbleScreenShare);
-        _shader.SetUniform("uWobbleSpeed", WorldGenerationConfig.UnderwaterWobbleSpeed);
+        _shader.SetUniform("uWobbleShare", PostProcessConfig.UnderwaterWobbleScreenShare);
+        _shader.SetUniform("uWobbleSpeed", PostProcessConfig.UnderwaterWobbleSpeed);
         _shader.SetUniform("uWobbleWaves", UnderwaterWobble.WavesAcross);
-        _shader.SetUniform("uFxaaReduceMin", WorldGenerationConfig.FxaaReduceMin);
-        _shader.SetUniform("uFxaaReduceMul", WorldGenerationConfig.FxaaReduceMul);
-        _shader.SetUniform("uFxaaSpanMax", WorldGenerationConfig.FxaaSpanMax);
-        _shader.SetUniform("uFxaaEdgeThreshold", WorldGenerationConfig.FxaaEdgeThreshold);
-        _shader.SetUniform("uFxaaEdgeThresholdMin", WorldGenerationConfig.FxaaEdgeThresholdMin);
+        _shader.SetUniform("uFxaaReduceMin", PostProcessConfig.FxaaReduceMin);
+        _shader.SetUniform("uFxaaReduceMul", PostProcessConfig.FxaaReduceMul);
+        _shader.SetUniform("uFxaaSpanMax", PostProcessConfig.FxaaSpanMax);
+        _shader.SetUniform("uFxaaEdgeThreshold", PostProcessConfig.FxaaEdgeThreshold);
+        _shader.SetUniform("uFxaaEdgeThresholdMin", PostProcessConfig.FxaaEdgeThresholdMin);
 
         // One triangle covering NDC: the two off-screen corners keep the visible area seamless
         Span<float> vertices = [-1f, -1f, 3f, -1f, -1f, 3f];

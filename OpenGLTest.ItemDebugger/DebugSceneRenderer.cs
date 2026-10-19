@@ -99,8 +99,8 @@ public sealed class DebugSceneRenderer : IDisposable
         // type clash fails the draw; unit 2 already holds a sampler2D. uCloudShadowStrength stays
         // at its default 0, which keeps the cloud-shadow path off here.
         _world.SetUniform("uCloudShadowMap", 2);
-        _world.SetUniform("uOreSpecScale", WorldGenerationConfig.OreSpecLinearScale);
-        _world.SetUniform("uWetDarken", WorldGenerationConfig.WetDarken);
+        _world.SetUniform("uOreSpecScale", SurfaceShadingConfig.OreSpecLinearScale);
+        _world.SetUniform("uWetDarken", SurfaceShadingConfig.WetDarken);
         // The plain vertex path lights meshes from these per-draw uniforms (the game samples the
         // world through RenderManager.SetDrawUniforms). The debugger has no world, so it lights
         // everything like the old vertex defaults: full sun, no block light. Unset they would be 0,
@@ -253,8 +253,8 @@ public sealed class DebugSceneRenderer : IDisposable
     // it so the gray texel times Gain lands on the color the game displays: encode(grayLin * v * Gain).
     private static void ToDisplaySpaceTint(List<Vertex> vertices)
     {
-        var grayLinear = ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGray) * BiomeTint.Gain;
-        var grayDisplay = WorldGenerationConfig.BiomeTintTextureGray * BiomeTint.Gain;
+        var grayLinear = ColorSpace.SrgbToLinear(SurfaceShadingConfig.BiomeTintTextureGray) * BiomeTint.Gain;
+        var grayDisplay = SurfaceShadingConfig.BiomeTintTextureGray * BiomeTint.Gain;
         var span = CollectionsMarshal.AsSpan(vertices);
         for (var i = 0; i < span.Length; i++)
         {
@@ -375,16 +375,16 @@ public sealed class DebugSceneRenderer : IDisposable
         _world.SetUniform("uLightViewProj", Matrix4x4.Identity);
         _world.SetUniform("uShadowStrength", 0f);
         _world.SetUniform("uShadowStrengthDry", 0f);
-        _world.SetUniform("uShadowTexel", 1f / WorldGenerationConfig.ShadowMapSize);
+        _world.SetUniform("uShadowTexel", 1f / LightingConfig.ShadowMapSize);
         _world.SetUniform("uShadowWorldTexel",
-            2f * WorldGenerationConfig.ShadowRadiusBlocks / WorldGenerationConfig.ShadowMapSize);
+            2f * LightingConfig.ShadowRadiusBlocks / LightingConfig.ShadowMapSize);
         // Harmless placeholders: uShadowStrength is 0 here, so SampleShadow never reads them.
         _world.SetUniform("uLightViewProjFar", Matrix4x4.Identity);
         _world.SetUniform("uShadowWorldTexelFar",
-            2f * WorldGenerationConfig.FarShadowRadiusBlocks / WorldGenerationConfig.FarShadowMapSize);
-        _world.SetUniform("uShadowBiasScaleFar", 1f / (8f * WorldGenerationConfig.FarShadowRadiusBlocks));
-        _world.SetUniform("uShadowSoftness", WorldGenerationConfig.ShadowSoftnessTexels);
-        _world.SetUniform("uShadowNormalOffset", WorldGenerationConfig.ShadowNormalOffsetTexels);
+            2f * LightingConfig.FarShadowRadiusBlocks / LightingConfig.FarShadowMapSize);
+        _world.SetUniform("uShadowBiasScaleFar", 1f / (8f * LightingConfig.FarShadowRadiusBlocks));
+        _world.SetUniform("uShadowSoftness", LightingConfig.ShadowSoftnessTexels);
+        _world.SetUniform("uShadowNormalOffset", LightingConfig.ShadowNormalOffsetTexels);
         _world.SetUniform("uClipY", -1e9f);
         _world.SetUniform("uInvViewport", new Vector2(1f / Math.Max(1, size.X), 1f / Math.Max(1, size.Y)));
         _world.SetUniform("uInvViewProj", Matrix4x4.Invert(viewProj, out var inv) ? inv : Matrix4x4.Identity);

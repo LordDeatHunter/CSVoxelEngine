@@ -9,7 +9,7 @@ namespace VoxelEngine.Simulation;
 /// <summary>
 /// The saplings planted in the world (an acorn, or any <see cref="ItemUseAction.PlantTree"/> use),
 /// GL-free and main thread only: each is one cell with a species and a clock, and every
-/// <see cref="WorldGenerationConfig.SaplingPulseSeconds"/> (jittered per pulse) the manager grows
+/// <see cref="SimulationConfig.SaplingPulseSeconds"/> (jittered per pulse) the manager grows
 /// it one <see cref="TreeGrower.GrowFurther"/> pulse through the same reactive path a player's
 /// ash uses (<see cref="World.TryGrowTree"/>), until the species' own maturity step
 /// (<see cref="TreeGrower.MaturityStepsAt"/>) — so a sapling becomes a tree over a few minutes.
@@ -128,6 +128,6 @@ public sealed class SaplingManager
     // The gap before the next pulse: the configured seconds, jittered up to half either way so a
     // row of saplings planted together does not pulse in lockstep.
     private static float PulseSeconds(Random rng) =>
-        WorldGenerationConfig.SaplingPulseSeconds
-        * (1f - WorldGenerationConfig.SaplingPulseJitter * 0.5f + WorldGenerationConfig.SaplingPulseJitter * rng.NextSingle());
+        SimulationConfig.SaplingPulseSeconds
+        * (1f - SimulationConfig.SaplingPulseJitter * 0.5f + SimulationConfig.SaplingPulseJitter * rng.NextSingle());
 }

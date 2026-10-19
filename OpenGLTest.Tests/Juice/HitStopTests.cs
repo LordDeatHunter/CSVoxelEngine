@@ -79,11 +79,11 @@ public sealed class HitStopTests : IDisposable
     {
         var plain = PlaySwing(new SwingHitStop(), SwingRate, SwingImpact);
         var frozen = PlaySwing(new SwingHitStop(), SwingRate, SwingImpact,
-            requestAtStart: WorldGenerationConfig.HitStopSeconds);
+            requestAtStart: PlayerConfig.HitStopSeconds);
 
         // Held at the impact pose for (about) what was asked...
         Assert.Equal(SwingImpact, frozen.HeldAt);
-        Assert.InRange(frozen.Held, WorldGenerationConfig.HitStopSeconds - 2 * Dt, WorldGenerationConfig.HitStopSeconds + Dt);
+        Assert.InRange(frozen.Held, PlayerConfig.HitStopSeconds - 2 * Dt, PlayerConfig.HitStopSeconds + Dt);
         // ...and the swing still ends on the same frame, so nothing that waits on it is delayed.
         Assert.InRange(frozen.Frames, plain.Frames - 1, plain.Frames + 1);
     }
@@ -95,7 +95,7 @@ public sealed class HitStopTests : IDisposable
         const float slowRate = 1f / 10f;
         var piled = PlaySwing(new SwingHitStop(), slowRate, 0.2f, requestAtStart: 100f, requestEveryFrame: 100f);
         Assert.True(piled.Held > 0f);
-        Assert.True(piled.Held <= WorldGenerationConfig.HitStopMaxSeconds + Dt);
+        Assert.True(piled.Held <= PlayerConfig.HitStopMaxSeconds + Dt);
 
         // Hits landing back to back, one per swing like a held jab: every swing holds once, bounded,
         // and the holds never chain into one longer freeze.
@@ -105,7 +105,7 @@ public sealed class HitStopTests : IDisposable
             stop.Reset();
             var result = PlaySwing(stop, SwingRate, SwingImpact, requestAtStart: 100f, requestEveryFrame: 100f);
             Assert.True(result.Held > 0f);
-            Assert.True(result.Held <= WorldGenerationConfig.HitStopMaxSeconds + Dt);
+            Assert.True(result.Held <= PlayerConfig.HitStopMaxSeconds + Dt);
         }
     }
 
@@ -118,7 +118,7 @@ public sealed class HitStopTests : IDisposable
             var seconds = SwingHitStop.SecondsFor(weight);
             Assert.True(seconds > 0f);
             Assert.True(seconds >= previous);
-            Assert.True(seconds <= WorldGenerationConfig.HitStopMaxSeconds);
+            Assert.True(seconds <= PlayerConfig.HitStopMaxSeconds);
             previous = seconds;
         }
     }
@@ -150,7 +150,7 @@ public sealed class HitStopTests : IDisposable
             frames++;
             if (hitAtImpact && !landed && model.SliceProgress >= PlayerModel.SliceImpactProgress)
             {
-                model.HitStop(WorldGenerationConfig.HitStopSeconds);
+                model.HitStop(PlayerConfig.HitStopSeconds);
                 landed = true;
             }
             held |= model.IsHitStopped;
@@ -163,7 +163,7 @@ public sealed class HitStopTests : IDisposable
     {
         // A request with no swing in progress is dropped: it never freezes the next swing.
         var model = new PlayerModel();
-        model.HitStop(WorldGenerationConfig.HitStopSeconds);
+        model.HitStop(PlayerConfig.HitStopSeconds);
         model.Punch();
         var previous = model.MineT;
         while (model.MineT < 1f)
@@ -185,7 +185,7 @@ public sealed class HitStopTests : IDisposable
         var hitPunch = new PlayerModel();
         plainPunch.Punch();
         hitPunch.Punch();
-        hitPunch.HitStop(WorldGenerationConfig.HitStopSeconds);
+        hitPunch.HitStop(PlayerConfig.HitStopSeconds);
         var plain = PlayPunch(plainPunch);
         var hit = PlayPunch(hitPunch);
         Assert.False(plain.Held);

@@ -117,7 +117,7 @@ public sealed class EntityPreviewStateTests
 
         var walkFrames = (int)(2f / Dt);
         Assert.True(state.SetMode(EntityAnimator.WalkClip));
-        var idleOnly = new EntityAnimator(clips, WorldGenerationConfig.GoblinWalkSpeed);
+        var idleOnly = new EntityAnimator(clips, MobConfig.GoblinWalkSpeed);
         for (var i = 0; i < walkFrames; i++)
         {
             state.Update(Dt);
@@ -133,7 +133,7 @@ public sealed class EntityPreviewStateTests
         Assert.True(state.SetMode(EntityAnimator.IdleClip));
         for (var i = 0; i < idleFrames; i++) state.Update(Dt);
 
-        var reference = new EntityAnimator(clips, WorldGenerationConfig.GoblinWalkSpeed);
+        var reference = new EntityAnimator(clips, MobConfig.GoblinWalkSpeed);
         for (var i = 0; i < walkFrames + idleFrames; i++) reference.Update(Dt, 0f);
 
         foreach (var bone in global::VoxelEngine.Entities.Goblins.Goblin.RequiredParts)

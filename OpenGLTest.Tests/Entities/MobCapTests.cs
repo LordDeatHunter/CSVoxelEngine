@@ -40,7 +40,7 @@ public sealed class MobCapTests
     {
         var drops = new DropManager();
         for (var i = 0; i < intervals && slimes.Slimes.Count == 0; i++)
-            slimes.Update(WorldGenerationConfig.SlimeSpawnIntervalSeconds + 0.01f, surface, drops, camera);
+            slimes.Update(MobConfig.SlimeSpawnIntervalSeconds + 0.01f, surface, drops, camera);
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public sealed class MobCapTests
     {
         var (caps, slimes, goblins) = SharedManagers();
         // Goblins alone fill the natural cap, so the slimes' ring finds no room either
-        for (var i = 0; i < WorldGenerationConfig.MobNaturalCap; i++)
+        for (var i = 0; i < MobConfig.MobNaturalCap; i++)
             Assert.NotNull(goblins.Spawn(GoblinBody, ammo: 0));
 
         Assert.False(caps.AllowsNaturalSpawn);
@@ -60,12 +60,12 @@ public sealed class MobCapTests
     public void ADyingMobFreesItsPlaceUnderTheNaturalCap()
     {
         var (caps, slimes, goblins) = SharedManagers();
-        for (var i = 0; i < WorldGenerationConfig.MobNaturalCap; i++)
+        for (var i = 0; i < MobConfig.MobNaturalCap; i++)
             goblins.Spawn(GoblinBody, ammo: 0);
 
         // Still in the goblin list (it is drawn until its death has played) but no longer counted
         goblins.Goblins[0].BeginDying();
-        Assert.Equal(WorldGenerationConfig.MobNaturalCap, goblins.Goblins.Count);
+        Assert.Equal(MobConfig.MobNaturalCap, goblins.Goblins.Count);
         Assert.True(caps.AllowsNaturalSpawn);
 
         RunSlimeRing(slimes, MobTestWorld.Surface(), HighCamera());
@@ -77,28 +77,28 @@ public sealed class MobCapTests
     public void AForcedSpawnPassesTheNaturalCapButNoKindPassesTheHardCap()
     {
         var (caps, slimes, goblins) = SharedManagers();
-        for (var i = 0; i < WorldGenerationConfig.MobNaturalCap; i++)
+        for (var i = 0; i < MobConfig.MobNaturalCap; i++)
             slimes.Spawn(SlimeBody);
 
         Assert.NotNull(goblins.Spawn(GoblinBody, ammo: 0));
-        Assert.True(caps.Living > WorldGenerationConfig.MobNaturalCap);
+        Assert.True(caps.Living > MobConfig.MobNaturalCap);
 
         // Fill the rest with both kinds in turn
-        for (var i = 0; i < 2 * WorldGenerationConfig.MobHardCap && caps.ForcedRoom > 0; i++)
+        for (var i = 0; i < 2 * MobConfig.MobHardCap && caps.ForcedRoom > 0; i++)
         {
             if (i % 2 == 0) slimes.Spawn(SlimeBody);
             else goblins.Spawn(GoblinBody, ammo: 0);
         }
 
-        Assert.Equal(WorldGenerationConfig.MobHardCap, slimes.LivingCount + goblins.LivingCount);
+        Assert.Equal(MobConfig.MobHardCap, slimes.LivingCount + goblins.LivingCount);
         Assert.Null(slimes.Spawn(SlimeBody));
         Assert.Null(goblins.Spawn(GoblinBody, ammo: 0));
-        Assert.Equal(WorldGenerationConfig.MobHardCap, caps.Living);
+        Assert.Equal(MobConfig.MobHardCap, caps.Living);
 
         // One death frees exactly one place, for whichever kind takes it
         slimes.Slimes[0].BeginDying();
         Assert.NotNull(goblins.Spawn(GoblinBody, ammo: 0));
         Assert.Null(slimes.Spawn(SlimeBody));
-        Assert.Equal(WorldGenerationConfig.MobHardCap, caps.Living);
+        Assert.Equal(MobConfig.MobHardCap, caps.Living);
     }
 }

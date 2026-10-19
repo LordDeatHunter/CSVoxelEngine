@@ -9,8 +9,8 @@ namespace VoxelEngine.Particles;
 /// <see cref="Step"/> reports a splash when the body enters or leaves water, with the entry's
 /// downward or the exit's upward speed; <see cref="WaterSplash"/> turns that into droplets. The first
 /// call only seeds (a body that appears in water does not splash), a step farther than
-/// <see cref="WorldGenerationConfig.WaterSplashTeleportBlocks"/> is a teleport and splashes nothing,
-/// and a body that sat still for <see cref="WorldGenerationConfig.WaterSplashStaleSeconds"/> counts as
+/// <see cref="JuiceConfig.WaterSplashTeleportBlocks"/> is a teleport and splashes nothing,
+/// and a body that sat still for <see cref="JuiceConfig.WaterSplashStaleSeconds"/> counts as
 /// still, so water rising over a resting drop raises no splash. Main thread only.
 /// </summary>
 public sealed class WaterSplashTracker
@@ -44,7 +44,7 @@ public sealed class WaterSplashTracker
         var dy = y - _lastY;
         if (MathF.Abs(dy) > 1e-5f)
         {
-            teleported = MathF.Abs(dy) > WorldGenerationConfig.WaterSplashTeleportBlocks;
+            teleported = MathF.Abs(dy) > JuiceConfig.WaterSplashTeleportBlocks;
             _speed = teleported ? 0f : dy / MathF.Max(_sinceMove, 1e-3f);
             _lastY = y;
             _sinceMove = 0f;
@@ -54,7 +54,7 @@ public sealed class WaterSplashTracker
         _wasInWater = inWater;
         if (!crossed || teleported) return false;
 
-        var current = _sinceMove > WorldGenerationConfig.WaterSplashStaleSeconds ? 0f : _speed;
+        var current = _sinceMove > JuiceConfig.WaterSplashStaleSeconds ? 0f : _speed;
         speed = inWater ? MathF.Max(0f, -current) : MathF.Max(0f, current);
         return speed > 0f;
     }

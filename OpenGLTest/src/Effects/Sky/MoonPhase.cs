@@ -10,7 +10,7 @@ namespace VoxelEngine.Effects.Sky;
 /// so one image covers every phase. The phase steps once a day, at noon, while the moon is below the
 /// horizon, so it never changes in view: day <see cref="DayIndex"/> 0 (the first night of a new world)
 /// is full, and the moon wanes, goes new and waxes back to full over
-/// <see cref="WorldGenerationConfig.MoonCycleDays"/> days.
+/// <see cref="SkyConfig.MoonCycleDays"/> days.
 /// </summary>
 public static class MoonPhase
 {
@@ -20,16 +20,16 @@ public static class MoonPhase
     /// <summary>Which day the lighting <paramref name="time"/> belongs to, counted in whole days from
     /// the first noon (the day changes at noon, so a night is one day from dusk to dawn).</summary>
     public static long DayIndex(double time) =>
-        (long)Math.Floor((time - DayCycle.NoonTime) / WorldGenerationConfig.DayLengthSeconds);
+        (long)Math.Floor((time - DayCycle.NoonTime) / SkyConfig.DayLengthSeconds);
 
     /// <summary>
     /// The phase on lighting <paramref name="time"/>, 0..1: 0 new, 0.25 first quarter (waxing, the
-    /// right half lit), 0.5 full, 0.75 last quarter. Advances by 1 / <see cref="WorldGenerationConfig.MoonCycleDays"/>
+    /// right half lit), 0.5 full, 0.75 last quarter. Advances by 1 / <see cref="SkyConfig.MoonCycleDays"/>
     /// each day and repeats every cycle.
     /// </summary>
     public static float Fraction(double time)
     {
-        var cycle = WorldGenerationConfig.MoonCycleDays;
+        var cycle = SkyConfig.MoonCycleDays;
         var day = DayIndex(time) % cycle;
         if (day < 0) day += cycle;
         var f = FirstNightPhase + day / (float)cycle;
@@ -57,13 +57,13 @@ public static class MoonPhase
     /// <summary>
     /// Whether the disc point with sphere normal <paramref name="normal"/> (z toward the viewer) is
     /// lit at phase <paramref name="fraction"/>, softened over
-    /// <see cref="WorldGenerationConfig.MoonTerminatorSoftness"/> across the terminator: 0 dark .. 1 lit.
+    /// <see cref="SkyConfig.MoonTerminatorSoftness"/> across the terminator: 0 dark .. 1 lit.
     /// Twin of the terminator in moon-fragment.glsl.
     /// </summary>
     public static float Lit(Vector3 normal, float fraction)
     {
         var l = LightDirection(fraction);
-        var soft = WorldGenerationConfig.MoonTerminatorSoftness;
+        var soft = SkyConfig.MoonTerminatorSoftness;
         return MathUtils.SmoothStep(-soft, soft, normal.X * l.X + normal.Z * l.Y);
     }
 

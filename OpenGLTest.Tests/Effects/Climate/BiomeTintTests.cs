@@ -47,12 +47,12 @@ public sealed class BiomeTintTests
     {
         Vector3[] corners =
         [
-            WorldGenerationConfig.GrassColorColdDry, WorldGenerationConfig.GrassColorColdWet,
-            WorldGenerationConfig.GrassColorWarmDry, WorldGenerationConfig.GrassColorWarmWet,
-            WorldGenerationConfig.FoliageColorColdDry, WorldGenerationConfig.FoliageColorColdWet,
-            WorldGenerationConfig.FoliageColorWarmDry, WorldGenerationConfig.FoliageColorWarmWet,
+            SurfaceShadingConfig.GrassColorColdDry, SurfaceShadingConfig.GrassColorColdWet,
+            SurfaceShadingConfig.GrassColorWarmDry, SurfaceShadingConfig.GrassColorWarmWet,
+            SurfaceShadingConfig.FoliageColorColdDry, SurfaceShadingConfig.FoliageColorColdWet,
+            SurfaceShadingConfig.FoliageColorWarmDry, SurfaceShadingConfig.FoliageColorWarmWet,
         ];
-        var ceiling = ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGray) * BiomeTint.Gain;
+        var ceiling = ColorSpace.SrgbToLinear(SurfaceShadingConfig.BiomeTintTextureGray) * BiomeTint.Gain;
         foreach (var corner in corners)
         {
             var needed = ColorSpace.SrgbToLinear(corner) / ceiling;

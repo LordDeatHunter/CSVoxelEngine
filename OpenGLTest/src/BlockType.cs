@@ -182,7 +182,7 @@ public sealed record BlockType
     public bool FootstepDust { get; init; }
 
     /// <summary>Whether the block springs a landing body back up (a slime block); see
-    /// <see cref="WorldGenerationConfig.SlimeBlockBounceRestitution"/>. Read through
+    /// <see cref="PlayerConfig.SlimeBlockBounceRestitution"/>. Read through
     /// <see cref="BouncesAt"/>.</summary>
     public bool Bounces { get; init; }
 

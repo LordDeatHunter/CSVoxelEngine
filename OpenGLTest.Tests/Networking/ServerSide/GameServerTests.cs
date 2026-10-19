@@ -695,7 +695,7 @@ public sealed class GameServerTests : IDisposable
         using var client = Connect("Tester");
         while (client.Inbound.TryDequeue(out _)) { }
 
-        var distinct = WorldGenerationConfig.NetLodBuildsPerPump + 2;
+        var distinct = NetworkConfig.NetLodBuildsPerPump + 2;
         void Request(int rx)
         {
             using var writer = new PacketWriter(NetMessage.LodRegionRequest);
@@ -729,7 +729,7 @@ public sealed class GameServerTests : IDisposable
         _server.Pump(0.01);
         Thread.Sleep(200);
         Drain();
-        Assert.True(received.Count <= WorldGenerationConfig.NetLodBuildsPerPump,
+        Assert.True(received.Count <= NetworkConfig.NetLodBuildsPerPump,
             $"{received.Count} regions built in one Pump");
 
         var sw = Stopwatch.StartNew();
@@ -776,7 +776,7 @@ public sealed class GameServerTests : IDisposable
         var arena = PrepareArena(client.Server!.Value.Spawn);
         SetCell(arena.Front, Dirt);
         var required = BareHandSeconds(Dirt);
-        Assert.True(required > WorldGenerationConfig.NetBreakSlackSeconds, "dirt must take several hits");
+        Assert.True(required > NetworkConfig.NetBreakSlackSeconds, "dirt must take several hits");
 
         // Start and completion together: far fewer hits than the hardness needs
         SendWorld(client, WorldIntent.BreakStart(arena.Eye, arena.AimAtFront, arena.Front));
@@ -1067,7 +1067,7 @@ public sealed class GameServerTests : IDisposable
         SetCell(arena.Front, Dirt);
 
         // The same break, claimed from an eye far from the player's authoritative position
-        var far = arena.Eye + new Vector3(0f, WorldGenerationConfig.NetMaxIntentEyeDriftBlocks * 3f, 0f);
+        var far = arena.Eye + new Vector3(0f, NetworkConfig.NetMaxIntentEyeDriftBlocks * 3f, 0f);
         var seq = SendWorld(client, WorldIntent.BreakComplete(far, Vector3.Normalize(arena.Front + new Vector3(0.5f) - far),
             arena.Front));
         Assert.False(AwaitResult(client, seq));
@@ -1144,8 +1144,8 @@ public sealed class GameServerTests : IDisposable
 
         // A respawn from an eye that drifted past the intent eye rule (the corpse kept falling on the
         // client) is still accepted, and brings the player back home at full health
-        var drifted = corpse - new Vector3(0f, WorldGenerationConfig.NetMaxIntentEyeDriftBlocks + 5f, 0f);
-        Assert.False(NetValidation.EyeWithin(corpse, drifted, WorldGenerationConfig.NetMaxIntentEyeDriftBlocks));
+        var drifted = corpse - new Vector3(0f, NetworkConfig.NetMaxIntentEyeDriftBlocks + 5f, 0f);
+        Assert.False(NetValidation.EyeWithin(corpse, drifted, NetworkConfig.NetMaxIntentEyeDriftBlocks));
         var respawn = SendWorld(client, WorldIntent.Respawn(drifted, -Vector3.UnitY));
         Assert.True(AwaitResult(client, respawn));
         Assert.Contains(inbox.PlayerCorrections, c => c.Eye == home);
@@ -1220,18 +1220,18 @@ public sealed class GameServerTests : IDisposable
 
         // Back and forth along the cleared row at walking pace (a state every 50 ms) for 2 s,
         // never leaving the cleared cells
-        var stride = PlayerPhysics.BaseSpeed * (float)WorldGenerationConfig.NetPlayerStateSeconds;
+        var stride = PlayerPhysics.BaseSpeed * (float)NetworkConfig.NetPlayerStateSeconds;
         var offset = 0f;
         var direction = 1f;
         var last = arena.Eye;
-        for (var t = 0.0; t < 2.0; t += WorldGenerationConfig.NetPlayerStateSeconds)
+        for (var t = 0.0; t < 2.0; t += NetworkConfig.NetPlayerStateSeconds)
         {
             if (MathF.Abs(offset + direction * stride) > 2f)
                 direction = -direction;
             offset += direction * stride;
             last = arena.Eye + new Vector3(offset, 0f, 0f);
             SendState(client, last, NetPlayerFlags.None);
-            Tick(WorldGenerationConfig.NetPlayerStateSeconds);
+            Tick(NetworkConfig.NetPlayerStateSeconds);
         }
 
         var sw = Stopwatch.StartNew();

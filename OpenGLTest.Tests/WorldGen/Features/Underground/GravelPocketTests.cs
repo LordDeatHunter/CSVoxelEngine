@@ -52,7 +52,7 @@ public sealed class GravelPocketTests
                 if (!loose) continue;
                 pockets++;
                 // Only stone inside a pocket, never within the burial band
-                Assert.True(y <= surfaceHeight - WorldGenerationConfig.GravelPocketMinBurial,
+                Assert.True(y <= surfaceHeight - WorldFeatureConfig.GravelPocketMinBurial,
                     $"a pocket reached ({x}, {y}, {z}), too close to the surface");
                 Assert.True(GravelPocketGenerator.HasPocket(x, y, z, surfaceHeight),
                     $"loose rock at ({x}, {y}, {z}) is outside every pocket");

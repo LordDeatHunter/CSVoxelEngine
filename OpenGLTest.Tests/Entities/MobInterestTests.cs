@@ -51,9 +51,9 @@ public sealed class MobInterestTests
         IMobTarget[] targets = [new Target(new Vector3(12.5f, 1f + Camera.EyeHeight, 8.5f))];
 
         var t = 0f;
-        for (; t < WorldGenerationConfig.MobLoseInterestSeconds - 0.25f; t += Dt)
+        for (; t < MobConfig.MobLoseInterestSeconds - 0.25f; t += Dt)
             Assert.Equal(0, slime.PickTarget(targets, Dt, chunks));
-        for (; t < WorldGenerationConfig.MobLoseInterestSeconds + 0.5f; t += Dt)
+        for (; t < MobConfig.MobLoseInterestSeconds + 0.5f; t += Dt)
             slime.PickTarget(targets, Dt, chunks);
         Assert.Equal(-1, slime.PickTarget(targets, Dt, chunks));
         Assert.True(slime.Interest.IsLost);
@@ -64,7 +64,7 @@ public sealed class MobInterestTests
         for (var z = 0; z < Chunk.Size; z++)
             chunk.SetBlockRaw(8, y, z, 0, 0);
         var chased = -1;
-        for (var s = 0f; s < WorldGenerationConfig.MobSightCheckSeconds + 0.1f && chased < 0; s += Dt)
+        for (var s = 0f; s < MobConfig.MobSightCheckSeconds + 0.1f && chased < 0; s += Dt)
             chased = slime.PickTarget(targets, Dt, chunks);
         Assert.Equal(0, chased);
     }
@@ -75,7 +75,7 @@ public sealed class MobInterestTests
         var chunks = MobTestWorld.Floor(Stone);
         var slime = SlimeAt(4.5f, 8.5f);
         IMobTarget[] targets = [new Target(new Vector3(12.5f, 1f + Camera.EyeHeight, 8.5f))];
-        for (var t = 0f; t < WorldGenerationConfig.MobLoseInterestSeconds * 2f; t += Dt)
+        for (var t = 0f; t < MobConfig.MobLoseInterestSeconds * 2f; t += Dt)
             Assert.Equal(0, slime.PickTarget(targets, Dt, chunks));
         Assert.Equal(0f, slime.Interest.IdleSeconds);
     }
@@ -87,7 +87,7 @@ public sealed class MobInterestTests
         var slime = SlimeAt(4.5f, 8.5f);
         IMobTarget[] first = [new Target(new Vector3(12.5f, 1f + Camera.EyeHeight, 8.5f))];
         IMobTarget[] second = [new Target(new Vector3(12.5f, 1f + Camera.EyeHeight, 6.5f))];
-        var lose = WorldGenerationConfig.MobLoseInterestSeconds;
+        var lose = MobConfig.MobLoseInterestSeconds;
 
         for (var t = 0f; t < lose * 0.75f; t += Dt)
             slime.PickTarget(first, Dt, chunks);
@@ -99,10 +99,10 @@ public sealed class MobInterestTests
     [Fact]
     public void OnlyALongIdleFarFromEveryTargetDespawns()
     {
-        var far = WorldGenerationConfig.MobIdleDespawnMinDistanceBlocks + 1f;
-        var near = WorldGenerationConfig.MobIdleDespawnMinDistanceBlocks - 1f;
-        var long_ = WorldGenerationConfig.MobIdleDespawnSeconds + 0.1f;
-        var short_ = WorldGenerationConfig.MobIdleDespawnSeconds - 0.1f;
+        var far = MobConfig.MobIdleDespawnMinDistanceBlocks + 1f;
+        var near = MobConfig.MobIdleDespawnMinDistanceBlocks - 1f;
+        var long_ = MobConfig.MobIdleDespawnSeconds + 0.1f;
+        var short_ = MobConfig.MobIdleDespawnSeconds - 0.1f;
         Assert.True(MobInterest.ShouldIdleDespawn(long_, far * far));
         Assert.False(MobInterest.ShouldIdleDespawn(short_, far * far));
         Assert.False(MobInterest.ShouldIdleDespawn(long_, near * near));
@@ -117,8 +117,8 @@ public sealed class MobInterestTests
         {
             var goal = MobInterest.WanderPoint(origin, a, r);
             var d = MathF.Sqrt((goal.X - origin.X) * (goal.X - origin.X) + (goal.Z - origin.Z) * (goal.Z - origin.Z));
-            Assert.InRange(d, WorldGenerationConfig.MobWanderMinRadiusBlocks - 1e-3f,
-                WorldGenerationConfig.MobWanderMaxRadiusBlocks + 1e-3f);
+            Assert.InRange(d, MobConfig.MobWanderMinRadiusBlocks - 1e-3f,
+                MobConfig.MobWanderMaxRadiusBlocks + 1e-3f);
         }
     }
 
@@ -146,7 +146,7 @@ public sealed class MobInterestTests
         var farSlime = manager.Spawn(new Vector3(2.5f, 1.02f + Slime.HalfExtent, 2.5f))!;
         var nearSlime = manager.Spawn(new Vector3(8.5f, 1.02f + Slime.HalfExtent, 2.5f))!;
 
-        var total = WorldGenerationConfig.MobLoseInterestSeconds + WorldGenerationConfig.MobIdleDespawnSeconds + 1f;
+        var total = MobConfig.MobLoseInterestSeconds + MobConfig.MobIdleDespawnSeconds + 1f;
         for (var t = 0f; t < total && !farSlime.IsDying; t += Dt)
             manager.Update(Dt, chunks, drops, [target]);
 
@@ -159,7 +159,7 @@ public sealed class MobInterestTests
     public void AMobChasingNobodyWandersButStandsStillWithNobodyInPlay()
     {
         var chunks = MobTestWorld.Floor(Stone);
-        var unnoticed = new Target(new Vector3(8.5f + WorldGenerationConfig.MobNoticeRadiusBlocks + 8f,
+        var unnoticed = new Target(new Vector3(8.5f + MobConfig.MobNoticeRadiusBlocks + 8f,
             1f + Camera.EyeHeight, 8.5f));
 
         var wanderer = new GoblinManager(EntityRegistry.Require("goblin"));

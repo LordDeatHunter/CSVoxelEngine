@@ -13,7 +13,7 @@ namespace VoxelEngine.Particles;
 /// </summary>
 public class LeafParticleSystem
 {
-    private readonly ParticleRing<LeafParticle> _particles = new(WorldGenerationConfig.LeafParticleMax);
+    private readonly ParticleRing<LeafParticle> _particles = new(ParticleConfig.LeafParticleMax);
     private float _spawnDebt;
     private byte _leavesId;
     private bool _leavesResolved;
@@ -86,7 +86,7 @@ public class LeafParticleSystem
         if (windTime.HasValue)
         {
             wind = Wind.Direction(t);
-            gustOffset = Wind.Offset(t, WorldGenerationConfig.WindGustSpeed);
+            gustOffset = Wind.Offset(t, SkyConfig.WindGustSpeed);
         }
 
         for (var i = _particles.Count - 1; i >= 0; i--)
@@ -104,16 +104,16 @@ public class LeafParticleSystem
     {
         if (!TryLeavesId(out var leavesId)) return;
 
-        _spawnDebt += deltaTime * WorldGenerationConfig.LeafParticleSpawnPerSecond;
-        var radius = WorldGenerationConfig.LeafParticleSpawnRadius;
-        var tries = WorldGenerationConfig.LeafParticleSpawnTries;
+        _spawnDebt += deltaTime * ParticleConfig.LeafParticleSpawnPerSecond;
+        var radius = ParticleConfig.LeafParticleSpawnRadius;
+        var tries = ParticleConfig.LeafParticleSpawnTries;
         var top = (int)MathF.Floor(cameraPos.Y + radius * 0.5f);
         const int scanDepth = 32;
 
         while (_spawnDebt >= 1f)
         {
             _spawnDebt -= 1f;
-            if (_particles.Count >= WorldGenerationConfig.LeafParticleMax)
+            if (_particles.Count >= ParticleConfig.LeafParticleMax)
             {
                 _spawnDebt = MathF.Min(_spawnDebt, 1f);
                 continue;
@@ -146,7 +146,7 @@ public class LeafParticleSystem
 
     private void Spawn(Vector3 position, Vector3? toss, Random rng)
     {
-        if (_particles.Count >= WorldGenerationConfig.LeafParticleMax)
+        if (_particles.Count >= ParticleConfig.LeafParticleMax)
             _particles.RemoveAt(0);
         _particles.Add(new LeafParticle(position, toss, random: rng));
     }

@@ -23,8 +23,8 @@ public sealed class BubbleParticle
         {
             var fadeIn = MathUtils.Clamp01(_age / FadeInSeconds);
             var fadeOut = 1f - MathUtils.Clamp01(
-                (_age - (_lifetime - WorldGenerationConfig.BubbleFadeSeconds))
-                / WorldGenerationConfig.BubbleFadeSeconds);
+                (_age - (_lifetime - ParticleConfig.BubbleFadeSeconds))
+                / ParticleConfig.BubbleFadeSeconds);
             return MathF.Min(fadeIn, fadeOut);
         }
     }
@@ -43,12 +43,12 @@ public sealed class BubbleParticle
     {
         var rng = random ?? Random.Shared;
         Position = position;
-        Size = WorldGenerationConfig.BubbleSize * (0.7f + 0.6f * rng.NextSingle());
-        _lifetime = WorldGenerationConfig.BubbleLifetime * (0.7f + 0.6f * rng.NextSingle());
-        _grow = WorldGenerationConfig.BubbleGrow;
+        Size = ParticleConfig.BubbleSize * (0.7f + 0.6f * rng.NextSingle());
+        _lifetime = ParticleConfig.BubbleLifetime * (0.7f + 0.6f * rng.NextSingle());
+        _grow = ParticleConfig.BubbleGrow;
         _velocity = new Vector3(
             (rng.NextSingle() * 2f - 1f) * 0.2f,
-            WorldGenerationConfig.BubbleRise * (0.8f + 0.4f * rng.NextSingle()),
+            ParticleConfig.BubbleRise * (0.8f + 0.4f * rng.NextSingle()),
             (rng.NextSingle() * 2f - 1f) * 0.2f);
         _wobblePhase = rng.NextSingle() * MathF.Tau;
         _wobbleFreq = 2f + rng.NextSingle() * 2f;
@@ -73,8 +73,8 @@ public sealed class BubbleParticle
         }
 
         _velocity.Y = MathUtils.Damp(_velocity.Y,
-            WorldGenerationConfig.BubbleRise,
-            WorldGenerationConfig.BubbleDrag, deltaTime);
+            ParticleConfig.BubbleRise,
+            ParticleConfig.BubbleDrag, deltaTime);
 
         Position += _velocity * deltaTime;
         Position += new Vector3(

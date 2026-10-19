@@ -25,7 +25,7 @@ Each row is a test that fails on harmless tuning and proves nothing.
 | `Assert.Equal(1, inventory holds one converter)` / starting-stock or seed counts | pins a data choice | assert the rule that produces it (e.g. "a new survival world starts with `Inventory.Empty`") only if that IS the rule |
 | exact ml / damage / cooldown figures from content | retuning breaks it | conservation: a cast melts back into exactly what it took (`MetalworksRecipeTests`); damage ordering; "result > 0 and <= cap" |
 | layout pixel numbers (button x/y, panel widths) | pins layout | assert hit-testing: every button's center `HitAt`s that button, rows do not overlap, scroll clamps |
-| a config constant (`WorldGenerationConfig.X == 16`) | tautology | assert the invariant the constant must satisfy (the LOD nesting invariants, `HotAirKeepsAFullLoadRadiusFromSnow`, goblin throw band inside `v^2/g`) |
+| a config constant (`StreamingConfig.ChunkRadius == 16`) | tautology | assert the invariant the constant must satisfy (the LOD nesting invariants, `HotAirKeepsAFullLoadRadiusFromSnow`, goblin throw band inside `v^2/g`) |
 | "does not throw" with no assertion on the result | proves nothing | assert the output |
 
 Rewrite rule of thumb: ask "what bug would make this fail?" If the answer is "someone retuned a value", delete it.

@@ -27,7 +27,7 @@ public sealed class OreTwinkleTests
 
         // Occasional: the flash lights at most its window of the cycle, a small share of it
         var share = lit / (float)samples;
-        Assert.True(share <= 2f * WorldGenerationConfig.OreTwinkleWidth + 1e-3f, $"lit for {share} of a cycle");
+        Assert.True(share <= 2f * SurfaceShadingConfig.OreTwinkleWidth + 1e-3f, $"lit for {share} of a cycle");
         Assert.True(share < 0.25f, $"a twinkle lit for {share} of its cycle is not occasional");
     }
 
@@ -37,8 +37,8 @@ public sealed class OreTwinkleTests
         foreach (var rateHash in new[] { 0f, 0.37f, 1f })
         foreach (var phaseHash in new[] { 0f, 0.5f, 0.91f })
         {
-            var rate = WorldGenerationConfig.OreTwinkleRateMin
-                       + (WorldGenerationConfig.OreTwinkleRateMax - WorldGenerationConfig.OreTwinkleRateMin) * rateHash;
+            var rate = SurfaceShadingConfig.OreTwinkleRateMin
+                       + (SurfaceShadingConfig.OreTwinkleRateMax - SurfaceShadingConfig.OreTwinkleRateMin) * rateHash;
             var period = 1f / rate;
             // Count rising edges over ten periods: one flash per cycle
             var flashes = 0;
@@ -62,14 +62,14 @@ public sealed class OreTwinkleTests
         Assert.Equal(0f, OreTwinkle.Gate(1f, 0.5f, 0.6f, DaySun, 2f));
         Assert.Equal(0f, OreTwinkle.Gate(1f, 1f, 0f, DaySun, 2f));
         Assert.Equal(0f, OreTwinkle.Gate(1f, 1f, 0.6f, 0f, 2f));
-        Assert.Equal(0f, OreTwinkle.Gate(1f, 1f, 0.6f, DaySun, WorldGenerationConfig.OreTwinkleFadeFarBlocks));
+        Assert.Equal(0f, OreTwinkle.Gate(1f, 1f, 0.6f, DaySun, SurfaceShadingConfig.OreTwinkleFadeFarBlocks));
     }
 
     [Fact]
     public void TheTwinkleFadesWithDistance()
     {
         var previous = OreTwinkle.Gate(1f, 1f, 0.6f, DaySun, 0f);
-        for (var d = 0f; d <= WorldGenerationConfig.OreTwinkleFadeFarBlocks * 1.5f; d += 0.25f)
+        for (var d = 0f; d <= SurfaceShadingConfig.OreTwinkleFadeFarBlocks * 1.5f; d += 0.25f)
         {
             var g = OreTwinkle.Gate(1f, 1f, 0.6f, DaySun, d);
             Assert.True(g <= previous, $"twinkle gate rose from {previous} to {g} at {d} blocks");

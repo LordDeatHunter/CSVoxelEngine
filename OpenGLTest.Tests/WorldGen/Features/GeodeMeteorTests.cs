@@ -96,7 +96,7 @@ public sealed class GeodeMeteorTests
         // The center is cut deepest and floored with obsidian; the rim is barely touched
         var lx = centerX - worldX0;
         var lz = centerZ - worldZ0;
-        var depth = (int)(radius * WorldGenerationConfig.MeteorBowlSlope);
+        var depth = (int)(radius * WorldFeatureConfig.MeteorBowlSlope);
         Assert.Equal(MeteorGenerator.ObsidianBlock, blocks[Chunk.Idx(lx, 4 - depth + 1, lz)]);
         Assert.Equal(BlockType.Air, blocks[Chunk.Idx(lx, 4, lz)]);
         Assert.Equal(stone, blocks[Chunk.Idx(lx + radius + 1, 4, lz)]);

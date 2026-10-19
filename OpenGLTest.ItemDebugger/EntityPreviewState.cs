@@ -148,7 +148,7 @@ public sealed class EntityPreviewState : IPreviewDriver
         }
         else if (Selected != null)
         {
-            Animator = new EntityAnimator(Selected.Model.Animations, WorldGenerationConfig.GoblinWalkSpeed);
+            Animator = new EntityAnimator(Selected.Model.Animations, MobConfig.GoblinWalkSpeed);
         }
         ResetTimers();
     }
@@ -205,7 +205,7 @@ public sealed class EntityPreviewState : IPreviewDriver
             _goblin = NewGoblin();
         else if (string.Equals(type.Name, "slime", StringComparison.OrdinalIgnoreCase))
             _slime = NewSlime();
-        Animator = _goblin?.Animation ?? new EntityAnimator(clips, WorldGenerationConfig.GoblinWalkSpeed);
+        Animator = _goblin?.Animation ?? new EntityAnimator(clips, MobConfig.GoblinWalkSpeed);
 
         if (_slime != null)
         {
@@ -469,5 +469,5 @@ public sealed class EntityPreviewState : IPreviewDriver
     }
 
     private static EntityAnimator EmptyAnimator() =>
-        new(Array.Empty<AnimationClip>(), WorldGenerationConfig.GoblinWalkSpeed);
+        new(Array.Empty<AnimationClip>(), MobConfig.GoblinWalkSpeed);
 }

@@ -59,7 +59,7 @@ public sealed class DamageNumberRenderer : IDisposable
         _shader.Use();
         _shader.SetUniform("uSprite", 0);
 
-        var capacity = WorldGenerationConfig.DamageNumberCapacity;
+        var capacity = MobConfig.DamageNumberCapacity;
         _maxQuads = capacity * MaxGlyphs * 2;
         _verts = new Vertex[_maxQuads * 4];
         _depths = new float[capacity];
@@ -143,7 +143,7 @@ public sealed class DamageNumberRenderer : IDisposable
 
         var size = _font.MeasureSize(text.AsSpan(), 1f);
         // Blocks per baked font pixel for this number right now
-        var k = WorldGenerationConfig.DamageNumberCapHeightBlocks * DamageNumberPool.ScaleOf(number) / _digitHeightPx;
+        var k = MobConfig.DamageNumberCapHeightBlocks * DamageNumberPool.ScaleOf(number) / _digitHeightPx;
         var anchor = DamageNumberPool.PositionOf(number);
         var alpha = DamageNumberPool.AlphaOf(number);
         var shadow = new Rgba(0, 0, 0, (byte)(MathUtils.Clamp01(alpha * ShadowAlpha) * 255f + 0.5f));

@@ -175,9 +175,9 @@ public sealed class ChunkSaveStore
                     static name => ContentRegistry.TryResolveBlock(name, out var id) ? id : null);
                 return true;
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException && attempt < WorldGenerationConfig.SaveMoveRetries)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException && attempt < SaveConfig.SaveMoveRetries)
             {
-                Thread.Sleep(WorldGenerationConfig.SaveMoveRetryDelayMs);
+                Thread.Sleep(SaveConfig.SaveMoveRetryDelayMs);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
             {
@@ -227,9 +227,9 @@ public sealed class ChunkSaveStore
                 stream.ReadExactly(bytes);
                 return bytes;
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException && attempt < WorldGenerationConfig.SaveMoveRetries)
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException && attempt < SaveConfig.SaveMoveRetries)
             {
-                Thread.Sleep(WorldGenerationConfig.SaveMoveRetryDelayMs);
+                Thread.Sleep(SaveConfig.SaveMoveRetryDelayMs);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
@@ -426,9 +426,9 @@ public sealed class ChunkSaveStore
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                if (attempt < WorldGenerationConfig.SaveMoveRetries)
+                if (attempt < SaveConfig.SaveMoveRetries)
                 {
-                    Thread.Sleep(WorldGenerationConfig.SaveMoveRetryDelayMs);
+                    Thread.Sleep(SaveConfig.SaveMoveRetryDelayMs);
                     continue;
                 }
 

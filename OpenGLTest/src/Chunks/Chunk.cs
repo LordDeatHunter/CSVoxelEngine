@@ -46,7 +46,7 @@ public class Chunk : IDisposable
     // border must still light this chunk's faces. The 3x3x3 neighbor chunks cover it
     // (LightBorder < Size). A padded-snapshot index (px,py,pz) maps to light index
     // (px+LightOffset, py+LightOffset, pz+LightOffset).
-    internal const int LightBorder = WorldGenerationConfig.LightPropagationRadius;
+    internal const int LightBorder = LightingConfig.LightPropagationRadius;
     internal const int LightSize = Size + LightBorder * 2;
     internal const int LightSq = LightSize * LightSize;
     internal const int LightCount = LightSize * LightSq;
@@ -517,55 +517,55 @@ public class Chunk : IDisposable
         WorldgenStats.AddTreeTicks(System.Diagnostics.Stopwatch.GetTimestamp() - treeStart);
 
         // Scenery on the floor, after the trees so it never displaces one and into air only
-        if (WorldGenerationConfig.FallenLogsEnabled)
+        if (WorldFeatureConfig.FallenLogsEnabled)
         {
             var state = _state;
             FallenLogGenerator.Stamp(_blocks, ref state, worldX0, lowerBoundY, worldZ0);
             _state = state;
         }
 
-        if (WorldGenerationConfig.BouldersEnabled)
+        if (WorldFeatureConfig.BouldersEnabled)
             BoulderGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
         // A landmark on a summit, after everything else so its stack owns the peak
-        if (WorldGenerationConfig.CairnsEnabled)
+        if (WorldFeatureConfig.CairnsEnabled)
             CairnGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
         // Ruins on the dry land, clipped at chunk borders
-        if (WorldGenerationConfig.RuinedPillarsEnabled)
+        if (WorldFeatureConfig.RuinedPillarsEnabled)
             RuinedPillarGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
-        if (WorldGenerationConfig.DesertWellsEnabled)
+        if (WorldFeatureConfig.DesertWellsEnabled)
             DesertWellGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
         // Deep rock features, after the carvers so a geode's heart is not carved again
-        if (WorldGenerationConfig.GeodesEnabled)
+        if (WorldFeatureConfig.GeodesEnabled)
             GeodeGenerator.Stamp(_blocks, worldX0, lowerBoundY, worldZ0);
 
-        if (WorldGenerationConfig.MeteorsEnabled)
+        if (WorldFeatureConfig.MeteorsEnabled)
             MeteorGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
         // Pond plants, after the water: reeds may replace the shallow cell they stand in, and a
         // lily pad floats on the cell above a lake's top water cell
-        if (WorldGenerationConfig.ReedsEnabled)
+        if (WorldFeatureConfig.ReedsEnabled)
             ReedGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
-        if (WorldGenerationConfig.LilyPadsEnabled)
+        if (WorldFeatureConfig.LilyPadsEnabled)
             LilyPadGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
         // Cave life, after the carvers and the water: only carved, dry air takes any
-        if (WorldGenerationConfig.GlowMushroomsEnabled)
+        if (WorldFeatureConfig.GlowMushroomsEnabled)
             GlowMushroomGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
-        if (WorldGenerationConfig.CaveFormationsEnabled)
+        if (WorldFeatureConfig.CaveFormationsEnabled)
             CaveFormationGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
         // Loose rock buried inside stone, after the carvers so a pocket never fills a cave
-        if (WorldGenerationConfig.GravelPocketsEnabled)
+        if (WorldFeatureConfig.GravelPocketsEnabled)
             GravelPocketGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
         // Underground water, after the lava so a pool never sits in a lava cell
-        if (WorldGenerationConfig.UndergroundPoolsEnabled)
+        if (WorldFeatureConfig.UndergroundPoolsEnabled)
             UndergroundPoolGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
         // Frozen-only ice spikes go down before the snow, so a spike keeps its base cell
@@ -577,18 +577,18 @@ public class Chunk : IDisposable
         if (WorldGenerationConfig.SnowAndIceEnabled)
             SnowGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
-        if (WorldGenerationConfig.PebblesEnabled)
+        if (WorldFeatureConfig.PebblesEnabled)
             PebbleGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
         // Before the flowers and foliage, so their per-column scatter fills in around a clump
         // instead of eating into it
-        if (WorldGenerationConfig.CottonEnabled)
+        if (WorldFeatureConfig.CottonEnabled)
             CottonGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
-        if (WorldGenerationConfig.FlowersEnabled)
+        if (WorldFeatureConfig.FlowersEnabled)
             FlowerGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
-        if (WorldGenerationConfig.FoliageEnabled)
+        if (WorldFeatureConfig.FoliageEnabled)
             FoliageGenerator.Stamp(_blocks, column, worldX0, lowerBoundY, worldZ0);
 
         // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping.
@@ -1101,7 +1101,7 @@ public class Chunk : IDisposable
     {
         var min = Position * Size;
         chunkManager.MarkAreaDirty(min, min + new Vector3(Size),
-            WorldGenerationConfig.LightPropagationRadius);
+            LightingConfig.LightPropagationRadius);
     }
 
     /// <summary>
@@ -1113,7 +1113,7 @@ public class Chunk : IDisposable
     private void MarkNeighborsDirty(Vector3 worldPos, ChunkManager chunkManager)
     {
         chunkManager.MarkAreaDirty(worldPos, worldPos + Vector3.One,
-            WorldGenerationConfig.LightPropagationRadius, skip: Position);
+            LightingConfig.LightPropagationRadius, skip: Position);
     }
 
     private static bool InBounds(int x, int y, int z)
@@ -1477,7 +1477,7 @@ public class Chunk : IDisposable
                     (vents ??= []).Add((ushort)Idx(x, y, z));
                 // A water top inside a hot spring steams (its site is the same pure hash the
                 // carve read, so the vents match the pond)
-                else if (WorldGenerationConfig.HotSpringsEnabled
+                else if (WorldFeatureConfig.HotSpringsEnabled
                          && padded[pIdx] == TerrainGenerator.SeaBlock
                          && padded[pIdx + FaceNeighborDelta[4]] == BlockType.Air
                          && HotSpringGenerator.IsSite(worldX0 + x, worldZ0 + z))

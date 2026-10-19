@@ -237,7 +237,7 @@ public sealed class ChunkSaveStoreTests : IDisposable
         // shutdown finds the file free again.
         store.MoveFile = (tmp, final) =>
         {
-            if (failures <= WorldGenerationConfig.SaveMoveRetries)
+            if (failures <= SaveConfig.SaveMoveRetries)
             {
                 failures++;
                 throw new IOException("locked");

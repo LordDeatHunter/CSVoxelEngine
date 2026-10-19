@@ -59,7 +59,7 @@ public sealed class LeafDecayTests
         for (var i = 0; i < ticks; i++)
         {
             var before = m.TickIndex;
-            m.Update(WorldGenerationConfig.LeafDecayTickSeconds, c, d);
+            m.Update(SimulationConfig.LeafDecayTickSeconds, c, d);
             while (m.TickInProgress)
                 m.Update(0f, c, d);
             Assert.True(m.TickIndex == before + 1, "a tick's worth of time did not run exactly one tick");
@@ -68,7 +68,7 @@ public sealed class LeafDecayTests
 
     /// <summary>Ticks enough for <paramref name="removals"/> cells under the per-tick budget,
     /// plus the tick that finds them and one of slack.</summary>
-    private static int Bound(int removals) => removals / WorldGenerationConfig.LeafDecayMaxRemovalsPerTick + 2;
+    private static int Bound(int removals) => removals / SimulationConfig.LeafDecayMaxRemovalsPerTick + 2;
 
     /// <summary>The graph rule's live tips among the nodes still standing: childless (among
     /// the remaining nodes), non-feature and no thicker than the species' tip limit.</summary>
@@ -261,7 +261,7 @@ public sealed class LeafDecayTests
             var (min, max) = StampedTree.Bounds(subtreeCells);
             manager.ScheduleBox(min, max);
 
-            if (doomed.Count > WorldGenerationConfig.LeafDecayMaxRemovalsPerTick)
+            if (doomed.Count > SimulationConfig.LeafDecayMaxRemovalsPerTick)
             {
                 RunTicks(manager, tree.Chunks, drops, 1);
                 Assert.True(doomed.Any(c => !IsAir(tree.Chunks, c)),
@@ -437,7 +437,7 @@ public sealed class LeafDecayTests
             manager.ScheduleBox(min, max);
 
             // A whole crown dissolves over several ticks, never past the per-tick budget
-            if (tree.Leaves.Count > WorldGenerationConfig.LeafDecayMaxRemovalsPerTick)
+            if (tree.Leaves.Count > SimulationConfig.LeafDecayMaxRemovalsPerTick)
             {
                 RunTicks(manager, tree.Chunks, drops, 1);
                 Assert.True(tree.Leaves.Keys.Any(c => !IsAir(tree.Chunks, c)),

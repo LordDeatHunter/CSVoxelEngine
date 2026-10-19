@@ -24,11 +24,11 @@ public sealed class GameSettingsTests
             GameSettings.Save(path);
 
             GameSettings.ResetToDefaults();
-            Assert.Equal(WorldGenerationConfig.WaterNormalScale, GameSettings.WaterWaves);
+            Assert.Equal(WaterRenderConfig.WaterNormalScale, GameSettings.WaterWaves);
             GameSettings.Load(path);
 
             Assert.Equal(3.5f, GameSettings.WaterWaves);
-            Assert.Equal(!WorldGenerationConfig.ShadowsEnabled, GameSettings.Shadows);
+            Assert.Equal(!LightingConfig.ShadowsEnabled, GameSettings.Shadows);
             Assert.Equal(1.25f, GameSettings.SunGlow);
             Assert.Equal(0, GameSettings.ResolutionIndex);
             Assert.Equal(0.42f, GameSettings.MouseSensitivity);

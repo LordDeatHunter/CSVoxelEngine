@@ -14,7 +14,7 @@ uniform float uVisibility;
 uniform float uDiscFraction; // the disc's radius as a share of the quad's
 uniform vec2 uPhaseLight;    // MoonPhase.LightDirection: (x across the disc, z toward the viewer)
 uniform float uLitFraction;  // MoonPhase.IlluminatedFraction, for the halo
-uniform float uTerminator;   // WorldGenerationConfig.MoonTerminatorSoftness
+uniform float uTerminator;   // SkyConfig.MoonTerminatorSoftness
 uniform float uEarthshine;
 uniform float uGlowIntensity;
 uniform float uGlowExponent;

@@ -42,7 +42,7 @@ public sealed class GrassShimmerTests
     {
         // Walking along the wind crosses bright crests and bare troughs within a few wavelengths.
         float lowest = 1f, highest = 0f;
-        for (var s = 0f; s <= 3f * WorldGenerationConfig.GrassShimmerWavelengthBlocks; s += 0.1f)
+        for (var s = 0f; s <= 3f * SurfaceShadingConfig.GrassShimmerWavelengthBlocks; s += 0.1f)
         {
             var b = GrassShimmer.Band(Wind * s, Wind, Vector2.Zero, 0.0);
             lowest = MathF.Min(lowest, b);
@@ -57,9 +57,9 @@ public sealed class GrassShimmerTests
     public void TheShimmerFadesOutWithDistance()
     {
         Assert.Equal(1f, GrassShimmer.Fade(0f));
-        Assert.Equal(0f, GrassShimmer.Fade(WorldGenerationConfig.GrassShimmerFadeFarBlocks));
+        Assert.Equal(0f, GrassShimmer.Fade(SurfaceShadingConfig.GrassShimmerFadeFarBlocks));
         var previous = 1f;
-        for (var d = 0f; d <= WorldGenerationConfig.GrassShimmerFadeFarBlocks * 1.5f; d += 0.5f)
+        for (var d = 0f; d <= SurfaceShadingConfig.GrassShimmerFadeFarBlocks * 1.5f; d += 0.5f)
         {
             var f = GrassShimmer.Fade(d);
             Assert.True(f <= previous, $"fade rose from {previous} to {f} at {d} blocks");
@@ -67,8 +67,8 @@ public sealed class GrassShimmerTests
         }
 
         var p = new Vector2(2f, 3f);
-        Assert.Equal(0f, GrassShimmer.Brightening(p, Wind, Vector2.Zero, 5.0, WorldGenerationConfig.GrassShimmerFadeFarBlocks + 1f));
-        Assert.InRange(GrassShimmer.Brightening(p, Wind, Vector2.Zero, 5.0, 0f), 0f, WorldGenerationConfig.GrassShimmerStrength);
+        Assert.Equal(0f, GrassShimmer.Brightening(p, Wind, Vector2.Zero, 5.0, SurfaceShadingConfig.GrassShimmerFadeFarBlocks + 1f));
+        Assert.InRange(GrassShimmer.Brightening(p, Wind, Vector2.Zero, 5.0, 0f), 0f, SurfaceShadingConfig.GrassShimmerStrength);
     }
 
     [Fact]

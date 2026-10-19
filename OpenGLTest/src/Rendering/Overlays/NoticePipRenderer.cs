@@ -14,7 +14,7 @@ namespace VoxelEngine.Rendering.Overlays;
 /// healthbar billboard shader and the HUD's own <see cref="BitmapFont"/> atlas (like the damage
 /// numbers): a dark drop shadow then a bright face, scaling in with an <see cref="MathUtils.EaseOutBack"/>
 /// pop and fading out, depth-tested without writing depth and fogged with distance. One draw,
-/// fixed buffers sized by <see cref="WorldGenerationConfig.GoblinNoticePipMax"/>. Main thread only.
+/// fixed buffers sized by <see cref="MobConfig.GoblinNoticePipMax"/>. Main thread only.
 /// </summary>
 public sealed class NoticePipRenderer : IDisposable
 {
@@ -54,7 +54,7 @@ public sealed class NoticePipRenderer : IDisposable
         _shader.Use();
         _shader.SetUniform("uSprite", 0);
 
-        _maxQuads = WorldGenerationConfig.GoblinNoticePipMax * 2;
+        _maxQuads = MobConfig.GoblinNoticePipMax * 2;
         _verts = new Vertex[_maxQuads * 4];
         var linear = ColorSpace.SrgbToLinear(FaceSrgb);
         _face = Rgba.FromFloat(linear.X, linear.Y, linear.Z);
@@ -127,9 +127,9 @@ public sealed class NoticePipRenderer : IDisposable
     {
         var scale = MathUtils.EaseOutBack(progress / PopShare);
         var alpha = 1f - MathUtils.SmoothStep(MathUtils.InverseLerp(FadeFrom, 1f, progress));
-        var k = WorldGenerationConfig.GoblinNoticePipCapHeightBlocks * scale / _glyphHeightPx;
+        var k = MobConfig.GoblinNoticePipCapHeightBlocks * scale / _glyphHeightPx;
         var anchor = new Vector3(goblin.Position.X,
-            goblin.Position.Y + goblin.HeadAboveCenter + WorldGenerationConfig.GoblinNoticePipRiseBlocks
+            goblin.Position.Y + goblin.HeadAboveCenter + MobConfig.GoblinNoticePipRiseBlocks
             + (scale - 1f) * 0.15f, goblin.Position.Z);
         var shadow = new Rgba(0, 0, 0, (byte)(MathUtils.Clamp01(alpha * ShadowAlpha) * 255f + 0.5f));
         var face = _face.WithAlpha(alpha);

@@ -18,7 +18,7 @@ public sealed class CloudShadowTests
     public void CoverageFollowsTheMeshLevels()
     {
         var levels = CloudField.BuildLevels();
-        var maxLevels = WorldGenerationConfig.CloudMaxLevels;
+        var maxLevels = SkyConfig.CloudMaxLevels;
         var coverage = CloudField.BuildShadowCoverage(levels, maxLevels);
         var cells = levels.GetLength(0);
         Assert.Equal(cells * levels.GetLength(1), coverage.Length);
@@ -53,8 +53,8 @@ public sealed class CloudShadowTests
     [Fact]
     public void FieldUvOfCopyOriginIsIntegralOnBothAxes()
     {
-        var field = WorldGenerationConfig.CloudFieldSize;
-        var cellSize = WorldGenerationConfig.CloudCellSize;
+        var field = SkyConfig.CloudFieldSize;
+        var cellSize = SkyConfig.CloudCellSize;
         var cells = CloudField.Cells;
         const float tolerance = 1e-4f;
 

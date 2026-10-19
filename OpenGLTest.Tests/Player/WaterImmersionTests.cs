@@ -68,7 +68,7 @@ public sealed class WaterImmersionTests
     [Fact]
     public void TheBuoyancyAlwaysHeadsBackToTheRestShare()
     {
-        const float rest = WorldGenerationConfig.WaterFloatRestShare;
+        const float rest = PlayerConfig.WaterFloatRestShare;
         Assert.Equal(0f, WaterImmersion.BuoyancySpeed(rest), 5);
 
         var previous = float.NegativeInfinity;
@@ -90,7 +90,7 @@ public sealed class WaterImmersionTests
         var camera = BodyAt(Pool(depth: 1), feetY: 1f);
         Assert.True(camera.IsInWater);
         Assert.Equal(WaterPhase.Wade, camera.WaterPhase);
-        Assert.InRange(camera.ImmersionShare, 0.01f, WorldGenerationConfig.WaterFloatShare);
+        Assert.InRange(camera.ImmersionShare, 0.01f, PlayerConfig.WaterFloatShare);
     }
 
     [Fact]

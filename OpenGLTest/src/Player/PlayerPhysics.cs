@@ -263,7 +263,7 @@ internal sealed class PlayerPhysics
         camera.SetSneaking(sneaking);
         camera.SetSprinting(sprinting && moving && !camera.IsFlying && !swimming && camera.IsGrounded && !sneaking);
         if (swimming) moveSpeed *= SwimSpeedFactor;
-        if (wading) moveSpeed *= WorldGenerationConfig.WadeSpeedFactor;
+        if (wading) moveSpeed *= PlayerConfig.WadeSpeedFactor;
         if (sneaking) moveSpeed = BaseSpeed * SneakSpeedFactor;
         // Pass-through blocks scale the walk instead of blocking it; flight is noclip.
         camera.SetMovementFactor(BlockMoveFactor(camera, chunkManager));
@@ -364,7 +364,7 @@ internal sealed class PlayerPhysics
                 _verticalVelocity = _diving
                     ? MathUtils.Damp(_verticalVelocity, SinkSpeed, SwimGlideDrag, deltaTime)
                     : MathUtils.Damp(_verticalVelocity, WaterImmersion.BuoyancySpeed(camera.ImmersionShare),
-                        WorldGenerationConfig.FloatSettleRate, deltaTime);
+                        PlayerConfig.FloatSettleRate, deltaTime);
             }
 
             frameMovement.Y = _verticalVelocity * deltaTime;
@@ -433,9 +433,9 @@ internal sealed class PlayerPhysics
                 // impact; the grounded frame is what the fall tracker reads as a cushioned
                 // landing, so it never bills damage. Anything else stops dead.
                 var impact = -_verticalVelocity;
-                _verticalVelocity = impact >= WorldGenerationConfig.SlimeBlockBounceMinSpeed
+                _verticalVelocity = impact >= PlayerConfig.SlimeBlockBounceMinSpeed
                                     && BounceBelow(camera, chunkManager)
-                    ? impact * WorldGenerationConfig.SlimeBlockBounceRestitution
+                    ? impact * PlayerConfig.SlimeBlockBounceRestitution
                     : 0f;
             }
             else

@@ -17,12 +17,12 @@ public static class FlowerGenerator
 
     /// <summary>The clump shape every meadow flower is placed by.</summary>
     public static readonly PlantClumpSpec Clumps = new(
-        WorldGenerationConfig.MeadowCellShift,
-        WorldGenerationConfig.MeadowRadius,
-        WorldGenerationConfig.MeadowJitter,
-        WorldGenerationConfig.MeadowMinMembers,
-        WorldGenerationConfig.MeadowClumpChance,
-        WorldGenerationConfig.MeadowEdgeDensity,
+        WorldFeatureConfig.MeadowCellShift,
+        WorldFeatureConfig.MeadowRadius,
+        WorldFeatureConfig.MeadowJitter,
+        WorldFeatureConfig.MeadowMinMembers,
+        WorldFeatureConfig.MeadowClumpChance,
+        WorldFeatureConfig.MeadowEdgeDensity,
         ClumpSalt);
 
     // Cached so a membership test never allocates a delegate
@@ -42,12 +42,12 @@ public static class FlowerGenerator
     /// <summary>
     /// Whether a clump centered at (x, z) may grow: forest open enough
     /// (<see cref="TerrainGenerator.ForestOpenness"/> at least
-    /// <see cref="WorldGenerationConfig.MeadowMinOpenness"/>), so meadows fill the open stretches
+    /// <see cref="WorldFeatureConfig.MeadowMinOpenness"/>), so meadows fill the open stretches
     /// between the woodland instead of the woods themselves.
     /// </summary>
     public static bool IsOpenMeadow(int x, int z) =>
         TerrainGenerator.IsForest(x, z)
-        && TerrainGenerator.ForestOpenness(x, z) >= WorldGenerationConfig.MeadowMinOpenness;
+        && TerrainGenerator.ForestOpenness(x, z) >= WorldFeatureConfig.MeadowMinOpenness;
 
     /// <summary>Whether the surface column (x, z) grows a flower, before the terrain checks.</summary>
     public static bool TryGetFlower(int x, int z) =>

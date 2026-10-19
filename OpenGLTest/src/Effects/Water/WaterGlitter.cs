@@ -4,12 +4,12 @@ namespace VoxelEngine.Effects.Water;
 
 /// <summary>
 /// GL-free twin of the sun glitter on water in test-fragment.glsl: the water plane is cut into
-/// <see cref="WorldGenerationConfig.WaterGlitterCellsPerBlock"/> cells per block, a share of them
+/// <see cref="WaterRenderConfig.WaterGlitterCellsPerBlock"/> cells per block, a share of them
 /// holds a tiny facet tilted off the wave normal, and a facet mirrors the sun (<see cref="Sparkle"/>)
 /// while the eye/sun half vector lines up with it, so the sparkles gather along the sun's reflection
 /// path. Each cell re-rolls its facet a few times a second and fades in and out within each roll
 /// (<see cref="Life"/>). <see cref="Gate"/> is what the shader multiplies in, and the result is added
-/// as <see cref="WorldGenerationConfig.WaterGlitterStrength"/> times the direct sun.
+/// as <see cref="WaterRenderConfig.WaterGlitterStrength"/> times the direct sun.
 /// </summary>
 public static class WaterGlitter
 {
@@ -49,6 +49,6 @@ public static class WaterGlitter
               * MathUtils.SmoothStep(0f, 0.05f, sunElevation)
               * MathUtils.SmoothStep(0f, 0.2f, sunIntensity)
               * (1f - MathUtils.Clamp01(underwater))
-              * (1f - MathUtils.SmoothStep(WorldGenerationConfig.WaterGlitterFadeNearBlocks,
-                  WorldGenerationConfig.WaterGlitterFadeFarBlocks, distance));
+              * (1f - MathUtils.SmoothStep(WaterRenderConfig.WaterGlitterFadeNearBlocks,
+                  WaterRenderConfig.WaterGlitterFadeFarBlocks, distance));
 }

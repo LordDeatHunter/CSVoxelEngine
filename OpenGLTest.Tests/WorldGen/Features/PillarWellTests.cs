@@ -58,11 +58,11 @@ public sealed class PillarWellTests
             if (RuinedPillarGenerator.TryGetPillar(cellX, cellZ, out var px, out var pz, out var height, out _))
             {
                 pillars++;
-                Assert.InRange(height, WorldGenerationConfig.PillarMinHeight, WorldGenerationConfig.PillarMaxHeight);
-                Assert.InRange(px, cellX << WorldGenerationConfig.PillarCellShift,
-                    ((cellX + 1) << WorldGenerationConfig.PillarCellShift) - 1);
-                Assert.InRange(pz, cellZ << WorldGenerationConfig.PillarCellShift,
-                    ((cellZ + 1) << WorldGenerationConfig.PillarCellShift) - 1);
+                Assert.InRange(height, WorldFeatureConfig.PillarMinHeight, WorldFeatureConfig.PillarMaxHeight);
+                Assert.InRange(px, cellX << WorldFeatureConfig.PillarCellShift,
+                    ((cellX + 1) << WorldFeatureConfig.PillarCellShift) - 1);
+                Assert.InRange(pz, cellZ << WorldFeatureConfig.PillarCellShift,
+                    ((cellZ + 1) << WorldFeatureConfig.PillarCellShift) - 1);
                 Assert.True(RuinedPillarGenerator.TryGetPillar(cellX, cellZ, out var px2, out var pz2, out var h2, out _));
                 Assert.Equal((px, pz, height), (px2, pz2, h2));
             }
@@ -70,10 +70,10 @@ public sealed class PillarWellTests
             if (DesertWellGenerator.TryGetWell(cellX, cellZ, out var wx, out var wz))
             {
                 wells++;
-                Assert.InRange(wx, cellX << WorldGenerationConfig.WellCellShift,
-                    ((cellX + 1) << WorldGenerationConfig.WellCellShift) - 1);
-                Assert.InRange(wz, cellZ << WorldGenerationConfig.WellCellShift,
-                    ((cellZ + 1) << WorldGenerationConfig.WellCellShift) - 1);
+                Assert.InRange(wx, cellX << WorldFeatureConfig.WellCellShift,
+                    ((cellX + 1) << WorldFeatureConfig.WellCellShift) - 1);
+                Assert.InRange(wz, cellZ << WorldFeatureConfig.WellCellShift,
+                    ((cellZ + 1) << WorldFeatureConfig.WellCellShift) - 1);
             }
         }
 

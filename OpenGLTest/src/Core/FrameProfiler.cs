@@ -69,7 +69,7 @@ public enum ProfileSection
 /// stalls). Update-side sections never get GPU samples and show "--" in that column. That timing
 /// is gated: <see cref="GpuPassTimer.BeginGpuFrame"/> latches
 /// <see cref="GpuTimingGate.ShouldTime"/> once per frame, so while the overlay is down only one
-/// frame in <see cref="WorldGenerationConfig.GpuTimingIdleInterval"/> issues its queries and each
+/// frame in <see cref="PostProcessConfig.GpuTimingIdleInterval"/> issues its queries and each
 /// always-run pass contributes about fps / GpuTimingIdleInterval samples to the window instead of
 /// one per frame. Averages over an overlay-down window are therefore thinner and the worst-frame
 /// column under-samples, and a pass that is not entered every frame (selectPass, bracketed by

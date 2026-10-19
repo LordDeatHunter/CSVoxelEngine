@@ -22,7 +22,7 @@ public static class LilyPadGenerator
     public static bool TryGetPad(int x, int z)
     {
         var h = SplitMix64.Hash(x, z, WorldGenerationConfig.Seed ^ 0x71D5);
-        return (SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) < WorldGenerationConfig.LilyPadChance;
+        return (SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) < WorldFeatureConfig.LilyPadChance;
     }
 
     /// <summary>

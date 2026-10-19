@@ -70,10 +70,10 @@ public sealed class WaterGlitterTests
         Assert.Equal(0f, WaterGlitter.Gate(false, 0f, 1f, 0f, HighSun, DaySun, 5f));
         Assert.Equal(0f, WaterGlitter.Gate(false, 0f, 1f, 1f, -0.2f, DaySun, 5f));
         Assert.Equal(0f, WaterGlitter.Gate(false, 0f, 1f, 1f, HighSun, 0f, 5f));
-        Assert.Equal(0f, WaterGlitter.Gate(false, 0f, 1f, 1f, HighSun, DaySun, WorldGenerationConfig.WaterGlitterFadeFarBlocks));
+        Assert.Equal(0f, WaterGlitter.Gate(false, 0f, 1f, 1f, HighSun, DaySun, WaterRenderConfig.WaterGlitterFadeFarBlocks));
 
         var previous = 1f;
-        for (var d = 0f; d <= WorldGenerationConfig.WaterGlitterFadeFarBlocks * 1.5f; d += 0.5f)
+        for (var d = 0f; d <= WaterRenderConfig.WaterGlitterFadeFarBlocks * 1.5f; d += 0.5f)
         {
             var g = WaterGlitter.Gate(false, 0f, 1f, 1f, HighSun, DaySun, d);
             Assert.True(g <= previous, $"glitter gate rose from {previous} to {g} at {d} blocks");

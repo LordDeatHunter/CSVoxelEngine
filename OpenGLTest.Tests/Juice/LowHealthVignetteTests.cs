@@ -10,8 +10,8 @@ namespace VoxelEngine.Tests.Juice;
 /// </summary>
 public sealed class LowHealthVignetteTests
 {
-    private const float Threshold = WorldGenerationConfig.LowHealthThreshold;
-    private const float Period = WorldGenerationConfig.LowHealthPulseSeconds;
+    private const float Threshold = JuiceConfig.LowHealthThreshold;
+    private const float Period = JuiceConfig.LowHealthPulseSeconds;
     private const int SamplesPerPeriod = 400;
 
     [Theory]

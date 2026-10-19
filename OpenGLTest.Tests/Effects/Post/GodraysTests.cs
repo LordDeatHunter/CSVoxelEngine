@@ -38,7 +38,7 @@ public sealed class GodraysTests
     [Fact]
     public void TheGodraysGrowSteadilyAsTheViewTurnsTowardTheSunAndAreGoneFacingAway()
     {
-        Assert.Equal(0f, Godrays.Intensity(MathUtils.CosDeg(WorldGenerationConfig.GodraysFacingDegrees), LowSun, 0f, 0f));
+        Assert.Equal(0f, Godrays.Intensity(MathUtils.CosDeg(PostProcessConfig.GodraysFacingDegrees), LowSun, 0f, 0f));
         Assert.Equal(0f, Godrays.Intensity(-1f, LowSun, 0f, 0f));
         var previous = 0f;
         for (var alignment = -1f; alignment <= 1f; alignment += 0.005f)
@@ -52,9 +52,9 @@ public sealed class GodraysTests
     [Fact]
     public void ALowSunCastsTheStrongestShaftsAndNoonOnlyAFractionOfThem()
     {
-        var peak = Godrays.Intensity(1f, WorldGenerationConfig.GodraysPeakElevation, 0f, 0f);
+        var peak = Godrays.Intensity(1f, PostProcessConfig.GodraysPeakElevation, 0f, 0f);
         var noon = Godrays.Intensity(1f, 1f, 0f, 0f);
-        Assert.Equal(WorldGenerationConfig.GodraysStrength, peak, 5);
+        Assert.Equal(PostProcessConfig.GodraysStrength, peak, 5);
         Assert.True(noon > 0f && noon < peak, "noon should keep only a fraction of the low sun's shafts");
         for (var e = 0f; e <= 1f; e += 0.01f)
             Assert.InRange(Godrays.Intensity(1f, e, 0f, 0f), 0f, peak + 1e-6f);
@@ -90,7 +90,7 @@ public sealed class GodraysTests
         // A ray into open sky scatters clearly more than one ending on a near trunk, which is the
         // contrast the composite turns into shafts
         var trunk = Godrays.Scatter(8f);
-        var sky = Godrays.Scatter(WorldGenerationConfig.GodraysMaxDistance + WorldGenerationConfig.GodraysSkyBlocks);
+        var sky = Godrays.Scatter(PostProcessConfig.GodraysMaxDistance + PostProcessConfig.GodraysSkyBlocks);
         Assert.True(sky > 2f * trunk);
     }
 
@@ -98,7 +98,7 @@ public sealed class GodraysTests
     public void TheShaftsAreBrightestLookingAtTheSunWithAFaintFloorElsewhere()
     {
         Assert.Equal(1f, Godrays.Phase(1f), 5);
-        Assert.Equal(WorldGenerationConfig.GodraysPhaseFloor, Godrays.Phase(-1f), 5);
+        Assert.Equal(PostProcessConfig.GodraysPhaseFloor, Godrays.Phase(-1f), 5);
         var previous = Godrays.Phase(-1f);
         for (var degrees = 180f; degrees >= 0f; degrees -= 1f)
         {

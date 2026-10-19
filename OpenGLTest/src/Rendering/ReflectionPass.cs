@@ -177,7 +177,7 @@ internal sealed class ReflectionPass
     /// The mirror is re-rendered at most every other frame: a reused frame issues no GL work
     /// at all and simply re-pushes the cached <c>_reflViewProj</c> that produced the texture,
     /// with the refresh decision in <see cref="ReflectionReuse.ShouldRefresh"/> and its
-    /// thresholds in <see cref="WorldGenerationConfig"/>.
+    /// thresholds in <see cref="WaterRenderConfig"/>.
     /// </summary>
     internal void RenderReflection(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<LodRegion> regions, in ReflectionEntities entities)
@@ -216,7 +216,7 @@ internal sealed class ReflectionPass
             Targets.ViewportSize.X / (float)Math.Max(1, Targets.ViewportSize.Y), RenderManager.WaterPlaneY);
         GatherMirrorEntities(camera.RenderEye, entities);
         var entitiesMoved = ReflectionReuse.EntitiesMoved(CollectionsMarshal.AsSpan(_reflEntityPositions),
-            CollectionsMarshal.AsSpan(_reflEntityScratch), WorldGenerationConfig.ReflectionReuseMaxEntityMoveBlocks);
+            CollectionsMarshal.AsSpan(_reflEntityScratch), WaterRenderConfig.ReflectionReuseMaxEntityMoveBlocks);
         if (!ReflectionReuse.ShouldRefresh(_reflPose, pose, _reflMirrorValid, targetRecreated,
                 _reflReusedLastFrame, entitiesMoved))
         {
@@ -382,7 +382,7 @@ internal sealed class ReflectionPass
     /// <summary>
     /// Fills the per-kind mirror draw lists and the position scratch the motion signal compares,
     /// in the fixed order drops, thrown, primed, falling, slimes, goblins, toppling. An entity counts only
-    /// within <see cref="WorldGenerationConfig.ReflectionEntityRadius"/> (horizontally) of the eye
+    /// within <see cref="WaterRenderConfig.ReflectionEntityRadius"/> (horizontally) of the eye
     /// and no lower than a block under the water plane; the player is covered by the camera pose.
     /// </summary>
     private void GatherMirrorEntities(Vector3 eye, in ReflectionEntities entities)
@@ -420,7 +420,7 @@ internal sealed class ReflectionPass
     {
         var dx = position.X - eye.X;
         var dz = position.Z - eye.Z;
-        var r = WorldGenerationConfig.ReflectionEntityRadius;
+        var r = WaterRenderConfig.ReflectionEntityRadius;
         if (dx * dx + dz * dz > r * r || position.Y < RenderManager.WaterPlaneY - 1f) return false;
         _reflEntityScratch.Add(position);
         return true;

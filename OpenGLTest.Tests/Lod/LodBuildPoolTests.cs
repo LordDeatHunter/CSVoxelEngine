@@ -17,7 +17,7 @@ namespace VoxelEngine.Tests.Lod;
 /// The stress half of item C5's test pairing: <see cref="StressWorkers"/> real builder threads
 /// driving <see cref="LodManager.TryBuildOneRegion"/> against one drain, the shape a pooled
 /// production run would have. The width is fixed at 3 on purpose and is NOT read from
-/// <see cref="WorldGenerationConfig.MaxConcurrentLodGenerations"/>, which C5's measurement left at
+/// <see cref="StreamingConfig.MaxConcurrentLodGenerations"/>, which C5's measurement left at
 /// 1: sizing these threads from the shipped constant would defuse every fact here into a
 /// single-threaded run that still passes (see <see cref="StressWorkers"/>). The equivalence half — the claim protocol pinned deterministically on one
 /// thread — lives in <c>LodManagerTests</c>'s C5 section.
@@ -61,7 +61,7 @@ public sealed class LodBuildPoolTests
 
     /// <summary>
     /// The stress width, deliberately FIXED rather than read from
-    /// <see cref="WorldGenerationConfig.MaxConcurrentLodGenerations"/>. That constant is a
+    /// <see cref="StreamingConfig.MaxConcurrentLodGenerations"/>. That constant is a
     /// measured product decision and currently ships at 1; if these threads were sized from it,
     /// every fact in this file would quietly become a single-threaded run that still passed, with
     /// names still promising three workers and the concurrency coverage the C5 safety argument
@@ -236,7 +236,7 @@ public sealed class LodBuildPoolTests
                                 Thread.Yield();
                                 break;
                             case LodBuildOutcome.Throttled:
-                                Thread.Sleep(WorldGenerationConfig.LodBuildThrottleDelayMs);
+                                Thread.Sleep(StreamingConfig.LodBuildThrottleDelayMs);
                                 break;
                         }
                     }
@@ -361,7 +361,7 @@ public sealed class LodBuildPoolTests
         // Warm the process (JIT, worldgen caches) exactly as ThreeWorkersBetweenThemClaimEveryRegionExactlyOnce did when
         // xUnit happened to run it first; the order follows a hash of the namespace-qualified name, so it is not stable.
         RunStress(targetBuilds: 60, drainSleepMs: 0, deadlineMs: 30_000);
-        var bound = WorldGenerationConfig.MaxLodBuildsInFlight + StressWorkers;
+        var bound = StreamingConfig.MaxLodBuildsInFlight + StressWorkers;
         var result = RunStress(targetBuilds: 60, drainSleepMs: 20, deadlineMs: 30_000);
 
         Assert.True(result.Failures.IsEmpty, string.Join(" | ", result.Failures));
@@ -369,7 +369,7 @@ public sealed class LodBuildPoolTests
             $"only {result.Drained.Count} builds completed in {result.ElapsedMs} ms; the fact would be vacuous");
         // Anti-vacuity: a queue that never filled would satisfy the bound trivially. The slow
         // consumer exists to push it up against the cap, so it must actually get there.
-        Assert.True(result.MaxPendingObserved >= WorldGenerationConfig.MaxLodBuildsInFlight,
+        Assert.True(result.MaxPendingObserved >= StreamingConfig.MaxLodBuildsInFlight,
             $"the queue only ever reached {result.MaxPendingObserved}; the cap was never approached");
         Assert.True(result.MaxPendingObserved <= bound,
             $"the completed queue reached {result.MaxPendingObserved}, past the {bound} bound");

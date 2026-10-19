@@ -8,7 +8,7 @@ namespace VoxelEngine.Entities;
 /// The floating damage numbers over struck mobs, in one fixed array: a hit claims a free slot, or
 /// replaces the oldest number when every slot is taken, so nothing is allocated per hit and the
 /// count never exceeds <see cref="Capacity"/>. Each number rises, drifts a little sideways and
-/// fades out over <see cref="WorldGenerationConfig.DamageNumberLifetimeSeconds"/> (the curves are
+/// fades out over <see cref="MobConfig.DamageNumberLifetimeSeconds"/> (the curves are
 /// <see cref="MathUtils"/>'s). GL-free; <see cref="World"/> owns one, feeds it the hits it sees and
 /// <see cref="DamageNumberRenderer"/> draws it. Main thread only.
 /// </summary>
@@ -80,7 +80,7 @@ public sealed class DamageNumberPool
             ref var item = ref _items[i];
             if (!item.Active) continue;
             item.Age += step;
-            if (item.Age < WorldGenerationConfig.DamageNumberLifetimeSeconds) continue;
+            if (item.Age < MobConfig.DamageNumberLifetimeSeconds) continue;
             item.Active = false;
             Count--;
         }
@@ -89,19 +89,19 @@ public sealed class DamageNumberPool
     /// <summary>Where a number is now: risen and drifted along eased curves from its origin.</summary>
     public static Vector3 PositionOf(in DamageNumber number)
     {
-        var t = MathUtils.EaseOutCubic(number.Age / WorldGenerationConfig.DamageNumberLifetimeSeconds);
-        var drift = WorldGenerationConfig.DamageNumberDriftBlocks * t;
+        var t = MathUtils.EaseOutCubic(number.Age / MobConfig.DamageNumberLifetimeSeconds);
+        var drift = MobConfig.DamageNumberDriftBlocks * t;
         return number.Origin + new Vector3(number.Drift.X * drift,
-            WorldGenerationConfig.DamageNumberRiseBlocks * t, number.Drift.Y * drift);
+            MobConfig.DamageNumberRiseBlocks * t, number.Drift.Y * drift);
     }
 
     /// <summary>A number's opacity: fully on for the hold, then fading to 0 by the end of its life.</summary>
     public static float AlphaOf(in DamageNumber number) =>
-        MathUtils.HoldThenFade(number.Age, WorldGenerationConfig.DamageNumberHoldSeconds,
-            WorldGenerationConfig.DamageNumberLifetimeSeconds - WorldGenerationConfig.DamageNumberHoldSeconds);
+        MathUtils.HoldThenFade(number.Age, MobConfig.DamageNumberHoldSeconds,
+            MobConfig.DamageNumberLifetimeSeconds - MobConfig.DamageNumberHoldSeconds);
 
     /// <summary>A number's size multiplier: it pops in larger and springs back to 1.</summary>
     public static float ScaleOf(in DamageNumber number) =>
-        MathUtils.LerpUnclamped(WorldGenerationConfig.DamageNumberPopScale, 1f,
-            MathUtils.EaseOutBack(number.Age / WorldGenerationConfig.DamageNumberPopSeconds));
+        MathUtils.LerpUnclamped(MobConfig.DamageNumberPopScale, 1f,
+            MathUtils.EaseOutBack(number.Age / MobConfig.DamageNumberPopSeconds));
 }

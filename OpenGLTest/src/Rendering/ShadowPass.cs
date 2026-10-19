@@ -97,7 +97,7 @@ internal sealed class ShadowPass
         Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
         _owner.ShadowShader.SetUniform("uTime", Lighting.Time);
         _owner.ShadowShader.SetUniform("uSwayStrength", GameSettings.LeafSway);
-        _owner.ShadowShader.SetUniform("uWind", Lighting.WindDirection * WorldGenerationConfig.WindLean);
+        _owner.ShadowShader.SetUniform("uWind", Lighting.WindDirection * SkyConfig.WindLean);
         _owner.ShadowShader.SetUniform("uWindOffset", Lighting.WindOffset);
 
         var frustum = new Frustum(_owner.NearShadow.ViewProj);
@@ -107,7 +107,7 @@ internal sealed class ShadowPass
         _owner.ChunkShadowShader.Use();
         _owner.ChunkShadowShader.SetUniform(_locChunkShadowTime, Lighting.Time);
         _owner.ChunkShadowShader.SetUniform(_locChunkShadowSway, GameSettings.LeafSway);
-        _owner.ChunkShadowShader.SetUniform(_locChunkShadowWind, Lighting.WindDirection * WorldGenerationConfig.WindLean);
+        _owner.ChunkShadowShader.SetUniform(_locChunkShadowWind, Lighting.WindDirection * SkyConfig.WindLean);
         _owner.ChunkShadowShader.SetUniform(_locChunkShadowWindOffset, Lighting.WindOffset);
         _owner.ChunkShadowShader.SetUniform(_locChunkShadowViewProj, _owner.NearShadow.ViewProj);
         DrawChunkCasters(chunks, frustum);

@@ -14,8 +14,8 @@ public sealed class CloudSilverLiningTests
 {
     // A tiny test grid: the field size is fixed, so each of its cells is a wide square.
     private const int Cells = 8;
-    private static float CellBlocks => WorldGenerationConfig.CloudFieldSize / Cells;
-    private static readonly byte OneLayer = (byte)MathF.Round(255f / WorldGenerationConfig.CloudMaxLevels);
+    private static float CellBlocks => SkyConfig.CloudFieldSize / Cells;
+    private static readonly byte OneLayer = (byte)MathF.Round(255f / SkyConfig.CloudMaxLevels);
 
     [Fact]
     public void ThereIsNoLiningWithTheSunAtOrBelowTheHorizon()
@@ -33,11 +33,11 @@ public sealed class CloudSilverLiningTests
         {
             var s = CloudSilverLining.Strength(e);
             Assert.True(s >= previous, $"the lining weakened from {previous} to {s} as the sun climbed ({e})");
-            Assert.InRange(s, 0f, WorldGenerationConfig.CloudSilverLiningStrength);
+            Assert.InRange(s, 0f, SkyConfig.CloudSilverLiningStrength);
             previous = s;
         }
 
-        Assert.Equal(WorldGenerationConfig.CloudSilverLiningStrength, previous, 5);
+        Assert.Equal(SkyConfig.CloudSilverLiningStrength, previous, 5);
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class CloudSilverLiningTests
     {
         var grid = new byte[Cells * Cells];
         grid[1 * Cells + 1] = 255; // cell (1, 1), two layers
-        var midY = WorldGenerationConfig.CloudHeight + WorldGenerationConfig.CloudLayerThickness;
+        var midY = SkyConfig.CloudHeight + SkyConfig.CloudLayerThickness;
         var z = 1.5f * CellBlocks;
 
         // On the cell's east wall, looking further east, out of the cloud: nothing behind the surface
@@ -90,7 +90,7 @@ public sealed class CloudSilverLiningTests
     [Fact]
     public void AOneLayerCloudIsThinnerThanATwoLayerOneSeenTheSameWay()
     {
-        var bottom = new Vector3(1.5f * CellBlocks, WorldGenerationConfig.CloudHeight, 1.5f * CellBlocks);
+        var bottom = new Vector3(1.5f * CellBlocks, SkyConfig.CloudHeight, 1.5f * CellBlocks);
         var climbing = Vector3.Normalize(new Vector3(1f, 1f, 0f));
 
         var thin = new byte[Cells * Cells];

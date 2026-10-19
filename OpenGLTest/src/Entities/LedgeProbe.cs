@@ -7,7 +7,7 @@ namespace VoxelEngine.Entities;
 /// <summary>
 /// Ledge caution, GL-free (main thread: it reads the live chunk map): how far the ground lies under a
 /// mob's feet in a column ahead of it, and whether stepping or hopping there is safe. A drop of more
-/// than <see cref="WorldGenerationConfig.MobLedgeMaxDropBlocks"/> is refused unless the mob's target
+/// than <see cref="MobConfig.MobLedgeMaxDropBlocks"/> is refused unless the mob's target
 /// stands below it, so a mob that is not chasing anything down never walks off a cliff that its fall
 /// damage would punish. The probe reads the live cells (player edits and caves included), not the
 /// generated heightmap; an unloaded cell or lava under the edge counts as a bottomless drop.
@@ -37,12 +37,12 @@ public static class LedgeProbe
     /// <summary>Whether a target whose feet are at <paramref name="targetFeetY"/> stands below a mob whose
     /// feet are at <paramref name="feetY"/>: lower by more than a ledge's worth.</summary>
     public static bool TargetBelow(float feetY, float targetFeetY) =>
-        targetFeetY < feetY - WorldGenerationConfig.MobLedgeMaxDropBlocks;
+        targetFeetY < feetY - MobConfig.MobLedgeMaxDropBlocks;
 
     /// <summary>Whether a step onto ground <paramref name="drop"/> blocks down is taken: a short drop
     /// always, a longer one only when the target is below.</summary>
     public static bool IsSafe(int drop, bool targetBelow) =>
-        targetBelow || drop <= WorldGenerationConfig.MobLedgeMaxDropBlocks;
+        targetBelow || drop <= MobConfig.MobLedgeMaxDropBlocks;
 
     /// <summary>
     /// Whether moving a body (center <paramref name="center"/>, feet <paramref name="feetY"/>) along the
@@ -56,7 +56,7 @@ public static class LedgeProbe
         direction.Y = 0f;
         if (direction.LengthSquared() < 1e-8f) return false;
         var probe = center + Vector3.Normalize(direction) * distance;
-        var maxScan = (int)WorldGenerationConfig.MobLedgeMaxDropBlocks + 1;
+        var maxScan = (int)MobConfig.MobLedgeMaxDropBlocks + 1;
         var drop = DropBelow(chunks, probe.X, feetY, probe.Z, maxScan);
         var below = targetEye is { } eye && TargetBelow(feetY, eye.Y - Camera.EyeHeight);
         return !IsSafe(drop, below);

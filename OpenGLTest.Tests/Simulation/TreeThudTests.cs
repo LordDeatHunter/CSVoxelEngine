@@ -43,8 +43,8 @@ public sealed class TreeThudTests
         tree.Dispose();
 
         var landedAt = Assert.Single(landings);
-        Assert.True(landedAt >= WorldGenerationConfig.TreeToppleSeconds);
-        Assert.True(landedAt < WorldGenerationConfig.TreeToppleSeconds + dt * 1.5f);
+        Assert.True(landedAt >= SimulationConfig.TreeToppleSeconds);
+        Assert.True(landedAt < SimulationConfig.TreeToppleSeconds + dt * 1.5f);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public sealed class TreeThudTests
 
         var trunk = Enumerable.Range(0, Chunk.Size).Select(x => new Vector3(x, 4, 6)).ToList();
         var spawned = GroundDust.TreeThud(trunk, manager, new BlockDebrisSystem());
-        Assert.True(spawned <= WorldGenerationConfig.TreeThudDustPoints * WorldGenerationConfig.TreeThudDustCount);
+        Assert.True(spawned <= JuiceConfig.TreeThudDustPoints * JuiceConfig.TreeThudDustCount);
         Assert.True(spawned > 0);
     }
 }

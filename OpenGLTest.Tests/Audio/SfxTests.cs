@@ -35,8 +35,8 @@ public sealed class SfxTests
     public void ConfiguredAmbiencePathsExist()
     {
         var root = TestContent.FindAssetsRoot();
-        Assert.True(File.Exists(Path.Combine(root, WorldGenerationConfig.DayAmbiencePath["assets/".Length..])));
-        Assert.True(File.Exists(Path.Combine(root, WorldGenerationConfig.NightAmbiencePath["assets/".Length..])));
+        Assert.True(File.Exists(Path.Combine(root, AudioConfig.DayAmbiencePath["assets/".Length..])));
+        Assert.True(File.Exists(Path.Combine(root, AudioConfig.NightAmbiencePath["assets/".Length..])));
     }
 
     [Fact]

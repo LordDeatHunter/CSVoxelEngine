@@ -35,11 +35,11 @@ public class LeafParticle
             var fadeIn = MathUtils.Clamp01(_age / FadeInSeconds);
             var fadeOut = 1f;
             if (IsLanded)
-                fadeOut = 1f - MathUtils.Clamp01(_landAge / WorldGenerationConfig.LeafParticleFadeSeconds);
+                fadeOut = 1f - MathUtils.Clamp01(_landAge / ParticleConfig.LeafParticleFadeSeconds);
             else
                 fadeOut = 1f - MathUtils.Clamp01(
-                    (_age - (_lifetime - WorldGenerationConfig.LeafParticleFadeSeconds))
-                    / WorldGenerationConfig.LeafParticleFadeSeconds);
+                    (_age - (_lifetime - ParticleConfig.LeafParticleFadeSeconds))
+                    / ParticleConfig.LeafParticleFadeSeconds);
             return MathF.Min(fadeIn, fadeOut);
         }
     }
@@ -59,8 +59,8 @@ public class LeafParticle
     {
         var rng = random ?? Random.Shared;
         Position = position;
-        Size = size ?? WorldGenerationConfig.LeafParticleSize;
-        _lifetime = WorldGenerationConfig.LeafParticleLifetime * (0.7f + 0.6f * rng.NextSingle());
+        Size = size ?? ParticleConfig.LeafParticleSize;
+        _lifetime = ParticleConfig.LeafParticleLifetime * (0.7f + 0.6f * rng.NextSingle());
 
         Rotation = rng.NextSingle() * MathF.Tau;
         _spin = (rng.NextSingle() * 2f - 1f) * 2.5f;
@@ -100,7 +100,7 @@ public class LeafParticle
         if (IsLanded)
         {
             _landAge += deltaTime;
-            if (_landAge >= WorldGenerationConfig.LeafParticleFadeSeconds)
+            if (_landAge >= ParticleConfig.LeafParticleFadeSeconds)
             {
                 IsAlive = false;
                 return false;
@@ -116,15 +116,15 @@ public class LeafParticle
         }
 
         _velocity.Y = MathUtils.Damp(_velocity.Y,
-            -WorldGenerationConfig.LeafParticleFallSpeed,
-            WorldGenerationConfig.LeafParticleFallDrag, deltaTime);
+            -ParticleConfig.LeafParticleFallSpeed,
+            ParticleConfig.LeafParticleFallDrag, deltaTime);
 
         if (wind != default)
         {
             // A leaf is all drag: its sideways motion (a burst's toss included) eases into the wind's
-            var drift = wind * (WorldGenerationConfig.WindLeafDrift * gust);
-            _velocity.X = MathUtils.Damp(_velocity.X, drift.X, WorldGenerationConfig.WindLeafDrag, deltaTime);
-            _velocity.Z = MathUtils.Damp(_velocity.Z, drift.Y, WorldGenerationConfig.WindLeafDrag, deltaTime);
+            var drift = wind * (SkyConfig.WindLeafDrift * gust);
+            _velocity.X = MathUtils.Damp(_velocity.X, drift.X, SkyConfig.WindLeafDrag, deltaTime);
+            _velocity.Z = MathUtils.Damp(_velocity.Z, drift.Y, SkyConfig.WindLeafDrag, deltaTime);
         }
 
         Position += _velocity * deltaTime;

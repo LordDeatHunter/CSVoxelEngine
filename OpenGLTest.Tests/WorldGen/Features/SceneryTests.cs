@@ -36,7 +36,7 @@ public sealed class SceneryTests
             if (TerrainGenerator.BiomeAt(sx, sz) != Biome.Forest) continue;
             var height = HeightAt(sx, sz);
             if (TerrainGenerator.IsWaterColumn(sx, sz, height)) continue;
-            Assert.InRange(length, WorldGenerationConfig.FallenLogMinLength, WorldGenerationConfig.FallenLogMaxLength);
+            Assert.InRange(length, WorldFeatureConfig.FallenLogMinLength, WorldFeatureConfig.FallenLogMaxLength);
 
             var chunks = new Dictionary<(int, int, int), Chunk>();
             for (var i = 0; i < length; i++)
@@ -78,7 +78,7 @@ public sealed class SceneryTests
             if (biome != Biome.Forest && biome != Biome.Taiga) continue;
             var height = HeightAt(cx, cz);
             if (TerrainGenerator.IsWaterColumn(cx, cz, height)) continue;
-            Assert.InRange(count, WorldGenerationConfig.BoulderMinBlocks, WorldGenerationConfig.BoulderMaxBlocks);
+            Assert.InRange(count, WorldFeatureConfig.BoulderMinBlocks, WorldFeatureConfig.BoulderMaxBlocks);
             Assert.Contains(blockId, new[] { BoulderGenerator.StoneBlock, BoulderGenerator.CobblestoneBlock });
 
             var chunks = new Dictionary<(int, int, int), Chunk>();

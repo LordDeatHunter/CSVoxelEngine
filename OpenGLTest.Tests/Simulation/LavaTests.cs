@@ -29,7 +29,7 @@ public sealed class LavaTests
     private static void Pump(FluidManager fluids, int ticks, ChunkManager manager, DropManager drops)
     {
         for (var i = 0; i < ticks; i++)
-            fluids.Update(WorldGenerationConfig.FluidTickSeconds, manager, drops);
+            fluids.Update(SimulationConfig.FluidTickSeconds, manager, drops);
     }
 
     [Fact]
@@ -45,7 +45,7 @@ public sealed class LavaTests
         fluids.ScheduleAround(4, 1, 8);
         fluids.ScheduleAround(12, 1, 8);
 
-        fluids.Update(WorldGenerationConfig.FluidTickSeconds, manager, drops);
+        fluids.Update(SimulationConfig.FluidTickSeconds, manager, drops);
 
         Assert.True(manager.TryGetCell(5, 1, 8, out var lavaNeighbor, out _));
         Assert.NotEqual(lava, lavaNeighbor);

@@ -28,11 +28,11 @@ public sealed class SwingHitStop
     /// <summary>
     /// How long a connecting swing of <paramref name="weight"/> (0 a light swing or a slice, 1 the
     /// slowest tool's punch, see <see cref="PlayerModel.Punch"/>) asks to hold: never shorter for a
-    /// heavier swing, never past <see cref="WorldGenerationConfig.HitStopMaxSeconds"/>.
+    /// heavier swing, never past <see cref="PlayerConfig.HitStopMaxSeconds"/>.
     /// </summary>
     public static float SecondsFor(float weight) =>
-        MathF.Min(MathUtils.Lerp(WorldGenerationConfig.HitStopSeconds, WorldGenerationConfig.HitStopHeavySeconds, weight),
-            WorldGenerationConfig.HitStopMaxSeconds);
+        MathF.Min(MathUtils.Lerp(PlayerConfig.HitStopSeconds, PlayerConfig.HitStopHeavySeconds, weight),
+            PlayerConfig.HitStopMaxSeconds);
 
     /// <summary>A new swing started: forget any hold the last one asked for or still has.</summary>
     public void Reset()
@@ -45,7 +45,7 @@ public sealed class SwingHitStop
 
     /// <summary>
     /// The swing connected: hold it for <paramref name="seconds"/> (clamped to
-    /// <see cref="WorldGenerationConfig.HitStopMaxSeconds"/>) once it reaches its impact pose, or at
+    /// <see cref="PlayerConfig.HitStopMaxSeconds"/>) once it reaches its impact pose, or at
     /// once if it is already past it. One hold per swing: another request before the hold begins only
     /// lengthens it up to the cap, and one after it began is ignored, so holds never add up.
     /// </summary>
@@ -53,7 +53,7 @@ public sealed class SwingHitStop
     {
         if (_spent || !(seconds > 0f))
             return;
-        _requested = MathF.Max(_requested, MathF.Min(seconds, WorldGenerationConfig.HitStopMaxSeconds));
+        _requested = MathF.Max(_requested, MathF.Min(seconds, PlayerConfig.HitStopMaxSeconds));
     }
 
     /// <summary>
@@ -95,7 +95,7 @@ public sealed class SwingHitStop
     private void Begin(float progress, float rate)
     {
         var remaining = MathF.Max(0f, 1f - progress) / rate;
-        var hold = MathF.Min(_requested, remaining * WorldGenerationConfig.HitStopMaxRecoveryShare);
+        var hold = MathF.Min(_requested, remaining * PlayerConfig.HitStopMaxRecoveryShare);
         _requested = 0f;
         _spent = true;
         if (hold <= 0f)

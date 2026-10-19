@@ -88,7 +88,7 @@ public readonly record struct WorldIntent(
     public bool PredictsInventory => Kind is NetIntentKind.Place or NetIntentKind.Use or NetIntentKind.Throw;
 
     /// <summary>Whether the intent may only be sent at the edit rate
-    /// (<see cref="WorldGenerationConfig.NetEditIntentsPerSecond"/>).</summary>
+    /// (<see cref="NetworkConfig.NetEditIntentsPerSecond"/>).</summary>
     public bool IsRateLimited =>
         Kind is NetIntentKind.BreakComplete or NetIntentKind.Place or NetIntentKind.Use or NetIntentKind.Throw;
 

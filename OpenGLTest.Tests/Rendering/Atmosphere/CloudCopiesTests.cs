@@ -21,8 +21,8 @@ namespace VoxelEngine.Tests.Rendering.Atmosphere;
 /// </summary>
 public sealed class CloudCopiesTests
 {
-    private const float Field = WorldGenerationConfig.CloudFieldSize;
-    private const float Thickness = WorldGenerationConfig.CloudMaxLevels * WorldGenerationConfig.CloudLayerThickness;
+    private const float Field = SkyConfig.CloudFieldSize;
+    private const float Thickness = SkyConfig.CloudMaxLevels * SkyConfig.CloudLayerThickness;
 
     /// <summary>
     /// A frustum that accepts every copy the tests place: an axis-aligned box ten million blocks on
@@ -46,7 +46,7 @@ public sealed class CloudCopiesTests
         {
             var minX = snapX + ix * Field + drift.X;
             var minZ = snapZ + iz * Field + drift.Y;
-            var min = new Vector3(minX, WorldGenerationConfig.CloudHeight, minZ);
+            var min = new Vector3(minX, SkyConfig.CloudHeight, minZ);
             if (!frustum.IntersectsAABB(min, min + new Vector3(Field, Thickness, Field)))
                 continue;
 
@@ -93,7 +93,7 @@ public sealed class CloudCopiesTests
         // Over a short step the layer moves about speed * dt along the wind; measured modulo the
         // field on each axis, so a step that crosses the wrap still reads as a small move.
         const double dt = 0.05;
-        var speed = WorldGenerationConfig.CloudDriftBlocksPerSecond;
+        var speed = SkyConfig.CloudDriftBlocksPerSecond;
         for (var t = 0.0; t < 20000.0; t += 97.3)
         {
             var a = CloudCopies.Drift(t, Field);
@@ -189,8 +189,8 @@ public sealed class CloudCopiesTests
         // A real perspective view from the middle of the layer looking along +X: the copies behind
         // the camera are culled, so the survivors land packed at the front of the destination while
         // the tail is left untouched.
-        var frustum = Looking(new Vector3(0f, WorldGenerationConfig.CloudHeight + 4f, 0f),
-            new Vector3(10000f, WorldGenerationConfig.CloudHeight + 4f, 0f), Vector3.UnitY, MathF.PI / 3f, 100000f);
+        var frustum = Looking(new Vector3(0f, SkyConfig.CloudHeight + 4f, 0f),
+            new Vector3(10000f, SkyConfig.CloudHeight + 4f, 0f), Vector3.UnitY, MathF.PI / 3f, 100000f);
         var expected = ReferenceLoop(frustum, 0f, 0f, Vector2.Zero);
 
         Span<Vector2> offsets = stackalloc Vector2[CloudCopies.MaxCopies];

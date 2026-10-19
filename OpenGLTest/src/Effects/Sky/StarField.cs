@@ -8,7 +8,7 @@ namespace VoxelEngine.Effects.Sky;
 /// the two in step. Stars live on a grid over the sphere of directions, not on the screen, so they
 /// stay put while the camera turns: each direction picks one face of a cube, an equi-angular warp
 /// (<c>atan</c> of the face coordinates) turns that face into a near-uniform-angle square, and the
-/// square is cut into <see cref="WorldGenerationConfig.StarCellsPerFace"/>² cells. A cell holds at
+/// square is cut into <see cref="SkyConfig.StarCellsPerFace"/>² cells. A cell holds at
 /// most one star, kept <see cref="CellMargin"/> clear of its edges so the shader, which only looks
 /// at the one cell a pixel falls in, never clips a star's soft point at a cell border. The warp
 /// leaves a cell at a face edge a little smaller in solid angle than one at the face center, so
@@ -29,13 +29,13 @@ public static class StarField
 
     /// <summary>
     /// How visible the stars are for a sun at sine-elevation <paramref name="sunElevation"/>: 0 by
-    /// day, rising smoothly over dusk from <see cref="WorldGenerationConfig.StarsGoneAboveSunElevation"/>
-    /// to 1 at <see cref="WorldGenerationConfig.StarsFullBelowSunElevation"/>, and the same in reverse
+    /// day, rising smoothly over dusk from <see cref="SkyConfig.StarsGoneAboveSunElevation"/>
+    /// to 1 at <see cref="SkyConfig.StarsFullBelowSunElevation"/>, and the same in reverse
     /// at dawn (the sun climbing back through the same band).
     /// </summary>
     public static float Visibility(float sunElevation) =>
-        1f - MathUtils.SmoothStep(WorldGenerationConfig.StarsFullBelowSunElevation,
-            WorldGenerationConfig.StarsGoneAboveSunElevation, sunElevation);
+        1f - MathUtils.SmoothStep(SkyConfig.StarsFullBelowSunElevation,
+            SkyConfig.StarsGoneAboveSunElevation, sunElevation);
 
     /// <summary>
     /// The cube face (0..5: +X, -X, +Y, -Y, +Z, -Z) a direction falls on and its face coordinates,
@@ -127,8 +127,8 @@ public static class StarField
     /// <summary>
     /// The star in cell (<paramref name="face"/>, <paramref name="x"/>, <paramref name="y"/>), if
     /// the cell holds one: its unit star-space direction and its brightness fraction (0..1, mostly
-    /// faint: a power law with exponent <see cref="WorldGenerationConfig.StarBrightnessCurve"/>
-    /// over a floor of <see cref="WorldGenerationConfig.StarFaintest"/>).
+    /// faint: a power law with exponent <see cref="SkyConfig.StarBrightnessCurve"/>
+    /// over a floor of <see cref="SkyConfig.StarFaintest"/>).
     /// </summary>
     public static bool TryGetStar(int face, int x, int y, int cellsPerFace, float density,
         out Vector3 direction, out float brightness)
@@ -143,15 +143,15 @@ public static class StarField
         var jitter = new Vector2(h2 & 0xffffu, h2 >> 16) / 65535f;
         var inCell = new Vector2(CellMargin) + jitter * (1f - 2f * CellMargin);
         direction = Vector3.Normalize(FaceDirection(face, CellPointUv(x + inCell.X, y + inCell.Y, cellsPerFace)));
-        brightness = MathUtils.Lerp(WorldGenerationConfig.StarFaintest, 1f,
-            MathF.Pow(Unit(h3), WorldGenerationConfig.StarBrightnessCurve));
+        brightness = MathUtils.Lerp(SkyConfig.StarFaintest, 1f,
+            MathF.Pow(Unit(h3), SkyConfig.StarBrightnessCurve));
         return true;
     }
 
     /// <summary>
     /// The twinkle of the star in cell (<paramref name="face"/>, <paramref name="x"/>, <paramref name="y"/>):
-    /// its rate in cycles per second (between <see cref="WorldGenerationConfig.StarTwinkleRateMin"/>
-    /// and <see cref="WorldGenerationConfig.StarTwinkleRateMax"/>) and its phase in [0, tau), both
+    /// its rate in cycles per second (between <see cref="SkyConfig.StarTwinkleRateMin"/>
+    /// and <see cref="SkyConfig.StarTwinkleRateMax"/>) and its phase in [0, tau), both
     /// hashed from the cell, so a star keeps its own flicker frame to frame and its neighbors do
     /// not flicker in step. Twin of the rate and phase in sky-fragment.glsl's <c>Stars</c>.
     /// </summary>
@@ -160,19 +160,19 @@ public static class StarField
         // The chain TryGetStar walks (cell, jitter, brightness, tint), two links further on
         var h3 = Hash(Hash(CellHash(face, x, y)));
         var h4 = Hash(Hash(h3));
-        return (MathUtils.Lerp(WorldGenerationConfig.StarTwinkleRateMin, WorldGenerationConfig.StarTwinkleRateMax, Unit(h4)),
+        return (MathUtils.Lerp(SkyConfig.StarTwinkleRateMin, SkyConfig.StarTwinkleRateMax, Unit(h4)),
             Unit(Hash(h4)) * MathF.Tau);
     }
 
     /// <summary>
     /// A star's brightness multiplier at <paramref name="time"/> seconds: two sines at an irrational
     /// ratio, so the flicker never visibly repeats, smooth everywhere and swinging between
-    /// 1 - <see cref="WorldGenerationConfig.StarTwinkleDepth"/> and 1. Twin of sky-fragment.glsl's.
+    /// 1 - <see cref="SkyConfig.StarTwinkleDepth"/> and 1. Twin of sky-fragment.glsl's.
     /// </summary>
     public static float Twinkle(float time, float rate, float phase)
     {
         var a = MathF.Tau * rate * time + phase;
         var w = 0.5f + 0.3f * MathF.Sin(a) + 0.2f * MathF.Sin(2.31f * a + 1.7f * phase);
-        return 1f - WorldGenerationConfig.StarTwinkleDepth * w;
+        return 1f - SkyConfig.StarTwinkleDepth * w;
     }
 }

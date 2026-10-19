@@ -172,12 +172,12 @@ public class RenderManager : IDisposable
     // and every world draw hands both to test-fragment.glsl's SampleShadow. The cascade also
     // carries its own texel-stepped box center (ShadowCascade.StepCenter) from frame to frame.
     private readonly ShadowCascade _nearShadow =
-        new(WorldGenerationConfig.ShadowRadiusBlocks, WorldGenerationConfig.ShadowMapSize);
+        new(LightingConfig.ShadowRadiusBlocks, LightingConfig.ShadowMapSize);
 
     // The coarse far cascade (unit 7): chunk casters only, sampled by SampleShadow where the near
     // box fades out. Its own ShadowCascade, so it steps its own center on its own texel lattice.
     private readonly ShadowCascade _farShadow =
-        new(WorldGenerationConfig.FarShadowRadiusBlocks, WorldGenerationConfig.FarShadowMapSize);
+        new(LightingConfig.FarShadowRadiusBlocks, LightingConfig.FarShadowMapSize);
 
     // The sea surface the reflection mirrors across (a source cell's top), and the
     // per-frame clip that keeps below-plane geometry out of the reflection texture.
@@ -425,7 +425,7 @@ public class RenderManager : IDisposable
         ContentRegistry.BakeModels();
         // After the bake, the first point that knows which tiles cutout blocks wear: their
         // box-filtered mips would average leaf alpha under the cutoff and thin canopies out.
-        TextureAtlas.ApplyCutoutMips(gl, textureAtlas, BlockType.CutoutTiles(), WorldGenerationConfig.AlphaCutoff);
+        TextureAtlas.ApplyCutoutMips(gl, textureAtlas, BlockType.CutoutTiles(), LightingConfig.AlphaCutoff);
         // After the bake, because the material table is keyed by the tiles the bake resolves.
         materialAtlas = TextureAtlas.BuildMaterial(gl, "assets/textures/blocks_material");
         CreateMaterialBuffer();
@@ -441,7 +441,7 @@ public class RenderManager : IDisposable
         // nothing else on this program ever writes them.
         chunkShader.SetUniform("uFlash", 0f);
         chunkShader.SetUniform("uHitFlash", 0f);
-        chunkShader.SetUniform("uAlphaCutoff", WorldGenerationConfig.AlphaCutoff);
+        chunkShader.SetUniform("uAlphaCutoff", LightingConfig.AlphaCutoff);
         // The HDR target first, so every creator after it restores to the scene target it made.
         Targets.CreateHdrTarget();
         Reflection.CreateReflectionTarget();
@@ -462,16 +462,16 @@ public class RenderManager : IDisposable
         _locFlash = worldShader.GetUniformLocation("uFlash");
         _locHitFlash = worldShader.GetUniformLocation("uHitFlash");
         _locAlphaCutoff = worldShader.GetUniformLocation("uAlphaCutoff");
-        _locPointPos = worldShader.GetUniformArrayLocations("uPointPos", WorldGenerationConfig.MaxPointLights);
-        _locPointColor = worldShader.GetUniformArrayLocations("uPointColor", WorldGenerationConfig.MaxPointLights);
+        _locPointPos = worldShader.GetUniformArrayLocations("uPointPos", LightingConfig.MaxPointLights);
+        _locPointColor = worldShader.GetUniformArrayLocations("uPointColor", LightingConfig.MaxPointLights);
         _locBlockLightPalette = worldShader.GetUniformArrayLocations("uBlockLightPalette", BlockLightPalette.MaxSlots);
         _blockLightPalette = BlockLightPalette.Linear.ToArray();
 
         _locChunkViewProj = chunkShader.GetUniformLocation("uViewProj");
         _locChunkDrawBase = chunkShader.GetUniformLocation("uDrawBase");
         _locChunkAlphaCutoff = chunkShader.GetUniformLocation("uAlphaCutoff");
-        _locChunkPointPos = chunkShader.GetUniformArrayLocations("uPointPos", WorldGenerationConfig.MaxPointLights);
-        _locChunkPointColor = chunkShader.GetUniformArrayLocations("uPointColor", WorldGenerationConfig.MaxPointLights);
+        _locChunkPointPos = chunkShader.GetUniformArrayLocations("uPointPos", LightingConfig.MaxPointLights);
+        _locChunkPointColor = chunkShader.GetUniformArrayLocations("uPointColor", LightingConfig.MaxPointLights);
         _locChunkBlockLightPalette = chunkShader.GetUniformArrayLocations("uBlockLightPalette", BlockLightPalette.MaxSlots);
 
         selectionShader = new Shader(gl, selectionVs, selectionFs);
@@ -479,10 +479,10 @@ public class RenderManager : IDisposable
         // The crack sprite is a single column of BreakOverlayFrames stacked 32x32 frames, so
         // each frame becomes its own array slice and no mip level bleeds a neighbor in.
         _breakProgressTexture = TextureLoader.LoadSpritesheet(gl, "assets/textures/environment/break_progress.png",
-            1, WorldGenerationConfig.BreakOverlayFrames, WorldGenerationConfig.BreakOverlayFrames, srgb: true);
+            1, PlayerConfig.BreakOverlayFrames, PlayerConfig.BreakOverlayFrames, srgb: true);
         breakShader.Use();
         breakShader.SetUniform("uBreakProgress", 0);
-        breakShader.SetUniform("uOpacity", WorldGenerationConfig.BreakOverlayOpacity);
+        breakShader.SetUniform("uOpacity", PlayerConfig.BreakOverlayOpacity);
 
         shadowShader = new Shader(gl, shadowVs, shadowFs);
         // The depth pass still samples the atlas, to punch the cutout tiles' holes
@@ -605,89 +605,89 @@ public class RenderManager : IDisposable
         program.SetUniform("uSceneDepth", 4);
         program.SetUniform("uMaterialAtlas", MaterialUnit);
         program.SetUniform("uCloudShadowMap", CloudShadowUnit);
-        program.SetUniform("uCloudHeight", WorldGenerationConfig.CloudHeight);
-        program.SetUniform("uCloudField", WorldGenerationConfig.CloudFieldSize);
+        program.SetUniform("uCloudHeight", SkyConfig.CloudHeight);
+        program.SetUniform("uCloudField", SkyConfig.CloudFieldSize);
         // Doubles as the switch for the whole reflective path: left at 0 the shader never reads
         // the material buffer, which is what keeps the ItemDebugger (same shaders, no buffer)
         // and a world with no reflective tiles safe.
         program.SetUniform("uMaterialCount", materialSsbo != 0 ? TileMaterials.ByLayer.Length : 0);
-        program.SetUniform("uOreSpecScale", WorldGenerationConfig.OreSpecLinearScale);
+        program.SetUniform("uOreSpecScale", SurfaceShadingConfig.OreSpecLinearScale);
         // Texels of the reflective tiles flashing now and then in the sun (OreTwinkle)
-        program.SetUniform("uOreTwinkle", WorldGenerationConfig.OreTwinkleStrength);
-        program.SetUniform("uOreTwinkleDensity", WorldGenerationConfig.OreTwinkleDensity);
+        program.SetUniform("uOreTwinkle", SurfaceShadingConfig.OreTwinkleStrength);
+        program.SetUniform("uOreTwinkleDensity", SurfaceShadingConfig.OreTwinkleDensity);
         program.SetUniform("uOreTwinkleRate",
-            new Vector2(WorldGenerationConfig.OreTwinkleRateMin, WorldGenerationConfig.OreTwinkleRateMax));
-        program.SetUniform("uOreTwinkleWidth", WorldGenerationConfig.OreTwinkleWidth);
+            new Vector2(SurfaceShadingConfig.OreTwinkleRateMin, SurfaceShadingConfig.OreTwinkleRateMax));
+        program.SetUniform("uOreTwinkleWidth", SurfaceShadingConfig.OreTwinkleWidth);
         program.SetUniform("uOreTwinkleFade",
-            new Vector2(WorldGenerationConfig.OreTwinkleFadeNearBlocks, WorldGenerationConfig.OreTwinkleFadeFarBlocks));
+            new Vector2(SurfaceShadingConfig.OreTwinkleFadeNearBlocks, SurfaceShadingConfig.OreTwinkleFadeFarBlocks));
         // The snow glints key off the snow block's own tile; strength 0 (a program that never sets
         // it, like the ItemDebugger's) leaves the term off whatever slice that is.
         program.SetUniform("uSnowLayer", (float)ContentRegistry.RequireBlock("snow").Top);
-        program.SetUniform("uSnowSparkle", WorldGenerationConfig.SnowSparkleStrength);
-        program.SetUniform("uSnowSparkleDensity", WorldGenerationConfig.SnowSparkleDensity);
+        program.SetUniform("uSnowSparkle", SurfaceShadingConfig.SnowSparkleStrength);
+        program.SetUniform("uSnowSparkleDensity", SurfaceShadingConfig.SnowSparkleDensity);
         // Leaves lit through from behind (LeafBacklight); strength 0 (the ItemDebugger) leaves it off
-        program.SetUniform("uLeafBacklight", WorldGenerationConfig.LeafBacklightStrength);
-        program.SetUniform("uLeafBacklightPower", WorldGenerationConfig.LeafBacklightPower);
-        program.SetUniform("uLeafBacklightReach", WorldGenerationConfig.LeafBacklightReachBlocks);
-        program.SetUniform("uLeafBacklightTint", ColorSpace.SrgbToLinear(WorldGenerationConfig.LeafBacklightTint));
+        program.SetUniform("uLeafBacklight", SurfaceShadingConfig.LeafBacklightStrength);
+        program.SetUniform("uLeafBacklightPower", SurfaceShadingConfig.LeafBacklightPower);
+        program.SetUniform("uLeafBacklightReach", SurfaceShadingConfig.LeafBacklightReachBlocks);
+        program.SetUniform("uLeafBacklightTint", ColorSpace.SrgbToLinear(SurfaceShadingConfig.LeafBacklightTint));
         // Bands rolling over the grass tops with the wind (GrassShimmer); 0 strength leaves it off
-        program.SetUniform("uGrassShimmer", WorldGenerationConfig.GrassShimmerStrength);
-        program.SetUniform("uGrassShimmerWavelength", WorldGenerationConfig.GrassShimmerWavelengthBlocks);
-        program.SetUniform("uGrassShimmerFadeNear", WorldGenerationConfig.GrassShimmerFadeNearBlocks);
-        program.SetUniform("uGrassShimmerFadeFar", WorldGenerationConfig.GrassShimmerFadeFarBlocks);
+        program.SetUniform("uGrassShimmer", SurfaceShadingConfig.GrassShimmerStrength);
+        program.SetUniform("uGrassShimmerWavelength", SurfaceShadingConfig.GrassShimmerWavelengthBlocks);
+        program.SetUniform("uGrassShimmerFadeNear", SurfaceShadingConfig.GrassShimmerFadeNearBlocks);
+        program.SetUniform("uGrassShimmerFadeFar", SurfaceShadingConfig.GrassShimmerFadeFarBlocks);
         // The ice tile's sky sheen and sun highlight (IceGlint); 0 strength leaves both off
         program.SetUniform("uIceLayer", (float)ContentRegistry.RequireBlock("ice").Top);
-        program.SetUniform("uIceGlint", WorldGenerationConfig.IceGlintStrength);
-        program.SetUniform("uIceShine", WorldGenerationConfig.IceGlintShine);
-        program.SetUniform("uIceSheen", WorldGenerationConfig.IceSheenStrength);
+        program.SetUniform("uIceGlint", SurfaceShadingConfig.IceGlintStrength);
+        program.SetUniform("uIceShine", SurfaceShadingConfig.IceGlintShine);
+        program.SetUniform("uIceSheen", SurfaceShadingConfig.IceSheenStrength);
         // Glass blocks and panes share the glass tile; their grazing sky tint (GlassSheen)
         program.SetUniform("uGlassLayer", (float)ContentRegistry.RequireBlock("glass").Top);
-        program.SetUniform("uGlassSheen", WorldGenerationConfig.GlassSheenStrength);
+        program.SetUniform("uGlassSheen", SurfaceShadingConfig.GlassSheenStrength);
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
         // instead of riding ApplyFrameUniforms every frame.
-        program.SetUniform("uWaterNormalScale", WorldGenerationConfig.WaterNormalScale);
-        program.SetUniform("uWaterRefractStrength", WorldGenerationConfig.WaterRefractStrength);
-        program.SetUniform("uWaterWindowRefract", WorldGenerationConfig.WaterWindowRefractScale);
-        program.SetUniform("uWaterAbsorb", WorldGenerationConfig.WaterAbsorb);
-        program.SetUniform("uWaterScatter", ColorSpace.SrgbToLinear(WorldGenerationConfig.WaterScatter));
-        program.SetUniform("uWaterCausticStrength", WorldGenerationConfig.WaterCausticStrength);
-        program.SetUniform("uWetDarken", WorldGenerationConfig.WetDarken);
-        program.SetUniform("uWaterFancyNear", WorldGenerationConfig.WaterFancyNearBlocks);
-        program.SetUniform("uWaterFancyFar", WorldGenerationConfig.WaterFancyFarBlocks);
-        program.SetUniform("uWaterFlowStretch", WorldGenerationConfig.WaterFlowStretch);
-        program.SetUniform("uWaterFlowScroll", WorldGenerationConfig.WaterFlowScrollSpeed);
-        program.SetUniform("uWaterFlowPeriod", WorldGenerationConfig.WaterFlowPeriod);
-        program.SetUniform("uWaterFallScroll", WorldGenerationConfig.WaterFallScrollSpeed);
-        program.SetUniform("uWaterFallStreak", WorldGenerationConfig.WaterFallStreakStrength);
-        program.SetUniform("uWaterFoamWidth", WorldGenerationConfig.WaterFoamWidthBlocks);
-        program.SetUniform("uWaterFoamStrength", WorldGenerationConfig.WaterFoamStrength);
-        program.SetUniform("uWaterFoamColor", ColorSpace.SrgbToLinear(WorldGenerationConfig.WaterFoamColor));
+        program.SetUniform("uWaterNormalScale", WaterRenderConfig.WaterNormalScale);
+        program.SetUniform("uWaterRefractStrength", WaterRenderConfig.WaterRefractStrength);
+        program.SetUniform("uWaterWindowRefract", WaterRenderConfig.WaterWindowRefractScale);
+        program.SetUniform("uWaterAbsorb", WaterRenderConfig.WaterAbsorb);
+        program.SetUniform("uWaterScatter", ColorSpace.SrgbToLinear(WaterRenderConfig.WaterScatter));
+        program.SetUniform("uWaterCausticStrength", WaterRenderConfig.WaterCausticStrength);
+        program.SetUniform("uWetDarken", SurfaceShadingConfig.WetDarken);
+        program.SetUniform("uWaterFancyNear", WaterRenderConfig.WaterFancyNearBlocks);
+        program.SetUniform("uWaterFancyFar", WaterRenderConfig.WaterFancyFarBlocks);
+        program.SetUniform("uWaterFlowStretch", WaterRenderConfig.WaterFlowStretch);
+        program.SetUniform("uWaterFlowScroll", WaterRenderConfig.WaterFlowScrollSpeed);
+        program.SetUniform("uWaterFlowPeriod", WaterRenderConfig.WaterFlowPeriod);
+        program.SetUniform("uWaterFallScroll", WaterRenderConfig.WaterFallScrollSpeed);
+        program.SetUniform("uWaterFallStreak", WaterRenderConfig.WaterFallStreakStrength);
+        program.SetUniform("uWaterFoamWidth", WaterRenderConfig.WaterFoamWidthBlocks);
+        program.SetUniform("uWaterFoamStrength", WaterRenderConfig.WaterFoamStrength);
+        program.SetUniform("uWaterFoamColor", ColorSpace.SrgbToLinear(WaterRenderConfig.WaterFoamColor));
         // Hashed sun sparkles on the waves (WaterGlitter); 0 strength leaves them off
-        program.SetUniform("uWaterGlitter", WorldGenerationConfig.WaterGlitterStrength);
-        program.SetUniform("uWaterGlitterCells", WorldGenerationConfig.WaterGlitterCellsPerBlock);
-        program.SetUniform("uWaterGlitterDensity", WorldGenerationConfig.WaterGlitterDensity);
-        program.SetUniform("uWaterGlitterTilt", WorldGenerationConfig.WaterGlitterTiltRadians);
-        program.SetUniform("uWaterGlitterRate", WorldGenerationConfig.WaterGlitterRate);
+        program.SetUniform("uWaterGlitter", WaterRenderConfig.WaterGlitterStrength);
+        program.SetUniform("uWaterGlitterCells", WaterRenderConfig.WaterGlitterCellsPerBlock);
+        program.SetUniform("uWaterGlitterDensity", WaterRenderConfig.WaterGlitterDensity);
+        program.SetUniform("uWaterGlitterTilt", WaterRenderConfig.WaterGlitterTiltRadians);
+        program.SetUniform("uWaterGlitterRate", WaterRenderConfig.WaterGlitterRate);
         program.SetUniform("uWaterGlitterFade",
-            new Vector2(WorldGenerationConfig.WaterGlitterFadeNearBlocks, WorldGenerationConfig.WaterGlitterFadeFarBlocks));
+            new Vector2(WaterRenderConfig.WaterGlitterFadeNearBlocks, WaterRenderConfig.WaterGlitterFadeFarBlocks));
         program.SetUniform("uLavaLayer", (float)ContentRegistry.RequireBlock("lava").Top);
-        program.SetUniform("uLavaNormalScale", WorldGenerationConfig.LavaNormalScale);
-        program.SetUniform("uLavaCatchLight", WorldGenerationConfig.LavaCatchLightStrength);
-        program.SetUniform("uLavaCatchPower", WorldGenerationConfig.LavaCatchLightPower);
-        program.SetUniform("uLavaPulse", WorldGenerationConfig.LavaPulseStrength);
+        program.SetUniform("uLavaNormalScale", SurfaceShadingConfig.LavaNormalScale);
+        program.SetUniform("uLavaCatchLight", SurfaceShadingConfig.LavaCatchLightStrength);
+        program.SetUniform("uLavaCatchPower", SurfaceShadingConfig.LavaCatchLightPower);
+        program.SetUniform("uLavaPulse", SurfaceShadingConfig.LavaPulseStrength);
         program.SetUniform("uLodLeafColor", _lodLeafColor);
         // The plain path's per-draw biome tint (mining pop, debris) must read as white for every
         // other draw, GLSL's zero default would draw a flagged vertex black; the chunk program
         // has no such uniform and -1 is a silent no-op.
         program.SetUniform("uBiomeTint", Vector3.One);
         program.SetUniform("uWaterPlaneY", WaterPlaneY);
-        program.SetUniform("uWaterSsrSteps", WorldGenerationConfig.WaterSsrSteps);
-        program.SetUniform("uWaterSsrStepStart", WorldGenerationConfig.WaterSsrStepStart);
-        program.SetUniform("uWaterSsrStepGrowth", WorldGenerationConfig.WaterSsrStepGrowth);
-        program.SetUniform("uWaterSsrThickness", WorldGenerationConfig.WaterSsrThickness);
-        program.SetUniform("uWaterSsrPlaneNear", WorldGenerationConfig.WaterSsrPlaneNear);
-        program.SetUniform("uWaterSsrPlaneFar", WorldGenerationConfig.WaterSsrPlaneFar);
+        program.SetUniform("uWaterSsrSteps", WaterRenderConfig.WaterSsrSteps);
+        program.SetUniform("uWaterSsrStepStart", WaterRenderConfig.WaterSsrStepStart);
+        program.SetUniform("uWaterSsrStepGrowth", WaterRenderConfig.WaterSsrStepGrowth);
+        program.SetUniform("uWaterSsrThickness", WaterRenderConfig.WaterSsrThickness);
+        program.SetUniform("uWaterSsrPlaneNear", WaterRenderConfig.WaterSsrPlaneNear);
+        program.SetUniform("uWaterSsrPlaneFar", WaterRenderConfig.WaterSsrPlaneFar);
         program.SetUniform("uWaterSsrMode", 0f);
     }
 
@@ -798,9 +798,9 @@ public class RenderManager : IDisposable
 
         chunkShader.Use();
         // Opaque default: punch the leaf tiles' holes; the translucent pass lowers it.
-        chunkShader.SetUniform(_locChunkAlphaCutoff, WorldGenerationConfig.AlphaCutoff);
+        chunkShader.SetUniform(_locChunkAlphaCutoff, LightingConfig.AlphaCutoff);
         worldShader.Use();
-        worldShader.SetUniform(_locAlphaCutoff, WorldGenerationConfig.AlphaCutoff);
+        worldShader.SetUniform(_locAlphaCutoff, LightingConfig.AlphaCutoff);
         _eyeWaterDepth = camera is { IsEyeInWater: true, IsEyeInLava: false }
             ? camera.EyeWaterSurfaceY - camera.RenderEye.Y
             : 0f;
@@ -912,12 +912,12 @@ public class RenderManager : IDisposable
         program.SetUniform("uCameraPos", Lighting.CameraPos);
         program.SetUniform("uNumPointLights", Lighting.PointCount);
         program.SetUniform("uFireLightStart", Lighting.FireLightStart);
-        program.SetUniform("uFireLightRange", WorldGenerationConfig.FireLightRange);
+        program.SetUniform("uFireLightRange", LightingConfig.FireLightRange);
         program.SetUniformArray3(locPointPos, Lighting.PointPos);
         program.SetUniformArray3(locPointColor, Lighting.PointColors);
         program.SetUniform("uSwayStrength", GameSettings.LeafSway);
         // uWind carries the leaf lean in its length (direction * WindLean), see test-vertex.glsl
-        program.SetUniform("uWind", Lighting.WindDirection * WorldGenerationConfig.WindLean);
+        program.SetUniform("uWind", Lighting.WindDirection * SkyConfig.WindLean);
         program.SetUniform("uWindOffset", Lighting.WindOffset);
         // The water look rides here (not the one-time init) so the settings sliders act live.
         program.SetUniform("uWaterNormalScale", GameSettings.WaterWaves);
@@ -925,11 +925,11 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterCausticStrength", GameSettings.WaterCaustics);
         program.SetUniform("uLightViewProj", _nearShadow.ViewProj);
         program.SetUniform("uShadowStrength", Lighting.ShadowStrength);
-        program.SetUniform("uShadowTexel", 1f / WorldGenerationConfig.ShadowMapSize);
+        program.SetUniform("uShadowTexel", 1f / LightingConfig.ShadowMapSize);
         program.SetUniform("uShadowWorldTexel", _nearShadow.WorldTexel);
-        program.SetUniform("uShadowSoftness", WorldGenerationConfig.ShadowSoftnessTexels);
-        program.SetUniform("uShadowNormalOffset", WorldGenerationConfig.ShadowNormalOffsetTexels);
-        program.SetUniform("uShadowBiasTexels", WorldGenerationConfig.ShadowBiasTexels);
+        program.SetUniform("uShadowSoftness", LightingConfig.ShadowSoftnessTexels);
+        program.SetUniform("uShadowNormalOffset", LightingConfig.ShadowNormalOffsetTexels);
+        program.SetUniform("uShadowBiasTexels", LightingConfig.ShadowBiasTexels);
         program.SetUniform("uShadowBiasScale", _nearShadow.BiasScale);
         program.SetUniform("uLightViewProjFar", _farShadow.ViewProj);
         program.SetUniform("uShadowWorldTexelFar", _farShadow.WorldTexel);
@@ -938,8 +938,8 @@ public class RenderManager : IDisposable
         // Program.timeOffset) CloudRenderer.Render drifts the mesh by. Rides the frame (not the
         // one-time init) so turning the clouds off in the settings takes their shadows with them.
         program.SetUniform("uCloudShadowStrength",
-            GameSettings.CloudOpacity > 0f ? WorldGenerationConfig.CloudShadowStrength : 0f);
-        program.SetUniform("uCloudDrift", CloudCopies.Drift(Lighting.TimeD, WorldGenerationConfig.CloudFieldSize));
+            GameSettings.CloudOpacity > 0f ? SkyConfig.CloudShadowStrength : 0f);
+        program.SetUniform("uCloudDrift", CloudCopies.Drift(Lighting.TimeD, SkyConfig.CloudFieldSize));
         program.SetUniform("uClipY", _clipY);
         // The water pass reads the scene copies by screen uv and unprojects their depth; both
         // describe the real eye, so the reflection pass (which draws no water) can ignore them.

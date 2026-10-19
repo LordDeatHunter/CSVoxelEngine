@@ -136,7 +136,7 @@ public static class TextureLoader
             // Core since GL 4.6, so no extension check; clamp to what the driver supports.
             gl.GetFloat(GLEnum.MaxTextureMaxAnisotropy, out float maxAniso);
             gl.TexParameter(TextureTarget.Texture2DArray, (TextureParameterName)GLEnum.TextureMaxAnisotropy,
-                MathF.Min(WorldGenerationConfig.AtlasAnisotropy, maxAniso));
+                MathF.Min(LightingConfig.AtlasAnisotropy, maxAniso));
         }
 
         gl.GenerateMipmap(TextureTarget.Texture2DArray);

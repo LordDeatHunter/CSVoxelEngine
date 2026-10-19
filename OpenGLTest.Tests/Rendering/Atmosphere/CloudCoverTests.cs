@@ -12,16 +12,16 @@ namespace VoxelEngine.Tests.Rendering.Atmosphere;
 /// </summary>
 public sealed class CloudCoverTests
 {
-    private static readonly float Below = WorldGenerationConfig.CloudHeight - 20f;
+    private static readonly float Below = SkyConfig.CloudHeight - 20f;
 
     // A tiny test grid: the field size is fixed, so each of its cells is a wide square.
     private const int Cells = 8;
-    private static float CellBlocks => WorldGenerationConfig.CloudFieldSize / Cells;
+    private static float CellBlocks => SkyConfig.CloudFieldSize / Cells;
 
     [Fact]
     public void TheLevelReadInvertsTheBakeForEveryLevel()
     {
-        var max = WorldGenerationConfig.CloudMaxLevels;
+        var max = SkyConfig.CloudMaxLevels;
         var levels = new byte[Cells, Cells];
         for (var x = 0; x < Cells; x++)
         for (var z = 0; z < Cells; z++)
@@ -48,7 +48,7 @@ public sealed class CloudCoverTests
         Assert.True(CloudCover.LevelAt(grid, Cells, x0 + CellBlocks - inset + drift.X, z0 + CellBlocks - inset + drift.Y, drift) > 0);
         Assert.Equal(0, CloudCover.LevelAt(grid, Cells, x0 - inset + drift.X, z0 + inset + drift.Y, drift));
         Assert.Equal(0, CloudCover.LevelAt(grid, Cells, x0 + CellBlocks + inset + drift.X, z0 + inset + drift.Y, drift));
-        var field = WorldGenerationConfig.CloudFieldSize;
+        var field = SkyConfig.CloudFieldSize;
         Assert.True(CloudCover.LevelAt(grid, Cells, x0 + 1f + drift.X - 3 * field, z0 + 1f + drift.Y + 2 * field, drift) > 0);
     }
 
@@ -59,7 +59,7 @@ public sealed class CloudCoverTests
         Assert.Equal(0f, Cover(full, new Vector3(0f, Below, 0f), new Vector3(0f, -1f, 0f)));
         Assert.Equal(0f, Cover(full, new Vector3(0f, Below, 0f), new Vector3(1f, 0f, 0f)));
         // from at or above the base the clouds are below the eye
-        Assert.Equal(0f, Cover(full, new Vector3(0f, WorldGenerationConfig.CloudHeight + 1f, 0f), Vector3.UnitY));
+        Assert.Equal(0f, Cover(full, new Vector3(0f, SkyConfig.CloudHeight + 1f, 0f), Vector3.UnitY));
         // and with the clouds turned off nothing covers anything
         Assert.Equal(0f, CloudCover.AlongRay(full, Cells, new Vector3(0f, Below, 0f), Vector3.UnitY, Vector2.Zero, 0f));
     }
@@ -70,7 +70,7 @@ public sealed class CloudCoverTests
         var eye = new Vector3(0f, Below, 0f);
         Assert.Equal(0f, Cover(Uniform(0), eye, Vector3.UnitY));
         Assert.Equal(1f, Cover(Uniform(255), eye, Vector3.UnitY));
-        var oneLayer = (byte)MathF.Round(255f / WorldGenerationConfig.CloudMaxLevels);
+        var oneLayer = (byte)MathF.Round(255f / SkyConfig.CloudMaxLevels);
         Assert.Equal(1f, Cover(Uniform(oneLayer), eye, Vector3.UnitY));
     }
 
@@ -80,10 +80,10 @@ public sealed class CloudCoverTests
         // A 45-degree ray that crosses the base and the first layer's top beside cell 1, then is
         // over cell 1 by the top of the second layer: it enters a two-layer cloud through its
         // wall, but passes clean over a one-layer cloud's top (the field stacks up to two layers).
-        var thick = WorldGenerationConfig.CloudLayerThickness;
+        var thick = SkyConfig.CloudLayerThickness;
         var climb = 10f;
         var edge = CellBlocks;
-        var eye = new Vector3(edge - climb - 2f * thick + 2f, WorldGenerationConfig.CloudHeight - climb, 0.5f * CellBlocks);
+        var eye = new Vector3(edge - climb - 2f * thick + 2f, SkyConfig.CloudHeight - climb, 0.5f * CellBlocks);
         var dir = Vector3.Normalize(new Vector3(1f, 1f, 0f));
 
         var tall = new byte[Cells * Cells];
@@ -91,7 +91,7 @@ public sealed class CloudCoverTests
         Assert.Equal(1f, Cover(tall, eye, dir));
 
         var low = new byte[Cells * Cells];
-        low[1] = (byte)MathF.Round(255f / WorldGenerationConfig.CloudMaxLevels);
+        low[1] = (byte)MathF.Round(255f / SkyConfig.CloudMaxLevels);
         Assert.Equal(0f, Cover(low, eye, dir));
     }
 
@@ -109,8 +109,8 @@ public sealed class CloudCoverTests
             var cover = Cover(full, eye, dir);
             Assert.True(cover <= previous + 1e-5f, $"cover rose from {previous} to {cover} farther away");
             previous = cover;
-            var distance = (WorldGenerationConfig.CloudHeight - eye.Y) / dir.Y;
-            if (distance >= WorldGenerationConfig.FogFarBlocks)
+            var distance = (SkyConfig.CloudHeight - eye.Y) / dir.Y;
+            if (distance >= LightingConfig.FogFarBlocks)
             {
                 Assert.Equal(0f, cover);
                 reachedZero = true;
@@ -125,8 +125,8 @@ public sealed class CloudCoverTests
     {
         var levels = CloudField.BuildLevels();
         var cells = levels.GetLength(0);
-        var coverage = CloudField.BuildShadowCoverage(levels, WorldGenerationConfig.CloudMaxLevels);
-        var cell = WorldGenerationConfig.CloudCellSize;
+        var coverage = CloudField.BuildShadowCoverage(levels, SkyConfig.CloudMaxLevels);
+        var cell = SkyConfig.CloudCellSize;
         for (var x = 0; x < cells; x++)
         for (var z = 0; z < cells; z++)
         {
@@ -145,7 +145,7 @@ public sealed class CloudCoverTests
         // several in-between values rather than in one flip.
         var grid = new byte[Cells * Cells];
         grid[1] = 255;
-        var radius = MathUtils.ToRadians(WorldGenerationConfig.SunAngularRadiusDeg);
+        var radius = MathUtils.ToRadians(SkyConfig.SunAngularRadiusDeg);
         var footprint = 20f * MathF.Tan(radius); // the disc's radius on the base, 20 blocks up
         var previous = 0f;
         var steps = new System.Collections.Generic.HashSet<float>();
@@ -168,7 +168,7 @@ public sealed class CloudCoverTests
     public void CloudsBlockFullyAtTheDefaultOpacityAndLessAsTheyAreTurnedDown()
     {
         Assert.Equal(0f, CloudCover.Blocking(0f));
-        Assert.Equal(1f, CloudCover.Blocking(WorldGenerationConfig.CloudOpacity));
+        Assert.Equal(1f, CloudCover.Blocking(SkyConfig.CloudOpacity));
         var previous = 0f;
         for (var opacity = 0f; opacity <= 1f; opacity += 0.01f)
         {

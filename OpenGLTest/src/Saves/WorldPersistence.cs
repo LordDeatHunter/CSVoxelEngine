@@ -74,7 +74,7 @@ internal sealed class WorldPersistence
         if (_saveStore != null)
         {
             _autosaveTimer += deltaTime;
-            if (_autosaveTimer >= WorldGenerationConfig.AutosaveIntervalSeconds)
+            if (_autosaveTimer >= SaveConfig.AutosaveIntervalSeconds)
                 Autosave();
         }
     }
@@ -110,11 +110,11 @@ internal sealed class WorldPersistence
     /// spawn paths, and restores its health, facing and motion. Each waits for its chunk because
     /// an entity restored over an unloaded chunk would fall through air (slimes, goblins and drops
     /// all read unloaded cells as air). A restore is a forced spawn: it may pass the natural mob cap
-    /// but a mob waits the same way while the hard cap (<see cref="WorldGenerationConfig.MobHardCap"/>,
+    /// but a mob waits the same way while the hard cap (<see cref="MobConfig.MobHardCap"/>,
     /// which sizes the healthbar buffers) is full, so an over-full save never overfills the world
     /// and loses nothing, since pending entries are re-saved. An unknown entity kind or item name, or a record with no
     /// position, is dropped with one warning per pass. After
-    /// <see cref="WorldGenerationConfig.EntityRestoreTimeoutSeconds"/> of play whatever is still
+    /// <see cref="SaveConfig.EntityRestoreTimeoutSeconds"/> of play whatever is still
     /// pending is discarded. Main thread, Playing only; nothing pending costs one check.
     /// </summary>
     internal void RestorePendingEntities(double deltaTime)
@@ -183,7 +183,7 @@ internal sealed class WorldPersistence
         if (dropped != null)
             Log.Warn($"Entity save: dropped {dropped.Count} unrestorable entr{(dropped.Count == 1 ? "y" : "ies")}: {string.Join(", ", dropped)}");
 
-        if (!(_entityRestoreTimer >= WorldGenerationConfig.EntityRestoreTimeoutSeconds)
+        if (!(_entityRestoreTimer >= SaveConfig.EntityRestoreTimeoutSeconds)
             || (_pendingMobs.Count <= 0 && _pendingDrops.Count <= 0)) return;
 
         Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s) and {_pendingDrops.Count} drop(s) whose chunk never loaded or that the full mob hard cap kept out");
@@ -200,7 +200,7 @@ internal sealed class WorldPersistence
     private static Vector3 ToVector(float[]? v) => v is { Length: 3 } ? new Vector3(v[0], v[1], v[2]) : Vector3.Zero;
 
     /// <summary>
-    /// One autosave pass: snapshots up to <see cref="WorldGenerationConfig.MaxAutosaveSnapshotsPerCall"/>
+    /// One autosave pass: snapshots up to <see cref="SaveConfig.MaxAutosaveSnapshotsPerCall"/>
     /// modified loaded chunks to the save store (the copies are cheap; encoding and disk I/O run
     /// on its writer thread), then the far-LOD edit state if it changed, the player and the
     /// entities. A burst
@@ -209,10 +209,10 @@ internal sealed class WorldPersistence
     /// </summary>
     private void Autosave()
     {
-        var snapshots = _chunkManager.FlushModified(WorldGenerationConfig.MaxAutosaveSnapshotsPerCall);
-        if (snapshots >= WorldGenerationConfig.MaxAutosaveSnapshotsPerCall)
+        var snapshots = _chunkManager.FlushModified(SaveConfig.MaxAutosaveSnapshotsPerCall);
+        if (snapshots >= SaveConfig.MaxAutosaveSnapshotsPerCall)
         {
-            _autosaveTimer = WorldGenerationConfig.AutosaveIntervalSeconds;
+            _autosaveTimer = SaveConfig.AutosaveIntervalSeconds;
             return;
         }
 
@@ -285,7 +285,7 @@ internal sealed class WorldPersistence
     /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime and
     /// goblin (kind by <see cref="EntityType.Name"/>, body center, health, facing, velocity, a
     /// goblin's ammo, a slime's size) and the item drops nearest the player first, capped at
-    /// <see cref="WorldGenerationConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
+    /// <see cref="SaveConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
     /// with no name is skipped with one warning). Entries still pending a restore are appended, so a
     /// flush during loading, or before a far entity's chunk arrived, never loses them.
     /// </summary>
@@ -307,7 +307,7 @@ internal sealed class WorldPersistence
 
         var drops = new List<EntitySaveData.DropData>();
         var unnamed = 0;
-        for (var i = 0; i < _dropSort.Count && drops.Count < WorldGenerationConfig.MaxSavedDrops; i++)
+        for (var i = 0; i < _dropSort.Count && drops.Count < SaveConfig.MaxSavedDrops; i++)
         {
             var drop = _dropSort[i].drop;
             if (SaveNames.NameOf(drop.BlockId) is not { } name)
@@ -325,7 +325,7 @@ internal sealed class WorldPersistence
             });
         }
         _dropSort.Clear();
-        for (var i = 0; i < _pendingDrops.Count && drops.Count < WorldGenerationConfig.MaxSavedDrops; i++)
+        for (var i = 0; i < _pendingDrops.Count && drops.Count < SaveConfig.MaxSavedDrops; i++)
             drops.Add(_pendingDrops[i]);
 
         if (unnamed > 0)
@@ -365,7 +365,7 @@ internal sealed class WorldPersistence
     /// joins the generation and LOD workers and drains the mesh runners
     /// (<see cref="ChunkManager.DrainMeshWork"/>) first, so this flush sees a quiescent world, then
     /// calls this, then <see cref="ChunkSaveStore.Shutdown"/> with
-    /// <see cref="WorldGenerationConfig.SaveWriterShutdownTimeoutSeconds"/>, releases the geometry
+    /// <see cref="SaveConfig.SaveWriterShutdownTimeoutSeconds"/>, releases the geometry
     /// and finally <see cref="WorldSeed.EndWorld"/>. Does nothing without a save store.
     /// </summary>
     internal void FlushAll()

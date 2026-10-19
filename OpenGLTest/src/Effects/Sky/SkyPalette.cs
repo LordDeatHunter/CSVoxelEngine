@@ -35,40 +35,40 @@ public readonly record struct SkyPalette(Vector3 Zenith, Vector3 Horizon, Vector
     public static SkyPalette Compute(float dayness, float duskAmount, float glowAmount = 0f)
     {
         var flat = Vector3.Lerp(NightSky, DaySky, dayness);
-        flat = Vector3.Lerp(flat, DuskSky, duskAmount * WorldGenerationConfig.SkyDuskMix);
-        var glow = DuskGlow * (WorldGenerationConfig.SkyDuskGlowStrength * MathUtils.Clamp01(glowAmount));
+        flat = Vector3.Lerp(flat, DuskSky, duskAmount * SkyConfig.SkyDuskMix);
+        var glow = DuskGlow * (SkyConfig.SkyDuskGlowStrength * MathUtils.Clamp01(glowAmount));
         return new SkyPalette(flat, flat, glow);
     }
 
     /// <summary>
     /// How strong the sunset glow is for a sun at sine-elevation <paramref name="sunElevation"/>,
-    /// 0..1: zero with the sun at or above <see cref="WorldGenerationConfig.SkyGlowAboveSunElevation"/>
-    /// (the flat day sky) and at or below <see cref="WorldGenerationConfig.SkyGlowBelowSunElevation"/>
+    /// 0..1: zero with the sun at or above <see cref="SkyConfig.SkyGlowAboveSunElevation"/>
+    /// (the flat day sky) and at or below <see cref="SkyConfig.SkyGlowBelowSunElevation"/>
     /// (night, once the afterglow has faded), rising smoothly to 1 at
-    /// <see cref="WorldGenerationConfig.SkyGlowPeakSunElevation"/>. The same at dawn, the sun
+    /// <see cref="SkyConfig.SkyGlowPeakSunElevation"/>. The same at dawn, the sun
     /// climbing back through the same band. Below the lower edge the glow is exactly zero, which is
     /// what lets the moon light the world there (<see cref="Moonlight"/>): the world and cloud fog's
     /// SkySample then reads the moon's direction, and with no glow the direction changes nothing.
     /// </summary>
     public static float GlowAmount(float sunElevation) =>
-        MathUtils.SmoothStep(WorldGenerationConfig.SkyGlowBelowSunElevation, WorldGenerationConfig.SkyGlowPeakSunElevation, sunElevation)
-        * (1f - MathUtils.SmoothStep(WorldGenerationConfig.SkyGlowPeakSunElevation, WorldGenerationConfig.SkyGlowAboveSunElevation, sunElevation));
+        MathUtils.SmoothStep(SkyConfig.SkyGlowBelowSunElevation, SkyConfig.SkyGlowPeakSunElevation, sunElevation)
+        * (1f - MathUtils.SmoothStep(SkyConfig.SkyGlowPeakSunElevation, SkyConfig.SkyGlowAboveSunElevation, sunElevation));
 
     /// <summary>
     /// The dome's shape constants as the shaders' <c>uSkyShape</c>: (horizon band, haze width,
     /// haze strength, glow exponent).
     /// </summary>
     public static Vector4 Shape => new(
-        WorldGenerationConfig.SkyHorizonBand,
-        WorldGenerationConfig.SkyHazeWidth,
-        WorldGenerationConfig.SkyHazeStrength,
-        WorldGenerationConfig.SkyGlowExponent);
+        SkyConfig.SkyHorizonBand,
+        SkyConfig.SkyHazeWidth,
+        SkyConfig.SkyHazeStrength,
+        SkyConfig.SkyGlowExponent);
 
     /// <summary>
     /// The horizon sample with no glow (facing away from the sun): the flat fog color the
     /// consumers that cannot sample the dome per direction use.
     /// </summary>
-    public Vector3 HazedHorizon => Horizon * (1f + WorldGenerationConfig.SkyHazeStrength);
+    public Vector3 HazedHorizon => Horizon * (1f + SkyConfig.SkyHazeStrength);
 
     /// <summary>
     /// The dome color in direction <paramref name="dir"/> (need not be normalized in XZ, but

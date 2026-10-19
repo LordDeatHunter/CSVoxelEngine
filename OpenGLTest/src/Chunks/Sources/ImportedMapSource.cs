@@ -180,9 +180,9 @@ public sealed class ImportedMapSource : IWorldSource
                     : new ChunkSnapshot(snapshot.Blocks, snapshot.State, playerPlaced: null);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException
-                                      && attempt < WorldGenerationConfig.SaveMoveRetries)
+                                      && attempt < SaveConfig.SaveMoveRetries)
             {
-                Thread.Sleep(WorldGenerationConfig.SaveMoveRetryDelayMs);
+                Thread.Sleep(SaveConfig.SaveMoveRetryDelayMs);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
             {

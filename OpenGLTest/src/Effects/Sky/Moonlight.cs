@@ -7,7 +7,7 @@ namespace VoxelEngine.Effects.Sky;
 /// GL-free key-light rule: what lights the world directly and casts its shadows. By day that is the
 /// sun; once the sun is well below the horizon it is the moon, a faint cool light from the moon's
 /// direction (the sun's negated, see <see cref="MoonPhase"/>), so a night keeps soft shadows and a
-/// blue cast. The handover happens at <see cref="WorldGenerationConfig.MoonlightSwitchSunElevation"/>
+/// blue cast. The handover happens at <see cref="SkyConfig.MoonlightSwitchSunElevation"/>
 /// with both lights at zero strength: the sun's light eases out on its way down to it
 /// (<see cref="SunFade"/>) and the moon's eases in from it as the moon climbs (<see cref="Rise"/>), so
 /// neither the light nor the shadow direction ever pops. The switch also lies at or below the end of
@@ -24,7 +24,7 @@ public static class Moonlight
 
     /// <summary>Whether a sun at sine-elevation <paramref name="sunElevation"/> has handed the world's
     /// light to the moon (at and below the switch).</summary>
-    public static bool IsMoonLit(float sunElevation) => sunElevation <= WorldGenerationConfig.MoonlightSwitchSunElevation;
+    public static bool IsMoonLit(float sunElevation) => sunElevation <= SkyConfig.MoonlightSwitchSunElevation;
 
     /// <summary>The unit direction the world is lit from: <paramref name="sunDir"/> by day, the moon's
     /// (<paramref name="sunDir"/> negated) once <see cref="IsMoonLit"/>.</summary>
@@ -33,24 +33,24 @@ public static class Moonlight
     /// <summary>The share of its own light the sun keeps as it sets: 1 while it is up, easing to 0 at
     /// the switch, so the floor it lit the night with from below the horizon is gone by the handover.</summary>
     public static float SunFade(float sunElevation) =>
-        MathUtils.SmoothStep(WorldGenerationConfig.MoonlightSwitchSunElevation, 0f, sunElevation);
+        MathUtils.SmoothStep(SkyConfig.MoonlightSwitchSunElevation, 0f, sunElevation);
 
     /// <summary>How far the moonlight has come in, 0 at the switch to 1 once the sun is
-    /// <see cref="WorldGenerationConfig.MoonlightRiseBand"/> further down (the moon that much higher).</summary>
+    /// <see cref="SkyConfig.MoonlightRiseBand"/> further down (the moon that much higher).</summary>
     public static float Rise(float sunElevation) =>
-        MathUtils.SmoothStep(WorldGenerationConfig.MoonlightSwitchSunElevation,
-            WorldGenerationConfig.MoonlightSwitchSunElevation - WorldGenerationConfig.MoonlightRiseBand, sunElevation);
+        MathUtils.SmoothStep(SkyConfig.MoonlightSwitchSunElevation,
+            SkyConfig.MoonlightSwitchSunElevation - SkyConfig.MoonlightRiseBand, sunElevation);
 
     /// <summary>How much of the full moon's light phase <paramref name="phase"/> gives
-    /// (<see cref="MoonPhase.Fraction"/>): <see cref="WorldGenerationConfig.MoonlightNewMoonShare"/> at a
+    /// (<see cref="MoonPhase.Fraction"/>): <see cref="SkyConfig.MoonlightNewMoonShare"/> at a
     /// new moon, rising with the lit share of the disc to 1 at full.</summary>
     public static float PhaseShare(float phase) =>
-        MathUtils.Lerp(WorldGenerationConfig.MoonlightNewMoonShare, 1f, MoonPhase.IlluminatedFraction(phase));
+        MathUtils.Lerp(SkyConfig.MoonlightNewMoonShare, 1f, MoonPhase.IlluminatedFraction(phase));
 
     /// <summary>The moonlight's strength in the world shader's sun-intensity units for a sun at
     /// sine-elevation <paramref name="sunElevation"/> and moon phase <paramref name="phase"/>; zero
     /// while the sun still lights the world.</summary>
     public static float Intensity(float sunElevation, float phase) => IsMoonLit(sunElevation)
-        ? WorldGenerationConfig.MoonlightIntensity * Rise(sunElevation) * PhaseShare(phase)
+        ? SkyConfig.MoonlightIntensity * Rise(sunElevation) * PhaseShare(phase)
         : 0f;
 }

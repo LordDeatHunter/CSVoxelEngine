@@ -136,13 +136,13 @@ public class BlockCubeCache : IDisposable
 
     /// <summary>
     /// The one cube every plain-color chip draws (<see cref="DebrisLook.Color"/>, a slime's goo):
-    /// <see cref="BuildColorChip"/> over <see cref="WorldGenerationConfig.ColorChipTile"/>, painted per
+    /// <see cref="BuildColorChip"/> over <see cref="JuiceConfig.ColorChipTile"/>, painted per
     /// draw by <c>uBiomeTint</c>.
     /// </summary>
     public Mesh GetColorChip()
     {
         if (_colorChip != null) return _colorChip;
-        var (vertices, indices) = BuildColorChip(TextureAtlas.TileOf(WorldGenerationConfig.ColorChipTile));
+        var (vertices, indices) = BuildColorChip(TextureAtlas.TileOf(JuiceConfig.ColorChipTile));
         _colorChip = new Mesh(_gl, vertices, indices);
         return _colorChip;
     }

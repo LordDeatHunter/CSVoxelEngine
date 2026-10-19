@@ -45,7 +45,7 @@ public sealed class BiomeGradeTests
     [Fact]
     public void TheGradeIsAlwaysFaint()
     {
-        var cap = WorldGenerationConfig.BiomeGradeStrength + 1e-6f;
+        var cap = PostProcessConfig.BiomeGradeStrength + 1e-6f;
         for (var warmth = 0f; warmth <= 1f; warmth += 0.02f)
         for (var wet = 0f; wet <= 1f; wet += 0.02f)
         {
@@ -70,6 +70,6 @@ public sealed class BiomeGradeTests
             previousDistance = distance;
         }
 
-        Assert.True(previousDistance < 0.01f * WorldGenerationConfig.BiomeGradeStrength + 1e-4f);
+        Assert.True(previousDistance < 0.01f * PostProcessConfig.BiomeGradeStrength + 1e-4f);
     }
 }

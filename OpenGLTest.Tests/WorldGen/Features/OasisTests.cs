@@ -35,13 +35,13 @@ public sealed class OasisTests
         Assert.True(found, "no oasis site found in the scanned cells");
 
         Assert.True(OasisGenerator.IsDisc(centerX, centerZ));
-        Assert.True(OasisGenerator.IsDisc(centerX + WorldGenerationConfig.OasisRadius - 1, centerZ));
-        Assert.False(OasisGenerator.IsDisc(centerX + WorldGenerationConfig.OasisRadius + 1, centerZ));
+        Assert.True(OasisGenerator.IsDisc(centerX + WorldFeatureConfig.OasisRadius - 1, centerZ));
+        Assert.False(OasisGenerator.IsDisc(centerX + WorldFeatureConfig.OasisRadius + 1, centerZ));
 
         // The pond is the inner disc, and the surface is one under the center's land height, so
         // the pond digs in rather than floods
         Assert.True(OasisGenerator.IsPond(centerX, centerZ));
-        Assert.False(OasisGenerator.IsPond(centerX + WorldGenerationConfig.OasisPondRadius + 1, centerZ));
+        Assert.False(OasisGenerator.IsPond(centerX + WorldFeatureConfig.OasisPondRadius + 1, centerZ));
         Assert.True(surface < (int)TerrainGenerator.LandHeight(centerX, centerZ, out _, out _, out _, out _));
     }
 

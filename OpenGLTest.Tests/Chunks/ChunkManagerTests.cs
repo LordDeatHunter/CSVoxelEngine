@@ -85,7 +85,7 @@ public sealed class ChunkManagerTests
 
         // Out-of-range entries drop on sight, but only up to the per-frame scan cap;
         // the rest wait for the next frames instead of costing milliseconds at once.
-        Assert.Equal(total - WorldGenerationConfig.MaxDirtyScanPerFrame, manager.DirtyCount);
+        Assert.Equal(total - StreamingConfig.MaxDirtyScanPerFrame, manager.DirtyCount);
         manager.Update(camera);
         Assert.Equal(0, manager.DirtyCount);
     }
@@ -160,9 +160,9 @@ public sealed class ChunkManagerTests
         // keep the first, and nothing keeps the other.
         var nearSecond = second + new Vector3(1f, 0f, 1f);
         var nearNeither = new Vector3(50f, 0f, 0f);
-        Assert.True(Vector3.DistanceSquared(nearSecond, first) > WorldGenerationConfig.ChunkRadiusSq);
-        Assert.True(Vector3.DistanceSquared(nearNeither, first) > WorldGenerationConfig.ChunkRadiusSq);
-        Assert.True(Vector3.DistanceSquared(nearNeither, second) > WorldGenerationConfig.ChunkRadiusSq);
+        Assert.True(Vector3.DistanceSquared(nearSecond, first) > StreamingConfig.ChunkRadiusSq);
+        Assert.True(Vector3.DistanceSquared(nearNeither, first) > StreamingConfig.ChunkRadiusSq);
+        Assert.True(Vector3.DistanceSquared(nearNeither, second) > StreamingConfig.ChunkRadiusSq);
 
         foreach (var pos in new[] { first, nearSecond, nearNeither })
         {

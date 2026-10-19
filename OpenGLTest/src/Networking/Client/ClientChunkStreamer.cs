@@ -181,7 +181,7 @@ public sealed class ClientChunkStreamer : IColumnSource
     // worker scans, built once).
     private static Vector3[] BuildOffsets()
     {
-        var radius = WorldGenerationConfig.ChunkRadius;
+        var radius = StreamingConfig.ChunkRadius;
         var offsets = new List<(int Dist2, Vector3 Offset)>();
         for (var dx = -radius; dx <= radius; dx++)
         for (var dy = -radius; dy <= radius; dy++)

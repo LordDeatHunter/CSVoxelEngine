@@ -21,7 +21,7 @@ public sealed class AuroraTests
     [Fact]
     public void ThereIsNoAuroraByDay()
     {
-        for (var e = WorldGenerationConfig.StarsGoneAboveSunElevation; e <= 1f; e += 0.01f)
+        for (var e = SkyConfig.StarsGoneAboveSunElevation; e <= 1f; e += 0.01f)
             foreach (var cold in new[] { 0f, 0.7f, 1f })
                 Assert.Equal(0f, Aurora.Visibility(cold, StarField.Visibility(e)));
     }
@@ -32,7 +32,7 @@ public sealed class AuroraTests
         // The climate's warmth is exactly 0.5 across the temperate band and above it in the warm lands
         for (var warmth = 0.5f; warmth <= 1f; warmth += 0.01f)
             Assert.Equal(0f, Aurora.Visibility(Aurora.TargetColdness(true, warmth), 1f));
-        for (var cold = 0f; cold <= WorldGenerationConfig.AuroraColdStart; cold += 0.01f)
+        for (var cold = 0f; cold <= SkyConfig.AuroraColdStart; cold += 0.01f)
             Assert.Equal(0f, Aurora.Visibility(cold, 1f));
     }
 
@@ -47,7 +47,7 @@ public sealed class AuroraTests
             previous = v;
         }
 
-        Assert.Equal(1f, Aurora.Visibility(WorldGenerationConfig.AuroraColdFull, 1f), 5);
+        Assert.Equal(1f, Aurora.Visibility(SkyConfig.AuroraColdFull, 1f), 5);
         previous = 0f;
         for (var stars = 0f; stars <= 1f; stars += 0.01f)
         {

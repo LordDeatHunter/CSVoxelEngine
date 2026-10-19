@@ -119,7 +119,7 @@ internal sealed class BlockEditor
         // otherwise pop it on first contact)
         if (BlockType.IsFluid(brokenId)) return;
 
-        _debris.Burst(blockPos, brokenId, WorldGenerationConfig.BlockDebrisOnBreak,
+        _debris.Burst(blockPos, brokenId, ParticleConfig.BlockDebrisOnBreak,
             columns: _chunkManager.ColumnSource);
 
         // Creative breaks drop nothing, but trees still fall. A client rolls no loot at all: what
@@ -182,7 +182,7 @@ internal sealed class BlockEditor
                 TreeGenerator.PoisonCanopy((int)blockPos.X, (int)blockPos.Z, TreeGenerator.SingleEditPoisonRadius);
                 _lodManager.MarkEditedColumn((int)blockPos.X, (int)blockPos.Z);
             }
-            _leaves.Burst(blockPos, WorldGenerationConfig.LeafParticleBurstMined);
+            _leaves.Burst(blockPos, ParticleConfig.LeafParticleBurstMined);
         }
 
         // Pebbles, torches and their kind need the block holding them up: pop whatever the break
@@ -327,7 +327,7 @@ internal sealed class BlockEditor
             felledLeaves.Add(block.Cell);
         }
         if (felledLeaves != null)
-            _leaves.BurstCells(felledLeaves, WorldGenerationConfig.LeafParticleBurstFell);
+            _leaves.BurstCells(felledLeaves, ParticleConfig.LeafParticleBurstFell);
 
         // The tree tips away from whoever felled it, pivoting on the mined cell's base
         var away = new Vector3(
@@ -508,14 +508,14 @@ internal sealed class BlockEditor
             center += block.Cell;
         }
 
-        _leaves.BurstCells(_thudLeaves, WorldGenerationConfig.LeafParticleBurstThud);
+        _leaves.BurstCells(_thudLeaves, ParticleConfig.LeafParticleBurstThud);
         GroundDust.TreeThud(_thudWood, _chunkManager, _debris);
         if (_thudWood.Count == 0) return;
         center = center / _thudWood.Count + new Vector3(0.5f);
-        var strength = WorldGenerationConfig.TreeThudShakeStrength
-                       * MathUtils.Clamp01(_thudWood.Count / (float)WorldGenerationConfig.TreeThudFullWoodCells);
-        Camera.AddShake(ShakeFalloff.Trauma(strength, WorldGenerationConfig.TreeThudShakeNearBlocks,
-            WorldGenerationConfig.TreeThudShakeRangeBlocks, Vector3.Distance(Camera.Position, center)));
+        var strength = JuiceConfig.TreeThudShakeStrength
+                       * MathUtils.Clamp01(_thudWood.Count / (float)JuiceConfig.TreeThudFullWoodCells);
+        Camera.AddShake(ShakeFalloff.Trauma(strength, JuiceConfig.TreeThudShakeNearBlocks,
+            JuiceConfig.TreeThudShakeRangeBlocks, Vector3.Distance(Camera.Position, center)));
     }
 
     /// <summary>Swings falling trees, then pops their wood out as item drops once rested.</summary>

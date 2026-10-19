@@ -17,23 +17,23 @@ namespace VoxelEngine.Lod;
 internal static class LodSkyExposure
 {
     /// <summary>
-    /// Horizon term: 1 minus <see cref="WorldGenerationConfig.LodValleyShade"/> times the mean
+    /// Horizon term: 1 minus <see cref="SurfaceShadingConfig.LodValleyShade"/> times the mean
     /// of how far each of the three columns rises above the vertex, in units of
-    /// <see cref="WorldGenerationConfig.LodSkyRiseCells"/> (saturating at 1). Each column sits one
+    /// <see cref="SurfaceShadingConfig.LodSkyRiseCells"/> (saturating at 1). Each column sits one
     /// cell step away, so the rise is a slope and reads the same at every LOD level.
     /// </summary>
     public static float Horizon(int vertexY, int a, int b, int c)
     {
         var blocked = (Blocked(vertexY, a) + Blocked(vertexY, b) + Blocked(vertexY, c)) / 3f;
-        return 1f - WorldGenerationConfig.LodValleyShade * blocked;
+        return 1f - SurfaceShadingConfig.LodValleyShade * blocked;
     }
 
     private static float Blocked(int vertexY, int top) =>
-        Math.Clamp((top + 1 - vertexY) / WorldGenerationConfig.LodSkyRiseCells, 0f, 1f);
+        Math.Clamp((top + 1 - vertexY) / SurfaceShadingConfig.LodSkyRiseCells, 0f, 1f);
 
     /// <summary>
     /// Understory term for canopy airspace: 1 at a bump's top face, falling by
-    /// <see cref="WorldGenerationConfig.LodCanopyShade"/> toward its base at the ground line.
+    /// <see cref="SurfaceShadingConfig.LodCanopyShade"/> toward its base at the ground line.
     /// A column with no bump (<paramref name="top"/> at or below <paramref name="ground"/>) is 1.
     /// </summary>
     public static float Understory(int vertexY, int ground, int top)
@@ -41,13 +41,13 @@ internal static class LodSkyExposure
         if (top <= ground)
             return 1f;
         var depth = Math.Clamp((top + 1 - vertexY) / (float)(top - ground), 0f, 1f);
-        return 1f - WorldGenerationConfig.LodCanopyShade * depth;
+        return 1f - SurfaceShadingConfig.LodCanopyShade * depth;
     }
 
     /// <summary>Multiplies the two terms, floored at
-    /// <see cref="WorldGenerationConfig.LodSkyExposureFloor"/> so no far face goes black.</summary>
+    /// <see cref="SurfaceShadingConfig.LodSkyExposureFloor"/> so no far face goes black.</summary>
     public static float Combine(float horizon, float understory) =>
-        Math.Clamp(horizon * understory, WorldGenerationConfig.LodSkyExposureFloor, 1f);
+        Math.Clamp(horizon * understory, SurfaceShadingConfig.LodSkyExposureFloor, 1f);
 
     /// <summary>
     /// Exposure of one top-face corner: the horizon over the same three ring columns the

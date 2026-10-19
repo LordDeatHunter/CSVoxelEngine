@@ -36,11 +36,11 @@ public static class MobTargets
 
     /// <summary>
     /// How far, horizontally, a mob notices <paramref name="target"/> from:
-    /// <see cref="WorldGenerationConfig.MobNoticeRadiusBlocks"/>, times
-    /// <see cref="WorldGenerationConfig.MobSneakNoticeFactor"/> while the target sneaks.
+    /// <see cref="MobConfig.MobNoticeRadiusBlocks"/>, times
+    /// <see cref="MobConfig.MobSneakNoticeFactor"/> while the target sneaks.
     /// </summary>
     public static float NoticeRadius(IMobTarget target) =>
-        WorldGenerationConfig.MobNoticeRadiusBlocks * (target.IsSneaking ? WorldGenerationConfig.MobSneakNoticeFactor : 1f);
+        MobConfig.MobNoticeRadiusBlocks * (target.IsSneaking ? MobConfig.MobSneakNoticeFactor : 1f);
 
     /// <summary>
     /// Index of the target a mob at <paramref name="position"/> chases: the horizontally nearest

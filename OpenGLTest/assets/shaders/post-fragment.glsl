@@ -15,11 +15,11 @@ in vec2 fUv;
 uniform sampler2D uScene;
 uniform float uExposure;
 uniform vec2 uResolution;      // scene texture size in pixels; taps clamp to it
-uniform float uFxaaReduceMin;  // WorldGenerationConfig.FxaaReduceMin
-uniform float uFxaaReduceMul;  // WorldGenerationConfig.FxaaReduceMul
-uniform float uFxaaSpanMax;    // WorldGenerationConfig.FxaaSpanMax, in pixels
-uniform float uFxaaEdgeThreshold;     // WorldGenerationConfig.FxaaEdgeThreshold
-uniform float uFxaaEdgeThresholdMin;  // WorldGenerationConfig.FxaaEdgeThresholdMin
+uniform float uFxaaReduceMin;  // PostProcessConfig.FxaaReduceMin
+uniform float uFxaaReduceMul;  // PostProcessConfig.FxaaReduceMul
+uniform float uFxaaSpanMax;    // PostProcessConfig.FxaaSpanMax, in pixels
+uniform float uFxaaEdgeThreshold;     // PostProcessConfig.FxaaEdgeThreshold
+uniform float uFxaaEdgeThresholdMin;  // PostProcessConfig.FxaaEdgeThresholdMin
 // The biome color grade (BiomeGrade): a faint display-space multiplier over the finished image,
 // warm over the desert and cool over the snow; (1, 1, 1) leaves the image alone.
 uniform vec3 uGrade;

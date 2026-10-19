@@ -108,7 +108,7 @@ public sealed class ChunkGenerationWorkerTests
         // Further apart than two load radii, so no chunk is inside both spheres and each claim
         // belongs to exactly one focus.
         const int apartChunks = 40;
-        Assert.True(apartChunks > 2 * WorldGenerationConfig.ChunkRadius);
+        Assert.True(apartChunks > 2 * StreamingConfig.ChunkRadius);
         var near = new Vector3(80f, 96f, -64f);
         var far = near + new Vector3(apartChunks * Chunk.Size, 0f, 0f);
         focus.SetEyes([near, far]);
@@ -128,9 +128,9 @@ public sealed class ChunkGenerationWorkerTests
                 $"round {round}: {claimed} is neither focus's closest needed chunk");
 
             var owner = claimed == expectedNear ? 0 : 1;
-            Assert.True(Vector3.DistanceSquared(claimed, foci[owner]) <= WorldGenerationConfig.ChunkRadiusSq,
+            Assert.True(Vector3.DistanceSquared(claimed, foci[owner]) <= StreamingConfig.ChunkRadiusSq,
                 $"round {round}: {claimed} lies outside its focus's radius");
-            Assert.True(StreamingFocus.WithinRadius(foci, claimed, WorldGenerationConfig.ChunkRadiusSq));
+            Assert.True(StreamingFocus.WithinRadius(foci, claimed, StreamingConfig.ChunkRadiusSq));
             claims[owner]++;
 
             manager.Chunks[claimed] = new Chunk(null!, claimed, generateBlockData: false);
@@ -166,12 +166,12 @@ public sealed class ChunkGenerationWorkerTests
             Assert.True(actual.Add(offset), $"duplicate offset {offset}");
 
         var expected = new HashSet<Vector3>();
-        const int radius = WorldGenerationConfig.ChunkRadius;
+        const int radius = StreamingConfig.ChunkRadius;
         for (var dx = -radius; dx <= radius; dx++)
         for (var dy = -radius; dy <= radius; dy++)
         for (var dz = -radius; dz <= radius; dz++)
         {
-            if (dx * dx + dy * dy + dz * dz <= WorldGenerationConfig.ChunkRadiusSq)
+            if (dx * dx + dy * dy + dz * dz <= StreamingConfig.ChunkRadiusSq)
                 expected.Add(new Vector3(dx, dy, dz));
         }
 

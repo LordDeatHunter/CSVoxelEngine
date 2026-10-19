@@ -16,14 +16,14 @@ public static class DayCycle
     public const float StartAngle = 0.8f;
 
     /// <summary>The first lighting time at which the sun stands highest (its orbit angle a quarter
-    /// turn), about 147 s; noon recurs every <see cref="WorldGenerationConfig.DayLengthSeconds"/>.</summary>
-    public static double NoonTime => (MathF.PI / 2f - StartAngle) / MathF.Tau * WorldGenerationConfig.DayLengthSeconds;
+    /// turn), about 147 s; noon recurs every <see cref="SkyConfig.DayLengthSeconds"/>.</summary>
+    public static double NoonTime => (MathF.PI / 2f - StartAngle) / MathF.Tau * SkyConfig.DayLengthSeconds;
 
     /// <summary>The unit direction toward the sun: one orbit per
-    /// <see cref="WorldGenerationConfig.DayLengthSeconds"/>, phased to start mid-morning.</summary>
+    /// <see cref="SkyConfig.DayLengthSeconds"/>, phased to start mid-morning.</summary>
     public static Vector3 SunDirection(double time)
     {
-        var angle = (float)(time / WorldGenerationConfig.DayLengthSeconds) * MathF.Tau + StartAngle;
+        var angle = (float)(time / SkyConfig.DayLengthSeconds) * MathF.Tau + StartAngle;
         return Vector3.Normalize(new Vector3(MathF.Cos(angle), MathF.Sin(angle), 0.35f));
     }
 

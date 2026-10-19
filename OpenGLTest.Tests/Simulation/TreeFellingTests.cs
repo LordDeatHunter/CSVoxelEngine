@@ -324,7 +324,7 @@ public sealed class TreeFellingTests
                 StampedTree.WriteCell(chunks, cell, oak.WoodId, shell);
             StampedTree.WriteCell(chunks, (8, 9, 8), groundId, groundState);
 
-            var support = new TreeSupport(WorldGenerationConfig.TreeFellWoodCap);
+            var support = new TreeSupport(SimulationConfig.TreeFellWoodCap);
             var result = support.Search(chunks.TryGetCell, 8, 12, 8,
                 hasExcluded: false, 0, 0, 0, unloadedIsUnknown: true);
             Assert.True(expected == result, $"a shell stack on block {groundId} searched {result}, expected {expected}");

@@ -43,7 +43,7 @@ public sealed class GoblinStoneTests
             goblins.Update(Dt, chunks, new DropManager(), camera, slimes: slimes.Slimes);
 
         Assert.True(slime.Health < before, "the stone never struck the slime");
-        Assert.Equal(before - WorldGenerationConfig.GoblinStoneDamage, slime.Health);
+        Assert.Equal(before - MobConfig.GoblinStoneDamage, slime.Health);
         Assert.Empty(goblins.Stones);
 
         // A stone thrown straight at its own thrower's cell passes through it

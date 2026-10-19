@@ -50,15 +50,15 @@ public sealed class GodraysRenderer : IDisposable
         _march.SetUniform("uShadowMap", 1);
         _march.SetUniform("uCloudShadowMap", cloudShadowUnit);
         _march.SetUniform("uCloudCells", CloudField.Cells);
-        _march.SetUniform("uCloudHeight", WorldGenerationConfig.CloudHeight);
-        _march.SetUniform("uCloudField", WorldGenerationConfig.CloudFieldSize);
-        _march.SetUniform("uMaxDistance", WorldGenerationConfig.GodraysMaxDistance);
-        _march.SetUniform("uSteps", WorldGenerationConfig.GodraysSteps);
-        _march.SetUniform("uPhaseExponent", WorldGenerationConfig.GodraysPhaseExponent);
-        _march.SetUniform("uPhaseFloor", WorldGenerationConfig.GodraysPhaseFloor);
-        _march.SetUniform("uDensity", WorldGenerationConfig.GodraysDensityPerBlock);
-        _march.SetUniform("uMaxAdd", WorldGenerationConfig.GodraysMaxAdd);
-        _march.SetUniform("uSkyBlocks", WorldGenerationConfig.GodraysSkyBlocks);
+        _march.SetUniform("uCloudHeight", SkyConfig.CloudHeight);
+        _march.SetUniform("uCloudField", SkyConfig.CloudFieldSize);
+        _march.SetUniform("uMaxDistance", PostProcessConfig.GodraysMaxDistance);
+        _march.SetUniform("uSteps", PostProcessConfig.GodraysSteps);
+        _march.SetUniform("uPhaseExponent", PostProcessConfig.GodraysPhaseExponent);
+        _march.SetUniform("uPhaseFloor", PostProcessConfig.GodraysPhaseFloor);
+        _march.SetUniform("uDensity", PostProcessConfig.GodraysDensityPerBlock);
+        _march.SetUniform("uMaxAdd", PostProcessConfig.GodraysMaxAdd);
+        _march.SetUniform("uSkyBlocks", PostProcessConfig.GodraysSkyBlocks);
 
         // The composite blurs the march radially toward the sun and adds it in display space
         _composite = new Shader(gl,
@@ -67,9 +67,9 @@ public sealed class GodraysRenderer : IDisposable
         _composite.Use();
         _composite.SetUniform("uRays", 5);
         _composite.SetUniform("uScene", SceneUnit);
-        _composite.SetUniform("uBlurLength", WorldGenerationConfig.GodraysBlurLength);
-        _composite.SetUniform("uDecay", WorldGenerationConfig.GodraysBlurDecay);
-        _composite.SetUniform("uSamples", WorldGenerationConfig.GodraysBlurSamples);
+        _composite.SetUniform("uBlurLength", PostProcessConfig.GodraysBlurLength);
+        _composite.SetUniform("uDecay", PostProcessConfig.GodraysBlurDecay);
+        _composite.SetUniform("uSamples", PostProcessConfig.GodraysBlurSamples);
 
         // One triangle covering NDC: the two off-screen corners keep the visible area seamless
         Span<float> vertices = [-1f, -1f, 3f, -1f, -1f, 3f];

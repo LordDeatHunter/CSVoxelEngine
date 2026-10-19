@@ -10,7 +10,7 @@ public sealed class MovementState
     /// <summary>
     /// Server seconds the player has spent airborne, out of water and not sinking, over its last
     /// consecutive judged states; anything that lands, swims, falls, flies or lags resets it. Past
-    /// <see cref="WorldGenerationConfig.NetHoverGraceSeconds"/> the player is hovering.
+    /// <see cref="NetworkConfig.NetHoverGraceSeconds"/> the player is hovering.
     /// </summary>
     public double AirborneStillSeconds { get; set; }
 }

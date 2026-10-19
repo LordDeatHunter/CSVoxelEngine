@@ -10,7 +10,7 @@ using VoxelEngine.WorldGen;
 namespace VoxelEngine.Simulation;
 
 /// <summary>
-/// The fluid simulation: a fixed tick (<see cref="WorldGenerationConfig.FluidTickSeconds"/>)
+/// The fluid simulation: a fixed tick (<see cref="SimulationConfig.FluidTickSeconds"/>)
 /// over a set of scheduled cells, mirroring Minecraft's water rules — infinite sources, a
 /// flowing skirt that thins by one level per block, columns that fall, and a slope search that
 /// makes water prefer the nearest hole.
@@ -170,7 +170,7 @@ public class FluidManager
     /// Interior frontiers were found on the generation worker (<see cref="Chunk.FluidFrontier"/>);
     /// the borders need both chunks loaded, so they are scanned here — always for a restored
     /// chunk and for a chunk loading beside one, since poured water can sit at any height. At most
-    /// <see cref="WorldGenerationConfig.MaxWakeChunksPerFrame"/> chunks are woken per call; the
+    /// <see cref="SimulationConfig.MaxWakeChunksPerFrame"/> chunks are woken per call; the
     /// rest wait in the queue for the next frame.
     ///
     /// Main thread, called once a frame right before <see cref="Update"/> so the cells it
@@ -179,8 +179,8 @@ public class FluidManager
     public void WakeLoadedChunks(ChunkManager chunks)
     {
         var woken = 0;
-        var backlog = WorldGenerationConfig.MaxFluidBacklogCells;
-        while (woken < WorldGenerationConfig.MaxWakeChunksPerFrame
+        var backlog = SimulationConfig.MaxFluidBacklogCells;
+        while (woken < SimulationConfig.MaxWakeChunksPerFrame
                && _next.Count < backlog
                && chunks.TryDequeueLoaded(out var chunk))
         {
@@ -351,9 +351,9 @@ public class FluidManager
 
     /// <summary>
     /// Advances the fluid simulation. A new tick starts at most every
-    /// <see cref="WorldGenerationConfig.FluidTickSeconds"/> and at most
-    /// <see cref="WorldGenerationConfig.MaxFluidTicksPerFrame"/> times per frame, but a tick's
-    /// cells are processed in slices of <see cref="WorldGenerationConfig.MaxFluidCellsPerFrame"/>
+    /// <see cref="SimulationConfig.FluidTickSeconds"/> and at most
+    /// <see cref="SimulationConfig.MaxFluidTicksPerFrame"/> times per frame, but a tick's
+    /// cells are processed in slices of <see cref="SimulationConfig.MaxFluidCellsPerFrame"/>
     /// so a chunk-load wake storm spreads over several frames instead of running in one.
     /// Leftover time past the tick budget is dropped, so a hitch can never leave the simulation
     /// spiraling to catch up.
@@ -374,23 +374,23 @@ public class FluidManager
 
         var ticks = 0;
         var processed = 0;
-        while (processed < WorldGenerationConfig.MaxFluidCellsPerFrame)
+        while (processed < SimulationConfig.MaxFluidCellsPerFrame)
         {
             // The previous tick is fully processed, so start the next one when it is due
             if (_tickCursor >= _tickCells.Count)
             {
-                if (_accumulator < WorldGenerationConfig.FluidTickSeconds
-                    || ticks >= WorldGenerationConfig.MaxFluidTicksPerFrame)
+                if (_accumulator < SimulationConfig.FluidTickSeconds
+                    || ticks >= SimulationConfig.MaxFluidTicksPerFrame)
                     break;
 
-                _accumulator -= WorldGenerationConfig.FluidTickSeconds;
+                _accumulator -= SimulationConfig.FluidTickSeconds;
                 ticks++;
                 BeginTick();
                 if (_tickCells.Count == 0) continue;
             }
 
             // Spend what is left of the frame's cell budget on the current tick, then yield
-            var slice = Math.Min(WorldGenerationConfig.MaxFluidCellsPerFrame - processed,
+            var slice = Math.Min(SimulationConfig.MaxFluidCellsPerFrame - processed,
                 _tickCells.Count - _tickCursor);
             var end = _tickCursor + slice;
             for (; _tickCursor < end; _tickCursor++)
@@ -400,7 +400,7 @@ public class FluidManager
             if (_tickCursor < _tickCells.Count) break;
         }
 
-        if (_accumulator >= WorldGenerationConfig.FluidTickSeconds) _accumulator = 0f;
+        if (_accumulator >= SimulationConfig.FluidTickSeconds) _accumulator = 0f;
 
         if (_dirtyChunks.Count > 0)
         {
@@ -614,7 +614,7 @@ public class FluidManager
     /// <summary>
     /// The horizontal directions water should take out of a cell (Minecraft's <c>getSpread</c>):
     /// the ones whose nearest hole is closest, within
-    /// <see cref="WorldGenerationConfig.FluidSlopeSearchDistance"/> blocks. On flat ground no
+    /// <see cref="SimulationConfig.FluidSlopeSearchDistance"/> blocks. On flat ground no
     /// direction finds a hole, they all tie, and the water spreads evenly.
     /// </summary>
     private List<(int X, int Y, int Z)> ChooseSpreadDirections(int x, int y, int z, byte fluid)
@@ -662,7 +662,7 @@ public class FluidManager
     /// <summary>
     /// Blocks from <paramref name="depth"/> to the nearest hole reachable through passable
     /// cells, or <see cref="NoSlope"/> when none is within
-    /// <see cref="WorldGenerationConfig.FluidSlopeSearchDistance"/>. Never turns back on
+    /// <see cref="SimulationConfig.FluidSlopeSearchDistance"/>. Never turns back on
     /// itself (<paramref name="exclude"/>), so the search fans out.
     /// </summary>
     private int SlopeDistance(int x, int y, int z, int depth, (int X, int Y, int Z) exclude, byte fluid)
@@ -686,7 +686,7 @@ public class FluidManager
             // hole above, but its recursion can only tie, never beat, so it is skipped.
             if (best == depth + 1) continue;
 
-            if (depth >= WorldGenerationConfig.FluidSlopeSearchDistance) continue;
+            if (depth >= SimulationConfig.FluidSlopeSearchDistance) continue;
 
             var distance = SlopeDistance(nx, ny, nz, depth + 1, (-dx, -dy, -dz), fluid);
             if (distance < best) best = distance;

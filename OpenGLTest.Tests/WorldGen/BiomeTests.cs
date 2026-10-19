@@ -547,7 +547,7 @@ public sealed class BiomeTests
         // The temperate band must be at least the full-detail load radius wide, so a player standing
         // on the last dune never has snow loaded around them. Hot = would be desert if fully dry (the
         // temperature band itself, independent of humidity luck); cold = the snow line.
-        var bufferBlocks = WorldGenerationConfig.ChunkRadius * Chunk.Size;
+        var bufferBlocks = StreamingConfig.ChunkRadius * Chunk.Size;
         const int stride = 8;
         const int window = 2048;
         // Cold seeds just outside the asserted window still count.

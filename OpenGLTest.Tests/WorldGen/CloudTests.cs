@@ -10,10 +10,10 @@ namespace VoxelEngine.Tests.WorldGen;
 
 public sealed class CloudTests(ITestOutputHelper output)
 {
-    private const float S = WorldGenerationConfig.CloudCellSize;
-    private const float T = WorldGenerationConfig.CloudLayerThickness;
-    private const float Y0 = WorldGenerationConfig.CloudHeight;
-    private const float R = WorldGenerationConfig.CloudCornerRadius;
+    private const float S = SkyConfig.CloudCellSize;
+    private const float T = SkyConfig.CloudLayerThickness;
+    private const float Y0 = SkyConfig.CloudHeight;
+    private const float R = SkyConfig.CloudCornerRadius;
 
     /// <summary>
     /// Walks the mesh triangle by triangle, handing back the geometric normal. The rounded mesher
@@ -55,9 +55,9 @@ public sealed class CloudTests(ITestOutputHelper output)
             var points = new[] { (3.3f, 17.9f), (200.25f, 0.5f), ((cells - 0.1f), (cells - 0.9f)) };
             foreach (var (x, z) in points)
             {
-                var baseline = CloudField.Density(x, z, cells, WorldGenerationConfig.CloudSeed);
-                Assert.Equal(baseline, CloudField.Density(x + cells, z, cells, WorldGenerationConfig.CloudSeed), precision: 5);
-                Assert.Equal(baseline, CloudField.Density(x, z + cells, cells, WorldGenerationConfig.CloudSeed), precision: 5);
+                var baseline = CloudField.Density(x, z, cells, SkyConfig.CloudSeed);
+                Assert.Equal(baseline, CloudField.Density(x + cells, z, cells, SkyConfig.CloudSeed), precision: 5);
+                Assert.Equal(baseline, CloudField.Density(x, z + cells, cells, SkyConfig.CloudSeed), precision: 5);
             }
         }
     }
@@ -67,7 +67,7 @@ public sealed class CloudTests(ITestOutputHelper output)
     {
         var levels = CloudField.BuildLevels();
         var cells = levels.GetLength(0);
-        var top = WorldGenerationConfig.CloudMaxLevels;
+        var top = SkyConfig.CloudMaxLevels;
         var filled = 0;
         var counts = new int[top + 1];
         for (var x = 0; x < cells; x++)
@@ -217,15 +217,15 @@ public sealed class CloudTests(ITestOutputHelper output)
         Assert.True(vertices.Length < 1_000_000, $"Runaway field: {vertices.Length} verts");
         Assert.Equal(0, indices.Length % 3);
 
-        var top = Y0 + WorldGenerationConfig.CloudMaxLevels * T;
+        var top = Y0 + SkyConfig.CloudMaxLevels * T;
         // Fillet and octant points can land a hair outside their plane after float rounding, so
         // allow a few ulps of slack (float epsilon at the 2048-block field edge is ~2.4e-4):
         // this catches runaway geometry, not rounding.
         const float slack = 1e-3f;
         foreach (var vertex in vertices)
         {
-            Assert.InRange(vertex.Position.X, -slack, WorldGenerationConfig.CloudFieldSize + slack);
-            Assert.InRange(vertex.Position.Z, -slack, WorldGenerationConfig.CloudFieldSize + slack);
+            Assert.InRange(vertex.Position.X, -slack, SkyConfig.CloudFieldSize + slack);
+            Assert.InRange(vertex.Position.Z, -slack, SkyConfig.CloudFieldSize + slack);
             Assert.InRange(vertex.Position.Y, Y0 - slack, top + slack);
         }
     }

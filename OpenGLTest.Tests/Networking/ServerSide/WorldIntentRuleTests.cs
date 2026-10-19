@@ -255,7 +255,7 @@ public sealed class WorldIntentRuleTests
     [Fact]
     public void AnIntentsEyeMustSitNearThePlayer()
     {
-        var drift = WorldGenerationConfig.NetMaxIntentEyeDriftBlocks;
+        var drift = NetworkConfig.NetMaxIntentEyeDriftBlocks;
         Assert.True(NetValidation.EyeWithin(Eye, Eye + new Vector3(drift * 0.5f, 0f, 0f), drift));
         Assert.False(NetValidation.EyeWithin(Eye, Eye + new Vector3(drift * 2f, 0f, 0f), drift));
     }

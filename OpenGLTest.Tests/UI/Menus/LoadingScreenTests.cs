@@ -58,13 +58,13 @@ public sealed class LoadingScreenTests
 
         var elapsed = 0f;
         var previousAlpha = view.FadeAlpha;
-        while (elapsed < WorldGenerationConfig.LoadingFadeSeconds * 2f)
+        while (elapsed < HudConfig.LoadingFadeSeconds * 2f)
         {
             view.Update(1f, true, Dt);
             elapsed += Dt;
             Assert.True(view.FadeAlpha <= previousAlpha);
             previousAlpha = view.FadeAlpha;
-            if (elapsed < WorldGenerationConfig.LoadingFadeSeconds - Dt)
+            if (elapsed < HudConfig.LoadingFadeSeconds - Dt)
                 Assert.False(view.IsFinished);
         }
         Assert.Equal(0f, view.FadeAlpha, 1e-5f);
@@ -83,7 +83,7 @@ public sealed class LoadingScreenTests
     [Fact]
     public void SpinnerPhaseIsPeriodicAndBounded()
     {
-        var period = WorldGenerationConfig.LoadingSpinnerPeriodSeconds;
+        var period = HudConfig.LoadingSpinnerPeriodSeconds;
         foreach (var t in new[] { 0.0, 0.37, 1.0, 5.5, 123.456, 10_000.25 })
         {
             var phase = LoadingScreenLayout.SpinnerPhase(t);
@@ -103,7 +103,7 @@ public sealed class LoadingScreenTests
     [Fact]
     public void TheLeadingDotIsTheBrightest()
     {
-        var n = WorldGenerationConfig.LoadingSpinnerDots;
+        var n = HudConfig.LoadingSpinnerDots;
         for (var d = 0; d < n; d++)
         {
             // The middle of the phase slice that points at dot d.

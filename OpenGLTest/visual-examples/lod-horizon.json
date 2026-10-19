@@ -1,5 +1,5 @@
 // LOD horizon: four elevated, grounded vantage points, each looking out over the coarse LOD
-// band that lies beyond the 256-block full-detail ring (WorldGenerationConfig.ChunkRadius 16
+// band that lies beyond the 256-block full-detail ring (StreamingConfig.ChunkRadius 16
 // chunks) and out to the level-2 ring at 2048 blocks. This is the scenario to reach for when a
 // change touches far-terrain geometry: the checked-in scenarios all frame near chunks.
 //

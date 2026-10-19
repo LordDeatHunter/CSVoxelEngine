@@ -6,7 +6,7 @@ namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Boulders: a rare blob of stone or cobblestone cells sitting on the forest or taiga floor,
-/// decided per 2^<see cref="WorldGenerationConfig.BoulderCellShift"/>-block cell from a pure hash
+/// decided per 2^<see cref="WorldFeatureConfig.BoulderCellShift"/>-block cell from a pure hash
 /// of (cell, seed), so every chunk a boulder reaches stamps the same cells (clipped at its
 /// border). Its cells share one height (the center column's ground plus one) and go into air only;
 /// the far LOD shows none.
@@ -42,14 +42,14 @@ public static class BoulderGenerator
         count = 0;
         blockId = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x80D1);
-        if (Unit(SplitMix64.Mix(h + AcceptStream)) >= WorldGenerationConfig.BoulderChance) return false;
+        if (Unit(SplitMix64.Mix(h + AcceptStream)) >= WorldFeatureConfig.BoulderChance) return false;
 
-        var size = 1 << WorldGenerationConfig.BoulderCellShift;
+        var size = 1 << WorldFeatureConfig.BoulderCellShift;
         var span = (ulong)size;
-        centerX = (cellX << WorldGenerationConfig.BoulderCellShift) + (int)(SplitMix64.Mix(h + CenterXStream) % span);
-        centerZ = (cellZ << WorldGenerationConfig.BoulderCellShift) + (int)(SplitMix64.Mix(h + CenterZStream) % span);
-        var counts = WorldGenerationConfig.BoulderMaxBlocks - WorldGenerationConfig.BoulderMinBlocks + 1;
-        count = WorldGenerationConfig.BoulderMinBlocks + (int)(SplitMix64.Mix(h + CountStream) % (ulong)counts);
+        centerX = (cellX << WorldFeatureConfig.BoulderCellShift) + (int)(SplitMix64.Mix(h + CenterXStream) % span);
+        centerZ = (cellZ << WorldFeatureConfig.BoulderCellShift) + (int)(SplitMix64.Mix(h + CenterZStream) % span);
+        var counts = WorldFeatureConfig.BoulderMaxBlocks - WorldFeatureConfig.BoulderMinBlocks + 1;
+        count = WorldFeatureConfig.BoulderMinBlocks + (int)(SplitMix64.Mix(h + CountStream) % (ulong)counts);
         blockId = (SplitMix64.Mix(h + MaterialStream) & 1) == 0 ? StoneBlock : CobblestoneBlock;
         return true;
     }
@@ -61,7 +61,7 @@ public static class BoulderGenerator
     /// </summary>
     public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
     {
-        var shift = WorldGenerationConfig.BoulderCellShift;
+        var shift = WorldFeatureConfig.BoulderCellShift;
         var minCellX = (worldX0 - 1) >> shift;
         var maxCellX = (worldX0 + Chunk.Size) >> shift;
         var minCellZ = (worldZ0 - 1) >> shift;

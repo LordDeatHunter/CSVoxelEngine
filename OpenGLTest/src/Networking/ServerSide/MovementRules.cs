@@ -18,11 +18,11 @@ namespace VoxelEngine.Networking.ServerSide;
 /// <see cref="MoveVerdict.Rejected"/>, unless the body already overlapped one where it was: a
 /// player buried by a block written over it may always leave.</item>
 /// <item>Without the flight flag, and only over a short state gap
-/// (<see cref="WorldGenerationConfig.NetMaxJudgedStateGapSeconds"/>), a climb faster than
-/// <see cref="WorldGenerationConfig.NetMaxRiseBlocksPerSecond"/> plus
-/// <see cref="WorldGenerationConfig.NetRiseSlackBlocks"/> is rejected, and so is a body that has
+/// (<see cref="NetworkConfig.NetMaxJudgedStateGapSeconds"/>), a climb faster than
+/// <see cref="NetworkConfig.NetMaxRiseBlocksPerSecond"/> plus
+/// <see cref="NetworkConfig.NetRiseSlackBlocks"/> is rejected, and so is a body that has
 /// stayed airborne, out of water and not sinking for longer than
-/// <see cref="WorldGenerationConfig.NetHoverGraceSeconds"/> (<see cref="MovementState"/>).</item>
+/// <see cref="NetworkConfig.NetHoverGraceSeconds"/> (<see cref="MovementState"/>).</item>
 /// </list>
 /// A body whose cells are not loaded on the server (<see cref="PlayerBodyProbe.IsKnown"/>) is judged
 /// by the speed clamp alone, since an unloaded cell would read as air. A rejected move leaves the
@@ -46,7 +46,7 @@ public static class MovementRules
     public static MoveVerdict Judge(Vector3 from, Vector3 to, double delta, bool flying, ChunkManager chunks,
         MovementState state, out Vector3 accepted)
     {
-        var verdict = NetValidation.AcceptMove(from, to, delta, WorldGenerationConfig.NetMaxMoveBlocksPerSecond,
+        var verdict = NetValidation.AcceptMove(from, to, delta, NetworkConfig.NetMaxMoveBlocksPerSecond,
             out var bounded)
             ? MoveVerdict.Accepted
             : MoveVerdict.Clamped;
@@ -67,14 +67,14 @@ public static class MovementRules
         }
 
         // After a lag spike the climb and the airborne time between two states say nothing
-        if (delta > WorldGenerationConfig.NetMaxJudgedStateGapSeconds)
+        if (delta > NetworkConfig.NetMaxJudgedStateGapSeconds)
         {
             state.AirborneStillSeconds = 0;
             return verdict;
         }
 
-        if (bounded.Y - from.Y > WorldGenerationConfig.NetMaxRiseBlocksPerSecond * (float)delta
-            + WorldGenerationConfig.NetRiseSlackBlocks)
+        if (bounded.Y - from.Y > NetworkConfig.NetMaxRiseBlocksPerSecond * (float)delta
+            + NetworkConfig.NetRiseSlackBlocks)
         {
             accepted = from;
             return MoveVerdict.Rejected;
@@ -84,7 +84,7 @@ public static class MovementRules
                        && !PlayerBodyProbe.InWater(bounded, chunks)
                        && bounded.Y >= from.Y - HoverSinkToleranceBlocks;
         state.AirborneStillSeconds = hovering ? state.AirborneStillSeconds + delta : 0;
-        if (state.AirborneStillSeconds > WorldGenerationConfig.NetHoverGraceSeconds)
+        if (state.AirborneStillSeconds > NetworkConfig.NetHoverGraceSeconds)
         {
             state.AirborneStillSeconds = 0;
             accepted = from;

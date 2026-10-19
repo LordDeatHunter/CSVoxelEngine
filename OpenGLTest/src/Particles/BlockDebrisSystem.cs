@@ -14,7 +14,7 @@ namespace VoxelEngine.Particles;
 /// </summary>
 public class BlockDebrisSystem
 {
-    private readonly ParticleRing<BlockDebris> _debris = new(WorldGenerationConfig.BlockDebrisMax);
+    private readonly ParticleRing<BlockDebris> _debris = new(ParticleConfig.BlockDebrisMax);
 
     public IReadOnlyList<BlockDebris> Debris => _debris;
 
@@ -46,7 +46,7 @@ public class BlockDebrisSystem
                 (rng.NextSingle() * 2f - 1f) * 1.2f,
                 rng.NextSingle() * 1.2f,
                 (rng.NextSingle() * 2f - 1f) * 1.2f);
-            if (_debris.Count >= WorldGenerationConfig.BlockDebrisMax)
+            if (_debris.Count >= ParticleConfig.BlockDebrisMax)
                 _debris.RemoveAt(0);
             _debris.Add(new BlockDebris(blockId, center + jitter, toss, random: rng, tint: tint));
         }
@@ -138,7 +138,7 @@ public class BlockDebrisSystem
                 ? innerRadius / MathF.Max(MathF.Abs(heading.X), MathF.Abs(heading.Z))
                 : 0f;
             var start = origin + heading * (inner + radius * rng.NextSingle());
-            if (_debris.Count >= WorldGenerationConfig.BlockDebrisMax)
+            if (_debris.Count >= ParticleConfig.BlockDebrisMax)
                 _debris.RemoveAt(0);
             _debris.Add(new BlockDebris(blockId, start, launch, size * (0.75f + 0.5f * rng.NextSingle()), rng,
                 tint, pop: false, look: look));

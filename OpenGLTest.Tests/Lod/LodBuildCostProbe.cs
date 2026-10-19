@@ -13,7 +13,7 @@ namespace VoxelEngine.Tests.Lod;
 ///
 /// C5's maximum possible win is bounded above by the MAIN THREAD's drain, not by the
 /// builder. <see cref="LodManager.ApplyCompletedMeshes"/> uploads at most
-/// <see cref="WorldGenerationConfig.MaxLodUploadsPerFrame"/> regions per frame, so region
+/// <see cref="StreamingConfig.MaxLodUploadsPerFrame"/> regions per frame, so region
 /// arrivals can never exceed MaxLodUploadsPerFrame * fps however many builders exist. If a
 /// single builder already saturates that ceiling, three builders buy nothing and C5 would
 /// be ~200 lines of concurrent code for zero throughput.
@@ -106,7 +106,7 @@ public sealed class LodBuildCostProbe
         }
 
         _output.WriteLine(
-            $"drain ceiling = MaxLodUploadsPerFrame ({WorldGenerationConfig.MaxLodUploadsPerFrame}) * fps; " +
+            $"drain ceiling = MaxLodUploadsPerFrame ({StreamingConfig.MaxLodUploadsPerFrame}) * fps; " +
             "at a burst fps of 30-50 that is 120-200 regions/s.");
     }
 }

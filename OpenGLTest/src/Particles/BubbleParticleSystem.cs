@@ -13,7 +13,7 @@ namespace VoxelEngine.Particles;
 /// </summary>
 public sealed class BubbleParticleSystem
 {
-    private readonly ParticleRing<BubbleParticle> _particles = new(WorldGenerationConfig.BubbleParticleMax);
+    private readonly ParticleRing<BubbleParticle> _particles = new(ParticleConfig.BubbleParticleMax);
     private float _spawnDebt;
     // The swimmer's stroke counter as last seen, so a burst fires once per stroke
     private int _lastStrokes;
@@ -27,7 +27,7 @@ public sealed class BubbleParticleSystem
     /// A swim stroke lets out a few bubbles from the head. Call once a frame, before
     /// <see cref="Update"/>, with the swimmer's stroke counter (<see cref="Camera.SwimStrokeCount"/>):
     /// each change of it while <paramref name="eyeInWater"/> spawns one burst of
-    /// <see cref="WorldGenerationConfig.SwimStrokeBubbleCount"/> bubbles just in front of
+    /// <see cref="ParticleConfig.SwimStrokeBubbleCount"/> bubbles just in front of
     /// <paramref name="head"/> along <paramref name="facing"/>. A dry eye spawns nothing, and the
     /// counter is still taken in, so a stroke made in the air never bursts late on diving under; the
     /// first call only learns the counter. Returns how many bubbles it spawned.
@@ -43,9 +43,9 @@ public sealed class BubbleParticleSystem
         var rng = random ?? Random.Shared;
         var forward = facing.NormalizeSafeOr(-Vector3.UnitZ);
         // Out of the mouth: in front of the eye and a touch below it
-        var center = head + forward * WorldGenerationConfig.SwimStrokeBubbleForward - Vector3.UnitY * 0.1f;
-        var spread = WorldGenerationConfig.SwimStrokeBubbleSpread;
-        for (var i = 0; i < WorldGenerationConfig.SwimStrokeBubbleCount; i++)
+        var center = head + forward * ParticleConfig.SwimStrokeBubbleForward - Vector3.UnitY * 0.1f;
+        var spread = ParticleConfig.SwimStrokeBubbleSpread;
+        for (var i = 0; i < ParticleConfig.SwimStrokeBubbleCount; i++)
         {
             var jitter = new Vector3(
                 (rng.NextSingle() * 2f - 1f) * spread,
@@ -53,7 +53,7 @@ public sealed class BubbleParticleSystem
                 (rng.NextSingle() * 2f - 1f) * spread);
             Add(new BubbleParticle(center + jitter, rng));
         }
-        return WorldGenerationConfig.SwimStrokeBubbleCount;
+        return ParticleConfig.SwimStrokeBubbleCount;
     }
 
     /// <summary>
@@ -70,7 +70,7 @@ public sealed class BubbleParticleSystem
         {
             var f = forward.NormalizeSafeOr(-Vector3.UnitZ);
             var mouth = eyePos + f * 0.3f - Vector3.UnitY * 0.18f;
-            _spawnDebt += deltaTime * WorldGenerationConfig.BubblePerSecond;
+            _spawnDebt += deltaTime * ParticleConfig.BubblePerSecond;
             while (_spawnDebt >= 1f)
             {
                 _spawnDebt -= 1f;
@@ -101,7 +101,7 @@ public sealed class BubbleParticleSystem
     // At the cap the oldest bubble makes room, so the newest are always the ones shown
     private void Add(BubbleParticle bubble)
     {
-        if (_particles.Count >= WorldGenerationConfig.BubbleParticleMax)
+        if (_particles.Count >= ParticleConfig.BubbleParticleMax)
             _particles.RemoveAt(0);
         _particles.Add(bubble);
     }

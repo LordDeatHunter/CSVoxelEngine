@@ -10,7 +10,7 @@ namespace VoxelEngine.Rendering.Atmosphere;
 /// frame, and which copies survive the frustum cull.
 ///
 /// The class is deliberately dependency-free — <c>System</c>, <c>System.Numerics</c>,
-/// <see cref="WorldGenerationConfig"/> and <see cref="Frustum"/>, no GL and no Silk.NET types — for
+/// <see cref="SkyConfig"/> and <see cref="Frustum"/>, no GL and no Silk.NET types — for
 /// the same reason <c>HalfResTarget</c> and <c>ReflectionReuse</c> are: <c>CloudRenderer</c> needs a
 /// live GL context to construct, so the only way to pin this arithmetic headlessly is to keep it out
 /// here. Before the extraction the offsets, the AABB and the cull were interleaved with the draw
@@ -44,13 +44,13 @@ internal static class CloudCopies
     /// <summary>
     /// How far the whole layer has drifted this frame, as (x, z), each axis wrapped into [0, field).
     /// The layer is carried along the turning wind (<see cref="Wind.Offset"/> at
-    /// <see cref="WorldGenerationConfig.CloudDriftBlocksPerSecond"/>), and the pattern repeats every
+    /// <see cref="SkyConfig.CloudDriftBlocksPerSecond"/>), and the pattern repeats every
     /// field on both axes, so wrapping the translation is invisible. The wrap is a positive modulo
     /// computed in double, since the wind offset can be negative on either axis.
     /// </summary>
     internal static Vector2 Drift(double time, float field)
     {
-        var offset = Wind.Offset(time, WorldGenerationConfig.CloudDriftBlocksPerSecond);
+        var offset = Wind.Offset(time, SkyConfig.CloudDriftBlocksPerSecond);
         return new Vector2(Wrap(offset.X, field), Wrap(offset.Y, field));
     }
 
@@ -82,7 +82,7 @@ internal static class CloudCopies
     /// Fills <paramref name="offsets"/> with the world-space (x, z) origin of every copy of the 3x3
     /// that survives the frustum cull, packed to the front in visit order, and returns how many
     /// there are. Each copy is tested as the AABB spanning one field in x and z and the full stack
-    /// thickness in y, based at <see cref="WorldGenerationConfig.CloudHeight"/>.
+    /// thickness in y, based at <see cref="SkyConfig.CloudHeight"/>.
     /// </summary>
     /// <param name="frustum">Culling frustum, built from the pass's view-projection.</param>
     /// <param name="snapX">Camera x snapped to a field multiple, from <see cref="Snap"/>.</param>
@@ -105,7 +105,7 @@ internal static class CloudCopies
         {
             var minX = snapX + ix * field + drift.X;
             var minZ = snapZ + iz * field + drift.Y;
-            var min = new Vector3(minX, WorldGenerationConfig.CloudHeight, minZ);
+            var min = new Vector3(minX, SkyConfig.CloudHeight, minZ);
             if (!frustum.IntersectsAABB(min, min + new Vector3(field, thickness, field)))
                 continue;
 

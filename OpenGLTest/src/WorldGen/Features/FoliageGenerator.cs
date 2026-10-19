@@ -46,8 +46,8 @@ public static class FoliageGenerator
     /// </summary>
     internal static void Reseed()
     {
-        GrassPatchNoise = TerrainGenerator.MakeNoise(63, WorldGenerationConfig.GrassPatchFrequency);
-        ShrubPatchNoise = TerrainGenerator.MakeNoise(64, WorldGenerationConfig.ShrubPatchFrequency);
+        GrassPatchNoise = TerrainGenerator.MakeNoise(63, WorldFeatureConfig.GrassPatchFrequency);
+        ShrubPatchNoise = TerrainGenerator.MakeNoise(64, WorldFeatureConfig.ShrubPatchFrequency);
     }
 
     /// <summary>Whether the forest surface column (x, z) grows a grass tuft.</summary>
@@ -56,7 +56,7 @@ public static class FoliageGenerator
         // An oasis disc is a dense meadow whatever the patch noise says
         if (OasisGenerator.IsDisc(x, z)) return true;
         if (!TerrainGenerator.IsForest(x, z)) return false;
-        if (GrassPatchNoise.GetNoise(x, z) <= WorldGenerationConfig.GrassPatchThreshold) return false;
+        if (GrassPatchNoise.GetNoise(x, z) <= WorldFeatureConfig.GrassPatchThreshold) return false;
         // Denser where the climate is wetter (Climate's own wetness, the tint's input)
         TerrainGenerator.Climate(x, z, out _, out var wetness);
         var density = GrassDensityAt(wetness);
@@ -66,15 +66,15 @@ public static class FoliageGenerator
     /// <summary>The tuft density a column of this climate wetness takes: the dry end's share at
     /// 0, the wet end's at 1, linear between.</summary>
     public static float GrassDensityAt(float wetness) =>
-        MathUtils.Lerp(WorldGenerationConfig.GrassDensityDry, WorldGenerationConfig.GrassDensityWet,
+        MathUtils.Lerp(WorldFeatureConfig.GrassDensityDry, WorldFeatureConfig.GrassDensityWet,
             MathUtils.Clamp01(wetness));
 
     /// <summary>Whether the desert surface column (x, z) grows a dead shrub.</summary>
     public static bool TryGetDeadShrub(int x, int z)
     {
         if (!TerrainGenerator.IsDesert(x, z)) return false;
-        if (ShrubPatchNoise.GetNoise(x, z) <= WorldGenerationConfig.ShrubPatchThreshold) return false;
-        return UnitHash(x, z, ShrubDensitySalt) < WorldGenerationConfig.ShrubDensity;
+        if (ShrubPatchNoise.GetNoise(x, z) <= WorldFeatureConfig.ShrubPatchThreshold) return false;
+        return UnitHash(x, z, ShrubDensitySalt) < WorldFeatureConfig.ShrubDensity;
     }
 
     /// <summary>

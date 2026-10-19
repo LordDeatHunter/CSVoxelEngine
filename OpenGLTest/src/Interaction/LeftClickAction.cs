@@ -275,7 +275,7 @@ internal sealed class LeftClickAction
             if (_clientMode)
             {
                 _creativeBreakTimer += (float)deltaTime;
-                if (_creativeBreakTimer < WorldGenerationConfig.ClientCreativeBreakSeconds)
+                if (_creativeBreakTimer < NetworkConfig.ClientCreativeBreakSeconds)
                     return;
                 _creativeBreakTimer = 0f;
             }
@@ -352,7 +352,7 @@ internal sealed class LeftClickAction
 
             if (_breakDamage < _breakHardness)
             {
-                _debris.Burst(_breakingBlockPosition, _breakingBlockId, WorldGenerationConfig.BlockDebrisPerHit,
+                _debris.Burst(_breakingBlockPosition, _breakingBlockId, ParticleConfig.BlockDebrisPerHit,
                     columns: _chunkManager.ColumnSource);
                 continue;
             }

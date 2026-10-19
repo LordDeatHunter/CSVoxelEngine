@@ -21,13 +21,13 @@ public sealed class WaterSplashTests
     public void ASlowCrossingSplashesNothingAndTheCountNeverFallsAsTheSpeedGrows()
     {
         Assert.Equal(0, WaterSplash.Count(0f));
-        Assert.Equal(0, WaterSplash.Count(WorldGenerationConfig.WaterSplashMinSpeed * 0.5f));
+        Assert.Equal(0, WaterSplash.Count(JuiceConfig.WaterSplashMinSpeed * 0.5f));
 
-        foreach (var scale in new[] { WorldGenerationConfig.WaterSplashSmallScale, 1f, WorldGenerationConfig.WaterSplashCubeScale })
+        foreach (var scale in new[] { JuiceConfig.WaterSplashSmallScale, 1f, JuiceConfig.WaterSplashCubeScale })
         {
             var lastCount = 0;
             var lastSpeed = 0f;
-            for (var speed = 0f; speed <= WorldGenerationConfig.WaterSplashFullSpeed * 2f; speed += 0.25f)
+            for (var speed = 0f; speed <= JuiceConfig.WaterSplashFullSpeed * 2f; speed += 0.25f)
             {
                 var count = WaterSplash.Count(speed, scale);
                 var launch = WaterSplash.Speed(speed);
@@ -42,7 +42,7 @@ public sealed class WaterSplashTests
     [Fact]
     public void ABiggerBodyNeverThrowsFewerDroplets()
     {
-        for (var speed = 0f; speed <= WorldGenerationConfig.WaterSplashFullSpeed; speed += 0.5f)
+        for (var speed = 0f; speed <= JuiceConfig.WaterSplashFullSpeed; speed += 0.5f)
             Assert.True(WaterSplash.Count(speed, 2f) >= WaterSplash.Count(speed, 1f));
     }
 
@@ -78,7 +78,7 @@ public sealed class WaterSplashTests
         var resting = new WaterSplashTracker();
         resting.Step(false, 8f, Dt, out _);
         resting.Step(false, 7f, Dt, out _);
-        for (var t = 0f; t < WorldGenerationConfig.WaterSplashStaleSeconds * 2f; t += Dt)
+        for (var t = 0f; t < JuiceConfig.WaterSplashStaleSeconds * 2f; t += Dt)
             resting.Step(false, 7f, Dt, out _);
         Assert.False(resting.Step(true, 7f, Dt, out _));
     }

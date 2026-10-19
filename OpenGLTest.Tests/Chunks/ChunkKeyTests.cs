@@ -122,7 +122,7 @@ public sealed class ChunkKeyTests
         Assert.Equal(new Vector3(0, 0, 1), ChunkKey.ToVector3(z));
     }
 
-    // A dense cube spanning both signs and well past WorldGenerationConfig.ChunkRadius: no two
+    // A dense cube spanning both signs and well past StreamingConfig.ChunkRadius: no two
     // distinct chunk positions may ever share a key. 81^3 = 531,441 keys.
     [Fact]
     public void NoTwoChunkPositionsInADenseSignedCubeShareAKey()

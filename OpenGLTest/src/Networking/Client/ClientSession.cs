@@ -81,7 +81,7 @@ internal sealed class ClientSession
         netClient?.Dispose();
         prediction = new ClientPrediction();
         netClient = new NetworkClient(target.Address, chatView.LocalName,
-            WorldGenerationConfig.NetConnectTimeoutSeconds);
+            NetworkConfig.NetConnectTimeoutSeconds);
         var client = netClient;
         new Thread(() => client.Connect()) { IsBackground = true, Name = "net-connect" }.Start();
     }
@@ -174,7 +174,7 @@ internal sealed class ClientSession
         clientStreamer?.Update(w.Camera.Position, deltaTime);
         clientLodStreamer?.Update(w.Camera.Position, deltaTime);
         netStateTimer += deltaTime;
-        if (netStateTimer >= WorldGenerationConfig.NetPlayerStateSeconds)
+        if (netStateTimer >= NetworkConfig.NetPlayerStateSeconds)
         {
             netStateTimer = 0;
             var camera = w.Camera;
@@ -204,12 +204,12 @@ internal sealed class ClientSession
         if (netDead)
         {
             netRespawnTimer += deltaTime;
-            if (netRespawnTimer >= WorldGenerationConfig.NetRespawnRetrySeconds)
+            if (netRespawnTimer >= NetworkConfig.NetRespawnRetrySeconds)
                 SendRespawn(w.Camera);
         }
 
         netKeepAliveTimer += deltaTime;
-        if (netKeepAliveTimer >= WorldGenerationConfig.NetKeepAliveSeconds)
+        if (netKeepAliveTimer >= NetworkConfig.NetKeepAliveSeconds)
         {
             netKeepAliveTimer = 0;
             using var writer = new PacketWriter(NetMessage.KeepAlive);
@@ -338,7 +338,7 @@ internal sealed class ClientSession
                     throw new System.IO.InvalidDataException("player correction eye is not finite");
                 w.Camera.TestTeleport(eye, w.Camera.Yaw, w.Camera.Pitch);
                 netCorrectionAck = seq;
-                netStateTimer = WorldGenerationConfig.NetPlayerStateSeconds;
+                netStateTimer = NetworkConfig.NetPlayerStateSeconds;
                 break;
             }
             case NetMessage.ChunkData:

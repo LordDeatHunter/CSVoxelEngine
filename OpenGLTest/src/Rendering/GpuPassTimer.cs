@@ -62,7 +62,7 @@ internal sealed class GpuPassTimer : IDisposable
     /// Also latches this frame's timing decision (<see cref="GpuTimingGate.ShouldTime"/>) into a
     /// field that is held for the whole frame, so every <see cref="BeginGpuPass"/> and
     /// <see cref="EndGpuPass"/> below reads one stable answer. While the overlay is down only one
-    /// frame in <see cref="WorldGenerationConfig.GpuTimingIdleInterval"/> issues queries; the drain
+    /// frame in <see cref="PostProcessConfig.GpuTimingIdleInterval"/> issues queries; the drain
     /// below runs regardless.
     /// </para>
     /// </summary>

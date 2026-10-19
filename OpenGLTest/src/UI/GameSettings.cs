@@ -7,7 +7,7 @@ namespace VoxelEngine.UI;
 
 /// <summary>
 /// Mutable player-facing settings with JSON persistence, shadowing the
-/// <see cref="WorldGenerationConfig"/> constants they override. Every value is read live
+/// <c>VoxelEngine.Config</c> constants they override. Every value is read live
 /// (per frame or per draw), so changing one applies instantly with no rebuild; the config
 /// constants stay the factory defaults <see cref="ResetToDefaults"/> restores.
 /// </summary>
@@ -71,19 +71,19 @@ public static class GameSettings
         ResolutionIndex = 2;
         GuiScaleIndex = 0;
         MaxFpsIndex = 0;
-        Shadows = WorldGenerationConfig.ShadowsEnabled;
-        LeafSway = WorldGenerationConfig.LeafSwayStrength;
-        SunSize = WorldGenerationConfig.SunAngularRadiusDeg;
-        SunGlow = WorldGenerationConfig.SunGlowIntensity;
-        CloudOpacity = WorldGenerationConfig.CloudOpacity;
+        Shadows = LightingConfig.ShadowsEnabled;
+        LeafSway = SurfaceShadingConfig.LeafSwayStrength;
+        SunSize = SkyConfig.SunAngularRadiusDeg;
+        SunGlow = SkyConfig.SunGlowIntensity;
+        CloudOpacity = SkyConfig.CloudOpacity;
         WaterReflections = true;
         ReflectionIndex = 1;
-        WaterWaves = WorldGenerationConfig.WaterNormalScale;
-        WaterRefraction = WorldGenerationConfig.WaterRefractStrength;
-        WaterCaustics = WorldGenerationConfig.WaterCausticStrength;
-        WaterSunShafts = WorldGenerationConfig.WaterRayStrength;
-        AmbienceVolume = WorldGenerationConfig.AmbienceVolume;
-        SfxVolume = WorldGenerationConfig.SfxVolume;
+        WaterWaves = WaterRenderConfig.WaterNormalScale;
+        WaterRefraction = WaterRenderConfig.WaterRefractStrength;
+        WaterCaustics = WaterRenderConfig.WaterCausticStrength;
+        WaterSunShafts = WaterRenderConfig.WaterRayStrength;
+        AmbienceVolume = AudioConfig.AmbienceVolume;
+        SfxVolume = AudioConfig.SfxVolume;
         MouseSensitivity = 0.2f;
         FieldOfView = 70f;
         SprintToggle = false;

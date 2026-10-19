@@ -45,7 +45,7 @@ public sealed class SlimeMergeTests
         manager.Spawn(Ground(7.5f, size), size);
         manager.Spawn(Ground(7.5f + Slime.HalfExtentFor(size), size), size);
 
-        Run(manager, chunks, WorldGenerationConfig.SlimeMergeCooldownSeconds - 0.5f);
+        Run(manager, chunks, MobConfig.SlimeMergeCooldownSeconds - 0.5f);
         Assert.Equal(2, manager.Slimes.Count);
 
         Run(manager, chunks, 1f);
@@ -60,7 +60,7 @@ public sealed class SlimeMergeTests
     public void SlimesApartOfDifferentSizesDyingOrAtTheLargestSizeNeverMerge()
     {
         var chunks = StoneFloor();
-        var cooldown = WorldGenerationConfig.SlimeMergeCooldownSeconds + 1f;
+        var cooldown = MobConfig.SlimeMergeCooldownSeconds + 1f;
 
         var apart = new SlimeManager(SlimeType);
         apart.Spawn(Ground(3.5f, 1), 1);
@@ -102,10 +102,10 @@ public sealed class SlimeMergeTests
         var parent = manager.Spawn(Ground(7.5f, 2), 2)!;
         // Across the half line while surviving: it splits on the next update
         parent.TakeDamage(parent.Health - parent.MaxHealth / 2);
-        Run(manager, chunks, WorldGenerationConfig.SlimeMergeCooldownSeconds * 0.9f);
+        Run(manager, chunks, MobConfig.SlimeMergeCooldownSeconds * 0.9f);
 
         var children = manager.Slimes.Where(s => s.Size == SlimeSize.ChildSize(2)).ToList();
-        Assert.Equal(WorldGenerationConfig.SlimeSplitChildren, children.Count);
+        Assert.Equal(MobConfig.SlimeSplitChildren, children.Count);
     }
 
     [Fact]

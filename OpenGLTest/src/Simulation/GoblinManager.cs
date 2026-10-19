@@ -98,13 +98,13 @@ public sealed class GoblinManager : IMobPopulation
     }
 
     /// <summary>
-    /// Alerts every other living goblin within <see cref="WorldGenerationConfig.GoblinPackAlertRadiusBlocks"/>
+    /// Alerts every other living goblin within <see cref="MobConfig.GoblinPackAlertRadiusBlocks"/>
     /// of one that just noticed a player: each skips its first-throw delay, so the pack joins in
     /// together. One pass over the pack, run on the noticing frame only.
     /// </summary>
     internal void AlertPackAround(Goblin noticed)
     {
-        var radius = WorldGenerationConfig.GoblinPackAlertRadiusBlocks;
+        var radius = MobConfig.GoblinPackAlertRadiusBlocks;
         var radiusSquared = radius * radius;
         for (var i = 0; i < _goblins.Count; i++)
         {
@@ -141,7 +141,7 @@ public sealed class GoblinManager : IMobPopulation
         for (var i = 0; i < _goblins.Count; i++)
         {
             var goblin = _goblins[i];
-            if (goblin.IsDying || goblin.Ammo >= WorldGenerationConfig.GoblinStoneMax) continue;
+            if (goblin.IsDying || goblin.Ammo >= MobConfig.GoblinStoneMax) continue;
             _collectorGoblins.Add(goblin);
             into.Add(new DropCollector(goblin.Position, _canScavenge));
         }
@@ -170,8 +170,8 @@ public sealed class GoblinManager : IMobPopulation
     public Goblin? Spawn(Vector3 position, int? ammo = null, int? torches = null)
     {
         if (_caps.ForcedRoom <= 0) return null;
-        var stones = ammo ?? Random.Shared.Next(WorldGenerationConfig.GoblinStoneMin,
-            WorldGenerationConfig.GoblinStoneMax + 1);
+        var stones = ammo ?? Random.Shared.Next(MobConfig.GoblinStoneMin,
+            MobConfig.GoblinStoneMax + 1);
         var goblin = new Goblin(_type, position, stones, torches: torches ?? 0);
         _goblins.Add(goblin);
         return goblin;
@@ -197,16 +197,16 @@ public sealed class GoblinManager : IMobPopulation
     /// <summary>
     /// Whether a charged throw from <paramref name="origin"/> along <paramref name="direction"/> is
     /// aimed at a body at <paramref name="target"/>: inside the cone
-    /// (<see cref="WorldGenerationConfig.GoblinDodgeConeDegrees"/>) and within
-    /// <see cref="WorldGenerationConfig.GoblinDodgeRangeBlocks"/>. The dodge rule's reading of the
+    /// (<see cref="MobConfig.GoblinDodgeConeDegrees"/>) and within
+    /// <see cref="MobConfig.GoblinDodgeRangeBlocks"/>. The dodge rule's reading of the
     /// aim; the caller owns the charge threshold.
     /// </summary>
     internal static bool IsAimedAt(Vector3 target, Vector3 origin, Vector3 direction)
     {
         var to = target - origin;
         var distance = to.Length();
-        if (distance < 1e-3f || distance > WorldGenerationConfig.GoblinDodgeRangeBlocks) return false;
-        var cosine = MathF.Cos(WorldGenerationConfig.GoblinDodgeConeDegrees * (MathF.PI / 180f));
+        if (distance < 1e-3f || distance > MobConfig.GoblinDodgeRangeBlocks) return false;
+        var cosine = MathF.Cos(MobConfig.GoblinDodgeConeDegrees * (MathF.PI / 180f));
         return Vector3.Dot(direction, to / distance) >= cosine;
     }
 
@@ -220,7 +220,7 @@ public sealed class GoblinManager : IMobPopulation
     /// <see cref="IMobTarget.TakeHit"/> and is summed into <see cref="DamageDealtThisFrame"/>. With
     /// no targets nothing chases, despawns or spawns. A charged throw
     /// (<paramref name="aimCharge"/>, at least
-    /// <see cref="WorldGenerationConfig.GoblinDodgeChargeThreshold"/>) aimed at a goblin from
+    /// <see cref="MobConfig.GoblinDodgeChargeThreshold"/>) aimed at a goblin from
     /// <paramref name="aimOrigin"/> along <paramref name="aimDirection"/> makes that goblin
     /// sidestep out of the line while the aim holds; singleplayer passes the local arm's aim.
     /// </summary>
@@ -231,10 +231,10 @@ public sealed class GoblinManager : IMobPopulation
         DamageDealtThisFrame = 0;
         if (chunks == null || targets == null) return;
 
-        var dodgeAimed = aimCharge >= WorldGenerationConfig.GoblinDodgeChargeThreshold
+        var dodgeAimed = aimCharge >= MobConfig.GoblinDodgeChargeThreshold
                          && aimOrigin.HasValue && aimDirection.HasValue;
-        var despawnSquared = WorldGenerationConfig.GoblinDespawnRadiusBlocks
-            * WorldGenerationConfig.GoblinDespawnRadiusBlocks;
+        var despawnSquared = MobConfig.GoblinDespawnRadiusBlocks
+            * MobConfig.GoblinDespawnRadiusBlocks;
 
         for (var i = _goblins.Count - 1; i >= 0; i--)
         {
@@ -286,11 +286,11 @@ public sealed class GoblinManager : IMobPopulation
                     var eye = target.Eye;
                     if (target.IsImmune || !Goblin.InMeleeReach(goblin.Position, eye)) continue;
 
-                    var damage = WorldGenerationConfig.GoblinMeleeDamage;
+                    var damage = MobConfig.GoblinMeleeDamage;
                     DamageDealtThisFrame += damage;
                     var away = new Vector3(eye.X - goblin.Position.X, 0f, eye.Z - goblin.Position.Z);
-                    target.TakeHit(damage, away, WorldGenerationConfig.GoblinKnockbackSpeed,
-                        WorldGenerationConfig.GoblinKnockbackLift, _type.DisplayName);
+                    target.TakeHit(damage, away, MobConfig.GoblinKnockbackSpeed,
+                        MobConfig.GoblinKnockbackLift, _type.DisplayName);
                 }
             }
 
@@ -303,7 +303,7 @@ public sealed class GoblinManager : IMobPopulation
 
                     // Walking into a goblin is harmless: the player shoves it aside.
                     var away = new Vector3(goblin.Position.X - eye.X, 0f, goblin.Position.Z - eye.Z);
-                    goblin.Shove(away, WorldGenerationConfig.GoblinShoveSpeed);
+                    goblin.Shove(away, MobConfig.GoblinShoveSpeed);
                 }
             }
 
@@ -368,11 +368,11 @@ public sealed class GoblinManager : IMobPopulation
             {
                 if (hurt != null)
                 {
-                    var damage = WorldGenerationConfig.GoblinStoneDamage;
+                    var damage = MobConfig.GoblinStoneDamage;
                     DamageDealtThisFrame += damage;
                     var eye = hurt.Eye;
                     var away = new Vector3(eye.X - stone.Position.X, 0f, eye.Z - stone.Position.Z);
-                    hurt.TakeHit(damage, away, WorldGenerationConfig.GoblinStoneKnockbackSpeed, 0f, _type.DisplayName);
+                    hurt.TakeHit(damage, away, MobConfig.GoblinStoneKnockbackSpeed, 0f, _type.DisplayName);
                 }
                 RemoveStone(i);
                 continue;
@@ -382,10 +382,10 @@ public sealed class GoblinManager : IMobPopulation
             {
                 // A mob in the way takes the stone and stops it: goblins hurt each other and the
                 // slimes, exactly like a stone that struck a player
-                mobHit.TakeDamage(WorldGenerationConfig.GoblinStoneDamage);
+                mobHit.TakeDamage(MobConfig.GoblinStoneDamage);
                 var away = new Vector3(mobHit.Position.X - stone.Position.X, 0f,
                     mobHit.Position.Z - stone.Position.Z);
-                mobHit.Shove(away, WorldGenerationConfig.GoblinStoneKnockbackSpeed);
+                mobHit.Shove(away, MobConfig.GoblinStoneKnockbackSpeed);
                 RemoveStone(i);
                 continue;
             }
@@ -433,7 +433,7 @@ public sealed class GoblinManager : IMobPopulation
         if (!_caps.AllowsNaturalSpawn) return;
 
         _spawnTimer += deltaTime;
-        if (_spawnTimer < WorldGenerationConfig.GoblinSpawnIntervalSeconds) return;
+        if (_spawnTimer < MobConfig.GoblinSpawnIntervalSeconds) return;
         _spawnTimer = 0f;
 
         if (targets.Count == 0) return;
@@ -445,7 +445,7 @@ public sealed class GoblinManager : IMobPopulation
             // A ring spawn rolls a pack: the found cell leads, and one to two more join it within
             // GoblinPackSpawnRadiusBlocks while the shared natural cap still has room. Each member
             // rolls its own torches from the lighting clock's night and its own depth.
-            var pack = 1 + Random.Shared.Next(WorldGenerationConfig.GoblinPackMaxSize);
+            var pack = 1 + Random.Shared.Next(MobConfig.GoblinPackMaxSize);
             Spawn(position, torches: RollTorches(chunks, position, night));
             for (var member = 1; member < pack && _caps.AllowsNaturalSpawn; member++)
             {
@@ -464,7 +464,7 @@ public sealed class GoblinManager : IMobPopulation
     private static bool TryFindPackMate(ChunkManager chunks, Vector3 leader, out Vector3 position)
     {
         if (!MobSpawner.TryFindSurfaceSpawn(chunks, leader, 1f,
-                WorldGenerationConfig.GoblinPackSpawnRadiusBlocks, WorldGenerationConfig.GoblinPackSpawnTries,
+                MobConfig.GoblinPackSpawnRadiusBlocks, MobConfig.GoblinPackSpawnTries,
                 out var x, out var groundY, out var z))
         {
             position = default;
@@ -480,8 +480,8 @@ public sealed class GoblinManager : IMobPopulation
     internal static bool TryFindSpawn(ChunkManager chunks, Vector3 playerPosition, out Vector3 position)
     {
         if (!MobSpawner.TryFindSurfaceSpawn(chunks, playerPosition,
-                WorldGenerationConfig.GoblinSpawnMinRadiusBlocks, WorldGenerationConfig.GoblinSpawnMaxRadiusBlocks,
-                WorldGenerationConfig.GoblinSpawnTries, out var x, out var groundY, out var z))
+                MobConfig.GoblinSpawnMinRadiusBlocks, MobConfig.GoblinSpawnMaxRadiusBlocks,
+                MobConfig.GoblinSpawnTries, out var x, out var groundY, out var z))
         {
             position = default;
             return false;

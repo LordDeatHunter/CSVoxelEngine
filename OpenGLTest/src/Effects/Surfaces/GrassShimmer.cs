@@ -8,7 +8,7 @@ namespace VoxelEngine.Effects.Surfaces;
 /// GL-free twin of the grass wind shimmer in test-fragment.glsl: soft bright bands that lie across
 /// the wind on the grass tops and roll downwind with the leaf sway's gusts. The pattern is read at
 /// the position carried back by the gusts' traveled offset (<see cref="Wind.Offset"/> at
-/// <see cref="WorldGenerationConfig.WindGustSpeed"/>, the shader's <c>uWindOffset</c>), the way the
+/// <see cref="SkyConfig.WindGustSpeed"/>, the shader's <c>uWindOffset</c>), the way the
 /// sway samples its gust wave, and weighted by that same gust (<see cref="Wind.Gust"/>), so the
 /// bands travel and swell with the canopy. Only biome-tinted up faces shimmer (<see cref="Applies"/>).
 /// </summary>
@@ -32,20 +32,20 @@ public static class GrassShimmer
         var g = worldXZ - gustOffset;
         var along = Vector2.Dot(g, wd);
         var across = Vector2.Dot(g, new Vector2(-wd.Y, wd.X));
-        var k = MathF.Tau / WorldGenerationConfig.GrassShimmerWavelengthBlocks;
+        var k = MathF.Tau / SurfaceShadingConfig.GrassShimmerWavelengthBlocks;
         var wave = MathF.Sin(along * k + 1.5f * MathF.Sin(across * k * 0.31f + along * k * 0.17f));
         return MathUtils.SmoothStep(0.35f, 1f, wave) * Wind.Gust(worldXZ, time, gustOffset);
     }
 
     /// <summary>1 near the eye, easing to 0 between the shimmer's fade distances.</summary>
     public static float Fade(float distance) =>
-        1f - MathUtils.SmoothStep(WorldGenerationConfig.GrassShimmerFadeNearBlocks,
-            WorldGenerationConfig.GrassShimmerFadeFarBlocks, distance);
+        1f - MathUtils.SmoothStep(SurfaceShadingConfig.GrassShimmerFadeNearBlocks,
+            SurfaceShadingConfig.GrassShimmerFadeFarBlocks, distance);
 
     /// <summary>
-    /// The share of its own light a grass top gains: <see cref="WorldGenerationConfig.GrassShimmerStrength"/>
+    /// The share of its own light a grass top gains: <see cref="SurfaceShadingConfig.GrassShimmerStrength"/>
     /// times the fade at <paramref name="distance"/> and the <see cref="Band"/>.
     /// </summary>
     public static float Brightening(Vector2 worldXZ, Vector2 windDirection, Vector2 gustOffset, double time, float distance) =>
-        WorldGenerationConfig.GrassShimmerStrength * Fade(distance) * Band(worldXZ, windDirection, gustOffset, time);
+        SurfaceShadingConfig.GrassShimmerStrength * Fade(distance) * Band(worldXZ, windDirection, gustOffset, time);
 }

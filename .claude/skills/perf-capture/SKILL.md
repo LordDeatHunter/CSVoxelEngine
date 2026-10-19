@@ -9,7 +9,7 @@ Tracking lives in repo-root `PERF_TODO.md` (ranked items + measurements table), 
 
 ## Ground rules
 - **Release only.** Debug is several times slower in the voxel loops and says nothing. `Directory.Build.props` defaults project builds to Release, but a solution build needs `-c Release`. The startup line `Build: Release | ...` confirms it.
-- The knobs are in `WorldGenerationConfig`. **Do not move a re-pricing lever (cache capacities, generation counts, budgets) blind**; only against a real capture.
+- The knobs are in the per-domain config classes under `OpenGLTest/src/Config/` (budgets and thread counts in `StreamingConfig`, worldgen cache capacities and generation counts in `WorldGenerationConfig`). **Do not move a re-pricing lever (cache capacities, generation counts, budgets) blind**; only against a real capture.
 - Wrap new work in `FrameProfiler.Begin/End` (main thread only) rather than a private stopwatch.
 - Run-to-run swing at rest is ~0.4 ms and every CPU section moves together, so **compare interleaved pairs, never single runs**.
 

@@ -7,7 +7,7 @@ namespace VoxelEngine.WorldGen.Features;
 /// <summary>
 /// Cairns: a small cobblestone stack — three cells and a one-stone pebble hat — on a local height
 /// maximum above <see cref="WorldGenerationConfig.MountainRockHeight"/>, as a landmark on the
-/// peaks. Decided per 2^<see cref="WorldGenerationConfig.CairnCellShift"/>-block cell from a pure
+/// peaks. Decided per 2^<see cref="WorldFeatureConfig.CairnCellShift"/>-block cell from a pure
 /// hash of (cell, seed); the center column's height and its eight neighbors' come from
 /// <see cref="ColumnCache"/> like the pebble scatter's, so a cairn near a chunk border is whole.
 /// The far LOD shows none.
@@ -35,11 +35,11 @@ public static class CairnGenerator
         x = 0;
         z = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0xCA12);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldGenerationConfig.CairnChance) return false;
+        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.CairnChance) return false;
 
-        var span = (ulong)(1 << WorldGenerationConfig.CairnCellShift);
-        x = (cellX << WorldGenerationConfig.CairnCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
-        z = (cellZ << WorldGenerationConfig.CairnCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        var span = (ulong)(1 << WorldFeatureConfig.CairnCellShift);
+        x = (cellX << WorldFeatureConfig.CairnCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
+        z = (cellZ << WorldFeatureConfig.CairnCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
         return true;
     }
 
@@ -67,7 +67,7 @@ public static class CairnGenerator
     /// </summary>
     public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
     {
-        var shift = WorldGenerationConfig.CairnCellShift;
+        var shift = WorldFeatureConfig.CairnCellShift;
         var minCellX = worldX0 >> shift;
         var maxCellX = (worldX0 + Chunk.Size - 1) >> shift;
         var minCellZ = worldZ0 >> shift;

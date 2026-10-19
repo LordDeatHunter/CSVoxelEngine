@@ -33,12 +33,12 @@ public sealed class GoblinTorchTests
             var cave = GoblinTorches.Roll(0f, underground: true, roll);
             Assert.True(night >= day, $"night rolled fewer torches than day for {roll}");
             Assert.True(cave >= night, $"underground rolled fewer torches than night for {roll}");
-            Assert.InRange(day, 0, WorldGenerationConfig.GoblinTorchMaxCount);
+            Assert.InRange(day, 0, MobConfig.GoblinTorchMaxCount);
         }
 
         // A roll past every threshold carries none, a tiny one carries the maximum
         Assert.Equal(0, GoblinTorches.Roll(1f, underground: true, 0.999f));
-        Assert.Equal(WorldGenerationConfig.GoblinTorchMaxCount, GoblinTorches.Roll(1f, underground: true, 1e-6f));
+        Assert.Equal(MobConfig.GoblinTorchMaxCount, GoblinTorches.Roll(1f, underground: true, 1e-6f));
     }
 
     [Fact]

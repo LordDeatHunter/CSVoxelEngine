@@ -21,21 +21,21 @@ public sealed class EyeAdaptationTests
     [Fact]
     public void ALitRoomIsNeverBrightened()
     {
-        for (var block = WorldGenerationConfig.EyeAdaptFullLight; block <= 1f; block += 0.01f)
+        for (var block = LightingConfig.EyeAdaptFullLight; block <= 1f; block += 0.01f)
             Assert.Equal(1f, EyeAdaptation.Target(0f, block));
     }
 
     [Fact]
     public void DarknessRaisesTheExposureToItsCapAndMoreLightNeverRaisesIt()
     {
-        Assert.Equal(WorldGenerationConfig.EyeAdaptMaxExposure, EyeAdaptation.Target(0f, 0f), 5);
+        Assert.Equal(LightingConfig.EyeAdaptMaxExposure, EyeAdaptation.Target(0f, 0f), 5);
         var previous = float.MaxValue;
         for (var light = 0f; light <= 1f; light += 0.01f)
         {
             var sky = EyeAdaptation.Target(light, 0f);
             var lamp = EyeAdaptation.Target(0f, light);
             Assert.Equal(sky, lamp);
-            Assert.InRange(sky, 1f, WorldGenerationConfig.EyeAdaptMaxExposure);
+            Assert.InRange(sky, 1f, LightingConfig.EyeAdaptMaxExposure);
             Assert.True(sky <= previous, $"more light raised the exposure ({light})");
             previous = sky;
         }
@@ -44,7 +44,7 @@ public sealed class EyeAdaptationTests
     [Fact]
     public void TheEyeAdaptsToTheDarkMoreSlowlyThanBackToTheLight()
     {
-        var max = WorldGenerationConfig.EyeAdaptMaxExposure;
+        var max = LightingConfig.EyeAdaptMaxExposure;
         var half = (1f + max) / 2f;
         Assert.True(SecondsToCross(1f, max, half) > SecondsToCross(max, 1f, half));
     }
@@ -52,7 +52,7 @@ public sealed class EyeAdaptationTests
     [Fact]
     public void TheExposureEasesWithoutOvershooting()
     {
-        var max = WorldGenerationConfig.EyeAdaptMaxExposure;
+        var max = LightingConfig.EyeAdaptMaxExposure;
         var exposure = 1f;
         for (var i = 0; i < 2000; i++)
         {

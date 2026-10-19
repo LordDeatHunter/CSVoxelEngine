@@ -371,7 +371,7 @@ internal sealed class HudRenderer : IDisposable
             var flash = pops?.FlashAt(i) ?? 0f;
             if (flash > 0f)
                 _ui.DrawRect(center, slotSize, new Rgba(255, 255, 255,
-                    (byte)Math.Clamp(flash * WorldGenerationConfig.HotbarFlashAlpha * 255f, 0f, 255f)));
+                    (byte)Math.Clamp(flash * HudConfig.HotbarFlashAlpha * 255f, 0f, 255f)));
         }
 
         // Icons come after every background so the depth clear can't erase a later slot's panel

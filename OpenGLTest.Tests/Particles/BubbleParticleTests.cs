@@ -148,7 +148,7 @@ public sealed class BubbleParticleTests
             system.Update(1f / 60f, new Vector3(8.5f, 5f, 8.5f), -Vector3.UnitZ,
                 true, chunks, rng);
 
-        Assert.True(system.Particles.Count <= WorldGenerationConfig.BubbleParticleMax);
+        Assert.True(system.Particles.Count <= ParticleConfig.BubbleParticleMax);
         Assert.NotEmpty(system.Particles);
     }
 
@@ -171,7 +171,7 @@ public sealed class BubbleParticleTests
     public void EvictionDropsTheOldestBubbleAndKeepsTheRestInSpawnOrder()
     {
         var (chunks, _) = WaterColumn(top: 15);
-        var max = WorldGenerationConfig.BubbleParticleMax;
+        var max = ParticleConfig.BubbleParticleMax;
         var system = new BubbleParticleSystem();
         var rng = new Random(13);
 

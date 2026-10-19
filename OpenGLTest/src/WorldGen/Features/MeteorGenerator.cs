@@ -6,7 +6,7 @@ namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
 /// Meteor craters: a rare bowl cut into the land, its floor lined with obsidian — the scar of an
-/// old impact. Decided per 2^<see cref="WorldGenerationConfig.MeteorCellShift"/>-block cell from a
+/// old impact. Decided per 2^<see cref="WorldFeatureConfig.MeteorCellShift"/>-block cell from a
 /// pure hash of (cell, seed) (the center column and a radius), so every chunk the bowl crosses
 /// stamps the same cells; each column is cut from its own ground down the bowl profile, so a
 /// crater on a slope stays a bowl. Only the surface is cut (never fluids), and the far LOD shows
@@ -29,13 +29,13 @@ public static class MeteorGenerator
         z = 0;
         radius = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x3E7E);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldGenerationConfig.MeteorChance) return false;
+        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.MeteorChance) return false;
 
-        var span = (ulong)(1 << WorldGenerationConfig.MeteorCellShift);
-        x = (cellX << WorldGenerationConfig.MeteorCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
-        z = (cellZ << WorldGenerationConfig.MeteorCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
-        var radii = WorldGenerationConfig.MeteorMaxRadius - WorldGenerationConfig.MeteorMinRadius + 1;
-        radius = WorldGenerationConfig.MeteorMinRadius + (int)(SplitMix64.Mix(h + 3) % (ulong)radii);
+        var span = (ulong)(1 << WorldFeatureConfig.MeteorCellShift);
+        x = (cellX << WorldFeatureConfig.MeteorCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
+        z = (cellZ << WorldFeatureConfig.MeteorCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        var radii = WorldFeatureConfig.MeteorMaxRadius - WorldFeatureConfig.MeteorMinRadius + 1;
+        radius = WorldFeatureConfig.MeteorMinRadius + (int)(SplitMix64.Mix(h + 3) % (ulong)radii);
         return true;
     }
 
@@ -47,8 +47,8 @@ public static class MeteorGenerator
     /// </summary>
     public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
-        var reach = WorldGenerationConfig.MeteorMaxRadius;
-        var shift = WorldGenerationConfig.MeteorCellShift;
+        var reach = WorldFeatureConfig.MeteorMaxRadius;
+        var shift = WorldFeatureConfig.MeteorCellShift;
         var minCellX = (worldX0 - reach) >> shift;
         var maxCellX = (worldX0 + Chunk.Size - 1 + reach) >> shift;
         var minCellZ = (worldZ0 - reach) >> shift;
@@ -68,7 +68,7 @@ public static class MeteorGenerator
                 if ((uint)lx >= Chunk.Size || (uint)lz >= Chunk.Size) continue;
 
                 var ground = column.Heights[(lx << Chunk.SizeShift) | lz];
-                var depth = (int)((radius - distance) * WorldGenerationConfig.MeteorBowlSlope);
+                var depth = (int)((radius - distance) * WorldFeatureConfig.MeteorBowlSlope);
                 for (var d = 0; d < depth; d++)
                 {
                     var ly = ground - d - worldY0;

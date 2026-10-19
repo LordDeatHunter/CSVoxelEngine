@@ -117,7 +117,7 @@ internal sealed class ClientMirror
             if (_clientMode && id != change.Id && BlockType.IsFalling(change.Id)
                 && NearMirroredFallingCube(change.X, change.Y, change.Z, change.Id))
                 GroundDust.LandBlock(new Vector3(change.X, change.Y, change.Z), change.Id,
-                    WorldGenerationConfig.FallingBlockDustClientFallBlocks, submerged: BlockType.IsFluid(id), _debris,
+                    JuiceConfig.FallingBlockDustClientFallBlocks, submerged: BlockType.IsFluid(id), _debris,
                     _chunkManager.ColumnSource);
             // The server's lava hardening into its rock: steam, like a local hardening
             if (_clientMode && change.Id != 0 && BlockType.IsFluid(id) && BlockType.HardensToById[id] == change.Id)
@@ -180,7 +180,7 @@ internal sealed class ClientMirror
             // the health it had left
             if (!_serverMode && _netMobs.TryGetValue(id, out var gone) && gone.Health > 0
                 && Vector3.DistanceSquared(gone.Position, Camera.Position)
-                <= WorldGenerationConfig.DamageNumberDeathRangeBlocks * WorldGenerationConfig.DamageNumberDeathRangeBlocks)
+                <= MobConfig.DamageNumberDeathRangeBlocks * MobConfig.DamageNumberDeathRangeBlocks)
                 Strikes.ShowDamageNumber(gone, gone.Health);
             RemoveNetMob(id);
         }
@@ -243,7 +243,7 @@ internal sealed class ClientMirror
             // The server drops a cube only when it detonates, so a mirror leaving the snapshot with
             // its locally burnt fuse spent is a blast: shake the camera at its last position
             if (_netTnt.Remove(id, out var gone)
-                && gone.FuseRemaining <= WorldGenerationConfig.BlastMirrorFuseSlackSeconds)
+                && gone.FuseRemaining <= JuiceConfig.BlastMirrorFuseSlackSeconds)
                 Ambient.ShakeForBlast(gone.Position);
         }
 

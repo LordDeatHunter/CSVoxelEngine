@@ -15,8 +15,8 @@ public sealed class MeadowTests
     [Fact]
     public void TheTuftDensityRisesWithWetness()
     {
-        Assert.Equal(WorldGenerationConfig.GrassDensityDry, FoliageGenerator.GrassDensityAt(0f), 4);
-        Assert.Equal(WorldGenerationConfig.GrassDensityWet, FoliageGenerator.GrassDensityAt(1f), 4);
+        Assert.Equal(WorldFeatureConfig.GrassDensityDry, FoliageGenerator.GrassDensityAt(0f), 4);
+        Assert.Equal(WorldFeatureConfig.GrassDensityWet, FoliageGenerator.GrassDensityAt(1f), 4);
         Assert.True(FoliageGenerator.GrassDensityAt(1f) > FoliageGenerator.GrassDensityAt(0f));
         Assert.True(FoliageGenerator.GrassDensityAt(0.5f) > FoliageGenerator.GrassDensityAt(0.25f));
 

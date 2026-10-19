@@ -62,7 +62,7 @@ public sealed class HudToastTests
         Assert.False(DayToast.CrossedDawn(0.5f, 0.6f));
 
         // The real clock crosses dawn exactly once per day
-        var day = WorldGenerationConfig.DayLengthSeconds;
+        var day = SkyConfig.DayLengthSeconds;
         var crossings = 0;
         var previous = DayCycle.SunDirection(0.0).Y;
         for (var t = 0.0; t < day * 2.0; t += 1.0)

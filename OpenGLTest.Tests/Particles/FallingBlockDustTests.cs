@@ -22,12 +22,12 @@ public sealed class FallingBlockDustTests
     public void ALipSlideRaisesNoDustAndTheDustNeverShrinksAsTheFallGrows()
     {
         Assert.Equal(0, LandingDust.FallingBlockCount(0f));
-        Assert.Equal(0, LandingDust.FallingBlockCount(WorldGenerationConfig.FallingBlockDustMinFallBlocks * 0.5f));
-        Assert.True(LandingDust.FallingBlockCount(WorldGenerationConfig.FallingBlockDustMinFallBlocks) > 0);
+        Assert.Equal(0, LandingDust.FallingBlockCount(JuiceConfig.FallingBlockDustMinFallBlocks * 0.5f));
+        Assert.True(LandingDust.FallingBlockCount(JuiceConfig.FallingBlockDustMinFallBlocks) > 0);
 
         var lastCount = 0;
         var lastSpeed = 0f;
-        for (var fall = 0f; fall <= WorldGenerationConfig.FallingBlockDustFullFallBlocks * 2f; fall += 0.25f)
+        for (var fall = 0f; fall <= JuiceConfig.FallingBlockDustFullFallBlocks * 2f; fall += 0.25f)
         {
             var count = LandingDust.FallingBlockCount(fall);
             var speed = LandingDust.FallingBlockSpeed(fall);

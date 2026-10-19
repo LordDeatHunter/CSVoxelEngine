@@ -40,7 +40,7 @@ public sealed class SaplingManagerTests
         Assert.True(maturity > 0);
         var pulses = 0;
         // Run well past the whole growth window (one pulse per jittered SaplingPulseSeconds)
-        var seconds = maturity * WorldGenerationConfig.SaplingPulseSeconds * 2f + 60f;
+        var seconds = maturity * SimulationConfig.SaplingPulseSeconds * 2f + 60f;
         for (var t = 0f; t < seconds; t += 0.25f)
         {
             saplings.Update(0.25f, chunks, (species, x, y, z, steps) =>

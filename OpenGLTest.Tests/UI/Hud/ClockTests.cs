@@ -10,7 +10,7 @@ namespace VoxelEngine.Tests.UI.Hud;
 /// </summary>
 public sealed class ClockTests
 {
-    private const double Day = WorldGenerationConfig.DayLengthSeconds;
+    private const double Day = SkyConfig.DayLengthSeconds;
 
     [Fact]
     public void TheDayRollsOverAtMidnight()

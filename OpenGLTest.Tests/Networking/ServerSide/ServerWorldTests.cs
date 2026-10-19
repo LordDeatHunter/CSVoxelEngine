@@ -249,7 +249,7 @@ public sealed class ServerWorldTests : IDisposable
         // Far enough apart that neither player's chunk lies inside the other's load radius, so
         // each one's terrain can only come from streaming around that player itself
         const int apartBlocks = 500;
-        Assert.True(apartBlocks > (WorldGenerationConfig.ChunkRadius + 1) * Chunk.Size,
+        Assert.True(apartBlocks > (StreamingConfig.ChunkRadius + 1) * Chunk.Size,
             "the players must stand outside each other's load radius");
 
         WorldSeed.Apply(WorldSeed.Default);

@@ -39,7 +39,7 @@ public sealed class BiomeTintTextureTests
             .ToList();
         Assert.NotEmpty(tiles);
 
-        var opaqueAlpha = WorldGenerationConfig.AlphaCutoff * 255f;
+        var opaqueAlpha = LightingConfig.AlphaCutoff * 255f;
         foreach (var tile in tiles)
         {
             var name = TextureAtlas.TileNames[tile];
@@ -58,8 +58,8 @@ public sealed class BiomeTintTextureTests
 
             Assert.True(opaque > 0, $"tinted tile '{name}' has no opaque texel");
             var mean = sum / opaque / 255.0;
-            Assert.True(Math.Abs(mean - WorldGenerationConfig.BiomeTintTextureGray) <= 2.0 / 255.0,
-                $"tinted tile '{name}' averages gray {mean * 255:F1}, not the gain's {WorldGenerationConfig.BiomeTintTextureGray * 255:F1}");
+            Assert.True(Math.Abs(mean - SurfaceShadingConfig.BiomeTintTextureGray) <= 2.0 / 255.0,
+                $"tinted tile '{name}' averages gray {mean * 255:F1}, not the gain's {SurfaceShadingConfig.BiomeTintTextureGray * 255:F1}");
         }
     }
 

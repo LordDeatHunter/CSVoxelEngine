@@ -17,7 +17,7 @@ public static class Aurora
     /// <summary>
     /// Cells round the horizon of the shader's four periodic noises (the broad curtain sectors, their
     /// detail, the lower edge's wave and the fine folds), and how fast each drifts relative to
-    /// <see cref="WorldGenerationConfig.AuroraDriftSpeed"/>. Twin of the periods in sky-fragment.glsl.
+    /// <see cref="SkyConfig.AuroraDriftSpeed"/>. Twin of the periods in sky-fragment.glsl.
     /// </summary>
     public static readonly Vector4 Periods = new(7f, 17f, 11f, 160f);
 
@@ -31,7 +31,7 @@ public static class Aurora
     /// </summary>
     public static Vector4 Drift(double time)
     {
-        var t = time * WorldGenerationConfig.AuroraDriftSpeed;
+        var t = time * SkyConfig.AuroraDriftSpeed;
         return new Vector4(Wrap(t * DriftRates.X, Periods.X), Wrap(t * DriftRates.Y, Periods.Y),
             Wrap(t * DriftRates.Z, Periods.Z), Wrap(t * DriftRates.W, Periods.W));
     }
@@ -46,11 +46,11 @@ public static class Aurora
     /// <summary>
     /// How strongly the curtains show, 0..1, for an eased <paramref name="coldness"/> at the eye
     /// (0..1, <see cref="EyeClimate.Coldness"/>) and the stars' <paramref name="starVisibility"/>:
-    /// zero at or below <see cref="WorldGenerationConfig.AuroraColdStart"/> (the temperate and warm
-    /// lands), full from <see cref="WorldGenerationConfig.AuroraColdFull"/> on, times the stars'.
+    /// zero at or below <see cref="SkyConfig.AuroraColdStart"/> (the temperate and warm
+    /// lands), full from <see cref="SkyConfig.AuroraColdFull"/> on, times the stars'.
     /// </summary>
     public static float Visibility(float coldness, float starVisibility) =>
-        MathUtils.SmoothStep(WorldGenerationConfig.AuroraColdStart, WorldGenerationConfig.AuroraColdFull, coldness)
+        MathUtils.SmoothStep(SkyConfig.AuroraColdStart, SkyConfig.AuroraColdFull, coldness)
         * MathUtils.Clamp01(starVisibility);
 
     /// <summary>
@@ -62,7 +62,7 @@ public static class Aurora
         hasClimate ? EyeClimate.Coldness(warmth) : 0f;
 
     /// <summary>Eases <paramref name="current"/> toward <paramref name="target"/> over
-    /// <paramref name="deltaTime"/> seconds at <see cref="WorldGenerationConfig.AuroraColdEaseRate"/>.</summary>
+    /// <paramref name="deltaTime"/> seconds at <see cref="SkyConfig.AuroraColdEaseRate"/>.</summary>
     public static float Ease(float current, float target, float deltaTime) =>
-        MathUtils.Damp(current, target, WorldGenerationConfig.AuroraColdEaseRate, deltaTime);
+        MathUtils.Damp(current, target, SkyConfig.AuroraColdEaseRate, deltaTime);
 }

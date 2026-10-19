@@ -59,11 +59,11 @@ public sealed class MobHitSparkTests : IDisposable
 
         Punch(world);
 
-        Assert.Equal(WorldGenerationConfig.HitSparkCount, world.GetDebrisSystem().Debris.Count);
+        Assert.Equal(JuiceConfig.HitSparkCount, world.GetDebrisSystem().Debris.Count);
         foreach (var chip in world.GetDebrisSystem().Debris)
         {
             Assert.Equal(DebrisLook.Color, chip.Look);
-            Assert.Equal(BiomeTint.VertexTint(WorldGenerationConfig.HitSparkColor), chip.Tint);
+            Assert.Equal(BiomeTint.VertexTint(JuiceConfig.HitSparkColor), chip.Tint);
         }
     }
 
@@ -80,7 +80,7 @@ public sealed class MobHitSparkTests : IDisposable
 
         Punch(_world);
 
-        Assert.Equal(WorldGenerationConfig.HitSparkCount, _world.GetDebrisSystem().Debris.Count);
+        Assert.Equal(JuiceConfig.HitSparkCount, _world.GetDebrisSystem().Debris.Count);
         // The prediction is cosmetic: the mirrored mob took no damage.
         Assert.Equal(3, _world.Slimes[0].Health);
     }

@@ -42,11 +42,11 @@ public static class BiomeTint
     /// bilinear over its four corners (first axis warmth, second wetness).</summary>
     public static Vector3 PaletteSrgb(BiomeTintPalette palette, float warmth01, float wetness01) =>
         palette == BiomeTintPalette.Foliage
-            ? Bilinear(WorldGenerationConfig.FoliageColorColdDry, WorldGenerationConfig.FoliageColorWarmDry,
-                WorldGenerationConfig.FoliageColorColdWet, WorldGenerationConfig.FoliageColorWarmWet,
+            ? Bilinear(SurfaceShadingConfig.FoliageColorColdDry, SurfaceShadingConfig.FoliageColorWarmDry,
+                SurfaceShadingConfig.FoliageColorColdWet, SurfaceShadingConfig.FoliageColorWarmWet,
                 warmth01, wetness01)
-            : Bilinear(WorldGenerationConfig.GrassColorColdDry, WorldGenerationConfig.GrassColorWarmDry,
-                WorldGenerationConfig.GrassColorColdWet, WorldGenerationConfig.GrassColorWarmWet,
+            : Bilinear(SurfaceShadingConfig.GrassColorColdDry, SurfaceShadingConfig.GrassColorWarmDry,
+                SurfaceShadingConfig.GrassColorColdWet, SurfaceShadingConfig.GrassColorWarmWet,
                 warmth01, wetness01);
 
     /// <summary>The 0..1 vertex multiplier that, times <see cref="Gain"/> against the gray
@@ -54,7 +54,7 @@ public static class BiomeTint
     public static Vector3 VertexTint(Vector3 targetSrgb) =>
         Vector3.Clamp(
             ColorSpace.SrgbToLinear(targetSrgb)
-            / (ColorSpace.SrgbToLinear(WorldGenerationConfig.BiomeTintTextureGray) * Gain),
+            / (ColorSpace.SrgbToLinear(SurfaceShadingConfig.BiomeTintTextureGray) * Gain),
             Vector3.Zero, Vector3.One);
 
     /// <summary>

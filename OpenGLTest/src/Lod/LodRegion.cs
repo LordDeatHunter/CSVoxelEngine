@@ -763,7 +763,7 @@ public class LodRegion : IDisposable
 
                     // An oasis: the same pure site the chunk fill and Compute read turns the
                     // cell's material to grass and its pond to the oasis' own surface
-                    if (WorldGenerationConfig.OasesEnabled
+                    if (WorldFeatureConfig.OasesEnabled
                         && OasisGenerator.TryGetDisc(centerX, centerZ, out _, out _, out var oasisSurface))
                     {
                         cellBiome = Biome.Forest;
@@ -1048,7 +1048,7 @@ public class LodRegion : IDisposable
         // each cell adds its surface rather than one sea plane.
         var water = BlockType.ById[TerrainGenerator.SeaBlock]!;
         var waterTile = water.FaceTiles[topFace];
-        var sheetDrop = FluidState.SourceHeight - spec.HeightBias - WorldGenerationConfig.LodWaterSink;
+        var sheetDrop = FluidState.SourceHeight - spec.HeightBias - WaterRenderConfig.LodWaterSink;
         Span<byte> waterShades = [
             Chunk.ShadeLut[(topFace << 2) | 3], Chunk.ShadeLut[(topFace << 2) | 3],
             Chunk.ShadeLut[(topFace << 2) | 3], Chunk.ShadeLut[(topFace << 2) | 3]

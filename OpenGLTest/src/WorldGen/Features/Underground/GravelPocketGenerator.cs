@@ -37,16 +37,16 @@ public static class GravelPocketGenerator
     /// Builds the noise from the current <see cref="WorldGenerationConfig.Seed"/>: once from the
     /// static constructor, and again by <see cref="WorldSeed.Apply"/> while no worker thread runs.
     /// </summary>
-    internal static void Reseed() => PocketNoise = TerrainGenerator.MakeNoise(93, WorldGenerationConfig.GravelPocketFrequency, octaves: 2);
+    internal static void Reseed() => PocketNoise = TerrainGenerator.MakeNoise(93, WorldFeatureConfig.GravelPocketFrequency, octaves: 2);
 
     /// <summary>
     /// Whether the stone cell (x, y, z) is inside a pocket, buried at least
-    /// <see cref="WorldGenerationConfig.GravelPocketMinBurial"/> under the column's surface.
+    /// <see cref="WorldFeatureConfig.GravelPocketMinBurial"/> under the column's surface.
     /// </summary>
     public static bool HasPocket(int x, int y, int z, int surfaceHeight)
     {
-        if (y > surfaceHeight - WorldGenerationConfig.GravelPocketMinBurial) return false;
-        return PocketNoise.GetNoise(x, y, z) > WorldGenerationConfig.GravelPocketThreshold;
+        if (y > surfaceHeight - WorldFeatureConfig.GravelPocketMinBurial) return false;
+        return PocketNoise.GetNoise(x, y, z) > WorldFeatureConfig.GravelPocketThreshold;
     }
 
     /// <summary>
@@ -62,11 +62,11 @@ public static class GravelPocketGenerator
             for (var ly = 0; ly < Chunk.Size; ly++)
             {
                 var y = worldY0 + ly;
-                if (y > surfaceHeight - WorldGenerationConfig.GravelPocketMinBurial) continue;
+                if (y > surfaceHeight - WorldFeatureConfig.GravelPocketMinBurial) continue;
                 var i = Chunk.Idx(x, ly, z);
                 if (blocks[i] != StoneBlock) continue;
                 if (!HasPocket(worldX0 + x, y, worldZ0 + z, surfaceHeight)) continue;
-                blocks[i] = UnitHash(worldX0 + x, y, worldZ0 + z) < WorldGenerationConfig.GravelPocketSandShare
+                blocks[i] = UnitHash(worldX0 + x, y, worldZ0 + z) < WorldFeatureConfig.GravelPocketSandShare
                     ? SandBlock
                     : GravelBlock;
             }

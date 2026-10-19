@@ -48,7 +48,7 @@ internal sealed class LoadingScreenRenderer
             _ui.DrawTextCentered(view.Caption, screen.X * 0.5f, LoadingScreenLayout.CaptionTop(screen),
                 _ui.CountScale, TextDim);
 
-            const int dots = WorldGenerationConfig.LoadingSpinnerDots;
+            const int dots = HudConfig.LoadingSpinnerDots;
             var phase = LoadingScreenLayout.SpinnerPhase(time);
             for (var d = 0; d < dots; d++)
             {

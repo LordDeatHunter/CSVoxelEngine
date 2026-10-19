@@ -31,9 +31,9 @@ public sealed class DamageFringeTests
         {
             var fringe = DamageFringe.Strength(health.DamageFlash);
             Assert.True(fringe <= previous, "the fringe grew back while the flash faded");
-            if (seconds < WorldGenerationConfig.DamageFringeSeconds - 2f * step)
+            if (seconds < PostProcessConfig.DamageFringeSeconds - 2f * step)
                 Assert.True(fringe > 0f, $"the fringe was gone {seconds} s after the hit");
-            if (seconds > WorldGenerationConfig.DamageFringeSeconds + 2f * step)
+            if (seconds > PostProcessConfig.DamageFringeSeconds + 2f * step)
                 Assert.Equal(0f, fringe);
             previous = fringe;
             health.Update(step);
@@ -41,7 +41,7 @@ public sealed class DamageFringeTests
         }
 
         // The vignette's flash itself lasts much longer: the fringe is only its first moment
-        Assert.True(WorldGenerationConfig.DamageFringeSeconds < PlayerHealth.DamageFlashSeconds);
+        Assert.True(PostProcessConfig.DamageFringeSeconds < PlayerHealth.DamageFlashSeconds);
     }
 
     [Fact]

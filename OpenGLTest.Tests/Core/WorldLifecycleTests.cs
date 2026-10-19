@@ -326,8 +326,8 @@ public sealed class WorldLifecycleTests : IDisposable
         WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
         // Twelve chunks out: inside the load sphere, outside the ready sphere the flip waits for
         var far = new Vector3(200f, High, 0f);
-        Assert.True(far.X / Chunk.Size > WorldGenerationConfig.LoadReadyRadiusChunks);
-        Assert.True(far.X / Chunk.Size < WorldGenerationConfig.ChunkRadius);
+        Assert.True(far.X / Chunk.Size > StreamingConfig.LoadReadyRadiusChunks);
+        Assert.True(far.X / Chunk.Size < StreamingConfig.ChunkRadius);
         WriteEntitiesFile(new EntitySaveData
         {
             Drops =
@@ -400,7 +400,7 @@ public sealed class WorldLifecycleTests : IDisposable
         WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
         // More mobs than may ever be alive together, all inside the ready sphere, of both kinds
         var mobs = new List<EntitySaveData.MobData>();
-        for (var i = 0; i < WorldGenerationConfig.MobHardCap + 3; i++)
+        for (var i = 0; i < MobConfig.MobHardCap + 3; i++)
             mobs.Add(new EntitySaveData.MobData { Type = "slime", Position = [i % 16 * 0.5f, High, i / 16 * 0.5f] });
         mobs.Add(new EntitySaveData.MobData { Type = "goblin", Position = [0f, High, -2f] });
         WriteEntitiesFile(new EntitySaveData { Mobs = mobs });
@@ -412,9 +412,9 @@ public sealed class WorldLifecycleTests : IDisposable
         // Read right after the flipping Update, before any manager could move or despawn a mob. A
         // restore is a forced spawn: the whole hard cap fills, well past the natural cap, and no more.
         Assert.Equal(world.Slimes.Count + world.Goblins.Count, world.Mobs.Count);
-        Assert.Equal(WorldGenerationConfig.MobHardCap, world.Mobs.Count);
-        Assert.True(world.Mobs.Count > WorldGenerationConfig.MobNaturalCap);
-        Assert.True(world.Mobs.Count <= WorldGenerationConfig.MobsMaxAlive);
+        Assert.Equal(MobConfig.MobHardCap, world.Mobs.Count);
+        Assert.True(world.Mobs.Count > MobConfig.MobNaturalCap);
+        Assert.True(world.Mobs.Count <= MobConfig.MobsMaxAlive);
         // The entries name no size, as a file saved before slimes had sizes: all the smallest
         Assert.All(world.Slimes, s => Assert.Equal(SlimeSize.Min, s.Size));
 

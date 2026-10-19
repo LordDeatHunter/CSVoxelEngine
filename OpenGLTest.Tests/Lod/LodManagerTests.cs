@@ -511,9 +511,9 @@ public sealed class LodManagerTests
         var (cx, cz) = CenterColumnOf(k);
         lods.MarkEditedColumn(cx, cz);
 
-        for (var i = 0; i < WorldGenerationConfig.MaxLodBuildsInFlight; i++)
+        for (var i = 0; i < StreamingConfig.MaxLodBuildsInFlight; i++)
             lods.EnqueueCompletedMesh(RentedEmptyMesh(lods, 0, 1000 + i, 1000));
-        Assert.Equal(WorldGenerationConfig.MaxLodBuildsInFlight, lods.PendingUploadCount);
+        Assert.Equal(StreamingConfig.MaxLodBuildsInFlight, lods.PendingUploadCount);
 
         var queuedBefore = lods.QueuedClaimCount;
         Assert.Equal(LodBuildOutcome.Throttled, lods.TryBuildOneRegion());

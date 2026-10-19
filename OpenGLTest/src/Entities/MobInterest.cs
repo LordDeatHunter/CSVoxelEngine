@@ -8,8 +8,8 @@ namespace VoxelEngine.Entities;
 /// <summary>
 /// One mob's interest in the target it noticed, GL-free (main thread: it reads the live chunk map).
 /// A line-of-sight check (<see cref="BlockRaycaster.SegmentHitsBlock"/>) runs every
-/// <see cref="WorldGenerationConfig.MobSightCheckSeconds"/>; once the sight has been blocked for
-/// <see cref="WorldGenerationConfig.MobLoseInterestSeconds"/> the mob loses interest and stops
+/// <see cref="MobConfig.MobSightCheckSeconds"/>; once the sight has been blocked for
+/// <see cref="MobConfig.MobLoseInterestSeconds"/> the mob loses interest and stops
 /// chasing, and a clear line wins it back at the next check. A different target restarts the count.
 /// While the mob chases nothing (none noticed, or interest lost) it is idle, and an idle mob far from
 /// every target may despawn (<see cref="ShouldIdleDespawn"/>). <see cref="Mob.PickTarget"/> owns one.
@@ -25,7 +25,7 @@ public sealed class MobInterest
     public float IdleSeconds { get; private set; }
 
     /// <summary>Whether the sight of the current target has been blocked long enough to give up on it.</summary>
-    public bool IsLost => _unseenSeconds >= WorldGenerationConfig.MobLoseInterestSeconds;
+    public bool IsLost => _unseenSeconds >= MobConfig.MobLoseInterestSeconds;
 
     /// <summary>
     /// Advances the interest by <paramref name="deltaTime"/> with <paramref name="noticed"/> (the target
@@ -53,7 +53,7 @@ public sealed class MobInterest
         _sightTimer -= deltaTime;
         if (_sightTimer <= 0f)
         {
-            _sightTimer = WorldGenerationConfig.MobSightCheckSeconds;
+            _sightTimer = MobConfig.MobSightCheckSeconds;
             _sightBlocked = BlockRaycaster.SegmentHitsBlock(sightOrigin, noticed.Eye, chunks);
         }
 
@@ -70,22 +70,22 @@ public sealed class MobInterest
 
     /// <summary>Whether a mob idle for <paramref name="idleSeconds"/> whose nearest target is
     /// <paramref name="minDistanceSquared"/> away (horizontally, squared) despawns: idle for at least
-    /// <see cref="WorldGenerationConfig.MobIdleDespawnSeconds"/> and farther than
-    /// <see cref="WorldGenerationConfig.MobIdleDespawnMinDistanceBlocks"/> from every target.</summary>
+    /// <see cref="MobConfig.MobIdleDespawnSeconds"/> and farther than
+    /// <see cref="MobConfig.MobIdleDespawnMinDistanceBlocks"/> from every target.</summary>
     public static bool ShouldIdleDespawn(float idleSeconds, float minDistanceSquared) =>
-        idleSeconds >= WorldGenerationConfig.MobIdleDespawnSeconds
-        && minDistanceSquared > WorldGenerationConfig.MobIdleDespawnMinDistanceBlocks
-            * WorldGenerationConfig.MobIdleDespawnMinDistanceBlocks;
+        idleSeconds >= MobConfig.MobIdleDespawnSeconds
+        && minDistanceSquared > MobConfig.MobIdleDespawnMinDistanceBlocks
+            * MobConfig.MobIdleDespawnMinDistanceBlocks;
 
     /// <summary>A wander goal around <paramref name="origin"/> for an <paramref name="angleRoll"/> and a
     /// <paramref name="radiusRoll"/> in [0, 1): a heading and a distance between
-    /// <see cref="WorldGenerationConfig.MobWanderMinRadiusBlocks"/> and
-    /// <see cref="WorldGenerationConfig.MobWanderMaxRadiusBlocks"/>, at the origin's height.</summary>
+    /// <see cref="MobConfig.MobWanderMinRadiusBlocks"/> and
+    /// <see cref="MobConfig.MobWanderMaxRadiusBlocks"/>, at the origin's height.</summary>
     public static Vector3 WanderPoint(Vector3 origin, float angleRoll, float radiusRoll)
     {
         var angle = angleRoll * MathF.Tau;
-        var radius = MathUtils.Lerp(WorldGenerationConfig.MobWanderMinRadiusBlocks,
-            WorldGenerationConfig.MobWanderMaxRadiusBlocks, MathUtils.Clamp01(radiusRoll));
+        var radius = MathUtils.Lerp(MobConfig.MobWanderMinRadiusBlocks,
+            MobConfig.MobWanderMaxRadiusBlocks, MathUtils.Clamp01(radiusRoll));
         return new Vector3(origin.X + MathF.Cos(angle) * radius, origin.Y, origin.Z + MathF.Sin(angle) * radius);
     }
 }

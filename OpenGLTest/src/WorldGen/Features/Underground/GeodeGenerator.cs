@@ -7,7 +7,7 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 /// <summary>
 /// Geodes: a rare hollow sphere deep in solid rock, its shell lined with crystal and its heart
 /// open air — break into one and the cave opens up. Decided per
-/// 2^<see cref="WorldGenerationConfig.GeodeCellShift"/>-block cell from a pure hash of (cell, seed)
+/// 2^<see cref="WorldFeatureConfig.GeodeCellShift"/>-block cell from a pure hash of (cell, seed)
 /// (the center column, a depth in the band and a radius 2..3), so every chunk the sphere crosses
 /// stamps the same cells; only stone is carved or lined, so a geode never eats soil or a cave. The
 /// far LOD shows none.
@@ -36,15 +36,15 @@ public static class GeodeGenerator
         z = 0;
         radius = 0;
         var h = SplitMix64.Hash(cellX, cellZ, WorldGenerationConfig.Seed ^ 0x6E0D);
-        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldGenerationConfig.GeodeChance) return false;
+        if ((SplitMix64.Mix(h) >> 40) * (1f / (1 << 24)) >= WorldFeatureConfig.GeodeChance) return false;
 
-        var span = (ulong)(1 << WorldGenerationConfig.GeodeCellShift);
-        x = (cellX << WorldGenerationConfig.GeodeCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
-        z = (cellZ << WorldGenerationConfig.GeodeCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
-        var depths = WorldGenerationConfig.GeodeMaxY - WorldGenerationConfig.GeodeMinY + 1;
-        y = WorldGenerationConfig.GeodeMinY + (int)(SplitMix64.Mix(h + 3) % (ulong)depths);
-        var radii = WorldGenerationConfig.GeodeMaxRadius - WorldGenerationConfig.GeodeMinRadius + 1;
-        radius = WorldGenerationConfig.GeodeMinRadius + (int)(SplitMix64.Mix(h + 4) % (ulong)radii);
+        var span = (ulong)(1 << WorldFeatureConfig.GeodeCellShift);
+        x = (cellX << WorldFeatureConfig.GeodeCellShift) + (int)(SplitMix64.Mix(h + 1) % span);
+        z = (cellZ << WorldFeatureConfig.GeodeCellShift) + (int)(SplitMix64.Mix(h + 2) % span);
+        var depths = WorldFeatureConfig.GeodeMaxY - WorldFeatureConfig.GeodeMinY + 1;
+        y = WorldFeatureConfig.GeodeMinY + (int)(SplitMix64.Mix(h + 3) % (ulong)depths);
+        var radii = WorldFeatureConfig.GeodeMaxRadius - WorldFeatureConfig.GeodeMinRadius + 1;
+        radius = WorldFeatureConfig.GeodeMinRadius + (int)(SplitMix64.Mix(h + 4) % (ulong)radii);
         return true;
     }
 
@@ -55,8 +55,8 @@ public static class GeodeGenerator
     /// </summary>
     public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
     {
-        var reach = WorldGenerationConfig.GeodeMaxRadius;
-        var shift = WorldGenerationConfig.GeodeCellShift;
+        var reach = WorldFeatureConfig.GeodeMaxRadius;
+        var shift = WorldFeatureConfig.GeodeCellShift;
         var minCellX = (worldX0 - reach) >> shift;
         var maxCellX = (worldX0 + Chunk.Size - 1 + reach) >> shift;
         var minCellZ = (worldZ0 - reach) >> shift;

@@ -38,7 +38,7 @@ public sealed class ServerPlayerStatusTests
         for (var feet = fromFeet - 1f; feet >= 1f; feet -= 1f)
         {
             player.Position = EyeAtFeet(x, feet, z);
-            player.ObserveAcceptedState(chunks, WorldGenerationConfig.NetPlayerStateSeconds);
+            player.ObserveAcceptedState(chunks, NetworkConfig.NetPlayerStateSeconds);
         }
     }
 
@@ -144,7 +144,7 @@ public sealed class ServerPlayerStatusTests
         const float height = 7f;
         Assert.True(PlayerHealth.FallDamage(height) > 0);
         player.Teleport(EyeAtFeet(3.5f, 1f + height, 3.5f));
-        player.ObserveAcceptedState(chunks, WorldGenerationConfig.NetPlayerStateSeconds);
+        player.ObserveAcceptedState(chunks, NetworkConfig.NetPlayerStateSeconds);
         player.Status.TakeDamage(PlayerHealth.MaxHealth);
         Assert.True(player.IsDead);
         Assert.True(player.IsImmune);
@@ -168,7 +168,7 @@ public sealed class ServerPlayerStatusTests
         Assert.True(player.StatusDirty);
 
         // The respawn forgot the fall it died in: standing at home lands free
-        player.ObserveAcceptedState(chunks, WorldGenerationConfig.NetPlayerStateSeconds);
+        player.ObserveAcceptedState(chunks, NetworkConfig.NetPlayerStateSeconds);
         Assert.Equal(PlayerHealth.MaxHealth, player.Health);
 
         // With no respawn eye of its own, a player comes back at the fallback

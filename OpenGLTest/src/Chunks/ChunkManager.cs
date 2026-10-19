@@ -111,10 +111,10 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
     /// <summary>
     /// Finished meshes <see cref="ApplyCompletedMeshes"/> uploads per frame (the rest wait for the
-    /// next). Defaults to <see cref="WorldGenerationConfig.MaxMeshUploadsPerFrame"/>; World raises it
+    /// next). Defaults to <see cref="StreamingConfig.MaxMeshUploadsPerFrame"/>; World raises it
     /// while a world is loading and restores it when the world starts playing. Main thread only.
     /// </summary>
-    public int MeshUploadBudget { get; set; } = WorldGenerationConfig.MaxMeshUploadsPerFrame;
+    public int MeshUploadBudget { get; set; } = StreamingConfig.MaxMeshUploadsPerFrame;
 
     /// <summary>
     /// A server world sets this: finished meshes are marked and their light published but their
@@ -149,10 +149,10 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
     /// <summary>
     /// Mesh builds <see cref="ProcessDirtyChunks"/> starts per frame. Defaults to
-    /// <see cref="WorldGenerationConfig.MaxDirtyChunksPerFrame"/>; raised by World while loading and
+    /// <see cref="StreamingConfig.MaxDirtyChunksPerFrame"/>; raised by World while loading and
     /// restored at the flip to playing, like <see cref="MeshUploadBudget"/>. Main thread only.
     /// </summary>
-    public int DirtyStartBudget { get; set; } = WorldGenerationConfig.MaxDirtyChunksPerFrame;
+    public int DirtyStartBudget { get; set; } = StreamingConfig.MaxDirtyChunksPerFrame;
 
     private int _loadedChunkCount;
 
@@ -216,7 +216,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// costs no closure, delegate, state machine or Task - the chunk travels in the queue. One
     /// instance is allocated per dispatch, not per chunk: a runner keeps draining until the queue
     /// is empty, so dispatches are far rarer than builds under load and at most
-    /// <see cref="WorldGenerationConfig.MaxConcurrentMeshGenerations"/> exist at once. A fresh
+    /// <see cref="StreamingConfig.MaxConcurrentMeshGenerations"/> exist at once. A fresh
     /// instance per dispatch also means no work item is ever queued twice.
     /// </summary>
     private sealed class MeshRunner(ChunkManager owner) : IThreadPoolWorkItem
@@ -344,7 +344,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         {
             var key = kvp.Key;
             var pos = ChunkKey.ToVector3(key);
-            if (StreamingFocus.WithinRadius(foci, pos, WorldGenerationConfig.ChunkRadiusSq))
+            if (StreamingFocus.WithinRadius(foci, pos, StreamingConfig.ChunkRadiusSq))
                 continue;
 
             if (!Chunks.TryRemovePacked(key, out var chunk)) continue;
@@ -496,7 +496,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
                 // replaced by a freshly generated chunk at the same position while this build ran:
                 // uploading into the dead one would leave a mesh in Renderable that no unload ever
                 // removes
-                if (distSq > WorldGenerationConfig.ChunkRadiusSq ||
+                if (distSq > StreamingConfig.ChunkRadiusSq ||
                     !Chunks.TryGetValue(pos, out var live) || !ReferenceEquals(live, chunk))
                 {
                     MeshBuffers.Return(meshData);
@@ -550,7 +550,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         // Lock-free enumeration, no snapshot; removing through it while enumerating is safe
         foreach (var kvp in _dirtyChunks)
         {
-            if (++scanned > WorldGenerationConfig.MaxDirtyScanPerFrame)
+            if (++scanned > StreamingConfig.MaxDirtyScanPerFrame)
                 break;
 
             var key = kvp.Key;
@@ -562,7 +562,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             var distSq = StreamingFocus.MinDistanceSquared(foci, pos);
 
             // Out of range of every focus, or unloaded — just drop the entry
-            if (distSq > WorldGenerationConfig.ChunkRadiusSq || !Chunks.TryGetPacked(key, out var chunk))
+            if (distSq > StreamingConfig.ChunkRadiusSq || !Chunks.TryGetPacked(key, out var chunk))
             {
                 _dirtyChunks.TryRemove(key, out _);
                 continue;
@@ -757,7 +757,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             // Interlocked rather than a plain or volatile read: neither orders against the
             // preceding store, and a stale "cap is full" here strands the work.
             var active = Interlocked.CompareExchange(ref _activeMeshRunners, 0, 0);
-            if (active >= WorldGenerationConfig.MaxConcurrentMeshGenerations)
+            if (active >= StreamingConfig.MaxConcurrentMeshGenerations)
                 return;
             if (Interlocked.CompareExchange(ref _activeMeshRunners, active + 1, active) != active)
                 continue;
@@ -1043,7 +1043,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// <summary>
     /// Marks every loaded chunk within <paramref name="radiusBlocks"/> of the world-space
     /// box [<paramref name="min"/>, <paramref name="max"/>] dirty. Voxel light travels up
-    /// to <see cref="WorldGenerationConfig.LightPropagationRadius"/> blocks from an edit,
+    /// to <see cref="LightingConfig.LightPropagationRadius"/> blocks from an edit,
     /// so all of these chunks need their light recomputed — not just face-adjacent ones.
     /// Async and budgeted like any other dirty chunk; the edited chunk itself is usually
     /// remeshed synchronously by the caller already, so it is skipped here.
@@ -1228,7 +1228,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// World Y of the real surface of the fluid column the cell (x, y, z) belongs to, or
     /// <see cref="float.NegativeInfinity"/> when the cell is not a loaded fluid cell.
     /// <see cref="GetFluidSurfaceGlobal"/> only resolves one cell up; this walks the column to its
-    /// top (at most <see cref="WorldGenerationConfig.FluidSurfaceSearchCells"/> cells, reading the
+    /// top (at most <see cref="WaterRenderConfig.FluidSurfaceSearchCells"/> cells, reading the
     /// cap's upper edge beyond that) and, when the walk ends under a solid ceiling (an overhang,
     /// a placed block, a flooded sea cave), sees through it to the column's water level from
     /// <see cref="ColumnSource"/> (generated, or streamed from the server), so the rays under a
@@ -1243,7 +1243,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         var top = y;
         var hitCap = true;
         var ceiling = false;
-        for (var step = 0; step < WorldGenerationConfig.FluidSurfaceSearchCells; step++)
+        for (var step = 0; step < WaterRenderConfig.FluidSurfaceSearchCells; step++)
         {
             if (TryGetCell(x, top + 1, z, out var above, out _))
             {

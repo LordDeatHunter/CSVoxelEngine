@@ -90,9 +90,9 @@ public sealed class AmbienceTests
     public void StartupScaleRisesFromSilenceToFull()
     {
         Assert.Equal(0f, AmbienceManager.StartupScale(0f));
-        var mid = AmbienceManager.StartupScale(WorldGenerationConfig.AmbienceStartupFadeSeconds / 2f);
+        var mid = AmbienceManager.StartupScale(AudioConfig.AmbienceStartupFadeSeconds / 2f);
         Assert.InRange(mid, 0f, 1f);
-        Assert.Equal(1f, AmbienceManager.StartupScale(WorldGenerationConfig.AmbienceStartupFadeSeconds));
+        Assert.Equal(1f, AmbienceManager.StartupScale(AudioConfig.AmbienceStartupFadeSeconds));
         Assert.Equal(1f, AmbienceManager.StartupScale(float.MaxValue));
     }
 

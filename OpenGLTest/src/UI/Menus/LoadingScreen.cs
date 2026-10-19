@@ -21,7 +21,7 @@ public enum LoadingScreenKind
 /// only reads it. A load that timed out still reports IsLoaded, so the bar completes either way.
 /// The shown progress eases toward the real one and never moves backwards, so a load whose
 /// progress estimate dips never makes the bar jump back; once complete the overlay fades out
-/// over <see cref="WorldGenerationConfig.LoadingFadeSeconds"/>.
+/// over <see cref="HudConfig.LoadingFadeSeconds"/>.
 /// </summary>
 public sealed class LoadingScreenView
 {
@@ -68,7 +68,7 @@ public sealed class LoadingScreenView
     public void Update(float targetProgress, bool complete, float deltaTime)
     {
         var target = MathUtils.Clamp01(targetProgress);
-        var eased = MathUtils.Damp(ShownProgress, target, WorldGenerationConfig.LoadingProgressDampRate, deltaTime);
+        var eased = MathUtils.Damp(ShownProgress, target, HudConfig.LoadingProgressDampRate, deltaTime);
         ShownProgress = MathF.Max(ShownProgress, MathF.Min(target, eased));
 
         if (!complete)
@@ -77,8 +77,8 @@ public sealed class LoadingScreenView
         Complete = true;
         ShownProgress = 1f;
         _fadeTimer += MathF.Max(0f, deltaTime);
-        FadeAlpha = 1f - MathUtils.SmoothStep(_fadeTimer / WorldGenerationConfig.LoadingFadeSeconds);
-        if (_fadeTimer >= WorldGenerationConfig.LoadingFadeSeconds)
+        FadeAlpha = 1f - MathUtils.SmoothStep(_fadeTimer / HudConfig.LoadingFadeSeconds);
+        if (_fadeTimer >= HudConfig.LoadingFadeSeconds)
             IsFinished = true;
     }
 
@@ -125,11 +125,11 @@ public static class LoadingScreenLayout
 
     /// <summary>
     /// Where the spinner is in its revolution, in [0, 1): the fractional part of
-    /// <paramref name="time"/> over <see cref="WorldGenerationConfig.LoadingSpinnerPeriodSeconds"/>.
+    /// <paramref name="time"/> over <see cref="HudConfig.LoadingSpinnerPeriodSeconds"/>.
     /// </summary>
     public static float SpinnerPhase(double time)
     {
-        var turns = time / WorldGenerationConfig.LoadingSpinnerPeriodSeconds;
+        var turns = time / HudConfig.LoadingSpinnerPeriodSeconds;
         var phase = (float)(turns - Math.Floor(turns));
         // A fraction just under 1 can round up to exactly 1 as a float; that is the next turn's 0.
         return phase >= 1f ? 0f : phase;

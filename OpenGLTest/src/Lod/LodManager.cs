@@ -13,7 +13,7 @@ namespace VoxelEngine.Lod;
 
 /// <summary>
 /// Manages far-terrain LOD regions across all LOD levels: a pool of
-/// <see cref="WorldGenerationConfig.MaxConcurrentLodGenerations"/> BelowNormal LodGen threads
+/// <see cref="StreamingConfig.MaxConcurrentLodGenerations"/> BelowNormal LodGen threads
 /// builds region meshes from the heightmap cache (CPU only), the main thread uploads them into
 /// the render manager's shared LOD <see cref="ChunkGeometryPool"/> with a per-frame cap and
 /// unloads regions that fall out of range. That constant ships at 1 — C5 measured a wider pool
@@ -37,10 +37,10 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
 
     /// <summary>
     /// Finished region builds <see cref="ApplyCompletedMeshes"/> uploads per frame. Defaults to
-    /// <see cref="WorldGenerationConfig.MaxLodUploadsPerFrame"/>; World raises it while a world is
+    /// <see cref="StreamingConfig.MaxLodUploadsPerFrame"/>; World raises it while a world is
     /// loading and restores it when the world starts playing. Main thread only.
     /// </summary>
-    public int UploadBudget { get; set; } = WorldGenerationConfig.MaxLodUploadsPerFrame;
+    public int UploadBudget { get; set; } = StreamingConfig.MaxLodUploadsPerFrame;
 
     /// <summary>
     /// Where the far LOD reads its terrain: worldgen by default (<see cref="GeneratedWorldSource"/>),
@@ -84,9 +84,9 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
     /// region build rents them every time, so dropping the empty ones would drain the pool inland.
     /// <para>
     /// The retention ceilings are DERIVED from the in-flight bound, not chosen. Outstanding rents
-    /// are capped at <see cref="WorldGenerationConfig.MaxLodBuildsInFlight"/> = 8 (finished builds
+    /// are capped at <see cref="StreamingConfig.MaxLodBuildsInFlight"/> = 8 (finished builds
     /// waiting in <c>_completedMeshes</c>, each pinning its four lists) plus
-    /// <see cref="WorldGenerationConfig.MaxConcurrentLodGenerations"/> (builds in progress), so
+    /// <see cref="StreamingConfig.MaxConcurrentLodGenerations"/> (builds in progress), so
     /// the bound is 8 + N. The ceiling is sized for the largest pool C5 measured (N = 3, bound 11)
     /// rather than for the N = 1 the measurement told it to ship, so that raising the constant
     /// stays a one-token experiment: 16 keeps the whole in-flight set recyclable with headroom for
@@ -221,7 +221,7 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
         _wake.Reset();
         _isRunning = true;
 
-        var threads = new Thread[WorldGenerationConfig.MaxConcurrentLodGenerations];
+        var threads = new Thread[StreamingConfig.MaxConcurrentLodGenerations];
         for (var i = 0; i < threads.Length; i++)
         {
             threads[i] = new Thread(WorkerLoop)
@@ -239,12 +239,12 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
 
         // Managed thread names are not observable from Process.GetCurrentProcess().Threads, so
         // this line is the only way to confirm the pool size a running build actually spawned.
-        Log.WriteLine($"LodGen: {WorldGenerationConfig.MaxConcurrentLodGenerations} workers");
+        Log.WriteLine($"LodGen: {StreamingConfig.MaxConcurrentLodGenerations} workers");
     }
 
     /// <summary>
     /// Stops the LodGen workers and joins them, each for at most
-    /// <see cref="WorldGenerationConfig.WorkerStopJoinTimeoutMs"/>. A worker mid-build finishes
+    /// <see cref="SaveConfig.WorkerStopJoinTimeoutMs"/>. A worker mid-build finishes
     /// (and enqueues) that region first; one waiting out a back-off is woken.
     /// <para>
     /// True means every LodGen thread has exited, so none can read the heightmap cache or the
@@ -266,9 +266,9 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
         var allJoined = true;
         foreach (var thread in threads)
         {
-            if (thread.Join(WorldGenerationConfig.WorkerStopJoinTimeoutMs)) continue;
+            if (thread.Join(SaveConfig.WorkerStopJoinTimeoutMs)) continue;
             allJoined = false;
-            Log.Warn($"LodGen: {thread.Name} did not stop within {WorldGenerationConfig.WorkerStopJoinTimeoutMs} ms");
+            Log.Warn($"LodGen: {thread.Name} did not stop within {SaveConfig.WorkerStopJoinTimeoutMs} ms");
         }
 
         if (!allJoined) return false;
@@ -333,12 +333,12 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
                 {
                     // Nothing left to build anywhere: the long poll, exactly as before.
                     case LodBuildOutcome.Idle:
-                        _wake.Wait(WorldGenerationConfig.GenerationDelayIdleMs);
+                        _wake.Wait(StreamingConfig.GenerationDelayIdleMs);
                         break;
                     // Work exists and only the main thread's drain is behind, so backing off for
                     // the idle poll would stall the streaming burst a fifth of a second at a time.
                     case LodBuildOutcome.Throttled:
-                        _wake.Wait(WorldGenerationConfig.LodBuildThrottleDelayMs);
+                        _wake.Wait(StreamingConfig.LodBuildThrottleDelayMs);
                         break;
                 }
             }
@@ -536,7 +536,7 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
     /// </summary>
     internal LodBuildOutcome TryBuildOneRegion()
     {
-        if (_completedMeshes.Count >= WorldGenerationConfig.MaxLodBuildsInFlight)
+        if (_completedMeshes.Count >= StreamingConfig.MaxLodBuildsInFlight)
             return LodBuildOutcome.Throttled;
 
         var next = ClaimNextRegion();
@@ -817,7 +817,7 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
     {
         // New regions first: they start unburied and the uploads cap additions per
         // frame below the slice budget, so same-frame evaluation is preserved.
-        var budget = WorldGenerationConfig.MaxLodCoverTestsPerFrame;
+        var budget = StreamingConfig.MaxLodCoverTestsPerFrame;
         foreach (var region in _pendingCover)
         {
             region.IsBuried = region.Level > 0
@@ -890,7 +890,7 @@ public class LodManager(ChunkGeometryPool? lodGeometry = null)
         // column is farther than that cannot be covered; skips the lookups for most of the ring
         var dx = Math.Max(0, Math.Max(baseCx - (int)camChunk.X, (int)camChunk.X - (baseCx + span - 1)));
         var dz = Math.Max(0, Math.Max(baseCz - (int)camChunk.Z, (int)camChunk.Z - (baseCz + span - 1)));
-        if (dx * dx + dz * dz > WorldGenerationConfig.ChunkRadiusSq)
+        if (dx * dx + dz * dz > StreamingConfig.ChunkRadiusSq)
             return false;
 
         for (var ci = 0; ci < span; ci++)

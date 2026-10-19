@@ -144,7 +144,7 @@ internal sealed class TerrainPasses
         var frustum = camera.GetViewFrustum();
         var camChunkPos = (camera.RenderEye / Chunk.Size).Floor();
         var camPos = camera.RenderEye;
-        var fancyFarSq = WorldGenerationConfig.WaterFancyFarBlocks * WorldGenerationConfig.WaterFancyFarBlocks;
+        var fancyFarSq = WaterRenderConfig.WaterFancyFarBlocks * WaterRenderConfig.WaterFancyFarBlocks;
 
         for (var i = 0; i < chunks.Count; i++)
         {
@@ -247,7 +247,7 @@ internal sealed class TerrainPasses
         _owner.ChunkDraws.Draw(_owner.LodGeometry.Vao, _owner.ChunkShader, _owner.LocChunkDrawBase);
 
         // Later chunk passes reuse this program and need the cutout behavior back.
-        _owner.ChunkShader.SetUniform(_owner.LocChunkAlphaCutoff, WorldGenerationConfig.AlphaCutoff);
+        _owner.ChunkShader.SetUniform(_owner.LocChunkAlphaCutoff, LightingConfig.AlphaCutoff);
     }
 
     private readonly List<(LodRegion region, float distSq)> _visibleRegions = new(256);

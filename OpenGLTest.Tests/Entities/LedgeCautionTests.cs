@@ -42,7 +42,7 @@ public sealed class LedgeCautionTests
     [Fact]
     public void AShortDropIsAlwaysTakenAndALongOneOnlyTowardATargetBelow()
     {
-        var max = (int)WorldGenerationConfig.MobLedgeMaxDropBlocks;
+        var max = (int)MobConfig.MobLedgeMaxDropBlocks;
         for (var drop = 0; drop <= max; drop++)
         {
             Assert.True(LedgeProbe.IsSafe(drop, targetBelow: false));
@@ -53,7 +53,7 @@ public sealed class LedgeCautionTests
 
         Assert.False(LedgeProbe.TargetBelow(10f, 10f));
         Assert.False(LedgeProbe.TargetBelow(10f, 9f));
-        Assert.True(LedgeProbe.TargetBelow(10f, 10f - WorldGenerationConfig.MobLedgeMaxDropBlocks - 1f));
+        Assert.True(LedgeProbe.TargetBelow(10f, 10f - MobConfig.MobLedgeMaxDropBlocks - 1f));
     }
 
     [Fact]

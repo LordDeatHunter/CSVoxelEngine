@@ -36,7 +36,7 @@ public sealed class ThrownProjectileTests
         var slow = ThrownProjectile.LaunchVelocity(Vector3.UnitX, 0f).Length();
         var fast = ThrownProjectile.LaunchVelocity(Vector3.UnitX, 1f).Length();
         Assert.True(fast > slow);
-        Assert.Equal(fast * WorldGenerationConfig.ThrowMinCharge, slow, precision: 3);
+        Assert.Equal(fast * PlayerConfig.ThrowMinCharge, slow, precision: 3);
     }
 
     [Fact]

@@ -16,10 +16,10 @@ public static class GlassSheen
     /// <summary>
     /// How far toward the mirrored sky a glass face goes when the eye sees it at
     /// <paramref name="cosView"/> (the cosine between the view and the face normal, either side):
-    /// <see cref="WorldGenerationConfig.GlassSheenStrength"/> times <see cref="SurfaceFresnel.Schlick"/>.
+    /// <see cref="SurfaceShadingConfig.GlassSheenStrength"/> times <see cref="SurfaceFresnel.Schlick"/>.
     /// </summary>
     public static float Weight(float cosView) =>
-        WorldGenerationConfig.GlassSheenStrength * SurfaceFresnel.Schlick(MathF.Abs(cosView));
+        SurfaceShadingConfig.GlassSheenStrength * SurfaceFresnel.Schlick(MathF.Abs(cosView));
 
     /// <summary>The blended alpha of a glass texel of alpha <paramref name="texAlpha"/> taking a
     /// sky share of <paramref name="weight"/>: <c>a + F - aF</c>, never below the texel's own.</summary>

@@ -11,12 +11,12 @@ namespace VoxelEngine.Tests.Effects.Sky;
 /// </summary>
 public sealed class MoonPhaseTests
 {
-    private static double Day => WorldGenerationConfig.DayLengthSeconds;
+    private static double Day => SkyConfig.DayLengthSeconds;
 
     [Fact]
     public void ThePhaseStepsOnceADayAndRepeatsEveryCycle()
     {
-        var cycle = WorldGenerationConfig.MoonCycleDays;
+        var cycle = SkyConfig.MoonCycleDays;
         for (var day = -cycle; day < 2 * cycle; day++)
         {
             var start = DayCycle.NoonTime + day * Day;
@@ -39,7 +39,7 @@ public sealed class MoonPhaseTests
     {
         var previousVisible = false;
         var phaseWhileVisible = 0f;
-        for (var t = 0.0; t < 3 * WorldGenerationConfig.MoonCycleDays * Day; t += 2.0)
+        for (var t = 0.0; t < 3 * SkyConfig.MoonCycleDays * Day; t += 2.0)
         {
             var visible = MoonPhase.Visibility(DayCycle.SunDirection(t).Y) > 0f;
             var phase = MoonPhase.Fraction(t);

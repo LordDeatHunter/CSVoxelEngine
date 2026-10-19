@@ -12,13 +12,13 @@ public readonly record struct ContactAoSettings(
     float FadeNear, float FadeFar, float RadiusBlocks, float MaxPx,
     float ReachNear, float ReachFar)
 {
-    /// <summary>The shipped values from <see cref="WorldGenerationConfig"/>.</summary>
+    /// <summary>The shipped values from <see cref="PostProcessConfig"/>.</summary>
     public static ContactAoSettings Default => new(
-        WorldGenerationConfig.ContactAoStrength, WorldGenerationConfig.ContactAoMinBlocks,
-        WorldGenerationConfig.ContactAoPeakBlocks, WorldGenerationConfig.ContactAoRangeBlocks,
-        WorldGenerationConfig.ContactAoFadeNear, WorldGenerationConfig.ContactAoFadeFar,
-        WorldGenerationConfig.ContactAoRadiusBlocks, WorldGenerationConfig.ContactAoMaxPx,
-        WorldGenerationConfig.ContactAoReachNear, WorldGenerationConfig.ContactAoReachFar);
+        PostProcessConfig.ContactAoStrength, PostProcessConfig.ContactAoMinBlocks,
+        PostProcessConfig.ContactAoPeakBlocks, PostProcessConfig.ContactAoRangeBlocks,
+        PostProcessConfig.ContactAoFadeNear, PostProcessConfig.ContactAoFadeFar,
+        PostProcessConfig.ContactAoRadiusBlocks, PostProcessConfig.ContactAoMaxPx,
+        PostProcessConfig.ContactAoReachNear, PostProcessConfig.ContactAoReachFar);
 }
 
 /// <summary>

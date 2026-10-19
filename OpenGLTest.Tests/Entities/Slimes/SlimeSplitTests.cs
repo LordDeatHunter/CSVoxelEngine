@@ -80,7 +80,7 @@ public sealed class SlimeSplitTests
         // The parent lives on at half health beside its children, each the next smaller size at full health
         Assert.False(parent.IsDead);
         var children = manager.Slimes.Where(s => s != parent).ToList();
-        Assert.Equal(WorldGenerationConfig.SlimeSplitChildren, children.Count);
+        Assert.Equal(MobConfig.SlimeSplitChildren, children.Count);
         foreach (var child in children)
         {
             Assert.Equal(parent.Size - 1, child.Size);
@@ -133,12 +133,12 @@ public sealed class SlimeSplitTests
         tight.TakeDamage(ToHalf(tight));
         slimes.Update(Dt, chunks, new DropManager(), camera);
         Assert.Equal(3, slimes.LivingCount);
-        Assert.Equal(WorldGenerationConfig.MobHardCap, caps.Living);
+        Assert.Equal(MobConfig.MobHardCap, caps.Living);
 
         // At the hard cap a split makes no children at all
         full.TakeDamage(ToHalf(full));
         slimes.Update(Dt, chunks, new DropManager(), camera);
         Assert.Equal(3, slimes.LivingCount);
-        Assert.Equal(WorldGenerationConfig.MobHardCap, caps.Living);
+        Assert.Equal(MobConfig.MobHardCap, caps.Living);
     }
 }

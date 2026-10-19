@@ -8,7 +8,7 @@ namespace VoxelEngine.Tests.Entities.Goblins;
 
 public sealed class GoblinAimTests
 {
-    private const float Speed = WorldGenerationConfig.GoblinStoneSpeed;
+    private const float Speed = MobConfig.GoblinStoneSpeed;
     private const float Gravity = ThrownProjectile.Gravity;
 
     private static readonly Vector3 Origin = new(3f, 70f, -5f);
@@ -73,7 +73,7 @@ public sealed class GoblinAimTests
     {
         // The goblin only throws inside [GoblinThrowMinRange, GoblinThrowMaxRange], at a chest a
         // little above its hand; the band's far edge must stay within the stone's reach.
-        var to = Origin + new Vector3(WorldGenerationConfig.GoblinThrowMaxRange, 0.6f, 0f);
+        var to = Origin + new Vector3(MobConfig.GoblinThrowMaxRange, 0.6f, 0f);
 
         Assert.True(GoblinAim.TryLaunchVelocity(Origin, to, Speed, Gravity, out _));
     }

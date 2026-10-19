@@ -27,7 +27,7 @@ public static class FootstepDust
     /// <summary>
     /// Whether a footfall right now puffs: the body sprints on foot (never flying, never sneaking),
     /// stands on the ground, is out of the water, covers at least
-    /// <see cref="WorldGenerationConfig.FootstepDustMinSpeed"/> sideways, and the block underfoot
+    /// <see cref="JuiceConfig.FootstepDustMinSpeed"/> sideways, and the block underfoot
     /// (<paramref name="surfaceId"/>) is loose ground.
     /// </summary>
     public static bool Kicks(bool sprinting, bool grounded, bool flying, bool sneaking, bool inWater,
@@ -40,5 +40,5 @@ public static class FootstepDust
     public static bool BodyKicks(bool sprinting, bool grounded, bool flying, bool sneaking, bool inWater,
         float horizontalSpeed) =>
         sprinting && grounded && !flying && !sneaking && !inWater
-        && horizontalSpeed >= WorldGenerationConfig.FootstepDustMinSpeed;
+        && horizontalSpeed >= JuiceConfig.FootstepDustMinSpeed;
 }

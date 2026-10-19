@@ -69,7 +69,7 @@ public static class MobSpawner
     /// random columns in the same ring, each scanned downward from a random height within
     /// <paramref name="searchHalfHeight"/> of the player's feet for at most <paramref name="scanDepth"/>
     /// cells, taking the first solid floor with two clear, dry cells above it. The floor must lie at
-    /// least <see cref="WorldGenerationConfig.SlimeUndergroundDepthBlocks"/> under its column's terrain
+    /// least <see cref="MobConfig.SlimeUndergroundDepthBlocks"/> under its column's terrain
     /// height (<see cref="SlimeSize.IsUnderground"/>), the cell above it must be dark (sky light at most
     /// <paramref name="maxSkyLight"/>, read like <see cref="IsLitByBlocks"/>; a cell without a published
     /// light snapshot reads as full sun, so it is refused) and not torch-lit, and every cell read must
@@ -127,7 +127,7 @@ public static class MobSpawner
 
     /// <summary>
     /// Whether the block light (torches, lamps, lava) in cell (<paramref name="x"/>, <paramref name="y"/>,
-    /// <paramref name="z"/>) reaches <see cref="WorldGenerationConfig.MobSpawnBlockLightLimit"/>, which
+    /// <paramref name="z"/>) reaches <see cref="MobConfig.MobSpawnBlockLightLimit"/>, which
     /// keeps every ring spawn off it, so a few torches keep a base clear. Read through
     /// <see cref="EntityLight.Sample"/> from the light each chunk publishes with its mesh (a headless
     /// server publishes it too); a cell without one reads as unlit.
@@ -135,6 +135,6 @@ public static class MobSpawner
     public static bool IsLitByBlocks(ChunkManager chunks, int x, int y, int z)
     {
         var light = EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
-        return (int)MathF.Round(light.Block * 15f) >= WorldGenerationConfig.MobSpawnBlockLightLimit;
+        return (int)MathF.Round(light.Block * 15f) >= MobConfig.MobSpawnBlockLightLimit;
     }
 }

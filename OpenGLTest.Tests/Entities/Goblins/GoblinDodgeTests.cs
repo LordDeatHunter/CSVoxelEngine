@@ -10,8 +10,8 @@ namespace VoxelEngine.Tests.Entities.Goblins;
 
 /// <summary>
 /// The goblin's dodge: a charged throw aimed at it (inside
-/// <see cref="WorldGenerationConfig.GoblinDodgeConeDegrees"/> and within
-/// <see cref="WorldGenerationConfig.GoblinDodgeRangeBlocks"/>) makes it sidestep out of the line
+/// <see cref="MobConfig.GoblinDodgeConeDegrees"/> and within
+/// <see cref="MobConfig.GoblinDodgeRangeBlocks"/>) makes it sidestep out of the line
 /// instead of closing in, while an aim past it is ignored.
 /// </summary>
 public sealed class GoblinDodgeTests
@@ -39,7 +39,7 @@ public sealed class GoblinDodgeTests
         Assert.False(GoblinManager.IsAimedAt(goblin, origin, Vector3.Normalize(Vector3.UnitZ + new Vector3(0.5f, 0f, 0f))));
 
         // Out of range, and a target on top of the origin
-        Assert.False(GoblinManager.IsAimedAt(new Vector3(0f, 0f, WorldGenerationConfig.GoblinDodgeRangeBlocks + 1f),
+        Assert.False(GoblinManager.IsAimedAt(new Vector3(0f, 0f, MobConfig.GoblinDodgeRangeBlocks + 1f),
             origin, Vector3.UnitZ));
         Assert.False(GoblinManager.IsAimedAt(origin, origin, Vector3.UnitZ));
     }

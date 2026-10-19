@@ -15,7 +15,7 @@ public sealed class HotbarNameFadeTests
     private const float Dt = 1f / 60f;
 
     private static float Lifetime =>
-        WorldGenerationConfig.HotbarNameHoldSeconds + WorldGenerationConfig.HotbarNameFadeSeconds;
+        HudConfig.HotbarNameHoldSeconds + HudConfig.HotbarNameFadeSeconds;
 
     [Fact]
     public void TheFirstObservationShowsNothing()

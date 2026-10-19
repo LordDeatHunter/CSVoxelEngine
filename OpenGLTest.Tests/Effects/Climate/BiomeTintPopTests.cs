@@ -146,14 +146,14 @@ public sealed class BiomeTintPopTests
         var bt = TintOf(type);
         var cell = new Vector3(-37f, 12f, -5f);
         var system = new BlockDebrisSystem();
-        system.Burst(cell, type.Id, WorldGenerationConfig.BlockDebrisPerHit, new Random(1));
+        system.Burst(cell, type.Id, ParticleConfig.BlockDebrisPerHit, new Random(1));
         Assert.NotEmpty(system.Debris);
         var expected = BiomeTint.CellTint(bt.Palette, (int)MathF.Floor(cell.X), (int)MathF.Floor(cell.Z));
         foreach (var debris in system.Debris)
             Assert.Equal(expected, debris.Tint);
 
         var stone = new BlockDebrisSystem();
-        stone.Burst(cell, Stone.Id, WorldGenerationConfig.BlockDebrisPerHit, new Random(1));
+        stone.Burst(cell, Stone.Id, ParticleConfig.BlockDebrisPerHit, new Random(1));
         Assert.NotEmpty(stone.Debris);
         foreach (var debris in stone.Debris)
             Assert.Equal(Vector3.One, debris.Tint);
@@ -196,7 +196,7 @@ public sealed class BiomeTintPopTests
         // A column the source does not have yet leaves every chip untinted, never a guess
         var missing = new FakeColumnSource((_, _) => null);
         var untinted = new BlockDebrisSystem();
-        untinted.Burst(cell, type.Id, WorldGenerationConfig.BlockDebrisPerHit, new Random(1), columns: missing);
+        untinted.Burst(cell, type.Id, ParticleConfig.BlockDebrisPerHit, new Random(1), columns: missing);
         Assert.NotEmpty(untinted.Debris);
         Assert.All(untinted.Debris, d => Assert.Equal(Vector3.One, d.Tint));
         Assert.NotEmpty(missing.Asked);
@@ -206,7 +206,7 @@ public sealed class BiomeTintPopTests
         var real = new FakeColumnSource((qx, qz) =>
             WorldgenColumnSource.Instance.TryGet(qx, qz, out var t) ? t : null);
         var tinted = new BlockDebrisSystem();
-        tinted.Burst(cell, type.Id, WorldGenerationConfig.BlockDebrisPerHit, new Random(1), columns: real);
+        tinted.Burst(cell, type.Id, ParticleConfig.BlockDebrisPerHit, new Random(1), columns: real);
         Assert.NotEmpty(tinted.Debris);
         var expected = BiomeTint.CellTint(bt.Palette, x, z);
         Assert.All(tinted.Debris, d => Assert.Equal(expected, d.Tint));
@@ -220,7 +220,7 @@ public sealed class BiomeTintPopTests
         var opposite = new FakeColumnSource((_, _) => new ColumnTerrain(
             new int[Chunk.Size * Chunk.Size], new int[Chunk.Size * Chunk.Size], warmth, wetness));
         var swapped = new BlockDebrisSystem();
-        swapped.Burst(cell, type.Id, WorldGenerationConfig.BlockDebrisPerHit, new Random(1), columns: opposite);
+        swapped.Burst(cell, type.Id, ParticleConfig.BlockDebrisPerHit, new Random(1), columns: opposite);
         BiomeTint.TintsFromClimate(warmth, wetness, out var grass, out var foliage);
         var uniform = bt.Palette == BiomeTintPalette.Foliage ? foliage : grass;
         Assert.NotEmpty(swapped.Debris);

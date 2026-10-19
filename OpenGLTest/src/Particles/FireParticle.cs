@@ -34,7 +34,7 @@ public sealed class FireParticle
     public float Alpha => Kind switch
     {
         FireParticleKind.Ember => 1f - MathUtils.Clamp01(_age / _lifetime),
-        FireParticleKind.Steam => WorldGenerationConfig.SteamAlpha * (1f - MathUtils.Clamp01(_age / _lifetime)),
+        FireParticleKind.Steam => JuiceConfig.SteamAlpha * (1f - MathUtils.Clamp01(_age / _lifetime)),
         FireParticleKind.Spark => 0.9f * (1f - MathUtils.Clamp01(_age / _lifetime)),
         _ => 0.45f * (1f - MathUtils.Clamp01(_age / _lifetime)),
     };
@@ -75,43 +75,43 @@ public sealed class FireParticle
         Kind = kind;
         if (kind == FireParticleKind.Ember)
         {
-            _lifetime = WorldGenerationConfig.FireEmberLifetime * (0.6f + 0.8f * rng.NextSingle());
+            _lifetime = ParticleConfig.FireEmberLifetime * (0.6f + 0.8f * rng.NextSingle());
             _velocity = new Vector3(
                 (rng.NextSingle() * 2f - 1f) * 0.35f,
-                WorldGenerationConfig.FireEmberRise * (0.8f + 0.4f * rng.NextSingle()),
+                ParticleConfig.FireEmberRise * (0.8f + 0.4f * rng.NextSingle()),
                 (rng.NextSingle() * 2f - 1f) * 0.35f);
-            Size = WorldGenerationConfig.FireEmberSize * (0.7f + 0.6f * rng.NextSingle());
+            Size = ParticleConfig.FireEmberSize * (0.7f + 0.6f * rng.NextSingle());
             _grow = 0f;
         }
         else if (kind == FireParticleKind.Steam)
         {
-            _lifetime = WorldGenerationConfig.SteamLifetime * (0.7f + 0.6f * rng.NextSingle());
+            _lifetime = JuiceConfig.SteamLifetime * (0.7f + 0.6f * rng.NextSingle());
             _velocity = new Vector3(
                 (rng.NextSingle() * 2f - 1f) * 0.3f,
-                WorldGenerationConfig.SteamRise * (0.8f + 0.4f * rng.NextSingle()),
+                JuiceConfig.SteamRise * (0.8f + 0.4f * rng.NextSingle()),
                 (rng.NextSingle() * 2f - 1f) * 0.3f);
-            Size = WorldGenerationConfig.SteamSize * (0.8f + 0.4f * rng.NextSingle());
-            _grow = WorldGenerationConfig.SteamGrow;
+            Size = JuiceConfig.SteamSize * (0.8f + 0.4f * rng.NextSingle());
+            _grow = JuiceConfig.SteamGrow;
         }
         else if (kind == FireParticleKind.Spark)
         {
-            _lifetime = WorldGenerationConfig.SparkLifetime * (0.7f + 0.6f * rng.NextSingle());
+            _lifetime = JuiceConfig.SparkLifetime * (0.7f + 0.6f * rng.NextSingle());
             _velocity = new Vector3(
                 (rng.NextSingle() * 2f - 1f) * 0.4f,
-                WorldGenerationConfig.SparkRise * (0.8f + 0.4f * rng.NextSingle()),
+                JuiceConfig.SparkRise * (0.8f + 0.4f * rng.NextSingle()),
                 (rng.NextSingle() * 2f - 1f) * 0.4f);
-            Size = WorldGenerationConfig.SparkSize * (0.8f + 0.4f * rng.NextSingle());
+            Size = JuiceConfig.SparkSize * (0.8f + 0.4f * rng.NextSingle());
             _grow = 0f;
         }
         else
         {
-            _lifetime = WorldGenerationConfig.FireSmokeLifetime * (0.7f + 0.6f * rng.NextSingle());
+            _lifetime = ParticleConfig.FireSmokeLifetime * (0.7f + 0.6f * rng.NextSingle());
             _velocity = new Vector3(
                 (rng.NextSingle() * 2f - 1f) * 0.2f,
-                WorldGenerationConfig.FireSmokeRise * (0.85f + 0.3f * rng.NextSingle()),
+                ParticleConfig.FireSmokeRise * (0.85f + 0.3f * rng.NextSingle()),
                 (rng.NextSingle() * 2f - 1f) * 0.2f);
-            Size = WorldGenerationConfig.FireSmokeSize * (0.8f + 0.4f * rng.NextSingle());
-            _grow = WorldGenerationConfig.FireSmokeGrow;
+            Size = ParticleConfig.FireSmokeSize * (0.8f + 0.4f * rng.NextSingle());
+            _grow = ParticleConfig.FireSmokeGrow;
         }
         _swayPhase = rng.NextSingle() * MathF.Tau;
         _swayAmp = kind == FireParticleKind.Ember ? 0.35f : 0.15f;
@@ -142,8 +142,8 @@ public sealed class FireParticle
             // Sway across the wind and drift down it. Smoke and steam pick the drift up as they rise
             // clear of their source (full after half their life); embers are carried from the start.
             var drift = Kind != FireParticleKind.Ember
-                ? WorldGenerationConfig.WindSmokeDrift * MathUtils.Clamp01(_age / (0.5f * _lifetime))
-                : WorldGenerationConfig.WindEmberDrift;
+                ? SkyConfig.WindSmokeDrift * MathUtils.Clamp01(_age / (0.5f * _lifetime))
+                : SkyConfig.WindEmberDrift;
             Position += new Vector3(-wind.Y * sway + wind.X * drift * deltaTime, 0f,
                 wind.X * sway + wind.Y * drift * deltaTime);
         }
