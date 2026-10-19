@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Stations;
@@ -159,7 +160,7 @@ public static class Primitives
             var quad = quads[q];
             // ShadeLut already folds face brightness and AO into a 0..255 byte; an element
             // with shade off keeps full brightness, exactly like the chunk mesher
-            var shade = quad.Shade ? Chunk.ShadeLut[(quad.Face << 2) | 3] / 255f : 1f;
+            var shade = quad.Shade ? ChunkFaceTables.ShadeLut[(quad.Face << 2) | 3] / 255f : 1f;
             var tint = Shade(Rgba.White, shade);
 
             for (var corner = 0; corner < CornersPerFace; corner++)

@@ -572,7 +572,7 @@ needs, not the history.
   buys.
 - **D1 · What took the `int` fast path, and why those sites and not others.** Every site that
   probes a **distinct key per operation** took it, because those are the sites with no pack to
-  amortize: `Chunk.TryResolveNeighbors` (`Chunk.cs:1060`, **26 probes per mesh build**, on pool
+  amortize: `ChunkMeshBuilder.TryResolveNeighbors` (`Chunks/Meshing/ChunkMeshBuilder.cs`, **26 probes per mesh build**, on pool
   threads), `LodManager.cs:731` (the column prefetch C5 measured at **36 / 100 / 324 chunk columns
   per region build**, on the LodGen thread), `ChunkManager.HasAllNeighbors` (`:892`),
   `GetBlockGlobal` / `ChunkAt` (`:759`, `:772`, whose intermediate `Vector3` was built from the same
@@ -907,8 +907,8 @@ needs, not the history.
 - **D3.** `ChunkDrawBatch.PassCount` deleted. The private `_passCount` field stays — it is the real
   `MultiDrawElementsIndirect` count. `grep -rn "PassCount" OpenGLTest OpenGLTest.Tests --include=*.cs`
   now returns nothing.
-- **C12(b).** `Chunk.GenerateBlockData`'s scalar recount is now
-  `_solidCount = BlockCount - _blocks.AsSpan().Count(BlockType.Air)` (`Chunk.cs:507`). Counting *air*
+- **C12(b).** `ChunkTerrainFill.GenerateBlockData`'s scalar recount is now
+  `_solidCount = BlockCount - _blocks.AsSpan().Count(BlockType.Air)` (`WorldGen/ChunkTerrainFill.cs`). Counting *air*
   and subtracting is the right shape rather than an accident: `BlockType.Air` is
   `public const byte Air = 0` and `_blocks` is `byte[]`, so this binds to the vectorized
   `MemoryExtensions.Count<byte>` with no cast, where a `!= Air` predicate would run one comparison
@@ -1127,7 +1127,7 @@ process launches**. It asserts nothing.
 **The arms are call-site SHAPES, not implementations**, because packing amortizes across the
 dictionary operations a site performs per key, and the source pins the reuse counts exactly.
 *Shape N* (`NeedsChunk`): one key, up to two `ContainsKey` probes. *Shape H*
-(`HasAllNeighbors`, `GetBlockGlobal`/`ChunkAt`, `Chunk.TryResolveNeighbors`, `LodManager.cs:731`):
+(`HasAllNeighbors`, `GetBlockGlobal`/`ChunkAt`, `ChunkMeshBuilder.TryResolveNeighbors`, `LodManager.cs:731`):
 one distinct key per probe, no reuse at all.
 
 | arm | shape | what it is | SETTLED median ns (4 runs) | STREAMING median ns |

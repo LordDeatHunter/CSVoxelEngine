@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Models;
@@ -176,7 +177,7 @@ public class BlockCubeCache : IDisposable
         for (var face = 0; face < 6; face++)
         {
             faceUvs[face] = UvRect.Tile(type.FaceTiles[face]);
-            faceShades[face] = Chunk.ShadeLut[(face << 2) | 3] / 255f;
+            faceShades[face] = ChunkFaceTables.ShadeLut[(face << 2) | 3] / 255f;
         }
 
         return Primitives.CreateCube(_gl, 1f, Rgba.White, faceUvs, faceShades);

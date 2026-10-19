@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Shapes;
@@ -11,8 +12,8 @@ namespace VoxelEngine.Particles;
 /// The mining pop's geometry: each hitbox drawn as a box sampling its crop of the block's
 /// face tiles at full-texel density. Scaling a full-cube mesh into a thin hitbox stretches
 /// its texture (what snow slabs showed); emitting the box with the same corner order, UVs
-/// and shade lookup as the chunk mesher (<see cref="Chunk.BoxFaceCorners"/>,
-/// <see cref="Chunk.CropUv"/>) makes the pop pixel-identical to the terrain it jumps out of.
+/// and shade lookup as the chunk mesher (<see cref="ChunkFaceTables.BoxFaceCorners"/>,
+/// <see cref="ChunkFaceTables.CropUv"/>) makes the pop pixel-identical to the terrain it jumps out of.
 /// Tile-based like the other procedural emitters (LOD, pebbles, tree wood), so every
 /// partial block is covered with no per-renderer branches: a new one only needs sensible
 /// <c>FaceTiles</c> (the baker falls back to the first quad's tile). A biome-tinted block's
@@ -43,9 +44,9 @@ public static class PopBoxEmitter
     {
         for (var face = 0; face < 6; face++)
         {
-            Chunk.BoxFaceCorners(grown.Min, grown.Max, face, out var a, out var b, out var c, out var d);
-            Chunk.BoxFaceCorners(crop.Min, crop.Max, face, out var ta, out var tb, out var tc, out var td);
-            var shade = Chunk.ShadeLut[(face << 2) | 3];
+            ChunkFaceTables.BoxFaceCorners(grown.Min, grown.Max, face, out var a, out var b, out var c, out var d);
+            ChunkFaceTables.BoxFaceCorners(crop.Min, crop.Max, face, out var ta, out var tb, out var tc, out var td);
+            var shade = ChunkFaceTables.ShadeLut[(face << 2) | 3];
             var normal = Chunk.CubeFaces[face].normal;
 
             if (biomeTint is { } bt)
@@ -63,10 +64,10 @@ public static class PopBoxEmitter
 
             void Emit(List<Vertex> vs, List<ushort> ids, ref ushort offset, ushort tile, bool tinted)
             {
-                vs.Add(new Vertex(blockPosition + a, shade, shade, shade, 255, Chunk.CropUv(face, ta), tile, 1f, 0f, normal, biomeTint: tinted));
-                vs.Add(new Vertex(blockPosition + b, shade, shade, shade, 255, Chunk.CropUv(face, tb), tile, 1f, 0f, normal, biomeTint: tinted));
-                vs.Add(new Vertex(blockPosition + c, shade, shade, shade, 255, Chunk.CropUv(face, tc), tile, 1f, 0f, normal, biomeTint: tinted));
-                vs.Add(new Vertex(blockPosition + d, shade, shade, shade, 255, Chunk.CropUv(face, td), tile, 1f, 0f, normal, biomeTint: tinted));
+                vs.Add(new Vertex(blockPosition + a, shade, shade, shade, 255, ChunkFaceTables.CropUv(face, ta), tile, 1f, 0f, normal, biomeTint: tinted));
+                vs.Add(new Vertex(blockPosition + b, shade, shade, shade, 255, ChunkFaceTables.CropUv(face, tb), tile, 1f, 0f, normal, biomeTint: tinted));
+                vs.Add(new Vertex(blockPosition + c, shade, shade, shade, 255, ChunkFaceTables.CropUv(face, tc), tile, 1f, 0f, normal, biomeTint: tinted));
+                vs.Add(new Vertex(blockPosition + d, shade, shade, shade, 255, ChunkFaceTables.CropUv(face, td), tile, 1f, 0f, normal, biomeTint: tinted));
                 ids.Add((ushort)(offset + 0));
                 ids.Add((ushort)(offset + 1));
                 ids.Add((ushort)(offset + 2));

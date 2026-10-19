@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Simulation;
@@ -31,7 +32,7 @@ public sealed class TopplingTreeTintTests
 
     private static (byte R, byte G, byte B) ShadeOf(int face, int ao, Vector3 tint)
     {
-        BiomeTint.Shade(Chunk.ShadeLut[(face << 2) | ao], tint, out var r, out var g, out var b);
+        BiomeTint.Shade(ChunkFaceTables.ShadeLut[(face << 2) | ao], tint, out var r, out var g, out var b);
         return (r, g, b);
     }
 

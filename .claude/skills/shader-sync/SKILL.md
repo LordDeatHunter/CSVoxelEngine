@@ -19,7 +19,7 @@ Several pieces of logic exist in more than one place on purpose. Change one and 
 | **Snow glint grid** | `const float SnowTexels` in `test-fragment.glsl` == the atlas tile size (`TextureAtlas.TileWidth`/`TileHeight`), so a glint lights exactly one texel of the snow art | `SnowSparkleTests` |
 | **Water fresnel / wet weight** | `test-fragment.glsl` == `SurfaceFresnel` | its tests |
 | **Texture sampling convention** | meshes sample `sampler2DArray` with `vec3(uv, float(layer))`; textures sampled before the tonemap are `SRGB8_ALPHA8`, data atlases plain; `ui-fragment.glsl` `uSrgbTex` re-encodes the two shared textures | check by eye |
-| **Material atlas** | `fTangent`/`fBitangent` in `test-vertex.glsl` must agree with `Chunk.TiledUv` per-face UV orientation | ore scenario |
+| **Material atlas** | `fTangent`/`fBitangent` in `test-vertex.glsl` must agree with `ChunkFaceTables.TiledUv` per-face UV orientation | ore scenario |
 | **Stars** | `sky-fragment.glsl` `Stars`/`StarHash`/`StarCellHash`/`StarFaceDirection` (cube face, equi-angular warp, solid-angle weight, in-cell jitter, brightness law, twinkle rate/phase and curve) == `StarField` | `StarFieldTests` |
 | **Sun glare falloff** | `sky-fragment.glsl` `uGlareColor * pow(max(dot(dir, uSunDir), 0), uGlareExponent)` == `SunGlare.Radial` (the intensity itself is CPU-only, `SunGlare.Intensity`) | `SunGlareTests` |
 | **Cloud cover along a ray** | `sky-fragment.glsl` `CloudLevelAt`/`CloudCoverAlongRay` == `CloudCover.LevelAt`/`AlongRay` (cell-exact read of the cloud-shadow map, layer-boundary tests, cubic fog fade) | `CloudCoverTests` |

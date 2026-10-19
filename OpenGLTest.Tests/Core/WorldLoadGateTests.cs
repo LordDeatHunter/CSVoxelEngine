@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks.Meshing;
 using Xunit;
 
 namespace VoxelEngine.Tests.Core;

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Lod;
 using VoxelEngine.Networking.Client;

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Shapes;
@@ -152,7 +153,7 @@ internal static class ModelBakeSteps
     /// Whether a baked model is exactly the six untransformed cube faces, so the greedy mesher
     /// can rebuild any of its faces from (face, extent) alone: one full, shaded quad per cube
     /// face, culled against its own side, positioned on the <see cref="Chunk.CubeFaces"/>
-    /// corners and textured with the plain <see cref="Chunk.TiledUv"/> orientation. A rotated
+    /// corners and textured with the plain <see cref="ChunkFaceTables.TiledUv"/> orientation. A rotated
     /// or cropped face UV, a sub-cell element or an unshaded face keeps the per-quad path.
     /// Cutout (leaves) and translucent (glass) cubes qualify: their culling rule is the same
     /// one, and the mesher picks the destination list per block type.
@@ -173,7 +174,7 @@ internal static class ModelBakeSteps
             for (var j = 0; j < 4; j++)
             {
                 if (quad.Positions[j] != corners[j]) return false;
-                if (quad.Uvs[j] != Chunk.TiledUv(quad.Face, corners[j], Vector3.One)) return false;
+                if (quad.Uvs[j] != ChunkFaceTables.TiledUv(quad.Face, corners[j], Vector3.One)) return false;
             }
         }
 

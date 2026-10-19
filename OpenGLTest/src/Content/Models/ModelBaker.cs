@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Shapes;
@@ -17,7 +18,7 @@ namespace VoxelEngine.Content.Models;
 /// Minecraft's u runs opposite to the engine's, for top and bottom its v does (see
 /// <c>FlipU</c>/<c>FlipV</c>). Applying that single flip makes a <c>cube_all</c> bake
 /// reproduce the hand-written full-cube UVs in <see cref="Chunk"/> exactly, and makes a
-/// sub-cell box with default UVs reproduce <c>Chunk.CropUv</c> — so models and the procedural
+/// sub-cell box with default UVs reproduce <c>ChunkFaceTables.CropUv</c> — so models and the procedural
 /// emitters sample the atlas identically.
 ///
 /// Runs on the main thread at startup, after <see cref="TextureAtlas.Build"/>.

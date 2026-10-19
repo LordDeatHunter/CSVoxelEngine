@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using VoxelEngine.Effects.Lighting;
 using static VoxelEngine.Chunks.Chunk;
+using static VoxelEngine.Chunks.Meshing.ChunkFaceTables;
 
 namespace VoxelEngine.Chunks.Meshing;
 
@@ -120,6 +121,130 @@ internal static class ChunkLighting
             else if (l < LightBorder + Size) { mapChunk[l] = 1; mapLocal[l] = l - LightBorder; }
             else { mapChunk[l] = 2; mapLocal[l] = l - LightBorder - Size; }
         }
+    }
+
+    /// <summary>
+    /// Copies the LightSize^3 block volume centered on this chunk straight from the 3x3x3
+    /// neighboring chunks' block arrays, so the fill loop does zero dictionary lookups.
+    /// <paramref name="neighbors"/> comes pre-resolved from <see cref="ChunkMeshBuilder.TryResolveNeighbors"/>,
+    /// which guarantees the 6 face neighbors are present; the corner and edge slots may still
+    /// be null and read as air, which only costs a little light accuracy in the diagonal
+    /// corners of the wide light volume. Same thread-safety convention as FillPaddedSnapshot
+    /// (block edits race the read; the edit's own remesh wins after).
+    /// </summary>
+    internal static void FillLightSnapshot(byte[] light, Chunk?[] neighbors)
+    {
+        // Per-axis map from volume coordinate to (chunk 0..2, local block 0..15). The volume
+        // spans LightBorder cells into each neighbor: [1, LightBorder) of the previous
+        // chunk, the full own chunk, then [0, LightBorder) of the next one.
+        Span<int> mapChunk = stackalloc int[LightSize];
+        Span<int> mapLocal = stackalloc int[LightSize];
+        BuildLightAxisMap(mapChunk, mapLocal);
+
+        for (var lx = 0; lx < LightSize; lx++)
+        for (var ly = 0; ly < LightSize; ly++)
+        {
+            var rowBase = (lx * LightSize + ly) * LightSize;
+            var neighborRow = (mapChunk[lx] * 3 + mapChunk[ly]) * 3;
+            var blockRow = (mapLocal[lx] << (2 * SizeShift)) | (mapLocal[ly] << SizeShift);
+            for (var lz = 0; lz < LightSize; lz++)
+            {
+                var neighbor = neighbors[neighborRow + mapChunk[lz]];
+                light[rowBase + lz] = neighbor?.Blocks[blockRow | mapLocal[lz]] ?? 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Flood-fills skylight and lamp light over the wide light snapshot (see
+    /// FillLightSnapshot), so lamps and skylight changes up to LightPropagationRadius
+    /// blocks away still light this chunk's faces. Sun seeds are air or leaf cells at or
+    /// above the terrain height (nothing generated is ever solid above it, and canopies
+    /// pass light); lamp seeds are emissive cells. Both spread through air and leaves
+    /// losing one level per block, so caves and overhangs fall off into darkness. All
+    /// inputs are local (snapshot + height cache), so this is thread-safe and needs no
+    /// cross-chunk state. Seeds all enter at the same max level, so a FIFO queue visits
+    /// every cell at its final level first, each cell is enqueued at most once, and the
+    /// caller-sized queue never overflows.
+    /// <paramref name="sun"/> and <paramref name="block"/> must be zeroed and hold at
+    /// least LightCount entries each, as must <paramref name="queue"/>.
+    /// <para>
+    /// <paramref name="block"/> stores <c>level | slot &lt;&lt; 4</c>: the lamp level in bits 0-3
+    /// (<see cref="BlockLevelMask"/>) and the <see cref="BlockLightPalette"/> slot of the light's
+    /// color in bits 4-6, so every read of a level must mask. <paramref name="sun"/> is plain
+    /// levels. Returns whether any lamp seed carries a non-default slot; when none does, every
+    /// slot is 0 and the byte is exactly the old level.
+    /// </para>
+    /// </summary>
+    internal static bool ComputeLight(Chunk chunk, byte[] light, byte[] sun, byte[] block, int[] queue)
+    {
+        var worldY0 = chunk.LowerBoundY - LightBorder;
+
+        var head = 0;
+        var tail = 0;
+
+        // The LightSize^2 volume columns only ever land in the 3x3 chunk columns around this one
+        // (LightBorder < Size), so their heightmaps are fetched once by GenerateMeshData into
+        // MeshScratch.Columns (ChunkLighting.FillColumns) instead of probing the column source per
+        // column (PERF_TODO C2). Same nine columns, same heights - only the number of probes changes.
+        Span<int> mapChunk = stackalloc int[LightSize];
+        Span<int> mapLocal = stackalloc int[LightSize];
+        BuildLightAxisMap(mapChunk, mapLocal);
+
+        var columns = MeshScratch.Current.Columns;
+
+        // Sunlight seeds: air cells at or above the terrain height see the sky directly.
+        // Leaves seed too: canopies pass light, so the sky reaches straight through them
+        // (branch tops under leaves stay lit; only depth falloff dims deep cover). Tree
+        // wood seeds as well (see PassesLight): a thin limb never casts a full shadow.
+        for (var lx = 0; lx < LightSize; lx++)
+        {
+            var columnRow = mapChunk[lx] * 3;
+            var heightRow = mapLocal[lx] << SizeShift;
+            for (var lz = 0; lz < LightSize; lz++)
+            {
+                var height = columns[columnRow + mapChunk[lz]].Heights[heightRow | mapLocal[lz]];
+                var columnBase = (lx * LightSize) * LightSize + lz;
+                for (var ly = 0; ly < LightSize; ly++)
+                {
+                    var i = columnBase + ly * LightSize;
+                    if (!PassesLight(light[i])) continue;
+                    if (worldY0 + ly >= height)
+                    {
+                        sun[i] = 15;
+                        queue[tail++] = i;
+                    }
+                }
+            }
+        }
+
+        SpreadLight(light, sun, queue, ref head, ref tail);
+
+        // Lamp seeds: emissive cells glow at full strength, then spread like sunlight, each
+        // carrying its color slot in bits 4-6.
+        head = 0;
+        tail = 0;
+        var anyTinted = false;
+        var emissionById = BlockType.Emission;
+        var slotById = BlockType.LightSlot;
+        for (var i = 0; i < LightCount; i++)
+        {
+            var id = light[i];
+            var emission = emissionById[id];
+            if (emission == 0) continue;
+            var slot = slotById[id];
+            block[i] = (byte)(emission | slot << 4);
+            anyTinted |= slot != 0;
+            queue[tail++] = i;
+        }
+
+        // All-default light keeps the plain pass: the values (slot bits all 0) and the cost are
+        // exactly what they were before colored light existed
+        if (anyTinted)
+            SpreadBlockLight(light, block, queue, ref head, ref tail);
+        else
+            SpreadLight(light, block, queue, ref head, ref tail);
+        return anyTinted;
     }
 
     /// <summary>

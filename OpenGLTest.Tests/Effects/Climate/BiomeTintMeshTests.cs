@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
@@ -37,7 +38,7 @@ public sealed class BiomeTintMeshTests
     {
         for (var ao = 0; ao < 4; ao++)
         {
-            BiomeTint.Shade(Chunk.ShadeLut[(face << 2) | ao], tint, out var r, out var g, out var b);
+            BiomeTint.Shade(ChunkFaceTables.ShadeLut[(face << 2) | ao], tint, out var r, out var g, out var b);
             if (Near(v, r, g, b)) return true;
         }
         return false;
@@ -182,7 +183,7 @@ public sealed class BiomeTintMeshTests
         var mesh = center.GenerateMeshData(manager, greedy, overrideFields);
         Assert.NotNull(mesh);
 
-        var lit = Chunk.ShadeLut[(4 << 2) | 3];
+        var lit = ChunkFaceTables.ShadeLut[(4 << 2) | 3];
         var tops = mesh.Vertices.Where(v => Face(v) == 4 && v.Layer == bt.Tinted[4]).ToList();
         Assert.NotEmpty(tops);
         var discriminating = 0;
@@ -212,7 +213,7 @@ public sealed class BiomeTintMeshTests
     {
         for (var ao = 0; ao < 4; ao++)
         {
-            BiomeTint.Shade(Chunk.ShadeLut[(face << 2) | ao], tint, out var r, out var g, out var b);
+            BiomeTint.Shade(ChunkFaceTables.ShadeLut[(face << 2) | ao], tint, out var r, out var g, out var b);
             if (Near(v, r, g, b)) yield return ao;
         }
     }
@@ -251,7 +252,7 @@ public sealed class BiomeTintMeshTests
             var grassTint = grass.Sample(v.Position.X, v.Position.Z);
             foreach (var ao in aos)
             {
-                var shade = Chunk.ShadeLut[(face << 2) | ao];
+                var shade = ChunkFaceTables.ShadeLut[(face << 2) | ao];
                 BiomeTint.Shade(shade, foliageTint, out var fr, out var fg, out var fb);
                 BiomeTint.Shade(shade, grassTint, out var gr, out var gg, out var gb);
                 if (Math.Max(Math.Abs(fr - gr), Math.Max(Math.Abs(fg - gg), Math.Abs(fb - gb))) <= 2) continue;

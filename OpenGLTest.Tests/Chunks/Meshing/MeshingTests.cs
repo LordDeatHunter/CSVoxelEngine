@@ -614,7 +614,7 @@ public sealed class MeshingTests
         var mesh = center.GenerateMeshData(manager, greedy: false);
         Assert.NotNull(mesh);
 
-        var expected = Chunk.ShadeLut[(4 << 2) | 3];
+        var expected = ChunkFaceTables.ShadeLut[(4 << 2) | 3];
         var topVertices = 0;
         foreach (var vertex in mesh.Vertices)
         {

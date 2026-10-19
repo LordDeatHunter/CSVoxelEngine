@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Content.Blocks;
@@ -1050,8 +1051,8 @@ public class LodRegion : IDisposable
         var waterTile = water.FaceTiles[topFace];
         var sheetDrop = FluidState.SourceHeight - spec.HeightBias - WaterRenderConfig.LodWaterSink;
         Span<byte> waterShades = [
-            Chunk.ShadeLut[(topFace << 2) | 3], Chunk.ShadeLut[(topFace << 2) | 3],
-            Chunk.ShadeLut[(topFace << 2) | 3], Chunk.ShadeLut[(topFace << 2) | 3]
+            ChunkFaceTables.ShadeLut[(topFace << 2) | 3], ChunkFaceTables.ShadeLut[(topFace << 2) | 3],
+            ChunkFaceTables.ShadeLut[(topFace << 2) | 3], ChunkFaceTables.ShadeLut[(topFace << 2) | 3]
         ];
 
         // Per-vertex ambient occlusion derived from the column-top grid (same formula and
@@ -1079,7 +1080,7 @@ public class LodRegion : IDisposable
                     var side1 = topCell[(gi + dx) * heightGrid + gj] > top;
                     var side2 = topCell[gi * heightGrid + (gj + dz)] > top;
                     var diagonal = topCell[(gi + dx) * heightGrid + (gj + dz)] > top;
-                    shades[c] = Chunk.ShadeLut[(topFace << 2) | Chunk.VertexAO(side1, side2, diagonal)];
+                    shades[c] = ChunkFaceTables.ShadeLut[(topFace << 2) | ChunkFaceTables.VertexAO(side1, side2, diagonal)];
                     suns[c] = LodSkyExposure.TopFace(ground, top,
                         topCell[(gi + dx) * heightGrid + gj],
                         topCell[gi * heightGrid + (gj + dz)],
@@ -1155,7 +1156,7 @@ public class LodRegion : IDisposable
                             var side1 = lateralTop >= cy;
                             var side2 = neighborTop >= cy + v;
                             var diagonal = lateralTop >= cy + v;
-                            shades[c] = Chunk.ShadeLut[(f << 2) | Chunk.VertexAO(side1, side2, diagonal)];
+                            shades[c] = ChunkFaceTables.ShadeLut[(f << 2) | ChunkFaceTables.VertexAO(side1, side2, diagonal)];
 
                             // Sky exposure reads only columns in front of the face: both front
                             // diagonals and the one straight ahead, never the coplanar wall column

@@ -46,7 +46,7 @@ public static class WorldGenerationConfig
 
     // --- Water ---
     // Sea level: every column whose terrain height is below it is flooded with water up to
-    // SeaLevel, after the carvers and before trees (see Chunk.FillWater). Measured over a
+    // SeaLevel, after the carvers and before trees (see ChunkTerrainFill.FillWater). Measured over a
     // 1024x1024 area around the origin, terrain heights run -65..112 with a mean near +15, so
     // 0 floods about a quarter of the map (basins up to ~65 deep) while the origin column
     // (height 0) stays dry as a shoreline. Coverage: -8 -> 8%, 0 -> 26%, 4 -> 45%, 8 -> 53%.

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Threading;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Data;

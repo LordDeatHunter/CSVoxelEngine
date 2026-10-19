@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Data;
@@ -81,7 +82,7 @@ public sealed class WorldSourceLodTests : IDisposable
         var (vr, vg, vb) = Rgb(v);
         for (var ao = 0; ao < 4; ao++)
         {
-            BiomeTint.Shade(Chunk.ShadeLut[(face << 2) | ao], tint, out var r, out var g, out var b);
+            BiomeTint.Shade(ChunkFaceTables.ShadeLut[(face << 2) | ao], tint, out var r, out var g, out var b);
             if (Math.Abs(vr - r) <= 1 && Math.Abs(vg - g) <= 1 && Math.Abs(vb - b) <= 1) return true;
         }
         return false;

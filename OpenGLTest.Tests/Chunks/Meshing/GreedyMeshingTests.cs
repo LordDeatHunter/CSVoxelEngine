@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Models;
@@ -115,7 +116,7 @@ public sealed class GreedyMeshingTests
         var origin = new Vector3(5, 9, 5);
         var extent = new Vector3(3, 1, 2);
         foreach (var v in top)
-            Assert.Equal(Chunk.TiledUv(4, v.Position - origin, extent), v.UV);
+            Assert.Equal(ChunkFaceTables.TiledUv(4, v.Position - origin, extent), v.UV);
         // U runs along X over three tiles, V along Z over two
         Assert.Equal(3f, top.Max(v => v.UV.X) - top.Min(v => v.UV.X));
         Assert.Equal(2f, top.Max(v => v.UV.Y) - top.Min(v => v.UV.Y));
@@ -143,7 +144,7 @@ public sealed class GreedyMeshingTests
         var origin = new Vector3(5, 8, 4);
         var extent = new Vector3(1, 2, 3);
         foreach (var v in east)
-            Assert.Equal(Chunk.TiledUv(3, v.Position - origin, extent), v.UV);
+            Assert.Equal(ChunkFaceTables.TiledUv(3, v.Position - origin, extent), v.UV);
         Assert.Equal(3f, east.Max(v => v.UV.X) - east.Min(v => v.UV.X));
         Assert.Equal(2f, east.Max(v => v.UV.Y) - east.Min(v => v.UV.Y));
     }
@@ -173,7 +174,7 @@ public sealed class GreedyMeshingTests
         Assert.True(floorTop.Count > 1, $"{floorTop.Count} top quads");
 
         // The cells around the pillar carry darker corners and never merged with the open floor
-        var lit = Chunk.ShadeLut[(4 << 2) | 3];
+        var lit = ChunkFaceTables.ShadeLut[(4 << 2) | 3];
         Assert.Contains(floorTop, q => q.Any(v => (v.PackedColor & 0xFF) < lit));
         Assert.Contains(floorTop, q => q.All(v => (v.PackedColor & 0xFF) == lit));
     }
@@ -229,7 +230,7 @@ public sealed class GreedyMeshingTests
         var strip = tops.Single(q => q.All(v => v.Position.Y == 1f && v.Position.Z is 1f or 2f));
         Assert.Equal(0f, strip.Min(v => v.Position.X));
         Assert.Equal(16f, strip.Max(v => v.Position.X));
-        var lit = Chunk.ShadeLut[(4 << 2) | 3];
+        var lit = ChunkFaceTables.ShadeLut[(4 << 2) | 3];
         Assert.All(strip.Where(v => v.Position.Z == 1f), v => Assert.True((v.PackedColor & 0xFF) < lit));
         Assert.All(strip.Where(v => v.Position.Z == 2f), v => Assert.Equal(lit, (byte)(v.PackedColor & 0xFF)));
 

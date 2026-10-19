@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
+using VoxelEngine.Chunks.Meshing;
 using Xunit;
 using Xunit.Abstractions;
 

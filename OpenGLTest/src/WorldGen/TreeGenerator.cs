@@ -210,7 +210,7 @@ public static class TreeGenerator
     internal static long GrowsOnThisThread => _growsOnThread;
 
     // The ground a tree grows over: the terrain heightmap, raised to the water level in a column
-    // Chunk.FillWater floods (the same Bed < level rule), so no limb or leaf is planned into a
+    // ChunkTerrainFill.FillWater floods (the same Bed < level rule), so no limb or leaf is planned into a
     // cell the stamp would then find full of water -- a drowned parent would leave the rest of
     // the limb floating above the surface. A static delegate field, built once, so a miss
     // allocates no delegate. Pure: reads only the deterministic column data.

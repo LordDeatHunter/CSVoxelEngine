@@ -45,7 +45,7 @@ internal static class ChunkMesher
     internal static int SubmergedSurfaceCode(byte[] padded, byte[] paddedState, int fluidPIdx,
         int chunkBaseY, ColumnTerrain[] columns)
     {
-        // FillPaddedSnapshot's layout: px * PaddedSq + py * Padded + pz (z innermost)
+        // ChunkMeshBuilder.FillPaddedSnapshot's layout: px * PaddedSq + py * Padded + pz (z innermost)
         var px = fluidPIdx / PaddedSq;
         var py = fluidPIdx % PaddedSq / Padded;
         var pz = fluidPIdx % Padded;
@@ -178,8 +178,8 @@ internal static class ChunkMesher
             var positive = FacePositive[f];
             var g = greedyCols[axis];
             var o = occCols[axis];
-            var faceDelta = FaceNeighborDelta[f];
-            var aoDeltas = AODeltas[f];
+            var faceDelta = ChunkFaceTables.FaceNeighborDelta[f];
+            var aoDeltas = ChunkFaceTables.AODeltas[f];
 
             // B. Face mask per column: a face shows where the cell is greedy and the cell one
             // step along the normal does not occlude
@@ -234,7 +234,7 @@ internal static class ChunkMesher
                         var side1Id = padded[pIdx + aoDeltas[j * 3 + 0]];
                         var side2Id = padded[pIdx + aoDeltas[j * 3 + 1]];
                         var cornerId = padded[pIdx + aoDeltas[j * 3 + 2]];
-                        ao |= VertexAO(BlockType.OccludesAO(side1Id), BlockType.OccludesAO(side2Id),
+                        ao |= ChunkFaceTables.VertexAO(BlockType.OccludesAO(side1Id), BlockType.OccludesAO(side2Id),
                             BlockType.OccludesAO(cornerId)) << (2 * j);
                         var code = SmoothCornerLight(f, j, sunLight, blockLight, lightBase,
                             side1Id, side2Id, cornerId);
@@ -352,9 +352,9 @@ internal static class ChunkMesher
         {
             for (var j = 0; j < 4; j++)
             {
-                tShade[j] = ShadeLut[(f << 2) | ((ao >> (2 * j)) & 3)];
-                tSun[j] = (int)((light >> (12 * j)) & 63) / SmoothLightDivisor;
-                tBlock[j] = (int)((light >> (12 * j + 6)) & 63) / SmoothLightDivisor;
+                tShade[j] = ChunkFaceTables.ShadeLut[(f << 2) | ((ao >> (2 * j)) & 3)];
+                tSun[j] = (int)((light >> (12 * j)) & 63) / ChunkFaceTables.SmoothLightDivisor;
+                tBlock[j] = (int)((light >> (12 * j + 6)) & 63) / ChunkFaceTables.SmoothLightDivisor;
                 tTint[j] = (ushort)((tint >> (10 * j)) & 0x3FF);
             }
         }
@@ -416,11 +416,11 @@ internal static class ChunkMesher
                 for (var j = 0; j < 4; j++)
                 {
                     var local = corners[j] * extent;
-                    var shade = ShadeLut[(f << 2) | ((ao >> (2 * j)) & 3)];
-                    var sun = (int)((light >> (12 * j)) & 63) / SmoothLightDivisor;
-                    var block = (int)((light >> (12 * j + 6)) & 63) / SmoothLightDivisor;
+                    var shade = ChunkFaceTables.ShadeLut[(f << 2) | ((ao >> (2 * j)) & 3)];
+                    var sun = (int)((light >> (12 * j)) & 63) / ChunkFaceTables.SmoothLightDivisor;
+                    var block = (int)((light >> (12 * j + 6)) & 63) / ChunkFaceTables.SmoothLightDivisor;
                     vertices.Add(new Vertex(origin + local, shade, shade, shade, 255,
-                        TiledUv(f, local, extent), layer, sun, block, normal, sway, submerged, waterSurface,
+                        ChunkFaceTables.TiledUv(f, local, extent), layer, sun, block, normal, sway, submerged, waterSurface,
                         (ushort)((tint >> (10 * j)) & 0x3FF)));
                 }
 
@@ -461,7 +461,7 @@ internal static class ChunkMesher
             {
                 var local = corners[j] * extent;
                 vertices.Add(new Vertex(origin + local, shade[j], shade[j], shade[j], 255,
-                    TiledUv(f, local, extent), layer, sun[j], block[j], normal, sway, submerged, waterSurface,
+                    ChunkFaceTables.TiledUv(f, local, extent), layer, sun[j], block[j], normal, sway, submerged, waterSurface,
                     lightTint[j]));
             }
             AddQuadIndices(indices, ref indexOffset);
@@ -477,7 +477,7 @@ internal static class ChunkMesher
                 var position = origin + local;
                 BiomeTint.Shade(shade[j], field.Sample(position.X, position.Z), out var r, out var g, out var b);
                 vertices.Add(new Vertex(position, r, g, b, 255,
-                    TiledUv(f, local, extent), layer, sun[j], block[j], normal, sway, submerged, waterSurface,
+                    ChunkFaceTables.TiledUv(f, local, extent), layer, sun[j], block[j], normal, sway, submerged, waterSurface,
                     lightTint[j], biomeTint: true));
             }
             AddQuadIndices(indices, ref indexOffset);
@@ -569,7 +569,7 @@ internal static class ChunkMesher
 
         for (var face = 0; face < 6; face++)
         {
-            var neighbor = padded[pIdx + FaceNeighborDelta[face]];
+            var neighbor = padded[pIdx + ChunkFaceTables.FaceNeighborDelta[face]];
 
             // Two fluid cells share no face: their sloped tops already meet at the corners
             if (BlockType.IsFluid(neighbor)) continue;
@@ -602,8 +602,8 @@ internal static class ChunkMesher
 
             // ponytail: alpha 254 flags water for the shader (glass stays 255); fColor.a is unused otherwise.
             EmitQuad(vertices, indices, ref indexOffset, basePos, a, b, c, d, normal,
-                CropUv(face, a), CropUv(face, b), CropUv(face, c), CropUv(face, d), tile,
-                ShadeLut[(face << 2) | 3], light, 254);
+                ChunkFaceTables.CropUv(face, a), ChunkFaceTables.CropUv(face, b), ChunkFaceTables.CropUv(face, c), ChunkFaceTables.CropUv(face, d), tile,
+                ChunkFaceTables.ShadeLut[(face << 2) | 3], light, 254);
 
             // EmitQuad appended a, b, c, d in that order; each vertex takes its (X, Z) corner's
             // flow code (LowerCorner keeps X/Z at 0 or 1, so side and bottom vertices do too)
@@ -688,7 +688,7 @@ internal static class ChunkMesher
 
         int s0 = sunLight[lightBase], s1 = sunLight[lightBase + ldx],
             s2 = sunLight[lightBase + dz], s3 = sunLight[lightBase + ldx + dz];
-        // blockLight holds level | slot << 4 (see ComputeLight)
+        // blockLight holds level | slot << 4 (see ChunkLighting.ComputeLight)
         int r0 = blockLight[lightBase], r1 = blockLight[lightBase + ldx],
             r2 = blockLight[lightBase + dz], r3 = blockLight[lightBase + ldx + dz];
         int b0 = r0 & BlockLevelMask, b1 = r1 & BlockLevelMask,
@@ -729,7 +729,7 @@ internal static class ChunkMesher
     /// <summary>Surface height inside one fluid cell of the padded snapshot, 0..1. Fluid
     /// directly above fills the cell completely, so stacked water shows no seam.</summary>
     internal static float FluidHeight(byte[] padded, byte[] paddedState, int p) =>
-        BlockType.IsFluid(padded[p + FaceNeighborDelta[4]])
+        BlockType.IsFluid(padded[p + ChunkFaceTables.FaceNeighborDelta[4]])
             ? 1f
             : FluidState.SurfaceHeight(paddedState[p]);
 
@@ -765,7 +765,7 @@ internal static class ChunkMesher
                 if (i is 1 or 2) orthogonalFluid = true;
 
                 // A full column touching this corner pins it to the cell top
-                if (BlockType.IsFluid(padded[q + FaceNeighborDelta[4]])) return 1f;
+                if (BlockType.IsFluid(padded[q + ChunkFaceTables.FaceNeighborDelta[4]])) return 1f;
 
                 var h = FluidHeight(padded, paddedState, q);
                 if (h >= 0.8f)
@@ -835,14 +835,14 @@ internal static class ChunkMesher
                 var tile = face == 4
                     ? (isObsidian ? obsidianType?.Top ?? type.Top : type.Top)
                     : (isObsidian ? obsidianType?.Side ?? type.Side : type.Side);
-                BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
+                ChunkFaceTables.BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
                 var normal = CubeFaces[face].normal;
                 EmitQuad(vertices, indices, ref indexOffset, basePos,
                     SpinY(p0, cx, cz, cos, sin), SpinY(p1, cx, cz, cos, sin),
                     SpinY(p2, cx, cz, cos, sin), SpinY(p3, cx, cz, cos, sin),
                     SpinY(normal, 0f, 0f, cos, sin),
-                    CropUv(face, p0), CropUv(face, p1), CropUv(face, p2), CropUv(face, p3), tile,
-                    ShadeLut[(face << 2) | 3], lights[face]);
+                    ChunkFaceTables.CropUv(face, p0), ChunkFaceTables.CropUv(face, p1), ChunkFaceTables.CropUv(face, p2), ChunkFaceTables.CropUv(face, p3), tile,
+                    ChunkFaceTables.ShadeLut[(face << 2) | 3], lights[face]);
             }
         }
     }
@@ -885,14 +885,14 @@ internal static class ChunkMesher
             {
                 if (face == 5) continue;
                 var tile = face is 2 or 3 ? type.Top : type.Side;
-                BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
+                ChunkFaceTables.BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
                 var normal = CubeFaces[face].normal;
                 EmitQuad(vertices, indices, ref indexOffset, basePos,
                     SpinY(p0, cx, cz, cos, sin), SpinY(p1, cx, cz, cos, sin),
                     SpinY(p2, cx, cz, cos, sin), SpinY(p3, cx, cz, cos, sin),
                     SpinY(normal, 0f, 0f, cos, sin),
-                    CropUv(face, p0), CropUv(face, p1), CropUv(face, p2), CropUv(face, p3), tile,
-                    ShadeLut[(face << 2) | 3], lights[face]);
+                    ChunkFaceTables.CropUv(face, p0), ChunkFaceTables.CropUv(face, p1), ChunkFaceTables.CropUv(face, p2), ChunkFaceTables.CropUv(face, p3), tile,
+                    ChunkFaceTables.ShadeLut[(face << 2) | 3], lights[face]);
             }
         }
     }
@@ -918,18 +918,18 @@ internal static class ChunkMesher
         for (var i = 0; i < 6; i++)
             lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
 
-        var drawBottom = count >= maxCount && !BlockType.Occludes(padded[pIdx + FaceNeighborDelta[5]]);
+        var drawBottom = count >= maxCount && !BlockType.Occludes(padded[pIdx + ChunkFaceTables.FaceNeighborDelta[5]]);
         var min = new Vector3(0f, 0f, 0f);
         var max = new Vector3(1f, height, 1f);
         for (var face = 0; face < 6; face++)
         {
             if (face == 5 && !drawBottom) continue;
             var tile = face == 4 ? type.Top : face == 5 ? type.Bottom : type.Side;
-            BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
+            ChunkFaceTables.BoxFaceCorners(min, max, face, out var p0, out var p1, out var p2, out var p3);
             EmitQuad(vertices, indices, ref indexOffset, basePos, p0, p1, p2, p3,
                 CubeFaces[face].normal,
-                CropUv(face, p0), CropUv(face, p1), CropUv(face, p2), CropUv(face, p3), tile,
-                ShadeLut[(face << 2) | 3], lights[face]);
+                ChunkFaceTables.CropUv(face, p0), ChunkFaceTables.CropUv(face, p1), ChunkFaceTables.CropUv(face, p2), ChunkFaceTables.CropUv(face, p3), tile,
+                ChunkFaceTables.ShadeLut[(face << 2) | 3], lights[face]);
         }
     }
 
@@ -950,7 +950,7 @@ internal static class ChunkMesher
     /// only their four walls - the neighbor emits the matching tube from its side, so the two
     /// meet flush with no cap between them - and a node face is dropped where a tube or plug of its
     /// own full width leaves it. The geometry is exactly <see cref="TreeWoodShape.GetBoxes"/>,
-    /// so the hitboxes cover what is drawn. UVs are cropped (<see cref="CropUv"/>), so bark
+    /// so the hitboxes cover what is drawn. UVs are cropped (<see cref="ChunkFaceTables.CropUv"/>), so bark
     /// keeps the atlas texel density at every thickness.
     /// </summary>
     internal static void EmitTreeWood(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
@@ -964,8 +964,8 @@ internal static class ChunkMesher
         var lightBase = LightIdx(x, y, z);
         for (var i = 0; i < 6; i++)
         {
-            nbIds[i] = padded[pIdx + FaceNeighborDelta[i]];
-            nbStates[i] = paddedState[pIdx + FaceNeighborDelta[i]];
+            nbIds[i] = padded[pIdx + ChunkFaceTables.FaceNeighborDelta[i]];
+            nbStates[i] = paddedState[pIdx + ChunkFaceTables.FaceNeighborDelta[i]];
             // Backed against an occluder, the cell's own light (like pebbles), so a limb
             // pressed against rock never goes black
             lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
@@ -982,7 +982,7 @@ internal static class ChunkMesher
             if ((mask & 1 << face) != 0 && TreeWoodShape.TubeHalf(state, nbStates[face]) >= half) continue;
             var tile = face == 4 ? type.Top : face == 5 ? type.Bottom : type.Side;
             EmitBoxFace(vertices, indices, ref indexOffset, basePos, nodeMin, nodeMax, face,
-                tile, ShadeLut[(face << 2) | 3], lights[face]);
+                tile, ChunkFaceTables.ShadeLut[(face << 2) | 3], lights[face]);
         }
 
         for (var dir = 0; dir < 6; dir++)
@@ -996,7 +996,7 @@ internal static class ChunkMesher
             {
                 if (face == dir || face == opposite) continue;
                 EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, face,
-                    type.Side, ShadeLut[(face << 2) | 3], lights[face]);
+                    type.Side, ChunkFaceTables.ShadeLut[(face << 2) | 3], lights[face]);
             }
         }
     }
@@ -1021,8 +1021,8 @@ internal static class ChunkMesher
         Span<byte> states = stackalloc byte[6];
         for (var i = 0; i < 4; i++)
         {
-            ids[i] = padded[idx + FaceNeighborDelta[i]];
-            states[i] = paddedState[idx + FaceNeighborDelta[i]];
+            ids[i] = padded[idx + ChunkFaceTables.FaceNeighborDelta[i]];
+            states[i] = paddedState[idx + ChunkFaceTables.FaceNeighborDelta[i]];
         }
 
         return TreeWoodShape.RimCornerMask(id, paddedState[idx], ids, states);
@@ -1041,12 +1041,12 @@ internal static class ChunkMesher
     {
         if (!TreeWoodShape.CanBevel(id, paddedState[nbIdx])) return true;
         if (side >= 4) return RimMaskInSnapshot(padded, paddedState, nbIdx, id) == 0;
-        var toward = nbIdx + FaceNeighborDelta[side];
+        var toward = nbIdx + ChunkFaceTables.FaceNeighborDelta[side];
         if (TreeWoodShape.IsRimMass(id, padded[toward], paddedState[toward])) return true;
         // The two edge neighbors across the other axis: X for a Z side, Z for an X side
         var across = side < 2 ? 2 : 0;
-        var a = nbIdx + FaceNeighborDelta[across];
-        var b = nbIdx + FaceNeighborDelta[across + 1];
+        var a = nbIdx + ChunkFaceTables.FaceNeighborDelta[across];
+        var b = nbIdx + ChunkFaceTables.FaceNeighborDelta[across + 1];
         return TreeWoodShape.IsRimMass(id, padded[a], paddedState[a])
                && TreeWoodShape.IsRimMass(id, padded[b], paddedState[b]);
     }
@@ -1059,7 +1059,7 @@ internal static class ChunkMesher
     /// </summary>
     internal static bool RimBoundaryHidden(byte[] padded, byte[] paddedState, int pIdx, byte id, int face)
     {
-        var nbIdx = pIdx + FaceNeighborDelta[face];
+        var nbIdx = pIdx + ChunkFaceTables.FaceNeighborDelta[face];
         var nb = padded[nbIdx];
         if (BlockType.Occludes(nb)) return true;
         return nb == id && WoodState.IsFullCube(paddedState[nbIdx])
@@ -1118,7 +1118,7 @@ internal static class ChunkMesher
         Span<int> coverHi = stackalloc int[RimPx];
         for (var face = 4; face <= 5; face++)
         {
-            var nbIdx = pIdx + FaceNeighborDelta[face];
+            var nbIdx = pIdx + ChunkFaceTables.FaceNeighborDelta[face];
             var nb = padded[nbIdx];
             if (BlockType.Occludes(nb)) continue;
             var covered = false;
@@ -1131,7 +1131,7 @@ internal static class ChunkMesher
             }
 
             var tile = face == 4 ? type.Top : type.Bottom;
-            var shade = ShadeLut[(face << 2) | 3];
+            var shade = ChunkFaceTables.ShadeLut[(face << 2) | 3];
             var runStart = 0;
             int a0 = 0, a1 = 0, b0 = 0, b1 = 0;
             for (var row = 0; row <= RimPx; row++)
@@ -1185,8 +1185,8 @@ internal static class ChunkMesher
         // X walls: a wall on the cell boundary culls like a cube face, one inside never does
         var hideMinX = RimBoundaryHidden(padded, paddedState, pIdx, id, 2);
         var hideMaxX = RimBoundaryHidden(padded, paddedState, pIdx, id, 3);
-        var sideShadeMinX = ShadeLut[(2 << 2) | 3];
-        var sideShadeMaxX = ShadeLut[(3 << 2) | 3];
+        var sideShadeMinX = ChunkFaceTables.ShadeLut[(2 << 2) | 3];
+        var sideShadeMaxX = ChunkFaceTables.ShadeLut[(3 << 2) | 3];
         foreach (var box in boxes)
         {
             if (box.Min.X > 0f || !hideMinX)
@@ -1199,8 +1199,8 @@ internal static class ChunkMesher
 
         // Z walls: the first and last are on the cell boundary; between two boxes only the part
         // of each box's wall that sticks out past the other is exposed
-        var shadeMinZ = ShadeLut[(0 << 2) | 3];
-        var shadeMaxZ = ShadeLut[(1 << 2) | 3];
+        var shadeMinZ = ChunkFaceTables.ShadeLut[(0 << 2) | 3];
+        var shadeMaxZ = ChunkFaceTables.ShadeLut[(1 << 2) | 3];
         if (!RimBoundaryHidden(padded, paddedState, pIdx, id, 0))
             EmitBoxFace(vertices, indices, ref indexOffset, basePos, boxes[0].Min, boxes[0].Max, 0,
                 type.Side, shadeMinZ, lights[0]);
@@ -1237,14 +1237,14 @@ internal static class ChunkMesher
     }
 
     /// <summary>One axis-aligned face of the [min, max] box (cell-local), with flat shading
-    /// and cropped UVs (see <see cref="CropUv"/>).</summary>
+    /// and cropped UVs (see <see cref="ChunkFaceTables.CropUv"/>).</summary>
     internal static void EmitBoxFace(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         Vector3 basePos, Vector3 min, Vector3 max, int face,
         ushort tile, byte shade, in FaceLight light)
     {
-        BoxFaceCorners(min, max, face, out var a, out var b, out var c, out var d);
+        ChunkFaceTables.BoxFaceCorners(min, max, face, out var a, out var b, out var c, out var d);
         EmitQuad(vertices, indices, ref indexOffset, basePos, a, b, c, d, CubeFaces[face].normal,
-            CropUv(face, a), CropUv(face, b), CropUv(face, c), CropUv(face, d), tile,
+            ChunkFaceTables.CropUv(face, a), ChunkFaceTables.CropUv(face, b), ChunkFaceTables.CropUv(face, c), ChunkFaceTables.CropUv(face, d), tile,
             shade, light);
     }
 

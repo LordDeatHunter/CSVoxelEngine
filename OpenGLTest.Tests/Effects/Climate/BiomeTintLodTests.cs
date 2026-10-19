@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
@@ -42,7 +43,7 @@ public sealed class BiomeTintLodTests
         var (vr, vg, vb) = Rgb(v);
         for (var ao = 0; ao < 4; ao++)
         {
-            BiomeTint.Shade(Chunk.ShadeLut[(face << 2) | ao], tint, out var r, out var g, out var b);
+            BiomeTint.Shade(ChunkFaceTables.ShadeLut[(face << 2) | ao], tint, out var r, out var g, out var b);
             if (Math.Abs(vr - r) <= 1 && Math.Abs(vg - g) <= 1 && Math.Abs(vb - b) <= 1) return true;
         }
         return false;
@@ -199,7 +200,7 @@ public sealed class BiomeTintLodTests
                 var matchedAny = false;
                 for (var ao = 0; ao < 4; ao++)
                 {
-                    var shade = Chunk.ShadeLut[(face << 2) | ao];
+                    var shade = ChunkFaceTables.ShadeLut[(face << 2) | ao];
                     BiomeTint.Shade(shade, foliage, out var fr, out var fg, out var fb);
                     if (Math.Abs(vr - fr) > 1 || Math.Abs(vg - fg) > 1 || Math.Abs(vb - fb) > 1) continue;
                     matchedAny = true;

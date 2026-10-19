@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks;
 using VoxelEngine.Data;
 using VoxelEngine.Lod;

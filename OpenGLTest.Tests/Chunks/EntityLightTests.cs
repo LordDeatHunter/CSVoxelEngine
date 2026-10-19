@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Data;
 using Xunit;
 
