@@ -452,7 +452,7 @@ internal sealed class LocalPlayer
             return;
         }
 
-        // The first dead frame posts the death line once; Program drains it into the chat
+        // The first dead frame posts the death line once; GameplayInput drains it into the chat
         _pendingDeathMessage ??= DeathMessages.For("Player", _health.LastSource, _health.LastKiller);
 
         // The death plays first: the view tips over and the body falls, then the respawn.

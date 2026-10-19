@@ -131,7 +131,7 @@ public sealed class GameServerTests : IDisposable
                     }
                     case NetMessage.EntityList:
                     {
-                        // The record shape the client's own reader decodes (Program's EntityList case)
+                        // The record shape the client's own reader decodes (ClientSession's EntityList case)
                         var count = reader.ReadInt();
                         var entities = new List<NetEntity>(count);
                         for (var i = 0; i < count; i++)

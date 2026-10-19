@@ -10,12 +10,12 @@ namespace VoxelEngine.UI.Menus;
 /// Every rule of the main menu in one GL-free place: page transitions, the four non-character
 /// keys, typing into the focused field and every <see cref="WorldStore"/> / <see cref="ServerStore"/>
 /// call (list, create, rename, delete, add server). Program cannot be tested, so the whole flow is
-/// pinned here and Program only feeds it hits and keys and acts on the <see cref="MainMenuAction"/>
+/// pinned here and InputEvents only feeds it hits and keys while Program acts on the <see cref="MainMenuAction"/>
 /// it gets back (a <see cref="MainMenuAction.Play"/> carries its world in <see cref="PlayRequest"/>,
 /// a <see cref="MainMenuAction.Connect"/> its server in <see cref="ConnectRequest"/>).
 /// <para>
 /// It never touches GL, the cursor or Silk. The settings page is only opened and closed here;
-/// Program owns that page's own clicks and slider drags through <see cref="SettingsLayout"/>,
+/// MenuInput owns that page's own clicks and slider drags through <see cref="SettingsLayout"/>,
 /// shared with the pause menu. Store errors never escape: they are logged in full and shown as
 /// the one-line <see cref="StoreErrorNotice"/> on the world/server page. Main thread only.
 /// </para>
@@ -93,7 +93,7 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
 
     public void OpenSettings() => View.Page = MainMenuPage.Settings;
 
-    /// <summary>Back from the settings page to the main page; Program clears the slider drag itself.</summary>
+    /// <summary>Back from the settings page to the main page; InputEvents clears the slider drag itself.</summary>
     public void CloseSettings() => View.Page = MainMenuPage.Main;
 
     /// <summary>Refuses PLAY and CREATE for the rest of the process (a teardown left the seed

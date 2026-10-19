@@ -334,7 +334,7 @@ public class RenderManager : IDisposable
     /// frame, and the world-less menu and loading frames.</summary>
     internal UiPasses UiPasses { get; }
 
-    /// <summary>The UI pass's renderer; Program hit-tests clicks against its last layout.</summary>
+    /// <summary>The UI pass's renderer; the input components hit-test clicks against its last layout.</summary>
     internal UIRenderer Ui => ui;
 
     // Live views of resources this renderer owns, for the pass components.

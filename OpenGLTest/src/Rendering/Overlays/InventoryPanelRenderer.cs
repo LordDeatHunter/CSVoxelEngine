@@ -80,7 +80,7 @@ internal sealed class InventoryPanelRenderer
             view.Focus == InventoryFocus.Search, "Search items and recipes", time);
 
         // A query replaces the tab's list with search results; the list region below doubles as
-        // the field's dropdown, and Program.HandleInventoryClick reads the same InventorySearch
+        // the field's dropdown, and InventoryPanelInput.HandleInventoryClick reads the same InventorySearch
         // call, so the drawn rows and the click always agree.
         IReadOnlyList<SearchHit>? hits = view.Search.IsEmpty
             ? null
@@ -106,7 +106,7 @@ internal sealed class InventoryPanelRenderer
             rowCount = (rows = inventory.StackEntries(view.Tab)).Count;
 
         // Clamp the stored offset with this frame's row count, exactly as
-        // Program.HandleInventoryClick does, so the drawn list and the click always agree.
+        // InventoryPanelInput.HandleInventoryClick does, so the drawn list and the click always agree.
         var offset = hits != null
             ? InventoryPanelLayout.ClampedOffset(view.Search.ScrollOffset, rowCount, _ui.ScreenSize)
             : InventoryPanelLayout.ClampedOffset(view.ScrollOffset, rowCount, _ui.ScreenSize);

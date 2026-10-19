@@ -10,7 +10,7 @@ namespace VoxelEngine.Interaction;
 /// <summary>
 /// The chat commands, GL-free: a line starting with <c>/</c> is parsed here and never echoed as
 /// chat. The table names each command's handler and the rights it needs, so singleplayer and a
-/// server run the same rules; the caller (Program locally, GameServer for a connected player)
+/// server run the same rules; the caller (ChatInput locally, GameServer for a connected player)
 /// performs the effect and answers with a system line.
 /// </summary>
 public static class ChatCommands

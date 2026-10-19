@@ -28,7 +28,7 @@ public sealed record OptionsRow(string Section, string Label, string[] Options,
 
 /// <summary>
 /// The settings page's rows: section, label, widget kind and the getter/setter into
-/// <see cref="GameSettings"/>. Setters only mutate + save (via <see cref="Program"/>); the
+/// <see cref="GameSettings"/>. Setters only mutate + save (via <see cref="VoxelEngine.App.MenuInput"/>); the
 /// engine reads the values live, and window-level ones are synced per frame, so no row
 /// needs its own apply hook. The GUI Scale row is read by <c>UiPasses.RenderUI</c> every
 /// frame through <see cref="GameSettings.RequestedGuiScale"/>.

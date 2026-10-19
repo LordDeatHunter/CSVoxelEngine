@@ -34,7 +34,7 @@ internal sealed class GpuPassTimer : IDisposable
     // frame (see the comment there); it starts true so a frame that somehow ran before the first
     // BeginGpuFrame behaves exactly as it did before the gate existed. The three counters are the
     // gate's instrument: LogQueryCounts logs them once from RenderManager.Dispose, which is the only
-    // place the gated configuration can report itself at all (Program.LogDebugLine returns early
+    // place the gated configuration can report itself at all (DevDiagnostics.LogDebugLine returns early
     // when debug output is off, and that is the same flag the gate reads).
     private bool _gpuTimingOn = true;
     private long _gpuFrameIndex;
@@ -150,7 +150,7 @@ internal sealed class GpuPassTimer : IDisposable
     internal void LogQueryCounts()
     {
         // R6's counted instrument, and the reason it is a shutdown log line rather than a token on
-        // FrameProfiler's console row: Program.LogDebugLine returns early when debug output is off,
+        // FrameProfiler's console row: DevDiagnostics.LogDebugLine returns early when debug output is off,
         // and that is the very flag the gate reads, so a console token could only ever report the
         // always-on configuration. This prints in every run, gated or not — the RenderManager
         // constructor's one "GPU:" line is the precedent — and Program.OnClosing disposes before

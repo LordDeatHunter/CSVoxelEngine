@@ -53,7 +53,7 @@ unique with the smallest free numeric suffix, `WorldNames.Unique`) and a seed fi
 random, an integer is used verbatim, any other text is FNV-1a-hashed by `WorldSeedParser`).
 Enter confirms the create and edit pages (never the delete popup), Tab switches field, and ESC
 steps back one page and does nothing on the main page. SETTINGS and EXIT are the pause menu's
-(the settings page is shared: the one `Program.SettingsPageOpen` predicate drives the slider drag
+(the settings page is shared: the one `MenuInput.SettingsPageOpen` predicate drives the slider drag
 and its save on both menus). PLAY / CREATE never block inside the click: the click records the
 pending work, `OnRender` presents one loading-screen frame, and the next update runs
 `WorldSeed.Apply(seed)` -> `new ChunkSaveStore(dir)` -> `new World(..., store)`. The world then
@@ -187,7 +187,7 @@ for the day toast ("Day N" as the sun rises through dawn), the inventory-full wa
 first-find toast; `HotbarNameFade` shows the selected item's name after a slot or item switch and
 `HotbarPickupPop` bumps a slot whose count rises. `ItemTooltip.Lines` builds the hover panel over the
 [E] panel's rows and the hotbar, and holding Tab draws the player list (a server session only). F2
-saves the finished frame through `VisualCapture`; F1 toggles `hudVisible`, the gate the scenario
+saves the finished frame through `VisualCapture`; F1 toggles `GameplayInput`'s `hudVisible`, the gate the scenario
 screenshot's `hideHud` drives. The chat commands are `/help`, `/tp x y z`, `/give <item> [count]`
 (the last two needing rights) and `/time day|night|<seconds>`; the death line is
 `DeathMessages.For` over the blow `PlayerHealth` recorded, drained into the chat (`LocalPlayer.TakeDeathMessage`).
@@ -197,9 +197,9 @@ snapshot to the console once a second so a headless run's log carries it. Consol
 through the async `Log` queue (`OpenGLTest/src/Core/Log.cs`), so a slow terminal never stalls the
 frame that logged; `Log.Shutdown` drains it on exit. Each row is a section
 of the frame — `camera`, the three `chunk*` rows from `ChunkManager.Update`, `lod`, `entities`,
-`fluidWake`, `fluidTick`, `raycast`, `breaking`, plus the `progUpdate` input shell and the
+`fluidWake`, `fluidTick`, `raycast`, `breaking`, plus the `progUpdate` input shell (`GameplayInput.Update`) and the
 `player` spawn/animation shell on the update side (right-click use/place work and console
-logging are split out as `usePlace` and `debugLog`, and the autosave of a store-backed world is
+logging (`DevDiagnostics.LogDebugLine`) are split out as `usePlace` and `debugLog`, and the autosave of a store-backed world is
 the one `save` row, see "Saves" below), then `lighting`, `shadows`,
 `lodPass`, `worldPass`, `entityPass`, `aoPass` (contact AO, see below), `waterPass`, `selectPass`, `postPass` (the tonemap resolve, see
 "Linear lighting" below), `uiPass` on the render side,
@@ -845,8 +845,9 @@ OpenGLTest/
   VoxelEngine.csproj           # the game (net9.0); <None Update> rules copy assets/ to the output directory
   GlobalUsings.cs              # project-wide usings: VoxelEngine.Core and the Shader alias (see "Code organization")
   src/                         # the app entry and the core types only (Program, World and its phase/seed/load gate, BlockType)
-    Program.cs                 # entry point, wires window callbacks, input polling; the AppScreen
-                               #   flow (Menu/Loading/Playing/Saving) and the deferred open/save
+    Program.cs                 # entry point and composition root: window callbacks, the components, the AppScreen
+                               #   flow (Menu/Loading/Playing/Saving), the deferred open/save/connect and the world lifecycle;
+                               #   the frame-order OnUpdate/OnRender orchestration
     World.cs                   # the composition root: owns Camera, ChunkManager, ChunkGenerationWorker, LodManager,
                                #   the simulations and the per-job components (BlockEditor, BlockPlacer, LeftClickAction,
                                #   RightClickAction, ThrowAction, LocalPlayer, ClientMirror, WorldPersistence, WorldRenderer,
@@ -857,6 +858,14 @@ OpenGLTest/
     WorldSeed.cs               # the runtime world seed: Apply reseeds worldgen + resets caches/LOD edits; BeginWorld/EndWorld
     BlockType.cs               # runtime block record built from JSON, plus the per-id lookup tables
                                #   the mesher and gameplay read (ById, Emission, IsSolid/Occludes/...)
+    App/                       # the app's components, built once by Program.OnLoad; they read the live world and screen through Program
+      AppScreen.cs             # what the window is showing: Menu / Loading / Playing / Saving
+      ChatInput.cs             # the chat's keys, submitting a line, the local chat commands and the Tab player list's names
+      DevDiagnostics.cs        # the startup build line, the VOXEL_TIME read, the live debug flag (X, VOXEL_DEBUG) and the X debug line
+      GameplayInput.cs         # a playing world's per-frame polled input: key edges, hotbar, right-click chain, pause-gated world update, mining, middle pick
+      InputEvents.cs           # the window's mouse and keyboard events, routed to whatever owns them on the current screen
+      InventoryPanelInput.cs   # the [E] panel's input: clicks, scrollbar, search keys, creative buttons, hovered row, tooltip
+      MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings
     Audio/                     # sound: the sfx library, mixer and manager, the ambience bed
       AmbienceManager.cs       # looping day/night ambience with a slow crossfade
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups
@@ -1197,6 +1206,8 @@ OpenGLTest/
         ClientChunkStreamer.cs # requests streamed chunks/columns and applies them, no worldgen; the
                                #   client's IColumnSource
         ClientLodStreamer.cs   # requests and applies server-built far regions
+        ClientSession.cs       # the client's session: connect, the connecting screen, the network pump and cadences,
+                               #   message dispatch, every send, the disconnect
         ClientMirror.cs        # World component, client mode: applies the server's cells, entities, stations,
                                #   health and player list (ApplyNetwork*, SyncRemotePlayers)
         ClientPrediction.cs    # GL-free: a client's pending predictions vs the server's answers (sequence ids)
@@ -2923,7 +2934,7 @@ mirrors all of it: `ClientMirror.ApplyNetworkHealth` (client mode only; lower he
 with the flash and a singleplayer-sized shake, higher is restored outright), `UpdateClient`
 fading the flash, `Camera.AddKnockback` for the shove (the client's own physics applies it) and
 `SetModes`; a client never bills itself damage. On the first dead status the client sends a
-`Respawn` intent at once (`Program.SendRespawn`, from its eye and aim) and re-sends it every
+`Respawn` intent at once (`ClientSession.SendRespawn`, from its eye and aim) and re-sends it every
 `NetRespawnRetrySeconds` while the status still reads dead; the server judges it before the
 eye-drift and rate rules, so a corpse that kept falling on the client can always come back, brings
 the player back at full health at its `RespawnEye` (else the join spawn, `ServerPlayer.Respawn`),
@@ -2998,13 +3009,13 @@ visible face, the respawn intent), `ClientPredictionTests`, `StationNetCodecTest
 `ChunkGenerationWorkerTests.TwoFociAreBothServed` for the GL-free rules.
 
 **The client** (`OpenGLTest/src/Networking/Client/NetworkClient.cs`) connects on a background thread from
-`Program.BeginConnect` (the CONNECT click records `PendingWork.Connect` and presents the
+`ClientSession.BeginConnect` (the CONNECT click records `PendingWork.Connect` and presents the
 "Connecting..." loading screen, like PLAY), handshakes, then a reader thread queues frames. The
 handshake read is bounded by `NetConnectTimeoutSeconds` (cleared before play), the socket is
 disposed on every failure path, the connect timeout included, and `Status`/`Server`/`Error` are
 published through volatile fields; `Handshaken` is set before the reader starts and the reader's
 final `Disconnected` is unconditional, so a server that closes at once can never leave
-`Handshaken` standing. `Program.UpdateConnecting` aborts to the server list on `Failed` **or**
+`Handshaken` standing. `ClientSession.UpdateConnecting` aborts to the server list on `Failed` **or**
 `Disconnected`, waits for `NetworkStatus.Handshaken`, then builds a **client-mode** `World`
 (`clientMode: true`, `spawn: server.Spawn`, so the camera starts at the server's spawn — a client
 camera never runs `Camera.SpawnPosition`'s surface search, and stands at
@@ -3056,7 +3067,7 @@ roof edit relights the edge and corner chunks) and registers an arriving quern
 worldgen water-wake queue, and a client world disables `FluidManager` and `LeafDecayManager`
 scheduling (`Enabled = false`), since it never ticks either. **The client predicts, then the
 server answers.** Every action runs locally first as a prediction and raises
-`World.IntentRaised` (`Program.SendWorldIntent`): mining raises `BreakStart` when it starts a
+`World.IntentRaised` (`ClientSession.SendWorldIntent`): mining raises `BreakStart` when it starts a
 target (or the held item changes) and `BreakComplete` when its own hits reach the hardness (a
 creative client breaks once per `ClientCreativeBreakSeconds` rather than per frame, to stay
 inside the edit rate); a claimed right-click raises `Place` (the hit cell and face its placement
@@ -3089,8 +3100,8 @@ feeds `ChatView`, `TimeSync` calls `World.SetLightingTime`,
 and knockback (and starts the automatic respawn, see "Player status"), `PlayerCorrection` snaps
 the camera and makes the next state go out at once with its ack, and `InventoryState` is
 imported as the truth when it is current.
-Inventory edits are predicted then sent (`Program.SendInventoryIntent`): the hotbar keys and `Q`
-are intents only, while the wheel (`Program.MirrorSelection`), a middle-click pick
+Inventory edits are predicted then sent (`ClientSession.SendInventoryIntent`): the hotbar keys and `Q`
+are intents only, while the wheel (`GameplayInput.MirrorSelection`), a middle-click pick
 (`BlockPlacer.TryPickTargetedBlock(inventory, out id)` -> `PickBlock`), an [E]-panel hotbar equip, a
 craft (the fed members read before `CraftingSession.Craft` spends the reservation) and a creative
 catalog grant or clear apply locally at once and send their intent, so the server's answer keeps
@@ -3107,7 +3118,7 @@ multiplayer page.
 a 100-line log, a 200-char input, arrow-key history and the open flag. `T` opens it from a clean
 play state, `Enter` sends, `Escape` closes; while it is open the keyboard is withheld from the
 camera exactly like a focused inventory field, and the log sits bottom-left above the hotbar
-(`ChatRenderer.DrawChat`, its own `UiPasses.RenderChat` UI pass). In singleplayer `Program.
+(`ChatRenderer.DrawChat`, its own `UiPasses.RenderChat` UI pass). In singleplayer `ClientSession.
 SendChat` echoes locally; in multiplayer it sends `ChatSend` and the server's broadcast is the
 only copy, so a line never appears twice.
 
@@ -3860,7 +3871,14 @@ touch a file that violates one of them, fixing it is in scope.
   item-icon textures and frame meshes) and the shared draw primitives every page and the item
   debugger use; its pages live in the components it builds and exposes as internal properties
   (`HudRenderer`, `TopStripRenderer`, `InventoryPanelRenderer`, `CraftCardRenderer`,
-  `MenuRenderer`, `LoadingScreenRenderer`, `ChatRenderer`).
+  `MenuRenderer`, `LoadingScreenRenderer`, `ChatRenderer`). `Program.cs` (628 lines, down from 2,297) has a
+  stated reason too: it is the process entry point and the app's composition root: `Main` registers the
+  window callbacks, `OnLoad` builds the platform managers and the components (`DevDiagnostics`,
+  `ClientSession`, `InventoryPanelInput`, `ChatInput`, `MenuInput`, `GameplayInput`, `InputEvents`), it
+  owns the app-screen flow and the world lifecycle (the deferred PLAY/CREATE/SAVE & QUIT/CONNECT work,
+  opening and saving a world, the save on close), which the components read through `Program.ActiveWorld`,
+  `Program.CurrentWorld` and `Program.Screen`, and it keeps the frame-order-sensitive
+  `OnUpdate`/`OnRender` orchestration.
 - **No god directories.** Keep any one folder under ~30 files and group by domain. The `src/`
   root holds the app entry and core types only; a new file goes into the folder of its area
   (a new feature area gets a new folder), never into a catch-all. `Networking/` is split into

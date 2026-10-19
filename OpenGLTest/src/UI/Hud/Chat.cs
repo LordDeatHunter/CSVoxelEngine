@@ -20,7 +20,7 @@ public readonly record struct ChatMessage(ChatKind Kind, string Sender, string T
 /// <summary>
 /// GL-free state of the universal chat, shared by singleplayer and multiplayer: a bounded log of
 /// the most recent lines, a single-line input field, a sent-message history walked with the arrow
-/// keys, and the open/closed flag the HUD reads. <see cref="Program"/> feeds it typed characters
+/// keys, and the open/closed flag the HUD reads. <see cref="VoxelEngine.App.InputEvents"/> and <see cref="VoxelEngine.App.ChatInput"/> feed it typed characters
 /// and keys; <see cref="ChatRenderer"/> only reads it.
 /// <para>
 /// A sent line is returned by <see cref="Submit"/> rather than added: singleplayer echoes it

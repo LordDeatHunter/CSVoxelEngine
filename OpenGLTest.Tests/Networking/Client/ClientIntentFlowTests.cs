@@ -91,7 +91,7 @@ public sealed class ClientIntentFlowTests : IDisposable
     private void SendIntent(WorldIntent intent) =>
         Send(NetMessage.WorldIntent, w => WorldIntentCodec.Write(w, _prediction.Commit(intent.PredictsInventory), intent));
 
-    /// <summary>What Program.HandleNetworkMessage does with the messages this flow needs.</summary>
+    /// <summary>What ClientSession.HandleNetworkMessage does with the messages this flow needs.</summary>
     private void HandleInbound()
     {
         var world = _client!;

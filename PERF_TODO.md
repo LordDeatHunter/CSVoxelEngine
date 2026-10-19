@@ -235,7 +235,7 @@ needs, not the history.
   `ceil(fps / GpuTimingIdleInterval)` samples per always-run pass in every publish window (~12 at
   100 fps); the gate **latched once per frame** in `GpuPassTimer.BeginGpuFrame(bool overlayOn)`
   and read by `BeginGpuPass` and `EndGpuPass`. The single call site is
-  `Program.cs:571`, passing the live `debugEnabled` X-toggle state on the render thread — no new
+  `GameplayInput.Update` (the toggle), passing the live `DevDiagnostics.DebugEnabled` X-toggle state on the render thread — no new
   cross-thread mechanism. The interval is **chosen, not measured**: it is a one-token lever, and by
   this file's own rule (`Generations`, C5's pool size) moving it owes a counted capture, which is said
   where the constant is declared.
@@ -3054,7 +3054,7 @@ this file's own instruments — see the carried-debt bullet below.
   before any GL teardown, and `Program.OnClosing` disposes the render manager before `Log.Shutdown()`,
   so it is drained in **every** run — scripted or interactive, with `VOXEL_DEBUG` or without. It is
   deliberately **not** a `FrameProfiler` console token, because a console token **structurally cannot**
-  report the gated configuration: `Program.LogDebugLine` (`Program.cs:194`) opens
+  report the gated configuration: `DevDiagnostics.LogDebugLine` opens
   `if (!debugEnabled) return;` (`:196`) — the same flag the gate reads — so a token would print only
   when the gate is open on every frame, i.e. it could only ever re-measure the always-on path. Scrape
   it from the tail of a run log. It reaches no pixel surface, but a scraper that parses the end of a

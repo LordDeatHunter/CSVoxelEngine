@@ -18,7 +18,7 @@ public enum ScrollbarHit
 /// GL-free geometry of the [E] inventory panel's left half — the panel background, the tab
 /// strip, the scrolled row list and its scrollbar — in canvas units (see <see cref="UiCanvas"/>).
 /// Every method takes the canvas size, mirroring <see cref="SettingsLayout"/>, so the draw in
-/// <see cref="InventoryPanelRenderer"/> and the click handling in <c>Program</c> read one definition.
+/// <see cref="InventoryPanelRenderer"/> and the click handling in <c>InventoryPanelInput</c> read one definition.
 /// </summary>
 public static class InventoryPanelLayout
 {
