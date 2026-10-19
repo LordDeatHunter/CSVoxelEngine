@@ -96,26 +96,41 @@ method at a time, keep the suite green, prefer:
 
 ## Running a cleanup task through the workflow
 
-One cleanup task is one `plan-and-implement` run (Workflow tool, `name: 'plan-and-implement'`),
-never several in parallel: they share one working tree. Pass the task plus this `extraContext`,
-and `maxFixRounds: 1`:
+Cleanup tasks run through the **`cleanup-campaign`** workflow
+(`.claude/workflows/cleanup-campaign.js`), not `plan-and-implement`. Launch it with the Workflow
+tool and `scriptPath` set to that file (a workflow launched by `name` is the copy cached when the
+session started, so an edit to the script would be ignored). One run at a time: every task shares
+the one working tree.
 
-> Cleanup run; read AGENTS.md "Code organization (standing rules)" and the code-cleanup skill.
-> Do NOT add or edit tests except what a move/rename/namespace change forces; no visual scenarios,
-> no in-game verification. The only gate is a zero-warning Release build plus the existing xUnit
-> suite, all passing. Toolchain: the code needs the .NET 10 SDK. Ignore the `~/.dotnet/dotnet.exe`
-> and `OpenGLTest.sln` in the preamble; use `DOTNET_ROLL_FORWARD=LatestMajor dotnet build
-> VoxelEngine.sln -c Release` and `DOTNET_ROLL_FORWARD=LatestMajor dotnet test
-> OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release` (system dotnet; set
-> `$env:DOTNET_ROLL_FORWARD` first in PowerShell). Do not commit, stash or branch. The tree is
-> CRLF: follow the crlf-safe-edit skill. Behavior-preserving only: move code verbatim before
-> touching it. Update AGENTS.md Layout paths for anything moved. Leave `.claude/worktrees`,
-> `.sisyphus`, `.run` alone. The reviewer checks the diff against the rules and the plan, and does
-> not ask for new tests or scenario runs.
+- **No args**: the next task in `CLEANUP_PLAN.md` (the in-progress one first, then "Still to do"
+  in order). **A string** (or `{task}`): that task. Other options: `tasks: n` runs n plan tasks
+  back to back, stopping at the first one not accepted; `dryRun: true` stops after the first plan;
+  `commit: false` leaves the accepted work uncommitted; `maxFixRounds` (default 1);
+  `implementer: 'sonnet' | 'opus'` forces one implementer for every step; `extraContext`.
+- **Roles.** Opus calls the shots: it picks the task and briefs the scouts, writes the plan and
+  assigns each step to Sonnet or to itself, reviews the result and decides. Sonnet does the
+  reading and most of the writing: it surveys the plan, scouts the code, answers Opus' questions,
+  fact-checks the plan, implements the steps, runs the build and tests, audits the diff and
+  commits. Opus takes the wheel for the steps it reserved (judgment it cannot write down in
+  advance) and for any step Sonnet leaves blocked, partial or red.
+- **The gate** is baked into the script: the cleanup rules above, the SDK 10 toolchain, no new
+  tests or scenario runs, a `--no-incremental` zero-warning Release build and the existing suite
+  (the baseline and the flaky list are read from `CLEANUP_PLAN.md`, so keep them current there).
+- **The move-diff residue check** is `move_residue.py` beside this file:
+  `python -I .claude/skills/code-cleanup/move_residue.py` (working tree vs HEAD, untracked files
+  included) or `--range A..B`. It pairs every removed line with an added one after normalizing
+  whitespace and visibility modifiers, and prints only the residue: changed lines, owner prefixes
+  swapped, new and deleted lines, verbatim lines out of source order, plus the line-ending, BOM
+  and final-newline state of every changed file. A split that moved verbatim leaves a residue of
+  wiring and doc rewording; the auditor lists it and the reviewer reads only that.
+- **Afterwards** the workflow stages the task's paths explicitly (never the junk folders), commits
+  with a one-line subject plus the trailer, records the commit in `CLEANUP_PLAN.md`, and ends the
+  run with one "Update cleanup plan" commit. A task that is not accepted is left uncommitted in
+  the tree with its gaps written into the plan's "In progress", and the next run refuses to start
+  until the tree is clean again.
 
-After a green run, stage the touched paths explicitly and commit with a one-line subject (no body
-beyond the trailer). Task order: folder moves, namespaces, American English, one god class per
-run, then dead code / duplication / early returns slice by slice.
+Task order: folder moves, namespaces, American English, one god class per run, then dead code /
+duplication / early returns slice by slice.
 
 ## Reporting
 

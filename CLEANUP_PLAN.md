@@ -22,48 +22,50 @@ procedure for applying them lives in the **`code-cleanup` skill**
 
 ## How each task is run (the process)
 
-- **One cleanup task is one `plan-and-implement` workflow run.** Run them sequentially, never
-  in parallel: they share the working tree. Never spawn ad-hoc general-purpose agents.
+- **Every task runs through the `cleanup-campaign` workflow** (`.claude/workflows/cleanup-campaign.js`),
+  one run at a time: tasks share the working tree. Never spawn ad-hoc general-purpose agents.
 - **Launch with `scriptPath`**, not `name`. A named workflow is cached when the session starts,
   so an edit to the script would be ignored. The path is:
-  `scriptPath: C:\Users\DH\Documents\CodeProjects\OpenGL\CSVoxelEngine\.claude\workflows\plan-and-implement.js`
-- The script's `ARCHITECT_MODEL` is `'opus'` (the user asked for Opus on every architect task
-  instead of Fable).
-- Pass `maxFixRounds: 1` and the `extraContext` template below.
+  `scriptPath: C:\Users\DH\Documents\CodeProjects\OpenGL\CSVoxelEngine\.claude\workflows\cleanup-campaign.js`
+- **No args** runs the next task of this file: the "In progress" task when there is one, else
+  the first worthwhile entry of "Still to do". A task string runs that task instead. `tasks: n`
+  runs n tasks back to back (stopping at the first one not accepted), `dryRun: true` stops after
+  the plan, `commit: false` leaves the accepted work uncommitted, `maxFixRounds` defaults to 1 and
+  `implementer: 'sonnet' | 'opus'` forces one implementer for every step.
+- **Roles.** Opus calls the shots: it picks the task and briefs the scouts, writes the plan,
+  assigns each step to Sonnet or to itself, and accepts or rejects the result. Sonnet surveys
+  this file, scouts the code, answers Opus' questions, fact-checks the plan, implements the
+  steps, builds, tests, audits the diff and commits. Opus implements the steps it reserved and
+  takes over any step Sonnet leaves blocked, partial or red.
 - **The user's preference:** no new tests and no visual scenarios or in-game verification. The
-  only gate is a zero-warning Release build plus the existing xUnit suite.
-- **After a green run:**
-  1. Read the verify and review results from the run's `journal.jsonl`.
-  2. Rebuild with `--no-incremental` and run the full suite yourself.
-  3. Stage the tracked changes (`git add -u`) plus the new files, listed explicitly. Never
-     stage `.claude/worktrees/`, `.sisyphus/`, `.run/` or `.gitattributes`.
-  4. Commit with a one-line subject plus the `Co-Authored-By` trailer and no other body.
-     Never change git config.
+  only gate is a zero-warning Release build plus the existing xUnit suite. The workflow bakes this
+  in, together with the toolchain and the cleanup rules, so no `extraContext` is needed.
+- **The review** reads the move-diff residue, not the whole diff: the Sonnet auditor runs
+  `python -I .claude/skills/code-cleanup/move_residue.py` (every removed line paired with an added
+  one; only what does not pair is printed, plus line-ending, BOM and final-newline changes) and
+  lists each item with an assessment; Opus decides from that and reads only the hunks it doubts.
+- **After an accepted task** the workflow stages the task's paths explicitly (never
+  `.claude/worktrees/`, `.sisyphus/`, `.run/` or `.gitattributes`), commits with a one-line
+  subject plus the `Co-Authored-By` trailer, records the commit here (Done row, queue, line counts,
+  follow-ups) and ends the run with one `Update cleanup plan` commit. A task that is not accepted
+  stays uncommitted in the tree, its gaps are written into "In progress", and the next run refuses
+  to start until the tree is clean. Never change git config.
 - **Toolchain.** The code uses C# 14, so it needs the .NET 10 SDK, which is the system `dotnet`.
-  `~/.dotnet/dotnet.exe` is a 9.0.100 SDK and fails with CS0079/CS0131/CS0411. The workflow
-  script's REPO preamble still says `~/.dotnet` and `OpenGLTest.sln`; the extraContext overrides
-  both.
+  `~/.dotnet/dotnet.exe` is a 9.0.100 SDK and fails with CS0079/CS0131/CS0411.
   - Build: `DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release --no-incremental`
   - Test: `DOTNET_ROLL_FORWARD=LatestMajor dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release --no-build`
   - Baseline: 0 warnings, 2441 tests.
-- **Known flaky tests.** Re-run a failure alone, by class filter, before treating it as real:
+- **Known flaky tests.** Re-run a failure alone, by class filter, before treating it as real
+  (the workflow's verifier reads this list):
   - `GenerationalCacheTests.EveryKeyAlwaysReturnsItsOwnValueUnderFourThreads`
   - `LodManagerTests.StopJoinsTheLodGenThreads`
   - `GameServerTests.TntOnePlayerPrimesDetonatesForEveryClient`
   - the `LodBuildPoolTests` class (fails under CPU contention in a full run)
   - `MeshingTests.MissingFaceNeighborAbandonsTheBuild` (depends on run order; caused by the
-    known bug listed under "Bugs found" below)
+    known bug listed under "Bugs found" below, which a cleanup run must not fix)
 - **Resuming an interrupted run.** `resumeFromRunId` only works in the same session and only
-  with byte-identical args. In a new session, relaunch the task fresh.
-
-### extraContext template
-
-Copy this verbatim, adapting only the task-specific test-edit clause (for example "except what
-the split forces").
-
-```
-Cleanup run; read AGENTS.md "Code organization (standing rules)" and the .claude/skills/code-cleanup skill. Do NOT add or edit tests except what the split forces (call sites, qualified names); no visual scenarios, no in-game verification. The only gate is a zero-warning Release build plus the existing xUnit suite, all passing (2441 tests at baseline). Known flaky tests: GenerationalCacheTests.EveryKeyAlwaysReturnsItsOwnValueUnderFourThreads, LodManagerTests.StopJoinsTheLodGenThreads, GameServerTests.TntOnePlayerPrimesDetonatesForEveryClient, the LodBuildPoolTests class (CPU contention) and MeshingTests.MissingFaceNeighborAbandonsTheBuild (order-dependent, caused by a known pre-existing bug in Chunk.GenerateMeshData's early return that is NOT to be fixed in this task): re-run a failure alone, by class filter, before treating it as real; do not edit tests to stabilize them. Toolchain: the code needs the .NET 10 SDK. IGNORE the `~/.dotnet/dotnet.exe` and `OpenGLTest.sln` in the preamble (the 9.0.100 SDK in ~/.dotnet cannot compile this C# 14 code, and the solution is VoxelEngine.sln); use `DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release` and `DOTNET_ROLL_FORWARD=LatestMajor dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release` (system dotnet; in PowerShell set $env:DOTNET_ROLL_FORWARD='LatestMajor' first). Namespaces are `VoxelEngine.*` (one per folder); every project has a GlobalUsings.cs. American English only in new code and comments. Do not commit, stash or branch. The working tree is CRLF (a few .cs files and the skill .md files are LF-only: keep each file's own endings, BOM and final-newline state — Program.cs has no final newline — and make new .cs files CRLF like their neighbors; verify with byte counts after scripted edits). Leave .claude/worktrees, .claude/workflows, .sisyphus and .run alone. Behavior-preserving only. The reviewer checks the diff against the rules and the plan with an order-sensitive move-diff residue check (every moved block identical apart from the class name, visibility and owner qualification, and the statement order unchanged) and must not ask for new tests or scenario runs; the verifier only runs the build and the existing tests.
-```
+  with byte-identical args. In a new session, relaunch the workflow: with no args it picks the
+  "In progress" task up again.
 
 ## Done (committed, each with a green build and the full suite)
 
@@ -82,9 +84,9 @@ Cleanup run; read AGENTS.md "Code organization (standing rules)" and the .claude
 
 ## In progress
 
-**Split `Program.cs` (2,297 lines).** Workflow run `wf_610eb2d8-427` was interrupted after its four
-scouts. The architect never returned and the working tree is clean, so nothing was lost. In a
-new session, relaunch it fresh with this task text:
+**Split `Program.cs` (2,297 lines).** A `plan-and-implement` run (`wf_610eb2d8-427`) was interrupted
+after its four scouts; the architect never returned and the working tree is clean, so nothing was
+lost. The `cleanup-campaign` workflow run with no args picks this task up with this text:
 
 ```
 Split the god file `Program.cs` (OpenGLTest/src/Program.cs, about 2,300 lines; check its real size first) into focused classes, following the standing rule: no god classes; one class, one coherent job; past ~700 lines a class is a smell and no source file goes past ~1000 lines without a stated reason; composition, never `partial`. The World (0660ac3), RenderManager (294c006) and UIRenderer (f01c883) splits are the precedent for the wiring style: a composition root that builds and owns the per-job components, verbatim moves, internal sealed components, live expression-bodied accessors over the owner's state instead of copied state, no forwarders except a small cross-project facade.
@@ -174,7 +176,8 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `HudRenderer` never disposes the five crosshair meshes (a pre-existing leak).
 - `OpenGLTest.Tests/Simulation` holds 23 files, one over the ~22 target.
 - The stale REPO preamble in `.claude/workflows/plan-and-implement.js` (`~/.dotnet/dotnet.exe`,
-  `OpenGLTest.sln`) is the user's file. They may want it fixed.
+  `OpenGLTest.sln`) is the user's file. They may want it fixed. (`cleanup-campaign.js` carries the
+  correct commands, so the cleanup no longer depends on it.)
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
