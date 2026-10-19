@@ -84,6 +84,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `3d45be4` | Split Program.cs (2,297 -> 628 lines) into App/ (AppScreen, DevDiagnostics, InventoryPanelInput, ChatInput, MenuInput, GameplayInput, InputEvents) and Networking/Client/ClientSession; Program keeps Main, OnLoad wiring, the AppScreen flow, the world lifecycle and the OnUpdate/OnRender orchestration; docs and crefs retargeted |
 | `d79f434` | Split WorldGenerationConfig (2,401 lines, 921 members) into 17 per-domain static classes under src/Config/ (VoxelEngine.Config, globally imported in all four projects); WorldGenerationConfig keeps its 199 worldgen knobs (480 lines), every call site, cref, shader/tool comment and doc mention retargeted |
 | `ad27efd` | Split ContentRegistry (2,383 -> 475 lines) into ContentFiles, ItemLoader, TagLoader, EntityLoader, TreeSpeciesLoader, Blocks/BlockLoader, Blocks/BlockSchemaParser, Loot/LootTableCompiler, Recipes/RecipeLoader and Models/ModelBakeSteps; ContentRegistry stays the static facade and the owner of the tables |
+| `e4a318b` | Split Chunk.cs (1,944 -> 769 lines): worldgen fill to WorldGen/ChunkTerrainFill, mesh build to Chunks/Meshing/ChunkMeshBuilder, light snapshot/flood to ChunkLighting, face tables and UV helpers to ChunkFaceTables, ChunkMeshData to its own file; Chunk keeps storage with one-line forwarders |
 
 ## In progress
 
@@ -99,7 +100,7 @@ update the docs. Folders now have headroom: `Chunks/` holds 9 files plus `Meshin
 
 | File | Lines | Notes |
 |---|---|---|
-| `src/Chunks/Chunk.cs` | 1,944 | Storage, state, snapshots, generation fill, mesh upload. Respect the threading model and the state-byte invariants. |
+| `src/Chunks/Chunk.cs` | 769 | Split in `e4a318b` (ChunkTerrainFill 377, ChunkMeshBuilder 584, ChunkFaceTables 98, ChunkMeshData 38, ChunkLighting 395, ChunkMesher 1,276 unchanged). Inside the 800 ceiling but above the ~700 smell line; AGENTS.md records it as a stated reason in the offender list. Remaining option: move TakeSnapshot/CaptureForNetwork/RestoreFrom (the save and network snapshot job) into a Saves- or Chunks-side helper to get under ~700. |
 | `src/Player/PlayerModel.cs` | 1,468 | Pose, arm frames, slice, swim, float, mods. Use the ItemDebugger modes as a mental check. |
 | `OpenGLTest.Server/GameServer.cs` | 1,393 | Accept loop, Pump, intent handling, streaming answers, status. The Server project is flat and namespaced `VoxelEngine.Server`. |
 | `src/Chunks/ChunkManager.cs` | 1,349 | Lifecycle, dirty scheduling, mesh scheduling, foci, unload. Threading rules apply. |
@@ -174,13 +175,17 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - The per-frame sapling lambda in `World.Update` allocates every frame.
 - `HudRenderer` never disposes the five crosshair meshes (a pre-existing leak).
 - `OpenGLTest.Tests/Simulation` holds 23 files, one over the ~22 target.
+- Chunk split follow-ups: trim the unused usings in `ChunkMeshBuilder.cs` and `ChunkTerrainFill.cs` (never trial-removed; the plain build does not flag them, check each with the doc build `-p:GenerateDocumentationFile=true`), and check `Chunk.cs`'s remaining usings (`System.Runtime.InteropServices`, `Silk.NET.OpenGL`, `Interaction`, `Rendering.Geometry`, others) for any now unused.
+- Stale test comments left on purpose under the no-test-edit rule: `ChunkRekeyReplayProbe.cs` lines 157/338/349 name `Chunk.TryResolveNeighbors`, and `LightVolumeHeightTests.cs` line 11 calls `ComputeLight` private. Fix them.
+- `ChunkFaceTables.TiledUv` carries a pre-existing CS1573 (no param tag for `face`), moved verbatim. Add the tag.
+- Pre-existing doc issues: the broken `Chunk.SmoothCornerLight` cref in `MeshScratch`, and the stale 'semaphore'/`Task.Run` wording in `GenerateMeshData`'s doc and AGENTS.md.
 - The stale REPO preamble in `.claude/workflows/plan-and-implement.js` (`~/.dotnet/dotnet.exe`,
   `OpenGLTest.sln`) is the user's file. They may want it fixed. (`cleanup-campaign.js` carries the
   correct commands, so the cleanup no longer depends on it.)
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
-- **`Chunk.GenerateMeshData` stale neighbor slots.** The all-air or fully-enclosed early return
+- **`Chunk.GenerateMeshData` stale neighbor slots** (both members now live in `Chunks/Meshing/ChunkMeshBuilder.cs`). The all-air or fully-enclosed early return
   (around `return new ChunkMeshData([], [], [], [], false);`) never calls
   `scratch.ClearNeighbors()`, and `TryResolveNeighbors` never nulls a missing slot. A later mesh
   build on the same thread (the `[ThreadStatic]` `MeshScratch.Current`) can therefore reuse the
