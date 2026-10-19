@@ -81,36 +81,22 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `3289edc` | Split crowded folders into domain subfolders (`Networking/{Client,ServerSide}`, `Rendering/{Atmosphere,Geometry,Overlays,ScreenSpace}`, `Chunks/{Meshing,Sources,Streaming}`, `Entities/{Goblins,Slimes}`, `WorldGen/Features/Underground`); every src folder is now at or under 22 files |
 | `294c006` | Split `RenderManager` (4,588 lines to 1,032) into 16 pass components (FrameLighting, RenderTargets, ShadowPass, ReflectionPass, TerrainPasses, TextureUnits, GpuPassTimer, Atmosphere/SkyPasses, ScreenSpace/ScreenPasses, Overlays/{Billboard,Selection,Ui}Passes, Actors/{Mob,Object,Player,Station}Passes) |
 | `f01c883` | Split `UIRenderer` (2,504 lines to 802) into 7 page renderers (Hud, Menu, InventoryPanel, CraftCard, TopStrip, LoadingScreen, Chat) |
+| `3d45be4` | Split Program.cs (2,297 -> 628 lines) into App/ (AppScreen, DevDiagnostics, InventoryPanelInput, ChatInput, MenuInput, GameplayInput, InputEvents) and Networking/Client/ClientSession; Program keeps Main, OnLoad wiring, the AppScreen flow, the world lifecycle and the OnUpdate/OnRender orchestration; docs and crefs retargeted |
 
 ## In progress
 
-**Split `Program.cs` (2,297 lines).** A `plan-and-implement` run (`wf_610eb2d8-427`) was interrupted
-after its four scouts; the architect never returned and the working tree is clean, so nothing was
-lost. The `cleanup-campaign` workflow run with no args picks this task up with this text:
-
-```
-Split the god file `Program.cs` (OpenGLTest/src/Program.cs, about 2,300 lines; check its real size first) into focused classes, following the standing rule: no god classes; one class, one coherent job; past ~700 lines a class is a smell and no source file goes past ~1000 lines without a stated reason; composition, never `partial`. The World (0660ac3), RenderManager (294c006) and UIRenderer (f01c883) splits are the precedent for the wiring style: a composition root that builds and owns the per-job components, verbatim moves, internal sealed components, live expression-bodied accessors over the owner's state instead of copied state, no forwarders except a small cross-project facade.
-
-How: first map Program's jobs from its members (for example: the entry point and window/GL setup, the window callbacks (OnLoad/OnUpdate/OnRender/OnClosing/OnResize), the AppScreen flow (Menu/Loading/Playing/Saving) and its deferred pending work (PLAY/CREATE/SAVE & QUIT/CONNECT), main-menu and pause/settings input, gameplay input polling (mouse look, keys, hotbar, inventory panel input, chat input), the multiplayer client session (BeginConnect, UpdateConnecting, UpdateNetwork, SendWorldIntent, SendInventoryIntent, SendRespawn, message dispatch), the dev overrides (VOXEL_SCRIPT/SPAWN/LOOK/TIME/DEBUG parsing) and the visual-scenario hookup, screenshots (F2) and debug logging). Pick the boundaries from the code, not from this list. Then extract one coherent responsibility per step into its own well-named class, MOVING THE CODE VERBATIM FIRST, fixing visibility (internal where possible) and updating the call sites. Program stays the entry point and composition root of the app (it builds and owns the window, the RenderManager, the World lifecycle and the new components), keeping the frame-order-sensitive OnUpdate/OnRender orchestration. Put each new file in the folder of its domain (for example the client session under Networking/Client, input under Platform or a new domain folder, the app-screen flow beside the menus or in a new App-style folder) with the matching namespace; keep every folder at or under ~22 files, and never name a folder or namespace after a type or an existing namespace segment (check every new segment against all type names, `Program`, `World`, and existing namespaces).
-
-Targets: Program.cs under about 1,000 lines (aim for ~600), every new class under ~700 lines; if that cannot be reached safely in this run, extract the largest responsibilities first and list exactly what remains.
-
-Hard constraints (input, network and menu code is barely covered by tests and there is no in-game verification in this run, so the compiler plus a strict move-diff residue check is the safety net): (1) the order of everything that happens within an update and a render frame stays identical: input polling, menu rules, world update, network pump and sends, the loading/saving screen frames, the deferred pending-work step on the next update; (2) all main-thread-only and GL-only-on-the-render-thread rules hold; window callbacks are wired in the same order; (3) every guard moves with the code it guards unchanged: `World.IsPlaying`, chat/inventory-field keyboard capture, pause menu state, loading phase, client vs singleplayer vs storeless (dev override) world; (4) the network message handling keeps its try/catch shape and its 'The server sent bad data' fallback, its send cadences (state 20 Hz, keep-alive) and the respawn retry; (5) the save-on-close path (OnClosing calling World.SaveAndDispose) and the menu's PLAY/CREATE/SAVE & QUIT flows keep their exact order; (6) no new per-frame allocations; (7) the ItemDebugger, the Server and all tests keep compiling and passing (tests like the main-menu, launch-mode and settings tests use the GL-free classes; keep their seams); (8) early returns / nesting fixes only in code you touch anyway, never logic rewrites while moving.
-
-Docs: AGENTS.md cites Program members widely (Program.timeOffset, Program.SettingsPageOpen, Program.BeginConnect, Program.UpdateConnecting, Program.SendWorldIntent, Program.SendInventoryIntent, Program.SendRespawn, Program.MirrorSelection, Program.SendChat, Program.OnLoad, PendingWork.Connect, AppScreen, OnClosing, ...): after the split update every such reference in AGENTS.md, the skills, PERF_TODO.md, TODO.md and code comments/crefs to name the new owner, update the Layout section with the new files, and record Program's remaining size and reason in Code organization the way World/RenderManager/UIRenderer are recorded.
-```
+Nothing is in progress. The next task is the first entry of "Still to do".
 
 ## Still to do, in order
 
 ### 1. God classes (one workflow run each)
 
-Line counts as of `f01c883`. Every task text follows the Program one above: map the jobs, move
+Line counts as of `f01c883` (Program.cs is done: 628 lines after `3d45be4`; App/ files: AppScreen 4, ChatInput 149, DevDiagnostics 91, GameplayInput 297, InputEvents 227, InventoryPanelInput 485, MenuInput 175; Networking/Client/ClientSession 558). Every task text follows the Program one above: map the jobs, move
 verbatim, use a composition root, list the GL, order and threading invariants that apply, and
 update the docs. Folders now have headroom: `Chunks/` holds 9 files plus `Meshing/` 6.
 
 | File | Lines | Notes |
 |---|---|---|
-| `src/Program.cs` | 2,297 | **in progress**, see above |
 | `src/Core/WorldGenerationConfig.cs` | 2,401 | A constants file. Split it into per-domain config classes (worldgen, rendering, networking, player, mobs, ...). The call-site churn is huge but mechanical. Docs cite `WorldGenerationConfig.X` everywhere. |
 | `src/Content/ContentRegistry.cs` | 2,383 | Loading, id assignment, baking, validation, recipes, tree species. The `Content/` subfolders exist. |
 | `src/Chunks/Chunk.cs` | 1,944 | Storage, state, snapshots, generation fill, mesh upload. Respect the threading model and the state-byte invariants. |
@@ -166,6 +152,11 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 
 ### 5. Small doc and code follow-ups found along the way
 
+- `MenuInput`'s constructor also takes `inventoryView` (`SetPauseMenu` reads `inventoryView.IsOpen`), which the Program split plan's signature omitted. Correctly handled; noted for anyone describing the wiring.
+- `InventoryPanelInput.cs` was re-encoded from cp1252 to UTF-8 during the Program split. Spot-check its non-ASCII comment characters (em dashes etc.) against HEAD's old `Program.cs` (`git show 3d45be4^:OpenGLTest/src/Program.cs`) for mojibake.
+- The doc-generation build (`-p:GenerateDocumentationFile=true`) was not run after the cref retargets in `Chat.cs` and `SettingsMenu.cs`. A future run should confirm no new cref warnings.
+- The `// TODO: move this to player class` `placeTimer` still relies on the static-initializer ordering quirk: it starts at 0.0, not 0.2. This affects only the storeless dev-override path. A later behavior task could make the intent explicit; it was out of scope for the cleanup.
+- Next extractions named in `AGENTS.md` remain: `World.Update`'s mob target/damage block and `PushFromBlast`; `Chunk.cs`, `Camera.cs`, `ChunkManager.cs` and `ContentRegistry.cs` are still on the offender list.
 - `AGENTS.md` still cites the deleted `MESHER_PLAN.md` (project overview, around lines 7 and 15).
 - `AGENTS.md` names tools scripts that do not exist: `generate-ore-materials.ps1`,
   `generate-mold-models.ps1` and `generate-biome-textures.ps1`. `PERF_TODO.md` (around line 1292)
