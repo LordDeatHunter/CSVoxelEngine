@@ -54,7 +54,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
   `~/.dotnet/dotnet.exe` is a 9.0.100 SDK and fails with CS0079/CS0131/CS0411.
   - Build: `DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release --no-incremental`
   - Test: `DOTNET_ROLL_FORWARD=LatestMajor dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release --no-build`
-  - Baseline: 0 warnings, 2441 tests.
+  - Baseline: 0 warnings, 2441 tests (last full run: 2440 passed, 1 known flaky `StopJoinsTheLodGenThreads` that passed on class re-run).
 - **Known flaky tests.** Re-run a failure alone, by class filter, before treating it as real
   (the workflow's verifier reads this list):
   - `GenerationalCacheTests.EveryKeyAlwaysReturnsItsOwnValueUnderFourThreads`
@@ -82,6 +82,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `294c006` | Split `RenderManager` (4,588 lines to 1,032) into 16 pass components (FrameLighting, RenderTargets, ShadowPass, ReflectionPass, TerrainPasses, TextureUnits, GpuPassTimer, Atmosphere/SkyPasses, ScreenSpace/ScreenPasses, Overlays/{Billboard,Selection,Ui}Passes, Actors/{Mob,Object,Player,Station}Passes) |
 | `f01c883` | Split `UIRenderer` (2,504 lines to 802) into 7 page renderers (Hud, Menu, InventoryPanel, CraftCard, TopStrip, LoadingScreen, Chat) |
 | `3d45be4` | Split Program.cs (2,297 -> 628 lines) into App/ (AppScreen, DevDiagnostics, InventoryPanelInput, ChatInput, MenuInput, GameplayInput, InputEvents) and Networking/Client/ClientSession; Program keeps Main, OnLoad wiring, the AppScreen flow, the world lifecycle and the OnUpdate/OnRender orchestration; docs and crefs retargeted |
+| `d79f434` | Split WorldGenerationConfig (2,401 lines, 921 members) into 17 per-domain static classes under src/Config/ (VoxelEngine.Config, globally imported in all four projects); WorldGenerationConfig keeps its 199 worldgen knobs (480 lines), every call site, cref, shader/tool comment and doc mention retargeted |
 
 ## In progress
 
@@ -97,7 +98,6 @@ update the docs. Folders now have headroom: `Chunks/` holds 9 files plus `Meshin
 
 | File | Lines | Notes |
 |---|---|---|
-| `src/Core/WorldGenerationConfig.cs` | 2,401 | A constants file. Split it into per-domain config classes (worldgen, rendering, networking, player, mobs, ...). The call-site churn is huge but mechanical. Docs cite `WorldGenerationConfig.X` everywhere. |
 | `src/Content/ContentRegistry.cs` | 2,383 | Loading, id assignment, baking, validation, recipes, tree species. The `Content/` subfolders exist. |
 | `src/Chunks/Chunk.cs` | 1,944 | Storage, state, snapshots, generation fill, mesh upload. Respect the threading model and the state-byte invariants. |
 | `src/Player/PlayerModel.cs` | 1,468 | Pose, arm frames, slice, swim, float, mods. Use the ItemDebugger modes as a mental check. |
@@ -157,6 +157,9 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - The doc-generation build (`-p:GenerateDocumentationFile=true`) was not run after the cref retargets in `Chat.cs` and `SettingsMenu.cs`. A future run should confirm no new cref warnings.
 - The `// TODO: move this to player class` `placeTimer` still relies on the static-initializer ordering quirk: it starts at 0.0, not 0.2. This affects only the storeless dev-override path. A later behavior task could make the intent explicit; it was out of scope for the cleanup.
 - Next extractions named in `AGENTS.md` remain: `World.Update`'s mob target/damage block and `PushFromBlast`; `Chunk.cs`, `Camera.cs`, `ChunkManager.cs` and `ContentRegistry.cs` are still on the offender list.
+- Section headers attached to the first member below them kept their old titles in their new config classes: `// --- Lighting ---` above `DayLengthSeconds` in `SkyConfig`, `// --- Ambience ---` in `AudioConfig` and `// --- GPU timer queries ---` in `PostProcessConfig`. Retitle them to match the class they now head.
+- Judgment-call config placements could be revisited (a pure call-site rewrite): `TonemapExposure` and `EyeAdapt*` in `LightingConfig` rather than `PostProcessConfig`; `SelectionOutline`/`SelectionPulse` in `HudConfig`; the `Steam*` lava-hardening knobs in `JuiceConfig` while `SpringSteam*` is in `ParticleConfig`.
+- git sees `WorldGenerationConfig.cs` as a rename (now `src/Config/`) plus a heavy rewrite; blame for the moved members needs `git blame -C -C`.
 - `AGENTS.md` still cites the deleted `MESHER_PLAN.md` (project overview, around lines 7 and 15).
 - `AGENTS.md` names tools scripts that do not exist: `generate-ore-materials.ps1`,
   `generate-mold-models.ps1` and `generate-biome-textures.ps1`. `PERF_TODO.md` (around line 1292)
