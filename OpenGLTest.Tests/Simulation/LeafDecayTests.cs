@@ -5,6 +5,7 @@ using System.Numerics;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Interaction;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Shape;

@@ -6,6 +6,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Interaction;

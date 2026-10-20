@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Lod;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Shape;

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Interaction;
@@ -11,7 +10,7 @@ using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Shape;
 
-namespace VoxelEngine.Simulation;
+namespace VoxelEngine.Simulation.LeafDecay;
 
 /// <summary>
 /// Leaf decay and orphaned-wood crumbling: a fixed tick
@@ -62,7 +61,7 @@ namespace VoxelEngine.Simulation;
 /// from the cut outward one layer per tick. Mining-driven felling stays
 /// <see cref="TopplingTree"/>'s job.</para>
 ///
-/// <para><b>Freezing.</b> Cells are read through <see cref="TryGetCell"/>, never
+/// <para><b>Freezing.</b> Cells are read through <see cref="LeafDecayCells.TryGetCell"/>, never
 /// <c>GetBlockGlobal</c>, which reports unloaded chunks as air. Whenever a decision needs a cell
 /// in an unloaded chunk — the cell itself, any candidate tip or a tip's neighbor in a leaf's
 /// cluster box, or any cell an orphan candidate's support walk or search reads — the scheduled cell is dropped silently and
@@ -86,11 +85,6 @@ namespace VoxelEngine.Simulation;
 /// </summary>
 public class LeafDecayManager
 {
-    // Cell keys pack a world position into 21 bits per axis (±1,048,576 blocks), as in
-    // FluidManager.
-    private const int PackBits = 21;
-    private const long PackMask = (1L << PackBits) - 1;
-
     private float _accumulator;
 
     // How many ticks have started; a test seam for counting ticks
@@ -107,9 +101,6 @@ public class LeafDecayManager
     private readonly List<long> _tickCells = [];
     private int _tickCursor;
 
-    // Chunks touched by this frame's removals, remeshed once the frame's slice is done
-    private readonly HashSet<long> _dirtyChunks = [];
-
     // Canopy columns (packed (x, 0, z)) that lost a tree block this frame, flushed to the far
     // LOD once per frame so a dissolving crown marks each column once
     private readonly HashSet<long> _editedColumns = [];
@@ -118,45 +109,16 @@ public class LeafDecayManager
     private readonly TreeSpecies?[] _speciesByLeaf = new TreeSpecies?[256];
     private readonly TreeSpecies?[] _speciesByWood = new TreeSpecies?[256];
 
-    // Per leaf id, every offset from a tip to a cell that tip hydrates (h >= 1), sorted by
-    // hydration descending: the first live tip a scan meets gives the cell its best hydration,
-    // so an intact leaf usually stops after a candidate or two
-    private readonly TipOffset[]?[] _offsetsByLeaf = new TipOffset[]?[256];
-
-    private readonly record struct TipOffset(int Dx, int Dy, int Dz, int Hydration);
-
     // Set by Update before the ticks run
     private ChunkManager _chunks = null!;
     private DropManager _drops = null!;
     private LodManager? _lod;
     private LeafParticleSystem? _leaves;
 
-    // Direct-mapped chunk-lookup cache for one frame, as in FluidManager: keys cleared at the
-    // top of every Update, only the Chunk cached (never its arrays, which SetBlockRaw may swap)
-    private const int ChunkCacheSize = 16;
-    private const int ChunkCacheMask = ChunkCacheSize - 1;
-    private readonly Chunk?[] _chunkCache = new Chunk?[ChunkCacheSize];
-    private readonly long[] _chunkCacheKeys = new long[ChunkCacheSize];
-
-    // The orphan rule: TreeSupport's search over this manager's cached reads, shared with felling
-    private readonly TreeCellReader _read;
-    private readonly TreeSupport _support = new(SimulationConfig.TreeFellWoodCap);
-
-    // Wood cells (TreeCellKey) known anchored or known unanchored this frame; cleared at the top
-    // of every Update, since an edit outside the decay can change either between frames
-    private readonly HashSet<long> _supported = [];
-    private readonly HashSet<long> _unsupported = [];
-
-    // The parent-chain fast path's walked cells, reused
-    private readonly List<long> _chain = [];
-
-    // Wood cells (TreeCellKey) whose parent chain's support is known this frame: the root
-    // diameter a live tip's cluster radius scales with. Cleared at the top of every Update, like
-    // the support memos; every cell of one walked chain shares its end and therefore its answer
-    private readonly Dictionary<long, int> _tipSupport = [];
-
-    // The support walk's visited cells, reused
-    private readonly List<long> _supportChain = [];
+    // The components: cell access for the frame, the orphaned-wood test and the leaf hydration rule
+    private readonly LeafDecayCells _cells = new();
+    private readonly OrphanWoodCheck _orphans;
+    private readonly TipHydration _hydration;
 
     /// <summary>
     /// How far around an edit cells are scheduled: the largest leaf radius of any leafy species
@@ -167,7 +129,8 @@ public class LeafDecayManager
 
     public LeafDecayManager()
     {
-        _read = TryGetCell;
+        _orphans = new OrphanWoodCheck(_cells);
+        _hydration = new TipHydration(_cells);
 
         var maxRadius = 0;
         foreach (var species in TreeSpeciesRegistry.All)
@@ -175,33 +138,11 @@ public class LeafDecayManager
             _speciesByWood[species.WoodId] = species;
             if (!species.HasLeaves) continue;
             _speciesByLeaf[species.LeavesId] = species;
-            _offsetsByLeaf[species.LeavesId] = TipOffsets(species);
+            _hydration.AddSpecies(species);
             maxRadius = Math.Max(maxRadius, species.LeafRadius);
         }
 
         ScheduleReach = Math.Max(1, maxRadius + 1);
-    }
-
-    // Every offset a tip of the species hydrates, best first (a leaf is never its own tip);
-    // OrderByDescending is stable, so ties keep the fixed x, y, z scan order. Built at the full
-    // LeafRadius, the largest cluster any tree of the species wears: a smaller tree's cluster is
-    // a subset of it (shapes are nested) with the same h on every shared offset, so
-    // TryHydrationAt only has to drop the offsets outside the tip's own radius
-    // and the best-first order stays exact
-    private static TipOffset[] TipOffsets(TreeSpecies species)
-    {
-        var radius = species.LeafRadius;
-        var offsets = new List<TipOffset>();
-        for (var dx = -radius; dx <= radius; dx++)
-        for (var dy = -radius; dy <= radius; dy++)
-        for (var dz = -radius; dz <= radius; dz++)
-        {
-            if (dx == 0 && dy == 0 && dz == 0) continue;
-            var h = LeafCluster.HydrationFromTip(species, dx, dy, dz);
-            if (h >= 1) offsets.Add(new TipOffset(dx, dy, dz, h));
-        }
-
-        return offsets.OrderByDescending(o => o.Hydration).ToArray();
     }
 
     /// <summary>Test seam: cells waiting for a tick, scheduled or still in the current one.</summary>
@@ -247,7 +188,7 @@ public class LeafDecayManager
         for (var z = z0; z <= z1; z++)
         {
             if (_next.Count >= SimulationConfig.MaxLeafDecayBacklogCells) return;
-            _next.Add(Pack(x, y, z));
+            _next.Add(LeafDecayCells.Pack(x, y, z));
         }
     }
 
@@ -266,15 +207,12 @@ public class LeafDecayManager
         _lod = lod;
         _leaves = leaves;
 
-        // The chunk cache is valid for one frame only: an unload can replace a chunk between
-        // frames, and a reference cached before it must never be handed back
-        _chunkCacheKeys.AsSpan().Fill(-1L);
+        _cells.BeginFrame(chunks);
 
         // The support memos hold for one frame: only decay removals happen inside it, and
         // removing an unsupported cell never changes another component's anchoring
-        _supported.Clear();
-        _unsupported.Clear();
-        _tipSupport.Clear();
+        _orphans.BeginFrame();
+        _hydration.BeginFrame();
 
         var ticks = 0;
         var processed = 0;
@@ -306,21 +244,13 @@ public class LeafDecayManager
 
         if (_accumulator >= SimulationConfig.LeafDecayTickSeconds) _accumulator = 0f;
 
-        if (_dirtyChunks.Count > 0)
-        {
-            foreach (var key in _dirtyChunks)
-            {
-                Unpack(key, out var cx, out var cy, out var cz);
-                chunks.MarkDirty(new Vector3(cx, cy, cz));
-            }
-            _dirtyChunks.Clear();
-        }
+        _cells.FlushDirty(chunks);
 
         if (_editedColumns.Count > 0)
         {
             foreach (var key in _editedColumns)
             {
-                Unpack(key, out var x, out _, out var z);
+                LeafDecayCells.Unpack(key, out var x, out _, out var z);
                 TreeGenerator.PoisonCanopy(x, z, 0);
                 lod?.MarkEditedColumn(x, z);
             }
@@ -345,8 +275,8 @@ public class LeafDecayManager
         _tickCells.Clear();
         foreach (var key in _next)
         {
-            Unpack(key, out var x, out var y, out var z);
-            if (TryGetCell(x, y, z, out var id, out _) && IsDecayCandidate(id))
+            LeafDecayCells.Unpack(key, out var x, out var y, out var z);
+            if (_cells.TryGetCell(x, y, z, out var id, out _) && IsDecayCandidate(id))
                 _tickCells.Add(key);
         }
 
@@ -365,10 +295,10 @@ public class LeafDecayManager
     /// <summary>Re-derives one scheduled cell: a leaf's hydration or a wood cell's support.</summary>
     private void TickCell(long key)
     {
-        Unpack(key, out var x, out var y, out var z);
+        LeafDecayCells.Unpack(key, out var x, out var y, out var z);
 
         // An unloaded cell is frozen: dropped silently, never decayed
-        if (!TryGetCell(x, y, z, out var id, out var state)) return;
+        if (!_cells.TryGetCell(x, y, z, out var id, out var state)) return;
 
         if (_speciesByLeaf[id] is { } leafSpecies)
             TickLeaf(leafSpecies, x, y, z, id, state, key);
@@ -385,19 +315,19 @@ public class LeafDecayManager
         if (LeafState.IsPersistent(state)) return;
 
         // A read in the cluster box hit an unloaded chunk: freeze rather than decide blind
-        if (!TryHydrationAt(species, x, y, z, out var hydration)) return;
+        if (!_hydration.TryHydrationAt(species, x, y, z, out var hydration)) return;
 
         if (hydration > 0)
         {
             if (hydration != LeafState.Hydration(state))
-                Write(x, y, z, id, LeafState.WithHydration(state, hydration), remesh: false);
+                _cells.Write(x, y, z, id, LeafState.WithHydration(state, hydration), remesh: false);
             return;
         }
 
         if (LeafState.Hydration(state) != 0)
         {
             state = LeafState.WithHydration(state, 0);
-            Write(x, y, z, id, state, remesh: false);
+            _cells.Write(x, y, z, id, state, remesh: false);
         }
 
         if (_removalsThisTick >= SimulationConfig.LeafDecayMaxRemovalsPerTick)
@@ -407,126 +337,6 @@ public class LeafDecayManager
         }
 
         Remove(x, y, z, id, state);
-    }
-
-    /// <summary>
-    /// The exact hydration rule on world cells: the best per-tip hydration over every live tip
-    /// of the species whose cluster holds (x, y, z), capped at <see cref="LeafState.MaxHydration"/>.
-    /// False when a read hit an unloaded chunk.
-    /// </summary>
-    private bool TryHydrationAt(TreeSpecies species, int x, int y, int z, out int hydration)
-    {
-        hydration = 0;
-        var offsets = _offsetsByLeaf[species.LeavesId]!;
-
-        // Best hydration first, so the first live tip met gives the maximum. A read that hits
-        // an unloaded chunk before that freezes the cell; one past it cannot change the answer
-        for (var i = 0; i < offsets.Length; i++)
-        {
-            var (dx, dy, dz, h) = offsets[i];
-
-            // The offset runs from the tip to the cell, so the candidate tip sits behind it
-            var tx = x - dx;
-            var ty = y - dy;
-            var tz = z - dz;
-            if (!TryGetCell(tx, ty, tz, out var tid, out var tstate)) return false;
-            if (tid != species.WoodId) continue;
-            if (!IsLiveTip(species, tx, ty, tz, tstate, out var unloaded))
-            {
-                if (unloaded) return false;
-                continue;
-            }
-
-            // The table is the full-radius cluster; this tree's cluster may be smaller. The
-            // best-first exit stays exact: a smaller radius only drops offsets (shapes are
-            // nested) and never changes h, so the first tip whose own cluster holds the cell is
-            // still the best one
-            if (!TryTipSupport(species, tx, ty, tz, tstate, out var support)) return false;
-            if (!LeafCluster.InShape(species.LeafShape, LeafCluster.ClusterRadius(species, support), dx, dy, dz))
-                continue;
-
-            hydration = Math.Min(h, LeafState.MaxHydration);
-            return true;
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// Whether a cell of the species' wood is a live tip: not detached, no thicker than the
-    /// species' tip limit, and no face neighbor of the same wood naming it as its parent.
-    /// <paramref name="unloaded"/> reports a neighbor read that hit an unloaded chunk.
-    /// </summary>
-    private bool IsLiveTip(TreeSpecies species, int tx, int ty, int tz, byte tstate, out bool unloaded)
-    {
-        unloaded = false;
-        // A shell rings a wide trunk core and is never a branch end
-        if (WoodState.IsDetached(tstate) || WoodState.IsShell(tstate)
-            || WoodState.DiameterPx(tstate) > species.TipMaxPx) return false;
-
-        for (var dir = 0; dir < TreeDirections.Count; dir++)
-        {
-            var nx = tx + TreeDirections.Dx[dir];
-            var ny = ty + TreeDirections.Dy[dir];
-            var nz = tz + TreeDirections.Dz[dir];
-            if (!TryGetCell(nx, ny, nz, out var nid, out var nstate))
-            {
-                unloaded = true;
-                return false;
-            }
-
-            // A child: the neighbor's parent points back at the candidate tip
-            if (nid == species.WoodId && !WoodState.IsDetached(nstate)
-                && WoodState.TryParentOffset(nstate, out var px, out var py, out var pz)
-                && nx + px == tx && ny + py == ty && nz + pz == tz)
-                return false;
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// The support a live tip's tree gives its cluster: the <see cref="WoodState.DiameterPx"/> of
-    /// the root cell its parent chain reaches, following the links <see cref="WalkParentChain"/>
-    /// follows (<see cref="TreeSupport.Links"/>) for at most
-    /// <see cref="SimulationConfig.TreeFellWoodCap"/> steps. A chain that stops first (no
-    /// parent cell, a broken link, the cap) answers with the last cell it reached, which only an
-    /// orphaned branch does. Memoized for the frame on every walked cell, since they all end at
-    /// the same cell. False when a read hit an unloaded chunk, which freezes the leaf.
-    /// </summary>
-    private bool TryTipSupport(TreeSpecies species, int tx, int ty, int tz, byte tstate, out int supportPx)
-    {
-        _supportChain.Clear();
-        int x = tx, y = ty, z = tz;
-        var id = species.WoodId;
-        var state = tstate;
-        supportPx = WoodState.DiameterPx(state);
-
-        for (var step = 0; step < SimulationConfig.TreeFellWoodCap; step++)
-        {
-            var cellKey = TreeCellKey.Pack(x, y, z);
-            if (_tipSupport.TryGetValue(cellKey, out var known))
-            {
-                supportPx = known;
-                break;
-            }
-
-            _supportChain.Add(cellKey);
-            supportPx = WoodState.DiameterPx(state);
-            if (WoodState.IsRoot(state) || !WoodState.HasParentCell(state)) break;
-
-            var dir = WoodState.Parent(state);
-            var px = x + TreeDirections.Dx[dir];
-            var py = y + TreeDirections.Dy[dir];
-            var pz = z + TreeDirections.Dz[dir];
-            if (!TryGetCell(px, py, pz, out var pid, out var pstate)) return false;
-            if (!TreeSupport.Links(id, state, pid, pstate, dir)) break;
-
-            (x, y, z, id, state) = (px, py, pz, pid, pstate);
-        }
-
-        foreach (var walked in _supportChain) _tipSupport[walked] = supportPx;
-        return true;
     }
 
     /// <summary>
@@ -538,24 +348,7 @@ public class LeafDecayManager
     {
         if (!WoodState.HasParentCell(state) || WoodState.IsDetached(state)) return;
 
-        if (!_unsupported.Contains(TreeCellKey.Pack(x, y, z)))
-        {
-            var chain = WalkParentChain(x, y, z, id, state);
-            if (chain != TreeSupportResult.Unsupported) return;
-
-            // The chain broke: only the full search can tell a held cell from an orphan
-            var result = _support.Search(_read, x, y, z, hasExcluded: false, 0, 0, 0,
-                unloadedIsUnknown: true, knownSupported: _supported);
-            if (result == TreeSupportResult.Unknown) return;
-            if (result == TreeSupportResult.Supported)
-            {
-                // Every visited cell is linked to this one, so it reaches the same anchor
-                foreach (var visited in _support.VisitedKeys) _supported.Add(visited);
-                return;
-            }
-
-            foreach (var c in _support.Component) _unsupported.Add(TreeCellKey.Pack(c.X, c.Y, c.Z));
-        }
+        if (!_orphans.IsOrphaned(x, y, z, id, state)) return;
 
         if (_removalsThisTick >= SimulationConfig.LeafDecayMaxRemovalsPerTick)
         {
@@ -567,50 +360,6 @@ public class LeafDecayManager
     }
 
     /// <summary>
-    /// The fast half of the orphan test: follows the cell's parent chain while every step links
-    /// (<see cref="TreeSupport.Links"/>). <see cref="TreeSupportResult.Supported"/> when it reaches
-    /// an anchor or a cell already known anchored this frame (every walked cell is then memoized
-    /// as anchored, since it reaches the same anchor), <see cref="TreeSupportResult.Unknown"/>
-    /// when a read hit an unloaded chunk, and <see cref="TreeSupportResult.Unsupported"/> when the
-    /// chain broke or ran past the cap, which only means the full search has to decide.
-    /// </summary>
-    private TreeSupportResult WalkParentChain(int x, int y, int z, byte id, byte state)
-    {
-        _chain.Clear();
-        for (var step = 0; step < SimulationConfig.TreeFellWoodCap; step++)
-        {
-            var cellKey = TreeCellKey.Pack(x, y, z);
-            _chain.Add(cellKey);
-
-            var anchored = WoodState.IsRoot(state) || _supported.Contains(cellKey);
-            if (!anchored && WoodState.IsShell(state))
-            {
-                if (!TryGetCell(x, y - 1, z, out var belowId, out _)) return TreeSupportResult.Unknown;
-                anchored = TreeSupport.IsAnchor(state, belowId);
-            }
-
-            if (anchored)
-            {
-                foreach (var walked in _chain) _supported.Add(walked);
-                return TreeSupportResult.Supported;
-            }
-
-            if (!WoodState.HasParentCell(state)) return TreeSupportResult.Unsupported;
-
-            var dir = WoodState.Parent(state);
-            var px = x + TreeDirections.Dx[dir];
-            var py = y + TreeDirections.Dy[dir];
-            var pz = z + TreeDirections.Dz[dir];
-            if (!TryGetCell(px, py, pz, out var pid, out var pstate)) return TreeSupportResult.Unknown;
-            if (!TreeSupport.Links(id, state, pid, pstate, dir)) return TreeSupportResult.Unsupported;
-
-            (x, y, z, id, state) = (px, py, pz, pid, pstate);
-        }
-
-        return TreeSupportResult.Unsupported;
-    }
-
-    /// <summary>
     /// Turns a decayed leaf or an orphaned wood cell into air: remeshes, rolls its loot and
     /// reaches the far LOD. A leaf shakes a few leaves loose; a wood cell schedules its reach
     /// box, which covers the removed tip's leaves, a parent that turned into a tip and the
@@ -618,7 +367,7 @@ public class LeafDecayManager
     /// </summary>
     private void Remove(int x, int y, int z, byte id, byte state)
     {
-        Write(x, y, z, 0, 0, remesh: true);
+        _cells.Write(x, y, z, 0, 0, remesh: true);
         _removalsThisTick++;
 
         _chunks.UnmarkPlayerPlaced(x, y, z);
@@ -626,7 +375,7 @@ public class LeafDecayManager
         _drops.SpawnLoot(id, cell, state: state);
         PopUnsupportedAround(cell);
 
-        if (TreeGenerator.IsTreeBlock(id)) _editedColumns.Add(Pack(x, 0, z));
+        if (TreeGenerator.IsTreeBlock(id)) _editedColumns.Add(LeafDecayCells.Pack(x, 0, z));
 
         // A leaf feeds nothing: no other leaf's hydration and no wood's support reads it, so a
         // decayed leaf schedules nothing. A reach box per decayed leaf would flood the backlog
@@ -652,110 +401,14 @@ public class LeafDecayManager
         {
             var cell = holder + Chunk.CubeFaces[face].normal;
             int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
-            if (!TryGetCell(x, y, z, out var id, out var state) || id == 0) continue;
+            if (!_cells.TryGetCell(x, y, z, out var id, out var state) || id == 0) continue;
             if (!BlockSupport.IsHeldUpBy(id, state, cell, holder)) continue;
 
-            Write(x, y, z, 0, 0, remesh: true);
+            _cells.Write(x, y, z, 0, 0, remesh: true);
             _chunks.UnmarkPlayerPlaced(x, y, z);
             _chunks.MarkAreaDirty(cell, cell + Vector3.One, LightingConfig.LightPropagationRadius);
             _drops.SpawnLoot(id, cell,
                 DropManager.PileCount(id, x, z, state), DropManager.PileSecondary(id, x, z, state), state);
         }
     }
-
-    /// <summary>
-    /// Writes a cell's id and state through the frame's chunk cache. A hydration rewrite passes
-    /// <paramref name="remesh"/> false: the mesher never reads <see cref="LeafState"/>, so
-    /// nothing visible changes. A removal queues only the cell's own chunk and the chunks across
-    /// a border it touches, never the light radius: leaves and tree wood both pass light, cast
-    /// no ambient occlusion and occlude nothing, so taking one out changes no other cell's light.
-    /// </summary>
-    private void Write(int x, int y, int z, byte id, byte state, bool remesh)
-    {
-        if (!TryGetChunk(x, y, z, out var chunk)) return;
-
-        chunk!.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, state);
-        if (remesh) AddTouchedChunks(x, y, z, _dirtyChunks);
-    }
-
-    /// <summary>
-    /// The loaded chunk owning a cell, through the frame's direct-mapped cache; the miss path
-    /// goes through <see cref="ChunkManager.ChunkAt"/>, so a chunk without ready block data
-    /// reads as unloaded.
-    /// </summary>
-    private bool TryGetChunk(int x, int y, int z, out Chunk? chunk)
-    {
-        var key = Pack(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
-        var slot = (int)((key ^ (key >> 32)) & ChunkCacheMask);
-
-        if (_chunkCacheKeys[slot] != key)
-        {
-            _chunkCacheKeys[slot] = key;
-            chunk = _chunks.ChunkAt(x, y, z);
-            _chunkCache[slot] = chunk;
-        }
-        else
-        {
-            chunk = _chunkCache[slot];
-        }
-
-        return chunk != null;
-    }
-
-    /// <summary>
-    /// Reads a world cell's block id and state through the frame's chunk cache. False means the
-    /// chunk is not loaded, and an unloaded cell must never read as air.
-    /// </summary>
-    private bool TryGetCell(int x, int y, int z, out byte id, out byte state)
-    {
-        if (!TryGetChunk(x, y, z, out var chunk))
-        {
-            id = 0;
-            state = 0;
-            return false;
-        }
-
-        var lx = x & Chunk.SizeMask;
-        var ly = y & Chunk.SizeMask;
-        var lz = z & Chunk.SizeMask;
-        id = chunk!.GetLocalBlock(lx, ly, lz);
-        state = chunk.GetLocalState(lx, ly, lz);
-        return true;
-    }
-
-    /// <summary>Adds the chunk owning a cell, plus the face-adjacent chunk on every axis where
-    /// the cell sits on a chunk border, to <paramref name="into"/> as packed chunk keys.</summary>
-    private static void AddTouchedChunks(int x, int y, int z, HashSet<long> into)
-    {
-        var cx = x >> Chunk.SizeShift;
-        var cy = y >> Chunk.SizeShift;
-        var cz = z >> Chunk.SizeShift;
-        into.Add(Pack(cx, cy, cz));
-
-        var lx = x & Chunk.SizeMask;
-        var ly = y & Chunk.SizeMask;
-        var lz = z & Chunk.SizeMask;
-
-        if (lx == 0) into.Add(Pack(cx - 1, cy, cz));
-        else if (lx == Chunk.SizeMask) into.Add(Pack(cx + 1, cy, cz));
-
-        if (ly == 0) into.Add(Pack(cx, cy - 1, cz));
-        else if (ly == Chunk.SizeMask) into.Add(Pack(cx, cy + 1, cz));
-
-        if (lz == 0) into.Add(Pack(cx, cy, cz - 1));
-        else if (lz == Chunk.SizeMask) into.Add(Pack(cx, cy, cz + 1));
-    }
-
-    private static long Pack(int x, int y, int z) =>
-        ((x & PackMask) << (2 * PackBits)) | ((y & PackMask) << PackBits) | (z & PackMask);
-
-    private static void Unpack(long key, out int x, out int y, out int z)
-    {
-        x = SignExtend((int)((key >> (2 * PackBits)) & PackMask));
-        y = SignExtend((int)((key >> PackBits) & PackMask));
-        z = SignExtend((int)(key & PackMask));
-    }
-
-    // A packed axis keeps only the low PackBits, so its sign bit has to be pushed back up
-    private static int SignExtend(int value) => (value << (32 - PackBits)) >> (32 - PackBits);
 }

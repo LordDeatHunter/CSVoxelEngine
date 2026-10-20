@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Features;

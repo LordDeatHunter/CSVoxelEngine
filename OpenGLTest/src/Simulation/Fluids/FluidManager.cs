@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Lod;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.LeafDecay;
 
 namespace VoxelEngine.Simulation.Fluids;
 

@@ -11,7 +11,7 @@ namespace VoxelEngine.WorldGen.Trees;
 /// shells' parent chains toward the core are cut; anchors are root cells and shells standing on
 /// real ground (<see cref="IsGround"/>: solid, not tree wood, not leaves). A wide trunk therefore
 /// falls only once a whole slice is cut. Shared by felling (<see cref="TopplingTree.Collect"/>)
-/// and the orphan crumble (<c>LeafDecayManager</c>), so the two can never disagree.
+/// and the orphan crumble (<c>OrphanWoodCheck</c>), so the two can never disagree.
 /// <para>
 /// GL-free reusable scratch with one owner: main thread only, not thread-safe. A search is an
 /// iterative depth-first walk that tries Down first, then the cell's own parent direction, then

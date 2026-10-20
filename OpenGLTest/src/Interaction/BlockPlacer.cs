@@ -10,6 +10,7 @@ using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;

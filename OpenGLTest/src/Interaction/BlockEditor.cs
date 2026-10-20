@@ -11,6 +11,7 @@ using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 

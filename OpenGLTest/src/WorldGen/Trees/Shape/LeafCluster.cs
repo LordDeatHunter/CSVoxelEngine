@@ -15,7 +15,7 @@ namespace VoxelEngine.WorldGen.Trees.Shape;
 /// <see cref="TreeSpecies.LeafHydration"/> minus the Manhattan <see cref="Distance"/> to the
 /// nearest live tip whose cluster shape contains the cell; a leaf is emitted only while that is at
 /// least 1, and 0 would decay. The radius changes shape membership only, never that number.
-/// Phase 5's <c>LeafDecayManager</c> re-derives the same number on world cells through
+/// Phase 5's leaf decay (<c>TipHydration</c>) re-derives the same number on world cells through
 /// <see cref="HydrationFromTip(TreeSpecies, int, int, int, int)"/>, the one per-tip formula this
 /// rule is built from.
 /// </summary>
@@ -109,7 +109,7 @@ public static class LeafCluster
     /// <summary>
     /// <see cref="HydrationFromTip(TreeSpecies, int, int, int, int)"/> at the species' full
     /// <see cref="TreeSpecies.LeafRadius"/>: the largest cluster any tree of the species wears,
-    /// which is what <c>LeafDecayManager.TipOffsets</c> precomputes. Because shapes are nested, a
+    /// which is what <c>TipHydration.TipOffsets</c> precomputes. Because shapes are nested, a
     /// smaller tree's cluster is a subset of it with the same hydration on every shared offset.
     /// </summary>
     public static int HydrationFromTip(TreeSpecies species, int dx, int dy, int dz)
