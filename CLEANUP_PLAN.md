@@ -54,7 +54,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
   `~/.dotnet/dotnet.exe` is a 9.0.100 SDK and fails with CS0079/CS0131/CS0411.
   - Build: `DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release --no-incremental`
   - Test: `DOTNET_ROLL_FORWARD=LatestMajor dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release --no-build`
-  - Baseline: 0 warnings, 2441 tests (last full run: 2440 passed, 1 known flaky `StopJoinsTheLodGenThreads` that passed on class re-run).
+  - Baseline: 0 warnings, 2441 tests (last full run: 2440 passed, 1 failed: known flaky `MeshingTests.MissingFaceNeighborAbandonsTheBuild`, which passed on class re-run 49/49).
 - **Known flaky tests.** Re-run a failure alone, by class filter, before treating it as real
   (the workflow's verifier reads this list):
   - `GenerationalCacheTests.EveryKeyAlwaysReturnsItsOwnValueUnderFourThreads`
@@ -94,6 +94,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `fc2ffb2` | Split Camera.cs (1,175 -> 731 lines, stated reason recorded) into HeadMotion, ShoulderRig, ModeToggles, ViewProjectionCache, SpawnOverrides and CameraMode; Camera stays the facade with forwards |
 | `78635e3` | Moved World's per-frame mob job (target list, slime/goblin updates and damage billing, PushFromBlast, RefreshMobs/SpawnEntity/DamageAllMobs bodies) into Simulation/MobDirector.cs with forwarders on World; World.cs 1,149 -> 1,015 lines |
 | `9dea99b` | Split FluidManager (1,066 -> 262 lines) into Simulation/Fluids/: FluidSchedule, FluidCells, FluidCellKey, FluidNeighborhood, FluidSpread, FluidMud, FluidWakeScanner, FluidWakeRules, with FluidFlow and FluidState moved alongside; Simulation/ 22 -> 19 files |
+| `452b2dd` | Split LodManager.cs (932 -> 314 lines) into LodRegionSet, LodCoverPass, LodRegionClaims and LodWorkerPool, with LodBuildOutcome moved to its own file; LodManager keeps the frame orchestration and forwards its public surface and test seams |
 
 ## In progress
 
@@ -113,7 +114,7 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 | `src/Player/Camera.cs` | 731 | Split in `fc2ffb2` (HeadMotion 136, ShoulderRig 196, ModeToggles 86, ViewProjectionCache 82, SpawnOverrides 98, CameraMode 9); AGENTS.md records a stated reason. Misses the ~700 target because the XML docs kept on the forwards take more lines than planned. Optional: move `PushOutOf`'s body (about 45 lines) verbatim into a small `Player/` helper (not `PlayerPhysics`) with a one-line forward, then update the AGENTS.md wording ('about 730 lines'). |
 | `src/World.cs` | 1,015 | Has a stated reason. Mob frame job moved to `Simulation/MobDirector.cs` (208) in `78635e3`. Next extraction: the fire-cell gathering that `Update` and `UpdateClient` both build. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
-| `src/Lod/LodManager.cs` | 932 | No stated reason; split it next. Its `LodBuildOutcome` enum is still inside it. |
+| `src/Lod/LodManager.cs` | 314 | Split in `452b2dd` (LodRegionSet 174, LodCoverPass 164, LodRegionClaims 278, LodWorkerPool 144, LodBuildOutcome 12); `Lod/` now holds 14 files. Nothing remains. `LodMeshBuilder.cs` (650) is the largest file left in `Lod/`. Test files: LodManagerTests 788, LodBuildPoolTests 426; AGENTS.md 4,069 lines. |
 | `src/UI/InventoryPanel/Inventory.cs` | 896 | |
 | `src/WorldGen/TerrainGenerator.cs` | 877 | |
 | `src/WorldGen/TreeGenerator.cs` | 845 | |
@@ -166,6 +167,10 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `BlockLoader.LoadBlocks` (`Blocks/BlockLoader.cs`, 569 lines) is still a single ~370-line method; a candidate for a later early-return and extract-method step.
 - `Chunk.cs` has a CS1574 doc-build warning for an `EmitGreedyFaces` cref. It predates the ContentRegistry split; retarget the cref to `ChunkMesher`.
 - ContentRegistry split line counts: ContentRegistry 475, ContentFiles 56, EntityLoader 62, ItemLoader 339, TagLoader 65, TreeSpeciesLoader 72, Blocks/BlockLoader 569, Blocks/BlockSchemaParser 349, Models/ModelBakeSteps 219, Loot/LootTableCompiler 100, Recipes/RecipeLoader 204.
+- `LodManager.cs` has plain-text comments (not crefs) that still name state now held in the components: line 73 says `_completedMeshes` (now in `LodRegionClaims`), lines 211-212 say `_regionSetVersion` / `IsCoveredByChunks` (now in `LodRegionSet` / `LodCoverPass`) and line 245 says `_queued` (now in `LodRegionClaims`). They were moved verbatim on purpose; a doc tidy-up could name the owning component in each.
+- The CS1574 cref warning on Interlocked `Read(ref long)` in `CompletedBuildCount`'s doc predates the LodManager split and moved to `LodRegionClaims.cs`. Retargeting it to `System.Threading.Interlocked.Read(ref long)` removes a doc-build warning.
+- The stale-neighbor-slots bug (behind the flaky `MeshingTests.MissingFaceNeighborAbandonsTheBuild`) is still open; a cleanup run must not fix it.
+- Next extraction: the remaining offenders in Code organization (`World.cs`, `Program.cs`, `Chunk.cs`, `Camera.cs`), in plan order.
 - Section headers attached to the first member below them kept their old titles in their new config classes: `// --- Lighting ---` above `DayLengthSeconds` in `SkyConfig`, `// --- Ambience ---` in `AudioConfig` and `// --- GPU timer queries ---` in `PostProcessConfig`. Retitle them to match the class they now head.
 - Judgment-call config placements could be revisited (a pure call-site rewrite): `TonemapExposure` and `EyeAdapt*` in `LightingConfig` rather than `PostProcessConfig`; `SelectionOutline`/`SelectionPulse` in `HudConfig`; the `Steam*` lava-hardening knobs in `JuiceConfig` while `SpringSteam*` is in `ParticleConfig`.
 - git sees `WorldGenerationConfig.cs` as a rename (now `src/Config/`) plus a heavy rewrite; blame for the moved members needs `git blame -C -C`.
