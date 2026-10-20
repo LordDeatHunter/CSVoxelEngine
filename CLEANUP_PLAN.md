@@ -100,6 +100,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `5318705` | Moved the fire-cell list and its gathering from World into AmbientEffects: GatherStationFires (both update paths) and AddGoblinTorches (full Update only), with World.FireCells forwarding to it; World.cs 1016 -> 1002 lines |
 | `efbadf6` | Split TerrainGenerator.cs (877 -> 461 lines): the 28 noise channels and Reseed/MakeNoise moved to TerrainNoise, the biome climate split to BiomeClassifier, the lakes, rivers and water levels to WaterBodies; TerrainGenerator keeps the palette, LandHeight, Compute and Climate, plus one-line forwards for its public queries |
 | `bc5a336` | Split TreeGenerator.cs (845 -> 269 lines): the solo shapes and cell batches moved to TreeBatches (263), Stamp/TryLocal/StampRoots to TreeStamper (135), the far-LOD canopy caches, CanopyDisturbed markers and their export/import to TreeCanopy (265), with one-line forwards on TreeGenerator; WorldGen/ holds 21 files |
+| `4b0aa80` | Split LeafDecayManager.cs (761 -> 413 lines) into Simulation/LeafDecay/: the chunk cache, TryGetCell/Write, the dirty-chunk batch and the 21-bit packer moved to LeafDecayCells (149), the parent-chain walk, TreeSupport search and support memos to OrphanWoodCheck (104, TickWood's support block now IsOrphaned), the tip offset tables, TryHydrationAt, IsLiveTip and TryTipSupport to TipHydration (178); LeafDecayManager keeps the schedule, tick and removal as the composition root; Simulation/ root holds 18 files |
 
 ## In progress
 
@@ -109,7 +110,7 @@ Nothing is in progress. The next task is the first entry of "Still to do".
 
 ### 1. God classes (one workflow run each)
 
-Line counts as of `f01c883` (Program.cs is done: 628 lines after `3d45be4`; App/ files: AppScreen 4, ChatInput 149, DevDiagnostics 91, GameplayInput 297, InputEvents 227, InventoryPanelInput 485, MenuInput 175; Networking/Client/ClientSession 558). Every task text follows the Program one above: map the jobs, move
+`src/Simulation/LeafDecay/LeafDecayManager.cs` is done (413 lines after `4b0aa80`; nothing remains). Line counts as of `f01c883` (Program.cs is done: 628 lines after `3d45be4`; App/ files: AppScreen 4, ChatInput 149, DevDiagnostics 91, GameplayInput 297, InputEvents 227, InventoryPanelInput 485, MenuInput 175; Networking/Client/ClientSession 558). Every task text follows the Program one above: map the jobs, move
 verbatim, use a composition root, list the GL, order and threading invariants that apply, and
 update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshing/` 10.
 
@@ -121,7 +122,6 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 | `src/Lod/LodManager.cs` | 314 | Split in `452b2dd` (LodRegionSet 174, LodCoverPass 164, LodRegionClaims 278, LodWorkerPool 144, LodBuildOutcome 12); `Lod/` now holds 14 files. Nothing remains. `LodMeshBuilder.cs` (650) is the largest file left in `Lod/`. Test files: LodManagerTests 788, LodBuildPoolTests 426; AGENTS.md 4,069 lines. |
 | `src/WorldGen/TreeGenerator.cs` | 269 | Split in `bc5a336` (TreeBatches 263, TreeStamper 135, TreeCanopy 265). |
 | `src/Rendering/Overlays/UIRenderer.cs` | 802 | Has a stated reason (shared primitives the ItemDebugger and tests bind to). |
-| `src/Simulation/LeafDecayManager.cs` | 760 | |
 | `src/Player/PlayerPhysics.cs` | 708 | |
 | ItemDebugger `ItemDebuggerUi.cs` / `ItemDebuggerProgram.cs` | 669 / 665 | Borderline. |
 | Test files over 700 (GameServerTests 1,266, LodManagerTests, TreeGrowthTests, TreeGrowerTests, GeometryAllocatorTests, MeshingTests, PlayerModelTests, LeafDecayTests) | | Lower priority. The rule targets classes; split by rule area if done. |
@@ -258,6 +258,13 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `TreeBatches` and `TreeBatch` are near-namesakes; a rename (for example `TreeBatches` to `TreeShapeCaches`) would help, with matching AGENTS.md updates.
 - `PERF_TODO.md` has an unqualified `BuildCanopyTops` mention near line 681, left as a historical note.
 - The commit step of the TreeGenerator run failed on a network error after the code commit landed; this entry was added by hand.
+
+- LeafDecayManager split line counts: Simulation/LeafDecay/LeafDecayManager 413, LeafDecayCells 149, OrphanWoodCheck 104, TipHydration 178; `Simulation/` holds 18 files; AGENTS.md 4,093 lines, code-cleanup SKILL.md 139, edit-path-checklist SKILL.md 31.
+- Restore the final CRLF on `Simulation/LeafDecay/LeafDecayManager.cs` if the commit step did not (it currently ends in `}` with no newline).
+- Duplication run: `LeafDecayCells`' 21-bit Pack/Unpack/SignExtend packer, `AddTouchedChunks` and the 16-slot direct-mapped chunk cache are verbatim twins of `Simulation/Fluids/FluidCellKey` + `FluidCells` (and overlap `Chunks/ChunkKey`); fold them into one shared helper.
+- `TREES_PLAN.md` (historical) still names `LeafDecayManager.TipOffsets`/`TryTipSupport` and bare `WalkParentChain` (lines ~423, 534-538); now `TipHydration.*` and `OrphanWoodCheck.WalkParentChain`. Leave it, or annotate it if the plan is ever revived.
+- `TipHydration.TryTipSupport`'s doc crefs the private `OrphanWoodCheck.WalkParentChain`. The doc build accepted it, but a `<c>` span would be more robust if CS1574 ever appears.
+- The doc build shows pre-existing CS1573 param-tag warnings in `Simulation/TreeGrowthWriter.cs` (not introduced by the split); a doc-comment pass could fill in the missing `<param>` tags.
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
