@@ -59,7 +59,7 @@ public static class MainMenuLayout
         return screenSize.Y * 0.5f - total * 0.5f - 80f;
     }
 
-    public static float ListTop(Vector2 screenSize) => PanelTop;
+    public static float ListTop() => PanelTop;
 
     public static float ListHeight(Vector2 screenSize) => screenSize.Y - PanelTop - ListBottomMargin;
 
@@ -71,8 +71,8 @@ public static class MainMenuLayout
     public static (int First, int EndExclusive) VisibleRows(float offset, int rowCount, Vector2 screenSize) =>
         ScrollList.VisibleRange(offset, RowHeight, rowCount, ListHeight(screenSize));
 
-    public static float RowTop(int row, float offset, Vector2 screenSize) =>
-        ListTop(screenSize) + ScrollList.RowTop(row, offset, RowHeight);
+    public static float RowTop(int row, float offset) =>
+        ListTop() + ScrollList.RowTop(row, offset, RowHeight);
 
     public static Vector2 RowButtonSize => new(RowButtonWidth, RowButtonHeight);
 
@@ -91,7 +91,7 @@ public static class MainMenuLayout
     {
         var x = PanelLeft(screenSize) + PanelWidth - RowPad
                 - (buttonCount - 1 - which) * (RowButtonWidth + RowButtonGap) - RowButtonWidth * 0.5f;
-        return new Vector2(x, RowTop(row, offset, screenSize) + RowHeight * 0.5f);
+        return new Vector2(x, RowTop(row, offset) + RowHeight * 0.5f);
     }
 
     /// <summary>Left edge of a row's name and seed lines.</summary>
@@ -101,7 +101,7 @@ public static class MainMenuLayout
     /// Widest a row's name line may be (the FitText bound): the panel minus the pads and the
     /// three buttons with their gaps, so a long name never runs under PLAY.
     /// </summary>
-    public static float NameMaxWidth(Vector2 screenSize) =>
+    public static float NameMaxWidth() =>
         PanelWidth - 3f * RowPad - 3f * RowButtonWidth - 2f * RowButtonGap;
 
     /// <summary>The list row under <paramref name="point"/>, or null outside the panel or past the last row.</summary>
@@ -109,14 +109,14 @@ public static class MainMenuLayout
     {
         var left = PanelLeft(screenSize);
         if (point.X < left || point.X > left + PanelWidth) return null;
-        return ScrollList.RowAt(point.Y - ListTop(screenSize), offset, RowHeight, rowCount, ListHeight(screenSize));
+        return ScrollList.RowAt(point.Y - ListTop(), offset, RowHeight, rowCount, ListHeight(screenSize));
     }
 
     /// <summary>Whether <paramref name="point"/> is over the worlds list's viewport (the wheel target).</summary>
     public static bool IsOverList(Vector2 point, Vector2 screenSize)
     {
         var left = PanelLeft(screenSize);
-        var top = ListTop(screenSize);
+        var top = ListTop();
         return point.X >= left && point.X <= left + PanelWidth
             && point.Y >= top && point.Y < top + ListHeight(screenSize);
     }
@@ -150,7 +150,7 @@ public static class MainMenuLayout
     /// <summary>Top of the notice line, between the list bottom and the bottom buttons.</summary>
     public static float NoticeTop(Vector2 screenSize)
     {
-        var listBottom = ListTop(screenSize) + ListHeight(screenSize);
+        var listBottom = ListTop() + ListHeight(screenSize);
         var buttonTop = BottomButtonCenter(screenSize, 0).Y - PauseMenuLayout.ButtonHeight * 0.5f;
         return listBottom + (buttonTop - listBottom) * 0.25f;
     }

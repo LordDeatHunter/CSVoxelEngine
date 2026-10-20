@@ -1,4 +1,3 @@
-using System;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 
@@ -13,9 +12,7 @@ namespace VoxelEngine.WorldGen.Features;
 /// </summary>
 public static class FoliageGenerator
 {
-    private const int GrassPatchSalt = 0x0F011A;
     private const int GrassDensitySalt = 0x0F011B;
-    private const int ShrubPatchSalt = 0x0F011C;
     private const int ShrubDensitySalt = 0x0F011D;
 
     private static FastNoiseLite GrassPatchNoise;

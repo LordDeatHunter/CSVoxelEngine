@@ -33,7 +33,7 @@ public class LeafParticle
         get
         {
             var fadeIn = MathUtils.Clamp01(_age / FadeInSeconds);
-            var fadeOut = 1f;
+            float fadeOut;
             if (IsLanded)
                 fadeOut = 1f - MathUtils.Clamp01(_landAge / ParticleConfig.LeafParticleFadeSeconds);
             else

@@ -35,12 +35,11 @@ public class Chunk : IDisposable
     // computed over a wider volume centered on this chunk: a lamp just across the
     // border must still light this chunk's faces. The 3x3x3 neighbor chunks cover it
     // (LightBorder < Size). A padded-snapshot index (px,py,pz) maps to light index
-    // (px+LightOffset, py+LightOffset, pz+LightOffset).
+    // (px+LightBorder-1, py+LightBorder-1, pz+LightBorder-1).
     internal const int LightBorder = LightingConfig.LightPropagationRadius;
     internal const int LightSize = Size + LightBorder * 2;
     internal const int LightSq = LightSize * LightSize;
     internal const int LightCount = LightSize * LightSq;
-    internal const int LightOffset = LightBorder - 1;
 
     // Tile layout lives on TextureAtlas (set once when the atlas is stitched at startup);
     // meshing only reads it, so background mesh threads need no synchronization.
@@ -195,7 +194,7 @@ public class Chunk : IDisposable
     public bool ModifiedSinceSave { get; private set; }
 
     /// <summary>
-    /// Whether this chunk's blocks came from a snapshot (<see cref="RestoreFrom"/>) — a save, or
+    /// Whether this chunk's blocks came from a snapshot (<see cref="RestoreFrom(ChunkSnapshot)"/>) — a save, or
     /// a world source that supplies chunks itself (<see cref="IWorldSource.Supplies"/>) — instead
     /// of worldgen. A restored chunk can hold fluid anywhere (poured water, or an imported map's),
     /// which is what makes the fluid wake scan its borders whatever height it sits at, and its
@@ -207,7 +206,7 @@ public class Chunk : IDisposable
     /// <summary>
     /// The player-placed cells (chunk-local <see cref="Idx"/> indices) a restored chunk brought
     /// back that the chunk manager has not yet adopted into its own player-placed set, or null.
-    /// Set by <see cref="RestoreFrom"/> on the generation worker, cleared on the main thread
+    /// Set by <see cref="RestoreFrom(ChunkSnapshot)"/> on the generation worker, cleared on the main thread
     /// once adopted.
     /// </summary>
     internal ushort[]? RestoredPlayerPlaced { get; set; }

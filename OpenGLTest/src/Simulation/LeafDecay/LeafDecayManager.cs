@@ -24,7 +24,7 @@ namespace VoxelEngine.Simulation.LeafDecay;
 /// species' leaf radius.
 ///
 /// <para><b>Hydration.</b> A scheduled, non-persistent leaf re-derives its hydration with the
-/// exact rule worldgen stamped it with: the best <see cref="LeafCluster.HydrationFromTip"/> over
+/// exact rule worldgen stamped it with: the best <see cref="LeafCluster.HydrationFromTip(TreeSpecies, int, int, int, int)"/> over
 /// every live tip of its species whose cluster shape holds the cell, capped at
 /// <see cref="LeafState.MaxHydration"/>. The cluster's radius follows the tree's support
 /// (<see cref="LeafCluster.ClusterRadius(TreeSpecies, int)"/>): the world re-derives it as the
@@ -112,7 +112,6 @@ public class LeafDecayManager
     // Set by Update before the ticks run
     private ChunkManager _chunks = null!;
     private DropManager _drops = null!;
-    private LodManager? _lod;
     private LeafParticleSystem? _leaves;
 
     // The components: cell access for the frame, the orphaned-wood test and the leaf hydration rule
@@ -204,7 +203,6 @@ public class LeafDecayManager
 
         _chunks = chunks;
         _drops = drops;
-        _lod = lod;
         _leaves = leaves;
 
         _cells.BeginFrame(chunks);
@@ -408,7 +406,7 @@ public class LeafDecayManager
             _chunks.UnmarkPlayerPlaced(x, y, z);
             _chunks.MarkAreaDirty(cell, cell + Vector3.One, LightingConfig.LightPropagationRadius);
             _drops.SpawnLoot(id, cell,
-                DropManager.PileCount(id, x, z, state), DropManager.PileSecondary(id, x, z, state), state);
+                DropManager.PileCount(id, state), DropManager.PileSecondary(id, state), state);
         }
     }
 }

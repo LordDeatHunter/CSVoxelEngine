@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using VoxelEngine.Chunks.Meshing;
-using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;

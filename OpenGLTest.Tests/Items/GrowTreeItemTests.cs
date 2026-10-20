@@ -15,8 +15,6 @@ public sealed class GrowTreeItemTests
 {
     public GrowTreeItemTests() => TestContent.EnsureLoaded();
 
-    private static byte Ash => ContentRegistry.RequireItem("ash").Id;
-
     [Fact]
     public void AshGrowsTheAimedTreeAndSpendsOne()
     {

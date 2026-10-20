@@ -9,7 +9,7 @@ namespace VoxelEngine.Tests.Chunks.Meshing;
 
 /// <summary>
 /// A MEASUREMENT HARNESS for the chunk mesh build, not a regression guard. It prints the mean
-/// cost of one greedy <see cref="Chunk.GenerateMeshData(ChunkManager, bool)"/> over a fixed
+/// cost of one greedy <see cref="Chunk.GenerateMeshData(ChunkManager)"/> over a fixed
 /// random soup of cubes and lamps, so a change to the light propagation or the mesher (the
 /// colored block light of SH-26) can report its before/after cost on the same scene.
 ///

@@ -83,7 +83,7 @@ public static class InventoryPanelLayout
     public static float ClampedOffset(float offset, int rowCount, Vector2 screen) =>
         ScrollList.Clamp(offset, ContentHeight(rowCount), ListHeight(screen));
 
-    public static float RowCenterY(int row, float offset, Vector2 screen) =>
+    public static float RowCenterY(int row, float offset) =>
         ListTop + ScrollList.RowTop(row, offset, RowHeight) + RowHeight * 0.5f;
 
     /// <summary>Left edge of the search field box.</summary>
@@ -126,7 +126,7 @@ public static class InventoryPanelLayout
         new(RowRight(screen, rowCount) - 6f
             - (CatalogButtonCount - 1 - which) * (CatalogButtonWidth + CatalogButtonGap)
             - CatalogButtonWidth * 0.5f,
-            RowCenterY(row, offset, screen));
+            RowCenterY(row, offset));
 
     /// <summary>The button of the catalog row it names under a canvas point, if any.</summary>
     public static CatalogButton? CatalogButtonAt(Vector2 point, int row, float offset, int rowCount, Vector2 screen)

@@ -1,4 +1,3 @@
-using System;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Items;

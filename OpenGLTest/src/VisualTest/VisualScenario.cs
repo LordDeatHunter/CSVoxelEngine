@@ -68,13 +68,6 @@ public sealed class VisualStep
 /// </summary>
 public sealed class VisualScenario
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        ReadCommentHandling = JsonCommentHandling.Skip,
-        AllowTrailingCommas = true,
-    };
-
     public string Name { get; }
     public string OutputDir { get; }
     public IReadOnlyList<VisualStep> Steps { get; }

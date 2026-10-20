@@ -61,7 +61,7 @@ public sealed class HotbarPickupPop
         }
     }
 
-    /// <summary>Starts <paramref name="slot">'s flash: the tool it held just broke. Independent of
+    /// <summary>Starts <paramref name="slot"/>'s flash: the tool it held just broke. Independent of
     /// the count pop, so it shows on a slot that is now empty.</summary>
     public void Flash(int slot)
     {

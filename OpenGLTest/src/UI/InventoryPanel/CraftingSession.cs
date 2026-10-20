@@ -157,7 +157,7 @@ public sealed class CraftingSession
             var need = NeedAt(i);
             var fed = FedAt(i);
             if (fed.Count >= need) continue;
-            var name = FedName(i, inventory);
+            var name = FedName(i);
             var owned = OwnedFor(i, inventory);
             if (owned < need)
                 return $"Need {need - owned} more {name} ({owned}/{need} on hand)";
@@ -216,7 +216,7 @@ public sealed class CraftingSession
         return total;
     }
 
-    private string FedName(int index, Inventory inventory)
+    private string FedName(int index)
     {
         if (Recipe == null) return "ingredient";
         var ingredient = Recipe.Ingredients[index];

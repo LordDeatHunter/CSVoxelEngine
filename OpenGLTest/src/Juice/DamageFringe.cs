@@ -1,4 +1,3 @@
-using System;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.Juice;

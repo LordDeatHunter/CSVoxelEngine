@@ -13,7 +13,6 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 /// </summary>
 public static class LavaGenerator
 {
-    private const int PatchSalt = 0x5A1A90;
     private const int PoolSalt = 0x5A1A91;
 
     private static FastNoiseLite PatchNoise;

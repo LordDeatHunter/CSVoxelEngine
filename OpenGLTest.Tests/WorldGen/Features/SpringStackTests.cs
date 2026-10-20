@@ -1,4 +1,3 @@
-using System;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;

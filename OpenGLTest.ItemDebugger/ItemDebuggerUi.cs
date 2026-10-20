@@ -248,7 +248,7 @@ public sealed class ItemDebuggerUi
                 DrawTitle(ui, editor, screen, status);
                 break;
         }
-        DrawControls(ui, screen);
+        DrawControls(ui);
     }
 
     private void BuildTabs(DebuggerTab tab)
@@ -628,11 +628,9 @@ public sealed class ItemDebuggerUi
         return (ui.CapHeightScale(cap), cap);
     }
 
-    private void DrawControls(UIRenderer ui, Vector2 screen)
+    private void DrawControls(UIRenderer ui)
     {
         var scale = ui.CapHeightScale(TextCap);
-        var left = screen.X - Pad - PanelWidth + Pad;
-        var right = screen.X - Pad - Pad;
 
         foreach (var (center, size, _, _, label, enabled, active) in _buttons)
         {

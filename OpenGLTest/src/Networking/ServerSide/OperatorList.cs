@@ -7,7 +7,7 @@ namespace VoxelEngine.Networking.ServerSide;
 
 /// <summary>
 /// The players a dedicated server lets be creative even while it does not allow creative for
-/// everyone (<see cref="GameServer.MayBeCreative"/>). GL-free and content-free.
+/// everyone (<c>GameServer.MayBeCreative</c>). GL-free and content-free.
 /// <para>
 /// Names are matched by their save slug (<see cref="WorldNames.Slug"/>), the same normalization
 /// that keys a player's save file, so "Alice", "alice" and "ALICE!" are one operator, exactly as

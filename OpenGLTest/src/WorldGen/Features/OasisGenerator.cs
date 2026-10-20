@@ -1,5 +1,3 @@
-using System;
-
 namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>

@@ -97,7 +97,7 @@ public static class StarField
     }
 
     /// <summary>
-    /// The chance cell (<paramref name="face"/>, <paramref name="x"/>, <paramref name="y"/>) holds
+    /// The chance cell (<c>face</c>, <paramref name="x"/>, <paramref name="y"/>) holds
     /// a star: <paramref name="density"/> scaled by the cell's relative solid angle at its center.
     /// </summary>
     public static float Probability(int x, int y, int cellsPerFace, float density) =>

@@ -43,7 +43,6 @@ public static class MultiblockPlacement
         Vector3 hitNormal, Vector3 viewForward, out Vector3 anchor, out int facing)
     {
         anchor = Vector3.Zero;
-        facing = -1;
 
         var normal = SnapToAxis(hitNormal);
         Vector3 screenUp;

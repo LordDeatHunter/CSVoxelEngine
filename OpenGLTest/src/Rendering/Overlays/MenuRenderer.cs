@@ -257,7 +257,7 @@ internal sealed class MenuRenderer
             MainMenuLayout.TitleTop(screen, MainMenuPage.Worlds), _ui.HeadScale, Rgba.White);
 
         var left = MainMenuLayout.PanelLeft(screen);
-        var top = MainMenuLayout.ListTop(screen);
+        var top = MainMenuLayout.ListTop();
         var listHeight = MainMenuLayout.ListHeight(screen);
         var panelCenter = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
         var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
@@ -276,7 +276,7 @@ internal sealed class MenuRenderer
             var offset = MainMenuLayout.ClampedOffset(view.ScrollOffset, count, screen);
             var (first, end) = MainMenuLayout.VisibleRows(offset, count, screen);
             var nameLeft = MainMenuLayout.NameLeft(screen);
-            var nameWidth = MainMenuLayout.NameMaxWidth(screen);
+            var nameWidth = MainMenuLayout.NameMaxWidth();
 
             // glScissor takes framebuffer pixels with a bottom-left origin, hence the conversion.
             // Only the row loop runs while it is enabled, and nothing returns from inside it.
@@ -289,7 +289,7 @@ internal sealed class MenuRenderer
                 for (var i = first; i < end; i++)
                 {
                     var world = view.Worlds[i];
-                    var rowTop = MainMenuLayout.RowTop(i, offset, screen);
+                    var rowTop = MainMenuLayout.RowTop(i, offset);
                     if (i > 0)
                         _ui.DrawRect(new Vector2(panelCenter.X, rowTop),
                             new Vector2(MainMenuLayout.PanelWidth - 2f * MainMenuLayout.RowPad, 1.5f),
@@ -329,7 +329,7 @@ internal sealed class MenuRenderer
             MainMenuLayout.TitleTop(screen, MainMenuPage.Multiplayer), _ui.HeadScale, Rgba.White);
 
         var left = MainMenuLayout.PanelLeft(screen);
-        var top = MainMenuLayout.ListTop(screen);
+        var top = MainMenuLayout.ListTop();
         var listHeight = MainMenuLayout.ListHeight(screen);
         var panelCenter = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
         var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
@@ -347,7 +347,7 @@ internal sealed class MenuRenderer
             var offset = MainMenuLayout.ClampedOffset(view.ServerScrollOffset, count, screen);
             var (first, end) = MainMenuLayout.VisibleRows(offset, count, screen);
             var nameLeft = MainMenuLayout.NameLeft(screen);
-            var nameWidth = MainMenuLayout.NameMaxWidth(screen);
+            var nameWidth = MainMenuLayout.NameMaxWidth();
 
             var (sx, sy, sw, sh) = UiCanvas.ScissorRect(new Vector2(left, top), panelSize,
                 _ui.Scale, _ui.WindowSize, _ui.FramebufferSize);
@@ -358,7 +358,7 @@ internal sealed class MenuRenderer
                 for (var i = first; i < end; i++)
                 {
                     var server = view.Servers[i];
-                    var rowTop = MainMenuLayout.RowTop(i, offset, screen);
+                    var rowTop = MainMenuLayout.RowTop(i, offset);
                     if (i > 0)
                         _ui.DrawRect(new Vector2(panelCenter.X, rowTop),
                             new Vector2(MainMenuLayout.PanelWidth - 2f * MainMenuLayout.RowPad, 1.5f),

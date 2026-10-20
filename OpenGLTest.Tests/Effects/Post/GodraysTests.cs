@@ -1,4 +1,3 @@
-using System;
 using VoxelEngine.Effects.Post;
 using Xunit;
 

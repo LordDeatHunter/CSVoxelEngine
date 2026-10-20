@@ -97,7 +97,7 @@ public static class LodColumnCaps
 
     private static int _capEditVersion;
 
-    /// <summary>Bumped by every cap <see cref="LowerColumnBelow"/> writes, so a save can tell whether anything changed.</summary>
+    /// <summary>Bumped by every cap <see cref="LowerColumnBelow(int, int, int)"/> writes, so a save can tell whether anything changed.</summary>
     internal static int CapEditVersion => Volatile.Read(ref _capEditVersion);
 
     /// <summary>

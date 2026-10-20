@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace VoxelEngine.Content.Definitions;
 
 /// <summary>JSON shape of <c>assets/data/recipes/&lt;name&gt;.json</c>.</summary>

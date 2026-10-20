@@ -178,7 +178,7 @@ public sealed class GoblinManager : IMobPopulation
     }
 
     /// <summary>Ticks the goblins against the one local player (singleplayer and the tests); see
-    /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget})"/>.</summary>
+    /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget}, BlockDebrisSystem, IReadOnlyList{Slime}, Vector3?, Vector3?, float, float)"/>.</summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera,
         BlockDebrisSystem? debris = null, IReadOnlyList<Slime>? slimes = null, Vector3? aimOrigin = null,
         Vector3? aimDirection = null, float aimCharge = 0f)

@@ -227,7 +227,7 @@ internal sealed class InventoryPanelRenderer
         bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null, float? durability = null,
         float countInset = 0f)
     {
-        var centerY = InventoryPanelLayout.RowCenterY(row, offset, _ui.ScreenSize);
+        var centerY = InventoryPanelLayout.RowCenterY(row, offset);
         var center = new Vector2(PanelLeft + PanelWidth * 0.5f, centerY);
         _ui.DrawRect(center, new Vector2(PanelWidth - PanelPad * 2f, RowHeight - 4f),
             selected ? RowSelected : SlotBackground);

@@ -9,7 +9,7 @@ namespace VoxelEngine.Tests.Lod;
 /// Covers item C9: LOD column height caps are bucketed by chunk column and resolved once per
 /// prefetched heightmap instead of being probed per height sample. The observable contract is
 /// unchanged, so these facts pin it end to end — a cap written through
-/// <see cref="LodColumnCaps.LowerColumnBelow"/> must still reach a rebuilt region's heights, and the
+/// <see cref="LodColumnCaps.LowerColumnBelow(int, int, int)"/> must still reach a rebuilt region's heights, and the
 /// bucket write must be visible to the very next read of the same bucket.
 /// </summary>
 public sealed class LodColumnCapTests

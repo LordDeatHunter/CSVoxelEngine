@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using VoxelEngine.Audio;
@@ -387,7 +386,7 @@ public sealed record BlockType
 
     /// <summary>The block a placement against a block's side becomes instead of this one (a
     /// torch's wall torch), or 0 when the block only ever places as itself; see
-    /// <see cref="Placement.TryMount"/>.</summary>
+    /// <see cref="Placement.TryMount(byte, byte, System.Numerics.Vector3, bool, out byte, out byte)"/>.</summary>
     public byte WallBlockId { get; internal set; }
 
     /// <summary>The upper half of a two-cell block whose lower half this is (a door), or 0; see

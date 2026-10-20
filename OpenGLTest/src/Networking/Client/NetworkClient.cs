@@ -20,7 +20,7 @@ public enum NetworkStatus
 public readonly record struct ServerHelloInfo(string WorldName, int Seed, double Time, Vector3 Spawn, int PlayerId);
 
 /// <summary>
-/// A client connection to a <see cref="GameServer"/>: the handshake (client hello out, server hello
+/// A client connection to a <c>GameServer</c>: the handshake (client hello out, server hello
 /// in) and, after that, framed messages between a reader thread and the main thread. Inbound frames
 /// land on <see cref="Inbound"/> and only the main thread drains it and touches the world; outbound
 /// sends are lock-guarded. GL-free.

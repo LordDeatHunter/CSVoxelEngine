@@ -100,7 +100,7 @@ internal static class ChunkTerrainFill
         var hasWater = false;
         if (WorldGenerationConfig.WaterEnabled)
         {
-            hasWater = FillWater(chunk, column, lowerBoundY, worldX0, worldZ0);
+            hasWater = FillWater(chunk, column, lowerBoundY);
             StampMud(chunk, column, worldX0, lowerBoundY, worldZ0);
         }
 
@@ -286,7 +286,7 @@ internal static class ChunkTerrainFill
     /// state. Returns whether any cell was flooded, which is what decides if this chunk can have a
     /// fluid frontier to report.
     /// </summary>
-    private static bool FillWater(Chunk chunk, ColumnData column, int lowerBoundY, int worldX0, int worldZ0)
+    private static bool FillWater(Chunk chunk, ColumnData column, int lowerBoundY)
     {
         var filled = false;
 

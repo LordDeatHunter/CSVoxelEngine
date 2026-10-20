@@ -12,7 +12,6 @@ namespace VoxelEngine.WorldGen.Features;
 /// </summary>
 public static class PebbleGenerator
 {
-    private const int PatchSalt = 0x6E8B1F;
     private const int DensitySalt = 0x6E8B20;
     private const int CountSalt = 0x6E8B21;
     private const int VariantSalt = 0x6E8B22;
@@ -82,7 +81,7 @@ public static class PebbleGenerator
     /// </summary>
     public static int ObsidianCountWithState(int x, int z, byte state, int max)
     {
-        if (TryDecode(state, max, out var total, out var obsidian))
+        if (TryDecode(state, max, out _, out var obsidian))
             return obsidian;
         var count = 0;
         var natural = CountAt(x, z);

@@ -184,7 +184,7 @@ public static class BbmodelLoader
                     throw new InvalidOperationException(
                         $"Model '{path}' has a cube outside any group: put every cube in a part group.");
                 if (cubesByUuid.TryGetValue(entry.GetString() ?? "", out var cube))
-                    AddCube(data, group, path, cube);
+                    AddCube(data, group, cube);
                 continue;
             }
 
@@ -211,7 +211,7 @@ public static class BbmodelLoader
         }
     }
 
-    private static void AddCube(BbmodelData data, string group, string path,
+    private static void AddCube(BbmodelData data, string group,
         (Vector3 Min, Vector3 Max, UvRect?[] Faces) cube)
     {
         if (!data.Parts.TryGetValue(group, out var part))

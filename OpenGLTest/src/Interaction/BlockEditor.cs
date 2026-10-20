@@ -150,8 +150,8 @@ internal sealed class BlockEditor
         {
             if (dropsLoot)
                 _dropManager.SpawnLoot(brokenId, blockPos,
-                    DropManager.PileCount(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState),
-                    DropManager.PileSecondary(brokenId, (int)blockPos.X, (int)blockPos.Z, brokenState),
+                    DropManager.PileCount(brokenId, brokenState),
+                    DropManager.PileSecondary(brokenId, brokenState),
                     brokenState);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.BranchPile)
                 _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, stationDrops);

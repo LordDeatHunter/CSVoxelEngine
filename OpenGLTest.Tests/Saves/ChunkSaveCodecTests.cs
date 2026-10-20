@@ -13,7 +13,7 @@ namespace VoxelEngine.Tests.Saves;
 /// The chunk save format (<see cref="ChunkSaveCodec"/>) and the chunk seams it feeds: an encoded
 /// snapshot decodes to the same cells, an unknown block degrades to air, a damaged file surfaces as
 /// <see cref="InvalidDataException"/>, <see cref="Chunk.TakeSnapshot"/> and
-/// <see cref="Chunk.RestoreFrom"/> round-trip a chunk, and a restored chunk's fluid frontier wakes
+/// <see cref="Chunk.RestoreFrom(ChunkSnapshot)"/> round-trip a chunk, and a restored chunk's fluid frontier wakes
 /// poured water while a generated-style sea source keeps the carved rule.
 /// </summary>
 public class ChunkSaveCodecTests

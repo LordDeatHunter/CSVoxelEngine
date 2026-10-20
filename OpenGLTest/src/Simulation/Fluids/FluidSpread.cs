@@ -1,7 +1,5 @@
 using System.Collections.Generic;
 using System.Numerics;
-using VoxelEngine.Config;
-using VoxelEngine.Simulation;
 
 namespace VoxelEngine.Simulation.Fluids;
 
@@ -203,8 +201,8 @@ internal sealed class FluidSpread
         if (previous != 0)
         {
             drops.SpawnLoot(previous, new Vector3(x, y, z),
-                DropManager.PileCount(previous, x, z, previousState),
-                DropManager.PileSecondary(previous, x, z, previousState),
+                DropManager.PileCount(previous, previousState),
+                DropManager.PileSecondary(previous, previousState),
                 previousState);
             _cells.Chunks.UnmarkPlayerPlaced(x, y, z);
         }

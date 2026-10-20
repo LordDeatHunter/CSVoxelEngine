@@ -7,7 +7,7 @@ namespace VoxelEngine.ItemDebugger;
 /// <summary>
 /// GL-free state behind the item debugger's player animations (the ITEMS tab): which animation the
 /// <see cref="PlayerModel"/> is showing and the synthetic inputs that drive it, so every pose the game
-/// can put the player in can be looked at without a world. The modes are data (<see cref="Modes"/>):
+/// can put the player in can be looked at without a world. The modes are data (<see cref="AllModes"/>):
 /// <b>continuous</b> poses (idle, walk, run, sneak, a jump loop, swimming) feed the model the speed and
 /// state the game would, and <b>one-shots</b> (punch, slice, throw, hurt, equip, landing, death) fire
 /// the model's own trigger, wait for it to finish, rest <see cref="RestBetweenPlays"/> and fire again,

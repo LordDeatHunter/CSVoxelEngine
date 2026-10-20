@@ -1,4 +1,3 @@
-using System;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.WorldGen.Trees;

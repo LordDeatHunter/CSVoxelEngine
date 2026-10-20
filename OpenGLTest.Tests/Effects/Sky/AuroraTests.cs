@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Numerics;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.WorldGen;

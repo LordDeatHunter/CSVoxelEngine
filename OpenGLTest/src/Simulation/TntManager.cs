@@ -44,7 +44,7 @@ public class TntManager
     public IReadOnlyList<PrimedTnt> Primed => _primed;
 
     /// <summary>The center of every blast the last <see cref="Update"/> set off, in detonation order;
-    /// valid until the next one. The world shakes the local camera by them (<see cref="BlastShake"/>).</summary>
+    /// valid until the next one. The world shakes the local camera by them (<see cref="AmbientEffects.ShakeForBlast"/>).</summary>
     public IReadOnlyList<Vector3> Blasts => _blasts;
 
     /// <summary>
@@ -188,8 +188,8 @@ public class TntManager
             {
                 // Same loot a mined block would leave (stone drops cobblestone)
                 drops.SpawnLoot(removed, new Vector3(x, y, z),
-                    DropManager.PileCount(removed, x, z, removedState),
-                    DropManager.PileSecondary(removed, x, z, removedState),
+                    DropManager.PileCount(removed, removedState),
+                    DropManager.PileSecondary(removed, removedState),
                     removedState);
             }
 
@@ -230,8 +230,8 @@ public class TntManager
                 touchedChunks.Add(pebbleChunkPos);
 
                 drops.SpawnLoot(standing, new Vector3(x, y, z),
-                    DropManager.PileCount(standing, x, z, standingState),
-                    DropManager.PileSecondary(standing, x, z, standingState),
+                    DropManager.PileCount(standing, standingState),
+                    DropManager.PileSecondary(standing, standingState),
                     standingState);
             }
         }

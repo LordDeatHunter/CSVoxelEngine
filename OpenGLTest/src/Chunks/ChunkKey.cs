@@ -21,7 +21,7 @@ namespace VoxelEngine.Chunks;
 /// </para>
 /// <para>
 /// Inputs are FLOORED, never truncated: <see cref="Pack(Vector3)"/> goes through
-/// <see cref="MathUtils.FloorToInt"/> and <see cref="PackBlock"/> uses an arithmetic shift, both
+/// <see cref="MathUtils.FloorToInt(float)"/> and <see cref="PackBlock"/> uses an arithmetic shift, both
 /// matching <see cref="VoxelCoords.ChunkPosOf(int, int, int)"/>'s floor-division convention. A
 /// truncating key would silently merge chunk -0 into chunk 0 on the negative side.
 /// </para>

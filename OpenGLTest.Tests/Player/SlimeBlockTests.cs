@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using VoxelEngine.Player;
 using VoxelEngine.VisualTest;

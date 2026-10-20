@@ -25,7 +25,7 @@ namespace VoxelEngine.Tests.Chunks;
 /// <para><b>It must compile and run UNCHANGED on the pristine export</b>, which is the whole point,
 /// so it names only API that exists on BOTH trees: <c>ChunkManager.Chunks</c> (indexer,
 /// <c>ContainsKey</c>, <c>TryGetValue</c>, <c>Count</c>, <c>Values</c>),
-/// <see cref="ChunkManager.Update"/>, <see cref="ChunkManager.NeedsChunk"/>,
+/// <see cref="ChunkManager.Update(Camera)"/>, <see cref="ChunkManager.NeedsChunk"/>,
 /// <see cref="ChunkManager.MarkDirty"/>, the placement accessors, the internal
 /// <c>DirtyCount</c>/<c>GeneratingMeshCount</c>/<c>PendingMeshWorkCount</c>/<c>ActiveMeshRunnerCount</c>
 /// counters, <c>Chunk.GenerateMeshData</c>, <c>Chunk.IsMeshed</c>, <c>Camera.TestTeleport</c> and the
@@ -155,7 +155,7 @@ public sealed class ChunkRekeyReplayProbe
     /// THE AUTHORITY FOLD. A real <see cref="ChunkManager"/>, a real chunk grid spanning both signs
     /// and both sides of the unload radius, scripted placements, a real synchronous mesh build that
     /// drives <c>Chunk.TryResolveNeighbors</c>' 26 chunk probes, and two real unload passes driven
-    /// by <c>TestTeleport</c> + <see cref="ChunkManager.Update"/> - folded into one FNV-1a 64 hash
+    /// by <c>TestTeleport</c> + <see cref="ChunkManager.Update(Camera)"/> - folded into one FNV-1a 64 hash
     /// after every phase.
     ///
     /// <para><b>Why this fact stays on the SYNCHRONOUS path, and why that is asserted rather than
@@ -444,7 +444,7 @@ public sealed class ChunkRekeyReplayProbe
 
     /// <summary>
     /// THE ASYNCHRONOUS COMPANION. Registers a small solid grid directly, marks a scripted interior
-    /// subset dirty, then spins <see cref="ChunkManager.Update"/> until the manager is quiescent and
+    /// subset dirty, then spins <see cref="ChunkManager.Update(Camera)"/> until the manager is quiescent and
     /// folds the CONVERGED state.
     ///
     /// <para><b>Why convergence and not per frame.</b> Per-frame mesh selection is order-dependent

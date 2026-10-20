@@ -333,7 +333,7 @@ public static class TerrainGenerator
                 // An oasis: a hashed deep-desert site marks its disc (the fill and the far LOD
                 // wear grass there) and carves its flat pond into the heightmap
                 if (WorldFeatureConfig.OasesEnabled
-                    && OasisGenerator.TryGetDisc((int)worldX, (int)worldZ, out var oasisX, out var oasisZ,
+                    && OasisGenerator.TryGetDisc((int)worldX, (int)worldZ, out _, out _,
                         out var oasisSurface))
                 {
                     oasis[i] = true;

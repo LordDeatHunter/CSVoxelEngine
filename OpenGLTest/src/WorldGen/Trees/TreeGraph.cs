@@ -84,7 +84,7 @@ public sealed class TreeGraph
     /// rasterized around the trunk chain, never graph nodes) and its stored parent offset lands
     /// exactly on the current cell. Detached cells and cells whose parent no longer exists are
     /// therefore never reached, so a cut branch stays cut. A node below the root's level loads as
-    /// a feature node (roots), which is exact because <see cref="TreeGrower.Pulse"/> never
+    /// a feature node (roots), which is exact because <see cref="TreeGrower.Pulse(TreeGraph, TreeSpecies, ITreeSpace, SplitMix64)"/> never
     /// descends; for a species with a <c>buttress</c> feature a non-root node at the root's own
     /// level loads as a feature node too (a fin), which is exact because the compiler requires
     /// such a species to have <c>growth.lowestBranchHeight</c> of at least 1, so growth never

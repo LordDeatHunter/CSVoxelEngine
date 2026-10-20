@@ -69,7 +69,7 @@ internal sealed class LodRegionClaims(LodManager owner)
     /// ring is full, loads and unloads cancel and the net rate plateaus near zero even while the
     /// generator is at full tilt. A cumulative counter has no purge bias and no plateau, so a
     /// throughput capture over it can use a fixed-duration window instead of chasing convergence.
-    /// Read on the main thread through <see cref="Interlocked.Read(ref long)"/> because the
+    /// Read on the main thread through <c>Interlocked.Read</c> because the
     /// increment happens on a LodGen worker and a long store is not atomic on 32-bit runtimes.
     /// </summary>
     public long CompletedBuildCount => Interlocked.Read(ref _completedBuildCount);

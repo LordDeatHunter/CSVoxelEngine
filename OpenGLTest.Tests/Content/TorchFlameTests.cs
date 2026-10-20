@@ -13,7 +13,7 @@ namespace VoxelEngine.Tests.Content;
 /// <summary>
 /// Torch flames: the <c>flame</c> block field (parsed by <see cref="BlockSchemaParser.ParseFlame"/>,
 /// turned with a facing block), the flame points the mesher records per chunk
-/// (<see cref="ChunkMeshData.FlamePoints"/>), and the tight, small particles the flame instance of
+/// (<see cref="VoxelEngine.Chunks.Meshing.ChunkMeshData.FlamePoints"/>), and the tight, small particles the flame instance of
 /// <see cref="FireParticleSystem"/> spawns.
 /// </summary>
 public sealed class TorchFlameTests

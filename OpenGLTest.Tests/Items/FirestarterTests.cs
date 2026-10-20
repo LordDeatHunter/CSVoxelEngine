@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using VoxelEngine.Entities;
@@ -16,8 +15,6 @@ public sealed class FirestarterTests
 
     private static byte Firestarter => ContentRegistry.RequireItem("firestarter").Id;
     private static byte Ash => ContentRegistry.RequireItem("ash").Id;
-    private static byte Vine => ContentRegistry.RequireItem("vine").Id;
-    private static byte Branch => ContentRegistry.RequireItem("branch").Id;
     private static byte BranchPile => ContentRegistry.RequireBlock("branch_pile").Id;
 
     [Fact]

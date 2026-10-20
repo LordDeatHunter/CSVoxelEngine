@@ -84,7 +84,7 @@ internal sealed class IntentReplay
         var accepted = player.AcceptSeq(seq)
                        && (player.IsDead
                            ? intent.Kind == NetIntentKind.Respawn && RespawnFor(client, player)
-                           : ApplyWorldIntent(client, player, intent));
+                           : ApplyWorldIntent(player, intent));
         if (intent.EditsCells && intent.HasCell
             && NetValidation.InEditReach(player.Position, intent.X, intent.Y, intent.Z, NetworkConfig.NetMaxEditReachBlocks))
             SendCellCorrection(client, seq, intent.X, intent.Y, intent.Z, radius: 1);
@@ -98,7 +98,7 @@ internal sealed class IntentReplay
     /// world is playing, the intent was aimed from (near) where the player is, and an edit fits the
     /// player's edit rate. A living player has nothing to respawn from, so its respawn is refused.
     /// </summary>
-    private bool ApplyWorldIntent(ClientConnection client, ServerPlayer player, in WorldIntent intent)
+    private bool ApplyWorldIntent(ServerPlayer player, in WorldIntent intent)
     {
         if (intent.Kind == NetIntentKind.Respawn)
             return false;

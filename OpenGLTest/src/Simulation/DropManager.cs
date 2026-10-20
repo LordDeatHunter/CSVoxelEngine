@@ -48,7 +48,7 @@ public class DropManager
     }
 
     /// <summary>
-    /// Block ids collected during the most recent <see cref="Update"/>. Valid until the next one.
+    /// Block ids collected during the most recent <c>Update</c>. Valid until the next one.
     /// </summary>
     public ReadOnlySpan<byte> Collected => CollectionsMarshal.AsSpan(_collected);
 
@@ -147,7 +147,7 @@ public class DropManager
     /// player-built pile, else 0 meaning "derive from the world". Callers must read the state
     /// before the block is cleared, and pass 0 straight through for ordinary blocks.
     /// </summary>
-    public static int PileCount(byte blockId, int x, int z, byte state)
+    public static int PileCount(byte blockId, byte state)
     {
         var max = BlockType.ById[blockId]?.StackMax ?? 0;
         if (BlockType.ById[blockId]?.Renderer == BlockRenderer.Pebbles)
@@ -159,7 +159,7 @@ public class DropManager
     /// Obsidian share for a destroyed pebble pile: the packed count for a player pile, else 0
     /// meaning "derive it from the world hash". Other blocks always read 0.
     /// </summary>
-    public static int PileSecondary(byte blockId, int x, int z, byte state)
+    public static int PileSecondary(byte blockId, byte state)
     {
         if (BlockType.ById[blockId]?.Renderer != BlockRenderer.Pebbles)
             return 0;

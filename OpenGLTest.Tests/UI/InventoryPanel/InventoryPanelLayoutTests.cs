@@ -41,7 +41,7 @@ public sealed class InventoryPanelLayoutTests
         var listBottom = InventoryPanelLayout.ListTop + InventoryPanelLayout.ListHeight(Screen);
         for (var r = first; r < end; r++)
         {
-            var y = InventoryPanelLayout.RowCenterY(r, offset, Screen);
+            var y = InventoryPanelLayout.RowCenterY(r, offset);
             if (y < InventoryPanelLayout.ListTop || y >= listBottom) continue;
             Assert.Equal(r, InventoryPanelLayout.RowAt(new Vector2(x, y), Screen, offset, rowCount));
         }
@@ -51,7 +51,7 @@ public sealed class InventoryPanelLayoutTests
             Assert.NotEqual(0, InventoryPanelLayout.RowAt(new Vector2(x, y), Screen, offset, rowCount));
 
         // The scrollbar band's left edge belongs to the scrollbar, never to a row.
-        var bandY = InventoryPanelLayout.RowCenterY(first + 1, offset, Screen);
+        var bandY = InventoryPanelLayout.RowCenterY(first + 1, offset);
         var band = new Vector2(InventoryPanelLayout.ScrollbarHitLeft(Screen), bandY);
         Assert.Null(InventoryPanelLayout.RowAt(band, Screen, offset, rowCount));
         Assert.NotEqual(ScrollbarHit.None, InventoryPanelLayout.ScrollbarHitAt(band, Screen, offset, rowCount));

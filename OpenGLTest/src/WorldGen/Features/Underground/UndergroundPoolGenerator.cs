@@ -14,7 +14,6 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 /// </summary>
 public static class UndergroundPoolGenerator
 {
-    private const int PatchSalt = 0x0C1A11;
     private const int PoolSalt = 0x0C1A12;
 
     private static FastNoiseLite PatchNoise;

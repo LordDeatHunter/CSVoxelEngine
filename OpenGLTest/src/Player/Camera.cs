@@ -73,7 +73,7 @@ public class Camera : IMobTarget
     /// Over-shoulder third-person view (F5 mode 2). The player body stays where the
     /// physics put it (<see cref="Position"/> is still the head); the view eye moves behind
     /// + to the side (<see cref="RenderEye"/>) and tilts back onto the aim point
-    /// (<see cref="ViewDirection"/>), which <see cref="Raycast"/> also fires along, so the
+    /// (<see cref="ViewDirection"/>), which <see cref="Raycast(float, ChunkManager, out Vector3, out Vector3, bool)"/> also fires along, so the
     /// highlight lands under the crosshair. Movement, collision and swimming keep reading
     /// <see cref="Position"/>.
     /// </summary>
@@ -104,7 +104,7 @@ public class Camera : IMobTarget
     /// <summary>
     /// Direction the screen looks along. Equals the head facing in first person; in
     /// shoulder-surf it tilts from the offset camera back onto the crosshair aim point,
-    /// which is also the direction <see cref="Raycast"/> fires.
+    /// which is also the direction <see cref="Raycast(float, ChunkManager, out Vector3, out Vector3, bool)"/> fires.
     /// </summary>
     public Vector3 ViewDirection => _shoulder.ViewDirection;
     /// <summary>
@@ -129,7 +129,7 @@ public class Camera : IMobTarget
 
     /// <summary>
     /// Whether the player is deep enough in a fluid to swim: some cell of the body's footprint
-    /// in the feet..feet+<see cref="SwimDepth"/> band has a fluid surface above the feet. A thin
+    /// in the feet..feet+<see cref="PlayerPhysics.SwimDepth"/> band has a fluid surface above the feet. A thin
     /// flowing skirt underfoot is waded through, not swum in.
     /// </summary>
     public bool IsInWater { get; private set; }

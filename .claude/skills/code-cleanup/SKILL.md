@@ -35,8 +35,22 @@ Prefer `rg`/Grep over guesswork. Useful recon commands (PowerShell):
   `Color`-legit hits like `oncologist`; check each). The stems are British on purpose: never
   convert this list. Substring false positives to skip: `TranslucentRenderable`,
   `ModelLoader`/`BbmodelLoader`, `FuelLocal`, `Silk.NET.Maths`, `optimistic`.
-- Dead code: the compiler only flags unused usings via IDE; grep for private members and
-  confirm zero references, and treat `private` fields with no reads as deletions.
+- Dead code: the plain build reports none of it. Measure with `DOTNET_ROLL_FORWARD=LatestMajor
+  dotnet build VoxelEngine.sln -c Release -p:GenerateDocumentationFile=true
+  -p:EnforceCodeStyleInBuild=true -p:AnalysisModeStyle=All -p:NoWarn=CS1591 --no-incremental
+  -clp:NoSummary > <scratchpad>/stylebuild.log 2>&1`, on the command line only (never in a
+  csproj, Directory.Build.props, .editorconfig or .globalconfig). Grep only IDE0005 (unused
+  using), IDE0051 (unused private member), IDE0052 (written, never read), IDE0059 (dead store),
+  IDE0060 (unused parameter) and the doc codes CS1574/CS0419/CS1570/CS1734 (CS1573 is a
+  separate doc chore) and ignore every other IDE code. Count unique sites by stripping the
+  trailing ` [project]` and running `sort -u`, since each project prints its own copy. IDE0005
+  reports once per file, so read the whole using block and re-run until 0 (a using that only a
+  cref needs counts as used under GenerateDocumentationFile). Removing a parameter can
+  cascade into its callee's parameters, so re-measure. Never drop or reorder an expression with
+  side effects (one that advances Random/SplitMix64/a noise or hash stream, or calls
+  Interlocked/Volatile, a GL call or a registry call): keep it as a statement or skip. A store
+  kept alive by a const config flag (ChunkTerrainFill `hasWater`) stays. Still grep for internal
+  members with zero references in all four projects, tests counting as uses.
 - Duplicates: two near-identical methods are easiest found while editing a file; search the
   extracted helper name first before writing a new one.
 

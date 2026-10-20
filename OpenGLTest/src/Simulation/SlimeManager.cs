@@ -105,7 +105,7 @@ public sealed class SlimeManager : IMobPopulation
     }
 
     /// <summary>Ticks the slimes against the one local player (singleplayer and the tests); see
-    /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget}, float)"/>.</summary>
+    /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget}, float, BlockDebrisSystem)"/>.</summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera, float night = 0f,
         BlockDebrisSystem? debris = null)
     {

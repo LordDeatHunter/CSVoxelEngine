@@ -30,7 +30,6 @@ internal sealed class PlayerPhysics
     private const float GroundMinResponse = 0.02f;
     private const float GroundSlideScale = 10f;
     private const float AirAccelRate = 6f;
-    private const float SwimAccelRate = 4.5f;
     private const float FlyAccelRate = 6f;
 
     // Auto-step heights: sprinting runs up a full block, plain walking only half a block,
@@ -73,7 +72,6 @@ internal sealed class PlayerPhysics
     /// <summary>Counts strokes started, so the body can start its stroke animation on the same frame.</summary>
     public int SwimStrokeCount { get; private set; }
     internal const float SinkSpeed = -2f;
-    private const float WaterDrag = 6f;
     // Pushing into a bank while holding Space lifts the player over it, so getting out of
     // water never needs a ramp
     internal const float SwimExitBoost = 6f;

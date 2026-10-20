@@ -224,7 +224,7 @@ internal sealed class LeftClickAction
         if (held is { Attack: AttackPattern.Slice })
         {
             Camera.NotifyPlayerAction();
-            UpdateSlice((float)deltaTime, justPressed, player);
+            UpdateSlice(justPressed, player);
             StopBreaking();
             return;
         }
@@ -478,7 +478,7 @@ internal sealed class LeftClickAction
     /// in the hemisphere then; a connected client sends the swing to the server instead of
     /// striking anything itself. The swing animation itself lives in <see cref="PlayerModel"/>.
     /// </summary>
-    private void UpdateSlice(double deltaTime, bool justPressed, PlayerContext player)
+    private void UpdateSlice(bool justPressed, PlayerContext player)
     {
         if (justPressed && _sliceCombo.Press())
         {

@@ -17,8 +17,8 @@ public enum LeafClusterShape : byte
 
     /// <summary>
     /// A flat cap resting on the tip with its fronds drooping one level below (a palm): the pad's
-    /// discs — <c>max(1, radius - 1)</c> at the tip's own level and <paramref name="radius"/> one
-    /// above — plus the full disc of <paramref name="radius"/> one level below, so the crown has
+    /// discs — <c>max(1, radius - 1)</c> at the tip's own level and <c>radius</c> one
+    /// above — plus the full disc of <c>radius</c> one level below, so the crown has
     /// some depth. Nothing deeper, so the trunk under it stays bare.
     /// </summary>
     Fan = 3,

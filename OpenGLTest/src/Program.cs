@@ -7,7 +7,6 @@ using VoxelEngine.App;
 using VoxelEngine.Audio;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Platform;
-using VoxelEngine.Player;
 using VoxelEngine.Rendering;
 using VoxelEngine.Saves;
 using VoxelEngine.UI;

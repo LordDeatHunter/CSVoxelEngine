@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Player;
@@ -28,7 +27,7 @@ namespace VoxelEngine.Tests.Chunks;
 /// the comparison meaningful at all. It therefore touches only API that exists on BOTH trees:
 /// <see cref="ChunkManager.MarkPlayerPlaced"/>, <see cref="ChunkManager.UnmarkPlayerPlaced"/>,
 /// <see cref="ChunkManager.IsPlayerPlaced"/>, <c>ChunkManager.Chunks</c>,
-/// <see cref="ChunkManager.Update"/>, <c>Camera.TestTeleport</c> and the headless
+/// <see cref="ChunkManager.Update(Camera)"/>, <c>Camera.TestTeleport</c> and the headless
 /// <c>new Chunk(null!, pos, generateBlockData: false)</c> harness the rest of
 /// <c>ChunkManagerTests</c> already uses. In particular it does NOT reference
 /// <c>ChunkManager.PlayerPlacedChunkCount</c>: that property is new in this round, so naming it
@@ -132,7 +131,7 @@ public sealed class PlayerPlacedUnloadReplayProbe
     /// <summary>
     /// THE CROSS-TREE OUTPUT-PRESERVATION GATE. A real <see cref="ChunkManager"/>, a real chunk
     /// set spanning both signs and both sides of the unload radius, a scripted placement list, two
-    /// real unload passes driven by <c>TestTeleport</c> + <see cref="ChunkManager.Update"/>, and
+    /// real unload passes driven by <c>TestTeleport</c> + <see cref="ChunkManager.Update(Camera)"/>, and
     /// then an FNV-1a 64 fold over exactly the cells that survived.
     ///
     /// <para><b>Why the survivors are probed rather than enumerated:</b> the placement index has

@@ -35,7 +35,7 @@ internal readonly struct FaceLight
     public static FaceLight FromCorners(int face, int c0, int c1, int c2, int c3) => new(face, c0, c1, c2, c3);
 
     /// <summary>Uniform light of one cell: every corner holds four samples of the same level, so
-    /// <see cref="Sample"/> returns exactly <c>level / 15</c>. <paramref name="block"/> is the lamp
+    /// <see cref="Sample(Vector3, out float, out float)"/> returns exactly <c>level / 15</c>. <paramref name="block"/> is the lamp
     /// level alone; <paramref name="slot"/> is its color slot.</summary>
     public static FaceLight Flat(byte sun, byte block, byte slot = 0)
     {

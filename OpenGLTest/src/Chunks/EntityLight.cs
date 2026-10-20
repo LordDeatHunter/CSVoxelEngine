@@ -6,7 +6,7 @@ namespace VoxelEngine.Chunks;
 
 /// <summary>
 /// GL-free world light query for entity draws (drops, pops, debris, the player, ...), read
-/// from the light snapshot each chunk publishes with its mesh (<see cref="Chunk.TryGetLocalLight"/>).
+/// from the light snapshot each chunk publishes with its mesh (<see cref="Chunk.TryGetLocalLight(int, int, int, out byte, out byte)"/>).
 /// </summary>
 public static class EntityLight
 {

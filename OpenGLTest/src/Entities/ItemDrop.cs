@@ -69,7 +69,7 @@ public class ItemDrop
     // length is collected the same instant it appears and its spin is never seen.
     private const float PickupDelaySeconds = 0.4f;
 
-    /// <summary>Block or item id this drop collects as (see <see cref="ItemType"/>).</summary>
+    /// <summary>Block or item id this drop collects as (see <see cref="ItemRegistry.IsItem"/>).</summary>
     public byte BlockId { get; }
     public Vector3 Position { get; private set; }
 

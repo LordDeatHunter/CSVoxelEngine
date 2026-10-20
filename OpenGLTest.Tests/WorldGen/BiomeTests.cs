@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen;
@@ -330,15 +329,6 @@ public sealed class BiomeTests
 
         Assert.Contains(Biome.Desert, seen);
         Assert.Contains(Biome.Forest, seen);
-    }
-
-    private static (int Cx, int Cz)? FindDesertChunk()
-    {
-        for (var cx = 0; cx <= 64; cx++)
-        for (var cz = -64; cz <= 64; cz++)
-            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) == Biome.Desert)
-                return (cx, cz);
-        return null;
     }
 
     [Fact]

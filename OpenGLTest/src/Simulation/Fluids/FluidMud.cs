@@ -1,5 +1,4 @@
 using System;
-using VoxelEngine.Config;
 using VoxelEngine.Content;
 
 namespace VoxelEngine.Simulation.Fluids;

@@ -4079,7 +4079,8 @@ touch a file that violates one of them, fixing it is in scope.
   `meter`. Applies to renames of existing symbols too.
 - **No dead code.** Delete unused private fields, methods, parameters, locals and `using`
   directives on sight; git keeps the history. Do not keep anything "for later". Build warnings
-  must stay at zero.
+  must stay at zero. The plain build does not report dead code; measure it with the doc+style
+  build in the code-cleanup skill.
 - **No duplication.** A rule that exists twice becomes one shared (and, where it is a rule,
   tested) helper. The GL-free-twin pattern (a `Foo` next to a `FooRenderer`) is the same idea
   for shader/renderer pairs: one definition, two consumers.

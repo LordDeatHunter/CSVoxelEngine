@@ -7,12 +7,12 @@ namespace VoxelEngine.Saves;
 /// An immutable copy of one chunk's saveable data: the block ids, the per-block state byte and
 /// the cells the player placed. Taken on the main thread by <see cref="Chunk.TakeSnapshot"/>
 /// (plain array copies, no encoding), encoded later by the save writer thread through
-/// <see cref="ChunkSaveCodec"/>, and handed to <see cref="Chunk.RestoreFrom"/> when the chunk
+/// <see cref="ChunkSaveCodec"/>, and handed to <see cref="Chunk.RestoreFrom(ChunkSnapshot)"/> when the chunk
 /// streams back in. The constructor copies every array it is given, so nothing the caller does
 /// afterwards can change the snapshot. The arrays the properties expose are the snapshot's own
 /// and must be treated as read-only: a snapshot can be read by the writer thread and a
 /// generation worker at the same time, which is only safe because nobody writes to it, and every
-/// consumer that needs a mutable array (<see cref="Chunk.RestoreFrom"/>) copies it.
+/// consumer that needs a mutable array (<see cref="Chunk.RestoreFrom(ChunkSnapshot)"/>) copies it.
 /// </summary>
 public sealed class ChunkSnapshot
 {

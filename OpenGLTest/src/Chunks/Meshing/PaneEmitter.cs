@@ -4,7 +4,6 @@ using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Data;
-using static VoxelEngine.Chunks.Chunk;
 using static VoxelEngine.Chunks.Meshing.ChunkLighting;
 using static VoxelEngine.Chunks.Meshing.ChunkFaceTables;
 

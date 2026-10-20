@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;

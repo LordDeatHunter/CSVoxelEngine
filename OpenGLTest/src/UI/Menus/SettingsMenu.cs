@@ -161,7 +161,7 @@ public static class SettingsLayout
 
     public static float PanelLeft(Vector2 screenSize) => (screenSize.X - PanelWidth) * 0.5f;
 
-    public static float ListTop(Vector2 screenSize) => PanelTop + TitleHeight + TabHeight;
+    public static float ListTop() => PanelTop + TitleHeight + TabHeight;
 
     public static float ListBottom(Vector2 screenSize) =>
         screenSize.Y - PanelBottomMargin - BackGap - BackHeight;
@@ -175,11 +175,11 @@ public static class SettingsLayout
         new(PanelLeft(screenSize) + TabWidth() * (tab + 0.5f),
             PanelTop + TitleHeight + TabHeight * 0.5f);
 
-    public static float RowTop(int tabRow, Vector2 screenSize) =>
-        ListTop(screenSize) + tabRow * RowHeight;
+    public static float RowTop(int tabRow) =>
+        ListTop() + tabRow * RowHeight;
 
     public static Vector2 RowCenter(int tabRow, Vector2 screenSize) =>
-        new(screenSize.X * 0.5f, RowTop(tabRow, screenSize) + RowHeight * 0.5f);
+        new(screenSize.X * 0.5f, RowTop(tabRow) + RowHeight * 0.5f);
 
     /// <summary>Tab-relative position of an absolute row on its tab (-1 when off-tab).</summary>
     public static int TabRowOf(string tab, int absRow)
@@ -226,7 +226,7 @@ public static class SettingsLayout
         var rows = SettingsRows.RowsInTab(tab);
         for (var r = 0; r < rows.Length; r++)
         {
-            var top = RowTop(r, screenSize);
+            var top = RowTop(r);
             if (point.Y < top || point.Y >= top + RowHeight) continue;
             if (point.X < PanelLeft(screenSize)
                 || point.X > PanelLeft(screenSize) + PanelWidth)

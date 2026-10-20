@@ -419,7 +419,7 @@ public class UIRenderer : IDisposable
     /// bright icons. Strings longer than 64 characters are truncated.
     ///
     /// Every glyph of the run — shadow copies and face copies alike — is written into one
-    /// dynamic vertex buffer and drawn with a single <see cref="GL.DrawElements"/> call
+    /// dynamic vertex buffer and drawn with a single <c>GL.DrawElements</c> call
     /// (<see cref="DrawTextBatch"/>), instead of the two draws per glyph a naive per-glyph
     /// <see cref="DrawMesh"/> would cost. Shadows are laid out before faces in the index
     /// order, so a glyph's face still draws over every shadow, exactly as separate draw

@@ -12,7 +12,7 @@ using VoxelEngine.WorldGen;
 namespace VoxelEngine.Saves;
 
 /// <summary>
-/// One world's far-LOD edit state: the removal caps (<see cref="LodColumnCaps.LowerColumnBelow"/>),
+/// One world's far-LOD edit state: the removal caps (<see cref="LodColumnCaps.LowerColumnBelow(int, int, int)"/>),
 /// the surface overrides (<see cref="LodSurface"/>) and the felled-canopy markers
 /// (<see cref="TreeGenerator.PoisonCanopy"/>). All three are process-global tables that only
 /// record edits, so without this a restart would redraw the far terrain as freshly generated and

@@ -48,7 +48,7 @@ public sealed class MainMenuLayoutTests
                 Assert.Equal(row, hit.Row);
             }
 
-            var rowCenterY = MainMenuLayout.RowTop(row, 0f, Screen) + MainMenuLayout.RowHeight * 0.5f;
+            var rowCenterY = MainMenuLayout.RowTop(row, 0f) + MainMenuLayout.RowHeight * 0.5f;
             var onName = new Vector2(MainMenuLayout.NameLeft(Screen) + 10f, rowCenterY);
             Assert.Equal(MainMenuHitKind.None, KindAt(onName, view));
         }
@@ -113,9 +113,9 @@ public sealed class MainMenuLayoutTests
         Assert.Equal(MainMenuHitKind.Create, KindAt(MainMenuLayout.BottomButtonCenter(Screen, 0), view));
         Assert.Equal(MainMenuHitKind.Back, KindAt(MainMenuLayout.BottomButtonCenter(Screen, 1), view));
 
-        Assert.True(MainMenuLayout.NameMaxWidth(Screen) > 0f);
+        Assert.True(MainMenuLayout.NameMaxWidth() > 0f);
         var playLeft = MainMenuLayout.RowButtonCenter(Screen, 0, 0f, 0).X - MainMenuLayout.RowButtonSize.X * 0.5f;
-        Assert.True(playLeft >= MainMenuLayout.NameLeft(Screen) + MainMenuLayout.NameMaxWidth(Screen));
+        Assert.True(playLeft >= MainMenuLayout.NameLeft(Screen) + MainMenuLayout.NameMaxWidth());
     }
 
     [Fact]

@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Simulation;
@@ -61,10 +60,10 @@ public sealed class MultistateTests
     public void PileCountPassesOnlyExplicitStackStatesThrough()
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        Assert.Equal(0, DropManager.PileCount(Pebble, 8, 8, 0));
-        Assert.Equal(2, DropManager.PileCount(Pebble, 8, 8, 2));
-        Assert.Equal(0, DropManager.PileCount(Pebble, 8, 8, 9));
-        Assert.Equal(0, DropManager.PileCount(stone, 8, 8, 2));
+        Assert.Equal(0, DropManager.PileCount(Pebble, 0));
+        Assert.Equal(2, DropManager.PileCount(Pebble, 2));
+        Assert.Equal(0, DropManager.PileCount(Pebble, 9));
+        Assert.Equal(0, DropManager.PileCount(stone, 2));
     }
 
     [Fact]
@@ -132,8 +131,8 @@ public sealed class MultistateTests
     [Fact]
     public void PileCountPassesBranchPileStatesThrough()
     {
-        Assert.Equal(0, DropManager.PileCount(BranchPile, 8, 8, 0));
-        Assert.Equal(4, DropManager.PileCount(BranchPile, 8, 8, 4));
+        Assert.Equal(0, DropManager.PileCount(BranchPile, 0));
+        Assert.Equal(4, DropManager.PileCount(BranchPile, 4));
     }
 
     [Fact]
@@ -176,8 +175,8 @@ public sealed class MultistateTests
             Assert.Equal(obsidian, decodedObsidian);
             Assert.Equal(total, PebbleGenerator.CountWithState(8, 8, state, pile.StackMax));
             Assert.Equal(obsidian, PebbleGenerator.ObsidianCountWithState(8, 8, state, pile.StackMax));
-            Assert.Equal(total, DropManager.PileCount(Pebble, 8, 8, state));
-            Assert.Equal(obsidian, DropManager.PileSecondary(Pebble, 8, 8, state));
+            Assert.Equal(total, DropManager.PileCount(Pebble, state));
+            Assert.Equal(obsidian, DropManager.PileSecondary(Pebble, state));
         }
     }
 
@@ -274,9 +273,9 @@ public sealed class MultistateTests
     public void PileSecondaryPassesOnlyPebbleStatesThrough()
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
-        Assert.Equal(0, DropManager.PileSecondary(Pebble, 8, 8, 0));
-        Assert.Equal(1, DropManager.PileSecondary(Pebble, 8, 8, PebbleGenerator.StateFor(2, 1)));
-        Assert.Equal(0, DropManager.PileSecondary(Pebble, 8, 8, 9));
-        Assert.Equal(0, DropManager.PileSecondary(stone, 8, 8, 2));
+        Assert.Equal(0, DropManager.PileSecondary(Pebble, 0));
+        Assert.Equal(1, DropManager.PileSecondary(Pebble, PebbleGenerator.StateFor(2, 1)));
+        Assert.Equal(0, DropManager.PileSecondary(Pebble, 9));
+        Assert.Equal(0, DropManager.PileSecondary(stone, 2));
     }
 }

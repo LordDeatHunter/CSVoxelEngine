@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Linq;
 using VoxelEngine.Audio;
 using VoxelEngine.Content.Blocks;
 using Xunit;
