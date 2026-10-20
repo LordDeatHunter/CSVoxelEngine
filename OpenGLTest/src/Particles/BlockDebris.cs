@@ -65,15 +65,6 @@ public class BlockDebris
 
     private const float FadeInSeconds = 0.08f;
 
-    private const float Gravity = 28f;
-    private const float TerminalVelocity = -30f;
-    private const float GroundFriction = 8f;
-    private const float BounceDamping = 0.35f;
-    private const float BounceThreshold = 4f;
-
-    private const float WaterSinkSpeed = -3f;
-    private const float WaterDrag = 5f;
-
     private Vector3 _velocity;
     private float _age;
     private readonly float _lifetime;
@@ -150,10 +141,7 @@ public class BlockDebris
         var (fluidX, fluidY, fluidZ) = Position.BlockCell();
         var submerged = Position.Y < chunks.GetFluidSurfaceGlobal(fluidX, fluidY, fluidZ);
 
-        if (submerged)
-            _velocity.Y = MathUtils.Damp(_velocity.Y, WaterSinkSpeed, WaterDrag, deltaTime);
-        else
-            _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+        _velocity.Y = BodyMotion.SinkOrFall(_velocity.Y, submerged, deltaTime);
 
         var movement = _velocity * deltaTime;
         var half = new Vector3(HalfExtent);
@@ -170,7 +158,7 @@ public class BlockDebris
             if (_velocity.Y < 0f)
             {
                 var impact = -_velocity.Y;
-                _velocity.Y = !submerged && impact >= BounceThreshold ? impact * BounceDamping : 0f;
+                _velocity.Y = BodyMotion.Bounce(impact, submerged, BodyMotion.HeavyBounceThreshold, BodyMotion.HeavyBounceDamping);
                 if (_velocity.Y == 0f)
                 {
                     IsLanded = true;
@@ -185,9 +173,7 @@ public class BlockDebris
 
         if (IsLanded)
         {
-            var damp = MathF.Max(0f, 1f - GroundFriction * deltaTime);
-            _velocity.X *= damp;
-            _velocity.Z *= damp;
+            BodyMotion.DampOnGround(ref _velocity, deltaTime);
         }
 
         Spin += _spinSpeed * deltaTime;

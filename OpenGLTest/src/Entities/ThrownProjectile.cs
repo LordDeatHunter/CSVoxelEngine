@@ -10,10 +10,9 @@ namespace VoxelEngine.Entities;
 public sealed class ThrownProjectile
 {
     public const float HalfExtent = 0.15f;
-    /// <summary>Downward acceleration of every thrown projectile; the goblin aim solver uses
-    /// the same value.</summary>
-    public const float Gravity = 28f;
-    private const float TerminalVelocity = -30f;
+    /// <summary>Downward acceleration of every thrown projectile: the shared loose-body gravity
+    /// (<see cref="BodyMotion.Gravity"/>), which the goblin aim solver uses too.</summary>
+    public const float Gravity = BodyMotion.Gravity;
 
     public byte ItemId { get; }
     public Vector3 Position { get; private set; }
@@ -64,7 +63,7 @@ public sealed class ThrownProjectile
         _age += Math.Max(0f, deltaTime);
         if (IsExpired) return false;
 
-        _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+        _velocity.Y = BodyMotion.Fall(_velocity.Y, deltaTime);
         var movement = _velocity * deltaTime;
         var half = new Vector3(HalfExtent);
         var next = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);

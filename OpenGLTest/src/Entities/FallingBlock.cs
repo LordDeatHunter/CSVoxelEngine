@@ -19,14 +19,6 @@ public class FallingBlock
     // cell instead of clipping its solid neighbors
     public const float HalfExtent = 0.49f;
 
-    private const float Gravity = 28f;
-    private const float TerminalVelocity = -30f;
-    private const float GroundFriction = 8f;
-
-    // A falling cube is heavier than an item drop: it does not float, it just sinks slowly
-    private const float WaterSinkSpeed = -3f;
-    private const float WaterDrag = 5f;
-
     // Seconds at rest before turning back into a block, so a cube still rolling off an edge
     // is not cemented mid-slide
     private const float SettleSeconds = 0.25f;
@@ -146,10 +138,8 @@ public class FallingBlock
         var submerged = Position.Y < chunks.GetFluidSurfaceGlobal(fluidX, fluidY, fluidZ);
         IsSubmerged = submerged;
 
-        if (submerged)
-            _velocity.Y = MathUtils.Damp(_velocity.Y, WaterSinkSpeed, WaterDrag, deltaTime);
-        else
-            _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+        // A falling cube is heavier than an item drop: it does not float, it just sinks slowly
+        _velocity.Y = BodyMotion.SinkOrFall(_velocity.Y, submerged, deltaTime);
 
         var movement = _velocity * deltaTime;
         var half = new Vector3(HalfExtent);
@@ -195,11 +185,7 @@ public class FallingBlock
         // 2.5 blocks/s nudge within centimeters, so it is skipped until the cube lands again
         if (hitY && _velocity.Y == 0f && !_sliding)
         {
-            var damp = MathF.Max(0f, 1f - GroundFriction * deltaTime);
-            _velocity.X *= damp;
-            _velocity.Z *= damp;
-            if (MathF.Abs(_velocity.X) < 0.01f) _velocity.X = 0f;
-            if (MathF.Abs(_velocity.Z) < 0.01f) _velocity.Z = 0f;
+            BodyMotion.ScrubOnGround(ref _velocity, deltaTime);
 
             if (_velocity.X == 0f && _velocity.Z == 0f)
                 _restTime += deltaTime;

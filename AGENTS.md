@@ -875,6 +875,8 @@ OpenGLTest/
                                #   query entities read (EntityLight); meshing, world sources and streaming below
       BoxSweep.cs              # GL-free, state-free solid-box axis sweep every loose body shares (drops, TNT, falling
                                #   blocks, projectiles, goblins, slimes, debris): StepSize, OffsetAxis, IsColliding, MoveOnAxis
+      BurningFluid.cs          # GL-free burning-fluid (lava) cell test over a box, behind MobLava.BodyInLava and
+                               #   PlayerBodyProbe.InLava
       CellKey.cs               # packs a world block cell into one long (fluid and leaf-decay schedules, tree growth sets),
                                #   forwarding to ChunkKey's one 21-bit bit math
       Chunk.cs                 # 16^3 block storage of one chunk: ids, the per-block state byte, the published light
@@ -1046,6 +1048,9 @@ OpenGLTest/
                                #   vendored FastNoiseLite (never reformat)
       AssetRoot.cs             # the assets-directory lookup the server, the item debugger and
                                #   the test fixture share
+      BodyMotion.cs            # GL-free, state-free velocity steps every loose body shares (drops, TNT, falling
+                               #   blocks, projectiles, goblins, slimes, debris): gravity, sinking, floating,
+                               #   water drag, bounce, ground scrub, and their numbers
       ColorSpace.cs            # exact sRGB transfer functions
       FastNoiseLite.cs         # vendored, don't reformat
       FileUtils.cs             # ReadFile: reads a file by path (assets are opened relative to the working directory)
@@ -1137,7 +1142,7 @@ OpenGLTest/
       MobFallDamage.cs         # GL-free mob fall damage: a share of the mob's pool per block past its safe height
       MobInterest.cs           # GL-free per-mob interest: sight checks, losing a hidden target, idle
                                #   time, the idle despawn gate and wander goals
-      MobLava.cs               # GL-free mob lava rule: body box in a burning fluid, damage per tick
+      MobLava.cs               # GL-free mob lava rule: body box in a burning fluid (BurningFluid), damage per tick
       MobLoot.cs               # GL-free loot toss: the up-and-out launch a killed mob's drops get
       MobTargets.cs            # GL-free target rules: body contact, nearest non-immune target, min distance
       PrimedTnt.cs             # a primed TNT block: a full-size cube that falls under gravity and
@@ -1367,7 +1372,7 @@ OpenGLTest/
                                #   body model, hurt and punch feedback, the saved-player apply, its PlayerContext
       ModeToggles.cs           # the creative (C) and double-tap flight toggles and the sprint latch
       PlayerBodyProbe.cs       # GL-free body probes over the live chunk map: known (loaded), grounded,
-                               #   in water, in lava; what the server judges a remote player's body by
+                               #   in water, in lava (BurningFluid); what the server judges a remote player's body by
       PlayerContext.cs         # who an interaction runs for: eye, aim, inventory, creative (local camera or a
                                #   server's connected player), threaded through every World interaction path
       PlayerHealth.cs          # the player's survival pool, 0-100 HP drawn as 10 hearts (1 heart = 10 HP)
@@ -3085,7 +3090,7 @@ loaded chunks around the reported position (`Player/PlayerBodyProbe.cs`: `IsKnow
 cell's chunk and the one `NetGroundProbeBlocks` below are loaded —, `Grounded` — the body lowered
 by `NetGroundProbeBlocks` collides, through the static `BodyCollision.BodyCollides` the client's
 own collision now delegates to —, `InWater`, mirroring `UpdateWaterState`'s swim test, and
-`InLava`, the one lava rule `UpdateWaterState` also calls). The fall tracker is fed once per
+`InLava`, the one lava rule `UpdateWaterState` also calls; its cell test, `BurningFluid.AnyInBox`, is the mobs' too). The fall tracker is fed once per
 **accepted** `PlayerState` (`ServerPlayer.ObserveAcceptedState`), with the state gap's allowed
 distance (`NetValidation.AllowedDistance(gap, NetMaxMoveBlocksPerSecond)`) as its teleport bound —
 exactly what the accepted position already obeys, so only the server's own teleports (join,
@@ -3513,8 +3518,8 @@ over the drop its impact speed implies: free up to `Mob.SafeFallBlocks` (`MobSaf
 adds its own hop's apex, so its hops never hurt it), then `MobFallDamagePerBlockShare` of the mob's
 full health (at least 1) per whole block past it, and nothing when the feet were in water
 (`MobFallDamageTests`). **Lava**: each manager calls `Mob.UpdateHazards` right after the mob's own
-update; a body box touching a burning fluid (`MobLava.BodyInLava`, the cell test of
-`PlayerBodyProbe.InLava`) takes `MobLava.DamagePerTick` (`MobLavaDamageShare` of its full health, at
+update; a body box touching a burning fluid (`MobLava.BodyInLava`, sharing the cell test
+`BurningFluid.AnyInBox` with `PlayerBodyProbe.InLava`) takes `MobLava.DamagePerTick` (`MobLavaDamageShare` of its full health, at
 least 1) every `MobLavaTickSeconds` with the hit flash, leaving it clears the partial tick, and a
 death it causes rolls the loot as usual (`MobLavaTests`). `visual-examples/mob-hazards.json`
 (`VOXEL_TIME=147`) films the falls and the lava bath. **Despawn fade**: a mob past every target's
@@ -3647,7 +3652,7 @@ stones never pile up as pickups. The rules:
 - **Movement.** Goblins auto-jump a one-block step they walked into, float and paddle in water like
   the slime, and are shoved away when they overlap the player on the ground.
 The launch velocity comes from **`GoblinAim.TryLaunchVelocity`**, the low arc of the exact ballistic
-solve under `ThrownProjectile.Gravity`. Always pass that constant, never a second gravity. The level
+solve under `ThrownProjectile.Gravity`. Always pass that constant, never a second gravity. It is an alias of `BodyMotion.Gravity`, the one gravity every loose body (drops, primed TNT, falling blocks, debris, goblins, slimes) falls under. The level
 range of a stone is `v²/g` (`GoblinStoneSpeed` 20 against gravity 28 gives about 14.3 blocks). The
 throw band must stay inside it, with margin for a chest-height target and the semi-implicit Euler drop.
 `GoblinAimTests` locks that relation down, so retuning the speed or the band cannot silently make edge

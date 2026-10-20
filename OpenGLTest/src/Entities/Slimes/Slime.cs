@@ -13,10 +13,6 @@ namespace VoxelEngine.Entities.Slimes;
 /// </summary>
 public sealed class Slime : Mob
 {
-    private const float Gravity = 28f;
-    private const float TerminalVelocity = -30f;
-    private const float GroundFriction = 8f;
-
     // Squash and stretch ride one under-damped spring (value = vertical scale offset), so a landing
     // rings out as a jiggle instead of easing back. The rest target breathes a little; a hop first
     // crouches (the windup) and launches with a stretch impulse.
@@ -30,14 +26,6 @@ public sealed class Slime : Mob
     private const float BreathAmplitude = 0.022f;
     private const float BreathRate = 2.3f;
     private const float TurnRate = 16f;
-
-    // Buoyancy, tuned like the item drops: instead of gravity a floating slime eases toward a
-    // rise proportional to how far under the surface it is, so it climbs, barely overshoots and
-    // bobs at the top. Water drags its sideways hop away and shrinks the hop itself.
-    private const float FloatSpeed = 1.5f;
-    private const float BuoyancyStiffness = 3f;
-    private const float WaterDrag = 4f;
-    private const float WaterFriction = 3f;
 
     // In water the hop keeps a land hop's total speed but halves its vertical share, moving the
     // rest into the horizontal, so the slime skims forward low and roughly twice as fast.
@@ -136,7 +124,7 @@ public sealed class Slime : Mob
         get
         {
             var lift = HopVelocity(Vector3.UnitX, inWater: false, Size).Y;
-            return base.SafeFallBlocks + lift * lift / (2f * Gravity);
+            return base.SafeFallBlocks + lift * lift / (2f * BodyMotion.Gravity);
         }
     }
 
@@ -268,7 +256,7 @@ public sealed class Slime : Mob
         var direction = new Vector3(target.X - Position.X, 0f, target.Z - Position.Z);
         if (direction.LengthSquared() < 1e-6f) return false;
         var hop = HopVelocity(Vector3.Normalize(direction), _inWater, Size);
-        var reach = 2f * MathF.Sqrt(hop.X * hop.X + hop.Z * hop.Z) * hop.Y / Gravity;
+        var reach = 2f * MathF.Sqrt(hop.X * hop.X + hop.Z * hop.Z) * hop.Y / BodyMotion.Gravity;
         return IsLedgeAhead(direction, reach, chunks, target);
     }
 
@@ -279,7 +267,7 @@ public sealed class Slime : Mob
         if (!wasGrounded && IsGrounded)
         {
             _squash.Impulse(-MathF.Min(fallSpeed, 20f) * LandKickPerSpeed);
-            NoteLanding(fallSpeed, Gravity, _inWater);
+            NoteLanding(fallSpeed, BodyMotion.Gravity, _inWater);
         }
 
         float target;
@@ -332,31 +320,27 @@ public sealed class Slime : Mob
         var floating = feetY < surfaceY;
         _inWater = floating;
 
+        // Buoyancy, tuned like the item drops: instead of gravity a floating slime eases toward a
+        // rise proportional to how far under the surface it is, so it climbs, barely overshoots and
+        // bobs at the top. Water drags its sideways hop away and shrinks the hop itself.
         if (floating)
         {
-            var targetY = Math.Clamp((surfaceY - feetY) * BuoyancyStiffness, -FloatSpeed, FloatSpeed);
-            _velocity.Y = MathUtils.Damp(_velocity.Y, targetY, WaterDrag, deltaTime);
+            _velocity.Y = BodyMotion.FloatTowardSurface(_velocity.Y, surfaceY, feetY, deltaTime);
 
             // Water scrubs the sideways motion so a floating slime drifts and bobs rather than
             // coasting: the same treatment the item drops get.
-            var drag = MathF.Exp(-WaterFriction * deltaTime);
-            _velocity.X *= drag;
-            _velocity.Z *= drag;
+            BodyMotion.DragInWater(ref _velocity, deltaTime);
         }
         else
         {
-            _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+            _velocity.Y = BodyMotion.Fall(_velocity.Y, deltaTime);
         }
 
         // Ground friction scrubs the shove off once the slime is standing, so a poke slides it a
         // short way and stops instead of launching it across the field.
         if (IsGrounded)
         {
-            var damp = MathF.Max(0f, 1f - GroundFriction * deltaTime);
-            _velocity.X *= damp;
-            _velocity.Z *= damp;
-            if (MathF.Abs(_velocity.X) < 0.01f) _velocity.X = 0f;
-            if (MathF.Abs(_velocity.Z) < 0.01f) _velocity.Z = 0f;
+            BodyMotion.ScrubOnGround(ref _velocity, deltaTime);
         }
 
         var movement = _velocity * deltaTime;

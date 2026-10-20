@@ -60,20 +60,9 @@ public sealed class Goblin : Mob
     /// feet are at <c>Position.Y - Height / 2</c>.</summary>
     public const float Height = 1.3f;
 
-    private const float Gravity = 28f;
-    private const float TerminalVelocity = -30f;
-    private const float GroundFriction = 8f;
-
     // Damp rate of the walking velocity toward the chosen move, so a goblin speeds up and turns
     // over a few frames instead of snapping to full speed.
     private const float MoveAccel = 12f;
-
-    // Buoyancy, the slime's numbers: a floating goblin eases toward a rise proportional to how
-    // far under the surface its feet are, so it climbs and bobs at the top.
-    private const float FloatSpeed = 1.5f;
-    private const float BuoyancyStiffness = 3f;
-    private const float WaterDrag = 4f;
-    private const float WaterFriction = 3f;
 
     // A floating goblin paddles toward its goal at this fraction of its walk speed, so it can
     // cross a pond and climb out instead of bobbing in place forever.
@@ -442,7 +431,7 @@ public sealed class Goblin : Mob
                   * (IsFleeing ? MobConfig.GoblinFleeSpeedFactor : 1f)
                 : MobConfig.GoblinWalkSpeed * SwimSpeedFactor;
             var moving = move != Vector3.Zero;
-            var rate = moving ? MoveAccel : IsGrounded ? GroundFriction : 0f;
+            var rate = moving ? MoveAccel : IsGrounded ? BodyMotion.GroundFriction : 0f;
             if (rate > 0f)
             {
                 _velocity.X = MathUtils.Damp(_velocity.X, move.X * speed, rate, deltaTime);
@@ -558,18 +547,16 @@ public sealed class Goblin : Mob
         var floating = feetY < surfaceY;
         _inWater = floating;
 
+        // Buoyancy, the slime's and the item drops' numbers: a floating goblin eases toward a rise
+        // proportional to how far under the surface its feet are, so it climbs and bobs at the top.
         if (floating)
         {
-            var targetY = Math.Clamp((surfaceY - feetY) * BuoyancyStiffness, -FloatSpeed, FloatSpeed);
-            _velocity.Y = MathUtils.Damp(_velocity.Y, targetY, WaterDrag, deltaTime);
-
-            var drag = MathF.Exp(-WaterFriction * deltaTime);
-            _velocity.X *= drag;
-            _velocity.Z *= drag;
+            _velocity.Y = BodyMotion.FloatTowardSurface(_velocity.Y, surfaceY, feetY, deltaTime);
+            BodyMotion.DragInWater(ref _velocity, deltaTime);
         }
         else
         {
-            _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
+            _velocity.Y = BodyMotion.Fall(_velocity.Y, deltaTime);
         }
 
         var movement = _velocity * deltaTime;
@@ -586,7 +573,7 @@ public sealed class Goblin : Mob
         if (hitY)
         {
             // IsGrounded still holds last frame's answer here, so this is the landing frame
-            if (movement.Y < 0f && !IsGrounded) NoteLanding(-_velocity.Y, Gravity, _inWater);
+            if (movement.Y < 0f && !IsGrounded) NoteLanding(-_velocity.Y, BodyMotion.Gravity, _inWater);
             IsGrounded = movement.Y < 0f;
             _velocity.Y = 0f;
         }
