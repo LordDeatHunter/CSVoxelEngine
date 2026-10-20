@@ -301,7 +301,7 @@ internal static class ChunkMeshBuilder
             {
                 if (TreeWoodShape.IsThin(paddedState[pIdx]))
                 {
-                    ChunkMesher.EmitTreeWood(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
+                    TreeWoodEmitter.EmitTreeWood(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                         x, y, z, type, basePos);
                     continue;
                 }
@@ -311,10 +311,10 @@ internal static class ChunkMeshBuilder
                 // cell only carves its own material); see EmitRimWood. Mask 0 is a plain cube.
                 if (BlockType.HasPixelRim(blockId))
                 {
-                    var rimMask = ChunkMesher.RimMaskInSnapshot(padded, paddedState, pIdx, blockId);
+                    var rimMask = TreeWoodEmitter.RimMaskInSnapshot(padded, paddedState, pIdx, blockId);
                     if (rimMask != 0)
                     {
-                        ChunkMesher.EmitRimWood(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight,
+                        TreeWoodEmitter.EmitRimWood(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight,
                             blockLight, x, y, z, type, basePos, rimMask);
                         continue;
                     }
@@ -326,7 +326,7 @@ internal static class ChunkMeshBuilder
             // Pebbles render as 1-3 ankle-high boxes sharing the cell; see EmitPebbles
             if (type.Renderer == BlockRenderer.Pebbles)
             {
-                ChunkMesher.EmitPebbles(worldX0, worldZ0, vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
+                StackEmitter.EmitPebbles(worldX0, worldZ0, vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                     x, y, z, type, basePos);
                 continue;
             }
@@ -334,7 +334,7 @@ internal static class ChunkMeshBuilder
             // Branch piles render as 1-4 crossed sticks sharing the cell; see EmitBranchPile
             if (type.Renderer == BlockRenderer.BranchPile)
             {
-                ChunkMesher.EmitBranchPile(worldX0, worldZ0, vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
+                StackEmitter.EmitBranchPile(worldX0, worldZ0, vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                     x, y, z, type, basePos);
                 continue;
             }
@@ -342,7 +342,7 @@ internal static class ChunkMeshBuilder
             // Layered snow renders as one box whose height is its stack depth; see EmitSnowLayers
             if (type.Renderer == BlockRenderer.SnowLayers)
             {
-                ChunkMesher.EmitSnowLayers(worldX0, chunkBaseY, worldZ0, vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
+                StackEmitter.EmitSnowLayers(worldX0, chunkBaseY, worldZ0, vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                     x, y, z, type, basePos);
                 continue;
             }
@@ -351,7 +351,7 @@ internal static class ChunkMeshBuilder
             // translucent lists; see EmitFluid
             if (type.Renderer == BlockRenderer.Fluid)
             {
-                ChunkMesher.EmitFluid(tVertices, tIndices, ref tIndexOffset, padded, paddedState, pIdx,
+                FluidEmitter.EmitFluid(tVertices, tIndices, ref tIndexOffset, padded, paddedState, pIdx,
                     sunLight, blockLight, x, y, z, type, basePos);
                 hasWater = true;
                 if (IsHotFluidVent(padded[pIdx], padded[pIdx + FaceNeighborDelta[4]]))
@@ -441,7 +441,7 @@ internal static class ChunkMeshBuilder
                     if (cullSameFullWood && neighbor == blockId
                         && WoodState.IsFullCube(paddedState[pIdx + FaceNeighborDelta[cullFace]])
                         && (!BlockType.HasPixelRim(blockId)
-                            || ChunkMesher.RimFaceFull(padded, paddedState, pIdx + FaceNeighborDelta[cullFace], blockId,
+                            || TreeWoodEmitter.RimFaceFull(padded, paddedState, pIdx + FaceNeighborDelta[cullFace], blockId,
                                 TreeWoodShape.Opposite(cullFace)))) continue;
 
                     // Light of the air cell in front of the face, from the wide light volume
@@ -454,7 +454,7 @@ internal static class ChunkMeshBuilder
                     // The water surface the caustics measure depth from: this face's own body
                     // of water, resolved exactly as the greedy pass keys it
                     if (submerged)
-                        waterSurface = ChunkMesher.BakedWaterSurface(padded, paddedState, pIdx + FaceNeighborDelta[cullFace],
+                        waterSurface = WaterSurfaceCodes.BakedWaterSurface(padded, paddedState, pIdx + FaceNeighborDelta[cullFace],
                             chunkBaseY, columns);
                 }
                 else

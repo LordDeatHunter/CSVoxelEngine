@@ -591,7 +591,7 @@ to 255 at its tip, never 253/254, and the vertex shader hands the fragment an al
 the exact-byte water/LOD-foliage flags only ever see non-swaying vertices), the `ushort Layer` at 28 (attribute location 7, an integer attribute) and the `ushort
 WaterSurface` at 30 (attribute location 8, also integer): the baked water surface over a
 submerged face in quarter blocks (`Vertex.EncodeWaterSurface`, 0 on every dry face). The mesher
-gets it from `ChunkMesher.SubmergedSurfaceCode`, which walks the fluid column in the padded snapshot and
+gets it from `WaterSurfaceCodes.SubmergedSurfaceCode`, which walks the fluid column in the padded snapshot and
 resolves a column that leaves the snapshot from the build's resolved `ColumnTerrain.WaterLevel`
 (`MeshScratch.Columns`, worldgen or streamed, see "Chunk meshing"); it rides the greedy key
 as a 7-bit code in bits 25-31 (bits 16-23 are unused), so a merge never crosses two water surfaces. On a **fluid** quad
@@ -715,8 +715,8 @@ faces per depth slice into a 16×16 bit plane and merges rectangles — but only
 where the key's AO and both corner lights are constant, so the merged quad's interpolated shade
 and light equal the per-cell values exactly. Merged quads carry UVs 0..W / 0..H in tile units
 (`TiledUv`) and the sampler's REPEAT tiles them. The per-voxel loop then skips greedy cells and
-emits everything else as before (tree wood — `ChunkMesher.EmitTreeWood`'s node box and connecting tubes
-for a thin cell, `ChunkMesher.EmitRimWood`'s stair-stepped `TreeWoodShape.RimBoxes` for a beveled
+emits everything else as before (tree wood — `TreeWoodEmitter.EmitTreeWood`'s node box and connecting tubes
+for a thin cell, `TreeWoodEmitter.EmitRimWood`'s stair-stepped `TreeWoodShape.RimBoxes` for a beveled
 pixel-rim trunk shell — pebbles, fluids, any model with cropped or rotated UVs); its full, shaded,
 culled cube faces use the same corner rule, and the procedural emitters (tree wood, pebbles, branch
 piles, snow layers) bilinearly interpolate the smooth corner light
@@ -903,11 +903,15 @@ OpenGLTest/
         ChunkMeshData.cs       # CPU-side mesh of one chunk (opaque + translucent lists, light snapshot, vents, flame points)
         ChunkMeshScheduler.cs  # the dirty set, the per-frame dirty scan, the thread-pool mesh runners, the completed queue and budgeted upload,
                                #   the immediate remesh paths (behind ChunkManager.Update, MarkDirty, ImmediateRemesh*)
-        ChunkMesher.cs         # the greedy pass + per-voxel procedural emitters + water-surface codes
+        ChunkMesher.cs         # the binary greedy pass, the biome-tinted cube face and model-tint helpers, and the box-face/quad primitives the emitters share
         FaceLight.cs           # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
+        FluidEmitter.cs        # a fluid cell's surface and side quads: order-independent corner heights, corner light, per-corner flow codes
         MeshScratch.cs         # per-thread scratch buffers of the binary greedy mesh pass
         PaneEmitter.cs         # a pane cell from the padded snapshot: post + arms, no face between
                                #   connected panes, caps culled against a same-shaped pane above/below
+        StackEmitter.cs        # the stack-block emitters: pebble piles, branch piles, layered snow
+        TreeWoodEmitter.cs     # tree wood: a thin cell's node box, tubes and plugs; the beveled pixel-rim trunk shell (RimBoxes)
+        WaterSurfaceCodes.cs   # the 7-bit water-surface code a submerged face keys on (SubmergedSurfaceCode), its decode, BakedWaterSurface
       Sources/                 # where a world's terrain comes from: IWorldSource and its implementations (see "World sources")
         GeneratedWorldSource.cs # the default IWorldSource: ColumnCache.Get + Chunk.GenerateBlockData, byte-identical
                                 #   to the path before world sources existed
@@ -2308,7 +2312,7 @@ index order; a wide limb elsewhere renders as a 16 px full cube, and a species t
 16 px rasterizes exactly as before shells existed.
 
 **Mesh, collision and the pixel rim.** `tree_wood` meshes on the per-voxel path, never greedy:
-`ChunkMesher.EmitTreeWood` draws a thin cell as a node box sized `TreeWoodShape.HalfWidth(t)` plus one
+`TreeWoodEmitter.EmitTreeWood` draws a thin cell as a node box sized `TreeWoodShape.HalfWidth(t)` plus one
 capless tube toward every connection at the thinner of the two widths (`TubeHalf`) and a same-width
 capless plug toward every adjacent solid occluding non-wood block (`TreeWoodShape.PlugMask`: the
 ground, a wall), so a thin trunk or root meets the ground it rests on instead of floating the node
@@ -2319,7 +2323,7 @@ by `TreeSpeciesLoader.LoadTreeSpecies`) gets its outer shells beveled from their
 neighbors: `TreeWoodShape.RimCornerMask` carves a corner when neither of its two edge neighbors
 is same-id attached full-cube wood (a cell only ever removes its own material, so diagonals never
 matter), `RimBoxes` turns the mask into stair-stepped full-height boxes (`RimInsetPx`, at most
-`MaxRimBoxes`, `TreeRimBevelPx` deep), and `ChunkMesher.EmitRimWood` meshes exactly those boxes from the
+`MaxRimBoxes`, `TreeRimBevelPx` deep), and `TreeWoodEmitter.EmitRimWood` meshes exactly those boxes from the
 18³ snapshot with caps that subtract a beveled cell above or below. The hitboxes match the mesh:
 `TreeWoodShape.GetBoxes`/`GetBoxesAt`/`OverlapsShape` (node, tubes and rim boxes, allocation-free)
 feed the raycast, the selection outline and `PlayerPhysics.IsColliding`.

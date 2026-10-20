@@ -5,7 +5,7 @@ using VoxelEngine.Effects.Lighting;
 namespace VoxelEngine.Chunks.Meshing;
 
 /// <summary>
-/// The smooth corner light of one full cell face (see <see cref="Chunk.SmoothCornerLight"/>),
+/// The smooth corner light of one full cell face (see <see cref="ChunkLighting.SmoothCornerLight"/>),
 /// bilinearly interpolated for geometry that sits inside the cell: tree wood, pebbles, branch
 /// piles, snow layers and fluids light each vertex from where it lies on the cell face it takes
 /// its light from, so a partial block blends into the full cubes beside it instead of stepping.

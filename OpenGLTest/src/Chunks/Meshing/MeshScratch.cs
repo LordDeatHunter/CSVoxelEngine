@@ -37,7 +37,7 @@ internal sealed class MeshScratch
     internal readonly int[] PlaneKeys = new int[Chunk.Size * Chunk.Size];
 
     /// <summary>Parallel 48-bit light key of each open plane: the four 12-bit smooth corner
-    /// light codes (<c>Chunk.SmoothCornerLight</c>), corner j at bit 12j. A plane matches a face
+    /// light codes (<see cref="ChunkLighting.SmoothCornerLight"/>), corner j at bit 12j. A plane matches a face
     /// only when both this and <see cref="PlaneKeys"/> are equal.</summary>
     internal readonly ulong[] PlaneLightKeys = new ulong[Chunk.Size * Chunk.Size];
 
@@ -67,7 +67,7 @@ internal sealed class MeshScratch
     /// column (cx - 1 + dx, cz - 1 + dz), resolved once by <see cref="ChunkLighting.FillColumns"/>
     /// from <c>Chunk.GenerateMeshData</c> (worldgen or streamed, through
     /// <see cref="ChunkManager.ColumnSource"/>). Read by the sun seeding,
-    /// <see cref="ChunkMesher.SubmergedSurfaceCode"/> and the biome tint fields; cleared at the end
+    /// <see cref="WaterSurfaceCodes.SubmergedSurfaceCode"/> and the biome tint fields; cleared at the end
     /// of the build like <see cref="ClearNeighbors"/>, so pooled threads hold no column references
     /// at rest.</summary>
     internal readonly ColumnTerrain[] Columns = new ColumnTerrain[9];

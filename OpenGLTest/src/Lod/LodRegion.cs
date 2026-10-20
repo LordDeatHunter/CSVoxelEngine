@@ -1003,7 +1003,7 @@ public class LodRegion : IDisposable
                 if (tinted is { } palette)
                 {
                     // A biome-tinted face bakes shade * tint into the rgb like the chunk mesher
-                    // (Chunk.EmitTintedCubeFace); bit 4 makes the fragment apply BiomeTint.Gain.
+                    // (ChunkMesher.EmitTintedCubeFace); bit 4 makes the fragment apply BiomeTint.Gain.
                     BiomeTint.Shade(shade, SampleTint(palette, pos), out var r, out var g, out var b);
                     targetVertices.Add(new Vertex(pos, r, g, b, alpha, uv[c], tile, suns[c], 0f, normal,
                         biomeTint: true));
