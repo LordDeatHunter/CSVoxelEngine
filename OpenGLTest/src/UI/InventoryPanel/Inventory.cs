@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Items;
@@ -9,27 +8,6 @@ using VoxelEngine.Saves;
 using VoxelEngine.UI.Hud;
 
 namespace VoxelEngine.UI.InventoryPanel;
-
-/// <summary>Which storage pool an id belongs to. Each pool has its own shared cap.</summary>
-public enum InventoryCategory
-{
-    Blocks,
-    Tools,
-    Misc,
-    Crafting,
-}
-
-/// <summary>
-/// One hotbar slot: either a reference to a stackable id (blocks/misc, whose count is the
-/// pool total, so several slots can show the same id and stay in sync) or to a single tool
-/// instance (tools are never stacked, so slots sharing an instance morph together while
-/// slots holding different instances stay independent). The default value is empty.
-/// </summary>
-public readonly record struct HotbarSlot(bool IsTool, byte Id, int ToolInstance)
-{
-    public static HotbarSlot Empty => default;
-    public bool IsEmpty => !IsTool && Id == 0;
-}
 
 /// <summary>
 /// The player's belongings: three category pools plus a 10-slot hotbar of references into
@@ -73,6 +51,15 @@ public class Inventory
     private int _nextToolInstance = 1;
 
     private readonly HotbarSlot[] _hotbar = new HotbarSlot[SlotCount];
+
+    // The same instances, handed to the static helpers that work on this inventory
+    // (InventoryCrafting, InventorySaveCodec); state lives only here
+    internal List<ItemStack> Tools => _tools;
+    internal Dictionary<byte, int> Blocks => _blocks;
+    internal Dictionary<byte, int> Misc => _misc;
+    internal HashSet<byte> Known => _known;
+    internal HotbarSlot[] Hotbar => _hotbar;
+    internal int NextToolInstance { get => _nextToolInstance; set => _nextToolInstance = value; }
 
     /// <summary>Which hotbar slot is in hand; always a valid index.</summary>
     public int SelectedIndex { get; private set; }
@@ -386,8 +373,7 @@ public class Inventory
     }
 
     /// <summary>Recipes the pools can currently afford, including room for the result.</summary>
-    public IReadOnlyList<CraftingRecipe> Craftable() =>
-        ContentRegistry.CraftingRecipes.Where(CanCraft).ToArray();
+    public IReadOnlyList<CraftingRecipe> Craftable() => InventoryCrafting.Craftable(this);
 
     /// <summary>Whether one craft of this recipe would succeed: ingredients on hand plus
     /// room for the result (consumption frees room first, so a full pool still crafts
@@ -400,26 +386,7 @@ public class Inventory
     /// picked member alone must cover its ingredient's share.
     /// </summary>
     public bool CanCraftBatch(CraftingRecipe recipe, int batch,
-        Func<int, CraftingRecipe.Ingredient, byte>? pickMember)
-    {
-        if (batch < 1) return false;
-        for (var i = 0; i < recipe.Ingredients.Length; i++)
-        {
-            var ingredient = recipe.Ingredients[i];
-            var need = ingredient.Count * batch;
-            if (pickMember != null)
-            {
-                var picked = pickMember(i, ingredient);
-                if (!ingredient.Accepts(picked) || CountFor(picked) < need) return false;
-            }
-            else if (AvailableFor(ingredient) < need) return false;
-        }
-
-        var category = CategoryOf(recipe.ResultId);
-        if (!category.HasValue) return false;
-        return UsedOf(category.Value) - FreedBy(recipe, category.Value) * batch
-            + recipe.ResultCount * batch <= CapacityOf(category.Value);
-    }
+        Func<int, CraftingRecipe.Ingredient, byte>? pickMember) => InventoryCrafting.CanCraftBatch(this, recipe, batch, pickMember);
 
     /// <summary>Consumes one craft's ingredients and adds its result. Returns false when
     /// the recipe is not currently craftable, consuming nothing.</summary>
@@ -432,32 +399,7 @@ public class Inventory
     /// the batch is not currently craftable, consuming nothing.
     /// </summary>
     public bool TryCraft(CraftingRecipe recipe, int batch,
-        Func<int, CraftingRecipe.Ingredient, byte>? pickMember)
-    {
-        if (!CanCraftBatch(recipe, batch, pickMember)) return false;
-        for (var i = 0; i < recipe.Ingredients.Length; i++)
-        {
-            var ingredient = recipe.Ingredients[i];
-            var need = ingredient.Count * batch;
-            if (pickMember != null)
-                RemoveUnits(pickMember(i, ingredient), need);
-            else if (ingredient.IsTag)
-            {
-                foreach (var member in ingredient.AcceptedIds)
-                {
-                    if (need <= 0) break;
-                    var take = Math.Min(need, CountFor(member));
-                    if (take > 0)
-                    {
-                        RemoveUnits(member, take);
-                        need -= take;
-                    }
-                }
-            }
-            else RemoveUnits(ingredient.Id, need);
-        }
-        return Add(recipe.ResultId, recipe.ResultCount * batch);
-    }
+        Func<int, CraftingRecipe.Ingredient, byte>? pickMember) => InventoryCrafting.TryCraft(this, recipe, batch, pickMember);
 
     /// <summary>Display name for a list row or preview heading.</summary>
     public static string DisplayName(byte id)
@@ -539,93 +481,11 @@ public class Inventory
         _tools.FirstOrDefault(t => t.InstanceId == instanceId)?.MarkUsed(now, delay);
 
     /// <summary>
-    /// Every <see cref="ItemStack"/> component type the save codec accounts for. Durability,
-    /// crucible contents and the rename are written by <see cref="Export"/>;
-    /// <see cref="CooldownComponent"/> is handled by deliberate omission, since it holds an
-    /// absolute window-clock time that means nothing in another session (a restored stack
-    /// starts ready). The coverage test fails when a stack grows a component type not listed
-    /// here, so a new one cannot be silently left out of the save.
-    /// </summary>
-    internal static readonly Type[] HandledComponentTypes =
-    [
-        typeof(DurabilityComponent), typeof(CrucibleComponent), typeof(DisplayNameComponent),
-        typeof(CooldownComponent),
-    ];
-
-    /// <summary>
     /// Snapshots the whole inventory for <c>player.json</c>: every pool entry, every tool
     /// instance with its components, the hotbar layout and the selection. Content is named
     /// through <see cref="SaveNames"/>; an id with no stable name is left out with one warning.
     /// </summary>
-    public PlayerSaveData.InventoryData Export()
-    {
-        var unnamed = new List<string>();
-
-        List<PlayerSaveData.StackData> ExportStore(Dictionary<byte, int> store)
-        {
-            var list = new List<PlayerSaveData.StackData>();
-            foreach (var (id, count) in store)
-            {
-                if (count <= 0) continue;
-                if (SaveNames.NameOf(id) is { } name)
-                    list.Add(new PlayerSaveData.StackData { Name = name, Count = count });
-                else unnamed.Add($"id {id}");
-            }
-            return list;
-        }
-
-        var tools = new List<PlayerSaveData.ToolData>();
-        foreach (var stack in _tools)
-        {
-            if (SaveNames.NameOf(stack.DefinitionId) is not { } name)
-            {
-                unnamed.Add($"tool id {stack.DefinitionId}");
-                continue;
-            }
-            var tool = new PlayerSaveData.ToolData { InstanceId = stack.InstanceId, Name = name };
-            if (stack.UsesDurability)
-            {
-                var durability = stack.Get<DurabilityComponent>();
-                tool.UsesLeft = durability.UsesLeft;
-                tool.MaxUses = durability.MaxUses;
-            }
-            if (stack.Item.CrucibleCapacityMl > 0)
-            {
-                var crucible = stack.Get<CrucibleComponent>();
-                tool.Crucible = new PlayerSaveData.CrucibleData
-                {
-                    Material = crucible.MaterialId == 0 ? null : SaveNames.MaterialNameOf(crucible.MaterialId),
-                    MoltenMl = crucible.MoltenMl,
-                    PendingMl = crucible.PendingMl,
-                    PendingInput = SaveNames.NameOf(crucible.PendingInputId),
-                };
-            }
-            tool.CustomName = stack.Get<DisplayNameComponent>().CustomName;
-            if (stack.Enchantments.Count > 0)
-                tool.Enchantments = new Dictionary<string, int>(stack.Enchantments, StringComparer.Ordinal);
-            tools.Add(tool);
-        }
-
-        var hotbar = new List<PlayerSaveData.HotbarSlotData>(SlotCount);
-        foreach (var slot in _hotbar)
-            hotbar.Add(slot.IsTool
-                ? new PlayerSaveData.HotbarSlotData { IsTool = true, ToolInstance = slot.ToolInstance }
-                : new PlayerSaveData.HotbarSlotData { IsTool = false, Name = SaveNames.NameOf(slot.Id), ToolInstance = 0 });
-
-        var data = new PlayerSaveData.InventoryData
-        {
-            Blocks = ExportStore(_blocks),
-            Misc = ExportStore(_misc),
-            Tools = tools,
-            Hotbar = hotbar,
-            SelectedIndex = SelectedIndex,
-            NextToolInstance = _nextToolInstance,
-            Known = ExportKnown(),
-        };
-        if (unnamed.Count > 0)
-            Log.Warn($"Player save: left out content with no save name: {string.Join(", ", unnamed)}");
-        return data;
-    }
+    public PlayerSaveData.InventoryData Export() => InventorySaveCodec.Export(this);
 
     /// <summary>
     /// Whether this player has ever obtained the id — the look-at label's "Unknown" rule (see
@@ -633,15 +493,6 @@ public class Inventory
     /// restored save's obtained names are marked on import.
     /// </summary>
     public bool Knows(byte id) => _known.Contains(id);
-
-    // The obtained set as save names, for Export
-    private List<string> ExportKnown()
-    {
-        var names = new List<string>(_known.Count);
-        foreach (var id in _known)
-            if (SaveNames.NameOf(id) is { } name) names.Add(name);
-        return names;
-    }
 
     /// <summary>
     /// Replaces everything this inventory holds — the constructor's spawn stock included —
@@ -651,166 +502,16 @@ public class Inventory
     /// know, or that belong to the wrong pool, are dropped with one warning, and a hotbar slot
     /// pointing at dropped content comes back empty.
     /// </summary>
-    public void Import(PlayerSaveData.InventoryData data)
-    {
-        _blocks.Clear();
-        _misc.Clear();
-        _tools.Clear();
-        _known.Clear();
-        Array.Fill(_hotbar, HotbarSlot.Empty);
-        var dropped = new List<string>();
+    public void Import(PlayerSaveData.InventoryData data) => InventorySaveCodec.Import(this, data);
 
-        // The obtained set: the saved names that still exist this run
-        if (data.Known != null)
-            foreach (var name in data.Known)
-                if (name != null && SaveNames.TryResolve(name, out var known)) _known.Add(known);
-
-        void ImportStore(List<PlayerSaveData.StackData>? entries, InventoryCategory category,
-            Dictionary<byte, int> store)
-        {
-            if (entries == null) return;
-            var capacity = CapacityOf(category);
-            var used = 0;
-            foreach (var entry in entries)
-            {
-                if (entry == null) continue;
-                if (!SaveNames.TryResolve(entry.Name, out var id) || CategoryOf(id) != category)
-                {
-                    dropped.Add(entry.Name ?? "(no name)");
-                    continue;
-                }
-                var count = Math.Min(entry.Count ?? 0, capacity - used);
-                if (count <= 0) continue;
-                store[id] = store.GetValueOrDefault(id) + count;
-                used += count;
-            }
-        }
-
-        ImportStore(data.Blocks, InventoryCategory.Blocks, _blocks);
-        ImportStore(data.Misc, InventoryCategory.Misc, _misc);
-
-        var maxRestored = 0;
-        if (data.Tools != null)
-            foreach (var tool in data.Tools)
-            {
-                if (_tools.Count >= ToolCapacity) break;
-                if (tool == null) continue;
-                // Any pure item may be a tool instance, not just a Tools-category one: the spawn
-                // stock puts the copper pickaxe and axe (no durability, no use action, so their
-                // StorageCategory is Misc) straight into the tools pool, and a save must bring
-                // them back. Blocks never are.
-                if (!SaveNames.TryResolve(tool.Name, out var id)
-                    || ItemRegistry.TryGet(id) is not { } item
-                    || CategoryOf(id) is not (InventoryCategory.Tools or InventoryCategory.Misc))
-                {
-                    dropped.Add(tool.Name ?? "(no name)");
-                    continue;
-                }
-                if (tool.InstanceId is not { } instanceId || instanceId <= 0
-                    || _tools.Any(t => t.InstanceId == instanceId))
-                {
-                    dropped.Add($"{tool.Name} (instance {tool.InstanceId?.ToString() ?? "none"})");
-                    continue;
-                }
-
-                var stack = new ItemStack(instanceId, item);
-                if (item.MaxDurability > 0 && tool.UsesLeft is { } usesLeft)
-                    stack.Set(new DurabilityComponent(Math.Clamp(usesLeft, 0, item.MaxDurability),
-                        item.MaxDurability));
-                if (item.CrucibleCapacityMl > 0 && tool.Crucible is { } crucible)
-                {
-                    byte material = 0;
-                    if (!string.IsNullOrEmpty(crucible.Material)
-                        && !SaveNames.TryResolveMaterial(crucible.Material, out material))
-                        dropped.Add($"molten {crucible.Material}");
-                    else
-                    {
-                        var pendingInput = SaveNames.TryResolve(crucible.PendingInput, out var input) ? input : (byte)0;
-                        var capacity = item.CrucibleCapacityMl;
-                        var molten = Math.Clamp(crucible.MoltenMl ?? 0, 0, capacity);
-                        var pending = Math.Clamp(crucible.PendingMl ?? 0, 0, capacity - molten);
-                        stack.Set(new CrucibleComponent(material, molten, pending, pendingInput));
-                    }
-                }
-                if (tool.CustomName != null)
-                    stack.Rename(tool.CustomName);
-                if (tool.Enchantments != null)
-                    foreach (var (enchantment, level) in tool.Enchantments)
-                        stack.Enchantments[enchantment] = level;
-                _tools.Add(stack);
-                maxRestored = Math.Max(maxRestored, instanceId);
-            }
-        _nextToolInstance = Math.Max(data.NextToolInstance ?? 1, maxRestored + 1);
-
-        if (data.Hotbar != null)
-            for (var i = 0; i < Math.Min(SlotCount, data.Hotbar.Count); i++)
-            {
-                var slot = data.Hotbar[i];
-                if (slot == null) continue;
-                if (slot.IsTool == true)
-                {
-                    if (slot.ToolInstance is { } instance && _tools.Any(t => t.InstanceId == instance))
-                        _hotbar[i] = new HotbarSlot(true, 0, instance);
-                }
-                else if (SaveNames.TryResolve(slot.Name, out var id) && StoreOf(id) != null && CountFor(id) > 0)
-                    _hotbar[i] = new HotbarSlot(false, id, 0);
-            }
-        Select(data.SelectedIndex ?? 0);
-
-        if (dropped.Count > 0)
-            Log.Warn($"Player save: dropped inventory content this run cannot restore: {string.Join(", ", dropped)}");
-    }
-
-    private Dictionary<byte, int>? StoreOf(byte id) => CategoryOf(id) switch
+    internal Dictionary<byte, int>? StoreOf(byte id) => CategoryOf(id) switch
     {
         InventoryCategory.Blocks => _blocks,
         InventoryCategory.Misc => _misc,
         _ => null,
     };
 
-    private int AvailableFor(CraftingRecipe.Ingredient ingredient)
-    {
-        var total = 0;
-        foreach (var id in ingredient.AcceptedIds)
-            total += CountFor(id);
-        return total;
-    }
-
-    private int FreedBy(CraftingRecipe recipe, InventoryCategory category)
-    {
-        var freed = 0;
-        foreach (var ingredient in recipe.Ingredients)
-        {
-            if (ingredient.IsTag)
-            {
-                if (ingredient.AcceptedIds.All(id => CategoryOf(id) == category))
-                    freed += ingredient.Count;
-            }
-            else if (CategoryOf(ingredient.Id) == category) freed += ingredient.Count;
-        }
-        return freed;
-    }
-
-    private void RemoveUnits(byte id, int count)
-    {
-        if (CategoryOf(id) == InventoryCategory.Tools)
-        {
-            foreach (var instance in _tools.Where(t => t.DefinitionId == id).Take(count).ToArray())
-                RemoveTool(instance.InstanceId);
-            return;
-        }
-        var store = StoreOf(id);
-        if (store == null) return;
-        var left = store.GetValueOrDefault(id) - count;
-        if (left <= 0)
-        {
-            store.Remove(id);
-            ClearSlotsShowing(id);
-        }
-        else store[id] = left;
-    }
-
-    private void ClearSlotsShowing(byte id)
+    internal void ClearSlotsShowing(byte id)
     {
         for (var i = 0; i < _hotbar.Length; i++)
             if (_hotbar[i] is { IsTool: false } slot && slot.Id == id)

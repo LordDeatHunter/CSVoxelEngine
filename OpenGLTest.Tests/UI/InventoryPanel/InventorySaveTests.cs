@@ -183,6 +183,6 @@ public sealed class InventorySaveTests
 
         foreach (var stack in stacks)
             foreach (var type in stack.ComponentTypes)
-                Assert.Contains(type, Inventory.HandledComponentTypes);
+                Assert.Contains(type, InventorySaveCodec.HandledComponentTypes);
     }
 }

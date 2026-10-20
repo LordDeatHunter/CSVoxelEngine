@@ -1613,8 +1613,12 @@ OpenGLTest/
         CraftingSession.cs     # the crafting tab's open recipe, copies and fed reservations
         CreativeCatalog.cs     # GL-free browsable catalog of every item, grouped by pool and name-sorted
         HotbarLayout.cs        # hotbar strip geometry shared by the draw, its hit-test and the panel
+        HotbarSlot.cs          # one hotbar slot: a stackable id or a tool instance (the default is empty)
         Inventory.cs, ItemStack.cs  # the three pools, the hotbar, stacks and their components
+        InventoryCategory.cs   # which storage pool an id belongs to (Blocks, Tools, Misc, Crafting)
+        InventoryCrafting.cs   # GL-free crafting rules behind Inventory's Craftable/CanCraftBatch/TryCraft forwarders
         InventoryPanelLayout.cs # [E] panel geometry, tabs, the search field, the catalog buttons, rows and scrollbar hit-testing
+        InventorySaveCodec.cs  # Inventory's player.json mapping (Export/Import forwarders), HandledComponentTypes
         InventorySearch.cs     # GL-free matching of owned items and recipes behind the search field
         InventoryView.cs       # [E] panel selection/scroll/focus state; ResetForNewWorld between worlds
         SearchFieldState.cs    # a dropdown search field's query, suggestion cursor and scroll
