@@ -850,7 +850,7 @@ OpenGLTest/
                                #   the frame-order OnUpdate/OnRender orchestration
     World.cs                   # the composition root: owns Camera, ChunkManager, ChunkGenerationWorker, LodManager,
                                #   the simulations and the per-job components (BlockEditor, BlockPlacer, LeftClickAction,
-                               #   RightClickAction, ThrowAction, LocalPlayer, ClientMirror, WorldPersistence, WorldRenderer,
+                               #   RightClickAction, ThrowAction, LocalPlayer, ClientMirror, WorldPersistence, MobDirector, WorldRenderer,
                                #   ...); runs Update/UpdateClient/UpdateLoading, the Loading phase and SaveAndDispose,
                                #   and holds the dedicated server's public facade (BreakBlockFor, TryUseSelected, ...)
     WorldPhase.cs              # Loading / Playing / Disposed
@@ -1548,6 +1548,8 @@ OpenGLTest/
                                #   slot and its melt loop, plus the multiblock integrity sweep
       LeafDecayManager.cs      # leaf decay + orphaned-wood crumble: a fixed tick over scheduled cells,
                                #   hydration from live tips (ScheduleAround/ScheduleBox from every edit path)
+      MobDirector.cs           # World component: the per-frame mob job (the targets, the slime and goblin updates and
+                               #   their damage, the blast shove, the mob list and its scenario spawn/damage seams)
       MobSpawner.cs            # the shared dry-forest-surface ring spawn search
       QuernManager.cs          # block-entity registry for querns: one crushable unit per cell plus a one-rotation spin timer
       SaplingManager.cs        # the saplings planted in the world (an acorn, or any
@@ -2564,7 +2566,7 @@ Other invariants:
 - **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `BlockEditor.RemoveBlock`, `BlockEditor.FellWood` (per cleared cell, and in both single-block branches), `BlockPlacer.PlaceBlockAtFace` (which every placement ends in: `BlockPlacer.TryPlaceBlockFromRaycast` through `PlaceAgainstFace`, and the item-use `IItemUseWorld.PlaceBlockAtFace`), `BlockInteractions.ToggleOpenCell`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate` (`WorldItemUse`'s `ScoopFluidCell`/`PourFluidCell`), which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `BlockEditor.RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes fluids.
 - **Every block edit path must also call `LeafDecayManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the leaves near the edit never re-derive their hydration: a cut limb's canopy would hang forever, and an orphaned wood cell would never crumble. `Simulation/LeafDecayManager.cs` (owned by `World` as `_leafDecay`, main thread only) grows each scheduled box by its `ScheduleReach` itself, so a caller passes only the edited cells. The current call sites: `BlockEditor.RemoveBlock`; `BlockEditor.FellWood` (`ScheduleAround` in both single-block branches, one `ScheduleBox` over the whole felled batch, never one per cell); `BlockPlacer.PlaceBlockAtFace`, which every placement goes through (`BlockPlacer.TryPlaceBlockFromRaycast` and the item-use `IItemUseWorld.PlaceBlockAtFace`); the `IItemUseWorld` bucket and TNT-prime wrappers on `WorldItemUse` (`ScoopFluidCell`, `PourFluidCell`, `RemoveCellForPrime`), scheduled for uniformity; `BlockInteractions.ToggleOpenCell`; `TntManager.Detonate` (`ScheduleBox` over the blast box); and `TreeGrowthWriter` (one `ScheduleBox` over the box it wrote). A new edit path adds its call next to its `FluidManager.ScheduleAround`.
 - **Gravity**: `Simulation/FallingBlockManager.cs` (owned by `World`, main thread only) topples `falls` blocks into `FallingBlock` entities and writes rested cubes back as blocks. Every edit path that can unsupport one must call `TryTopple` above it (`BlockEditor.RemoveBlock`, `BlockEditor.FellWood` per cleared cell, `BlockPlacer.PlaceAgainstFace` at the placed cell (the path of `BlockPlacer.TryPlaceBlockFromRaycast`) and `WorldItemUse`'s `IItemUseWorld.AfterPlaced` after an item's own placement, `TntManager.Detonate` via `CheckColumn` bottom-up over the blast box); fluids never count as support, so fluid edits need no hook. A landing cube slides with chance (8 - solid neighbors of its support) / 8 toward a random clear side, corners included (a corner needs its two flanking sides and the three cells above it clear), committing to its direction across landings, and drops straight once past the edge. Sand stacks on sand: a falls-block support never slides, so towers rebuild. A calm landing converts at once so a collapsing tower settles bottom-up instead of interpenetrating, and a cube that would rest over air pops out as a drop instead of floating. A live cube owns its cell: `BlockPlacer.PlaceBlockAtFace` refuses placements into one, cubes shove the player aside one-way (`Camera.PushOutOf`, never through walls, never while flying), and a cube motionless-but-unsettled for 5 s breaks into its usual loot instead of hovering. Shorelines generate from sand (`TerrainGenerator.IsBeachHeight`, gravel-capped where `IsGravelPatch`); the far LOD wears sand and gravel there too, the gravel read with one noise eval per cell.
-- **TNT**: `Simulation/TntManager.cs` (owned by `World`, main thread only, never ticked on a client) runs the primed cubes (`PrimedTnt`). A cube lit by hand burns `TntManager.PlayerFuseSeconds` (1 s) and one lit by another blast `ChainFuseSeconds` (0.5 s), so a chain stays prompt; `PrimedTnt.WhiteFlash` ramps its strobe from 4 to 16 Hz over whatever fuse it was given (`FirestarterTests`). A blast shoves everything loose within `BlastRadius` away from its center (`BlastImpulse.At`: `BlastPushMaxSpeed` at the center falling linearly to zero at the radius, the direction tipped up by `BlastPushUpBias`, never growing with distance): at the end of `Detonate`'s clearing, before the falling-block sweep (so sand the blast undermines falls straight), the other primed TNT (`PrimedTnt.Push`, chained cubes at spawn), the drops (`DropManager.ApplyBlastImpulse`, the blast's own loot included) and the falling cubes in the air (`FallingBlock.Push`); then `World.PushFromBlast` takes each center `TntManager.Blasts` reports and shoves the living mobs (`Mob.Shove`, sideways) and the players through `IMobTarget.TakeHit` with no damage: the local camera's knockback in singleplayer, each `ServerPlayer`'s queued knockback on a server (its `PlayerStatus` carries it to the client); a creative, flying or dead player is immune. Gameplay, so a client, which never ticks TNT, pushes nothing (`BlastEffectTests`).
+- **TNT**: `Simulation/TntManager.cs` (owned by `World`, main thread only, never ticked on a client) runs the primed cubes (`PrimedTnt`). A cube lit by hand burns `TntManager.PlayerFuseSeconds` (1 s) and one lit by another blast `ChainFuseSeconds` (0.5 s), so a chain stays prompt; `PrimedTnt.WhiteFlash` ramps its strobe from 4 to 16 Hz over whatever fuse it was given (`FirestarterTests`). A blast shoves everything loose within `BlastRadius` away from its center (`BlastImpulse.At`: `BlastPushMaxSpeed` at the center falling linearly to zero at the radius, the direction tipped up by `BlastPushUpBias`, never growing with distance): at the end of `Detonate`'s clearing, before the falling-block sweep (so sand the blast undermines falls straight), the other primed TNT (`PrimedTnt.Push`, chained cubes at spawn), the drops (`DropManager.ApplyBlastImpulse`, the blast's own loot included) and the falling cubes in the air (`FallingBlock.Push`); then `MobDirector.PushFromBlast` (World's mob component, called once per blast from `World.Update`) takes each center `TntManager.Blasts` reports and shoves the living mobs (`Mob.Shove`, sideways) and the players through `IMobTarget.TakeHit` with no damage: the local camera's knockback in singleplayer, each `ServerPlayer`'s queued knockback on a server (its `PlayerStatus` carries it to the client); a creative, flying or dead player is immune. Gameplay, so a client, which never ticks TNT, pushes nothing (`BlastEffectTests`).
 - Worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup; noise instances are configured once in static constructors and never re-tuned per call). All noise seeds derive from `WorldGenerationConfig.Seed` plus fixed per-channel offsets (`TerrainGenerator.MakeNoise`); `Seed` reads `WorldSeed.Value`, which `WorldSeed.Apply` sets (rebuilding every noise from it) before a World is built, never while one is live (see "Saves"). Before player edits, terrain obeys:
   - **Nothing generated is ever solid above `height(x,z)`** — heights come from `ColumnCache.Get(...).Heights` (or the `ColumnCache.GetHeights` wrapper) and already include ravines, which are cut into the heightmap so the far LOD sees them too. The ravine cut fades out across the shore band (`OceanShoreWeight`..0.5), so it never slices the ocean's edge; the block at `height` is solid unless a cave or entrance carved it.
   - Both carvers only ever **remove** blocks: `ChunkTerrainFill.GenerateBlockData` fills the columns (grass at depth 0, dirt down to `DirtDepth`, stone below), then `NoiseCaves.Carve` and `WormCarver.Carve` clear air out of the result and `_solidCount` is recounted.
@@ -3086,8 +3088,8 @@ is an operator by default. Both enforcement points use it — the restored modes
 is answered once with a `PlayerStatus` carrying the modes the player really has.
 
 **Mobs follow real players.** A mob chases and hurts an `IMobTarget` (`IMobTarget.cs`: `Eye`,
-`IsImmune`, `TakeHit(damage, away, speed, lift)`), never the camera directly. `World` rebuilds the
-target list each frame right before the slime and goblin managers run: singleplayer's is the
+`IsImmune`, `TakeHit(damage, away, speed, lift)`), never the camera directly. `MobDirector.Update`
+(World's mob component) rebuilds the target list each frame right before it runs the slime and goblin managers: singleplayer's is the
 `Camera` (immune while creative or flying; its `TakeHit` applies only the knockback, since World
 still bills the managers' `DamageDealtThisFrame` to its own pool, so singleplayer is unchanged),
 and a server's is every `ServerPlayer` (immune while creative, flying or dead; `TakeHit` bills its
@@ -3427,7 +3429,7 @@ plus its skin. The goblin draws per part: `PlayerRig.FromBbmodel(type.Model)` +
 Every hostile derives from the abstract **`Mob`** (`Mob.cs`). It exposes `Type`, `Position` (the body
 center), `Health`/`IsDead`, `Facing` (yaw, the model faces -Z at 0), `HitFlash`, and the body box as
 `BodyHalfExtent`/`BodyHalfHeight`. `HeadAboveCenter` is where the healthbar sits. It also has
-`TakeDamage` and `Shove`. `World` rebuilds one `_mobs` list each frame (`RefreshMobs`), after every mob
+`TakeDamage` and `Shove`. `World`'s `MobDirector` rebuilds one `_mobs` list each frame (`MobDirector.RefreshMobs`), after every mob
 manager has run and before `ThrowAction.UpdateThrown`, so a mob killed or despawned this frame is never hit or given
 a healthbar. The punch, the slice, the player's thrown items (`ThrownProjectile.Update`, an AABB overlap
 against each mob's body box, so a tall goblin is hit through its head and shins) and the healthbars
@@ -3690,7 +3692,7 @@ overshoot or jiggle.
   (`BeginDying`/`IsDying`/`DeathProgress`/`IsRemovable`, `DeathSeconds` per kind), a hit recoil spring
   (`HitKick`) and an eased `HitFlash`. A killed mob **rolls its loot at once**, then stays in the
   manager's list (still drawn, no longer a target, a threat, a saved or broadcast mob or part of the
-  live count) until its death has played; `World.RefreshMobs` skips dying mobs, the spawn caps use
+  live count) until its death has played; `MobDirector.RefreshMobs` skips dying mobs, the spawn caps use
   `LivingCount`, and a client's `Remove` (the server stopped reporting it) starts the death instead of
   popping it. `AnimateMirror` advances the clocks of mobs a client never simulates.
 - **Slime**: squash and stretch ride one under-damped spring (`Slime._squash`): a 0.2 s crouch before
@@ -3964,13 +3966,13 @@ touch a file that violates one of them, fixing it is in scope.
   No source file goes past ~1000 lines without a stated reason. `World.cs`,
   `Program.cs`, `Chunk.cs`, `Camera.cs`
   are the current offenders — keep shrinking them, never
-  grow them. `World.cs` (about 1,140 lines, down from 4,700) has a stated reason: it is the
+  grow them. `World.cs` (about 1,020 lines, down from 4,700) has a stated reason: it is the
   composition root that builds and owns the per-job components (`BlockEditor`, `BlockPlacer`,
   `LeftClickAction`, `RightClickAction`, `ThrowAction`, `BlockInteractions`, `WorldItemUse`,
   `MobStrikes`, `AmbientEffects`, `LocalPlayer`, `ClientMirror`, `WorldPersistence`,
-  `DropPickup`, `WorldRenderer`) and keeps the order-sensitive `Update`/`UpdateClient` frame
-  orchestration. The next candidates to move out of it are `Update`'s mob target/damage block
-  and `PushFromBlast`. `RenderManager.cs` (1,032 lines, down from 4,588) has a stated reason
+  `DropPickup`, `MobDirector`, `WorldRenderer`) and keeps the order-sensitive `Update`/`UpdateClient` frame
+  orchestration. The next candidate to move out of it is the fire-cell gathering that `Update`
+  and `UpdateClient` both build. `RenderManager.cs` (1,032 lines, down from 4,588) has a stated reason
   too: it is the GL resource owner whose `LoadResources`/`Dispose` fix the creation and
   disposal order, plus the world programs' one-time and per-frame uniforms
   (`InitWorldProgram`, `ApplyFrameUniforms`, `SetDrawUniforms`); its passes live in the

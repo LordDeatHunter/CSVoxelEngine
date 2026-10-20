@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using Silk.NET.Input;
@@ -15,7 +14,6 @@ using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
-using VoxelEngine.Juice;
 using VoxelEngine.Lod;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
@@ -39,8 +37,8 @@ namespace VoxelEngine;
 /// <see cref="LocalPlayer"/>, <see cref="Strikes"/>, <see cref="Ambient"/>, <see cref="Edits"/>,
 /// <see cref="LeftClick"/>, <see cref="Placer"/>, <see cref="Throws"/>,
 /// <see cref="Interactions"/>, <see cref="ItemUse"/>, <see cref="RightClick"/>,
-/// <see cref="ClientMirror"/>, <see cref="Persistence"/>, <see cref="Pickup"/> and
-/// <see cref="Renderer"/>. It runs the frame (<see cref="Update"/>, which hands a multiplayer
+/// <see cref="ClientMirror"/>, <see cref="Persistence"/>, <see cref="Pickup"/>,
+/// <see cref="Director"/> and <see cref="Renderer"/>. It runs the frame (<see cref="Update"/>, which hands a multiplayer
 /// client to <see cref="UpdateClient"/> and a loading world to <see cref="UpdateLoading"/>) and
 /// the lifecycle (the constructor and <see cref="SaveAndDispose"/>), and keeps the small public
 /// facade the dedicated server needs. Every <see cref="Item"/> override runs its effects through
@@ -63,8 +61,6 @@ public class World
     private readonly SaplingManager _saplings = new();
     // The natural and hard mob caps every manager above spawns under, counted over all of them.
     private readonly MobCaps _mobCaps = new();
-    // The players the mob managers chase this frame, rebuilt right before they run.
-    private readonly List<IMobTarget> _mobTargets = [];
     private readonly FluidManager _fluidManager = new();
     private readonly LeafDecayManager _leafDecay = new();
     private readonly TreeGrowthWriter _treeGrowth = new();
@@ -169,6 +165,9 @@ public class World
 
     /// <summary>The per-frame drop pickup: the collectors, the drop update, crediting and the full-inventory warning.</summary>
     internal DropPickup Pickup { get; }
+
+    /// <summary>The per-frame mob job: the mob targets, the slime and goblin updates and their damage, the blast shove and the mob list.</summary>
+    internal MobDirector Director { get; }
 
     /// <summary>The world's draw: the frame's render passes in order and the HUD.</summary>
     internal WorldRenderer Renderer { get; }
@@ -277,7 +276,7 @@ public class World
     public IReadOnlyList<Goblin> Goblins => _goblins?.Goblins ?? [];
 
     // Every live mob of every kind, rebuilt once a frame after the mob managers ran
-    // (RefreshMobs), so punch, slice, thrown items and healthbars target them all.
+    // (MobDirector.RefreshMobs), so punch, slice, thrown items and healthbars target them all.
     private readonly List<Mob> _mobs = [];
 
     /// <summary>Every live mob (slimes, goblins), feeding targeting and the healthbars.</summary>
@@ -411,6 +410,8 @@ public class World
             Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _health,
                 serverMode, savedPlayer, savedEntities);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
+            Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _debris, _health, _mobs,
+                serverMode, clientMode);
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
                 _leaves, _fire, _lavaFire, _torchFire, _bubbles, _health, _hotbarName, _hotbarPops);
@@ -442,7 +443,7 @@ public class World
                 _lodManager.Start(Camera);
             else if (clientMode)
                 _lodManager.BindCamera(Camera);
-            RefreshMobs();
+            Director.RefreshMobs();
         }
         catch
         {
@@ -458,44 +459,13 @@ public class World
         }
     }
 
-    /// <summary>
-    /// Rebuilds <see cref="Mobs"/> from every mob manager. Indexed loops rather than
-    /// <c>AddRange</c>, whose IEnumerable overload would allocate an enumerator every frame.
-    /// </summary>
-    internal void RefreshMobs()
-    {
-        _mobs.Clear();
-        if (_slimes != null)
-            _mobs.AddRange(_slimes.Slimes.Where(t => !t.IsDying));
+    /// <summary>Rebuilds <see cref="Mobs"/> (see <see cref="MobDirector.RefreshMobs"/>).</summary>
+    internal void RefreshMobs() => Director.RefreshMobs();
 
-        if (_goblins != null)
-            _mobs.AddRange(_goblins.Goblins.Where(t => !t.IsDying));
-    }
-
-    /// <summary>
-    /// Spawns one mob of the named entity kind standing with its feet at <paramref name="feet"/>
-    /// (the scripted visual tests' <c>spawn</c> op), a forced spawn under the hard mob cap. False
-    /// for an unknown name, a kind whose manager does not exist because its content is not
-    /// registered, or a full hard cap. <paramref name="size"/> is a slime's size (other kinds
-    /// have none and ignore it).
-    /// </summary>
-    public bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min)
-    {
-        if (string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
-        {
-            var center = feet + new Vector3(0f, Slime.HalfExtentFor(size), 0f);
-            if (_slimes?.Spawn(center, size) == null) return false;
-            RefreshMobs();
-            return true;
-        }
-        if (string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
-        {
-            if (_goblins?.Spawn(feet + new Vector3(0f, Goblin.Height * 0.5f, 0f)) == null) return false;
-            RefreshMobs();
-            return true;
-        }
-        return false;
-    }
+    /// <summary>Spawns one mob of the named kind with its feet at <paramref name="feet"/>, the scenario
+    /// <c>spawn</c> op (see <see cref="MobDirector.SpawnEntity"/>).</summary>
+    public bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min) =>
+        Director.SpawnEntity(name, feet, size);
 
     /// <summary>
     /// The terrain height of the column at (<paramref name="x"/>, <paramref name="z"/>) from the
@@ -669,48 +639,6 @@ public class World
     public bool TryUseSelected(float maxDistance, PlayerContext player, out RightClickOutcome outcome,
         bool allowPlace = true) => RightClick.TryUseSelected(maxDistance, player, out outcome, allowPlace);
 
-    /// <summary>
-    /// A TNT blast at <paramref name="center"/> shoves the players and the living mobs in range away
-    /// from it (<see cref="BlastImpulse"/>): the local camera in singleplayer, every connected player
-    /// on a server (through <see cref="IMobTarget.TakeHit"/>, which queues the knockback the player's
-    /// status carries to its client), a creative, flying or dead player being immune; a mob is shoved
-    /// sideways (<see cref="Mob.Shove"/>). The drops, falling cubes and other TNT the blast reached
-    /// were already flung by <see cref="TntManager"/>. Gameplay: singleplayer and the server.
-    /// </summary>
-    private void PushFromBlast(Vector3 center)
-    {
-        if (_serverMode)
-        {
-            var players = ServerPlayers;
-            for (var i = 0; i < players.Count; i++)
-                PushTargetFromBlast(players[i], center);
-        }
-        else
-        {
-            PushTargetFromBlast(Camera, center);
-        }
-
-        foreach (var mob in _mobs)
-        {
-            if (mob.IsDying) continue;
-            var impulse = BlastImpulse.At(center, mob.Position, TntManager.BlastRadius);
-            var sideways = impulse with { Y = 0f };
-            if (sideways.LengthSquared() > 1e-6f)
-                mob.Shove(sideways, sideways.Length());
-        }
-    }
-
-    // One player's share of a blast, aimed at its body's middle rather than its eye
-    private static void PushTargetFromBlast(IMobTarget target, Vector3 center)
-    {
-        if (target.IsImmune) return;
-        var body = target.Eye - new Vector3(0f, Camera.EyeHeight * 0.5f, 0f);
-        var impulse = BlastImpulse.At(center, body, TntManager.BlastRadius);
-        if (impulse == Vector3.Zero) return;
-        var sideways = impulse with { Y = 0f };
-        target.TakeHit(0, sideways, sideways.Length(), MathF.Max(0f, impulse.Y));
-    }
-
     /// <summary>Whether any station block entity (campfire, quern, kiln, cast mold) is tracked,
     /// so a server with none sends no station snapshots.</summary>
     public bool HasStations => StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting);
@@ -783,17 +711,8 @@ public class World
         FrameProfiler.End(ProfileSection.Raycast);
     }
 
-    /// <summary>Scenario seam: damages every live mob, so a script can film the hit reaction and the death.</summary>
-    internal void DamageAllMobs(int amount)
-    {
-        RefreshMobs();
-        foreach (var mob in _mobs)
-        {
-            var hits = mob.HitsTaken;
-            mob.TakeDamage(amount);
-            Strikes.ShowLandedHit(mob, hits);
-        }
-    }
+    /// <summary>Scenario seam: damages every live mob (see <see cref="MobDirector.DamageAllMobs"/>).</summary>
+    internal void DamageAllMobs(int amount) => Director.DamageAllMobs(amount);
 
     /// <summary>
     /// One gameplay frame. Each block of work runs under its own profiler section; the autosave
@@ -860,7 +779,7 @@ public class World
         // distance; a server's camera is nobody
         foreach (var blast in _tntManager.Blasts)
         {
-            PushFromBlast(blast);
+            Director.PushFromBlast(blast);
             if (!_serverMode)
                 Ambient.ShakeForBlast(blast);
         }
@@ -905,60 +824,12 @@ public class World
         foreach (var block in _falling.Falling)
             Camera.PushOutOf(block.Position, FallingBlock.HalfExtent, _chunkManager);
 
-        // The players the mobs chase, rebuilt each frame. Singleplayer: the local camera, whose
-        // TakeHit applies only the knockback, since the damage below still lands on this world's
-        // own pool. A server: every connected player, each taking its hits on its own pool
-        // (ServerPlayer.TakeHit), never the hovering camera, so nobody online means nobody chased.
-        _mobTargets.Clear();
-        if (_serverMode)
-        {
-            var players = ServerPlayers;
-            for (var i = 0; i < players.Count; i++)
-                _mobTargets.Add(players[i]);
-        }
-        else
-        {
-            _mobTargets.Add(Camera);
-        }
-
-        // Slimes hop at the player: an airborne touch bills damage, a grounded one is just
-        // shoved aside. The manager only reports the amount; the health pool stays here (a
-        // server's players already took theirs through TakeHit).
-        if (_slimes != null)
-        {
-            // The lighting clock's night, so the ring rolls larger slimes after dark
-            _slimes.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, DayCycle.NightFactor(LightingTime),
-                _serverMode ? null : _debris);
-            if (!_serverMode && _slimes.DamageDealtThisFrame > 0)
-            {
-                _health.TakeDamage(_slimes.DamageDealtThisFrame, DamageSource.Mob, Camera.LastMobAttacker);
-                Camera.AddShake(Math.Clamp(_slimes.DamageDealtThisFrame / 20f, 0.2f, 1f));
-                LocalPlayer.NotifyPlayerHurt(fromMob: true);
-            }
-        }
-
-        // Goblins lob their flint and then close in for a club swing; like the slimes, the
-        // manager only reports the damage and the health pool stays here.
-        if (_goblins != null)
-        {
-            _goblins.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris,
-                _slimes?.Slimes,
-                aimOrigin: _serverMode || _clientMode ? null : Camera.Position,
-                aimDirection: _serverMode || _clientMode ? null : Camera.LastAimDirection,
-                aimCharge: _serverMode || _clientMode ? 0f : Camera.ThrowCharge ?? 0f,
-                night: DayCycle.NightFactor(LightingTime));
-            var goblinDamage = _goblins.DamageDealtThisFrame;
-            if (!_serverMode && goblinDamage > 0)
-            {
-                _health.TakeDamage(goblinDamage, DamageSource.Mob, Camera.LastMobAttacker);
-                Camera.AddShake(Math.Clamp(goblinDamage / 20f, 0.2f, 1f));
-                LocalPlayer.NotifyPlayerHurt(fromMob: true);
-            }
-        }
+        // The mobs: their targets, the slime and goblin updates and the damage they deal (MobDirector.Update)
+        Director.Update(deltaTime);
 
         // After every mob manager and before the thrown items, so a mob killed or despawned
         // this frame is never hit by a projectile or drawn a healthbar.
-        RefreshMobs();
+        Director.RefreshMobs();
         // A mob that landed this frame kicks up its dust; a server spawns no particles
         if (!_serverMode)
             _dust.TakeMobLandings(_mobs, _chunkManager, _debris);
@@ -1069,7 +940,7 @@ public class World
         Phase = WorldPhase.Playing;
         LocalPlayer.ForgetPreloadPosition();
         Persistence.RestorePendingEntities(0);
-        RefreshMobs();
+        Director.RefreshMobs();
         // The clock is applied and the capture no longer needs the saved one
         Persistence.ForgetSavedPlayer();
     }

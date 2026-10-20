@@ -56,7 +56,7 @@ internal sealed class ThrowAction
     internal float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / PlayerConfig.ThrowChargeSeconds);
 
     /// <summary>Rebuilds the projectile list (<c>_projectiles</c>) from the player's throws and the
-    /// goblins' stones, with indexed loops for the same reason as <see cref="World.RefreshMobs"/>.</summary>
+    /// goblins' stones, with indexed loops so a frame allocates no enumerator.</summary>
     internal void RefreshProjectiles()
     {
         _projectiles.Clear();
