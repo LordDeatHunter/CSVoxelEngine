@@ -8,7 +8,7 @@ using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Lighting;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using Xunit;
 
 namespace VoxelEngine.Tests.Chunks.Meshing;

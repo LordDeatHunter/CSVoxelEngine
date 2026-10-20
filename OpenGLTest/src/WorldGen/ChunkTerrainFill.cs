@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using VoxelEngine.Chunks;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using static VoxelEngine.Chunks.Chunk;
@@ -218,7 +218,7 @@ internal static class ChunkTerrainFill
     /// air forever — nothing schedules those cells, since only block edits do.
     ///
     /// Generated water keeps the carved rule: only neighbors at or below their column's natural
-    /// terrain top count (see <see cref="FluidManager.IsWakeTarget"/>), since that is what a
+    /// terrain top count (see <see cref="FluidWakeRules.IsWakeTarget"/>), since that is what a
     /// carver opened, and open air above the terrain is deliberately excluded so a generated sea
     /// never wakes across a ravine, a beach or a hillside. Minecraft's generated water is static
     /// the same way. A restored chunk can also hold fluid the player poured: a non-source
@@ -265,10 +265,10 @@ internal static class ChunkTerrainFill
     }
 
     /// <summary>Whether a chunk-local neighbor is somewhere the fluid beside it may wake into
-    /// (<see cref="FluidManager.IsWakeTarget"/> with this chunk's column data).</summary>
+    /// (<see cref="FluidWakeRules.IsWakeTarget"/> with this chunk's column data).</summary>
     private static bool IsWakeTarget(Chunk chunk, ColumnData column, int lowerBoundY, int x, int y, int z,
         int fluidY, int fluidColumnHeight, int fluidColumnWaterLevel) =>
-        FluidManager.IsWakeTarget(chunk.Blocks[Idx(x, y, z)], lowerBoundY + y,
+        FluidWakeRules.IsWakeTarget(chunk.Blocks[Idx(x, y, z)], lowerBoundY + y,
             column.Heights[(x << SizeShift) | z], fluidY, fluidColumnHeight, fluidColumnWaterLevel);
 
     /// <summary>

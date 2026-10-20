@@ -1,7 +1,7 @@
 using System.Numerics;
 using VoxelEngine.Chunks;
 
-namespace VoxelEngine.Simulation;
+namespace VoxelEngine.Simulation.Fluids;
 
 /// <summary>
 /// Reads one cell's block id and state byte for <see cref="FluidFlow"/>. Returns false when

@@ -1,6 +1,6 @@
 using System.Linq;
 using System.Numerics;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using Xunit;
 
 namespace VoxelEngine.Tests.Chunks;

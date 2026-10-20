@@ -1,5 +1,5 @@
 using VoxelEngine.Content.Blocks;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Items;

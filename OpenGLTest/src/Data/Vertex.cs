@@ -3,7 +3,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using VoxelEngine.Chunks;
 using VoxelEngine.Effects.Climate;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 
 namespace VoxelEngine.Data;
 

@@ -5,6 +5,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Entities;
 using VoxelEngine.Lod;
 using VoxelEngine.Particles;
+using VoxelEngine.Simulation.Fluids;
 
 namespace VoxelEngine.Simulation;
 

@@ -3,6 +3,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Lod;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 using Xunit;
 

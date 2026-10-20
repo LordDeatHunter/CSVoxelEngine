@@ -202,7 +202,7 @@ public static class LodSurface
     /// and its Settle (a surface-solid landing)</item>
     /// <item>TntManager.Detonate (the highest then the lowest blasted cell per column)</item>
     /// <item>KilnManager.Update (the integrity sweep's revert, all eight cells)</item>
-    /// <item>FluidManager.Write (block writes above the column's generated water level: lava
+    /// <item>FluidCells.Write (block writes above the column's generated water level: lava
     /// hardening, dirt turning to mud)</item>
     /// </list>
     /// Campfire branch piles, stack placements through SetStateAt and bucket fluid edits need no

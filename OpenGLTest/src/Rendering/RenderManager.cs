@@ -16,7 +16,7 @@ using VoxelEngine.Rendering.Atmosphere;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.Rendering.ScreenSpace;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Rendering;

@@ -1,4 +1,4 @@
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using Xunit;
 
 namespace VoxelEngine.Tests.Effects.Water;

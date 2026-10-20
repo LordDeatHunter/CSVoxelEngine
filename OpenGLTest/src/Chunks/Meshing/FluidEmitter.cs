@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using System.Numerics;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Lighting;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using static VoxelEngine.Chunks.Chunk;
 using static VoxelEngine.Chunks.Meshing.ChunkLighting;
 

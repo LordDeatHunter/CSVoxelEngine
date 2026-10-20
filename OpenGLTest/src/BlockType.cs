@@ -14,7 +14,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Graphics;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Trees;
 

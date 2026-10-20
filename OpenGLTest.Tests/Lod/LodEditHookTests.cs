@@ -3,6 +3,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Lod;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 using Xunit;
 

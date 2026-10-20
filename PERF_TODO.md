@@ -489,8 +489,8 @@ needs, not the history.
 - **D1 · The packer is `ChunkKey` (`src/Chunks/ChunkKey.cs`), 21 bits an axis, reusing `FluidManager`'s
   budget line for line.** `Pack(cx, cy, cz)` is
   `((cx & PackMask) << 42) | ((cy & PackMask) << 21) | (cz & PackMask)` (`ChunkKey.cs:31-37`)
-  against `FluidManager`'s identical expression (`FluidManager.cs:36-37,938-939`), and `SignExtend`
-  is a literal copy (`ChunkKey.cs:70` / `FluidManager.cs:952`). The two are **not** collapsed onto
+  against the fluid packer's identical expression (`FluidCellKey`), and `SignExtend`
+  is a literal copy (`ChunkKey.cs:70` / `FluidCellKey.SignExtend`). The two are **not** collapsed onto
   one helper — `FluidManager`'s packer is block-scale, `ChunkKey`'s is chunk-scale — and copying the
   constant rather than sizing a new one keeps them readable side by side. It is a shared
   `internal static class` rather than private helpers because it has two genuine consumers in
@@ -577,7 +577,7 @@ needs, not the history.
   per region build**, on the LodGen thread), `ChunkManager.HasAllNeighbors` (`:892`),
   `GetBlockGlobal` / `ChunkAt` (`:759`, `:772`, whose intermediate `Vector3` was built from the same
   shifts and is simply gone), `QueueChunk`'s six-neighbor fan-out, `MarkAreaDirty`'s triple loop,
-  `FluidManager.WakeBorders`' six border probes, and `TntManager` / `FallingBlockManager`'s
+  `FluidWakeScanner.WakeBorders`' six border probes, and `TntManager` / `FallingBlockManager`'s
   shift-derived lookups. The six cardinal offsets now come from one shared
   `Vector3Directions.CardinalOffsets` array rather than hand-transcribed literals, pinned equal to
   `CardinalDirections` by a fact so a reorder of one cannot silently diverge from the other.

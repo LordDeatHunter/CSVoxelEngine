@@ -4,7 +4,7 @@ using System.Numerics;
 using VoxelEngine.Data;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using Xunit;
 
 namespace VoxelEngine.Tests.Saves;

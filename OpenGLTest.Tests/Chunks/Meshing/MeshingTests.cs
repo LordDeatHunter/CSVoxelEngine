@@ -5,7 +5,7 @@ using System.Numerics;
 using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Data;
 using VoxelEngine.Rendering.Geometry;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 using Xunit;

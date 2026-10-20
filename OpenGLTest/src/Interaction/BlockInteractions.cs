@@ -5,6 +5,7 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Interaction;

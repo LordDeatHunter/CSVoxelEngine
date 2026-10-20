@@ -9,6 +9,7 @@ using VoxelEngine.Content.Shapes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Lod;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen.Trees;
 using Xunit;
 

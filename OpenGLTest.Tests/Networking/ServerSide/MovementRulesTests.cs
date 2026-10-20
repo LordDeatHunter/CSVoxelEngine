@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.VisualTest;
 using Xunit;
 

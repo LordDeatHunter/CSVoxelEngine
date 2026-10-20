@@ -5,7 +5,7 @@ using System.Numerics;
 using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Lighting;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using Xunit;
 
 namespace VoxelEngine.Tests.Chunks.Meshing;

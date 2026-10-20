@@ -24,6 +24,7 @@ using VoxelEngine.Rendering;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Trees;

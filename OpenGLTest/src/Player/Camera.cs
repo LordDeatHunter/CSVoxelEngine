@@ -9,7 +9,7 @@ using VoxelEngine.Content.Shapes;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
 using VoxelEngine.Juice;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Player;

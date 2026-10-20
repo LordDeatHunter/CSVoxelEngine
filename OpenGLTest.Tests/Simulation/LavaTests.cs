@@ -1,5 +1,6 @@
 using System.Numerics;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features.Underground;
 using Xunit;

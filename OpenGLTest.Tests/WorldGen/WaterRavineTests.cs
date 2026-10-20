@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 using Xunit;
 
@@ -128,10 +129,10 @@ public sealed class WaterRavineTests
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var top = 4;
 
-        Assert.False(FluidManager.IsCarvedFlowTarget(air, top + 1, top));
-        Assert.True(FluidManager.IsCarvedFlowTarget(air, top, top));
-        Assert.True(FluidManager.IsCarvedFlowTarget(air, 0, top));
-        Assert.False(FluidManager.IsCarvedFlowTarget(stone, 0, top));
+        Assert.False(FluidWakeRules.IsCarvedFlowTarget(air, top + 1, top));
+        Assert.True(FluidWakeRules.IsCarvedFlowTarget(air, top, top));
+        Assert.True(FluidWakeRules.IsCarvedFlowTarget(air, 0, top));
+        Assert.False(FluidWakeRules.IsCarvedFlowTarget(stone, 0, top));
     }
 
     [Fact]

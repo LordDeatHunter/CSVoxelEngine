@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 using Xunit;
 

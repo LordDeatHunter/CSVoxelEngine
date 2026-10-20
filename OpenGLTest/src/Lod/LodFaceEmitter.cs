@@ -7,7 +7,7 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Rendering.Geometry;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 
 namespace VoxelEngine.Lod;

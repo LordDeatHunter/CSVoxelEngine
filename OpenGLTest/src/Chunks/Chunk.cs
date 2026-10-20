@@ -12,6 +12,7 @@ using VoxelEngine.Interaction;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 
 namespace VoxelEngine.Chunks;
@@ -175,7 +176,7 @@ public class Chunk : IDisposable
     /// water standing against worldgen air that nothing would ever schedule; this is the list
     /// <see cref="FluidManager.WakeLoadedChunks"/> uses to make it pour in the moment the chunk
     /// loads. Generated water keeps the carved rule: open air above the terrain is not a cavity
-    /// (see <see cref="FluidManager.IsWakeTarget"/>), so a ravine, beach or hillside never wakes
+    /// (see <see cref="FluidWakeRules.IsWakeTarget"/>), so a ravine, beach or hillside never wakes
     /// the sea. A restored chunk can hold fluid the player poured, so a non-source (mid-flow)
     /// cell always counts, and so does a source above both its column's terrain top and water
     /// level (only ever poured) wherever it has a replaceable neighbor. Written once by the

@@ -1,4 +1,4 @@
-namespace VoxelEngine.Simulation;
+namespace VoxelEngine.Simulation.Fluids;
 
 /// <summary>
 /// Encoding of the per-block state byte (see <c>Chunk._state</c>) for fluid cells, mirroring

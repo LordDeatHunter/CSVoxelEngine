@@ -4,6 +4,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Lod;
 using VoxelEngine.Particles;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using Xunit;
 
 namespace VoxelEngine.Tests.Particles;

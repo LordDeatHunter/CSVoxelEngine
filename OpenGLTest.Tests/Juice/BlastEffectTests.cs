@@ -2,6 +2,7 @@ using System.Numerics;
 using VoxelEngine.Juice;
 using VoxelEngine.Lod;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using Xunit;
 
 namespace VoxelEngine.Tests.Juice;

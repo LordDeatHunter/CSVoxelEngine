@@ -3,7 +3,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Player;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 
 namespace VoxelEngine.Interaction;
 

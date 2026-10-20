@@ -6,6 +6,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Interaction;
 using VoxelEngine.Lod;
 using VoxelEngine.Particles;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Shape;

@@ -8,6 +8,7 @@ using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Lod;
 using VoxelEngine.Particles;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 
 namespace VoxelEngine.Simulation;

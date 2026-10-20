@@ -1,6 +1,6 @@
 using System;
 using VoxelEngine.Data;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 using static VoxelEngine.Chunks.Chunk;
 

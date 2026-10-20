@@ -1,6 +1,6 @@
 using System.Numerics;
 using VoxelEngine.Player;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.VisualTest;
 using Xunit;
 

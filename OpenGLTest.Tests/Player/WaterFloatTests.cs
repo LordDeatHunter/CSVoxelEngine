@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using Silk.NET.Input;
 using VoxelEngine.Player;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.VisualTest;
 using Xunit;
 

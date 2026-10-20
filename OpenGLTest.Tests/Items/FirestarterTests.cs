@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Particles;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.UI.InventoryPanel;
 using Xunit;
 

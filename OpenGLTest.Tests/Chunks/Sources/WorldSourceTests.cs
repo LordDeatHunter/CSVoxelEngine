@@ -8,7 +8,7 @@ using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Lod;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
-using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 using Xunit;
 
@@ -276,7 +276,7 @@ public sealed class WorldSourceTests : IDisposable
         var worldgenWater = ColumnCache.Get(2, 1);
         var worldgenBeside = ColumnCache.Get(3, 1);
         var waterIndex = VoxelCoords.ColumnIndex(Chunk.SizeMask, faceZ);
-        Assert.True(FluidManager.IsWakeTarget(BlockType.Air, top + 1,
+        Assert.True(FluidWakeRules.IsWakeTarget(BlockType.Air, top + 1,
             worldgenBeside.Heights[VoxelCoords.ColumnIndex(0, faceZ)],
             top + 1, worldgenWater.Heights[waterIndex], worldgenWater.WaterLevel[waterIndex]));
 
