@@ -1036,8 +1036,10 @@ OpenGLTest/
                                #   shared by every item sprite lying on a station
                                #   (the cooled cast, kiln fuel)
     Core/                      # GL-free utilities: math, springs, vectors, color space, logging, the frame
-                               #   profiler, launch mode, voxel coordinates, file IO and the vendored
-                               #   FastNoiseLite (never reformat)
+                               #   profiler, launch mode, voxel coordinates, file IO, the assets-directory lookup and the
+                               #   vendored FastNoiseLite (never reformat)
+      AssetRoot.cs             # the assets-directory lookup the server, the item debugger and
+                               #   the test fixture share
       ColorSpace.cs            # exact sRGB transfer functions
       FastNoiseLite.cs         # vendored, don't reformat
       FileUtils.cs             # ReadFile: reads a file by path (assets are opened relative to the working directory)
@@ -1778,7 +1780,6 @@ OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS
   VoxelEngine.ItemDebugger.csproj     # the project file (references the game project)
   GlobalUsings.cs                     # VoxelEngine.Core and the Shader alias
   AnimationClock.cs                   # the playback controls of the item debugger's timeline
-  AssetRoot.cs                        # points the process at the engine's assets directory before any content loads
   DebuggerTab.cs                      # which grid the item debugger's left panel shows, and
                                       #   so what the scene previews: the player holding an item
   DebugSceneRenderer.cs               # a minimal standalone renderer for the item debugger: content registry, block atlas
@@ -1793,7 +1794,6 @@ OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS
 OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple players and chat")
   VoxelEngine.Server.csproj           # the project file (references the game project)
   GlobalUsings.cs                     # VoxelEngine.Core and VoxelEngine.Config
-  AssetRoot.cs                        # locate assets/ walking up from the server's working directory
   ClientConnection.cs                 # one connected socket: id, name, lock-guarded framed send, idle
                                       #   clock (LastInboundAt), the far-LOD regions queued for it
   GameServer.cs                       # the composition root: builds the components below, owns the
@@ -4030,7 +4030,7 @@ touch a file that violates one of them, fixing it is in scope.
   components it builds and exposes as internal properties (`GpuPassTimer`, `TextureUnits`,
   `RenderTargets`, `FrameLighting`, `SkyPasses`, `ScreenPasses`, `BillboardPasses`,
   `SelectionPasses`, `StationPasses`, `ObjectPasses`, `PlayerPasses`, `MobPasses`,
-  `ShadowPass`, `TerrainPasses`, `ReflectionPass`, `UiPasses`). `UIRenderer.cs` (802
+  `ShadowPass`, `TerrainPasses`, `ReflectionPass`, `UiPasses`). `UIRenderer.cs` (801
   lines, down from 2,504) has a stated reason too: it owns the UI's GL resources and their
   creation and disposal order (the ui program, the count font, the text batch buffers, the
   item-icon textures and frame meshes) and the shared draw primitives every page and the item

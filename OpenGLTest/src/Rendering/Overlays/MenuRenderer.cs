@@ -210,7 +210,7 @@ internal sealed class MenuRenderer
 
             case MainMenuPage.ConfirmDeleteServer:
                 DrawMultiplayerPage(view, screen);
-                DrawConfirmDeleteServer(view, screen);
+                DrawConfirmDelete(screen, "Delete this server?", view.SelectedServer?.Name);
                 break;
 
             case MainMenuPage.Worlds:
@@ -239,7 +239,7 @@ internal sealed class MenuRenderer
 
             case MainMenuPage.ConfirmDelete:
                 DrawWorldsPage(view, screen);
-                DrawConfirmDelete(view, screen);
+                DrawConfirmDelete(screen, "Delete this world?", view.SelectedWorld?.Name);
                 break;
 
             case MainMenuPage.Settings:
@@ -248,13 +248,65 @@ internal sealed class MenuRenderer
         }
     }
 
-    // The worlds list: title, panel, the scissored rows (name and seed on their own lines, never
-    // concatenated since a layout run stops at MaxLayoutChars), the empty-state line, the notice
-    // and the CREATE / BACK buttons.
+    // Draws one list row's name, detail line and row buttons under the separator DrawListPage draws.
+    // Each page's drawer is a static lambda cached in a field, so a menu frame allocates nothing for it.
+    private delegate void ListRowDrawer(MenuRenderer renderer, MainMenuView view, Vector2 screen, int row,
+        float offset, float rowTop, float nameLeft, float nameWidth);
+
+    // A worlds row: the name over the seed and last-played line, then PLAY / EDIT / DELETE.
+    private static readonly ListRowDrawer WorldRow =
+        static (renderer, view, screen, i, offset, rowTop, nameLeft, nameWidth) =>
+        {
+            var world = view.Worlds[i];
+            renderer.DrawRowText(world.Name, MainMenuLayout.WorldDetailText(world.Seed, world.LastPlayedUnixMs),
+                rowTop, nameLeft, nameWidth);
+            renderer.DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 0),
+                MainMenuLayout.RowButtonSize, "PLAY");
+            renderer.DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 1),
+                MainMenuLayout.RowButtonSize, "EDIT");
+            renderer.DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 2),
+                MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
+        };
+
+    // A server row: the name over the address, then CONNECT / DELETE.
+    private static readonly ListRowDrawer ServerRow =
+        static (renderer, view, screen, i, offset, rowTop, nameLeft, nameWidth) =>
+        {
+            var server = view.Servers[i];
+            renderer.DrawRowText(server.Name, server.Address.ToString(), rowTop, nameLeft, nameWidth);
+            renderer.DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 0, 2),
+                MainMenuLayout.RowButtonSize, "CONNECT");
+            renderer.DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 1, 2),
+                MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
+        };
+
+    // The worlds list with its CREATE / BACK buttons.
     private void DrawWorldsPage(MainMenuView view, Vector2 screen)
     {
-        _ui.DrawTextCentered("WORLDS", screen.X * 0.5f,
-            MainMenuLayout.TitleTop(screen, MainMenuPage.Worlds), _ui.HeadScale, Rgba.White);
+        DrawListPage(view, screen, "WORLDS", MainMenuPage.Worlds, view.Worlds.Count, view.ScrollOffset,
+            "No worlds yet - create one", WorldRow);
+
+        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CREATE");
+        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
+    }
+
+    // The multiplayer list, shaped like the worlds list, with ADD SERVER / DIRECT CONNECT / BACK.
+    private void DrawMultiplayerPage(MainMenuView view, Vector2 screen)
+    {
+        DrawListPage(view, screen, "MULTIPLAYER", MainMenuPage.Multiplayer, view.Servers.Count,
+            view.ServerScrollOffset, "No servers yet - add one", ServerRow);
+        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 0), MainMenuLayout.TripleButtonSize, "ADD SERVER");
+        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 1), MainMenuLayout.TripleButtonSize, "DIRECT CONNECT");
+        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 2), MainMenuLayout.TripleButtonSize, "BACK");
+    }
+
+    // A scrolled list page (worlds or multiplayer): title, panel, the scissored rows (name and detail
+    // on their own lines, never concatenated since a layout run stops at MaxLayoutChars), the
+    // empty-state line and the notice. The page draws its bottom buttons after.
+    private void DrawListPage(MainMenuView view, Vector2 screen, string title, MainMenuPage page,
+        int count, float scrollOffset, string emptyText, ListRowDrawer drawRow)
+    {
+        _ui.DrawTextCentered(title, screen.X * 0.5f, MainMenuLayout.TitleTop(screen, page), _ui.HeadScale, Rgba.White);
 
         var left = MainMenuLayout.PanelLeft(screen);
         var top = MainMenuLayout.ListTop();
@@ -263,17 +315,14 @@ internal sealed class MenuRenderer
         var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
         _ui.DrawRect(panelCenter, panelSize, SlotBackground);
         _ui.DrawBorder(panelCenter, panelSize, SlotBorder, SlotBorderColor);
-
-        var count = view.Worlds.Count;
         if (count == 0)
         {
-            _ui.DrawTextCentered("No worlds yet - create one", panelCenter.X, panelCenter.Y - 8f,
-                _ui.CountScale, TextDim);
+            _ui.DrawTextCentered(emptyText, panelCenter.X, panelCenter.Y - 8f, _ui.CountScale, TextDim);
         }
         else
         {
             // Clamped with this frame's row count, exactly as MainMenuLayout.HitAt clamps it.
-            var offset = MainMenuLayout.ClampedOffset(view.ScrollOffset, count, screen);
+            var offset = MainMenuLayout.ClampedOffset(scrollOffset, count, screen);
             var (first, end) = MainMenuLayout.VisibleRows(offset, count, screen);
             var nameLeft = MainMenuLayout.NameLeft(screen);
             var nameWidth = MainMenuLayout.NameMaxWidth();
@@ -288,88 +337,12 @@ internal sealed class MenuRenderer
             {
                 for (var i = first; i < end; i++)
                 {
-                    var world = view.Worlds[i];
                     var rowTop = MainMenuLayout.RowTop(i, offset);
                     if (i > 0)
                         _ui.DrawRect(new Vector2(panelCenter.X, rowTop),
                             new Vector2(MainMenuLayout.PanelWidth - 2f * MainMenuLayout.RowPad, 1.5f),
                             SlotBorderColor);
-                    _ui.DrawText(_ui.FittedText(world.Name, _ui.CountScale, nameWidth),
-                        new Vector2(nameLeft, rowTop + 8f), _ui.CountScale, Rgba.White);
-                    _ui.DrawText(MainMenuLayout.WorldDetailText(world.Seed, world.LastPlayedUnixMs),
-                        new Vector2(nameLeft, rowTop + 36f), _ui.CountScale, TextDim);
-                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 0),
-                        MainMenuLayout.RowButtonSize, "PLAY");
-                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 1),
-                        MainMenuLayout.RowButtonSize, "EDIT");
-                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 2),
-                        MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
-                }
-            }
-            finally
-            {
-                _gl.Disable(EnableCap.ScissorTest);
-            }
-        }
-
-        if (!string.IsNullOrEmpty(view.Notice))
-            _ui.DrawTextCentered(_ui.FittedText(view.Notice, _ui.CountScale, MainMenuLayout.PanelWidth),
-                screen.X * 0.5f, MainMenuLayout.NoticeTop(screen), _ui.CountScale, AccentGold);
-
-        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CREATE");
-        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
-    }
-
-    // The multiplayer list, shaped exactly like the worlds list: title, panel, the scissored rows
-    // (name over address) with CONNECT / DELETE, the empty state, the notice and the three bottom
-    // buttons ADD SERVER / DIRECT CONNECT / BACK.
-    private void DrawMultiplayerPage(MainMenuView view, Vector2 screen)
-    {
-        _ui.DrawTextCentered("MULTIPLAYER", screen.X * 0.5f,
-            MainMenuLayout.TitleTop(screen, MainMenuPage.Multiplayer), _ui.HeadScale, Rgba.White);
-
-        var left = MainMenuLayout.PanelLeft(screen);
-        var top = MainMenuLayout.ListTop();
-        var listHeight = MainMenuLayout.ListHeight(screen);
-        var panelCenter = new Vector2(left + MainMenuLayout.PanelWidth * 0.5f, top + listHeight * 0.5f);
-        var panelSize = new Vector2(MainMenuLayout.PanelWidth, listHeight);
-        _ui.DrawRect(panelCenter, panelSize, SlotBackground);
-        _ui.DrawBorder(panelCenter, panelSize, SlotBorder, SlotBorderColor);
-
-        var count = view.Servers.Count;
-        if (count == 0)
-        {
-            _ui.DrawTextCentered("No servers yet - add one", panelCenter.X, panelCenter.Y - 8f,
-                _ui.CountScale, TextDim);
-        }
-        else
-        {
-            var offset = MainMenuLayout.ClampedOffset(view.ServerScrollOffset, count, screen);
-            var (first, end) = MainMenuLayout.VisibleRows(offset, count, screen);
-            var nameLeft = MainMenuLayout.NameLeft(screen);
-            var nameWidth = MainMenuLayout.NameMaxWidth();
-
-            var (sx, sy, sw, sh) = UiCanvas.ScissorRect(new Vector2(left, top), panelSize,
-                _ui.Scale, _ui.WindowSize, _ui.FramebufferSize);
-            _gl.Enable(EnableCap.ScissorTest);
-            _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
-            try
-            {
-                for (var i = first; i < end; i++)
-                {
-                    var server = view.Servers[i];
-                    var rowTop = MainMenuLayout.RowTop(i, offset);
-                    if (i > 0)
-                        _ui.DrawRect(new Vector2(panelCenter.X, rowTop),
-                            new Vector2(MainMenuLayout.PanelWidth - 2f * MainMenuLayout.RowPad, 1.5f),
-                            SlotBorderColor);
-                    _ui.DrawText(_ui.FittedText(server.Name, _ui.CountScale, nameWidth),
-                        new Vector2(nameLeft, rowTop + 8f), _ui.CountScale, Rgba.White);
-                    _ui.DrawText(server.Address.ToString(), new Vector2(nameLeft, rowTop + 36f), _ui.CountScale, TextDim);
-                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 0, 2),
-                        MainMenuLayout.RowButtonSize, "CONNECT");
-                    DrawSmallButton(MainMenuLayout.RowButtonCenter(screen, i, offset, 1, 2),
-                        MainMenuLayout.RowButtonSize, "DELETE", DangerRed);
+                    drawRow(this, view, screen, i, offset, rowTop, nameLeft, nameWidth);
                 }
             }
             finally
@@ -379,10 +352,14 @@ internal sealed class MenuRenderer
         }
 
         DrawNotice(view, screen);
+    }
 
-        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 0), MainMenuLayout.TripleButtonSize, "ADD SERVER");
-        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 1), MainMenuLayout.TripleButtonSize, "DIRECT CONNECT");
-        DrawSmallButton(MainMenuLayout.TripleButtonCenter(screen, 2), MainMenuLayout.TripleButtonSize, "BACK");
+    // A list row's name, fitted to the name column, over its dim detail line.
+    private void DrawRowText(string name, string detail, float rowTop, float nameLeft, float nameWidth)
+    {
+        _ui.DrawText(_ui.FittedText(name, _ui.CountScale, nameWidth),
+            new Vector2(nameLeft, rowTop + 8f), _ui.CountScale, Rgba.White);
+        _ui.DrawText(detail, new Vector2(nameLeft, rowTop + 36f), _ui.CountScale, TextDim);
     }
 
     private void DrawNotice(MainMenuView view, Vector2 screen)
@@ -392,31 +369,9 @@ internal sealed class MenuRenderer
                 screen.X * 0.5f, MainMenuLayout.NoticeTop(screen), _ui.CountScale, AccentGold);
     }
 
-    // The delete confirmation over the dimmed multiplayer page: question, the server's name on its
-    // own line, DELETE / CANCEL.
-    private void DrawConfirmDeleteServer(MainMenuView view, Vector2 screen)
-    {
-        _ui.DrawRect(screen * 0.5f, screen, Rgba.Gray(0f, 0.62f));
-
-        var center = MainMenuLayout.ConfirmBoxCenter(screen);
-        var size = MainMenuLayout.ConfirmBoxSize;
-        _ui.DrawRect(center, size, CardBackground);
-        _ui.DrawBorder(center, size, SlotBorder, SelectedBorderColor);
-
-        var top = center.Y - size.Y * 0.5f;
-        _ui.DrawTextCentered("Delete this server?", center.X, top + 32f, _ui.HeadScale, Rgba.White);
-        if (view.SelectedServer is { } server)
-            _ui.DrawTextCentered(_ui.FittedText(server.Name, _ui.CountScale, size.X - 48f),
-                center.X, top + 84f, _ui.CountScale, AccentGold);
-
-        DrawSmallButton(MainMenuLayout.ConfirmYesCenter(screen), MainMenuLayout.ConfirmButtonSize,
-            "DELETE", DangerRed);
-        DrawSmallButton(MainMenuLayout.ConfirmNoCenter(screen), MainMenuLayout.ConfirmButtonSize, "CANCEL");
-    }
-
-    // The delete confirmation over the dimmed worlds page: question, the world's name on its own
-    // line, DELETE / CANCEL.
-    private void DrawConfirmDelete(MainMenuView view, Vector2 screen)
+    // The delete confirmation over the dimmed worlds or multiplayer page: the question, the
+    // selected world's or server's name on its own line, DELETE / CANCEL.
+    private void DrawConfirmDelete(Vector2 screen, string question, string? name)
     {
         _ui.DrawRect(screen * 0.5f, screen, Rgba.Gray(0f, 0.62f));
 
@@ -428,9 +383,9 @@ internal sealed class MenuRenderer
         _ui.DrawBorder(center, size, SlotBorder, SelectedBorderColor);
 
         var top = center.Y - size.Y * 0.5f;
-        _ui.DrawTextCentered("Delete this world?", center.X, top + 32f, _ui.HeadScale, Rgba.White);
-        if (view.SelectedWorld is { } world)
-            _ui.DrawTextCentered(_ui.FittedText(world.Name, _ui.CountScale, size.X - 48f),
+        _ui.DrawTextCentered(question, center.X, top + 32f, _ui.HeadScale, Rgba.White);
+        if (name is not null)
+            _ui.DrawTextCentered(_ui.FittedText(name, _ui.CountScale, size.X - 48f),
                 center.X, top + 84f, _ui.CountScale, AccentGold);
 
         DrawSmallButton(MainMenuLayout.ConfirmYesCenter(screen), MainMenuLayout.ConfirmButtonSize,

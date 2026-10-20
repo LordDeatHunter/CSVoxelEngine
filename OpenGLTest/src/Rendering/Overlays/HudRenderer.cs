@@ -4,7 +4,6 @@ using System.Numerics;
 using Silk.NET.OpenGL;
 using VoxelEngine.Data;
 using VoxelEngine.Graphics;
-using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
@@ -383,10 +382,7 @@ internal sealed class HudRenderer : IDisposable
             // The pop marks a pickup; IconFill leaves enough margin for it to stay in the slot
             var iconSize = SlotSize * IconFill * (pops?.ScaleAt(i) ?? 1f);
             // Items show their flat sprites here like the list rows; blocks keep 3D cubes
-            if (ItemRegistry.IsItem(id) && _ui.ItemIcons.TryGetValue(id, out var icon))
-                _ui.DrawItemSprite(center, new Vector2(iconSize), id, icon, headingDegrees, timeSeconds);
-            else
-                _ui.DrawBlockIcon(center, iconSize, id);
+            _ui.DrawIdIcon(center, iconSize, id, headingDegrees, timeSeconds);
         }
 
         // Durability bars sit along the slot bottom, under the icons so they stay visible.

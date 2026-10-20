@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Graphics;
@@ -46,18 +45,5 @@ internal static class TestContent
         return tiles;
     }
 
-    internal static string FindAssetsRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null)
-        {
-            var nextToProject = Path.Combine(dir.FullName, "OpenGLTest", "assets");
-            if (Directory.Exists(nextToProject)) return nextToProject;
-            if (Directory.Exists(Path.Combine(dir.FullName, "assets", "data")))
-                return Path.Combine(dir.FullName, "assets");
-            dir = dir.Parent;
-        }
-        throw new DirectoryNotFoundException(
-            "Could not locate assets/ walking up from " + AppContext.BaseDirectory);
-    }
+    internal static string FindAssetsRoot() => AssetRoot.Find();
 }

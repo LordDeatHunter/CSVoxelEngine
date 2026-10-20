@@ -237,10 +237,7 @@ internal sealed class InventoryPanelRenderer
             new Vector2(4f, RowHeight - 4f), dim ? TextDim : barColor);
 
         var iconCenter = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 8f, centerY);
-        if (ItemRegistry.IsItem(id) && _ui.ItemIcons.TryGetValue(id, out var icon))
-            _ui.DrawItemSprite(iconCenter, new Vector2(RowIcon), id, icon, headingDegrees, timeSeconds);
-        else
-            _ui.DrawBlockIcon(iconCenter, RowIcon, id);
+        _ui.DrawIdIcon(iconCenter, RowIcon, id, headingDegrees, timeSeconds);
 
         _ui.DrawText(_ui.FitText(name, _ui.CountScale, RowNameAvail(count, countInset)), new Vector2(iconCenter.X + RowIcon * 0.5f + 8f, centerY - 9f),
             _ui.CountScale, dim && !selected ? TextDim : Rgba.White);

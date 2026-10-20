@@ -322,7 +322,6 @@ public class UIRenderer : IDisposable
     internal bool AtlasIsSrgb => _atlasIsSrgb;
     internal BlockCubeCache BlockCubes => _blockCubes;
     internal Mesh UnitSquare => _unitSquare;
-    internal IReadOnlyDictionary<byte, uint> ItemIcons => _itemIcons;
 
     /// <summary>Solid-color rectangle centered on <paramref name="center"/>.</summary>
     public void DrawRect(Vector2 center, Vector2 size, Rgba color) =>

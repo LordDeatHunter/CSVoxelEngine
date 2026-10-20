@@ -20,7 +20,7 @@ ITEM_DEBUGGER_SHOT_AT=0.28 ITEM_DEBUGGER_ORBIT=160,10 \
 ITEM_DEBUGGER_SHOT=visual/debugger/slice.png \
 dotnet run --project ../OpenGLTest.ItemDebugger -c Release --no-build
 ```
-- The working directory must hold `assets/` (`OpenGLTest/`); `AssetRoot` only walks up from there.
+- The working directory must hold `assets/` (`OpenGLTest/`); `AssetRoot.UseAssetsDirectory` (`OpenGLTest/src/Core/AssetRoot.cs`, in the game project) searches the working directory and then the base directory, preferring the engine source tree, and leaves the working directory unchanged when it finds nothing.
 - `ITEM_DEBUGGER_SHOT` saves one PNG (path relative to the cwd; `visual/` is gitignored) and closes;
   the process exits on its own. Without it a window opens and grabs the mouse like the game.
 - Do not `dotnet build` while an instance is running (locked exe). Several captures in a row:
