@@ -877,17 +877,21 @@ OpenGLTest/
                                #   snapshot, the raw writers and edit API, save/network snapshots and restore, and its GPU slices
                                #   (UpdateMesh, MarkMeshedHeadless); GenerateBlockData and GenerateMeshData forward to
                                #   WorldGen/ChunkTerrainFill and Meshing/ChunkMeshBuilder
+      ChunkFluidQueries.cs     # the fluid surface, column-top and flow queries over the loaded cells (behind ChunkManager.GetFluid*)
       ChunkKey.cs              # packs a chunk position into one long, so the chunk
                                #   dictionaries hash one integer instead of three floats
-      ChunkManager.cs          # chunk lifecycle: load/unload, dirty tracking, mesh scheduling, all against
-                               #   a focus list (unload only outside every focus's radius)
+      ChunkManager.cs          # the chunk lifecycle and composition root: load/restore/stream-in/unload against a focus list
+                               #   (unload only outside every focus's radius), saves of edited chunks, the world cell queries;
+                               #   composes ChunkMeshScheduler, ChunkRenderLists and PlayerPlacedIndex and forwards their public members
       ChunkMap.cs              # the loaded-chunk table (ChunkManager.Chunks): a ConcurrentDictionary keyed on a packed ChunkKey long
+      ChunkRenderLists.cs      # Renderable / TranslucentRenderable swap-remove bookkeeping and MeshVersion (behind ChunkManager's forwarders)
       ColumnCache.cs           # the process-global column-data cache, its accessors and the column fill
       ColumnTerrain.cs         # one chunk column's terrain: heights, water levels, corner climate (warmth, wetness)
       EntityLight.cs           # GL-free world light query for entity draws (drops, pops, debris, the player, ...)
       EntityLightSample.cs     # sun and block light (each 0..1) one entity draw is lit with
       IColumnSource.cs         # the seam a mesh build, the fluid-surface query and the pop/debris tint read
                                #   chunk-column terrain through (ChunkManager.ColumnSource): IsReady + TryGet
+      PlayerPlacedIndex.cs     # the player-placed cells bucketed by chunk, the restored-placement queue and its adoption, the unload snapshot's placed indices
       Meshing/                 # the mesh build: the greedy pass, the procedural emitters, the light volume and corner light
         CellBatchMesher.cs     # GL-free: meshes any TreeCell set with the real chunk mesher over scratch chunks
                                #   at their real positions inside an empty ring (the item debugger's TREES tab)
@@ -897,6 +901,8 @@ OpenGLTest/
         ChunkMeshBuilder.cs    # the per-chunk mesh build: neighborhood resolve, padded and light snapshots, the light flood
                                #   and the per-voxel emitter loop (behind Chunk.GenerateMeshData)
         ChunkMeshData.cs       # CPU-side mesh of one chunk (opaque + translucent lists, light snapshot, vents, flame points)
+        ChunkMeshScheduler.cs  # the dirty set, the per-frame dirty scan, the thread-pool mesh runners, the completed queue and budgeted upload,
+                               #   the immediate remesh paths (behind ChunkManager.Update, MarkDirty, ImmediateRemesh*)
         ChunkMesher.cs         # the greedy pass + per-voxel procedural emitters + water-surface codes
         FaceLight.cs           # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
         MeshScratch.cs         # per-thread scratch buffers of the binary greedy mesh pass
@@ -2510,13 +2516,13 @@ nothing places against it.
 Chunk work is split across threads, and OpenGL calls are only legal on the main thread:
 
 1. `ChunkGenerationWorker` runs dedicated background threads that scan positions around each streaming focus (closest first; `World.Focus` is the camera, or every connected player on a server, and the workers round-robin over the foci with one `ChunkScanFrontier` each) and call `ChunkManager.QueueChunk`, which creates the `Chunk` and generates its block data **on that background thread**.
-2. Meshing is scheduled by `ChunkManager.ProcessDirtyChunks` (main thread, per-frame budget `MaxDirtyChunksPerFrame`) and runs on the thread pool via `Task.Run`, throttled by a `SemaphoreSlim` (`MaxConcurrentMeshGenerations`). Mesh generation produces CPU-side `ChunkMeshData` only.
-3. Completed mesh data lands in `_completedMeshQueue` and is uploaded to the GPU on the **main thread** in `ApplyCompletedMeshes`, sorted closest-first and capped at `MaxMeshUploadsPerFrame` per frame.
+2. Meshing is scheduled by `ChunkMeshScheduler.ProcessDirtyChunks` (behind `ChunkManager.Update`; main thread, per-frame budget `DirtyStartBudget`, default `MaxDirtyChunksPerFrame`) and runs as plain thread-pool work items (`ThreadPool.UnsafeQueueUserWorkItem`): at most `StreamingConfig.MaxConcurrentMeshGenerations` runners are in flight, each draining a shared queue of pending builds. Mesh generation produces CPU-side `ChunkMeshData` only.
+3. Completed mesh data lands in `ChunkMeshScheduler`'s `_completedMeshQueue` and is uploaded to the GPU on the **main thread** in `ChunkMeshScheduler.ApplyCompletedMeshes`, sorted closest-first and capped at `MeshUploadBudget` (default `MaxMeshUploadsPerFrame`) per frame.
 
 Rules that follow from this:
 
 - **Never call GL functions (buffer uploads, `Mesh` creation/disposal, pool uploads/frees through `ChunkGeometryPool`, shader use) off the main thread.** Background work must only produce plain data handed over via the concurrent queues.
-- A chunk is only meshed when its block data is ready **and all 6 cardinal neighbors exist with ready data** (`HasAllNeighbors`) — meshing reads neighbor blocks for face culling and cross-chunk AO. Breaking this reintroduces holes/seams at chunk borders (see git history). That scheduling check can go stale (the mesh task waits on the semaphore and an unload may take a neighbor away meanwhile), so `Chunk.GenerateMeshData` (`ChunkMeshBuilder.GenerateMeshData`) re-resolves the whole 3x3x3 neighborhood once up front and returns `null` when a face neighbor is gone; callers must then re-mark the chunk dirty rather than apply anything. Only the edge/corner neighbors may be absent, and those read as air (they feed light and fluid corner heights only). The same holds for the 3x3 chunk **columns** a build reads (`ChunkManager.ColumnSource`, see "Chunk meshing"): `ProcessDirtyChunks` drops, and `ImmediateRemesh` re-adds once, a chunk whose nine columns are not all `IColumnSource.IsReady` (an all-air chunk, whose build reads no column, is exempt; a fully enclosed one cannot be told apart without its columns and waits too), `ClientChunkStreamer.ApplyColumn` re-dirties the 3x3 chunk columns on arrival, which is what wakes it, and a build that still finds a column missing returns `null` like a vanished neighbor. The worldgen source is always ready, so singleplayer and the server never wait. A mesh build reaches worldgen only through `WorldgenColumnSource` and the seed-hashed pebble, branch-pile and snow emitters, which is why a seed swap still waits for `ChunkManager.DrainMeshWork`.
+- A chunk is only meshed when its block data is ready **and all 6 cardinal neighbors exist with ready data** (`ChunkMeshScheduler.HasAllNeighbors`) — meshing reads neighbor blocks for face culling and cross-chunk AO. Breaking this reintroduces holes/seams at chunk borders (see git history). That scheduling check can go stale (the build waits in the pending queue for a free runner and an unload may take a neighbor away meanwhile), so `Chunk.GenerateMeshData` (`ChunkMeshBuilder.GenerateMeshData`) re-resolves the whole 3x3x3 neighborhood once up front and returns `null` when a face neighbor is gone; callers must then re-mark the chunk dirty rather than apply anything. Only the edge/corner neighbors may be absent, and those read as air (they feed light and fluid corner heights only). The same holds for the 3x3 chunk **columns** a build reads (`ChunkManager.ColumnSource`, see "Chunk meshing"): `ChunkMeshScheduler.ProcessDirtyChunks` drops, and `ImmediateRemesh` re-adds once, a chunk whose nine columns are not all `IColumnSource.IsReady` (an all-air chunk, whose build reads no column, is exempt; a fully enclosed one cannot be told apart without its columns and waits too), `ClientChunkStreamer.ApplyColumn` re-dirties the 3x3 chunk columns on arrival, which is what wakes it, and a build that still finds a column missing returns `null` like a vanished neighbor. The worldgen source is always ready, so singleplayer and the server never wait. A mesh build reaches worldgen only through `WorldgenColumnSource` and the seed-hashed pebble, branch-pile and snow emitters, which is why a seed swap still waits for `ChunkManager.DrainMeshWork`.
 - Shared state uses `ConcurrentDictionary`/`ConcurrentQueue`; `Chunk.IsBlockDataReady` is `volatile`. Keep new shared state lock-free in the same style. `ChunkManager.Chunks` is a `ChunkMap` (`Chunks/ChunkMap.cs`) wrapping a `ConcurrentDictionary<long, Chunk>` — it is a wrapper, never a `Dictionary` behind a lock, because chunk-gen workers write it and mesh-build pool workers read it.
 - Editing a block on a chunk border must also remesh the affected neighbor chunk(s) — block edits use `ChunkManager.ImmediateRemesh` / `MarkDirty`.
 - Performance tuning knobs all live in the per-domain config classes under `src/Config/` (per-frame budgets and thread counts in `StreamingConfig`, worldgen knobs in `WorldGenerationConfig`, and so on); change constants there rather than hardcoding budgets elsewhere.
@@ -3931,7 +3937,7 @@ touch a file that violates one of them, fixing it is in scope.
 - **No god classes.** One class, one coherent job. Past roughly 700 lines a class is a smell:
   move the stray responsibilities out into a well-named class (composition, not `partial`).
   No source file goes past ~1000 lines without a stated reason. `World.cs`,
-  `Program.cs`, `Chunk.cs`, `Camera.cs`, `ChunkManager.cs`
+  `Program.cs`, `Chunk.cs`, `Camera.cs`
   are the current offenders — keep shrinking them, never
   grow them. `World.cs` (about 1,140 lines, down from 4,700) has a stated reason: it is the
   composition root that builds and owns the per-job components (`BlockEditor`, `BlockPlacer`,
@@ -4007,7 +4013,7 @@ touch a file that violates one of them, fixing it is in scope.
 
 ## Conventions
 
-- C# with file-scoped namespaces (one per folder, see "Code organization"), one type per file, `_camelCase` private fields, PascalCase public members. Primary constructors are used where natural (`ChunkManager(GL gl)`).
+- C# with file-scoped namespaces (one per folder, see "Code organization"), one type per file, `_camelCase` private fields, PascalCase public members. Primary constructors are used where natural (`ChunkGenerationWorker(ChunkManager chunkManager, StreamingFocus focus)`).
 - XML doc comments (`/// <summary>`) on classes and non-obvious public methods; brief `//` comments explaining *why* for tricky logic. Match the existing density — the code is moderately commented.
 - **New blocks go in JSON, not C#.** When a block has to behave differently, prefer a new data flag on `BlockDefinition`/`BlockType` that every call site reads over another per-id branch in gameplay code — the point of the content registry is that `World`, `TntManager` and the mesher ask "what does this block do?" instead of "which block is this?".
 - `FastNoiseLite.cs` is vendored third-party code — do not reformat or refactor it.

@@ -9,67 +9,65 @@ using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Chunks.Streaming;
 using VoxelEngine.Data;
-using VoxelEngine.Lod;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Saves;
-using VoxelEngine.Simulation;
 using VoxelEngine.WorldGen;
 
 namespace VoxelEngine.Chunks;
 
 /// <summary>
-/// Manages chunk loading, unloading, and mesh generation.
+/// The chunk lifecycle: loads (generates or restores), streams in and unloads chunks around the streaming foci,
+/// persists their edits, and composes the mesh pipeline (<see cref="ChunkMeshScheduler"/>), the drawn-chunk lists
+/// (<see cref="ChunkRenderLists"/>) and the player-placed index (<see cref="PlayerPlacedIndex"/>), forwarding their
+/// public members; the world cell queries live here and the fluid ones in <see cref="ChunkFluidQueries"/>.
 /// </summary>
-/// <param name="gl">The GL context new chunks are constructed with.</param>
-/// <param name="opaqueGeometry">The shared opaque chunk geometry pool finished meshes upload
-/// into, owned by <see cref="RenderManager"/>. Null in the headless tests, which only ever
-/// apply empty meshes.</param>
-/// <param name="translucentGeometry">The shared translucent (water and glass) pool; see
-/// <paramref name="opaqueGeometry"/>.</param>
-/// <param name="saveStore">Where edited chunks are persisted: a modified chunk is snapshotted
-/// into it when it unloads (and by <see cref="FlushModified"/>), and a chunk the store holds is
-/// restored from it instead of generated. Null means no persistence — the headless tests,
-/// TopplingTree's scratch manager and a storeless World — and unloaded edits are forgotten.</param>
-public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
-    ChunkGeometryPool? translucentGeometry = null, ChunkSaveStore? saveStore = null)
+public class ChunkManager
 {
+    private readonly GL _gl;
+    private readonly ChunkSaveStore? _saveStore;
+    private readonly ChunkRenderLists _renderLists = new();
+    private readonly PlayerPlacedIndex _placedIndex;
+    private readonly ChunkMeshScheduler _meshScheduler;
+
     public readonly ChunkMap Chunks = new();
 
+    /// <summary>Builds an empty manager: nothing is loaded until a generation worker or a stream registers chunks.</summary>
+    /// <param name="gl">The GL context new chunks are constructed with.</param>
+    /// <param name="opaqueGeometry">The shared opaque chunk geometry pool finished meshes upload
+    /// into, owned by <see cref="RenderManager"/>. Null in the headless tests, which only ever
+    /// apply empty meshes.</param>
+    /// <param name="translucentGeometry">The shared translucent (water and glass) pool; see
+    /// <paramref name="opaqueGeometry"/>.</param>
+    /// <param name="saveStore">Where edited chunks are persisted: a modified chunk is snapshotted
+    /// into it when it unloads (and by <see cref="FlushModified"/>), and a chunk the store holds is
+    /// restored from it instead of generated. Null means no persistence — the headless tests,
+    /// TopplingTree's scratch manager and a storeless World — and unloaded edits are forgotten.</param>
+    public ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
+        ChunkGeometryPool? translucentGeometry = null, ChunkSaveStore? saveStore = null)
+    {
+        _gl = gl;
+        _saveStore = saveStore;
+        _placedIndex = new PlayerPlacedIndex(Chunks);
+        _meshScheduler = new ChunkMeshScheduler(this, _renderLists, opaqueGeometry, translucentGeometry);
+    }
+
     /// <summary>The save store this manager persists edited chunks into, or null.</summary>
-    public ChunkSaveStore? SaveStore => saveStore;
+    public ChunkSaveStore? SaveStore => _saveStore;
 
-    /// <summary>
-    /// Every loaded chunk that currently has an opaque or a translucent mesh. The render
-    /// passes walk this flat list instead of <see cref="Chunks"/>: enumerating the dictionary
-    /// by <c>Values</c> takes a locked full-table copy and then hands the passes every loaded
-    /// chunk, the large majority of which have nothing to draw. Order is irrelevant — each
-    /// pass sorts what it draws — so entries are swap-removed.
-    /// Main thread only: it is maintained by <see cref="Update"/> and
-    /// <see cref="ImmediateRemesh"/>, the only places a chunk's mesh appears or disappears.
-    /// </summary>
-    public readonly List<Chunk> Renderable = new(4096);
+    /// <inheritdoc cref="ChunkRenderLists.Renderable"/>
+    public List<Chunk> Renderable => _renderLists.Renderable;
 
-    /// <summary>
-    /// The <see cref="Renderable"/> subset with a translucent mesh (water, glass), so
-    /// <c>CullWater</c> walks hundreds of candidates instead of every meshed chunk.
-    /// Same swap-remove contract (<see cref="Chunk.TranslucentRenderIndex"/>), same thread.
-    /// </summary>
-    public readonly List<Chunk> TranslucentRenderable = new(512);
+    /// <inheritdoc cref="ChunkRenderLists.TranslucentRenderable"/>
+    public List<Chunk> TranslucentRenderable => _renderLists.TranslucentRenderable;
 
     /// <summary>Recycled opaque mesh buffers; see <see cref="MeshBufferPool"/>.</summary>
     public MeshBufferPool MeshBuffers { get; } = new();
 
-    /// <summary>
-    /// Bumped whenever the set of loaded, meshed chunks changes: a chunk enters or leaves
-    /// <see cref="Renderable"/>, a chunk is meshed for the first time (even with an empty mesh,
-    /// which never enters <see cref="Renderable"/>), or a chunk is unloaded. A consumer that
-    /// derives something from which chunks are loaded and drawn (the LOD buried flags) compares
-    /// it to skip the recompute when nothing moved. Main thread only.
-    /// </summary>
-    public int MeshVersion { get; private set; }
+    /// <inheritdoc cref="ChunkRenderLists.MeshVersion"/>
+    public int MeshVersion => _renderLists.MeshVersion;
 
     private int _chunkRemovalVersion;
 
@@ -100,21 +98,17 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     public int LoadedChunkCount => _loadedChunkCount;
 
     /// <summary>Dirty-set size, for tests asserting the scan cap paces the drain.</summary>
-    internal int DirtyCount => _dirtyChunks.Count;
+    internal int DirtyCount => _meshScheduler.DirtyCount;
 
     /// <summary>Mesh-dispatcher state, for MeshSchedulingTests.</summary>
-    internal int PendingMeshWorkCount => _pendingMeshWork.Count;
+    internal int PendingMeshWorkCount => _meshScheduler.PendingMeshWorkCount;
 
-    internal int ActiveMeshRunnerCount => Volatile.Read(ref _activeMeshRunners);
+    internal int ActiveMeshRunnerCount => _meshScheduler.ActiveMeshRunnerCount;
 
-    internal int GeneratingMeshCount => _generatingMeshes.Count;
+    internal int GeneratingMeshCount => _meshScheduler.GeneratingMeshCount;
 
-    /// <summary>
-    /// Finished meshes <see cref="ApplyCompletedMeshes"/> uploads per frame (the rest wait for the
-    /// next). Defaults to <see cref="StreamingConfig.MaxMeshUploadsPerFrame"/>; World raises it
-    /// while a world is loading and restores it when the world starts playing. Main thread only.
-    /// </summary>
-    public int MeshUploadBudget { get; set; } = StreamingConfig.MaxMeshUploadsPerFrame;
+    /// <inheritdoc cref="ChunkMeshScheduler.MeshUploadBudget"/>
+    public int MeshUploadBudget { get => _meshScheduler.MeshUploadBudget; set => _meshScheduler.MeshUploadBudget = value; }
 
     /// <summary>
     /// A server world sets this: finished meshes are marked and their light published but their
@@ -131,7 +125,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// chunks (restored without worldgen, see <see cref="Chunk.RestoreFrom(ChunkSnapshot, bool)"/>)
     /// light, resolve their water surfaces and take their tint from server-supplied columns, and
     /// a chunk whose streamed columns have not arrived is not meshed yet (see
-    /// <see cref="ProcessDirtyChunks"/>). Read by pool mesh builds
+    /// <see cref="ChunkMeshScheduler.ProcessDirtyChunks"/>). Read by pool mesh builds
     /// (<see cref="ChunkLighting.FillColumns"/>), so an implementation must be thread-safe.
     /// </summary>
     public IColumnSource ColumnSource { get; set; } = WorldgenColumnSource.Instance;
@@ -147,12 +141,8 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public IWorldSource WorldSource { get; set; } = GeneratedWorldSource.Instance;
 
-    /// <summary>
-    /// Mesh builds <see cref="ProcessDirtyChunks"/> starts per frame. Defaults to
-    /// <see cref="StreamingConfig.MaxDirtyChunksPerFrame"/>; raised by World while loading and
-    /// restored at the flip to playing, like <see cref="MeshUploadBudget"/>. Main thread only.
-    /// </summary>
-    public int DirtyStartBudget { get; set; } = StreamingConfig.MaxDirtyChunksPerFrame;
+    /// <inheritdoc cref="ChunkMeshScheduler.DirtyStartBudget"/>
+    public int DirtyStartBudget { get => _meshScheduler.DirtyStartBudget; set => _meshScheduler.DirtyStartBudget = value; }
 
     private int _loadedChunkCount;
 
@@ -171,18 +161,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     // a chunk crossing, which keeps the reference-keyed unload gate quiet while the camera is still.
     private readonly StreamingFocus _cameraFocus = new();
 
-    // The sequence number stamps each result with the order it finished in. ApplyCompletedMeshes
-    // sorts by distance, and two results for the same chunk (an older one re-queued by the
-    // upload budget, plus a newer rebuild) tie there, so without it the unstable sort could
-    // apply them newest-first and leave the stale mesh on screen.
-    private readonly ConcurrentQueue<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq)> _completedMeshQueue = new();
-    private long _meshSequence;
-    // Keyed on ChunkKey.Pack rather than the Vector3 chunk position: every probe here sits on a
-    // hot path (the dirty scan, QueueChunk's six-neighbor fan-out, NeedsChunk on the generation
-    // workers' scan frontier) and a packed long hashes once where a Vector3 hashes three floats
-    // and compares twelve bytes per node visit (PERF_TODO D1). FluidManager's cell keys are the
-    // in-repo precedent; ChunkKey deliberately reuses its 21-bit budget at chunk scale.
-    private readonly ConcurrentDictionary<long, byte> _dirtyChunks = new();
+    // Packed keys, like ChunkMeshScheduler's dirty set (PERF_TODO D1).
     private readonly ConcurrentDictionary<long, byte> _queuedChunkPositions = new();
 
     // Chunks whose block data was just generated, handed to the main thread so the fluid tick
@@ -191,90 +170,17 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     // consumer re-checks that the chunk is still the live one at its position.
     private readonly ConcurrentQueue<Chunk> _loadedChunks = new();
 
-    // Chunks restored from the save store whose player-placed cells still have to be adopted
-    // into _playerPlacedByChunk. Filled by the generation workers (CreateChunk), drained on the
-    // main thread at the top of Update, since the placement index is main-thread only. Like
-    // _loadedChunks, an entry can outlive an unload, so the drain re-checks the chunk is live.
-    private readonly ConcurrentQueue<Chunk> _restoredChunks = new();
+    /// <inheritdoc cref="PlayerPlacedIndex.IsPlayerPlaced"/>
+    public bool IsPlayerPlaced(int x, int y, int z) => _placedIndex.IsPlayerPlaced(x, y, z);
 
-    // Track active mesh generation to avoid duplicates. Packed keys, like _dirtyChunks above.
-    private readonly ConcurrentDictionary<long, byte> _generatingMeshes = new();
+    /// <inheritdoc cref="PlayerPlacedIndex.MarkPlayerPlaced"/>
+    public void MarkPlayerPlaced(int x, int y, int z) => _placedIndex.MarkPlayerPlaced(x, y, z);
 
-    // Mesh builds are dispatched as plain thread-pool work items rather than one
-    // Task.Run(async ...) per chunk: at up to MaxDirtyChunksPerFrame starts a frame, the closure +
-    // delegate + Task + state machine per start fed the streaming gen0 rate (PERF_TODO C4).
-    // Scheduling now only enqueues a (pos, chunk) pair; at most MaxConcurrentMeshGenerations
-    // runners are in flight and each drains the queue, so the old semaphore's cap survives with
-    // nothing ever blocking on a wait. Main thread enqueues (ProcessDirtyChunks), pool threads
-    // dequeue.
-    private readonly ConcurrentQueue<(Vector3 pos, Chunk chunk)> _pendingMeshWork = new();
-    private int _activeMeshRunners;
+    /// <inheritdoc cref="PlayerPlacedIndex.UnmarkPlayerPlaced"/>
+    public void UnmarkPlayerPlaced(int x, int y, int z) => _placedIndex.UnmarkPlayerPlaced(x, y, z);
 
-    /// <summary>
-    /// One drain pass over <see cref="_pendingMeshWork"/>, queued straight to the thread pool
-    /// instead of wrapped in a Task. It carries nothing but its manager, so scheduling a chunk
-    /// costs no closure, delegate, state machine or Task - the chunk travels in the queue. One
-    /// instance is allocated per dispatch, not per chunk: a runner keeps draining until the queue
-    /// is empty, so dispatches are far rarer than builds under load and at most
-    /// <see cref="StreamingConfig.MaxConcurrentMeshGenerations"/> exist at once. A fresh
-    /// instance per dispatch also means no work item is ever queued twice.
-    /// </summary>
-    private sealed class MeshRunner(ChunkManager owner) : IThreadPoolWorkItem
-    {
-        public void Execute() => owner.RunMeshWork();
-    }
-
-    // World cells the player built (integer coords): breaking one never fells a tree, it just
-    // drops as-is with no toppling entity. Main thread only, like every other block edit, so
-    // this stays a plain Dictionary/HashSet pair — AGENTS.md reserves the concurrent
-    // collections for genuinely shared state, and nothing off the main thread reads this.
-    // A chunk's entries are purged on unload to keep the index — and the felling decision —
-    // truthful. With a save store attached they are first written into the chunk's snapshot
-    // (PlacedIndicesOf), and a restored chunk brings them back through _restoredChunks; with no
-    // store the chunk regenerates from worldgen and its placements are simply forgotten.
-    // Bucketing by chunk position is what makes that purge cheap: the unload drops one bucket instead of
-    // scanning every placement in the world, which was O(unloads x placements) per unload pass
-    // (PERF_TODO C6). The key is the same packed chunk key Chunks is keyed on (ChunkKey, see
-    // _dirtyChunks above), so the unload site already holds it. A bucket is removed as soon as
-    // it empties; without that the index would grow one permanent entry per chunk ever edited,
-    // trading the scan for a slow leak.
-    private readonly Dictionary<long, HashSet<(int X, int Y, int Z)>> _playerPlacedByChunk = new();
-
-    /// <summary>Whether the world cell was built by the player rather than generated.</summary>
-    public bool IsPlayerPlaced(int x, int y, int z) =>
-        _playerPlacedByChunk.TryGetValue(ChunkKey.PackBlock(x, y, z), out var cells) &&
-        cells.Contains((x, y, z));
-
-    /// <summary>Records a player placement (called by <see cref="Chunk.PlaceBlockAt"/>).</summary>
-    public void MarkPlayerPlaced(int x, int y, int z)
-    {
-        var chunkKey = ChunkKey.PackBlock(x, y, z);
-        if (!_playerPlacedByChunk.TryGetValue(chunkKey, out var cells))
-        {
-            cells = new HashSet<(int X, int Y, int Z)>();
-            _playerPlacedByChunk[chunkKey] = cells;
-        }
-
-        cells.Add((x, y, z));
-    }
-
-    /// <summary>Forgets a placement once its block is gone (mined, felled or blasted).</summary>
-    public void UnmarkPlayerPlaced(int x, int y, int z)
-    {
-        // Most callers unmark unconditionally on any block removal, so the miss path has to
-        // stay a lookup that allocates nothing.
-        var chunkKey = ChunkKey.PackBlock(x, y, z);
-        if (!_playerPlacedByChunk.TryGetValue(chunkKey, out var cells)) return;
-
-        cells.Remove((x, y, z));
-        if (cells.Count == 0) _playerPlacedByChunk.Remove(chunkKey);
-    }
-
-    /// <summary>
-    /// How many chunks currently hold at least one player placement. Diagnostics and tests
-    /// only: it exists so the empty-bucket invariant above is pinnable.
-    /// </summary>
-    internal int PlayerPlacedChunkCount => _playerPlacedByChunk.Count;
+    /// <inheritdoc cref="PlayerPlacedIndex.PlayerPlacedChunkCount"/>
+    internal int PlayerPlacedChunkCount => _placedIndex.PlayerPlacedChunkCount;
 
     /// <summary>
     /// One frame streaming around <paramref name="camera"/> alone: the single-focus form of
@@ -302,7 +208,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         // Before the unload scan, so a chunk restored and then unloaded again is snapshotted
         // with its placements already in the index (PlacedIndicesOf also merges any still held
         // on the chunk, so neither order loses them)
-        AdoptRestoredPlacements();
+        _placedIndex.AdoptRestoredPlacements();
 
         if (foci.Length == 0) return;
 
@@ -320,11 +226,11 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         FrameProfiler.End(ProfileSection.ChunkUnload);
 
         FrameProfiler.Begin(ProfileSection.ChunkApply);
-        ApplyCompletedMeshes(foci);
+        _meshScheduler.ApplyCompletedMeshes(foci);
         FrameProfiler.End(ProfileSection.ChunkApply);
 
         FrameProfiler.Begin(ProfileSection.ChunkDirty);
-        ProcessDirtyChunks(foci);
+        _meshScheduler.ProcessDirtyChunks(foci);
         FrameProfiler.End(ProfileSection.ChunkDirty);
     }
 
@@ -356,88 +262,29 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             // is what lets a generation worker queue it again and look it up in the store) and
             // the placement bucket be dropped. No profiler span of its own: this already runs
             // inside ChunkUnload, and sections cannot nest.
-            if (saveStore != null && chunk.ModifiedSinceSave)
-                saveStore.Enqueue(key, chunk.TakeSnapshot(PlacedIndicesOf(chunk, key)));
+            if (_saveStore != null && chunk.ModifiedSinceSave)
+                _saveStore.Enqueue(key, chunk.TakeSnapshot(_placedIndex.PlacedIndicesOf(chunk, key)));
 
             // Dispose nulls both slices, so the Renderable bookkeeping has to happen first
-            RemoveRenderable(chunk);
+            _renderLists.RemoveRenderable(chunk);
             // A chunk leaving the world changes the LOD cover even when it had nothing to draw.
-            MeshVersion++;
+            _renderLists.MeshVersion++;
             chunk.Dispose();
             Interlocked.Decrement(ref _loadedChunkCount);
             _queuedChunkPositions.TryRemove(key, out _);
-            _generatingMeshes.TryRemove(key, out _);
-            _dirtyChunks.TryRemove(key, out _);
+            _meshScheduler.ForgetChunk(key);
 
             // The placements leave with the chunk: into its snapshot above when a store is
             // attached (a restored chunk brings them back), forgotten with the regenerated
             // chunk otherwise. The bucket IS the chunk, so that is one dictionary removal
             // instead of a scan of every placement.
-            _playerPlacedByChunk.Remove(key);
+            _placedIndex.ForgetChunk(key);
         }
 
         // After the loop, not inside it: the position only becomes needed once it has left
         // _queuedChunkPositions too, and the gate keeps a settled world (the 120-frame fallback scan
         // at Update, which finds nothing) from bumping at all and restarting four scans twice a second.
         if (removed > 0) Interlocked.Increment(ref _chunkRemovalVersion);
-    }
-
-    /// <summary>
-    /// Moves the player-placed cells of every chunk restored since the last call into the
-    /// placement index, then clears them off the chunk (adopted). Main thread only. A chunk
-    /// that was unloaded (or replaced) before the drain reached it is skipped: its snapshot
-    /// already carried the placements back to the store.
-    /// </summary>
-    private void AdoptRestoredPlacements()
-    {
-        while (_restoredChunks.TryDequeue(out var chunk))
-        {
-            if (!Chunks.TryGetPacked(ChunkKey.Pack(chunk.Position), out var live) || live != chunk)
-                continue;
-
-            var placed = chunk.RestoredPlayerPlaced;
-            if (placed == null) continue;
-
-            var min = chunk.WorldMin;
-            foreach (var index in placed)
-            {
-                var cell = min + Chunk.LocalOfIdx(index);
-                MarkPlayerPlaced((int)cell.X, (int)cell.Y, (int)cell.Z);
-            }
-
-            chunk.RestoredPlayerPlaced = null;
-        }
-    }
-
-    /// <summary>
-    /// The chunk's player-placed cells as local <see cref="Chunk.Idx"/> indices for its
-    /// snapshot: the adopted ones from the placement index plus any the chunk still holds from
-    /// its restore and has not handed over yet. Null when there are none.
-    /// </summary>
-    private ushort[]? PlacedIndicesOf(Chunk chunk, long key)
-    {
-        _playerPlacedByChunk.TryGetValue(key, out var cells);
-        var pending = chunk.RestoredPlayerPlaced;
-        if ((cells == null || cells.Count == 0) && (pending == null || pending.Length == 0)) return null;
-
-        var minX = (int)chunk.WorldMin.X;
-        var minY = (int)chunk.WorldMin.Y;
-        var minZ = (int)chunk.WorldMin.Z;
-        var indices = new HashSet<ushort>();
-        if (cells != null)
-        {
-            foreach (var (x, y, z) in cells)
-                indices.Add((ushort)Chunk.Idx(x - minX, y - minY, z - minZ));
-        }
-        if (pending != null)
-        {
-            foreach (var index in pending) indices.Add(index);
-        }
-
-        var result = new ushort[indices.Count];
-        indices.CopyTo(result);
-        Array.Sort(result);
-        return result;
     }
 
     /// <summary>
@@ -449,7 +296,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     /// </summary>
     public int FlushModified(int maxSnapshots)
     {
-        if (saveStore == null || maxSnapshots <= 0) return 0;
+        if (_saveStore == null || maxSnapshots <= 0) return 0;
 
         var written = 0;
         foreach (var kvp in Chunks.Packed)
@@ -457,368 +304,15 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             var chunk = kvp.Value;
             if (!chunk.IsBlockDataReady || !chunk.ModifiedSinceSave) continue;
 
-            saveStore.Enqueue(kvp.Key, chunk.TakeSnapshot(PlacedIndicesOf(chunk, kvp.Key)));
+            _saveStore.Enqueue(kvp.Key, chunk.TakeSnapshot(_placedIndex.PlacedIndicesOf(chunk, kvp.Key)));
             if (++written >= maxSnapshots) break;
         }
 
         return written;
     }
 
-    private void ApplyCompletedMeshes(Vector3[] foci)
-    {
-        // Drain into the reusable scratch to sort by distance to the nearest focus. Distances
-        // are computed once on drain: the old per-compare DistanceSquared plus the sort lambda's
-        // closure allocated every frame the queue was non-empty.
-        while (_completedMeshQueue.TryDequeue(out var item))
-        {
-            _applyScratch.Add((item.pos, item.chunk, item.meshData, item.seq,
-                StreamingFocus.MinDistanceSquared(foci, item.pos)));
-        }
-
-        if (_applyScratch.Count == 0) return;
-
-        try
-        {
-            // Sort closest first, then oldest first. List.Sort is unstable, so the sequence
-            // tiebreak is what guarantees a newer mesh for a chunk is applied after an older one
-            // rather than being overwritten by it.
-            _applyScratch.Sort((a, b) =>
-            {
-                var byDistance = a.distSq.CompareTo(b.distSq);
-                return byDistance != 0 ? byDistance : a.seq.CompareTo(b.seq);
-            });
-
-            var appliedCount = 0;
-
-            foreach (var (pos, chunk, meshData, seq, distSq) in _applyScratch)
-            {
-                // Skip chunks that moved out of range of every focus, were unloaded, or were
-                // replaced by a freshly generated chunk at the same position while this build ran:
-                // uploading into the dead one would leave a mesh in Renderable that no unload ever
-                // removes
-                if (distSq > StreamingConfig.ChunkRadiusSq ||
-                    !Chunks.TryGetValue(pos, out var live) || !ReferenceEquals(live, chunk))
-                {
-                    MeshBuffers.Return(meshData);
-                    continue;
-                }
-
-                if (appliedCount < MeshUploadBudget)
-                {
-                    ApplyMesh(chunk, meshData);
-                    appliedCount++;
-                }
-                else
-                {
-                    // Re-queue for next frame, keeping the original sequence so a rebuild that
-                    // finishes in the meantime still sorts after it
-                    _completedMeshQueue.Enqueue((pos, chunk, meshData, seq));
-                }
-            }
-        }
-        finally
-        {
-            // Don't keep the chunk references alive between frames
-            _applyScratch.Clear();
-        }
-    }
-
-    // Reused across frames: the dirty entries eligible to mesh this frame, with the distance
-    // the per-frame budget sorts on. Cleared after every pass so it holds no chunk references
-    // at rest.
-    // The packed key travels with the candidate so the over-budget re-add below reuses the one
-    // the scan already computed instead of re-packing on the frame the budget is saturated.
-    private readonly List<(long key, Vector3 pos, Chunk chunk, float distSq)> _dirtyCandidates = new(256);
-
-    // Reused across frames: finished mesh builds waiting for upload, with the distance the
-    // upload budget sorts on. Same clear-after-pass contract as _dirtyCandidates.
-    private readonly List<(Vector3 pos, Chunk chunk, ChunkMeshData meshData, long seq, float distSq)> _applyScratch = new(64);
-
-    private void ProcessDirtyChunks(Vector3[] foci)
-    {
-        if (_dirtyChunks.IsEmpty) return;
-
-        _dirtyCandidates.Clear();
-
-        // The set holds thousands of entries mid-stream and every one costs several
-        // dictionary probes, so the scan itself is capped: leftovers wait for the next
-        // frames, which meshgen (DirtyStartBudget starts/frame, 4 concurrent builds) cannot outrun
-        // anyway. Drops do not need a second visit — out-of-range entries are removed
-        // on sight and missing-neighbor ones are re-added by QueueChunk on arrival.
-        var scanned = 0;
-
-        // Lock-free enumeration, no snapshot; removing through it while enumerating is safe
-        foreach (var kvp in _dirtyChunks)
-        {
-            if (++scanned > StreamingConfig.MaxDirtyScanPerFrame)
-                break;
-
-            var key = kvp.Key;
-            // Unpacked once per entry and reused by everything below that still speaks Vector3:
-            // the distance test, HasAllNeighbors and StartMeshGeneration. The Chunks probe takes
-            // the packed key directly - it is the same key this entry is stored under.
-            ChunkKey.Unpack(key, out var cx, out var cy, out var cz);
-            var pos = new Vector3(cx, cy, cz);
-            var distSq = StreamingFocus.MinDistanceSquared(foci, pos);
-
-            // Out of range of every focus, or unloaded — just drop the entry
-            if (distSq > StreamingConfig.ChunkRadiusSq || !Chunks.TryGetPacked(key, out var chunk))
-            {
-                _dirtyChunks.TryRemove(key, out _);
-                continue;
-            }
-
-            // A build is already in flight for this chunk. The entry stays: it was added after
-            // that build took its snapshot, so the chunk has to mesh again once it finishes.
-            if (_generatingMeshes.ContainsKey(key))
-                continue;
-
-            // Block data is always ready for a chunk in Chunks (QueueChunk generates before
-            // inserting), but the check is cheap and keeps the contract honest
-            if (!chunk.IsBlockDataReady)
-                continue;
-
-            // Claim the entry BEFORE the neighbor test, and drop a chunk that is still
-            // missing a face neighbor instead of retrying it every frame. QueueChunk
-            // re-dirties all six neighbors of a chunk when it arrives (with its block data
-            // already generated), so the missing neighbor's arrival is what wakes this chunk
-            // back up. Removing first closes the race where that TryAdd would be a no-op
-            // because this entry still existed. This is what lets _dirtyChunks reach empty at
-            // rest: the rim chunks of the load sphere never get their outer neighbor until
-            // the camera moves, and used to be rescanned every single frame. A chunk whose
-            // streamed columns have not arrived is dropped the same way:
-            // ClientChunkStreamer.ApplyColumn re-dirties the 3x3 chunk columns around every
-            // column it stores, which is what wakes it.
-            if (!_dirtyChunks.TryRemove(key, out _))
-                continue;
-
-            if (!HasAllNeighbors(pos))
-                continue;
-
-            if (!HasColumnNeighborhood(chunk, cx, cz))
-                continue;
-
-            _dirtyCandidates.Add((key, pos, chunk, distSq));
-        }
-
-        if (_dirtyCandidates.Count > DirtyStartBudget)
-        {
-            // Only sorted when the budget actually has to choose between candidates
-            _dirtyCandidates.Sort((a, b) => a.distSq.CompareTo(b.distSq));
-
-            for (var i = 0; i < DirtyStartBudget; i++)
-                StartMeshGeneration(_dirtyCandidates[i].key, _dirtyCandidates[i].pos, _dirtyCandidates[i].chunk);
-
-            // Everything past the budget goes back in the dirty set for next frame
-            for (var i = DirtyStartBudget; i < _dirtyCandidates.Count; i++)
-                _dirtyChunks.TryAdd(_dirtyCandidates[i].key, 0);
-        }
-        else
-        {
-            for (var i = 0; i < _dirtyCandidates.Count; i++)
-                StartMeshGeneration(_dirtyCandidates[i].key, _dirtyCandidates[i].pos, _dirtyCandidates[i].chunk);
-        }
-
-        // Don't keep the chunk references alive between frames
-        _dirtyCandidates.Clear();
-    }
-
     /// <summary>
-    /// Uploads a finished mesh to the chunk and keeps <see cref="Renderable"/> in step with it.
-    /// Main thread only, like every GL call.
-    /// </summary>
-    private void ApplyMesh(Chunk chunk, ChunkMeshData meshData)
-    {
-        var wasMeshed = chunk.IsMeshed;
-        if (Headless)
-            chunk.MarkMeshedHeadless(meshData);
-        else
-            chunk.UpdateMesh(meshData, opaqueGeometry, translucentGeometry);
-        // BufferSubData copies synchronously, so the lists can be recycled at once.
-        MeshBuffers.Return(meshData);
-        SyncRenderable(chunk);
-        // The first mesh makes the chunk count as "drawn" for the LOD cover test even when it is
-        // empty (all air, or enclosed) and therefore never enters Renderable
-        if (!wasMeshed) MeshVersion++;
-    }
-
-    /// <summary>
-    /// Adds <paramref name="chunk"/> to <see cref="Renderable"/> or drops it, to match whether
-    /// it currently has anything to draw — a rebuild can also empty a chunk that had a mesh
-    /// (the last block mined out of it). Main thread only.
-    /// </summary>
-    private void SyncRenderable(Chunk chunk)
-    {
-        var wants = chunk.HasMesh || chunk.HasTranslucentMesh;
-
-        if (!wants)
-        {
-            RemoveRenderable(chunk);
-            return;
-        }
-
-        if (chunk.RenderIndex < 0)
-        {
-            chunk.RenderIndex = Renderable.Count;
-            Renderable.Add(chunk);
-            MeshVersion++;
-        }
-
-        SyncTranslucent(chunk);
-    }
-
-    /// <summary>
-    /// Keeps <see cref="TranslucentRenderable"/> matching the chunk's translucent mesh.
-    /// No <see cref="MeshVersion"/> bump: its only consumer is the LOD cover gate, which
-    /// reads <c>IsMeshed</c>, never slices.
-    /// </summary>
-    private void SyncTranslucent(Chunk chunk)
-    {
-        if (chunk.HasTranslucentMesh)
-        {
-            if (chunk.TranslucentRenderIndex >= 0) return;
-            chunk.TranslucentRenderIndex = TranslucentRenderable.Count;
-            TranslucentRenderable.Add(chunk);
-            return;
-        }
-
-        RemoveTranslucent(chunk);
-    }
-
-    private void RemoveTranslucent(Chunk chunk)
-    {
-        var index = chunk.TranslucentRenderIndex;
-        if (index < 0) return;
-
-        var last = TranslucentRenderable.Count - 1;
-        if (index != last)
-        {
-            var moved = TranslucentRenderable[last];
-            TranslucentRenderable[index] = moved;
-            moved.TranslucentRenderIndex = index;
-        }
-
-        TranslucentRenderable.RemoveAt(last);
-        chunk.TranslucentRenderIndex = -1;
-    }
-
-    /// <summary>
-    /// Swap-removes a chunk from <see cref="Renderable"/>; a no-op for a chunk that is not in
-    /// the list. Must run before <see cref="Chunk.Dispose"/>, which nulls the slices this
-    /// bookkeeping is keyed on. Main thread only.
-    /// </summary>
-    private void RemoveRenderable(Chunk chunk)
-    {
-        // Unload calls this while slices are still set (Dispose nulls them after), so the
-        // translucent membership is dropped here too rather than trusting the caller.
-        RemoveTranslucent(chunk);
-
-        var index = chunk.RenderIndex;
-        if (index < 0) return;
-
-        var last = Renderable.Count - 1;
-        if (index != last)
-        {
-            var moved = Renderable[last];
-            Renderable[index] = moved;
-            moved.RenderIndex = index;
-        }
-
-        Renderable.RemoveAt(last);
-        chunk.RenderIndex = -1;
-        MeshVersion++;
-    }
-
-    /// <summary>
-    /// Claims the dedupe slot and queues the build. Takes the packed key alongside the position
-    /// because both callers (ProcessDirtyChunks' two budget branches) already hold it.
-    /// </summary>
-    private void StartMeshGeneration(long key, Vector3 pos, Chunk chunk)
-    {
-        if (!_generatingMeshes.TryAdd(key, 0))
-            return;
-
-        _pendingMeshWork.Enqueue((pos, chunk));
-        TryStartMeshRunner();
-    }
-
-    /// <summary>
-    /// Queues one more runner if the concurrency cap allows. Callers must have made their work
-    /// visible - enqueued it, or decremented the runner count - BEFORE calling: the interlocked
-    /// read below is what orders against that store, and doing it the other way round would let
-    /// the last runner exit with work still queued. The cap cannot be exceeded because the count
-    /// is claimed by CAS before the item is queued, and every queued runner decrements exactly
-    /// once in its finally.
-    /// </summary>
-    private void TryStartMeshRunner()
-    {
-        while (true)
-        {
-            // Interlocked rather than a plain or volatile read: neither orders against the
-            // preceding store, and a stale "cap is full" here strands the work.
-            var active = Interlocked.CompareExchange(ref _activeMeshRunners, 0, 0);
-            if (active >= StreamingConfig.MaxConcurrentMeshGenerations)
-                return;
-            if (Interlocked.CompareExchange(ref _activeMeshRunners, active + 1, active) != active)
-                continue;
-            // preferLocal: false - a thread's local queue is LIFO and drained only by that thread,
-            // so a runner queued from inside another runner could sit behind its own work.
-            ThreadPool.UnsafeQueueUserWorkItem(new MeshRunner(this), preferLocal: false);
-            return;
-        }
-    }
-
-    private void RunMeshWork()
-    {
-        try
-        {
-            while (_pendingMeshWork.TryDequeue(out var work))
-                BuildMeshFor(work.pos, work.chunk);
-        }
-        finally
-        {
-            Interlocked.Decrement(ref _activeMeshRunners);
-        }
-
-        // Work enqueued after the last TryDequeue but before the decrement would have found the cap
-        // full and queued nothing; this second look is what keeps it from being stranded.
-        if (!_pendingMeshWork.IsEmpty)
-            TryStartMeshRunner();
-    }
-
-    /// <summary>
-    /// Waits, for at most <paramref name="timeout"/>, until every queued mesh build has run and
-    /// every pool runner has exited; returns whether that happened. Main thread only: only
-    /// <see cref="ProcessDirtyChunks"/> (reached through <see cref="Update"/>) starts runners, so
-    /// none can start while this waits, and a runner's own second look in <c>RunMeshWork</c>
-    /// only fires on work that is still queued, which this waits out too. Finished results stay
-    /// in the completed queue; nothing is applied here.
-    /// <para>
-    /// A mesh build reads worldgen state - the nine chunk columns around it through
-    /// <see cref="ColumnSource"/> (<see cref="WorldgenColumnSource"/> outside a client, resolved up
-    /// front), plus the seed-keyed position hashes and the snow-depth noise the pebble, branch-pile
-    /// and snow-layer emitters read for untouched cells - so a world-seed swap must wait for this
-    /// as well as for the worker joins. <c>World.SaveAndDispose</c> calls <see cref="ChunkGenerationWorker.Stop"/>,
-    /// then <see cref="LodManager.Stop"/>, then this, and only when all three return true does it
-    /// free the chunks through <see cref="ReleaseAll"/> and call <see cref="WorldSeed.EndWorld"/>
-    /// (after which <see cref="WorldSeed.Apply"/> is legal again).
-    /// </para>
-    /// </summary>
-    public bool DrainMeshWork(TimeSpan timeout)
-    {
-        var deadline = DateTime.UtcNow + timeout;
-        while (true)
-        {
-            if (_pendingMeshWork.IsEmpty && Volatile.Read(ref _activeMeshRunners) == 0)
-                return true;
-            if (DateTime.UtcNow >= deadline)
-                return false;
-            Thread.Sleep(1);
-        }
-    }
-
-    /// <summary>
-    /// Unloads every chunk at once and empties every table this manager keeps, handing each
+    /// Unloads every chunk at once and empties every table this manager and its components keep, handing each
     /// chunk's geometry-pool slices back to the shared pools (which stay alive for the next
     /// world). Takes no snapshots: the caller has already flushed the modified chunks. Main
     /// thread only (it frees GL slices).
@@ -839,7 +333,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
 
             // Dispose nulls both slices, so the Renderable bookkeeping has to happen first,
             // exactly as UnloadDistantChunks orders it
-            RemoveRenderable(chunk);
+            _renderLists.RemoveRenderable(chunk);
             chunk.Dispose();
         }
 
@@ -847,67 +341,16 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         Renderable.Clear();
         TranslucentRenderable.Clear();
 
-        // Finished builds nobody will apply: their lists go back to the buffer pool
-        while (_completedMeshQueue.TryDequeue(out var item))
-            MeshBuffers.Return(item.meshData);
-
-        // Empty by the precondition, drained anyway so no chunk reference outlives the world
-        while (_pendingMeshWork.TryDequeue(out _)) { }
-        while (_restoredChunks.TryDequeue(out _)) { }
+        _meshScheduler.Release();
+        _placedIndex.Release();
         while (_loadedChunks.TryDequeue(out _)) { }
 
-        _dirtyChunks.Clear();
         _queuedChunkPositions.Clear();
-        _generatingMeshes.Clear();
-        _playerPlacedByChunk.Clear();
-        _applyScratch.Clear();
-        _dirtyCandidates.Clear();
 
         Interlocked.Exchange(ref _loadedChunkCount, 0);
-        MeshVersion++;
+        _renderLists.MeshVersion++;
         Interlocked.Increment(ref _chunkRemovalVersion);
         _lastUnloadFoci = null;
-    }
-
-    /// <summary>
-    /// One mesh build, on a thread-pool thread - the old Task body unchanged, plus a catch:
-    /// Task.Run turned a throw into an unobserved task exception, while one escaping a raw work
-    /// item tears the process down, so it is logged and the runner carries on exactly as
-    /// <see cref="ChunkGenerationWorker"/> does. The finally sits outside the catch so a failed
-    /// build still releases its dedupe slot.
-    /// </summary>
-    private void BuildMeshFor(Vector3 pos, Chunk chunk)
-    {
-        // One pack for the whole call: the re-dirty on a vanished neighbor and the finally's
-        // dedupe release both take it. The work queue carries the position, not the key.
-        var key = ChunkKey.Pack(pos);
-
-        try
-        {
-            if (!Chunks.ContainsPacked(key))
-                return;
-
-            var meshData = chunk.GenerateMeshData(this);
-            if (meshData == null)
-            {
-                // A face neighbor was unloaded between the scheduling check and this
-                // snapshot, or one of the nine streamed columns is missing; meshing across
-                // that hole would bake border artifacts (or dark light and no water), so the
-                // build is dropped and the chunk retried once the world settles
-                _dirtyChunks.TryAdd(key, 0);
-                return;
-            }
-
-            _completedMeshQueue.Enqueue((pos, chunk, meshData, Interlocked.Increment(ref _meshSequence)));
-        }
-        catch (Exception ex)
-        {
-            Log.WriteLine($"Error meshing chunk {pos}: {ex}");
-        }
-        finally
-        {
-            _generatingMeshes.TryRemove(key, out _);
-        }
     }
 
     /// <summary>
@@ -932,10 +375,10 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         // its position, so a restored chunk queued before SetPacked could be dequeued early, read
         // as stale and lose its player-placed cells for the session.
         if (chunk.IsRestored)
-            _restoredChunks.Enqueue(chunk);
+            _placedIndex.EnqueueRestored(chunk);
 
         // Mark this chunk and neighbors dirty for meshing
-        _dirtyChunks.TryAdd(key, 0);
+        _meshScheduler.MarkDirtyKey(key);
         
         // CardinalOffsets is the integer companion to CardinalDirections, in the same order, so
         // the six neighbor keys come from ints in hand instead of six Vector3 additions
@@ -948,7 +391,7 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
             var ny = py + d.Y;
             var nz = pz + d.Z;
             if (Chunks.ContainsKey(nx, ny, nz))
-                _dirtyChunks.TryAdd(ChunkKey.Pack(nx, ny, nz), 0);
+                _meshScheduler.MarkDirtyKey(ChunkKey.Pack(nx, ny, nz));
         }
     }
 
@@ -967,15 +410,15 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
     {
         var cx = MathUtils.FloorToInt(pos.X);
         var cz = MathUtils.FloorToInt(pos.Z);
-        if (saveStore != null && saveStore.TryLoad(key, out var snapshot))
+        if (_saveStore != null && _saveStore.TryLoad(key, out var snapshot))
         {
-            var restored = new Chunk(gl, pos, generateBlockData: false);
+            var restored = new Chunk(_gl, pos, generateBlockData: false);
             restored.RestoreFrom(snapshot, WorldSource.GetColumn(cx, cz));
             return restored;
         }
 
         // The default source's Fill is the GenerateBlockData call the constructor used to make
-        var chunk = new Chunk(gl, pos, generateBlockData: false);
+        var chunk = new Chunk(_gl, pos, generateBlockData: false);
         WorldSource.Fill(chunk);
         return chunk;
     }
@@ -1013,14 +456,14 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         if (Chunks.ContainsPacked(key))
             return;
 
-        var chunk = new Chunk(gl, pos, generateBlockData: false);
+        var chunk = new Chunk(_gl, pos, generateBlockData: false);
         chunk.RestoreFrom(snapshot, streamedColumns: true);
         Chunks.SetPacked(key, chunk);
         Interlocked.Increment(ref _loadedChunkCount);
         // Not queued on _loadedChunks: that queue feeds the worldgen water wake
         // (FluidManager.WakeLoadedChunks), which a client never runs, so every streamed chunk
         // would sit in it for the rest of the session.
-        _dirtyChunks.TryAdd(key, 0);
+        _meshScheduler.MarkDirtyKey(key);
 
         var px = MathUtils.FloorToInt(pos.X);
         var py = MathUtils.FloorToInt(pos.Y);
@@ -1028,110 +471,24 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         foreach (var d in Vector3Directions.CardinalOffsets)
         {
             if (Chunks.ContainsKey(px + d.X, py + d.Y, pz + d.Z))
-                _dirtyChunks.TryAdd(ChunkKey.Pack(px + d.X, py + d.Y, pz + d.Z), 0);
+                _meshScheduler.MarkDirtyKey(ChunkKey.Pack(px + d.X, py + d.Y, pz + d.Z));
         }
     }
 
-    /// <summary>
-    /// Marks a chunk as dirty (needs remeshing).
-    /// </summary>
-    public void MarkDirty(Vector3 pos)
-    {
-        _dirtyChunks.TryAdd(ChunkKey.Pack(pos), 0);
-    }
+    /// <inheritdoc cref="ChunkMeshScheduler.DrainMeshWork"/>
+    public bool DrainMeshWork(TimeSpan timeout) => _meshScheduler.DrainMeshWork(timeout);
 
-    /// <summary>
-    /// Marks every loaded chunk within <paramref name="radiusBlocks"/> of the world-space
-    /// box [<paramref name="min"/>, <paramref name="max"/>] dirty. Voxel light travels up
-    /// to <see cref="LightingConfig.LightPropagationRadius"/> blocks from an edit,
-    /// so all of these chunks need their light recomputed — not just face-adjacent ones.
-    /// Async and budgeted like any other dirty chunk; the edited chunk itself is usually
-    /// remeshed synchronously by the caller already, so it is skipped here.
-    /// </summary>
-    public void MarkAreaDirty(Vector3 min, Vector3 max, int radiusBlocks, Vector3? skip = null)
-    {
-        var low = VoxelCoords.ChunkPosOf(min - new Vector3(radiusBlocks));
-        var high = VoxelCoords.ChunkPosOf(max + new Vector3(radiusBlocks));
-        var x0 = (int)low.X;
-        var y0 = (int)low.Y;
-        var z0 = (int)low.Z;
-        var x1 = (int)high.X;
-        var y1 = (int)high.Y;
-        var z1 = (int)high.Z;
+    /// <inheritdoc cref="ChunkMeshScheduler.MarkDirty"/>
+    public void MarkDirty(Vector3 pos) => _meshScheduler.MarkDirty(pos);
 
-        for (var x = x0; x <= x1; x++)
-        for (var y = y0; y <= y1; y++)
-        for (var z = z0; z <= z1; z++)
-        {
-            var pos = new Vector3(x, y, z);
-            if (skip.HasValue && pos == skip.Value) continue;
-            if (Chunks.ContainsKey(x, y, z))
-                _dirtyChunks.TryAdd(ChunkKey.Pack(x, y, z), 0);
-        }
-    }
+    /// <inheritdoc cref="ChunkMeshScheduler.MarkAreaDirty"/>
+    public void MarkAreaDirty(Vector3 min, Vector3 max, int radiusBlocks, Vector3? skip = null) => _meshScheduler.MarkAreaDirty(min, max, radiusBlocks, skip);
 
-    /// <summary>
-    /// Immediately regenerates the mesh for a chunk (used for block breaking).
-    /// </summary>
-    public void ImmediateRemesh(Vector3 pos)
-    {
-        // One pack for the whole call: the lookup, the _generatingMeshes probe and both dirty
-        // re-adds below all take it, where the Vector3 spelling packed once for the lookup and
-        // again below.
-        var key = ChunkKey.Pack(pos);
+    /// <inheritdoc cref="ChunkMeshScheduler.ImmediateRemesh"/>
+    public void ImmediateRemesh(Vector3 pos) => _meshScheduler.ImmediateRemesh(pos);
 
-        if (!Chunks.TryGetPacked(key, out var chunk)) return;
-        if (!chunk.IsBlockDataReady) return;
-        if (!HasAllNeighbors(pos)) return;
-
-        // A streamed column is missing: mesh once it arrives instead of baking dark light and
-        // no water now. The entry is re-added once per edit, never per frame, and the next
-        // ProcessDirtyChunks drops it until ApplyColumn wakes it, so nothing spins.
-        if (!HasColumnNeighborhood(chunk, (int)pos.X, (int)pos.Z))
-        {
-            _dirtyChunks.TryAdd(key, 0);
-            return;
-        }
-
-        var meshData = chunk.GenerateMeshData(this);
-        if (meshData == null)
-        {
-            // Lost a face neighbor to an unload mid-call: retry rather than bake a hole in
-            _dirtyChunks.TryAdd(key, 0);
-            return;
-        }
-
-        ApplyMesh(chunk, meshData);
-
-        // A build that started before this edit can still finish afterwards with its pre-edit
-        // snapshot and overwrite this fresh mesh; leaving a dirty entry guarantees the
-        // post-edit rebuild wins in the end.
-        if (_generatingMeshes.ContainsKey(key))
-            _dirtyChunks.TryAdd(key, 0);
-    }
-
-    /// <summary>
-    /// Synchronously remeshes the edited chunk plus every face neighbor sharing the edited
-    /// cell, so a block broken or placed on a chunk border never leaves a one-frame hole in
-    /// the neighbor's mesh while the async dirty budget catches up (the neighbor's border
-    /// face was culled against the old block and only a rebuild brings it back). Chunks in
-    /// light radius still rebuild async through <see cref="MarkAreaDirty"/>.
-    /// </summary>
-    public void ImmediateRemeshWithBorders(Vector3 chunkPos, Vector3 cell)
-    {
-        ImmediateRemesh(chunkPos);
-
-        var localX = (int)(cell.X - chunkPos.X * Chunk.Size);
-        var localY = (int)(cell.Y - chunkPos.Y * Chunk.Size);
-        var localZ = (int)(cell.Z - chunkPos.Z * Chunk.Size);
-
-        if (localX == 0) ImmediateRemesh(chunkPos + new Vector3(-1, 0, 0));
-        else if (localX == Chunk.Size - 1) ImmediateRemesh(chunkPos + new Vector3(1, 0, 0));
-        if (localY == 0) ImmediateRemesh(chunkPos + new Vector3(0, -1, 0));
-        else if (localY == Chunk.Size - 1) ImmediateRemesh(chunkPos + new Vector3(0, 1, 0));
-        if (localZ == 0) ImmediateRemesh(chunkPos + new Vector3(0, 0, -1));
-        else if (localZ == Chunk.Size - 1) ImmediateRemesh(chunkPos + new Vector3(0, 0, 1));
-    }
+    /// <inheritdoc cref="ChunkMeshScheduler.ImmediateRemeshWithBorders"/>
+    public void ImmediateRemeshWithBorders(Vector3 chunkPos, Vector3 cell) => _meshScheduler.ImmediateRemeshWithBorders(chunkPos, cell);
 
     /// <summary>
     /// Reads a block at world coordinates. Unloaded chunks read as air.
@@ -1207,90 +564,17 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         return chunk.TryGetLocalLight(lx, ly, lz, out sun, out block);
     }
 
-    /// <summary>
-    /// World Y of the fluid surface in the cell (x, y, z): <c>y + 1</c> when another fluid cell
-    /// sits directly above (stacked water has no seam), otherwise <c>y</c> plus the cell's own
-    /// <see cref="FluidState.SurfaceHeight"/>. Returns <see cref="float.NegativeInfinity"/>
-    /// when the cell holds no fluid, so callers can compare against it unconditionally.
-    /// </summary>
-    public float GetFluidSurfaceGlobal(int x, int y, int z)
-    {
-        if (!TryGetCell(x, y, z, out var id, out var state) || !BlockType.IsFluid(id))
-            return float.NegativeInfinity;
+    /// <inheritdoc cref="ChunkFluidQueries.GetFluidSurfaceGlobal"/>
+    public float GetFluidSurfaceGlobal(int x, int y, int z) => ChunkFluidQueries.GetFluidSurfaceGlobal(this, x, y, z);
 
-        if (TryGetCell(x, y + 1, z, out var above, out _) && BlockType.IsFluid(above))
-            return y + 1f;
+    /// <inheritdoc cref="ChunkFluidQueries.GetFluidColumnTopGlobal"/>
+    public float GetFluidColumnTopGlobal(int x, int y, int z) => ChunkFluidQueries.GetFluidColumnTopGlobal(this, x, y, z);
 
-        return y + FluidState.SurfaceHeight(state);
-    }
+    /// <inheritdoc cref="ChunkFluidQueries.GetFluidFlowGlobal"/>
+    public Vector3 GetFluidFlowGlobal(int x, int y, int z) => ChunkFluidQueries.GetFluidFlowGlobal(this, x, y, z);
 
-    /// <summary>
-    /// World Y of the real surface of the fluid column the cell (x, y, z) belongs to, or
-    /// <see cref="float.NegativeInfinity"/> when the cell is not a loaded fluid cell.
-    /// <see cref="GetFluidSurfaceGlobal"/> only resolves one cell up; this walks the column to its
-    /// top (at most <see cref="WaterRenderConfig.FluidSurfaceSearchCells"/> cells, reading the
-    /// cap's upper edge beyond that) and, when the walk ends under a solid ceiling (an overhang,
-    /// a placed block, a flooded sea cave), sees through it to the column's water level from
-    /// <see cref="ColumnSource"/> (generated, or streamed from the server), so the rays under a
-    /// ledge still march against the sea or lake above it. A client whose column has not arrived
-    /// sees only what it walked.
-    /// </summary>
-    public float GetFluidColumnTopGlobal(int x, int y, int z)
-    {
-        if (!TryGetCell(x, y, z, out var id, out _) || !BlockType.IsFluid(id))
-            return float.NegativeInfinity;
-
-        var top = y;
-        var hitCap = true;
-        var ceiling = false;
-        for (var step = 0; step < WaterRenderConfig.FluidSurfaceSearchCells; step++)
-        {
-            if (TryGetCell(x, top + 1, z, out var above, out _))
-            {
-                if (BlockType.IsFluid(above))
-                {
-                    top++;
-                    continue;
-                }
-
-                ceiling = BlockType.IsSolid(above);
-            }
-
-            hitCap = false;
-            break;
-        }
-
-        var walked = hitCap ? top + 1f : GetFluidSurfaceGlobal(x, top, z);
-        if (!ceiling)
-            return walked;
-
-        if (!ColumnSource.TryGet(x >> Chunk.SizeShift, z >> Chunk.SizeShift, out var column))
-            return walked;
-        var level = column.WaterLevel[((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
-        if (level == TerrainGenerator.NoWater)
-            return walked;
-
-        return MathF.Max(walked, level + FluidState.SourceHeight);
-    }
-
-    // The live world as a FluidFlow cell reader: unloaded chunks report no cell
-    private readonly struct LiveCells(ChunkManager m) : IFluidCellReader
-    {
-        public bool TryGetCell(int x, int y, int z, out byte id, out byte state) =>
-            m.TryGetCell(x, y, z, out id, out state);
-    }
-
-    /// <summary>
-    /// Unit-length horizontal direction the fluid in the cell (x, y, z) flows, or
-    /// <see cref="Vector3.Zero"/> when the cell holds no fluid or the fluid is still: the
-    /// normalized <see cref="FluidFlow.Raw"/> (Minecraft's <c>FlowingFluid.getFlow</c>).
-    /// </summary>
-    public Vector3 GetFluidFlowGlobal(int x, int y, int z) =>
-        FluidFlow.Raw(new LiveCells(this), x, y, z).NormalizeSafe();
-
-    /// <summary>The un-normalized <see cref="FluidFlow.Raw"/> flow at (x, y, z).</summary>
-    internal Vector3 GetFluidFlowRawGlobal(int x, int y, int z) =>
-        FluidFlow.Raw(new LiveCells(this), x, y, z);
+    /// <inheritdoc cref="ChunkFluidQueries.GetFluidFlowRawGlobal"/>
+    internal Vector3 GetFluidFlowRawGlobal(int x, int y, int z) => ChunkFluidQueries.GetFluidFlowRawGlobal(this, x, y, z);
 
     /// <summary>
     /// Checks if a chunk needs to be created at the given position.
@@ -1301,49 +585,5 @@ public class ChunkManager(GL gl, ChunkGeometryPool? opaqueGeometry = null,
         // costs exactly one probe, as it did before.
         var key = ChunkKey.Pack(pos);
         return !Chunks.ContainsPacked(key) && !_queuedChunkPositions.ContainsKey(key);
-    }
-    
-    /// <summary>
-    /// Checks if all 6 cardinal neighbors of a chunk are loaded and have block data ready.
-    /// </summary>
-    private bool HasAllNeighbors(Vector3 pos)
-    {
-        // Hoisted once, then six probes from ints in hand. CardinalOffsets is in the same order
-        // as CardinalDirections, so the early return still fires on the same neighbor.
-        var cx = MathUtils.FloorToInt(pos.X);
-        var cy = MathUtils.FloorToInt(pos.Y);
-        var cz = MathUtils.FloorToInt(pos.Z);
-        foreach (var d in Vector3Directions.CardinalOffsets)
-        {
-            if (!Chunks.TryGetValue(cx + d.X, cy + d.Y, cz + d.Z, out var neighbor)
-                || !neighbor.IsBlockDataReady)
-                return false;
-        }
-        return true;
-    }
-
-    /// <summary>
-    /// Whether <see cref="ColumnSource"/> has the nine chunk columns around (<paramref name="cx"/>,
-    /// <paramref name="cz"/>) that a build of <paramref name="chunk"/> resolves: the light volume's
-    /// heights, the water surface codes and the +1 tint corners. The worldgen source always says
-    /// yes, so singleplayer pays nine trivial virtual calls per dirty entry. An all-air chunk is
-    /// exempt, since its build returns before it reads any column and a sky chunk at a client's
-    /// rim must keep meshing at once; a fully enclosed chunk cannot be told apart without its
-    /// neighbors and so waits for its columns too, which only delays <see cref="Chunk.IsMeshed"/>
-    /// for <c>LodManager.IsCoveredByChunks</c> at a client's load-sphere rim.
-    /// </summary>
-    private bool HasColumnNeighborhood(Chunk chunk, int cx, int cz)
-    {
-        if (chunk.SolidCount == 0)
-            return true;
-
-        var source = ColumnSource;
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
-        {
-            if (!source.IsReady(cx + dx, cz + dz))
-                return false;
-        }
-        return true;
     }
 }

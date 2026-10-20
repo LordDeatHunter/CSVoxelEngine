@@ -601,7 +601,7 @@ public class Chunk : IDisposable
     /// columns' terrain (<see cref="ChunkManager.ColumnSource"/>, a streamed column that has not
     /// arrived), is missing.
     /// The whole 3x3x3 neighborhood is resolved once, up front: the caller checked for face
-    /// neighbors before scheduling, but this runs on a pool thread behind a semaphore and can
+    /// neighbors before scheduling, but this runs on a pool thread behind the mesh runner cap (ChunkMeshScheduler) and can
     /// start seconds later, by which time an unload may have taken one away. Meshing against
     /// that hole reads solid ground as air and bakes bogus side faces, sunk fluid corners and
     /// sunlight leaks along the border, which then stay until something re-dirties the chunk —

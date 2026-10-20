@@ -44,7 +44,7 @@ public readonly record struct GeometrySlice(int UnitOffset, int UnitCount, int V
 /// slices chunks already hold stay valid. Growth doubles, so it happens a handful of times during
 /// the first stream-in and then never again.
 ///
-/// Main thread only: uploads come from <c>Chunk.UpdateMesh</c> via <c>ChunkManager.ApplyMesh</c>
+/// Main thread only: uploads come from <c>Chunk.UpdateMesh</c> via <c>ChunkMeshScheduler.ApplyMesh</c>
 /// and frees from <c>Chunk.Dispose</c> via <c>ChunkManager.UnloadDistantChunks</c>, both of which
 /// run on the render thread.
 /// </summary>
@@ -157,7 +157,7 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     /// <summary>
     /// Copies one chunk mesh into the pool and returns the slice it landed in. The copy is
     /// synchronous, so the caller may recycle its lists as soon as this returns (which is what
-    /// <c>ChunkManager.ApplyMesh</c> does with the <see cref="MeshBufferPool"/> lists).
+    /// <c>ChunkMeshScheduler.ApplyMesh</c> does with the <see cref="MeshBufferPool"/> lists).
     /// </summary>
     /// <exception cref="ArgumentException">Both spans are empty; callers must skip empty meshes.</exception>
     public GeometrySlice Upload(ReadOnlySpan<Vertex> vertices, ReadOnlySpan<ushort> indices)
