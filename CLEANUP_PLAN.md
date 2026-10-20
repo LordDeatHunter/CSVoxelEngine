@@ -92,6 +92,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `33e3ab7` | Split LodRegion.cs (1,237 lines) into LodLevelSpec, LodMeshData, LodColumnCaps (the mined-column cap table), LodMeshBuilder (the per-build phases) and the ref-struct LodFaceEmitter (palette, tint lattice, face and water emission); LodRegion (243 lines) keeps the region object and comparers, and BuildMeshData forwards to LodMeshBuilder |
 
 | `fc2ffb2` | Split Camera.cs (1,175 -> 731 lines, stated reason recorded) into HeadMotion, ShoulderRig, ModeToggles, ViewProjectionCache, SpawnOverrides and CameraMode; Camera stays the facade with forwards |
+| `78635e3` | Moved World's per-frame mob job (target list, slime/goblin updates and damage billing, PushFromBlast, RefreshMobs/SpawnEntity/DamageAllMobs bodies) into Simulation/MobDirector.cs with forwarders on World; World.cs 1,149 -> 1,015 lines |
 
 ## In progress
 
@@ -109,7 +110,7 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 |---|---|---|
 | `src/Chunks/Chunk.cs` | 769 | Split in `e4a318b` (ChunkTerrainFill 377, ChunkMeshBuilder 584, ChunkFaceTables 98, ChunkMeshData 38, ChunkLighting 395; ChunkMesher since split in `ef2f66b`, now 482). Inside the 800 ceiling but above the ~700 smell line; AGENTS.md records it as a stated reason in the offender list. Remaining option: move TakeSnapshot/CaptureForNetwork/RestoreFrom (the save and network snapshot job) into a Saves- or Chunks-side helper to get under ~700. |
 | `src/Player/Camera.cs` | 731 | Split in `fc2ffb2` (HeadMotion 136, ShoulderRig 196, ModeToggles 86, ViewProjectionCache 82, SpawnOverrides 98, CameraMode 9); AGENTS.md records a stated reason. Misses the ~700 target because the XML docs kept on the forwards take more lines than planned. Optional: move `PushOutOf`'s body (about 45 lines) verbatim into a small `Player/` helper (not `PlayerPhysics`) with a one-line forward, then update the AGENTS.md wording ('about 730 lines'). |
-| `src/World.cs` | 1,144 | Has a stated reason. Next extraction: `Update`'s mob target/damage block and `PushFromBlast`/`PushTargetFromBlast`. |
+| `src/World.cs` | 1,015 | Has a stated reason. Mob frame job moved to `Simulation/MobDirector.cs` (208) in `78635e3`. Next extraction: the fire-cell gathering that `Update` and `UpdateClient` both build. |
 | `src/Simulation/FluidManager.cs` | 1,066 | Tick, wake scans, hardening. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
 | `src/Lod/LodManager.cs` | 932 | No stated reason; split it next. Its `LodBuildOutcome` enum is still inside it. |
@@ -144,7 +145,7 @@ Known duplicates, recorded by the earlier runs:
 - The inline sprite-or-cube icon blocks in `HudRenderer.DrawHotbar` and
   `InventoryPanelRenderer.DrawEntryRow` duplicate `UIRenderer.DrawIdIcon`.
 - `MenuRenderer` has duplicated confirm-delete and list pages (worlds vs servers).
-- `World.Update` and `World.UpdateClient` both gather the fire cells.
+- `World.Update` and `World.UpdateClient` both gather the fire cells (campfire and kiln lit cells plus the goblin-torch loop); also the next World.cs extraction.
 - Search for more: near-identical methods, and repeated constants or rules that should be one
   helper.
 
@@ -159,7 +160,7 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `InventoryPanelInput.cs` was re-encoded from cp1252 to UTF-8 during the Program split. Spot-check its non-ASCII comment characters (em dashes etc.) against HEAD's old `Program.cs` (`git show 3d45be4^:OpenGLTest/src/Program.cs`) for mojibake.
 - The doc-generation build (`-p:GenerateDocumentationFile=true`) was not run after the cref retargets in `Chat.cs` and `SettingsMenu.cs`. A future run should confirm no new cref warnings.
 - The `// TODO: move this to player class` `placeTimer` still relies on the static-initializer ordering quirk: it starts at 0.0, not 0.2. This affects only the storeless dev-override path. A later behavior task could make the intent explicit; it was out of scope for the cleanup.
-- Next extractions named in `AGENTS.md` remain: `World.Update`'s mob target/damage block and `PushFromBlast`; `Program.cs`, `Chunk.cs`, `Camera.cs` and `ChunkManager.cs` are still on the offender list.
+- Next extractions named in `AGENTS.md` remain: the fire-cell gathering shared by `World.Update` and `UpdateClient`; `Program.cs`, `Chunk.cs`, `Camera.cs` and `ChunkManager.cs` are still on the offender list.
 - `ContentRegistry.Reset` does not clear `StackSolidStateById`, `BounceById`, `BlocksSightById`, `ContactDamageById`, `GreedyById`, `BlockType.Types` or `ModelFiles`. It was like that before the ContentRegistry split and was left as is; a candidate bug fix outside the cleanup campaign.
 - The play-time content lookups (`RecipeForResult`, `RecipeByName`, `CastRecipeFor`, `IsCastMold`, ...) allocate LINQ closures on every call. Candidate perf cleanup.
 - `BlockLoader.LoadBlocks` (`Blocks/BlockLoader.cs`, 569 lines) is still a single ~370-line method; a candidate for a later early-return and extract-method step.
@@ -217,6 +218,11 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - The cref `<see cref="SwimDepth"/>` on `Camera.IsInWater` is still broken (CS1574 in a doc build).
 - A comment in `OpenGLTest.Tests/Player/CameraViewProjectionCacheTests.cs` (line 334) names `EnsureViewCache` unqualified; the method now lives in `ViewProjectionCache`. Harmless; fix when tests may be edited.
 - Run a doc build (`-p:GenerateDocumentationFile=true`) to confirm the crefs in the moved Camera docs, and the usings in `Camera.cs` that only crefs need, all resolve.
+
+- MobDirector split: `World.cs` 1,015, `MobDirector.cs` 208, `Simulation/` holds 22 files, AGENTS.md 4,048 lines.
+- `World.cs` class summary (line 41) runs past ~100 chars after adding `<see cref="Director"/>`; rewrap in a later doc touch.
+- The edited AGENTS.md lines (TNT invariant, Mobs follow real players, Entities, Code organization World.cs paragraph) were not reflowed, so a few are slightly longer than their neighbors.
+- `MobDirector`'s class doc `<see cref="Update"/>` resolves to `MobDirector.Update`; if it means World's entity update it should read `World.Update`.
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
