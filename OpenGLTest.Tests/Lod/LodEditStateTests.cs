@@ -134,7 +134,7 @@ public sealed class LodEditStateTests
         var canopyX = capX + 80;
 
         var capY = HeightAt(capX, z) - 20;
-        Assert.True(LodRegion.LowerColumnBelow(capX, capY, z));
+        Assert.True(LodColumnCaps.LowerColumnBelow(capX, capY, z));
         var ovrTop = HeightAt(ovrX, z) + 11;
         LodSurface.Set(ovrX, z, ovrTop, TerrainGenerator.RockBlock);
         TreeGenerator.PoisonCanopy(canopyX, z, TreeGenerator.SingleEditPoisonRadius);
@@ -161,7 +161,7 @@ public sealed class LodEditStateTests
         var x = 777 * Level1RegionBlocks + 100;
 
         var v0 = LodEditState.CombinedVersion;
-        Assert.True(LodRegion.LowerColumnBelow(x, HeightAt(x, z) - 25, z));
+        Assert.True(LodColumnCaps.LowerColumnBelow(x, HeightAt(x, z) - 25, z));
         var v1 = LodEditState.CombinedVersion;
         LodSurface.Set(x + 1, z, HeightAt(x + 1, z) + 3, TerrainGenerator.RockBlock);
         var v2 = LodEditState.CombinedVersion;
@@ -184,7 +184,7 @@ public sealed class LodEditStateTests
 
         // Column 1: a live cap, then an import of a HIGHER cap for the same column.
         var y = HeightAt(x1, z) - 20;
-        Assert.True(LodRegion.LowerColumnBelow(x1, y, z));
+        Assert.True(LodColumnCaps.LowerColumnBelow(x1, y, z));
 
         // Column 2: no live cap; the import brings cap c.
         var c = HeightAt(x2, z) - 20;
@@ -211,11 +211,11 @@ public sealed class LodEditStateTests
             []).Import();
 
         // The live lower cap survived: had the import raised it to y + 10, y would be accepted.
-        Assert.False(LodRegion.LowerColumnBelow(x1, y, z));
+        Assert.False(LodColumnCaps.LowerColumnBelow(x1, y, z));
 
         // The imported cap landed and stays monotone.
-        Assert.False(LodRegion.LowerColumnBelow(x2, c + 1, z));
-        Assert.True(LodRegion.LowerColumnBelow(x2, c - 1, z));
+        Assert.False(LodColumnCaps.LowerColumnBelow(x2, c + 1, z));
+        Assert.True(LodColumnCaps.LowerColumnBelow(x2, c - 1, z));
 
         // The live override won over the saved one.
         Assert.True(LodSurface.TryGet(x3, z, out var top3, out var block3));

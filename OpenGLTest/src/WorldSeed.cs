@@ -77,7 +77,7 @@ public static class WorldSeed
         TreeGenerator.ResetCaches();
 
         // The previous world's edit state is process-global and must not leak into the next one.
-        LodRegion.ResetColumnCaps();
+        LodColumnCaps.ResetColumnCaps();
         TreeGenerator.ResetCanopyDisturbed();
         LodSurface.Reset();
     }

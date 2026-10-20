@@ -93,7 +93,7 @@ namespace VoxelEngine.WorldGen;
 /// the common path under a LOD sweep.</para>
 ///
 /// <para><b>10. Standing obligation.</b> Only values that are pure functions of the key may be
-/// stored here. Anything carrying player edits - <c>LodRegion.ColumnCaps</c>,
+/// stored here. Anything carrying player edits - <c>LodColumnCaps</c>,
 /// <c>TreeGenerator.CanopyDisturbed</c> - must NEVER be moved into this type: for those an eviction
 /// is data loss the generator cannot rebuild, not a recompute. Point 2 is the whole safety argument,
 /// and it evaporates the moment a value stops being derivable from its key.</para>

@@ -229,9 +229,9 @@ public sealed class WorldSourceTests : IDisposable
 
         // A dig three cells under the import's surface caps the column; judged against worldgen's
         // surface, far below it, the same dig would be a removal above the LOD terrain
-        Assert.False(LodRegion.LowerColumnBelow(x, plateau - 3, z), "worldgen's surface reached the plateau");
-        Assert.False(LodRegion.LowerColumnBelow(source, x, plateau + 5, z));
-        Assert.True(LodRegion.LowerColumnBelow(source, x, plateau - 3, z));
+        Assert.False(LodColumnCaps.LowerColumnBelow(x, plateau - 3, z), "worldgen's surface reached the plateau");
+        Assert.False(LodColumnCaps.LowerColumnBelow(source, x, plateau + 5, z));
+        Assert.True(LodColumnCaps.LowerColumnBelow(source, x, plateau - 3, z));
 
         // The edit hook reads the manager's source: mining into the loaded plateau caps the column
         var manager = new ChunkManager(null!) { WorldSource = source };

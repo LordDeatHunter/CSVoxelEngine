@@ -484,7 +484,7 @@ single-arc player.
   `GenerationalCache` (eviction = data loss). The real fix derives the set from stored block data
   and is entangled with save/load; the interim is one entry per chunk column and hoisting the
   `Count` test. Sibling of `M-11`.
-- [ ] **`M-11` · `LodRegion.ColumnCaps` grows unbounded** — P2, L, blocked on a design.
+- [ ] **`M-11` · `LodColumnCaps.ColumnCaps` grows unbounded** — P2, L, blocked on a design.
   A process-global, never-shrinking `ConcurrentDictionary` of ~1 KB per edited chunk column.
   Edit state, not a cache (eviction pops mined terrain back into the far LOD); cannot ride chunk
   unload (LOD outlives chunks). A real fix re-derives caps from stored block data, so it is

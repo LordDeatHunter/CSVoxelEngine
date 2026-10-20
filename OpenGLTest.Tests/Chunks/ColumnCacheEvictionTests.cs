@@ -49,7 +49,7 @@ namespace VoxelEngine.Tests.Chunks;
 /// <c>WormCarver.Carve</c> for real. The next round should not re-derive this.</para>
 ///
 /// <para><b>Why the coordinates sit far from the origin.</b> <see cref="LodRegion"/>'s
-/// <c>ColumnCaps</c> is process-global, reset only by <c>WorldSeed.Apply</c> (which the parallel
+/// <c>LodColumnCaps</c> is process-global, reset only by <c>WorldSeed.Apply</c> (which the parallel
 /// suite never calls), and xUnit runs test classes in parallel,
 /// so a class that mines or drops a block near the origin can flip a region's build output
 /// mid-suite (<c>LodColumnCapTests</c> and <c>LodHeightSamplingTests</c> already dodge this the

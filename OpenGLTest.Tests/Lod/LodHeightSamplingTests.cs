@@ -122,7 +122,7 @@ public sealed class LodHeightSamplingTests
     [Fact]
     public void SeparableMinMatchesTheNestedWindowUnderColumnCaps()
     {
-        // ColumnCaps is process-global, reset only by WorldSeed.Apply (which the parallel suite
+        // LodColumnCaps is process-global, reset only by WorldSeed.Apply (which the parallel suite
         // never calls), and xUnit runs test classes in parallel, so this region sits far from every other test's regions: level 2 region
         // (555, -555) covers fine ~142080, while the rest of the suite stays near the origin
         // (and LodColumnCapTests sits at level 1 region (777, 777), fine ~99456).
@@ -143,7 +143,7 @@ public sealed class LodHeightSamplingTests
         {
             var fx = baseFineX + 17 + k * 29;
             var fz = baseFineZ + 41 + k * 23;
-            Assert.True(LodRegion.LowerColumnBelow(fx, floor - 32 - k, fz));
+            Assert.True(LodColumnCaps.LowerColumnBelow(fx, floor - 32 - k, fz));
         }
 
         var separable = LodRegion.BuildMeshData(Level, Rx, Rz);
@@ -180,7 +180,7 @@ public sealed class LodHeightSamplingTests
 
         // One column short of the reach: outside every sample window, outside the grid, and the
         // ColumnCyMin loop reads raw uncapped heightmaps, so this must change nothing at all.
-        Assert.True(LodRegion.LowerColumnBelow(baseFineX - 4, floor - 32, baseFineZ + 32));
+        Assert.True(LodColumnCaps.LowerColumnBelow(baseFineX - 4, floor - 32, baseFineZ + 32));
         var outside = LodRegion.BuildMeshData(Level, rx, rz);
         AssertSameMesh(baseline, outside);
 
@@ -189,7 +189,7 @@ public sealed class LodHeightSamplingTests
         // move geometry. A line rather than one column, so an unlucky flat spot at a single Z
         // cannot hide the effect.
         for (var fz = baseFineZ - 3; fz <= baseFineZ + spec.RegionBlocks + 3; fz += 2)
-            Assert.True(LodRegion.LowerColumnBelow(baseFineX - 3, floor - 32, fz));
+            Assert.True(LodColumnCaps.LowerColumnBelow(baseFineX - 3, floor - 32, fz));
         var inside = LodRegion.BuildMeshData(Level, rx, rz);
         Assert.False(baseline.Vertices.SequenceEqual(inside.Vertices));
 

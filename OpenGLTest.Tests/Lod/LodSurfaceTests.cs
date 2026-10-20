@@ -176,7 +176,7 @@ public sealed class LodSurfaceTests
         var plateau = BuildPlateau(790, (rx, rz) => baseline = LodRegion.BuildMeshData(1, rx, rz));
         var capX = (plateau.Cx << Chunk.SizeShift) + 3;
         var capZ = (plateau.Cz << Chunk.SizeShift) + 3;
-        Assert.True(LodRegion.LowerColumnBelow(capX, HeightAt(capX, capZ) - 30, capZ));
+        Assert.True(LodColumnCaps.LowerColumnBelow(capX, HeightAt(capX, capZ) - 30, capZ));
 
         var separable = BuildAllLevels(plateau.Rx, plateau.Rz);
         var nested = BuildAllLevels(plateau.Rx, plateau.Rz, separableMin: false);
@@ -304,7 +304,7 @@ public sealed class LodSurfaceTests
         // wrote stands (an equal cap is refused), and the override does not move.
         Set(manager, x, oracleY - 1, z, 0);
         Assert.True(LodSurface.RecordEdit(manager, x, oracleY - 1, z));
-        Assert.False(LodRegion.LowerColumnBelow(x, oracleY - 1, z));
+        Assert.False(LodColumnCaps.LowerColumnBelow(x, oracleY - 1, z));
         AssertOverride(x, z, oracleY, oracleId);
     }
 

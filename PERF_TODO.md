@@ -188,7 +188,7 @@ under **Not chasing** below keeps the part that still costs this file something.
   *in* `Camera` — the view-projection and view-frustum caches — but they were their own
   bullets, not findings from that walk, so this entry still stands.)
 
-- **`LodRegion.ColumnCaps` unbounded growth — moved out of this file to `TODO.md` `M-11`** (it was
+- **`LodColumnCaps.ColumnCaps` unbounded growth — moved out of this file to `TODO.md` `M-11`** (it was
   **D2b** here). Its entries are *irreproducible player edits*, so dropping one is **data loss, not a
   recompute**: that makes it a **correctness** item entangled with save/load (`TODO.md` `M-1`), not a
   perf item, and the full reasoning traveled with it — why it cannot go on `GenerationalCache`, why
@@ -650,7 +650,7 @@ needs, not the history.
   following `ColumnCache*` / `CellCache*`. **All three ship at G = 4**, matching
   `ColumnCacheGenerations` and `CellCacheGenerations`, so all **five** `GenerationalCache` sites now
   read alike. AGENTS.md's worldgen bullet names all five and their knobs, and its two forbidden
-  examples (`LodRegion.ColumnCaps`, `TreeGenerator.CanopyDisturbed`) are unchanged.
+  examples (`LodColumnCaps.ColumnCaps`, `TreeGenerator.CanopyDisturbed`) are unchanged.
 - **D6 · G = 4 was not assumed — it was the branch the round's own capture selected, for each cache
   separately.** Lesson 4 says `Generations` may only be moved against a real capture, and the losing
   regime is real (G = 2 was measurably *worse* than the wholesale clear for `ColumnCache`), so the
@@ -697,7 +697,7 @@ needs, not the history.
   cold, on a hit, and again after a forced eviction. **`TreeGenerator.CanopyDisturbed` was not
   touched** — player-edit state, `TODO.md` `M-10`, `GenerationalCache` invariant 10 — so
   `using System.Collections.Concurrent;` stays in `TreeGenerator.cs` for it alone, and
-  `LodRegion.ColumnCaps` (then `D2b` here, now `TODO.md` `M-11`) was likewise left entirely alone.
+  `LodColumnCaps.ColumnCaps` (then `D2b` here, now `TODO.md` `M-11`) was likewise left entirely alone.
 - **D2 · Both deterministic worldgen caches evict generationally instead of clearing wholesale.**
   `Chunk.ColumnCache` and `WormCarver.CellCache` were `ConcurrentDictionary` plus
   `if (Count >= limit) Clear()` on the miss path. Both now run on
@@ -725,7 +725,7 @@ needs, not the history.
   runs fall **1219 -> 733 (-40 %)**; avoidable recomputes overall fall **5473 -> 3413 (-38 %)**. The
   `CellCache` half bought **uniformity, not hit rate** — its 4096-cell cap sits one to two orders of
   magnitude above its ~150-cell working set and its `Clear()` essentially never fired in play. The
-  third part of the old D2 bullet, `LodRegion.ColumnCaps`, was **deliberately not taken**: its
+  third part of the old D2 bullet, `LodColumnCaps.ColumnCaps`, was **deliberately not taken**: its
   entries are irreproducible player edits, so eviction there is data loss, not a recompute. It is
   now its own item — it was `D2b` here and is now `TODO.md` `M-11`, having turned out to be a
   correctness item rather than a perf one. Full write-up, gate and table: **"Measurement: D2"**.
@@ -1023,7 +1023,7 @@ on `_queued.TryAdd` is precisely what fans workers onto distinct regions, so the
 mechanism, not a hazard to remove.
 
 **What is already safe and needed nothing.** `MeshBufferPool` locks every `Rent`/`Return`;
-`LodRegion.ColumnCaps` is `Volatile`-ordered with C5 named in its own comment; `Chunk.ColumnCache`
+`LodColumnCaps.ColumnCaps` is `Volatile`-ordered with C5 named in its own comment; `Chunk.ColumnCache`
 and `TreeGenerator`'s caches are `ConcurrentDictionary`s already shared with the four chunk-gen
 threads; `ArrayPool<T>.Shared` is per-core. `LodRegion.BuildMeshData` itself is pure and reentrant —
 its only statics are the readonly `Levels` array and `ColumnCaps`, and every scratch grid is
@@ -1768,7 +1768,7 @@ pre-existing failures and no others, with 11 new facts added (9 `GenerationalCac
 `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` each fail in roughly 1
 full-suite run in 4-6, never in isolation — **reproduced on a pristine `git archive HEAD` build
 carrying zero D2 code** (2/12 and 1/5 runs there). Both build regions at the origin, and the cause
-is `LodRegion.ColumnCaps` being process-global with no reset hook, so a parallel test class mining
+is `LodColumnCaps.ColumnCaps` being process-global with no reset hook, so a parallel test class mining
 near the origin legitimately changes a later build. Do not chase either as a D2 bug; the item was
 tracked as `D2b` here and is now `TODO.md` `M-11`, with the pointer under **Not chasing**.
 
@@ -2975,7 +2975,7 @@ list only so a cold reader would not re-propose a bigger pool, and the Ruled-out
 job properly. (D2 was the lever that capture pointed at and has been taken; D6 extended it to three
 more caches. Neither reopens the pool question.)
 
-**D2b — relocated, not fixed: it is `TODO.md` `M-11` now.** `LodRegion.ColumnCaps` grows unbounded,
+**D2b — relocated, not fixed: it is `TODO.md` `M-11` now.** `LodColumnCaps.ColumnCaps` grows unbounded,
 but its entries are **irreproducible player edits**, so it must not take D2's or D6's cache/eviction
 scheme — evicting a cap is **data loss, not a recompute**, and `GenerationalCache` invariant 10 names
 this exact site — and it cannot ride chunk unload either, because LOD regions cover terrain far outside
@@ -3007,7 +3007,7 @@ this file's own instruments — see the carried-debt bullet below.
   `BlockMovementTests.LeavesDeclareThreeQuarterMovementSpeed` and
   `FallingBlockTests.SevenTowerChainRebuildsFullyWithNoDrops`. They are real failures and somebody
   should fix them — it is simply not this file's work, and a round that sees exactly these four has
-  seen a clean run. **(ii) `LodRegion.ColumnCaps` is process-global with no reset hook**, so any test
+  seen a clean run. **(ii) `LodColumnCaps.ColumnCaps` is process-global with no reset hook**, so any test
   class that mines near the origin flips a *later* build of the same region, which makes
   `LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
   `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` **intermittent in full-suite

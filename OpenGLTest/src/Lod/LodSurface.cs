@@ -181,10 +181,10 @@ public static class LodSurface
     /// <item><b>At the top</b>: a surface-solid block is a replacement and swaps the override's
     /// block; anything else means the top was removed, and the column is rescanned downward through
     /// loaded chunks for at most <see cref="StreamingConfig.LodSurfaceRescanDepth"/> cells. An
-    /// unloaded cell is assumed solid (the conservative assumption <see cref="LodRegion.LowerColumnBelow"/>'s
+    /// unloaded cell is assumed solid (the conservative assumption <see cref="LodColumnCaps.LowerColumnBelow"/>'s
     /// y - 1 cap makes too) and becomes the top with the generated tile rule (block 0).</item>
     /// <item><b>Below the top</b>: a dig falls through to the monotone removal cap
-    /// (<see cref="LodRegion.LowerColumnBelow"/>), so a hole never exposes the buried shell.</item>
+    /// (<see cref="LodColumnCaps.LowerColumnBelow"/>), so a hole never exposes the buried shell.</item>
     /// </list>
     /// A placement must only be recorded when the placed block <see cref="IsSurfaceSolid"/>: this
     /// cannot tell a placed torch from a removal, and would read it as a sub-surface dig and cap
@@ -243,6 +243,6 @@ public static class LodSurface
             return Set(x, z, y - depth - 1, 0);
         }
 
-        return !IsSurfaceSolid(id) && LodRegion.LowerColumnBelow(chunks.WorldSource, x, y, z);
+        return !IsSurfaceSolid(id) && LodColumnCaps.LowerColumnBelow(chunks.WorldSource, x, y, z);
     }
 }

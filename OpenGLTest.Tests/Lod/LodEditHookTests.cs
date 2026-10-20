@@ -141,7 +141,7 @@ public sealed class LodEditHookTests
         Assert.Equal(BlockType.Air, BlockAt(chunks, bx, dugY, z));
         Assert.True(LodSurface.IsSurfaceSolid(BlockAt(chunks, bx, bh, z)), "the buried blast reached the surface");
         Assert.False(LodSurface.TryGet(bx, z, out _, out _), "a buried blast moved the surface override");
-        Assert.False(LodRegion.LowerColumnBelow(bx, dugY, z), "the hole did not cap the column");
+        Assert.False(LodColumnCaps.LowerColumnBelow(bx, dugY, z), "the hole did not cap the column");
     }
 
     [Fact]

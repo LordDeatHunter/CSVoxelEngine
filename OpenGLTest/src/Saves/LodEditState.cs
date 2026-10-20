@@ -12,7 +12,7 @@ using VoxelEngine.WorldGen;
 namespace VoxelEngine.Saves;
 
 /// <summary>
-/// One world's far-LOD edit state: the removal caps (<see cref="LodRegion.LowerColumnBelow"/>),
+/// One world's far-LOD edit state: the removal caps (<see cref="LodColumnCaps.LowerColumnBelow"/>),
 /// the surface overrides (<see cref="LodSurface"/>) and the felled-canopy markers
 /// (<see cref="TreeGenerator.PoisonCanopy"/>). All three are process-global tables that only
 /// record edits, so without this a restart would redraw the far terrain as freshly generated and
@@ -70,11 +70,11 @@ public sealed class LodEditState(
     /// an autosave can skip rewriting the file while it stands still.
     /// </summary>
     public static int CombinedVersion =>
-        unchecked(LodRegion.CapEditVersion + LodSurface.EditVersion + TreeGenerator.CanopyEditVersion);
+        unchecked(LodColumnCaps.CapEditVersion + LodSurface.EditVersion + TreeGenerator.CanopyEditVersion);
 
     /// <summary>Copies the live tables. Main thread, the tables' only writer.</summary>
     public static LodEditState Capture() =>
-        new(LodRegion.ExportColumnCaps(), LodSurface.Export(), TreeGenerator.ExportCanopyDisturbed());
+        new(LodColumnCaps.ExportColumnCaps(), LodSurface.Export(), TreeGenerator.ExportCanopyDisturbed());
 
     /// <summary>
     /// Merges this state into the live tables: the lower cap wins, a live override wins over the
@@ -82,7 +82,7 @@ public sealed class LodEditState(
     /// </summary>
     public void Import()
     {
-        LodRegion.ImportColumnCaps(Caps);
+        LodColumnCaps.ImportColumnCaps(Caps);
         LodSurface.Import(Overrides);
         TreeGenerator.ImportCanopyDisturbed(Disturbed);
     }

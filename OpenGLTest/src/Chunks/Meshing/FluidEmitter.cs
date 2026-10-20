@@ -78,7 +78,7 @@ internal static class FluidEmitter
             // instead of z-fighting the block above
             if (face == 4 && BlockType.Occludes(neighbor) && minCorner >= 0.999f) continue;
 
-            // Meshes are indexed with ushort (mirrors LodRegion.AddQuad): stop emitting
+            // Meshes are indexed with ushort (mirrors LodFaceEmitter.AddQuad): stop emitting
             // instead of wrapping the offset if a chunk somehow runs past the limit
             if (vertices.Count > ushort.MaxValue - 3) return;
 

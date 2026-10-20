@@ -140,8 +140,8 @@ public class WorldSeedTests
             var fz = 3300 * spec.RegionBlocks + 9;
             var local = ((fx & Chunk.SizeMask) << Chunk.SizeShift) | (fz & Chunk.SizeMask);
             var y = ColumnCache.GetHeights(fx >> Chunk.SizeShift, fz >> Chunk.SizeShift)[local] - 40;
-            Assert.True(LodRegion.LowerColumnBelow(fx, y, fz));
-            Assert.False(LodRegion.LowerColumnBelow(fx, y, fz)); // the equal cap is refused while it stands
+            Assert.True(LodColumnCaps.LowerColumnBelow(fx, y, fz));
+            Assert.False(LodColumnCaps.LowerColumnBelow(fx, y, fz)); // the equal cap is refused while it stands
 
             // (2) A felled-canopy marker on the nearest canopy column.
             var (cx, cz) = FindCanopyColumn();
@@ -155,7 +155,7 @@ public class WorldSeedTests
 
             // (4) The swap forgets all three.
             WorldSeed.Apply(WorldSeed.Default);
-            Assert.True(LodRegion.LowerColumnBelow(fx, y, fz), "the cap outlived the world swap");
+            Assert.True(LodColumnCaps.LowerColumnBelow(fx, y, fz), "the cap outlived the world swap");
             Assert.True(TreeGenerator.TryGetCanopy(cx, cz, out _, out _), "the canopy marker outlived the world swap");
             Assert.False(LodSurface.TryGet(x3, z3, out _, out _), "the surface override outlived the world swap");
         }

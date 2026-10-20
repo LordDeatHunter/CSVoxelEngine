@@ -19,7 +19,7 @@ Existing call sites to mirror: `BlockEditor.RemoveBlock`, `BlockEditor.FellWood`
 - [ ] `LeafDecayManager.ScheduleAround(cell)` / `ScheduleBox` next to it. It grows the box by `ScheduleReach` itself; callers pass only edited cells.
 - [ ] **Gravity**: anything that can unsupport a `falls` block calls `FallingBlockManager.TryTopple` above it (`CheckColumn` bottom-up for batches). Fluids never count as support, so fluid edits need no hook.
 - [ ] **Needs-support** blocks above a removed cell pop through `BlockEditor.RemoveBlock` (`PopUnsupportedAround`).
-- [ ] **Far LOD**: removals call `LodManager.MarkEditedColumn` and cap the column (`LodRegion.LowerColumnBelow`, via `BlockEditor.NotifyLodEdit`); placements need nothing.
+- [ ] **Far LOD**: removals call `LodManager.MarkEditedColumn` and cap the column (`LodColumnCaps.LowerColumnBelow`, via `BlockEditor.NotifyLodEdit`); placements need nothing.
 - [ ] **Trees**: touching wood or leaves calls `TreeGenerator.PoisonCanopy(x, z, ...)` plus `MarkEditedColumn`.
 - [ ] **Station block entities** (campfire, quern, kiln, casting): `NotifyBlockRemoved` when their block goes. Multiblocks: mining any of the 8 cells reverts the rest; a blast path relies on the `KilnManager.Update` integrity sweep.
 - [ ] **TNT blasts skip fluid cells.** Mining never removes a fluid (only buckets do).

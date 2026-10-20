@@ -9,7 +9,7 @@ namespace VoxelEngine.Tests.Lod;
 /// Covers item C9: LOD column height caps are bucketed by chunk column and resolved once per
 /// prefetched heightmap instead of being probed per height sample. The observable contract is
 /// unchanged, so these facts pin it end to end — a cap written through
-/// <see cref="LodRegion.LowerColumnBelow"/> must still reach a rebuilt region's heights, and the
+/// <see cref="LodColumnCaps.LowerColumnBelow"/> must still reach a rebuilt region's heights, and the
 /// bucket write must be visible to the very next read of the same bucket.
 /// </summary>
 public sealed class LodColumnCapTests
@@ -36,7 +36,7 @@ public sealed class LodColumnCapTests
     [Fact]
     public void MinedColumnCapsPropagateIntoARebuiltRegion()
     {
-        // ColumnCaps is process-global, reset only by WorldSeed.Apply (which the parallel suite
+        // LodColumnCaps is process-global, reset only by WorldSeed.Apply (which the parallel suite
         // never calls), and xUnit runs test classes in parallel, so this region sits far away from every other test's regions: region index
         // 777+ covers fine ~49728, while the rest of the suite stays near the origin (region
         // index ~5). The climate rework moved the biomes around, so the region is chosen as the
@@ -58,17 +58,17 @@ public sealed class LodColumnCapTests
         var before = LodRegion.BuildMeshData(1, rx, rz);
 
         // Above the terrain (e.g. a player-placed block): nothing to lower, no rebuild needed.
-        Assert.False(LodRegion.LowerColumnBelow(fx, h + 5, fz));
+        Assert.False(LodColumnCaps.LowerColumnBelow(fx, h + 5, fz));
 
         // Derived from a measured floor rather than guessed as a relative offset, so the stored
         // cap (floor - 33) is strictly below every other sample in the region and is therefore
         // guaranteed to win every window minimum that covers this column.
         var floor = RegionFloor(1, rx, rz);
-        Assert.True(LodRegion.LowerColumnBelow(fx, floor - 32, fz));
+        Assert.True(LodColumnCaps.LowerColumnBelow(fx, floor - 32, fz));
 
         // The C9 write/read round trip: floor - 20 > floor - 33, so this must be refused — which
         // is only true if the previous call's bucket element write is visible to this read.
-        Assert.False(LodRegion.LowerColumnBelow(fx, floor - 20, fz));
+        Assert.False(LodColumnCaps.LowerColumnBelow(fx, floor - 20, fz));
 
         var after = LodRegion.BuildMeshData(1, rx, rz);
 
