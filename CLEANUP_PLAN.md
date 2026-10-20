@@ -98,6 +98,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `c3f0d50` | Split Inventory.cs (896 -> 597 lines): the player.json mapping moved to InventorySaveCodec, the crafting rules to InventoryCrafting, and InventoryCategory and HotbarSlot to their own files; the public members became one-line forwarders over internal state accessors |
 | `6d9cb2d` | Shrink Chunk.cs under 700: the RestoreFrom bodies and their helpers move to the new Chunks/ChunkRestore.cs (71 lines) behind three one-line forwarders, AONeighbors moves to ChunkFaceTables, and the unused using is dropped (Chunk.cs 770 -> 675) |
 | `5318705` | Moved the fire-cell list and its gathering from World into AmbientEffects: GatherStationFires (both update paths) and AddGoblinTorches (full Update only), with World.FireCells forwarding to it; World.cs 1016 -> 1002 lines |
+| `efbadf6` | Split TerrainGenerator.cs (877 -> 461 lines): the 28 noise channels and Reseed/MakeNoise moved to TerrainNoise, the biome climate split to BiomeClassifier, the lakes, rivers and water levels to WaterBodies; TerrainGenerator keeps the palette, LandHeight, Compute and Climate, plus one-line forwards for its public queries |
 
 ## In progress
 
@@ -117,7 +118,6 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 | `src/World.cs` | 1,002 | Has a stated reason. Mob frame job moved to `Simulation/MobDirector.cs` (208) in `78635e3`; fire-cell gathering moved to `AmbientEffects` (351) in `5318705`. No next extraction is named in AGENTS.md; check whether anything is left in World.cs worth moving before planning. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
 | `src/Lod/LodManager.cs` | 314 | Split in `452b2dd` (LodRegionSet 174, LodCoverPass 164, LodRegionClaims 278, LodWorkerPool 144, LodBuildOutcome 12); `Lod/` now holds 14 files. Nothing remains. `LodMeshBuilder.cs` (650) is the largest file left in `Lod/`. Test files: LodManagerTests 788, LodBuildPoolTests 426; AGENTS.md 4,069 lines. |
-| `src/WorldGen/TerrainGenerator.cs` | 877 | |
 | `src/WorldGen/TreeGenerator.cs` | 845 | |
 | `src/Rendering/Overlays/UIRenderer.cs` | 802 | Has a stated reason (shared primitives the ItemDebugger and tests bind to). |
 | `src/Simulation/LeafDecayManager.cs` | 760 | |
@@ -246,6 +246,12 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 
 - Fire-cell move line counts: World.cs 1,002, Particles/AmbientEffects.cs 351; AGENTS.md 4,077 lines.
 - Next World.cs extraction: AGENTS.md no longer names one after the fire-cell move. `Update`'s mob target and damage block and `PushFromBlast` were the older candidates, but they moved to `MobDirector` in `78635e3`; check what is still in World.cs (about 1,000 lines) before planning.
+
+- TerrainGenerator split line counts: TerrainGenerator 461, TerrainNoise 129, BiomeClassifier 104, WaterBodies 252, WorldSeed 84; `WorldGen/` holds 20 files; AGENTS.md 4,083 lines.
+- The noise is now first built when a noise channel is first read (`TerrainNoise`'s static constructor) instead of when the palette resolves. `WorldSeed.Apply`'s first `TerrainNoise.Reseed()` therefore builds every channel twice on first access. The output is identical and the cost is startup only; a later pass could make it a single build.
+- `TerrainGenerator` still mixes the relief functions (`MountainHeight`, `TrenchDepthAt`, `RavineDepthAt`, `RavineCutFade`) with the column build. At 461 lines that is fine; if it grows, a `TerrainRelief` class is the natural next extraction.
+- Hot paths still in `TerrainGenerator` (`BiomeAt`, `LandHeight`, `Compute` -> `SurfaceWaterGate`) go through one-line facade forwards, which the JIT should inline. If a perf capture ever shows otherwise, call `BiomeClassifier.BiomeWeights` and `WaterBodies.SurfaceWaterGate` directly there.
+- No bugs were found during the TerrainGenerator move.
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
