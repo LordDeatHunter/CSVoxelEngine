@@ -99,6 +99,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `6d9cb2d` | Shrink Chunk.cs under 700: the RestoreFrom bodies and their helpers move to the new Chunks/ChunkRestore.cs (71 lines) behind three one-line forwarders, AONeighbors moves to ChunkFaceTables, and the unused using is dropped (Chunk.cs 770 -> 675) |
 | `5318705` | Moved the fire-cell list and its gathering from World into AmbientEffects: GatherStationFires (both update paths) and AddGoblinTorches (full Update only), with World.FireCells forwarding to it; World.cs 1016 -> 1002 lines |
 | `efbadf6` | Split TerrainGenerator.cs (877 -> 461 lines): the 28 noise channels and Reseed/MakeNoise moved to TerrainNoise, the biome climate split to BiomeClassifier, the lakes, rivers and water levels to WaterBodies; TerrainGenerator keeps the palette, LandHeight, Compute and Climate, plus one-line forwards for its public queries |
+| `bc5a336` | Split TreeGenerator.cs (845 -> 269 lines): the solo shapes and cell batches moved to TreeBatches (263), Stamp/TryLocal/StampRoots to TreeStamper (135), the far-LOD canopy caches, CanopyDisturbed markers and their export/import to TreeCanopy (265), with one-line forwards on TreeGenerator; WorldGen/ holds 21 files |
 
 ## In progress
 
@@ -118,7 +119,7 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 | `src/World.cs` | 1,002 | Has a stated reason. Mob frame job moved to `Simulation/MobDirector.cs` (208) in `78635e3`; fire-cell gathering moved to `AmbientEffects` (351) in `5318705`. No next extraction is named in AGENTS.md; check whether anything is left in World.cs worth moving before planning. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
 | `src/Lod/LodManager.cs` | 314 | Split in `452b2dd` (LodRegionSet 174, LodCoverPass 164, LodRegionClaims 278, LodWorkerPool 144, LodBuildOutcome 12); `Lod/` now holds 14 files. Nothing remains. `LodMeshBuilder.cs` (650) is the largest file left in `Lod/`. Test files: LodManagerTests 788, LodBuildPoolTests 426; AGENTS.md 4,069 lines. |
-| `src/WorldGen/TreeGenerator.cs` | 845 | |
+| `src/WorldGen/TreeGenerator.cs` | 269 | Split in `bc5a336` (TreeBatches 263, TreeStamper 135, TreeCanopy 265). |
 | `src/Rendering/Overlays/UIRenderer.cs` | 802 | Has a stated reason (shared primitives the ItemDebugger and tests bind to). |
 | `src/Simulation/LeafDecayManager.cs` | 760 | |
 | `src/Player/PlayerPhysics.cs` | 708 | |
@@ -252,6 +253,11 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `TerrainGenerator` still mixes the relief functions (`MountainHeight`, `TrenchDepthAt`, `RavineDepthAt`, `RavineCutFade`) with the column build. At 461 lines that is fine; if it grows, a `TerrainRelief` class is the natural next extraction.
 - Hot paths still in `TerrainGenerator` (`BiomeAt`, `LandHeight`, `Compute` -> `SurfaceWaterGate`) go through one-line facade forwards, which the JIT should inline. If a perf capture ever shows otherwise, call `BiomeClassifier.BiomeWeights` and `WaterBodies.SurfaceWaterGate` directly there.
 - No bugs were found during the TerrainGenerator move.
+
+- TreeGenerator split line counts: TreeGenerator 269, TreeBatches 263, TreeStamper 135, TreeCanopy 265; `WorldGen/` holds 21 files.
+- `TreeBatches` and `TreeBatch` are near-namesakes; a rename (for example `TreeBatches` to `TreeShapeCaches`) would help, with matching AGENTS.md updates.
+- `PERF_TODO.md` has an unqualified `BuildCanopyTops` mention near line 681, left as a historical note.
+- The commit step of the TreeGenerator run failed on a network error after the code commit landed; this entry was added by hand.
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
