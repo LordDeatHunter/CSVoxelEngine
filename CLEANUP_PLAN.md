@@ -96,6 +96,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `9dea99b` | Split FluidManager (1,066 -> 262 lines) into Simulation/Fluids/: FluidSchedule, FluidCells, FluidCellKey, FluidNeighborhood, FluidSpread, FluidMud, FluidWakeScanner, FluidWakeRules, with FluidFlow and FluidState moved alongside; Simulation/ 22 -> 19 files |
 | `452b2dd` | Split LodManager.cs (932 -> 314 lines) into LodRegionSet, LodCoverPass, LodRegionClaims and LodWorkerPool, with LodBuildOutcome moved to its own file; LodManager keeps the frame orchestration and forwards its public surface and test seams |
 | `c3f0d50` | Split Inventory.cs (896 -> 597 lines): the player.json mapping moved to InventorySaveCodec, the crafting rules to InventoryCrafting, and InventoryCategory and HotbarSlot to their own files; the public members became one-line forwarders over internal state accessors |
+| `6d9cb2d` | Shrink Chunk.cs under 700: the RestoreFrom bodies and their helpers move to the new Chunks/ChunkRestore.cs (71 lines) behind three one-line forwarders, AONeighbors moves to ChunkFaceTables, and the unused using is dropped (Chunk.cs 770 -> 675) |
 
 ## In progress
 
@@ -111,7 +112,6 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 
 | File | Lines | Notes |
 |---|---|---|
-| `src/Chunks/Chunk.cs` | 769 | Split in `e4a318b` (ChunkTerrainFill 377, ChunkMeshBuilder 584, ChunkFaceTables 98, ChunkMeshData 38, ChunkLighting 395; ChunkMesher since split in `ef2f66b`, now 482). Inside the 800 ceiling but above the ~700 smell line; AGENTS.md records it as a stated reason in the offender list. Remaining option: move TakeSnapshot/CaptureForNetwork/RestoreFrom (the save and network snapshot job) into a Saves- or Chunks-side helper to get under ~700. |
 | `src/Player/Camera.cs` | 731 | Split in `fc2ffb2` (HeadMotion 136, ShoulderRig 196, ModeToggles 86, ViewProjectionCache 82, SpawnOverrides 98, CameraMode 9); AGENTS.md records a stated reason. Misses the ~700 target because the XML docs kept on the forwards take more lines than planned. Optional: move `PushOutOf`'s body (about 45 lines) verbatim into a small `Player/` helper (not `PlayerPhysics`) with a one-line forward, then update the AGENTS.md wording ('about 730 lines'). |
 | `src/World.cs` | 1,015 | Has a stated reason. Mob frame job moved to `Simulation/MobDirector.cs` (208) in `78635e3`. Next extraction: the fire-cell gathering that `Update` and `UpdateClient` both build. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
@@ -240,6 +240,9 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `Inventory.cs` is LF-only while most of its neighbors are CRLF. Future edits must keep LF in that file, unless a separate normalization task is planned.
 - `Inventory.cs` now exposes six internal state accessors (Tools, Blocks, Misc, Known, Hotbar, NextToolInstance) to the test and ItemDebugger assemblies through InternalsVisibleTo. A later pass could check whether any can be narrowed (for example, a dedicated reset method for Import).
 - `Import`'s nesting in `InventorySaveCodec` was deliberately left as it was; a candidate for an early-return cleanup task.
+
+- Chunk shrink line counts: Chunk 675, ChunkRestore 71, Meshing/ChunkFaceTables 139, Meshing/ChunkLighting 396; AGENTS.md 4,077 lines. Chunk.cs is no longer an offender; the remaining offenders are `World.cs`, `Program.cs` and `Camera.cs` (update the AGENTS.md offender wording when it is next touched).
+- The doc build (`-p:GenerateDocumentationFile=true`) reports a CS0419 ambiguous-cref warning on `Chunk.cs`'s `RestoreFrom` docs. It predates the shrink (it was in the baseline) and is probably the unqualified `RestoreFrom` / `Chunk.RestoreFrom` cref resolving to the three overloads (check the AGENTS.md mentions and `ChunkRestore`'s class summary too). Pin it to a specific overload signature in a doc-tidy pass.
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
