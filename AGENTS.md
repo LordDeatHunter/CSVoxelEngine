@@ -1304,7 +1304,8 @@ OpenGLTest/
       InputManager.cs          # keyboard/mouse context
       WindowManager.cs         # Silk.NET window setup
     Player/                    # the player: camera, physics, water phases, body probes, health,
-                               #   fall tracking, the rig and model, sprint toggle, death messages
+                               #   fall tracking, the rig and model (its posing components live in Posing/),
+                               #   sprint toggle, death messages
       Camera.cs                # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA
                                #   raycast live in Player/PlayerPhysics.cs and Interaction/BlockRaycaster.cs
       DeathMessages.cs         # the death line from the blow PlayerHealth recorded
@@ -1317,7 +1318,21 @@ OpenGLTest/
       PlayerContext.cs         # who an interaction runs for: eye, aim, inventory, creative (local camera or a
                                #   server's connected player), threaded through every World interaction path
       PlayerHealth.cs          # the player's survival pool, 0-100 HP drawn as 10 hearts (1 heart = 10 HP)
-      PlayerModel.cs           # blocky Minecraft-like player model with two-segment limbs
+      PlayerModel.cs           # blocky Minecraft-like player model with two-segment limbs: the state owner and facade
+                               #   (Update, triggers, GetPose/GetPartMatrix/GetHandAnchorMatrix) over Posing/
+      Posing/                  # the posing components PlayerModel owns (see PlayerModel.cs), namespace VoxelEngine.Player.Posing
+        ArmOverlays.cs         # lays the pose-specific arm frames (jump, swim stroke and float, punch chamber, cocked throw) over the base frames
+        ArmSolver.cs           # the two-bone arm math: hand offset for a shoulder pitch and elbow, and the joints that reach an offset
+        BodyPartMatrices.cs    # the world matrices of the body parts and the held item's hand anchor (GetPartMatrix/GetHandAnchorMatrix bodies)
+        LimbFrames.cs          # the arm-frame builders (FrameOf, UpperFrame, ForeFrame, Blend) and the shoulder socket
+        PoseBuilder.cs         # assembles the frame's joint pose: gait and jump blend, then swim, mods, jab, throw and use in order
+        PoseMods.cs            # the secondary-motion values ComputeMods hands to ApplyMods
+        PunchPose.cs           # the jab: phase weights and the two-bone IK that drives the fist along the aim
+        SecondaryMotion.cs     # the body-wide mods (landing dip, crouch, flinch, sway, twist, swim tilt, death fall) and ApplyMods
+        ShoulderReach.cs       # where each shoulder is pulled toward its reaching arm (the target of the owner's pull springs)
+        SliceMotion.cs         # the slice swing's phase shapes as pure functions of the slice clock
+        SwimPose.cs            # the swim stroke shape and the swim and surface-float leg pose
+        ThrowPose.cs           # the right arm's throw and timed-use overrides
       PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision (static BodyCollides),
                                #   auto-step, knockback, water state
       PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
@@ -2066,7 +2081,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 | field | meaning |
 |---|---|
 | `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item), `place_fluid` (pour one into the targeted cell), `place_stack` (build a stack block up), `ignite_campfire` (strike a branch pile, or a kiln that has fuel), `convert_multiblock` (turn a 2x2x2 volume into a structure), `heal` (restore health to the user, refused at full health) or `grow_tree` (grow the tree the aimed cell belongs to, `AshGrowthPulses` pulses) |
-| `use.seconds` | seconds holding right-click takes before the use runs: the world charges a use pose (`PlayerModel.StartUseCharge`/`WithUse`) and only runs the use at completion, so letting go early cancels it and spends nothing (`RightClickAction.TryBeginUseCharge`/`UpdateUseCharge`/`CancelUseCharge`, the twin of `ThrowAction`'s throw charge). 0 (omitted) keeps the old instant use. The firestarter's `useDelay` stays the cooldown after a use |
+| `use.seconds` | seconds holding right-click takes before the use runs: the world charges a use pose (`PlayerModel.StartUseCharge`/`ThrowPose.WithUse`) and only runs the use at completion, so letting go early cancels it and spends nothing (`RightClickAction.TryBeginUseCharge`/`UpdateUseCharge`/`CancelUseCharge`, the twin of `ThrowAction`'s throw charge). 0 (omitted) keeps the old instant use. The firestarter's `useDelay` stays the cooldown after a use |
 | `use.block` | for `convert_multiblock`, the **source** block the volume must be built from (`block/mud_bricks`); for `place_stack`, the stack block it builds |
 | `use.result` (`convert_multiblock`) | the multiblock **anchor** block the volume becomes (`block/mud_brick_kiln`). The registry checks at startup that the anchor really is a `multiblock` renderer built from that very source, so a mismatched pair names its file instead of failing in play. The converter itself is spent by nothing and never morphs |
 | `use.fluid` | the fluid block the action works on; must be a block with `fluid: true` || `use.result` | the item this one becomes on success; must be an item, and the two normally point at each other |
@@ -3642,11 +3657,11 @@ overshoot or jiggle.
   pacing) plus the optional `hurt`, `death` and `spawn`. `EntityAnimator.PlayOverlay` plays `hurt` as
   an **additive overlay** (translation added, rotation composed) so a hit never cancels a throw or
   swing; `death` and `spawn` are ordinary actions.
-- **Arm frames** (`PlayerModel.ApplyArmFrames`): the base arm is a forward flex plus a yaw, so both
+- **Arm frames** (`ArmOverlays.ApplyArmFrames`): the base arm is a forward flex plus a yaw, so both
   bones stay in one plane and it cannot reach out sideways. Poses that need that are given as an upper
   arm *roll* (abduction about the front axis, then flexion about X, then yaw; the left arm mirrors the
   roll and yaw) and a forearm *flexion plus bend*, slerped over the base frames by a weight
-  (`UpperFrame`/`ForeFrame`/`Blend`). With the arm held out the elbow's X hinge is the vertical axis, so
+  (`LimbFrames.UpperFrame`/`ForeFrame`/`Blend`). With the arm held out the elbow's X hinge is the vertical axis, so
   a plain forearm flexion swings it forward in the horizontal plane and a bend about Z lifts it up. In
   use: the **jump** (arms out to the sides, a soft elbow, both knees folded under; a sprint jump trails
   them back), the **punch** (the elbow flares out and forward at the chamber with the forearm folded to
@@ -3655,20 +3670,20 @@ overshoot or jiggle.
   the **throw charge** (the upper arm out to the right and a little behind the body, the forearm bent up
   at about a right angle, the shoulders wound back toward the throwing side, then a whip forward and a
   settle) and the **swim stroke**. The hand anchor follows the forearm frame, so the held item does too.
-- **Slice** (`PlayerModel.SlicePhase`): a whole-body motion in uneven phases of the same 0.7 s: a slow
+- **Slice** (`SliceMotion.SlicePhase`): a whole-body motion in uneven phases of the same 0.7 s: a slow
   wind-up that coils the body (to 0.26), a strike about twice as fast as before centered on the impact
   (0.26..0.49, a steeper `EaseInOutCubic` through the middle) and a long eased recovery, so the contrast
   reads as a snap. The arm sweep is only part of it: the whole body turns about the feet
-  (`SliceBodyYaw`, the legs counter-turning by `SliceLegCounter` so the feet stay planted), the shoulders
-  turn further (`SliceTorsoYaw`), the knees and hips sink into the strike and the torso dips. The hand
+  (`SliceMotion.SliceBodyYaw`, the legs counter-turning by `SliceLegCounter` so the feet stay planted), the shoulders
+  turn further (`SliceMotion.SliceTorsoYaw`), the knees and hips sink into the strike and the torso dips. The hand
   also travels a diagonal on every slice, from `SliceStartRaiseBlocks` above the chest line (so the cut
-  starts high, not horizontal) down to just `SliceEndDropBlocks` below it (`SliceDiagonal`, through the
+  starts high, not horizontal) down to just `SliceEndDropBlocks` below it (`SliceMotion.SliceDiagonal`, through the
   same re-solved arm as the chest-height drop), whichever way the swing goes. The slicing **arm is held out in front,
-  nearly straight, at chest height** (`SliceArmShoulder`, `SliceArmElbow`): the carrying pose (elbow bent 75
+  nearly straight, at chest height** (`BodyPartMatrices.SliceArmShoulder`, `SliceArmElbow`): the carrying pose (elbow bent 75
   degrees, forearm up, which made the hand look held up by the elbow) is eased into it as the stroke ramps in. The
   **blade is carried by the wrist**: its tip points along the forearm (so it follows the arm's sweep and is
   always across the direction the hand travels, never turned up mid-cut), rolled about its length by
-  `SliceBladeRoll` (cocked on edge, not laid flat) and cocked up from the forearm by `SliceBladeCant`, and through the main part of the cut (`SliceMainWeight`: eased in at the end of the wind-up,
+  `SliceBladeRoll` (cocked on edge, not laid flat) and cocked up from the forearm by `SliceBladeCant`, and through the main part of the cut (`SliceMotion.SliceMainWeight`: eased in at the end of the wind-up,
   full through the strike, out over the start of the recovery) turned about the vertical by `SliceBladeYawOffset`
   (+45 degrees in the engine's yaw convention, so the tip leads ahead of the hand's travel; mirrored for the
   return); in
@@ -3687,17 +3702,17 @@ overshoot or jiggle.
   of the first swing's (`PlayerModelTests.TheDrawnBladeLeadsAheadOfTheForearmThroughTheCutAndTheReturnSwingIsItsMirrorImage`,
   which measures the item as drawn: the blade sprite's tip is its (1, 1, 0) diagonal and its edge the (1, -1, 0) one,
   both through `DisplayMatrix(offset)` and the hand anchor).
-  The **shoulder socket** (`ShoulderSocketInward`, 0.09) slides the joint in toward the torso as an arm lifts off
-  hanging (`SocketWeight`), so a raised arm stays seated on the body instead of hinging on a point 0.1 outside it
+  The **shoulder socket** (`LimbFrames.ShoulderSocketInward`, 0.09) slides the joint in toward the torso as an arm lifts off
+  hanging (`LimbFrames.SocketWeight`), so a raised arm stays seated on the body instead of hinging on a point 0.1 outside it
   with a gap; the punch IK includes it. `SliceImpactProgress` (where the damage lands) is the middle of the strike. Filmed by
   `visual-examples/animations-slice.json`.
-- **Attachment** (`PlayerModel.GetPartMatrix`): the neck and both shoulders are children of the **torso
+- **Attachment** (`PlayerModel.GetPartMatrix`, its body in `Posing/BodyPartMatrices`): the neck and both shoulders are children of the **torso
   frame** (hip-origin, turning with the torso's lean, twist and roll), so a limb can never come off the body
   or sink into it; only the legs and the pelvis hang off the root. While a tuned pose is showing (the slice
   sweep, the cocked throw, the punch) the torso's twist is taken back out of that arm's yaw so its hand path is
   the one authored in body space; an idle arm just follows the torso round. The punch IK is solved from where
-  the torso actually carries the shoulder (`PunchTargetFromShoulder`), not from its rest place. On top of that a
-  reaching arm **pulls its shoulder** a little toward where it reaches (`PullTarget`, spring-smoothed so a
+  the torso actually carries the shoulder (`PunchPose.PunchTargetFromShoulder`), not from its rest place. On top of that a
+  reaching arm **pulls its shoulder** a little toward where it reaches (`ShoulderReach.PullTarget`, spring-smoothed so a
   thrust or release trails and settles, at most `MaxShoulderPullBlocks` = 0.08) and the torso leans toward the
   pulled side. `PlayerModelJuiceTests.TheShouldersAndTheNeckStayOnTheTorsoThroughEveryAnimation` runs every
   debugger mode and asserts that no shoulder or neck is ever farther off its place on the torso than the pull bound.
@@ -3708,8 +3723,8 @@ overshoot or jiggle.
   stroke. The legs snap straight with the thrust and draw up during the recovery, and the whole body
   tips about the hips toward the heading (`Update(..., swimForward:, swimSide:)`: forward when
   swimming ahead, back when backing off, rolled into a strafe, plus a lunge at the burst).
-- **Surface float** (`PlayerModel.Update(..., floating:)`, `FloatBlend`, `Float*` constants): a body at
-  rest in `WaterPhase.Float` is upright and straight (`ComputeMods` drops the swim tilt and roll by the
+- **Surface float** (`PlayerModel.Update(..., floating:)`, `FloatBlend`, the `SwimPose.Float*` constants): a body at
+  rest in `WaterPhase.Float` is upright and straight (`SecondaryMotion.ComputeMods` drops the swim tilt and roll by the
   float's share), its arms scull slowly beside the hips (upper arms a little out and forward, forearms
   bent forward, the hands sweeping out and in together) and its legs hang with a faint flutter. It eases
   in over the swim pose through `MathUtils.Damp` and back out during a stroke (a floater swimming off
@@ -3718,8 +3733,8 @@ overshoot or jiggle.
   debugger's `SURFACE` mode (`ITEM_DEBUGGER_PLAYER_ANIM=surface`) previews it, `SurfaceFloatPoseTests`
   locks it down and `visual-examples/water-depth.json` (`VOXEL_TIME=147`) films a poured puddle (wade),
   the deep sea's float, a stroke hop and a dive (swim) from the shoulder camera.
-- **Player model** (`PlayerModel.cs`): the existing `Pose` is post-processed by `ApplySwim` and
-  `ApplyMods` (`ComputeMods`): a landing dip spring (knees, hips, torso, root drop), crouch
+- **Player model** (`PlayerModel.cs`): the existing `Pose` is post-processed by `SwimPose.ApplySwim` and
+  `SecondaryMotion.ApplyMods` (`ComputeMods`): a landing dip spring (knees, hips, torso, root drop), crouch
   (`Update(..., sneaking:)`), a swim stroke (`swimming:`), the hit flinch (`Hurt(fromFront)`), torso
   twist and sway in the gait, the slice twist and weight shift, the throw lean, the off-hand counter
   on a punch, a heavier swing for a slower tool (`Punch(weight)`), the first-person arm lag behind
