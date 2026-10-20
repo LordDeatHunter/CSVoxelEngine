@@ -103,6 +103,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `4b0aa80` | Split LeafDecayManager.cs (761 -> 413 lines) into Simulation/LeafDecay/: the chunk cache, TryGetCell/Write, the dirty-chunk batch and the 21-bit packer moved to LeafDecayCells (149), the parent-chain walk, TreeSupport search and support memos to OrphanWoodCheck (104, TickWood's support block now IsOrphaned), the tip offset tables, TryHydrationAt, IsLiveTip and TryTipSupport to TipHydration (178); LeafDecayManager keeps the schedule, tick and removal as the composition root; Simulation/ root holds 18 files |
 | `0bf8943` | Split PlayerPhysics.cs (708 -> 547 lines) into ViewShake (the damage view shake, owned and ticked by PlayerPhysics) and BodyCollision (the static body collision rule BodyCollides, the stepped axis moves and auto-step, and the falling-cube shove that Camera.PushOutOf now forwards to); moved the BodyCollides callers (MovementRules, PlayerBodyProbe, tests); Camera.cs 731 -> 684 lines |
 | `f27e922` | Dead code and broken crefs pass: 76 unused usings, 14 unused or never-read members, unused parameters in 10 methods (incl. the menu layout ListTop/RowTop cascade) and 4 dead stores removed; 40 CS1574/CS0419/CS1570/CS1734 doc references fixed. Doc+style build at 0 for all except IDE0059 3 (hasWater const-flag keep plus 2 test bodies) and CS1573 37 (out of scope). The code-cleanup skill documents the measuring build. |
+| `3f77a2b` | Duplication pass: the server's and the item debugger's AssetRoot (plus the test fixture's walk) now live in one VoxelEngine.Core.AssetRoot, with each search rule kept verbatim. The hotbar and the [E] rows call UIRenderer.DrawIdIcon, and the unused ItemIcons is gone. MenuRenderer's two confirm-delete popups and its two list pages are folded into DrawConfirmDelete and DrawListPage, with static cached row drawers (467 to 422 lines). |
 
 ## In progress
 
@@ -141,14 +142,16 @@ are 32/41 files and 43 test lines, so take later measurements against those.
 
 ### 3. Duplication pass
 
-Known duplicates, recorded by the earlier runs:
-- `AssetRoot` is declared in both `OpenGLTest.Server` and `OpenGLTest.ItemDebugger`. Move one
-  shared copy into the game project.
-- The inline sprite-or-cube icon blocks in `HudRenderer.DrawHotbar` and
-  `InventoryPanelRenderer.DrawEntryRow` duplicate `UIRenderer.DrawIdIcon`.
-- `MenuRenderer` has duplicated confirm-delete and list pages (worlds vs servers).
+The three known duplicates (AssetRoot, the item-icon blocks, MenuRenderer's confirm-delete and list pages)
+are done in `3f77a2b` (nothing remains of them). Line counts after it: Core/AssetRoot 100, TestContent 49,
+HudRenderer 436, InventoryPanelRenderer 369, UIRenderer 801, MenuRenderer 422; AGENTS.md 4,100,
+item-debugger SKILL.md 83. Still open:
 - Search for more: near-identical methods, and repeated constants or rules that should be one
-  helper.
+  helper. Known candidates: the `LeafDecayCells`, `FluidCellKey` and `FluidCells` twins, and the per-entity
+  `CollisionStepSize`, `MoveOnAxis` and `IsColliding` copies (see section 5).
+- `MenuRenderer`'s other pages (AddServer, DirectConnect, Create and Edit) still repeat a title, fields,
+  `DrawNotice`, two-button pattern inline in `DrawMainMenu`. A possible later fold; check first that the
+  halves really are the same.
 
 ### 4. Early returns / nesting pass
 
@@ -271,6 +274,10 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `BodyCollision.PushOutOf`'s XML summary is a single ~180-character line; wrap it to the file's comment width in a later doc tidy.
 - Duplication task still open: the private `CollisionStepSize`/`MoveOnAxis`/`IsColliding` copies in `FallingBlock`, `Goblin`, `ItemDrop`, `PrimedTnt`, `Slime`, `ThrownProjectile` and `BlockDebris` could share one collision helper. Its interface would differ from `BodyCollision`'s player-body rule because entity boxes and hitbox rules differ.
 - Next extraction candidates per AGENTS.md: `World.Update`'s mob target/damage block and `World.PushFromBlast` (check first: both may already live in `MobDirector`, see `78635e3`).
+
+- Duplication pass follow-ups (`3f77a2b`):
+  - The new `OpenGLTest/src/Core/AssetRoot.cs` was untracked and the two project copies deleted but not staged; the commit must `git add` the new file and stage both deletions (`OpenGLTest.Server/AssetRoot.cs`, `OpenGLTest.ItemDebugger/AssetRoot.cs`). Check `git status` shows them committed.
+  - The doc build's CS1573 count is 37 unique warnings, not the 74 once recorded (the old figure probably counted each twice). Re-baselined at 37; recheck once against HEAD.
 
 - Dead code pass follow-ups (`f27e922`):
   - IDE0059 in two test bodies is left as is because that run could not edit tests: `CampfireCookingTests.cs:48` (manager) and `PoolCairnTests.cs:87/88` (pebble). A future test-tidy pass can drop the dead stores.
