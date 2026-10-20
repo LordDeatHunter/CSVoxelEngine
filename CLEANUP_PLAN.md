@@ -88,6 +88,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `f17ea5c` | Split PlayerModel.cs (1,468 to 583 lines) into Player/Posing/: static SliceMotion, ArmSolver and LimbFrames; the PoseMods struct; owned SwimPose, ThrowPose, SecondaryMotion, PunchPose, ArmOverlays, ShoulderReach, PoseBuilder and BodyPartMatrices. PlayerModel stays the state owner and facade. |
 | `d34921c` | Split GameServer.cs (1,393 -> 330 lines) into ServerState, ServerTransport, PlayerSessions, IntentReplay, StreamRequests, ServerBroadcasts and ServerChat, with ClientConnection and Inbound lifted to their own files; GameServer stays the composition root with an unchanged public surface and Pump order |
 | `51a537f` | Split ChunkManager.cs (1,349 -> 589 lines) into Meshing/ChunkMeshScheduler (dirty set, thread-pool mesh runners, completed queue and budgeted upload, immediate remesh), ChunkRenderLists (Renderable/TranslucentRenderable swap-remove, MeshVersion), PlayerPlacedIndex (player-placed cells, restored-placement adoption) and the static ChunkFluidQueries; ChunkManager keeps the lifecycle and composition root with one-line forwarders; AGENTS.md layout, threading bullets and offenders list updated |
+| `ef2f66b` | Split ChunkMesher.cs (1,276 -> 482 lines) into WaterSurfaceCodes, FluidEmitter, StackEmitter and TreeWoodEmitter; ChunkMesher keeps the greedy pass, the tinted cube face and the quad primitives; fixed the FaceLight/MeshScratch SmoothCornerLight crefs |
 
 ## In progress
 
@@ -103,8 +104,7 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 
 | File | Lines | Notes |
 |---|---|---|
-| `src/Chunks/Chunk.cs` | 769 | Split in `e4a318b` (ChunkTerrainFill 377, ChunkMeshBuilder 584, ChunkFaceTables 98, ChunkMeshData 38, ChunkLighting 395, ChunkMesher 1,276 unchanged). Inside the 800 ceiling but above the ~700 smell line; AGENTS.md records it as a stated reason in the offender list. Remaining option: move TakeSnapshot/CaptureForNetwork/RestoreFrom (the save and network snapshot job) into a Saves- or Chunks-side helper to get under ~700. |
-| `src/Chunks/Meshing/ChunkMesher.cs` | 1,276 | Greedy pass vs per-voxel emitters. Perf-hot: no new allocations, and keep `GreedyMeshingTests` equality. |
+| `src/Chunks/Chunk.cs` | 769 | Split in `e4a318b` (ChunkTerrainFill 377, ChunkMeshBuilder 584, ChunkFaceTables 98, ChunkMeshData 38, ChunkLighting 395; ChunkMesher since split in `ef2f66b`, now 482). Inside the 800 ceiling but above the ~700 smell line; AGENTS.md records it as a stated reason in the offender list. Remaining option: move TakeSnapshot/CaptureForNetwork/RestoreFrom (the save and network snapshot job) into a Saves- or Chunks-side helper to get under ~700. |
 | `src/Lod/LodRegion.cs` | 1,236 | LOD mesh build, levels, caps. Keep the nesting invariants. |
 | `src/Player/Camera.cs` | 1,175 | Pose, view cache, head motion, FOV/roll terms, water state. |
 | `src/World.cs` | 1,144 | Has a stated reason. Next extraction: `Update`'s mob target/damage block and `PushFromBlast`/`PushTargetFromBlast`. |
@@ -193,6 +193,13 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - Some prose comments in `ChunkManager.cs` still name the scheduler's private fields (`_dirtyChunks`, `_pendingMeshWork`) or `PlayerPlacedIndex`'s (`_restoredChunks`, `_playerPlacedByChunk`); retarget them to `ChunkMeshScheduler` / `PlayerPlacedIndex` in a doc tidy.
 - `PERF_TODO.md` keeps historical records naming `_dirtyChunks`, `_generatingMeshes`, `ProcessDirtyChunks`, `ApplyCompletedMeshes` and `HasAllNeighbors` on `ChunkManager`; left on purpose, but those now live in `ChunkMeshScheduler`.
 - `ChunkMeshScheduler.cs` is 566 lines, a little over the ~550 per-file target (accepted); if it grows, move the immediate-remesh paths (`MarkDirty`, `MarkAreaDirty`, `ImmediateRemesh*`) out next.
+- ChunkMesher split line counts: ChunkMesher 482, WaterSurfaceCodes 85, FluidEmitter 290, StackEmitter 170, TreeWoodEmitter 312, ChunkMeshBuilder 584, MeshScratch 76, PaneEmitter 116, Chunk.cs 769, MeshingTests 714; AGENTS.md 4,025 lines. `Chunks/Meshing/` now holds 14 files.
+- The `Chunk.cs` `EmitGreedyFaces` cref warning listed above does not exist (ChunkMeshBuilder already crefs `ChunkMesher.EmitGreedyFaces` correctly); the broken `SmoothCornerLight` cref was in `FaceLight.cs`, not `MeshScratch`, and is fixed.
+- The working copies of `ChunkMeshBuilder.cs`, `MeshScratch.cs` and `MeshingTests.cs` are LF-only and git warns it will convert them to CRLF. This predates the split; consider normalizing them in a separate step.
+- The new `ChunkMesher.cs` line in the AGENTS.md Layout is longer than its neighbors; wrap it onto a continuation line at the `#` column if consistent width matters.
+- Pre-existing doc warnings left alone: `ChunkFaceTables.cs(70)` CS1573, `ImportedMapSource.cs(64)` CS1573, `MeshBuildCostProbe.cs(12)` CS1574.
+- `ChunkMeshBuilder.cs` (584 lines) is now the largest file in `Meshing/`; watch it if the stale-neighbor fix grows it.
+- The stale-neighbor-slots bug (see "Bugs found") still needs its own task.
 - The stale REPO preamble in `.claude/workflows/plan-and-implement.js` (`~/.dotnet/dotnet.exe`,
   `OpenGLTest.sln`) is the user's file. They may want it fixed. (`cleanup-campaign.js` carries the
   correct commands, so the cleanup no longer depends on it.)
