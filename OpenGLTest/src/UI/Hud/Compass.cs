@@ -11,7 +11,7 @@ namespace VoxelEngine.UI.Hud;
 public static class Compass
 {
     /// <summary>World XZ the spawn marker points at: the center of the origin column,
-    /// matching the eye XZ of <c>Camera.SpawnPosition</c>.</summary>
+    /// matching the eye XZ of <c>SpawnOverrides.SpawnPosition</c>.</summary>
     public const float SpawnX = 0.5f;
     public const float SpawnZ = 0.5f;
 

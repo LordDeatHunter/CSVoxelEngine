@@ -2281,7 +2281,7 @@ night run (`VOXEL_TIME=300`; the day cycle has since doubled to 1200 s, which pu
 bind at night. **A single-entry deletion is not a sufficient control, and a daytime-only sweep misses
 a real state divide.**
 
-**On R7/R11**: `Camera.GetViewProjection()` and `GetViewFrustum()` share one `EnsureViewCache()` keyed
+**On R7/R11**: `Camera.GetViewProjection()` and `GetViewFrustum()` share one `ViewProjectionCache.EnsureViewCache()` keyed
 on a `ViewProjKey` compared bit-for-bit (the record's generated equality is deliberately unused,
 because `float.Equals` calls `+0f`/`-0f` equal and `NaN`/`NaN` equal, which would break the proof).
 `GetViewMatrix()` / `GetProjectionMatrix()` are uncached **on purpose**: they are the correct answer

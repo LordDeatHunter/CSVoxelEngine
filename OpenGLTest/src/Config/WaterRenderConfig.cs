@@ -28,7 +28,7 @@ public static class WaterRenderConfig
     // Eye movement in blocks. BaseSpeed 8 with SprintMultiplier 1.5 (Camera.cs) is <= 0.2
     // blocks/frame at 60 fps and still reuses; FlyBoostMultiplier 10 is ~1.3 and always refreshes.
     public const float ReflectionReuseMaxMoveBlocks = 0.35f;
-    // Vertical FOV change, in degrees. Camera.GetProjectionMatrix builds from _currentFov, which
+    // Vertical FOV change, in degrees. Camera.GetProjectionMatrix builds from CurrentFov, which
     // eases toward the sprint boost via MathUtils.Damp, and that projection is baked into the
     // cached reflection view-projection.
     public const float ReflectionReuseMaxFovDegrees = 0.1f;

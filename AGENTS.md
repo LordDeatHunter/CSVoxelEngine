@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project overview
 
-A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, binary greedy chunk meshing with ambient occlusion (plain cubes are culled by bitmask and merged into larger quads wherever the result is pixel-identical; procedural blocks and fluids keep per-quad emitters — see `MESHER_PLAN.md`), frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`Camera.SpawnPosition`), or where they left a saved world; worlds are created, listed and opened from a main menu and saved to disk (see "Launch flow" and "Saves").
+A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, binary greedy chunk meshing with ambient occlusion (plain cubes are culled by bitmask and merged into larger quads wherever the result is pixel-identical; procedural blocks and fluids keep per-quad emitters — see `MESHER_PLAN.md`), frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`SpawnOverrides.SpawnPosition`), or where they left a saved world; worlds are created, listed and opened from a main menu and saved to disk (see "Launch flow" and "Saves").
 
 The renderer requires an **OpenGL 4.6 core** context: `WindowManager` requests `APIVersion(4, 6)`
 with `ContextProfile.Core`, and every shader under `assets/shaders/` declares `#version 460 core`.
@@ -1326,13 +1326,20 @@ OpenGLTest/
     Player/                    # the player: camera, physics, water phases, body probes, health,
                                #   fall tracking, the rig and model (its posing components live in Posing/),
                                #   sprint toggle, death messages
-      Camera.cs                # FPS camera pose, view/proj cache, shoulder/orbit modes; movement+physics and the DDA
-                               #   raycast live in Player/PlayerPhysics.cs and Interaction/BlockRaycaster.cs
+      Camera.cs                # the camera's pose, mouse look, eye water state and IMobTarget side, and the facade over
+                               #   its components (ViewProjectionCache, ModeToggles, HeadMotion, ShoulderRig); the view and
+                               #   projection matrices and the cache key; movement and physics live in PlayerPhysics.cs,
+                               #   the DDA walk in Interaction/BlockRaycaster.cs
+      CameraMode.cs            # F5 camera modes, FirstPerson -> Shoulder -> Orbit
       DeathMessages.cs         # the death line from the blow PlayerHealth recorded
       FallTracker.cs           # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
                                #   (singleplayer's LocalPlayer.UpdateHealth and each ServerPlayer's accepted states)
+      HeadMotion.cs            # the per-frame view juice (bob, roll, landing dip, hit kick, FOV punch, sprint FOV, throw
+                               #   zoom, strafe tilt, crouch drop, death view, damage arc and droplet aging) folded into
+                               #   Roll/BobHeight/BobStrafe/CurrentFov
       LocalPlayer.cs           # World component: the local player's spawn settle, health, death and respawn,
                                #   body model, hurt and punch feedback, the saved-player apply, its PlayerContext
+      ModeToggles.cs           # the creative (C) and double-tap flight toggles and the sprint latch
       PlayerBodyProbe.cs       # GL-free body probes over the live chunk map: known (loaded), grounded,
                                #   in water, in lava; what the server judges a remote player's body by
       PlayerContext.cs         # who an interaction runs for: eye, aim, inventory, creative (local camera or a
@@ -1356,8 +1363,12 @@ OpenGLTest/
       PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision (static BodyCollides),
                                #   auto-step, knockback, water state
       PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
+      ShoulderRig.cs           # the F5 rig (mode cycle, shoulder offset march, tilted view direction, orbit body facing)
+                               #   and the crosshair raycast along it
+      SpawnOverrides.cs        # VOXEL_SPAWN / VOXEL_LOOK parsing and the origin surface spawn search
       SprintToggle.cs          # the sprint latch, GL-free: flipped on each fresh press
                                #   with the sprint-toggle setting on, else it follows the key
+      ViewProjectionCache.cs   # the bit-compared view*projection and frustum cache over Camera.ViewProjKey (PERF_TODO R7/R11)
       WaterImmersion.cs, WaterPhase.cs  # GL-free water depth states: the submerged share of the body and
                                         #   its phase (Dry / Wade / Float / Swim)
     Rendering/                 # the GL render passes and their GL-free gates: RenderManager plus its pass components,
@@ -2747,7 +2758,7 @@ describe the live world go through it:
 
 Worldgen's own pure functions deliberately stay static and never see the source:
 `ChunkTerrainFill.GenerateBlockData`, the carvers (`NoiseCaves`, `WormCarver`), `TreeGenerator` (placement,
-batches, the far-LOD canopy), `VirtualTreeSpace` and `Camera.SpawnPosition` (a server's camera
+batches, the far-LOD canopy), `VirtualTreeSpace` and `SpawnOverrides.SpawnPosition` (a server's camera
 starts at the generated origin surface, harmless since it is creative and flying, and the spawn
 settle then re-settles it on the source's terrain). A generated chunk beside a supplied column
 therefore generates as if the source were not there (see the known gaps).
@@ -3119,7 +3130,7 @@ final `Disconnected` is unconditional, so a server that closes at once can never
 `Handshaken` standing. `ClientSession.UpdateConnecting` aborts to the server list on `Failed` **or**
 `Disconnected`, waits for `NetworkStatus.Handshaken`, then builds a **client-mode** `World`
 (`clientMode: true`, `spawn: server.Spawn`, so the camera starts at the server's spawn — a client
-camera never runs `Camera.SpawnPosition`'s surface search, and stands at
+camera never runs `SpawnOverrides.SpawnPosition`'s surface search, and stands at
 `Camera.PlaceholderSpawn` when no spawn is given) with the renderer's pools and the window — no
 worldgen, no LOD threads and no local simulation — and plays. The client derives nothing from the
 seed: terrain, water levels and the biome tint all stream from the server, so it never calls
@@ -3275,7 +3286,7 @@ every imported chunk as restored (its border faces are always scanned at load), 
 water disagrees with its columns costs wake work, never a crash; `ImportedMapSource` loads every
 column file at construction, so a map of hundreds of thousands of columns costs hundreds of MB
 and a long synchronous start (a lazy per-column load is the follow-up); and the server camera,
-which `Camera.SpawnPosition` still places on the generated origin surface, can start inside or
+which `SpawnOverrides.SpawnPosition` still places on the generated origin surface, can start inside or
 under the map's terrain until the spawn settle lifts it.
 
 ## Biomes
@@ -3777,7 +3788,7 @@ overshoot or jiggle.
   the look (`SetLook`), the equip dip (`NotifyEquip`), the body-yaw lag with a head that leads
   (`BodyYawLags`, third person and remote players only) and the death fall (`DeathFall`). The limbs
   are still not parented to the torso, so torso-only motion stays small.
-- **Camera** (`Camera.cs`): the view effects fold into `_bobHeight`, `_roll` and `_currentFov`, which
+- **Camera** (`Camera.cs`, its view juice in `HeadMotion.cs`): the view effects fold into `HeadMotion`'s `_bobHeight`, `_roll` and `CurrentFov`, which
   the view cache is already keyed on, so none needs a key of its own: a landing dip, a directional
   hit kick (`AddHitKick`), an FOV pinch on a swing (`PunchFov`), a crouch eye drop and the death view
   (`DeathProgress`). The **sprint FOV** widening (`SprintFov`, knobs `SprintFov*` in
@@ -3972,7 +3983,7 @@ touch a file that violates one of them, fixing it is in scope.
   item-icon textures and frame meshes) and the shared draw primitives every page and the item
   debugger use; its pages live in the components it builds and exposes as internal properties
   (`HudRenderer`, `TopStripRenderer`, `InventoryPanelRenderer`, `CraftCardRenderer`,
-  `MenuRenderer`, `LoadingScreenRenderer`, `ChatRenderer`). `Chunk.cs` (769 lines, down from 1,944) has a stated reason too: it is the one owner of a chunk's storage (ids, the volatile state byte and light snapshot, the raw writers and edit API, the save/network snapshots and restore, its GPU slices), with its worldgen fill in `WorldGen/ChunkTerrainFill`, its mesh build in `Chunks/Meshing/ChunkMeshBuilder` and `ChunkLighting`, and the face tables in `ChunkFaceTables`. `Program.cs` (628 lines, down from 2,297) has a
+  `MenuRenderer`, `LoadingScreenRenderer`, `ChatRenderer`). `Chunk.cs` (769 lines, down from 1,944) has a stated reason too: it is the one owner of a chunk's storage (ids, the volatile state byte and light snapshot, the raw writers and edit API, the save/network snapshots and restore, its GPU slices), with its worldgen fill in `WorldGen/ChunkTerrainFill`, its mesh build in `Chunks/Meshing/ChunkMeshBuilder` and `ChunkLighting`, and the face tables in `ChunkFaceTables`. `Camera.cs` (about 730 lines, down from 1,175) has a stated reason too: it is the player's public facade, the one type `PlayerPhysics`, `World` and its components, the renderer passes, the server and the tests compile against, and it owns the pose, the mouse look, the eye fluid state, the mode setters and the `IMobTarget` side; its view juice, F5 rig, mode toggles, view-projection cache and spawn overrides live in `HeadMotion`, `ShoulderRig`, `ModeToggles`, `ViewProjectionCache` and `SpawnOverrides`, and about 290 of its lines are the XML docs of the members it forwards to them. `Program.cs` (628 lines, down from 2,297) has a
   stated reason too: it is the process entry point and the app's composition root: `Main` registers the
   window callbacks, `OnLoad` builds the platform managers and the components (`DevDiagnostics`,
   `ClientSession`, `InventoryPanelInput`, `ChatInput`, `MenuInput`, `GameplayInput`, `InputEvents`), it

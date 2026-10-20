@@ -94,7 +94,7 @@ internal sealed class LocalPlayer
     private readonly PlayerContext _localContext;
 
     // True once the player rests exactly on real ground at the origin spawn. The camera's
-    // initial position is only a heightmap guess (pre-carve, see Camera.SpawnPosition), and
+    // initial position is only a heightmap guess (pre-carve, see SpawnOverrides.SpawnPosition), and
     // physics starts before the spawn chunks stream in (unloaded cells read as air), so
     // without this the player falls through and ends up buried once the terrain loads.
     private bool _spawnSettled;

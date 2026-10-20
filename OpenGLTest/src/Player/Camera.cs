@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using Silk.NET.Input;
@@ -9,51 +8,36 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
-using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Simulation;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Player;
 
-/// <summary>F5 camera modes, cycled FirstPerson -> Shoulder -> Orbit -> FirstPerson.</summary>
-public enum CameraMode
-{
-    FirstPerson,
-    Shoulder,
-    Orbit,
-}
-
 public class Camera : IMobTarget
 {
     private readonly PlayerPhysics _physics = new();
+    private readonly ViewProjectionCache _viewCache;
+    private readonly ModeToggles _toggles;
+    private readonly HeadMotion _head;
+    private readonly ShoulderRig _shoulder;
     private readonly IWindow? window;
     private readonly IMouse? mouse;
     public Vector3 Position { get; private set; }
     public float Yaw { get; private set; } = SpawnLook.X;
     public float Pitch { get; private set; } = SpawnLook.Y;
     public bool IsGrounded { get; private set; }
-    public bool IsFlying { get; private set; }
+    public bool IsFlying { get; internal set; }
     /// <summary>True while sprinting on foot with movement input; drives the run cycle and roll (the FOV
     /// widening reads the sprint key itself, so a flight sprint widens too: see <see cref="SprintFov"/>).</summary>
     public bool IsSprinting { get; private set; }
 
-    // The sprint latch (see SprintToggle): with the toggle setting on, the key flips it on each
-    // press instead of being held
-    private bool _sprintLatched;
-    private bool _sprintKeyWasHeld;
-
     /// <summary>Whether the sprint key counts as held this frame: the toggle setting's latch, or
     /// the key itself (<see cref="SprintToggle.Step"/>).</summary>
-    public bool SprintHeld { get; private set; }
+    public bool SprintHeld => _toggles.SprintHeld;
 
     /// <summary>Advances the sprint latch from this frame's key state.</summary>
-    public void UpdateSprintLatch(bool keyHeld)
-    {
-        SprintHeld = SprintToggle.Step(_sprintLatched, keyHeld, _sprintKeyWasHeld, GameSettings.SprintToggle);
-        _sprintLatched = SprintHeld;
-        _sprintKeyWasHeld = keyHeld;
-    }
+    public void UpdateSprintLatch(bool keyHeld) => _toggles.UpdateSprintLatch(keyHeld);
     /// <summary>True while crouched on foot (Left Ctrl): slower, a lowered view and the model's crouch pose.
     /// The body and its collision keep their size, so the server's movement rules are unaffected.</summary>
     public bool IsSneaking { get; private set; }
@@ -61,7 +45,7 @@ public class Camera : IMobTarget
     public int SwimStrokeCount => _physics.SwimStrokeCount;
     /// <summary>Current vertical FOV in degrees: the base FOV plus the eased sprint widening plus the punch
     /// pinch plus the throw charge zoom.</summary>
-    public float CurrentFov { get; private set; } = DefaultFov;
+    public float CurrentFov => _head.CurrentFov;
     /// <summary>
     /// The 0..1 charge of the throw the player is winding up, or null when none. The world sets it
     /// every frame from the player's arm (<see cref="PlayerModel.ThrowCharge"/>); the next head-motion
@@ -69,22 +53,22 @@ public class Camera : IMobTarget
     /// </summary>
     public float? ThrowCharge { get; set; }
     /// <summary>How strongly the damage direction arc shows, 0..1 (see <see cref="DamageDirection"/>).</summary>
-    public float DamageArcStrength => _damageArc.Intensity;
+    public float DamageArcStrength => _head.DamageArc.Intensity;
     /// <summary>
     /// Where on screen the damage direction arc sits: a unit direction from the screen center, x to
     /// the right and y up, recomputed from the current view yaw so it keeps pointing at the attacker
     /// while the player turns.
     /// </summary>
-    public Vector2 DamageArcScreenDirection => _damageArc.ScreenDirection(Yaw);
+    public Vector2 DamageArcScreenDirection => _head.DamageArc.ScreenDirection(Yaw);
     /// <summary>The droplets streaking down the screen after the eye surfaced from water (see
     /// <see cref="SurfacingDroplets"/>): their strength, age and pattern seed.</summary>
-    public SurfacingDroplets Droplets => _droplets;
+    public SurfacingDroplets Droplets => _head.Droplets;
     /// <summary>
     /// Creative mode (toggled with [C]): walking behaves like survival, but block placing
     /// costs nothing, breaking drops nothing, and double-tapping Space toggles flight.
     /// Flight itself is noclip — it passes through walls.
     /// </summary>
-    public bool IsCreative { get; private set; }
+    public bool IsCreative { get; internal set; }
     /// <summary>
     /// Over-shoulder third-person view (F5 mode 2). The player body stays where the
     /// physics put it (<see cref="Position"/> is still the head); the view eye moves behind
@@ -93,16 +77,16 @@ public class Camera : IMobTarget
     /// highlight lands under the crosshair. Movement, collision and swimming keep reading
     /// <see cref="Position"/>.
     /// </summary>
-    public bool IsShoulderSurf => Mode != CameraMode.FirstPerson;
+    public bool IsShoulderSurf => _shoulder.IsShoulderSurf;
     /// <summary>Active F5 camera mode.</summary>
-    public CameraMode Mode { get; private set; } = CameraMode.FirstPerson;
+    public CameraMode Mode => _shoulder.Mode;
     /// <summary>
     /// Centered orbit view (F5 mode 3): same rig as shoulder-surf but centered, with the
     /// camera orbiting freely while the player body keeps its own facing
     /// (<see cref="PlayerYaw"/>). Moving or interacting turns the player toward the motion
     /// or the aim, fast-lerped rather than snapped.
     /// </summary>
-    public bool IsOrbit => Mode == CameraMode.Orbit;
+    public bool IsOrbit => _shoulder.IsOrbit;
     /// <summary>
     /// Yaw the player body faces, in degrees. Tracks the camera in first person and
     /// shoulder-surf; in orbit mode it lerps toward the movement direction or, after a
@@ -110,26 +94,26 @@ public class Camera : IMobTarget
     /// </summary>
     public float PlayerYaw => IsOrbit ? OrbitPlayerYaw : Yaw;
     /// <summary>View eye: the head in first person, the pulled-in shoulder camera in third.</summary>
-    public Vector3 RenderEye => Position + _shoulderOffset;
+    public Vector3 RenderEye => _shoulder.RenderEye;
     /// <summary>
     /// F5 transition state, 0 in first person and 1 in shoulder-surf, eased over
     /// <c>ShoulderTransitionSeconds</c>. The camera offset, the view direction and the
     /// head opacity all ride this, so toggling never snaps.
     /// </summary>
-    public float ShoulderBlend => MathUtils.SmoothStep(ShoulderBlendT);
+    public float ShoulderBlend => _shoulder.ShoulderBlend;
     /// <summary>
     /// Direction the screen looks along. Equals the head facing in first person; in
     /// shoulder-surf it tilts from the offset camera back onto the crosshair aim point,
     /// which is also the direction <see cref="Raycast"/> fires.
     /// </summary>
-    public Vector3 ViewDirection => _shoulderViewDir.NormalizeSafeOr(GetForwardVector(), 1e-8f);
+    public Vector3 ViewDirection => _shoulder.ViewDirection;
     /// <summary>
     /// The unit head ray the last <see cref="Raycast(float, ChunkManager, out Vector3, out Vector3, out int, bool)"/>
     /// fired from <see cref="Position"/>: the facing in first person, the head's re-cast toward the
     /// crosshair's surface point in third person. A multiplayer client sends it with an intent, so
     /// the server's first-person ray from the same eye lands on the same cell.
     /// </summary>
-    public Vector3 LastAimDirection { get; private set; } = -Vector3.UnitZ;
+    public Vector3 LastAimDirection => _shoulder.LastAimDirection;
     /// <summary>The body's vertical speed in blocks per second (negative falls).</summary>
     public float VerticalVelocity => _physics.VerticalVelocity;
 
@@ -183,134 +167,49 @@ public class Camera : IMobTarget
     /// <see cref="IsEyeInLava"/>, so a new emissive fluid burns unnamed.</summary>
     public bool IsInLava { get; private set; }
 
-    private const float BobDampRate = 8f;
-    private const float RunBlendRate = 6f;
-    private const float WalkBobHeight = 0.035f;
-    private const float RunBobHeight = 0.06f;
-    private const float WalkBobStrafe = 0.02f;
-    private const float RunBobStrafe = 0.035f;
-    private const float RunRoll = 0.02f;
     // Near plane sets depth precision at distance (error ~ z^2 / (near * 2^24)); it must be
     // large enough that stacked LOD levels ~4 blocks apart don't z-fight at 2048 blocks.
     // Collision keeps geometry at least PlayerRadius (0.3) away, so 0.2 never clips.
     private const float NearPlane = 0.2f;
     private const float FarPlane = 4096f; // past the outermost LOD ring (2048 blocks + terrain height)
-    private static float DefaultFov => GameSettings.FieldOfView;
     private static float MouseSensitivity => GameSettings.MouseSensitivity;
 
     /// <summary>Eye above the feet; the player model roots itself here.</summary>
     public const float EyeHeight = 1.62f;
 
-    // Shoulder-surf framing, in blocks, relative to the head eye. RPG-style:
-    // behind, above and out to the right shoulder. The view direction stays parallel
-    // to the look so aiming (which still fires from the head) keeps its feel.
-    private const float ShoulderBackDist = 3.5f;
-    private const float ShoulderHeightOffset = 0.7f;
-    private const float ShoulderSideOffset = 0.9f;
-    // How far short of a blocking wall the pulled-in camera stops, and the march step.
-    private const float ShoulderPullMargin = 0.3f;
-    private const float ShoulderProbeStep = 0.175f;
-    // The camera converges on this point ahead of the head, so the crosshair sits on
-    // the same block the raycast hits. Matches World.InteractionReach.
-    private const float ShoulderAimDistance = 10f;
-
-    // Two Space presses within this window toggle flight
-    private const float DoubleTapWindow = 0.3f;
-
     // F5 transition: the camera glides and the head fades over this long, eased.
     internal const float ShoulderTransitionSeconds = 0.5f;
     // Orbit player turn speed, in exponential-damp units per second: fast but visibly lerped.
     internal const float OrbitTurnRate = 10f;
-    // Lateral glide rate for the shoulder<->orbit side offset, same ballpark as the F5 glide.
-    private const float OrbitSideRate = 8f;
-
-    private bool _f5WasPressed;
-    private Vector3 _shoulderOffset = Vector3.Zero;
-    private Vector3 _shoulderViewDir = Vector3.Zero;
-    // Linear 0..1 timer behind ShoulderBlend; toggling mid-glide reverses smoothly.
-    // Orbit body facing (degrees) plus its smoothed lateral rig offset, both glided.
-    private float _shoulderSide = ShoulderSideOffset;
-
-    // Set to "x,y,z" to start the eye at an exact spot instead of the surface spawn
-    private const string SpawnOverrideVariable = "VOXEL_SPAWN";
-
-    // Set to "yaw,pitch" in degrees to start facing an exact direction
-    private const string LookOverrideVariable = "VOXEL_LOOK";
-
-    // Yaw 0 looks down +X, so the default -90 faces -Z, level with the horizon
-    private static readonly Vector2 DefaultLook = new(-90f, 0f);
 
     // Parsed once for the whole process, and read by the Yaw/Pitch initializers above
-    private static readonly Vector2 SpawnLook = SpawnOrientation();
+    private static readonly Vector2 SpawnLook = SpawnOverrides.SpawnOrientation();
 
     private float _aspectRatio = 16f / 10f;
-    private float _bobPhase;
-    private float _bobBlend;
-    private float _runBlend;
-    private float _bobHeight;
-    private float _bobStrafe;
-    private float _roll;
-
-    // Camera juice. Every effect folds into the fields the view cache is already keyed on
-    // (_bobHeight, _roll, _currentFov), so none of it needs a cache key of its own: a landing
-    // dips the view, a hit kicks its roll toward the blow, a landed punch pinches the FOV, a
-    // crouch lowers the eye and a death tips the view over.
-    private Spring _landDip = new(3f, 0.45f);
-    private Spring _kickRoll = new(4f, 0.35f);
-    private Spring _fovPunch = new(5f, 0.4f);
-    // Extra degrees of the sprint widening, eased by SprintFov.Step; added to the FOV, never set over it
-    private float _sprintFov;
-    // Roll toward the strafe side in radians, eased by StrafeTilt.Step; added to _roll, never set over it
-    // The throw charge zoom's spring and its clamped degrees (ThrowZoom); added to the FOV, never set over it
-    private Spring _throwZoom = ThrowZoom.CreateSpring();
-    private float _throwZoomDegrees;
-    // Where the last billed blow came from, for the damage direction arc (aged in UpdateHeadMotion)
-    private readonly DamageDirection _damageArc = new();
-    // The surfacing droplets: aged in UpdateHeadMotion, told the eye's fluid state in RefreshEyeWaterState
-    private readonly SurfacingDroplets _droplets = new();
-    private float _sneakBlend;
-    private float _prevVerticalVelocity;
-    private bool _wasGrounded;
-    private float _deathProgress;
-    private const float SneakEyeDrop = 0.22f;
-    private const float LandDipPerSpeed = 0.55f;
-    private const float LandDipScale = 0.8f;
-    private const float DeathRollRadians = 1.2f;
-    private const float DeathDropBlocks = 1.1f;
 
     /// <summary>The landing spring's displacement (positive = the view is dipped).</summary>
-    public float LandingDip => _landDip.Value;
+    public float LandingDip => _head.LandingDip;
 
     /// <summary>The hit-kick roll in radians.</summary>
-    public float KickRoll => _kickRoll.Value;
+    public float KickRoll => _head.KickRoll;
 
     /// <summary>The eased strafe tilt in radians: positive leans the view right (see <see cref="StrafeTilt"/>).</summary>
-    public float StrafeTiltRoll { get; private set; }
+    public float StrafeTiltRoll => _head.StrafeTiltRoll;
 
     /// <summary>0..1 how far the death view has fallen over; set by the world while a death plays.</summary>
     public float DeathProgress
     {
-        set => _deathProgress = MathUtils.Clamp01(value);
+        set => _head.DeathProgress = value;
     }
 
     /// <summary>
     /// A hit from the world direction <paramref name="awayHorizontal"/> (the way the blow pushes the
     /// player): the view rolls away from the side it came from and dips, springing back.
     /// </summary>
-    public void AddHitKick(Vector3 awayHorizontal, float strength = 1f)
-    {
-        var forward = GetForwardVector();
-        var right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
-        var side = awayHorizontal.LengthSquared() > 1e-6f
-            ? Vector3.Dot(Vector3.Normalize(new Vector3(awayHorizontal.X, 0f, awayHorizontal.Z)), right)
-            : 0f;
-        // Pushed to the right (blow from the left) rolls the view clockwise.
-        _kickRoll.Impulse((0.9f * side + 0.25f) * strength);
-        _landDip.Impulse(5f * strength);
-    }
+    public void AddHitKick(Vector3 awayHorizontal, float strength = 1f) => _head.AddHitKick(awayHorizontal, strength);
 
     /// <summary>Pinches the FOV for a beat: a negative <paramref name="degrees"/> is a zoom-in (an impact).</summary>
-    public void PunchFov(float degrees) => _fovPunch.Impulse(degrees * 14f);
+    public void PunchFov(float degrees) => _head.PunchFov(degrees);
 
     /// <summary>
     /// While true the punch pinch holds where it is instead of springing back. The world sets it
@@ -319,96 +218,8 @@ public class Camera : IMobTarget
     /// </summary>
     public bool HoldPunchFov { get; set; }
 
-    // PERF_TODO R7: GetViewProjection ran at 22 call sites a frame, rebuilding view and
-    // projection every time. The cache is validated against its own inputs rather than
-    // dirty-flagged: the key holds exactly the mutable state GetViewMatrix and
-    // GetProjectionMatrix read, compared bit-for-bit, so a hit means the recomputation
-    // would have produced a bit-identical matrix. Render and update run on one thread
-    // (AGENTS.md), so these are plain fields with no lock.
-    private ViewProjKey _vpKey;
-    private Matrix4x4 _viewProj;
-    private Frustum _viewFrustum;
-    private bool _vpValid;
     private Vector2 _lastMousePosition;
     private bool _firstMouseMovement = true;
-    private bool _spaceWasPressed;
-    private bool _creativeWasPressed;
-    private float _timeSinceSpacePress = float.MaxValue;
-    // Eye position standing on the terrain at the origin, so the player never starts buried
-    private static Vector3 SpawnPosition()
-    {
-        // Dev override: VOXEL_SPAWN="x,y,z" drops the eye exactly there, so a spot worth
-        // inspecting (a cave, a ravine) can be looked at without flying out to it first.
-        var spawnOverride = Environment.GetEnvironmentVariable(SpawnOverrideVariable);
-        if (!string.IsNullOrWhiteSpace(spawnOverride))
-        {
-            if (TryParseSpawnOverride(spawnOverride, out var overridePosition))
-                return overridePosition;
-
-            Log.WriteLine(
-                $"Ignoring {SpawnOverrideVariable}=\"{spawnOverride}\": expected three comma-separated numbers, e.g. -40,-107,-75");
-        }
-
-        // On the water surface where the origin column is flooded, so the player never starts
-        // submerged (or, once swimming exists, sinking)
-        var surface = Math.Max(ColumnCache.GetHeights(0, 0)[0], WorldGenerationConfig.SeaLevel) + 1;
-        return new Vector3(0.5f, surface + EyeHeight, 0.5f);
-    }
-
-    private static bool TryParseSpawnOverride(string value, out Vector3 position)
-    {
-        position = Vector3.Zero;
-
-        var parts = value.Split(',');
-        if (parts.Length != 3)
-            return false;
-
-        Span<float> components = stackalloc float[3];
-        for (var i = 0; i < 3; i++)
-        {
-            if (!float.TryParse(parts[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out components[i]))
-                return false;
-        }
-
-        position = new Vector3(components[0], components[1], components[2]);
-        return true;
-    }
-
-    // Facing at startup, as (yaw, pitch) in degrees
-    private static Vector2 SpawnOrientation()
-    {
-        // Dev override: VOXEL_LOOK="yaw,pitch" pins the view direction, so a scripted
-        // verification run frames the same thing every time instead of whatever the mouse
-        // happened to be doing.
-        var lookOverride = Environment.GetEnvironmentVariable(LookOverrideVariable);
-        if (!string.IsNullOrWhiteSpace(lookOverride))
-        {
-            if (TryParseLookOverride(lookOverride, out var look))
-                return look;
-
-            Log.WriteLine(
-                $"Ignoring {LookOverrideVariable}=\"{lookOverride}\": expected two comma-separated numbers, e.g. -90,-20");
-        }
-
-        return DefaultLook;
-    }
-
-    private static bool TryParseLookOverride(string value, out Vector2 look)
-    {
-        look = DefaultLook;
-
-        var parts = value.Split(',');
-        if (parts.Length != 2)
-            return false;
-
-        if (!float.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var yaw)
-            || !float.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var pitch))
-            return false;
-
-        // Same clamp the mouse look uses, so an override can never start the view past vertical
-        look = new Vector2(yaw, MathUtils.ClampPitch(pitch));
-        return true;
-    }
 
     /// <summary>
     /// Where a multiplayer client's camera stands until the server's spawn is known: a fixed
@@ -429,7 +240,11 @@ public class Camera : IMobTarget
     /// </param>
     public Camera(IWindow? window, IInputContext? input, Vector3? startPosition = null)
     {
-        Position = startPosition ?? SpawnPosition();
+        _viewCache = new ViewProjectionCache(this);
+        _toggles = new ModeToggles(this, _physics);
+        _head = new HeadMotion(this);
+        _shoulder = new ShoulderRig(this);
+        Position = startPosition ?? SpawnOverrides.SpawnPosition();
         this.window = window;
         mouse = input?.Mice.FirstOrDefault();
 
@@ -517,12 +332,7 @@ public class Camera : IMobTarget
         // A teleport is not a fall: without this a scenario dropped at altitude keeps the
         // speed it built up before the jump and plummets through the frame it wanted
         _physics.ResetMotion();
-        _shoulderOffset = Vector3.Zero;
-        _shoulderViewDir = Vector3.Zero;
-        ShoulderBlendT = IsShoulderSurf ? 1f : 0f;
-        OrbitPlayerYaw = yaw;
-        _shoulderSide = Mode == CameraMode.Shoulder ? ShoulderSideOffset : 0f;
-        HasActionTarget = false;
+        _shoulder.ResetForTeleport(yaw);
     }
 
     /// <summary>
@@ -549,12 +359,12 @@ public class Camera : IMobTarget
         float? bobStrafe = null, Vector3? shoulderOffset = null, Vector3? shoulderViewDir = null,
         Vector3? shakeOffset = null, float? shakeRoll = null)
     {
-        if (fov.HasValue) CurrentFov = fov.Value;
-        if (roll.HasValue) _roll = roll.Value;
-        if (bobHeight.HasValue) _bobHeight = bobHeight.Value;
-        if (bobStrafe.HasValue) _bobStrafe = bobStrafe.Value;
-        if (shoulderOffset.HasValue) _shoulderOffset = shoulderOffset.Value;
-        if (shoulderViewDir.HasValue) _shoulderViewDir = shoulderViewDir.Value;
+        if (fov.HasValue) _head.CurrentFov = fov.Value;
+        if (roll.HasValue) _head.Roll = roll.Value;
+        if (bobHeight.HasValue) _head.BobHeight = bobHeight.Value;
+        if (bobStrafe.HasValue) _head.BobStrafe = bobStrafe.Value;
+        if (shoulderOffset.HasValue) _shoulder.ShoulderOffset = shoulderOffset.Value;
+        if (shoulderViewDir.HasValue) _shoulder.ShoulderViewDir = shoulderViewDir.Value;
         if (shakeOffset.HasValue) _physics.SetShakeOffset(shakeOffset.Value);
         if (shakeRoll.HasValue) _physics.SetShakeRoll(shakeRoll.Value);
     }
@@ -564,12 +374,7 @@ public class Camera : IMobTarget
     /// toward the camera aim over the next frames while the action itself fires at once.
     /// No-op outside orbit mode, where the body already faces the camera.
     /// </summary>
-    public void NotifyPlayerAction()
-    {
-        if (!IsOrbit) return;
-        ActionYaw = Yaw;
-        HasActionTarget = true;
-    }
+    public void NotifyPlayerAction() => _shoulder.NotifyPlayerAction();
 
     /// <summary>
     /// Kicks the damage shake: <paramref name="amount"/> adds to trauma (0..1, clamped),
@@ -583,9 +388,6 @@ public class Camera : IMobTarget
     }
 
     /// <summary>
-    /// Knocks the player back from a mob hit: a horizontal shove that decays over a few tenths of
-    /// a second — the normal collision still stops it, so a hit can never push the player through
-    /// a wall — plus a small upward pop. Flight ignores both (and cannot be hit).
     /// While set, mouse movement no longer turns the view (the [E] panel owns the cursor).
     /// Position still updates so reopening the game never jumps the look.
     /// </summary>
@@ -617,44 +419,8 @@ public class Camera : IMobTarget
     /// which <see cref="StrafeTilt"/> turns into a lean.
     /// </summary>
     internal void UpdateHeadMotion(float deltaTime, float intendedSpeed, bool moving, bool swimming,
-        bool sprintHeld = false, float strafe = 0f)
-    {
-        _sprintFov = SprintFov.Step(_sprintFov,
-            SprintFov.TargetDegrees(sprintHeld, moving, IsSneaking, swimming, intendedSpeed), deltaTime);
-        if (!HoldPunchFov)
-            _fovPunch.Step(0f, deltaTime);
-        _throwZoomDegrees = ThrowZoom.Step(ref _throwZoom, ThrowZoom.TargetDegrees(ThrowCharge), deltaTime);
-        _damageArc.Update(deltaTime);
-        _droplets.Update(deltaTime);
-        CurrentFov = DefaultFov + _sprintFov + MathUtils.Clamp(_fovPunch.Value, -6f, 6f) + _throwZoomDegrees;
-
-        // A landing dips the view in proportion to the fall that ended just now.
-        if (!_wasGrounded && IsGrounded && !IsFlying && _prevVerticalVelocity < -4f)
-            _landDip.Impulse(MathF.Min(-_prevVerticalVelocity, 25f) * LandDipPerSpeed);
-        _wasGrounded = IsGrounded;
-        _prevVerticalVelocity = _physics.VerticalVelocity;
-        _landDip.Step(0f, deltaTime);
-        _kickRoll.Step(0f, deltaTime);
-        _sneakBlend = MathUtils.Damp(_sneakBlend, IsSneaking ? 1f : 0f, 12f, deltaTime);
-
-        _runBlend = MathUtils.Damp(_runBlend, IsSprinting ? 1f : 0f, RunBlendRate, deltaTime);
-        var bobTarget = moving && !IsFlying && (IsGrounded || swimming) ? 1f : 0f;
-        _bobBlend = MathUtils.Damp(_bobBlend, bobTarget, BobDampRate, deltaTime);
-        if (moving && !IsFlying)
-            _bobPhase += deltaTime * (4f + intendedSpeed * 0.9f + _runBlend * 2.5f);
-
-        var height = MathUtils.Lerp(WalkBobHeight, RunBobHeight, _runBlend);
-        var bobStrafe = MathUtils.Lerp(WalkBobStrafe, RunBobStrafe, _runBlend);
-        var death = MathUtils.EaseInCubic(_deathProgress);
-        _bobHeight = MathF.Sin(_bobPhase * 2f) * height * _bobBlend
-                     - MathUtils.Clamp(_landDip.Value, -4f, 12f) * LandDipScale
-                     - SneakEyeDrop * _sneakBlend - DeathDropBlocks * death;
-        _bobStrafe = MathF.Cos(_bobPhase) * bobStrafe * _bobBlend;
-        StrafeTiltRoll = StrafeTilt.Step(StrafeTiltRoll,
-            StrafeTilt.TargetRadians(strafe, IsFlying, dead: _deathProgress > 0f), deltaTime);
-        _roll = MathF.Sin(_bobPhase) * RunRoll * _runBlend * _bobBlend
-                + MathUtils.Clamp(_kickRoll.Value, -0.12f, 0.12f) + DeathRollRadians * death + StrafeTiltRoll;
-    }
+        bool sprintHeld = false, float strafe = 0f) =>
+        _head.UpdateHeadMotion(deltaTime, intendedSpeed, moving, swimming, sprintHeld, strafe);
 
     /// <summary>
     /// Called instead of the toggle updates while a text field owns the keyboard: the edge
@@ -663,120 +429,18 @@ public class Camera : IMobTarget
     /// </summary>
     internal void MarkTogglesHeld()
     {
-        _creativeWasPressed = true;
-        _spaceWasPressed = true;
-        _f5WasPressed = true;
+        _toggles.MarkTogglesHeld();
+        _shoulder.MarkToggleHeld();
     }
 
-    internal void UpdateCreativeToggle(IKeyboard keyboard)
-    {
-        var creativePressed = keyboard.IsKeyPressed(Key.C);
-        if (creativePressed && !_creativeWasPressed)
-        {
-            IsCreative = !IsCreative;
-            if (!IsCreative)
-                IsFlying = false;
-            _physics.ResetVerticalVelocity();
-            Log.WriteLine($"Creative {(IsCreative ? "ON" : "OFF")}");
-        }
+    internal void UpdateCreativeToggle(IKeyboard keyboard) => _toggles.UpdateCreativeToggle(keyboard);
 
-        _creativeWasPressed = creativePressed;
-    }
+    internal void UpdateFlightToggle(float deltaTime, IKeyboard keyboard) => _toggles.UpdateFlightToggle(deltaTime, keyboard);
 
-    internal void UpdateFlightToggle(float deltaTime, IKeyboard keyboard)
-    {
-        _timeSinceSpacePress += deltaTime;
+    internal void UpdateShoulderToggle(IKeyboard keyboard) => _shoulder.UpdateShoulderToggle(keyboard);
 
-        var spacePressed = keyboard.IsKeyPressed(Key.Space);
-        if (spacePressed && !_spaceWasPressed)
-        {
-            if (_timeSinceSpacePress <= DoubleTapWindow)
-            {
-                // Flight is a creative-only move: on foot the second tap is just a jump.
-                if (IsCreative)
-                {
-                    IsFlying = !IsFlying;
-                    _physics.ResetVerticalVelocity();
-                    Log.WriteLine($"Flight {(IsFlying ? "ON" : "OFF")}");
-                }
-                _timeSinceSpacePress = float.MaxValue; // a toggle requires a fresh double tap
-            }
-            else
-            {
-                _timeSinceSpacePress = 0f;
-            }
-        }
-
-        _spaceWasPressed = spacePressed;
-    }
-
-    internal void UpdateShoulderToggle(IKeyboard keyboard)
-    {
-        var pressed = keyboard.IsKeyPressed(Key.F5);
-        if (pressed && !_f5WasPressed)
-        {
-            Mode = (CameraMode)(((int)Mode + 1) % 3);
-            if (Mode == CameraMode.Orbit)
-            {
-                OrbitPlayerYaw = Yaw;
-                HasActionTarget = false;
-            }
-            Log.WriteLine($"Camera {Mode}");
-        }
-
-        _f5WasPressed = pressed;
-    }
-
-    internal void UpdateShoulderOffset(ChunkManager chunkManager, float deltaTime)
-    {
-        var forward = GetForwardVector();
-        if (!IsShoulderSurf && ShoulderBlendT <= 0f)
-        {
-            _shoulderOffset = Vector3.Zero;
-            _shoulderViewDir = forward;
-            _shoulderSide = Mode == CameraMode.Shoulder ? ShoulderSideOffset : 0f;
-            return;
-        }
-
-        _shoulderSide = MathUtils.Damp(_shoulderSide,
-            Mode == CameraMode.Shoulder ? ShoulderSideOffset : 0f, OrbitSideRate, deltaTime);
-        var right = Vector3.Normalize(Vector3.Cross(forward, Vector3.UnitY));
-        var desired = -forward * ShoulderBackDist + Vector3.UnitY * ShoulderHeightOffset + right * _shoulderSide;
-        var length = desired.Length();
-        if (length < float.Epsilon)
-        {
-            _shoulderOffset = Vector3.Zero;
-            _shoulderViewDir = forward;
-            return;
-        }
-
-        var steps = Math.Max(1, (int)MathF.Ceiling(length / ShoulderProbeStep));
-        var resolved = desired;
-        for (var i = 1; i <= steps; i++)
-        {
-            var probe = Position + desired * (i / (float)steps);
-            if (!IsCameraBlocked(probe, chunkManager))
-                continue;
-
-            var safeT = Math.Max(0f, (i - 1) / (float)steps - ShoulderPullMargin / length);
-            resolved = desired * safeT;
-            break;
-        }
-
-        // The glide rides the blend: at 0 the camera sits in the head no matter what the
-        // march found, so toggling out slides back along the collision-free line.
-        var effective = resolved * ShoulderBlend;
-        _shoulderOffset = effective;
-        var viewDir = forward * ShoulderAimDistance - effective;
-        _shoulderViewDir = viewDir.NormalizeSafeOr(forward, 1e-8f);
-    }
-
-    private static bool IsCameraBlocked(Vector3 point, ChunkManager chunkManager)
-    {
-        var (pointX, pointY, pointZ) = point.BlockCell();
-        var id = chunkManager.GetBlockGlobal(pointX, pointY, pointZ);
-        return BlockType.IsSolid(id) && BlockType.MovementSpeedOf(id) <= 0f;
-    }
+    internal void UpdateShoulderOffset(ChunkManager chunkManager, float deltaTime) =>
+        _shoulder.UpdateShoulderOffset(chunkManager, deltaTime);
 
     // Refreshes EyeWaterSurfaceY while the eye is in water (not lava, which draws no rays);
     // a non-finite result (the eye cell stopped being loaded fluid) keeps the last value
@@ -795,12 +459,12 @@ public class Camera : IMobTarget
         if (IsShoulderSurf)
             RefreshShoulderEyeWaterState(chunkManager);
         // The frame's final eye state, the one the underwater tint reads, decides the droplets
-        _droplets.Observe(IsEyeInWater, IsEyeInLava);
+        _head.Droplets.Observe(IsEyeInWater, IsEyeInLava);
     }
 
     private void RefreshShoulderEyeWaterState(ChunkManager chunkManager)
     {
-        var eye = Position + _shoulderOffset;
+        var eye = Position + _shoulder.ShoulderOffset;
         var (eyeX, eyeY, eyeZ) = eye.BlockCell();
         IsEyeInWater = eye.Y < chunkManager.GetFluidSurfaceGlobal(eyeX, eyeY, eyeZ);
         IsEyeInLava = false;
@@ -812,14 +476,6 @@ public class Camera : IMobTarget
 
         UpdateEyeWaterSurface(chunkManager, eyeX, eyeY, eyeZ);
     }
-
-    /// <summary>
-    /// Auto-step: replays a blocked horizontal move from raised copies of <paramref name="start"/>,
-    /// trying the smallest lift first, and returns the first one that clears the ledge and travels
-    /// the full frame movement. Returns null when the obstacle is taller than <paramref name="stepHeight"/>
-    /// (or the head is boxed in), leaving the caller's normally blocked position in place.
-    /// against the body does not count, exactly like <see cref="OverlapsPlayer"/>.
-    /// </summary>
 
     /// <summary>Runs the per-frame movement simulation (see <see cref="PlayerPhysics"/>).</summary>
     public void Update(float deltaTime, IKeyboard? keyboard, ChunkManager chunkManager) =>
@@ -833,14 +489,7 @@ public class Camera : IMobTarget
     internal void SetSneaking(bool sneaking) => IsSneaking = sneaking;
 
     /// <summary>Scenario seam: selects the camera mode directly (the F5 cycle without the key).</summary>
-    internal void TestSetMode(CameraMode mode)
-    {
-        Mode = mode;
-        ShoulderBlendT = IsShoulderSurf ? 1f : 0f;
-        if (mode != CameraMode.Orbit) return;
-        OrbitPlayerYaw = Yaw;
-        HasActionTarget = false;
-    }
+    internal void TestSetMode(CameraMode mode) => _shoulder.TestSetMode(mode);
     internal void SetMovementFactor(float factor) => MovementFactor = factor;
     internal void SetGroundFriction(float friction) => GroundFriction = friction;
     internal void SetInWater(bool inWater) => IsInWater = inWater;
@@ -852,17 +501,17 @@ public class Camera : IMobTarget
     internal void SetEyeInWater(bool inWater) => IsEyeInWater = inWater;
     internal void SetInLava(bool inLava) => IsInLava = inLava;
     internal void SetEyeInLava(bool inLava) => IsEyeInLava = inLava;
-    internal void SetShoulderBlendT(float t) => ShoulderBlendT = t;
-    internal float ShoulderBlendT { get; private set; }
+    internal void SetShoulderBlendT(float t) => _shoulder.ShoulderBlendT = t;
+    internal float ShoulderBlendT => _shoulder.ShoulderBlendT;
 
-    internal void SetOrbitPlayerYaw(float yaw) => OrbitPlayerYaw = yaw;
-    internal float OrbitPlayerYaw { get; private set; }
+    internal void SetOrbitPlayerYaw(float yaw) => _shoulder.OrbitPlayerYaw = yaw;
+    internal float OrbitPlayerYaw => _shoulder.OrbitPlayerYaw;
 
-    internal bool HasActionTarget { get; private set; }
+    internal bool HasActionTarget => _shoulder.HasActionTarget;
 
-    internal float ActionYaw { get; private set; }
+    internal float ActionYaw => _shoulder.ActionYaw;
 
-    internal void ClearActionTarget() => HasActionTarget = false;
+    internal void ClearActionTarget() => _shoulder.ClearActionTarget();
 
     /// <summary>Ground acceleration response for a top-face friction, 0..1 (see <see cref="PlayerPhysics"/>).</summary>
     internal static float GroundAccelRate(float friction) => PlayerPhysics.GroundAccelRate(friction);
@@ -972,15 +621,15 @@ public class Camera : IMobTarget
     /// zero direction (a fall, lava) shows no arc. Singleplayer feeds it from <see cref="TakeHit"/>;
     /// a multiplayer client from the knockback of a <c>PlayerStatus</c> that also lowered its health.
     /// </summary>
-    public void AddDamageDirection(Vector3 awayHorizontal) => _damageArc.Hit(awayHorizontal);
+    public void AddDamageDirection(Vector3 awayHorizontal) => _head.DamageArc.Hit(awayHorizontal);
 
     public Matrix4x4 GetViewMatrix()
     {
         var viewDir = ViewDirection;
         var right = Vector3.Normalize(Vector3.Cross(viewDir, Vector3.UnitY));
         var up = Vector3.Transform(Vector3.UnitY,
-            Matrix4x4.CreateFromAxisAngle(viewDir, _roll + _physics.ShakeRoll));
-        var eye = Position + Vector3.UnitY * _bobHeight + right * _bobStrafe + _shoulderOffset + _physics.ShakeOffset;
+            Matrix4x4.CreateFromAxisAngle(viewDir, _head.Roll + _physics.ShakeRoll));
+        var eye = Position + Vector3.UnitY * _head.BobHeight + right * _head.BobStrafe + _shoulder.ShoulderOffset + _physics.ShakeOffset;
         return Matrix4x4.CreateLookAt(eye, eye + viewDir, up);
     }
 
@@ -1005,11 +654,7 @@ public class Camera : IMobTarget
     /// <see cref="GetViewFrustum"/> shares this one key and is refreshed in the same place,
     /// so the two can never drift apart.
     /// </summary>
-    public Matrix4x4 GetViewProjection()
-    {
-        EnsureViewCache();
-        return _viewProj;
-    }
+    public Matrix4x4 GetViewProjection() => _viewCache.GetViewProjection();
 
     /// <summary>
     /// The view frustum of <see cref="GetViewProjection"/>, built once per distinct camera
@@ -1019,76 +664,28 @@ public class Camera : IMobTarget
     /// built from the shadow cascades' <c>ViewProj</c> / <c>_reflViewProj</c> and are deliberately not
     /// routed through here.
     /// </summary>
-    public Frustum GetViewFrustum()
-    {
-        EnsureViewCache();
-        return _viewFrustum;
-    }
-
-    /// <summary>
-    /// Revalidates the cached view-projection matrix and its frustum against the current
-    /// pose. One key and one miss branch for both, so a caller can never see a frustum that
-    /// belongs to a different matrix than <see cref="GetViewProjection"/> returns; rebuilding
-    /// the frustum on a matrix miss is free relative to the matrix build itself.
-    /// </summary>
-    private void EnsureViewCache()
-    {
-        var key = CurrentViewProjKey();
-        if (_vpValid && SameBits(in _vpKey, in key)) return;
-
-        _vpKey = key;
-        _viewProj = GetViewMatrix() * GetProjectionMatrix();
-        _viewFrustum = new Frustum(_viewProj);
-        _vpValid = true;
-    }
+    public Frustum GetViewFrustum() => _viewCache.GetViewFrustum();
 
     /// <summary>
     /// Exactly the mutable state the two matrix builders read. <see cref="GetViewMatrix"/>
-    /// reads <see cref="ViewDirection"/> (<c>_shoulderViewDir</c> when non-degenerate, else
+    /// reads <see cref="ViewDirection"/> (<c>ShoulderRig.ShoulderViewDir</c> when non-degenerate, else
     /// <see cref="GetForwardVector"/> -> <see cref="Yaw"/>/<see cref="Pitch"/>),
-    /// <c>_roll</c>, <c>_shakeRoll</c>, <see cref="Position"/>, <c>_bobHeight</c>,
-    /// <c>_bobStrafe</c>, <c>_shoulderOffset</c> and <c>_shakeOffset</c>;
-    /// <see cref="GetProjectionMatrix"/> reads <c>_currentFov</c>
+    /// <c>HeadMotion.Roll</c>, <c>PlayerPhysics.ShakeRoll</c>, <see cref="Position"/>, <c>HeadMotion.BobHeight</c>,
+    /// <c>HeadMotion.BobStrafe</c>, <c>ShoulderRig.ShoulderOffset</c> and <c>PlayerPhysics.ShakeOffset</c>;
+    /// <see cref="GetProjectionMatrix"/> reads <c>HeadMotion.CurrentFov</c>
     /// and <c>_aspectRatio</c>. <c>NearPlane</c>/<c>FarPlane</c> are <c>const</c> and so are
     /// deliberately not in the key.
     /// </summary>
-    private ViewProjKey CurrentViewProjKey() =>
-        new(Position, _shoulderViewDir, _shoulderOffset, Yaw, Pitch, _roll, _bobHeight, _bobStrafe,
+    internal ViewProjKey CurrentViewProjKey() =>
+        new(Position, _shoulder.ShoulderViewDir, _shoulder.ShoulderOffset, Yaw, Pitch, _head.Roll, _head.BobHeight, _head.BobStrafe,
             _physics.ShakeOffset, _physics.ShakeRoll, CurrentFov, _aspectRatio);
-
-    /// <summary>
-    /// Bit-for-bit key comparison. Deliberately not <c>==</c> or the record's generated
-    /// equality: <c>float</c> equality calls +0f and -0f equal and the generated
-    /// <c>Equals</c> calls NaN and NaN equal, and the correctness argument here is strictly
-    /// "the inputs were bit-identical, therefore the recomputation would have been
-    /// bit-identical".
-    /// </summary>
-    private static bool SameBits(in ViewProjKey a, in ViewProjKey b) =>
-        SameBits(a.Position, b.Position)
-        && SameBits(a.ShoulderViewDir, b.ShoulderViewDir)
-        && SameBits(a.ShoulderOffset, b.ShoulderOffset)
-        && SameBits(a.Yaw, b.Yaw)
-        && SameBits(a.Pitch, b.Pitch)
-        && SameBits(a.Roll, b.Roll)
-        && SameBits(a.BobHeight, b.BobHeight)
-        && SameBits(a.BobStrafe, b.BobStrafe)
-        && SameBits(a.ShakeOffset, b.ShakeOffset)
-        && SameBits(a.ShakeRoll, b.ShakeRoll)
-        && SameBits(a.Fov, b.Fov)
-        && SameBits(a.Aspect, b.Aspect);
-
-    private static bool SameBits(float a, float b) =>
-        BitConverter.SingleToInt32Bits(a) == BitConverter.SingleToInt32Bits(b);
-
-    private static bool SameBits(in Vector3 a, in Vector3 b) =>
-        SameBits(a.X, b.X) && SameBits(a.Y, b.Y) && SameBits(a.Z, b.Z);
 
     /// <summary>
     /// The inputs of <see cref="GetViewProjection"/>'s cache, and nothing else. Adding a
     /// member here means the matrix builders gained an input; removing one means they lost
     /// it. See the invariant on <see cref="GetViewProjection"/>.
     /// </summary>
-    private readonly record struct ViewProjKey(
+    internal readonly record struct ViewProjKey(
         Vector3 Position,
         Vector3 ShoulderViewDir,
         Vector3 ShoulderOffset,
@@ -1128,48 +725,7 @@ public class Camera : IMobTarget
     /// can highlight that box's face.
     /// </summary>
     public bool Raycast(float maxDistance, ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal,
-        out int hitBoxIndex, bool includeFluids = false)
-    {
-        hitPosition = Vector3.Zero;
-        hitNormal = Vector3.Zero;
-        hitBoxIndex = 0;
-
-        if (!IsShoulderSurf)
-        {
-            LastAimDirection = GetForwardVector();
-            return BlockRaycaster.Raycast(Position, LastAimDirection, maxDistance, 0f, stopAtRange: false,
-                chunkManager, out hitPosition, out hitNormal, out hitBoxIndex, out _, includeFluids);
-        }
-
-        // Crosshair target from the shoulder camera. Its walk is longer than head reach
-        // because it starts behind the head; the head check below cuts it back down.
-        LastAimDirection = ViewDirection;
-        var camRange = maxDistance + _shoulderOffset.Length();
-        if (!BlockRaycaster.Raycast(RenderEye, ViewDirection, camRange, camRange * 3 + 2, stopAtRange: true,
-                chunkManager, out var camHit, out var camNormal, out var camBox, out var camT, includeFluids))
-            return false;
-
-        // Head validation: the head re-casts toward the exact surface point the camera
-        // hit, under first-person rules, and must arrive at the same cell. Range and
-        // line-of-sight therefore never exceed first person: nothing is mined or placed
-        // through walls or past what the head could hit itself.
-        var surface = RenderEye + ViewDirection * camT;
-        var toSurface = surface - Position;
-        var headDist = toSurface.Length();
-        if (headDist < 1e-4f)
-        {
-            (hitPosition, hitNormal, hitBoxIndex) = (camHit, camNormal, camBox);
-            return true;
-        }
-        LastAimDirection = toSurface / headDist;
-        if (!BlockRaycaster.Raycast(Position, LastAimDirection, maxDistance, 0f, stopAtRange: false,
-                chunkManager, out var headHit, out _, out _, out _, includeFluids))
-            return false;
-        if (headHit != camHit)
-            return false;
-
-        (hitPosition, hitNormal, hitBoxIndex) = (camHit, camNormal, camBox);
-        return true;
-    }
+        out int hitBoxIndex, bool includeFluids = false) =>
+        _shoulder.Raycast(maxDistance, chunkManager, out hitPosition, out hitNormal, out hitBoxIndex, includeFluids);
 
 }
