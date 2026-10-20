@@ -1,6 +1,6 @@
 # Codebase cleanup campaign
 
-Handoff notes for the ongoing cleanup, so a new session can pick it up. Last updated 2026-10-20.
+Handoff notes for the ongoing cleanup, so a new session can pick it up. Last updated 2026-10-21.
 
 ## The rules (what "clean" means)
 
@@ -105,6 +105,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `f27e922` | Dead code and broken crefs pass: 76 unused usings, 14 unused or never-read members, unused parameters in 10 methods (incl. the menu layout ListTop/RowTop cascade) and 4 dead stores removed; 40 CS1574/CS0419/CS1570/CS1734 doc references fixed. Doc+style build at 0 for all except IDE0059 3 (hasWater const-flag keep plus 2 test bodies) and CS1573 37 (out of scope). The code-cleanup skill documents the measuring build. |
 | `3f77a2b` | Duplication pass: the server's and the item debugger's AssetRoot (plus the test fixture's walk) now live in one VoxelEngine.Core.AssetRoot, with each search rule kept verbatim. The hotbar and the [E] rows call UIRenderer.DrawIdIcon, and the unused ItemIcons is gone. MenuRenderer's two confirm-delete popups and its two list pages are folded into DrawConfirmDelete and DrawListPage, with static cached row drawers (467 to 422 lines). |
 | `9c13d77` | Duplication pass part 2: the seven entity axis sweeps fold into Chunks/BoxSweep (BodyCollision shares its step and OffsetAxis). FluidCells and LeafDecayCells' chunk cache and dirty batch fold into Chunks/ChunkCellCache, with one instance per simulation. FluidCellKey, LeafDecayCells' packer and TreeCellKey become Chunks/CellKey over ChunkKey's one 21-bit bit math. About -330 lines net. |
+| `94647c9` | Folded the sink-or-gravity, float, water-drag, bounce and ground-scrub steps that seven entity classes repeated into Core/BodyMotion (one set of shared constants; ThrownProjectile.Gravity now aliases BodyMotion.Gravity), and the burning-fluid box loop of MobLava and PlayerBodyProbe into Chunks/BurningFluid.AnyInBox |
 
 ## In progress
 
@@ -149,10 +150,7 @@ HudRenderer 436, InventoryPanelRenderer 369, UIRenderer 801, MenuRenderer 422; A
 item-debugger SKILL.md 83. Still open:
 - Search for more: near-identical methods, and repeated constants or rules that should be one
   helper. The `LeafDecayCells`/`FluidCellKey`/`FluidCells` twins and the per-entity box sweeps are done in `9c13d77`
-  (nothing remains of them). Line counts after it: FallingBlock 344, PrimedTnt 194, ItemDrop 268, ThrownProjectile 96, Goblin 598, Slime 390, BlockDebris 198, BodyCollision 173, ChunkKey 71, BoxSweep 77, CellKey 20, ChunkCellCache 144, FluidCells 69, FluidManager 261, FluidSchedule 59, LeafDecayManager 412; `Chunks/` holds 19 files; AGENTS.md 4,103, PERF_TODO.md 3,179. Known candidates left:
-  - `FallingBlock`, `PrimedTnt` and `BlockDebris` repeat the same water-sink and gravity block (submerged damp-or-gravity, and the bounce line in `PrimedTnt` and `BlockDebris`) with private `Gravity`, `TerminalVelocity`, `GroundFriction`, `WaterSinkSpeed`, `WaterDrag` and `Bounce*` constants.
-  - `Goblin`, `Slime` and `ItemDrop` repeat the same water-float block (buoyancy damp plus friction: `FloatSpeed`, `BuoyancyStiffness`, `WaterDrag`, `WaterFriction`), and five files repeat a 4-line ground-friction scrub.
-  - `MobLava.BodyInLava` and `PlayerBodyProbe.InLava` share the same burning-fluid cell test.
+  (nothing remains of them). The loose-body motion steps and the burning-fluid box test are done in `94647c9` (nothing remains of them; the fold added 14 net lines, since the two new helper files carry 116 lines of XML docs, accepted to keep the comment density). Line counts after it: FallingBlock 330, PrimedTnt 178, ItemDrop 252, ThrownProjectile 95, Goblin 585, Slime 374, BlockDebris 184, MobLava 31, PlayerBodyProbe 75, BodyMotion 90, BurningFluid 26; `Core/` holds 13 files, `Chunks/` 20; AGENTS.md 4,108. Known candidates left:
   - Deliberately unfolded: `LightFlicker.CellPhase` is a ulong 21-bit pack with its own axis order; folding it into `CellKey` would move the flicker phases. Leave it.
 - `MenuRenderer`'s other pages (AddServer, DirectConnect, Create and Edit) still repeat a title, fields,
   `DrawNotice`, two-button pattern inline in `DrawMainMenu`. A possible later fold; check first that the
@@ -303,6 +301,10 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
   - Members used only by tests: `Vector2Utils.Lerp/Damp`, `Vector3Utils.FlattenY/WithY/LerpUnclamped`. Decide whether they belong in production code or in a test helper.
 
 - Minor check after `9c13d77`: whether `LeafDecayManager.cs`, `OrphanWoodCheck.cs` and `TipHydration.cs` still need every using (unused usings raise no warning in this build).
+
+- Fold follow-ups (`94647c9`):
+  - Pre-existing doc warning: the `BlockDebris` constructor's XML doc (`Particles/BlockDebris.cs` lines 80-81) documents only some of its parameters (CS1573); a doc pass could add the missing param tags.
+  - Left alone because it only looks similar: `LeafParticle` and `BubbleParticle` each damp toward their own targets at their own rates, and `PlayerPhysics.Gravity` is 34, the player's own value, not the loose-body 28.
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
