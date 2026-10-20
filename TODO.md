@@ -476,7 +476,7 @@ single-arc player.
   old TODO.
 - [ ] **`M-9` · Mod / data-pack behavior hooks** — P3, XL.
   Data packs already exist; consider a scripting/behavior hook (`M-21`).
-- [ ] **`M-10` · Fix: `TreeGenerator.CanopyDisturbed` loses felled-canopy markers at its cap** —
+- [ ] **`M-10` · Fix: `TreeCanopy.CanopyDisturbed` loses felled-canopy markers at its cap** —
   P2, S. It is edit state, not a cache: 289 entries per edited block and a wholesale `Clear()` at
   16384 entries, so after roughly 57 felled trees the LOD redraws cleared canopy, and the `Count`
   test sits inside the 289-iteration loop (a per-block lock storm). The markers now persist per

@@ -193,7 +193,7 @@ public class ChunkSaveCodecTests
         for (var z = -96; z < 96; z++)
         {
             if (!TreeGenerator.TryGetTree(x, z, out _, out _)) continue;
-            var shape = TreeGenerator.ShapeOf(x, z);
+            var shape = TreeBatches.ShapeOf(x, z);
             // A cell above the base, so the chunk is the one the trunk climbs through
             var cell = shape.Cells[Math.Min(1, shape.WoodCount - 1)];
             var position = new Vector3(cell.X >> Chunk.SizeShift, cell.Y >> Chunk.SizeShift, cell.Z >> Chunk.SizeShift);

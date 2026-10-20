@@ -433,16 +433,16 @@ public static class FrameProfiler
     {
         WorldgenStats.TakeWindow(out var treeTicks, out var genTicks, out var chunks,
             out var growTicks, out var grows);
-        var misses = TreeGenerator.ShapeCacheMisses;
+        var misses = TreeBatches.ShapeCacheMisses;
         var missDelta = misses - _shapeMissesPrev;
         _shapeMissesPrev = misses;
-        var batchMisses = TreeGenerator.BatchCacheMisses;
+        var batchMisses = TreeBatches.BatchCacheMisses;
         var batchMissDelta = batchMisses - _batchMissesPrev;
         _batchMissesPrev = batchMisses;
-        var duplicates = TreeGenerator.BatchDuplicateBuilds;
+        var duplicates = TreeBatches.BatchDuplicateBuilds;
         var dupDelta = duplicates - _batchDuplicatesPrev;
         _batchDuplicatesPrev = duplicates;
-        var rotations = TreeGenerator.BatchCacheRotations;
+        var rotations = TreeBatches.BatchCacheRotations;
         var rotDelta = rotations - _batchRotationsPrev;
         _batchRotationsPrev = rotations;
 

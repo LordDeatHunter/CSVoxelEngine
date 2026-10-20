@@ -77,7 +77,7 @@ public sealed class SnowIceTests
 
                 Assert.True(species.Worldgen!.GrowsIn(Biome.Taiga), $"{species.Name} does not grow in taiga");
                 Assert.True(species.HasLeaves, $"taiga grew the leafless {species.Name}");
-                var shape = TreeGenerator.ShapeOf(wx, wz);
+                var shape = TreeBatches.ShapeOf(wx, wz);
                 Assert.Same(species, shape.Species);
                 Assert.True(shape.WoodCount > 0);
                 return;
@@ -108,7 +108,7 @@ public sealed class SnowIceTests
                     continue;
 
                 // A leaf cell that is its column's canopy top, so the LOD must wear this species there
-                var shape = TreeGenerator.BatchShapeOf(wx, wz);
+                var shape = TreeBatches.BatchShapeOf(wx, wz);
                 for (var i = shape.WoodCount; i < shape.Cells.Length; i++)
                 {
                     var cell = shape.Cells[i];

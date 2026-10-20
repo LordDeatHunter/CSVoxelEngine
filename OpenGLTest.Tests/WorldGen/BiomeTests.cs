@@ -362,7 +362,7 @@ public sealed class BiomeTests
                     continue;
 
                 Assert.False(species.HasLeaves, $"the desert grew the leafy {species.Name}");
-                var shape = TreeGenerator.ShapeOf(wx, wz);
+                var shape = TreeBatches.ShapeOf(wx, wz);
                 Assert.True(shape.WoodCount > 0);
                 Assert.Equal(shape.WoodCount, shape.Cells.Length);
                 return;

@@ -22,10 +22,10 @@ public sealed class CanopyDisturbedTests
 
     private static HashSet<(int X, int Z)> Poisoned(int radius)
     {
-        TreeGenerator.ResetCanopyDisturbed();
+        TreeCanopy.ResetCanopyDisturbed();
         TreeGenerator.PoisonCanopy(X, Z, radius);
         Assert.Equal(0, TreeGenerator.CanopyTop(X, Z));
-        return TreeGenerator.ExportCanopyDisturbed().ToHashSet();
+        return TreeCanopy.ExportCanopyDisturbed().ToHashSet();
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public sealed class CanopyDisturbedTests
         }
         finally
         {
-            TreeGenerator.ResetCanopyDisturbed();
+            TreeCanopy.ResetCanopyDisturbed();
         }
     }
 }

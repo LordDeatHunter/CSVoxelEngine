@@ -448,7 +448,7 @@ public sealed class TreeGrowthTests
             var after = SnapshotReach(tree, rootX);
             var idChanged = after.Where(kv => before[kv.Key].Id != kv.Value.Id).Select(kv => (kv.Key.X, kv.Key.Z)).ToHashSet();
             Assert.NotEmpty(idChanged);
-            Assert.True(TreeGenerator.ExportCanopyDisturbed().Any(idChanged.Contains),
+            Assert.True(TreeCanopy.ExportCanopyDisturbed().Any(idChanged.Contains),
                 $"{species.Name}: no grown column reached the far-LOD canopy markers");
         }
 

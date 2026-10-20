@@ -86,8 +86,8 @@ public sealed class LodCanopyProxyTests
         {
             // Read the cached columns directly: CanopyTop/TryGetCanopy first apply the edit gate,
             // which parallel LOD-edit tests poison, and that gate is CanopyDisturbedTests' rule
-            var proxy = TreeGenerator.GetProxyCanopyColumns(cx, cz);
-            var real = TreeGenerator.GetCanopyColumns(cx, cz);
+            var proxy = TreeCanopy.GetProxyCanopyColumns(cx, cz);
+            var real = TreeCanopy.GetCanopyColumns(cx, cz);
             var trunks = LeafyTrunksAround(cx, cz, reach);
 
             for (var lx = 0; lx < Chunk.Size; lx++)
@@ -223,7 +223,7 @@ public sealed class LodCanopyProxyTests
             leafTiles.UnionWith(TestContent.WorldTiles(BlockType.ById[species.LeavesId]!));
 
         TreeGenerator.ResetCaches();
-        var before = TreeGenerator.GrowsOnThisThread;
+        var before = TreeBatches.GrowsOnThisThread;
         var proxyRings = 0;
         for (var level = 0; level < LodRegion.Levels.Length; level++)
         {
@@ -231,7 +231,7 @@ public sealed class LodCanopyProxyTests
             if (!spec.ProxyCanopy) continue;
             proxyRings++;
             var mesh = LodRegion.BuildMeshData(level, DivFloor(x, spec.RegionBlocks), DivFloor(z, spec.RegionBlocks));
-            Assert.True(before == TreeGenerator.GrowsOnThisThread, $"LOD ring {level} reads the proxy but grew a tree");
+            Assert.True(before == TreeBatches.GrowsOnThisThread, $"LOD ring {level} reads the proxy but grew a tree");
             Assert.Contains(mesh.Vertices, v => (v.PackedColor >> 24) == 253u && leafTiles.Contains(v.Layer));
         }
         Assert.True(proxyRings > 0, "no LOD ring reads the proxy canopy");
@@ -240,6 +240,6 @@ public sealed class LodCanopyProxyTests
         var first = LodRegion.Levels[0];
         Assert.False(first.ProxyCanopy, "the ring meeting the full-detail chunks must read the grown canopy");
         LodRegion.BuildMeshData(0, DivFloor(x, first.RegionBlocks), DivFloor(z, first.RegionBlocks));
-        Assert.True(TreeGenerator.GrowsOnThisThread > before, "the first ring read the grown canopy without growing a tree");
+        Assert.True(TreeBatches.GrowsOnThisThread > before, "the first ring read the grown canopy without growing a tree");
     }
 }

@@ -562,7 +562,7 @@ internal sealed class BlockEditor
     internal void NotifyLodEdit(int x, int y, int z)
     {
         // A client's far LOD is the server's, streamed as finished regions through LodNetCodec:
-        // LodSurface, LodColumnCaps and TreeGenerator.CanopyDisturbed are worldgen-side
+        // LodSurface, LodColumnCaps and TreeCanopy.CanopyDisturbed are worldgen-side
         // tables a client must never touch.
         if (_clientMode) return;
         if (LodSurface.RecordEdit(_chunkManager, x, y, z))

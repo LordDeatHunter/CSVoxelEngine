@@ -151,7 +151,7 @@ public sealed class ClientWorldgenIsolationTests
             var reads = WorldgenReads.Count;
             var surfaces = LodSurface.EditVersion;
             var caps = LodColumnCaps.CapEditVersion;
-            var canopy = TreeGenerator.CanopyEditVersion;
+            var canopy = TreeCanopy.CanopyEditVersion;
 
             // Mining the surface top, which on a server lowers the column's far-LOD surface
             Assert.True(client.BreakBlockFor(player, top));
@@ -173,7 +173,7 @@ public sealed class ClientWorldgenIsolationTests
 
             Assert.Equal(surfaces, LodSurface.EditVersion);
             Assert.Equal(caps, LodColumnCaps.CapEditVersion);
-            Assert.Equal(canopy, TreeGenerator.CanopyEditVersion);
+            Assert.Equal(canopy, TreeCanopy.CanopyEditVersion);
             Assert.Equal(reads, WorldgenReads.Count);
         }
         finally

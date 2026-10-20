@@ -425,7 +425,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // corner row is carved, at most half a cell so two rounds on one edge never meet
     public const int TreeRimBevelPx = 8;
 
-    // TreeGenerator.ShapeCache and TreeGenerator.CanopyCache, both on the same GenerationalCache as
+    // TreeBatches.ShapeCache and TreeCanopy.CanopyCache, both on the same GenerationalCache as
     // the column and worm-path caches above (item D6).
     //
     // The SHAPE cache holds one grown, rasterized tree per accepted trunk column, keyed by (x, z):
@@ -454,7 +454,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TreeCellShift = 6;
     public const int TreeCellBlocks = 1 << TreeCellShift;
 
-    // TreeGenerator.BatchCache, on the same GenerationalCache as the sites above. One entry holds a
+    // TreeBatches.BatchCache, on the same GenerationalCache as the sites above. One entry holds a
     // whole 64x64 cell of grown trees, measured over the 3x3 cells around tree-perf.json's vantages:
     // forest ~21 trees x ~250 cells x 16 B per entry (~82 KB mean, max ~70 trees / ~250 KB), taiga
     // ~79 trees x ~230 cells x 16 B per entry (~288 KB mean, max ~350 KB). It is shared by Stamp on
@@ -465,7 +465,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TreeBatchCacheCapacity = 336;
     public const int TreeBatchCacheGenerations = 4;
 
-    // TreeGenerator.ProxyCanopyCache: the proxy CanopyColumns of a chunk column that the far LOD
+    // TreeCanopy.ProxyCanopyCache: the proxy CanopyColumns of a chunk column that the far LOD
     // rings read instead of the grown canopy. Cheap to rebuild (no growth, only placement and the
     // species' lod crown), and sized like the real canopy cache because the same per-fine-column
     // sweep in LodRegion.BuildMeshData drives it. G = 4 like every site; re-price only against a
@@ -473,7 +473,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TreeProxyCanopyCacheCapacity = 4096;
     public const int TreeProxyCanopyCacheGenerations = 4;
 
-    // Felled-canopy markers kept before TreeGenerator.CanopyDisturbed is wiped wholesale (it only
+    // Felled-canopy markers kept before TreeCanopy.CanopyDisturbed is wiped wholesale (it only
     // bounds memory). Sized so a fell's square, (2 * FellPoisonRadius + 1)^2 ~ 1000 columns, wipes
     // the set no more often than the old 289-column square did against 16384.
     public const int CanopyDisturbedLimit = 65536;

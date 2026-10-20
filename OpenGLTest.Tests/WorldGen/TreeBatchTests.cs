@@ -9,7 +9,7 @@ using Xunit;
 namespace VoxelEngine.Tests.WorldGen;
 
 /// <summary>
-/// Rules of the per-cell tree batches (<see cref="TreeBatch"/>, <see cref="TreeGenerator.BatchOf"/>):
+/// Rules of the per-cell tree batches (<see cref="TreeBatch"/>, <see cref="TreeBatches.BatchOf"/>):
 /// a batch is a pure function of its cell whatever order cells are asked for in, its trunks are
 /// exactly the cell's placement in placement-hash order, no grown cell of one tree enters a cell
 /// already held by an earlier tree of the batch or a neighbor cell's solo shape, and every tree
@@ -78,7 +78,7 @@ public sealed class TreeBatchTests
         {
             if (x >= x0 && x < x0 + size && z >= z0 && z < z0 + size) continue;
             if (!TreeGenerator.TryGetTree(x, z, out _, out _)) continue;
-            foreach (var cell in TreeGenerator.ShapeOf(x, z).Cells)
+            foreach (var cell in TreeBatches.ShapeOf(x, z).Cells)
                 cells.Add(Key(cell));
         }
 
@@ -110,17 +110,17 @@ public sealed class TreeBatchTests
         var (bx, bz) = (ax + 1, az);
 
         TreeGenerator.ResetCaches();
-        var a1 = Snapshot(TreeGenerator.BatchOf(ax, az));
-        var b1 = Snapshot(TreeGenerator.BatchOf(bx, bz));
+        var a1 = Snapshot(TreeBatches.BatchOf(ax, az));
+        var b1 = Snapshot(TreeBatches.BatchOf(bx, bz));
 
         TreeGenerator.ResetCaches();
-        var b2 = Snapshot(TreeGenerator.BatchOf(bx, bz));
-        var a2 = Snapshot(TreeGenerator.BatchOf(ax, az));
+        var b2 = Snapshot(TreeBatches.BatchOf(bx, bz));
+        var a2 = Snapshot(TreeBatches.BatchOf(ax, az));
 
         Assert.NotEmpty(a1);
         AssertSameBatch(a1, a2);
         AssertSameBatch(b1, b2);
-        Assert.Same(TreeGenerator.BatchOf(ax, az), TreeGenerator.BatchOf(ax, az));
+        Assert.Same(TreeBatches.BatchOf(ax, az), TreeBatches.BatchOf(ax, az));
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public sealed class TreeBatchTests
     {
         foreach (var (cx, cz) in SampleCells())
         {
-            var batch = TreeGenerator.BatchOf(cx, cz);
+            var batch = TreeBatches.BatchOf(cx, cz);
             var grown = new HashSet<long>();
             var bases = new HashSet<long>();
             foreach (var tree in batch.Trees)
@@ -152,7 +152,7 @@ public sealed class TreeBatchTests
     {
         foreach (var (cx, cz) in SampleCells())
         {
-            var batch = TreeGenerator.BatchOf(cx, cz);
+            var batch = TreeBatches.BatchOf(cx, cz);
             var occupied = NeighborSoloCells(cx, cz);
             foreach (var tree in batch.Trees)
             {
@@ -183,7 +183,7 @@ public sealed class TreeBatchTests
                 if (TreeGenerator.TryGetTree(x, z, out var species, out var baseY))
                     placed.Add((x, z, species, baseY));
 
-            var batch = TreeGenerator.BatchOf(cx, cz);
+            var batch = TreeBatches.BatchOf(cx, cz);
             var trunks = batch.Trees.Select(t => (t.X, t.Z, t.Species, t.BaseY)).ToHashSet();
             Assert.Equal(batch.Trees.Length, trunks.Count);
             Assert.True(placed.SetEquals(trunks), $"cell ({cx}, {cz}) batch trunks differ from its placement");
@@ -205,7 +205,7 @@ public sealed class TreeBatchTests
         var trees = 0;
         foreach (var (cx, cz) in SampleCells())
         {
-            var batch = TreeGenerator.BatchOf(cx, cz);
+            var batch = TreeBatches.BatchOf(cx, cz);
             trees += batch.Trees.Length;
             foreach (var tree in batch.Trees)
             {
@@ -259,7 +259,7 @@ public sealed class TreeBatchTests
                 if (!allForest) continue;
 
                 // Only a tree whose batch shape really crosses into another cell tests the border
-                var crosses = TreeGenerator.BatchShapeOf(x, z).Cells.Any(c =>
+                var crosses = TreeBatches.BatchShapeOf(x, z).Cells.Any(c =>
                     TreeGenerator.CellOf(c.X) != cx || TreeGenerator.CellOf(c.Z) != cz);
                 if (crosses)
                     return (x, z);
@@ -273,7 +273,7 @@ public sealed class TreeBatchTests
     public void BatchTreesAreStampedWholeAcrossCellBorders()
     {
         var (x, z) = FindForestTrunkNearCellBorder();
-        var tree = TreeGenerator.BatchShapeOf(x, z);
+        var tree = TreeBatches.BatchShapeOf(x, z);
         var world = TreeWorldgenFixture.Generate(x >> Chunk.SizeShift, z >> Chunk.SizeShift, reverse: false);
         var woodIds = TreeWorldgenFixture.WoodIds();
 
@@ -301,7 +301,7 @@ public sealed class TreeBatchTests
     /// </summary>
     // Wooded forest chunk columns, searched in rings from the origin. No margin from a tree
     // cell's border is needed: a chunk's canopy aggregates every batch that can overhang it
-    // (TreeGenerator.GetCanopyColumns), so the comparison holds at any reach.
+    // (TreeCanopy.GetCanopyColumns), so the comparison holds at any reach.
     private static IEnumerable<(int Cx, int Cz)> WoodedForestColumns()
     {
         const int maxRadius = 96;
@@ -349,7 +349,7 @@ public sealed class TreeBatchTests
 
             // The cached canopy itself, not CanopyTop: the edit gate in front of it is a separate
             // rule, and a parallel test may poison columns.
-            var canopy = TreeGenerator.GetCanopyColumns(cx, cz);
+            var canopy = TreeCanopy.GetCanopyColumns(cx, cz);
             for (var lx = 0; lx < Chunk.Size; lx++)
             for (var lz = 0; lz < Chunk.Size; lz++)
             {

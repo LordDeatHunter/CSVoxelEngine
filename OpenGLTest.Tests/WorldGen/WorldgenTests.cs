@@ -58,7 +58,7 @@ public sealed class WorldgenTests
                     continue;
                 // The same instance twice: the second call hit the shape cache (item 25) instead
                 // of growing the tree again.
-                Assert.Same(TreeGenerator.ShapeOf(x, z), TreeGenerator.ShapeOf(x, z));
+                Assert.Same(TreeBatches.ShapeOf(x, z), TreeBatches.ShapeOf(x, z));
                 found = true;
             }
         }

@@ -639,7 +639,7 @@ needs, not the history.
   `ChunkScanFrontierTests.FrontierTrustsThePrefixUntilTheRemovalVersionMoves`,
   `ChunkScanFrontierTests.TheScanCostIsAmortizedNotPerCall`.
 - **D6 · The last three `Clear()`-at-cap worldgen caches now evict generationally too.**
-  `TreeGenerator.ShapeCache`, `TreeGenerator.CanopyCache` and `CactusGenerator.ShapeCache` all
+  `TreeBatches.ShapeCache`, `TreeCanopy.CanopyCache` and `CactusGenerator.ShapeCache` all
   carried the pre-D2 pattern — `if (Count >= limit) Clear()` on the miss path, which threw the whole
   working set away *and* evaluated `ConcurrentDictionary.Count`, an all-locks barrier, on **every
   miss**. All three now run on `GenerationalCache<TKey, TValue>` at **unchanged capacity** (tree
@@ -650,7 +650,7 @@ needs, not the history.
   following `ColumnCache*` / `CellCache*`. **All three ship at G = 4**, matching
   `ColumnCacheGenerations` and `CellCacheGenerations`, so all **five** `GenerationalCache` sites now
   read alike. AGENTS.md's worldgen bullet names all five and their knobs, and its two forbidden
-  examples (`LodColumnCaps.ColumnCaps`, `TreeGenerator.CanopyDisturbed`) are unchanged.
+  examples (`LodColumnCaps.ColumnCaps`, `TreeCanopy.CanopyDisturbed`) are unchanged.
 - **D6 · G = 4 was not assumed — it was the branch the round's own capture selected, for each cache
   separately.** Lesson 4 says `Generations` may only be moved against a real capture, and the losing
   regime is real (G = 2 was measurably *worse* than the wholesale clear for `ColumnCache`), so the
@@ -677,7 +677,7 @@ needs, not the history.
   **3152 / 12608 / 50432** at levels 0 / 1 / 2 against a 4096 cap, so it is the level-1 and level-2
   rings that overrun it, not level 0. (The radius-8 ring `LodRegionClaims.BuildSortedOffsets` builds is a
   **disc of 197 regions**, not a 17x17 square — an earlier estimate of "~4.6k level-0 columns" came
-  from the square and is wrong.) `TreeGenerator.ShapeCache` is the one of the three genuinely shared
+  from the square and is wrong.) `TreeBatches.ShapeCache` is the one of the three genuinely shared
   between two streams (`TreeGenerator.Stamp` on the generation workers and `BuildCanopyTops` under
   the far-LOD sweep), so it is the one where the wholesale `Clear()` had two populations to throw
   away at once; `CactusGenerator.ShapeCache` has exactly one caller (`CactusGenerator.Stamp`) and
@@ -685,8 +685,8 @@ needs, not the history.
 - **D6 · The design wrinkle the next reader will hit: `GetOrAdd`'s factory is key-only, so both
   `ShapeCache`s recompute rather than capture.** The two miss paths used to close over a `baseY` and
   (for trees) a `biome` computed earlier in `TryGetTrunk` / `TryGetCactus`. The factories are instead
-  **static, non-capturing `Func<,>` fields** (`TreeGenerator.BuildShapeFor`,
-  `CactusGenerator.BuildShapeFor`, `TreeGenerator.BuildCanopyFor`) that recompute
+  **static, non-capturing `Func<,>` fields** (`TreeBatches.BuildShapeFor`,
+  `CactusGenerator.BuildShapeFor`, `TreeCanopy.BuildCanopyFor`) that recompute
   `HeightAt(x, z) + 1` and `TerrainGenerator.BiomeAt(x, z)` **from the key, on a miss only** —
   mirroring `Chunk.ComputeColumn` and `WormCarver.BuildCellFor`. That is a deliberate trade: a
   capturing lambda would allocate a closure at the call site on **every call including hits**, on the
@@ -694,9 +694,9 @@ needs, not the history.
   reduce. It is a behavior-preserving *claim*, so it is **pinned, not asserted**:
   `WorldgenShapeCacheEvictionTests.TreeCactusAndCanopyShapesSurviveForcedCacheEviction` asserts
   `baseY == Chunk.GetColumnHeights(...)[...] + 1` and `shape.TrunkBaseY == baseY` for both generators,
-  cold, on a hit, and again after a forced eviction. **`TreeGenerator.CanopyDisturbed` was not
+  cold, on a hit, and again after a forced eviction. **`TreeCanopy.CanopyDisturbed` was not
   touched** — player-edit state, `TODO.md` `M-10`, `GenerationalCache` invariant 10 — so
-  `using System.Collections.Concurrent;` stays in `TreeGenerator.cs` for it alone, and
+  `using System.Collections.Concurrent;` stays in `TreeCanopy.cs` for it alone, and
   `LodColumnCaps.ColumnCaps` (then `D2b` here, now `TODO.md` `M-11`) was likewise left entirely alone.
 - **D2 · Both deterministic worldgen caches evict generationally instead of clearing wholesale.**
   `Chunk.ColumnCache` and `WormCarver.CellCache` were `ConcurrentDictionary` plus
@@ -1308,7 +1308,7 @@ The **interleaved** row is the only one that decides anything — a bulk sweep a
 under both policies. Verbatim from the run (`generational` vs `clear-at-cap`, misses):
 
 ```
-canopy (TreeGenerator.CanopyCache, cap 4096)
+canopy (TreeCanopy.CanopyCache, cap 4096)
   lod-ring-L0 (hot)   accesses 25216 (rawAsks 806912)   distinct 3152    misses 3152  under clear AND G=2/4/8 alike, wholesaleClears 0
   lod-ring-L2 (bulk)  accesses 100864 (rawAsks 12910592) distinct 50432  misses 50432 under every policy, clear wholesaleClears 12
   INTERLEAVED         accesses 113472                   distinct 50432
@@ -1318,7 +1318,7 @@ canopy (TreeGenerator.CanopyCache, cap 4096)
       generational G=8    misses 51880   -0.08%   promotions   6  rotations 101
   VERDICT: CONVERT AT G=4 (rule not fired).
 
-tree-shape (TreeGenerator.ShapeCache, cap 16384) — INTERLEAVED rows, by distinct-key target T
+tree-shape (TreeBatches.ShapeCache, cap 16384) — INTERLEAVED rows, by distinct-key target T
   T= 4096   clear  4163 | G=4  4163   0.00%   wholesaleClears 0
   T= 8192   clear  8345 | G=4  8345   0.00%   wholesaleClears 0
   T=16384   clear 16710 | G=2 16690 | G=4 16689 (-0.13%) | G=8 16657 (-0.32%)   wholesaleClears 1
@@ -2907,7 +2907,7 @@ confirmed the first four and added the fifth, and D5 added the sixth:**
    in final wording before a number was read, prepared either to re-price one cache's G against that
    table or to leave that cache unconverted on the R3/C5 no-go precedent. The rule did not fire.
    **All five `GenerationalCache` sites now ship at G = 4** — `Chunk.ColumnCache`,
-   `WormCarver.CellCache`, `TreeGenerator.ShapeCache`, `TreeGenerator.CanopyCache`,
+   `WormCarver.CellCache`, `TreeBatches.ShapeCache`, `TreeCanopy.CanopyCache`,
    `CactusGenerator.ShapeCache` — and **none of them ships at a G derived from a capture**; four is
    simply the value every capture so far has failed to beat. The next editor who wants a different G
    owes a capture of their own, per cache.

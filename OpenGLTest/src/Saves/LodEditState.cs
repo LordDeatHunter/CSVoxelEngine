@@ -70,11 +70,11 @@ public sealed class LodEditState(
     /// an autosave can skip rewriting the file while it stands still.
     /// </summary>
     public static int CombinedVersion =>
-        unchecked(LodColumnCaps.CapEditVersion + LodSurface.EditVersion + TreeGenerator.CanopyEditVersion);
+        unchecked(LodColumnCaps.CapEditVersion + LodSurface.EditVersion + TreeCanopy.CanopyEditVersion);
 
     /// <summary>Copies the live tables. Main thread, the tables' only writer.</summary>
     public static LodEditState Capture() =>
-        new(LodColumnCaps.ExportColumnCaps(), LodSurface.Export(), TreeGenerator.ExportCanopyDisturbed());
+        new(LodColumnCaps.ExportColumnCaps(), LodSurface.Export(), TreeCanopy.ExportCanopyDisturbed());
 
     /// <summary>
     /// Merges this state into the live tables: the lower cap wins, a live override wins over the
@@ -84,7 +84,7 @@ public sealed class LodEditState(
     {
         LodColumnCaps.ImportColumnCaps(Caps);
         LodSurface.Import(Overrides);
-        TreeGenerator.ImportCanopyDisturbed(Disturbed);
+        TreeCanopy.ImportCanopyDisturbed(Disturbed);
     }
 
     /// <summary>Encodes with this run's block names.</summary>
