@@ -11,10 +11,13 @@ using VoxelEngine.Simulation;
 namespace VoxelEngine.Particles;
 
 /// <summary>
-/// The world's ambient cosmetic effects: steam off hardening lava and hot springs, the embers over
+/// The world's ambient effects: the burning cells the fire particles and the warm point lights
+/// share (<see cref="FireCells"/>), steam off hardening lava and hot springs, the embers over
 /// lava vents, the torch flames, the local player's bubbles, the water splashes of every body and
-/// the camera shake of a blast. Never gameplay, so a headless server runs none of it. Owned by
-/// <see cref="World"/>, which keeps the particle systems it feeds and draws them; main thread only.
+/// the camera shake of a blast. Never gameplay: nothing here changes the simulation. The fire-cell
+/// and lava-vent gathers run on a headless server too, while the splashes, bubbles and torch flames
+/// skip it. Owned by <see cref="World"/>, which keeps the particle systems it feeds and draws them;
+/// main thread only.
 /// </summary>
 internal sealed class AmbientEffects
 {
@@ -30,12 +33,16 @@ internal sealed class AmbientEffects
     private readonly List<Mob> _mobs;
     private readonly List<ThrownProjectile> _projectiles;
     private readonly bool _serverMode;
+    private readonly CampfireManager _campfires;
+    private readonly KilnManager _kilns;
+    private readonly GoblinManager? _goblins;
 
     private Camera Camera => _world.Camera;
 
     internal AmbientEffects(World world, ChunkManager chunkManager, FireParticleSystem fire, FireParticleSystem torchFire,
         BubbleParticleSystem bubbles, BlockDebrisSystem debris, DropManager dropManager, FallingBlockManager falling,
-        TntManager tntManager, List<Mob> mobs, List<ThrownProjectile> projectiles, bool serverMode)
+        TntManager tntManager, List<Mob> mobs, List<ThrownProjectile> projectiles, bool serverMode,
+        CampfireManager campfires, KilnManager kilns, GoblinManager? goblins)
     {
         _world = world;
         _chunkManager = chunkManager;
@@ -49,6 +56,39 @@ internal sealed class AmbientEffects
         _mobs = mobs;
         _projectiles = projectiles;
         _serverMode = serverMode;
+        _campfires = campfires;
+        _kilns = kilns;
+        _goblins = goblins;
+    }
+
+    /// <summary>Every burning cell this frame (campfires, lit kilns and, in the full update,
+    /// goblin torches), feeding both the fire particles and the warm point lights.</summary>
+    internal IReadOnlyList<Vector3> FireCells => _fireCells;
+
+    // Every cell whose flame the particle system and the point lights draw: campfires plus kilns
+    // (and goblin torches in the full update), rebuilt once per update so both consumers read one list
+    private readonly List<Vector3> _fireCells = [];
+
+    /// <summary>Refills <see cref="_fireCells"/> with the lit campfires and kilns; both update
+    /// paths call it after the stations ticked and before the fire particles run.</summary>
+    internal void GatherStationFires()
+    {
+        _fireCells.Clear();
+        _fireCells.AddRange(_campfires.LitCells);
+        _fireCells.AddRange(_kilns.LitCells);
+    }
+
+    /// <summary>Adds every goblin's lit torch to <see cref="_fireCells"/>, right after
+    /// <see cref="GatherStationFires"/>; the full update only, never a client's.</summary>
+    internal void AddGoblinTorches()
+    {
+        // A goblin's lit torch: its flame rides the offhand, a few blocks of radius like a campfire
+        if (_goblins != null)
+        {
+            foreach (var goblin in _goblins.Goblins)
+                if (goblin.TorchFlamePoint is { } flame)
+                    _fireCells.Add(flame - FireParticleSystem.SpawnOffset);
+        }
     }
 
     /// <summary>The exposed hot-fluid vents the lava embers burn over this frame

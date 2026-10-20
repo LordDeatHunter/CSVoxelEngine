@@ -84,9 +84,6 @@ public class World
         ParticleConfig.TorchSmokePerSecond, ParticleConfig.TorchParticleMax, Vector3.Zero,
         ParticleConfig.TorchFlameJitter, ParticleConfig.TorchFlameScale);
 
-    // Every cell whose flame the particle system and the point lights draw: campfires plus kilns,
-    // rebuilt once per update so both consumers read one list
-    private readonly List<Vector3> _fireCells = [];
     private readonly BubbleParticleSystem _bubbles = new();
 
     // Where edited chunks, the far-LOD edit state, the player and the entities are persisted; null = no
@@ -283,9 +280,8 @@ public class World
     /// <summary>Every live mob (slimes, goblins), feeding targeting and the healthbars.</summary>
     public IReadOnlyList<Mob> Mobs => _mobs;
 
-    /// <summary>Every burning cell this frame (campfires and lit kilns), feeding both the fire
-    /// particles and the warm point lights.</summary>
-    public IReadOnlyList<Vector3> FireCells => _fireCells;
+    /// <summary>Every burning cell this frame, gathered by <see cref="Ambient"/>.</summary>
+    public IReadOnlyList<Vector3> FireCells => Ambient.FireCells;
 
     /// <summary>
     /// Builds the world and starts its chunk-generation and LOD workers. With a
@@ -394,7 +390,7 @@ public class World
             // The per-job components: each only stores its references here and reads this world lazily
             Strikes = new MobStrikes(this, _debris, serverMode);
             Ambient = new AmbientEffects(this, _chunkManager, _fire, _torchFire, _bubbles, _debris, _dropManager,
-                _falling, _tntManager, _mobs, _projectiles, serverMode);
+                _falling, _tntManager, _mobs, _projectiles, serverMode, _campfires, _kilns, _goblins);
             Edits = new BlockEditor(this, _chunkManager, _debris, _dropManager, _campfires, _querns, _kilns, _casting,
                 _fluidManager, _leafDecay, _lodManager, _leaves, _falling, _toppling, clientMode, serverMode);
             LeftClick = new LeftClickAction(this, _chunkManager, _debris, _hitMarker, _mobs, sfx, clientMode);
@@ -689,10 +685,8 @@ public class World
         _slimes?.AnimateMirrors((float)deltaTime, _debris);
         _goblins?.AnimateMirrors((float)deltaTime, _debris);
         _tntManager.AnimateMirrors((float)deltaTime);
-        _fireCells.Clear();
-        _fireCells.AddRange(_campfires.LitCells);
-        _fireCells.AddRange(_kilns.LitCells);
-        _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
+        Ambient.GatherStationFires();
+        _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
         Ambient.UpdateTorchFlames((float)deltaTime, Wind.Direction(LightingTime));
         Ambient.UpdateBubbles((float)deltaTime);
         Throws.UpdateThrown((float)deltaTime);
@@ -799,19 +793,11 @@ public class World
         // world's own inventory and camera stand for the local player
         _casting.Update((float)deltaTime, _chunkManager, _dropManager, Inventory,
             Inventory.SelectedToolInstance, Camera.Position, InteractionReach);
-        _fireCells.Clear();
-        _fireCells.AddRange(_campfires.LitCells);
-        _fireCells.AddRange(_kilns.LitCells);
-        // A goblin's lit torch: its flame rides the offhand, a few blocks of radius like a campfire
-        if (_goblins != null)
-        {
-            foreach (var goblin in _goblins.Goblins)
-                if (goblin.TorchFlamePoint is { } flame)
-                    _fireCells.Add(flame - FireParticleSystem.SpawnOffset);
-        }
+        Ambient.GatherStationFires();
+        Ambient.AddGoblinTorches();
         // The lighting clock (window time plus VOXEL_TIME), so the smoke blows the way the leaves lean
         var wind = Wind.Direction(LightingTime);
-        _fire.Update((float)deltaTime, _fireCells, Camera.RenderEye, wind: wind);
+        _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: wind);
         Ambient.GatherLavaVents(Camera.RenderEye);
         _lavaFire.Update((float)deltaTime, Ambient.LavaVents, Camera.RenderEye, wind: wind);
         // Hot springs steam while the eye is in range; cosmetic, so never on a server
