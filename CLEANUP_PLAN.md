@@ -54,7 +54,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
   `~/.dotnet/dotnet.exe` is a 9.0.100 SDK and fails with CS0079/CS0131/CS0411.
   - Build: `DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release --no-incremental`
   - Test: `DOTNET_ROLL_FORWARD=LatestMajor dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release --no-build`
-  - Baseline: 0 warnings, 2441 tests (last full run: 2440 passed, 1 failed: known flaky `MeshingTests.MissingFaceNeighborAbandonsTheBuild`, which passed on class re-run 49/49).
+  - Baseline: 0 warnings, 2441 tests (last full run: 2440 passed, 1 failed: known flaky `LodBuildPoolTests.TheInFlightCapHoldsUnderThreeProducers`, which passed on class re-run 4/4).
 - **Known flaky tests.** Re-run a failure alone, by class filter, before treating it as real
   (the workflow's verifier reads this list):
   - `GenerationalCacheTests.EveryKeyAlwaysReturnsItsOwnValueUnderFourThreads`
@@ -97,6 +97,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `452b2dd` | Split LodManager.cs (932 -> 314 lines) into LodRegionSet, LodCoverPass, LodRegionClaims and LodWorkerPool, with LodBuildOutcome moved to its own file; LodManager keeps the frame orchestration and forwards its public surface and test seams |
 | `c3f0d50` | Split Inventory.cs (896 -> 597 lines): the player.json mapping moved to InventorySaveCodec, the crafting rules to InventoryCrafting, and InventoryCategory and HotbarSlot to their own files; the public members became one-line forwarders over internal state accessors |
 | `6d9cb2d` | Shrink Chunk.cs under 700: the RestoreFrom bodies and their helpers move to the new Chunks/ChunkRestore.cs (71 lines) behind three one-line forwarders, AONeighbors moves to ChunkFaceTables, and the unused using is dropped (Chunk.cs 770 -> 675) |
+| `5318705` | Moved the fire-cell list and its gathering from World into AmbientEffects: GatherStationFires (both update paths) and AddGoblinTorches (full Update only), with World.FireCells forwarding to it; World.cs 1016 -> 1002 lines |
 
 ## In progress
 
@@ -113,7 +114,7 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 | File | Lines | Notes |
 |---|---|---|
 | `src/Player/Camera.cs` | 731 | Split in `fc2ffb2` (HeadMotion 136, ShoulderRig 196, ModeToggles 86, ViewProjectionCache 82, SpawnOverrides 98, CameraMode 9); AGENTS.md records a stated reason. Misses the ~700 target because the XML docs kept on the forwards take more lines than planned. Optional: move `PushOutOf`'s body (about 45 lines) verbatim into a small `Player/` helper (not `PlayerPhysics`) with a one-line forward, then update the AGENTS.md wording ('about 730 lines'). |
-| `src/World.cs` | 1,015 | Has a stated reason. Mob frame job moved to `Simulation/MobDirector.cs` (208) in `78635e3`. Next extraction: the fire-cell gathering that `Update` and `UpdateClient` both build. |
+| `src/World.cs` | 1,002 | Has a stated reason. Mob frame job moved to `Simulation/MobDirector.cs` (208) in `78635e3`; fire-cell gathering moved to `AmbientEffects` (351) in `5318705`. No next extraction is named in AGENTS.md; check whether anything is left in World.cs worth moving before planning. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
 | `src/Lod/LodManager.cs` | 314 | Split in `452b2dd` (LodRegionSet 174, LodCoverPass 164, LodRegionClaims 278, LodWorkerPool 144, LodBuildOutcome 12); `Lod/` now holds 14 files. Nothing remains. `LodMeshBuilder.cs` (650) is the largest file left in `Lod/`. Test files: LodManagerTests 788, LodBuildPoolTests 426; AGENTS.md 4,069 lines. |
 | `src/WorldGen/TerrainGenerator.cs` | 877 | |
@@ -146,7 +147,6 @@ Known duplicates, recorded by the earlier runs:
 - The inline sprite-or-cube icon blocks in `HudRenderer.DrawHotbar` and
   `InventoryPanelRenderer.DrawEntryRow` duplicate `UIRenderer.DrawIdIcon`.
 - `MenuRenderer` has duplicated confirm-delete and list pages (worlds vs servers).
-- `World.Update` and `World.UpdateClient` both gather the fire cells (campfire and kiln lit cells plus the goblin-torch loop); also the next World.cs extraction.
 - Search for more: near-identical methods, and repeated constants or rules that should be one
   helper.
 
@@ -161,7 +161,7 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `InventoryPanelInput.cs` was re-encoded from cp1252 to UTF-8 during the Program split. Spot-check its non-ASCII comment characters (em dashes etc.) against HEAD's old `Program.cs` (`git show 3d45be4^:OpenGLTest/src/Program.cs`) for mojibake.
 - The doc-generation build (`-p:GenerateDocumentationFile=true`) was not run after the cref retargets in `Chat.cs` and `SettingsMenu.cs`. A future run should confirm no new cref warnings.
 - The `// TODO: move this to player class` `placeTimer` still relies on the static-initializer ordering quirk: it starts at 0.0, not 0.2. This affects only the storeless dev-override path. A later behavior task could make the intent explicit; it was out of scope for the cleanup.
-- Next extractions named in `AGENTS.md` remain: the fire-cell gathering shared by `World.Update` and `UpdateClient`; `Program.cs`, `Chunk.cs`, `Camera.cs` and `ChunkManager.cs` are still on the offender list.
+- `Program.cs`, `Chunk.cs`, `Camera.cs` and `ChunkManager.cs` are still on the AGENTS.md offender list.
 - `ContentRegistry.Reset` does not clear `StackSolidStateById`, `BounceById`, `BlocksSightById`, `ContactDamageById`, `GreedyById`, `BlockType.Types` or `ModelFiles`. It was like that before the ContentRegistry split and was left as is; a candidate bug fix outside the cleanup campaign.
 - The play-time content lookups (`RecipeForResult`, `RecipeByName`, `CastRecipeFor`, `IsCastMold`, ...) allocate LINQ closures on every call. Candidate perf cleanup.
 - `BlockLoader.LoadBlocks` (`Blocks/BlockLoader.cs`, 569 lines) is still a single ~370-line method; a candidate for a later early-return and extract-method step.
@@ -244,8 +244,12 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - Chunk shrink line counts: Chunk 675, ChunkRestore 71, Meshing/ChunkFaceTables 139, Meshing/ChunkLighting 396; AGENTS.md 4,077 lines. Chunk.cs is no longer an offender; the remaining offenders are `World.cs`, `Program.cs` and `Camera.cs` (update the AGENTS.md offender wording when it is next touched).
 - The doc build (`-p:GenerateDocumentationFile=true`) reports a CS0419 ambiguous-cref warning on `Chunk.cs`'s `RestoreFrom` docs. It predates the shrink (it was in the baseline) and is probably the unqualified `RestoreFrom` / `Chunk.RestoreFrom` cref resolving to the three overloads (check the AGENTS.md mentions and `ChunkRestore`'s class summary too). Pin it to a specific overload signature in a doc-tidy pass.
 
+- Fire-cell move line counts: World.cs 1,002, Particles/AmbientEffects.cs 351; AGENTS.md 4,077 lines.
+- Next World.cs extraction: AGENTS.md no longer names one after the fire-cell move. `Update`'s mob target and damage block and `PushFromBlast` were the older candidates, but they moved to `MobDirector` in `78635e3`; check what is still in World.cs (about 1,000 lines) before planning.
+
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
+- **`World.UpdateClient` skips goblin torches** (pre-existing, kept as is). It gathers only campfires and kilns into the fire cells, never goblin torches. A client mirrors goblins with their torch count (`NetEntity.ItemId`) and draws the torch, so it probably shows a goblin's torch without its embers and warm point light. A fix would likely add one `Ambient.AddGoblinTorches()` call in `UpdateClient` after `GatherStationFires`, but first check that a goblin mirror's `TorchFlamePoint` is valid on a client.
 - **`Chunk.GenerateMeshData` stale neighbor slots** (both members now live in `Chunks/Meshing/ChunkMeshBuilder.cs`). The all-air or fully-enclosed early return
   (around `return new ChunkMeshData([], [], [], [], false);`) never calls
   `scratch.ClearNeighbors()`, and `TryResolveNeighbors` never nulls a missing slot. A later mesh
