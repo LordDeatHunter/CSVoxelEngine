@@ -104,6 +104,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `0bf8943` | Split PlayerPhysics.cs (708 -> 547 lines) into ViewShake (the damage view shake, owned and ticked by PlayerPhysics) and BodyCollision (the static body collision rule BodyCollides, the stepped axis moves and auto-step, and the falling-cube shove that Camera.PushOutOf now forwards to); moved the BodyCollides callers (MovementRules, PlayerBodyProbe, tests); Camera.cs 731 -> 684 lines |
 | `f27e922` | Dead code and broken crefs pass: 76 unused usings, 14 unused or never-read members, unused parameters in 10 methods (incl. the menu layout ListTop/RowTop cascade) and 4 dead stores removed; 40 CS1574/CS0419/CS1570/CS1734 doc references fixed. Doc+style build at 0 for all except IDE0059 3 (hasWater const-flag keep plus 2 test bodies) and CS1573 37 (out of scope). The code-cleanup skill documents the measuring build. |
 | `3f77a2b` | Duplication pass: the server's and the item debugger's AssetRoot (plus the test fixture's walk) now live in one VoxelEngine.Core.AssetRoot, with each search rule kept verbatim. The hotbar and the [E] rows call UIRenderer.DrawIdIcon, and the unused ItemIcons is gone. MenuRenderer's two confirm-delete popups and its two list pages are folded into DrawConfirmDelete and DrawListPage, with static cached row drawers (467 to 422 lines). |
+| `9c13d77` | Duplication pass part 2: the seven entity axis sweeps fold into Chunks/BoxSweep (BodyCollision shares its step and OffsetAxis). FluidCells and LeafDecayCells' chunk cache and dirty batch fold into Chunks/ChunkCellCache, with one instance per simulation. FluidCellKey, LeafDecayCells' packer and TreeCellKey become Chunks/CellKey over ChunkKey's one 21-bit bit math. About -330 lines net. |
 
 ## In progress
 
@@ -147,8 +148,12 @@ are done in `3f77a2b` (nothing remains of them). Line counts after it: Core/Asse
 HudRenderer 436, InventoryPanelRenderer 369, UIRenderer 801, MenuRenderer 422; AGENTS.md 4,100,
 item-debugger SKILL.md 83. Still open:
 - Search for more: near-identical methods, and repeated constants or rules that should be one
-  helper. Known candidates: the `LeafDecayCells`, `FluidCellKey` and `FluidCells` twins, and the per-entity
-  `CollisionStepSize`, `MoveOnAxis` and `IsColliding` copies (see section 5).
+  helper. The `LeafDecayCells`/`FluidCellKey`/`FluidCells` twins and the per-entity box sweeps are done in `9c13d77`
+  (nothing remains of them). Line counts after it: FallingBlock 344, PrimedTnt 194, ItemDrop 268, ThrownProjectile 96, Goblin 598, Slime 390, BlockDebris 198, BodyCollision 173, ChunkKey 71, BoxSweep 77, CellKey 20, ChunkCellCache 144, FluidCells 69, FluidManager 261, FluidSchedule 59, LeafDecayManager 412; `Chunks/` holds 19 files; AGENTS.md 4,103, PERF_TODO.md 3,179. Known candidates left:
+  - `FallingBlock`, `PrimedTnt` and `BlockDebris` repeat the same water-sink and gravity block (submerged damp-or-gravity, and the bounce line in `PrimedTnt` and `BlockDebris`) with private `Gravity`, `TerminalVelocity`, `GroundFriction`, `WaterSinkSpeed`, `WaterDrag` and `Bounce*` constants.
+  - `Goblin`, `Slime` and `ItemDrop` repeat the same water-float block (buoyancy damp plus friction: `FloatSpeed`, `BuoyancyStiffness`, `WaterDrag`, `WaterFriction`), and five files repeat a 4-line ground-friction scrub.
+  - `MobLava.BodyInLava` and `PlayerBodyProbe.InLava` share the same burning-fluid cell test.
+  - Deliberately unfolded: `LightFlicker.CellPhase` is a ulong 21-bit pack with its own axis order; folding it into `CellKey` would move the flicker phases. Leave it.
 - `MenuRenderer`'s other pages (AddServer, DirectConnect, Create and Edit) still repeat a title, fields,
   `DrawNotice`, two-button pattern inline in `DrawMainMenu`. A possible later fold; check first that the
   halves really are the same.
@@ -234,7 +239,7 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 
 - FluidManager split: Fluids/FluidManager 262, FluidSchedule 59, FluidCells 148, FluidCellKey 56, FluidNeighborhood 115, FluidSpread 240, FluidMud 101, FluidWakeScanner 201, FluidWakeRules 45, FluidFlow 139, FluidState 53; `Simulation/` holds 19 files, `Simulation/Fluids/` 11; ChunkTerrainFill 377; AGENTS.md 4,060 lines.
 - Remove the redundant `using VoxelEngine.Simulation;` from `Simulation/Fluids/FluidManager.cs` and `FluidSpread.cs`: their namespace `VoxelEngine.Simulation.Fluids` already has the enclosing namespace in scope. The doc+style build never reports IDE0005 in this config, so the build cannot catch it.
-- Duplication: `LeafDecayManager` has a twin of `FluidCellKey`'s 21-bit packer and `AddTouchedChunks`, and of `FluidCells`' 16-slot direct-mapped chunk cache; candidates for one shared helper in a duplication run.
+- Done in `9c13d77`: `LeafDecayManager` had a twin of `FluidCellKey`'s 21-bit packer and `AddTouchedChunks`, and of `FluidCells`' 16-slot direct-mapped chunk cache; candidates for one shared helper in a duplication run.
 - Dead code check: `FluidWakeRules.IsCarvedFlowTarget` has no production caller, only `WaterRavineTests`. Decide whether the rule belongs in production or the test should assert through `IsWakeTarget`.
 - `Fluids/FluidFlow.cs` still declares two types (`FluidFlow` and `IFluidCellReader`); split `IFluidCellReader` into its own file for the one-type-per-file convention.
 - The `FluidSchedule.Enabled` doc and the `UnpackedY` comment were carried over verbatim; check them for stale wording in a doc pass.
@@ -263,16 +268,16 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 
 - LeafDecayManager split line counts: Simulation/LeafDecay/LeafDecayManager 413, LeafDecayCells 149, OrphanWoodCheck 104, TipHydration 178; `Simulation/` holds 18 files; AGENTS.md 4,093 lines, code-cleanup SKILL.md 139, edit-path-checklist SKILL.md 31.
 - Restore the final CRLF on `Simulation/LeafDecay/LeafDecayManager.cs` if the commit step did not (it currently ends in `}` with no newline).
-- Duplication run: `LeafDecayCells`' 21-bit Pack/Unpack/SignExtend packer, `AddTouchedChunks` and the 16-slot direct-mapped chunk cache are verbatim twins of `Simulation/Fluids/FluidCellKey` + `FluidCells` (and overlap `Chunks/ChunkKey`); fold them into one shared helper.
+- Done in `9c13d77`: `LeafDecayCells`' 21-bit Pack/Unpack/SignExtend packer, `AddTouchedChunks` and the 16-slot direct-mapped chunk cache are verbatim twins of `Simulation/Fluids/FluidCellKey` + `FluidCells` (and overlap `Chunks/ChunkKey`); fold them into one shared helper.
 - `TREES_PLAN.md` (historical) still names `LeafDecayManager.TipOffsets`/`TryTipSupport` and bare `WalkParentChain` (lines ~423, 534-538); now `TipHydration.*` and `OrphanWoodCheck.WalkParentChain`. Leave it, or annotate it if the plan is ever revived.
 - `TipHydration.TryTipSupport`'s doc crefs the private `OrphanWoodCheck.WalkParentChain`. The doc build accepted it, but a `<c>` span would be more robust if CS1574 ever appears.
 - The doc build shows pre-existing CS1573 param-tag warnings in `Simulation/TreeGrowthWriter.cs` (not introduced by the split); a doc-comment pass could fill in the missing `<param>` tags.
 
 - PlayerPhysics split line counts: PlayerPhysics 547, ViewShake 57, BodyCollision 185, Camera 684, MovementRules 96, PlayerBodyProbe 83; `Player/` holds 22 files; AGENTS.md 4,099 lines.
 - Stale doc: `PlayerPhysics.ResetMotion`'s XML doc says it clears the trauma state, but it never resets the shake (now `ViewShake`). It was already wrong before the split; fix the doc or the behavior in a separate task.
-- Stale test comment: `OpenGLTest.Tests/Content/HitboxCollisionTests.cs:135` names a nonexistent `Camera.IsColliding`; retarget it to `BodyCollision.BodyCollides` in a test-comment pass.
+- Stale test comment: `OpenGLTest.Tests/Content/HitboxCollisionTests.cs:135` names a nonexistent `Camera.IsColliding`; retarget it to `BodyCollision.BodyCollides` in a test-comment pass (still open after `9c13d77`).
 - `BodyCollision.PushOutOf`'s XML summary is a single ~180-character line; wrap it to the file's comment width in a later doc tidy.
-- Duplication task still open: the private `CollisionStepSize`/`MoveOnAxis`/`IsColliding` copies in `FallingBlock`, `Goblin`, `ItemDrop`, `PrimedTnt`, `Slime`, `ThrownProjectile` and `BlockDebris` could share one collision helper. Its interface would differ from `BodyCollision`'s player-body rule because entity boxes and hitbox rules differ.
+- Done in `9c13d77` (now `Chunks/BoxSweep`): the private `CollisionStepSize`/`MoveOnAxis`/`IsColliding` copies in `FallingBlock`, `Goblin`, `ItemDrop`, `PrimedTnt`, `Slime`, `ThrownProjectile` and `BlockDebris` could share one collision helper. Its interface would differ from `BodyCollision`'s player-body rule because entity boxes and hitbox rules differ.
 - Next extraction candidates per AGENTS.md: `World.Update`'s mob target/damage block and `World.PushFromBlast` (check first: both may already live in `MobDirector`, see `78635e3`).
 
 - Duplication pass follow-ups (`3f77a2b`):
@@ -296,6 +301,8 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
     `GenerationalCache.Generations`; `ItemDisplayEditor.CanSave`; `AnimationClip.Tracks`.
   - `NetMessage.PlayerJoined` and `PlayerLeft` have zero references but are wire ids: never delete them, at most document them as reserved.
   - Members used only by tests: `Vector2Utils.Lerp/Damp`, `Vector3Utils.FlattenY/WithY/LerpUnclamped`. Decide whether they belong in production code or in a test helper.
+
+- Minor check after `9c13d77`: whether `LeafDecayManager.cs`, `OrphanWoodCheck.cs` and `TipHydration.cs` still need every using (unused usings raise no warning in this build).
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
