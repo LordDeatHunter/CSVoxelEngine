@@ -1,6 +1,6 @@
 # Codebase cleanup campaign
 
-Handoff notes for the ongoing cleanup, so a new session can pick it up. Last updated 2026-10-19.
+Handoff notes for the ongoing cleanup, so a new session can pick it up. Last updated 2026-10-20.
 
 ## The rules (what "clean" means)
 
@@ -85,6 +85,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `d79f434` | Split WorldGenerationConfig (2,401 lines, 921 members) into 17 per-domain static classes under src/Config/ (VoxelEngine.Config, globally imported in all four projects); WorldGenerationConfig keeps its 199 worldgen knobs (480 lines), every call site, cref, shader/tool comment and doc mention retargeted |
 | `ad27efd` | Split ContentRegistry (2,383 -> 475 lines) into ContentFiles, ItemLoader, TagLoader, EntityLoader, TreeSpeciesLoader, Blocks/BlockLoader, Blocks/BlockSchemaParser, Loot/LootTableCompiler, Recipes/RecipeLoader and Models/ModelBakeSteps; ContentRegistry stays the static facade and the owner of the tables |
 | `e4a318b` | Split Chunk.cs (1,944 -> 769 lines): worldgen fill to WorldGen/ChunkTerrainFill, mesh build to Chunks/Meshing/ChunkMeshBuilder, light snapshot/flood to ChunkLighting, face tables and UV helpers to ChunkFaceTables, ChunkMeshData to its own file; Chunk keeps storage with one-line forwarders |
+| `f17ea5c` | Split PlayerModel.cs (1,468 to 583 lines) into Player/Posing/: static SliceMotion, ArmSolver and LimbFrames; the PoseMods struct; owned SwimPose, ThrowPose, SecondaryMotion, PunchPose, ArmOverlays, ShoulderReach, PoseBuilder and BodyPartMatrices. PlayerModel stays the state owner and facade. |
 
 ## In progress
 
@@ -101,7 +102,6 @@ update the docs. Folders now have headroom: `Chunks/` holds 9 files plus `Meshin
 | File | Lines | Notes |
 |---|---|---|
 | `src/Chunks/Chunk.cs` | 769 | Split in `e4a318b` (ChunkTerrainFill 377, ChunkMeshBuilder 584, ChunkFaceTables 98, ChunkMeshData 38, ChunkLighting 395, ChunkMesher 1,276 unchanged). Inside the 800 ceiling but above the ~700 smell line; AGENTS.md records it as a stated reason in the offender list. Remaining option: move TakeSnapshot/CaptureForNetwork/RestoreFrom (the save and network snapshot job) into a Saves- or Chunks-side helper to get under ~700. |
-| `src/Player/PlayerModel.cs` | 1,468 | Pose, arm frames, slice, swim, float, mods. Use the ItemDebugger modes as a mental check. |
 | `OpenGLTest.Server/GameServer.cs` | 1,393 | Accept loop, Pump, intent handling, streaming answers, status. The Server project is flat and namespaced `VoxelEngine.Server`. |
 | `src/Chunks/ChunkManager.cs` | 1,349 | Lifecycle, dirty scheduling, mesh scheduling, foci, unload. Threading rules apply. |
 | `src/Chunks/Meshing/ChunkMesher.cs` | 1,276 | Greedy pass vs per-voxel emitters. Perf-hot: no new allocations, and keep `GreedyMeshingTests` equality. |
@@ -179,6 +179,10 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - Stale test comments left on purpose under the no-test-edit rule: `ChunkRekeyReplayProbe.cs` lines 157/338/349 name `Chunk.TryResolveNeighbors`, and `LightVolumeHeightTests.cs` line 11 calls `ComputeLight` private. Fix them.
 - `ChunkFaceTables.TiledUv` carries a pre-existing CS1573 (no param tag for `face`), moved verbatim. Add the tag.
 - Pre-existing doc issues: the broken `Chunk.SmoothCornerLight` cref in `MeshScratch`, and the stale 'semaphore'/`Task.Run` wording in `GenerateMeshData`'s doc and AGENTS.md.
+- PlayerModel split line counts: PlayerModel 583, Posing/ArmOverlays 108, ArmSolver 33, BodyPartMatrices 193, LimbFrames 46, PoseBuilder 123, PoseMods 20, PunchPose 161, SecondaryMotion 83, ShoulderReach 53, SliceMotion 101, SwimPose 84, ThrowPose 81; `Player/` holds 14 files; AGENTS.md 3,999 lines, `.claude/skills/item-debugger/SKILL.md` 83.
+- `PunchPose.TorsoRotation` still calls `SecondaryMotion.ComputeMods` once per arm solve (four times per `WithPunch`), and `GetPartMatrix` recomputes `GetPose` for every part. This predates the split and was kept verbatim on purpose; a candidate perf item.
+- `PlayerModel` now carries 16 internal state accessors for its components. If more posing jobs move out later, consider grouping the read-only pose state into one internal view struct instead of growing the accessor list.
+- The pre-existing CS1574 on `Camera.cs` `SwimDepth` in the doc build is still open (out of scope for the PlayerModel split).
 - The stale REPO preamble in `.claude/workflows/plan-and-implement.js` (`~/.dotnet/dotnet.exe`,
   `OpenGLTest.sln`) is the user's file. They may want it fixed. (`cleanup-campaign.js` carries the
   correct commands, so the cleanup no longer depends on it.)
