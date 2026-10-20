@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Chunks;
 using VoxelEngine.WorldGen.Trees;
 using VoxelEngine.WorldGen.Trees.Shape;
 
@@ -9,7 +10,7 @@ namespace VoxelEngine.Simulation.LeafDecay;
 /// <summary>The leaf hydration rule on world cells: per leaf block the best-first offsets a tip hydrates, the live-tip test and the support a tip's tree gives its cluster, memoized for the frame. Owned by <see cref="LeafDecayManager"/>; main thread only.</summary>
 internal sealed class TipHydration
 {
-    private readonly LeafDecayCells _cells;
+    private readonly ChunkCellCache _cells;
 
     // Per leaf id, every offset from a tip to a cell that tip hydrates (h >= 1), sorted by
     // hydration descending: the first live tip a scan meets gives the cell its best hydration,
@@ -18,7 +19,7 @@ internal sealed class TipHydration
 
     private readonly record struct TipOffset(int Dx, int Dy, int Dz, int Hydration);
 
-    // Wood cells (TreeCellKey) whose parent chain's support is known this frame: the root
+    // Wood cells (CellKey) whose parent chain's support is known this frame: the root
     // diameter a live tip's cluster radius scales with. Cleared at the top of every Update, like
     // the support memos; every cell of one walked chain shares its end and therefore its answer
     private readonly Dictionary<long, int> _tipSupport = [];
@@ -26,7 +27,7 @@ internal sealed class TipHydration
     // The support walk's visited cells, reused
     private readonly List<long> _supportChain = [];
 
-    internal TipHydration(LeafDecayCells cells) => _cells = cells;
+    internal TipHydration(ChunkCellCache cells) => _cells = cells;
 
     /// <summary>Builds a leafy species' best-first tip offsets; called once per leafy species while the manager is constructed.</summary>
     internal void AddSpecies(TreeSpecies species) => _offsetsByLeaf[species.LeavesId] = TipOffsets(species);
@@ -151,7 +152,7 @@ internal sealed class TipHydration
 
         for (var step = 0; step < SimulationConfig.TreeFellWoodCap; step++)
         {
-            var cellKey = TreeCellKey.Pack(x, y, z);
+            var cellKey = CellKey.Pack(x, y, z);
             if (_tipSupport.TryGetValue(cellKey, out var known))
             {
                 supportPx = known;

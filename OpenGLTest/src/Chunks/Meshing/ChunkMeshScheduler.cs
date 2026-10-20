@@ -55,8 +55,8 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     // Keyed on ChunkKey.Pack rather than the Vector3 chunk position: every probe here sits on a
     // hot path (the dirty scan, QueueChunk's six-neighbor fan-out, NeedsChunk on the generation
     // workers' scan frontier) and a packed long hashes once where a Vector3 hashes three floats
-    // and compares twelve bytes per node visit (PERF_TODO D1). FluidManager's cell keys are the
-    // in-repo precedent; ChunkKey deliberately reuses its 21-bit budget at chunk scale.
+    // and compares twelve bytes per node visit (PERF_TODO D1). CellKey's block-cell keys share the
+    // same 21-bit bit math at block scale.
     private readonly ConcurrentDictionary<long, byte> _dirtyChunks = new();
 
     // Track active mesh generation to avoid duplicates. Packed keys, like _dirtyChunks above.

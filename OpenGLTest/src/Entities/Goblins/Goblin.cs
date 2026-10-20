@@ -62,7 +62,6 @@ public sealed class Goblin : Mob
 
     private const float Gravity = 28f;
     private const float TerminalVelocity = -30f;
-    private const float CollisionStepSize = 0.05f;
     private const float GroundFriction = 8f;
 
     // Damp rate of the walking velocity toward the chosen move, so a goblin speeds up and turns
@@ -574,10 +573,11 @@ public sealed class Goblin : Mob
         }
 
         var movement = _velocity * deltaTime;
+        var half = new Vector3(HalfExtent, Height * 0.5f, HalfExtent);
 
-        Position = MoveOnAxis(Position, movement.X, 0, chunks, out var hitX);
-        Position = MoveOnAxis(Position, movement.Z, 2, chunks, out var hitZ);
-        Position = MoveOnAxis(Position, movement.Y, 1, chunks, out var hitY);
+        Position = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
+        Position = BoxSweep.MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ);
+        Position = BoxSweep.MoveOnAxis(Position, movement.Y, 1, half, chunks, out var hitY);
 
         if (hitX) _velocity.X = 0f;
         if (hitZ) _velocity.Z = 0f;
@@ -594,60 +594,5 @@ public sealed class Goblin : Mob
         {
             IsGrounded = false;
         }
-    }
-
-    private static Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunks, out bool collided)
-    {
-        collided = false;
-        if (MathF.Abs(delta) < float.Epsilon)
-            return start;
-
-        var position = start;
-        var remaining = delta;
-
-        while (MathF.Abs(remaining) > float.Epsilon)
-        {
-            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
-            var candidate = OffsetAxis(position, axis, step);
-
-            if (IsColliding(candidate, chunks))
-            {
-                collided = true;
-                break;
-            }
-
-            position = candidate;
-            remaining -= step;
-        }
-
-        return position;
-    }
-
-    private static Vector3 OffsetAxis(Vector3 value, int axis, float delta)
-    {
-        return axis switch
-        {
-            0 => new Vector3(value.X + delta, value.Y, value.Z),
-            1 => new Vector3(value.X, value.Y + delta, value.Z),
-            2 => new Vector3(value.X, value.Y, value.Z + delta),
-            _ => value
-        };
-    }
-
-    private static bool IsColliding(Vector3 center, ChunkManager chunks)
-    {
-        var half = new Vector3(HalfExtent, Height * 0.5f, HalfExtent);
-        VoxelCoords.CellRange(center - half, center + half,
-            out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
-
-        for (var x = minX; x <= maxX; x++)
-        for (var y = minY; y <= maxY; y++)
-        for (var z = minZ; z <= maxZ; z++)
-        {
-            if (BlockType.IsSolid(chunks.GetBlockGlobal(x, y, z)))
-                return true;
-        }
-
-        return false;
     }
 }

@@ -145,7 +145,7 @@ public sealed class TreeGrowthLogicTests
         {
             var leaves = new HashSet<long>();
             for (var i = woodCount; i < cells.Count; i++)
-                leaves.Add(TreeCellKey.Pack(cells[i].X, cells[i].Y, cells[i].Z));
+                leaves.Add(CellKey.Pack(cells[i].X, cells[i].Y, cells[i].Z));
             Assert.NotEmpty(leaves);
 
             bool IsBare(int node)
@@ -153,7 +153,7 @@ public sealed class TreeGrowthLogicTests
                 var n = graph[node];
                 for (var dir = 0; dir < TreeDirections.Count; dir++)
                 {
-                    if (leaves.Contains(TreeCellKey.Pack(n.X + TreeDirections.Dx[dir], n.Y + TreeDirections.Dy[dir],
+                    if (leaves.Contains(CellKey.Pack(n.X + TreeDirections.Dx[dir], n.Y + TreeDirections.Dy[dir],
                             n.Z + TreeDirections.Dz[dir])))
                         return false;
                 }

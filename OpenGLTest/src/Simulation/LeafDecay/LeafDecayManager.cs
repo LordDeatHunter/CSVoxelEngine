@@ -61,7 +61,7 @@ namespace VoxelEngine.Simulation.LeafDecay;
 /// from the cut outward one layer per tick. Mining-driven felling stays
 /// <see cref="TopplingTree"/>'s job.</para>
 ///
-/// <para><b>Freezing.</b> Cells are read through <see cref="LeafDecayCells.TryGetCell"/>, never
+/// <para><b>Freezing.</b> Cells are read through <see cref="ChunkCellCache.TryGetCell"/>, never
 /// <c>GetBlockGlobal</c>, which reports unloaded chunks as air. Whenever a decision needs a cell
 /// in an unloaded chunk — the cell itself, any candidate tip or a tip's neighbor in a leaf's
 /// cluster box, or any cell an orphan candidate's support walk or search reads — the scheduled cell is dropped silently and
@@ -115,7 +115,7 @@ public class LeafDecayManager
     private LeafParticleSystem? _leaves;
 
     // The components: cell access for the frame, the orphaned-wood test and the leaf hydration rule
-    private readonly LeafDecayCells _cells = new();
+    private readonly ChunkCellCache _cells = new();
     private readonly OrphanWoodCheck _orphans;
     private readonly TipHydration _hydration;
 
@@ -187,7 +187,7 @@ public class LeafDecayManager
         for (var z = z0; z <= z1; z++)
         {
             if (_next.Count >= SimulationConfig.MaxLeafDecayBacklogCells) return;
-            _next.Add(LeafDecayCells.Pack(x, y, z));
+            _next.Add(CellKey.Pack(x, y, z));
         }
     }
 
@@ -248,7 +248,7 @@ public class LeafDecayManager
         {
             foreach (var key in _editedColumns)
             {
-                LeafDecayCells.Unpack(key, out var x, out _, out var z);
+                CellKey.Unpack(key, out var x, out _, out var z);
                 TreeGenerator.PoisonCanopy(x, z, 0);
                 lod?.MarkEditedColumn(x, z);
             }
@@ -273,7 +273,7 @@ public class LeafDecayManager
         _tickCells.Clear();
         foreach (var key in _next)
         {
-            LeafDecayCells.Unpack(key, out var x, out var y, out var z);
+            CellKey.Unpack(key, out var x, out var y, out var z);
             if (_cells.TryGetCell(x, y, z, out var id, out _) && IsDecayCandidate(id))
                 _tickCells.Add(key);
         }
@@ -293,7 +293,7 @@ public class LeafDecayManager
     /// <summary>Re-derives one scheduled cell: a leaf's hydration or a wood cell's support.</summary>
     private void TickCell(long key)
     {
-        LeafDecayCells.Unpack(key, out var x, out var y, out var z);
+        CellKey.Unpack(key, out var x, out var y, out var z);
 
         // An unloaded cell is frozen: dropped silently, never decayed
         if (!_cells.TryGetCell(x, y, z, out var id, out var state)) return;
@@ -373,7 +373,7 @@ public class LeafDecayManager
         _drops.SpawnLoot(id, cell, state: state);
         PopUnsupportedAround(cell);
 
-        if (TreeGenerator.IsTreeBlock(id)) _editedColumns.Add(LeafDecayCells.Pack(x, 0, z));
+        if (TreeGenerator.IsTreeBlock(id)) _editedColumns.Add(CellKey.Pack(x, 0, z));
 
         // A leaf feeds nothing: no other leaf's hydration and no wood's support reads it, so a
         // decayed leaf schedules nothing. A reach box per decayed leaf would flood the backlog

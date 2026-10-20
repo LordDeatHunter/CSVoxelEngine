@@ -89,7 +89,7 @@ public class TopplingTree : IDisposable
         var cy = (int)breakCell.Y;
         var cz = (int)breakCell.Z;
         var fallingWood = new List<FellBlock> { new(breakCell, brokenId, brokenState) };
-        var taken = new HashSet<long> { TreeCellKey.Pack(cx, cy, cz) };
+        var taken = new HashSet<long> { CellKey.Pack(cx, cy, cz) };
         var standing = new HashSet<long>();
         var support = new TreeSupport(SimulationConfig.TreeFellWoodCap);
 
@@ -103,7 +103,7 @@ public class TopplingTree : IDisposable
             if (!chunks.TryGetCell(nx, ny, nz, out var nid, out var nstate)
                 || !TreeSupport.Links(brokenId, brokenState, nid, nstate, dir))
                 continue;
-            var key = TreeCellKey.Pack(nx, ny, nz);
+            var key = CellKey.Pack(nx, ny, nz);
             if (standing.Contains(key) || taken.Contains(key))
                 continue;
 
@@ -114,7 +114,7 @@ public class TopplingTree : IDisposable
             {
                 foreach (var (x, y, z, state) in support.Component)
                 {
-                    taken.Add(TreeCellKey.Pack(x, y, z));
+                    taken.Add(CellKey.Pack(x, y, z));
                     fallingWood.Add(new FellBlock(new Vector3(x, y, z), nid, state));
                 }
             }
@@ -154,7 +154,7 @@ public class TopplingTree : IDisposable
                     return collected;
 
                 int lx = wx + dx, ly = wy + dy, lz = wz + dz;
-                if (!taken.Add(TreeCellKey.Pack(lx, ly, lz)))
+                if (!taken.Add(CellKey.Pack(lx, ly, lz)))
                     continue;
                 if (!chunks.TryGetCell(lx, ly, lz, out var leafId, out var leafState)
                     || !TreeGenerator.IsLeaf(leafId))

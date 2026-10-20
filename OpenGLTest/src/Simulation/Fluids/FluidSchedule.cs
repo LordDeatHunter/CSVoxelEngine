@@ -22,13 +22,13 @@ internal sealed class FluidSchedule
     internal void ScheduleAround(int x, int y, int z)
     {
         if (!Enabled) return;
-        _next.Add(FluidCellKey.Pack(x, y, z));
-        _next.Add(FluidCellKey.Pack(x + 1, y, z));
-        _next.Add(FluidCellKey.Pack(x - 1, y, z));
-        _next.Add(FluidCellKey.Pack(x, y + 1, z));
-        _next.Add(FluidCellKey.Pack(x, y - 1, z));
-        _next.Add(FluidCellKey.Pack(x, y, z + 1));
-        _next.Add(FluidCellKey.Pack(x, y, z - 1));
+        _next.Add(CellKey.Pack(x, y, z));
+        _next.Add(CellKey.Pack(x + 1, y, z));
+        _next.Add(CellKey.Pack(x - 1, y, z));
+        _next.Add(CellKey.Pack(x, y + 1, z));
+        _next.Add(CellKey.Pack(x, y - 1, z));
+        _next.Add(CellKey.Pack(x, y, z + 1));
+        _next.Add(CellKey.Pack(x, y, z - 1));
     }
 
     /// <summary>Schedules every cell of the inclusive box; nothing while disabled.</summary>
@@ -38,12 +38,12 @@ internal sealed class FluidSchedule
         for (var x = (int)min.X; x <= (int)max.X; x++)
         for (var y = (int)min.Y; y <= (int)max.Y; y++)
         for (var z = (int)min.Z; z <= (int)max.Z; z++)
-            _next.Add(FluidCellKey.Pack(x, y, z));
+            _next.Add(CellKey.Pack(x, y, z));
     }
 
     /// <summary>Schedules a chunk-local cell for the next tick.</summary>
     internal void ScheduleLocal(Chunk chunk, int lx, int ly, int lz) =>
-        _next.Add(FluidCellKey.Pack((int)chunk.Position.X * Chunk.Size + lx,
+        _next.Add(CellKey.Pack((int)chunk.Position.X * Chunk.Size + lx,
             (int)chunk.Position.Y * Chunk.Size + ly,
             (int)chunk.Position.Z * Chunk.Size + lz));
 

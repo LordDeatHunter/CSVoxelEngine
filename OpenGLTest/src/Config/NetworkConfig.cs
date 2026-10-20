@@ -21,7 +21,7 @@ public static class NetworkConfig
     public const float NetMaxMoveBlocksPerSecond = 130f;
     // How far below a connected player's feet the server probes for ground (PlayerBodyProbe): a
     // body whose box lowered by this much collides is standing. It must exceed any clearance the
-    // client's physics leaves under a landed body: BodyCollision moves in CollisionStepSize (0.05)
+    // client's physics leaves under a landed body: BodyCollision moves in BoxSweep.StepSize (0.05)
     // steps and stops before the first colliding one, so a landing rests less than 0.05 above the
     // block top (StepClearance adds only 0.001 to a step-up), and gravity then settles it closer.
     public const float NetGroundProbeBlocks = 0.15f;

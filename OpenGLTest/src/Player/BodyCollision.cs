@@ -9,12 +9,11 @@ namespace VoxelEngine.Player;
 /// The player-body collision rule and the stepped moves through it, split out of
 /// <see cref="PlayerPhysics"/>: <see cref="BodyCollides"/> (shared with the server's
 /// <c>MovementRules</c> and <see cref="PlayerBodyProbe"/>), the per-axis sweep
-/// <see cref="MoveOnAxis"/> and the auto-step <see cref="TryStepUp"/>. State-free, GL-free,
+/// <see cref="MoveOnAxis"/> and the auto-step <see cref="TryStepUp"/>, stepping by <see cref="BoxSweep.StepSize"/> like every loose body. State-free, GL-free,
 /// main thread.
 /// </summary>
 internal static class BodyCollision
 {
-    private const float CollisionStepSize = 0.05f;
     // StepClearance is a hair of extra lift so a block top the feet land exactly on is not read as a
     // collision because of float rounding.
     private const float StepClearance = 0.001f;
@@ -25,11 +24,11 @@ internal static class BodyCollision
         if (stepHeight <= 0f)
             return null;
 
-        var steps = Math.Max(1, (int)MathF.Ceiling(stepHeight / CollisionStepSize));
+        var steps = Math.Max(1, (int)MathF.Ceiling(stepHeight / BoxSweep.StepSize));
         for (var i = 1; i <= steps; i++)
         {
-            var lift = MathF.Min(i * CollisionStepSize, stepHeight) + StepClearance;
-            var lifted = OffsetAxis(start, 1, lift);
+            var lift = MathF.Min(i * BoxSweep.StepSize, stepHeight) + StepClearance;
+            var lifted = BoxSweep.OffsetAxis(start, 1, lift);
             if (BodyCollides(lifted, chunkManager))
                 continue;
 
@@ -60,8 +59,8 @@ internal static class BodyCollision
 
         while (MathF.Abs(remaining) > float.Epsilon)
         {
-            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
-            var candidate = OffsetAxis(position, axis, step);
+            var step = MathUtils.ClampStep(remaining, BoxSweep.StepSize);
+            var candidate = BoxSweep.OffsetAxis(position, axis, step);
 
             if (BodyCollides(candidate, chunkManager))
             {
@@ -74,17 +73,6 @@ internal static class BodyCollision
         }
 
         return position;
-    }
-
-    private static Vector3 OffsetAxis(Vector3 value, int axis, float delta)
-    {
-        return axis switch
-        {
-            0 => new Vector3(value.X + delta, value.Y, value.Z),
-            1 => new Vector3(value.X, value.Y + delta, value.Z),
-            2 => new Vector3(value.X, value.Y, value.Z + delta),
-            _ => value
-        };
     }
 
     /// <summary>

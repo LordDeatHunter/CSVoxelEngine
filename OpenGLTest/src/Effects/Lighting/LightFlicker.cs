@@ -22,7 +22,7 @@ public static class LightFlicker
         var x = (int)MathF.Floor(cell.X);
         var y = (int)MathF.Floor(cell.Y);
         var z = (int)MathF.Floor(cell.Z);
-        // 21 bits per axis, like the block-scale cell packers elsewhere
+        // 21 bits per axis, like CellKey's block-cell keys
         var packed = ((ulong)(uint)x & 0x1FFFFF)
                      | (((ulong)(uint)y & 0x1FFFFF) << 21)
                      | (((ulong)(uint)z & 0x1FFFFF) << 42);

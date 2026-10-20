@@ -338,7 +338,7 @@ public sealed class TreeGrowthWriter
             for (var dy = -radius; dy <= radius; dy++)
             for (var dz = -radius; dz <= radius; dz++)
                 if (LeafCluster.HydrationFromTip(species, radius, dx, dy, dz) >= 1)
-                    regrow.Add(TreeCellKey.Pack(tx + dx, ty + dy, tz + dz));
+                    regrow.Add(CellKey.Pack(tx + dx, ty + dy, tz + dz));
         }
 
         // Leaf pass: new leaves into air, hydration only ever raised on the species' own leaves
@@ -347,7 +347,7 @@ public sealed class TreeGrowthWriter
         for (var i = woodCount; i < cells.Count && regrow.Count > 0; i++)
         {
             var c = cells[i];
-            if (!regrow.Contains(TreeCellKey.Pack(c.X, c.Y, c.Z)))
+            if (!regrow.Contains(CellKey.Pack(c.X, c.Y, c.Z)))
                 continue;
             if (!chunks.TryGetCell(c.X, c.Y, c.Z, out var id, out var state))
                 continue;

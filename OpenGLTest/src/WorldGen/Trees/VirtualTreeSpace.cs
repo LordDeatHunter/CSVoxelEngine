@@ -42,12 +42,12 @@ public sealed class VirtualTreeSpace : ITreeSpace
     /// <inheritdoc />
     public bool IsFree(int x, int y, int z)
     {
-        if (_occupied.Contains(TreeCellKey.Pack(x, y, z))) return false;
+        if (_occupied.Contains(CellKey.Pack(x, y, z))) return false;
         return y > _heightAt(x, z) || (_carvedAt != null && _carvedAt(x, y, z));
     }
 
     /// <summary>Marks the cell as taken (by another tree), so it is no longer free.</summary>
-    public void Occupy(int x, int y, int z) => _occupied.Add(TreeCellKey.Pack(x, y, z));
+    public void Occupy(int x, int y, int z) => _occupied.Add(CellKey.Pack(x, y, z));
 
     /// <summary>
     /// Marks every cell as taken: a finished tree's cells become obstacles for the next tree of a
@@ -60,7 +60,7 @@ public sealed class VirtualTreeSpace : ITreeSpace
     }
 
     /// <summary>Whether <see cref="Occupy"/> took the cell.</summary>
-    public bool IsOccupied(int x, int y, int z) => _occupied.Contains(TreeCellKey.Pack(x, y, z));
+    public bool IsOccupied(int x, int y, int z) => _occupied.Contains(CellKey.Pack(x, y, z));
 
     /// <summary>How many distinct cells are occupied.</summary>
     public int OccupiedCount => _occupied.Count;

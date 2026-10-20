@@ -92,7 +92,7 @@ public sealed class HitboxCollisionTests
         camera.TestTeleport(new Vector3(8.5f, 2.5f + Camera.EyeHeight, 8.5f), yaw: 0f, pitch: 0f);
         Settle(camera, manager);
 
-        // The slab top is 1.25; MoveOnAxis sweeps in CollisionStepSize increments and
+        // The slab top is 1.25; MoveOnAxis sweeps in BoxSweep.StepSize increments and
         // OverlapsShape counts a touch as a hit, so the feet settle within one step of it.
         Assert.True(camera.IsGrounded, "did not land on the mold");
         Assert.InRange(camera.Position.Y - Camera.EyeHeight, 1.25f, 1.31f);

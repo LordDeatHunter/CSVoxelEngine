@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using VoxelEngine.Chunks;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Simulation;
 
@@ -79,7 +80,7 @@ public sealed class TreeSupport(int cap)
         if (!BlockType.IsTreeWood(id) || WoodState.IsDetached(startState))
             return TreeSupportResult.Supported;
 
-        _visited.Add(TreeCellKey.Pack(x, y, z));
+        _visited.Add(CellKey.Pack(x, y, z));
         _component.Add((x, y, z, startState));
         _stack.Push(0);
 
@@ -87,7 +88,7 @@ public sealed class TreeSupport(int cap)
         {
             var (cx, cy, cz, state) = _component[_stack.Pop()];
             if (WoodState.IsRoot(state)
-                || (knownSupported != null && knownSupported.Contains(TreeCellKey.Pack(cx, cy, cz))))
+                || (knownSupported != null && knownSupported.Contains(CellKey.Pack(cx, cy, cz))))
                 return TreeSupportResult.Supported;
 
             // Down first: it decides a shell's anchor and is the shortest way home for a trunk
@@ -128,7 +129,7 @@ public sealed class TreeSupport(int cap)
                 if (dir == TreeDirections.Down && WoodState.IsShell(state) && IsGround(nid))
                     return TreeSupportResult.Supported;
 
-                if (!Links(id, state, nid, nstate, dir) || !_visited.Add(TreeCellKey.Pack(nx, ny, nz)))
+                if (!Links(id, state, nid, nstate, dir) || !_visited.Add(CellKey.Pack(nx, ny, nz)))
                     continue;
                 if (_visited.Count > cap)
                     return TreeSupportResult.Unknown;

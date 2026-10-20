@@ -15,7 +15,6 @@ public sealed class Slime : Mob
 {
     private const float Gravity = 28f;
     private const float TerminalVelocity = -30f;
-    private const float CollisionStepSize = 0.05f;
     private const float GroundFriction = 8f;
 
     // Squash and stretch ride one under-damped spring (value = vertical scale offset), so a landing
@@ -361,11 +360,11 @@ public sealed class Slime : Mob
         }
 
         var movement = _velocity * deltaTime;
-        var half = BodyHalfExtent;
+        var half = new Vector3(BodyHalfExtent);
 
-        Position = MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
-        Position = MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ);
-        Position = MoveOnAxis(Position, movement.Y, 1, half, chunks, out var hitY);
+        Position = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
+        Position = BoxSweep.MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ);
+        Position = BoxSweep.MoveOnAxis(Position, movement.Y, 1, half, chunks, out var hitY);
 
         if (hitX) _velocity.X = 0f;
         if (hitZ) _velocity.Z = 0f;
@@ -384,59 +383,8 @@ public sealed class Slime : Mob
         }
     }
 
-    private static Vector3 MoveOnAxis(Vector3 start, float delta, int axis, float halfExtent, ChunkManager chunks,
-        out bool collided)
-    {
-        collided = false;
-        if (MathF.Abs(delta) < float.Epsilon)
-            return start;
-
-        var position = start;
-        var remaining = delta;
-
-        while (MathF.Abs(remaining) > float.Epsilon)
-        {
-            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
-            var candidate = OffsetAxis(position, axis, step);
-
-            if (IsColliding(candidate, halfExtent, chunks))
-            {
-                collided = true;
-                break;
-            }
-
-            position = candidate;
-            remaining -= step;
-        }
-
-        return position;
-    }
-
-    private static Vector3 OffsetAxis(Vector3 value, int axis, float delta)
-    {
-        return axis switch
-        {
-            0 => new Vector3(value.X + delta, value.Y, value.Z),
-            1 => new Vector3(value.X, value.Y + delta, value.Z),
-            2 => new Vector3(value.X, value.Y, value.Z + delta),
-            _ => value
-        };
-    }
-
     /// <summary>Whether a slime body of <paramref name="halfExtent"/> centered at
     /// <paramref name="center"/> overlaps a solid cell (unloaded cells read as air).</summary>
-    internal static bool IsColliding(Vector3 center, float halfExtent, ChunkManager chunks)
-    {
-        VoxelCoords.CellRange(center, halfExtent, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
-
-        for (var x = minX; x <= maxX; x++)
-        for (var y = minY; y <= maxY; y++)
-        for (var z = minZ; z <= maxZ; z++)
-        {
-            if (BlockType.IsSolid(chunks.GetBlockGlobal(x, y, z)))
-                return true;
-        }
-
-        return false;
-    }
+    internal static bool IsColliding(Vector3 center, float halfExtent, ChunkManager chunks) =>
+        BoxSweep.IsColliding(center, new Vector3(halfExtent), chunks);
 }

@@ -85,7 +85,7 @@ public sealed class TreeBatchTests
         return cells;
     }
 
-    private static long Key(in TreeCell cell) => TreeCellKey.Pack(cell.X, cell.Y, cell.Z);
+    private static long Key(in TreeCell cell) => CellKey.Pack(cell.X, cell.Y, cell.Z);
 
     private static List<(int X, int Z, int BaseY, string Species, TreeCell[] Cells)> Snapshot(TreeBatch batch) =>
         batch.Trees.Select(t => (t.X, t.Z, t.BaseY, t.Species.Name, t.Cells)).ToList();

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Chunks;
 using VoxelEngine.WorldGen.Trees.Shape;
 
 namespace VoxelEngine.WorldGen.Trees;
@@ -71,7 +72,7 @@ public sealed class TreeGraph
             ThicknessPx = thicknessPx,
         };
         _count = 1;
-        _cells[TreeCellKey.Pack(x, y, z)] = Root;
+        _cells[CellKey.Pack(x, y, z)] = Root;
         _maxY = y;
     }
 
@@ -255,7 +256,7 @@ public sealed class TreeGraph
         var x = _nodes[parent].X + TreeDirections.Dx[dir];
         var y = _nodes[parent].Y + TreeDirections.Dy[dir];
         var z = _nodes[parent].Z + TreeDirections.Dz[dir];
-        var key = TreeCellKey.Pack(x, y, z);
+        var key = CellKey.Pack(x, y, z);
         if (_cells.ContainsKey(key))
             throw new InvalidOperationException($"The tree already holds the cell ({x}, {y}, {z}).");
 
@@ -312,11 +313,11 @@ public sealed class TreeGraph
     }
 
     /// <summary>Whether the graph holds a node at the cell.</summary>
-    public bool Occupies(int x, int y, int z) => _cells.ContainsKey(TreeCellKey.Pack(x, y, z));
+    public bool Occupies(int x, int y, int z) => _cells.ContainsKey(CellKey.Pack(x, y, z));
 
     /// <summary>Index of the node at the cell, or -1 when the graph holds none there.</summary>
     public int NodeAt(int x, int y, int z) =>
-        _cells.TryGetValue(TreeCellKey.Pack(x, y, z), out var i) ? i : -1;
+        _cells.TryGetValue(CellKey.Pack(x, y, z), out var i) ? i : -1;
 
     /// <summary>Sets a node's raw pipe and displayed diameters.</summary>
     public void SetThickness(int i, float pipePx, float thicknessPx)

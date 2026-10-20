@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using VoxelEngine.Chunks;
 using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.Simulation.LeafDecay;
@@ -6,13 +7,13 @@ namespace VoxelEngine.Simulation.LeafDecay;
 /// <summary>The orphaned-wood support test: a wood cell's parent-chain walk, the full <see cref="TreeSupport"/> search on a broken chain, and their frame memos. Owned by <see cref="LeafDecayManager"/>; main thread only.</summary>
 internal sealed class OrphanWoodCheck
 {
-    private readonly LeafDecayCells _cells;
+    private readonly ChunkCellCache _cells;
 
     // The orphan rule: TreeSupport's search over the decay's cached reads, shared with felling
     private readonly TreeCellReader _read;
     private readonly TreeSupport _support = new(SimulationConfig.TreeFellWoodCap);
 
-    // Wood cells (TreeCellKey) known anchored or known unanchored this frame; cleared at the top
+    // Wood cells (CellKey) known anchored or known unanchored this frame; cleared at the top
     // of every Update, since an edit outside the decay can change either between frames
     private readonly HashSet<long> _supported = [];
     private readonly HashSet<long> _unsupported = [];
@@ -20,7 +21,7 @@ internal sealed class OrphanWoodCheck
     // The parent-chain fast path's walked cells, reused
     private readonly List<long> _chain = [];
 
-    internal OrphanWoodCheck(LeafDecayCells cells)
+    internal OrphanWoodCheck(ChunkCellCache cells)
     {
         _cells = cells;
         _read = cells.TryGetCell;
@@ -36,7 +37,7 @@ internal sealed class OrphanWoodCheck
     /// <summary>Whether a wood cell with a parent cell has lost every path to an anchor: its parent chain first, the full search only when the chain broke, both answers memoized for the frame. False as well when a read hit an unloaded chunk, which freezes the cell.</summary>
     internal bool IsOrphaned(int x, int y, int z, byte id, byte state)
     {
-        if (!_unsupported.Contains(TreeCellKey.Pack(x, y, z)))
+        if (!_unsupported.Contains(CellKey.Pack(x, y, z)))
         {
             var chain = WalkParentChain(x, y, z, id, state);
             if (chain != TreeSupportResult.Unsupported) return false;
@@ -52,7 +53,7 @@ internal sealed class OrphanWoodCheck
                 return false;
             }
 
-            foreach (var c in _support.Component) _unsupported.Add(TreeCellKey.Pack(c.X, c.Y, c.Z));
+            foreach (var c in _support.Component) _unsupported.Add(CellKey.Pack(c.X, c.Y, c.Z));
         }
 
         return true;
@@ -71,7 +72,7 @@ internal sealed class OrphanWoodCheck
         _chain.Clear();
         for (var step = 0; step < SimulationConfig.TreeFellWoodCap; step++)
         {
-            var cellKey = TreeCellKey.Pack(x, y, z);
+            var cellKey = CellKey.Pack(x, y, z);
             _chain.Add(cellKey);
 
             var anchored = WoodState.IsRoot(state) || _supported.Contains(cellKey);

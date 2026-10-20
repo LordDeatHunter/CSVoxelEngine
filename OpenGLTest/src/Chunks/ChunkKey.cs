@@ -7,15 +7,15 @@ namespace VoxelEngine.Chunks;
 /// Packs a chunk position into a single <see cref="long"/> so the chunk dictionaries can be
 /// keyed on one integer hash instead of a three-float <see cref="Vector3"/> hash.
 /// <para>
-/// The 21-bits-per-axis budget is deliberately the same one <c>FluidManager</c> already commits
-/// to for its cell keys — copying the constant rather than sizing a fresh one keeps the two
-/// packers readable side by side and makes <c>SignExtend</c> a literal copy. The difference is
-/// scale: FluidManager's keys are block-scale, these are chunk-scale.
+/// This is the one definition of the 21-bits-per-axis bit math. <see cref="CellKey"/> forwards
+/// to it to pack world BLOCK cells for the fluid tick's and the leaf decay's schedules and the
+/// tree growth engine's sets: the same bits at a different scale, kept apart by name. These keys
+/// are chunk-scale; CellKey's are block-scale.
 /// </para>
 /// <para>
 /// Range, and note that it is ASYMMETRIC because 21 bits signed is not +/-2^20: the representable
 /// chunk coordinates are -1,048,576..+1,048,575 (the positive edge is 2^20 - 1, not 2^20), which
-/// is -16,777,216..+16,777,215 blocks — 16x beyond the range FluidManager's block keys reach, and
+/// is -16,777,216..+16,777,215 blocks — 16x beyond the range CellKey's block keys reach, and
 /// far past anything the chunk streamer will ever load. <c>Pack(2^20)</c> does not round-trip; it
 /// wraps to -2^20, and that contract is pinned by a fact rather than left to be discovered.
 /// </para>

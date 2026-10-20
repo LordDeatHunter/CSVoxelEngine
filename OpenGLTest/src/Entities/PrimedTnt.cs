@@ -31,7 +31,6 @@ public class PrimedTnt
     private const float GroundFriction = 8f;
     private const float BounceDamping = 0.35f;
     private const float BounceThreshold = 4f;
-    private const float CollisionStepSize = 0.05f;
 
     // A primed cube is heavier than an item drop: it does not float, it just sinks slowly
     private const float WaterSinkSpeed = -3f;
@@ -158,10 +157,11 @@ public class PrimedTnt
             _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
 
         var movement = _velocity * deltaTime;
+        var half = new Vector3(HalfExtent);
 
-        Position = MoveOnAxis(Position, movement.X, 0, chunks, out var hitX);
-        Position = MoveOnAxis(Position, movement.Z, 2, chunks, out var hitZ);
-        Position = MoveOnAxis(Position, movement.Y, 1, chunks, out var hitY);
+        Position = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
+        Position = BoxSweep.MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ);
+        Position = BoxSweep.MoveOnAxis(Position, movement.Y, 1, half, chunks, out var hitY);
 
         // Walls just stop that axis; the floor bounces light impacts and rests on hard ones
         if (hitX) _velocity.X = 0f;
@@ -190,60 +190,5 @@ public class PrimedTnt
             if (MathF.Abs(_velocity.X) < 0.01f) _velocity.X = 0f;
             if (MathF.Abs(_velocity.Z) < 0.01f) _velocity.Z = 0f;
         }
-    }
-
-    private static Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunks, out bool collided)
-    {
-        collided = false;
-        if (MathF.Abs(delta) < float.Epsilon)
-            return start;
-
-        var position = start;
-        var remaining = delta;
-
-        while (MathF.Abs(remaining) > float.Epsilon)
-        {
-            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
-            var candidate = OffsetAxis(position, axis, step);
-
-            if (IsColliding(candidate, chunks))
-            {
-                collided = true;
-                break;
-            }
-
-            position = candidate;
-            remaining -= step;
-        }
-
-        return position;
-    }
-
-    private static Vector3 OffsetAxis(Vector3 value, int axis, float delta)
-    {
-        return axis switch
-        {
-            0 => new Vector3(value.X + delta, value.Y, value.Z),
-            1 => new Vector3(value.X, value.Y + delta, value.Z),
-            2 => new Vector3(value.X, value.Y, value.Z + delta),
-            _ => value
-        };
-    }
-
-    private static bool IsColliding(Vector3 center, ChunkManager chunks)
-    {
-        VoxelCoords.CellRange(center, HalfExtent, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
-
-        for (var x = minX; x <= maxX; x++)
-        for (var y = minY; y <= maxY; y++)
-        for (var z = minZ; z <= maxZ; z++)
-        {
-            // Solid, not merely non-air: a primed cube falls through pebbles like the
-            // player and the item drops do
-            if (BlockType.IsSolid(chunks.GetBlockGlobal(x, y, z)))
-                return true;
-        }
-
-        return false;
     }
 }

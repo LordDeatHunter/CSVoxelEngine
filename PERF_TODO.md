@@ -495,6 +495,7 @@ needs, not the history.
   constant rather than sizing a new one keeps them readable side by side. It is a shared
   `internal static class` rather than private helpers because it has two genuine consumers in
   different files (`ChunkManager` and `ChunkMap`), which `FluidManager`'s packer does not.
+  Later (cleanup campaign): the block-cell keys now share `ChunkKey`'s bit math too, through the named block-scale `CellKey` (`src/Chunks/CellKey.cs`, forwarding `Pack`/`Unpack`), as `TreeCellKey` already did, and `FluidCellKey` and `LeafDecayCells`'s copy are gone. The scales stay apart by name; the bits, the asymmetric range and `ChunkKeyTests`' wrap contract are unchanged.
   **The representable range is asymmetric, and that asymmetry is the contract, not a bug:**
   **-1,048,576..+1,048,575 chunks = -16,777,216..+16,777,215 blocks**, because 21 bits signed is not
   +/-2^20 — `Pack(1 << 20, 0, 0)` keeps bit 20, which *is* the sign bit, so it unpacks to

@@ -184,19 +184,18 @@ public class FluidManager
 
         chunk.SetBlockRaw(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask, id, state);
 
-        var chunkPos = FluidCellKey.ChunkPosOf(x, y, z);
+        var chunkPos = VoxelCoords.ChunkPosOf(x, y, z);
         chunks.ImmediateRemeshWithBorders(chunkPos, cell);
 
         // Border neighbors were already remeshed synchronously above; they still join the
         // dirty set so their light catches up through the async budget.
-        var chunkKey = FluidCellKey.Pack(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift);
+        var chunkKey = ChunkKey.PackBlock(x, y, z);
         _borderScratch.Clear();
-        FluidCellKey.AddTouchedChunks(x, y, z, _borderScratch);
+        ChunkCellCache.AddTouchedChunks(x, y, z, _borderScratch);
         foreach (var key in _borderScratch)
         {
             if (key == chunkKey) continue;
-            FluidCellKey.Unpack(key, out var cx, out var cy, out var cz);
-            chunks.MarkDirty(new Vector3(cx, cy, cz));
+            chunks.MarkDirty(ChunkKey.ToVector3(key));
         }
 
         ScheduleAround(x, y, z);
@@ -206,7 +205,7 @@ public class FluidManager
     /// <summary>Recomputes one scheduled cell's level, then spreads it.</summary>
     private void TickCell(long key, DropManager drops)
     {
-        FluidCellKey.Unpack(key, out var x, out var y, out var z);
+        CellKey.Unpack(key, out var x, out var y, out var z);
 
         // An unloaded cell is dropped silently: nothing has to be remembered for it, so
         // chunk unloading needs no hook here

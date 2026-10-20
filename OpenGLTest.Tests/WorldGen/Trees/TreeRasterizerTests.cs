@@ -29,7 +29,7 @@ public sealed class TreeRasterizerTests
     private static TreeGraph Grow(TreeSpecies species, (int X, int Y, int Z) pos, ITreeSpace space) =>
         TreeGrower.GrowToMaturity(species, pos.X, pos.Y, pos.Z, space, Seed);
 
-    private static long Key(int x, int y, int z) => TreeCellKey.Pack(x, y, z);
+    private static long Key(int x, int y, int z) => CellKey.Pack(x, y, z);
 
     /// <summary>Every shipped species plus the synthetic wide ones, so the shell rules are exercised.</summary>
     private static IEnumerable<TreeSpecies> SpeciesWithWide => TreeSpeciesRegistry.All.Concat(WideTreeSpecies.AllShapes);

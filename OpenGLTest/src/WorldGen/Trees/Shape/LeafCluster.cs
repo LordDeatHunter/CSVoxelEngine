@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Chunks;
 
 namespace VoxelEngine.WorldGen.Trees.Shape;
 
@@ -145,7 +146,7 @@ public static class LeafCluster
     /// a fixed x, y, z order, and cells are emitted in first-visit order through a list, so the
     /// output depends only on the graph and never on dictionary order. A leafless species adds nothing.
     /// Cells in <paramref name="exclude"/> (the rasterizer's shells, packed by
-    /// <see cref="TreeCellKey.Pack"/>) are skipped like the graph's own cells.
+    /// <see cref="CellKey.Pack"/>) are skipped like the graph's own cells.
     /// </summary>
     public static void Collect(TreeGraph graph, TreeSpecies species, ITreeSpace space, List<TreeCell> output,
         HashSet<long>? exclude = null)
@@ -176,7 +177,7 @@ public static class LeafCluster
                 if (graph.Occupies(x, y, z) || !space.IsFree(x, y, z))
                     continue;
 
-                long key = TreeCellKey.Pack(x, y, z);
+                long key = CellKey.Pack(x, y, z);
                 if (exclude != null && exclude.Contains(key))
                     continue;
                 if (index.TryGetValue(key, out int at))

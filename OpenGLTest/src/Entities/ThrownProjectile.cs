@@ -14,7 +14,6 @@ public sealed class ThrownProjectile
     /// the same value.</summary>
     public const float Gravity = 28f;
     private const float TerminalVelocity = -30f;
-    private const float CollisionStepSize = 0.05f;
 
     public byte ItemId { get; }
     public Vector3 Position { get; private set; }
@@ -67,9 +66,10 @@ public sealed class ThrownProjectile
 
         _velocity.Y = MathF.Max(_velocity.Y - Gravity * deltaTime, TerminalVelocity);
         var movement = _velocity * deltaTime;
-        var next = MoveOnAxis(Position, movement.X, 0, chunks, out var hitX);
-        next = MoveOnAxis(next, movement.Z, 2, chunks, out var hitZ);
-        next = MoveOnAxis(next, movement.Y, 1, chunks, out var hitY);
+        var half = new Vector3(HalfExtent);
+        var next = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
+        next = BoxSweep.MoveOnAxis(next, movement.Z, 2, half, chunks, out var hitZ);
+        next = BoxSweep.MoveOnAxis(next, movement.Y, 1, half, chunks, out var hitY);
         Position = next;
         if (hitX || hitY || hitZ) return false;
 
@@ -92,45 +92,5 @@ public sealed class ThrownProjectile
             }
         }
         return true;
-    }
-
-    private static Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunks, out bool collided)
-    {
-        collided = false;
-        if (MathF.Abs(delta) < float.Epsilon) return start;
-        var position = start;
-        var remaining = delta;
-        while (MathF.Abs(remaining) > float.Epsilon)
-        {
-            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
-            var candidate = OffsetAxis(position, axis, step);
-            if (IsColliding(candidate, chunks))
-            {
-                collided = true;
-                break;
-            }
-            position = candidate;
-            remaining -= step;
-        }
-        return position;
-    }
-
-    private static Vector3 OffsetAxis(Vector3 value, int axis, float delta) => axis switch
-    {
-        0 => new Vector3(value.X + delta, value.Y, value.Z),
-        1 => new Vector3(value.X, value.Y + delta, value.Z),
-        _ => new Vector3(value.X, value.Y, value.Z + delta),
-    };
-
-    private static bool IsColliding(Vector3 center, ChunkManager chunks)
-    {
-        VoxelCoords.CellRange(center, HalfExtent, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
-        for (var x = minX; x <= maxX; x++)
-        for (var y = minY; y <= maxY; y++)
-        for (var z = minZ; z <= maxZ; z++)
-        {
-            if (BlockType.IsSolid(chunks.GetBlockGlobal(x, y, z))) return true;
-        }
-        return false;
     }
 }

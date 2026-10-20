@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Chunks;
 
 namespace VoxelEngine.WorldGen.Trees.Shape;
 
@@ -192,7 +193,7 @@ public static class TreeRasterizer
                     int x = core.X + o.Dx, y = core.Y, z = core.Z + o.Dz;
                     if (graph.Occupies(x, y, z))
                         continue;
-                    var key = TreeCellKey.Pack(x, y, z);
+                    var key = CellKey.Pack(x, y, z);
                     if (shellKeys != null && shellKeys.Contains(key))
                         continue;
 
@@ -220,7 +221,7 @@ public static class TreeRasterizer
     {
         if (px == core.X && pz == core.Z)
             return true;
-        if (shellKeys != null && shellKeys.Contains(TreeCellKey.Pack(px, py, pz)))
+        if (shellKeys != null && shellKeys.Contains(CellKey.Pack(px, py, pz)))
             return true;
         var at = graph.NodeAt(px, py, pz);
         if (at < 0)
