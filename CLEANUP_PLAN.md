@@ -89,6 +89,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `d34921c` | Split GameServer.cs (1,393 -> 330 lines) into ServerState, ServerTransport, PlayerSessions, IntentReplay, StreamRequests, ServerBroadcasts and ServerChat, with ClientConnection and Inbound lifted to their own files; GameServer stays the composition root with an unchanged public surface and Pump order |
 | `51a537f` | Split ChunkManager.cs (1,349 -> 589 lines) into Meshing/ChunkMeshScheduler (dirty set, thread-pool mesh runners, completed queue and budgeted upload, immediate remesh), ChunkRenderLists (Renderable/TranslucentRenderable swap-remove, MeshVersion), PlayerPlacedIndex (player-placed cells, restored-placement adoption) and the static ChunkFluidQueries; ChunkManager keeps the lifecycle and composition root with one-line forwarders; AGENTS.md layout, threading bullets and offenders list updated |
 | `ef2f66b` | Split ChunkMesher.cs (1,276 -> 482 lines) into WaterSurfaceCodes, FluidEmitter, StackEmitter and TreeWoodEmitter; ChunkMesher keeps the greedy pass, the tinted cube face and the quad primitives; fixed the FaceLight/MeshScratch SmoothCornerLight crefs |
+| `33e3ab7` | Split LodRegion.cs (1,237 lines) into LodLevelSpec, LodMeshData, LodColumnCaps (the mined-column cap table), LodMeshBuilder (the per-build phases) and the ref-struct LodFaceEmitter (palette, tint lattice, face and water emission); LodRegion (243 lines) keeps the region object and comparers, and BuildMeshData forwards to LodMeshBuilder |
 
 ## In progress
 
@@ -105,12 +106,11 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 | File | Lines | Notes |
 |---|---|---|
 | `src/Chunks/Chunk.cs` | 769 | Split in `e4a318b` (ChunkTerrainFill 377, ChunkMeshBuilder 584, ChunkFaceTables 98, ChunkMeshData 38, ChunkLighting 395; ChunkMesher since split in `ef2f66b`, now 482). Inside the 800 ceiling but above the ~700 smell line; AGENTS.md records it as a stated reason in the offender list. Remaining option: move TakeSnapshot/CaptureForNetwork/RestoreFrom (the save and network snapshot job) into a Saves- or Chunks-side helper to get under ~700. |
-| `src/Lod/LodRegion.cs` | 1,236 | LOD mesh build, levels, caps. Keep the nesting invariants. |
 | `src/Player/Camera.cs` | 1,175 | Pose, view cache, head motion, FOV/roll terms, water state. |
 | `src/World.cs` | 1,144 | Has a stated reason. Next extraction: `Update`'s mob target/damage block and `PushFromBlast`/`PushTargetFromBlast`. |
 | `src/Simulation/FluidManager.cs` | 1,066 | Tick, wake scans, hardening. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
-| `src/Lod/LodManager.cs` | 932 | |
+| `src/Lod/LodManager.cs` | 932 | No stated reason; split it next. Its `LodBuildOutcome` enum is still inside it. |
 | `src/UI/InventoryPanel/Inventory.cs` | 896 | |
 | `src/WorldGen/TerrainGenerator.cs` | 877 | |
 | `src/WorldGen/TreeGenerator.cs` | 845 | |
@@ -200,6 +200,11 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - Pre-existing doc warnings left alone: `ChunkFaceTables.cs(70)` CS1573, `ImportedMapSource.cs(64)` CS1573, `MeshBuildCostProbe.cs(12)` CS1574.
 - `ChunkMeshBuilder.cs` (584 lines) is now the largest file in `Meshing/`; watch it if the stale-neighbor fix grows it.
 - The stale-neighbor-slots bug (see "Bugs found") still needs its own task.
+- LodRegion split line counts: LodRegion 243, LodColumnCaps 149, LodFaceEmitter 401, LodLevelSpec 17, LodMeshBuilder 650, LodMeshData 18, LodManager 932, LodSurface 248, LodEditState 292, WorldSeed 84; `Lod/` holds 9 files, `OpenGLTest.Tests/Lod/` 13; AGENTS.md 4,035 lines, edit-path-checklist SKILL.md 31, PERF_TODO.md 3,178, TODO.md 530.
+- `LodMeshBuilder.FineHeight` and `FineHeightGen` have no explicit `private` modifier; add one for consistency with the other phase methods.
+- `LodMeshBuilder.SampleSeparable` and `SampleSeam` bodies keep their old 12-space indentation; dedent them to their method nesting (whitespace only).
+- Fields promoted from locals in `LodMeshBuilder` and `LodFaceEmitter`, plus the per-cell method calls (`FillCell`, `EmitCell`), may make a LodGen region build slightly slower. Output is byte-identical; measure with `LodBuildCostProbe` or perf-capture before deciding whether to act.
+- `LodFaceEmitter`'s constructor takes 27 parameters. If the emitter grows, consider passing a readonly grid bundle instead (only by a behavior-preserving change).
 - The stale REPO preamble in `.claude/workflows/plan-and-implement.js` (`~/.dotnet/dotnet.exe`,
   `OpenGLTest.sln`) is the user's file. They may want it fixed. (`cleanup-campaign.js` carries the
   correct commands, so the cleanup no longer depends on it.)
