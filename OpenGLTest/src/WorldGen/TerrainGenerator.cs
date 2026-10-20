@@ -8,44 +8,17 @@ using VoxelEngine.WorldGen.Features.Underground;
 namespace VoxelEngine.WorldGen;
 
 /// <summary>
-/// The 2D half of world generation: terrain heights with ravines cut in, dirt depth and the
-/// per-column cave inputs (entrance zones, cave intensity). Everything is a pure function of
-/// (x, z) and the seed, so results are cached per chunk column by <see cref="ColumnCache.Get"/>
-/// and shared by the vertical chunk stack and the far LOD. Noise instances are built by
-/// <see cref="Reseed"/>, once at startup and again only by <see cref="WorldSeed.Apply"/> while no
-/// worker runs, and are only read otherwise, which keeps this safe to call from any worker thread.
+/// The 2D column build of world generation: the terrain palette, each column's land height (<see cref="LandHeight"/>, with
+/// its mountains and trenches) and the full <see cref="Compute"/> pass into <see cref="ColumnData"/> (heights with ravines
+/// cut in, dirt depth, the cave inputs, water levels, biomes and the corner climate), plus the column queries the rest of
+/// the engine calls it by. The biome climate split lives in <see cref="BiomeClassifier"/>, the lakes, rivers and water
+/// levels in <see cref="WaterBodies"/> and every noise channel in <see cref="TerrainNoise"/>; the queries here forward to
+/// them. Everything is a pure function of (x, z) and the seed, so results are cached per chunk column by
+/// <see cref="ColumnCache.Get"/> and shared by the vertical chunk stack and the far LOD, and it is safe to call from any
+/// worker thread.
 /// </summary>
 public static class TerrainGenerator
 {
-    private static FastNoiseLite ForestSwellNoise;
-    private static FastNoiseLite HillNoise;
-    private static FastNoiseLite HillMaskNoise;
-    private static FastNoiseLite ValleyRoughNoise;
-    private static FastNoiseLite HillWarp;
-    private static FastNoiseLite DirtNoise;
-    private static FastNoiseLite RavineRidge;
-    private static FastNoiseLite RavineWarp;
-    private static FastNoiseLite RavineMask;
-    private static FastNoiseLite EntranceNoise;
-    private static FastNoiseLite IntensityNoise;
-    private static FastNoiseLite GravelNoise;
-    private static FastNoiseLite ContinentNoise;
-    private static FastNoiseLite TemperatureNoise;
-    private static FastNoiseLite HumidityNoise;
-    private static FastNoiseLite DuneNoise;
-    private static FastNoiseLite TrenchMask;
-    private static FastNoiseLite TrenchRidge;
-    private static FastNoiseLite TrenchWarp;
-    private static FastNoiseLite RiverMask;
-    private static FastNoiseLite RiverRidge;
-    private static FastNoiseLite RiverWarp;
-    private static FastNoiseLite MountainMask;
-    private static FastNoiseLite MountainNoise;
-    private static FastNoiseLite MountainWarp;
-    private static FastNoiseLite OpennessNoise;
-    private static FastNoiseLite BiomeDitherNoise;
-    private static FastNoiseLite LakeShapeNoise;
-
     // The terrain palette: the generator owns the choice of which blocks natural ground is made
     // of, and Chunk only fills its columns with them. Resolved once here so the per-voxel fill
     // and the far LOD both read a byte instead of hitting the registry.
@@ -92,67 +65,6 @@ public static class TerrainGenerator
         SandstoneBlock = ContentRegistry.RequireBlock("sandstone").Id;
         IceBlock = ContentRegistry.RequireBlock("ice").Id;
         SnowBlock = ContentRegistry.RequireBlock("snow").Id;
-
-        Reseed();
-    }
-
-    /// <summary>
-    /// Builds every noise channel from the current <see cref="WorldGenerationConfig.Seed"/>. The
-    /// static constructor runs it once; <see cref="WorldSeed.Apply"/> runs it again between worlds,
-    /// only while no worker thread can read these fields.
-    /// </summary>
-    internal static void Reseed()
-    {
-        // The rolling base keeps the original seed and settings exactly, so natural terrain
-        // is unchanged wherever the flat mask stays at zero. The mask is rare and
-        // low-frequency on purpose: most of the world keeps its old look, and only large
-        // patches go flat, with a wide soft blend between.
-        ForestSwellNoise = MakeNoise(52, WorldGenerationConfig.ForestSwellFrequency, octaves: 2);
-        HillNoise = MakeNoise(54, WorldGenerationConfig.HillFrequency, octaves: 3);
-        HillMaskNoise = MakeNoise(55, WorldGenerationConfig.HillMaskFrequency, octaves: 2);
-        ValleyRoughNoise = MakeNoise(56, WorldGenerationConfig.ValleyRoughFrequency);
-
-        // Winding hill outlines, the same domain-warp trick the ravines and rivers use
-        HillWarp = MakeWarp(57, WorldGenerationConfig.HillWarpFrequency, WorldGenerationConfig.HillWarpAmplitude);
-
-        DirtNoise = MakeNoise(11, WorldGenerationConfig.DirtDepthFrequency);
-        RavineRidge = MakeNoise(21, WorldGenerationConfig.RavineRidgeFrequency);
-        RavineMask = MakeNoise(23, WorldGenerationConfig.RavineMaskFrequency);
-        EntranceNoise = MakeNoise(31, WorldGenerationConfig.EntranceFrequency);
-        IntensityNoise = MakeNoise(41, WorldGenerationConfig.CaveIntensityFrequency);
-        GravelNoise = MakeNoise(61, WorldGenerationConfig.GravelFrequency);
-        ContinentNoise = MakeNoise(70, WorldGenerationConfig.ContinentFrequency, octaves: 2);
-        // Temperature is a single octave on purpose: the fine octave only steepened the gradient,
-        // which is what squeezes the temperate band between snow and sand. Single-octave output
-        // spans the raw [-1, 1] where two-octave FBm was scaled by 1/1.5, so this choice also set
-        // the cold ramp's share (taiga, frozen, snow) and re-laid every temperature value.
-        TemperatureNoise = MakeNoise(71, WorldGenerationConfig.TemperatureFrequency);
-        HumidityNoise = MakeNoise(88, WorldGenerationConfig.HumidityFrequency, octaves: 2);
-        DuneNoise = MakeNoise(72, WorldGenerationConfig.DuneFrequency, octaves: 3);
-        TrenchMask = MakeNoise(73, WorldGenerationConfig.TrenchMaskFrequency);
-        TrenchRidge = MakeNoise(74, WorldGenerationConfig.TrenchFrequency);
-
-        // Displaces the ridge lookup so ravines wind instead of following straight noise contours
-        RavineWarp = MakeWarp(22, WorldGenerationConfig.RavineWarpFrequency, WorldGenerationConfig.RavineWarpAmplitude);
-
-        // Trench lines wind the same way, so a gash runs along the basin floor instead of
-        // tracking a straight noise contour
-        TrenchWarp = MakeWarp(75, WorldGenerationConfig.TrenchWarpFrequency, WorldGenerationConfig.TrenchWarpAmplitude);
-
-        RiverMask = MakeNoise(81, WorldGenerationConfig.RiverMaskFrequency);
-        RiverRidge = MakeNoise(82, WorldGenerationConfig.RiverFrequency);
-
-        // Like the trench, a river winds rather than tracking a straight noise contour
-        RiverWarp = MakeWarp(83, WorldGenerationConfig.RiverWarpFrequency, WorldGenerationConfig.RiverWarpAmplitude);
-
-        MountainMask = MakeNoise(84, WorldGenerationConfig.MountainMaskFrequency, octaves: 2);
-        MountainNoise = MakeNoise(85, WorldGenerationConfig.MountainFrequency, octaves: 3);
-        OpennessNoise = MakeNoise(86, WorldGenerationConfig.OpennessFrequency, octaves: 2);
-        BiomeDitherNoise = MakeNoise(89, WorldGenerationConfig.BiomeDitherFrequency);
-        LakeShapeNoise = MakeNoise(90, WorldGenerationConfig.LakeShapeFrequency);
-
-        // Mountains wind like ravines and rivers, so a range snakes instead of tracking a contour
-        MountainWarp = MakeWarp(87, WorldGenerationConfig.MountainWarpFrequency, WorldGenerationConfig.MountainWarpAmplitude);
     }
 
     /// <summary>
@@ -172,79 +84,20 @@ public static class TerrainGenerator
     /// <summary>Whether the beach column at (x, z) is capped with gravel. Pure function of
     /// world position like everything else here, so neighbors agree without shared state.</summary>
     public static bool IsGravelPatch(float x, float z) =>
-        GravelNoise.GetNoise(x, z) > WorldGenerationConfig.GravelThreshold;
+        TerrainNoise.GravelNoise.GetNoise(x, z) > WorldGenerationConfig.GravelThreshold;
 
     /// <summary>Biome at a world column; a pure function of (x, z) like the rest of the 2D half.</summary>
     public static Biome BiomeAt(float x, float z) => BiomeWeights(x, z, out _, out _);
 
-    /// <summary>
-    /// 0..1 weights of the two land profiles <see cref="Compute"/> needs, plus the biome they
-    /// classify to. Ocean takes the share of continentalness that falls low; desert takes the
-    /// warm+dry share of what is left, so a coastal blend never grows a desert out over the water.
-    /// Desert needs firmly warm air (the midpoint of the warm ramp,
-    /// <see cref="WorldGenerationConfig.TemperatureWarmStart"/>..<see cref="WorldGenerationConfig.TemperatureWarmEnd"/>)
-    /// and the cold biomes firmly cold air (<see cref="WorldGenerationConfig.ColdBiomeMinCold"/> on
-    /// the cold ramp), so the whole raw-noise band between the two ramps is temperate forest and
-    /// dunes never touch snow. <paramref name="desertWeight"/> is min(warm, dry) scaled by the land
-    /// share, so it is exactly 0.5 on the inland desert line, on the humid border and the temperate
-    /// border alike. The cold biomes ride the forest's height profile, so they need no weight of
-    /// their own here. Every weight is smooth, which is what lets <see cref="Compute"/> lerp the
-    /// height across a border instead of stepping.
-    /// </summary>
-    public static Biome BiomeWeights(float x, float z, out float oceanWeight, out float desertWeight)
-    {
-        // Not "if (!enabled) return": the flag is a compile-time const, and a dead branch would
-        // read as unreachable. Zeroing the weights keeps the toggle a real expression.
-        var gate = WorldGenerationConfig.BiomesEnabled ? 1f : 0f;
-        var continent = ContinentNoise.GetNoise(x, z);
-        oceanWeight = (1f - MathUtils.SmoothStep(WorldGenerationConfig.ContinentOceanStart,
-            WorldGenerationConfig.ContinentOceanEnd, continent)) * gate;
+    /// <summary>The ocean and desert weights and the biome they classify to (<see cref="BiomeClassifier.BiomeWeights"/>).</summary>
+    public static Biome BiomeWeights(float x, float z, out float oceanWeight, out float desertWeight) =>
+        BiomeClassifier.BiomeWeights(x, z, out oceanWeight, out desertWeight);
 
-        // One temperature eval feeds both ramps.
-        var temperature = TemperatureNoise.GetNoise(x, z);
-        var cold = ColdOf(temperature);
-        var warm = WarmOf(temperature);
-        var dry = 1f - MathUtils.SmoothStep(WorldGenerationConfig.HumidityDryStart,
-            WorldGenerationConfig.HumidityDryEnd, HumidityNoise.GetNoise(x, z));
-        // Min, not a product: the dune blend reaches 0.5 exactly where Classify turns desert.
-        desertWeight = MathF.Min(warm, dry) * (1f - oceanWeight) * gate;
+    /// <summary>0..1 how cold (x, z) is (<see cref="BiomeClassifier.ColdWeight"/>).</summary>
+    public static float ColdWeight(float x, float z) => BiomeClassifier.ColdWeight(x, z);
 
-        return gate < 0.5f ? Biome.Forest : Classify(oceanWeight, cold, warm, dry);
-    }
-
-    /// <summary>
-    /// The pure classification rule behind <see cref="BiomeWeights"/>. 0.5 is the midpoint of
-    /// every smoothstep ramp in this file, and the same line the desert weight, the border dither
-    /// and the surface-water fade are keyed to.
-    /// </summary>
-    internal static Biome Classify(float oceanWeight, float cold, float warm, float dry) =>
-        oceanWeight >= WorldGenerationConfig.OceanShoreWeight ? Biome.Ocean
-        : cold >= WorldGenerationConfig.ColdBiomeMinCold ? dry >= 0.5f ? Biome.Frozen : Biome.Taiga
-        : MathF.Min(warm, dry) >= 0.5f ? Biome.Desert
-        : Biome.Forest;
-
-    /// <summary>The pure cold ramp behind <see cref="ColdWeight"/>: 1 at or below
-    /// <see cref="WorldGenerationConfig.TemperatureColdStart"/>, 0 at or above
-    /// <see cref="WorldGenerationConfig.TemperatureColdEnd"/>.</summary>
-    internal static float ColdOf(float temperature) =>
-        1f - MathUtils.SmoothStep(WorldGenerationConfig.TemperatureColdStart,
-            WorldGenerationConfig.TemperatureColdEnd, temperature);
-
-    /// <summary>The pure warm ramp behind <see cref="WarmWeight"/>: 0 at or below
-    /// <see cref="WorldGenerationConfig.TemperatureWarmStart"/>, 1 at or above
-    /// <see cref="WorldGenerationConfig.TemperatureWarmEnd"/>.</summary>
-    internal static float WarmOf(float temperature) =>
-        MathUtils.SmoothStep(WorldGenerationConfig.TemperatureWarmStart,
-            WorldGenerationConfig.TemperatureWarmEnd, temperature);
-
-    /// <summary>0..1 how cold (x, z) is: 1 in the taiga/frozen band, 0 through the temperate band
-    /// and the warm ramp. A biome-generation input, read by the snow and freezing passes to place
-    /// their features.</summary>
-    public static float ColdWeight(float x, float z) => ColdOf(TemperatureNoise.GetNoise(x, z));
-
-    /// <summary>0..1 how warm (x, z) is: 1 in the desert band, 0 through the temperate band and
-    /// the whole cold ramp. A biome-generation input like <see cref="ColdWeight"/>.</summary>
-    public static float WarmWeight(float x, float z) => WarmOf(TemperatureNoise.GetNoise(x, z));
+    /// <summary>0..1 how warm (x, z) is (<see cref="BiomeClassifier.WarmWeight"/>).</summary>
+    public static float WarmWeight(float x, float z) => BiomeClassifier.WarmWeight(x, z);
 
     /// <summary>
     /// The climate axes behind the biome ramps, as 0..1, so a palette keyed to them has its
@@ -257,10 +110,10 @@ public static class TerrainGenerator
     public static void Climate(float x, float z, out float warmth01, out float wetness01)
     {
         WorldgenReads.Note();
-        var t = TemperatureNoise.GetNoise(x, z);
-        warmth01 = 0.5f * (1f - ColdOf(t)) + 0.5f * WarmOf(t);
+        var t = TerrainNoise.TemperatureNoise.GetNoise(x, z);
+        warmth01 = 0.5f * (1f - BiomeClassifier.ColdOf(t)) + 0.5f * BiomeClassifier.WarmOf(t);
         wetness01 = MathUtils.SmoothStep(WorldGenerationConfig.HumidityDryStart,
-            WorldGenerationConfig.HumidityDryEnd, HumidityNoise.GetNoise(x, z));
+            WorldGenerationConfig.HumidityDryEnd, TerrainNoise.HumidityNoise.GetNoise(x, z));
     }
 
     /// <summary>Whether world column (x, z) is forest; vegetation and spawn rules ask here.</summary>
@@ -269,245 +122,20 @@ public static class TerrainGenerator
     /// <summary>Whether world column (x, z) is desert; the dead-shrub scatter asks here.</summary>
     public static bool IsDesert(int x, int z) => BiomeAt(x, z) == Biome.Desert;
 
-    /// <summary>Water level of a column that holds no water at all.</summary>
-    public const int NoWater = int.MinValue;
+    /// <summary>Water level of a column that holds no water at all (<see cref="WaterBodies.NoWater"/>).</summary>
+    public const int NoWater = WaterBodies.NoWater;
 
-    /// <summary>
-    /// The y water in column (x, z) rises to: <see cref="WorldGenerationConfig.SeaLevel"/> for the
-    /// ocean and for rivers, the lake's own surface for a lake, and <see cref="NoWater"/> where the
-    /// column holds none. This is the one definition of where water sits, and it is what lets a pond
-    /// rest on the ground it was dug into instead of on one global sea level.
-    ///
-    /// Callers measuring a column's own terrain must pass <see cref="ColumnData.Bed"/>, not
-    /// <see cref="ColumnData.Heights"/>: the bed is the profile before a ravine cut it, so a ravine
-    /// that merely deepens an otherwise-dry column stays dry instead of flooding as a narrow spike,
-    /// while a ravine breaching a lake or river is prevented outright by <see cref="RavineCutFade"/>.
-    /// </summary>
-    public static int WaterLevelAt(float x, float z)
-    {
-        var biome = BiomeWeights(x, z, out _, out var desertWeight);
-        var gate = SurfaceWaterGate(desertWeight);
-        var lakeWeight = 0f;
-        var lakeSurface = NoWater;
-        var riverWeight = 0f;
-        if (CanHoldSurfaceWater(biome))
-        {
-            lakeWeight = LakeSample(x, z, out lakeSurface, out _);
-            riverWeight = RiverWeight(x, z);
-        }
+    /// <summary>The y water in column (x, z) rises to (<see cref="WaterBodies.WaterLevelAt"/>).</summary>
+    public static int WaterLevelAt(float x, float z) => WaterBodies.WaterLevelAt(x, z);
 
-        return WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
-    }
+    /// <summary>Whether the column (x, z) at this height is wet (<see cref="WaterBodies.IsWaterColumn"/>).</summary>
+    public static bool IsWaterColumn(int x, int z, int height) => WaterBodies.IsWaterColumn(x, z, height);
 
-    /// <summary>Whether a biome is one a lake or a river may stand in.</summary>
-    private static bool CanHoldSurfaceWater(Biome biome) =>
-        WorldGenerationConfig.LakesAndRiversEnabled && biome is Biome.Forest or Biome.Taiga or Biome.Frozen;
+    /// <summary>0..1 gate on a surface water body as the column nears a desert (<see cref="WaterBodies.SurfaceWaterGate"/>).</summary>
+    internal static float SurfaceWaterGate(float desertWeight) => WaterBodies.SurfaceWaterGate(desertWeight);
 
-    /// <summary>
-    /// The level a column with these surface-water weights floods to. Shared by
-    /// <see cref="WaterLevelAt"/> and by <see cref="Compute"/>, which evaluates the same weights
-    /// itself and stores the result per column, so a stored level is by construction the level the
-    /// carve that made the bowl was working toward.
-    /// </summary>
-    private static int WaterLevelFor(Biome biome, float gate, float riverWeight, float lakeWeight,
-        int lakeSurface)
-    {
-        // The master water toggle is a compile-time const, so it is folded into these runtime
-        // tests: a branch of its own would read as unreachable code (see BiomeWeights).
-        if (biome == Biome.Ocean)
-            return WorldGenerationConfig.WaterEnabled ? WorldGenerationConfig.SeaLevel : NoWater;
-        if (!WorldGenerationConfig.WaterEnabled || !CanHoldSurfaceWater(biome)) return NoWater;
-
-        var level = NoWater;
-        if (riverWeight * gate > WorldGenerationConfig.WaterBodyThreshold)
-            level = WorldGenerationConfig.SeaLevel;
-        if (lakeWeight * gate > WorldGenerationConfig.WaterBodyThreshold && lakeSurface > level)
-            level = lakeSurface;
-        return level;
-    }
-
-    /// <summary>Whether the column (x, z) at this height is wet: it sits below the level
-    /// <see cref="WaterLevelAt"/> reports. A hot desert stays dry, and a cold lake or river freezes
-    /// over instead (see the freezing pass), both because their level is <see cref="NoWater"/>.</summary>
-    public static bool IsWaterColumn(int x, int z, int height) => height < WaterLevelAt(x, z);
-
-    /// <summary>
-    /// 0..1 multiplicative gate on a surface water body at (x, z): 1 away from a desert, fading to
-    /// 0 as the column reaches the forest/desert line. Both the carve in <see cref="Compute"/> and
-    /// the flood test in <see cref="IsWaterColumn"/> read it, so a lake or river tapers out and
-    /// closes on forest ground just before the desert instead of being cut off in a wall. The fade
-    /// only covers the last stretch before the line, so forest lakes elsewhere keep their depth.
-    /// </summary>
-    internal static float SurfaceWaterGate(float desertWeight) =>
-        1f - MathUtils.SmoothStep(WorldGenerationConfig.WaterDesertFadeStart,
-            WorldGenerationConfig.WaterDesertFadeEnd, desertWeight);
-
-    private const int LakeSalt = 0x4C414B45;
-
-    /// <summary>
-    /// 0..1 lake bowl at (x, z), plus the water level and floor of the lake that reaches the column.
-    /// One hashed candidate per <see cref="WorldGenerationConfig.LakeCellBlocks"/> cell, offset inside
-    /// the cell and sized by a skewed roll, so the world is mostly little ponds with the occasional
-    /// broad lake rather than one uniform size. The bowl falls from 1 at the center to 0 at the rim,
-    /// so the carve blends back into the ground it was dug from, and the shoreline is the candidate's
-    /// radius wobbled by <see cref="LakeShapeNoise"/> so it is ragged rather than a circle.
-    /// Candidates near the origin are skipped so the spawn is always on dry land.
-    /// </summary>
-    private static float LakeSample(float x, float z, out int surface, out int floor)
-    {
-        const int cell = WorldGenerationConfig.LakeCellBlocks;
-        var gx0 = MathUtils.FloorToInt(x / cell);
-        var gz0 = MathUtils.FloorToInt(z / cell);
-        var best = 0f;
-        surface = NoWater;
-        floor = 0;
-
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
-        {
-            var gx = gx0 + dx;
-            var gz = gz0 + dz;
-            var h = SplitMix64.Hash(gx, gz, WorldGenerationConfig.Seed ^ LakeSalt);
-            if (Unit(h, 0) >= WorldGenerationConfig.LakeChance) continue;
-
-            var centerX = gx * cell + Unit(h, 1) * cell;
-            var centerZ = gz * cell + Unit(h, 2) * cell;
-            if (MathF.Abs(centerX) < WorldGenerationConfig.LakeSpawnClearRadius
-                && MathF.Abs(centerZ) < WorldGenerationConfig.LakeSpawnClearRadius)
-                continue;
-
-            var size = MathF.Pow(Unit(h, 3), WorldGenerationConfig.LakeRadiusSkew);
-            var nominal = MathUtils.Lerp(WorldGenerationConfig.LakeMinRadius,
-                WorldGenerationConfig.LakeMaxRadius, size);
-            var ox = x - centerX;
-            var oz = z - centerZ;
-            var d2 = ox * ox + oz * oz;
-
-            // The wobble below only ever pulls the shoreline inside `nominal`, so a column past it
-            // is out without paying for the rim samples that choosing a water level costs.
-            if (d2 >= nominal * nominal) continue;
-            if (!TryLakeSite(centerX, centerZ, nominal, size, out var siteSurface, out var siteFloor))
-                continue;
-
-            var radius = nominal * (1f + WorldGenerationConfig.LakeShapeAmplitude
-                * LakeShapeNoise.GetNoise(x, z));
-            if (d2 >= radius * radius) continue;
-
-            var w = MathUtils.SmoothStep(1f - MathF.Sqrt(d2) / radius);
-            if (w > best)
-            {
-                best = w;
-                surface = siteSurface;
-                floor = siteFloor;
-            }
-        }
-
-        return best;
-    }
-
-    /// <summary>
-    /// Where a lake candidate of this radius puts its water and its floor, or false when the ground
-    /// it would stand on is too uneven to hold a pond. Sampling the rim is what keeps the water
-    /// enclosed: the surface sits <see cref="WorldGenerationConfig.LakeBankDepth"/> under the lowest
-    /// ground on the rim, so every bank is above the water, and the floor is a drop below that which
-    /// grows with the lake. A rim that climbs more than
-    /// <see cref="WorldGenerationConfig.LakeSiteFlatness"/> is a hillside, and a pond there would
-    /// tower over its downhill side, so the candidate is dropped and the terrain keeps the slope.
-    /// The rim is read from <see cref="LandHeight"/>, the profile before a river cuts it, so a pond
-    /// standing above the waterline is also dropped when a river channel crosses its footprint
-    /// (<see cref="RiverCrossesSite"/>): the channel would cut a bank below the pond's surface.
-    /// </summary>
-    private static bool TryLakeSite(float centerX, float centerZ, float radius, float size,
-        out int surface, out int floor)
-    {
-        var rimMin = LandHeight(centerX, centerZ, out _, out _, out _, out _);
-        var rimMax = rimMin;
-        for (var k = 0; k < 8; k++)
-        {
-            var angle = k * (MathF.Tau / 8f);
-            var land = LandHeight(centerX + MathF.Cos(angle) * radius,
-                centerZ + MathF.Sin(angle) * radius, out _, out _, out _, out _);
-            if (land < rimMin) rimMin = land;
-            if (land > rimMax) rimMax = land;
-        }
-
-        surface = 0;
-        floor = 0;
-        if (rimMax - rimMin > WorldGenerationConfig.LakeSiteFlatness) return false;
-
-        var depth = MathUtils.Lerp(WorldGenerationConfig.LakeMinDepth,
-            WorldGenerationConfig.LakeMaxDepth, size * size);
-        surface = (int)MathF.Round(rimMin - WorldGenerationConfig.LakeBankDepth);
-        floor = (int)MathF.Round(surface - depth);
-        // A pond at or below the river's own waterline cannot spill into the channel, so only an
-        // elevated one pays for the river samples.
-        if (surface > WorldGenerationConfig.SeaLevel && RiverCrossesSite(centerX, centerZ, radius))
-            return false;
-        return true;
-    }
-
-    /// <summary>Blocks between river samples across a lake candidate's footprint, ring to ring and along a ring.</summary>
-    private const float RiverSampleSpacing = 6f;
-
-    /// <summary>
-    /// Whether a river channel reaches a lake candidate's footprint. The disc is sampled with
-    /// concentric rings every <see cref="RiverSampleSpacing"/> blocks of radius (the rim ring
-    /// included), each ring holding points no more than that far apart, so neighboring samples sit
-    /// closer together than a river channel is wide and a channel cannot slip between them,
-    /// whatever the lake's size.
-    /// </summary>
-    private static bool RiverCrossesSite(float centerX, float centerZ, float radius)
-    {
-        if (RiverWeight(centerX, centerZ) > 0f) return true;
-        var rings = Math.Max(1, (int)MathF.Ceiling(radius / RiverSampleSpacing));
-        for (var ring = 1; ring <= rings; ring++)
-        {
-            var r = radius * ring / rings;
-            var points = Math.Max(1, (int)MathF.Ceiling(MathF.Tau * r / RiverSampleSpacing));
-            for (var k = 0; k < points; k++)
-            {
-                var angle = k * (MathF.Tau / points);
-                if (RiverWeight(centerX + MathF.Cos(angle) * r, centerZ + MathF.Sin(angle) * r) > 0f)
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>One 0..1 hash value for a candidate, re-mixed by <paramref name="index"/>.</summary>
-    private static float Unit(ulong h, int index) =>
-        (SplitMix64.Mix(h + (ulong)index * 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
-
-    /// <summary>0..1 river weight: a warped ridge band (|noise| near zero) gated by a rarity mask.</summary>
-    internal static float RiverWeight(float x, float z)
-    {
-        var mask = MathUtils.SmoothStep(WorldGenerationConfig.RiverMaskStart,
-            WorldGenerationConfig.RiverMaskEnd, RiverMask.GetNoise(x, z));
-        if (mask <= 0f) return 0f;
-
-        var warpedX = x;
-        var warpedZ = z;
-        RiverWarp.DomainWarp(ref warpedX, ref warpedZ);
-
-        var ridge = MathF.Abs(RiverRidge.GetNoise(warpedX, warpedZ));
-        if (ridge >= WorldGenerationConfig.RiverWidth) return 0f;
-
-        var t = ridge / WorldGenerationConfig.RiverWidth;
-        return mask * (1f - t * t);
-    }
-
-    /// <summary>
-    /// 0..1 how strongly a lake or river covers (x, z): the max of the two masks, gated toward a
-    /// desert the same way the carve is. The forest uses it to mark shores, so sand and gravel
-    /// appear only where a water body actually is.
-    /// </summary>
-    public static float SurfaceWaterWeight(float x, float z)
-    {
-        BiomeWeights(x, z, out _, out var desertWeight);
-        return MathF.Max(LakeSample(x, z, out _, out _), RiverWeight(x, z))
-               * SurfaceWaterGate(desertWeight);
-    }
+    /// <summary>0..1 how strongly a lake or river covers (x, z) (<see cref="WaterBodies.SurfaceWaterWeight"/>).</summary>
+    public static float SurfaceWaterWeight(float x, float z) => WaterBodies.SurfaceWaterWeight(x, z);
 
     /// <summary>
     /// 0..1 how open the forest at (x, z) is: a clearing or grassy plain rather than woodland.
@@ -517,7 +145,7 @@ public static class TerrainGenerator
     /// </summary>
     public static float ForestOpenness(float x, float z) =>
         MathUtils.SmoothStep(WorldGenerationConfig.OpennessStart, WorldGenerationConfig.OpennessEnd,
-            OpennessNoise.GetNoise(x, z));
+            TerrainNoise.OpennessNoise.GetNoise(x, z));
 
     /// <summary>
     /// Blocks an occasional mountain range raises the forest floor at (x, z): a warped ridged
@@ -530,13 +158,13 @@ public static class TerrainGenerator
         // unreachable (see BiomeWeights); a multiplier keeps the toggle a real expression.
         var enabled = WorldGenerationConfig.MountainsEnabled ? 1f : 0f;
         var mask = MathUtils.SmoothStep(WorldGenerationConfig.MountainMaskStart,
-            WorldGenerationConfig.MountainMaskEnd, MountainMask.GetNoise(x, z)) * enabled;
+            WorldGenerationConfig.MountainMaskEnd, TerrainNoise.MountainMask.GetNoise(x, z)) * enabled;
         if (mask <= 0f) return 0f;
 
         var warpedX = x;
         var warpedZ = z;
-        MountainWarp.DomainWarp(ref warpedX, ref warpedZ);
-        var ridge = 1f - MathF.Abs(MountainNoise.GetNoise(warpedX, warpedZ));
+        TerrainNoise.MountainWarp.DomainWarp(ref warpedX, ref warpedZ);
+        var ridge = 1f - MathF.Abs(TerrainNoise.MountainNoise.GetNoise(warpedX, warpedZ));
         ridge = MathF.Pow(ridge, WorldGenerationConfig.MountainSharpness);
 
         var clear = MathUtils.SmoothStep(WorldGenerationConfig.MountainSpawnClearStart,
@@ -553,67 +181,23 @@ public static class TerrainGenerator
     private static float TrenchDepthAt(float x, float z)
     {
         var mask = MathUtils.SmoothStep(WorldGenerationConfig.TrenchMaskStart,
-            WorldGenerationConfig.TrenchMaskEnd, TrenchMask.GetNoise(x, z));
+            WorldGenerationConfig.TrenchMaskEnd, TerrainNoise.TrenchMask.GetNoise(x, z));
         if (mask <= 0f) return 0f;
 
         var warpedX = x;
         var warpedZ = z;
-        TrenchWarp.DomainWarp(ref warpedX, ref warpedZ);
+        TerrainNoise.TrenchWarp.DomainWarp(ref warpedX, ref warpedZ);
 
-        var ridge = MathF.Abs(TrenchRidge.GetNoise(warpedX, warpedZ));
+        var ridge = MathF.Abs(TerrainNoise.TrenchRidge.GetNoise(warpedX, warpedZ));
         if (ridge >= WorldGenerationConfig.TrenchWidth) return 0f;
 
         var t = ridge / WorldGenerationConfig.TrenchWidth;
         return WorldGenerationConfig.TrenchDepth * mask * (1f - t * t);
     }
 
-    /// <summary>
-    /// Nudges a column's biome across the forest/desert material line inside the blend band, so
-    /// the grass-to-sand edge reads as a ragged patchwork instead of a drawn contour. Only the
-    /// surface material flips; the height already came from the smooth desert weight, so the
-    /// ground stays continuous.
-    /// </summary>
-    private static Biome DitherBiome(float x, float z, Biome biome, float desertWeight)
-    {
-        if (biome is not (Biome.Forest or Biome.Desert)) return biome;
-        if (MathF.Abs(desertWeight - 0.5f) >= WorldGenerationConfig.BiomeBorderDither) return biome;
-
-        // The dither only raggeds the material line; it must never push sand below the warm line
-        // into the temperate band, so a desert column is always fully on the warm ramp.
-        if (biome == Biome.Forest && WarmWeight(x, z) < 0.5f)
-            return biome;
-
-        // A coherent field, so whole patches flip: a per-column hash turned the line into a
-        // checkerboard instead of a ragged edge.
-        if (BiomeDitherNoise.GetNoise(x, z) <= 0f) return biome;
-        return biome == Biome.Forest ? Biome.Desert : Biome.Forest;
-    }
-
-    /// <summary>An OpenSimplex2 domain warp seeded from the world seed plus <paramref name="seedOffset"/>.</summary>
-    private static FastNoiseLite MakeWarp(int seedOffset, float frequency, float amplitude)
-    {
-        var warp = new FastNoiseLite(WorldGenerationConfig.Seed + seedOffset);
-        warp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2);
-        warp.SetFrequency(frequency);
-        warp.SetDomainWarpAmp(amplitude);
-        return warp;
-    }
-
-    /// <summary>OpenSimplex2 noise seeded from the world seed; more than one octave turns on FBm.</summary>
-    internal static FastNoiseLite MakeNoise(int seedOffset, float frequency, int octaves = 1)
-    {
-        var noise = new FastNoiseLite(WorldGenerationConfig.Seed + seedOffset);
-        noise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2);
-        noise.SetFrequency(frequency);
-
-        if (octaves > 1)
-        {
-            noise.SetFractalType(FastNoiseLite.FractalType.FBm);
-            noise.SetFractalOctaves(octaves);
-        }
-
-        return noise;
-    }
+    /// <summary>OpenSimplex2 noise seeded from the world seed (<see cref="TerrainNoise.MakeNoise"/>).</summary>
+    internal static FastNoiseLite MakeNoise(int seedOffset, float frequency, int octaves = 1) =>
+        TerrainNoise.MakeNoise(seedOffset, frequency, octaves);
 
     /// <summary>
     /// One column's land height before any water or ravine is cut into it: the forest, desert-dune
@@ -631,14 +215,14 @@ public static class TerrainGenerator
         // forest alternates between rolling woodland and open grass instead of one mass.
         // An occasional mountain range lifts the floor well above the hills. The floor
         // stays above sea level, which is what makes a carved lake or river enclosed.
-        var swell = ForestSwellNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.ForestSwellAmplitude;
+        var swell = TerrainNoise.ForestSwellNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.ForestSwellAmplitude;
         var hillMask = MathUtils.SmoothStep(WorldGenerationConfig.HillMaskStart,
-            WorldGenerationConfig.HillMaskEnd, HillMaskNoise.GetNoise(worldX, worldZ));
+            WorldGenerationConfig.HillMaskEnd, TerrainNoise.HillMaskNoise.GetNoise(worldX, worldZ));
         var warpedX = worldX;
         var warpedZ = worldZ;
-        HillWarp.DomainWarp(ref warpedX, ref warpedZ);
-        var hill = 0.5f + 0.5f * HillNoise.GetNoise(warpedX, warpedZ);
-        var rough = ValleyRoughNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.ValleyRoughAmplitude;
+        TerrainNoise.HillWarp.DomainWarp(ref warpedX, ref warpedZ);
+        var hill = 0.5f + 0.5f * TerrainNoise.HillNoise.GetNoise(warpedX, warpedZ);
+        var rough = TerrainNoise.ValleyRoughNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.ValleyRoughAmplitude;
         var openness = ForestOpenness(worldX, worldZ);
         var hillScale = 1f - WorldGenerationConfig.OpennessHillReduction * openness;
         forestHeight = WorldGenerationConfig.ForestBaseHeight + swell
@@ -655,7 +239,7 @@ public static class TerrainGenerator
         {
             // Smooth dunes on the swell, not the forest hills: a desert is its own profile
             var dune = WorldGenerationConfig.ForestBaseHeight + swell
-                + DuneNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.DuneAmplitude;
+                + TerrainNoise.DuneNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.DuneAmplitude;
             heightF = MathUtils.Lerp(heightF, dune, desertWeight);
         }
 
@@ -719,10 +303,10 @@ public static class TerrainGenerator
                 var lakeSurface = NoWater;
                 var lakeFloor = 0;
                 var riverWeight = 0f;
-                if (CanHoldSurfaceWater(biome))
+                if (WaterBodies.CanHoldSurfaceWater(biome))
                 {
-                    lakeWeight = LakeSample(worldX, worldZ, out lakeSurface, out lakeFloor);
-                    riverWeight = RiverWeight(worldX, worldZ);
+                    lakeWeight = WaterBodies.LakeSample(worldX, worldZ, out lakeSurface, out lakeFloor);
+                    riverWeight = WaterBodies.RiverWeight(worldX, worldZ);
                 }
 
                 if (lakeWeight > 0f)
@@ -744,7 +328,7 @@ public static class TerrainGenerator
                             WorldGenerationConfig.SeaLevel - WorldGenerationConfig.RiverBedDepth, river);
                 }
 
-                waterLevel[i] = WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
+                waterLevel[i] = WaterBodies.WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
 
                 // An oasis: a hashed deep-desert site marks its disc (the fill and the far LOD
                 // wear grass there) and carves its flat pond into the heightmap
@@ -791,7 +375,7 @@ public static class TerrainGenerator
                 heights[i] = height - ravineDepth;
 
                 var dirt = WorldGenerationConfig.DirtDepthBase
-                           + WorldGenerationConfig.DirtDepthVariation * DirtNoise.GetNoise(worldX, worldZ);
+                           + WorldGenerationConfig.DirtDepthVariation * TerrainNoise.DirtNoise.GetNoise(worldX, worldZ);
                 var soil = Math.Clamp((int)MathF.Round(dirt), 1, 8);
 
                 // Ravine walls are exposed rock, not stacked grass/dirt terraces: strip the soil
@@ -819,10 +403,10 @@ public static class TerrainGenerator
                 entrance[i] = MathUtils.SmoothStep(
                     WorldGenerationConfig.EntranceStart,
                     WorldGenerationConfig.EntranceEnd,
-                    EntranceNoise.GetNoise(worldX, worldZ)) * entranceShore;
+                    TerrainNoise.EntranceNoise.GetNoise(worldX, worldZ)) * entranceShore;
 
-                intensity[i] = IntensityNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.CaveIntensityRange;
-                biomes[i] = DitherBiome(worldX, worldZ, biome, desertWeight);
+                intensity[i] = TerrainNoise.IntensityNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.CaveIntensityRange;
+                biomes[i] = BiomeClassifier.DitherBiome(worldX, worldZ, biome, desertWeight);
             }
         }
 
@@ -846,14 +430,14 @@ public static class TerrainGenerator
         var mask = MathUtils.SmoothStep(
             WorldGenerationConfig.RavineMaskStart,
             WorldGenerationConfig.RavineMaskEnd,
-            RavineMask.GetNoise(x, z));
+            TerrainNoise.RavineMask.GetNoise(x, z));
         if (mask <= 0f) return 0;
 
         var warpedX = x;
         var warpedZ = z;
-        RavineWarp.DomainWarp(ref warpedX, ref warpedZ);
+        TerrainNoise.RavineWarp.DomainWarp(ref warpedX, ref warpedZ);
 
-        var ridge = MathF.Abs(RavineRidge.GetNoise(warpedX, warpedZ));
+        var ridge = MathF.Abs(TerrainNoise.RavineRidge.GetNoise(warpedX, warpedZ));
         if (ridge >= WorldGenerationConfig.RavineWidth) return 0;
 
         var t = ridge / WorldGenerationConfig.RavineWidth;

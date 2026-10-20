@@ -487,14 +487,14 @@ public sealed class BiomeTests
         for (var i = 0; i <= samples; i++)
         {
             var t = T(i);
-            var cold = TerrainGenerator.ColdOf(t);
-            var warm = TerrainGenerator.WarmOf(t);
+            var cold = BiomeClassifier.ColdOf(t);
+            var warm = BiomeClassifier.WarmOf(t);
             Assert.False(cold > 0f && warm > 0f, $"t {t} is both cold ({cold}) and warm ({warm})");
 
             foreach (var dry in dries)
-                if (TerrainGenerator.Classify(0f, cold, warm, dry) is Biome.Taiga or Biome.Frozen)
+                if (BiomeClassifier.Classify(0f, cold, warm, dry) is Biome.Taiga or Biome.Frozen)
                     tColdMax = t;
-            if (tHotMin == null && TerrainGenerator.Classify(0f, cold, warm, 1f) == Biome.Desert)
+            if (tHotMin == null && BiomeClassifier.Classify(0f, cold, warm, 1f) == Biome.Desert)
                 tHotMin = t;
         }
 
@@ -505,11 +505,11 @@ public sealed class BiomeTests
         for (var i = 0; i <= samples; i++)
         {
             var t = T(i);
-            var cold = TerrainGenerator.ColdOf(t);
-            var warm = TerrainGenerator.WarmOf(t);
+            var cold = BiomeClassifier.ColdOf(t);
+            var warm = BiomeClassifier.WarmOf(t);
             foreach (var dry in dries)
             {
-                var biome = TerrainGenerator.Classify(0f, cold, warm, dry);
+                var biome = BiomeClassifier.Classify(0f, cold, warm, dry);
                 if (t < tColdMax)
                     Assert.True(biome is Biome.Taiga or Biome.Frozen, $"t {t} dry {dry} is {biome}, below the cold line");
                 else if (t > tColdMax && t < tHotMin)
@@ -517,7 +517,7 @@ public sealed class BiomeTests
             }
 
             if (t > tHotMin)
-                Assert.Equal(Biome.Desert, TerrainGenerator.Classify(0f, cold, warm, 1f));
+                Assert.Equal(Biome.Desert, BiomeClassifier.Classify(0f, cold, warm, 1f));
         }
     }
 
@@ -567,7 +567,7 @@ public sealed class BiomeTests
             var x = Coord(gx);
             var z = Coord(gz);
             var k = gz * size + gx;
-            hot[k] = TerrainGenerator.Classify(0f, TerrainGenerator.ColdWeight(x, z),
+            hot[k] = BiomeClassifier.Classify(0f, TerrainGenerator.ColdWeight(x, z),
                 TerrainGenerator.WarmWeight(x, z), 1f) == Biome.Desert;
             if (hot[k] && InWindow(gx) && InWindow(gz)) hotInWindow++;
             if (SnowGenerator.DepthAt(x, z, 0) <= 0) continue;

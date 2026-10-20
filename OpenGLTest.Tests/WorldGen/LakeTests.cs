@@ -102,7 +102,7 @@ public sealed class LakeTests
             foreach (var cell in cells)
             {
                 elevated++;
-                Assert.True(TerrainGenerator.RiverWeight(cell.X, cell.Z) == 0f,
+                Assert.True(WaterBodies.RiverWeight(cell.X, cell.Z) == 0f,
                     $"a river crosses the pond at ({cell.X}, {cell.Z}), surface {level}");
             }
         }

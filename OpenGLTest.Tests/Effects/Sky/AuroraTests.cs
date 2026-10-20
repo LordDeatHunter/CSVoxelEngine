@@ -100,9 +100,9 @@ public sealed class AuroraTests
         for (var t = -1f; t <= 1f; t += 0.005f)
         {
             // TerrainGenerator.Climate's warmth for a raw temperature t
-            var warmth = 0.5f * (1f - TerrainGenerator.ColdOf(t)) + 0.5f * TerrainGenerator.WarmOf(t);
-            Assert.Equal(TerrainGenerator.ColdOf(t), EyeClimate.Coldness(warmth), 4);
-            Assert.Equal(TerrainGenerator.WarmOf(t), EyeClimate.Warmness(warmth), 4);
+            var warmth = 0.5f * (1f - BiomeClassifier.ColdOf(t)) + 0.5f * BiomeClassifier.WarmOf(t);
+            Assert.Equal(BiomeClassifier.ColdOf(t), EyeClimate.Coldness(warmth), 4);
+            Assert.Equal(BiomeClassifier.WarmOf(t), EyeClimate.Warmness(warmth), 4);
         }
     }
 

@@ -60,7 +60,7 @@ public static class WorldSeed
 
         _value = seed;
 
-        TerrainGenerator.Reseed();
+        TerrainNoise.Reseed();
         NoiseCaves.Reseed();
         CoalGenerator.Reseed();
         MalachiteGenerator.Reseed();

@@ -10,7 +10,7 @@ namespace VoxelEngine.Config;
 public static class WorldGenerationConfig
 {
     // --- Terrain ---
-    // Every noise channel and worldgen hash derives its seed from this one (TerrainGenerator,
+    // Every noise channel and worldgen hash derives its seed from this one (TerrainNoise,
     // NoiseCaves, WormCarver, the feature generators). It is runtime state, not a constant: a world
     // sets it through WorldSeed.Apply between worlds (never while one is live), and it defaults to
     // WorldSeed.Default, so tests, the item debugger and scripted runs see the old fixed seed.
@@ -67,7 +67,7 @@ public static class WorldGenerationConfig
     // The forest floor sits above sea level, so an un-carved column is always the dry rim of any
     // carved water: a lake is a bowl and a river a channel, and water fills only the part cut
     // below the waterline, which keeps it enclosed instead of floating on a slope. The carve and
-    // the flood test read the same LakeWeight/RiverWeight functions (TerrainGenerator). Forest
+    // the flood test read the same LakeWeight/RiverWeight functions (WaterBodies). Forest
     // only: a desert stays dry, and sand/gravel show only where these weights are present.
     public const bool LakesAndRiversEnabled = true;
     // Below this water-body weight a below-waterline column is left dry.
@@ -159,7 +159,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // frozen biome (without it). Temperature and humidity are read only while choosing a biome and
     // the worldgen features that follow from it, and by the grass/foliage tint through
     // TerrainGenerator.Climate, so nothing else in the game sees them.
-    // Low frequency (one octave, see TerrainGenerator's ctor) keeps the temperature gradient shallow,
+    // Low frequency (one octave, see TerrainNoise.Reseed) keeps the temperature gradient shallow,
     // so the raw-noise gap between the two ramps spans a wide band of world: at this frequency it
     // keeps every hot column at least a full-detail load radius from snow
     // (BiomeTests.HotAirKeepsAFullLoadRadiusFromSnow). Changing it re-lays every temperature
