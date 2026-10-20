@@ -95,6 +95,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `78635e3` | Moved World's per-frame mob job (target list, slime/goblin updates and damage billing, PushFromBlast, RefreshMobs/SpawnEntity/DamageAllMobs bodies) into Simulation/MobDirector.cs with forwarders on World; World.cs 1,149 -> 1,015 lines |
 | `9dea99b` | Split FluidManager (1,066 -> 262 lines) into Simulation/Fluids/: FluidSchedule, FluidCells, FluidCellKey, FluidNeighborhood, FluidSpread, FluidMud, FluidWakeScanner, FluidWakeRules, with FluidFlow and FluidState moved alongside; Simulation/ 22 -> 19 files |
 | `452b2dd` | Split LodManager.cs (932 -> 314 lines) into LodRegionSet, LodCoverPass, LodRegionClaims and LodWorkerPool, with LodBuildOutcome moved to its own file; LodManager keeps the frame orchestration and forwards its public surface and test seams |
+| `c3f0d50` | Split Inventory.cs (896 -> 597 lines): the player.json mapping moved to InventorySaveCodec, the crafting rules to InventoryCrafting, and InventoryCategory and HotbarSlot to their own files; the public members became one-line forwarders over internal state accessors |
 
 ## In progress
 
@@ -115,7 +116,6 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 | `src/World.cs` | 1,015 | Has a stated reason. Mob frame job moved to `Simulation/MobDirector.cs` (208) in `78635e3`. Next extraction: the fire-cell gathering that `Update` and `UpdateClient` both build. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
 | `src/Lod/LodManager.cs` | 314 | Split in `452b2dd` (LodRegionSet 174, LodCoverPass 164, LodRegionClaims 278, LodWorkerPool 144, LodBuildOutcome 12); `Lod/` now holds 14 files. Nothing remains. `LodMeshBuilder.cs` (650) is the largest file left in `Lod/`. Test files: LodManagerTests 788, LodBuildPoolTests 426; AGENTS.md 4,069 lines. |
-| `src/UI/InventoryPanel/Inventory.cs` | 896 | |
 | `src/WorldGen/TerrainGenerator.cs` | 877 | |
 | `src/WorldGen/TreeGenerator.cs` | 845 | |
 | `src/Rendering/Overlays/UIRenderer.cs` | 802 | Has a stated reason (shared primitives the ItemDebugger and tests bind to). |
@@ -235,6 +235,11 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - Dead code check: `FluidWakeRules.IsCarvedFlowTarget` has no production caller, only `WaterRavineTests`. Decide whether the rule belongs in production or the test should assert through `IsWakeTarget`.
 - `Fluids/FluidFlow.cs` still declares two types (`FluidFlow` and `IFluidCellReader`); split `IFluidCellReader` into its own file for the one-type-per-file convention.
 - The `FluidSchedule.Enabled` doc and the `UnpackedY` comment were carried over verbatim; check them for stale wording in a doc pass.
+
+- Inventory split line counts: Inventory 597, InventorySaveCodec 221, InventoryCrafting 114, InventoryCategory 10, HotbarSlot 13, InventorySaveTests 188; AGENTS.md 4,073 lines.
+- `Inventory.cs` is LF-only while most of its neighbors are CRLF. Future edits must keep LF in that file, unless a separate normalization task is planned.
+- `Inventory.cs` now exposes six internal state accessors (Tools, Blocks, Misc, Known, Hotbar, NextToolInstance) to the test and ItemDebugger assemblies through InternalsVisibleTo. A later pass could check whether any can be narrowed (for example, a dedicated reset method for Import).
+- `Import`'s nesting in `InventorySaveCodec` was deliberately left as it was; a candidate for an early-return cleanup task.
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
