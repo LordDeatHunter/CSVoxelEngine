@@ -1707,10 +1707,26 @@ OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS
                                       #   snapshots, ground plane and framing bounds
 OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple players and chat")
   VoxelEngine.Server.csproj           # the project file (references the game project)
-  GlobalUsings.cs                     # VoxelEngine.Core
+  GlobalUsings.cs                     # VoxelEngine.Core and VoxelEngine.Config
   AssetRoot.cs                        # locate assets/ walking up from the server's working directory
-  GameServer.cs                       # TCP listener, per-connection reader threads, main-thread Pump
+  ClientConnection.cs                 # one connected socket: id, name, lock-guarded framed send, idle
+                                      #   clock (LastInboundAt), the far-LOD regions queued for it
+  GameServer.cs                       # the composition root: builds the components below, owns the
+                                      #   public surface, Start/Stop and the main-thread Pump, and
+                                      #   dispatches each inbound message (Handle)
+  Inbound.cs                          # one frame a reader thread queued (a null payload: remove it)
+  IntentReplay.cs                     # world and inventory intents replayed for their player and
+                                      #   answered (BlockCorrection, InventoryState, IntentResult)
+  PlayerSessions.cs                   # join (hello), PlayerState judging, status ticks, saves, unique
+                                      #   names, the player list, leave and the idle sweep
+  ServerBroadcasts.cs                 # the cell journal (BlockChanges), entities under stable ids,
+                                      #   stations and the day clock
+  ServerChat.cs                       # chat relay and the server's chat commands (over ChatCommands)
   ServerProgram.cs                    # content load, world/port prompts, headless World + tick loop
+  ServerState.cs                      # what the components share: world, client and player tables,
+                                      #   pending connections, clock, join spawn, creative rights
+  ServerTransport.cs                  # TCP listener, accept thread, per-connection reader threads
+  StreamRequests.cs                   # chunk, column and far-LOD region requests and the LOD queue
 OpenGLTest.Tests/                     # xUnit tests, headless (no window); a test sits beside the area
                                       #   of the code it tests (by the type under test), a probe beside
                                       #   the area it probes, a helper of several areas in Support/;
@@ -2826,18 +2842,18 @@ bounds-checked: an unknown action, an overlong recipe name or more than
 `InventoryIntentCodec.MaxCraftMembers` members is an `InvalidDataException` (the sender is
 dropped like any malformed frame), while merely out-of-range values parse and are refused.
 
-**The server** (`OpenGLTest.Server/GameServer.cs`) is a dual-mode `TcpListener.Create(port)`
+**The server** (`OpenGLTest.Server/GameServer.cs`, the composition root over `ServerTransport`, `PlayerSessions`, `IntentReplay`, `StreamRequests`, `ServerBroadcasts` and `ServerChat`, which share a `ServerState`) is a dual-mode `TcpListener.Create(port)`
 (IPv6 any with IPv4 mapped, so `[::1]:port` works like `127.0.0.1:port`) with one reader thread per
 connection that only frames inbound bytes onto a `ConcurrentQueue`; `Pump` (main thread) drains it
 and owns every piece of `World` state, so the simulation stays single-threaded exactly like the
 client. A transient `SocketException` from the accept is logged and retried rather than ending the
-accept thread. Each `Handle` runs inside a try/catch: a short or malformed frame
+accept thread. Each `Handle` call in `Pump` runs inside a try/catch: a short or malformed frame
 (`EndOfStreamException`, `IOException`, `InvalidDataException`, `FormatException`,
 `ArgumentException`, `ObjectDisposedException`) logs, closes and removes only that client. Sends
 are blocking writes on the main thread, so every socket gets a `NetSendTimeoutMs` write timeout,
 and a failed or timed-out send faults the connection (no further sends) and queues its removal
-once. The accept thread queues each new connection on `_accepted` before its reader starts; `Pump`
-moves the ones that have not said hello into `_pending`, and once a second sweeps every
+once. The accept thread queues each new connection on `ServerTransport.Accepted` before its reader starts; `Pump`
+moves the ones that have not said hello into `ServerState.Pending`, and once a second sweeps (`PlayerSessions.SweepIdleConnections`) every
 connection, hello'd or pending, whose reader saw no frame for `NetIdleTimeoutSeconds`
 (`ClientConnection.LastInboundAt`, `Volatile` ticks; clients send `KeepAlive` every
 `NetKeepAliveSeconds` and their state at 20 Hz). `Stop` closes the pending ones too. Every
@@ -2845,7 +2861,7 @@ connected player is a **`ServerPlayer`** (`OpenGLTest/src/Networking/ServerSide/
 unique among the players online by its save slug (a second "Player" joins as "Player 2"), its
 **own** `Inventory` (`Inventory.Empty()` for a newcomer), server-owned `Creative`/`Flying` flags
 (survival by default), its own health and respawn eye (see "Player status" below), the accepted
-pose and `LastStateAt`. On `ClientHello` it assigns an
+pose and `LastStateAt`. On `ClientHello` (`PlayerSessions.Join`) it assigns an
 id, loads the player's file (`ServerPlayerSaves`: `players/<slug of the name>.json` in the world
 folder, the `PlayerSaveCodec` shape — health and respawn eye included — written through the
 world's `ChunkSaveStore` — `World.SaveStore` — which accepts that one subfolder), replies
@@ -2862,10 +2878,10 @@ only while `GameServer.MayBeCreative` holds for that player, and flight only wit
 position goes through the movement rubberband (both below) — syncs the day clock
 (`NetTimeSyncSeconds`), serves `ChunkRequest`/`ColumnRequest` from the loaded world
 (`ChunkManager.TryCaptureChunk`; a column through `WorldgenColumnSource`, exactly what its own
-mesher reads, encoded by `ChunkNetCodec.EncodeColumn`), queues `LodRegionRequest`s (deduped
+mesher reads, encoded by `ChunkNetCodec.EncodeColumn`), queues `LodRegionRequest`s (`StreamRequests`, deduped
 per connection, `ClientConnection.LodQueued`) and builds at most `NetLodBuildsPerPump` of them a
 `Pump` (`LodRegion.BuildMeshData`, skipping any whose client has gone), replays each
-`InventoryRequest` intent against **the sender's** inventory only — `InventoryIntentRules.Apply`
+`InventoryRequest` intent (`IntentReplay.OnInventoryRequest`) against **the sender's** inventory only — `InventoryIntentRules.Apply`
 (a slot must be on the hotbar; equip only what the player owns, or toggle off what the slot
 already shows; craft through `Inventory.TryCraft` with exactly the fed members, so a refused craft
 spends nothing; creative grants and clears only while `ServerPlayer.Creative`; pick-block through
@@ -2941,7 +2957,7 @@ client is read, logged and refused, answered with the named cell's state when it
 request with a `PlayerStatus` (`ServerPlayer.ShouldReportModes`), and the client takes those modes
 (`Camera.SetModes`). The server also broadcasts every station block entity it runs as a
 `StationState` on the entity cadence (and one empty snapshot after the last one goes). It **journals every raw cell
-write** (`Chunk.CellWritten`, set in `Start`, cleared in `Stop`) and broadcasts the coalesced
+write** (`Chunk.CellWritten` -> `ServerBroadcasts.OnCellWritten`, set in `Start`, cleared in `Stop`) and broadcasts the coalesced
 batch as `BlockChanges` each `Pump`, so its own simulation — explosions, fluid flow, leaf decay,
 felling, tree growth — reaches clients too. It broadcasts the live mobs, drops, primed TNT and
 falling blocks every `NetEntitySyncSeconds` (`EntityList`, with stable ids by object identity). Client input is
@@ -2987,7 +3003,7 @@ distance (`NetValidation.AllowedDistance(gap, NetMaxMoveBlocksPerSecond)`) as it
 exactly what the accepted position already obeys, so only the server's own teleports (join,
 respawn, a correction: `Teleport`/`ResetFall`) reset it and lag errs toward no damage, never extra
 damage; a body over unloaded chunks is not judged. Lava and the damage flash tick once per `Pump`
-(`ServerPlayer.TickStatus` from `GameServer.TickPlayers`), creative or flying being immune as in
+(`ServerPlayer.TickStatus` from `PlayerSessions.TickPlayers`), creative or flying being immune as in
 singleplayer. Mob hits land through `IMobTarget.TakeHit` (below), which bills the player's own
 pool and queues the knockback. Whatever changed the status marks `StatusDirty`, and `TickPlayers`
 then sends that player a `PlayerStatus` (modes, health, dead, and the queued knockback, handed

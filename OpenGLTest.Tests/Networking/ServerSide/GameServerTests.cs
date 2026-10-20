@@ -151,7 +151,7 @@ public sealed class GameServerTests : IDisposable
                     }
                     case NetMessage.PlayerList:
                     {
-                        // The record shape GameServer.BroadcastPlayerList writes
+                        // The record shape PlayerSessions.BroadcastPlayerList writes
                         var count = reader.ReadInt();
                         for (var i = 0; i < count; i++)
                         {
