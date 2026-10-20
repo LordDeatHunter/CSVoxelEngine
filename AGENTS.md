@@ -1340,10 +1340,14 @@ OpenGLTest/
     Player/                    # the player: camera, physics, water phases, body probes, health,
                                #   fall tracking, the rig and model (its posing components live in Posing/),
                                #   sprint toggle, death messages
+      BodyCollision.cs         # GL-free, state-free player-body collision rule (BodyCollides, which the server's
+                               #   MovementRules and PlayerBodyProbe judge by), the stepped axis moves and auto-step,
+                               #   and the falling-cube shove behind Camera.PushOutOf
       Camera.cs                # the camera's pose, mouse look, eye water state and IMobTarget side, and the facade over
                                #   its components (ViewProjectionCache, ModeToggles, HeadMotion, ShoulderRig); the view and
-                               #   projection matrices and the cache key; movement and physics live in PlayerPhysics.cs,
-                               #   the DDA walk in Interaction/BlockRaycaster.cs
+                               #   projection matrices and the cache key; movement lives in PlayerPhysics.cs, the body
+                               #   collision and the falling-cube shove in BodyCollision.cs, the DDA walk in
+                               #   Interaction/BlockRaycaster.cs
       CameraMode.cs            # F5 camera modes, FirstPerson -> Shoulder -> Orbit
       DeathMessages.cs         # the death line from the blow PlayerHealth recorded
       FallTracker.cs           # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
@@ -1374,8 +1378,8 @@ OpenGLTest/
         SliceMotion.cs         # the slice swing's phase shapes as pure functions of the slice clock
         SwimPose.cs            # the swim stroke shape and the swim and surface-float leg pose
         ThrowPose.cs           # the right arm's throw and timed-use overrides
-      PlayerPhysics.cs         # walk/fly/swim input -> body position, voxel collision (static BodyCollides),
-                               #   auto-step, knockback, water state
+      PlayerPhysics.cs         # walk/fly/swim input -> body position (moved through BodyCollision),
+                               #   knockback, water state, pass-through and ground-friction probes; owns and ticks the ViewShake
       PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
       ShoulderRig.cs           # the F5 rig (mode cycle, shoulder offset march, tilted view direction, orbit body facing)
                                #   and the crosshair raycast along it
@@ -1383,6 +1387,8 @@ OpenGLTest/
       SprintToggle.cs          # the sprint latch, GL-free: flipped on each fresh press
                                #   with the sprint-toggle setting on, else it follows the key
       ViewProjectionCache.cs   # the bit-compared view*projection and frustum cache over Camera.ViewProjKey (PERF_TODO R7/R11)
+      ViewShake.cs             # the damage view shake: trauma fed by Camera.AddShake, decayed each frame by
+                               #   PlayerPhysics.Update into the view offset and roll the view matrix and its cache key read
       WaterImmersion.cs, WaterPhase.cs  # GL-free water depth states: the submerged share of the body and
                                         #   its phase (Dry / Wade / Float / Swim)
     Rendering/                 # the GL render passes and their GL-free gates: RenderManager plus its pass components,
@@ -1984,7 +1990,7 @@ trailing commas.
 | `loot` | the table sharing this block's name, else drop self | loot table name; `"none"` drops nothing |
 | `sfx` | `hit_default` | sound group played while the block is mined, e.g. `hit_rock` (the stone blocks) or `hit_wood` (the logs and cactus). A group is every `<group>.wav` / `<group>_N.wav` directly under `assets/sfx`, and one variant is picked at random per hit (`SfxManager`). An unknown group warns yellow and uses the default |
 | `hitbox` | full cube | selection boxes in cell-local 0..1 space: one `{"min": [x,y,z], "max": [x,y,z]}` object or an array of them; the outline draws all, the raycast only targets through one |
-| `collidesByHitbox` | false | the body collides with the declared `hitbox` boxes instead of the full cell, the way tree wood collides with its drawn node and tubes (a 0.25 slab is stepped onto and stood on; `PlayerPhysics.IsColliding` -> `TreeWoodShape.OverlapsShape`, which tests the registered hitboxes for every block that is not thin or beveled tree wood); requires `hitbox`, `solid: true`, no `stackMax`, not a fluid. Player body only: drops, slimes and falling blocks still see the full cell |
+| `collidesByHitbox` | false | the body collides with the declared `hitbox` boxes instead of the full cell, the way tree wood collides with its drawn node and tubes (a 0.25 slab is stepped onto and stood on; `BodyCollision.BodyCollides` -> `TreeWoodShape.OverlapsShape`, which tests the registered hitboxes for every block that is not thin or beveled tree wood); requires `hitbox`, `solid: true`, no `stackMax`, not a fluid. Player body only: drops, slimes and falling blocks still see the full cell |
 
 Two traps worth repeating: a **model that is not a full cube needs `light.passes: true`** (which
 is its default) or its own cell stays dark and the interior quads render black; and a **cutout
@@ -2395,7 +2401,7 @@ matter), `RimBoxes` turns the mask into stair-stepped full-height boxes (`RimIns
 `MaxRimBoxes`, `TreeRimBevelPx` deep), and `TreeWoodEmitter.EmitRimWood` meshes exactly those boxes from the
 18³ snapshot with caps that subtract a beveled cell above or below. The hitboxes match the mesh:
 `TreeWoodShape.GetBoxes`/`GetBoxesAt`/`OverlapsShape` (node, tubes and rim boxes, allocation-free)
-feed the raycast, the selection outline and `PlayerPhysics.IsColliding`.
+feed the raycast, the selection outline and `BodyCollision.BodyCollides`.
 
 **Worldgen** (`TreeGenerator`, a pure function of position like the rest of worldgen).
 `TreeGenerator.TryGetTree(x, z, ...)` keeps the placement gates per species from its `worldgen`
@@ -3074,7 +3080,7 @@ of singleplayer's `LocalPlayer.UpdateHealth`, which still uses it with `DefaultM
 `RespawnEye` and a mob-hit sink. The server never simulates a player's body; it probes its own
 loaded chunks around the reported position (`Player/PlayerBodyProbe.cs`: `IsKnown` — the feet
 cell's chunk and the one `NetGroundProbeBlocks` below are loaded —, `Grounded` — the body lowered
-by `NetGroundProbeBlocks` collides, through the static `PlayerPhysics.BodyCollides` the client's
+by `NetGroundProbeBlocks` collides, through the static `BodyCollision.BodyCollides` the client's
 own collision now delegates to —, `InWater`, mirroring `UpdateWaterState`'s swim test, and
 `InLava`, the one lava rule `UpdateWaterState` also calls). The fall tracker is fed once per
 **accepted** `PlayerState` (`ServerPlayer.ObserveAcceptedState`), with the state gap's allowed
@@ -4010,7 +4016,7 @@ touch a file that violates one of them, fixing it is in scope.
 - **No god classes.** One class, one coherent job. Past roughly 700 lines a class is a smell:
   move the stray responsibilities out into a well-named class (composition, not `partial`).
   No source file goes past ~1000 lines without a stated reason. `World.cs`,
-  `Program.cs`, `Camera.cs`
+  `Program.cs`
   are the current offenders — keep shrinking them, never
   grow them. `World.cs` (about 1,000 lines, down from 4,700) has a stated reason: it is the
   composition root that builds and owns the per-job components (`BlockEditor`, `BlockPlacer`,
@@ -4030,7 +4036,7 @@ touch a file that violates one of them, fixing it is in scope.
   item-icon textures and frame meshes) and the shared draw primitives every page and the item
   debugger use; its pages live in the components it builds and exposes as internal properties
   (`HudRenderer`, `TopStripRenderer`, `InventoryPanelRenderer`, `CraftCardRenderer`,
-  `MenuRenderer`, `LoadingScreenRenderer`, `ChatRenderer`). `Chunk.cs` (675 lines, down from 1,944) is under the smell line now: it is the one owner of a chunk's storage (ids, the volatile state byte and light snapshot, the raw writers and edit API, the save/network snapshots, its GPU slices), with its worldgen fill in `WorldGen/ChunkTerrainFill`, its restore from a snapshot in `Chunks/ChunkRestore`, its mesh build in `Chunks/Meshing/ChunkMeshBuilder` and `ChunkLighting`, and the face and AO tables in `ChunkFaceTables`. `Camera.cs` (about 730 lines, down from 1,175) has a stated reason too: it is the player's public facade, the one type `PlayerPhysics`, `World` and its components, the renderer passes, the server and the tests compile against, and it owns the pose, the mouse look, the eye fluid state, the mode setters and the `IMobTarget` side; its view juice, F5 rig, mode toggles, view-projection cache and spawn overrides live in `HeadMotion`, `ShoulderRig`, `ModeToggles`, `ViewProjectionCache` and `SpawnOverrides`, and about 290 of its lines are the XML docs of the members it forwards to them. `Program.cs` (628 lines, down from 2,297) has a
+  `MenuRenderer`, `LoadingScreenRenderer`, `ChatRenderer`). `Chunk.cs` (675 lines, down from 1,944) is under the smell line now: it is the one owner of a chunk's storage (ids, the volatile state byte and light snapshot, the raw writers and edit API, the save/network snapshots, its GPU slices), with its worldgen fill in `WorldGen/ChunkTerrainFill`, its restore from a snapshot in `Chunks/ChunkRestore`, its mesh build in `Chunks/Meshing/ChunkMeshBuilder` and `ChunkLighting`, and the face and AO tables in `ChunkFaceTables`. `Camera.cs` (684 lines, down from 1,175) is under the smell line now: it is the player's public facade, the one type `PlayerPhysics`, `World` and its components, the renderer passes, the server and the tests compile against, and it owns the pose, the mouse look, the eye fluid state, the mode setters and the `IMobTarget` side; its view juice, F5 rig, mode toggles, view-projection cache, spawn overrides and falling-cube shove live in `HeadMotion`, `ShoulderRig`, `ModeToggles`, `ViewProjectionCache`, `SpawnOverrides` and `BodyCollision`, and about 290 of its lines are the XML docs of the members it forwards to them. `Program.cs` (628 lines, down from 2,297) has a
   stated reason too: it is the process entry point and the app's composition root: `Main` registers the
   window callbacks, `OnLoad` builds the platform managers and the components (`DevDiagnostics`,
   `ClientSession`, `InventoryPanelInput`, `ChatInput`, `MenuInput`, `GameplayInput`, `InputEvents`), it

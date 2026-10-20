@@ -365,8 +365,8 @@ public class Camera : IMobTarget
         if (bobStrafe.HasValue) _head.BobStrafe = bobStrafe.Value;
         if (shoulderOffset.HasValue) _shoulder.ShoulderOffset = shoulderOffset.Value;
         if (shoulderViewDir.HasValue) _shoulder.ShoulderViewDir = shoulderViewDir.Value;
-        if (shakeOffset.HasValue) _physics.SetShakeOffset(shakeOffset.Value);
-        if (shakeRoll.HasValue) _physics.SetShakeRoll(shakeRoll.Value);
+        if (shakeOffset.HasValue) _physics.Shake.SetOffset(shakeOffset.Value);
+        if (shakeRoll.HasValue) _physics.Shake.SetRoll(shakeRoll.Value);
     }
 
     /// <summary>
@@ -384,7 +384,7 @@ public class Camera : IMobTarget
     public void AddShake(float amount)
     {
         if (amount <= 0f) return;
-        _physics.AddShake(amount);
+        _physics.Shake.Add(amount);
     }
 
     /// <summary>
@@ -481,7 +481,7 @@ public class Camera : IMobTarget
     public void Update(float deltaTime, IKeyboard? keyboard, ChunkManager chunkManager) =>
         _physics.Update(this, deltaTime, keyboard, chunkManager);
 
-    /// <summary>Test seam for the physics state; the game reaches these through PlayerPhysics.</summary>
+    /// <summary>Test seam for the physics state; the game reaches these through PlayerPhysics and BodyCollision.</summary>
     internal void SetPosition(Vector3 position) => Position = position;
     internal void MoveBy(Vector3 delta) => Position += delta;
     internal void SetGrounded(bool grounded) => IsGrounded = grounded;
@@ -537,55 +537,8 @@ public class Camera : IMobTarget
     /// the eye inside a solid block are skipped, so a cube cannot shove the player through a
     /// wall; flight ignores shoves entirely.
     /// </summary>
-    public void PushOutOf(Vector3 center, float halfExtent, ChunkManager chunkManager)
-    {
-        if (IsFlying) return;
-
-        var min = new Vector3(
-            Position.X - PlayerPhysics.PlayerRadius,
-            Position.Y - EyeHeight,
-            Position.Z - PlayerPhysics.PlayerRadius);
-        var max = new Vector3(
-            Position.X + PlayerPhysics.PlayerRadius,
-            Position.Y - EyeHeight + PlayerPhysics.PlayerHeight,
-            Position.Z + PlayerPhysics.PlayerRadius);
-        var eMin = center - new Vector3(halfExtent);
-        var eMax = center + new Vector3(halfExtent);
-
-        var ox = Math.Min(max.X, eMax.X) - Math.Max(min.X, eMin.X);
-        var oy = Math.Min(max.Y, eMax.Y) - Math.Max(min.Y, eMin.Y);
-        var oz = Math.Min(max.Z, eMax.Z) - Math.Max(min.Z, eMin.Z);
-        if (ox <= 0f || oy <= 0f || oz <= 0f) return;
-
-        // Signed shove per axis that moves the body fully clear of the cube; ties go negative.
-        // Shallowest first, so the shove moves the player the least.
-        var bodyCenterY = Position.Y - EyeHeight + PlayerPhysics.PlayerHeight * 0.5f;
-        Span<float> pushes = [
-            Position.X <= center.X ? eMin.X - max.X : eMax.X - min.X,
-            bodyCenterY <= center.Y ? eMin.Y - max.Y : eMax.Y - min.Y,
-            Position.Z <= center.Z ? eMin.Z - max.Z : eMax.Z - min.Z,
-        ];
-        Span<int> order = [0, 1, 2];
-        for (var a = 0; a < 2; a++)
-        for (var b = a + 1; b < 3; b++)
-            if (Math.Abs(pushes[order[b]]) < Math.Abs(pushes[order[a]]))
-                (order[a], order[b]) = (order[b], order[a]);
-
-        foreach (var axis in order)
-        {
-            var candidate = axis switch
-            {
-                0 => Position + new Vector3(pushes[0], 0f, 0f),
-                1 => Position + new Vector3(0f, pushes[1], 0f),
-                _ => Position + new Vector3(0f, 0f, pushes[2]),
-            };
-
-            if (_physics.IsColliding(candidate, chunkManager)) continue;
-
-            Position = candidate;
-            return;
-        }
-    }
+    public void PushOutOf(Vector3 center, float halfExtent, ChunkManager chunkManager) =>
+        BodyCollision.PushOutOf(this, center, halfExtent, chunkManager);
 
     /// <inheritdoc />
     Vector3 IMobTarget.Eye => Position;
@@ -628,8 +581,8 @@ public class Camera : IMobTarget
         var viewDir = ViewDirection;
         var right = Vector3.Normalize(Vector3.Cross(viewDir, Vector3.UnitY));
         var up = Vector3.Transform(Vector3.UnitY,
-            Matrix4x4.CreateFromAxisAngle(viewDir, _head.Roll + _physics.ShakeRoll));
-        var eye = Position + Vector3.UnitY * _head.BobHeight + right * _head.BobStrafe + _shoulder.ShoulderOffset + _physics.ShakeOffset;
+            Matrix4x4.CreateFromAxisAngle(viewDir, _head.Roll + _physics.Shake.Roll));
+        var eye = Position + Vector3.UnitY * _head.BobHeight + right * _head.BobStrafe + _shoulder.ShoulderOffset + _physics.Shake.Offset;
         return Matrix4x4.CreateLookAt(eye, eye + viewDir, up);
     }
 
@@ -670,15 +623,15 @@ public class Camera : IMobTarget
     /// Exactly the mutable state the two matrix builders read. <see cref="GetViewMatrix"/>
     /// reads <see cref="ViewDirection"/> (<c>ShoulderRig.ShoulderViewDir</c> when non-degenerate, else
     /// <see cref="GetForwardVector"/> -> <see cref="Yaw"/>/<see cref="Pitch"/>),
-    /// <c>HeadMotion.Roll</c>, <c>PlayerPhysics.ShakeRoll</c>, <see cref="Position"/>, <c>HeadMotion.BobHeight</c>,
-    /// <c>HeadMotion.BobStrafe</c>, <c>ShoulderRig.ShoulderOffset</c> and <c>PlayerPhysics.ShakeOffset</c>;
+    /// <c>HeadMotion.Roll</c>, <c>ViewShake.Roll</c>, <see cref="Position"/>, <c>HeadMotion.BobHeight</c>,
+    /// <c>HeadMotion.BobStrafe</c>, <c>ShoulderRig.ShoulderOffset</c> and <c>ViewShake.Offset</c>;
     /// <see cref="GetProjectionMatrix"/> reads <c>HeadMotion.CurrentFov</c>
     /// and <c>_aspectRatio</c>. <c>NearPlane</c>/<c>FarPlane</c> are <c>const</c> and so are
     /// deliberately not in the key.
     /// </summary>
     internal ViewProjKey CurrentViewProjKey() =>
         new(Position, _shoulder.ShoulderViewDir, _shoulder.ShoulderOffset, Yaw, Pitch, _head.Roll, _head.BobHeight, _head.BobStrafe,
-            _physics.ShakeOffset, _physics.ShakeRoll, CurrentFov, _aspectRatio);
+            _physics.Shake.Offset, _physics.Shake.Roll, CurrentFov, _aspectRatio);
 
     /// <summary>
     /// The inputs of <see cref="GetViewProjection"/>'s cache, and nothing else. Adding a

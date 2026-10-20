@@ -14,7 +14,7 @@ namespace VoxelEngine.Networking.ServerSide;
 /// converging behavior: a too-fast move is <see cref="MoveVerdict.Clamped"/>, never corrected, and
 /// the rules below judge the clamped point.</item>
 /// <item>Without the flight flag (flight is noclip), a move whose body would overlap a solid cell
-/// (<see cref="PlayerPhysics.BodyCollides"/>, the client's collision rule) is
+/// (<see cref="BodyCollision.BodyCollides"/>, the client's collision rule) is
 /// <see cref="MoveVerdict.Rejected"/>, unless the body already overlapped one where it was: a
 /// player buried by a block written over it may always leave.</item>
 /// <item>Without the flight flag, and only over a short state gap
@@ -60,7 +60,7 @@ public static class MovementRules
             return verdict;
         }
 
-        if (PlayerPhysics.BodyCollides(bounded, chunks) && !PlayerPhysics.BodyCollides(from, chunks))
+        if (BodyCollision.BodyCollides(bounded, chunks) && !BodyCollision.BodyCollides(from, chunks))
         {
             accepted = from;
             return MoveVerdict.Rejected;

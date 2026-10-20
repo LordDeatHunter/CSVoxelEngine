@@ -290,13 +290,13 @@ public sealed class PaneTests
 
         // A lone pane is its post: the body beside it is clear, and the ray misses it
         Assert.False(TreeWoodShape.OverlapsShape(_pane, manager, px, py, pz, bodyMin, bodyMax));
-        Assert.False(PlayerPhysics.BodyCollides(eye, manager));
+        Assert.False(BodyCollision.BodyCollides(eye, manager));
         Assert.False(RayHitsTheCell());
 
         // A pane to the west gives it an arm through the body and the ray
         center.SetBlockRaw(7, y, 8, _pane, 0);
         Assert.True(TreeWoodShape.OverlapsShape(_pane, manager, px, py, pz, bodyMin, bodyMax));
-        Assert.True(PlayerPhysics.BodyCollides(eye, manager));
+        Assert.True(BodyCollision.BodyCollides(eye, manager));
         Assert.True(RayHitsTheCell());
     }
 }

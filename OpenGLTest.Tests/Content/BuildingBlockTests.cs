@@ -68,9 +68,9 @@ public sealed class BuildingBlockTests
             var column = new Vector3(origin.X + 8.5f, 0f, origin.Z + 8.5f);
 
             // Standing on the slab's top is clear, sinking into it is not
-            Assert.False(PlayerPhysics.BodyCollides(column + new Vector3(0f, top + 0.01f + Camera.EyeHeight, 0f), manager),
+            Assert.False(BodyCollision.BodyCollides(column + new Vector3(0f, top + 0.01f + Camera.EyeHeight, 0f), manager),
                 $"a body standing on {slab.Name} collides with it");
-            Assert.True(PlayerPhysics.BodyCollides(column + new Vector3(0f, top - 0.1f + Camera.EyeHeight, 0f), manager),
+            Assert.True(BodyCollision.BodyCollides(column + new Vector3(0f, top - 0.1f + Camera.EyeHeight, 0f), manager),
                 $"a body sunk into {slab.Name} does not collide with it");
         }
     }

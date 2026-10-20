@@ -170,12 +170,12 @@ public sealed class MovementRulesTests
     {
         var course = Course();
         var before = Eye(WallX - 1.5f, Resting, 4.5f);
-        Assert.False(PlayerPhysics.BodyCollides(before, course));
+        Assert.False(BodyCollision.BodyCollides(before, course));
 
         // Into the wall, whole or by the edge of the body: rejected, back where the player stood
         foreach (var into in new[] { Eye(WallX + 0.5f, Resting, 4.5f), Eye(WallX - 0.2f, Resting, 4.5f) })
         {
-            Assert.True(PlayerPhysics.BodyCollides(into, course));
+            Assert.True(BodyCollision.BodyCollides(into, course));
             Assert.Equal(MoveVerdict.Rejected, Judge(course, before, into, out var accepted));
             Assert.Equal(before, accepted);
 
@@ -187,7 +187,7 @@ public sealed class MovementRulesTests
         // A body already inside the wall (a block written over it) may move, inside or out
         var buried = Eye(WallX + 0.5f, Resting, 4.5f);
         var stillInside = Eye(WallX + 0.3f, Resting, 4.5f);
-        Assert.True(PlayerPhysics.BodyCollides(stillInside, course));
+        Assert.True(BodyCollision.BodyCollides(stillInside, course));
         Assert.Equal(MoveVerdict.Accepted, Judge(course, buried, stillInside, out var moved));
         Assert.Equal(stillInside, moved);
         Assert.Equal(MoveVerdict.Accepted, Judge(course, buried, before, out moved));

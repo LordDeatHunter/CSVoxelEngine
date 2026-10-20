@@ -2,14 +2,14 @@ using System;
 using System.Numerics;
 using Silk.NET.Input;
 using VoxelEngine.Chunks;
-using VoxelEngine.Content.Shapes;
 
 namespace VoxelEngine.Player;
 
 /// <summary>
 /// The player's movement simulation, extracted from <see cref="Camera"/>: walk/fly/swim input
-/// to a body position, collision against the voxel world, auto-step, knockback and the water
-/// state probes. It reads and mutates the <see cref="Camera"/>'s pose and state through the
+/// to a body position (moved through the voxel world by <see cref="BodyCollision"/>, which also
+/// holds the auto-step), knockback, the water state probes and the damage <see cref="ViewShake"/>
+/// it ticks. It reads and mutates the <see cref="Camera"/>'s pose and state through the
 /// public/internal members Camera exposes, so the camera keeps owning the body while the
 /// per-frame movement logic lives here.
 /// </summary>
@@ -25,7 +25,6 @@ internal sealed class PlayerPhysics
     internal const float JumpSpeed = 11f;
     public const float PlayerHeight = 1.8f;
     public const float PlayerRadius = 0.30f;
-    private const float CollisionStepSize = 0.05f;
     // How fast a mob knockback shove decays; larger stops the slide sooner.
     private const float KnockbackDamping = 6f;
     private const float GroundMinResponse = 0.02f;
@@ -35,12 +34,9 @@ internal sealed class PlayerPhysics
     private const float FlyAccelRate = 6f;
 
     // Auto-step heights: sprinting runs up a full block, plain walking only half a block,
-    // so a one-block terrain step still has to be jumped (or run at) on foot. StepClearance
-    // is a hair of extra lift so a block top the feet land exactly on is not read as a
-    // collision because of float rounding.
+    // so a one-block terrain step still has to be jumped (or run at) on foot.
     private const float WalkStepHeight = 0.5f;
     internal const float SprintStepHeight = 1f;
-    private const float StepClearance = 0.001f;
 
     // Swimming. Water has no gravity term: vertical speed eases toward a target instead, so it
     // stays capped by SwimUpSpeed/SinkSpeed however long the player stays under.
@@ -87,15 +83,8 @@ internal sealed class PlayerPhysics
     // How hard a flow carries a swimmer along it, in blocks/s
     private const float FlowPushSpeed = 2f;
 
-    // Damage shake: trauma 0..1, fed by AddShake and decayed in Update. The view offset
-    // and roll ride trauma-squared, so small hits tremble and big hits lurch.
-    private float _trauma;
-    private float _shakeTime;
-    public Vector3 ShakeOffset { get; private set; } = Vector3.Zero;
-    public float ShakeRoll { get; private set; }
-    private const float ShakeDecaySeconds = 0.7f;
-    private const float ShakeMaxOffset = 0.3f;
-    private const float ShakeMaxRoll = 0.04f;
+    // The damage view shake; Camera feeds it through AddShake and Update ticks it once a frame.
+    internal ViewShake Shake { get; } = new();
 
     private float _verticalVelocity;
     // Averaged flow of the fluid cells the body is in, refreshed by UpdateWaterState
@@ -108,11 +97,6 @@ internal sealed class PlayerPhysics
     public float VerticalVelocity => _verticalVelocity;
     /// <summary>Horizontal (x, z) speed in blocks/s.</summary>
     public Vector2 HorizontalVelocity => _horizontalVelocity;
-
-    /// <summary>Test seam: sets the damage-shake view offset directly.</summary>
-    public void SetShakeOffset(Vector3 offset) => ShakeOffset = offset;
-    /// <summary>Test seam: sets the damage-shake roll directly.</summary>
-    public void SetShakeRoll(float roll) => ShakeRoll = roll;
 
     /// <summary>Feet-relative eye height of the body being simulated.</summary>
     public const float EyeHeight = Camera.EyeHeight;
@@ -132,13 +116,6 @@ internal sealed class PlayerPhysics
     public void ResetVerticalVelocity() => _verticalVelocity = 0f;
 
     /// <summary>
-    /// Kicks the damage shake: <paramref name="amount"/> adds to trauma (0..1, clamped),
-    /// which <see cref="UpdateShake"/> decays back to still over <c>ShakeDecaySeconds</c>.
-    /// Callers scale it by the hit — World bills fall and lava ticks through here.
-    /// </summary>
-    public void AddShake(float amount) => _trauma = Math.Min(1f, _trauma + amount);
-
-    /// <summary>
     /// Knocks the player back from a mob hit: a horizontal shove that decays over a few tenths of
     /// a second — the normal collision still stops it, so a hit can never push the player through
     /// a wall — plus a small upward pop. Flight ignores both (and cannot be hit).
@@ -154,28 +131,6 @@ internal sealed class PlayerPhysics
         }
         if (!camera.IsFlying && lift > 0f)
             _verticalVelocity = MathF.Max(_verticalVelocity, lift);
-    }
-
-    private void UpdateShake(float deltaTime)
-    {
-        _shakeTime += Math.Max(0f, deltaTime);
-        if (_trauma <= 0f)
-        {
-            ShakeOffset = Vector3.Zero;
-            ShakeRoll = 0f;
-            return;
-        }
-
-        _trauma = Math.Max(0f, _trauma - Math.Max(0f, deltaTime) / ShakeDecaySeconds);
-        // Squared falloff plus mismatched sines per axis, so the view shudders instead of
-        // swaying on one clean frequency.
-        var t = _trauma * _trauma;
-        var time = _shakeTime;
-        ShakeOffset = new Vector3(
-            MathF.Sin(time * 39.7f) * ShakeMaxOffset * t,
-            MathF.Sin(time * 44.3f + 1.3f) * ShakeMaxOffset * 0.6f * t,
-            MathF.Sin(time * 31.9f + 2.1f) * ShakeMaxOffset * t);
-        ShakeRoll = MathF.Sin(time * 47.7f + 0.7f) * ShakeMaxRoll * t;
     }
 
     /// <summary>
@@ -310,7 +265,7 @@ internal sealed class PlayerPhysics
         var intendedSpeed = _horizontalVelocity.Length();
         camera.UpdateHeadMotion(deltaTime, intendedSpeed, moving, swimming, sprintHeld: sprinting,
             strafe: Vector3.Dot(moveInput, right));
-        UpdateShake(deltaTime);
+        Shake.Update(deltaTime);
 
         var frameMovement = new Vector3(_horizontalVelocity.X * deltaTime, 0f, _horizontalVelocity.Y * deltaTime);
 
@@ -392,8 +347,8 @@ internal sealed class PlayerPhysics
         }
 
         var horizontalStart = camera.Position;
-        var afterX = MoveOnAxis(camera.Position, frameMovement.X, 0, chunkManager, out var collidedX);
-        var afterZ = MoveOnAxis(afterX, frameMovement.Z, 2, chunkManager, out var collidedZ);
+        var afterX = BodyCollision.MoveOnAxis(camera.Position, frameMovement.X, 0, chunkManager, out var collidedX);
+        var afterZ = BodyCollision.MoveOnAxis(afterX, frameMovement.Z, 2, chunkManager, out var collidedZ);
         camera.SetPosition(afterZ);
 
         // Auto-step: on foot and grounded, a low ledge is climbed instead of stopping the
@@ -401,7 +356,7 @@ internal sealed class PlayerPhysics
         // the frame's horizontal move from the pre-move spot, so the climb never overshoots.
         var steppedThisFrame = false;
         if (!swimming && camera.IsGrounded && (collidedX || collidedZ)
-            && TryStepUp(horizontalStart, frameMovement,
+            && BodyCollision.TryStepUp(horizontalStart, frameMovement,
                 camera.IsSprinting ? SprintStepHeight : WalkStepHeight, chunkManager) is { } stepped)
         {
             camera.SetPosition(stepped);
@@ -421,7 +376,7 @@ internal sealed class PlayerPhysics
             frameMovement.Y = _verticalVelocity * deltaTime;
         }
 
-        var afterY = MoveOnAxis(camera.Position, frameMovement.Y, 1, chunkManager, out var collidedY);
+        var afterY = BodyCollision.MoveOnAxis(camera.Position, frameMovement.Y, 1, chunkManager, out var collidedY);
         camera.SetPosition(afterY);
 
         if (collidedY)
@@ -530,126 +485,10 @@ internal sealed class PlayerPhysics
         camera.SetInLava(PlayerBodyProbe.InLava(position, chunkManager));
     }
 
-    private Vector3? TryStepUp(Vector3 start, Vector3 frameMovement, float stepHeight,
-        ChunkManager chunkManager)
-    {
-        if (stepHeight <= 0f)
-            return null;
-
-        var steps = Math.Max(1, (int)MathF.Ceiling(stepHeight / CollisionStepSize));
-        for (var i = 1; i <= steps; i++)
-        {
-            var lift = MathF.Min(i * CollisionStepSize, stepHeight) + StepClearance;
-            var lifted = OffsetAxis(start, 1, lift);
-            if (IsColliding(lifted, chunkManager))
-                continue;
-
-            var stepped = MoveOnAxis(lifted, frameMovement.X, 0, chunkManager, out var blockedX);
-            stepped = MoveOnAxis(stepped, frameMovement.Z, 2, chunkManager, out var blockedZ);
-            if (blockedX || blockedZ)
-                continue;
-
-            // A lift that clears nothing must not teleport the body straight up; only accept
-            // it when the horizontal move actually advanced past the start.
-            if (MathF.Abs(stepped.X - start.X) < 1e-4f && MathF.Abs(stepped.Z - start.Z) < 1e-4f)
-                continue;
-
-            return stepped;
-        }
-
-        return null;
-    }
-
-    private Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunkManager, out bool collided)
-    {
-        collided = false;
-        if (MathF.Abs(delta) < float.Epsilon)
-            return start;
-
-        var position = start;
-        var remaining = delta;
-
-        while (MathF.Abs(remaining) > float.Epsilon)
-        {
-            var step = MathUtils.ClampStep(remaining, CollisionStepSize);
-            var candidate = OffsetAxis(position, axis, step);
-
-            if (IsColliding(candidate, chunkManager))
-            {
-                collided = true;
-                break;
-            }
-
-            position = candidate;
-            remaining -= step;
-        }
-
-        return position;
-    }
-
-    private static Vector3 OffsetAxis(Vector3 value, int axis, float delta)
-    {
-        return axis switch
-        {
-            0 => new Vector3(value.X + delta, value.Y, value.Z),
-            1 => new Vector3(value.X, value.Y + delta, value.Z),
-            2 => new Vector3(value.X, value.Y, value.Z + delta),
-            _ => value
-        };
-    }
-
-    /// <summary>
-    /// Whether the body box at <paramref name="eyePosition"/> overlaps a solid or collidesByHitbox
-    /// cell. Player body only: drops, slimes and falling blocks still see the full cell.
-    /// </summary>
-    public bool IsColliding(Vector3 eyePosition, ChunkManager chunkManager) =>
-        BodyCollides(eyePosition, chunkManager);
-
-    /// <summary>
-    /// The player-body collision rule behind <see cref="IsColliding"/>, with no simulation state,
-    /// so the server can judge a connected player's body (<see cref="PlayerBodyProbe"/>) by the
-    /// very rule the client's own physics moves it under. An unloaded cell reads as air.
-    /// </summary>
-    public static bool BodyCollides(Vector3 eyePosition, ChunkManager chunkManager)
-    {
-        var min = new Vector3(
-            eyePosition.X - PlayerRadius,
-            eyePosition.Y - EyeHeight,
-            eyePosition.Z - PlayerRadius);
-        var max = new Vector3(
-            eyePosition.X + PlayerRadius,
-            eyePosition.Y - EyeHeight + PlayerHeight,
-            eyePosition.Z + PlayerRadius);
-
-        VoxelCoords.CellRange(min, max, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
-
-        for (var x = minX; x <= maxX; x++)
-        for (var y = minY; y <= maxY; y++)
-        for (var z = minZ; z <= maxZ; z++)
-        {
-            var blockId = chunkManager.GetBlockGlobal(x, y, z);
-            // A layered-snow cell only collides once its stack fills the cell; every other
-            // block answers as before. See BlockType.IsSolidCell.
-            if (!BlockType.IsSolidCell(blockId, chunkManager.GetStateGlobal(x, y, z))) continue;
-            // A pass-through block (leaves) never blocks the body; it only scales the walk
-            // while the body overlaps it (see BlockMoveFactor).
-            if (BlockType.MovementSpeedOf(blockId) > 0f) continue;
-            // Tree wood collides with its drawn node-and-tubes shape and a collidesByHitbox
-            // block (a mold slab) with its declared hitboxes, so the body slips past thin limbs,
-            // under high branches and onto a low slab; every other solid block keeps the
-            // full-cube test it always had.
-            if (!BlockType.IsTreeWood(blockId) && !BlockType.CollidesByHitboxOf(blockId)) return true;
-            if (TreeWoodShape.OverlapsShape(blockId, chunkManager, x, y, z, min, max))
-                return true;
-        }
-
-        return false;
-    }
-
     /// <summary>
     /// Movement speed multiplier from the pass-through blocks the body currently occupies: the
     /// smallest <see cref="BlockType.MovementSpeedOf"/> among them, or 1 when none. A block with a
-    /// positive movement speed does not collide (see <see cref="IsColliding"/>) but scales the
+    /// positive movement speed does not collide (see <see cref="BodyCollision.BodyCollides"/>) but scales the
     /// player's speed while they wade through it, so leaves slow a walk without stopping it.
     /// </summary>
     private float BlockMoveFactor(Camera camera, ChunkManager chunkManager)

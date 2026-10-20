@@ -1172,7 +1172,7 @@ public sealed class GameServerTests : IDisposable
 
         // Settle on the arena floor a hair above its top, where the client's physics rests a body
         var start = new Vector3(arena.Eye.X, arena.Y + Camera.EyeHeight + 0.01f, arena.Eye.Z);
-        Assert.False(PlayerPhysics.BodyCollides(start, manager));
+        Assert.False(BodyCollision.BodyCollides(start, manager));
         SendState(client, start, NetPlayerFlags.None);
         var sw = Stopwatch.StartNew();
         while (PlayerOf(client).Position != start && sw.Elapsed.TotalSeconds < 15)
@@ -1183,7 +1183,7 @@ public sealed class GameServerTests : IDisposable
         SetCell(arena.Front, Stone);
         SetCell(arena.Front - Vector3.UnitY, Stone);
         var inside = new Vector3(arena.Front.X + 0.5f, start.Y, arena.Front.Z + 0.5f);
-        Assert.True(PlayerPhysics.BodyCollides(inside, manager));
+        Assert.True(BodyCollision.BodyCollides(inside, manager));
         Tick(0.05);
         SendState(client, inside, NetPlayerFlags.None);
         sw.Restart();
