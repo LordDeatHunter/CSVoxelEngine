@@ -91,6 +91,8 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `ef2f66b` | Split ChunkMesher.cs (1,276 -> 482 lines) into WaterSurfaceCodes, FluidEmitter, StackEmitter and TreeWoodEmitter; ChunkMesher keeps the greedy pass, the tinted cube face and the quad primitives; fixed the FaceLight/MeshScratch SmoothCornerLight crefs |
 | `33e3ab7` | Split LodRegion.cs (1,237 lines) into LodLevelSpec, LodMeshData, LodColumnCaps (the mined-column cap table), LodMeshBuilder (the per-build phases) and the ref-struct LodFaceEmitter (palette, tint lattice, face and water emission); LodRegion (243 lines) keeps the region object and comparers, and BuildMeshData forwards to LodMeshBuilder |
 
+| `fc2ffb2` | Split Camera.cs (1,175 -> 731 lines, stated reason recorded) into HeadMotion, ShoulderRig, ModeToggles, ViewProjectionCache, SpawnOverrides and CameraMode; Camera stays the facade with forwards |
+
 ## In progress
 
 Nothing is in progress. The next task is the first entry of "Still to do".
@@ -106,7 +108,7 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 | File | Lines | Notes |
 |---|---|---|
 | `src/Chunks/Chunk.cs` | 769 | Split in `e4a318b` (ChunkTerrainFill 377, ChunkMeshBuilder 584, ChunkFaceTables 98, ChunkMeshData 38, ChunkLighting 395; ChunkMesher since split in `ef2f66b`, now 482). Inside the 800 ceiling but above the ~700 smell line; AGENTS.md records it as a stated reason in the offender list. Remaining option: move TakeSnapshot/CaptureForNetwork/RestoreFrom (the save and network snapshot job) into a Saves- or Chunks-side helper to get under ~700. |
-| `src/Player/Camera.cs` | 1,175 | Pose, view cache, head motion, FOV/roll terms, water state. |
+| `src/Player/Camera.cs` | 731 | Split in `fc2ffb2` (HeadMotion 136, ShoulderRig 196, ModeToggles 86, ViewProjectionCache 82, SpawnOverrides 98, CameraMode 9); AGENTS.md records a stated reason. Misses the ~700 target because the XML docs kept on the forwards take more lines than planned. Optional: move `PushOutOf`'s body (about 45 lines) verbatim into a small `Player/` helper (not `PlayerPhysics`) with a one-line forward, then update the AGENTS.md wording ('about 730 lines'). |
 | `src/World.cs` | 1,144 | Has a stated reason. Next extraction: `Update`'s mob target/damage block and `PushFromBlast`/`PushTargetFromBlast`. |
 | `src/Simulation/FluidManager.cs` | 1,066 | Tick, wake scans, hardening. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
@@ -208,6 +210,13 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - The stale REPO preamble in `.claude/workflows/plan-and-implement.js` (`~/.dotnet/dotnet.exe`,
   `OpenGLTest.sln`) is the user's file. They may want it fixed. (`cleanup-campaign.js` carries the
   correct commands, so the cleanup no longer depends on it.)
+
+- Camera split line counts: Camera 731, CameraMode 9, HeadMotion 136, ModeToggles 86, ShoulderRig 196, SpawnOverrides 98, ViewProjectionCache 82; `Player/` holds 20 files; AGENTS.md 4,046 lines.
+- `PlayerPhysics.cs` is 708 lines with no stated reason, just over the ~700 smell line; a candidate for a later split.
+- `Camera.IsCreative` and `IsFlying` are now `internal set`, so any code in the assembly (and the tests and ItemDebugger through InternalsVisibleTo) can write them. Nothing outside `ModeToggles` writes them today.
+- The cref `<see cref="SwimDepth"/>` on `Camera.IsInWater` is still broken (CS1574 in a doc build).
+- A comment in `OpenGLTest.Tests/Player/CameraViewProjectionCacheTests.cs` (line 334) names `EnsureViewCache` unqualified; the method now lives in `ViewProjectionCache`. Harmless; fix when tests may be edited.
+- Run a doc build (`-p:GenerateDocumentationFile=true`) to confirm the crefs in the moved Camera docs, and the usings in `Camera.cs` that only crefs need, all resolve.
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
