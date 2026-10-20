@@ -86,6 +86,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `ad27efd` | Split ContentRegistry (2,383 -> 475 lines) into ContentFiles, ItemLoader, TagLoader, EntityLoader, TreeSpeciesLoader, Blocks/BlockLoader, Blocks/BlockSchemaParser, Loot/LootTableCompiler, Recipes/RecipeLoader and Models/ModelBakeSteps; ContentRegistry stays the static facade and the owner of the tables |
 | `e4a318b` | Split Chunk.cs (1,944 -> 769 lines): worldgen fill to WorldGen/ChunkTerrainFill, mesh build to Chunks/Meshing/ChunkMeshBuilder, light snapshot/flood to ChunkLighting, face tables and UV helpers to ChunkFaceTables, ChunkMeshData to its own file; Chunk keeps storage with one-line forwarders |
 | `f17ea5c` | Split PlayerModel.cs (1,468 to 583 lines) into Player/Posing/: static SliceMotion, ArmSolver and LimbFrames; the PoseMods struct; owned SwimPose, ThrowPose, SecondaryMotion, PunchPose, ArmOverlays, ShoulderReach, PoseBuilder and BodyPartMatrices. PlayerModel stays the state owner and facade. |
+| `d34921c` | Split GameServer.cs (1,393 -> 330 lines) into ServerState, ServerTransport, PlayerSessions, IntentReplay, StreamRequests, ServerBroadcasts and ServerChat, with ClientConnection and Inbound lifted to their own files; GameServer stays the composition root with an unchanged public surface and Pump order |
 
 ## In progress
 
@@ -102,7 +103,6 @@ update the docs. Folders now have headroom: `Chunks/` holds 9 files plus `Meshin
 | File | Lines | Notes |
 |---|---|---|
 | `src/Chunks/Chunk.cs` | 769 | Split in `e4a318b` (ChunkTerrainFill 377, ChunkMeshBuilder 584, ChunkFaceTables 98, ChunkMeshData 38, ChunkLighting 395, ChunkMesher 1,276 unchanged). Inside the 800 ceiling but above the ~700 smell line; AGENTS.md records it as a stated reason in the offender list. Remaining option: move TakeSnapshot/CaptureForNetwork/RestoreFrom (the save and network snapshot job) into a Saves- or Chunks-side helper to get under ~700. |
-| `OpenGLTest.Server/GameServer.cs` | 1,393 | Accept loop, Pump, intent handling, streaming answers, status. The Server project is flat and namespaced `VoxelEngine.Server`. |
 | `src/Chunks/ChunkManager.cs` | 1,349 | Lifecycle, dirty scheduling, mesh scheduling, foci, unload. Threading rules apply. |
 | `src/Chunks/Meshing/ChunkMesher.cs` | 1,276 | Greedy pass vs per-voxel emitters. Perf-hot: no new allocations, and keep `GreedyMeshingTests` equality. |
 | `src/Lod/LodRegion.cs` | 1,236 | LOD mesh build, levels, caps. Keep the nesting invariants. |
@@ -183,6 +183,11 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `PunchPose.TorsoRotation` still calls `SecondaryMotion.ComputeMods` once per arm solve (four times per `WithPunch`), and `GetPartMatrix` recomputes `GetPose` for every part. This predates the split and was kept verbatim on purpose; a candidate perf item.
 - `PlayerModel` now carries 16 internal state accessors for its components. If more posing jobs move out later, consider grouping the read-only pose state into one internal view struct instead of growing the accessor list.
 - The pre-existing CS1574 on `Camera.cs` `SwimDepth` in the doc build is still open (out of scope for the PlayerModel split).
+- GameServer split line counts: GameServer 330, ClientConnection 77, Inbound 3, ServerState 37, ServerTransport 123, ServerBroadcasts 198, StreamRequests 100, ServerChat 135, PlayerSessions 311, IntentReplay 273; `OpenGLTest.Server/` holds 13 .cs files; AGENTS.md 4,015 lines.
+- The new server files were staged intent-to-add (`git add -N`); the committer must add them in full.
+- `ClientConnection.cs`'s usings were never checked one by one for unused entries (the plain build does not flag them); a later pass could prune any extras.
+- The static sender helpers `PlayerSessions.SendInventory`, `SendPlayerStatus` and `SendPlayerCorrection` are shared with `IntentReplay` and `ServerChat`; if the server grows, they could move into their own small sender class.
+- The `AssetRoot.cs` duplication with the ItemDebugger copy is still the queued separate task (see the duplication pass); not touched by the GameServer split.
 - The stale REPO preamble in `.claude/workflows/plan-and-implement.js` (`~/.dotnet/dotnet.exe`,
   `OpenGLTest.sln`) is the user's file. They may want it fixed. (`cleanup-campaign.js` carries the
   correct commands, so the cleanup no longer depends on it.)
