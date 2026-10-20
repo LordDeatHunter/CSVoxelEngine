@@ -93,6 +93,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 
 | `fc2ffb2` | Split Camera.cs (1,175 -> 731 lines, stated reason recorded) into HeadMotion, ShoulderRig, ModeToggles, ViewProjectionCache, SpawnOverrides and CameraMode; Camera stays the facade with forwards |
 | `78635e3` | Moved World's per-frame mob job (target list, slime/goblin updates and damage billing, PushFromBlast, RefreshMobs/SpawnEntity/DamageAllMobs bodies) into Simulation/MobDirector.cs with forwarders on World; World.cs 1,149 -> 1,015 lines |
+| `9dea99b` | Split FluidManager (1,066 -> 262 lines) into Simulation/Fluids/: FluidSchedule, FluidCells, FluidCellKey, FluidNeighborhood, FluidSpread, FluidMud, FluidWakeScanner, FluidWakeRules, with FluidFlow and FluidState moved alongside; Simulation/ 22 -> 19 files |
 
 ## In progress
 
@@ -111,7 +112,6 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 | `src/Chunks/Chunk.cs` | 769 | Split in `e4a318b` (ChunkTerrainFill 377, ChunkMeshBuilder 584, ChunkFaceTables 98, ChunkMeshData 38, ChunkLighting 395; ChunkMesher since split in `ef2f66b`, now 482). Inside the 800 ceiling but above the ~700 smell line; AGENTS.md records it as a stated reason in the offender list. Remaining option: move TakeSnapshot/CaptureForNetwork/RestoreFrom (the save and network snapshot job) into a Saves- or Chunks-side helper to get under ~700. |
 | `src/Player/Camera.cs` | 731 | Split in `fc2ffb2` (HeadMotion 136, ShoulderRig 196, ModeToggles 86, ViewProjectionCache 82, SpawnOverrides 98, CameraMode 9); AGENTS.md records a stated reason. Misses the ~700 target because the XML docs kept on the forwards take more lines than planned. Optional: move `PushOutOf`'s body (about 45 lines) verbatim into a small `Player/` helper (not `PlayerPhysics`) with a one-line forward, then update the AGENTS.md wording ('about 730 lines'). |
 | `src/World.cs` | 1,015 | Has a stated reason. Mob frame job moved to `Simulation/MobDirector.cs` (208) in `78635e3`. Next extraction: the fire-cell gathering that `Update` and `UpdateClient` both build. |
-| `src/Simulation/FluidManager.cs` | 1,066 | Tick, wake scans, hardening. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
 | `src/Lod/LodManager.cs` | 932 | No stated reason; split it next. Its `LodBuildOutcome` enum is still inside it. |
 | `src/UI/InventoryPanel/Inventory.cs` | 896 | |
@@ -223,6 +223,13 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `World.cs` class summary (line 41) runs past ~100 chars after adding `<see cref="Director"/>`; rewrap in a later doc touch.
 - The edited AGENTS.md lines (TNT invariant, Mobs follow real players, Entities, Code organization World.cs paragraph) were not reflowed, so a few are slightly longer than their neighbors.
 - `MobDirector`'s class doc `<see cref="Update"/>` resolves to `MobDirector.Update`; if it means World's entity update it should read `World.Update`.
+
+- FluidManager split: Fluids/FluidManager 262, FluidSchedule 59, FluidCells 148, FluidCellKey 56, FluidNeighborhood 115, FluidSpread 240, FluidMud 101, FluidWakeScanner 201, FluidWakeRules 45, FluidFlow 139, FluidState 53; `Simulation/` holds 19 files, `Simulation/Fluids/` 11; ChunkTerrainFill 377; AGENTS.md 4,060 lines.
+- Remove the redundant `using VoxelEngine.Simulation;` from `Simulation/Fluids/FluidManager.cs` and `FluidSpread.cs`: their namespace `VoxelEngine.Simulation.Fluids` already has the enclosing namespace in scope. The doc+style build never reports IDE0005 in this config, so the build cannot catch it.
+- Duplication: `LeafDecayManager` has a twin of `FluidCellKey`'s 21-bit packer and `AddTouchedChunks`, and of `FluidCells`' 16-slot direct-mapped chunk cache; candidates for one shared helper in a duplication run.
+- Dead code check: `FluidWakeRules.IsCarvedFlowTarget` has no production caller, only `WaterRavineTests`. Decide whether the rule belongs in production or the test should assert through `IsWakeTarget`.
+- `Fluids/FluidFlow.cs` still declares two types (`FluidFlow` and `IFluidCellReader`); split `IFluidCellReader` into its own file for the one-type-per-file convention.
+- The `FluidSchedule.Enabled` doc and the `UnpackedY` comment were carried over verbatim; check them for stale wording in a doc pass.
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
