@@ -675,7 +675,7 @@ needs, not the history.
   `LodRegion.BuildMeshData` (`LodRegion.cs:524`) — the cache's **only** engine caller — asking
   `TryGetCanopy` once per **fine column** of a region: measured distinct chunk columns per ring are
   **3152 / 12608 / 50432** at levels 0 / 1 / 2 against a 4096 cap, so it is the level-1 and level-2
-  rings that overrun it, not level 0. (The radius-8 ring `LodManager.BuildSortedOffsets` builds is a
+  rings that overrun it, not level 0. (The radius-8 ring `LodRegionClaims.BuildSortedOffsets` builds is a
   **disc of 197 regions**, not a 17x17 square — an earlier estimate of "~4.6k level-0 columns" came
   from the square and is wrong.) `TreeGenerator.ShapeCache` is the one of the three genuinely shared
   between two streams (`TreeGenerator.Stamp` on the generation workers and `BuildCanopyTops` under
@@ -863,7 +863,7 @@ needs, not the history.
   the plumbing step and it existed for exactly one step; it is not a shipped condition. Noted only so
   a bisect landing on it is not mistaken for a leak.
 
-- **C5 · the LodGen pool.** `LodManager.Start` now spawns
+- **C5 · the LodGen pool.** `LodWorkerPool.Start` (which `LodManager.Start` forwards to) now spawns
   `StreamingConfig.MaxConcurrentLodGenerations` dedicated `Thread`s named `LodGen-{i}`,
   `IsBackground = true`, `Priority = ThreadPriority.BelowNormal`, all running the same `WorkerLoop`;
   `Stop()` needed **no change**, because every worker polls the same volatile `_isRunning`. One
@@ -916,7 +916,7 @@ needs, not the history.
   the engine reads it — because `_solidCount` and `_blocks` are private and `GetLocalBlock` was the
   only public block reader, so the new form could not otherwise be pinned against a scalar oracle.
   No measurement was taken and none should be invented.
-- **C12(c).** `LodManager.RemoveRegion`'s `_pendingCover.Remove(region)` is now an index-tracked
+- **C12(c).** `LodRegionSet.RemoveRegion`'s `_pendingCover.Remove(region)` is now an index-tracked
   swap-remove mirroring `LodRegion.ListIndex`: `LodRegion.PendingCoverIndex` (`LodRegion.cs:85`,
   main-thread only), set in `AddRegion`, swapped in `RemoveRegion`, and **reset to -1 for every entry
   in `UpdateBuriedFlags` before the `Clear()`** — without that reset a region added before one pass
@@ -961,7 +961,7 @@ needs, not the history.
 
 ### The C5 concurrency argument — the reusable artifact of this round
 
-This is the part to read before touching `LodManager`, its claim paths, or the LOD mesh pool, and it
+This is the part to read before touching `LodRegionClaims`, its claim paths, or the LOD mesh pool, and it
 is worth keeping **even if the pool is resized or backed out to one worker**: it documents what a
 single builder was silently guaranteeing. The code's own doc comments carry it in full beside the
 code; this is the summary.

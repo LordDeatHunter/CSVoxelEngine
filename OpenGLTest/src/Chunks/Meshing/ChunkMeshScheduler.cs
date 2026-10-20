@@ -521,7 +521,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     /// exempt, since its build returns before it reads any column and a sky chunk at a client's
     /// rim must keep meshing at once; a fully enclosed chunk cannot be told apart without its
     /// neighbors and so waits for its columns too, which only delays <see cref="Chunk.IsMeshed"/>
-    /// for <c>LodManager.IsCoveredByChunks</c> at a client's load-sphere rim.
+    /// for <c>LodCoverPass.IsCoveredByChunks</c> at a client's load-sphere rim.
     /// </summary>
     private bool HasColumnNeighborhood(Chunk chunk, int cx, int cz)
     {

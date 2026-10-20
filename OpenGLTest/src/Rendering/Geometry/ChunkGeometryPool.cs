@@ -85,7 +85,7 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     ///
     /// Sizing runs off the resident ceiling, not the settled count. The settled live set is 591
     /// regions (197 integer offsets inside RegionRadius 8, times the three <c>LodRegion.Levels</c>),
-    /// but generation scans at <c>RegionRadius</c> (LodManager.BuildSortedOffsets) while retention
+    /// but generation scans at <c>RegionRadius</c> (LodRegionClaims.BuildSortedOffsets) while retention
     /// and the out-of-range upload drop test use <c>RegionRadius + 1</c> — 253 offsets per level, so
     /// 759 regions can be resident at once. That hysteresis band is occupied exactly while the
     /// camera is moving, which is when the pool is under pressure.

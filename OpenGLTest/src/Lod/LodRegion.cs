@@ -64,13 +64,13 @@ public class LodRegion : IDisposable
 
     /// <summary>
     /// This region's index in <see cref="LodManager.RegionList"/>, or -1 while it is not in
-    /// that list. Maintained by <see cref="LodManager"/> on the main thread only.
+    /// that list. Maintained by <see cref="LodRegionSet"/> on the main thread only.
     /// </summary>
     public int ListIndex = -1;
 
     /// <summary>
-    /// This region's index in <c>LodManager._pendingCover</c>, or -1 while it is not in that
-    /// list. Maintained by <see cref="LodManager"/> on the main thread only, exactly like
+    /// This region's index in <c>LodRegionSet._pendingCover</c>, or -1 while it is not in that
+    /// list. Maintained by <see cref="LodRegionSet"/> on the main thread only, exactly like
     /// <see cref="ListIndex"/>, so removal is a swap instead of a linear scan.
     /// </summary>
     public int PendingCoverIndex = -1;

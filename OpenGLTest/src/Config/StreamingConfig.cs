@@ -27,7 +27,7 @@ public static class StreamingConfig
     // How many dedicated threads for block data generation
     public const int MaxConcurrentBlockDataGenerations = 4;
 
-    // How many dedicated threads build LOD region meshes (LodManager's LodGen pool).
+    // How many dedicated threads build LOD region meshes (LodWorkerPool's LodGen pool).
     //
     // SHIPS AT 1: a pool was built, measured and declined. The thread census said 3 (12 hardware
     // threads on the reference machine, minus 1 render thread, minus MaxConcurrentMeshGenerations

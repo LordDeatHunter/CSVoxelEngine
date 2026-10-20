@@ -36,7 +36,7 @@ namespace VoxelEngine.WorldGen;
 /// <c>Interlocked.CompareExchange</c> (a full fence). <see cref="GetOrAdd"/> takes exactly one
 /// <c>Volatile.Read</c> of <c>_current</c> and uses that snapshot for the whole call, so no reader
 /// can observe a half-rotated set - the same protocol as <c>ChunkScanFrontier</c>'s node (C3) and
-/// <c>LodManager</c>'s TryAdd-gated claim (C5).</para>
+/// <c>LodRegionClaims</c>'s TryAdd-gated claim (C5).</para>
 ///
 /// <para><b>4. An insert racing a rotation is dropped one generation early.</b> A caller whose
 /// snapshot was taken before a rotation inserts into what is now <c>Maps[1]</c>. That entry is
