@@ -1,11 +1,12 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using VoxelEngine.Content.Models;
+using VoxelEngine.Data;
 using static VoxelEngine.Chunks.Chunk;
 
 namespace VoxelEngine.Chunks.Meshing;
 
-/// <summary>The mesher's per-face lookup tables (padded-snapshot neighbor deltas, AO sample deltas, the shade LUT) and the per-face corner and UV helpers every chunk, LOD, pop and icon mesh shares. Filled once from <see cref="Chunk.CubeFaces"/> and <see cref="Chunk.AONeighbors"/>.</summary>
+/// <summary>The mesher's per-face lookup tables (padded-snapshot neighbor deltas, AO sample deltas, the shade LUT) and the per-face corner and UV helpers every chunk, LOD, pop and icon mesh shares. Filled once from <see cref="Chunk.CubeFaces"/> and <see cref="AONeighbors"/>.</summary>
 internal static class ChunkFaceTables
 {
     internal static readonly int[] FaceNeighborDelta = new int[6];
@@ -13,6 +14,46 @@ internal static class ChunkFaceTables
     internal const float SmoothLightDivisor = 60f; // 4 samples x level 15
     internal static readonly float[] FaceBrightness = [0.85f, 0.95f, 0.8f, 0.9f, 1.0f, 0.75f]; // matches CubeFaces order
     internal static readonly byte[] ShadeLut = new byte[6 * 4]; // [face * 4 + ao]
+
+    internal static readonly Vector3[][][] AONeighbors =
+    [
+        [
+            [Vector3Directions.LeftBackward, Vector3Directions.DownBackward, Vector3Directions.DownLeftBackward],
+            [Vector3Directions.LeftBackward, Vector3Directions.UpBackward, Vector3Directions.UpLeftBackward],
+            [Vector3Directions.RightBackward, Vector3Directions.UpBackward, Vector3Directions.UpRightBackward],
+            [Vector3Directions.RightBackward, Vector3Directions.DownBackward, Vector3Directions.DownRightBackward],
+        ],
+        [
+            [Vector3Directions.RightForward, Vector3Directions.DownForward, Vector3Directions.DownRightForward],
+            [Vector3Directions.RightForward, Vector3Directions.UpForward, Vector3Directions.UpRightForward],
+            [Vector3Directions.LeftForward, Vector3Directions.UpForward, Vector3Directions.UpLeftForward],
+            [Vector3Directions.LeftForward, Vector3Directions.DownForward, Vector3Directions.DownLeftForward],
+        ],
+        [
+            [Vector3Directions.DownLeft, Vector3Directions.LeftForward, Vector3Directions.DownLeftForward],
+            [Vector3Directions.UpLeft, Vector3Directions.LeftForward, Vector3Directions.UpLeftForward],
+            [Vector3Directions.UpLeft, Vector3Directions.LeftBackward, Vector3Directions.UpLeftBackward],
+            [Vector3Directions.DownLeft, Vector3Directions.LeftBackward, Vector3Directions.DownLeftBackward],
+        ],
+        [
+            [Vector3Directions.DownRight, Vector3Directions.RightBackward, Vector3Directions.DownRightBackward],
+            [Vector3Directions.UpRight, Vector3Directions.RightBackward, Vector3Directions.UpRightBackward],
+            [Vector3Directions.UpRight, Vector3Directions.RightForward, Vector3Directions.UpRightForward],
+            [Vector3Directions.DownRight, Vector3Directions.RightForward, Vector3Directions.DownRightForward],
+        ],
+        [
+            [Vector3Directions.UpLeft, Vector3Directions.UpBackward, Vector3Directions.UpLeftBackward],
+            [Vector3Directions.UpLeft, Vector3Directions.UpForward, Vector3Directions.UpLeftForward],
+            [Vector3Directions.UpRight, Vector3Directions.UpForward, Vector3Directions.UpRightForward],
+            [Vector3Directions.UpRight, Vector3Directions.UpBackward, Vector3Directions.UpRightBackward],
+        ],
+        [
+            [Vector3Directions.DownLeft, Vector3Directions.DownForward, Vector3Directions.DownLeftForward],
+            [Vector3Directions.DownLeft, Vector3Directions.DownBackward, Vector3Directions.DownLeftBackward],
+            [Vector3Directions.DownRight, Vector3Directions.DownBackward, Vector3Directions.DownRightBackward],
+            [Vector3Directions.DownRight, Vector3Directions.DownForward, Vector3Directions.DownRightForward],
+        ]
+    ];
 
     static ChunkFaceTables()
     {

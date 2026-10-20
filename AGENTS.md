@@ -874,9 +874,9 @@ OpenGLTest/
     Chunks/                    # chunk storage and lifecycle, the column cache and column terrain, the light
                                #   query entities read (EntityLight); meshing, world sources and streaming below
       Chunk.cs                 # 16^3 block storage of one chunk: ids, the per-block state byte, the published light
-                               #   snapshot, the raw writers and edit API, save/network snapshots and restore, and its GPU slices
-                               #   (UpdateMesh, MarkMeshedHeadless); GenerateBlockData and GenerateMeshData forward to
-                               #   WorldGen/ChunkTerrainFill and Meshing/ChunkMeshBuilder
+                               #   snapshot, the raw writers and edit API, save/network snapshots, and its GPU slices
+                               #   (UpdateMesh, MarkMeshedHeadless); GenerateBlockData, RestoreFrom and GenerateMeshData
+                               #   forward to WorldGen/ChunkTerrainFill, ChunkRestore and Meshing/ChunkMeshBuilder
       ChunkFluidQueries.cs     # the fluid surface, column-top and flow queries over the loaded cells (behind ChunkManager.GetFluid*)
       ChunkKey.cs              # packs a chunk position into one long, so the chunk
                                #   dictionaries hash one integer instead of three floats
@@ -885,6 +885,9 @@ OpenGLTest/
                                #   composes ChunkMeshScheduler, ChunkRenderLists and PlayerPlacedIndex and forwards their public members
       ChunkMap.cs              # the loaded-chunk table (ChunkManager.Chunks): a ConcurrentDictionary keyed on a packed ChunkKey long
       ChunkRenderLists.cs      # Renderable / TranslucentRenderable swap-remove bookkeeping and MeshVersion (behind ChunkManager's forwarders)
+      ChunkRestore.cs          # rebuilds a chunk from a ChunkSnapshot (a save, a world source's map, a streamed chunk):
+                               #   copies blocks and state, recounts, surface floor, fluid frontier, publishes (behind
+                               #   Chunk.RestoreFrom)
       ColumnCache.cs           # the process-global column-data cache, its accessors and the column fill
       ColumnTerrain.cs         # one chunk column's terrain: heights, water levels, corner climate (warmth, wetness)
       EntityLight.cs           # GL-free world light query for entity draws (drops, pops, debris, the player, ...)
@@ -895,8 +898,9 @@ OpenGLTest/
       Meshing/                 # the mesh build: the greedy pass, the procedural emitters, the light volume and corner light
         CellBatchMesher.cs     # GL-free: meshes any TreeCell set with the real chunk mesher over scratch chunks
                                #   at their real positions inside an empty ring (the item debugger's TREES tab)
-        ChunkFaceTables.cs     # the mesher's per-face tables (neighbor/AO deltas, ShadeLut, SmoothLightDivisor) and the
-                               #   shared corner/UV helpers (BoxFaceCorners, TiledUv, CropUv, VertexAO)
+        ChunkFaceTables.cs     # the mesher's per-face tables (neighbor/AO deltas, the AO neighbor table AONeighbors,
+                               #   ShadeLut, SmoothLightDivisor) and the shared corner/UV helpers (BoxFaceCorners,
+                               #   TiledUv, CropUv, VertexAO)
         ChunkLighting.cs       # the wide light-volume snapshot and flood (sun + colored lamp) + corner light queries
         ChunkMeshBuilder.cs    # the per-chunk mesh build: neighborhood resolve, padded and light snapshots, the light flood
                                #   and the per-voxel emitter loop (behind Chunk.GenerateMeshData)
@@ -3989,7 +3993,7 @@ touch a file that violates one of them, fixing it is in scope.
 - **No god classes.** One class, one coherent job. Past roughly 700 lines a class is a smell:
   move the stray responsibilities out into a well-named class (composition, not `partial`).
   No source file goes past ~1000 lines without a stated reason. `World.cs`,
-  `Program.cs`, `Chunk.cs`, `Camera.cs`
+  `Program.cs`, `Camera.cs`
   are the current offenders — keep shrinking them, never
   grow them. `World.cs` (about 1,020 lines, down from 4,700) has a stated reason: it is the
   composition root that builds and owns the per-job components (`BlockEditor`, `BlockPlacer`,
@@ -4010,7 +4014,7 @@ touch a file that violates one of them, fixing it is in scope.
   item-icon textures and frame meshes) and the shared draw primitives every page and the item
   debugger use; its pages live in the components it builds and exposes as internal properties
   (`HudRenderer`, `TopStripRenderer`, `InventoryPanelRenderer`, `CraftCardRenderer`,
-  `MenuRenderer`, `LoadingScreenRenderer`, `ChatRenderer`). `Chunk.cs` (769 lines, down from 1,944) has a stated reason too: it is the one owner of a chunk's storage (ids, the volatile state byte and light snapshot, the raw writers and edit API, the save/network snapshots and restore, its GPU slices), with its worldgen fill in `WorldGen/ChunkTerrainFill`, its mesh build in `Chunks/Meshing/ChunkMeshBuilder` and `ChunkLighting`, and the face tables in `ChunkFaceTables`. `Camera.cs` (about 730 lines, down from 1,175) has a stated reason too: it is the player's public facade, the one type `PlayerPhysics`, `World` and its components, the renderer passes, the server and the tests compile against, and it owns the pose, the mouse look, the eye fluid state, the mode setters and the `IMobTarget` side; its view juice, F5 rig, mode toggles, view-projection cache and spawn overrides live in `HeadMotion`, `ShoulderRig`, `ModeToggles`, `ViewProjectionCache` and `SpawnOverrides`, and about 290 of its lines are the XML docs of the members it forwards to them. `Program.cs` (628 lines, down from 2,297) has a
+  `MenuRenderer`, `LoadingScreenRenderer`, `ChatRenderer`). `Chunk.cs` (675 lines, down from 1,944) is under the smell line now: it is the one owner of a chunk's storage (ids, the volatile state byte and light snapshot, the raw writers and edit API, the save/network snapshots, its GPU slices), with its worldgen fill in `WorldGen/ChunkTerrainFill`, its restore from a snapshot in `Chunks/ChunkRestore`, its mesh build in `Chunks/Meshing/ChunkMeshBuilder` and `ChunkLighting`, and the face and AO tables in `ChunkFaceTables`. `Camera.cs` (about 730 lines, down from 1,175) has a stated reason too: it is the player's public facade, the one type `PlayerPhysics`, `World` and its components, the renderer passes, the server and the tests compile against, and it owns the pose, the mouse look, the eye fluid state, the mode setters and the `IMobTarget` side; its view juice, F5 rig, mode toggles, view-projection cache and spawn overrides live in `HeadMotion`, `ShoulderRig`, `ModeToggles`, `ViewProjectionCache` and `SpawnOverrides`, and about 290 of its lines are the XML docs of the members it forwards to them. `Program.cs` (628 lines, down from 2,297) has a
   stated reason too: it is the process entry point and the app's composition root: `Main` registers the
   window callbacks, `OnLoad` builds the platform managers and the components (`DevDiagnostics`,
   `ClientSession`, `InventoryPanelInput`, `ChatInput`, `MenuInput`, `GameplayInput`, `InputEvents`), it

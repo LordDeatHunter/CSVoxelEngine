@@ -10,7 +10,8 @@ namespace VoxelEngine.Chunks.Meshing;
 /// <summary>
 /// GL-free voxel lighting: the wide light-volume BFS flood (sun + colored lamp light) and the
 /// per-corner light/AO queries the mesher samples. Extracted from <see cref="Chunk"/>; reads
-/// Chunk's shared geometry tables and light-volume constants through <c>using static Chunk</c>.
+/// Chunk's shared geometry tables and light-volume constants through <c>using static Chunk</c>,
+/// and the AO neighbor table through <c>using static ChunkFaceTables</c>.
 /// </summary>
 internal static class ChunkLighting
 {

@@ -11,7 +11,6 @@ using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Interaction;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Saves;
-using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen;
 
@@ -203,7 +202,7 @@ public class Chunk : IDisposable
     /// <see cref="RestoredPlayerPlaced"/> may be null. Restoring never sets
     /// <see cref="ModifiedSinceSave"/>; only the raw writers do.
     /// </summary>
-    public bool IsRestored { get; private set; }
+    public bool IsRestored { get; internal set; }
 
     /// <summary>
     /// The player-placed cells (chunk-local <see cref="Idx"/> indices) a restored chunk brought
@@ -215,8 +214,6 @@ public class Chunk : IDisposable
 
     /// <summary>Lamp level bits of a <c>blockLight</c> byte (see <see cref="ChunkLighting.ComputeLight"/>).</summary>
     internal const int BlockLevelMask = 15;
-
-
 
     /// <summary>Flat index of a chunk-local block; shared with the WorldGen carvers.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -393,7 +390,7 @@ public class Chunk : IDisposable
     /// chunk built with <c>generateBlockData: false</c>, before any other thread can see it;
     /// <see cref="IsBlockDataReady"/> goes true last, which is what publishes the rest.
     /// </summary>
-    internal void RestoreFrom(ChunkSnapshot snapshot) => RestoreFrom(snapshot, streamedColumns: false);
+    internal void RestoreFrom(ChunkSnapshot snapshot) => ChunkRestore.RestoreFrom(this, snapshot);
 
     /// <summary>
     /// <see cref="RestoreFrom(ChunkSnapshot)"/> with the block source chosen: a streamed
@@ -402,20 +399,7 @@ public class Chunk : IDisposable
     /// owns fluids). A save restore without a world source at hand uses the column cache as
     /// before, for the fluid frontier (<see cref="RestoreFrom(ChunkSnapshot, ColumnData)"/>).
     /// </summary>
-    internal void RestoreFrom(ChunkSnapshot snapshot, bool streamedColumns)
-    {
-        ArgumentNullException.ThrowIfNull(snapshot);
-
-        if (!streamedColumns)
-        {
-            RestoreFrom(snapshot, ColumnCache.Get((int)Position.X, (int)Position.Z));
-            return;
-        }
-
-        CopySnapshot(snapshot);
-        SurfaceMinY = LowestSolidY();
-        FinishRestore(snapshot);
-    }
+    internal void RestoreFrom(ChunkSnapshot snapshot, bool streamedColumns) => ChunkRestore.RestoreFrom(this, snapshot, streamedColumns);
 
     /// <summary>
     /// <see cref="RestoreFrom(ChunkSnapshot)"/> against a known column: the surface floor comes
@@ -423,46 +407,7 @@ public class Chunk : IDisposable
     /// water levels. This is the save store's restore (with the world source's column) and the
     /// way a world source that supplies chunks fills one (<see cref="IWorldSource.Fill"/>).
     /// </summary>
-    internal void RestoreFrom(ChunkSnapshot snapshot, ColumnData column)
-    {
-        ArgumentNullException.ThrowIfNull(snapshot);
-        ArgumentNullException.ThrowIfNull(column);
-
-        CopySnapshot(snapshot);
-        SurfaceMinY = column.MinHeight;
-        // A restored chunk can hold fluid anywhere, so it always scans (a chunk with no fluid
-        // cell simply reports nothing)
-        ChunkTerrainFill.ScanFluidFrontier(this, column, LowerBoundY);
-        FinishRestore(snapshot);
-    }
-
-    // The blocks, state bytes and non-air count of a restore.
-    private void CopySnapshot(ChunkSnapshot snapshot)
-    {
-        Array.Copy(snapshot.Blocks, _blocks, BlockCount);
-        _state = snapshot.State is { } state ? (byte[])state.Clone() : null;
-        _solidCount = BlockCount - _blocks.AsSpan().Count(BlockType.Air);
-    }
-
-    // The tail every restore shares; IsBlockDataReady goes true last, which publishes the rest.
-    private void FinishRestore(ChunkSnapshot snapshot)
-    {
-        IsRestored = true;
-        RestoredPlayerPlaced = snapshot.PlayerPlaced is { } placed ? (ushort[])placed.Clone() : null;
-
-        IsBlockDataReady = true;
-    }
-
-    // The world Y of this chunk's lowest non-air cell, or int.MinValue when it is all air.
-    private int LowestSolidY()
-    {
-        for (var y = 0; y < Size; y++)
-        for (var x = 0; x < Size; x++)
-        for (var z = 0; z < Size; z++)
-            if (_blocks[Idx(x, y, z)] != 0)
-                return LowerBoundY + y;
-        return int.MinValue;
-    }
+    internal void RestoreFrom(ChunkSnapshot snapshot, ColumnData column) => ChunkRestore.RestoreFrom(this, snapshot, column);
 
     /// <summary>Clears a block. Returns false if the cell is outside this chunk or already air.</summary>
     public bool RemoveBlockAt(Vector3 worldPos, ChunkManager chunkManager)
@@ -726,45 +671,5 @@ public class Chunk : IDisposable
        (new Vector3(1,  0,  0), [CubeVertexPositions.BackRightBottom, CubeVertexPositions.BackRightTop, CubeVertexPositions.FrontRightTop, CubeVertexPositions.FrontRightBottom]),
        (new Vector3(0,  1,  0), [CubeVertexPositions.BackLeftTop, CubeVertexPositions.FrontLeftTop, CubeVertexPositions.FrontRightTop, CubeVertexPositions.BackRightTop]),
        (new Vector3(0, -1,  0), [CubeVertexPositions.FrontLeftBottom, CubeVertexPositions.BackLeftBottom, CubeVertexPositions.BackRightBottom, CubeVertexPositions.FrontRightBottom])
-    ];
-
-    internal static readonly Vector3[][][] AONeighbors =
-    [
-        [
-            [Vector3Directions.LeftBackward, Vector3Directions.DownBackward, Vector3Directions.DownLeftBackward],
-            [Vector3Directions.LeftBackward, Vector3Directions.UpBackward, Vector3Directions.UpLeftBackward],
-            [Vector3Directions.RightBackward, Vector3Directions.UpBackward, Vector3Directions.UpRightBackward],
-            [Vector3Directions.RightBackward, Vector3Directions.DownBackward, Vector3Directions.DownRightBackward],
-        ],
-        [
-            [Vector3Directions.RightForward, Vector3Directions.DownForward, Vector3Directions.DownRightForward],
-            [Vector3Directions.RightForward, Vector3Directions.UpForward, Vector3Directions.UpRightForward],
-            [Vector3Directions.LeftForward, Vector3Directions.UpForward, Vector3Directions.UpLeftForward],
-            [Vector3Directions.LeftForward, Vector3Directions.DownForward, Vector3Directions.DownLeftForward],
-        ],
-        [
-            [Vector3Directions.DownLeft, Vector3Directions.LeftForward, Vector3Directions.DownLeftForward],
-            [Vector3Directions.UpLeft, Vector3Directions.LeftForward, Vector3Directions.UpLeftForward],
-            [Vector3Directions.UpLeft, Vector3Directions.LeftBackward, Vector3Directions.UpLeftBackward],
-            [Vector3Directions.DownLeft, Vector3Directions.LeftBackward, Vector3Directions.DownLeftBackward],
-        ],
-        [
-            [Vector3Directions.DownRight, Vector3Directions.RightBackward, Vector3Directions.DownRightBackward],
-            [Vector3Directions.UpRight, Vector3Directions.RightBackward, Vector3Directions.UpRightBackward],
-            [Vector3Directions.UpRight, Vector3Directions.RightForward, Vector3Directions.UpRightForward],
-            [Vector3Directions.DownRight, Vector3Directions.RightForward, Vector3Directions.DownRightForward],
-        ],
-        [
-            [Vector3Directions.UpLeft, Vector3Directions.UpBackward, Vector3Directions.UpLeftBackward],
-            [Vector3Directions.UpLeft, Vector3Directions.UpForward, Vector3Directions.UpLeftForward],
-            [Vector3Directions.UpRight, Vector3Directions.UpForward, Vector3Directions.UpRightForward],
-            [Vector3Directions.UpRight, Vector3Directions.UpBackward, Vector3Directions.UpRightBackward],
-        ],
-        [
-            [Vector3Directions.DownLeft, Vector3Directions.DownForward, Vector3Directions.DownLeftForward],
-            [Vector3Directions.DownLeft, Vector3Directions.DownBackward, Vector3Directions.DownLeftBackward],
-            [Vector3Directions.DownRight, Vector3Directions.DownBackward, Vector3Directions.DownRightBackward],
-            [Vector3Directions.DownRight, Vector3Directions.DownForward, Vector3Directions.DownRightForward],
-        ]
     ];
 }
