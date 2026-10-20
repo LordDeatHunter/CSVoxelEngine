@@ -101,6 +101,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `efbadf6` | Split TerrainGenerator.cs (877 -> 461 lines): the 28 noise channels and Reseed/MakeNoise moved to TerrainNoise, the biome climate split to BiomeClassifier, the lakes, rivers and water levels to WaterBodies; TerrainGenerator keeps the palette, LandHeight, Compute and Climate, plus one-line forwards for its public queries |
 | `bc5a336` | Split TreeGenerator.cs (845 -> 269 lines): the solo shapes and cell batches moved to TreeBatches (263), Stamp/TryLocal/StampRoots to TreeStamper (135), the far-LOD canopy caches, CanopyDisturbed markers and their export/import to TreeCanopy (265), with one-line forwards on TreeGenerator; WorldGen/ holds 21 files |
 | `4b0aa80` | Split LeafDecayManager.cs (761 -> 413 lines) into Simulation/LeafDecay/: the chunk cache, TryGetCell/Write, the dirty-chunk batch and the 21-bit packer moved to LeafDecayCells (149), the parent-chain walk, TreeSupport search and support memos to OrphanWoodCheck (104, TickWood's support block now IsOrphaned), the tip offset tables, TryHydrationAt, IsLiveTip and TryTipSupport to TipHydration (178); LeafDecayManager keeps the schedule, tick and removal as the composition root; Simulation/ root holds 18 files |
+| `0bf8943` | Split PlayerPhysics.cs (708 -> 547 lines) into ViewShake (the damage view shake, owned and ticked by PlayerPhysics) and BodyCollision (the static body collision rule BodyCollides, the stepped axis moves and auto-step, and the falling-cube shove that Camera.PushOutOf now forwards to); moved the BodyCollides callers (MovementRules, PlayerBodyProbe, tests); Camera.cs 731 -> 684 lines |
 
 ## In progress
 
@@ -116,13 +117,13 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 
 | File | Lines | Notes |
 |---|---|---|
-| `src/Player/Camera.cs` | 731 | Split in `fc2ffb2` (HeadMotion 136, ShoulderRig 196, ModeToggles 86, ViewProjectionCache 82, SpawnOverrides 98, CameraMode 9); AGENTS.md records a stated reason. Misses the ~700 target because the XML docs kept on the forwards take more lines than planned. Optional: move `PushOutOf`'s body (about 45 lines) verbatim into a small `Player/` helper (not `PlayerPhysics`) with a one-line forward, then update the AGENTS.md wording ('about 730 lines'). |
+| `src/Player/Camera.cs` | 684 | Split in `fc2ffb2` (HeadMotion 136, ShoulderRig 196, ModeToggles 86, ViewProjectionCache 82, SpawnOverrides 98, CameraMode 9); `PushOutOf`'s body moved to `BodyCollision` in `0bf8943` (731 -> 684). AGENTS.md records a stated reason. Nothing remains. |
 | `src/World.cs` | 1,002 | Has a stated reason. Mob frame job moved to `Simulation/MobDirector.cs` (208) in `78635e3`; fire-cell gathering moved to `AmbientEffects` (351) in `5318705`. No next extraction is named in AGENTS.md; check whether anything is left in World.cs worth moving before planning. |
 | `src/Rendering/RenderManager.cs` | 1,032 | Has a stated reason (composition root). |
 | `src/Lod/LodManager.cs` | 314 | Split in `452b2dd` (LodRegionSet 174, LodCoverPass 164, LodRegionClaims 278, LodWorkerPool 144, LodBuildOutcome 12); `Lod/` now holds 14 files. Nothing remains. `LodMeshBuilder.cs` (650) is the largest file left in `Lod/`. Test files: LodManagerTests 788, LodBuildPoolTests 426; AGENTS.md 4,069 lines. |
 | `src/WorldGen/TreeGenerator.cs` | 269 | Split in `bc5a336` (TreeBatches 263, TreeStamper 135, TreeCanopy 265). |
 | `src/Rendering/Overlays/UIRenderer.cs` | 802 | Has a stated reason (shared primitives the ItemDebugger and tests bind to). |
-| `src/Player/PlayerPhysics.cs` | 708 | |
+| `src/Player/PlayerPhysics.cs` | 547 | Split in `0bf8943` (ViewShake 57, BodyCollision 185); nothing remains. |
 | ItemDebugger `ItemDebuggerUi.cs` / `ItemDebuggerProgram.cs` | 669 / 665 | Borderline. |
 | Test files over 700 (GameServerTests 1,266, LodManagerTests, TreeGrowthTests, TreeGrowerTests, GeometryAllocatorTests, MeshingTests, PlayerModelTests, LeafDecayTests) | | Lower priority. The rule targets classes; split by rule area if done. |
 
@@ -219,7 +220,7 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
   correct commands, so the cleanup no longer depends on it.)
 
 - Camera split line counts: Camera 731, CameraMode 9, HeadMotion 136, ModeToggles 86, ShoulderRig 196, SpawnOverrides 98, ViewProjectionCache 82; `Player/` holds 20 files; AGENTS.md 4,046 lines.
-- `PlayerPhysics.cs` is 708 lines with no stated reason, just over the ~700 smell line; a candidate for a later split.
+- `PlayerPhysics.cs` was 708 lines with no stated reason; split in `0bf8943` (now 547).
 - `Camera.IsCreative` and `IsFlying` are now `internal set`, so any code in the assembly (and the tests and ItemDebugger through InternalsVisibleTo) can write them. Nothing outside `ModeToggles` writes them today.
 - The cref `<see cref="SwimDepth"/>` on `Camera.IsInWater` is still broken (CS1574 in a doc build).
 - A comment in `OpenGLTest.Tests/Player/CameraViewProjectionCacheTests.cs` (line 334) names `EnsureViewCache` unqualified; the method now lives in `ViewProjectionCache`. Harmless; fix when tests may be edited.
@@ -265,6 +266,13 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `TREES_PLAN.md` (historical) still names `LeafDecayManager.TipOffsets`/`TryTipSupport` and bare `WalkParentChain` (lines ~423, 534-538); now `TipHydration.*` and `OrphanWoodCheck.WalkParentChain`. Leave it, or annotate it if the plan is ever revived.
 - `TipHydration.TryTipSupport`'s doc crefs the private `OrphanWoodCheck.WalkParentChain`. The doc build accepted it, but a `<c>` span would be more robust if CS1574 ever appears.
 - The doc build shows pre-existing CS1573 param-tag warnings in `Simulation/TreeGrowthWriter.cs` (not introduced by the split); a doc-comment pass could fill in the missing `<param>` tags.
+
+- PlayerPhysics split line counts: PlayerPhysics 547, ViewShake 57, BodyCollision 185, Camera 684, MovementRules 96, PlayerBodyProbe 83; `Player/` holds 22 files; AGENTS.md 4,099 lines.
+- Stale doc: `PlayerPhysics.ResetMotion`'s XML doc says it clears the trauma state, but it never resets the shake (now `ViewShake`). It was already wrong before the split; fix the doc or the behavior in a separate task.
+- Stale test comment: `OpenGLTest.Tests/Content/HitboxCollisionTests.cs:135` names a nonexistent `Camera.IsColliding`; retarget it to `BodyCollision.BodyCollides` in a test-comment pass.
+- `BodyCollision.PushOutOf`'s XML summary is a single ~180-character line; wrap it to the file's comment width in a later doc tidy.
+- Duplication task still open: the private `CollisionStepSize`/`MoveOnAxis`/`IsColliding` copies in `FallingBlock`, `Goblin`, `ItemDrop`, `PrimedTnt`, `Slime`, `ThrownProjectile` and `BlockDebris` could share one collision helper. Its interface would differ from `BodyCollision`'s player-body rule because entity boxes and hitbox rules differ.
+- Next extraction candidates per AGENTS.md: `World.Update`'s mob target/damage block and `World.PushFromBlast` (check first: both may already live in `MobDirector`, see `78635e3`).
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
