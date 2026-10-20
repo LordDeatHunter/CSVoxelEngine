@@ -102,6 +102,7 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `bc5a336` | Split TreeGenerator.cs (845 -> 269 lines): the solo shapes and cell batches moved to TreeBatches (263), Stamp/TryLocal/StampRoots to TreeStamper (135), the far-LOD canopy caches, CanopyDisturbed markers and their export/import to TreeCanopy (265), with one-line forwards on TreeGenerator; WorldGen/ holds 21 files |
 | `4b0aa80` | Split LeafDecayManager.cs (761 -> 413 lines) into Simulation/LeafDecay/: the chunk cache, TryGetCell/Write, the dirty-chunk batch and the 21-bit packer moved to LeafDecayCells (149), the parent-chain walk, TreeSupport search and support memos to OrphanWoodCheck (104, TickWood's support block now IsOrphaned), the tip offset tables, TryHydrationAt, IsLiveTip and TryTipSupport to TipHydration (178); LeafDecayManager keeps the schedule, tick and removal as the composition root; Simulation/ root holds 18 files |
 | `0bf8943` | Split PlayerPhysics.cs (708 -> 547 lines) into ViewShake (the damage view shake, owned and ticked by PlayerPhysics) and BodyCollision (the static body collision rule BodyCollides, the stepped axis moves and auto-step, and the falling-cube shove that Camera.PushOutOf now forwards to); moved the BodyCollides callers (MovementRules, PlayerBodyProbe, tests); Camera.cs 731 -> 684 lines |
+| `f27e922` | Dead code and broken crefs pass: 76 unused usings, 14 unused or never-read members, unused parameters in 10 methods (incl. the menu layout ListTop/RowTop cascade) and 4 dead stores removed; 40 CS1574/CS0419/CS1570/CS1734 doc references fixed. Doc+style build at 0 for all except IDE0059 3 (hasWater const-flag keep plus 2 test bodies) and CS1573 37 (out of scope). The code-cleanup skill documents the measuring build. |
 
 ## In progress
 
@@ -131,15 +132,12 @@ update the docs. Folders now have headroom: `Chunks/` holds 12 files plus `Meshi
 
 ### 2. Dead code pass
 
-- 67 pre-existing unused `using System…` lines, plus 2 hidden behind others
-  (`SnowCanopyTests.cs`, `RecipeDefinition.cs` line 1 `using System.Text.Json.Serialization;`).
-  A doc+style build finds them:
-  `dotnet build VoxelEngine.sln -c Release -p:GenerateDocumentationFile=true -p:EnforceCodeStyleInBuild=true`,
-  then look for IDE0005.
-- Unused private members, parameters and locals, repo-wide. Use the compiler and analyzers plus a
-  grep for zero references.
-- Pre-existing unresolved XML crefs (about 16 CS1574 in the doc build), for example
-  `ItemTooltip` → `UIRenderer`, and two game-file crefs to `GameServer`. Fix or qualify them.
+Done in `f27e922` (nothing remains of the usings, unused members, parameters, dead stores and
+broken crefs). Leftovers are listed in the follow-ups below (section 5). Line counts after it:
+OpenGLTest/src 89,792, OpenGLTest.Tests 66,007, OpenGLTest.ItemDebugger 3,489,
+OpenGLTest.Server/IntentReplay.cs 273, code-cleanup SKILL.md 153, AGENTS.md 4,100. The brief's
+per-file counts (35/38 using files, 44 test using lines) were slightly off; the real figures
+are 32/41 files and 43 test lines, so take later measurements against those.
 
 ### 3. Duplication pass
 
@@ -273,6 +271,24 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - `BodyCollision.PushOutOf`'s XML summary is a single ~180-character line; wrap it to the file's comment width in a later doc tidy.
 - Duplication task still open: the private `CollisionStepSize`/`MoveOnAxis`/`IsColliding` copies in `FallingBlock`, `Goblin`, `ItemDrop`, `PrimedTnt`, `Slime`, `ThrownProjectile` and `BlockDebris` could share one collision helper. Its interface would differ from `BodyCollision`'s player-body rule because entity boxes and hitbox rules differ.
 - Next extraction candidates per AGENTS.md: `World.Update`'s mob target/damage block and `World.PushFromBlast` (check first: both may already live in `MobDirector`, see `78635e3`).
+
+- Dead code pass follow-ups (`f27e922`):
+  - IDE0059 in two test bodies is left as is because that run could not edit tests: `CampfireCookingTests.cs:48` (manager) and `PoolCairnTests.cs:87/88` (pebble). A future test-tidy pass can drop the dead stores.
+  - `ChunkTerrainFill`'s `var hasWater = false;` stays on purpose: it is dead only because `WorldGenerationConfig.WaterEnabled` is a const true. Known deliberate IDE0059.
+  - CS1573 is 37 unique sites (missing param tags where sibling params have docs, e.g. `Shader`, `UIRenderer`, `BlockDebris`, `TreeGrowthWriter.Grow`). A separate doc chore.
+  - Public zero-reference candidates to triage (delete them or give them a use):
+    `Vector2Utils.Ceil/Floor/Round`; `Vector3Utils.Ceil/Round/IsNearZero`; `MathUtils.SinDeg`;
+    `Vector3Directions.EdgeDirections/DiagonalDirections/AllDirections`; `Rgba.Black/Transparent`;
+    `ChunkManager.TryGetLightGlobal`; `ImportedMapSource.ColumnCount`;
+    `NetworkConfig.NetRemotePlayerReachBlocks`; `WaterRenderConfig.WaterReflectionScale`
+    (comment mention in `ReflectionPass.cs:36`); `WorldFeatureConfig.OasisPalmMinGround`;
+    `FrameProfiler.ConsoleLine` (cref at `FrameProfiler.cs:231`); `PostEffects.Neutral` (cref in
+    class doc); `ItemFactory.RegisterCustom`; `BreakProgress.IsActive`;
+    `PlayerRig.TotalHeight/SwatchUv`; `ChunkGeometryPool.CapacityUnits`; `CampfireManager.LitCount`;
+    `FluidState.MaxLevel`; `Inventory.ClearSlot`; `BranchPileGenerator.PileTop`;
+    `GenerationalCache.Generations`; `ItemDisplayEditor.CanSave`; `AnimationClip.Tracks`.
+  - `NetMessage.PlayerJoined` and `PlayerLeft` have zero references but are wire ids: never delete them, at most document them as reserved.
+  - Members used only by tests: `Vector2Utils.Lerp/Damp`, `Vector3Utils.FlattenY/WithY/LerpUnclamped`. Decide whether they belong in production code or in a test helper.
 
 ## Bugs found (not cleanup: fix as separate, normal tasks)
 
