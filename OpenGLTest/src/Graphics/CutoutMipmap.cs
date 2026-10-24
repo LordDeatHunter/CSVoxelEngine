@@ -69,37 +69,7 @@ public static class CutoutMipmap
         {
             int dw = Math.Max(1, w >> l), dh = Math.Max(1, h >> l);
             var dst = new float[dw * dh * 4];
-            for (int y = 0; y < dh; y++)
-            {
-                int y0 = Math.Min(2 * y, ph - 1), y1 = Math.Min(2 * y + 1, ph - 1);
-                int ny = y1 == y0 ? 1 : 2;
-                for (int x = 0; x < dw; x++)
-                {
-                    int x0 = Math.Min(2 * x, pw - 1), x1 = Math.Min(2 * x + 1, pw - 1);
-                    int nx = x1 == x0 ? 1 : 2;
-                    float r = 0, g = 0, b = 0, a = 0, pr = 0, pg = 0, pb = 0;
-                    for (int sy = 0; sy < ny; sy++)
-                    for (int sx = 0; sx < nx; sx++)
-                    {
-                        int s = (((sy == 0 ? y0 : y1) * pw) + (sx == 0 ? x0 : x1)) * 4;
-                        float sa = src[s + 3];
-                        r += src[s] * sa; g += src[s + 1] * sa; b += src[s + 2] * sa;
-                        pr += src[s]; pg += src[s + 1]; pb += src[s + 2];
-                        a += sa;
-                    }
-                    int n = nx * ny;
-                    int d = (y * dw + x) * 4;
-                    if (a > 0f)
-                    {
-                        dst[d] = r / a; dst[d + 1] = g / a; dst[d + 2] = b / a;
-                    }
-                    else
-                    {
-                        dst[d] = pr / n; dst[d + 1] = pg / n; dst[d + 2] = pb / n;
-                    }
-                    dst[d + 3] = a / n;
-                }
-            }
+            DownsampleLevel(src, pw, ph, dw, dh, dst);
 
             float scale = rescale ? FindScale(dst, cutoff, target) : 1f;
             var level = new byte[dst.Length];
@@ -117,6 +87,43 @@ public static class CutoutMipmap
             ph = dh;
         }
         return chain;
+    }
+
+    /// <summary>One level of the chain: an alpha-weighted 2x2 box filter of
+    /// <paramref name="src"/>, written into <paramref name="dst"/>.</summary>
+    private static void DownsampleLevel(float[] src, int pw, int ph, int dw, int dh, float[] dst)
+    {
+        for (int y = 0; y < dh; y++)
+        {
+            int y0 = Math.Min(2 * y, ph - 1), y1 = Math.Min(2 * y + 1, ph - 1);
+            int ny = y1 == y0 ? 1 : 2;
+            for (int x = 0; x < dw; x++)
+            {
+                int x0 = Math.Min(2 * x, pw - 1), x1 = Math.Min(2 * x + 1, pw - 1);
+                int nx = x1 == x0 ? 1 : 2;
+                float r = 0, g = 0, b = 0, a = 0, pr = 0, pg = 0, pb = 0;
+                for (int sy = 0; sy < ny; sy++)
+                for (int sx = 0; sx < nx; sx++)
+                {
+                    int s = (((sy == 0 ? y0 : y1) * pw) + (sx == 0 ? x0 : x1)) * 4;
+                    float sa = src[s + 3];
+                    r += src[s] * sa; g += src[s + 1] * sa; b += src[s + 2] * sa;
+                    pr += src[s]; pg += src[s + 1]; pb += src[s + 2];
+                    a += sa;
+                }
+                int n = nx * ny;
+                int d = (y * dw + x) * 4;
+                if (a > 0f)
+                {
+                    dst[d] = r / a; dst[d + 1] = g / a; dst[d + 2] = b / a;
+                }
+                else
+                {
+                    dst[d] = pr / n; dst[d + 1] = pg / n; dst[d + 2] = pb / n;
+                }
+                dst[d + 3] = a / n;
+            }
+        }
     }
 
     /// <summary>Binary-searches the alpha scale whose coverage lands closest to

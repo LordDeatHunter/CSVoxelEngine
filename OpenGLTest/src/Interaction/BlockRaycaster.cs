@@ -46,7 +46,8 @@ public static class BlockRaycaster
     public static bool Raycast(Vector3 origin, Vector3 direction, float range, float cellCap, bool stopAtRange,
         ChunkManager chunkManager, out Vector3 hitPosition, out Vector3 hitNormal, out int hitBoxIndex,
         out float hitT, bool includeFluids, bool sightOnly = false)
-    {        // A diagonal ray crosses up to 3 cells per block traveled, so a walk counted in
+    {
+        // A diagonal ray crosses up to 3 cells per block traveled, so a walk counted in
         // iterations starves rays that travel further (shoulder camera) or aim steeply.
         // Capped walks therefore count cells generously and stop on traveled distance
         // instead; the uncapped walk is first person exactly as it always was. tMax holds
@@ -78,61 +79,11 @@ public static class BlockRaycaster
             var cellZ = (int)currentPosition.Z;
             var cellId = chunkManager.GetBlockGlobal(cellX, cellY, cellZ);
 
-            // A fluid is hit only for a caller that asked for it, and then only as a source: a
-            // flowing skirt is aimed through (Minecraft's SOURCE_ONLY), and the cell the eye is
-            // already inside is skipped so swimming never targets the water on the player's face.
-            var targetsCell = cellId != 0 && (!BlockType.IsFluid(cellId)
-                || (includeFluids && i > 0 && FluidState.IsSource(chunkManager.GetStateGlobal(cellX, cellY, cellZ))));
-            // A sight-only walk (the combat line of sight) walks through a block that does not
-            // block sight (a plant): the plant still aims for mining, it just never stops a punch
-            if (targetsCell && sightOnly && !BlockType.BlocksSightAt(cellId))
-                targetsCell = false;
-
-            if (targetsCell)
+            if (TryHitCell(i, cellX, cellY, cellZ, cellId, currentPosition,
+                    out hitT, out hitNormal, out hitBoxIndex))
             {
-                // Every cell aims at its drawn shape: tree wood at its node and tubes, layered
-                // snow at its stack depth, a facing block at its turned boxes (see BlockShape)
-                var boxes = BlockShape.BoxesAt(cellId, chunkManager, cellX, cellY, cellZ);
-                if (boxes == null || boxes.Length == 0)
-                {
-                    hitPosition = currentPosition;
-                    hitNormal = lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal;
-                    hitBoxIndex = 0;
-                    if (!RayIntersectsBox(origin, direction, currentPosition, currentPosition + Vector3.One,
-                            float.PositiveInfinity, out var cellT, out _))
-                        cellT = 0f;
-                    hitT = cellT;
-                    return true;
-                }
-
-                var bestT = float.PositiveInfinity;
-                var bestBox = -1;
-                var bestNormal = Vector3.Zero;
-                for (var b = 0; b < boxes.Length; b++)
-                {
-                    var boxMin = currentPosition + boxes[b].Min;
-                    var boxMax = currentPosition + boxes[b].Max;
-                    if (!RayIntersectsBox(origin, direction, boxMin, boxMax, range, out var t, out var normal))
-                        continue;
-                    if (t < bestT)
-                    {
-                        bestT = t;
-                        bestBox = b;
-                        bestNormal = normal;
-                    }
-                }
-
-                if (bestBox >= 0)
-                {
-                    hitPosition = currentPosition;
-                    hitBoxIndex = bestBox;
-                    hitT = bestT;
-                    // The eye inside the box has no entry face: fall back to the cell entry.
-                    hitNormal = bestNormal == Vector3.Zero
-                        ? (lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal)
-                        : bestNormal;
-                    return true;
-                }
+                hitPosition = currentPosition;
+                return true;
             }
 
             if (stopAtRange && Math.Min(tMax.X, Math.Min(tMax.Y, tMax.Z)) > range)
@@ -159,7 +110,59 @@ public static class BlockRaycaster
         }
 
         return false;
+
+        bool TryHitCell(int step, int cellX, int cellY, int cellZ, byte cellId, Vector3 cell,
+            out float cellT, out Vector3 cellNormal, out int cellBox)
+        {
+            cellT = 0f;
+            cellNormal = Vector3.Zero;
+            cellBox = 0;
+
+            // A fluid is hit only for a caller that asked for it, and then only as a source: a
+            // flowing skirt is aimed through (Minecraft's SOURCE_ONLY), and the cell the eye is
+            // already inside is skipped so swimming never targets the water on the player's face.
+            var targetsCell = cellId != 0 && (!BlockType.IsFluid(cellId)
+                || (includeFluids && step > 0 && FluidState.IsSource(chunkManager.GetStateGlobal(cellX, cellY, cellZ))));
+            // A sight-only walk (the combat line of sight) walks through a block that does not
+            // block sight (a plant): the plant still aims for mining, it just never stops a punch
+            if (!targetsCell) return false;
+            if (sightOnly && !BlockType.BlocksSightAt(cellId)) return false;
+
+            // Every cell aims at its drawn shape: tree wood at its node and tubes, layered
+            // snow at its stack depth, a facing block at its turned boxes (see BlockShape)
+            var boxes = BlockShape.BoxesAt(cellId, chunkManager, cellX, cellY, cellZ);
+            if (boxes == null || boxes.Length == 0)
+            {
+                cellNormal = EntryNormal(lastStepNormal, direction);
+                if (!RayIntersectsBox(origin, direction, cell, cell + Vector3.One,
+                        float.PositiveInfinity, out cellT, out _))
+                    cellT = 0f;
+                return true;
+            }
+
+            cellT = float.PositiveInfinity;
+            cellBox = -1;
+            for (var b = 0; b < boxes.Length; b++)
+            {
+                var boxMin = cell + boxes[b].Min;
+                var boxMax = cell + boxes[b].Max;
+                if (!RayIntersectsBox(origin, direction, boxMin, boxMax, range, out var t, out var normal))
+                    continue;
+                if (t >= cellT) continue;
+                cellT = t;
+                cellBox = b;
+                cellNormal = normal;
+            }
+
+            if (cellBox < 0) return false;
+            // The eye inside the box has no entry face: fall back to the cell entry.
+            if (cellNormal == Vector3.Zero) cellNormal = EntryNormal(lastStepNormal, direction);
+            return true;
+        }
     }
+
+    private static Vector3 EntryNormal(Vector3 lastStepNormal, Vector3 direction) =>
+        lastStepNormal == Vector3.Zero ? -direction.Sign() : lastStepNormal;
 
     internal static bool RayIntersectsBox(Vector3 origin, Vector3 direction, Vector3 min, Vector3 max,
         float maxDistance, out float tEnter, out Vector3 normal)
