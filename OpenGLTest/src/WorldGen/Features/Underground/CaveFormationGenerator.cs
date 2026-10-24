@@ -70,23 +70,27 @@ public static class CaveFormationGenerator
                 if (ceiling && HasStalactite(worldX0 + x, y, worldZ0 + z))
                 {
                     blocks[i] = StalactiteBlock;
-                    // Its drip point: the first free cell over the column's floor below it
-                    for (var drip = y - 1; drip > worldY0; drip--)
-                    {
-                        var dl = drip - worldY0;
-                        if (dl <= 0) break;
-                        var di = Chunk.Idx(x, dl, z);
-                        if (blocks[di] != BlockType.Air) break;
-                        if (blocks[di - Chunk.Size] == BlockType.Air) continue;
-                        blocks[di] = StalagmiteBlock;
-                        break;
-                    }
+                    StampDrip(blocks, x, y, z, worldY0);
+                    continue;
                 }
-                else if (floor && HasStalagmite(worldX0 + x, y, worldZ0 + z))
-                {
+                if (floor && HasStalagmite(worldX0 + x, y, worldZ0 + z))
                     blocks[i] = StalagmiteBlock;
-                }
             }
+        }
+    }
+
+    // Its drip point: the first free cell over the column's floor below it
+    private static void StampDrip(byte[] blocks, int x, int y, int z, int worldY0)
+    {
+        for (var drip = y - 1; drip > worldY0; drip--)
+        {
+            var dl = drip - worldY0;
+            if (dl <= 0) break;
+            var di = Chunk.Idx(x, dl, z);
+            if (blocks[di] != BlockType.Air) break;
+            if (blocks[di - Chunk.Size] == BlockType.Air) continue;
+            blocks[di] = StalagmiteBlock;
+            break;
         }
     }
 }

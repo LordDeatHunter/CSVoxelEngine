@@ -384,34 +384,39 @@ public sealed class KilnManager
             changed = true;
 
             var anchor = new Vector3(key.X, key.Y, key.Z);
-            if (BlockType.ById[state.AnchorId] is { } anchorType)
-            {
-                var touchedChunks = new HashSet<Vector3>();
-                Multiblock.Revert(chunks, anchor, anchorType, null, touchedChunks);
-                foreach (var chunkPos in touchedChunks)
-                {
-                    if (chunks.Chunks.TryGetValue(chunkPos, out var touched))
-                        touched.RemeshAfterBatchEdit(chunks);
-                }
-
-                // The cells went back to their source block, which can re-tile the far LOD
-                if (lod != null)
-                {
-                    foreach (var (dx, dy, dz) in Multiblock.Offsets)
-                    {
-                        int cx = key.X + dx, cy = key.Y + dy, cz = key.Z + dz;
-                        if (LodSurface.RecordEdit(chunks, cx, cy, cz))
-                            lod.MarkEditedColumn(cx, cz);
-                    }
-                }
-            }
-
+            RevertStructure(chunks, lod, key, state.AnchorId, anchor);
             SpawnFuel(state, anchor, drops);
             SpawnCrucible(state, anchor, drops);
         }
 
         if (changed)
             RefreshCells();
+    }
+
+    /// <summary>
+    /// Puts a broken kiln's cells back to its source block and re-tiles the far LOD there.
+    /// The anchor's own block must still resolve; its fuel and crucible are handed back
+    /// separately by the caller.
+    /// </summary>
+    private static void RevertStructure(ChunkManager chunks, LodManager? lod, (int X, int Y, int Z) key,
+        byte anchorId, Vector3 anchor)
+    {
+        if (BlockType.ById[anchorId] is not { } anchorType) return;
+
+        var touchedChunks = new HashSet<Vector3>();
+        Multiblock.Revert(chunks, anchor, anchorType, null, touchedChunks);
+        foreach (var chunkPos in touchedChunks)
+            if (chunks.Chunks.TryGetValue(chunkPos, out var touched))
+                touched.RemeshAfterBatchEdit(chunks);
+
+        // The cells went back to their source block, which can re-tile the far LOD
+        if (lod == null) return;
+        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        {
+            int cx = key.X + dx, cy = key.Y + dy, cz = key.Z + dz;
+            if (LodSurface.RecordEdit(chunks, cx, cy, cz))
+                lod.MarkEditedColumn(cx, cz);
+        }
     }
 
     private static (int X, int Y, int Z) KeyOf(Vector3 anchor) => VoxelCoords.BlockCellOf(anchor);
