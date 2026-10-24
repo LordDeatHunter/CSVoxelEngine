@@ -401,76 +401,76 @@ internal sealed class LodMeshBuilder
 
     private void SampleSeparable(int i, int j, out int minHeight, ref int maxOwn)
     {
-            // Vertical half of the min
-            var wz = (j + 1) * _cellSize;
-            minHeight = _xMin[wz];
-            for (var w = 1; w < _windowSpan; w++)
-                if (_xMin[wz + w] < minHeight) minHeight = _xMin[wz + w];
+        // Vertical half of the min
+        var wz = (j + 1) * _cellSize;
+        minHeight = _xMin[wz];
+        for (var w = 1; w < _windowSpan; w++)
+            if (_xMin[wz + w] < minHeight) minHeight = _xMin[wz + w];
 
-            // The uneroded per-cell max is NOT separable and is not meant to be: it reads
-            // the cell's own footprint only (no margin), exactly as before, just out of the
-            // grid - the GENERATED grid, so no edit moves the water or beach decisions.
-            var ox = i * _cellSize + _fineMargin;
-            var oz = j * _cellSize + _fineMargin;
-            for (var dx = 0; dx < _cellSize; dx++)
+        // The uneroded per-cell max is NOT separable and is not meant to be: it reads
+        // the cell's own footprint only (no margin), exactly as before, just out of the
+        // grid - the GENERATED grid, so no edit moves the water or beach decisions.
+        var ox = i * _cellSize + _fineMargin;
+        var oz = j * _cellSize + _fineMargin;
+        for (var dx = 0; dx < _cellSize; dx++)
+        {
+            var row = (ox + dx) * _fineSpan + oz;
+            for (var dz = 0; dz < _cellSize; dz++)
+                if (_fineGen[row + dz] > maxOwn) maxOwn = _fineGen[row + dz];
+        }
+
+        // Tile rule: an override's block shows only where that override actually is
+        // the drawn (eroded-min) surface, so a lone block never repaints a coarse cell.
+        // First match in dx-outer, dz-inner order, the seam path's order too.
+        byte topBlock = 0;
+        if (_hasRegionOverrides)
+        {
+            for (var dx = 0; dx < _cellSize && topBlock == 0; dx++)
             {
                 var row = (ox + dx) * _fineSpan + oz;
                 for (var dz = 0; dz < _cellSize; dz++)
-                    if (_fineGen[row + dz] > maxOwn) maxOwn = _fineGen[row + dz];
+                    if (_fine[row + dz] == minHeight && _fineBlock[row + dz] != 0)
+                    {
+                        topBlock = _fineBlock[row + dz];
+                        break;
+                    }
             }
-
-            // Tile rule: an override's block shows only where that override actually is
-            // the drawn (eroded-min) surface, so a lone block never repaints a coarse cell.
-            // First match in dx-outer, dz-inner order, the seam path's order too.
-            byte topBlock = 0;
-            if (_hasRegionOverrides)
-            {
-                for (var dx = 0; dx < _cellSize && topBlock == 0; dx++)
-                {
-                    var row = (ox + dx) * _fineSpan + oz;
-                    for (var dz = 0; dz < _cellSize; dz++)
-                        if (_fine[row + dz] == minHeight && _fineBlock[row + dz] != 0)
-                        {
-                            topBlock = _fineBlock[row + dz];
-                            break;
-                        }
-                }
-            }
-            _topBlockGrid[(i + 1) * _heightGrid + (j + 1)] = topBlock;
+        }
+        _topBlockGrid[(i + 1) * _heightGrid + (j + 1)] = topBlock;
     }
 
     private void SampleSeam(int i, int j, out int minHeight, ref int maxOwn)
     {
-            // Test seam (item C1): the original fused O(window^2) scan, kept so
-            // LodHeightSamplingTests can compare full output against it.
-            minHeight = int.MaxValue;
-            for (var dx = -_margin; dx < _cellSize + _margin; dx++)
-            for (var dz = -_margin; dz < _cellSize + _margin; dz++)
-            {
-                var fx = _baseFineX + i * _cellSize + dx;
-                var fz = _baseFineZ + j * _cellSize + dz;
-                var h = FineHeight(fx, fz, out _);
-                if (h < minHeight) minHeight = h;
-                var g = FineHeightGen(fx, fz);
-                if (g > maxOwn && dx >= 0 && dx < _cellSize && dz >= 0 && dz < _cellSize) maxOwn = g;
-            }
+        // Test seam (item C1): the original fused O(window^2) scan, kept so
+        // LodHeightSamplingTests can compare full output against it.
+        minHeight = int.MaxValue;
+        for (var dx = -_margin; dx < _cellSize + _margin; dx++)
+        for (var dz = -_margin; dz < _cellSize + _margin; dz++)
+        {
+            var fx = _baseFineX + i * _cellSize + dx;
+            var fz = _baseFineZ + j * _cellSize + dz;
+            var h = FineHeight(fx, fz, out _);
+            if (h < minHeight) minHeight = h;
+            var g = FineHeightGen(fx, fz);
+            if (g > maxOwn && dx >= 0 && dx < _cellSize && dz >= 0 && dz < _cellSize) maxOwn = g;
+        }
 
-            // The same tile rule, restricted to the cell's own footprint.
-            byte topBlock = 0;
-            if (_hasRegionOverrides)
+        // The same tile rule, restricted to the cell's own footprint.
+        byte topBlock = 0;
+        if (_hasRegionOverrides)
+        {
+            for (var dx = 0; dx < _cellSize && topBlock == 0; dx++)
+            for (var dz = 0; dz < _cellSize; dz++)
             {
-                for (var dx = 0; dx < _cellSize && topBlock == 0; dx++)
-                for (var dz = 0; dz < _cellSize; dz++)
+                var h = FineHeight(_baseFineX + i * _cellSize + dx, _baseFineZ + j * _cellSize + dz, out var b);
+                if (h == minHeight && b != 0)
                 {
-                    var h = FineHeight(_baseFineX + i * _cellSize + dx, _baseFineZ + j * _cellSize + dz, out var b);
-                    if (h == minHeight && b != 0)
-                    {
-                        topBlock = b;
-                        break;
-                    }
+                    topBlock = b;
+                    break;
                 }
             }
-            _topBlockGrid[(i + 1) * _heightGrid + (j + 1)] = topBlock;
+        }
+        _topBlockGrid[(i + 1) * _heightGrid + (j + 1)] = topBlock;
     }
 
     private void ClassifyGenerated(int i, int j, int centerX, int centerZ, int maxOwn, ref int canopyMax, ref byte canopyId)
