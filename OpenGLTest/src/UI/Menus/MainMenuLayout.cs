@@ -205,16 +205,13 @@ public static class MainMenuLayout
             {
                 var count = view.Worlds.Count;
                 var offset = ClampedOffset(view.ScrollOffset, count, screenSize);
-                if (RowAt(point, screenSize, offset, count) is { } row)
-                {
-                    for (var which = 0; which < 3; which++)
-                    {
-                        if (InBox(point, RowButtonCenter(screenSize, row, offset, which), RowButtonSize))
-                            return new((MainMenuHitKind)((int)MainMenuHitKind.Play + which), row);
-                    }
-                    return new(MainMenuHitKind.None);
-                }
-                return BottomHit(point, screenSize, MainMenuHitKind.Create);
+                if (RowAt(point, screenSize, offset, count) is not { } row)
+                    return BottomHit(point, screenSize, MainMenuHitKind.Create);
+
+                for (var which = 0; which < 3; which++)
+                    if (InBox(point, RowButtonCenter(screenSize, row, offset, which), RowButtonSize))
+                        return new((MainMenuHitKind)((int)MainMenuHitKind.Play + which), row);
+                return new(MainMenuHitKind.None);
             }
 
             case MainMenuPage.Create:
@@ -238,20 +235,21 @@ public static class MainMenuLayout
             {
                 var count = view.Servers.Count;
                 var offset = ClampedOffset(view.ServerScrollOffset, count, screenSize);
-                if (RowAt(point, screenSize, offset, count) is { } row)
+                if (RowAt(point, screenSize, offset, count) is not { } row)
                 {
-                    if (InBox(point, RowButtonCenter(screenSize, row, offset, 0, 2), RowButtonSize))
-                        return new(MainMenuHitKind.Connect, row);
-                    if (InBox(point, RowButtonCenter(screenSize, row, offset, 1, 2), RowButtonSize))
-                        return new(MainMenuHitKind.DeleteServer, row);
+                    if (InBox(point, TripleButtonCenter(screenSize, 0), TripleButtonSize))
+                        return new(MainMenuHitKind.AddServer);
+                    if (InBox(point, TripleButtonCenter(screenSize, 1), TripleButtonSize))
+                        return new(MainMenuHitKind.DirectConnect);
+                    if (InBox(point, TripleButtonCenter(screenSize, 2), TripleButtonSize))
+                        return new(MainMenuHitKind.Back);
                     return new(MainMenuHitKind.None);
                 }
-                if (InBox(point, TripleButtonCenter(screenSize, 0), TripleButtonSize))
-                    return new(MainMenuHitKind.AddServer);
-                if (InBox(point, TripleButtonCenter(screenSize, 1), TripleButtonSize))
-                    return new(MainMenuHitKind.DirectConnect);
-                if (InBox(point, TripleButtonCenter(screenSize, 2), TripleButtonSize))
-                    return new(MainMenuHitKind.Back);
+
+                if (InBox(point, RowButtonCenter(screenSize, row, offset, 0, 2), RowButtonSize))
+                    return new(MainMenuHitKind.Connect, row);
+                if (InBox(point, RowButtonCenter(screenSize, row, offset, 1, 2), RowButtonSize))
+                    return new(MainMenuHitKind.DeleteServer, row);
                 return new(MainMenuHitKind.None);
             }
 
