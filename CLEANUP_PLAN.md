@@ -106,6 +106,14 @@ procedure for applying them lives in the **`code-cleanup` skill**
 | `3f77a2b` | Duplication pass: the server's and the item debugger's AssetRoot (plus the test fixture's walk) now live in one VoxelEngine.Core.AssetRoot, with each search rule kept verbatim. The hotbar and the [E] rows call UIRenderer.DrawIdIcon, and the unused ItemIcons is gone. MenuRenderer's two confirm-delete popups and its two list pages are folded into DrawConfirmDelete and DrawListPage, with static cached row drawers (467 to 422 lines). |
 | `9c13d77` | Duplication pass part 2: the seven entity axis sweeps fold into Chunks/BoxSweep (BodyCollision shares its step and OffsetAxis). FluidCells and LeafDecayCells' chunk cache and dirty batch fold into Chunks/ChunkCellCache, with one instance per simulation. FluidCellKey, LeafDecayCells' packer and TreeCellKey become Chunks/CellKey over ChunkKey's one 21-bit bit math. About -330 lines net. |
 | `94647c9` | Folded the sink-or-gravity, float, water-drag, bounce and ground-scrub steps that seven entity classes repeated into Core/BodyMotion (one set of shared constants; ThrownProjectile.Gravity now aliases BodyMotion.Gravity), and the burning-fluid box loop of MobLava and PlayerBodyProbe into Chunks/BurningFluid.AnyInBox |
+| `f1caa25` | Early-return pass 1: the station passes' five item/block mesh lookups fold into `BindStationMesh`/`BindAtlas`, flattening the kiln pending-charge and cast-result blocks |
+| `72bea1c` | Early-return pass 2: `InventorySaveCodec.Import` splits into `ImportStore`/`ImportTools`/`ImportHotbar`, with `RestoreCrucible` early-returning on an unresolvable material |
+| `41c9af7` | Early-return pass 3: the menu list row hit-tests become guard clauses (Worlds and Multiplayer pages) |
+| `4e9058a` | Early-return pass 4: the cave stalactite drip moves to `StampDrip` and the kiln stale sweep to `RevertStructure`, replacing an `else if` and three nested blocks |
+| `419dc92` | Early-return pass 5: `FluidFlow.PairTerm`, `PlaceStackItem` and `TreeSpeciesCompiler.Compile` flatten their last `else` branches |
+| `c8b049a` | Early-return pass 6: `BlockRaycaster.TryHitCell` and `CutoutMipmap.DownsampleLevel` extracted; the malformed `Raycast` opening brace fixed |
+| `cf4a3a7` | `LodMeshBuilder.SampleSeparable`/`SampleSeam` dedented to their method nesting (whitespace only) |
+| `84e80e7` | The LOD sampling methods return their top block and `FillCell` writes `_topBlockGrid` once |
 
 ## In progress
 
@@ -158,8 +166,15 @@ item-debugger SKILL.md 83. Still open:
 
 ### 4. Early returns / nesting pass
 
-Do it slice by slice, per folder, as separate workflow runs. Use guard clauses, `continue` and
-extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
+A first slice is done in commits `f1caa25`..`84e80e7` (see "Done"): the 13 non-vendored depth-5
+statements are down to 5, and depth-4 control statements fell from 121 to 99. What remains:
+- `Chunks/Meshing/ChunkMeshBuilder.cs` (corner loops at 511/529/561), `Chunks/Meshing/ChunkMesher.cs`
+  (the `while (true)` key probe) and `Lod/LodMeshBuilder.cs` (`FillCell`'s supplied-column read) are
+  genuine depth-4 blocks, but hot paths: extract only against a before/after capture.
+- `Content/Blocks/BlockLoader.cs` (the ~370-line `LoadBlocks` loop) and `Content/ItemLoader.cs`
+  (`ValidateItemUses`' switch) are flat but long; they want extraction, not guard clauses.
+- The 8 remaining `else`-after-terminator hits are false positives or would nest deeper
+  (`FluidSpread`), so leave them. The throwaway scanner that found them is not committed.
 
 ### 5. Small doc and code follow-ups found along the way
 
@@ -216,7 +231,7 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - The stale-neighbor-slots bug (see "Bugs found") still needs its own task.
 - LodRegion split line counts: LodRegion 243, LodColumnCaps 149, LodFaceEmitter 401, LodLevelSpec 17, LodMeshBuilder 650, LodMeshData 18, LodManager 932, LodSurface 248, LodEditState 292, WorldSeed 84; `Lod/` holds 9 files, `OpenGLTest.Tests/Lod/` 13; AGENTS.md 4,035 lines, edit-path-checklist SKILL.md 31, PERF_TODO.md 3,178, TODO.md 530.
 - `LodMeshBuilder.FineHeight` and `FineHeightGen` have no explicit `private` modifier; add one for consistency with the other phase methods.
-- `LodMeshBuilder.SampleSeparable` and `SampleSeam` bodies keep their old 12-space indentation; dedent them to their method nesting (whitespace only).
+- `LodMeshBuilder.SampleSeparable` and `SampleSeam` bodies are dedented in `cf4a3a7`, and their repeated `_topBlockGrid` write now happens once in `FillCell` (`84e80e7`).
 - Fields promoted from locals in `LodMeshBuilder` and `LodFaceEmitter`, plus the per-cell method calls (`FillCell`, `EmitCell`), may make a LodGen region build slightly slower. Output is byte-identical; measure with `LodBuildCostProbe` or perf-capture before deciding whether to act.
 - `LodFaceEmitter`'s constructor takes 27 parameters. If the emitter grows, consider passing a readonly grid bundle instead (only by a behavior-preserving change).
 - The stale REPO preamble in `.claude/workflows/plan-and-implement.js` (`~/.dotnet/dotnet.exe`,
@@ -245,7 +260,7 @@ extracted methods for bodies that nest past ~3 levels, and do not rewrite logic.
 - Inventory split line counts: Inventory 597, InventorySaveCodec 221, InventoryCrafting 114, InventoryCategory 10, HotbarSlot 13, InventorySaveTests 188; AGENTS.md 4,073 lines.
 - `Inventory.cs` is LF-only while most of its neighbors are CRLF. Future edits must keep LF in that file, unless a separate normalization task is planned.
 - `Inventory.cs` now exposes six internal state accessors (Tools, Blocks, Misc, Known, Hotbar, NextToolInstance) to the test and ItemDebugger assemblies through InternalsVisibleTo. A later pass could check whether any can be narrowed (for example, a dedicated reset method for Import).
-- `Import`'s nesting in `InventorySaveCodec` was deliberately left as it was; a candidate for an early-return cleanup task.
+- `Import`'s nesting in `InventorySaveCodec` is fixed in `72bea1c` (per-pool helpers, and the crucible material guard).
 
 - Chunk shrink line counts: Chunk 675, ChunkRestore 71, Meshing/ChunkFaceTables 139, Meshing/ChunkLighting 396; AGENTS.md 4,077 lines. Chunk.cs is no longer an offender; the remaining offenders are `World.cs`, `Program.cs` and `Camera.cs` (update the AGENTS.md offender wording when it is next touched).
 - The doc build (`-p:GenerateDocumentationFile=true`) reports a CS0419 ambiguous-cref warning on `Chunk.cs`'s `RestoreFrom` docs. It predates the shrink (it was in the baseline) and is probably the unqualified `RestoreFrom` / `Chunk.RestoreFrom` cref resolving to the three overloads (check the AGENTS.md mentions and `ChunkRestore`'s class summary too). Pin it to a specific overload signature in a doc-tidy pass.
