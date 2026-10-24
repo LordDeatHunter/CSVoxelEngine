@@ -43,18 +43,14 @@ internal static class FluidFlow
         {
             neighborHeight = FluidState.SurfaceHeight(neighborState);
         }
-        else if (BlockType.IsReplaceable(neighborId))
+        else
         {
             // Air or a fragile block: the fluid only gets pulled that way if it would drop
             // off there, and a drop counts as a full source lower than any level could be
-            if (cells.TryGetCell(x + dx, y - 1, z + dz, out var belowId, out var belowState) && belowId == id)
-                neighborHeight = FluidState.SurfaceHeight(belowState) - FluidState.SourceHeight;
-            else
+            if (!BlockType.IsReplaceable(neighborId)) return false; // a solid neighbor dams the flow
+            if (!cells.TryGetCell(x + dx, y - 1, z + dz, out var belowId, out var belowState) || belowId != id)
                 return false;
-        }
-        else
-        {
-            return false; // a solid neighbor dams the flow instead of steering it
+            neighborHeight = FluidState.SurfaceHeight(belowState) - FluidState.SourceHeight;
         }
 
         term = ownHeight - neighborHeight;

@@ -45,12 +45,10 @@ public class PlaceStackItem : Item
         }
 
         var freshSecondary = PebbleGenerator.IsObsidianItem(Id) ? 1 : 0;
-        if (pile.Renderer == BlockRenderer.Pebbles)
-        {
-            if (!world.PlaceBlockAtFace(hit, normal, UseBlockId, PebbleGenerator.StateFor(1, freshSecondary), out _))
-                return ItemUseResult.Ignored;
-        }
-        else if (!world.PlaceBlockAtFace(hit, normal, UseBlockId, state: 1, out _))
+        var state = pile.Renderer == BlockRenderer.Pebbles
+            ? PebbleGenerator.StateFor(1, freshSecondary)
+            : (byte)1;
+        if (!world.PlaceBlockAtFace(hit, normal, UseBlockId, state, out _))
             return ItemUseResult.Ignored;
         if (!world.IsCreative)
             world.ConsumeSelected();

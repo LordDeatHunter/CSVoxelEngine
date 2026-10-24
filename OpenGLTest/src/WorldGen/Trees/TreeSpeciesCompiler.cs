@@ -87,12 +87,9 @@ internal static class TreeSpeciesCompiler
         // Leaf cluster: present exactly when the species has leaves.
         var leafShape = LeafClusterShape.Blob;
         int leafRadius = 0, leafHydration = 0, tipMaxPx = 0, leafMinRadius = 0, leafFullRadiusPx = 0;
-        if (leavesId == 0)
-        {
-            if (dto.LeafCluster != null)
-                throw Fail(path, "has a 'leafCluster' but no 'leaves'.");
-        }
-        else
+        if (leavesId == 0 && dto.LeafCluster != null)
+            throw Fail(path, "has a 'leafCluster' but no 'leaves'.");
+        if (leavesId != 0)
         {
             var cluster = dto.LeafCluster ?? throw Fail(path, "has 'leaves' but is missing 'leafCluster'.");
             leafShape = ParseEnum(path, "leafCluster.shape", cluster.Shape, LeafClusterShape.Blob);
