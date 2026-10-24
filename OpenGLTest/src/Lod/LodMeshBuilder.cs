@@ -349,10 +349,12 @@ internal sealed class LodMeshBuilder
     {
         int minHeight;
         var maxOwn = int.MinValue;
+        byte topBlock;
         if (_separableMin)
-            SampleSeparable(i, j, out minHeight, ref maxOwn);
+            topBlock = SampleSeparable(i, j, out minHeight, ref maxOwn);
         else
-            SampleSeam(i, j, out minHeight, ref maxOwn);
+            topBlock = SampleSeam(i, j, out minHeight, ref maxOwn);
+        _topBlockGrid[(i + 1) * _heightGrid + (j + 1)] = topBlock;
 
         // Biome read at the cell center, like the gravel patch below: the coarse cell
         // wears one material even where its footprint straddles a border.
@@ -399,7 +401,7 @@ internal sealed class LodMeshBuilder
         _canopyLeaf[(i + 1) * _heightGrid + (j + 1)] = canopyId;
     }
 
-    private void SampleSeparable(int i, int j, out int minHeight, ref int maxOwn)
+    private byte SampleSeparable(int i, int j, out int minHeight, ref int maxOwn)
     {
         // Vertical half of the min
         var wz = (j + 1) * _cellSize;
@@ -436,10 +438,10 @@ internal sealed class LodMeshBuilder
                     }
             }
         }
-        _topBlockGrid[(i + 1) * _heightGrid + (j + 1)] = topBlock;
+        return topBlock;
     }
 
-    private void SampleSeam(int i, int j, out int minHeight, ref int maxOwn)
+    private byte SampleSeam(int i, int j, out int minHeight, ref int maxOwn)
     {
         // Test seam (item C1): the original fused O(window^2) scan, kept so
         // LodHeightSamplingTests can compare full output against it.
@@ -470,7 +472,7 @@ internal sealed class LodMeshBuilder
                 }
             }
         }
-        _topBlockGrid[(i + 1) * _heightGrid + (j + 1)] = topBlock;
+        return topBlock;
     }
 
     private void ClassifyGenerated(int i, int j, int centerX, int centerZ, int maxOwn, ref int canopyMax, ref byte canopyId)
