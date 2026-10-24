@@ -43,6 +43,33 @@ internal sealed class StationPasses : IDisposable
 
     private TextureUnits Units => _owner.Units;
 
+    /// <summary>
+    /// The mesh an item or block id draws as in a station pass, binding the texture it samples:
+    /// an item's own sprite texture, or the world atlas - a no-op while that is already bound,
+    /// so a run of block results never rebinds. Null when the id has no mesh.
+    /// </summary>
+    private Mesh? BindStationMesh(byte id, ref bool atlasBound)
+    {
+        if (ItemRegistry.IsItem(id))
+        {
+            if (!_owner.ItemMeshes.TryGet(id, out var itemMesh, out var itemTexture)) return null;
+            Units.BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
+            atlasBound = false;
+            return itemMesh;
+        }
+
+        BindAtlas(ref atlasBound);
+        return _owner.BlockCubes.Get(id);
+    }
+
+    /// <summary>Rebinds the world atlas after an item mesh left its own texture on unit 0.</summary>
+    private void BindAtlas(ref bool atlasBound)
+    {
+        if (atlasBound) return;
+        _owner.BindWorldTextures();
+        atlasBound = true;
+    }
+
     internal StationPasses(GL gl, RenderManager owner)
     {
         _gl = gl;
@@ -87,23 +114,8 @@ internal sealed class StationPasses : IDisposable
                 drew = true;
             }
 
-            Mesh? mesh;
-            if (ItemRegistry.IsItem(itemId))
-            {
-                if (!_owner.ItemMeshes.TryGet(itemId, out mesh, out var itemTexture)) continue;
-                Units.BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
-                atlasBound = false;
-            }
-            else
-            {
-                if (!atlasBound)
-                {
-                    _owner.BindWorldTextures();
-                    atlasBound = true;
-                }
-                mesh = _owner.BlockCubes.Get(itemId);
-                if (mesh == null) continue;
-            }
+            var mesh = BindStationMesh(itemId, ref atlasBound);
+            if (mesh == null) continue;
 
             var scale = ItemDrop.Size * (ItemRegistry.IsItem(itemId) ? 1.5f : 1f);
             var offset = CampfireManager.SlotOffsets[slot % CampfireManager.SlotOffsets.Length];
@@ -145,23 +157,8 @@ internal sealed class StationPasses : IDisposable
 
             if (inputId == 0) continue;
 
-            Mesh? mesh;
-            if (ItemRegistry.IsItem(inputId))
-            {
-                if (!_owner.ItemMeshes.TryGet(inputId, out mesh, out var itemTexture)) continue;
-                Units.BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
-                atlasBound = false;
-            }
-            else
-            {
-                if (!atlasBound)
-                {
-                    _owner.BindWorldTextures();
-                    atlasBound = true;
-                }
-                mesh = _owner.BlockCubes.Get(inputId);
-                if (mesh == null) continue;
-            }
+            var mesh = BindStationMesh(inputId, ref atlasBound);
+            if (mesh == null) continue;
 
             // Hovering over the plate, clear of the handle's orbit
             var scale = ItemDrop.Size * (ItemRegistry.IsItem(inputId) ? 1.5f : 1f);
@@ -220,11 +217,7 @@ internal sealed class StationPasses : IDisposable
 
         foreach (var (anchor, facing, state) in kilns.KilnView())
         {
-            if (!atlasBound)
-            {
-                _owner.BindWorldTextures();
-                atlasBound = true;
-            }
+            BindAtlas(ref atlasBound);
 
             // One sample per kiln, half a block outside its opening: every cell inside the
             // structure is solid brickwork, so the light the hearth sees is the light at its mouth.
@@ -252,64 +245,27 @@ internal sealed class StationPasses : IDisposable
 
                 var pendingMl = KilnManager.DisplayPendingMl(state);
                 var inputId = state.Contents.PendingInputId;
-                if (pendingMl > 0f && inputId != 0)
+                if (pendingMl > 0f && inputId != 0
+                    && BindStationMesh(inputId, ref atlasBound) is { } lump)
                 {
-                    Mesh? lump;
-                    if (ItemRegistry.IsItem(inputId))
-                    {
-                        if (_owner.ItemMeshes.TryGet(inputId, out lump, out var lumpTexture))
-                        {
-                            Units.BindUnit(0, TextureTarget.Texture2DArray, lumpTexture);
-                            atlasBound = false;
-                        }
-                    }
-                    else
-                    {
-                        if (!atlasBound)
-                        {
-                            _owner.BindWorldTextures();
-                            atlasBound = true;
-                        }
-
-                        lump = _owner.BlockCubes.Get(inputId);
-                    }
-
-                    if (lump != null)
-                    {
-                        // One piece of the last thing charged in, resting over the rim and facing
-                        // the opening; it shrinks as its last unit melts into the pool below
-                        var size = KilnRenderer.PendingSize
-                                 * KilnRenderer.PendingScale01(pendingMl, KilnManager.PendingUnitMl(state));
-                        var foot = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.PendingLocal);
-                        var placed = Matrix4x4.CreateScale(size)
-                                    * Matrix4x4.CreateRotationY(KilnRenderer.OpeningYaw(facing))
-                                    * Matrix4x4.CreateTranslation(foot + new Vector3(0f, size * 0.5f, 0f));
-                        _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
-                        lump.Render();
-                    }
+                    // One piece of the last thing charged in, resting over the rim and facing
+                    // the opening; it shrinks as its last unit melts into the pool below
+                    var size = KilnRenderer.PendingSize
+                             * KilnRenderer.PendingScale01(pendingMl, KilnManager.PendingUnitMl(state));
+                    var foot = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.PendingLocal);
+                    var placed = Matrix4x4.CreateScale(size)
+                                * Matrix4x4.CreateRotationY(KilnRenderer.OpeningYaw(facing))
+                                * Matrix4x4.CreateTranslation(foot + new Vector3(0f, size * 0.5f, 0f));
+                    _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
+                    lump.Render();
                 }
             }
 
             if (state.Fuel <= 0 || state.FuelItemId == 0) continue;
 
             var fuelIsItem = ItemRegistry.IsItem(state.FuelItemId);
-            Mesh? fuelMesh;
-            if (fuelIsItem)
-            {
-                if (!_owner.ItemMeshes.TryGet(state.FuelItemId, out fuelMesh, out var fuelTexture)) continue;
-                Units.BindUnit(0, TextureTarget.Texture2DArray, fuelTexture);
-                atlasBound = false;
-            }
-            else
-            {
-                if (!atlasBound)
-                {
-                    _owner.BindWorldTextures();
-                    atlasBound = true;
-                }
-                fuelMesh = _owner.BlockCubes.Get(state.FuelItemId);
-                if (fuelMesh == null) continue;
-            }
+            var fuelMesh = BindStationMesh(state.FuelItemId, ref atlasBound);
+            if (fuelMesh == null) continue;
 
             // Spread the stored units across the back of the hearth; sprites lie face-up on the
             // floor, cubes stand on it, both turned to the opening.
@@ -350,44 +306,34 @@ internal sealed class StationPasses : IDisposable
         _owner.BindWorldTextures();
 
         var viewProj = camera.GetViewProjection();
+        var atlasBound = true;
 
         foreach (var (cell, materialId, fill01, cool01, done, resultId) in castings.CastingView())
         {
             if (done || cool01 > 0f)
             {
-                Mesh? mesh;
-                Matrix4x4 sprite;
-                if (ItemRegistry.IsItem(resultId))
-                {
-                    if (!_owner.ItemMeshes.TryGet(resultId, out mesh, out var resultTexture)) continue;
-                    Units.BindUnit(0, TextureTarget.Texture2DArray, resultTexture);
+                var resultIsItem = ItemRegistry.IsItem(resultId);
+                var mesh = BindStationMesh(resultId, ref atlasBound);
+                if (mesh == null) continue;
 
-                    // The cast lies face-up in the pocket, filling it
-                    sprite = Matrix4x4.CreateScale(CastingRenderer.ResultSize)
-                            * SpritePose.LyingFaceUp(0f)
-                            * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
-                                CastingRenderer.ResultY, 0.5f));
-                }
-                else
-                {
-                    mesh = _owner.BlockCubes.Get(resultId);
-                    if (mesh == null) continue;
-
-                    // A block result is a cube fitted to the pocket's depth
-                    sprite = Matrix4x4.CreateScale(CastingRenderer.ResultCubeSize)
-                            * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
-                                CastingRenderer.ResultCubeY, 0.5f));
-                }
+                // The cast lies face-up in the pocket, filling it; a block result is a cube
+                // fitted to the pocket's depth
+                var sprite = resultIsItem
+                    ? Matrix4x4.CreateScale(CastingRenderer.ResultSize)
+                      * SpritePose.LyingFaceUp(0f)
+                      * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, CastingRenderer.ResultY, 0.5f))
+                    : Matrix4x4.CreateScale(CastingRenderer.ResultCubeSize)
+                      * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, CastingRenderer.ResultCubeY, 0.5f));
 
                 _owner.SetDrawUniforms(sprite, sprite * viewProj, done ? 1f : CastingRenderer.ResultAlpha(cool01),
                     _owner.LightAt(cell + new Vector3(0.5f)));
                 mesh.Render();
-                _owner.BindWorldTextures();
             }
 
             if (done || fill01 <= 0f) continue;
             if (ContentRegistry.MoltenMaterialById(materialId) is not { } material) continue;
 
+            BindAtlas(ref atlasBound);
             var liquid = Matrix4x4.CreateScale(CastingRenderer.PocketWidth)
                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
                             CastingRenderer.LiquidHeight(fill01), 0.5f));
