@@ -75,7 +75,7 @@ public sealed class SceneryTests
             if (!BoulderGenerator.TryGetBoulder(cellX, cellZ, out var cx, out var cz, out var count, out var blockId))
                 continue;
             var biome = TerrainGenerator.BiomeAt(cx, cz);
-            if (biome != Biome.Forest && biome != Biome.Taiga) continue;
+            if (biome is not (Biome.Forest or Biome.Taiga or Biome.Steppe or Biome.Savanna)) continue;
             var height = HeightAt(cx, cz);
             if (TerrainGenerator.IsWaterColumn(cx, cz, height)) continue;
             Assert.InRange(count, WorldFeatureConfig.BoulderMinBlocks, WorldFeatureConfig.BoulderMaxBlocks);

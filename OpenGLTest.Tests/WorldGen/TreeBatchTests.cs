@@ -46,7 +46,7 @@ public sealed class TreeBatchTests
             if (Math.Max(Math.Abs(cx), Math.Abs(cz)) != r) continue;
             var centerX = (cx << WorldGenerationConfig.TreeCellShift) + half;
             var centerZ = (cz << WorldGenerationConfig.TreeCellShift) + half;
-            if (!TerrainGenerator.IsForest(centerX, centerZ)) continue;
+            if (TerrainGenerator.BiomeAt(centerX, centerZ) != Biome.Forest) continue;
             if (CellTrunks(cx, cz) >= minTrunks)
                 return (cx, cz);
         }
@@ -255,7 +255,8 @@ public sealed class TreeBatchTests
                 var allForest = true;
                 for (var dx = -1; dx <= 1 && allForest; dx++)
                 for (var dz = -1; dz <= 1 && allForest; dz++)
-                    allForest = TerrainGenerator.IsForest((chunkX + dx) * Chunk.Size + 8, (chunkZ + dz) * Chunk.Size + 8);
+                    allForest = TerrainGenerator.BiomeAt((chunkX + dx) * Chunk.Size + 8, (chunkZ + dz) * Chunk.Size + 8)
+                                == Biome.Forest;
                 if (!allForest) continue;
 
                 // Only a tree whose batch shape really crosses into another cell tests the border
@@ -314,7 +315,7 @@ public sealed class TreeBatchTests
             var allForest = true;
             for (var dx = -1; dx <= 1 && allForest; dx++)
             for (var dz = -1; dz <= 1 && allForest; dz++)
-                allForest = TerrainGenerator.IsForest((cx + dx) * Chunk.Size + 8, (cz + dz) * Chunk.Size + 8);
+                allForest = TerrainGenerator.BiomeAt((cx + dx) * Chunk.Size + 8, (cz + dz) * Chunk.Size + 8) == Biome.Forest;
             if (!allForest) continue;
 
             var wooded = false;

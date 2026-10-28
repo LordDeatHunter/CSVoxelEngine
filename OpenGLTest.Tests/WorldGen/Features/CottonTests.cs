@@ -10,7 +10,7 @@ namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
 /// Wild cotton: the plant breaks into cotton, the generator places it only on dry grass inside its
-/// clumps on the forest's desert fringe, and that fringe stays clear of the dithered sand border.
+/// clumps in the savanna, and those clumps stay clear of the dithered sand border.
 /// The clump pattern itself is <see cref="PlantClumpTests"/>.
 /// </summary>
 public sealed class CottonTests
@@ -63,7 +63,7 @@ public sealed class CottonTests
     }
 
     [Fact]
-    public void CottonStampsOnlyOnDryGrassInsideAClumpOnItsFringe()
+    public void CottonStampsOnlyOnDryGrassInsideASavannaClump()
     {
         var cotton = CottonPlant.Id;
         var grass = ContentRegistry.RequireBlock("grass").Id;
@@ -91,10 +91,11 @@ public sealed class CottonTests
     }
 
     [Fact]
-    public void CottonClumpsCenterOnForestThatTheSandDitherNeverReaches()
+    public void CottonClumpsCenterOnSavannaThatTheSandDitherNeverReaches()
     {
-        // The fringe's top end is the start of the grass/sand dither, so the column a clump is
-        // centered on always keeps the forest surface (the per-column biome is the dithered one)
+        // Every clump center is savanna, and the gate's top end is the start of the savanna/sand
+        // dither, so the column a clump is centered on never takes the desert surface (the
+        // per-column biome is the dithered one)
         var spec = CottonGenerator.Clumps;
         var gated = 0;
         for (var cellX = -60; cellX <= 60; cellX++)
@@ -103,9 +104,10 @@ public sealed class CottonTests
             if (!PlantClumps.TryGetClump(spec, WorldGenerationConfig.Seed, cellX, cellZ, out var x, out var z)) continue;
             if (!CottonGenerator.IsCottonClimate(x, z)) continue;
             gated++;
+            Assert.Equal(Biome.Savanna, TerrainGenerator.BiomeAt(x, z));
             var surface = ColumnCache.GetBiomes(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
                 [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
-            Assert.Equal(Biome.Forest, surface);
+            Assert.NotEqual(Biome.Desert, surface);
         }
 
         Assert.True(gated > 0, "expected cotton clumps in the sampled cells");

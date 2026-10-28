@@ -47,7 +47,7 @@ public sealed class WorldgenTests
         for (var cx = 0; cx <= 64 && !found; cx++)
         for (var cz = -64; cz <= 64 && !found; cz++)
         {
-            if (!TerrainGenerator.IsForest(cx * Chunk.Size + Chunk.Size / 2, cz * Chunk.Size + Chunk.Size / 2))
+            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + Chunk.Size / 2, cz * Chunk.Size + Chunk.Size / 2) != Biome.Forest)
                 continue;
 
             for (var x = cx * Chunk.Size; x < cx * Chunk.Size + Chunk.Size && !found; x++)
@@ -181,10 +181,11 @@ public sealed class WorldgenTests
         var found = false;
         var tx = 0;
         var tz = 0;
-        for (var x = 8; x < 256 && !found; x++)
-        for (var z = 8; z < 256 && !found; z++)
+        for (var x = 8; x < 1024 && !found; x++)
+        for (var z = 8; z < 1024 && !found; z++)
         {
-            if (TreeGenerator.CanopyTop(x, z) > 0)
+            if (TreeGenerator.CanopyTop(x, z) > 0
+                && TreeGenerator.CanopyLeafBlock(x, z) == TreeGenerator.LeavesBlock)
             {
                 tx = x;
                 tz = z;
@@ -236,9 +237,9 @@ public sealed class WorldgenTests
                 }
                 var beachBiome = TerrainGenerator.BiomeAt(x0 + 1, z0 + 1);
                 if (allBeach && TerrainGenerator.IsGravelPatch(x0 + 1, z0 + 1)
-                    // Only ocean and the two sand-shored land biomes wear gravel in the LOD;
+                    // Only ocean and the sand-shored land biomes wear gravel in the LOD;
                     // desert and frozen rock keep their own materials.
-                    && beachBiome is Biome.Ocean or Biome.Forest or Biome.Taiga
+                    && (beachBiome == Biome.Ocean || BiomeTraits.RimsWaterWithSand(beachBiome))
                     // A wooded column's canopy is the LOD's top face, which hides the beach cap.
                     && TreeGenerator.CanopyTop(x0, z0) == 0 && TreeGenerator.CanopyTop(x0 + 1, z0) == 0
                     && TreeGenerator.CanopyTop(x0, z0 + 1) == 0 && TreeGenerator.CanopyTop(x0 + 1, z0 + 1) == 0)

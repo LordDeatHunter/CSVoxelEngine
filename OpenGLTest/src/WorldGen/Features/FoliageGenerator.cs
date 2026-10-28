@@ -47,12 +47,12 @@ public static class FoliageGenerator
         ShrubPatchNoise = TerrainGenerator.MakeNoise(64, WorldFeatureConfig.ShrubPatchFrequency);
     }
 
-    /// <summary>Whether the forest surface column (x, z) grows a grass tuft.</summary>
+    /// <summary>Whether the forest, steppe or savanna surface column (x, z) grows a grass tuft.</summary>
     public static bool TryGetGrassTuft(int x, int z)
     {
         // An oasis disc is a dense meadow whatever the patch noise says
         if (OasisGenerator.IsDisc(x, z)) return true;
-        if (!TerrainGenerator.IsForest(x, z)) return false;
+        if (TerrainGenerator.BiomeAt(x, z) is not (Biome.Forest or Biome.Steppe or Biome.Savanna)) return false;
         if (GrassPatchNoise.GetNoise(x, z) <= WorldFeatureConfig.GrassPatchThreshold) return false;
         // Denser where the climate is wetter (Climate's own wetness, the tint's input)
         TerrainGenerator.Climate(x, z, out _, out var wetness);

@@ -67,8 +67,9 @@ public static class WorldGenerationConfig
     // The forest floor sits above sea level, so an un-carved column is always the dry rim of any
     // carved water: a lake is a bowl and a river a channel, and water fills only the part cut
     // below the waterline, which keeps it enclosed instead of floating on a slope. The carve and
-    // the flood test read the same LakeWeight/RiverWeight functions (WaterBodies). Forest
-    // only: a desert stays dry, and sand/gravel show only where these weights are present.
+    // the flood test read the same LakeWeight/RiverWeight functions (WaterBodies). Every land
+    // biome but the desert (WaterBodies.CanHoldSurfaceWater): a desert stays dry, and sand/gravel
+    // show only where these weights are present.
     public const bool LakesAndRiversEnabled = true;
     // Below this water-body weight a below-waterline column is left dry.
     public const float WaterBodyThreshold = 0.05f;
@@ -136,10 +137,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
 
     // --- Biomes ---
     // Biome is a pure function of (x, z): continentalness (low = ocean) splits ocean from land; on
-    // land temperature and humidity form a 2D climate grid (warm+wet forest, warm+dry desert,
-    // cold+wet taiga, cold+dry barren frozen). Every field is a smooth 0..1 weight, so the height
-    // profile blends across a border instead of stepping, and a per-column hash breaks the
-    // forest/desert material line into a ragged patchwork.
+    // land temperature (cold / temperate / warm) and humidity (dry / semi-dry / wet) form a 3x3
+    // climate grid (BiomeClassifier.Classify): cold is taiga (wet, semi-dry) or barren frozen tundra
+    // (dry), temperate is forest (wet) or steppe (semi-dry, dry), warm is forest (wet), savanna
+    // (semi-dry) or desert (dry). So the dry axis reads desert -> steppe -> tundra and no forest
+    // ever stands between sand and snow. Every field is a smooth 0..1 weight, so the height
+    // profile blends across a border instead of stepping, and a coherent dither field breaks the
+    // desert's material line into a ragged patchwork.
     public const bool BiomesEnabled = true;
 
     // Continentalness: a ~2800-block wavelength keeps ocean basins 1-2k blocks across.
@@ -155,14 +159,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Temperature: a three-band axis. The cold ramp (TemperatureCold*, read by
     // TerrainGenerator.ColdWeight) holds the snow, the ice and the taiga/frozen biomes; the warm
     // ramp (TemperatureWarm*, read by TerrainGenerator.WarmWeight) holds the desert; the raw-noise
-    // gap between them is the temperate band. Cold land is taiga (with humidity) or the barren
-    // frozen biome (without it). Temperature and humidity are read only while choosing a biome and
-    // the worldgen features that follow from it, and by the grass/foliage tint through
-    // TerrainGenerator.Climate, so nothing else in the game sees them.
+    // gap between them is the temperate band (forest or steppe, by humidity). Cold land is taiga
+    // (with humidity) or the barren frozen biome (without it). Temperature and humidity are read
+    // only through BiomeClassifier.SampleClimate, while choosing a biome and the worldgen features
+    // that follow from it, and by the grass/foliage tint through TerrainGenerator.Climate, so
+    // nothing else in the game sees them.
     // Low frequency (one octave, see TerrainNoise.Reseed) keeps the temperature gradient shallow,
     // so the raw-noise gap between the two ramps spans a wide band of world: at this frequency it
     // keeps every hot column at least a full-detail load radius from snow
-    // (BiomeTests.HotAirKeepsAFullLoadRadiusFromSnow). Changing it re-lays every temperature
+    // (BiomeTests.DesertAndSnowAreNeverNearAndTheDryCorridorIsSteppeOrTundra). Changing it re-lays every temperature
     // value, the origin's included.
     public const float TemperatureFrequency = 1f / 4500f;
     public const float TemperatureColdStart = -0.35f;  // at or below: fully cold
@@ -173,18 +178,33 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float TemperatureWarmStart = 0.05f;   // at or below: no warmth
     public const float TemperatureWarmEnd = 0.35f;     // at or above: fully warm
 
-    // Humidity: dry where the noise runs low. Dry land is desert (warm) or barren frozen (cold).
+    // Humidity: a three-band axis like temperature. dry = 1 - smooth(HumidityDryStart, HumidityDryEnd,
+    // humidity): dry land is desert (warm), steppe (temperate) or barren frozen (cold).
     public const float HumidityFrequency = 1f / 1700f;
     public const float HumidityDryStart = -0.35f;      // at or below: fully dry
-    public const float HumidityDryEnd = -0.05f;        // at or above: fully wet
+    public const float HumidityDryEnd = -0.05f;        // at or above: no dryness at all
+    // semiDry = 1 - smooth(HumiditySemiDryStart, HumiditySemiDryEnd, humidity): semi-dry land is
+    // steppe when temperate and savanna when warm (a cold one stays taiga). The ramp starts at or
+    // after the dry ramp ends, so the two are exclusive (a test rule: HumidityRampsAreExclusive) and
+    // semiDry is 1 wherever any dryness is, which is what makes the savanna sit between forest and
+    // desert on the warm row and the steppe between the forest and both dry biomes. The origin's
+    // raw humidity is exactly 0 for every seed (OpenSimplex is zero at the lattice origin), so the
+    // ramp's midpoint sits just below 0 to keep the spawn a forest (BiomeTests.OriginColumnIsForest).
+    public const float HumiditySemiDryStart = -0.05f;  // at or below: fully semi-dry
+    public const float HumiditySemiDryEnd = 0.03f;     // at or above: wet
+    // Share of the forest-profile hills semi-dry and dry land loses (scaled by the smooth arid weight,
+    // BiomeClassifier.BiomeWeights), which flattens steppe, savanna and tundra into plains while the
+    // border stays a slope.
+    public const float DryHillReduction = 0.6f;
 
     // Temperate band between hot and cold biomes: taiga/frozen live on the cold ramp (at
-    // ColdBiomeMinCold and colder), desert on the warm ramp (from its midpoint up), and the whole
-    // raw-noise gap between those two lines always classifies as forest. Without it the warm/cold
-    // isoline puts dunes directly against snow whenever the humidity stays dry across the
-    // temperature line. Widen the band by raising both TemperatureWarm constants together (which
+    // ColdBiomeMinCold and colder), desert and savanna on the warm ramp (from its midpoint up), and
+    // the raw-noise gap between those two lines classifies as forest (wet) or steppe (semi-dry and
+    // dry). Without it the warm/cold isoline would put dunes directly against snow whenever the
+    // humidity stays dry across the temperature line; with it the dry corridor runs desert ->
+    // steppe -> tundra. Widen the band by raising both TemperatureWarm constants together (which
     // keeps the dune fade width), never by moving the cold ramp.
-    public const float ColdBiomeMinCold = 0.70f; // below: too warm for taiga/frozen, forest instead
+    public const float ColdBiomeMinCold = 0.70f; // below: too warm for taiga/frozen, forest or steppe instead
 
     // Ocean depth ramp: the shelf sits just over the waterline and the basin falls to the floor.
     public const float OceanShoreHeight = 3f;       // blocks, the shallowest shelf

@@ -47,10 +47,9 @@ public static class WorldFeatureConfig
 
     // --- Cotton (CottonGenerator over PlantClumps) ---
     // Clumped, not scattered: at most one clump per 2^CottonCellShift-block cell, accepted with
-    // CottonClumpChance and only on the warm, dry forest fringe before the desert line: a forest
-    // center whose desert weight (0.5 on the desert line itself) lies in
-    // [CottonMinDesertWeight, CottonMaxDesertWeight), the top end being where the grass/sand border
-    // dither starts, so a clump never lands on dithered sand. The center sits up to CottonJitter
+    // CottonClumpChance and only on the savanna before the desert line: a savanna center whose
+    // desert weight (0.5 on the desert line itself) stays under CottonMaxDesertWeight, where the
+    // savanna/sand border dither starts, so a clump never lands on dithered sand. The center sits up to CottonJitter
     // blocks off the cell's middle, so centers are at least 2^shift - 2 * jitter apart, and the clump
     // fills a CottonRadius disc: the CottonMinMembers cells nearest the center always, the rest with
     // a density falling from 1 at the center to CottonEdgeDensity at the rim. Clumps never overlap
@@ -62,7 +61,6 @@ public static class WorldFeatureConfig
     public const int CottonMinMembers = 5;
     public const float CottonClumpChance = 0.6f;
     public const float CottonEdgeDensity = 0.1f;
-    public const float CottonMinDesertWeight = 0.2f;
     public const float CottonMaxDesertWeight = 0.5f - WorldGenerationConfig.BiomeBorderDither;
 
     // --- Fallen logs (FallenLogGenerator): a rare detached oak log on the forest floor ---
@@ -73,8 +71,8 @@ public static class WorldFeatureConfig
     public const int FallenLogMinLength = 3;
     public const int FallenLogMaxLength = 5;
 
-    // --- Boulders (BoulderGenerator): a rare blob of stone or cobblestone on the forest and
-    // taiga floor ---
+    // --- Boulders (BoulderGenerator): a rare blob of stone or cobblestone on the forest, taiga,
+    // steppe and savanna floor ---
     public const bool BouldersEnabled = true;
     // One candidate boulder per 2^BoulderCellShift-block cell, accepted with BoulderChance
     public const int BoulderCellShift = 5;

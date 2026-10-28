@@ -101,7 +101,7 @@ public sealed class FoliageTests
         // cell rather than pinning one chunk's count.
         var grassFound = 0;
         var shrubFound = 0;
-        foreach (var (cx, cz) in FindChunks((x, z) => TerrainGenerator.IsForest(x, z), 4))
+        foreach (var (cx, cz) in FindChunks((x, z) => TerrainGenerator.BiomeAt(x, z) == Biome.Forest, 4))
             grassFound += StampMixedGround(cx, cz).Grass;
         foreach (var (cx, cz) in FindChunks((x, z) => TerrainGenerator.IsDesert(x, z), 8))
             shrubFound += StampMixedGround(cx, cz).Shrub;
@@ -191,7 +191,8 @@ public sealed class FoliageTests
             {
                 grassFound++;
                 Assert.Equal(grass, surface);
-                Assert.True(TerrainGenerator.IsForest(wx, wz));
+                Assert.True(TerrainGenerator.BiomeAt(wx, wz) is Biome.Forest or Biome.Steppe or Biome.Savanna,
+                    $"tall grass at ({wx}, {wz}) outside the grass biomes");
             }
             else if (cell == deadShrub)
             {

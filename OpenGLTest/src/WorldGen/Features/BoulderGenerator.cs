@@ -5,7 +5,8 @@ using VoxelEngine.Content;
 namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
-/// Boulders: a rare blob of stone or cobblestone cells sitting on the forest or taiga floor,
+/// Boulders: a rare blob of stone or cobblestone cells sitting on the forest, taiga, steppe or
+/// savanna floor,
 /// decided per 2^<see cref="WorldFeatureConfig.BoulderCellShift"/>-block cell from a pure hash
 /// of (cell, seed), so every chunk a boulder reaches stamps the same cells (clipped at its
 /// border). Its cells share one height (the center column's ground plus one) and go into air only;
@@ -74,7 +75,8 @@ public static class BoulderGenerator
             if (!TryGetBoulder(cellX, cellZ, out var centerX, out var centerZ, out var count, out var blockId))
                 continue;
             var biome = TerrainGenerator.BiomeAt(centerX, centerZ);
-            if (biome != Biome.Forest && biome != Biome.Taiga) continue;
+            // The grass biomes: forest and taiga floors, and the kopjes of the open steppe and savanna
+            if (biome is not (Biome.Forest or Biome.Taiga or Biome.Steppe or Biome.Savanna)) continue;
 
             var heights = ColumnCache.GetHeights(VoxelCoords.WorldToChunk(centerX), VoxelCoords.WorldToChunk(centerZ));
             var height = heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(centerX),

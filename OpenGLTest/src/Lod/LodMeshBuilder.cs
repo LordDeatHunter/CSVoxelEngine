@@ -498,16 +498,17 @@ internal sealed class LodMeshBuilder
         _seaFloor[(i + 1) * _heightGrid + (j + 1)] = FloorMaterial(maxOwn, cellLevel, cellBiome);
 
         // Sand rings ocean shores and lake/river rims, not every column in the height
-        // band. Taiga shores wear sand like forest ones; frozen rock keeps its own
-        // material.
+        // band. Every grass-fill biome (the near fill's default branch) wears sand on
+        // its rims; desert and frozen rock keep their own material.
         _beachTop[(i + 1) * _heightGrid + (j + 1)] = TerrainGenerator.IsBeachHeight(maxOwn)
             && (cellBiome == Biome.Ocean
-                || ((cellBiome == Biome.Forest || cellBiome == Biome.Taiga)
+                || (BiomeTraits.RimsWaterWithSand(cellBiome)
                     && TerrainGenerator.SurfaceWaterWeight(centerX, centerZ) > 0f));
         _gravelTop[(i + 1) * _heightGrid + (j + 1)] =
             _beachTop[(i + 1) * _heightGrid + (j + 1)] && TerrainGenerator.IsGravelPatch(centerX, centerZ);
+        // The same bare-rock rule TerrainGenerator.Compute strips a column's soil by
         _rockTop[(i + 1) * _heightGrid + (j + 1)] =
-            cellBiome == Biome.Forest && maxOwn >= WorldGenerationConfig.MountainRockHeight;
+            BiomeTraits.ShowsBareRock(cellBiome) && maxOwn >= WorldGenerationConfig.MountainRockHeight;
 
         var cold = SnowGenerator.ColdWeightAt(centerX, centerZ, maxOwn);
         _snowTop[(i + 1) * _heightGrid + (j + 1)] = cold > WorldGenerationConfig.SnowColdThreshold;
@@ -543,9 +544,10 @@ internal sealed class LodMeshBuilder
             TerrainGenerator.IsBeachHeight(maxOwn) && cellBiome == Biome.Ocean;
         _gravelTop[(i + 1) * _heightGrid + (j + 1)] = false;
         // The column-level bare-rock truth the chunk mesher's column fill follows, so a
-        // supplied grass plateau above the mountain rock line keeps its grass.
+        // supplied grass plateau above the mountain rock line keeps its grass, while a
+        // stripped column of a snowless grass biome shows stone.
         _rockTop[(i + 1) * _heightGrid + (j + 1)] =
-            cellBiome == Biome.Forest && suppliedColumn.DirtDepth[centerLocal] == 0;
+            BiomeTraits.ShowsBareRock(cellBiome) && suppliedColumn.DirtDepth[centerLocal] == 0;
         _snowTop[(i + 1) * _heightGrid + (j + 1)] = cellBiome is Biome.Taiga or Biome.Frozen;
         _iceTop[(i + 1) * _heightGrid + (j + 1)] = cellBiome == Biome.Frozen;
     }

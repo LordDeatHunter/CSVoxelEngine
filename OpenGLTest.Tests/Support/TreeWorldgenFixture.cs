@@ -32,7 +32,7 @@ internal static class TreeWorldgenFixture
             var allForest = true;
             for (var dx = -1; dx <= 1 && allForest; dx++)
             for (var dz = -1; dz <= 1 && allForest; dz++)
-                allForest = TerrainGenerator.IsForest((cx + dx) * Chunk.Size + 8, (cz + dz) * Chunk.Size + 8);
+                allForest = TerrainGenerator.BiomeAt((cx + dx) * Chunk.Size + 8, (cz + dz) * Chunk.Size + 8) == Biome.Forest;
             if (!allForest) continue;
 
             for (var x = 0; x < Chunk.Size; x++)

@@ -58,8 +58,10 @@ public static class ColumnCache
     /// Fills one column of a chunk's block array from the chunk floor up to the terrain height:
     /// grass on top, dirt for dirtDepth blocks under it, stone below that. dirtDepth == 0 marks a
     /// bare stone column, deep ravine walls, where the top block is stone too. A wet column tops
-    /// out in dirt instead. Shoreline columns build from sand, capped with gravel where
-    /// <see cref="TerrainGenerator.IsGravelPatch"/> holds. <paramref name="terrainHeight"/>
+    /// out in dirt instead. That is the fill of every grass biome (forest, taiga, steppe, savanna,
+    /// the set <see cref="BiomeTraits.RimsWaterWithSand"/> names), whose shoreline columns build
+    /// from sand, capped with gravel where <see cref="TerrainGenerator.IsGravelPatch"/> holds; the
+    /// desert, the ocean and the frozen plains wear their own materials. <paramref name="terrainHeight"/>
     /// (ravines cut in) decides how deep to fill; <paramref name="bed"/> (ravines not cut) decides
     /// whether the column is water.
     /// </summary>
@@ -106,7 +108,10 @@ public static class ColumnCache
                 break;
 
             default:
-                // Sand and gravel ring actual water only: the height band plus a lake or river rim.
+                // Every grass biome (forest, taiga, steppe, savanna: the set
+                // BiomeTraits.RimsWaterWithSand names, which the far LOD reads too) keeps the grass
+                // over dirt set above. Sand and gravel ring actual water only: the height band plus
+                // a lake or river rim.
                 // Without the weight test a dry ravine floor in the band would wear sand in the
                 // middle of the forest, which is what made random patches before.
                 if (dirtDepth != 0 && TerrainGenerator.IsBeachHeight(terrainHeight)

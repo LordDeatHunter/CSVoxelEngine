@@ -1,17 +1,22 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
+using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
 namespace VoxelEngine.Tests.WorldGen;
 
 /// <summary>
-/// Covers the biome split: selection from continentalness/aridity, the ocean depth ramp and its
-/// floor bands, the desert sand/sandstone column, and the cactus wood family (which must never
-/// weld to tree wood). The near-terrain and far-LOD views are checked separately.
+/// Covers the biome split: the 3x3 climate grid over continentalness, temperature and the two
+/// humidity ramps (forest needs wet air, so the dry axis reads desert, steppe, tundra), the smooth
+/// weights the heights lerp by, the ragged desert border, the ocean depth ramp and its floor bands,
+/// the desert sand/sandstone column and which trees each biome grows. Classification scans read
+/// the undithered biome (<see cref="TerrainGenerator.BiomeAt"/>); only the dither test reads the
+/// dithered column biomes. The near-terrain and far-LOD views are checked separately.
 /// </summary>
 public sealed class BiomeTests
 {
@@ -32,7 +37,6 @@ public sealed class BiomeTests
     public void OriginColumnIsForest()
     {
         Assert.Equal(Biome.Forest, TerrainGenerator.BiomeAt(0, 0));
-        Assert.True(TerrainGenerator.IsForest(0, 0));
     }
 
     [Fact]
@@ -59,6 +63,123 @@ public sealed class BiomeTests
 
         Assert.True(sawOcean, "no ocean biome within 64 chunks");
         Assert.True(sawDesert, "no desert biome within 64 chunks");
+    }
+
+    [Fact]
+    public void SteppeAndSavannaBothExistNearOrigin()
+    {
+        var sawSteppe = false;
+        var sawSavanna = false;
+        const int radius = 64;
+        for (var cx = -radius; cx <= radius && !(sawSteppe && sawSavanna); cx++)
+        for (var cz = -radius; cz <= radius && !(sawSteppe && sawSavanna); cz++)
+        {
+            var biome = TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8);
+            sawSteppe |= biome == Biome.Steppe;
+            sawSavanna |= biome == Biome.Savanna;
+        }
+
+        Assert.True(sawSteppe, "no steppe biome within 64 chunks");
+        Assert.True(sawSavanna, "no savanna biome within 64 chunks");
+    }
+
+    [Fact]
+    public void HumidityRampsAreExclusive()
+    {
+        // The semi-dry ramp lies wholly on the wet side of the dry ramp: wherever any dryness is,
+        // the air is fully semi-dry, so the savanna and the steppe always sit between forest and
+        // the dry biomes. Swept through both ramps' real constants.
+        var sawDry = false;
+        var sawSemiDryRamp = false;
+        for (var i = 0; i <= 4000; i++)
+        {
+            var h = -1f + i * 0.0005f;
+            var dry = BiomeClassifier.DryOf(h);
+            var semiDry = BiomeClassifier.SemiDryOf(h);
+            if (dry > 0f)
+            {
+                sawDry = true;
+                Assert.True(semiDry == 1f, $"humidity {h} is dry ({dry}) but only {semiDry} semi-dry");
+            }
+
+            sawSemiDryRamp |= semiDry > 0f && semiDry < 1f;
+        }
+
+        Assert.True(sawDry, "no humidity is dry");
+        Assert.True(sawSemiDryRamp, "the sweep never crossed the semi-dry ramp");
+    }
+
+    [Fact]
+    public void TheDryAxisNeverClassifiesForest()
+    {
+        // Over a fine (temperature, humidity) lattice through the real seams: dry air is tundra,
+        // steppe or desert, never forest; forest needs wet air; savanna is warm and short of dry;
+        // and desert is still exactly min(warm, dry) >= 0.5, the line the dune blend keys on.
+        var seen = new HashSet<Biome>();
+        for (var ti = 0; ti <= 400; ti++)
+        for (var hi = 0; hi <= 400; hi++)
+        {
+            var t = -1f + ti * 0.005f;
+            var h = -1f + hi * 0.005f;
+            var cold = BiomeClassifier.ColdOf(t);
+            var warm = BiomeClassifier.WarmOf(t);
+            var dry = BiomeClassifier.DryOf(h);
+            var semiDry = BiomeClassifier.SemiDryOf(h);
+            var biome = BiomeClassifier.Classify(0f, cold, warm, dry, semiDry);
+            seen.Add(biome);
+
+            if (dry >= 0.5f)
+                Assert.True(biome is Biome.Frozen or Biome.Steppe or Biome.Desert,
+                    $"t {t} h {h} is dry ({dry}) but classifies {biome}");
+            if (biome == Biome.Forest)
+                Assert.True(semiDry < 0.5f, $"t {t} h {h} is forest with semi-dry {semiDry}");
+            if (biome == Biome.Savanna)
+                Assert.True(warm >= 0.5f && dry < 0.5f, $"t {t} h {h} is savanna with warm {warm}, dry {dry}");
+            Assert.Equal(MathF.Min(warm, dry) >= 0.5f, biome == Biome.Desert);
+        }
+
+        foreach (var biome in new[] { Biome.Forest, Biome.Steppe, Biome.Savanna, Biome.Desert, Biome.Taiga, Biome.Frozen })
+            Assert.True(seen.Contains(biome), $"the climate lattice never classifies {biome}");
+    }
+
+    [Fact]
+    public void AridWeightIsSmooth()
+    {
+        // aridWeight = SemiDryOf(h) * (1 - ocean), so by the product rule a unit step can move it by
+        // at most the semi-dry smoothstep's steepest slope times the humidity change (scaled by the
+        // land share) plus the semi-dry share times the ocean change. Holding that bound on every
+        // stride-1 step, coasts included, is what keeps the hills LandHeight flattens with it a
+        // slope rather than a cliff.
+        var k = 1.5f / (WorldGenerationConfig.HumiditySemiDryEnd - WorldGenerationConfig.HumiditySemiDryStart);
+        var moved = 0;
+        var coastal = 0;
+        for (var z = -2048; z <= 2048; z += 256)
+        {
+            BiomeClassifier.SampleClimate(-2048, z, out _, out var h0);
+            BiomeClassifier.BiomeWeights(-2048, z, out var ocean0, out _, out var arid0);
+            for (var x = -2047; x <= 2048; x++)
+            {
+                BiomeClassifier.SampleClimate(x, z, out _, out var h1);
+                BiomeClassifier.BiomeWeights(x, z, out var ocean1, out _, out var arid1);
+
+                var dArid = MathF.Abs(arid1 - arid0);
+                var dOcean = MathF.Abs(ocean1 - ocean0);
+                var bound = k * MathF.Abs(h1 - h0) * (1f - MathF.Min(ocean0, ocean1))
+                            + MathF.Max(BiomeClassifier.SemiDryOf(h0), BiomeClassifier.SemiDryOf(h1)) * dOcean
+                            + 1e-5f;
+                Assert.True(dArid <= bound,
+                    $"aridWeight jumps {dArid} between x {x - 1} and {x} at z {z}, over the bound {bound}");
+                if (dArid > 0f) moved++;
+                if (dOcean > 0f) coastal++;
+
+                h0 = h1;
+                ocean0 = ocean1;
+                arid0 = arid1;
+            }
+        }
+
+        Assert.True(moved > 0, "aridWeight never changed along the scanned rows");
+        Assert.True(coastal > 0, "no scanned step crossed a coast");
     }
 
     [Fact]
@@ -302,17 +423,32 @@ public sealed class BiomeTests
     [Fact]
     public void EveryTreeGrowsInItsSpeciesBiome()
     {
-        // Whatever roots in a desert or forest chunk is a species whose worldgen rules name the
-        // column's biome, so no forest tree takes root in the sand and no desert species grows in
-        // the forest. Sampled until both biomes produced trees, so the check is never vacuous.
+        // Whatever roots in a land chunk is a species whose worldgen rules name the column's biome,
+        // so no forest tree takes root in the sand and no desert species grows in the forest. Every
+        // land biome some species is planted in (an oasis species counts only through its oases)
+        // and whose chunk centers the scan meets must produce a tree, so no biome's check is vacuous.
+        var required = new HashSet<Biome>();
+        foreach (var species in TreeSpeciesRegistry.All)
+        {
+            if (species.Worldgen is not { Oasis: false } worldgen) continue;
+            foreach (var biome in Enum.GetValues<Biome>())
+                if (biome != Biome.Ocean && worldgen.GrowsIn(biome))
+                    required.Add(biome);
+        }
+
+        Assert.NotEmpty(required);
         var seen = new HashSet<Biome>();
-        var checkedChunks = 0;
-        for (var cx = 0; cx <= 64 && (seen.Count < 2 || checkedChunks < 8); cx++)
-        for (var cz = -64; cz <= 64 && (seen.Count < 2 || checkedChunks < 8); cz++)
+        var centers = new HashSet<Biome>();
+
+        // Chebyshev rings outward, so the scan stops early once every biome has produced a tree;
+        // a sparse biome keeps it going to the edge of the window, widened only if still unseen.
+        bool Done() => required.IsSubsetOf(seen);
+        bool CenterBiomesSeen() => required.Where(centers.Contains).All(seen.Contains);
+        void ScanChunk(int cx, int cz)
         {
             var center = TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8);
-            if (center is not (Biome.Desert or Biome.Forest)) continue;
-            checkedChunks++;
+            if (center == Biome.Ocean) return;
+            centers.Add(center);
 
             for (var x = 0; x < Chunk.Size; x++)
             for (var z = 0; z < Chunk.Size; z++)
@@ -327,8 +463,19 @@ public sealed class BiomeTests
             }
         }
 
-        Assert.Contains(Biome.Desert, seen);
-        Assert.Contains(Biome.Forest, seen);
+        const int window = 64;
+        const int widened = 96;
+        for (var ring = 0; ring <= widened && !Done(); ring++)
+        {
+            if (ring > window && CenterBiomesSeen()) break;
+            for (var cx = -ring; cx <= ring && !Done(); cx++)
+            for (var cz = -ring; cz <= ring && !Done(); cz++)
+                if (Math.Max(Math.Abs(cx), Math.Abs(cz)) == ring)
+                    ScanChunk(cx, cz);
+        }
+
+        foreach (var biome in required.Where(centers.Contains))
+            Assert.True(seen.Contains(biome), $"no tree rooted in {biome}, though the scan met its chunks");
     }
 
     [Fact]
@@ -435,20 +582,39 @@ public sealed class BiomeTests
     [Fact]
     public void BiomeBorderDitherFlipsCoherentPatchesNotSingleColumns()
     {
+        // Inside the band around the desert line the stored (dithered) column biome may differ from
+        // the undithered one, in coherent patches. A desert column that flips takes the grass biome
+        // across the line it borders: steppe where warmth binds min(warm, dry), savanna where
+        // dryness does. Forest never borders the desert, so no flip ever gives forest.
         var band = 0;
         var differingNeighbor = 0;
+        var desertFlips = 0;
         const int step = 4;
 
         for (var x = -2048; x < 2048; x += step)
         for (var z = -2048; z < 2048; z += step)
         {
-            TerrainGenerator.BiomeWeights(x, z, out _, out var desertWeight);
+            var undithered = TerrainGenerator.BiomeWeights(x, z, out _, out var desertWeight);
             if (MathF.Abs(desertWeight - 0.5f) >= WorldGenerationConfig.BiomeBorderDither) continue;
 
             var column = ColumnCache.Get(x >> Chunk.SizeShift, z >> Chunk.SizeShift);
             var local = ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
             var here = column.Biomes[local];
-            if (here is not (Biome.Forest or Biome.Desert)) continue;
+            if (here != undithered)
+            {
+                Assert.NotEqual(Biome.Forest, here);
+                if (undithered == Biome.Desert)
+                {
+                    BiomeClassifier.SampleClimate(x, z, out var temperature, out var humidity);
+                    var across = BiomeClassifier.WarmOf(temperature) <= BiomeClassifier.DryOf(humidity)
+                        ? Biome.Steppe
+                        : Biome.Savanna;
+                    Assert.True(here == across, $"desert at ({x},{z}) dithered to {here}, but it borders {across}");
+                    desertFlips++;
+                }
+            }
+
+            if (here is not (Biome.Desert or Biome.Savanna or Biome.Steppe)) continue;
             band++;
 
             var nx = x + step;
@@ -457,7 +623,8 @@ public sealed class BiomeTests
             if (neighbor.Biomes[neighborLocal] != here) differingNeighbor++;
         }
 
-        Assert.True(band > 0, "no forest/desert dither band found in the scanned area");
+        Assert.True(band > 0, "no desert-border dither band found in the scanned area");
+        Assert.True(desertFlips > 0, "no desert column dithered across its border");
         Assert.True(differingNeighbor * 3 < band,
             $"the dither flips single columns: {differingNeighbor} of {band} samples differ from a neighbor");
     }
@@ -467,10 +634,12 @@ public sealed class BiomeTests
     {
         // Sweeps raw temperature through the real ramps and the real classifier. No column is ever
         // both cold and warm, the cold biomes and the (fully dry) desert each own one end of the
-        // axis, and everything strictly between them is temperate forest whatever the humidity.
-        var dries = new[] { 0f, 0.5f, 1f };
+        // axis, and everything strictly between them is temperate: forest in wet air and steppe in
+        // semi-dry or dry air, never a warm or a cold biome. Humidity is swept across both ramps.
         const int samples = 400;
+        const int humiditySamples = 200;
         float T(int i) => -1f + i * 0.005f;
+        float H(int j) => -1f + j * 0.01f;
 
         float? tColdMax = null;
         float? tHotMin = null;
@@ -481,10 +650,11 @@ public sealed class BiomeTests
             var warm = BiomeClassifier.WarmOf(t);
             Assert.False(cold > 0f && warm > 0f, $"t {t} is both cold ({cold}) and warm ({warm})");
 
-            foreach (var dry in dries)
-                if (BiomeClassifier.Classify(0f, cold, warm, dry) is Biome.Taiga or Biome.Frozen)
+            for (var j = 0; j <= humiditySamples; j++)
+                if (BiomeClassifier.Classify(0f, cold, warm, BiomeClassifier.DryOf(H(j)),
+                        BiomeClassifier.SemiDryOf(H(j))) is Biome.Taiga or Biome.Frozen)
                     tColdMax = t;
-            if (tHotMin == null && BiomeClassifier.Classify(0f, cold, warm, 1f) == Biome.Desert)
+            if (tHotMin == null && BiomeClassifier.Classify(0f, cold, warm, 1f, 1f) == Biome.Desert)
                 tHotMin = t;
         }
 
@@ -492,23 +662,36 @@ public sealed class BiomeTests
         Assert.True(tHotMin.HasValue, "no temperature classifies desert even when fully dry");
         Assert.True(tColdMax < tHotMin, $"the cold biomes reach t {tColdMax}, past the desert's {tHotMin}");
 
+        var sawForest = false;
+        var sawSteppe = false;
         for (var i = 0; i <= samples; i++)
         {
             var t = T(i);
             var cold = BiomeClassifier.ColdOf(t);
             var warm = BiomeClassifier.WarmOf(t);
-            foreach (var dry in dries)
+            for (var j = 0; j <= humiditySamples; j++)
             {
-                var biome = BiomeClassifier.Classify(0f, cold, warm, dry);
+                var h = H(j);
+                var semiDry = BiomeClassifier.SemiDryOf(h);
+                var biome = BiomeClassifier.Classify(0f, cold, warm, BiomeClassifier.DryOf(h), semiDry);
                 if (t < tColdMax)
-                    Assert.True(biome is Biome.Taiga or Biome.Frozen, $"t {t} dry {dry} is {biome}, below the cold line");
+                {
+                    Assert.True(biome is Biome.Taiga or Biome.Frozen, $"t {t} h {h} is {biome}, below the cold line");
+                }
                 else if (t > tColdMax && t < tHotMin)
-                    Assert.True(biome == Biome.Forest, $"t {t} dry {dry} is {biome} inside the temperate band");
+                {
+                    var temperate = semiDry < 0.5f ? Biome.Forest : Biome.Steppe;
+                    Assert.True(biome == temperate, $"t {t} h {h} is {biome} inside the temperate band, expected {temperate}");
+                    sawForest |= biome == Biome.Forest;
+                    sawSteppe |= biome == Biome.Steppe;
+                }
             }
 
             if (t > tHotMin)
-                Assert.Equal(Biome.Desert, BiomeClassifier.Classify(0f, cold, warm, 1f));
+                Assert.Equal(Biome.Desert, BiomeClassifier.Classify(0f, cold, warm, 1f, 1f));
         }
+
+        Assert.True(sawForest && sawSteppe, $"the temperate band never held both forest ({sawForest}) and steppe ({sawSteppe})");
     }
 
     [Fact]
@@ -532,11 +715,13 @@ public sealed class BiomeTests
     }
 
     [Fact]
-    public void HotAirKeepsAFullLoadRadiusFromSnow()
+    public void DesertAndSnowAreNeverNearAndTheDryCorridorIsSteppeOrTundra()
     {
         // The temperate band must be at least the full-detail load radius wide, so a player standing
         // on the last dune never has snow loaded around them. Hot = would be desert if fully dry (the
-        // temperature band itself, independent of humidity luck); cold = the snow line.
+        // temperature band itself, independent of humidity luck); cold = the snow line. And the dry
+        // corridor between them never passes a forest: every dry land column is desert, steppe or
+        // frozen tundra.
         var bufferBlocks = StreamingConfig.ChunkRadius * Chunk.Size;
         const int stride = 8;
         const int window = 2048;
@@ -551,6 +736,7 @@ public sealed class BiomeTests
         Array.Fill(seed, -1);
         var frontier = new List<int>();
         var hotInWindow = 0;
+        var dryLandInWindow = 0;
         for (var gz = 0; gz < size; gz++)
         for (var gx = 0; gx < size; gx++)
         {
@@ -558,8 +744,20 @@ public sealed class BiomeTests
             var z = Coord(gz);
             var k = gz * size + gx;
             hot[k] = BiomeClassifier.Classify(0f, TerrainGenerator.ColdWeight(x, z),
-                TerrainGenerator.WarmWeight(x, z), 1f) == Biome.Desert;
-            if (hot[k] && InWindow(gx) && InWindow(gz)) hotInWindow++;
+                TerrainGenerator.WarmWeight(x, z), 1f, 1f) == Biome.Desert;
+            if (InWindow(gx) && InWindow(gz))
+            {
+                if (hot[k]) hotInWindow++;
+                BiomeClassifier.SampleClimate(x, z, out _, out var humidity);
+                var biome = TerrainGenerator.BiomeAt(x, z);
+                if (biome != Biome.Ocean && BiomeClassifier.DryOf(humidity) >= 0.5f)
+                {
+                    dryLandInWindow++;
+                    Assert.True(biome is Biome.Desert or Biome.Steppe or Biome.Frozen,
+                        $"dry land at ({x},{z}) classifies {biome}");
+                }
+            }
+
             if (SnowGenerator.DepthAt(x, z, 0) <= 0) continue;
             seed[k] = k;
             frontier.Add(k);
@@ -567,6 +765,7 @@ public sealed class BiomeTests
 
         Assert.True(frontier.Count > 0, "no snow found in the scanned area");
         Assert.True(hotInWindow > 0, "no hot column found in the asserted window");
+        Assert.True(dryLandInWindow > 0, "no dry land column found in the asserted window");
 
         // Multi-source 8-connected BFS from the snow. Ring r is a Chebyshev distance of r * stride,
         // a lower bound on the Euclidean band, so a failure measured on the diagonal is a real

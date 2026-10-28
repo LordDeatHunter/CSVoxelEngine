@@ -103,21 +103,19 @@ public static class TerrainGenerator
     /// The climate axes behind the biome ramps, as 0..1, so a palette keyed to them has its
     /// corners on the biome lines (<see cref="BiomeTint"/>). Warmth is 0 fully cold, exactly 0.5
     /// across the temperate band (the cold and warm ramps are exclusive) and 1 fully warm;
-    /// wetness is 1 minus the <c>dry</c> weight of <see cref="BiomeWeights"/>. Raw humidity is
-    /// two-octave FBm and would never reach the palette corners, hence the ramp. A pure function
-    /// of position like everything else here.
+    /// wetness reads the two humidity ramps the same way (<see cref="BiomeClassifier.WetnessOf"/>):
+    /// 0 fully dry, exactly 0.5 between the dry and the semi-dry ramp (steppe, savanna) and 1 wet.
+    /// Raw humidity is two-octave FBm and would never reach the palette corners, hence the ramps.
+    /// It reads the very climate sample the biome does (<see cref="BiomeClassifier.SampleClimate"/>),
+    /// so colors and biomes agree. A pure function of position like everything else here.
     /// </summary>
     public static void Climate(float x, float z, out float warmth01, out float wetness01)
     {
         WorldgenReads.Note();
-        var t = TerrainNoise.TemperatureNoise.GetNoise(x, z);
+        BiomeClassifier.SampleClimate(x, z, out var t, out var h);
         warmth01 = 0.5f * (1f - BiomeClassifier.ColdOf(t)) + 0.5f * BiomeClassifier.WarmOf(t);
-        wetness01 = MathUtils.SmoothStep(WorldGenerationConfig.HumidityDryStart,
-            WorldGenerationConfig.HumidityDryEnd, TerrainNoise.HumidityNoise.GetNoise(x, z));
+        wetness01 = BiomeClassifier.WetnessOf(h);
     }
-
-    /// <summary>Whether world column (x, z) is forest; vegetation and spawn rules ask here.</summary>
-    public static bool IsForest(int x, int z) => BiomeAt(x, z) == Biome.Forest;
 
     /// <summary>Whether world column (x, z) is desert; the dead-shrub scatter asks here.</summary>
     public static bool IsDesert(int x, int z) => BiomeAt(x, z) == Biome.Desert;
@@ -224,17 +222,20 @@ public static class TerrainGenerator
         var hill = 0.5f + 0.5f * TerrainNoise.HillNoise.GetNoise(warpedX, warpedZ);
         var rough = TerrainNoise.ValleyRoughNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.ValleyRoughAmplitude;
         var openness = ForestOpenness(worldX, worldZ);
+
+        // Biome blend: the smooth arid weight flattens the hills of dry and semi-dry land into
+        // plains (steppe, savanna, tundra), dunes lift the desert share of the land, then the
+        // ocean ramp empties the basins. All are weighted 0..1, so a border lerps between the
+        // profiles and comes out as a slope, never a cliff.
+        biome = BiomeClassifier.BiomeWeights(worldX, worldZ, out oceanWeight, out desertWeight, out var aridWeight);
         var hillScale = 1f - WorldGenerationConfig.OpennessHillReduction * openness;
+        hillScale *= 1f - WorldGenerationConfig.DryHillReduction * aridWeight;
         forestHeight = WorldGenerationConfig.ForestBaseHeight + swell
             + hill * WorldGenerationConfig.HillAmplitude * hillMask * hillScale
             + rough
             + MountainHeight(worldX, worldZ);
         var heightF = forestHeight;
 
-        // Biome blend: dunes lift the desert share of the land, then the ocean ramp empties
-        // the basins. Both are weighted 0..1, so a border lerps between the profiles and
-        // comes out as a slope, never a cliff.
-        biome = BiomeWeights(worldX, worldZ, out oceanWeight, out desertWeight);
         if (desertWeight > 0f)
         {
             // Smooth dunes on the swell, not the forest hills: a desert is its own profile
@@ -387,10 +388,10 @@ public static class TerrainGenerator
                 else if (ravineDepth > 0)
                     soil = Math.Min(soil, WorldGenerationConfig.RavineBareStoneDepth - ravineDepth);
 
-                // A forest peak above the rock line is bare stone too, so a high crest reads as a
-                // rocky mountain instead of another tree-covered hill. Read off the final heightmap
+                // A grass-biome peak above the rock line is bare stone too, so a high crest reads as
+                // a rocky mountain instead of another tree-covered hill. Read off the final heightmap
                 // (heights[i], ravines included) so the far LOD's rock cap agrees.
-                if (biome == Biome.Forest && heights[i] >= WorldGenerationConfig.MountainRockHeight)
+                if (BiomeTraits.ShowsBareRock(biome) && heights[i] >= WorldGenerationConfig.MountainRockHeight)
                     soil = 0;
 
                 dirtDepth[i] = (byte)soil;

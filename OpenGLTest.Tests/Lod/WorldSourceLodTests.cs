@@ -297,4 +297,48 @@ public sealed class WorldSourceLodTests : IDisposable
         Assert.NotEmpty(bare);
         Assert.All(bare, v => Assert.Equal(stoneTop, v.Layer));
     }
+
+    [Theory]
+    [InlineData(Biome.Steppe)]
+    [InlineData(Biome.Savanna)]
+    public void ASuppliedDryGrasslandColumnWearsGrassOverDirtLikeAForestColumn(Biome biome)
+    {
+        const int rx = 0;
+        const int rz = 0;
+        var top = TallestUnder(rx, rz) + PlateauLift;
+        var forest = LodRegion.BuildMeshData(Level, rx, rz, source: Over(rx, rz, top, Biome.Forest));
+        var grassland = LodRegion.BuildMeshData(Level, rx, rz, source: Over(rx, rz, top, biome));
+
+        // A grassland column differs from a forest one only in tint, trees and flora, all of
+        // which a supplied column carries in its stored climate and its own blocks
+        AssertSameMesh(forest, grassland);
+
+        // ... and that shared mesh is grass on top over the soil band on the plateau's sides
+        var grassTop = GrassTint.Tinted[TopFace];
+        Assert.Contains(InteriorTops(grassland), v => v.Layer == grassTop);
+        // (above worldgen's tallest column, so only the plateau's own sides can count)
+        var soil = BlockOf(TerrainGenerator.SoilBlock);
+        var worldgenTop = TallestUnder(rx, rz) + 1;
+        Assert.Contains(grassland.Vertices, v =>
+            Face(v) < TopFace && v.Position.Y > worldgenTop && v.Layer == soil.FaceTiles[Face(v)]);
+    }
+
+    [Theory]
+    [InlineData(Biome.Steppe)]
+    [InlineData(Biome.Savanna)]
+    public void AStrippedSuppliedDryGrasslandColumnShowsBareRock(Biome biome)
+    {
+        const int rx = 0;
+        const int rz = 0;
+        var top = TallestUnder(rx, rz) + PlateauLift;
+        var stoneTop = BlockOf(TerrainGenerator.RockBlock).FaceTiles[TopFace];
+
+        var soiled = InteriorTops(LodRegion.BuildMeshData(Level, rx, rz, source: Over(rx, rz, top, biome)));
+        Assert.DoesNotContain(soiled, v => v.Layer == stoneTop);
+
+        var bare = InteriorTops(LodRegion.BuildMeshData(Level, rx, rz,
+            source: Over(rx, rz, top, biome, dirtDepth: 0)));
+        Assert.NotEmpty(bare);
+        Assert.All(bare, v => Assert.Equal(stoneTop, v.Layer));
+    }
 }

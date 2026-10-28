@@ -9,7 +9,8 @@ namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// The surface spawn search shared by every mob manager: samples a ring around the player and
-/// returns the first dry, loaded forest column with two clear cells above its ground that no torch
+/// returns the first dry, loaded column of a mob-spawning biome (<see cref="SpawnsMobs"/>: forest,
+/// steppe or savanna) with two clear cells above its ground that no torch
 /// lights (<see cref="IsLitByBlocks"/>). Main thread only (it reads the live chunk map).
 /// </summary>
 public static class MobSpawner
@@ -40,16 +41,17 @@ public static class MobSpawner
             var i = VoxelCoords.ColumnIndex(localX, localZ);
             var height = column.Heights[i];
 
-            // Surface spawns only: dry forest ground with two clear cells above, all of them in
-            // loaded chunks (TryGetCell reports unloaded as absent, not as air). A lake bed counts
-            // as wet even where it sits above sea level, so a mob never spawns inside a pond.
+            // Surface spawns only: dry ground of a mob-spawning biome with two clear cells above,
+            // all of them in loaded chunks (TryGetCell reports unloaded as absent, not as air). A
+            // lake bed counts as wet even where it sits above sea level, so a mob never spawns
+            // inside a pond.
             if (height < column.WaterLevel[i]) continue;
-            // A generated column keeps worldgen's undithered forest test (ColumnData.Biomes holds
-            // the dithered biome); a column the source supplies only has its own biome to go by
-            var forest = source.Supplies(chunkX, chunkZ)
-                ? column.Biomes[i] == Biome.Forest
-                : TerrainGenerator.IsForest(x, z);
-            if (!forest) continue;
+            // A generated column keeps worldgen's undithered biome (ColumnData.Biomes holds the
+            // dithered one); a column the source supplies only has its own biome to go by
+            var biome = source.Supplies(chunkX, chunkZ)
+                ? column.Biomes[i]
+                : TerrainGenerator.BiomeAt(x, z);
+            if (!SpawnsMobs(biome)) continue;
             if (!chunks.TryGetCell(x, height, z, out var ground, out _) || !BlockType.IsSolid(ground)) continue;
             if (!chunks.TryGetCell(x, height + 1, z, out var above1, out _) || BlockType.IsSolid(above1)) continue;
             if (!chunks.TryGetCell(x, height + 2, z, out var above2, out _) || BlockType.IsSolid(above2)) continue;
@@ -63,6 +65,12 @@ public static class MobSpawner
         x = groundY = z = 0;
         return false;
     }
+
+    /// <summary>
+    /// The biomes whose surface the ring spawn search takes: the temperate and warm grasslands
+    /// (forest, steppe, savanna). The desert, the ocean and the snowy taiga and frozen plains spawn nothing.
+    /// </summary>
+    private static bool SpawnsMobs(Biome biome) => biome is Biome.Forest or Biome.Steppe or Biome.Savanna;
 
     /// <summary>
     /// The underground counterpart of <see cref="TryFindSurfaceSpawn"/>: up to <paramref name="tries"/>

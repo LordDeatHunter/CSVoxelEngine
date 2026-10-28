@@ -40,9 +40,14 @@ internal static class WaterBodies
         return WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
     }
 
-    /// <summary>Whether a biome is one a lake or a river may stand in.</summary>
+    /// <summary>
+    /// Whether a biome is one a lake or a river may stand in: every land biome but the desert
+    /// (forest, taiga, frozen, steppe and savanna). The ocean is excluded too, because its water is
+    /// the sea itself, which <see cref="WaterLevelFor"/> answers before it asks this. A dry steppe or
+    /// savanna still closes its bodies toward a desert through <see cref="SurfaceWaterGate"/>.
+    /// </summary>
     internal static bool CanHoldSurfaceWater(Biome biome) =>
-        WorldGenerationConfig.LakesAndRiversEnabled && biome is Biome.Forest or Biome.Taiga or Biome.Frozen;
+        WorldGenerationConfig.LakesAndRiversEnabled && biome is not (Biome.Ocean or Biome.Desert);
 
     /// <summary>
     /// The level a column with these surface-water weights floods to. Shared by
@@ -74,10 +79,10 @@ internal static class WaterBodies
 
     /// <summary>
     /// 0..1 multiplicative gate on a surface water body at (x, z): 1 away from a desert, fading to
-    /// 0 as the column reaches the forest/desert line. Both the carve in <see cref="TerrainGenerator.Compute"/> and
+    /// 0 as the column reaches the desert line (desert weight 0.5). Both the carve in <see cref="TerrainGenerator.Compute"/> and
     /// the flood test in <see cref="IsWaterColumn"/> read it, so a lake or river tapers out and
-    /// closes on forest ground just before the desert instead of being cut off in a wall. The fade
-    /// only covers the last stretch before the line, so forest lakes elsewhere keep their depth.
+    /// closes on steppe or savanna ground just before the desert instead of being cut off in a wall.
+    /// The fade only covers the last stretch before the line, so lakes elsewhere keep their depth.
     /// </summary>
     internal static float SurfaceWaterGate(float desertWeight) =>
         1f - MathUtils.SmoothStep(WorldGenerationConfig.WaterDesertFadeStart,

@@ -7,7 +7,7 @@ namespace VoxelEngine.WorldGen.Features;
 /// <summary>
 /// Meadow flowers in clumps: one X-shaped cross block sitting on the surface, placed through
 /// <see cref="PlantClumps"/> over <see cref="Clumps"/> and gated at the clump's center by
-/// <see cref="IsOpenMeadow"/> (open forest), so a meadow grows whole or not at all. A pure
+/// <see cref="IsOpenMeadow"/> (open forest or steppe), so a meadow grows whole or not at all. A pure
 /// function of (x, z) and the seed, so chunks agree without shared state. Only dry grass columns
 /// qualify (no beaches, no sea floors), and the cell above the ground must be air over grass.
 /// </summary>
@@ -40,13 +40,13 @@ public static class FlowerGenerator
     }
 
     /// <summary>
-    /// Whether a clump centered at (x, z) may grow: forest open enough
+    /// Whether a clump centered at (x, z) may grow: forest or steppe open enough
     /// (<see cref="TerrainGenerator.ForestOpenness"/> at least
     /// <see cref="WorldFeatureConfig.MeadowMinOpenness"/>), so meadows fill the open stretches
-    /// between the woodland instead of the woods themselves.
+    /// between the woodland and the open temperate grassland instead of the woods themselves.
     /// </summary>
     public static bool IsOpenMeadow(int x, int z) =>
-        TerrainGenerator.IsForest(x, z)
+        TerrainGenerator.BiomeAt(x, z) is Biome.Forest or Biome.Steppe
         && TerrainGenerator.ForestOpenness(x, z) >= WorldFeatureConfig.MeadowMinOpenness;
 
     /// <summary>Whether the surface column (x, z) grows a flower, before the terrain checks.</summary>

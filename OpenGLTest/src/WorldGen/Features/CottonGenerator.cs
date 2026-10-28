@@ -5,7 +5,7 @@ using VoxelEngine.Content;
 namespace VoxelEngine.WorldGen.Features;
 
 /// <summary>
-/// Wild cotton: clumps of the <c>cotton_plant</c> cross block on the warm, dry forest fringe
+/// Wild cotton: clumps of the <c>cotton_plant</c> cross block on the warm, semi-dry savanna
 /// before the desert line. Placement is <see cref="PlantClumps"/> over <see cref="Clumps"/> (one
 /// candidate clump per coarse cell, a disc of plants thinning outward from its center), gated at
 /// the clump's center by <see cref="IsCottonClimate"/> so a clump grows whole or not at all. A pure
@@ -41,19 +41,14 @@ public static class CottonGenerator
     }
 
     /// <summary>
-    /// Whether a clump centered at (x, z) may grow: forest whose desert weight
-    /// (<see cref="TerrainGenerator.BiomeWeights"/>, exactly 0.5 on the desert line) reaches
-    /// <see cref="WorldFeatureConfig.CottonMinDesertWeight"/>, i.e. both warm and dry enough to
-    /// be the forest's edge toward the dunes, but stays under
-    /// <see cref="WorldFeatureConfig.CottonMaxDesertWeight"/>, where the grass/sand border dither
-    /// begins. Everywhere else stays bare.
+    /// Whether a clump centered at (x, z) may grow: savanna (warm and semi-dry) whose desert weight
+    /// (<see cref="TerrainGenerator.BiomeWeights"/>, exactly 0.5 on the desert line) stays under
+    /// <see cref="WorldFeatureConfig.CottonMaxDesertWeight"/>, where the savanna/sand border dither
+    /// begins, so a clump never lands on dithered sand. Everywhere else stays bare.
     /// </summary>
-    public static bool IsCottonClimate(int x, int z)
-    {
-        if (TerrainGenerator.BiomeWeights(x, z, out _, out var desertWeight) != Biome.Forest) return false;
-        return desertWeight >= WorldFeatureConfig.CottonMinDesertWeight
-               && desertWeight < WorldFeatureConfig.CottonMaxDesertWeight;
-    }
+    public static bool IsCottonClimate(int x, int z) =>
+        TerrainGenerator.BiomeWeights(x, z, out _, out var desertWeight) == Biome.Savanna
+        && desertWeight < WorldFeatureConfig.CottonMaxDesertWeight;
 
     /// <summary>Whether the surface column (x, z) is a cotton clump member, before the terrain checks.</summary>
     public static bool TryGetCotton(int x, int z) =>
