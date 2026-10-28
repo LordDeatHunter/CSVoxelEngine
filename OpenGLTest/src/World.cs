@@ -565,6 +565,15 @@ public class World
     /// (a client following the server's day clock).</summary>
     public void SetLightingTime(double time) => TimeOffset = time - Now;
 
+    /// <summary>Holds the lighting clock still for a paused frame: the window clock keeps running, so
+    /// the offset gives that time back. A client follows the server's day clock and is left alone.</summary>
+    public void HoldLightingClock(double deltaTime)
+    {
+        if (_clientMode)
+            return;
+        TimeOffset -= deltaTime;
+    }
+
     /// <summary>The other players on this client's server, drawn each frame. Empty in singleplayer.</summary>
     public IReadOnlyList<RemotePlayer> RemotePlayers => _remotePlayers;
 

@@ -292,6 +292,7 @@ internal sealed class GameplayInput
         else
         {
             middleWasPressed = false;
+            w.HoldLightingClock(deltaTime);
         }
     }
 }
