@@ -263,8 +263,8 @@ single-arc player.
 - [ ] **`P-24` · Biomes** — P1, M.
   Grass, leaves and spruce leaves are already climate-tinted through the `biomeTint` block field.
   Open: falling-leaf particles should sample the foliage field; flowers and water can opt into
-  `biomeTint`'s `tile` form; and the biome roster itself can grow (swamp, jungle, savanna,
-  volcanic, underground biomes).
+  `biomeTint`'s `tile` form; and the biome roster itself can grow (swamp, jungle, volcanic,
+  underground biomes).
 - [ ] **`P-25` · More ores + deeper strata** — P1, M.
   Tin/iron/gold/… veins placed deterministically like trees/pebbles/malachite; tiers gate tools
   (`P-1`, `P-7`, `P-44`).

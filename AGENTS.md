@@ -749,9 +749,15 @@ plain cube face; an `overlay` is further refused on a cutout block, which has no
 The alpha-tested tint tiles (every overlay, and a cutout block's replacement tile) join
 `BlockType.CutoutTiles`, so they get the coverage-preserving mips a leaf tile gets. The color is
 `TerrainGenerator.Climate`, the temperature and humidity noises normalized through the biome ramps
-to warmth 0..1 (exactly 0.5 across the temperate band) and wetness 0..1, so the palette's four
-sRGB corners (`SurfaceShadingConfig.GrassColorColdDry/ColdWet/WarmDry/WarmWet` and the slightly
-darker `FoliageColor*`) sit on the biome lines. `BiomeTint` samples it on a 16-block lattice of
+to warmth 0..1 (exactly 0.5 across the temperate band) and wetness 0..1 (the two humidity ramps
+read the same way, `BiomeClassifier.WetnessOf`: 0 fully dry, exactly 0.5 between the dry and the
+semi-dry ramp, 1 wet), so the palette's three rows of a cold and a warm sRGB corner
+(`SurfaceShadingConfig.GrassColorColdDry/WarmDry`, `ColdMid/WarmMid`, `ColdWet/WarmWet` and the
+slightly darker `FoliageColor*`) sit on the biome lines: Dry on the desert and tundra, Mid on the
+steppe, the savanna and the dry taiga edge, Wet on the forest and taiga. `BiomeTint.PaletteSrgb`
+interpolates them piecewise (Dry to Mid up to wetness 0.5, Mid to Wet above), and each Mid corner
+is yellower than the plain average of its Dry and Wet corners, so the grass dries monotonically
+and the dry grasslands read dry (`TheGrassDriesMonotonically`). `BiomeTint` samples it on a 16-block lattice of
 chunk-column corners: `TintsAt` reads the climate once and returns both palettes (through
 `TintsFromClimate`), `FieldsFor(cx, cz)` gives a chunk column's `BiomeTintFields` (a grass and a
 foliage `BiomeTintField`, four corners each) and `BiomeTintField.Sample` interpolates bilinearly in
@@ -1665,9 +1671,12 @@ OpenGLTest/
                                #   steps loaded from JSON (VOXEL_SCRIPT)
     WorldGen/                  # procedural worldgen: terrain, biomes, caves and worms, the
                                #   tree front end and batches, clouds, the generational cache
-      Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen enum
-      BiomeClassifier.cs       # the biome climate split: BiomeWeights over the Classify/ColdOf/WarmOf seams, ColdWeight,
-                               #   WarmWeight and the forest/desert border dither (DitherBiome)
+      Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen / Steppe / Savanna enum (appended, never reordered)
+      BiomeClassifier.cs       # the biome climate split: SampleClimate (the one temperature/humidity reader), BiomeWeights
+                               #   over the Classify/ColdOf/WarmOf/DryOf/SemiDryOf seams, WetnessOf, ColdWeight, WarmWeight
+                               #   and the desert border dither (DitherBiome)
+      BiomeTraits.cs           # shared biome yes/no rules the near fill and both far-LOD paths ask (ShowsBareRock,
+                               #   RimsWaterWithSand)
       CaveNode.cs, Worm.cs     # one tunnel sphere (center + radius); a worm's node array plus its AABB
       ChunkTerrainFill.cs      # the worldgen fill of a fresh chunk (column fill, carvers, water, mud, lava, every feature
                                #   stamp, the fluid frontier scan; behind Chunk.GenerateBlockData)
@@ -1701,7 +1710,7 @@ OpenGLTest/
         BoulderGenerator.cs    # a rare 2-4 cell stone or cobblestone blob on the forest/taiga floor
         BranchPileGenerator.cs # crossed-stick branch piles: up to 4 long thin logs sharing one air cell above the ground
         CairnGenerator.cs      # a 3-cell cobblestone stack with a pebble hat on a local summit
-        CottonGenerator.cs     # wild cotton clumps on the dry forest fringe (PlantClumps + a climate gate)
+        CottonGenerator.cs     # wild cotton clumps in the savanna (PlantClumps + a climate gate)
         DesertWellGenerator.cs # the desert's ring-and-roof well, dug into sand over sandstone
         FallenLogGenerator.cs  # a rare 3-5 cell detached oak log lying on the forest floor
         FlowerGenerator.cs     # meadow flowers on warm, open grass
@@ -2273,11 +2282,12 @@ the blocks** (`TreeSpeciesLoader.LoadTreeSpecies`; a missing folder is an empty 
 the pure `TreeSpeciesCompiler.Compile` (DTO `TreeSpeciesDefinition.cs`) into an immutable
 `TreeSpecies`, and every error starts `Tree species '<path>'`. Block references take an optional
 `block/` prefix and never resolve to an item. Seven species ship: `oak` (the forest), `spruce` (the
-taiga), the leafless `cactus` (the desert) and the leafless `dead_tree` (the desert and the frozen
-plains, which borrows the oak's wood — `TreeSpeciesRegistry.ForBlock` resolves a shared wood to the
-leafy owner, so the growth item never turns an oak into a snag) generate in the world; the `palm`
-generates only through its `worldgen.oasis` disc; and `baobab` and `stone_pine` have **no `worldgen`
-block** and are only ever grown (`TreeGrowthWriter`, the `grow` op, the item debugger). See
+taiga), the leafless `cactus` (the desert), the leafless `dead_tree` (the desert, the frozen
+plains and the steppe, which borrows the oak's wood — `TreeSpeciesRegistry.ForBlock` resolves a
+shared wood to the leafy owner, so the growth item never turns an oak into a snag) and the sparse
+`stone_pine` (the savanna, its umbrella crown an acacia stand-in) generate in the world; the `palm`
+generates only through its `worldgen.oasis` disc; and `baobab` has **no `worldgen` block** and is
+only ever grown (`TreeGrowthWriter`, the `grow` op, the item debugger). See
 `### Trees` for what the fields drive.
 
 | field | default | meaning |
@@ -2813,8 +2823,9 @@ describe the live world go through it:
 - `World.TryGroundHeight` and the spawn settle (`LocalPlayer.EnsureSpawnSettled`, whose water test is now the
   column's stored `WaterLevel`, the same value `TerrainGenerator.IsWaterColumn` evaluates for a
   generated column);
-- `MobSpawner.TryFindSurfaceSpawn` (heights and water from the column; a supplied column's forest
-  test reads its own `Biomes`, a generated one keeps the undithered `TerrainGenerator.IsForest`);
+- `MobSpawner.TryFindSurfaceSpawn` (heights and water from the column; a supplied column's
+  mob-biome test, `MobSpawner.SpawnsMobs`, reads its own `Biomes`, a generated one keeps the
+  undithered `TerrainGenerator.BiomeAt`);
 - the server's `ColumnRequest`, answered from `ChunkManager.ColumnSource`, exactly what its own
   mesher reads.
 
@@ -3353,28 +3364,51 @@ under the map's terrain until the spawn settle lifts it.
 
 ## Biomes
 
-Five biomes. **Ocean** is a flooded basin ramping from a sandy shore down to bare stone.
-The four land biomes sit on a temperature x humidity grid: **forest** (warm+wet; smooth rolling
-grass hills with flat valleys), **desert** (warm+dry; dunes of sand over sandstone), **taiga**
-(cold+wet; a snowy spruce wood) and **frozen** (cold+dry; a barren snow plain of bare rock and
-occasional ice). Selection is a pure function of (x, z) from low-frequency noise — continentalness
-(low = ocean) plus temperature and humidity, which are read **only** while choosing a biome, the
-worldgen features that follow from it and the grass/foliage tint (`TerrainGenerator.Climate`, see
-"Biome-tinted grass and leaves") — in `TerrainGenerator.BiomeWeights`; `TerrainGenerator.BiomeAt`
-classifies the result. Temperature is a **three-band axis**: the cold ramp
-(`TemperatureColdStart/End`, read by `ColdWeight`: snow, ice, and taiga/frozen at
-`ColdBiomeMinCold`), a temperate band, and the warm ramp (`TemperatureWarmStart/End`, read by
-`WarmWeight`; desert begins at its midpoint). `desertWeight = min(warm, dry) * (1 - ocean)` is
-exactly 0.5 on the desert line on both borders, the humid one and the temperate one, which is the
-one line the dune height blend, the surface-water fade (`WaterDesertFade*`) and the border dither
-are keyed to, and `DitherBiome` never pushes sand below the warm line. The raw-noise gap between
-`ColdBiomeMinCold` on the cold ramp and the warm midpoint always classifies forest and is what keeps
-hundreds of blocks of it between sand and snow: widen it by raising the warm ramp, never by moving
-the cold one, and the warm ramp must start at or after the cold ramp ends (a test rule,
+Seven biomes (`WorldGen/Biome.cs`; new values are appended, never inserted, since the ordinals ride
+`ColumnFileCodec` and the network column and index `TreeGenerator.SpeciesByBiome`). **Ocean** is a
+flooded basin ramping from a sandy shore down to bare stone. The six land biomes sit on a **3x3
+climate grid** of temperature (cold / temperate / warm) and humidity (dry / semi-dry / wet),
+`BiomeClassifier.Classify`:
+
+|               | wet    | semi-dry | dry    |
+|---------------|--------|----------|--------|
+| **cold**      | taiga  | taiga    | frozen |
+| **temperate** | forest | steppe   | steppe |
+| **warm**      | forest | savanna  | desert |
+
+**forest** (smooth rolling grass hills with flat valleys), **desert** (dunes of sand over
+sandstone), **taiga** (a snowy spruce wood), **frozen** (a barren tundra: a snow plain of bare rock
+and occasional ice), **steppe** (an open, dry-tinted grass plain with scattered dead trees) and
+**savanna** (a dry grassland of umbrella-crowned stone pines and cotton). Forest needs wet air, so
+the dry axis reads desert -> steppe -> tundra and the warm row forest -> savanna -> desert: no strip
+of forest ever stands between sand and snow. Selection is a pure function of (x, z) from
+low-frequency noise — continentalness (low = ocean) plus temperature and humidity, which are read
+**only** through `BiomeClassifier.SampleClimate` (the one reader of the two noises) while choosing a
+biome, the worldgen features that follow from it and the grass/foliage tint
+(`TerrainGenerator.Climate`, see "Biome-tinted grass and leaves") — in `BiomeClassifier.BiomeWeights`
+(forwarded by `TerrainGenerator.BiomeWeights`); `TerrainGenerator.BiomeAt` classifies the result.
+Temperature is a **three-band axis**: the cold ramp (`TemperatureColdStart/End`, read by
+`ColdWeight`: snow, ice, and taiga/frozen at `ColdBiomeMinCold`), a temperate band, and the warm
+ramp (`TemperatureWarmStart/End`, read by `WarmWeight`; desert and savanna begin at its midpoint).
+Humidity is a three-band axis too: the dry ramp (`HumidityDryStart/End`, `BiomeClassifier.DryOf`)
+and the **semi-dry ramp** (`HumiditySemiDryStart/End`, `SemiDryOf`), which starts at or after the
+dry ramp ends, so the two are exclusive and `semiDry` is 1 wherever any dryness is (a test rule,
+`HumidityRampsAreExclusive`). `desertWeight = min(warm, dry) * (1 - ocean)` is exactly 0.5 on the
+desert line on both borders, the humid one and the temperate one, which is the one line the dune
+height blend, the surface-water fade (`WaterDesertFade*`) and the border dither are keyed to. A
+third smooth weight, `aridWeight = semiDry * (1 - ocean)`, flattens `DryHillReduction` of the
+forest-profile hills on dry and semi-dry land, so the steppe, the savanna and the tundra are plains
+while every border stays a slope. The raw-noise gap between `ColdBiomeMinCold` on the cold ramp
+and the warm midpoint classifies forest (wet) or steppe (semi-dry, dry) and keeps hundreds of
+blocks of it between sand and snow: widen it by raising the warm ramp, never by moving the cold
+one, and the warm ramp must start at or after the cold ramp ends (a test rule,
 `TemperatureRampsAreExclusiveWithATemperateBandBetween`). The rules sit in the pure seams
-`BiomeClassifier.Classify` / `ColdOf` / `WarmOf`, and `HotAirKeepsAFullLoadRadiusFromSnow` pins
-the band to at least the full-detail load radius (`ChunkRadius * Chunk.Size`, Chebyshev distance)
-from any column that would be desert if fully dry to any snow. Reaching that bar took a lower
+`BiomeClassifier.Classify` / `ColdOf` / `WarmOf` / `DryOf` / `SemiDryOf`: `TheDryAxisNeverClassifiesForest`
+locks the grid, and `DesertAndSnowAreNeverNearAndTheDryCorridorIsSteppeOrTundra` pins the band to
+at least the full-detail load radius (`ChunkRadius * Chunk.Size`, Chebyshev distance) from any
+column that would be desert if fully dry to any snow, and every dry land column to desert, steppe
+or tundra. The origin's raw humidity is exactly 0 for every seed, so the semi-dry ramp's midpoint
+sits just below 0 to keep the spawn a forest (the origin rule in `BiomeTests`). Reaching that bar took a lower
 `TemperatureFrequency` (1/4500, was 1/2300) and a **single-octave** temperature noise (was two
 octaves), both of which re-laid every temperature value; single-octave output spans the raw
 [-1, 1] where two-octave FBm was scaled by 1/1.5, so it also rescaled the cold ramp's share
@@ -3382,7 +3416,16 @@ octaves), both of which re-laid every temperature value; single-octave output sp
 between the forest, desert-dune and ocean-ramp profiles by them, so a border is a slope, never a
 cliff; the cold biomes ride the forest profile (only their surface differs), and a coherent
 `TerrainNoise.BiomeDitherNoise` field (`BiomeClassifier.DitherBiome`) breaks the grass/sand material line into ragged patches
-rather than a per-column checkerboard. The ocean biome begins at `OceanShoreWeight`, and `Compute`
+rather than a per-column checkerboard: inside the band around the desert line a savanna column may
+take sand (it is always on the warm ramp, so sand never enters the temperate band), a steppe column
+never does, and a desert column takes the grass biome across the line it actually borders — of the
+two ramps that bind `min(warm, dry)`, a binding warmth gives steppe and a binding dryness savanna
+(the label check in `BiomeBorderDitherFlipsCoherentPatchesNotSingleColumns`). The forest, steppe
+and savanna borders share one grass fill and the taiga/frozen line lies under snow, so neither is
+dithered. Shared yes/no biome rules live in `WorldGen/BiomeTraits.cs` (`ShowsBareRock`: the
+snowless grass biomes whose stripped columns show stone; `RimsWaterWithSand`: the grass-fill
+biomes whose lake and river rims wear sand), so the near fill and both far-LOD column paths ask one
+rule. The ocean biome begins at `OceanShoreWeight`, and `Compute`
 fades the land's above-the-waterline clamp out across `[OceanShoreWeight, 0.5]` — clamping only
 while the biome was land put a hard step where the coast met the water, so the blended band is
 ocean biome and slopes below the waterline into the sea. The ocean ramp falls to
@@ -3391,7 +3434,7 @@ depth (`OceanSandDepth`/`OceanGravelDepth`). The forest floor is a broad swell p
 hill field gated by a hill-region mask (`Hill*`/`ForestBaseHeight`), so hills rise in patches with
 flats between them. A rare warped **mountain** ridge (`Mountain*`, gated by a low-frequency mask and
 faded out near the origin) lifts an occasional range well above the hills; a crest above
-`MountainRockHeight` is bare stone (`ColumnCache.GenerateColumn` reads the stripped soil, the far LOD a
+`MountainRockHeight` in a snowless grass biome (`BiomeTraits.ShowsBareRock`) is bare stone (`ColumnCache.GenerateColumn` reads the stripped soil, the far LOD a
 matching rock cap), so it reads as rock rather than another wooded hill. A low-frequency
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy
@@ -3400,7 +3443,10 @@ forest alternates between rolling woodland and open grass instead of one uniform
 their own water level and flood only those (every land biome but the desert; both fade out toward a
 desert so a pond closes on its own rim) — see the Water invariant below.
 A desert column is sand over `SandstoneDepth` sandstone blocks, then stone; a frozen column is bare
-rock (the snow pass covers it); a ravined (bare-stone) column keeps those rules.
+rock (the snow pass covers it); forest, taiga, steppe and savanna share the grass-over-dirt fill
+(sand or gravel only on the rims of real water); a ravined (bare-stone) column keeps those rules.
+Existing saves regenerate their unmodified chunks under the current rules, so a biome change shows
+as seams at the edge of the edited (saved) chunks of an old world.
 
 **Cold weather** (`WorldGen/Features/SnowGenerator.cs`) runs last of the surface features and reads
 `SnowGenerator.ColdWeightAt` — the climate's `TerrainGenerator.ColdWeight` (a biome-generation input)
@@ -3419,23 +3465,33 @@ block, so a full stack is solid and partial layers are walked through (`BlockTyp
 (`ColumnCache.GetBiomes`); the LOD samples it per cell and wears the matching tile (snow for a cold
 cell, snow-covered ice for a frozen sea sheet — snow tile when snow-covered, else ice, and never
 flagged water, since the flag alone selects the fragment-shader water model whatever the tile), so a
-distant desert and sea floor agree with the near chunks.
+distant desert and sea floor agree with the near chunks. Its beach and bare-rock tops ask the same
+`BiomeTraits` rules as the near fill (`RimsWaterWithSand`, `ShowsBareRock`; a supplied column's rock
+rule is `ShowsBareRock` with a zero `DirtDepth`, its beaches stay ocean-only), and steppe and
+savanna fall through to the tinted grass top and the soil side band, exactly like the forest.
 Vegetation is biome-gated. Trees come from the species files (`assets/data/trees`), each planted
-only in its `worldgen.biomes`: `oak` in the forest, `spruce` in the taiga and the leafless `cactus`
+only in its `worldgen.biomes`: `oak` in the forest, `spruce` in the taiga, the leafless `cactus`
 (a thick stem whose few arms bend upward, wearing the generated `cactus_side`/`cactus_top` tiles;
-see `tools/generate-biome-textures.ps1`) in the desert, while `baobab` and `stone_pine` never
-generate; the forest also grows flowers (`FlowerGenerator`), and the frozen plains grow nothing.
-Wild cotton grows in **clumps** on the warm, dry forest fringe before the desert
-(`CottonGenerator`: a forest center whose desert weight lies in
-`[CottonMinDesertWeight, CottonMaxDesertWeight)`, the top end being where the sand dither starts),
-stamped after the pebbles and before the flowers and foliage. Placement is the reusable
+see `tools/generate-biome-textures.ps1`) in the desert (where it wins over the dead tree, since
+`TreeGenerator.SpeciesByBiome` takes the first species in name order), the leafless `dead_tree` in
+the desert, the frozen tundra and the steppe, and `stone_pine` in the savanna, whose umbrella crown
+stands in for an acacia (its reach equals the palm's, so `ReachChunkRadius` did not grow), while
+`baobab` never generates (`EveryTreeGrowsInItsSpeciesBiome` checks every land biome a species
+names); the forest and the steppe grow flowers in open clumps (`FlowerGenerator`), grass tufts
+grow in the forest, steppe and savanna, and the frozen plains grow nothing.
+Wild cotton grows in **clumps** in the savanna (`CottonGenerator`: a savanna center whose desert
+weight stays under `CottonMaxDesertWeight`, where the savanna/sand dither starts, so a clump never
+lands on dithered sand), stamped after the pebbles and before the flowers and foliage. Placement is the reusable
 `PlantClumps` rule over a `PlantClumpSpec`: one candidate clump per coarse cell, its center jittered
 inside the cell (so centers are at least `MinCenterSpacing` apart), a disc whose `MinMembers` nearest
 cells always belong and whose rest thin toward the rim, and a column asks every cell that can reach
 it, so a clump is never cut at a cell or chunk border. A pure hash of (cell, seed), no noise, so no
 reseed; a later clumped plant needs only its own spec and gate. Like flowers, the far LOD draws none.
 How a tree is grown, stamped, felled and decays is in `### Trees`. Mob spawning (`MobSpawner`,
-shared by slimes and goblins) asks `TerrainGenerator.IsForest(x, z)`, which is now a real test.
+shared by slimes and goblins) takes a column whose biome spawns mobs (`MobSpawner.SpawnsMobs`:
+forest, steppe or savanna; a supplied column's stored biome, a generated column's undithered
+`TerrainGenerator.BiomeAt`). Steppe and savanna hold lakes and rivers like the forest
+(`WaterBodies.CanHoldSurfaceWater`: every land biome but the desert).
 
 **Scenery and landmarks** are pure per-cell functions like the rest of worldgen — each decided
 from a hash of (cell, seed) or a `PlantClumps` clump, stamped per chunk and clipped at its border,
@@ -3444,8 +3500,8 @@ into air or stone only, and never drawn by the far LOD (`SceneryTests`, `PillarW
 `SpringStackTests`, `GravelPocketTests`, `SnowCanopyTests`):
 - **Fallen logs** (`FallenLogGenerator`): a rare detached oak log of 3-5 cells lying along X or Z on
   the forest floor, written as `WoodState.Detached` so it never welds to a standing tree or fells.
-- **Boulders** (`BoulderGenerator`): a rare 2-4 cell blob of stone or cobblestone on the forest and
-  taiga floor.
+- **Boulders** (`BoulderGenerator`): a rare 2-4 cell blob of stone or cobblestone on the forest,
+  taiga, steppe and savanna floor.
 - **Cairns** (`CairnGenerator`): a three-cell cobblestone stack with a one-stone pebble hat on a
   local summit.
 - **Ruined pillars** (`RuinedPillarGenerator`) and the **desert well** (`DesertWellGenerator`):
