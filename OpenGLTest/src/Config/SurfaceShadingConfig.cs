@@ -115,21 +115,30 @@ public static class SurfaceShadingConfig
     public const float WetDarken = 0.62f;
 
     // --- Biome tint (BiomeTint: grass and foliage color from climate) ---
-    // sRGB target colors of a flat, fully lit tinted face, one palette per tint kind. The four
-    // corners sit on the biome lines of TerrainGenerator.Climate (ColdDry = frozen, ColdWet =
-    // taiga, WarmDry = desert, WarmWet = warm forest); the temperate band is the midpoint of the
-    // two rows, and at full wetness the grass midpoint (70, 132, 77) lands near grass_top's
-    // measured mean, so near-spawn grass matches the inventory icon. Every channel must stay
-    // under the ceiling BiomeTint.Gain reaches against the gray tiles (about sRGB 183), which
-    // BiomeTintTests enforces.
+    // sRGB target colors of a flat, fully lit tinted face, one palette per tint kind: three rows
+    // along TerrainGenerator.Climate's wetness (0 = Dry, 0.5 = Mid, 1 = Wet), each with a cold
+    // (warmth 0) and a warm (warmth 1) corner, interpolated piecewise (BiomeTint.PaletteSrgb).
+    // Wetness 0.5 is the band between the dry and the semi-dry humidity ramps, so the Dry row sits
+    // on frozen tundra and desert, the Mid row on steppe, savanna and the dry taiga edge, and the
+    // Wet row on taiga and forest; the temperate band is the midpoint of each row's two corners.
+    // Each Mid corner lies between its Dry and Wet corners on the red/green ratio but yellower
+    // than their plain average, so the grass dries monotonically and the steppe and savanna read
+    // as dry grassland rather than as a muted forest. At full wetness the grass midpoint
+    // (70, 132, 77) lands near grass_top's measured mean, so near-spawn grass matches the
+    // inventory icon. Every channel must stay under the ceiling BiomeTint.Gain reaches against
+    // the gray tiles (about sRGB 183), which BiomeTintTests enforces.
     public static readonly Vector3 GrassColorColdDry = new Vector3(112f, 138f, 104f) / 255f;
+    public static readonly Vector3 GrassColorColdMid = new Vector3(100f, 134f, 98f) / 255f;
     public static readonly Vector3 GrassColorColdWet = new Vector3(74f, 124f, 88f) / 255f;
     public static readonly Vector3 GrassColorWarmDry = new Vector3(142f, 146f, 70f) / 255f;
+    public static readonly Vector3 GrassColorWarmMid = new Vector3(128f, 145f, 68f) / 255f;
     public static readonly Vector3 GrassColorWarmWet = new Vector3(66f, 140f, 66f) / 255f;
-    // Foliage (leaves, spruce leaves): the same climate axes, a little darker than the grass.
+    // Foliage (leaves, spruce leaves): the same climate axes and rows, a little darker than the grass.
     public static readonly Vector3 FoliageColorColdDry = new Vector3(92f, 118f, 86f) / 255f;
+    public static readonly Vector3 FoliageColorColdMid = new Vector3(82f, 116f, 80f) / 255f;
     public static readonly Vector3 FoliageColorColdWet = new Vector3(58f, 106f, 70f) / 255f;
     public static readonly Vector3 FoliageColorWarmDry = new Vector3(120f, 126f, 58f) / 255f;
+    public static readonly Vector3 FoliageColorWarmMid = new Vector3(110f, 127f, 56f) / 255f;
     public static readonly Vector3 FoliageColorWarmWet = new Vector3(52f, 120f, 52f) / 255f;
     // The sRGB gray every textureless tile averages to (the two supplied grass tiles measure 98.4
     // and 97.4, and tools/generate-leaf-textureless.ps1 normalizes the leaf tiles to it), so the

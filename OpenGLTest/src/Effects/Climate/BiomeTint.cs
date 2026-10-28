@@ -8,8 +8,8 @@ namespace VoxelEngine.Effects.Climate;
 
 /// <summary>
 /// GL-free biome tint: the grass and foliage color as a pure function of world (x, z). The
-/// climate (<see cref="TerrainGenerator.Climate"/>) picks an sRGB color from a four-corner
-/// palette, which is turned into the linear multiplier a vertex carries against the gray
+/// climate (<see cref="TerrainGenerator.Climate"/>) picks an sRGB color from a three-row
+/// palette (<see cref="PaletteSrgb"/>), which is turned into the linear multiplier a vertex carries against the gray
 /// textureless tiles. Meshes sample it on the 16-block lattice of chunk-column corners and
 /// interpolate bilinearly, so neighboring chunks agree bit for bit at their shared borders and
 /// the tint depends on vertex position only, never on the cell.
@@ -38,16 +38,31 @@ public static class BiomeTint
     /// <summary>log2 of the lattice spacing: the 16-block lattice of chunk-column corners.</summary>
     public const int LatticeShift = Chunk.SizeShift;
 
-    /// <summary>The sRGB target color of <paramref name="palette"/> at the given climate,
-    /// bilinear over its four corners (first axis warmth, second wetness).</summary>
+    /// <summary>
+    /// The sRGB target color of <paramref name="palette"/> at the given climate: three rows of a
+    /// cold and a warm corner along wetness (Dry at 0, Mid at 0.5, Wet at 1), interpolated
+    /// piecewise, bilinear over the Dry and Mid rows up to wetness 0.5 and over the Mid and Wet
+    /// rows above it (first axis warmth, second wetness). Both pieces give exactly the Mid row at
+    /// 0.5, so the color is continuous in the climate.
+    /// </summary>
     public static Vector3 PaletteSrgb(BiomeTintPalette palette, float warmth01, float wetness01) =>
         palette == BiomeTintPalette.Foliage
-            ? Bilinear(SurfaceShadingConfig.FoliageColorColdDry, SurfaceShadingConfig.FoliageColorWarmDry,
+            ? ThreeRows(SurfaceShadingConfig.FoliageColorColdDry, SurfaceShadingConfig.FoliageColorWarmDry,
+                SurfaceShadingConfig.FoliageColorColdMid, SurfaceShadingConfig.FoliageColorWarmMid,
                 SurfaceShadingConfig.FoliageColorColdWet, SurfaceShadingConfig.FoliageColorWarmWet,
                 warmth01, wetness01)
-            : Bilinear(SurfaceShadingConfig.GrassColorColdDry, SurfaceShadingConfig.GrassColorWarmDry,
+            : ThreeRows(SurfaceShadingConfig.GrassColorColdDry, SurfaceShadingConfig.GrassColorWarmDry,
+                SurfaceShadingConfig.GrassColorColdMid, SurfaceShadingConfig.GrassColorWarmMid,
                 SurfaceShadingConfig.GrassColorColdWet, SurfaceShadingConfig.GrassColorWarmWet,
                 warmth01, wetness01);
+
+    /// <summary>A palette's piecewise interpolation over its Dry, Mid and Wet rows (each a cold
+    /// and a warm corner); see <see cref="PaletteSrgb"/>.</summary>
+    private static Vector3 ThreeRows(Vector3 coldDry, Vector3 warmDry, Vector3 coldMid, Vector3 warmMid,
+        Vector3 coldWet, Vector3 warmWet, float warmth01, float wetness01) =>
+        wetness01 <= 0.5f
+            ? Bilinear(coldDry, warmDry, coldMid, warmMid, warmth01, wetness01 * 2f)
+            : Bilinear(coldMid, warmMid, coldWet, warmWet, warmth01, (wetness01 - 0.5f) * 2f);
 
     /// <summary>The 0..1 vertex multiplier that, times <see cref="Gain"/> against the gray
     /// textureless tile, lands a flat fully lit face on <paramref name="targetSrgb"/>.</summary>

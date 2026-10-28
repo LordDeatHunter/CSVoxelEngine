@@ -47,10 +47,12 @@ public sealed class BiomeTintTests
     {
         Vector3[] corners =
         [
-            SurfaceShadingConfig.GrassColorColdDry, SurfaceShadingConfig.GrassColorColdWet,
-            SurfaceShadingConfig.GrassColorWarmDry, SurfaceShadingConfig.GrassColorWarmWet,
-            SurfaceShadingConfig.FoliageColorColdDry, SurfaceShadingConfig.FoliageColorColdWet,
-            SurfaceShadingConfig.FoliageColorWarmDry, SurfaceShadingConfig.FoliageColorWarmWet,
+            SurfaceShadingConfig.GrassColorColdDry, SurfaceShadingConfig.GrassColorColdMid,
+            SurfaceShadingConfig.GrassColorColdWet, SurfaceShadingConfig.GrassColorWarmDry,
+            SurfaceShadingConfig.GrassColorWarmMid, SurfaceShadingConfig.GrassColorWarmWet,
+            SurfaceShadingConfig.FoliageColorColdDry, SurfaceShadingConfig.FoliageColorColdMid,
+            SurfaceShadingConfig.FoliageColorColdWet, SurfaceShadingConfig.FoliageColorWarmDry,
+            SurfaceShadingConfig.FoliageColorWarmMid, SurfaceShadingConfig.FoliageColorWarmWet,
         ];
         var ceiling = ColorSpace.SrgbToLinear(SurfaceShadingConfig.BiomeTintTextureGray) * BiomeTint.Gain;
         foreach (var corner in corners)
@@ -76,7 +78,17 @@ public sealed class BiomeTintTests
     [Fact]
     public void ClimateAgreesWithTheBiomeClassification()
     {
-        var sawDesert = false;
+        // The tint axes' values on the classification lines, from the same seams the classifier
+        // reads: the dry ramp's midpoint, the semi-dry ramp's midpoint and the warm ramp's midpoint.
+        const float eps = 1e-5f;
+        var dryLine = BiomeClassifier.WetnessOf(
+            (WorldGenerationConfig.HumidityDryStart + WorldGenerationConfig.HumidityDryEnd) / 2f);
+        var semiLine = BiomeClassifier.WetnessOf(
+            (WorldGenerationConfig.HumiditySemiDryStart + WorldGenerationConfig.HumiditySemiDryEnd) / 2f);
+        var warmMid = (WorldGenerationConfig.TemperatureWarmStart + WorldGenerationConfig.TemperatureWarmEnd) / 2f;
+        var warmLine = 0.5f * (1f - BiomeClassifier.ColdOf(warmMid)) + 0.5f * BiomeClassifier.WarmOf(warmMid);
+
+        bool sawDesert = false, sawSteppe = false, sawSavanna = false;
         for (var cx = -64; cx <= 64; cx++)
         for (var cz = -64; cz <= 64; cz++)
         {
@@ -84,22 +96,65 @@ public sealed class BiomeTintTests
             var z = cz * Chunk.Size + 8;
             var biome = TerrainGenerator.BiomeAt(x, z);
             TerrainGenerator.Climate(x, z, out var warmth, out var wetness);
+            var at = $"{biome} at ({x}, {z}): warmth {warmth}, wetness {wetness}";
             switch (biome)
             {
                 case Biome.Desert:
                     sawDesert = true;
-                    Assert.True(warmth > 0.5f && wetness <= 0.5f, $"desert at ({x}, {z}): {warmth}, {wetness}");
-                    break;
-                case Biome.Taiga:
-                    Assert.True(warmth < 0.5f && wetness >= 0.5f, $"taiga at ({x}, {z}): {warmth}, {wetness}");
+                    Assert.True(wetness <= dryLine + eps, at);
                     break;
                 case Biome.Frozen:
-                    Assert.True(warmth < 0.5f && wetness <= 0.5f, $"frozen at ({x}, {z}): {warmth}, {wetness}");
+                    Assert.True(wetness <= dryLine + eps, at);
+                    break;
+                case Biome.Steppe:
+                    sawSteppe = true;
+                    Assert.True(wetness <= semiLine + eps && warmth < warmLine, at);
+                    break;
+                case Biome.Savanna:
+                    sawSavanna = true;
+                    Assert.True(warmth >= warmLine - eps && wetness >= dryLine - eps
+                        && wetness <= semiLine + eps, at);
+                    break;
+                case Biome.Taiga:
+                    Assert.True(wetness >= dryLine - eps, at);
+                    break;
+                case Biome.Forest:
+                    Assert.True(wetness >= semiLine - eps, at);
                     break;
             }
         }
-        Assert.True(sawDesert);
+        Assert.True(sawDesert, "no desert in the scanned window");
+        Assert.True(sawSteppe, "no steppe in the scanned window");
+        Assert.True(sawSavanna, "no savanna in the scanned window");
     }
+
+    [Fact]
+    public void TheGrassDriesMonotonically()
+    {
+        // Drier grass is yellower: red over green never falls as the climate dries, and the
+        // semi-dry middle reads drier than the plain average of the dry and wet colors would.
+        const int steps = 512;
+        foreach (var palette in Palettes)
+        foreach (var warmth in new[] { 0f, 0.5f, 1f })
+        {
+            var previous = float.PositiveInfinity;
+            for (var i = 0; i <= steps; i++)
+            {
+                var wetness = i / (float)steps;
+                var ratio = RedOverGreen(BiomeTint.PaletteSrgb(palette, warmth, wetness));
+                Assert.True(ratio <= previous + 1e-6f,
+                    $"{palette} at warmth {warmth}: red/green rose from {previous} to {ratio} at wetness {wetness}");
+                previous = ratio;
+            }
+
+            var plainMiddle = (BiomeTint.PaletteSrgb(palette, warmth, 0f) + BiomeTint.PaletteSrgb(palette, warmth, 1f)) / 2f;
+            var middle = BiomeTint.PaletteSrgb(palette, warmth, 0.5f);
+            Assert.True(RedOverGreen(middle) > RedOverGreen(plainMiddle),
+                $"{palette} at warmth {warmth}: the semi-dry middle {middle * 255f} is no drier than {plainMiddle * 255f}");
+        }
+    }
+
+    private static float RedOverGreen(Vector3 srgb) => srgb.X / srgb.Y;
 
     [Fact]
     public void ShadeNeverExceedsTheShade()
