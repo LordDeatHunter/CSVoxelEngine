@@ -69,9 +69,9 @@ public static class SimulationConfig
     // Ceiling on cells queued for the next decay tick, only a memory bound: ScheduleBox stops
     // adding once it is reached, and a stale leaf left behind waits for the next nearby edit.
     // It must hold a whole felled tree's box (the largest worldgen tree's reach on every side,
-    // grown by the schedule reach, ~49k cells today) with room to spare, or a fell would
-    // silently skip the far side of its crown.
-    public const int MaxLeafDecayBacklogCells = 1 << 17;
+    // grown by the schedule reach, ~132k cells today for the stone pine and the palm) with room
+    // to spare, or a fell would silently skip the far side of its crown.
+    public const int MaxLeafDecayBacklogCells = 1 << 18;
 
     // --- Ash fertilizer (ItemUseAction.GrowTree): growth pulses one use of ash adds to the
     // aimed tree, spent from the stack ---

@@ -1,7 +1,8 @@
 {
-  // A leafless snag for the desert and the frozen plains: the oak wood and growth logic, no
-  // leaves (a leafless species), and a sparse worldgen block. It shares oak_log with oak, which
-  // the rim must agree on (both "block").
+  // A leafless snag for the desert, the frozen plains and the steppe: the oak wood and growth
+  // logic, no leaves (a leafless species), and a sparse worldgen block. In the desert the cactus
+  // wins (TreeGenerator takes the first species per biome in name order). It shares oak_log with
+  // oak, which the rim must agree on (both "block").
   "wood": "block/oak_log",
   "growth": {
     "logic": "oak",
@@ -22,7 +23,7 @@
   // leafless: the crown proxy only has to stay valid (the far LOD draws no canopy)
   "lod": { "crownHeight": [4, 7], "crownRadius": 1, "profile": "column" },
   "worldgen": {
-    "biomes": ["desert", "frozen"],
+    "biomes": ["desert", "frozen", "steppe"],
     "density": 0.004,
     "spacing": 4,
     "maxSlope": 3,

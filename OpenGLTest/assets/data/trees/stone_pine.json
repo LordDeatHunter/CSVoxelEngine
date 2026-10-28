@@ -26,9 +26,22 @@
   },
   "leafCluster": { "shape": "pad", "radius": 3, "hydration": 6, "tipMaxPx": 3, "minRadius": 1, "fullRadiusPx": 14 },
   "features": [ { "type": "roots", "depth": 4 } ],
-  // lod tuned against 48 flat-ground mature trees (no worldgen block, so no batch crowns): crown
+  // lod tuned against 48 flat-ground mature trees grown alone (not in a worldgen batch): crown
   // apex above base p20/p50/p80 15/16/16, leaf radius from the trunk column p50/p80 11/12,
   // footprint-equivalent radius (sqrt(leaf columns / pi)) median 8.2
-  "lod": { "crownHeight": [15, 16], "crownRadius": 8, "profile": "dome" }
-  // no worldgen block: grown in-world only (TreeGrowthWriter, the `grow` scenario op)
+  "lod": { "crownHeight": [15, 16], "crownRadius": 8, "profile": "dome" },
+  // A sparse savanna tree: its umbrella crown stands in for an acacia. Its reach (signalEnergy 22
+  // plus the pad radius 3) equals the palm's and its lod crownRadius (8) is under the palm's (10),
+  // so planting it raises neither TreeGenerator.ReachChunkRadius nor the proxy canopy reach.
+  // openness 0: the forest-openness thinning never empties the savanna.
+  "worldgen": {
+    "biomes": ["savanna"],
+    "density": 0.003,
+    "spacing": 8,
+    "maxSlope": 3,
+    "minSoil": 2,
+    "minGround": 1,
+    "maxGround": 90,
+    "openness": 0
+  }
 }
