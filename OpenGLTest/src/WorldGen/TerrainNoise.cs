@@ -38,6 +38,9 @@ internal static class TerrainNoise
     internal static FastNoiseLite BiomeDitherNoise;
     internal static FastNoiseLite LakeShapeNoise;
 
+    /// <summary>The pack-ice floe field, read only by <see cref="Features.SnowGenerator.IsFrozenWater"/>.</summary>
+    internal static FastNoiseLite PackIceNoise;
+
     static TerrainNoise()
     {
         Reseed();
@@ -101,6 +104,8 @@ internal static class TerrainNoise
         OpennessNoise = MakeNoise(86, WorldGenerationConfig.OpennessFrequency, octaves: 2);
         BiomeDitherNoise = MakeNoise(89, WorldGenerationConfig.BiomeDitherFrequency);
         LakeShapeNoise = MakeNoise(90, WorldGenerationConfig.LakeShapeFrequency);
+        // Offset 152 was unused (ClimateWarp took 151, the feature generators stop at 142)
+        PackIceNoise = MakeNoise(152, WorldGenerationConfig.PackIceFrequency, octaves: 2);
 
         // Mountains wind like ravines and rivers, so a range snakes instead of tracking a contour
         MountainWarp = MakeWarp(87, WorldGenerationConfig.MountainWarpFrequency, WorldGenerationConfig.MountainWarpAmplitude);

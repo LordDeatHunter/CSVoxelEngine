@@ -60,8 +60,8 @@ public sealed class WaterRavineTests
             var column = ColumnCache.Get(cx, cz);
             if (column.Bed[local] >= WorldGenerationConfig.SeaLevel) continue;
             if (column.Heights[local] >= column.Bed[local]) continue;
-            // A cold column's surface water freezes to ice; only open water proves the fill.
-            if (TerrainGenerator.ColdWeight(x, z) > WorldGenerationConfig.FreezeColdThreshold) continue;
+            // A column in or past the pack-ice band may hold ice; only open water proves the fill.
+            if (TerrainGenerator.ColdWeight(x, z) > WorldGenerationConfig.PackIceColdStart) continue;
 
             Assert.True(TerrainGenerator.IsWaterColumn(x, z, column.Bed[local]));
 

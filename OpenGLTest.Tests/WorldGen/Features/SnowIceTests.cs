@@ -138,7 +138,7 @@ public sealed class SnowIceTests
     {
         Assert.True(TryFindColumn(
             (x, z) => TerrainGenerator.BiomeAt(x, z) == Biome.Ocean
-                      && TerrainGenerator.ColdWeight(x, z) > WorldGenerationConfig.FreezeColdThreshold,
+                      && SnowGenerator.IsFrozenWater(x, z, TerrainGenerator.ColdWeight(x, z)),
             out var iceX, out var iceZ));
 
         var spec = LodRegion.Levels[0];
@@ -180,7 +180,8 @@ public sealed class SnowIceTests
     public void ColdOceanFreezesAndWarmOceanStaysLiquid()
     {
         // Only columns that really hold sea water at sea level: an ocean-biome shore column whose
-        // beach stands at or above the waterline has nothing to freeze or keep liquid.
+        // beach stands at or above the waterline has nothing to freeze or keep liquid. Past the
+        // pack-ice band the sheet is solid; at or below its start the sea is always open.
         Assert.True(TryFindColumn(
             (x, z) => IsSeaColumn(x, z)
                       && TerrainGenerator.ColdWeight(x, z) > WorldGenerationConfig.FreezeColdThreshold,
@@ -189,13 +190,13 @@ public sealed class SnowIceTests
 
         if (TryFindColumn(
             (x, z) => IsSeaColumn(x, z)
-                      && TerrainGenerator.ColdWeight(x, z) < WorldGenerationConfig.SnowColdThreshold,
+                      && TerrainGenerator.ColdWeight(x, z) <= WorldGenerationConfig.PackIceColdStart,
             out var warmX, out var warmZ))
             Assert.Equal(TerrainGenerator.SeaBlock, SurfaceSeaCell(warmX, warmZ));
     }
 
     /// <summary>Whether (x, z) is an ocean column whose floor lies below a sea-level water surface.</summary>
-    private static bool IsSeaColumn(int x, int z)
+    internal static bool IsSeaColumn(int x, int z)
     {
         if (TerrainGenerator.BiomeAt(x, z) != Biome.Ocean) return false;
         if (TerrainGenerator.WaterLevelAt(x, z) != WorldGenerationConfig.SeaLevel) return false;
@@ -205,7 +206,7 @@ public sealed class SnowIceTests
     }
 
     /// <summary>The block at sea level in the chunk holding the column (x, z).</summary>
-    private static byte SurfaceSeaCell(int x, int z)
+    internal static byte SurfaceSeaCell(int x, int z)
     {
         var cy = WorldGenerationConfig.SeaLevel >> Chunk.SizeShift;
         var chunk = new Chunk(null!, new Vector3(x >> Chunk.SizeShift, cy, z >> Chunk.SizeShift),

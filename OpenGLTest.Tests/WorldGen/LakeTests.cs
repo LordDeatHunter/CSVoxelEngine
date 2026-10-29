@@ -119,8 +119,9 @@ public sealed class LakeTests
             if (level <= WorldGenerationConfig.SeaLevel) continue;
             foreach (var cell in cells)
             {
+                // A column in or past the pack-ice band may hold ice; only open water proves the fill.
                 if (TerrainGenerator.ColdWeight(cell.X, cell.Z)
-                    > WorldGenerationConfig.FreezeColdThreshold) continue;
+                    > WorldGenerationConfig.PackIceColdStart) continue;
 
                 var cy = level >> Chunk.SizeShift;
                 var bedLy = cell.Bed - cy * Chunk.Size;

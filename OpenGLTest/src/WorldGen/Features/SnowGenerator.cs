@@ -8,9 +8,12 @@ namespace VoxelEngine.WorldGen.Features;
 /// <summary>
 /// Cold weather: freezes a cold column's surface water into a walkable ice sheet and lays layered
 /// snow on top of whatever solid surface is left. Both read <see cref="TerrainGenerator.ColdWeight"/>,
-/// a biome-generation input, so the snow line and the freeze line fade in as a column cools instead
-/// of snapping at a biome border. A pure function of (x, z) like the other generators, so neighbors
-/// agree without shared state; it runs after the trees and cacti so it only fills cells they left air.
+/// a biome-generation input, so the snow line fades in as a column cools instead of snapping at a
+/// biome border, and freezing runs over a pack-ice band (<see cref="IsFrozenWater"/>): ragged floes
+/// and open leads from <see cref="WorldGenerationConfig.PackIceColdStart"/> that thicken into a
+/// solid sheet past <see cref="WorldGenerationConfig.FreezeColdThreshold"/>. A pure function of
+/// (x, z) like the other generators, so neighbors agree without shared state; it runs after the
+/// trees and cacti so it only fills cells they left air.
 /// </summary>
 public static class SnowGenerator
 {
@@ -54,7 +57,8 @@ public static class SnowGenerator
     /// <see cref="TerrainGenerator.ColdWeight"/>, raised by altitude so a peak above
     /// <see cref="WorldGenerationConfig.MountainRockHeight"/> wears snow even in a warm biome —
     /// full snow at <see cref="WorldGenerationConfig.MountainSnowFullHeight"/>. The near stamp,
-    /// the drawn depth and the far LOD all read this one function, so their lines agree.
+    /// the drawn depth and the far LOD all read this one function, and both feed it to
+    /// <see cref="IsFrozenWater"/>, so their snow and ice lines agree.
     /// </summary>
     public static float ColdWeightAt(float x, float z, int height)
     {
@@ -64,6 +68,35 @@ public static class SnowGenerator
                        / (float)(WorldGenerationConfig.MountainSnowFullHeight
                                  - WorldGenerationConfig.MountainRockHeight);
         return MathF.Max(cold, MathUtils.Clamp01(altitude));
+    }
+
+    /// <summary>
+    /// Whether the surface water of the column (x, z) freezes, given that column's
+    /// <see cref="ColdWeightAt"/>: open water at or below
+    /// <see cref="WorldGenerationConfig.PackIceColdStart"/>, a solid sheet past
+    /// <see cref="WorldGenerationConfig.FreezeColdThreshold"/>, and in between the coherent floe
+    /// noise against a smoothstep of the cold, so the ice share rises with the cold. A hot spring
+    /// never freezes. A pure, stateless function of (x, z, seed), safe on any thread: the near
+    /// stamp and the generated far LOD both call it, so the two agree exactly.
+    /// </summary>
+    public static bool IsFrozenWater(float x, float z, float cold)
+    {
+        // SnowAndIceEnabled is a compile-time const, so an early return on it would read as
+        // unreachable; a multiplier keeps the toggle a real expression (see DepthAt).
+        if (cold * (WorldGenerationConfig.SnowAndIceEnabled ? 1f : 0f) <= WorldGenerationConfig.PackIceColdStart)
+            return false;
+
+        // For a fixed column the floe value is fixed and the smoothstep only rises with the cold,
+        // so the result is monotone in cold: ice that forms stays as the column gets colder.
+        var frozen = cold > WorldGenerationConfig.FreezeColdThreshold
+                     || 0.5f + 0.5f * TerrainNoise.PackIceNoise.GetNoise(x, z)
+                     < MathUtils.SmoothStep(WorldGenerationConfig.PackIceColdStart,
+                         WorldGenerationConfig.FreezeColdThreshold, cold);
+        if (!frozen) return false;
+
+        // Last, and only where ice would form: the site test is the costly one (climate and land
+        // height reads), and a hot spring keeps its own warm surface however cold it gets.
+        return !(WorldFeatureConfig.HotSpringsEnabled && HotSpringGenerator.IsSite((int)x, (int)z));
     }
 
     /// <summary>
@@ -90,11 +123,8 @@ public static class SnowGenerator
             int surfaceLy;
             if (height < level)
             {
-                // A hot spring never freezes: its site holds its own warm surface
-                if (WorldFeatureConfig.HotSpringsEnabled && HotSpringGenerator.IsSite(worldX, worldZ))
-                    continue;
-                // Open water only freezes below the freeze line; a merely cold lake keeps its surface.
-                if (cold <= WorldGenerationConfig.FreezeColdThreshold) continue;
+                // Open water (a lead in the pack ice, or a hot spring) keeps its surface and no snow
+                if (!IsFrozenWater(worldX, worldZ, cold)) continue;
                 var seaLy = level - worldY0;
                 if ((uint)seaLy >= Chunk.Size) continue;
                 var wi = Chunk.Idx(x, seaLy, z);

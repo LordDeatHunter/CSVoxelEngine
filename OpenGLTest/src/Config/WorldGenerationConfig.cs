@@ -120,11 +120,19 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
 
     // --- Snow and ice ---
     // Cold columns freeze their surface water into a walkable ice sheet and lay snow on dry ground.
-    // Both read TerrainGenerator.ColdWeight (a biome-generation input), so the snow line and the
-    // freeze line fade in as a column cools instead of snapping at a biome border.
+    // Both read TerrainGenerator.ColdWeight (a biome-generation input), so the snow line fades in
+    // as a column cools instead of snapping at a biome border. Freezing is a band rather than a
+    // line: between PackIceColdStart and FreezeColdThreshold a floe noise decides ice or open water
+    // per column (SnowGenerator.IsFrozenWater), the ice share rising with the cold, so the edge is
+    // ragged pack ice that thickens into a solid sheet.
     public const bool SnowAndIceEnabled = true;
     public const float SnowColdThreshold = 0.55f;   // ColdWeight above which snow starts to settle
-    public const float FreezeColdThreshold = 0.72f; // ColdWeight above which surface water freezes
+    // ColdWeight above which the first floes form. Must stay at or above SnowColdThreshold: Stamp
+    // skips sub-snow columns before it ever freezes, and the far LOD covers a frozen sheet in snow
+    // only above the snow line, so ice below the snow line would disagree between near and far.
+    public const float PackIceColdStart = 0.6f;
+    public const float FreezeColdThreshold = 0.72f; // ColdWeight above which the sheet is solid (the band's end)
+    public const float PackIceFrequency = 1f / 36f; // floe noise: a wavelength of tens of blocks
     public const float SnowFrequency = 1f / 140f;   // drift noise: where snow piles deeper
     public const int SnowMaxDepth = 8;              // deepest natural drift, in layers (block holds 16)
 
