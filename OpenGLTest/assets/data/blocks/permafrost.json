@@ -1,0 +1,7 @@
+{
+  // The frozen tundra's ground: its top and shallow soil under the snow layer, over stone.
+  "name": "Permafrost",
+  "model": { "parent": "block/cube_all", "textures": { "all": "permafrost" } },
+  "sfx": "hit_rock",
+  "hardness": 7
+}
