@@ -510,8 +510,15 @@ internal sealed class LodMeshBuilder
             BiomeTraits.ShowsBareRock(cellBiome) && maxOwn >= WorldGenerationConfig.MountainRockHeight;
 
         var cold = SnowGenerator.ColdWeightAt(centerX, centerZ, maxOwn);
+        // The plain snow line: it also decides snow on land cells. On a sea sheet the emitter
+        // draws snow only over a frozen cell, and PackIceColdStart >= SnowColdThreshold makes
+        // every frozen cell snow-covered, exactly as the near stamp lays snow on every ice cell.
         _snowTop[(i + 1) * _heightGrid + (j + 1)] = cold > WorldGenerationConfig.SnowColdThreshold;
-        _iceTop[(i + 1) * _heightGrid + (j + 1)] = cold > WorldGenerationConfig.FreezeColdThreshold;
+        // The near stamp's pack-ice rule. The emitter reads _iceTop only for water cells (the
+        // same > NoWater test), so land cells never pay for it, and the hot-spring site test
+        // inside it runs only for would-be-frozen water, keeping it off the LodGen threads.
+        _iceTop[(i + 1) * _heightGrid + (j + 1)] =
+            cellLevel > TerrainGenerator.NoWater && SnowGenerator.IsFrozenWater(centerX, centerZ, cold);
 
         for (var dx = 0; dx < _cellSize; dx++)
         for (var dz = 0; dz < _cellSize; dz++)
@@ -549,6 +556,8 @@ internal sealed class LodMeshBuilder
         _rockTop[(i + 1) * _heightGrid + (j + 1)] =
             BiomeTraits.ShowsBareRock(cellBiome) && suppliedColumn.DirtDepth[centerLocal] == 0;
         _snowTop[(i + 1) * _heightGrid + (j + 1)] = cellBiome is Biome.Taiga or Biome.Frozen;
+        // A supplied column carries no cold weight, so its sea ice is the stored biome's
+        // approximation of the generated pack-ice band (a documented gap)
         _iceTop[(i + 1) * _heightGrid + (j + 1)] = cellBiome == Biome.Frozen;
     }
 
