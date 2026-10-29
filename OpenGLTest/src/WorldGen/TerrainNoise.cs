@@ -23,6 +23,7 @@ internal static class TerrainNoise
     internal static FastNoiseLite ContinentNoise;
     internal static FastNoiseLite TemperatureNoise;
     internal static FastNoiseLite HumidityNoise;
+    internal static FastNoiseLite ClimateWarp;
     internal static FastNoiseLite DuneNoise;
     internal static FastNoiseLite TrenchMask;
     internal static FastNoiseLite TrenchRidge;
@@ -74,6 +75,10 @@ internal static class TerrainNoise
         // the cold ramp's share (taiga, frozen, snow) and re-laid every temperature value.
         TemperatureNoise = MakeNoise(71, WorldGenerationConfig.TemperatureFrequency);
         HumidityNoise = MakeNoise(88, WorldGenerationConfig.HumidityFrequency, octaves: 2);
+        // One displacement shared by both climate channels, so a border bends the same way in
+        // temperature and humidity and the tint follows. Offset 151 is unused: this class uses at
+        // most 90, the feature generators and caves at most 142.
+        ClimateWarp = MakeWarp(151, WorldGenerationConfig.ClimateWarpFrequency, WorldGenerationConfig.ClimateWarpAmplitude);
         DuneNoise = MakeNoise(72, WorldGenerationConfig.DuneFrequency, octaves: 3);
         TrenchMask = MakeNoise(73, WorldGenerationConfig.TrenchMaskFrequency);
         TrenchRidge = MakeNoise(74, WorldGenerationConfig.TrenchFrequency);

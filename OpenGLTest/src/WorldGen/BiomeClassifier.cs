@@ -7,18 +7,23 @@ namespace VoxelEngine.WorldGen;
 /// desert and arid weights and the biome they classify to (<see cref="BiomeWeights(float, float, out float, out float, out float)"/>,
 /// over the pure <see cref="Classify"/> / <see cref="ColdOf"/> / <see cref="WarmOf"/> / <see cref="DryOf"/> /
 /// <see cref="SemiDryOf"/> seams), the cold and warm ramps, and the ragged desert material line (<see cref="DitherBiome"/>).
-/// <see cref="SampleClimate"/> is the one reader of the temperature and humidity noises, so every consumer (the biome, the
-/// cold and warm weights, the tint climate) sees the same values. A pure function of (x, z) and the seed, read on any worker
+/// <see cref="SampleClimate"/> is the one reader of the temperature and humidity noises, which it reads at a domain-warped
+/// position, so every consumer (the biome, the cold and warm weights, the tint climate) sees the same values. A pure function of (x, z) and the seed, read on any worker
 /// thread; <see cref="TerrainGenerator"/> forwards its public queries here.
 /// </summary>
 internal static class BiomeClassifier
 {
-    /// <summary>The raw temperature and humidity noise at (x, z): the only reader of
-    /// <see cref="TerrainNoise.TemperatureNoise"/> and <see cref="TerrainNoise.HumidityNoise"/>.</summary>
+    /// <summary>The raw temperature and humidity noise at the domain-warped position of (x, z): the
+    /// only reader of <see cref="TerrainNoise.TemperatureNoise"/>, <see cref="TerrainNoise.HumidityNoise"/>
+    /// and <see cref="TerrainNoise.ClimateWarp"/>, so every climate consumer sees the same warped
+    /// sample. The warp is exactly zero at the origin, so the origin's raw humidity stays exactly 0.</summary>
     internal static void SampleClimate(float x, float z, out float temperature, out float humidity)
     {
-        temperature = TerrainNoise.TemperatureNoise.GetNoise(x, z);
-        humidity = TerrainNoise.HumidityNoise.GetNoise(x, z);
+        var wx = x;
+        var wz = z;
+        TerrainNoise.ClimateWarp.DomainWarp(ref wx, ref wz);
+        temperature = TerrainNoise.TemperatureNoise.GetNoise(wx, wz);
+        humidity = TerrainNoise.HumidityNoise.GetNoise(wx, wz);
     }
 
     /// <summary>The ocean and desert weights and the biome they classify to; the arid weight is

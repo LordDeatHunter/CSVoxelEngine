@@ -340,13 +340,15 @@ public sealed class WorldgenTests
         for (var z = 0; z < Chunk.Size; z++)
             Assert.Equal(a.GetLocalBlock(x, y, z), b.GetLocalBlock(x, y, z));
 
+        // A cold sea's top cell freezes, so the flooded layer may hold its ice instead of water
         var water = ContentRegistry.RequireBlock("water").Id;
+        var ice = ContentRegistry.RequireBlock("ice").Id;
         var flooded = false;
         for (var x = 0; x < Chunk.Size && !flooded; x++)
         for (var y = 0; y < Chunk.Size && !flooded; y++)
         for (var z = 0; z < Chunk.Size && !flooded; z++)
-            flooded = a.GetLocalBlock(x, y, z) == water;
-        Assert.True(flooded, $"submerged chunk ({cx},0,{cz}) holds no water");
+            flooded = a.GetLocalBlock(x, y, z) == water || a.GetLocalBlock(x, y, z) == ice;
+        Assert.True(flooded, $"submerged chunk ({cx},0,{cz}) holds neither water nor its ice");
     }
 
     [Fact]

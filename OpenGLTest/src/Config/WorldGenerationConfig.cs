@@ -161,15 +161,17 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // ramp (TemperatureWarm*, read by TerrainGenerator.WarmWeight) holds the desert; the raw-noise
     // gap between them is the temperate band (forest or steppe, by humidity). Cold land is taiga
     // (with humidity) or the barren frozen biome (without it). Temperature and humidity are read
-    // only through BiomeClassifier.SampleClimate, while choosing a biome and the worldgen features
+    // only through BiomeClassifier.SampleClimate, which domain-warps the sample position first
+    // (ClimateWarp* below), while choosing a biome and the worldgen features
     // that follow from it, and by the grass/foliage tint through TerrainGenerator.Climate, so
     // nothing else in the game sees them.
     // Low frequency (one octave, see TerrainNoise.Reseed) keeps the temperature gradient shallow,
     // so the raw-noise gap between the two ramps spans a wide band of world: at this frequency it
     // keeps every hot column at least a full-detail load radius from snow
-    // (BiomeTests.DesertAndSnowAreNeverNearAndTheDryCorridorIsSteppeOrTundra). Changing it re-lays every temperature
-    // value, the origin's included.
-    public const float TemperatureFrequency = 1f / 4500f;
+    // (BiomeTests.DesertAndSnowAreNeverNearAndTheDryCorridorIsSteppeOrTundra), with room left for
+    // the climate warp below, which narrows the band wherever it squeezes the plane. Changing it
+    // re-lays every temperature value except the origin's, which is exactly 0 at any frequency.
+    public const float TemperatureFrequency = 1f / 5500f;
     public const float TemperatureColdStart = -0.35f;  // at or below: fully cold
     public const float TemperatureColdEnd = -0.05f;    // at or above: no cold at all
     // The warm ramp must start at or after the cold ramp ends, so no column is ever both cold and
@@ -196,6 +198,23 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // BiomeClassifier.BiomeWeights), which flattens steppe, savanna and tundra into plains while the
     // border stays a slope.
     public const float DryHillReduction = 0.6f;
+
+    // One shared domain-warp displacement of the temperature and humidity sample position
+    // (TerrainNoise.ClimateWarp, read only by BiomeClassifier.SampleClimate), so biome borders, and
+    // the tint, grade and aurora that read the same sample, are ragged rather than smooth blobs.
+    // The amplitude is the FastNoiseLite SetDomainWarpAmp value, not blocks: the peak sideways
+    // displacement in blocks scales linearly with it, but FastNoiseLite's default fractal bounding
+    // and the gradient's own range keep it well under the amplitude. One OpenSimplex2 warp with no
+    // fractal: one evaluation per climate sample. Changing either value re-lays every climate value
+    // of every seed, except at the origin, where the warp is exactly zero. Tuning rules: amplitude
+    // times frequency stays small enough that the warp stretches the plane by at most 2
+    // (BiomeClimateTests.TheWarpStretchesTheClimateBoundedly), and the band the warp squeezes must
+    // still keep the desert/snow load-radius separation
+    // (BiomeTests.DesertAndSnowAreNeverNearAndTheDryCorridorIsSteppeOrTundra), which is the tighter
+    // of the two. If a rule fails, lower these values (or TemperatureFrequency, which widens the
+    // band and re-lays the climate), never the rule.
+    public const float ClimateWarpFrequency = 1f / 1400f;
+    public const float ClimateWarpAmplitude = 360f;
 
     // Temperate band between hot and cold biomes: taiga/frozen live on the cold ramp (at
     // ColdBiomeMinCold and colder), desert and savanna on the warm ramp (from its midpoint up), and

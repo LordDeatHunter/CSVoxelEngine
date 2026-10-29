@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.WorldGen;
@@ -24,6 +25,30 @@ public sealed class SceneryTests
         ColumnCache.GetHeights(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
             [((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask)];
 
+    /// <summary>
+    /// Whether the layer one above <paramref name="height"/> was free for a scenery stamp at each
+    /// of the <paramref name="count"/> columns <paramref name="cell"/> names: the ground there does
+    /// not rise into it, and no tree (a leaf, or wood that is not detached scenery) holds the cell.
+    /// </summary>
+    private static bool LayerIsClearOfGroundAndTrees(Dictionary<(int, int, int), Chunk> chunks, int height,
+        int count, Func<int, (int X, int Z)> cell)
+    {
+        var y = height + 1;
+        for (var i = 0; i < count; i++)
+        {
+            var (x, z) = cell(i);
+            if (HeightAt(x, z) > height) return false;
+            var chunk = chunks[(x >> Chunk.SizeShift, y >> Chunk.SizeShift, z >> Chunk.SizeShift)];
+            var id = chunk.GetLocalBlock(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask);
+            if (TreeGenerator.IsLeaf(id)) return false;
+            if (BlockType.IsTreeWood(id)
+                && chunk.GetLocalState(x & Chunk.SizeMask, y & Chunk.SizeMask, z & Chunk.SizeMask) != WoodState.Detached)
+                return false;
+        }
+
+        return true;
+    }
+
     [Fact]
     public void AFallenLogLiesWholeAndDetachedOnTheForestFloor()
     {
@@ -47,6 +72,11 @@ public sealed class SceneryTests
                 if (!chunks.ContainsKey(key))
                     chunks[key] = ChunkAt(x, height + 1, z);
             }
+
+            // The log goes into air only, so a log whose layer the rising ground, a trunk or a
+            // crown already fills is cut short by design; the rule is checked on a clear floor.
+            if (!LayerIsClearOfGroundAndTrees(chunks, height, length, i => alongX ? (sx + i, sz) : (sx, sz + i)))
+                continue;
 
             // Every cell of the log is there, one height, detached wood (scenery, never a tree)
             for (var i = 0; i < length; i++)
@@ -82,15 +112,28 @@ public sealed class SceneryTests
             Assert.Contains(blockId, new[] { BoulderGenerator.StoneBlock, BoulderGenerator.CobblestoneBlock });
 
             var chunks = new Dictionary<(int, int, int), Chunk>();
-            var found = 0;
             for (var dx = -1; dx <= 1; dx++)
             for (var dz = -1; dz <= 1; dz++)
             {
                 var x = cx + dx;
                 var z = cz + dz;
                 var key = (x >> Chunk.SizeShift, (height + 1) >> Chunk.SizeShift, z >> Chunk.SizeShift);
-                if (!chunks.TryGetValue(key, out var chunk))
-                    chunks[key] = chunk = ChunkAt(x, height + 1, z);
+                if (!chunks.ContainsKey(key))
+                    chunks[key] = ChunkAt(x, height + 1, z);
+            }
+
+            // The blob goes into air only, so one whose layer the rising ground, a trunk or a
+            // crown already fills is cut short by design; the rule is checked on a clear floor.
+            if (!LayerIsClearOfGroundAndTrees(chunks, height, 9, i => (cx + i / 3 - 1, cz + i % 3 - 1)))
+                continue;
+
+            var found = 0;
+            for (var dx = -1; dx <= 1; dx++)
+            for (var dz = -1; dz <= 1; dz++)
+            {
+                var x = cx + dx;
+                var z = cz + dz;
+                var chunk = chunks[(x >> Chunk.SizeShift, (height + 1) >> Chunk.SizeShift, z >> Chunk.SizeShift)];
                 if (chunk.GetLocalBlock(x & Chunk.SizeMask, (height + 1) & Chunk.SizeMask, z & Chunk.SizeMask) == blockId)
                     found++;
             }
