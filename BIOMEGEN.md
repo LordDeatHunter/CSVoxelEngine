@@ -6,8 +6,9 @@ repo root; code is under `OpenGLTest/src/`. Read `AGENTS.md` ("Biomes", "Code or
 repo's standing rules (American English, no dead code, no pointless tests, JSON-for-content, build
 Release with the .NET 10 SDK).
 
-State: **phase 1** of the biome plan is in (the semi-dry ramp, Steppe and Savanna). Phases 2-4 (a
-domain-warped climate, a permafrost tundra, a pack-ice edge on the frozen ocean) are not.
+State: **phases 1 and 2** of the biome plan are in (the semi-dry ramp, Steppe and Savanna; a
+domain-warped climate sample). Phases 3-4 (a permafrost tundra, a pack-ice edge on the frozen ocean)
+are not.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -28,7 +29,9 @@ Seven `Biome` values: `Forest, Desert, Ocean, Taiga, Frozen, Steppe, Savanna` (`
 ordinals 0..6, appended, never reordered). Forest needs wet air, so the dry axis reads
 desert -> steppe -> tundra (Frozen) and the warm row forest -> savanna -> desert: **no strip of forest
 ever separates sand from snow**. Everything is a smooth weight first and only classified at the end,
-so heights blend across borders (slopes, never cliffs).
+so heights blend across borders (slopes, never cliffs). Temperature and humidity are sampled at a
+**domain-warped** position (one shared low-frequency warp, exactly zero at the origin), so the
+climate borders bend and wander instead of tracing the smooth contours of the raw noises.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -36,7 +39,7 @@ so heights blend across borders (slopes, never cliffs).
 
 | File | Role |
 |---|---|
-| `WorldGen/BiomeClassifier.cs` | **The core.** `SampleClimate` (the only reader of the temperature and humidity noises), `BiomeWeights` (two-out and three-out), `Classify`, `ColdOf`, `WarmOf`, `DryOf`, `SemiDryOf`, `WetnessOf`, `ColdWeight`, `WarmWeight`, `DitherBiome`. |
+| `WorldGen/BiomeClassifier.cs` | **The core.** `SampleClimate` (the only reader of the temperature and humidity noises and of the climate warp), `BiomeWeights` (two-out and three-out), `Classify`, `ColdOf`, `WarmOf`, `DryOf`, `SemiDryOf`, `WetnessOf`, `ColdWeight`, `WarmWeight`, `DitherBiome`. |
 | `WorldGen/BiomeTraits.cs` | Shared yes/no biome rules: `ShowsBareRock`, `RimsWaterWithSand` (near fill + both LOD paths). |
 | `WorldGen/TerrainNoise.cs` | Every noise instance; `Reseed()` builds them from `WorldSeed`. `MakeNoise(seedOffset, freq, octaves)`. |
 | `Config/WorldGenerationConfig.cs` | All constants (continent/temperature/humidity ramps, ocean, desert, dither, water, snow, mountains, openness, dry hills). |
@@ -52,6 +55,7 @@ so heights blend across borders (slopes, never cliffs).
 | `Effects/Post/BiomeGrade.cs` | Post-process color grade from climate. |
 | `Lod/LodMeshBuilder.cs`, `Lod/LodFaceEmitter.cs` | Far-terrain LOD wears biome-specific tiles. |
 | `OpenGLTest.Tests/WorldGen/BiomeTests.cs` | The rule tests (see §10). |
+| `OpenGLTest.Tests/WorldGen/BiomeClimateTests.cs` | The climate-sample rules: one warped sample behind every reader, the warp's stretch bound (§10). |
 
 ---------------------------------------------------------------------------------------------------
 
@@ -64,8 +68,9 @@ down, which matters for ramp thresholds).
 | Noise | Seed offset | Frequency (wavelength) | Octaves | Used for |
 |---|---|---|---|---|
 | `ContinentNoise` | 70 | 1/2800 | 2 | ocean vs land |
-| `TemperatureNoise` | 71 | 1/4500 | **1** | cold/warm ramps |
+| `TemperatureNoise` | 71 | 1/5500 | **1** | cold/warm ramps |
 | `HumidityNoise` | 88 | 1/1700 | 2 | dry and semi-dry ramps |
+| `ClimateWarp` | 151 | 1/1400 | 1 (warp) | displaces the temperature and humidity sample position |
 | `BiomeDitherNoise` | 89 | 1/28 | 1 | ragged desert material line |
 | `OpennessNoise` | 86 | 1/900 | 2 | forest woodland vs open (trees + hill flattening) |
 
@@ -73,15 +78,26 @@ down, which matters for ramp thresholds).
 the same as `BiomeDitherNoise`. Different frequencies, so not identical fields, but the same seed base.
 Do not "fix" it without knowing it re-lays snow drift (or dither); it is not a bug today.
 
+`ClimateWarp` is not a value noise but an OpenSimplex2 **domain warp** (`MakeWarp`, like `HillWarp`,
+`RiverWarp` and the rest): `ClimateWarp.DomainWarp(ref x, ref z)` moves a position. One warp is shared
+by both climate channels, so a border bends the same way in temperature and humidity, and it is read
+only inside `SampleClimate`. Its amplitude constant is FastNoiseLite's `SetDomainWarpAmp` value, not
+blocks: the peak displacement in blocks grows linearly with it but stays well under it. Offset 151 is
+clear of every other channel (this class uses at most 90, the feature generators and caves at most 142).
+
 **Trap:** OpenSimplex is exactly 0 at the lattice origin whatever the seed, so the origin's raw
 temperature and humidity are both 0. The semi-dry ramp's midpoint sits just below 0 so the origin
-stays Forest (the origin rule in `BiomeTests`). A future warp (phase 2) that moves the origin's sample
-position breaks that unless its offset is zero at the origin, or the test is relaxed to its real rule
-("the origin is a land biome that spawns mobs").
+stays Forest (`BiomeTests.OriginColumnIsForest`). The climate warp keeps that: its displacement at the
+origin is exactly zero too (`TheWarpStretchesTheClimateBoundedly` asserts it), so the origin samples
+the raw noises at (0, 0). A change that moves the origin's sample position, or a semi-dry ramp whose
+midpoint reaches 0, breaks the test, which should then be relaxed to its real rule ("the origin is a
+land biome that spawns mobs"), never tuned toward one seed.
 
-Changing any frequency, octave count or seed offset **re-lays the whole world** for existing seeds.
-Temperature was deliberately made single-octave (the extra octave steepened the gradient and squeezed
-the temperate band between snow and sand), which also set the share of the world that is cold.
+Changing any frequency, octave count, warp amplitude or seed offset **re-lays the whole world** for
+existing seeds. Temperature was deliberately made single-octave (the extra octave steepened the
+gradient and squeezed the temperate band between snow and sand), which also set the share of the world
+that is cold, and its frequency was lowered from 1/4500 to 1/5500 with phase 2 to leave the warp room
+inside the desert/snow separation (§9).
 
 ---------------------------------------------------------------------------------------------------
 
@@ -93,7 +109,8 @@ Notation: `smooth(a, b, v)` = smoothstep 0 at `v<=a`, 1 at `v>=b`.
 continent   = ContinentNoise(x,z)
 ocean       = 1 - smooth(ContinentOceanStart=-0.30, ContinentOceanEnd=-0.04, continent)   // 1 = deep ocean
 
-SampleClimate(x, z, out t, out h)       // the only reader of TemperatureNoise / HumidityNoise
+SampleClimate(x, z, out t, out h)       // the only reader of TemperatureNoise / HumidityNoise / ClimateWarp:
+                                        //   (wx, wz) = ClimateWarp.DomainWarp(x, z); t = Temperature(wx, wz); h = Humidity(wx, wz)
 cold        = 1 - smooth(TemperatureColdStart=-0.35, TemperatureColdEnd=-0.05, t)          // ColdOf
 warm        =     smooth(TemperatureWarmStart=+0.05, TemperatureWarmEnd=+0.35,  t)          // WarmOf
 dry         = 1 - smooth(HumidityDryStart=-0.35,     HumidityDryEnd=-0.05,      h)          // DryOf
@@ -111,6 +128,11 @@ Classify(ocean, cold, warm, dry, semiDry):
 
 Ordering matters: ocean beats everything, then the cold biomes, then the warm row, else the temperate
 row. Desert is still exactly `min(warm, dry) >= 0.5`.
+
+The warp sits inside `SampleClimate`, before every reader: `BiomeWeights`, `ColdWeight` (so the snow
+and ice lines through `SnowGenerator.ColdWeightAt`), `WarmWeight`, `DitherBiome`'s binding-ramp label,
+`HotSpringGenerator` and `Climate` (§5) all see the same warped sample. Continentalness is not warped,
+so coasts keep their shape; only the climate borders move.
 
 Key structural facts:
 
@@ -167,8 +189,8 @@ label rule, never a Forest flip).
 
 ## 5. Climate axes for color (`TerrainGenerator.Climate`)
 
-A second, continuous read of the same climate sample (`SampleClimate`, so colors and biomes agree),
-used **only** for tint/grade/aurora, never for placement:
+A second, continuous read of the same climate sample (`SampleClimate`, warped exactly as the biome's,
+so colors and biomes agree), used **only** for tint/grade/aurora, never for placement:
 
 ```
 warmth01  = 0.5 * (1 - ColdOf(t)) + 0.5 * WarmOf(t)          // 0 fully cold, exactly 0.5 across temperate band, 1 fully warm
@@ -178,7 +200,9 @@ wetness01 = WetnessOf(h) = 0.5 * (1 - DryOf(h)) + 0.5 * (1 - SemiDryOf(h))
 
 * Evaluated **once per chunk column at its minimum corner** and stored in `ColumnData.CornerWarmth /
   CornerWetness` (so meshers do no noise; multiplayer clients get it streamed). The call must use
-  `chunkX << Chunk.SizeShift` as float so it is bit-identical to `BiomeTint.TintsAt` on the direct path.
+  `chunkX << Chunk.SizeShift` as float so it is bit-identical to `BiomeTint.TintsAt` on the direct path;
+  the warp is a deterministic function of the same float arguments, so the stored and the direct
+  climate stay the same bits (`TheStoredCornerClimateReproducesTheDirectLatticeEvaluation`).
 * `EyeClimate.Coldness(w) = clamp01(1 - 2w)`, `Warmness(w) = clamp01(2w - 1)` read it back.
 * Wetness by biome: Desert and Frozen sit at or below the dry-ramp midpoint's wetness (about 0.25);
   Steppe and Savanna in the semi-dry band (about 0.25..0.75, 0.5 between the ramps); Forest at or
@@ -271,10 +295,11 @@ SeaLevel 0                    BeachAboveSeaLevel 2          BeachBelowSeaLevel 3
 ContinentFrequency 1/2800     ContinentOceanStart -0.30     ContinentOceanEnd -0.04
 OceanShoreWeight 0.35         OceanShoreHeight 3            OceanFloorHeight -44      OceanDepthExponent 1.35
 OceanSandDepth 4              OceanGravelDepth 16
-TemperatureFrequency 1/4500   TemperatureColdStart -0.35    TemperatureColdEnd -0.05
+TemperatureFrequency 1/5500   TemperatureColdStart -0.35    TemperatureColdEnd -0.05
 TemperatureWarmStart 0.05     TemperatureWarmEnd 0.35       ColdBiomeMinCold 0.70
 HumidityFrequency 1/1700      HumidityDryStart -0.35        HumidityDryEnd -0.05
 HumiditySemiDryStart -0.05    HumiditySemiDryEnd 0.03       DryHillReduction 0.6
+ClimateWarpFrequency 1/1400   ClimateWarpAmplitude 360 (a SetDomainWarpAmp value, not blocks)
 DuneFrequency 1/170           DuneAmplitude 8               SandstoneDepth 4
 BiomeBorderDither 0.16        BiomeDitherFrequency 1/28
 WaterDesertFadeStart 0.3      WaterDesertFadeEnd 0.5        WaterBodyThreshold 0.05
@@ -290,8 +315,17 @@ SimulationConfig: MaxLeafDecayBacklogCells 1<<18 (holds the stone pine's and the
 ```
 
 `HumiditySemiDry*` was tuned against the origin (raw humidity exactly 0, see §3): with the midpoint at
--0.01 the origin is Forest. A probe over ±2048 at stride 16 (default seed) counted Forest 8751,
-Steppe 6794, Savanna 1756, Desert 5139, Ocean 31477, Taiga 7727, Frozen 4405 samples.
+-0.01 the origin is Forest. After the phase-2 warp, a probe over ±3072 at stride 16 (default seed)
+found about Ocean 38 %, Forest 15 %, Taiga 14 %, Steppe 14 %, Desert 9 %, Frozen 7 % and Savanna 3 %
+of the samples; savanna stays the rarest land biome, since its semi-dry band is narrow.
+
+`ClimateWarp*` tuning rules: the warp must stretch the plane by at most 2
+(`BiomeClimateTests.TheWarpStretchesTheClimateBoundedly`), and the temperate band it squeezes must
+still keep the desert/snow load-radius separation (§9, invariant 4), which is the tighter of the two.
+At these values the warp moves a climate sample by up to roughly 80 blocks and stretches it by about a
+third at most. Raising the amplitude bends the borders further but narrows the band: if the separation
+test fails, lower the warp (or lower `TemperatureFrequency`, which widens the band and re-lays the
+climate), never the rule. `TemperatureFrequency` went from 1/4500 to 1/5500 for exactly that room.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -355,6 +389,14 @@ Grep `Biome\.` to confirm; at time of writing:
 7. Content rule: block behavior stays data-driven; prefer a JSON flag over a new `switch` on the biome
    where the question is "what does this block do". Biome-keyed placement is already code + tree JSON;
    a biome rule asked in more than one place belongs in `BiomeTraits`.
+8. **Every climate read goes through `SampleClimate`**, the one reader of `TemperatureNoise`,
+   `HumidityNoise` and `ClimateWarp`, so the biome, the cold and warm weights, snow, the tint, the
+   grade and the aurora all see one warped sample (`BiomeClimateTests.EveryClimateReaderSeesTheOneSample`).
+   Never warp anywhere else and never add a second sampler.
+9. **The climate warp is bounded:** a unit step in the world moves the warped sample by at most 2
+   (a Lipschitz bound on `ClimateWarp.DomainWarp`, `BiomeClimateTests.TheWarpStretchesTheClimateBoundedly`),
+   so it can at most halve a band, and its displacement at the origin is exactly zero. Invariant 4 is
+   the tighter limit in practice: the squeezed temperate band must still hold the load radius.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -366,8 +408,14 @@ Grep `Biome\.` to confirm; at time of writing:
   `DesertAndSnowAreNeverNearAndTheDryCorridorIsSteppeOrTundra`, `SteppeAndSavannaBothExistNearOrigin`,
   `AridWeightIsSmooth`, `BiomeBorderDitherFlipsCoherentPatchesNotSingleColumns` (with the binding-ramp
   label rule), `EveryTreeGrowsInItsSpeciesBiome` (every land biome a non-oasis species names must grow
-  a tree in the window), `SurfaceWaterFadeHasClosedOnEveryDesertColumn`, and the origin rule (the
-  origin column classifies Forest).
+  a tree in the window), `SurfaceWaterFadeHasClosedOnEveryDesertColumn`, and the origin rule
+  (`OriginColumnIsForest`).
+* `OpenGLTest.Tests/WorldGen/BiomeClimateTests.cs` holds the climate-sample rules:
+  `EveryClimateReaderSeesTheOneSample` (`ColdWeight`, `WarmWeight`, `Climate`'s warmth and wetness,
+  `BiomeWeights` and `BiomeAt` all agree with one `SampleClimate` call, relationally) and
+  `TheWarpStretchesTheClimateBoundedly` (the finite-difference Jacobian of `ClimateWarp.DomainWarp` and
+  unit steps along both axes and both diagonals stay within a stretch of 2, the warp really stretches
+  and shrinks somewhere, and it is exactly zero at the origin).
   Related: `BiomeTintTests` (`ClimateAgreesWithTheBiomeClassification`, `TheGrassDriesMonotonically`),
   `BiomeGradeTests`, `LakeTests`, `SnowCanopyTests`, `SceneryTests`, `CottonTests` (savanna only),
   `FoliageTests`, `DeadTreeTests` (`ItNeverSharesABiomeWithALeafyWorldgenSpecies`), `WorldSourceLodTests`
@@ -377,8 +425,9 @@ Grep `Biome\.` to confirm; at time of writing:
   runtime-only-10 box prefix `DOTNET_ROLL_FORWARD=LatestMajor`). Follow the repo test policy: assert
   rules/relations, never constants or content literals.
 * Visual: `OpenGLTest/visual-examples/biomes.json` (forest, steppe, the steppe/desert and savanna/desert
-  edges, savanna from above and under the stone pines, desert, the steppe/tundra transition; a flying
-  camera, its vantages from a headless probe), plus `grass-tint.json`, `biome-grade.json`, `aurora.json`,
+  edges, savanna from above and under the stone pines, desert, the steppe/tundra transition, and a
+  high shot along the warped desert/savanna line; a flying camera, its vantages from a headless probe
+  that must be redone whenever the climate re-lays), plus `grass-tint.json`, `biome-grade.json`, `aurora.json`,
   `snow-sparkle.json`, `water.json`, all with `VOXEL_TIME=147` (`VOXEL_SCRIPT=<json>`); use
   `VOXEL_SPAWN=x,y,z` to jump to a biome. Nothing in-game prints the current biome; a quick headless
   probe is a test calling `TerrainGenerator.BiomeAt/BiomeWeights/Climate` over a grid (do not commit it
@@ -400,9 +449,15 @@ Grep `Biome\.` to confirm; at time of writing:
 * The binding-ramp dither label is exact only inland; on a coast a mislabeled column is grass either way.
 * Cold biomes have no height identity (same profile as forest). Desert and Ocean are the only ones with
   their own.
-* Temperature noise is 1 octave at 1/4500: climates are enormous and smooth (borders are far apart).
-  Humidity is 1/1700, so humidity varies ~2.6x faster than temperature; most border crossings are humid
-  flips. Borders are smooth blobs until the phase-2 domain warp.
+* Temperature noise is 1 octave at 1/5500: climates are enormous (borders are far apart). Humidity is
+  1/1700, so humidity varies ~3x faster than temperature; most border crossings are humid flips. The
+  climate warp bends every climate border over a wavelength of about 1400 blocks; it is low frequency
+  on purpose (the stretch bound and the desert/snow separation limit how much it may squeeze), so a
+  border wanders rather than frays. Only the desert line is also dithered at the block scale.
+* **The warp re-laid every seed.** Phase 2 (the warp, and `TemperatureFrequency` going from 1/4500 to
+  1/5500) moved every climate border except at the origin; existing saves regenerate their unmodified
+  chunks under the new climate, so old worlds show seams of biome, height and tint at the edge of their
+  edited chunks.
 * The origin is Forest only because its raw climate is exactly 0 (§3); spawn is additionally forced to a
   forest valley (mountain clear + lake spawn-clear radius 72).
 * Desert, Taiga, Frozen and Ocean are mob-free by design (`MobSpawner.SpawnsMobs`).

@@ -2,65 +2,75 @@
   // Biome check (the 3x3 climate grid of BIOMEGEN.md): run from OpenGLTest/ with
   //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/biomes.json
   // Shots land in visual/biomes/. VOXEL_TIME=147 is noon, so the grass tint is read under a high,
-  // neutral sun: steppe and savanna grass should read drier and yellower than the forest's, and no
-  // strip of forest should stand between sand and snow.
+  // neutral sun: steppe and savanna grass should read drier and yellower than the forest's, no
+  // strip of forest should stand between sand and snow, and the climate's domain warp
+  // (TerrainNoise.ClimateWarp) should bend the biome borders instead of tracing smooth blobs.
   //
-  // The vantage points come from a headless probe over TerrainGenerator.BiomeAt, ColumnCache.Get,
-  // SnowGenerator.DepthAt, TreeGenerator.TryGetTree and CottonGenerator.TryGetCotton (default seed):
-  //   forest         - all forest within 64 blocks of (-64, -64), ground about 16
-  //   steppe         - all steppe within 96 blocks of (-32, 160), ground about 8; the camera looks
-  //                    west, away from the desert line near x 136
-  //   steppe_desert  - steppe at (96, 96) with the desert line about 40 blocks east
-  //   savanna_desert - savanna at (224, -96) with the desert to the south-east and a short steppe
-  //                    edge to the south-west
-  //   savanna        - all savanna within 48 blocks of (1408, -1216), ground 14-19, with stone
-  //                    pines (the acacia stand-in, e.g. (1415, 17, -1218)) and cotton clumps
-  //   desert         - all desert within 96 blocks of (1152, 1152), ground about 10
-  //   steppe_tundra  - steppe at (-480, 1152) with frozen tundra about 56 blocks west and taiga
-  //                    to the north-west, snow within 64 blocks
+  // The vantage points come from a headless probe over TerrainGenerator.BiomeAt, BiomeWeights,
+  // ColumnCache.Get, SnowGenerator.DepthAt, TreeGenerator.TryGetTree and
+  // CottonGenerator.TryGetCotton (default seed, warped climate):
+  //   forest         - all forest within 96 blocks of (-64, -112), ground 11-17; the camera
+  //                    looks north into it
+  //   steppe         - all steppe within 96 blocks of (16, 144), ground up to about 11 with a few
+  //                    low wet spots; the camera looks west, away from the desert line to the east
+  //   steppe_desert  - steppe at (96, 16) with the desert about 90 blocks to the south-east
+  //   savanna_desert - savanna at (192, -48) with the desert about 64 blocks to the south and
+  //                    steppe to the west
+  //   savanna        - all savanna within 48 blocks of (1392, -1216), ground 14-17, with stone
+  //                    pines (the acacia stand-in, e.g. (1365, 15, -1212)) and cotton clumps
+  //   desert         - all desert within 96 blocks of (576, 1184), ground 7-19, with cacti
+  //   steppe_tundra  - steppe at (-480, 1056) with frozen tundra about 70 blocks west-south-west
+  //   ragged_border  - the desert/savanna line through (576, 1696), (608, 1728) and (640, 1760),
+  //                    filmed from height looking along it (north-east), so the warp's bends show
+  //                    as the sand edge wanders across the frame
   // The camera flies (so it hovers instead of falling), every teleport is followed by a wait while
   // the streaming ring fills around the new position, and the repeat teleport restores the exact
   // pose before the frame is taken.
   "steps": [
     { "op": "fly" },
 
-    { "op": "teleport", "pos": [-64.5, 60.5, -24.5], "yaw": -90, "pitch": -18 },
+    { "op": "teleport", "pos": [-64.5, 60.5, -40.5], "yaw": -90, "pitch": -18 },
     { "op": "wait", "seconds": 12 },
-    { "op": "teleport", "pos": [-64.5, 60.5, -24.5], "yaw": -90, "pitch": -18 },
+    { "op": "teleport", "pos": [-64.5, 60.5, -40.5], "yaw": -90, "pitch": -18 },
     { "op": "screenshot", "name": "forest", "hideHud": true },
 
-    { "op": "teleport", "pos": [-8.5, 50.5, 160.5], "yaw": 180, "pitch": -14 },
+    { "op": "teleport", "pos": [40.5, 50.5, 144.5], "yaw": 180, "pitch": -14 },
     { "op": "wait", "seconds": 12 },
-    { "op": "teleport", "pos": [-8.5, 50.5, 160.5], "yaw": 180, "pitch": -14 },
+    { "op": "teleport", "pos": [40.5, 50.5, 144.5], "yaw": 180, "pitch": -14 },
     { "op": "screenshot", "name": "steppe", "hideHud": true },
 
-    { "op": "teleport", "pos": [40.5, 60.5, 96.5], "yaw": 0, "pitch": -18 },
+    { "op": "teleport", "pos": [64.5, 60.5, -16.5], "yaw": 45, "pitch": -18 },
     { "op": "wait", "seconds": 10 },
-    { "op": "teleport", "pos": [40.5, 60.5, 96.5], "yaw": 0, "pitch": -18 },
+    { "op": "teleport", "pos": [64.5, 60.5, -16.5], "yaw": 45, "pitch": -18 },
     { "op": "screenshot", "name": "steppe_desert", "hideHud": true },
 
-    { "op": "teleport", "pos": [176.5, 70.5, -144.5], "yaw": 45, "pitch": -20 },
+    { "op": "teleport", "pos": [192.5, 70.5, -112.5], "yaw": 90, "pitch": -20 },
     { "op": "wait", "seconds": 12 },
-    { "op": "teleport", "pos": [176.5, 70.5, -144.5], "yaw": 45, "pitch": -20 },
+    { "op": "teleport", "pos": [192.5, 70.5, -112.5], "yaw": 90, "pitch": -20 },
     { "op": "screenshot", "name": "savanna_desert", "hideHud": true },
 
-    { "op": "teleport", "pos": [1408.5, 50.5, -1264.5], "yaw": 90, "pitch": -16 },
+    { "op": "teleport", "pos": [1392.5, 50.5, -1264.5], "yaw": 90, "pitch": -16 },
     { "op": "wait", "seconds": 30 },
-    { "op": "teleport", "pos": [1408.5, 50.5, -1264.5], "yaw": 90, "pitch": -16 },
+    { "op": "teleport", "pos": [1392.5, 50.5, -1264.5], "yaw": 90, "pitch": -16 },
     { "op": "screenshot", "name": "savanna", "hideHud": true },
-    { "op": "teleport", "pos": [1408.5, 28.5, -1236.5], "yaw": 90, "pitch": -6 },
+    { "op": "teleport", "pos": [1392.5, 28.5, -1236.5], "yaw": 90, "pitch": -6 },
     { "op": "wait", "seconds": 6 },
-    { "op": "teleport", "pos": [1408.5, 28.5, -1236.5], "yaw": 90, "pitch": -6 },
+    { "op": "teleport", "pos": [1392.5, 28.5, -1236.5], "yaw": 90, "pitch": -6 },
     { "op": "screenshot", "name": "savanna_ground", "hideHud": true },
 
-    { "op": "teleport", "pos": [1152.5, 50.5, 1152.5], "yaw": 0, "pitch": -15 },
+    { "op": "teleport", "pos": [576.5, 50.5, 1184.5], "yaw": 0, "pitch": -15 },
     { "op": "wait", "seconds": 30 },
-    { "op": "teleport", "pos": [1152.5, 50.5, 1152.5], "yaw": 0, "pitch": -15 },
+    { "op": "teleport", "pos": [576.5, 50.5, 1184.5], "yaw": 0, "pitch": -15 },
     { "op": "screenshot", "name": "desert", "hideHud": true },
 
-    { "op": "teleport", "pos": [-416.5, 80.5, 1168.5], "yaw": 180, "pitch": -18 },
+    { "op": "teleport", "pos": [-416.5, 80.5, 1040.5], "yaw": 159, "pitch": -18 },
     { "op": "wait", "seconds": 30 },
-    { "op": "teleport", "pos": [-416.5, 80.5, 1168.5], "yaw": 180, "pitch": -18 },
-    { "op": "screenshot", "name": "steppe_tundra", "hideHud": true }
+    { "op": "teleport", "pos": [-416.5, 80.5, 1040.5], "yaw": 159, "pitch": -18 },
+    { "op": "screenshot", "name": "steppe_tundra", "hideHud": true },
+
+    { "op": "teleport", "pos": [480.5, 160.5, 1600.5], "yaw": 45, "pitch": -30 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [480.5, 160.5, 1600.5], "yaw": 45, "pitch": -30 },
+    { "op": "screenshot", "name": "ragged_border", "hideHud": true }
   ]
 }

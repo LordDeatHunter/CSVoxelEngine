@@ -1672,7 +1672,8 @@ OpenGLTest/
     WorldGen/                  # procedural worldgen: terrain, biomes, caves and worms, the
                                #   tree front end and batches, clouds, the generational cache
       Biome.cs                 # the Forest / Desert / Ocean / Taiga / Frozen / Steppe / Savanna enum (appended, never reordered)
-      BiomeClassifier.cs       # the biome climate split: SampleClimate (the one temperature/humidity reader), BiomeWeights
+      BiomeClassifier.cs       # the biome climate split: SampleClimate (the one temperature/humidity reader, at the
+                               #   ClimateWarp-displaced position), BiomeWeights
                                #   over the Classify/ColdOf/WarmOf/DryOf/SemiDryOf seams, WetnessOf, ColdWeight, WarmWeight
                                #   and the desert border dither (DitherBiome)
       BiomeTraits.cs           # shared biome yes/no rules the near fill and both far-LOD paths ask (ShowsBareRock,
@@ -3387,6 +3388,18 @@ low-frequency noise — continentalness (low = ocean) plus temperature and humid
 biome, the worldgen features that follow from it and the grass/foliage tint
 (`TerrainGenerator.Climate`, see "Biome-tinted grass and leaves") — in `BiomeClassifier.BiomeWeights`
 (forwarded by `TerrainGenerator.BiomeWeights`); `TerrainGenerator.BiomeAt` classifies the result.
+`SampleClimate` **domain-warps** the sample position before reading either noise, with one shared
+OpenSimplex2 warp (`TerrainNoise.ClimateWarp`, seed offset 151, `WorldGenerationConfig.ClimateWarp*`;
+the amplitude is a FastNoiseLite `SetDomainWarpAmp` value, not blocks), so every climate border bends
+and wanders instead of tracing the raw noises' smooth blobs, and the biome, the cold and warm weights,
+snow and ice, the tint, the grade and the aurora all read the same warped sample
+(`BiomeClimateTests.EveryClimateReaderSeesTheOneSample`); never warp anywhere else. The warp is exactly
+zero at the origin, and its stretch budget is a Lipschitz bound of 2: a unit step in the world moves
+the warped sample by at most 2 (`BiomeClimateTests.TheWarpStretchesTheClimateBoundedly`), while the
+desert/snow separation below is the tighter limit on how strong it may be. The warp (with
+`TemperatureFrequency` lowered to make room for it) re-laid every seed except the origin: existing
+saves regenerate their unmodified chunks under the new climate, so old worlds show seams at the edge
+of their edited chunks.
 Temperature is a **three-band axis**: the cold ramp (`TemperatureColdStart/End`, read by
 `ColdWeight`: snow, ice, and taiga/frozen at `ColdBiomeMinCold`), a temperate band, and the warm
 ramp (`TemperatureWarmStart/End`, read by `WarmWeight`; desert and savanna begin at its midpoint).
@@ -3408,9 +3421,9 @@ locks the grid, and `DesertAndSnowAreNeverNearAndTheDryCorridorIsSteppeOrTundra`
 at least the full-detail load radius (`ChunkRadius * Chunk.Size`, Chebyshev distance) from any
 column that would be desert if fully dry to any snow, and every dry land column to desert, steppe
 or tundra. The origin's raw humidity is exactly 0 for every seed, so the semi-dry ramp's midpoint
-sits just below 0 to keep the spawn a forest (the origin rule in `BiomeTests`). Reaching that bar took a lower
-`TemperatureFrequency` (1/4500, was 1/2300) and a **single-octave** temperature noise (was two
-octaves), both of which re-laid every temperature value; single-octave output spans the raw
+sits just below 0 to keep the spawn a forest (`BiomeTests.OriginColumnIsForest`). Reaching that bar took a lower
+`TemperatureFrequency` (1/5500, was 1/2300, then 1/4500 before the climate warp) and a
+**single-octave** temperature noise (was two octaves), both of which re-laid every temperature value; single-octave output spans the raw
 [-1, 1] where two-octave FBm was scaled by 1/1.5, so it also rescaled the cold ramp's share
 (taiga, frozen, snow). The weights are smooth 0..1 and `TerrainGenerator.Compute` lerps the height
 between the forest, desert-dune and ocean-ramp profiles by them, so a border is a slope, never a
