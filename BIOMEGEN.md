@@ -6,9 +6,9 @@ repo root; code is under `OpenGLTest/src/`. Read `AGENTS.md` ("Biomes", "Code or
 repo's standing rules (American English, no dead code, no pointless tests, JSON-for-content, build
 Release with the .NET 10 SDK).
 
-State: **phases 1 to 3** of the biome plan are in (the semi-dry ramp, Steppe and Savanna; a
-domain-warped climate sample; a permafrost tundra with dead shrubs). Phase 4 (a pack-ice edge on the
-frozen ocean) is not.
+State: **phases 1 to 4** of the biome plan are in (the semi-dry ramp, Steppe and Savanna; a
+domain-warped climate sample; a permafrost tundra with dead shrubs; a ragged pack-ice edge on cold
+water). Drifting icebergs outside the ice edge are future work (§11).
 
 ---------------------------------------------------------------------------------------------------
 
@@ -47,7 +47,7 @@ climate borders bend and wander instead of tracing the smooth contours of the ra
 | `WorldGen/ColumnData.cs` | Per-chunk-column arrays incl. `Biomes[]`, `CornerWarmth`, `CornerWetness`. |
 | `Chunks/ColumnCache.cs` | Column cache + `GenerateColumn` (surface/soil block per biome). |
 | `WorldGen/WaterBodies.cs` | Lakes/rivers/sea level; which biomes may hold surface water. |
-| `WorldGen/Features/SnowGenerator.cs` | Snow, ice, `ColdWeightAt` (cold + altitude). |
+| `WorldGen/Features/SnowGenerator.cs` | Snow, ice, `ColdWeightAt` (cold + altitude), `IsFrozenWater` (the pack-ice rule the far LOD shares). |
 | `WorldGen/Features/*`, `WorldGen/Features/Underground/*` | Per-biome vegetation/scenery (see §8). |
 | `Simulation/MobSpawner.cs` | `SpawnsMobs(biome)`: which biomes ring-spawn mobs. |
 | `assets/data/trees/*.json` | `worldgen.biomes` per tree species. |
@@ -73,6 +73,7 @@ down, which matters for ramp thresholds).
 | `ClimateWarp` | 151 | 1/1400 | 1 (warp) | displaces the temperature and humidity sample position |
 | `BiomeDitherNoise` | 89 | 1/28 | 1 | ragged desert material line |
 | `OpennessNoise` | 86 | 1/900 | 2 | forest woodland vs open (trees + hill flattening) |
+| `PackIceNoise` | 152 | 1/36 | 2 | floes vs open leads in the pack-ice band (`SnowGenerator.IsFrozenWater` only) |
 
 **Trap:** `SnowGenerator.DriftNoise` also uses seed offset **89** (`TerrainGenerator.MakeNoise(89, ...)`),
 the same as `BiomeDitherNoise`. Different frequencies, so not identical fields, but the same seed base.
@@ -83,7 +84,9 @@ Do not "fix" it without knowing it re-lays snow drift (or dither); it is not a b
 by both climate channels, so a border bends the same way in temperature and humidity, and it is read
 only inside `SampleClimate`. Its amplitude constant is FastNoiseLite's `SetDomainWarpAmp` value, not
 blocks: the peak displacement in blocks grows linearly with it but stays well under it. Offset 151 is
-clear of every other channel (this class uses at most 90, the feature generators and caves at most 142).
+clear of every other channel (this class uses at most 90 besides it and `PackIceNoise`'s 152, the
+feature generators and caves at most 142). `PackIceNoise` (152) is not a climate channel: it never
+moves a biome border, it only decides ice versus open water inside the pack-ice band (§6).
 
 **Trap:** OpenSimplex is exactly 0 at the lattice origin whatever the seed, so the origin's raw
 temperature and humidity are both 0. The semi-dry ramp's midpoint sits just below 0 so the origin
@@ -268,10 +271,26 @@ from `tools/generate-permafrost-texture.py`.
 
 ### Snow/ice (`SnowGenerator`, reads `ColdWeightAt`, **not** the biome)
 * `SnowColdThreshold 0.55`: snow layer placed above this cold weight (depth grows with cold, noise drift,
-  max 8 layers). `FreezeColdThreshold 0.72`: surface water becomes ice. Hot springs never freeze.
-* Because Taiga/Frozen need `cold >= 0.70`, snow starts (0.55) slightly **before** the biome line and
-  freezing (0.72) just **after** it: a taiga column at cold 0.70..0.72 has snow but unfrozen lakes, and
-  the cold edge of a steppe wears snow before the tundra starts.
+  max 8 layers).
+* **Pack ice.** Surface water (the sea, lakes and rivers alike) freezes by one pure function of
+  (x, z, seed), `SnowGenerator.IsFrozenWater(x, z, cold)`, fed the column's `ColdWeightAt`:
+  open water at or below `PackIceColdStart 0.6`; a solid sheet past `FreezeColdThreshold 0.72`; in
+  between, a column freezes where the coherent floe field `0.5 + 0.5 * PackIceNoise` lies under
+  `smoothstep(PackIceColdStart, FreezeColdThreshold, cold)`, so the edge is floes and open leads whose
+  ice share rises with the cold until they close into the sheet (a dither of the freeze line, as
+  `DitherBiome` raggeds the desert line). For a fixed column the result is monotone in the cold. Hot
+  springs never freeze: `HotSpringGenerator.IsSite` is tested **last**, only for a column that would
+  otherwise freeze, so the LodGen threads never pay it per cell. Snow follows the ice: `Stamp` skips
+  an open column's snow cell, and every ice cell lies above the snow line because
+  `PackIceColdStart >= SnowColdThreshold`.
+* The near stamp and the generated far LOD's `_iceTop` call the same function, so their edges agree
+  cell for cell (`PackIceTests.TheFarLodSheetAgreesWithTheNearIce`). The far LOD's `_snowTop` stays the
+  plain snow line (it also decides snow on land); the ordering above is what makes every frozen sheet
+  cell snow-covered there too.
+* Because Taiga/Frozen need `cold >= 0.70`, snow starts (0.55) slightly **before** the biome line,
+  floes appear in the band from 0.6, also before it, and the sheet is solid only past 0.72, just
+  **after** it: a taiga column at cold 0.70..0.72 has snow but may still hold open leads, and the cold
+  edge of a steppe wears snow, and its water the first floes, before the tundra starts.
 * Cold trees get a snow dusting (`SnowCanopyTests`).
 
 ### Vegetation and mobs
@@ -309,6 +328,7 @@ DuneFrequency 1/170           DuneAmplitude 8               SandstoneDepth 4
 BiomeBorderDither 0.16        BiomeDitherFrequency 1/28
 WaterDesertFadeStart 0.3      WaterDesertFadeEnd 0.5        WaterBodyThreshold 0.05
 SnowColdThreshold 0.55        FreezeColdThreshold 0.72      SnowMaxDepth 8   SnowFrequency 1/140
+PackIceColdStart 0.6          PackIceFrequency 1/36         (rule: SnowColdThreshold <= PackIceColdStart < FreezeColdThreshold)
 OpennessFrequency 1/900       OpennessStart 0.0             OpennessEnd 0.45  OpennessHillReduction 0.5
 MountainRockHeight 56         MountainSnowFullHeight 96
 ForestBaseHeight 12           HillAmplitude 32              MountainAmplitude 60
@@ -358,10 +378,12 @@ Grep `Biome\.` to confirm; at time of writing:
 * **Mobs:** `Simulation/MobSpawner.cs` `SpawnsMobs` (Forest, Steppe, Savanna); a supplied column reads
   `Biomes[i]`, a generated one the undithered `BiomeAt`. **A new biome gets no mobs unless it is added
   there.**
-* **LOD:** `Lod/LodMeshBuilder.cs` `ClassifyGenerated` (snow top for Taiga/Frozen, ice top for Frozen,
+* **LOD:** `Lod/LodMeshBuilder.cs` `ClassifyGenerated` (snow top above `SnowColdThreshold` of
+  `ColdWeightAt`, ice top on a water cell exactly where `SnowGenerator.IsFrozenWater` says so,
   beach via `RimsWaterWithSand` (or Ocean), bare rock via `ShowsBareRock` above `MountainRockHeight`,
-  water-sheet kind) and `ClassifySupplied` (bare rock via `ShowsBareRock` with `DirtDepth == 0`;
-  beaches Ocean-only). Both paths fill the `_soilStripped` grid from the cell-center column's
+  water-sheet kind) and `ClassifySupplied` (snow and ice from the stored Taiga/Frozen biome, the ice
+  an approximation of the pack-ice band since a supplied column has no cold weight; bare rock via
+  `ShowsBareRock` with `DirtDepth == 0`; beaches Ocean-only). Both paths fill the `_soilStripped` grid from the cell-center column's
   `DirtDepth == 0` (the generated path reads the `ColumnData` `Prefetch` already holds), and
   `FloorMaterial` gives a Frozen lake bed code 4, permafrost (2, stone, when stripped).
   `Lod/LodFaceEmitter.cs` maps code 4 to permafrost and orders the soil side band Desert sandstone,
@@ -408,6 +430,10 @@ Grep `Biome\.` to confirm; at time of writing:
    (a Lipschitz bound on `ClimateWarp.DomainWarp`, `BiomeClimateTests.TheWarpStretchesTheClimateBoundedly`),
    so it can at most halve a band, and its displacement at the origin is exactly zero. Invariant 4 is
    the tighter limit in practice: the squeezed temperate band must still hold the load radius.
+10. **Ice is `SnowGenerator.IsFrozenWater`** on the near stamp and the generated far path alike, never a
+   second freeze test; `PackIceColdStart >= SnowColdThreshold` (so every ice cell is snow-covered near
+   and far) and `PackIceColdStart < FreezeColdThreshold` (so the band exists), both asserted by
+   `PackIceTests.IceThickensMonotonicallyWithCold`. The hot-spring test stays last inside it.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -440,13 +466,24 @@ Grep `Biome\.` to confirm; at time of writing:
   shrub, snow over any other ground never does); `WorldSourceLodTests.ASuppliedFrozenColumnWearsPermafrostSoil`,
   `AStrippedSuppliedFrozenColumnWearsStoneSoil` and `AGeneratedFrozenRegionsLodWearsPermafrost` (the far
   LOD agrees on both column paths).
+* The pack ice (phase 4): `OpenGLTest.Tests/WorldGen/Features/PackIceTests.cs`:
+  `IceThickensMonotonicallyWithCold` (no ice at or below the band, solid past it, a column never thaws
+  as the cold rises, the knob ordering of invariant 10), `HotSpringsNeverFreeze`,
+  `TheNearSeaCellAgreesWithTheRule` (generated sea cells are ice exactly where the rule says),
+  `TheFarLodSheetAgreesWithTheNearIce` (a level-0 region's sheet is open or snow-covered ice cell for
+  cell by the same rule) and `TheIceEdgeIsRaggedPatchesNotAContour` (one cold holds both ice and open
+  water, neighbors agree well above independent coins, the ice share rises across the band); plus
+  `SnowIceTests.ColdOceanFreezesAndWarmOceanStaysLiquid` in band form. `WaterRavineTests` and
+  `LakeTests` check their fills only on columns at or below `PackIceColdStart`, where water is
+  always open.
 * Run: `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release` (needs .NET 10 SDK; on a
   runtime-only-10 box prefix `DOTNET_ROLL_FORWARD=LatestMajor`). Follow the repo test policy: assert
   rules/relations, never constants or content literals.
 * Visual: `OpenGLTest/visual-examples/biomes.json` (forest, steppe, the steppe/desert and savanna/desert
   edges, savanna from above and under the stone pines, desert, the steppe/tundra transition, a
   high shot along the warped desert/savanna line, the tundra's shrubs and snags from low height and
-  a cut where the permafrost band shows between the snow and the stone; a flying camera, its vantages from a headless probe
+  a cut where the permafrost band shows between the snow and the stone, and the pack-ice edge of a
+  cold sea from height (`pack_ice`) and grazing over an open lead (`pack_ice_low`); a flying camera, its vantages from a headless probe
   that must be redone whenever the climate re-lays), plus `grass-tint.json`, `biome-grade.json`, `aurora.json`,
   `snow-sparkle.json`, `water.json`, all with `VOXEL_TIME=147` (`VOXEL_SCRIPT=<json>`); use
   `VOXEL_SPAWN=x,y,z` to jump to a biome. Nothing in-game prints the current biome; a quick headless
@@ -481,10 +518,16 @@ Grep `Biome\.` to confirm; at time of writing:
 * The origin is Forest only because its raw climate is exactly 0 (§3); spawn is additionally forced to a
   forest valley (mountain clear + lake spawn-clear radius 72).
 * Desert, Taiga, Frozen and Ocean are mob-free by design (`MobSpawner.SpawnsMobs`).
-* Snow/freeze thresholds (0.55 / 0.72) straddle the Taiga line (0.70); see §6. The frozen ocean's ice
-  edge is still one `FreezeColdThreshold` line (the phase-4 pack-ice edge is not in).
-* A supplied (imported) column's far LOD decides ice from its stored Frozen biome and its beaches stay
-  Ocean-only; only the generated path has a cold weight and grass-biome beaches.
+* The snow line (0.55), the pack-ice band (0.6..0.72) and the Taiga line (0.70) overlap; see §6.
+* A supplied (imported) column's far LOD decides ice from its stored Frozen biome, so it shows no
+  ragged pack-ice band, and its beaches stay Ocean-only; only the generated path has a cold weight and
+  grass-biome beaches. A stored per-column ice flag would fix it but is a format change.
+* The pack-ice band re-laid cold water: existing saves regenerate their unmodified chunks under the
+  band rule, so cold seas and lakes can show seams of ice against open water at the edge of edited
+  chunks. The near stamp reads `ColdWeightAt` at the column's bed height and the far LOD at the
+  cell's highest ground, so a lake above `MountainRockHeight` (where altitude raises the cold) can
+  disagree between near and far by a cell.
+* **Future work:** drifting iceberg entities on the open water outside the ice edge (not planned yet).
 * Existing saves regenerate unmodified chunks under the new rules, so seams appear beside edited areas.
 * Tree biome lists are lowercase enum names; an unknown name fails at content load.
 * **The shrub-over-snow exception.** Every surface stamp writes into air only, except one: a tundra
