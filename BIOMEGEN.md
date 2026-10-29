@@ -6,9 +6,9 @@ repo root; code is under `OpenGLTest/src/`. Read `AGENTS.md` ("Biomes", "Code or
 repo's standing rules (American English, no dead code, no pointless tests, JSON-for-content, build
 Release with the .NET 10 SDK).
 
-State: **phases 1 and 2** of the biome plan are in (the semi-dry ramp, Steppe and Savanna; a
-domain-warped climate sample). Phases 3-4 (a permafrost tundra, a pack-ice edge on the frozen ocean)
-are not.
+State: **phases 1 to 3** of the biome plan are in (the semi-dry ramp, Steppe and Savanna; a
+domain-warped climate sample; a permafrost tundra with dead shrubs). Phase 4 (a pack-ice edge on the
+frozen ocean) is not.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -43,7 +43,7 @@ climate borders bend and wander instead of tracing the smooth contours of the ra
 | `WorldGen/BiomeTraits.cs` | Shared yes/no biome rules: `ShowsBareRock`, `RimsWaterWithSand` (near fill + both LOD paths). |
 | `WorldGen/TerrainNoise.cs` | Every noise instance; `Reseed()` builds them from `WorldSeed`. `MakeNoise(seedOffset, freq, octaves)`. |
 | `Config/WorldGenerationConfig.cs` | All constants (continent/temperature/humidity ramps, ocean, desert, dither, water, snow, mountains, openness, dry hills). |
-| `WorldGen/TerrainGenerator.cs` | `Compute(chunkX, chunkZ)` builds a `ColumnData`; `LandHeight` blends per-biome height profiles; `Climate(x,z,out warmth01,out wetness01)`; public forwarders (`BiomeAt`, `BiomeWeights`, `ColdWeight`, `WarmWeight`, `IsDesert`). |
+| `WorldGen/TerrainGenerator.cs` | `Compute(chunkX, chunkZ)` builds a `ColumnData`; `LandHeight` blends per-biome height profiles; `Climate(x,z,out warmth01,out wetness01)`; public forwarders (`BiomeAt`, `BiomeWeights`, `ColdWeight`, `WarmWeight`); `PermafrostBlock`, the Frozen top and soil. |
 | `WorldGen/ColumnData.cs` | Per-chunk-column arrays incl. `Biomes[]`, `CornerWarmth`, `CornerWetness`. |
 | `Chunks/ColumnCache.cs` | Column cache + `GenerateColumn` (surface/soil block per biome). |
 | `WorldGen/WaterBodies.cs` | Lakes/rivers/sea level; which biomes may hold surface water. |
@@ -251,10 +251,12 @@ peaks, via `SnowGenerator.ColdWeightAt = max(cold, altitude01)`).
 | Forest, Taiga, Steppe, Savanna (default case) | grass (dirt if wet column) | dirt `DirtDepth` | sand/gravel on beach height **only** where `SurfaceWaterWeight > 0` (`BiomeTraits.RimsWaterWithSand`) |
 | Desert | sand | sandstone, `SandstoneDepth 4` | soil 0 if ravine-stripped |
 | Ocean | sand ≥ -4, gravel ≥ -16, else stone | same | soil depth 2 |
-| Frozen | stone | stone, depth 2 | snow pass covers it; barren |
+| Frozen | permafrost | permafrost, depth 2, then stone | soil 0 (bare stone) if ravine-stripped; the snow pass covers it; frozen lake beds wear permafrost too |
 
 Taiga uses the **default** (grass) branch: its "snowiness" comes entirely from `SnowGenerator`, not the
-biome. Steppe and Savanna differ from Forest only in tint, trees and flora.
+biome. Steppe and Savanna differ from Forest only in tint, trees and flora. `permafrost` is a JSON
+block (`assets/data/blocks/permafrost.json`, `hit_rock`, hand-diggable, drops itself) whose tile comes
+from `tools/generate-permafrost-texture.py`.
 
 ### Water (`WaterBodies`)
 * Ocean: level = `SeaLevel`. Lakes/rivers: every land biome but the desert (`CanHoldSurfaceWater`:
@@ -279,6 +281,9 @@ biome. Steppe and Savanna differ from Forest only in tint, trees and flora.
   for an acacia); palm = desert oases only; baobab grown only.
 * Flowers: open Forest or Steppe (`FlowerGenerator.IsOpenMeadow`, `ForestOpenness >= MeadowMinOpenness`).
 * Grass tufts: Forest, Steppe, Savanna (`FoliageGenerator.TryGetGrassTuft`), density by wetness.
+* Dead shrubs: sparse patches on desert sand and on Frozen permafrost (`FoliageGenerator.TryGetDeadShrub`;
+  `Stamp` pairs each ground with its biome, sand only in a Desert column and permafrost only in a Frozen
+  one). A tundra shrub replaces the snow cell the snow pass laid over permafrost (see §11).
 * Cotton: Savanna centers with `desertWeight < CottonMaxDesertWeight` (= 0.5 - `BiomeBorderDither`, clear
   of the savanna/sand dither).
 * Boulders: Forest, Taiga, Steppe, Savanna floor.
@@ -346,7 +351,8 @@ Grep `Biome\.` to confirm; at time of writing:
   worldgen species must not raise the tree reach without checking `TreeGenerator.ReachChunkRadius`,
   `ProxyReach` and `SimulationConfig.MaxLeafDecayBacklogCells`.
 * **Features (per-biome):** `Boulder` (Forest/Taiga/Steppe/Savanna), `Cotton` (Savanna),
-  `Flower` (Forest/Steppe), `Foliage` tufts (Forest/Steppe/Savanna; dead shrubs via `IsDesert`),
+  `Flower` (Forest/Steppe), `Foliage` tufts (Forest/Steppe/Savanna; dead shrubs on desert sand and
+  frozen permafrost, `TryGetDeadShrub` gated on Desert or Frozen),
   `DesertWell`, `FallenLog`, `IceSpike` (frozen), `Oasis` (desert, deep), `SeaStack` (ocean), `HotSpring`
   (cold, hashed), `Reed`/`LilyPad`/`Pebble`/`Cairn`/`RuinedPillar`, underground generators.
 * **Mobs:** `Simulation/MobSpawner.cs` `SpawnsMobs` (Forest, Steppe, Savanna); a supplied column reads
@@ -355,8 +361,13 @@ Grep `Biome\.` to confirm; at time of writing:
 * **LOD:** `Lod/LodMeshBuilder.cs` `ClassifyGenerated` (snow top for Taiga/Frozen, ice top for Frozen,
   beach via `RimsWaterWithSand` (or Ocean), bare rock via `ShowsBareRock` above `MountainRockHeight`,
   water-sheet kind) and `ClassifySupplied` (bare rock via `ShowsBareRock` with `DirtDepth == 0`;
-  beaches Ocean-only), and `Lod/LodFaceEmitter.cs` (Desert sand/sandstone, Frozen/sea/rock stone;
-  Steppe and Savanna fall to the tinted grass top and the soil side band like Forest). For a world
+  beaches Ocean-only). Both paths fill the `_soilStripped` grid from the cell-center column's
+  `DirtDepth == 0` (the generated path reads the `ColumnData` `Prefetch` already holds), and
+  `FloorMaterial` gives a Frozen lake bed code 4, permafrost (2, stone, when stripped).
+  `Lod/LodFaceEmitter.cs` maps code 4 to permafrost and orders the soil side band Desert sandstone,
+  sea or rock stone, Frozen permafrost (stone when stripped), else the soil; the top chain is
+  untouched, since snow always wins on a Frozen cell. Steppe and Savanna fall to the tinted grass top
+  and the soil side band like Forest. For a world
   source that *supplies* columns the LOD reads the stored `Biomes`; for generated it re-derives from
   worldgen. **Any biome change must be mirrored in the LOD builder or distant terrain disagrees with
   near chunks.**
@@ -421,12 +432,21 @@ Grep `Biome\.` to confirm; at time of writing:
   `FoliageTests`, `DeadTreeTests` (`ItNeverSharesABiomeWithALeafyWorldgenSpecies`), `WorldSourceLodTests`
   (supplied steppe/savanna columns wear grass over dirt like forest; a stripped one shows rock),
   `ClientWorldgenIsolationTests`.
+* The tundra (phase 3): `SnowIceTests.FrozenGroundIsPermafrostOverStone` (relational: a stripped
+  column's surface is never permafrost, nothing deeper than the 2-cell soil band is permafrost, an
+  undisturbed soiled column never tops out in dirt or grass, with non-vacuity counts) and
+  `SnowSettlesOnColdDryGround` (skips shrub columns); `FoliageTests.TundraShrubsStandOnPermafrost` and
+  the per-cell ground rules of `FoliageStampsOnlyOnItsOwnGround` (snow over permafrost may become a
+  shrub, snow over any other ground never does); `WorldSourceLodTests.ASuppliedFrozenColumnWearsPermafrostSoil`,
+  `AStrippedSuppliedFrozenColumnWearsStoneSoil` and `AGeneratedFrozenRegionsLodWearsPermafrost` (the far
+  LOD agrees on both column paths).
 * Run: `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release` (needs .NET 10 SDK; on a
   runtime-only-10 box prefix `DOTNET_ROLL_FORWARD=LatestMajor`). Follow the repo test policy: assert
   rules/relations, never constants or content literals.
 * Visual: `OpenGLTest/visual-examples/biomes.json` (forest, steppe, the steppe/desert and savanna/desert
-  edges, savanna from above and under the stone pines, desert, the steppe/tundra transition, and a
-  high shot along the warped desert/savanna line; a flying camera, its vantages from a headless probe
+  edges, savanna from above and under the stone pines, desert, the steppe/tundra transition, a
+  high shot along the warped desert/savanna line, the tundra's shrubs and snags from low height and
+  a cut where the permafrost band shows between the snow and the stone; a flying camera, its vantages from a headless probe
   that must be redone whenever the climate re-lays), plus `grass-tint.json`, `biome-grade.json`, `aurora.json`,
   `snow-sparkle.json`, `water.json`, all with `VOXEL_TIME=147` (`VOXEL_SCRIPT=<json>`); use
   `VOXEL_SPAWN=x,y,z` to jump to a biome. Nothing in-game prints the current biome; a quick headless
@@ -467,6 +487,18 @@ Grep `Biome\.` to confirm; at time of writing:
   Ocean-only; only the generated path has a cold weight and grass-biome beaches.
 * Existing saves regenerate unmodified chunks under the new rules, so seams appear beside edited areas.
 * Tree biome lists are lowercase enum names; an unknown name fails at content load.
+* **The shrub-over-snow exception.** Every surface stamp writes into air only, except one: a tundra
+  dead shrub replaces the snow cell `SnowGenerator` (which stamps before the foliage) laid over
+  permafrost. It is confined to permafrost ground; snow over stone, sand or grass is never replaced.
+  The snow cell's state byte is 0, so nothing else needs clearing.
+* The far LOD's soil side band is `NominalDirtDepth` deep for every biome, Frozen included, against the
+  near fill's 2 permafrost cells, so a distant tundra cut shows a deeper permafrost band than near.
+* Side effects of permafrost replacing the Frozen stone top: the rare pebble that could land on a
+  Frozen stone top where the snow cell was skipped at a chunk border (a surface at local y 15) no longer
+  appears, since permafrost has no `pebbleWeight`; and ore veins (malachite, coal), which replace only
+  stone hosts, no longer reach the top 2 soil cells of a Frozen column.
+* Existing saves: unmodified Frozen chunks regenerate with permafrost, edited ones keep their old rock
+  tops, so seams appear at the edge of edited tundra.
 
 ---------------------------------------------------------------------------------------------------
 

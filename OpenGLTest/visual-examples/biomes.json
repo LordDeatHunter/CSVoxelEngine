@@ -8,7 +8,8 @@
   //
   // The vantage points come from a headless probe over TerrainGenerator.BiomeAt, BiomeWeights,
   // ColumnCache.Get, SnowGenerator.DepthAt, TreeGenerator.TryGetTree and
-  // CottonGenerator.TryGetCotton (default seed, warped climate):
+  // CottonGenerator.TryGetCotton, FoliageGenerator.TryGetDeadShrub and the columns' DirtDepth
+  // (default seed, warped climate):
   //   forest         - all forest within 96 blocks of (-64, -112), ground 11-17; the camera
   //                    looks north into it
   //   steppe         - all steppe within 96 blocks of (16, 144), ground up to about 11 with a few
@@ -23,6 +24,13 @@
   //   ragged_border  - the desert/savanna line through (576, 1696), (608, 1728) and (640, 1760),
   //                    filmed from height looking along it (north-east), so the warp's bends show
   //                    as the sand edge wanders across the frame
+  //   tundra         - a flat frozen plain around (-764, 1348), ground 11-13, filmed from low
+  //                    height looking north (+Z): dead_tree snags (e.g. (-764, 12, 1336)) and sparse
+  //                    dead shrubs poke out of a 4-5 layer snow cover over permafrost
+  //   tundra_permafrost - a frozen ravine running along X near z -138 (floor about 16-20), filmed
+  //                    from inside it looking north (+Z) at its north wall (rim about 40-44 at
+  //                    z -128, soil 3-4): the permafrost band shows between the snow on the rim and
+  //                    the bare stone of the stripped ravine wall below
   // The camera flies (so it hovers instead of falling), every teleport is followed by a wait while
   // the streaming ring fills around the new position, and the repeat teleport restores the exact
   // pose before the frame is taken.
@@ -71,6 +79,16 @@
     { "op": "teleport", "pos": [480.5, 160.5, 1600.5], "yaw": 45, "pitch": -30 },
     { "op": "wait", "seconds": 30 },
     { "op": "teleport", "pos": [480.5, 160.5, 1600.5], "yaw": 45, "pitch": -30 },
-    { "op": "screenshot", "name": "ragged_border", "hideHud": true }
+    { "op": "screenshot", "name": "ragged_border", "hideHud": true },
+
+    { "op": "teleport", "pos": [-764.5, 19.5, 1318.5], "yaw": 90, "pitch": -10 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [-764.5, 19.5, 1318.5], "yaw": 90, "pitch": -10 },
+    { "op": "screenshot", "name": "tundra", "hideHud": true },
+
+    { "op": "teleport", "pos": [-888.5, 40.5, -140.5], "yaw": 90, "pitch": -8 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [-888.5, 40.5, -140.5], "yaw": 90, "pitch": -8 },
+    { "op": "screenshot", "name": "tundra_permafrost", "hideHud": true }
   ]
 }

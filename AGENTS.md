@@ -1715,8 +1715,8 @@ OpenGLTest/
         DesertWellGenerator.cs # the desert's ring-and-roof well, dug into sand over sandstone
         FallenLogGenerator.cs  # a rare 3-5 cell detached oak log lying on the forest floor
         FlowerGenerator.cs     # meadow flowers on warm, open grass
-        FoliageGenerator.cs    # ground cover: a grass tuft on dry forest grass and a dead shrub on desert sand
-        IceSpikeGenerator.cs   # rare single-column ice spikes on the barren frozen plains
+        FoliageGenerator.cs    # ground cover: a grass tuft on dry forest grass and a dead shrub on desert sand or tundra permafrost
+        IceSpikeGenerator.cs   # rare single-column ice spikes on the frozen plains
         LilyPadGenerator.cs    # lily pads floating on ponds (PlantClumps)
         MeteorGenerator.cs     # a blast crater with scattered meteor rock
         OasisGenerator.cs      # a desert oasis: a water disc, a grass ring and palms (worldgen.oasis)
@@ -1913,6 +1913,7 @@ tools/                                # asset generators: tiles, sprites, models
   generate-goblin-skin.ps1            # deterministic generator of goblin.png; its header pins the UV layout
   generate-lantern-texture.py         # deterministic lantern tile; its header pins the uv of every model part
   generate-leaf-textureless.ps1       # deterministic gray leaf tiles for the biome tint (scaled to BiomeTintTextureGray)
+  generate-permafrost-texture.py      # deterministic generator of the permafrost tile (permafrost.png)
   generate-plank-texture.py           # deterministic oak_planks tile (stdlib PNG writer)
   generate-pond-plants.py             # deterministic generator of the pond plants' art
   generate-slime-block-texture.py     # deterministic generator of the slime block tile (slime_block.png)
@@ -2817,7 +2818,9 @@ describe the live world go through it:
   `LodRegionRequest` (`ChunkManager.WorldSource`). A supplied column's far LOD takes the biome and
   water level at the cell center from its `ColumnData`, snow from a Taiga or Frozen biome, sea ice
   from Frozen, beaches from `TerrainGenerator.IsBeachHeight` in the Ocean biome, bare rock from a
-  zero `DirtDepth` in the Forest biome and the tint lattice from the stored corner climate, and it
+  zero `DirtDepth` in a snowless grass biome (`BiomeTraits.ShowsBareRock`), a permafrost soil band
+  and lake bed in the Frozen biome (stone at a zero `DirtDepth`) and the tint lattice from the
+  stored corner climate, and it
   draws no canopy bumps (its trees are in its blocks) and no gravel caps; an unsupplied column keeps
   every worldgen read verbatim, so a generated region is byte-identical to the build without a
   source;
@@ -3378,8 +3381,8 @@ climate grid** of temperature (cold / temperate / warm) and humidity (dry / semi
 | **warm**      | forest | savanna  | desert |
 
 **forest** (smooth rolling grass hills with flat valleys), **desert** (dunes of sand over
-sandstone), **taiga** (a snowy spruce wood), **frozen** (a barren tundra: a snow plain of bare rock
-and occasional ice), **steppe** (an open, dry-tinted grass plain with scattered dead trees) and
+sandstone), **taiga** (a snowy spruce wood), **frozen** (a tundra: permafrost under the snow, over
+stone, with sparse dead shrubs, leafless snags and occasional ice), **steppe** (an open, dry-tinted grass plain with scattered dead trees) and
 **savanna** (a dry grassland of umbrella-crowned stone pines and cotton). Forest needs wet air, so
 the dry axis reads desert -> steppe -> tundra and the warm row forest -> savanna -> desert: no strip
 of forest ever stands between sand and snow. Selection is a pure function of (x, z) from
@@ -3455,8 +3458,9 @@ forest alternates between rolling woodland and open grass instead of one uniform
 `worldgen.openness`, so a taiga keeps more of its spruce and the desert's cactus ignores it). On land a hashed lake bowl and a warped river ridge carve below
 their own water level and flood only those (every land biome but the desert; both fade out toward a
 desert so a pond closes on its own rim) — see the Water invariant below.
-A desert column is sand over `SandstoneDepth` sandstone blocks, then stone; a frozen column is bare
-rock (the snow pass covers it); forest, taiga, steppe and savanna share the grass-over-dirt fill
+A desert column is sand over `SandstoneDepth` sandstone blocks, then stone; a frozen column is a
+`permafrost` top and two cells of permafrost soil over stone, under the snow layer the snow pass
+lays (a ravine strips it down to bare stone, like a stripped desert column); forest, taiga, steppe and savanna share the grass-over-dirt fill
 (sand or gravel only on the rims of real water); a ravined (bare-stone) column keeps those rules.
 Existing saves regenerate their unmodified chunks under the current rules, so a biome change shows
 as seams at the edge of the edited (saved) chunks of an old world.
@@ -3481,7 +3485,10 @@ flagged water, since the flag alone selects the fragment-shader water model what
 distant desert and sea floor agree with the near chunks. Its beach and bare-rock tops ask the same
 `BiomeTraits` rules as the near fill (`RimsWaterWithSand`, `ShowsBareRock`; a supplied column's rock
 rule is `ShowsBareRock` with a zero `DirtDepth`, its beaches stay ocean-only), and steppe and
-savanna fall through to the tinted grass top and the soil side band, exactly like the forest.
+savanna fall through to the tinted grass top and the soil side band, exactly like the forest. A
+frozen cell's soil side band and lake bed wear permafrost on both column paths (stone where the
+cell-center column's `DirtDepth` is zero: `LodMeshBuilder`'s stripped-soil grid, read from the
+prefetched `ColumnData` on the generated path too), while its top stays snow.
 Vegetation is biome-gated. Trees come from the species files (`assets/data/trees`), each planted
 only in its `worldgen.biomes`: `oak` in the forest, `spruce` in the taiga, the leafless `cactus`
 (a thick stem whose few arms bend upward, wearing the generated `cactus_side`/`cactus_top` tiles;
@@ -3491,7 +3498,10 @@ the desert, the frozen tundra and the steppe, and `stone_pine` in the savanna, w
 stands in for an acacia (its reach equals the palm's, so `ReachChunkRadius` did not grow), while
 `baobab` never generates (`EveryTreeGrowsInItsSpeciesBiome` checks every land biome a species
 names); the forest and the steppe grow flowers in open clumps (`FlowerGenerator`), grass tufts
-grow in the forest, steppe and savanna, and the frozen plains grow nothing.
+grow in the forest, steppe and savanna, and dead shrubs grow sparsely on desert sand and on the
+frozen plains' permafrost (`FoliageGenerator.TryGetDeadShrub`). A tundra shrub replaces the snow cell
+the snow pass already laid over permafrost: the one exception to the into-air stamp rule, confined
+to permafrost ground (snow over any other ground is never replaced).
 Wild cotton grows in **clumps** in the savanna (`CottonGenerator`: a savanna center whose desert
 weight stays under `CottonMaxDesertWeight`, where the savanna/sand dither starts, so a clump never
 lands on dithered sand), stamped after the pebbles and before the flowers and foliage. Placement is the reusable
