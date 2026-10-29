@@ -40,7 +40,12 @@ internal static class ChunkMeshBuilder
         // seal every boundary face. The second case is most of the deep terrain in the load
         // sphere, and skipping it saves the light flood and the per-voxel walk below.
         if (chunk.SolidCount == 0 || IsFullyEnclosed(chunk, neighbors))
+        {
+            // The resolve fills only the slots it finds, so a stale neighbor left here would let
+            // this thread's next build pass the missing-face-neighbor check
+            scratch.ClearNeighbors();
             return new ChunkMeshData([], [], [], [], false);
+        }
 
         // The nine chunk columns' terrain (heights, water levels, corner climate), resolved once
         // for the light flood, the water-surface codes and the tint. False is a streamed column
