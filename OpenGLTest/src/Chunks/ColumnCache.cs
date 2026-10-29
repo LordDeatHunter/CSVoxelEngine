@@ -100,11 +100,11 @@ public static class ColumnCache
                 break;
 
             case Biome.Frozen:
-                // Barren rock rather than grass: the snow pass lays a drift on top, so the plains
-                // read as rock-and-snow instead of a white field over soil.
-                topBlock = TerrainGenerator.RockBlock;
-                soilBlock = TerrainGenerator.RockBlock;
-                soilDepth = 2;
+                // Frozen soil under the snow layer the snow pass lays on top, over stone. A ravine
+                // that stripped the soil (dirtDepth 0) is bare rock, like the desert's.
+                topBlock = TerrainGenerator.PermafrostBlock;
+                soilBlock = TerrainGenerator.PermafrostBlock;
+                soilDepth = dirtDepth == 0 ? 0 : 2;
                 break;
 
             default:

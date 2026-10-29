@@ -11,9 +11,9 @@ using Xunit;
 namespace VoxelEngine.Tests.WorldGen.Features;
 
 /// <summary>
-/// Covers the cold-weather features: the temperature/humidity biomes (taiga and barren frozen),
-/// spruce conifers, layered snow (depth, stacking and the partial-height mesh), and the freezing
-/// of cold surface water into ice.
+/// Covers the cold-weather features: the temperature/humidity biomes (taiga and the permafrost
+/// tundra), spruce conifers, layered snow (depth, stacking and the partial-height mesh), and the
+/// freezing of cold surface water into ice.
 /// </summary>
 public sealed class SnowIceTests
 {
@@ -228,6 +228,8 @@ public sealed class SnowIceTests
             if (TerrainGenerator.BiomeAt(wx, wz) != Biome.Frozen) continue;
             if (IceSpikeGenerator.TryGetSpike(wx, wz, out _, out _)) continue;
             if (SnowGenerator.DepthAt(wx, wz, 0) <= 0) continue;
+            // A tundra shrub legitimately takes the snow cell over permafrost
+            if (FoliageGenerator.TryGetDeadShrub(wx, wz)) continue;
 
             var column = ColumnCache.Get(cx, cz);
             var height = column.Heights[(x << Chunk.SizeShift) | z];
@@ -240,6 +242,75 @@ public sealed class SnowIceTests
         }
 
         Assert.Fail("no snow-covered frozen column found");
+    }
+
+    [Fact]
+    public void FrozenGroundIsPermafrostOverStone()
+    {
+        // Worldgen features (meteors, cave entrances, pockets, geodes, snags, cairns, pillars)
+        // disturb single cells, so the rules are relational: a stripped column never wears
+        // permafrost, none lies under the soil band, and an undisturbed soiled column tops out in
+        // it rather than in dirt or grass.
+        const int maxChunkColumns = 40;
+        const int soilBand = 2;
+        var permafrost = TerrainGenerator.PermafrostBlock;
+        var deadShrub = FoliageGenerator.DeadShrubBlock;
+        var chunks = new Dictionary<(int, int, int), Chunk>();
+
+        byte BlockAt(int wx, int wy, int wz)
+        {
+            var key = (wx >> Chunk.SizeShift, wy >> Chunk.SizeShift, wz >> Chunk.SizeShift);
+            if (!chunks.TryGetValue(key, out var chunk))
+            {
+                chunk = new Chunk(null!, new Vector3(key.Item1, key.Item2, key.Item3), generateBlockData: true);
+                chunks[key] = chunk;
+            }
+            return chunk.GetLocalBlock(wx & Chunk.SizeMask, wy & Chunk.SizeMask, wz & Chunk.SizeMask);
+        }
+
+        var permafrostTops = 0;
+        var stoneUnderSoil = 0;
+        var chunkColumns = 0;
+        for (var cx = -48; cx <= 48 && chunkColumns < maxChunkColumns; cx += 4)
+        for (var cz = -48; cz <= 48 && chunkColumns < maxChunkColumns; cz += 4)
+        {
+            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Frozen) continue;
+            chunkColumns++;
+            var column = ColumnCache.Get(cx, cz);
+
+            for (var x = 0; x < Chunk.Size; x++)
+            for (var z = 0; z < Chunk.Size; z++)
+            {
+                var i = (x << Chunk.SizeShift) | z;
+                var wx = cx * Chunk.Size + x;
+                var wz = cz * Chunk.Size + z;
+                if (column.Biomes[i] != Biome.Frozen || column.Oasis[i]) continue;
+                if (IceSpikeGenerator.TryGetSpike(wx, wz, out _, out _)) continue;
+                var height = column.Heights[i];
+                if (TerrainGenerator.IsWaterColumn(wx, wz, column.Bed[i])) continue;
+
+                var surface = BlockAt(wx, height, wz);
+                if (column.DirtDepth[i] == 0)
+                    Assert.NotEqual(permafrost, surface);
+                for (var depth = soilBand + 1; depth <= soilBand + 3; depth++)
+                    Assert.NotEqual(permafrost, BlockAt(wx, height - depth, wz));
+
+                if (column.DirtDepth[i] == 0) continue;
+                var ly = height & Chunk.SizeMask;
+                if (ly is < 1 or > Chunk.Size - 2) continue;
+                // Undisturbed ground only: the cell above still holds what the surface passes laid
+                var above = BlockAt(wx, height + 1, wz);
+                if (above != Snow && above != deadShrub) continue;
+
+                Assert.NotEqual(TerrainGenerator.SoilBlock, surface);
+                Assert.NotEqual(TerrainGenerator.SurfaceBlock, surface);
+                if (surface == permafrost) permafrostTops++;
+                if (BlockAt(wx, height - soilBand - 1, wz) == TerrainGenerator.RockBlock) stoneUnderSoil++;
+            }
+        }
+
+        Assert.True(permafrostTops > 0, "no undisturbed frozen column topped out in permafrost");
+        Assert.True(stoneUnderSoil > 0, "no frozen column showed stone under its soil band");
     }
 
     [Fact]

@@ -103,11 +103,23 @@ public sealed class FoliageTests
         var shrubFound = 0;
         foreach (var (cx, cz) in FindChunks((x, z) => TerrainGenerator.BiomeAt(x, z) == Biome.Forest, 4))
             grassFound += StampMixedGround(cx, cz).Grass;
-        foreach (var (cx, cz) in FindChunks((x, z) => TerrainGenerator.IsDesert(x, z), 8))
-            shrubFound += StampMixedGround(cx, cz).Shrub;
+        foreach (var (cx, cz) in FindChunks((x, z) => TerrainGenerator.BiomeAt(x, z) == Biome.Desert, 8))
+            shrubFound += StampMixedGround(cx, cz).DesertShrub;
 
         Assert.True(grassFound > 0, "expected tall grass across the sampled forest chunks");
         Assert.True(shrubFound > 0, "expected dead shrubs across the sampled desert chunks");
+    }
+
+    [Fact]
+    public void TundraShrubsStandOnPermafrost()
+    {
+        // The snow pass stamps first, so a tundra shrub takes the snow cell over permafrost; the
+        // per-cell gate in StampMixedGround keeps the snow over stone untouched.
+        var shrubFound = 0;
+        foreach (var (cx, cz) in FindChunks((x, z) => TerrainGenerator.BiomeAt(x, z) == Biome.Frozen, 16))
+            shrubFound += StampMixedGround(cx, cz).TundraShrub;
+
+        Assert.True(shrubFound > 0, "expected dead shrubs on permafrost across the sampled frozen chunks");
     }
 
     [Fact]
@@ -139,24 +151,28 @@ public sealed class FoliageTests
     }
 
     /// <summary>
-    /// Stamps ground cover over a synthetic chunk whose ground alternates stone / grass / sand,
-    /// and checks the gate both ways: every plant sits on its own ground and the biome agrees,
-    /// nothing lands on stone, and the counts are returned so the caller can require the plants
-    /// actually appeared (a zero-plant run must not pass vacuously).
+    /// Stamps ground cover over a synthetic chunk whose ground cycles stone / grass / sand, then
+    /// permafrost and stone each under a snow cell (the snow pass stamps before the foliage), and
+    /// checks the gate both ways: every plant sits on its own ground and the biome agrees, nothing
+    /// lands on stone, snow over stone is never taken, and the counts are returned so the caller
+    /// can require the plants actually appeared (a zero-plant run must not pass vacuously).
     /// </summary>
-    private static (int Grass, int Shrub) StampMixedGround(int chunkX, int chunkZ)
+    private static (int Grass, int DesertShrub, int TundraShrub) StampMixedGround(int chunkX, int chunkZ)
     {
         var tallGrass = TallGrass.Id;
         var deadShrub = DeadShrub.Id;
         var grass = ContentRegistry.RequireBlock("grass").Id;
         var sand = ContentRegistry.RequireBlock("sand").Id;
         var stone = ContentRegistry.RequireBlock("stone").Id;
+        var permafrost = ContentRegistry.RequireBlock("permafrost").Id;
+        var snow = ContentRegistry.RequireBlock("snow").Id;
 
         const int groundLy = 8;
         var cells = Chunk.Size * Chunk.Size;
         var groundY = WorldGenerationConfig.SeaLevel + 20;
         var heights = new int[cells];
         var ground = new byte[cells];
+        var cover = new byte[cells];
         var blocks = new byte[Chunk.BlockCount];
 
         for (var x = 0; x < Chunk.Size; x++)
@@ -164,29 +180,36 @@ public sealed class FoliageTests
         {
             var i = (x << Chunk.SizeShift) | z;
             heights[i] = groundY;
-            ground[i] = ((x + z) % 3) switch
+            (ground[i], cover[i]) = ((x + z) % 5) switch
             {
-                0 => stone,
-                1 => grass,
-                _ => sand,
+                0 => (stone, BlockType.Air),
+                1 => (grass, BlockType.Air),
+                2 => (sand, BlockType.Air),
+                3 => (permafrost, snow),
+                _ => (stone, snow),
             };
             blocks[Chunk.Idx(x, groundLy, z)] = ground[i];
+            blocks[Chunk.Idx(x, groundLy + 1, z)] = cover[i];
         }
 
         var column = new ColumnData(heights, new byte[cells], new float[cells], new float[cells]);
         FoliageGenerator.Stamp(blocks, column, chunkX * Chunk.Size, groundY - groundLy, chunkZ * Chunk.Size);
 
         var grassFound = 0;
-        var shrubFound = 0;
+        var desertShrubs = 0;
+        var tundraShrubs = 0;
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         {
+            var i = (x << Chunk.SizeShift) | z;
             var cell = blocks[Chunk.Idx(x, groundLy + 1, z)];
-            if (cell == BlockType.Air) continue;
+            if (cell == cover[i]) continue;
 
-            var surface = ground[(x << Chunk.SizeShift) | z];
+            var surface = ground[i];
             var wx = chunkX * Chunk.Size + x;
             var wz = chunkZ * Chunk.Size + z;
+            Assert.True(cover[i] == BlockType.Air || surface == permafrost,
+                $"the snow over {surface} at ({wx}, {wz}) was replaced by {cell}");
             if (cell == tallGrass)
             {
                 grassFound++;
@@ -196,9 +219,11 @@ public sealed class FoliageTests
             }
             else if (cell == deadShrub)
             {
-                shrubFound++;
-                Assert.Equal(sand, surface);
-                Assert.True(TerrainGenerator.IsDesert(wx, wz));
+                var biome = TerrainGenerator.BiomeAt(wx, wz);
+                Assert.True((surface == sand && biome == Biome.Desert) || (surface == permafrost && biome == Biome.Frozen),
+                    $"dead shrub at ({wx}, {wz}) over {surface} in {biome}");
+                if (surface == sand) desertShrubs++;
+                else tundraShrubs++;
             }
             else
             {
@@ -206,7 +231,7 @@ public sealed class FoliageTests
             }
         }
 
-        return (grassFound, shrubFound);
+        return (grassFound, desertShrubs, tundraShrubs);
     }
 
     private static List<(int Cx, int Cz)> FindChunks(Func<int, int, bool> predicate, int wanted)

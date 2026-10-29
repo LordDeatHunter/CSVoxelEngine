@@ -32,6 +32,9 @@ public static class TerrainGenerator
     /// <summary>Block everything below the soil band is made of.</summary>
     public static readonly byte RockBlock;
 
+    /// <summary>The frozen tundra's top and shallow soil under its snow, over stone.</summary>
+    public static readonly byte PermafrostBlock;
+
     /// <summary>Fluid the sea is filled with, up to and including sea level.</summary>
     public static readonly byte SeaBlock;
 
@@ -58,6 +61,7 @@ public static class TerrainGenerator
         SurfaceBlock = ContentRegistry.RequireBlock("grass").Id;
         SoilBlock = ContentRegistry.RequireBlock("dirt").Id;
         RockBlock = ContentRegistry.RequireBlock("stone").Id;
+        PermafrostBlock = ContentRegistry.RequireBlock("permafrost").Id;
         SeaBlock = ContentRegistry.RequireBlock("water").Id;
         MudBlock = ContentRegistry.RequireBlock("mud").Id;
         SandBlock = ContentRegistry.RequireBlock("sand").Id;
@@ -116,9 +120,6 @@ public static class TerrainGenerator
         warmth01 = 0.5f * (1f - BiomeClassifier.ColdOf(t)) + 0.5f * BiomeClassifier.WarmOf(t);
         wetness01 = BiomeClassifier.WetnessOf(h);
     }
-
-    /// <summary>Whether world column (x, z) is desert; the dead-shrub scatter asks here.</summary>
-    public static bool IsDesert(int x, int z) => BiomeAt(x, z) == Biome.Desert;
 
     /// <summary>Water level of a column that holds no water at all (<see cref="WaterBodies.NoWater"/>).</summary>
     public const int NoWater = WaterBodies.NoWater;

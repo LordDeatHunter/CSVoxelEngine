@@ -5,11 +5,12 @@ namespace VoxelEngine.WorldGen;
 /// Ocean is a flooded basin selected by continentalness; the six land biomes sit on a temperature
 /// x humidity grid (<see cref="BiomeClassifier.Classify"/>): Forest keeps the engine's original
 /// rolling grass/dirt/stone terrain, Desert builds dunes of sand over sandstone, Taiga is a cold
-/// spruce wood under snow, Frozen is a barren snow plain over rock with occasional ice, and Steppe
-/// and Savanna are the dry grasslands between them. Every selection comes from low-frequency noise
-/// fields, so regions are large and contiguous, and the height and surface material blend across
-/// their borders rather than stepping. The ordinals persist (ColumnFileCodec, the network column)
-/// and index per-biome tables, so a new biome is appended, never inserted.
+/// spruce wood under snow, Frozen is a tundra of permafrost under snow over stone, with dead shrubs
+/// and snags and occasional ice, and Steppe and Savanna are the dry grasslands between them. Every
+/// selection comes from low-frequency noise fields, so regions are large and contiguous, and the
+/// height and surface material blend across their borders rather than stepping. The ordinals
+/// persist (ColumnFileCodec, the network column) and index per-biome tables, so a new biome is
+/// appended, never inserted.
 /// </summary>
 public enum Biome : byte
 {
