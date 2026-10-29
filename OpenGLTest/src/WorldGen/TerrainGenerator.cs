@@ -9,7 +9,7 @@ namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// The 2D column build of world generation: the terrain palette, each column's land height (<see cref="LandHeight"/>, with
-/// its mountains and trenches) and the full <see cref="Compute"/> pass into <see cref="ColumnData"/> (heights with ravines
+/// its trenches and the highlands and mountain ranges of <see cref="TerrainRelief"/>) and the full <see cref="Compute"/> pass into <see cref="ColumnData"/> (heights with ravines
 /// cut in, dirt depth, the cave inputs, water levels, biomes and the corner climate), plus the column queries the rest of
 /// the engine calls it by. The biome climate split lives in <see cref="BiomeClassifier"/>, the lakes, rivers and water
 /// levels in <see cref="WaterBodies"/> and every noise channel in <see cref="TerrainNoise"/>; the queries here forward to
@@ -147,31 +147,6 @@ public static class TerrainGenerator
             TerrainNoise.OpennessNoise.GetNoise(x, z));
 
     /// <summary>
-    /// Blocks an occasional mountain range raises the forest floor at (x, z): a warped ridged
-    /// field (a peak where |noise| is near zero) gated by a rare mask, sharpened so only the crest
-    /// climbs. Fades out near the origin so the spawn stays a forest valley.
-    /// </summary>
-    private static float MountainHeight(float x, float z)
-    {
-        // MountainsEnabled is a compile-time const, so an early return on it would read as
-        // unreachable (see BiomeWeights); a multiplier keeps the toggle a real expression.
-        var enabled = WorldGenerationConfig.MountainsEnabled ? 1f : 0f;
-        var mask = MathUtils.SmoothStep(WorldGenerationConfig.MountainMaskStart,
-            WorldGenerationConfig.MountainMaskEnd, TerrainNoise.MountainMask.GetNoise(x, z)) * enabled;
-        if (mask <= 0f) return 0f;
-
-        var warpedX = x;
-        var warpedZ = z;
-        TerrainNoise.MountainWarp.DomainWarp(ref warpedX, ref warpedZ);
-        var ridge = 1f - MathF.Abs(TerrainNoise.MountainNoise.GetNoise(warpedX, warpedZ));
-        ridge = MathF.Pow(ridge, WorldGenerationConfig.MountainSharpness);
-
-        var clear = MathUtils.SmoothStep(WorldGenerationConfig.MountainSpawnClearStart,
-            WorldGenerationConfig.MountainSpawnClearEnd, MathF.Sqrt(x * x + z * z));
-        return ridge * mask * WorldGenerationConfig.MountainAmplitude * clear;
-    }
-
-    /// <summary>
     /// How many blocks a trench lowers the ocean floor at (x, z): a warped ridged band (|n| near
     /// zero) gives the gash line, a rarity mask makes trenches finite, and the parabolic profile
     /// gives steep walls like <see cref="RavineDepthAt"/>. The caller weights it by the ocean
@@ -203,17 +178,75 @@ public static class TerrainGenerator
     /// and ocean-ramp profiles blended by the biome weights and clamped above the waterline. A lake
     /// measures this at its own rim to choose where its water sits, so it must stay the exact value
     /// <see cref="Compute"/> carves into. <paramref name="forestHeight"/> is the pre-blend forest
-    /// profile, which the river carve reads to dry out as the land climbs.
+    /// profile, which the river carve reads to dry out as the land climbs; it includes the massifs
+    /// and the lone peaks (<see cref="TerrainPeaks.WithMassif"/>, <see cref="TerrainPeaks.WithLonePeak"/>),
+    /// so every later carve sees them.
     /// </summary>
     internal static float LandHeight(float worldX, float worldZ, out Biome biome,
+        out float oceanWeight, out float desertWeight, out float forestHeight) =>
+        LandHeightCore(worldX, worldZ, massifs: true, lonePeaks: true,
+            out biome, out oceanWeight, out desertWeight, out forestHeight);
+
+    /// <summary>
+    /// The land height without any hashed peak: the relief land a massif's acceptance and rise are
+    /// measured from. The massif site factory reads only this, never <see cref="LandHeight"/>, so it
+    /// never recurses into itself.
+    /// </summary>
+    internal static float ReliefLandHeight(float x, float z) =>
+        LandHeightCore(x, z, massifs: false, lonePeaks: false, out _, out _, out _, out _);
+
+    /// <summary><see cref="ReliefLandHeight(float, float)"/> with the outs of <see cref="LandHeight"/>,
+    /// so a caller can compare the two profiles out for out.</summary>
+    internal static float ReliefLandHeight(float x, float z, out Biome biome, out float oceanWeight,
+        out float desertWeight, out float forestHeight) =>
+        LandHeightCore(x, z, massifs: false, lonePeaks: false,
+            out biome, out oceanWeight, out desertWeight, out forestHeight);
+
+    /// <summary>
+    /// <see cref="ReliefLandHeight(float, float)"/> as a (x, z) height function, for the massif rim samples
+    /// (<see cref="TerrainSites.RimRange"/>). A static, non-capturing field, so reading it allocates nothing.
+    /// </summary>
+    internal static readonly Func<float, float, float> ReliefHeightAt =
+        static (x, z) => ReliefLandHeight(x, z);
+
+    /// <summary>
+    /// The land height with the massifs and without the lone peaks: the profile the lone-peak
+    /// flatness test reads. It includes massifs and never lone peaks, so the lone-peak site test
+    /// cannot recurse into itself.
+    /// </summary>
+    internal static float PreFeatureLandHeight(float x, float z) =>
+        LandHeightCore(x, z, massifs: true, lonePeaks: false, out _, out _, out _, out _);
+
+    /// <summary><see cref="PreFeatureLandHeight(float, float)"/> with the outs of <see cref="LandHeight"/>,
+    /// so a caller can compare the two profiles out for out.</summary>
+    internal static float PreFeatureLandHeight(float x, float z, out Biome biome, out float oceanWeight,
+        out float desertWeight, out float forestHeight) =>
+        LandHeightCore(x, z, massifs: true, lonePeaks: false,
+            out biome, out oceanWeight, out desertWeight, out forestHeight);
+
+    /// <summary>
+    /// <see cref="PreFeatureLandHeight(float, float)"/> as a (x, z) height function, for the lone-peak
+    /// rim samples (<see cref="TerrainSites.RimRange"/>). A static, non-capturing field, so reading it
+    /// allocates nothing.
+    /// </summary>
+    internal static readonly Func<float, float, float> PreFeatureHeightAt =
+        static (x, z) => PreFeatureLandHeight(x, z);
+
+    /// <summary>The body of <see cref="LandHeight"/>, with the massif and lone-peak terms switchable for
+    /// <see cref="ReliefLandHeight(float, float)"/> and <see cref="PreFeatureLandHeight(float, float)"/>.</summary>
+    private static float LandHeightCore(float worldX, float worldZ, bool massifs, bool lonePeaks, out Biome biome,
         out float oceanWeight, out float desertWeight, out float forestHeight)
     {
         // Forest floor: a broad swell plus a hill mass (a positive-only field gated by the
         // hill mask) so hills rise in patches and open flat valleys run between them. Open
         // regions (see ForestOpenness) flatten the hills and drop their trees, so the
         // forest alternates between rolling woodland and open grass instead of one mass.
-        // An occasional mountain range lifts the floor well above the hills. The floor
-        // stays above sea level, which is what makes a carved lake or river enclosed.
+        // The relief layer (TerrainRelief) sits on top: a highland lifts the base and steepens
+        // the hills, and mountain ranges run only along highlands, lifting the floor well above
+        // the hills; the spawn fades both out. Every relief term is exactly neutral where the
+        // highland weight is 0. The floor stays above sea level, which is what makes a carved
+        // lake or river enclosed.
+        var highland = TerrainRelief.HighlandWeight(worldX, worldZ);
         var swell = TerrainNoise.ForestSwellNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.ForestSwellAmplitude;
         var hillMask = MathUtils.SmoothStep(WorldGenerationConfig.HillMaskStart,
             WorldGenerationConfig.HillMaskEnd, TerrainNoise.HillMaskNoise.GetNoise(worldX, worldZ));
@@ -231,16 +264,30 @@ public static class TerrainGenerator
         biome = BiomeClassifier.BiomeWeights(worldX, worldZ, out oceanWeight, out desertWeight, out var aridWeight);
         var hillScale = 1f - WorldGenerationConfig.OpennessHillReduction * openness;
         hillScale *= 1f - WorldGenerationConfig.DryHillReduction * aridWeight;
-        forestHeight = WorldGenerationConfig.ForestBaseHeight + swell
+        // A highland steepens the hills; the arid reduction above still applies, so an arid
+        // highland reads as a lifted plateau
+        hillScale *= TerrainRelief.HillGain(highland);
+        // The lift goes right after the swell: at a highland weight of 0 it adds an exact 0f,
+        // so the float sums keep their association and unmasked land is bit-identical
+        var lift = TerrainRelief.HighlandLift(highland);
+        var reliefForest = WorldGenerationConfig.ForestBaseHeight + swell + lift
             + hill * WorldGenerationConfig.HillAmplitude * hillMask * hillScale
             + rough
-            + MountainHeight(worldX, worldZ);
+            + TerrainRelief.MountainHeight(worldX, worldZ, highland);
+        // Massifs (TerrainPeaks) rise from the forest profile alone, after the ranges. WithMassif is
+        // the exact identity outside every site's disc, so land outside them is bit-identical. The
+        // desert and ocean lerps below would dilute a massif, which is why a site is accepted only
+        // where its center and rim carry zero desert and ocean weight.
+        forestHeight = massifs ? TerrainPeaks.WithMassif(worldX, worldZ, reliefForest) : reliefForest;
+        // Lone peaks rise last, on top of the massifs, with the same exact identity outside their discs
+        if (lonePeaks) forestHeight = TerrainPeaks.WithLonePeak(worldX, worldZ, forestHeight);
         var heightF = forestHeight;
 
         if (desertWeight > 0f)
         {
-            // Smooth dunes on the swell, not the forest hills: a desert is its own profile
-            var dune = WorldGenerationConfig.ForestBaseHeight + swell
+            // Smooth dunes on the swell, not the forest hills: a desert is its own profile. It
+            // takes the highland lift too, so a highland desert does not sit in a basin.
+            var dune = WorldGenerationConfig.ForestBaseHeight + swell + lift
                 + TerrainNoise.DuneNoise.GetNoise(worldX, worldZ) * WorldGenerationConfig.DuneAmplitude;
             heightF = MathUtils.Lerp(heightF, dune, desertWeight);
         }
@@ -266,6 +313,13 @@ public static class TerrainGenerator
 
         return heightF;
     }
+
+    /// <summary>
+    /// <see cref="LandHeight"/> as a (x, z) height function, for the hashed-site rim samples
+    /// (<see cref="TerrainSites.RimRange"/>). A static, non-capturing field, so reading it allocates nothing.
+    /// </summary>
+    internal static readonly Func<float, float, float> LandHeightAt =
+        static (x, z) => LandHeight(x, z, out _, out _, out _, out _);
 
     /// <summary>Computes every 2D input for the chunk column at (chunkX, chunkZ).</summary>
     public static ColumnData Compute(int chunkX, int chunkZ)

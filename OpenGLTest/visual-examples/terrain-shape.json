@@ -1,0 +1,185 @@
+{
+  // Relief check (BIOMEGEN.md 13 phases A, B and C: highlands, linear mountain ranges, massifs and
+  // lone peaks, islands and archipelagos): run from
+  // OpenGLTest/ with
+  //   VOXEL_TIME=1090 VOXEL_SCRIPT=visual-examples/terrain-shape.json
+  // Shots land in visual/terrain-shape/. The whole run takes about eight minutes of clock, far
+  // longer than the afternoon after noon (147) lasts, so it starts at 1090, which is -110 one
+  // 1200 s day later, 43 s after sunrise (about 1047): measured, the first shot lands near 1106,
+  // with the sun up, the middle ones around noon (1347), and the last near 1580, before sunset
+  // (about 1647). Phase C's five shots moved the start down from 1160, which would have put the
+  // last of them past sunset. Starting at 147 instead leaves the later shots in dusk and night.
+  //
+  // The vantage points come from a headless probe over TerrainRelief.HighlandWeight,
+  // TerrainRelief.MountainHeight, RangeLattice and RangeDirection, WaterBodies.RiverWeight and
+  // TerrainGenerator.LandHeight (default seed):
+  //   origin_valley    - the spawn, inside ReliefSpawnClear: highland weight 0, so the land is the
+  //                      forest valley it was before the relief layer (ground 12)
+  //   forest_highland  - a wet-forest highland interior at weight 1 with no range and an open forest
+  //                      (ForestOpenness 1) around (-3367, 2084) (ground 50), from about 60 blocks up:
+  //                      lifted, broken hill country with valleys between, not spikes
+  //   range_along      - a forest range in range cell (0, 2), whose hashed direction is (0.58, 0.81)
+  //                      (yaw 54); the crest runs through (1050, 3635), (1191, 3870) and (1238, 3917)
+  //                      at ground 60-70 and stays above 15 blocks of range over 900 of 1200 blocks
+  //                      along that line. Filmed from its south-west end looking along it
+  //   range_across     - the same range from 300 blocks off its side, looking across it (yaw 144)
+  //   arid_plateau     - a steppe highland at weight 1 around (-4025, -4119) (ground 25-29, steppe and
+  //                      weight 1 for 120 blocks around): the
+  //                      arid hill reduction still flattens it, so it reads as a lifted plateau
+  //   highland_border  - a forest lowland at (-1465, 4833) (weight 0, ground 21) looking north-north-
+  //                      west (yaw 107) at the highland rising 300 blocks away (weight 1, ground 33)
+  //   river_wash       - a river at (-3000, 3240) in the lowland (forest floor 13, level 0) looking
+  //                      (yaw -146) up its channel toward (-3304, 3032), where the floor climbs to 36
+  //                      inside a highland, past RiverLowEnd, so the channel dries into a wash
+  //   range_cell_border - a taiga range crossing a range-cell border at (-30, 4387) (blend 0.45),
+  //                      from high above: the cell borders are jittered (MountainRangeCellWarp), so
+  //                      no straight north-south or east-west seam may show where the range turns
+  //   lod_vista        - a high view over the forest highland across the full-detail ring into the
+  //                      far LOD, for over-dark far valleys (LodSkyExposure)
+  // Phase B (hashed peaks, TerrainPeaks), from a headless probe over TerrainPeaks.MassifSiteAt,
+  // PeakSiteAt and TerrainGenerator.LandHeight (default seed). Inside +-6000 there are two accepted
+  // massifs: cell (0, -4), center (1131, -4900), radius 256, rise 89.8, crown land 120.6 at
+  // (1119, -4932), forest; and cell (0, -2), center (997, -2777), radius 179, crown 121.7, steppe.
+  // The shots use the first:
+  //   massif_far       - from 500 blocks west (ground 16) looking east (yaw 0) at the whole silhouette
+  //                      and its wobbled outline
+  //   massif_flank     - 210 blocks south of the center at y 75 (the flank ground there is about 25)
+  //                      looking up the south flank: spurs, bare rock above MountainRockHeight and
+  //                      snow toward MountainSnowFullHeight
+  //   massif_summit    - 58 blocks south of the crown at y 140 (below the cloud layer at 160) looking
+  //                      down onto the snow-capped crown
+  //   lone_peak        - the lone peak at (-2721, 3061) (radius 67, height 46, top 61 over a plain whose
+  //                      rim spreads 13..18) from 150 blocks west (ground 13)
+  //   massif_lod_vista - from 900 blocks west at y 150, across the full-detail ring onto the massif in
+  //                      the far LOD, for LOD holes and over-dark far valleys beside it
+  // No other scenario's teleport farther than 1536 blocks from the origin lies within 64 blocks of a
+  // massif or a lone peak.
+  // Phase C (islands and archipelagos, TerrainIslands), from a headless probe over
+  // BiomeClassifier.PreIslandOceanWeight and BiomeWeights (island land: the pre-island ocean weight
+  // past OceanShoreWeight, the folded one under it), TerrainIslands.TryGetArchipelago,
+  // FootprintWeight and ArchipelagoWeight, TerrainGenerator.LandHeight and ColumnCache.Get (default
+  // seed). The islands below have no continental dry land within 100 blocks:
+  //   island_far       - a large island centered near (4617, 4) (core x 4368..4776, z -120..120),
+  //                      highest at (4752, -72) (LandHeight 36.5, forest; its west end is savanna
+  //                      and desert, stone pines and cacti on sand), from 250 blocks off its west
+  //                      shore at y 40 looking east (yaw 0)
+  //   island_beach     - low (y 6.5) over deep water off the same island's west shore at
+  //                      (4325, -75), looking north (yaw 85) along the sand terraces of its rim
+  //   island_knoll     - a small knoll centered near (5572, 20) (core 16 blocks across, highest 4.0,
+  //                      forest: a sand knoll under one tree), from 50 blocks south-west at y 8.5
+  //                      (yaw 51)
+  //   archipelago_chain - the accepted archipelago in cell (2, 1): center (3776, 2601), half length
+  //                      761, half width 259, direction yaw -28, a taiga chain of islands at 371 and
+  //                      83 blocks before the center and at it (highest 38.7, 28.7 and 10.2) set in
+  //                      pack ice; from y 140 at (3158, 2929), 685 blocks before the center, looking
+  //                      along the chain (pitch -25)
+  //   island_lod_vista - from 900 blocks west of the large island at y 150 (yaw 0), across the
+  //                      full-detail ring onto it and its neighbors in the far LOD, for LOD holes,
+  //                      floating LOD and a dry, sunken ring around an island at range
+  // The same probe audited every other scenario's teleports farther than 1536 blocks from the
+  // origin: only icebergs.json and biomes.json's pack_ice / pack_ice_low stand within 64 blocks of
+  // island land (an island now rises just west of the iceberg row, around (-1100, -2510)). Both
+  // were re-run: the bergs, the push and the pack-ice gradient still read, so they carry a note
+  // instead of a move.
+  // The camera flies (so it hovers instead of falling), every teleport is followed by a wait while
+  // the streaming ring and the far LOD fill around the new position, and the repeat teleport
+  // restores the exact pose before the frame is taken.
+  "steps": [
+    { "op": "fly" },
+
+    { "op": "teleport", "pos": [0.5, 45.5, 60.5], "yaw": -90, "pitch": -14 },
+    { "op": "wait", "seconds": 15 },
+    { "op": "teleport", "pos": [0.5, 45.5, 60.5], "yaw": -90, "pitch": -14 },
+    { "op": "screenshot", "name": "origin_valley", "hideHud": true },
+
+    { "op": "teleport", "pos": [-3450.5, 110.5, 2000.5], "yaw": 45, "pitch": -16 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [-3450.5, 110.5, 2000.5], "yaw": 45, "pitch": -16 },
+    { "op": "screenshot", "name": "forest_highland", "hideHud": true },
+
+    { "op": "teleport", "pos": [1017.5, 120.5, 3627.5], "yaw": 54, "pitch": -12 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [1017.5, 120.5, 3627.5], "yaw": 54, "pitch": -12 },
+    { "op": "screenshot", "name": "range_along", "hideHud": true },
+
+    { "op": "teleport", "pos": [1434.5, 110.5, 3696.5], "yaw": 144, "pitch": -10 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [1434.5, 110.5, 3696.5], "yaw": 144, "pitch": -10 },
+    { "op": "screenshot", "name": "range_across", "hideHud": true },
+
+    { "op": "teleport", "pos": [-4100.5, 70.5, -4200.5], "yaw": 45, "pitch": -14 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [-4100.5, 70.5, -4200.5], "yaw": 45, "pitch": -14 },
+    { "op": "screenshot", "name": "arid_plateau", "hideHud": true },
+
+    { "op": "teleport", "pos": [-1421.5, 60.5, 4690.5], "yaw": 107, "pitch": -6 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [-1421.5, 60.5, 4690.5], "yaw": 107, "pitch": -6 },
+    { "op": "screenshot", "name": "highland_border", "hideHud": true },
+
+    { "op": "teleport", "pos": [-2950.5, 55.5, 3275.5], "yaw": -146, "pitch": -10 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [-2950.5, 55.5, 3275.5], "yaw": -146, "pitch": -10 },
+    { "op": "screenshot", "name": "river_wash", "hideHud": true },
+
+    { "op": "teleport", "pos": [-30.5, 150.5, 4230.5], "yaw": 90, "pitch": -40 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [-30.5, 150.5, 4230.5], "yaw": 90, "pitch": -40 },
+    { "op": "screenshot", "name": "range_cell_border", "hideHud": true },
+
+    { "op": "teleport", "pos": [-3450.5, 150.5, 2000.5], "yaw": 45, "pitch": -8 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [-3450.5, 150.5, 2000.5], "yaw": 45, "pitch": -8 },
+    { "op": "screenshot", "name": "lod_vista", "hideHud": true },
+
+    { "op": "teleport", "pos": [631.5, 50.5, -4900.5], "yaw": 0, "pitch": 0 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [631.5, 50.5, -4900.5], "yaw": 0, "pitch": 0 },
+    { "op": "screenshot", "name": "massif_far", "hideHud": true },
+
+    { "op": "teleport", "pos": [1131.5, 75.5, -5110.5], "yaw": 80, "pitch": 6 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [1131.5, 75.5, -5110.5], "yaw": 80, "pitch": 6 },
+    { "op": "screenshot", "name": "massif_flank", "hideHud": true },
+
+    { "op": "teleport", "pos": [1119.5, 140.5, -4990.5], "yaw": 90, "pitch": -20 },
+    { "op": "wait", "seconds": 15 },
+    { "op": "teleport", "pos": [1119.5, 140.5, -4990.5], "yaw": 90, "pitch": -20 },
+    { "op": "screenshot", "name": "massif_summit", "hideHud": true },
+
+    { "op": "teleport", "pos": [-2871.5, 30.5, 3061.5], "yaw": 0, "pitch": 3 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [-2871.5, 30.5, 3061.5], "yaw": 0, "pitch": 3 },
+    { "op": "screenshot", "name": "lone_peak", "hideHud": true },
+
+    { "op": "teleport", "pos": [231.5, 150.5, -4900.5], "yaw": 0, "pitch": -6 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [231.5, 150.5, -4900.5], "yaw": 0, "pitch": -6 },
+    { "op": "screenshot", "name": "massif_lod_vista", "hideHud": true },
+
+    { "op": "teleport", "pos": [4120.5, 40.5, -9.5], "yaw": 0, "pitch": -4 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [4120.5, 40.5, -9.5], "yaw": 0, "pitch": -4 },
+    { "op": "screenshot", "name": "island_far", "hideHud": true },
+
+    { "op": "teleport", "pos": [4325.5, 6.5, -75.5], "yaw": 85, "pitch": -8 },
+    { "op": "wait", "seconds": 15 },
+    { "op": "teleport", "pos": [4325.5, 6.5, -75.5], "yaw": 85, "pitch": -8 },
+    { "op": "screenshot", "name": "island_beach", "hideHud": true },
+
+    { "op": "teleport", "pos": [5540.5, 8.5, -19.5], "yaw": 51, "pitch": -8 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [5540.5, 8.5, -19.5], "yaw": 51, "pitch": -8 },
+    { "op": "screenshot", "name": "island_knoll", "hideHud": true },
+
+    { "op": "teleport", "pos": [3158.5, 140.5, 2929.5], "yaw": -28, "pitch": -25 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [3158.5, 140.5, 2929.5], "yaw": -28, "pitch": -25 },
+    { "op": "screenshot", "name": "archipelago_chain", "hideHud": true },
+
+    { "op": "teleport", "pos": [3700.5, 150.5, 4.5], "yaw": 0, "pitch": -6 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "teleport", "pos": [3700.5, 150.5, 4.5], "yaw": 0, "pitch": -6 },
+    { "op": "screenshot", "name": "island_lod_vista", "hideHud": true }
+  ]
+}

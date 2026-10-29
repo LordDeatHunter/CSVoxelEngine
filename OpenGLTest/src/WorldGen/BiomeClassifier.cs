@@ -46,17 +46,41 @@ internal static class BiomeClassifier
     /// it flattens the steppe, the savanna and the tundra into plains. The cold biomes ride the
     /// forest's height profile, so they need no weight of their own here. Every weight is smooth,
     /// which is what lets <see cref="TerrainGenerator.Compute"/> lerp the height across a border
-    /// instead of stepping.
+    /// instead of stepping. <paramref name="oceanWeight"/> is the folded weight: the pre-island ocean
+    /// weight (<see cref="PreIslandOceanWeight"/>) times one minus the island land weight
+    /// (<see cref="TerrainIslands.LandWeight(float, float, float)"/>), so an island is ordinary land of
+    /// its climate to every consumer, while land and the coast band, where the island term is exactly
+    /// 0, keep their bits.
     /// </summary>
     public static Biome BiomeWeights(float x, float z, out float oceanWeight, out float desertWeight,
         out float aridWeight)
+    {
+        oceanWeight = PreIslandOceanWeight(x, z);
+        var island = TerrainIslands.LandWeight(x, z, oceanWeight);
+        // No multiply when the island term is 0, so land, the coast band and the spawn keep their bits.
+        if (island > 0f) oceanWeight *= 1f - island;
+        return WeightsForOcean(x, z, oceanWeight, out desertWeight, out aridWeight);
+    }
+
+    /// <summary>The ocean weight before the island fold: the share of continentalness that falls
+    /// low. The one reader of <see cref="TerrainNoise.ContinentNoise"/> for the biome weights.</summary>
+    internal static float PreIslandOceanWeight(float x, float z)
     {
         // Not "if (!enabled) return": the flag is a compile-time const, and a dead branch would
         // read as unreachable. Zeroing the weights keeps the toggle a real expression.
         var gate = WorldGenerationConfig.BiomesEnabled ? 1f : 0f;
         var continent = TerrainNoise.ContinentNoise.GetNoise(x, z);
-        oceanWeight = (1f - MathUtils.SmoothStep(WorldGenerationConfig.ContinentOceanStart,
+        return (1f - MathUtils.SmoothStep(WorldGenerationConfig.ContinentOceanStart,
             WorldGenerationConfig.ContinentOceanEnd, continent)) * gate;
+    }
+
+    /// <summary>The desert and arid weights and the biome of (x, z) for a given (already folded)
+    /// ocean weight: the climate half of
+    /// <see cref="BiomeWeights(float, float, out float, out float, out float)"/>.</summary>
+    internal static Biome WeightsForOcean(float x, float z, float oceanWeight, out float desertWeight,
+        out float aridWeight)
+    {
+        var gate = WorldGenerationConfig.BiomesEnabled ? 1f : 0f;
 
         // One climate sample feeds every ramp.
         SampleClimate(x, z, out var temperature, out var humidity);

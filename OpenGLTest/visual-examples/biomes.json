@@ -27,16 +27,22 @@
   //   tundra         - a flat frozen plain around (-764, 1348), ground 11-13, filmed from low
   //                    height looking north (+Z): dead_tree snags (e.g. (-764, 12, 1336)) and sparse
   //                    dead shrubs poke out of a 4-5 layer snow cover over permafrost
-  //   tundra_permafrost - a frozen ravine running along X near z -138 (floor about 16-20), filmed
-  //                    from inside it looking north (+Z) at its north wall (rim about 40-44 at
-  //                    z -128, soil 3-4): the permafrost band shows between the snow on the rim and
-  //                    the bare stone of the stripped ravine wall below
+  //   tundra_permafrost - a frozen ravine running north-east through (-1110, 816) (floor -9, bed
+  //                    16), filmed from its south rim (ground 15 at z 806) looking north (+Z)
+  //                    across it at its north wall (rim 17 at z 824, soil 2-4): the permafrost band
+  //                    shows between the snow on the rim and the bare stone of the stripped ravine
+  //                    wall below. (The ravine at (-888, -138) this shot used was cut into a
+  //                    mountain the relief layer removed: ranges now rise only inside highlands.)
   //   pack_ice       - the pack-ice edge of a cold sea, from the open water at (-952, -2536), 120
   //                    blocks up, looking up the cold gradient (north-west, toward -X and +Z) at the
   //                    band centered near (-1090, -2440): open leads and loose floes thicken into the
   //                    solid, snow-covered sheet past the freeze line (SnowGenerator.IsFrozenWater)
   //   pack_ice_low   - a grazing shot just above an open lead at (-1056, -2456), inside the band,
   //                    looking the same way across the floes to the sheet behind them
+  //                    (since phase C's islands (BIOMEGEN 13.2) a wooded island rises out of the sea
+  //                    just south-west of the band, around (-1100, -2510), and small islands stand
+  //                    in the sheet beyond; pack_ice shows the first in the foreground. The open
+  //                    leads, the floes and the sheet still read, so the shots stay where they are)
   // The camera flies (so it hovers instead of falling), every teleport is followed by a wait while
   // the streaming ring fills around the new position, and the repeat teleport restores the exact
   // pose before the frame is taken.
@@ -92,9 +98,9 @@
     { "op": "teleport", "pos": [-764.5, 19.5, 1318.5], "yaw": 90, "pitch": -10 },
     { "op": "screenshot", "name": "tundra", "hideHud": true },
 
-    { "op": "teleport", "pos": [-888.5, 40.5, -140.5], "yaw": 90, "pitch": -8 },
+    { "op": "teleport", "pos": [-1110.5, 22.5, 806.5], "yaw": 90, "pitch": -18 },
     { "op": "wait", "seconds": 30 },
-    { "op": "teleport", "pos": [-888.5, 40.5, -140.5], "yaw": 90, "pitch": -8 },
+    { "op": "teleport", "pos": [-1110.5, 22.5, 806.5], "yaw": 90, "pitch": -18 },
     { "op": "screenshot", "name": "tundra_permafrost", "hideHud": true },
 
     { "op": "teleport", "pos": [-951.5, 120.5, -2535.5], "yaw": 144, "pitch": -35 },

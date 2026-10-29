@@ -102,41 +102,36 @@ internal static class WaterBodies
     internal static float LakeSample(float x, float z, out int surface, out int floor)
     {
         const int cell = WorldGenerationConfig.LakeCellBlocks;
-        var gx0 = MathUtils.FloorToInt(x / cell);
-        var gz0 = MathUtils.FloorToInt(z / cell);
+        TerrainSites.CellRange(x, cell, WorldGenerationConfig.LakeMaxRadius, out var gxMin, out var gxMax);
+        TerrainSites.CellRange(z, cell, WorldGenerationConfig.LakeMaxRadius, out var gzMin, out var gzMax);
         var best = 0f;
         surface = NoWater;
         floor = 0;
 
-        for (var dx = -1; dx <= 1; dx++)
-        for (var dz = -1; dz <= 1; dz++)
+        for (var gx = gxMin; gx <= gxMax; gx++)
+        for (var gz = gzMin; gz <= gzMax; gz++)
         {
-            var gx = gx0 + dx;
-            var gz = gz0 + dz;
-            var h = SplitMix64.Hash(gx, gz, WorldGenerationConfig.Seed ^ LakeSalt);
-            if (Unit(h, 0) >= WorldGenerationConfig.LakeChance) continue;
-
-            var centerX = gx * cell + Unit(h, 1) * cell;
-            var centerZ = gz * cell + Unit(h, 2) * cell;
+            if (!TerrainSites.TryRoll(gx, gz, cell, LakeSalt, WorldGenerationConfig.LakeChance,
+                    WorldGenerationConfig.LakeRadiusSkew, out _, out var centerX, out var centerZ, out var size))
+                continue;
             if (MathF.Abs(centerX) < WorldGenerationConfig.LakeSpawnClearRadius
                 && MathF.Abs(centerZ) < WorldGenerationConfig.LakeSpawnClearRadius)
                 continue;
 
-            var size = MathF.Pow(Unit(h, 3), WorldGenerationConfig.LakeRadiusSkew);
             var nominal = MathUtils.Lerp(WorldGenerationConfig.LakeMinRadius,
                 WorldGenerationConfig.LakeMaxRadius, size);
             var ox = x - centerX;
             var oz = z - centerZ;
             var d2 = ox * ox + oz * oz;
 
-            // The wobble below only ever pulls the shoreline inside `nominal`, so a column past it
-            // is out without paying for the rim samples that choosing a water level costs.
+            // A column past `nominal` is out (this cull clips any outward wobble there) without
+            // paying for the rim samples that choosing a water level costs.
             if (d2 >= nominal * nominal) continue;
             if (!TryLakeSite(centerX, centerZ, nominal, size, out var siteSurface, out var siteFloor))
                 continue;
 
-            var radius = nominal * (1f + WorldGenerationConfig.LakeShapeAmplitude
-                * TerrainNoise.LakeShapeNoise.GetNoise(x, z));
+            var radius = TerrainSites.Wobble(nominal, WorldGenerationConfig.LakeShapeAmplitude,
+                TerrainNoise.LakeShapeNoise, x, z);
             if (d2 >= radius * radius) continue;
 
             var w = MathUtils.SmoothStep(1f - MathF.Sqrt(d2) / radius);
@@ -166,16 +161,7 @@ internal static class WaterBodies
     private static bool TryLakeSite(float centerX, float centerZ, float radius, float size,
         out int surface, out int floor)
     {
-        var rimMin = TerrainGenerator.LandHeight(centerX, centerZ, out _, out _, out _, out _);
-        var rimMax = rimMin;
-        for (var k = 0; k < 8; k++)
-        {
-            var angle = k * (MathF.Tau / 8f);
-            var land = TerrainGenerator.LandHeight(centerX + MathF.Cos(angle) * radius,
-                centerZ + MathF.Sin(angle) * radius, out _, out _, out _, out _);
-            if (land < rimMin) rimMin = land;
-            if (land > rimMax) rimMax = land;
-        }
+        TerrainSites.RimRange(centerX, centerZ, radius, TerrainGenerator.LandHeightAt, out var rimMin, out var rimMax);
 
         surface = 0;
         floor = 0;
@@ -220,10 +206,6 @@ internal static class WaterBodies
 
         return false;
     }
-
-    /// <summary>One 0..1 hash value for a candidate, re-mixed by <paramref name="index"/>.</summary>
-    private static float Unit(ulong h, int index) =>
-        (SplitMix64.Mix(h + (ulong)index * 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
 
     /// <summary>0..1 river weight: a warped ridge band (|noise| near zero) gated by a rarity mask.</summary>
     internal static float RiverWeight(float x, float z)

@@ -36,6 +36,17 @@ public static class WorldGenerationConfig
     public const int ColumnCacheCapacity = 16384;
     public const int ColumnCacheGenerations = 4;
 
+    // TerrainPeaks' massif verdict cache: one TerrainSite per massif cell (an accepted site or
+    // none), a pure function of (cell, seed), so a column scan tests each candidate once per cell
+    // instead of once per column. An entry is a few floats; GENERATIONS matches the other sites.
+    public const int MassifSiteCacheCapacity = 1024;
+    public const int MassifSiteCacheGenerations = 4;
+
+    // TerrainPeaks' lone-peak verdict cache: one TerrainSite per lone-peak cell, a pure function of
+    // (cell, seed). Its factory samples the land nine times, so caching it keeps that off each column.
+    public const int PeakSiteCacheCapacity = 4096;
+    public const int PeakSiteCacheGenerations = 4;
+
     // Blocks of dirt under the grass: DirtDepthBase +- DirtDepthVariation, varying slowly over the map
     public const float DirtDepthBase = 3f;
     public const float DirtDepthVariation = 1.5f;
@@ -321,29 +332,137 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float ValleyRoughFrequency = 1f / 90f;  // small roughness on the valley floors
     public const float ValleyRoughAmplitude = 2.5f;      // blocks
 
+    // --- Relief: highlands (BIOMEGEN 13.1) ---
+    // A continent-scale highland weight (TerrainRelief.HighlandWeight), orthogonal to the climate:
+    // it lifts the base height of the forest and dune profiles and multiplies the hill amplitude,
+    // and mountain ranges rise only where it is positive. Every term it drives is exactly neutral
+    // where the weight is 0 (no lift, a hill gain of 1, no range), so unmasked land is unchanged.
+    // The spawn fades the weight out (ReliefSpawnClear*), so the origin stays a lowland.
+    public const bool HighlandsEnabled = true;
+    public const float ReliefFrequency = 1f / 5000f;       // highland/lowland wavelength (2 octaves)
+    public const float HighlandMaskStart = 0.1f;           // lowland below this relief value...
+    public const float HighlandMaskEnd = 0.35f;            // ...full highland above it
+    public const float HighlandBaseLift = 16f;             // blocks a full highland raises the base
+    public const float HighlandHillGain = 1.0f;            // extra share of the hill amplitude at full highland
+    // No highland this close to the origin (faded in by the second radius), and through the
+    // highland weight no mountain range either, so the spawn view stays a forest valley and the
+    // land around it (where most visual-examples scenarios stand) is the land without the relief
+    // layer. The highlands begin on the horizon the far LOD shows from the spawn.
+    public const float ReliefSpawnClearStart = 1536f;
+    public const float ReliefSpawnClearEnd = 2560f;
+
     // --- Forest mountains (occasional, not common) ---
-    // Rare tall ranges: a warped ridged field (peaks where |noise| is near zero) gated by a
-    // low-frequency, high-threshold mask, so an occasional mountain rises out of the rolling
-    // hills. The ridge is raised to MountainSharpness so only the crest climbs, leaving the
-    // hills around it intact.
+    // Tall ranges that run only along highlands: a warped ridged field (peaks where |noise| is
+    // near zero) riding a lower-frequency spine, sampled stretched along a hashed direction per
+    // MountainRangeCellBlocks cell so a range reads as a chain, and gated by a rarity mask times
+    // the highland weight. The ridge is raised to MountainSharpness so only the crest climbs,
+    // leaving the hills around it intact.
     public const bool MountainsEnabled = true;
     public const float MountainFrequency = 1f / 240f;     // ridge line spacing
     public const float MountainWarpFrequency = 1f / 420f;  // how tightly a range winds
     public const float MountainWarpAmplitude = 30f;        // blocks of sideways displacement
     public const float MountainMaskFrequency = 1f / 1600f; // where ranges sit versus plain hills
-    public const float MountainMaskStart = 0.38f;          // no mountain below this...
-    public const float MountainMaskEnd = 0.62f;            // ...a full range above it
+    // The rarity mask is multiplied by the highland weight and mostly saturates inside one, so it
+    // only breaks a range here and there; the narrow spine is what keeps ranges apart
+    public const float MountainMaskStart = -0.3f;          // no mountain below this...
+    public const float MountainMaskEnd = 0.1f;             // ...a full range above it
     public const float MountainAmplitude = 60f;            // blocks a fully-masked crest adds
     public const float MountainSharpness = 3f;             // >1 sharpens the crest into a peak
+    public const int MountainRangeCellBlocks = 1536;       // one range direction per cell this wide
+    public const float MountainRangeBlend = 0.15f;         // half-width of the cell-border crossfade, in cell fractions (< 0.5)
+    // Jitters only the cell lookup, so the cell borders wander instead of running straight
+    // north-south and east-west (the amplitude is a FastNoiseLite domain-warp value, not blocks)
+    public const float MountainRangeCellWarpFrequency = 1f / 3000f;
+    public const float MountainRangeCellWarpAmplitude = 1600f;
+    public const float MountainRangeStretch = 6f;          // along-range wavelength multiplier
+    public const float MountainSpineFrequency = 1f / 1400f; // the lower-frequency spine a range's ridges ride
+    public const float MountainSpineSharpness = 2.5f;      // >1 narrows the spine
+    public const float MountainSpineFloor = 0.3f;          // share of the ridge left where the spine is high but the ridge is low
     // Above this altitude a forest column turns to bare rock, so a high crest reads as a rocky
-    // mountain instead of another tree-covered hill (trees also stop at TreeMaxGroundHeight).
+    // mountain instead of another tree-covered hill (trees also stop at each species'
+    // worldgen.maxGround).
     public const float MountainRockHeight = 56f;
     // Height at which a peak wears full snow whatever its climate (SnowGenerator.ColdWeightAt)
     public const int MountainSnowFullHeight = 96;
-    // No crests this close to the origin (faded in by the second radius), so the spawn view
-    // stays a forest valley rather than a random summit.
-    public const float MountainSpawnClearStart = 48f;
-    public const float MountainSpawnClearEnd = 120f;
+
+    // --- Relief: massifs and lone peaks (BIOMEGEN 13.1, phase B) ---
+    // Hashed sites (TerrainSites, TerrainPeaks) summed into the forest profile after the ranges.
+    // A massif is a rare, large mountain: each accepted site rolls an absolute summit height and
+    // rises from the relief land at its center to it, a pointed body with spurred flanks inside a
+    // wobbled outline. A site is accepted only clear of the spawn, its neighbors, the ocean and the
+    // desert, and only where it stands well clear of its rim. Every term is exactly 0 outside a
+    // site's disc and within the spawn clearing (ReliefSpawnClear*).
+    public const bool MassifsEnabled = true;
+    public const int MassifCellBlocks = 1536;              // one massif candidate per cell this wide
+    public const float MassifChance = 0.35f;               // chance a cell rolls a candidate
+    public const float MassifSizeSkew = 1.5f;              // >1 skews the radius toward small
+    public const float MassifMinRadius = 160f;             // blocks, the smallest nominal radius
+    public const float MassifMaxRadius = 360f;             // blocks, the largest nominal radius
+    public const float MassifMinSummit = 96f;              // lowest absolute summit a site rolls
+    // Keep at or below ReliefCeilingHeight - ReliefCeilingKnee, so the ceiling never shapes a crown
+    public const float MassifMaxSummit = 128f;
+    public const float MassifMinRise = 48f;                // blocks the summit must stand above its center and its rim
+    public const float MassifSharpness = 1.4f;             // >1 points the crown
+    public const float MassifMinSpacing = 720f;            // blocks between two candidates (lowest hash wins)
+    public const float MassifShapeFrequency = 1f / 220f;   // how fast the outline wobbles
+    public const float MassifShapeAmplitude = 0.25f;       // share of the radius the outline pulls inward
+    public const float MassifSpurFrequency = 1f / 110f;    // spur ridge spacing on the flanks
+    // At or below 0.25 keeps the center the highest point of the term
+    public const float MassifSpurShare = 0.25f;
+
+    // A lone peak is a small, steep peak standing on flat land: accepted only clear of the spawn,
+    // its neighbors, every massif, the ocean and the desert, and only where the land under its rim
+    // (without lone peaks) is flat and above the sea.
+    public const bool LonePeaksEnabled = true;
+    public const int PeakCellBlocks = 448;                 // one lone-peak candidate per cell this wide
+    public const float PeakChance = 0.45f;                 // chance a cell rolls a candidate
+    public const float PeakSizeSkew = 1.3f;                // >1 skews the radius toward small
+    public const float PeakMinRadius = 32f;                // blocks, the smallest nominal radius
+    public const float PeakMaxRadius = 72f;                // blocks, the largest nominal radius
+    public const float PeakMinHeight = 28f;                // blocks the lowest peak adds at its center
+    public const float PeakMaxHeight = 56f;                // blocks the tallest peak adds at its center
+    public const float PeakSharpness = 1.6f;               // >1 points the peak
+    // Largest rim height spread (center included) a site may stand on: fewer, flatter-footed peaks below
+    public const float PeakSiteFlatness = 6f;
+    public const float PeakMinSpacing = 144f;              // blocks between two candidates (lowest hash wins)
+    public const float PeakShapeFrequency = 1f / 40f;      // how fast the outline wobbles
+    public const float PeakShapeAmplitude = 0.25f;         // share of the radius the outline pulls inward
+
+    // A soft ceiling on the forest profile wherever a hashed site raises it: the identity up to
+    // ReliefCeilingHeight - ReliefCeilingKnee, then easing toward ReliefCeilingHeight without ever
+    // reaching it. Keep ReliefCeilingHeight below SkyConfig.CloudHeight, so no peak pierces the
+    // cloud layer.
+    public const float ReliefCeilingHeight = 148f;
+    public const float ReliefCeilingKnee = 20f;
+
+    // --- Islands and archipelagos (BIOMEGEN 13.2, phase C) ---
+    // An ocean-gated island term: oceanWeight' = oceanWeight * (1 - islandLand), folded into the one
+    // place the ocean weight is produced (BiomeClassifier.BiomeWeights), so every consumer sees the
+    // same island. It is exactly 0 wherever the pre-island ocean weight is at or below
+    // OceanShoreWeight (land and the coast band keep their bits) and inside ReliefSpawnClear*.
+    // Two channels rise out of the deep water: a large one (islands that carry hills) and a small
+    // one (knolls and islets); a hashed archipelago footprint lowers the small channel's threshold
+    // and raises its gain along an elongated ellipse, so islets string out into chains.
+    public const bool IslandsEnabled = true;
+    public const float IslandLargeFrequency = 1f / 1200f;  // large-island noise spacing
+    public const float IslandLargeStart = 0.45f;           // large-island noise where land begins...
+    public const float IslandLargeEnd = 0.90f;             // ...and where it is full
+    public const float IslandLargeGain = 1.25f;            // >1 so a deep core saturates to whole land
+    public const float IslandSmallFrequency = 1f / 420f;   // small-island noise spacing
+    public const float IslandSmallStart = 0.55f;           // small-island noise where land begins...
+    public const float IslandSmallEnd = 0.85f;             // ...and where it is full
+    public const float IslandSmallGain = 0.8f;             // small islands stay low outside an archipelago
+    public const bool ArchipelagosEnabled = true;
+    public const int ArchipelagoCellBlocks = 1792;         // one archipelago candidate per cell this wide
+    public const float ArchipelagoChance = 0.3f;           // chance a cell rolls a candidate
+    public const float ArchipelagoSizeSkew = 1f;           // >1 skews the length toward short
+    public const float ArchipelagoMinHalfLength = 480f;    // blocks, the shortest chain's half length
+    public const float ArchipelagoMaxHalfLength = 860f;    // blocks, the longest chain's half length
+    public const float ArchipelagoMinAspect = 0.2f;        // half-width over half-length, the narrowest...
+    public const float ArchipelagoMaxAspect = 0.45f;       // ...and the widest
+    public const float ArchipelagoCoreShare = 0.5f;        // share of the ellipse at full archipelago weight
+    public const float ArchipelagoThresholdDrop = 0.45f;   // how far the small channel's ramp drops inside
+    public const float ArchipelagoSmallGain = 1.25f;       // the small channel's gain inside an archipelago
 
     // --- Forest openness (woodland versus open grass) ---
     // A low-frequency mask that says how open the forest is at (x, z). Trees thin out to none

@@ -21,6 +21,10 @@ public sealed class SplitMix64(ulong seed)
     public static ulong Hash(int x, int z, int seed) =>
         Mix(((ulong)(uint)x << 32) | (uint)z) ^ Mix((ulong)(uint)seed * 0x9E3779B97F4A7C15UL);
 
+    /// <summary>One 0..1 hash value for a candidate hash, re-mixed by <paramref name="index"/>.</summary>
+    public static float Unit(ulong h, int index) =>
+        (Mix(h + (ulong)index * 0x9E3779B97F4A7C15UL) >> 40) * (1f / (1 << 24));
+
     public ulong NextULong()
     {
         _state += 0x9E3779B97F4A7C15UL;

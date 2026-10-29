@@ -1,0 +1,56 @@
+{
+  // Drifting icebergs at the pack-ice edge: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/icebergs.json
+  // Shots land in visual/icebergs/. VOXEL_TIME=147 is noon.
+  //
+  // The sea comes from a headless probe over ColumnCache.Get, SnowGenerator.ColdWeightAt and
+  // SnowGenerator.IsFrozenWater (default seed): around (-1045, -2470) the ocean is open, at sea
+  // level, at least nine blocks deep and inside the iceberg spawn band (IcebergSpawnRule), with the
+  // first floes of the pack ice about 30 blocks north-west (toward -X and +Z, see biomes.json's
+  // pack_ice shots). The three size classes are spawned (the `spawn` op's `size` 1..3 picks the
+  // variant) about 15 blocks apart along X at z -2470. Since phase C's islands (BIOMEGEN 13.2) a
+  // wooded, sand-rimmed island rises just west and south-west of the row (its shore about 15
+  // blocks west of the small berg, around (-1100, -2510)), and small islands stand in the pack ice
+  // beyond: it shows at the edge of sizes and behind push_before, but every berg still spawns in
+  // open water and the push still moves the small one, so the spawns stay where they are:
+  //   sizes / wobble - the three bergs from the south, looking north (+Z) toward the pack ice;
+  //                    the two shots 1.5 s apart show the render-only bob and tilt
+  //   drift          - ten seconds later, each berg moved along its wind drift
+  //   standing       - out of flight, dropped onto the large berg: the player stands on its steps
+  //   push_before /
+  //   push_after     - swimming into the west side of the small berg for four seconds pushes it
+  //                    a little east (a big berg would barely move)
+  //   reflection     - low over the water, the bergs mirrored in it
+  // The camera flies (so it hovers) except while standing and swimming; every spawn waits for the
+  // chunks to stream in first, since a berg is refused over an unloaded or solid cell.
+  "steps": [
+    { "op": "teleport", "pos": [-1042.5, 16.0, -2500.5], "yaw": 90, "pitch": -15 },
+    { "op": "fly" },
+    { "op": "wait", "seconds": 6 },
+    { "op": "spawn", "entity": "iceberg", "pos": [-1059.5, -2469.5], "size": 1 },
+    { "op": "spawn", "entity": "iceberg", "pos": [-1044.5, -2469.5], "size": 2 },
+    { "op": "spawn", "entity": "iceberg", "pos": [-1024.5, -2469.5], "size": 3 },
+    // A fresh berg rises out of the sea over IcebergConfig.EmergeSeconds
+    { "op": "wait", "seconds": 7 },
+    { "op": "screenshot", "name": "sizes" },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "wobble" },
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "drift" },
+    // Onto the large berg: dropped from above its top so it lands on a step
+    { "op": "fly", "on": false },
+    { "op": "teleport", "pos": [-1024.5, 9.5, -2469.5], "yaw": 90, "pitch": -10 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "standing" },
+    // Into the water west of the small berg, swimming east into its shelf
+    { "op": "teleport", "pos": [-1066.5, 2.2, -2469.5], "yaw": 0, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "push_before" },
+    { "op": "walk", "keys": ["W"], "seconds": 4 },
+    { "op": "screenshot", "name": "push_after" },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-1042.5, 2.5, -2495.5], "yaw": 90, "pitch": -4 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "reflection" }
+  ]
+}

@@ -41,6 +41,34 @@ internal static class TerrainNoise
     /// <summary>The pack-ice floe field, read only by <see cref="Features.SnowGenerator.IsFrozenWater"/>.</summary>
     internal static FastNoiseLite PackIceNoise;
 
+    /// <summary>The continent-scale relief field behind <see cref="TerrainRelief.HighlandWeight"/>.</summary>
+    internal static FastNoiseLite ReliefNoise;
+
+    /// <summary>The low-frequency spine a mountain range's ridges ride (<see cref="TerrainRelief.CellShape"/>).</summary>
+    internal static FastNoiseLite MountainSpineNoise;
+
+    /// <summary>Jitters only the range-cell lookup (<see cref="TerrainRelief.RangeLattice"/>), so the
+    /// cell borders wander instead of running straight north-south and east-west.</summary>
+    internal static FastNoiseLite MountainRangeCellWarp;
+
+    /// <summary>Pulls a massif's outline inward (<see cref="TerrainPeaks.MassifHeight(float, float)"/>),
+    /// so its foot is ragged rather than a circle.</summary>
+    internal static FastNoiseLite MassifShapeNoise;
+
+    /// <summary>The ridged spur field on a massif's flanks (<see cref="TerrainPeaks.MassifHeight(float, float)"/>).</summary>
+    internal static FastNoiseLite MassifSpurNoise;
+
+    /// <summary>Pulls a lone peak's outline inward (<see cref="TerrainPeaks.LonePeakHeight(float, float)"/>),
+    /// so its foot is ragged rather than a circle.</summary>
+    internal static FastNoiseLite PeakShapeNoise;
+
+    /// <summary>The large-island channel of <see cref="TerrainIslands.LandWeight(float, float, float)"/>.</summary>
+    internal static FastNoiseLite IslandNoise;
+
+    /// <summary>The small-island channel of <see cref="TerrainIslands.LandWeight(float, float, float)"/>,
+    /// whose threshold an archipelago lowers.</summary>
+    internal static FastNoiseLite IslandSmallNoise;
+
     static TerrainNoise()
     {
         Reseed();
@@ -106,6 +134,19 @@ internal static class TerrainNoise
         LakeShapeNoise = MakeNoise(90, WorldGenerationConfig.LakeShapeFrequency);
         // Offset 152 was unused (ClimateWarp took 151, the feature generators stop at 142)
         PackIceNoise = MakeNoise(152, WorldGenerationConfig.PackIceFrequency, octaves: 2);
+        // Offsets 153 and 154 were unused (PackIce took 152)
+        ReliefNoise = MakeNoise(153, WorldGenerationConfig.ReliefFrequency, octaves: 2);
+        MountainSpineNoise = MakeNoise(154, WorldGenerationConfig.MountainSpineFrequency);
+        // Offset 155 was unused too
+        MountainRangeCellWarp = MakeWarp(155, WorldGenerationConfig.MountainRangeCellWarpFrequency,
+            WorldGenerationConfig.MountainRangeCellWarpAmplitude);
+        // Offsets 156, 157 and 158 were unused (phase A stopped at 155)
+        MassifShapeNoise = MakeNoise(156, WorldGenerationConfig.MassifShapeFrequency);
+        MassifSpurNoise = MakeNoise(157, WorldGenerationConfig.MassifSpurFrequency, octaves: 2);
+        PeakShapeNoise = MakeNoise(158, WorldGenerationConfig.PeakShapeFrequency);
+        // Offsets 159 and 160 were unused (phase B stopped at 158)
+        IslandNoise = MakeNoise(159, WorldGenerationConfig.IslandLargeFrequency, octaves: 2);
+        IslandSmallNoise = MakeNoise(160, WorldGenerationConfig.IslandSmallFrequency, octaves: 2);
 
         // Mountains wind like ravines and rivers, so a range snakes instead of tracking a contour
         MountainWarp = MakeWarp(87, WorldGenerationConfig.MountainWarpFrequency, WorldGenerationConfig.MountainWarpAmplitude);
