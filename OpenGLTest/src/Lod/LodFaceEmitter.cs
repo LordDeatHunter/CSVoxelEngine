@@ -30,6 +30,7 @@ internal ref struct LodFaceEmitter
     private readonly BlockType _fallbackLeaves;
     private readonly BlockType _snow;
     private readonly BlockType _ice;
+    private readonly BlockType _permafrost;
     private readonly LodLevelSpec _spec;
     private readonly int _cellSize;
     private readonly int _cells;
@@ -44,6 +45,7 @@ internal ref struct LodFaceEmitter
     private readonly bool[] _beachTop;
     private readonly bool[] _gravelTop;
     private readonly bool[] _rockTop;
+    private readonly bool[] _soilStripped;
     private readonly bool[] _snowTop;
     private readonly bool[] _iceTop;
     private readonly Biome[] _biomeGrid;
@@ -61,7 +63,8 @@ internal ref struct LodFaceEmitter
     internal LodFaceEmitter(MeshBufferPool? buffers, LodLevelSpec spec, int cellSize, int cells, int heightGrid,
         int regionChunkSpan, int chunkSpan, int latticeSpan, int regionChunkX, int regionChunkZ, bool[] supplied,
         ColumnData[] columns, Vector3[] grassTint, Vector3[] foliageTint, bool hasRegionOverrides, int[] topCell,
-        int[] groundTop, bool[] beachTop, bool[] gravelTop, bool[] rockTop, bool[] snowTop, bool[] iceTop,
+        int[] groundTop, bool[] beachTop, bool[] gravelTop, bool[] rockTop, bool[] soilStripped, bool[] snowTop,
+        bool[] iceTop,
         Biome[] biomeGrid, int[] waterLevels, byte[] seaFloor, byte[] canopyLeaf, byte[] topBlockGrid)
     {
         _spec = spec;
@@ -78,6 +81,7 @@ internal ref struct LodFaceEmitter
         _beachTop = beachTop;
         _gravelTop = gravelTop;
         _rockTop = rockTop;
+        _soilStripped = soilStripped;
         _snowTop = snowTop;
         _iceTop = iceTop;
         _biomeGrid = biomeGrid;
@@ -95,6 +99,7 @@ internal ref struct LodFaceEmitter
         _fallbackLeaves = BlockType.ById[TreeGenerator.LeavesBlock]!;
         _snow = BlockType.ById[TerrainGenerator.SnowBlock]!;
         _ice = BlockType.ById[TerrainGenerator.IceBlock]!;
+        _permafrost = BlockType.ById[TerrainGenerator.PermafrostBlock]!;
 
         // Fill the tint lattice: one climate evaluation per point gives both palettes. Lattice
         // point (li, lj) is the minimum corner of chunk column (regionChunkX + li, regionChunkZ + lj),
@@ -129,12 +134,14 @@ internal ref struct LodFaceEmitter
 
     // Ocean floor block by the depth band the chunk mesher's GenerateColumn would pick for the
     // same height (0 sand, 1 gravel, 2 stone), so far seabed matches near seabed. A land biome's
-    // lake or river bed keeps the soil the column wears under water instead (3), which is dirt.
+    // lake or river bed keeps the soil the column wears under water instead (3), which is dirt,
+    // and the frozen biome's bed is its permafrost (4).
     private BlockType FloorBlock(byte material) => material switch
     {
         0 => _sand,
         1 => _gravel,
         3 => _dirt,
+        4 => _permafrost,
         _ => _stone,
     };
 
@@ -294,6 +301,7 @@ internal ref struct LodFaceEmitter
         var cap = beach && _gravelTop[gi * _heightGrid + gj] ? _gravel : _sand;
         var soil = beach ? _sand : _dirt;
         var rock = _rockTop[gi * _heightGrid + gj];
+        var stripped = _soilStripped[gi * _heightGrid + gj];
         var snowCell = _snowTop[gi * _heightGrid + gj];
         var biome = _biomeGrid[gi * _heightGrid + gj];
         var cellLevel = _waterLevels[gi * _heightGrid + gj];
@@ -383,10 +391,12 @@ internal ref struct LodFaceEmitter
                 }
                 else
                 {
-                    // The soil/stone band below the top cell never tints.
+                    // The soil/stone band below the top cell never tints. The frozen biome's band is
+                    // its permafrost, or stone where the column's soil was stripped.
                     var tile = (ground - cy) * _cellSize <= WorldGenerationConfig.NominalDirtDepth
                         ? (biome == Biome.Desert ? _sandstone.FaceTiles[f]
-                            : isSeaCell || rock || biome == Biome.Frozen ? _stone.FaceTiles[f]
+                            : isSeaCell || rock ? _stone.FaceTiles[f]
+                            : biome == Biome.Frozen ? (stripped ? _stone : _permafrost).FaceTiles[f]
                             : soil.FaceTiles[f])
                         : _stone.FaceTiles[f];
                     AddQuad(_vertices, _indices, f, sideOrigin, tile, shades, suns);

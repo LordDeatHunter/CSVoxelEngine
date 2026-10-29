@@ -341,4 +341,76 @@ public sealed class WorldSourceLodTests : IDisposable
         Assert.NotEmpty(bare);
         Assert.All(bare, v => Assert.Equal(stoneTop, v.Layer));
     }
+
+    // Whether a vertex is a side face of the supplied plateau (above worldgen's tallest column, so
+    // no worldgen side can count) wearing the given block's tile for that face.
+    private static bool PlateauSideWears(Vertex v, int worldgenTop, BlockType block) =>
+        Face(v) < TopFace && v.Position.Y > worldgenTop && v.Layer == block.FaceTiles[Face(v)];
+
+    [Fact]
+    public void ASuppliedFrozenColumnWearsPermafrostSoil()
+    {
+        const int rx = 0;
+        const int rz = 0;
+        var top = TallestUnder(rx, rz) + PlateauLift;
+        var worldgenTop = TallestUnder(rx, rz) + 1;
+        var mesh = LodRegion.BuildMeshData(Level, rx, rz,
+            source: Over(rx, rz, top, Biome.Frozen, warmth: 0.05f, wetness: 0.1f));
+
+        // The tundra's soil band under its snow is permafrost, never the grass biomes' dirt
+        var permafrost = BlockOf(TerrainGenerator.PermafrostBlock);
+        var dirt = BlockOf(TerrainGenerator.SoilBlock);
+        Assert.Contains(mesh.Vertices, v => PlateauSideWears(v, worldgenTop, permafrost));
+        Assert.DoesNotContain(mesh.Vertices, v => PlateauSideWears(v, worldgenTop, dirt));
+    }
+
+    [Fact]
+    public void AStrippedSuppliedFrozenColumnWearsStoneSoil()
+    {
+        const int rx = 0;
+        const int rz = 0;
+        var top = TallestUnder(rx, rz) + PlateauLift;
+        var worldgenTop = TallestUnder(rx, rz) + 1;
+        var mesh = LodRegion.BuildMeshData(Level, rx, rz,
+            source: Over(rx, rz, top, Biome.Frozen, warmth: 0.05f, wetness: 0.1f, dirtDepth: 0));
+
+        // A column with no soil is bare rock under its snow, as the near fill makes it
+        var permafrost = BlockOf(TerrainGenerator.PermafrostBlock);
+        Assert.Contains(mesh.Vertices, v => PlateauSideWears(v, worldgenTop, BlockOf(TerrainGenerator.RockBlock)));
+        Assert.DoesNotContain(mesh.Vertices, v => v.Layer == permafrost.FaceTiles[Face(v)]);
+    }
+
+    [Fact]
+    public void AGeneratedFrozenRegionsLodWearsPermafrost()
+    {
+        // Worldgen's own tundra, through the generated column path: its far LOD shows the same
+        // permafrost band the supplied path does. Only regions whose center column is a soiled,
+        // uneven Frozen column are built, nearest first, so a soil band is exposed somewhere.
+        const int maxBuilds = 24;
+        const int minHeightSpread = 4;
+        var permafrost = BlockOf(TerrainGenerator.PermafrostBlock);
+        var builds = 0;
+        for (var ring = 0; ring <= 48 && builds < maxBuilds; ring++)
+        for (var rx = -ring; rx <= ring && builds < maxBuilds; rx++)
+        for (var rz = -ring; rz <= ring && builds < maxBuilds; rz++)
+        {
+            if (Math.Max(Math.Abs(rx), Math.Abs(rz)) != ring) continue;
+            var centerX = rx * Spec.RegionBlocks + Spec.RegionBlocks / 2;
+            var centerZ = rz * Spec.RegionBlocks + Spec.RegionBlocks / 2;
+            if (TerrainGenerator.BiomeAt(centerX, centerZ) != Biome.Frozen) continue;
+
+            var column = ColumnCache.Get(centerX >> Chunk.SizeShift, centerZ >> Chunk.SizeShift);
+            var centerLocal = ((centerX & Chunk.SizeMask) << Chunk.SizeShift) | (centerZ & Chunk.SizeMask);
+            if (column.DirtDepth[centerLocal] == 0) continue;
+            if (column.MaxHeight - column.MinHeight < minHeightSpread) continue;
+
+            builds++;
+            var mesh = LodRegion.BuildMeshData(Level, rx, rz);
+            if (mesh.Vertices.Any(v => Face(v) < TopFace && v.Layer == permafrost.FaceTiles[Face(v)]))
+                return;
+        }
+
+        Assert.Fail($"none of the {builds} soiled, uneven Frozen regions near the origin wears a permafrost side "
+            + "in its far LOD");
+    }
 }

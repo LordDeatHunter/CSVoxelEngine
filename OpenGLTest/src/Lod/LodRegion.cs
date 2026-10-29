@@ -233,9 +233,12 @@ public class LodRegion : IDisposable
     /// from its <see cref="ColumnData"/> instead: the biome and water level at the cell center,
     /// snow from a Taiga or Frozen biome and sea ice from a Frozen one, beaches from
     /// <see cref="TerrainGenerator.IsBeachHeight"/> in the Ocean biome, bare rock from a zero
-    /// <see cref="ColumnData.DirtDepth"/> in the Forest biome, and the tint lattice from the
-    /// stored corner climate. A supplied column's far LOD therefore shows no canopy bumps (its
-    /// trees are in its blocks) and no gravel caps.
+    /// <see cref="ColumnData.DirtDepth"/> in a snowless grass biome
+    /// (<see cref="BiomeTraits.ShowsBareRock"/>), and the tint lattice from the stored corner
+    /// climate. A supplied
+    /// column's far LOD therefore shows no canopy bumps (its trees are in its blocks) and no
+    /// gravel caps. On either path the Frozen soil band and lake bed wear permafrost, stone where
+    /// the cell-center column's <see cref="ColumnData.DirtDepth"/> is zero, as the near fill does.
     /// </summary>
     public static LodMeshData BuildMeshData(int level, int rx, int rz, MeshBufferPool? buffers = null,
         bool separableMin = true, IWorldSource? source = null)

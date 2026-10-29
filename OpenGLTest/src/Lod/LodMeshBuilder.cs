@@ -49,6 +49,7 @@ internal sealed class LodMeshBuilder
     private readonly bool[] _snowTop;
     private readonly bool[] _iceTop;
     private readonly bool[] _rockTop;
+    private readonly bool[] _soilStripped;
     private readonly Biome[] _biomeGrid;
     private readonly byte[] _seaFloor;
     private readonly byte[] _canopyLeaf;
@@ -158,6 +159,9 @@ internal sealed class LodMeshBuilder
         // Bare-rock mountain tops, matching the chunk mesher's rock line, so a distant peak
         // shows the same stone cap the near chunks do.
         _rockTop = ArrayPool<bool>.Shared.Rent(gridSize);
+        // A column whose soil a ravine stripped (its cell-center column's DirtDepth is 0), so the
+        // far LOD shows stone where the near fill does instead of the biome's soil band.
+        _soilStripped = ArrayPool<bool>.Shared.Rent(gridSize);
         _biomeGrid = ArrayPool<Biome>.Shared.Rent(gridSize);
         _seaFloor = ArrayPool<byte>.Shared.Rent(gridSize);
         _canopyLeaf = ArrayPool<byte>.Shared.Rent(gridSize);
@@ -361,22 +365,16 @@ internal sealed class LodMeshBuilder
         var centerX = _baseFineX + i * _cellSize + _cellSize / 2;
         var centerZ = _baseFineZ + j * _cellSize + _cellSize / 2;
 
-        // The column the cell center stands in, when the source supplies it. Cells are
-        // aligned to chunk columns (cellSize divides Chunk.Size), so the whole footprint
-        // stands in it, and the 1-cell border stays inside the prefetched span exactly as
-        // FineHeight's reads do.
-        ColumnData? suppliedColumn = null;
-        var centerLocal = 0;
-        if (_anySupplied)
-        {
-            var k = ((centerX >> Chunk.SizeShift) - _baseChunkX) * _chunkSpan
-                + ((centerZ >> Chunk.SizeShift) - _baseChunkZ);
-            if (_supplied[k])
-            {
-                suppliedColumn = _columns[k];
-                centerLocal = ((centerX & Chunk.SizeMask) << Chunk.SizeShift) | (centerZ & Chunk.SizeMask);
-            }
-        }
+        // The column the cell center stands in. Cells are aligned to chunk columns (cellSize
+        // divides Chunk.Size), so the whole footprint stands in it, and the 1-cell border stays
+        // inside the prefetched span exactly as FineHeight's reads do. Prefetch holds every
+        // column, generated ones included, so the stripped-soil flag reads both paths alike;
+        // every other decision reads the column only when the source supplies it.
+        var k = ((centerX >> Chunk.SizeShift) - _baseChunkX) * _chunkSpan
+            + ((centerZ >> Chunk.SizeShift) - _baseChunkZ);
+        var centerLocal = ((centerX & Chunk.SizeMask) << Chunk.SizeShift) | (centerZ & Chunk.SizeMask);
+        var suppliedColumn = _anySupplied && _supplied[k] ? _columns[k] : null;
+        _soilStripped[(i + 1) * _heightGrid + (j + 1)] = _columns[k].DirtDepth[centerLocal] == 0;
 
         // Cell cy is solid iff cellSize * (cy + 1) <= eroded height
         var ground = ((minHeight - _spec.HeightBias) >> _cellShift) - 1;
@@ -495,7 +493,8 @@ internal sealed class LodMeshBuilder
             if (OasisGenerator.IsPond(centerX, centerZ)) cellLevel = oasisSurface;
         }
         _waterLevels[(i + 1) * _heightGrid + (j + 1)] = cellLevel;
-        _seaFloor[(i + 1) * _heightGrid + (j + 1)] = FloorMaterial(maxOwn, cellLevel, cellBiome);
+        _seaFloor[(i + 1) * _heightGrid + (j + 1)] =
+            FloorMaterial(maxOwn, cellLevel, cellBiome, _soilStripped[(i + 1) * _heightGrid + (j + 1)]);
 
         // Sand rings ocean shores and lake/river rims, not every column in the height
         // band. Every grass-fill biome (the near fill's default branch) wears sand on
@@ -538,7 +537,8 @@ internal sealed class LodMeshBuilder
         var cellLevel = suppliedColumn.WaterLevel[centerLocal];
         if (maxOwn >= cellLevel) cellLevel = TerrainGenerator.NoWater;
         _waterLevels[(i + 1) * _heightGrid + (j + 1)] = cellLevel;
-        _seaFloor[(i + 1) * _heightGrid + (j + 1)] = FloorMaterial(maxOwn, cellLevel, cellBiome);
+        _seaFloor[(i + 1) * _heightGrid + (j + 1)] =
+            FloorMaterial(maxOwn, cellLevel, cellBiome, _soilStripped[(i + 1) * _heightGrid + (j + 1)]);
 
         _beachTop[(i + 1) * _heightGrid + (j + 1)] =
             TerrainGenerator.IsBeachHeight(maxOwn) && cellBiome == Biome.Ocean;
@@ -612,8 +612,11 @@ internal sealed class LodMeshBuilder
         columnCyMax[ci * _regionChunkSpan + cj] = (yHi - 1) >> Chunk.SizeShift;
     }
 
-    private static byte FloorMaterial(int height, int level, Biome biome) =>
-        biome == Biome.Frozen ? (byte)2
+    // The bed material code LodFaceEmitter.FloorBlock draws: 0 sand, 1 gravel, 2 stone by the
+    // ocean depth band, 3 a land biome's soil (dirt), 4 the frozen biome's permafrost (stone
+    // where the column's soil was stripped), matching the near column fill.
+    private static byte FloorMaterial(int height, int level, Biome biome, bool stripped) =>
+        biome == Biome.Frozen ? (stripped ? (byte)2 : (byte)4)
         : biome == Biome.Ocean || level <= WorldGenerationConfig.SeaLevel
             ? height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanSandDepth ? (byte)0
             : height >= WorldGenerationConfig.SeaLevel - WorldGenerationConfig.OceanGravelDepth ? (byte)1
@@ -624,7 +627,7 @@ internal sealed class LodMeshBuilder
     {
         var emitter = new LodFaceEmitter(buffers, _spec, _cellSize, _cells, _heightGrid, _regionChunkSpan, _chunkSpan,
             _latticeSpan, _regionChunkX, _regionChunkZ, _supplied, _columns, _grassTint, _foliageTint, _hasRegionOverrides,
-            _topCell, _groundTop, _beachTop, _gravelTop, _rockTop, _snowTop, _iceTop, _biomeGrid, _waterLevels, _seaFloor,
+            _topCell, _groundTop, _beachTop, _gravelTop, _rockTop, _soilStripped, _snowTop, _iceTop, _biomeGrid, _waterLevels, _seaFloor,
             _canopyLeaf, _topBlockGrid);
         emitter.Emit();
         return emitter.ToMeshData(level, rx, rz, columnCyMin, columnCyMax);
@@ -640,6 +643,7 @@ internal sealed class LodMeshBuilder
         ArrayPool<bool>.Shared.Return(_snowTop);
         ArrayPool<bool>.Shared.Return(_iceTop);
         ArrayPool<bool>.Shared.Return(_rockTop);
+        ArrayPool<bool>.Shared.Return(_soilStripped);
         ArrayPool<Biome>.Shared.Return(_biomeGrid);
         ArrayPool<byte>.Shared.Return(_seaFloor);
         ArrayPool<byte>.Shared.Return(_canopyLeaf);
