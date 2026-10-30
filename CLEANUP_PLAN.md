@@ -270,7 +270,7 @@ statements are down to 5, and depth-4 control statements fell from 121 to 99. Wh
 
 - TerrainGenerator split line counts: TerrainGenerator 461, TerrainNoise 129, BiomeClassifier 104, WaterBodies 252, WorldSeed 84; `WorldGen/` holds 20 files; AGENTS.md 4,083 lines.
 - The noise is now first built when a noise channel is first read (`TerrainNoise`'s static constructor) instead of when the palette resolves. `WorldSeed.Apply`'s first `TerrainNoise.Reseed()` therefore builds every channel twice on first access. The output is identical and the cost is startup only; a later pass could make it a single build.
-- `TerrainGenerator` still mixes the relief functions (`MountainHeight`, `TrenchDepthAt`, `RavineDepthAt`, `RavineCutFade`) with the column build. At 461 lines that is fine; if it grows, a `TerrainRelief` class is the natural next extraction.
+- `TerrainGenerator` still mixes some relief functions (`TrenchDepthAt`, `RavineDepthAt`, `RavineCutFade`) with the column build. `MountainHeight` now lives in `WorldGen/TerrainRelief.cs` with the highland layer (BIOMEGEN §6); if `TerrainGenerator` grows, the trench and ravine depths are the natural next move into it.
 - Hot paths still in `TerrainGenerator` (`BiomeAt`, `LandHeight`, `Compute` -> `SurfaceWaterGate`) go through one-line facade forwards, which the JIT should inline. If a perf capture ever shows otherwise, call `BiomeClassifier.BiomeWeights` and `WaterBodies.SurfaceWaterGate` directly there.
 - No bugs were found during the TerrainGenerator move.
 

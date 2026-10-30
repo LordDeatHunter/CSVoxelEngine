@@ -83,8 +83,8 @@ never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column c
 felled-canopy markers, surface overrides), `player.json` (`PlayerSaveCodec`: position and look,
 creative/flight, health, respawn eye, lighting clock, the full inventory and hotbar; no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live slimes and
-goblins with health, facing, velocity, ammo and a slime's size plus still-pending entries, and up to
-`MaxSavedDrops` item drops, nearest first). See "Saves" below for the rules.
+goblins with health, facing, velocity, ammo and a slime's size plus still-pending entries, up to
+`MaxSavedDrops` item drops, nearest first, and the drifting icebergs). See "Saves" below for the rules.
 
 Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `SkyConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; `damage` hurts every live mob, or the player's own pool with `"target": "player"`, then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, and an optional `"size"` (an integer from 1, default 1) is a slime's size; the entity name (`slime` or `goblin`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
@@ -948,6 +948,8 @@ OpenGLTest/
                                #   readonly, read concurrently by every thread; namespace VoxelEngine.Config)
       AudioConfig.cs           # ambience bed paths, volumes and fades; the sfx volume
       HudConfig.cs             # selection outline and pulse, hotbar name fade, pop and flash, the loading screen
+      IcebergConfig.cs         # icebergs: caps and the spawn ring, the spawn band, size and mass, drift and push,
+                               #   wobble, life cycle, the client mirror's lead
       JuiceConfig.cs           # landing and footstep dust, slime splat, hit sparks, death poof, blast shake and
                                #   push, falling-block dust, lava steam, tree thud, splashes, tool shatter, pickup
                                #   sparkle, low-health vignette, damage arc, surfacing droplets
@@ -974,7 +976,8 @@ OpenGLTest/
                                #   and fog, flow, foam, glitter, SSR, deep-water fog, LOD water sheet
       WorldFeatureConfig.cs    # pebbles, flowers, foliage, cotton and the scenery generators
       WorldGenerationConfig.cs # the seed and every worldgen knob: terrain, water levels, biomes, snow and ice, ores,
-                               #   lava, ravines, caves, worms, tree placement, worldgen cache sizes
+                               #   lava, ravines, caves, worms, islands and archipelagos (Island*, Archipelago*),
+                               #   tree placement, worldgen cache sizes
     Content/                   # the data-driven content pipeline (ContentRegistry) — see "Content" below
       ContentRegistry.cs       # the static facade: owns the content tables, assigns byte ids, runs Load / BakeModels /
                                #   Reset in order and serves the public lookups (RequireBlock, recipes, tags, ...)
@@ -1160,6 +1163,16 @@ OpenGLTest/
                                #   (ValidateContent), animation-driven release/impact events
         GoblinAim.cs           # GL-free low-arc ballistic solver for the thrown stones
         GoblinTorches.cs       # GL-free torch roll for a goblin spawn (night, depth, one uniform roll)
+      Icebergs/                # drifting icebergs (not mobs): the berg and its GL-free rules, see "Icebergs"
+        Iceberg.cs             # one berg: variant, horizontal scale, quarter turns, seed, waterline center,
+                               #   velocity, cached world boxes, emerge/sink, the client mirror's dead reckoning
+        IcebergContact.cs      # GL-free box rules: overlap, riding, side contact and its push direction; the one
+                               #   player body box (BodyMin/BodyMax) BodyCollision builds from
+        IcebergMotion.cs       # GL-free drift along the wind, the push over the mass, the speed cap
+        IcebergShape.cs        # a variant's collision boxes from its model cubes; the one turn rule (RotateQuarter),
+                               #   ModelMatrix, Place, mass
+        IcebergSpawnRule.cs    # GL-free spawn band: open water from SpawnColdMin to the freeze threshold
+        IcebergWobble.cs       # GL-free render-only bob, pitch and roll of (seed, lighting clock)
       Slimes/                  # the slime: the mob, its sizes and its merge
         Slime.cs               # a slime: a gel cube that hops toward the player and only hurts on contact while it is off the ground
         SlimeMerge.cs          # GL-free slime merge: who merges (same size, touching, past the cooldown),
@@ -1371,6 +1384,8 @@ OpenGLTest/
       DeathMessages.cs         # the death line from the blow PlayerHealth recorded
       FallTracker.cs           # GL-free fall-damage rule: peak/grounded chain fed one feet height at a time
                                #   (singleplayer's LocalPlayer.UpdateHealth and each ServerPlayer's accepted states)
+      IBodySolids.cs           # non-block solids a player body collides with (the iceberg boxes), read by
+                               #   BodyCollision, PlayerPhysics (Camera.BodySolids) and the server's grounded probe
       HeadMotion.cs            # the per-frame view juice (bob, roll, landing dip, hit kick, FOV punch, sprint FOV, throw
                                #   zoom, strafe tilt, crouch drop, death view, damage arc and droplet aging) folded into
                                #   Roll/BobHeight/BobStrafe/CurrentFov
@@ -1462,6 +1477,8 @@ OpenGLTest/
                                #   BindLazy, InvalidateTextureUnits) over the one TextureUnitCache
       WorldRenderer.cs         # World component: the world's frame (Render, every pass in order) and its UI (RenderUI)
       Actors/                  # the entity and station draws: mobs, loose objects, the player, the stations
+        IcebergPasses.cs       # the iceberg draws: one mesh and skin per variant, ModelMatrix (wobble and rise/sink
+                               #   over IcebergShape.ModelMatrix), the entity, near-shadow and mirror passes
         MobPasses.cs           # the slime and goblin draws (RenderSlimes, RenderGoblins), their meshes and skins,
                                #   SlimeTransform and GoblinFeet
         ObjectPasses.cs        # drops, thrown items, primed TNT, falling blocks, mining debris and toppling trees
@@ -1594,6 +1611,11 @@ OpenGLTest/
         FluidWakeScanner.cs    # waking loaded chunks' water: the worker-found frontier and the border scan
       GoblinManager.cs         # goblins: AI tick, their thrown stones, melee damage at the impact
                                #   event, loot + carried flint on death, ring spawning
+      Icebergs/                # the iceberg simulation, namespace VoxelEngine.Simulation.Icebergs
+        IcebergManager.cs      # the live bergs: forced and ring spawns, drift and push, the terrain/berg/body
+                               #   collision, the life cycle, IBodySolids, the rider carry and push-out, client mirrors
+        IcebergSpawner.cs      # where a berg may spawn: ocean at sea level, the band (injectable IcebergClimate),
+                               #   the footprint clear and loaded, no target near
       KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
                                #   slot and its melt loop, plus the multiblock integrity sweep
       LeafDecay/               # leaf decay and the orphaned-wood crumble, namespace VoxelEngine.Simulation.LeafDecay
@@ -1686,11 +1708,28 @@ OpenGLTest/
                                #   CaveIntensity, Biomes, Bed (pre-ravine profile: decides wetness), WaterLevel,
                                #   CornerWarmth/CornerWetness (the climate at the column's tint lattice point)
       GenerationalCache.cs     # the shared eviction policy behind the deterministic worldgen caches (PERF_TODO D2)
+      GreatLakeLobe.cs         # one disc of a great lake's outline, or its island (Radius 0 = none)
+      GreatLakeSite.cs         # one great-lake cell's cached verdict: surface, floor, shore share, river-fed, up to
+                               #   three lobes and an island (default = no lake)
+      GreatLakes.cs            # the second, rare lake tier: hashed lobed sites on TerrainSites, the cached verdict
+                               #   (SiteAt/BuildSite: rim walk, interior pass, relief overlap, river-fed rule, island),
+                               #   the per-column Sample (weight, surface, floor, ravine guard), RiverShare, NearAnyLobe
       NoiseCaves.cs            # 3D-noise caves (cheese rooms, wide/narrow spaghetti, deep caverns) on a strided lattice
       SplitMix64.cs            # deterministic integer-hash PRNG so worms don't depend on System.Random internals
-      TerrainGenerator.cs      # the 2D column build: the palette, LandHeight with mountains, trenches and ravines, Compute ->
-                               #   ColumnData, Climate, and the column queries (forwarding to BiomeClassifier, WaterBodies, TerrainNoise)
+      TerrainGenerator.cs      # the 2D column build: the palette, LandHeight (with the relief layer, trenches and ravines), Compute ->
+                               #   ColumnData, Climate, and the column queries (forwarding to BiomeClassifier, WaterBodies, TerrainNoise);
+                               #   ReliefLandHeight (no hashed peaks) and PreFeatureLandHeight (massifs, no lone peaks) for the site tests
       TerrainNoise.cs          # every 2D terrain noise channel, built only by Reseed (static ctor, WorldSeed.Apply); MakeNoise
+      TerrainIslands.cs        # the ocean-gated island term folded into BiomeWeights (LandWeight: large and small
+                               #   island noise) and the stateless hashed archipelago footprints
+      TerrainPeaks.cs          # massifs and lone peaks: cached hashed sites, a pointed spurred massif, flatness-tested
+                               #   lone peaks, the soft relief ceiling (SoftCeiling) under the clouds; sites accepted
+                               #   all-or-nothing on the pre-island ocean weight, island sites scaled by island land
+      TerrainRelief.cs         # the relief layer: highland weight (ReliefNoise), its lift and hill gain, the linear
+                               #   mountain ranges (hashed per-cell direction, spine), the spawn clear
+      TerrainSite.cs           # one accepted hashed site (center, radius, height, OnIsland; default = no site)
+      TerrainSites.cs          # the shared hashed-site helper used by lakes, massifs and peaks: cell range, roll,
+                               #   wobbles, rim samples, lowest-hash spacing
       TreeBatch.cs             # every tree of one 64x64 XZ cell grown together in one VirtualTreeSpace
       TreeBatches.cs           # the grown tree caches: solo shapes (one tree alone, per trunk) and the
                                #   64x64-cell batches grown together (BuildBatch), their profiler counters
@@ -1701,7 +1740,8 @@ OpenGLTest/
                                #   Stamp and the far-LOD canopy lookups (TryGetCanopy, PoisonCanopy)
       TreeStamper.cs           # stamping the batch shapes that cross a chunk into its blocks and state bytes
       WaterBodies.cs           # the surface-water model: WaterLevelAt (ocean, rivers, lakes on their own rim), lake bowls,
-                               #   river channels, IsWaterColumn and the desert gate SurfaceWaterGate
+                               #   river channels, IsWaterColumn and the desert gate SurfaceWaterGate; lake candidates
+                               #   roll through TerrainSites; SampleSurfaceWater composes ponds, rivers and great lakes
       WorldgenReads.cs         # test hook: a flag-gated counter of worldgen entries, noted on a ColumnCache
                                #   miss and in TerrainGenerator.Climate (off in production)
       WorldgenStats.cs         # lock-free worldgen timing from the generation workers and
@@ -1839,7 +1879,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   GlobalUsings.cs                     # VoxelEngine.Core, VoxelEngine.Chunks, VoxelEngine.Content and VoxelEngine.Tests.Support
   Support/                     # cross-area fixtures: TestContent (the headless content load),
                                #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
-                               #   WideTreeSpecies, TreeWorldgenFixture and the three [CollectionDefinition]s
+                               #   WideTreeSpecies, TreeWorldgenFixture, IcebergTestWorld (a hand-built sea with a
+                               #   pack-ice strip), StubTarget, BoxSolids and the three [CollectionDefinition]s
   Audio/                       # the sfx library and the ambience bed
   Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
                                #   column cache, fluid surfaces, lava vents, EntityLight; the replay probes
@@ -1861,6 +1902,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   lava, ledge, loot), clips and the animator, drops, projectiles, damage numbers
     Goblins/                   # goblin AI, aim and stones, flee, dodge, pack alert,
                                #   torches, the content contract (mirrors src/Entities/Goblins)
+    Icebergs/                  # iceberg shape, motion, wobble, spawn band, contact, the berg (mirrors src/Entities/Icebergs)
     Slimes/                    # slime sizes, hops, knockback, split and merge (mirrors src/Entities/Slimes)
   Graphics/                    # shader defines and the chunk-draw shader guard, cutout mips, tile materials
   Interaction/                 # raycast and targeting, mining, combat and the slice combo,
@@ -1891,6 +1933,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   and server saves, names, seed parsing, world sources
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
+    Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World
   UI/                          # the canvas, settings, scroll lists, text wrap
     Hud/                       # chat, clock, compass, hit marker, hotbar feedback,
                                #   toasts, tooltips, the look label, screenshot paths
@@ -1912,6 +1955,8 @@ tools/                                # asset generators: tiles, sprites, models
   generate-door-textures.py           # deterministic oak trapdoor (and door) tiles (stdlib PNG writer)
   generate-goblin-clips.py            # deterministic generator of the goblin's animation clips (goblin.bbmodel)
   generate-goblin-skin.ps1            # deterministic generator of goblin.png; its header pins the UV layout
+  generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
+                                      #   the geometry rules (waterline, shelf, 8 px inset steps) and the UV layout
   generate-lantern-texture.py         # deterministic lantern tile; its header pins the uv of every model part
   generate-leaf-textureless.ps1       # deterministic gray leaf tiles for the biome tint (scaled to BiomeTintTextureGray)
   generate-permafrost-texture.py      # deterministic generator of the permafrost tile (permafrost.png)
@@ -2643,10 +2688,10 @@ Other invariants:
 - Worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup; noise instances are configured once in static constructors and never re-tuned per call). All noise seeds derive from `WorldGenerationConfig.Seed` plus fixed per-channel offsets (`TerrainNoise.MakeNoise`, forwarded as `TerrainGenerator.MakeNoise`; every 2D channel is built by `TerrainNoise.Reseed`); `Seed` reads `WorldSeed.Value`, which `WorldSeed.Apply` sets (rebuilding every noise from it) before a World is built, never while one is live (see "Saves"). Before player edits, terrain obeys:
   - **Nothing generated is ever solid above `height(x,z)`** — heights come from `ColumnCache.Get(...).Heights` (or the `ColumnCache.GetHeights` wrapper) and already include ravines, which are cut into the heightmap so the far LOD sees them too. The ravine cut fades out across the shore band (`OceanShoreWeight`..0.5), so it never slices the ocean's edge; the block at `height` is solid unless a cave or entrance carved it.
   - Both carvers only ever **remove** blocks: `ChunkTerrainFill.GenerateBlockData` fills the columns (grass at depth 0, dirt down to `DirtDepth`, stone below), then `NoiseCaves.Carve` and `WormCarver.Carve` clear air out of the result and `_solidCount` is recounted.
-  - **Water** fills every air cell up to the column's own level in a **wet** column, in `ChunkTerrainFill.FillWater` after both carvers and before trees and pebbles: an ocean floor, or a lake or river bed, where a hashed lake bowl or a warped river ridge channel carves the ground below it. There is **no single water plane**: `ColumnData.WaterLevel` (`TerrainGenerator.WaterLevelAt`) is sea level for the ocean and for rivers, but a lake's **own** surface, so a pond rests in the ground it was dug into instead of at the bottom of a crater dug to sea level. A lake takes that surface from its own rim (`WaterBodies.TryLakeSite`): the lowest ground on the rim minus `LakeBankDepth`, and a candidate whose rim climbs more than `LakeSiteFlatness` is dropped rather than dug into a hillside, which is what keeps every bank it floods against above the water. A candidate standing above `SeaLevel` is also dropped when a river channel crosses its footprint (`WaterBodies.RiverCrossesSite`, sampled every few blocks across the disc), because the rim is read from `LandHeight` before any river cut and the channel would carve a bank below the pond's surface (rule test `LakeTests.NoRiverChannelCrossesAnElevatedPond`). Its radius (skewed small by `LakeRadiusSkew`), depth and outline (wobbled by `TerrainNoise.LakeShapeNoise`, so a shoreline is ragged rather than a circle) all vary per lake. `TerrainGenerator.IsWaterColumn` is now just `height < WaterLevelAt(x, z)`, so the carve in `Compute` and the fill agree by construction, and the far LOD draws its sheet at the same per-cell level. Wetness reads the column's `ColumnData.Bed` — the profile before a ravine cut it — not the ravine-cut `Heights`, so a ravine that merely deepens an otherwise dry column holds no water instead of flooding as a narrow spike, while a ravine under a real lake or river just deepens that body (and the cut fades out across the shore band, so no ravine ever cuts the ocean floor). Every other below-level basin is left **dry** — the forest is not flooded wholesale now that ocean carries the bulk of the water — and a desert stays dry; sand and gravel ring actual water only (`TerrainGenerator.SurfaceWaterWeight` gates the height band), never a dry ravine floor in the band. Both the carve and the flood test are scaled by `TerrainGenerator.SurfaceWaterGate` (`WaterDesertFadeStart`/`WaterDesertFadeEnd`), which fades the body out over the last stretch before the desert, so a pond closes on its own forest rim instead of ending in a vertical wall where the hard forest/desert classification flips, while lakes away from a desert keep their full depth. Sea-floor caves still flood, nothing grows in water (wet columns top out in dirt instead of grass), and `IsSubmerged(height)` is only the waterline height test, since wetness is a per-column level now. Generated water is always a **source** (state `0`). A cold column's top water cell is then replaced by `ice` in `SnowGenerator.Stamp` wherever `SnowGenerator.IsFrozenWater` says so (see Biomes), so a cold ocean or lake freezes into a walkable sheet whose edge breaks into floes and open leads over the pack-ice band. `WaterEnabled = false` turns the water off; `LakesAndRiversEnabled = false` leaves oceans only.
+  - **Water** fills every air cell up to the column's own level in a **wet** column, in `ChunkTerrainFill.FillWater` after both carvers and before trees and pebbles: an ocean floor, or a lake or river bed, where a hashed lake bowl or a warped river ridge channel carves the ground below it. There is **no single water plane**: `ColumnData.WaterLevel` (`TerrainGenerator.WaterLevelAt`) is sea level for the ocean and for rivers, but a lake's **own** surface, so a pond rests in the ground it was dug into instead of at the bottom of a crater dug to sea level. A lake takes that surface from its own rim (`WaterBodies.TryLakeSite`): the lowest ground on the rim minus `LakeBankDepth`, and a candidate whose rim climbs more than `LakeSiteFlatness` is dropped rather than dug into a hillside, which is what keeps every bank it floods against above the water. A candidate standing above `SeaLevel` is also dropped when a river channel crosses its footprint (`WaterBodies.RiverCrossesSite`, sampled every few blocks across the disc), because the rim is read from `LandHeight` before any river cut and the channel would carve a bank below the pond's surface (rule test `LakeTests.NoRiverChannelCrossesAnElevatedPond`). Its radius (skewed small by `LakeRadiusSkew`), depth and outline (wobbled by `TerrainNoise.LakeShapeNoise`, so a shoreline is ragged rather than a circle) all vary per lake. A second, much rarer **great lake** tier (`WorldGen/GreatLakes.cs`, BIOMEGEN §13 phase D) sits beside the ponds: one hashed candidate per `GreatLakeCellBlocks` cell, a union of one to three lobe discs of radius `GreatLakeMinRadius..MaxRadius` wobbled inward by `TerrainNoise.GreatLakeShapeNoise`, optionally with an island in its main lobe. Its verdict is cached per cell (`GreatLakes.SiteAt`/`BuildSite`): the surface is the lowest ground of a dense walk over each lobe's dry shore annulus minus `GreatLakeBankDepth`, a rim spread over `GreatLakeSiteFlatness`, any ocean or desert weight or a biome that holds no water on the rim or in a coarse interior pass, interior ground rising more than `GreatLakeInteriorRiseMax` over the rim, or any massif or lone-peak disc meeting a lobe refuses the site, and the shore ramp widens with the rim spread. A great lake never refuses a river: a cutting river anywhere in a lobe's shore annulus makes it **river-fed**, and it then rests at `SeaLevel`, the river's own level, refused only when its rim-chosen surface lies below `SeaLevel` or more than `GreatLakeRiverFedMaxDrop` above it. `WaterBodies.SampleSurfaceWater` is the one place the tiers compose, read by `WaterLevelAt`, `SurfaceWaterWeight` and `Compute`: wherever the great-lake weight is above 0 it replaces the pond fields, and the river is scaled by `GreatLakes.RiverShare`, exactly 0 wherever lake water stands; a pond yields to a great lake at site level (`TryLakeSite` refuses a candidate `GreatLakes.NearAnyLobe` within `GreatLakePondClearance`), so no column belongs to both; and `Compute` feeds the great lake's ravine guard (1 inside a lobe, easing to 0 `GreatLakeRavineGuardBlocks` past it) times `WaterBodyThreshold` into `RavineCutFade`, so a ravine tapers in across the guard band and never cuts a bank or an island. Every great-lake output is exactly 0 outside the accepted lobe discs grown by the guard and within `GreatLakeSpawnClearRadius` (= `ReliefSpawnClearStart`), so land elsewhere is bit-identical but for ponds that yield within pond reach of a lake (`GreatLakeSiteTests`, `GreatLakeTests`, `LodReliefTests.TheFarLodSitsInsideTheChunkTerrainOverAGreatLake`). `TerrainGenerator.IsWaterColumn` is now just `height < WaterLevelAt(x, z)`, so the carve in `Compute` and the fill agree by construction, and the far LOD draws its sheet at the same per-cell level. Wetness reads the column's `ColumnData.Bed` — the profile before a ravine cut it — not the ravine-cut `Heights`, so a ravine that merely deepens an otherwise dry column holds no water instead of flooding as a narrow spike, while a ravine under a real lake or river just deepens that body (and the cut fades out across the shore band, so no ravine ever cuts the ocean floor). Every other below-level basin is left **dry** — the forest is not flooded wholesale now that ocean carries the bulk of the water — and a desert stays dry; sand and gravel ring actual water only (`TerrainGenerator.SurfaceWaterWeight` gates the height band), never a dry ravine floor in the band. Both the carve and the flood test are scaled by `TerrainGenerator.SurfaceWaterGate` (`WaterDesertFadeStart`/`WaterDesertFadeEnd`), which fades the body out over the last stretch before the desert, so a pond closes on its own forest rim instead of ending in a vertical wall where the hard forest/desert classification flips, while lakes away from a desert keep their full depth. Sea-floor caves still flood, nothing grows in water (wet columns top out in dirt instead of grass), and `IsSubmerged(height)` is only the waterline height test, since wetness is a per-column level now. Generated water is always a **source** (state `0`). A cold column's top water cell is then replaced by `ice` in `SnowGenerator.Stamp` wherever `SnowGenerator.IsFrozenWater` says so (see Biomes), so a cold ocean or lake freezes into a walkable sheet whose edge breaks into floes and open leads over the pack-ice band. `WaterEnabled = false` turns the water off; `LakesAndRiversEnabled = false` leaves oceans only.
   - **Lava pockets** pond over dry cave floors at/below `LavaMaxY` (`LavaGenerator.Stamp`, after the sea so flooded caves stay water): a patch mask plus a per-cell roll, buried under the terrain so ravines and entrances stay dry. Generated lava is likewise all sources; set `LavaEnabled = false` to turn it off.
   - Caves fade out within ~`CaveSurfaceFadeEnd` blocks of the surface (`WormSurfaceMargin` for worms), except inside entrance zones — sparse patches where `ColumnData.EntranceWeight` lifts the fade and caves reach the sky. The entrance weight fades out before the shore band (`EntranceShoreFade`, see `OceanShoreWeight`), so a cave never breaches a beach or the sea floor into a water-filled hole.
-  - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbors agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `ColumnCache.Get`, and so are the four tree caches in `TreeBatches` and `TreeCanopy` (see `### Trees`): the cell batches (`TreeBatches.BatchCache`, every tree rooted in one 64x64 XZ cell grown together, shared by `Stamp` on the generation workers and the first LOD ring's canopy on the LOD builder), the solo tree shapes (`TreeBatches.ShapeCache`, which `BuildBatch` reads as the neighboring cells' obstacles), the grown canopy tops (`TreeCanopy.CanopyCache`) and the far rings' crown-proxy canopy (`TreeCanopy.ProxyCanopyCache`), the last two read by their one engine caller `LodRegion.BuildMeshData` once per *fine* column of a region. All six go through `GenerationalCache<TKey, TValue>` (`WorldGen/GenerationalCache.cs`): the cache is split into G generation dictionaries published as one immutable node swapped by `Interlocked.CompareExchange`, a read probes the newest first, a miss computes into the newest, and when the newest fills its `capacity / G` insert budget the node rotates and the *oldest* generation is dropped — so eviction retains the most recently used generations instead of clearing wholesale, and an entry read while it sits in the oldest generation is promoted forward (a second chance). Entries are deterministic, so a race, an eviction or a duplicate yields identical values, and the worst an evicted entry can ever cost is a recompute. Capacities and generation counts all live in `WorldGenerationConfig`, one pair per site: `ColumnCacheCapacity`/`ColumnCacheGenerations`, `CellCacheCapacity`/`CellCacheGenerations`, `TreeBatchCacheCapacity`/`TreeBatchCacheGenerations`, `TreeShapeCacheCapacity`/`TreeShapeCacheGenerations`, `TreeCanopyCacheCapacity`/`TreeCanopyCacheGenerations` and `TreeProxyCanopyCacheCapacity`/`TreeProxyCanopyCacheGenerations` — every site ships at 4 generations, and that count is a re-pricing lever that may only be moved against a real capture, never blind. The factory a site passes to `GetOrAdd` must be a `static`, non-capturing delegate *field* (`ColumnCache.Compute`, `WormCarver.BuildCellFor`, `TreeBatches.BuildShapeFor`, `BuildBatchFor`, `TreeCanopy.BuildCanopyFor`, `BuildProxyCanopyFor`), because the factory takes the key alone: a lambda written at the call site that captured locals would allocate a closure on every call, hits included, on the generation workers — recomputing those values from the key on a miss is the cheaper trade. **Standing rule: only values that are a pure function of the key may live in that type.** State carrying *player edits* must never be moved into it, because there eviction is data loss rather than a recompute — `LodColumnCaps` (mined-column LOD caps) and `TreeCanopy.CanopyDisturbed` (felled-canopy markers) are the two current examples, and both are tracked as their own items rather than converted. They are still plain process-global tables; `LodEditState` exports and imports them per world (with the `LodSurface` overrides) and `WorldSeed.Apply` resets them between worlds.
+  - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbors agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `ColumnCache.Get`, and so are the four tree caches in `TreeBatches` and `TreeCanopy` (see `### Trees`): the cell batches (`TreeBatches.BatchCache`, every tree rooted in one 64x64 XZ cell grown together, shared by `Stamp` on the generation workers and the first LOD ring's canopy on the LOD builder), the solo tree shapes (`TreeBatches.ShapeCache`, which `BuildBatch` reads as the neighboring cells' obstacles), the grown canopy tops (`TreeCanopy.CanopyCache`) and the far rings' crown-proxy canopy (`TreeCanopy.ProxyCanopyCache`), the last two read by their one engine caller `LodRegion.BuildMeshData` once per *fine* column of a region; and so are the massif and lone-peak site verdicts (`TerrainPeaks.MassifSiteAt`/`PeakSiteAt`, one accepted-or-rejected `TerrainSite` per site cell) and the great-lake verdicts (`GreatLakes.SiteAt`, one `GreatLakeSite` per great-lake cell, whose factory reads the massif and lone-peak caches one way: a lake reads the peaks, the peaks never read lakes, so nothing recurses). All nine go through `GenerationalCache<TKey, TValue>` (`WorldGen/GenerationalCache.cs`): the cache is split into G generation dictionaries published as one immutable node swapped by `Interlocked.CompareExchange`, a read probes the newest first, a miss computes into the newest, and when the newest fills its `capacity / G` insert budget the node rotates and the *oldest* generation is dropped — so eviction retains the most recently used generations instead of clearing wholesale, and an entry read while it sits in the oldest generation is promoted forward (a second chance). Entries are deterministic, so a race, an eviction or a duplicate yields identical values, and the worst an evicted entry can ever cost is a recompute. Capacities and generation counts all live in `WorldGenerationConfig`, one pair per site: `ColumnCacheCapacity`/`ColumnCacheGenerations`, `CellCacheCapacity`/`CellCacheGenerations`, `TreeBatchCacheCapacity`/`TreeBatchCacheGenerations`, `TreeShapeCacheCapacity`/`TreeShapeCacheGenerations`, `TreeCanopyCacheCapacity`/`TreeCanopyCacheGenerations`, `TreeProxyCanopyCacheCapacity`/`TreeProxyCanopyCacheGenerations`, `MassifSiteCacheCapacity`/`MassifSiteCacheGenerations`, `PeakSiteCacheCapacity`/`PeakSiteCacheGenerations` and `GreatLakeSiteCacheCapacity`/`GreatLakeSiteCacheGenerations` — every site ships at 4 generations, and that count is a re-pricing lever that may only be moved against a real capture, never blind. The factory a site passes to `GetOrAdd` must be a `static`, non-capturing delegate *field* (`ColumnCache.Compute`, `WormCarver.BuildCellFor`, `TreeBatches.BuildShapeFor`, `BuildBatchFor`, `TreeCanopy.BuildCanopyFor`, `BuildProxyCanopyFor`, `TerrainPeaks.BuildMassifSiteFor`, `BuildPeakSiteFor`, `GreatLakes.BuildSiteFor`), because the factory takes the key alone: a lambda written at the call site that captured locals would allocate a closure on every call, hits included, on the generation workers — recomputing those values from the key on a miss is the cheaper trade. **Standing rule: only values that are a pure function of the key may live in that type.** State carrying *player edits* must never be moved into it, because there eviction is data loss rather than a recompute — `LodColumnCaps` (mined-column LOD caps) and `TreeCanopy.CanopyDisturbed` (felled-canopy markers) are the two current examples, and both are tracked as their own items rather than converted. They are still plain process-global tables; `LodEditState` exports and imports them per world (with the `LodSurface` overrides) and `WorldSeed.Apply` resets them between worlds.
   - 3D cave noise is sampled on a `CaveNoiseStride` lattice (aligned to world coordinates so adjacent chunks share boundary samples) and trilinearly interpolated per block before thresholding.
 - **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (`LodRegion.BuildMeshData`, built by `LodMeshBuilder` and `LodFaceEmitter`) (no block data; a column a server's world source supplies is read from that source's `ColumnData` instead, see "World sources"). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodCoverPass.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `TerrainPasses.RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodCoverPass.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones; a desert cell wears sand over sandstone and a sea-floor cell the sand/gravel/stone band its depth picks (`LodRegion.BuildMeshData` reads `ColumnCache.GetBiomes`). The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`TerrainPasses.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodColumnCaps.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing. All of this runs where the LOD is built (singleplayer and the server): a multiplayer client's far LOD is the server's, streamed as finished vertices, so its edits return before these hooks (see "Multiple players and chat"). Canopy bumps come from `TreeGenerator.TryGetCanopy(x, z, proxy, out top, out leaf)`, read once per fine column with the level's `LodLevelSpec.ProxyCanopy`: the first ring reads the grown canopy of the same cell batches the chunks stamp, and the farther rings read each species' `lod` crown proxy (`LodCrownProxy.TopOffset` over its `LodCrownProfile`), which never grows a tree. Either way a bump wears the leaf block that owns its top cell (the species' `LeavesId`, resolved generically via `BlockType.ById` in `LodRegion.BuildMeshData`, falling back to `TreeGenerator.LeavesBlock`), so a new tree species only needs its species file — never a new LOD branch. An edited canopy reads as open sky: mining or blasting a wood or leaf cell, every fell, every column `LeafDecayManager` clears or `TreeGrowthWriter` writes call `TreeGenerator.PoisonCanopy`, whose `CanopyDisturbed` markers `TryGetCanopy` and `CanopyLeafBlock` consult before either cache. LOD vertices bake a coarse sky exposure from those same column heights into `Vertex.Sun` (`LodSkyExposure`, tuned by the `LodSky*`/`LodValleyShade`/`LodCanopyShade` constants): a vertex darkens by how far the columns in front of or around it rise above it, and a canopy bump darkens toward its base, while open ground, straight walls under open sky and the water sheet keep full sun so the ring matches the near chunks.
 
@@ -2711,7 +2756,7 @@ pure function of the seed: only **deltas** and the seed are written.
   `WorldSeed.Value`; `WorldSeed.Default` is what tests and scripted runs use). It is legal only
   while no World is live (`WorldSeed.BeginWorld` in the World constructor, `EndWorld` at the very
   end of a clean teardown; `WorldIsLive` reports it), and it rebuilds every worldgen noise, clears
-  the six `GenerationalCache` sites and resets the process-global LOD edit state — always, even
+  the nine `GenerationalCache` sites and resets the process-global LOD edit state — always, even
   for the same seed, since another world sharing it must not inherit the previous one's edits.
 - **The loading phase.** A World built with a store starts in `WorldPhase.Loading`. The saved
   player is applied before the workers start, so they stream around the restored position;
@@ -2744,7 +2789,9 @@ pure function of the seed: only **deltas** and the seed are written.
   once loading finishes, each only when its chunk is loaded; a restore is a forced spawn, so it
   may pass the natural mob cap but a mob waits while the hard cap (`MobHardCap`, which sizes the
   healthbar buffers) is full; an entry that waits stays pending and is saved again, and is
-  discarded only after `EntityRestoreTimeoutSeconds` of play.
+  discarded only after `EntityRestoreTimeoutSeconds` of play. A saved iceberg (`Icebergs` in
+  `entities.json`) waits until every chunk under its placed bounds is loaded, and a sinking berg
+  is not saved.
 - **Not persisted** (tracked as `M-12` in TODO.md): the station block entities (campfire, quern,
   kiln, casting — a reloaded kiln is plain blocks plus its multiblock state bytes until a
   right-click re-registers it through `KilnManager.Ensure`, with no fuel or crucible), primed
@@ -2785,7 +2832,7 @@ as the player: `WorldPersistence.CapturePlayer` writes back the `player.json` th
 was opened, since every connected player carries their own — or for a world that had none no pose,
 no creative or flight, no respawn eye and no inventory, so a survival world opened after hosting is
 not in creative flight at the server camera's hover), and skips the LodGen threads; the
-global `WorldSeed` still applies, and the six `GenerationalCache` sites behave exactly as in the
+global `WorldSeed` still applies, and the nine `GenerationalCache` sites behave exactly as in the
 game, which is what lets a headless World run `Update` over real terrain (the LOD builder already
 drops real builds when its pool is null). `ServerWorldTests` locks this down.
 
@@ -2936,7 +2983,13 @@ climate) instead of the heights alone, so a client derives nothing from worldgen
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`ClientMirror.KindMatches`). A
+whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 8 (current) adds
+`NetEntityKind.Iceberg` (6): `Position` the waterline center, `Yaw` the quarter turns times pi/2
+(`NetEntity.YawFromTurns` / `TurnsFromYaw`), `Health` the seed, `Ammo` the scale in thousandths and
+the sinking in its next byte (`NetEntity.PackIcebergAmmo` / `UnpackIcebergAmmo`), `ItemId` the
+variant and `Velocity` the drift the client dead-reckons along; an older client is refused, since
+it would neither draw nor collide with bergs while the server judges a rider's hover against
+them. A
 `WorldIntent` is the sequence id, a `NetIntentKind` byte, the eye and the unit aim the action was
 made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(cell)`,
 `Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)`,
@@ -3149,7 +3202,11 @@ resets its fall tracking and sends a numbered `PlayerCorrection(seq, eye)`
 (`ServerPlayer.IssueCorrection`); the client snaps there (`Camera.TestTeleport`, motion reset),
 echoes the number in every following `PlayerState`, and the server ignores state positions until
 one acks the newest correction (`AcceptsStatePosition`), so the states the client sent before it
-snapped can never trip a second correction. A respawn uses the same correction.
+snapped can never trip a second correction. A respawn uses the same correction. The hover rule
+(and the fall tracker's grounded probe) also counts the server's iceberg boxes as ground
+(`World.BodySolids`, an `IBodySolids` passed to `MovementRules.Judge` and
+`ServerPlayer.ObserveAcceptedState`), so a rider is never a hoverer; the endpoint-collision rule
+stays block-only, since a client stands on a mirror up to a snapshot behind the server's berg.
 
 **Creative permission** is per player: a client's creative bit is only a request, granted (with
 flight only alongside it, and flight is noclip to the movement rules) while
@@ -3451,16 +3508,82 @@ ocean biome and slopes below the waterline into the sea. The ocean ramp falls to
 `OceanFloorHeight` with rare warped **trenches** cut in, and its floor wears sand, gravel or stone by
 depth (`OceanSandDepth`/`OceanGravelDepth`). The forest floor is a broad swell plus a positive-only
 hill field gated by a hill-region mask (`Hill*`/`ForestBaseHeight`), so hills rise in patches with
-flats between them. A rare warped **mountain** ridge (`Mountain*`, gated by a low-frequency mask and
-faded out near the origin) lifts an occasional range well above the hills; a crest above
-`MountainRockHeight` in a snowless grass biome (`BiomeTraits.ShowsBareRock`) is bare stone (`ColumnCache.GenerateColumn` reads the stripped soil, the far LOD a
-matching rock cap), so it reads as rock rather than another wooded hill. A low-frequency
+flats between them. A **relief layer** (`WorldGen/TerrainRelief.cs`, BIOMEGEN §6) rides
+on top, orthogonal to the climate: a continent-scale **highland weight**
+(`TerrainRelief.HighlandWeight`, a smoothstep of `ReliefNoise`, seed offset 153, about 5000 blocks,
+two octaves, over `HighlandMaskStart/End`) lifts the base of the forest and dune profiles
+(`HighlandBaseLift`, added right after the swell) and multiplies the hill amplitude
+(`HighlandHillGain`); `DryHillReduction` still applies after it, so an arid highland is a lifted
+plateau rather than broken country. **Mountain ranges** rise only inside highlands: the rarity mask
+(`MountainMask*`) is multiplied by the highland weight, and the warped ridge (`MountainSharpness`)
+rides a lower-frequency **spine** (`MountainSpineNoise`, offset 154) and is sampled stretched
+(`MountainRangeStretch`) along a hashed direction per `MountainRangeCellBlocks` cell, so a range is a
+chain hundreds of blocks long; neighboring cells crossfade only in a narrow band at their borders
+(`MountainRangeBlend`), and the cell lookup alone is jittered by `MountainRangeCellWarp` (offset 155)
+so no straight north-south or east-west seam shows. The whole layer fades out within
+`ReliefSpawnClearStart/End` (1536..2560 blocks) of the origin, so the spawn region and nearly every
+scenario's ground stay as they were; highlands begin on the horizon the far LOD shows from the
+spawn. A highland's lift raises the forest-profile height past `RiverLowEnd`, so its rivers dry
+into washes, and its high ground reaches the rock and snow caps through the same altitude path as
+before: a crest above `MountainRockHeight` in a snowless grass biome (`BiomeTraits.ShowsBareRock`)
+is bare stone (`ColumnCache.GenerateColumn` reads the stripped soil, the far LOD a matching rock
+cap), so it reads as rock rather than another wooded hill, and `SnowGenerator.ColdWeightAt` caps a
+peak with snow. Every relief term is exactly neutral where the highland weight is 0 (no lift, a hill
+gain of exactly 1, no range), so land with zero weight is bit-identical to the terrain before the
+layer, except where an old out-of-highland mountain stood (those mountains are gone, so unmodified
+chunks of an old save re-lay there). `TerrainReliefTests` (neutral at zero, ranges only inside
+highlands, below the cloud layer, ranges run along their cell's direction, a continuous crossfade),
+`TerrainReliefSeedTests` (a pure function of position and seed) and `LodReliefTests` (the LOD
+nesting invariants, and the far LOD inside the chunk terrain over a steep highland range at every
+level) lock it down. **Massifs and lone peaks** (`WorldGen/TerrainPeaks.cs`, phase B) are hashed
+sites rolled through the shared `TerrainSites` helper (the one lake candidates use too) and summed
+into the forest profile after the ranges (`WithMassif`, then `WithLonePeak`): a rare massif rolls an
+absolute summit (`MassifMinSummit..MaxSummit`) and rises from `ReliefLandHeight` to it with a pointed,
+spurred body, and a lone peak stands only where the pre-feature profile (`PreFeatureLandHeight`) is
+flat over its rim (`PeakSiteFlatness`), never on a massif; a site's acceptance never reads `LandHeight`,
+so nothing recurses, and its cached verdict (`MassifSiteAt`/`PeakSiteAt`) is reset by `WorldSeed.Apply`.
+Both terms are exactly zero outside their discs and inside the spawn clear, so land there is
+bit-identical, and the soft `SoftCeiling` (`ReliefCeilingHeight`, knee `ReliefCeilingKnee`) keeps any
+spur under the clouds (`TerrainPeaksTests`, `TerrainSitesTests`, the site facts in
+`TerrainReliefSeedTests` and `LodReliefTests`). **Islands and archipelagos**
+(`WorldGen/TerrainIslands.cs`, phase C) rise out of deep water by lowering the ocean weight itself:
+`BiomeClassifier.BiomeWeights` takes the pre-island weight (`PreIslandOceanWeight`, the old ocean
+expression), asks `TerrainIslands.LandWeight` for an island land weight (the max of a large-island
+channel, `IslandNoise` offset 159, and a small-island one, `IslandSmallNoise` offset 160, scaled by how
+far past the shore band the water is), folds it as `pre * (1 - island)` only when that weight is above
+0 and hands the result to `WeightsForOcean`, so every consumer of the ocean weight (the
+classification, the height lerps and shore clamp, water bodies, trees, mobs, the far LOD) sees island
+land as ordinary land of its climate biome, sand-rimmed through the Ocean-classified 0.35..0.5 rim.
+A stateless hashed **archipelago** footprint (one elongated ellipse per `ArchipelagoCellBlocks` cell,
+no cache) lowers the small channel's threshold and raises its gain, so islets string out in chains.
+`LandWeight` is exactly 0 wherever the pre-island weight is at or below `OceanShoreWeight` (checked
+before any read) and inside `ReliefSpawnClear*`; `ContinentNoise` and `SampleClimate` are untouched. A
+massif or lone-peak site is accepted all-or-nothing on the pre-island weight (wholly continental, or
+wholly on saturated island land), and an island site (`TerrainSite.OnIsland`) is scaled by the island
+land weight at the column, so `BiomeWeights`, the peak terms and `LandHeight` are bit-identical on the
+continent and the coast band by construction (`TerrainIslandsTests`, the island facts of
+`TerrainPeaksTests` (`ASiteNeverStraddlesTheIslandFold`, `AnIslandSiteNeverRaisesTheShoreBandOrTheContinent`),
+`TerrainReliefSeedTests.TheIslandTermIsAPureFunctionOfPositionAndSeed` and the island, archipelago and
+shore-pit facts of `LodReliefTests`). `visual-examples/terrain-shape.json` (`VOXEL_TIME=1090`,
+so the long run stays in daylight) films the origin valley, a highland interior, a range along and
+across, an arid plateau, a highland border, a river wash, a range crossing a cell border, a far-LOD
+vista, a massif from afar, its flank and its crown, a lone peak and a massif in the far LOD, and an
+island from offshore, its beach, a sand knoll, an archipelago chain and islands in the far LOD
+(`island_far`, `island_beach`, `island_knoll`, `archipelago_chain`, `island_lod_vista`). A low-frequency
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy
 (`TreeGenerator.TryGetTree` reads `TerrainGenerator.ForestOpenness`, scaled per species by its
 `worldgen.openness`, so a taiga keeps more of its spruce and the desert's cactus ignores it). On land a hashed lake bowl and a warped river ridge carve below
 their own water level and flood only those (every land biome but the desert; both fade out toward a
-desert so a pond closes on its own rim) — see the Water invariant below.
+desert so a pond closes on its own rim) — see the Water invariant below. Far from the spawn (past
+`GreatLakeSpawnClearRadius`, 1536 blocks) rare **great lakes** (`WorldGen/GreatLakes.cs`, phase D)
+spread over lobed bowls a few hundred blocks across: their surface is chosen from their rim like a
+pond's, they stand only on lake-holding ground with no ocean, desert, massif or lone peak inside and no
+interior rise over the rim, a river reaching one makes it river-fed at `SeaLevel` instead of refusing
+it, ponds give way to them and a ravine guard keeps ravines out of their banks. A cold great lake
+freezes into the pack ice like any water. `visual-examples/terrain-shape.json` shoots them
+(`great_lake_shore`, `great_lake_height`, `great_lake_bay`, `great_lake_island`, `great_lake_river`,
+`great_lake_lod_vista`).
 A desert column is sand over `SandstoneDepth` sandstone blocks, then stone; a frozen column is a
 `permafrost` top and two cells of permafrost soil over stone, under the snow layer the snow pass
 lays (a ravine strips it down to bare stone, like a stripped desert column); forest, taiga, steppe and savanna share the grass-over-dirt fill
@@ -3571,8 +3694,11 @@ an open-forest clump (`FlowerGenerator`, the `PlantClumps` rule) (`MeadowTests`)
 ## Entities
 
 Entities (mobs) are data-driven like blocks: `assets/data/entities/<name>.json` gives a display
-`name`, an `hp` pool, an optional `loot` table rolled on death, and an optional `model` Blockbench
-project (default `assets/models/entity/<name>.bbmodel`). `ContentRegistry.Load` parses them into
+`name`, an `hp` pool (optional: an entity with none has no health pool, `EntityType.MaxHealth` 0,
+and the `Mob` constructor refuses it), an optional `loot` table rolled on death, and an optional
+`model` Blockbench project (default `assets/models/entity/<name>.bbmodel`), or instead of `model`
+a non-empty `variants` list of projects, one per size class or look (`EntityType.Variants` /
+`VariantPaths`, whose first entry is always `Model`; the icebergs use it). `ContentRegistry.Load` parses them into
 `EntityType`s published on `EntityRegistry` (`RequireEntity`/`TryGet`), and parses each entity's
 `.bbmodel` once, GL-free, into `EntityType.Model` (a `BbmodelData`: parts, skin pixels and animation
 clips). The entity, the renderer and the item debugger all share that one parse. A broken entity model
@@ -3784,6 +3910,102 @@ share every `MobLavaTickSeconds` with the hit flash, a death it causes rolling l
 (`MobLavaTests`). **Ledge caution**: `Mob.IsLedgeAhead` over `LedgeProbe` (live cells, not the
 heightmap) stops a step or a hop that would land more than `MobLedgeMaxDropBlocks` down unless the
 target stands lower (`LedgeCautionTests`).
+
+### Icebergs
+
+Drifting icebergs float on the open sea at the pack-ice edge. They are entities, never blocks, and
+**not mobs**: an `Iceberg` (`src/Entities/Icebergs/`) has no health, is never a punch, slice or
+projectile target, draws no healthbar and counts toward none of the mob caps (`MobCaps`); the
+`IcebergManager` (`src/Simulation/Icebergs/`, owned by `World`, main thread only) keeps its own
+`IcebergConfig.NaturalCap` (the ring spawner) and `MaxAlive` (every forced spawn: a scenario, a
+save restore). All tuning lives in `Config/IcebergConfig.cs`.
+
+- **Content.** `assets/data/entities/iceberg.json` names no `hp` and lists its size classes as
+  `variants` (`iceberg_small`, `_medium`, `_large`.bbmodel, generated with their shared skin by
+  `tools/generate-iceberg-models.py`, byte-identical re-runs, `--check`). Model y = 0 is the
+  **waterline**; every cube is axis-aligned and snapped to 8 px vertically, the one cube crossing
+  the waterline is a **shelf** whose top is 8 px up (a swimmer can climb onto it), and every cube
+  above it is an 8 px **step** inset from the one below on all four sides, so walking auto-step
+  (`PlayerPhysics.WalkStepHeight`, half a block) climbs to the top from any side;
+  `BodySolidsTests.ASwimmerCanBoardEveryIcebergVariant` enforces it.
+- **Shape and placement.** `IcebergShape` reads a variant's collision boxes from the model's own
+  cubes through `EntityModel.CubeBoxes` (the frame the baked mesh uses) and is the one definition
+  of a berg's placement: `RotateQuarter` turns a box (each quarter turn maps (x, z) to (z, -x),
+  exactly `Matrix4x4.CreateRotationY(pi/2)` on a row vector, so the boxes stay axis-aligned) and
+  `ModelMatrix` is the matrix the renderer draws with (`IcebergShapeTests` checks they agree for
+  every turn). A berg rolls a variant, a **horizontal-only** scale (`ScaleMin..ScaleMax`, so step
+  heights and freeboard stay exactly as authored), a quarter-turn yaw and a seed, all fixed for
+  life; its center's Y is fixed at the waterline. Its mass is `Density * Volume * scale^2`.
+- **Motion.** `IcebergMotion`: the velocity eases (`WaterDragRate`) toward a drift along the world
+  wind (`Wind.Direction`, turned by a seed-hashed angle within `DriftSpreadRadians`, at
+  `DriftSpeed`), a push adds `PlayerPushForce` along the summed contact normals over the mass (the
+  same push moves a big berg less), capped at `MaxSpeed`. A berg moves along X then Z; a move
+  whose leading face enters a cell layer holding a solid or unloaded cell anywhere across the
+  berg's bounds (the pack ice, shallows, land), or whose bounds would overlap another berg, or
+  whose boxes would push into a standing (not riding, flying or dead) target's body, stops that
+  axis. A berg only moves while a target is within `SimulateRadiusBlocks` and every chunk under it
+  is loaded.
+- **Pushing** is derived from positions, with nothing on the wire: a target in side contact with a
+  berg box (`IcebergContact.TrySideContact`, within `ContactSlackBlocks`) pushes it along the
+  contact normal, unless it rides the berg, flies or is dead (`IMobTarget.IsFlying` / `IsDead`,
+  default members the camera and `ServerPlayer` override).
+- **Standing on a berg.** The player body collides with berg boxes through one seam,
+  `Player/IBodySolids.cs`: `BodyCollision.BodyCollides` / `MoveOnAxis` / `TryStepUp` /
+  `PushOutOfBox` take an optional `IBodySolids`, `PlayerPhysics` passes `Camera.BodySolids` (the
+  world's `IcebergManager`), so walking, auto-step, the swim exit and landing all treat the boxes
+  as solid. The rider is carried client-side (`IcebergManager.CarryAndPushOut`, after the bergs
+  moved): a body riding a berg's boxes where they stood before the move is moved by the berg's
+  displacement through the body collision with its own berg ignored (terrain and other bergs still
+  stop it), then a body left inside any box is pushed out. Singleplayer runs it after
+  `IcebergManager.Update` (`MobDirector.UpdateIcebergs`), a client after its mirrors dead-reckoned
+  (`MobDirector.AnimateIcebergMirrors`). A placement into a cell a berg box overlaps is refused
+  (`IcebergManager.OverlapsCell`, beside the falling-cube check); the air above a low ledge is free.
+- **Wobble** (`IcebergWobble`) is render only: bob, pitch and roll as two sines each of hashed
+  periods and phases, a pure function of (seed, lighting clock), smaller for a bigger berg. The
+  collision boxes never bob, so a rider's feet may visually bob by its small amplitude.
+- **Spawning and life.** Every `SpawnIntervalSeconds`, below the natural cap, the spawner tries
+  ring points around a target in turn (`IcebergSpawner.TryFindSite`): the stored column must be
+  `Biome.Ocean` at `WorldGenerationConfig.SeaLevel` (no river or lake), its climate in the band
+  (`IcebergSpawnRule.InBand`: cold from `SpawnColdMin`, a little below `PackIceColdStart`, up to
+  `FreezeColdThreshold`, and the top water not frozen by `SnowGenerator.IsFrozenWater`), the berg's
+  whole placed bounds loaded and free of solids (deep and wide enough) and no target within
+  `SpawnClearRadiusBlocks`. The climate read is an injectable `IcebergClimate`; the default reads
+  worldgen and none for a column a world source supplies. A fresh berg rises out of the sea over
+  `EmergeSeconds` (render only); past `DespawnRadiusBlocks` from every target it is removed; when
+  its rolled life runs out and nobody rides it or stands within the clear radius it sinks over
+  `SinkSeconds` (no longer colliding) and is removed. With nobody online nothing spawns, moves or
+  despawns.
+- **Saves and the wire.** `entities.json` carries an optional `Icebergs` list (variant, scale,
+  turns, seed, waterline center, velocity, life left); a saved berg is restored once every chunk
+  under its placed bounds is loaded. On a server each berg rides `EntityList` as
+  `NetEntityKind.Iceberg` (see "Multiple players and chat"); a client mirrors it without
+  simulation (`Iceberg.Mirror`, fully emerged, dead-reckoned along its velocity for at most
+  `MirrorMaxLeadSeconds` past a snapshot, `IcebergManager.ReplaceMirrors` / `AnimateMirrors`).
+- **Rendering.** `Rendering/Actors/IcebergPasses.cs` builds one mesh and skin per variant
+  (`EntityModel.FromData`) and draws each berg with `IcebergPasses.ModelMatrix` (the wobble's tilt
+  about the waterline center, then `IcebergShape.ModelMatrix` at the center raised by the bob and
+  lowered by the rise or sink) in the entity pass (before contact AO), the near shadow cascade and
+  the water mirror (whose reuse motion signal reads each berg's center). The wobble clock
+  (`IcebergPasses.Time`) is set once a frame before the shadows, so the three agree.
+- **Debugger.** The item debugger's ENTITIES tab offers one mode per variant for the iceberg
+  (`ITEM_DEBUGGER_SELECT=iceberg ITEM_DEBUGGER_ANIM=iceberg_large`).
+
+Tests: `Entities/Icebergs/` (shape, motion, wobble, spawn band, contact, the berg),
+`Simulation/Icebergs/` (`IcebergManagerTests`: drift stopped by the ice and by other bergs, frozen
+over unloaded chunks, a small berg pushed farther than a large one, carry, push-out, mirrors,
+despawn and sinking; `IcebergSpawnerTests`; `IcebergWorldTests`: the spawn op, standing on a berg,
+the placement refusal and the save restore), `Player/BodySolidsTests`, the hover rule in
+`MovementRulesTests`, the codec and protocol tests and `GameServerTests.AnIcebergReachesTheClientsEntityList`.
+`visual-examples/icebergs.json` (`VOXEL_TIME=147`) films the three sizes, the wobble, the drift,
+standing on a berg, a push and the reflection.
+
+Known gaps (TODO `M-27`): no natural bergs on a column a world source supplies (no worldgen climate there);
+item drops, mobs, projectiles, TNT blasts, the punch and slice cones and the block raycast ignore
+bergs; the server's endpoint-collision rule is not judged against bergs (only the hover rule is);
+a body merely resting against a berg nudges it a hair until contact breaks; mirrors dead-reckon
+without collision; a rider's feet visually bob by the wobble; and a block that lands or hardens
+inside a berg's bounds (a falling block, a fluid crust, a felled tree) is not refused and is
+carried inside it.
 
 ### Entity animation
 

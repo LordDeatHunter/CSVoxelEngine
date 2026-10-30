@@ -265,6 +265,7 @@ single-arc player.
   Open: falling-leaf particles should sample the foliage field; flowers and water can opt into
   `biomeTint`'s `tile` form; and the biome roster itself can grow (swamp, jungle, volcanic,
   underground biomes).
+  Terrain relief (highlands, ranges, massifs, lone peaks) is in `BIOMEGEN.md` §6.
 - [ ] **`P-25` · More ores + deeper strata** — P1, M.
   Tin/iron/gold/… veins placed deterministically like trees/pebbles/malachite; tiers gate tools
   (`P-1`, `P-7`, `P-44`).
@@ -278,6 +279,7 @@ single-arc player.
 - [ ] **`P-56` · Ocean & island content** — P3, M.
   Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.
   Ties `F-19`.
+  Island, archipelago and great lake *shape* is in `BIOMEGEN.md` §6; the remaining ideas are its §12.
 - [ ] **`P-57` · World events** — P2, M.
   Blood moons, raids, meteors, wandering bosses, seasonal changes; drives `F-5` and gives the
   base a reason to be defended (`P-54`).
@@ -496,6 +498,20 @@ single-arc player.
   station registries (campfire, quern, kiln, casting), primed TNT, falling blocks, projectiles or
   toppling trees. Add a side-car per registry or one `block-entities.json`, restored like mobs
   once the cell's chunk loads.
+- [ ] **`M-27` · Iceberg gaps** — P3, M.
+  Drifting icebergs (`AGENTS.md` "Icebergs") ignore item drops, mobs, projectiles, TNT blasts, the
+  punch/slice cones and the block raycast; the server judges a rider's hover against them but not
+  the endpoint collision; a body resting against a berg nudges it slightly; client mirrors
+  dead-reckon without collision; an imported (supplied) sea spawns none; and a block that lands or
+  hardens inside a berg's bounds is not refused.
+- [ ] **`M-28` · Great-lake gaps** — P3, M.
+  The great-lake tier (`BIOMEGEN.md` §6 great lakes, `WorldGen/GreatLakes.cs`) leaves four gaps: an
+  elevated great lake (surface above `SeaLevel`) mirrors against the single sea-level reflection
+  plane (`RenderManager.WaterPlaneY`), like an elevated pond; an elevated lake's shore gets no beach
+  sand, since `IsBeachHeight` keys on `SeaLevel`; rivers neither carve toward an elevated lake nor
+  flow out of one (a river-fed lake simply rests at `SeaLevel`; the per-column river target level
+  and outflow rivers are phase E); and a hot spring placed on a great-lake shore overrides the
+  stored water level there (`TerrainGenerator.Compute` applies hot springs after the lake carve).
 - [ ] **`M-13` · Far-LOD canopy for grown trees** — P3, M.
   `PoisonCanopy` only removes canopy, so a grown tree shows no far canopy until reload; needs an
   add-canopy override keyed by column. Also spends `CanopyDisturbedLimit` budget per grow.
