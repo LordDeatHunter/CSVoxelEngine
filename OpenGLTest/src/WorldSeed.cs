@@ -42,7 +42,7 @@ public static class WorldSeed
     public static bool WorldIsLive => Volatile.Read(ref _liveWorlds) > 0;
 
     /// <summary>
-    /// Sets the world seed, rebuilds every worldgen noise from it, clears the five worldgen caches
+    /// Sets the world seed, rebuilds every worldgen noise from it, clears every worldgen cache
     /// and resets the process-global LOD edit state (column caps, felled-canopy markers, surface
     /// overrides). It always does the full reset, even when <paramref name="seed"/> equals the
     /// current seed, because a
@@ -75,6 +75,8 @@ public static class WorldSeed
         ColumnCache.Reset();
         WormCarver.ResetCellCache();
         TreeGenerator.ResetCaches();
+        TerrainPeaks.ResetCaches();
+        GreatLakes.ResetCaches();
 
         // The previous world's edit state is process-global and must not leak into the next one.
         LodColumnCaps.ResetColumnCaps();

@@ -67,7 +67,52 @@ internal static class TerrainSites
     /// nominal one, and the cull leaves no step.
     /// </summary>
     internal static float InwardWobble(float nominal, float amplitude, FastNoiseLite noise, float x, float z) =>
-        nominal * (1f - amplitude * (0.5f + 0.5f * noise.GetNoise(x, z)));
+        InwardWobbleOf(nominal, amplitude, noise.GetNoise(x, z));
+
+    /// <summary>
+    /// <see cref="InwardWobble"/> from an already read noise value (-1..1), so a caller that tests several
+    /// outlines at one point (a great lake's lobes) reads the noise once.
+    /// </summary>
+    internal static float InwardWobbleOf(float nominal, float amplitude, float noiseValue) =>
+        nominal * (1f - amplitude * (0.5f + 0.5f * noiseValue));
+
+    /// <summary>
+    /// Whether <paramref name="test"/> holds at any point of the circle of <paramref name="radius"/> round
+    /// the center, sampled every <paramref name="spacing"/> blocks of arc starting on +X; a radius of 0 or
+    /// less tests the center alone. Pass a static, non-capturing delegate field so a hot caller allocates
+    /// nothing.
+    /// </summary>
+    internal static bool AnyOnRing(float centerX, float centerZ, float radius, float spacing,
+        Func<float, float, bool> test)
+    {
+        if (radius <= 0f) return test(centerX, centerZ);
+
+        var points = Math.Max(1, (int)MathF.Ceiling(MathF.Tau * radius / spacing));
+        for (var k = 0; k < points; k++)
+        {
+            var angle = k * (MathF.Tau / points);
+            if (test(centerX + MathF.Cos(angle) * radius, centerZ + MathF.Sin(angle) * radius)) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="test"/> holds anywhere in the annulus from <paramref name="rIn"/> to
+    /// <paramref name="rOut"/> round the center: <see cref="AnyOnRing"/> over evenly spaced rings at most
+    /// <paramref name="spacing"/> apart, both edges included. Pass a static, non-capturing delegate field
+    /// so a hot caller allocates nothing.
+    /// </summary>
+    internal static bool AnyInAnnulus(float centerX, float centerZ, float rIn, float rOut, float spacing,
+        Func<float, float, bool> test)
+    {
+        var rings = Math.Max(1, (int)MathF.Ceiling((rOut - rIn) / spacing));
+        for (var ring = 0; ring <= rings; ring++)
+            if (AnyOnRing(centerX, centerZ, rIn + (rOut - rIn) * ring / rings, spacing, test))
+                return true;
+
+        return false;
+    }
 
     /// <summary>The <paramref name="k"/>-th of <see cref="RimPoints"/> points evenly spaced on the circle of
     /// <paramref name="radius"/> round the center, starting on +X.</summary>

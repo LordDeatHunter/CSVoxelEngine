@@ -69,6 +69,9 @@ internal static class TerrainNoise
     /// whose threshold an archipelago lowers.</summary>
     internal static FastNoiseLite IslandSmallNoise;
 
+    /// <summary>Pulls a great lake lobe's outline inward (GreatLakes.Sample), so its shore has bays.</summary>
+    internal static FastNoiseLite GreatLakeShapeNoise;
+
     static TerrainNoise()
     {
         Reseed();
@@ -147,6 +150,8 @@ internal static class TerrainNoise
         // Offsets 159 and 160 were unused (phase B stopped at 158)
         IslandNoise = MakeNoise(159, WorldGenerationConfig.IslandLargeFrequency, octaves: 2);
         IslandSmallNoise = MakeNoise(160, WorldGenerationConfig.IslandSmallFrequency, octaves: 2);
+        // Offset 161 was the next free one (phase C stopped at 160)
+        GreatLakeShapeNoise = MakeNoise(161, WorldGenerationConfig.GreatLakeShapeFrequency, octaves: 2);
 
         // Mountains wind like ravines and rivers, so a range snakes instead of tracking a contour
         MountainWarp = MakeWarp(87, WorldGenerationConfig.MountainWarpFrequency, WorldGenerationConfig.MountainWarpAmplitude);

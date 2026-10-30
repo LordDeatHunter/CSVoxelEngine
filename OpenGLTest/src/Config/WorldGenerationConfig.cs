@@ -47,6 +47,13 @@ public static class WorldGenerationConfig
     public const int PeakSiteCacheCapacity = 4096;
     public const int PeakSiteCacheGenerations = 4;
 
+    // GreatLakes' verdict cache: one GreatLakeSite per great-lake cell (an accepted lake or none),
+    // a pure function of (cell, seed). Its factory walks thousands of LandHeight and river samples
+    // over the rim, the interior and the shore annulus, which is what the cache keeps off every
+    // column. An entry is a few lobes of floats; GENERATIONS matches the other sites.
+    public const int GreatLakeSiteCacheCapacity = 512;
+    public const int GreatLakeSiteCacheGenerations = 4;
+
     // Blocks of dirt under the grass: DirtDepthBase +- DirtDepthVariation, varying slowly over the map
     public const float DirtDepthBase = 3f;
     public const float DirtDepthVariation = 1.5f;
@@ -114,6 +121,49 @@ public const float LakeChance = 0.35f;      // fraction of cells that grow a lak
 public const float LakeMinRadius = 11f;
 public const float LakeMaxRadius = 46f;
 public const int LakeSpawnClearRadius = 72; // no lake this close to the origin spawn
+
+    // --- Great lakes (BIOMEGEN §6, phase D) ---
+    // A second, much rarer lake tier (GreatLakes): one hashed candidate per GreatLakeCellBlocks
+    // cell, a union of one to three lobe discs whose outlines are wobbled inward by
+    // GreatLakeShapeNoise, optionally carrying an island. Like a pond it chooses its own surface
+    // from its rim (GreatLakeBankDepth under the lowest rim point) and is refused on a rim that
+    // climbs more than GreatLakeSiteFlatness, on ocean, desert or a biome that holds no water, on
+    // interior ground rising over the rim, and over a massif or lone peak. A cutting river reaching
+    // its shore makes it river-fed: it then rests at SeaLevel, the river's own waterline. Ponds
+    // yield to it, the river yields inside its bowl, and a ravine tapers out across its guard band.
+    public const bool GreatLakesEnabled = true;      // false: no great lake anywhere (ponds and rivers unchanged)
+    public const int GreatLakeCellBlocks = 1280;     // candidate grid, one possible great lake per cell
+    public const float GreatLakeChance = 0.3f;       // fraction of cells that roll a candidate
+    public const float GreatLakeRadiusSkew = 1.4f;   // exponent on the size roll: most lakes nearer the minimum
+    public const float GreatLakeMinRadius = 120f;    // main lobe radius of the smallest great lake
+    public const float GreatLakeMaxRadius = 400f;    // main lobe radius of the largest great lake
+    public const float GreatLakeMinDepth = 15f;      // floor depth under the surface, rolled per lake...
+    public const float GreatLakeMaxDepth = 30f;      // ...up to this
+    public const float GreatLakeBankDepth = 3f;      // surface under the lowest rim; above the pond's 2, since a
+                                                     // 30-deep bowl's sub-threshold carve takes ~0.05*33 off a bank
+    public const float GreatLakeSiteFlatness = 20f;  // reject a site whose rim climbs more than this
+    public const float GreatLakeInteriorRiseMax = 12f; // how far interior ground may rise over the highest rim
+                                                       // point before the site would erase relief
+    public const float GreatLakeShoreShareMin = 0.2f; // shore ramp share of the radius on a flat rim...
+    public const float GreatLakeShoreShareMax = 0.4f; // ...widening to this as the rim spread reaches the flatness
+    public const float GreatLakeRimBandShare = 0.2f; // share of the shore ramp, from the outline inward, the rim walk samples
+    public const float GreatLakeRimSpacing = 16f;    // blocks between rim walk samples
+    public const float GreatLakeInteriorSpacing = 32f; // blocks between the coarse interior pass's samples
+    public const float GreatLakeShapeFrequency = 1f / 120f; // outline wobble: bays a few lobes across a lake
+    public const float GreatLakeShapeAmplitude = 0.18f;    // fraction of a lobe radius the wobble pulls inward
+    public const float GreatLakeExtraLobeChance = 0.6f; // chance of each of the two extra lobes
+    public const float GreatLakeLobeOffsetMin = 0.5f; // extra lobe center distance from the main center, in main radii...
+    public const float GreatLakeLobeOffsetMax = 0.9f; // ...up to this
+    public const float GreatLakeLobeRadiusMin = 0.4f; // extra lobe radius, in main radii...
+    public const float GreatLakeLobeRadiusMax = 0.7f; // ...up to this
+    public const float GreatLakeRavineGuardBlocks = 24f; // band past the outline across which a ravine tapers in
+    public const float GreatLakePondClearance = 16f; // a pond keeps this far beyond a great lake's guard band
+    public const float GreatLakeRiverFedMaxDrop = 12f; // the most a river-fed lake may sit below its rim-chosen surface
+    public const float GreatLakeIslandChance = 0.5f; // chance a lake carries an island in its main lobe
+    public const float GreatLakeIslandMinRadius = 18f; // island radius range
+    public const float GreatLakeIslandMaxRadius = 60f;
+    public const float GreatLakeIslandShoreShare = 0.5f; // share of the island radius its shore ramp takes
+    public const float GreatLakeSpawnClearRadius = ReliefSpawnClearStart; // no great lake reaches this close to the origin
 
     // Rivers: warped ridge lines (|noise| near zero) gated by a rarity mask. The channel is cut
     // RiverBedDepth below the waterline, then faded out as the local land climbs above RiverLowEnd,
@@ -332,7 +382,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float ValleyRoughFrequency = 1f / 90f;  // small roughness on the valley floors
     public const float ValleyRoughAmplitude = 2.5f;      // blocks
 
-    // --- Relief: highlands (BIOMEGEN 13.1) ---
+    // --- Relief: highlands (BIOMEGEN §6) ---
     // A continent-scale highland weight (TerrainRelief.HighlandWeight), orthogonal to the climate:
     // it lifts the base height of the forest and dune profiles and multiplies the hill amplitude,
     // and mountain ranges rise only where it is positive. Every term it drives is exactly neutral
@@ -385,7 +435,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // Height at which a peak wears full snow whatever its climate (SnowGenerator.ColdWeightAt)
     public const int MountainSnowFullHeight = 96;
 
-    // --- Relief: massifs and lone peaks (BIOMEGEN 13.1, phase B) ---
+    // --- Relief: massifs and lone peaks (BIOMEGEN §6, phase B) ---
     // Hashed sites (TerrainSites, TerrainPeaks) summed into the forest profile after the ranges.
     // A massif is a rare, large mountain: each accepted site rolls an absolute summit height and
     // rises from the relief land at its center to it, a pointed body with spurred flanks inside a
@@ -435,7 +485,7 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float ReliefCeilingHeight = 148f;
     public const float ReliefCeilingKnee = 20f;
 
-    // --- Islands and archipelagos (BIOMEGEN 13.2, phase C) ---
+    // --- Islands and archipelagos (BIOMEGEN §6, phase C) ---
     // An ocean-gated island term: oceanWeight' = oceanWeight * (1 - islandLand), folded into the one
     // place the ocean weight is produced (BiomeClassifier.BiomeWeights), so every consumer sees the
     // same island. It is exactly 0 wherever the pre-island ocean weight is at or below

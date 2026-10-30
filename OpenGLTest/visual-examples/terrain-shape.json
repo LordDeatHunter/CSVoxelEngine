@@ -1,14 +1,18 @@
 {
-  // Relief check (BIOMEGEN.md 13 phases A, B and C: highlands, linear mountain ranges, massifs and
-  // lone peaks, islands and archipelagos): run from
+  // Relief check (BIOMEGEN.md 13 phases A to D: highlands, linear mountain ranges, massifs and
+  // lone peaks, islands and archipelagos, great lakes): run from
   // OpenGLTest/ with
   //   VOXEL_TIME=1090 VOXEL_SCRIPT=visual-examples/terrain-shape.json
   // Shots land in visual/terrain-shape/. The whole run takes about eight minutes of clock, far
   // longer than the afternoon after noon (147) lasts, so it starts at 1090, which is -110 one
-  // 1200 s day later, 43 s after sunrise (about 1047): measured, the first shot lands near 1106,
-  // with the sun up, the middle ones around noon (1347), and the last near 1580, before sunset
-  // (about 1647). Phase C's five shots moved the start down from 1160, which would have put the
-  // last of them past sunset. Starting at 147 instead leaves the later shots in dusk and night.
+  // 1200 s day later, 43 s after sunrise (about 1047): the first shot lands near 1108, with the
+  // sun up, the middle ones around noon (1347), and the last near 1585, before sunset (about
+  // 1647). The scene is only brightly lit from about 1080 to 1610, so the run has to fit in about
+  // 530 s: Phase C's five shots moved the start down from 1160, and phase D's six shots cut the
+  // waits instead (20 s after a long hop, 6 s within one lake; 22 s instead of 30 for the earlier
+  // non-vista shots, 25 for the vistas), since at 1090 with the old waits the last three
+  // great-lake shots fell after sunset and an earlier start leaves the first ones in the dawn.
+  // Starting at 147 instead leaves the later shots in dusk and night.
   //
   // The vantage points come from a headless probe over TerrainRelief.HighlandWeight,
   // TerrainRelief.MountainHeight, RangeLattice and RangeDirection, WaterBodies.RiverWeight and
@@ -81,6 +85,26 @@
   // island land (an island now rises just west of the iceberg row, around (-1100, -2510)). Both
   // were re-run: the bergs, the push and the pack-ice gradient still read, so they carry a note
   // instead of a move.
+  // Phase D (great lakes, GreatLakes), from a headless probe over GreatLakes.SiteAt and Sample,
+  // WaterBodies.RiverWeight, TerrainGenerator.BiomeAt and ColumnCache.Get (default seed). The
+  // nearest accepted lakes past the spawn clearing are cell (4, 3) (three lobes, river-fed at
+  // SeaLevel 0, center (5773, 4397), lobe radii 148/74/95, Frozen, so it is iced over), cell
+  // (-6, -5) (one lobe of radius 179 at (-7322, -6252), river-fed at 0, forest) and cell (-8, -8)
+  // (rim-fed at surface 8 with banks at 11..15, lobes (-9341, -9791) R 128 and (-9340, -9725) R 78,
+  // an island of radius 60 at (-9340, -9789) whose ground stands at 15, forest). The lobed lakes
+  // in reach, (4, 3) and (-4, 10), are both frozen, so the bay is the neck of (-8, -8)'s north lobe:
+  //   great_lake_river     - the river that runs into lake (4, 3) from the north-east, joining it
+  //                          near (5873, 4345); both iced at the one level 0, from its bank at y 30
+  //   great_lake_lod_vista - from 330 blocks west of lake (-6, -5) at y 150 (yaw 0): its near half
+  //                          is chunk water and its far half lies past the full-detail ring in the
+  //                          far LOD, so the two sheets must meet without a step
+  //   great_lake_shore     - on the east bank of lake (-8, -8) (ground 11, water 8) looking west
+  //                          over the water to the island
+  //   great_lake_island    - the island from y 40 north-east of the lake
+  //   great_lake_bay       - from the north end at y 40 looking south into the narrower north lobe
+  //   great_lake_height    - 80 blocks over the surface south of the lake, looking down onto the
+  //                          whole outline, its terraced banks and the island
+  // The same probe audited every scenario's teleports: none lies within 400 blocks of a great lake.
   // The camera flies (so it hovers instead of falling), every teleport is followed by a wait while
   // the streaming ring and the far LOD fill around the new position, and the repeat teleport
   // restores the exact pose before the frame is taken.
@@ -93,12 +117,12 @@
     { "op": "screenshot", "name": "origin_valley", "hideHud": true },
 
     { "op": "teleport", "pos": [-3450.5, 110.5, 2000.5], "yaw": 45, "pitch": -16 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 22 },
     { "op": "teleport", "pos": [-3450.5, 110.5, 2000.5], "yaw": 45, "pitch": -16 },
     { "op": "screenshot", "name": "forest_highland", "hideHud": true },
 
     { "op": "teleport", "pos": [1017.5, 120.5, 3627.5], "yaw": 54, "pitch": -12 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 22 },
     { "op": "teleport", "pos": [1017.5, 120.5, 3627.5], "yaw": 54, "pitch": -12 },
     { "op": "screenshot", "name": "range_along", "hideHud": true },
 
@@ -108,22 +132,22 @@
     { "op": "screenshot", "name": "range_across", "hideHud": true },
 
     { "op": "teleport", "pos": [-4100.5, 70.5, -4200.5], "yaw": 45, "pitch": -14 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 22 },
     { "op": "teleport", "pos": [-4100.5, 70.5, -4200.5], "yaw": 45, "pitch": -14 },
     { "op": "screenshot", "name": "arid_plateau", "hideHud": true },
 
     { "op": "teleport", "pos": [-1421.5, 60.5, 4690.5], "yaw": 107, "pitch": -6 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 22 },
     { "op": "teleport", "pos": [-1421.5, 60.5, 4690.5], "yaw": 107, "pitch": -6 },
     { "op": "screenshot", "name": "highland_border", "hideHud": true },
 
     { "op": "teleport", "pos": [-2950.5, 55.5, 3275.5], "yaw": -146, "pitch": -10 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 22 },
     { "op": "teleport", "pos": [-2950.5, 55.5, 3275.5], "yaw": -146, "pitch": -10 },
     { "op": "screenshot", "name": "river_wash", "hideHud": true },
 
     { "op": "teleport", "pos": [-30.5, 150.5, 4230.5], "yaw": 90, "pitch": -40 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 22 },
     { "op": "teleport", "pos": [-30.5, 150.5, 4230.5], "yaw": 90, "pitch": -40 },
     { "op": "screenshot", "name": "range_cell_border", "hideHud": true },
 
@@ -133,7 +157,7 @@
     { "op": "screenshot", "name": "lod_vista", "hideHud": true },
 
     { "op": "teleport", "pos": [631.5, 50.5, -4900.5], "yaw": 0, "pitch": 0 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 22 },
     { "op": "teleport", "pos": [631.5, 50.5, -4900.5], "yaw": 0, "pitch": 0 },
     { "op": "screenshot", "name": "massif_far", "hideHud": true },
 
@@ -148,17 +172,17 @@
     { "op": "screenshot", "name": "massif_summit", "hideHud": true },
 
     { "op": "teleport", "pos": [-2871.5, 30.5, 3061.5], "yaw": 0, "pitch": 3 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 22 },
     { "op": "teleport", "pos": [-2871.5, 30.5, 3061.5], "yaw": 0, "pitch": 3 },
     { "op": "screenshot", "name": "lone_peak", "hideHud": true },
 
     { "op": "teleport", "pos": [231.5, 150.5, -4900.5], "yaw": 0, "pitch": -6 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 25 },
     { "op": "teleport", "pos": [231.5, 150.5, -4900.5], "yaw": 0, "pitch": -6 },
     { "op": "screenshot", "name": "massif_lod_vista", "hideHud": true },
 
     { "op": "teleport", "pos": [4120.5, 40.5, -9.5], "yaw": 0, "pitch": -4 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 22 },
     { "op": "teleport", "pos": [4120.5, 40.5, -9.5], "yaw": 0, "pitch": -4 },
     { "op": "screenshot", "name": "island_far", "hideHud": true },
 
@@ -173,13 +197,43 @@
     { "op": "screenshot", "name": "island_knoll", "hideHud": true },
 
     { "op": "teleport", "pos": [3158.5, 140.5, 2929.5], "yaw": -28, "pitch": -25 },
-    { "op": "wait", "seconds": 30 },
+    { "op": "wait", "seconds": 22 },
     { "op": "teleport", "pos": [3158.5, 140.5, 2929.5], "yaw": -28, "pitch": -25 },
     { "op": "screenshot", "name": "archipelago_chain", "hideHud": true },
 
     { "op": "teleport", "pos": [3700.5, 150.5, 4.5], "yaw": 0, "pitch": -6 },
     { "op": "wait", "seconds": 25 },
     { "op": "teleport", "pos": [3700.5, 150.5, 4.5], "yaw": 0, "pitch": -6 },
-    { "op": "screenshot", "name": "island_lod_vista", "hideHud": true }
+    { "op": "screenshot", "name": "island_lod_vista", "hideHud": true },
+
+    { "op": "teleport", "pos": [5935.5, 30.5, 4215.5], "yaw": 114, "pitch": -11 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [5935.5, 30.5, 4215.5], "yaw": 114, "pitch": -11 },
+    { "op": "screenshot", "name": "great_lake_river", "hideHud": true },
+
+    { "op": "teleport", "pos": [-7650.5, 150.5, -6252.5], "yaw": 0, "pitch": -18 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [-7650.5, 150.5, -6252.5], "yaw": 0, "pitch": -18 },
+    { "op": "screenshot", "name": "great_lake_lod_vista", "hideHud": true },
+
+    { "op": "teleport", "pos": [-9239.5, 14.0, -9791.5], "yaw": 180, "pitch": -6 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "teleport", "pos": [-9239.5, 14.0, -9791.5], "yaw": 180, "pitch": -6 },
+    { "op": "screenshot", "name": "great_lake_shore", "hideHud": true },
+
+    { "op": "teleport", "pos": [-9230.5, 40.5, -9700.5], "yaw": -141, "pitch": -10 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "teleport", "pos": [-9230.5, 40.5, -9700.5], "yaw": -141, "pitch": -10 },
+    { "op": "screenshot", "name": "great_lake_island", "hideHud": true },
+
+    { "op": "teleport", "pos": [-9340.5, 40.5, -9620.5], "yaw": -90, "pitch": -14 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "teleport", "pos": [-9340.5, 40.5, -9620.5], "yaw": -90, "pitch": -14 },
+    { "op": "screenshot", "name": "great_lake_bay", "hideHud": true },
+
+    { "op": "teleport", "pos": [-9341.5, 88.5, -9900.5], "yaw": 90, "pitch": -45 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "teleport", "pos": [-9341.5, 88.5, -9900.5], "yaw": 90, "pitch": -45 },
+    { "op": "screenshot", "name": "great_lake_height", "hideHud": true }
   ]
 }

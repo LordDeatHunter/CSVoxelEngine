@@ -18,7 +18,8 @@ namespace VoxelEngine.Tests.Lod;
 /// make the levels bury each other and the ushort vertex budget the steeper side skirts eat into.
 /// The islands rising out of deep water get the same checks over an island (with its summit's sky
 /// exposure) and an archipelago, and their shores are held to leave no more dry pits in the far
-/// shell than a continental coast does.
+/// shell than a continental coast does. A great lake's shore region, whose bowl is dug deep into the
+/// land, is checked the same way.
 /// </summary>
 [Collection("LOD column caps")]
 public sealed class LodReliefTests
@@ -126,6 +127,16 @@ public sealed class LodReliefTests
         {
             var (rx, rz) = FindArchipelagoRegion(level);
             AssertLodInsideTerrain(level, rx, rz, "archipelago");
+        }
+    }
+
+    [Fact]
+    public void TheFarLodSitsInsideTheChunkTerrainOverAGreatLake()
+    {
+        for (var level = 0; level < LodRegion.Levels.Length; level++)
+        {
+            var (rx, rz) = FindGreatLakeRegion(level);
+            AssertLodInsideTerrain(level, rx, rz, "great lake");
         }
     }
 
@@ -679,6 +690,35 @@ public sealed class LodReliefTests
 
         Assert.Fail($"no {what} region with relief past {minReliefCells} level-{level} cells in block box " +
                     $"x, z in [{SearchMin}, {SearchMax}]");
+        return (0, 0);
+    }
+
+    /// <summary>
+    /// The level-<paramref name="level"/> region holding the first accepted great lake's shore point:
+    /// on its main lobe, <c>Radius * (1 - ShoreShare / 2)</c> out toward +X, half way up the shore
+    /// ramp, so the region spans both water and dry bank. The region must lie wholly inside the
+    /// searched box.
+    /// </summary>
+    private static (int Rx, int Rz) FindGreatLakeRegion(int level)
+    {
+        const int cellBlocks = WorldGenerationConfig.GreatLakeCellBlocks;
+        var spec = LodRegion.Levels[level];
+        for (var gx = FloorDiv(SearchMax, cellBlocks); gx >= FloorDiv(SearchMin, cellBlocks); gx--)
+        for (var gz = FloorDiv(SearchMax, cellBlocks); gz >= FloorDiv(SearchMin, cellBlocks); gz--)
+        {
+            var site = GreatLakes.SiteAt(gx, gz);
+            if (!site.Exists) continue;
+
+            var x = (int)MathF.Floor(site.Lobe0.X + site.Lobe0.Radius * (1f - site.ShoreShare / 2f));
+            var z = (int)MathF.Floor(site.Lobe0.Z);
+            var rx = FloorDiv(x, spec.RegionBlocks);
+            var rz = FloorDiv(z, spec.RegionBlocks);
+            if (!RegionInSearchBox(rx, spec) || !RegionInSearchBox(rz, spec)) continue;
+
+            return (rx, rz);
+        }
+
+        Assert.Fail($"no level-{level} great-lake shore region in block box x, z in [{SearchMin}, {SearchMax}]");
         return (0, 0);
     }
 

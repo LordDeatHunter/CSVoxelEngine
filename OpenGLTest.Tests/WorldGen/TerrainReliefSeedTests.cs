@@ -9,7 +9,8 @@ namespace VoxelEngine.Tests.WorldGen;
 /// <summary>
 /// The relief layer is a pure function of position and the world seed: a seed swap changes it,
 /// and swapping back reproduces it bit for bit. The hashed massif and lone-peak site caches follow
-/// the seed too, so a cached verdict never outlives the seed it was computed under. The island term
+/// the seed too, so a cached verdict never outlives the seed it was computed under, and so does the
+/// great-lake site cache. The island term
 /// and its hashed archipelagos follow the seed the same way.
 /// </summary>
 [Collection("Worldgen seed")]
@@ -36,6 +37,12 @@ public sealed class TerrainReliefSeedTests
     private static IEnumerable<(int X, int Z)> MassifCells => Cells(MassifCellHalfExtent, MassifCellStride);
     private static IEnumerable<(int X, int Z)> PeakCells => Cells(PeakCellHalfExtent, PeakCellStride);
 
+    // The great-lake cells the site samples cover
+    private const int GreatLakeCellHalfExtent = 8;
+    private const int GreatLakeCellStride = 2;
+
+    private static IEnumerable<(int X, int Z)> GreatLakeCells => Cells(GreatLakeCellHalfExtent, GreatLakeCellStride);
+
     private static void AddSite(List<(string, int)> samples, string kind, (int X, int Z) cell, TerrainSite site)
     {
         samples.Add(($"{kind} site exists in cell {cell}", site.Exists ? 1 : 0));
@@ -43,7 +50,17 @@ public sealed class TerrainReliefSeedTests
         samples.Add(($"{kind} site height in cell {cell}", BitConverter.SingleToInt32Bits(site.Height)));
     }
 
-    // The cached massif and lone-peak verdicts over the site grid, as raw bits
+    private static void AddGreatLake(List<(string, int)> samples, (int X, int Z) cell, GreatLakeSite site)
+    {
+        samples.Add(($"great lake exists in cell {cell}", site.Exists ? 1 : 0));
+        samples.Add(($"great lake surface in cell {cell}", site.Surface));
+        samples.Add(($"great lake floor in cell {cell}", site.Floor));
+        samples.Add(($"great lake lobe count in cell {cell}", site.LobeCount));
+        samples.Add(($"great lake center x in cell {cell}", BitConverter.SingleToInt32Bits(site.Lobe0.X)));
+        samples.Add(($"great lake center z in cell {cell}", BitConverter.SingleToInt32Bits(site.Lobe0.Z)));
+    }
+
+    // The cached massif, lone-peak and great-lake verdicts over the site grid, as raw bits
     private static List<(string Term, int Bits)> SampleSites()
     {
         var samples = new List<(string, int)>();
@@ -51,6 +68,8 @@ public sealed class TerrainReliefSeedTests
             AddSite(samples, "massif", cell, TerrainPeaks.MassifSiteAt(cell.X, cell.Z));
         foreach (var cell in PeakCells)
             AddSite(samples, "lone peak", cell, TerrainPeaks.PeakSiteAt(cell.X, cell.Z));
+        foreach (var cell in GreatLakeCells)
+            AddGreatLake(samples, cell, GreatLakes.SiteAt(cell.X, cell.Z));
         return samples;
     }
 
@@ -80,6 +99,9 @@ public sealed class TerrainReliefSeedTests
         foreach (var cell in PeakCells)
             Assert.True(TerrainPeaks.PeakSiteAt(cell.X, cell.Z) == TerrainPeaks.BuildPeakSite(cell),
                 $"the cached lone-peak site in cell {cell} is stale {when}");
+        foreach (var cell in GreatLakeCells)
+            Assert.True(GreatLakes.SiteAt(cell.X, cell.Z) == GreatLakes.BuildSite(cell),
+                $"the cached great-lake site in cell {cell} is stale {when}");
     }
 
     [Fact]

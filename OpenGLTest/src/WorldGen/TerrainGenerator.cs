@@ -359,11 +359,10 @@ public static class TerrainGenerator
                 var lakeSurface = NoWater;
                 var lakeFloor = 0;
                 var riverWeight = 0f;
+                var lakeGuard = 0f;
                 if (WaterBodies.CanHoldSurfaceWater(biome))
-                {
-                    lakeWeight = WaterBodies.LakeSample(worldX, worldZ, out lakeSurface, out lakeFloor);
-                    riverWeight = WaterBodies.RiverWeight(worldX, worldZ);
-                }
+                    WaterBodies.SampleSurfaceWater(worldX, worldZ, out lakeWeight, out lakeSurface, out lakeFloor,
+                        out riverWeight, out lakeGuard);
 
                 if (lakeWeight > 0f)
                 {
@@ -376,8 +375,7 @@ public static class TerrainGenerator
 
                 if (riverWeight > 0f)
                 {
-                    var lowland = 1f - MathUtils.SmoothStep(WorldGenerationConfig.RiverLowStart,
-                        WorldGenerationConfig.RiverLowEnd, forestHeight);
+                    var lowland = WaterBodies.RiverLowland(forestHeight);
                     var river = riverWeight * gate * lowland;
                     if (river > 0f)
                         heightF = MathUtils.Lerp(heightF,
@@ -420,11 +418,17 @@ public static class TerrainGenerator
                     if (stackTop > height) height = stackTop;
                 }
 
+                // A great lake's guard 1 maps to the threshold, so a ravine has no cut at the lake's
+                // outline and tapers in across the guard band instead of cutting a bank or an island
+                // below the surface.
+                var surfaceWater = MathF.Max(lakeWeight, riverWeight) * gate;
+                var guarded = lakeGuard * WorldGenerationConfig.WaterBodyThreshold;
+                if (guarded > surfaceWater) surfaceWater = guarded;
+
                 // Sampled once and reused: the same value cuts the ravine into the heightmap and
                 // decides how much soil is left on the column.
                 var ravineDepth = WorldGenerationConfig.RavinesEnabled
-                    ? (int)(RavineDepthAt(worldX, worldZ) * RavineCutFade(oceanWeight,
-                        MathF.Max(lakeWeight, riverWeight) * gate))
+                    ? (int)(RavineDepthAt(worldX, worldZ) * RavineCutFade(oceanWeight, surfaceWater))
                     : 0;
 
                 bed[i] = height;
@@ -508,7 +512,10 @@ public static class TerrainGenerator
     /// lake's or river's footprint (<see cref="WorldGenerationConfig.WaterBodyThreshold"/>), so a
     /// body's bank is never carved out from under its own surface. A column only holds a surface
     /// water level above that threshold, so the second fade leaves every lake and river uncut by
-    /// construction while the ocean keeps its own gashes as trenches.
+    /// construction while the ocean keeps its own gashes as trenches. Compute raises the
+    /// surface-water weight to a great lake's ravine guard times that threshold, so the cut is
+    /// already gone at a great lake's outline and tapers back in across its guard band, leaving
+    /// its banks and island whole.
     /// </summary>
     private static float RavineCutFade(float oceanWeight, float surfaceWaterWeight) =>
         (1f - MathUtils.SmoothStep(WorldGenerationConfig.OceanShoreWeight, 0.5f, oceanWeight))

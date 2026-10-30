@@ -5,7 +5,9 @@ namespace VoxelEngine.WorldGen;
 /// <summary>
 /// The surface-water model of the 2D terrain half: where water stands in a column (<see cref="WaterLevelAt"/>: sea level for
 /// the ocean and rivers, a lake's own rim-chosen surface for a lake, <see cref="NoWater"/> elsewhere), the hashed lake bowls
-/// and warped river channels <see cref="TerrainGenerator.Compute"/> carves, and the desert gate that closes them. A pure
+/// and warped river channels <see cref="TerrainGenerator.Compute"/> carves, and the desert gate that closes them. Lakes come
+/// in two tiers, the small hashed ponds here and the rare great lakes of <see cref="GreatLakes"/>, composed in one place,
+/// <see cref="SampleSurfaceWater"/>, which every reader of the water fields goes through. A pure
 /// function of (x, z) and the seed, read on any worker thread; <see cref="TerrainGenerator"/> forwards its public queries here.
 /// </summary>
 internal static class WaterBodies
@@ -32,12 +34,35 @@ internal static class WaterBodies
         var lakeSurface = NoWater;
         var riverWeight = 0f;
         if (CanHoldSurfaceWater(biome))
-        {
-            lakeWeight = LakeSample(x, z, out lakeSurface, out _);
-            riverWeight = RiverWeight(x, z);
-        }
+            SampleSurfaceWater(x, z, out lakeWeight, out lakeSurface, out _, out riverWeight, out _);
 
         return WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
+    }
+
+    /// <summary>
+    /// The lake and river fields at (x, z), with both lake tiers composed: the pond bowl of
+    /// <see cref="LakeSample"/>, the great lake of <see cref="GreatLakes.Sample(float, float, out int, out int, out float)"/>
+    /// and the river channel of <see cref="RiverWeight"/>. Ponds never reach a great lake
+    /// (<see cref="TryLakeSite"/> refuses a pond near one), so wherever the great lake has weight it
+    /// is the only lake and its surface and floor replace the pond's; the river yields to it,
+    /// scaled by <see cref="GreatLakes.RiverShare"/>, which is 0 wherever lake water stands, so a
+    /// channel ends at the shore without a step. Wherever the great-lake weight is 0, every out
+    /// equals the pond and river values exactly. <paramref name="lakeGuard"/> is the great lake's
+    /// ravine guard (1 inside an outline, easing to 0 across the guard band). The biome is not
+    /// tested here: callers gate on <see cref="CanHoldSurfaceWater"/> as before.
+    /// </summary>
+    internal static void SampleSurfaceWater(float x, float z, out float lakeWeight, out int lakeSurface,
+        out int lakeFloor, out float riverWeight, out float lakeGuard)
+    {
+        lakeWeight = LakeSample(x, z, out lakeSurface, out lakeFloor);
+        riverWeight = RiverWeight(x, z);
+        var great = GreatLakes.Sample(x, z, out var greatSurface, out var greatFloor, out lakeGuard);
+        if (great <= 0f) return;
+
+        lakeWeight = great;
+        lakeSurface = greatSurface;
+        lakeFloor = greatFloor;
+        riverWeight *= GreatLakes.RiverShare(great);
     }
 
     /// <summary>
@@ -97,7 +122,9 @@ internal static class WaterBodies
     /// broad lake rather than one uniform size. The bowl falls from 1 at the center to 0 at the rim,
     /// so the carve blends back into the ground it was dug from, and the shoreline is the candidate's
     /// radius wobbled by <see cref="TerrainNoise.LakeShapeNoise"/> so it is ragged rather than a circle.
-    /// Candidates near the origin are skipped so the spawn is always on dry land.
+    /// Candidates near the origin are skipped so the spawn is always on dry land. This is the pond
+    /// tier only: a candidate near a great lake yields to it (<see cref="TryLakeSite"/>), and
+    /// <see cref="SampleSurfaceWater"/> composes the two tiers.
     /// </summary>
     internal static float LakeSample(float x, float z, out int surface, out int floor)
     {
@@ -157,10 +184,22 @@ internal static class WaterBodies
     /// The rim is read from <see cref="TerrainGenerator.LandHeight"/>, the profile before a river cuts it, so a pond
     /// standing above the waterline is also dropped when a river channel crosses its footprint
     /// (<see cref="RiverCrossesSite"/>): the channel would cut a bank below the pond's surface.
+    /// A candidate within <see cref="WorldGenerationConfig.GreatLakePondClearance"/> of an accepted
+    /// great lake's guarded outline (<see cref="GreatLakes.NearAnyLobe"/>) is dropped first, so the
+    /// two lake tiers never share a column and never split a surface.
     /// </summary>
     private static bool TryLakeSite(float centerX, float centerZ, float radius, float size,
         out int surface, out int floor)
     {
+        // A pond yields to a great lake, so no column belongs to both and no surface is split.
+        // Tested first, which also skips the rim samples near a lake.
+        if (GreatLakes.NearAnyLobe(centerX, centerZ, radius + WorldGenerationConfig.GreatLakePondClearance))
+        {
+            surface = 0;
+            floor = 0;
+            return false;
+        }
+
         TerrainSites.RimRange(centerX, centerZ, radius, TerrainGenerator.LandHeightAt, out var rimMin, out var rimMax);
 
         surface = 0;
@@ -179,7 +218,10 @@ internal static class WaterBodies
     }
 
     /// <summary>Blocks between river samples across a lake candidate's footprint, ring to ring and along a ring.</summary>
-    private const float RiverSampleSpacing = 6f;
+    internal const float RiverSampleSpacing = 6f;
+
+    /// <summary>Whether a river channel has any weight at (x, z), as a static delegate for the ring samplers.</summary>
+    private static readonly Func<float, float, bool> RiverAt = static (x, z) => RiverWeight(x, z) > 0f;
 
     /// <summary>
     /// Whether a river channel reaches a lake candidate's footprint. The disc is sampled with
@@ -193,19 +235,19 @@ internal static class WaterBodies
         if (RiverWeight(centerX, centerZ) > 0f) return true;
         var rings = Math.Max(1, (int)MathF.Ceiling(radius / RiverSampleSpacing));
         for (var ring = 1; ring <= rings; ring++)
-        {
-            var r = radius * ring / rings;
-            var points = Math.Max(1, (int)MathF.Ceiling(MathF.Tau * r / RiverSampleSpacing));
-            for (var k = 0; k < points; k++)
-            {
-                var angle = k * (MathF.Tau / points);
-                if (RiverWeight(centerX + MathF.Cos(angle) * r, centerZ + MathF.Sin(angle) * r) > 0f)
-                    return true;
-            }
-        }
+            if (TerrainSites.AnyOnRing(centerX, centerZ, radius * ring / rings, RiverSampleSpacing, RiverAt))
+                return true;
 
         return false;
     }
+
+    /// <summary>
+    /// How much of its channel a river cuts over land of this forest-profile height: 1 in the lowlands,
+    /// where it cuts its full channel, easing to 0 above <see cref="WorldGenerationConfig.RiverLowEnd"/>,
+    /// where it is a dry wash.
+    /// </summary>
+    internal static float RiverLowland(float forestHeight) =>
+        1f - MathUtils.SmoothStep(WorldGenerationConfig.RiverLowStart, WorldGenerationConfig.RiverLowEnd, forestHeight);
 
     /// <summary>0..1 river weight: a warped ridge band (|noise| near zero) gated by a rarity mask.</summary>
     internal static float RiverWeight(float x, float z)
@@ -226,14 +268,15 @@ internal static class WaterBodies
     }
 
     /// <summary>
-    /// 0..1 how strongly a lake or river covers (x, z): the max of the two masks, gated toward a
+    /// 0..1 how strongly a lake (either tier) or river covers (x, z): the max of the two masks of
+    /// <see cref="SampleSurfaceWater"/>, gated toward a
     /// desert the same way the carve is. The forest uses it to mark shores, so sand and gravel
     /// appear only where a water body actually is.
     /// </summary>
     public static float SurfaceWaterWeight(float x, float z)
     {
         BiomeClassifier.BiomeWeights(x, z, out _, out var desertWeight);
-        return MathF.Max(LakeSample(x, z, out _, out _), RiverWeight(x, z))
-               * SurfaceWaterGate(desertWeight);
+        SampleSurfaceWater(x, z, out var lake, out _, out _, out var river, out _);
+        return MathF.Max(lake, river) * SurfaceWaterGate(desertWeight);
     }
 }
