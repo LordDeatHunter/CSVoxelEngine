@@ -24,8 +24,11 @@
   //     the color of the standing canopies beside it. A copper axe is given first only so the hand
   //     holds something that belongs in the frame instead of the grass block.
   //
-  // The vantage points come from biomes.json's probe (forest (-80, 8), mountain
-  // (120, 73, -280), meadow (-328, 14, 8)) plus headless probes made for this file:
+  // The vantage points come from biomes.json's probe (forest (-80, 8), meadow (-328, 14, 8)),
+  // terrain-shape.json's range probe (the forest range of range cell (0, 2), crest through
+  // (1050, 3635) and (1238, 3917), direction yaw 54; the old mountain at (120, 73, -280) went with
+  // the relief layer, since ranges now rise only inside highlands) plus headless probes made for
+  // this file:
   //   a one-block rise in +X at (-97, 13): ground 14 on the low side, flat and treeless for four
   //     columns before it, so the camera stands at x -100.5 facing +X.
   //   forest trunks around the forest ground spot (x, baseY, z): (-79, 14, -2), (-70, 13, -6),
@@ -33,11 +36,10 @@
   //   the nearest taiga columns with a spruce canopy within 4 blocks of a chunk center:
   //     (-172, -124) canopy top 19 over ground 13, with ground 13 again 14 blocks south of it,
   //     and further ones at (-172, -132) and (-172, -108).
-  //   forest_mountain_ground stands at (113.5, -194.5) on ground 27 (eye cell 29), re-probed after
-  //     the batch growth, 2-cell eye clearance: no tree cell within Chebyshev 2 of the eye cell
-  //     and no ground rising within two columns. It teleports to just under a block above the
-  //     standing eye, since the old 21-block drop from y 48.5 was a fatal fall (the run respawned
-  //     at the first aerial), and the old spot at (120.5, -190.5) now lies inside a crown.
+  //   forest_mountain_ground stands on the range's flank at (1309.5, 3979.5) on ground 54 (just
+  //     under the rock line, so the ground is tinted grass), looking up toward the crest (yaw
+  //     -139): no tree rooted within 10 columns and no ground rising within two columns. It
+  //     hovers just under a block above the standing eye.
   // Since the temperature-band change the meadow aerial at (-328, 82, 8) looks over taiga and snow
   // in the foreground, which is useful here: the grass, the snow line and the spruce share a frame.
   // biomes.json's forest lake at (-616, 464) has turned into frozen plain the same way, so it is left
@@ -46,7 +48,10 @@
   // Order matters. The camera shots run first with an empty hand: hideHud hides the HUD but not
   // the first-person hand, and "give" puts its block in the hand for the rest of the run. The
   // mining shot runs on foot (creative breaks instantly, so no pop), and only then does "fly"
-  // switch creative on (it stays on after fly off), where one instant hit topples the tree.
+  // switch creative on (it stays on after fly off), where one instant hit topples the tree. The
+  // mountain shots come last, hovering with an empty slot selected: the range is nearly 4000 blocks
+  // out, and a camera falling 60 blocks onto it on foot dies and respawns at the origin, which
+  // unloads the range before the shot.
   // Every teleport starts well above its stand point or near its target and the long waits double
   // as streaming time; the hovering shots (the aerials and the spruce) teleport a second time
   // and shoot with no wait, so the pose is held exactly.
@@ -70,14 +75,6 @@
     { "op": "wait", "seconds": 12 },
     { "op": "teleport", "pos": [-328.5, 82.5, 8.5], "yaw": 0, "pitch": -22 },
     { "op": "screenshot", "name": "forest_open_aerial", "hideHud": true },
-
-    { "op": "teleport", "pos": [40.5, 120.5, -320.5], "yaw": 27, "pitch": -24 },
-    { "op": "wait", "seconds": 12 },
-    { "op": "teleport", "pos": [40.5, 120.5, -320.5], "yaw": 27, "pitch": -24 },
-    { "op": "screenshot", "name": "forest_mountain", "hideHud": true },
-    { "op": "teleport", "pos": [113.5, 30.5, -194.5], "yaw": -90, "pitch": 8 },
-    { "op": "wait", "seconds": 8 },
-    { "op": "screenshot", "name": "forest_mountain_ground", "hideHud": true },
 
     { "op": "teleport", "pos": [-171.5, 40.5, -100.5], "yaw": -90, "pitch": -20 },
     { "op": "wait", "seconds": 10 },
@@ -105,6 +102,16 @@
     { "op": "wait", "seconds": 0.4 },
     { "op": "screenshot", "name": "felled_tree_falling", "hideHud": true },
     { "op": "wait", "seconds": 0.6 },
-    { "op": "screenshot", "name": "felled_tree_fallen", "hideHud": true }
+    { "op": "screenshot", "name": "felled_tree_fallen", "hideHud": true },
+
+    { "op": "select", "slot": 9 },
+    { "op": "teleport", "pos": [1017.5, 130.5, 3627.5], "yaw": 54, "pitch": -22 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "teleport", "pos": [1017.5, 130.5, 3627.5], "yaw": 54, "pitch": -22 },
+    { "op": "screenshot", "name": "forest_mountain", "hideHud": true },
+    { "op": "teleport", "pos": [1309.5, 57.5, 3979.5], "yaw": -139, "pitch": 8 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "teleport", "pos": [1309.5, 57.5, 3979.5], "yaw": -139, "pitch": 8 },
+    { "op": "screenshot", "name": "forest_mountain_ground", "hideHud": true }
   ]
 }

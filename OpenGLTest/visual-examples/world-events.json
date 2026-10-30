@@ -4,8 +4,8 @@
   // Particles and blasts are RNG- and frame-rate-driven, so this is a presence check judged by eye,
   // never a pixel instrument.
   //
-  // Stands on the flat, bare desert patch torches.json uses (sand at y 9, so the feet are at 10; the
-  // desert spawns no mobs of its own). From the eye (253.5, 11.62, -4.5) a ground-top cell center dz
+  // Stands on the flat, bare desert patch torches.json uses (sand at y 11, so the feet are at 12; the
+  // desert spawns no mobs of its own). From the eye (157.5, 13.62, 283.5) a ground-top cell center dz
   // cells ahead is pitch -atan(1.62 / dz) at yaw -90.
   //   tnt-fuse   a TNT block three cells ahead, primed (the `prime` op is a firestarter strike that
   //              never misses), seen from nine blocks back while the 1 s fuse strobes, a goblin two
@@ -23,9 +23,9 @@
   //              water surface (WaterSplash)
   "steps": [
     { "op": "fly", "on": true },
-    { "op": "teleport", "pos": [253.5, 30, -4.5], "yaw": -90, "pitch": -28.37 },
+    { "op": "teleport", "pos": [157.5, 32, 283.5], "yaw": -90, "pitch": -28.37 },
     { "op": "wait", "seconds": 14 },
-    { "op": "teleport", "pos": [253.5, 11.63, -4.5], "yaw": -90, "pitch": -28.37 },
+    { "op": "teleport", "pos": [157.5, 13.63, 283.5], "yaw": -90, "pitch": -28.37 },
     { "op": "walk", "keys": ["C"], "seconds": 0.15 },
     { "op": "wait", "seconds": 1.5 },
 
@@ -33,11 +33,11 @@
     { "op": "give", "block": "tnt", "count": 1 },
     { "op": "look", "yaw": -90, "pitch": -28.37 },
     { "op": "place" },
-    { "op": "teleport", "pos": [253.5, 11.63, 1.5], "yaw": -90, "pitch": -7.2 },
+    { "op": "teleport", "pos": [157.5, 13.63, 289.5], "yaw": -90, "pitch": -7.2 },
     { "op": "wait", "seconds": 0.5 },
-    { "op": "spawn", "entity": "goblin", "pos": [255.5, 10.0, -7.5] },
-    { "op": "spawn", "entity": "slime", "pos": [251.5, 10.3, -7.5] },
-    { "op": "prime", "pos": [253, 10, -8] },
+    { "op": "spawn", "entity": "goblin", "pos": [159.5, 12.0, 280.5] },
+    { "op": "spawn", "entity": "slime", "pos": [155.5, 12.3, 280.5] },
+    { "op": "prime", "pos": [157, 12, 280] },
     { "op": "wait", "seconds": 0.6 },
     { "op": "screenshot", "name": "tnt-fuse", "hideHud": true },
     { "op": "wait", "seconds": 0.45 },
@@ -52,12 +52,12 @@
 
     // LEG 2 — a sand cube placed against the top of a four-high dirt pillar topples three blocks to
     // the ground beside it and settles in a skirt of its own chips. The camera hovers (flight, so
-    // creative) at (254.5, 15.5, 1.5), above the pillar's top, so every placement ray reaches the top
-    // face it aims at (x 256, z 1, tops at y 10..13) before any side face, within the first-person
+    // creative) at (158.5, 17.5, 289.5), above the pillar's top, so every placement ray reaches the top
+    // face it aims at (x 160, z 289, tops at y 12..15) before any side face, within the first-person
     // ray's ten cells; the sand's aim then meets the finished pillar's west face and puts the sand
-    // in the air at (255, 13, 1).
+    // in the air at (159, 15, 289).
     { "op": "fly", "on": true },
-    { "op": "teleport", "pos": [254.5, 15.5, 1.5], "yaw": 0, "pitch": -70.02 },
+    { "op": "teleport", "pos": [158.5, 17.5, 289.5], "yaw": 0, "pitch": -70.02 },
     { "op": "wait", "seconds": 0.3 },
     { "op": "give", "block": "dirt", "count": 4 },
     { "op": "look", "yaw": 0, "pitch": -70.02 },
@@ -71,9 +71,9 @@
     { "op": "give", "block": "sand", "count": 1 },
     { "op": "look", "yaw": 0, "pitch": -53.13 },
     { "op": "place" },
-    // Empty hands, and a side view of the landing cell (255, 10, 1) from six blocks south of it
+    // Empty hands, and a side view of the landing cell (159, 12, 289) from six blocks south of it
     { "op": "select", "slot": 9 },
-    { "op": "teleport", "pos": [255.5, 12.5, -4.5], "yaw": 90, "pitch": -20 },
+    { "op": "teleport", "pos": [159.5, 14.5, 283.5], "yaw": 90, "pitch": -20 },
     { "op": "wait", "seconds": 0.4 },
     { "op": "screenshot", "name": "sand-settle-a", "hideHud": true },
     { "op": "wait", "seconds": 0.08 },
@@ -86,17 +86,17 @@
     // LEG 3 — steam: lava poured into the bottom of the leg 1 crater, then water poured on its slope
     // two blocks east, which runs down onto the lava: every cell that hardens to cobblestone puffs
     // gray smoke (FluidManager.HardenedCells). Each pour looks straight down from a hovering eye.
-    { "op": "teleport", "pos": [253.5, 14.5, -7.5], "yaw": 0, "pitch": -89 },
+    { "op": "teleport", "pos": [157.5, 16.5, 280.5], "yaw": 0, "pitch": -89 },
     { "op": "wait", "seconds": 0.3 },
     { "op": "give", "block": "item/lava_bucket" },
     { "op": "place" },
     { "op": "wait", "seconds": 1.0 },
-    { "op": "teleport", "pos": [255.5, 14.5, -7.5], "yaw": 0, "pitch": -89 },
+    { "op": "teleport", "pos": [159.5, 16.5, 280.5], "yaw": 0, "pitch": -89 },
     { "op": "wait", "seconds": 0.2 },
     { "op": "give", "block": "item/water_bucket" },
     { "op": "place" },
     { "op": "select", "slot": 8 },
-    { "op": "teleport", "pos": [253.5, 10.5, -3.5], "yaw": -90, "pitch": -25 },
+    { "op": "teleport", "pos": [157.5, 12.5, 284.5], "yaw": -90, "pitch": -25 },
     { "op": "wait", "seconds": 0.8 },
     { "op": "screenshot", "name": "steam-a", "hideHud": true },
     { "op": "wait", "seconds": 0.6 },
