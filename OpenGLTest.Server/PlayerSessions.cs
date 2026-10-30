@@ -90,9 +90,11 @@ internal sealed class PlayerSessions
                 // always advances, so refused states cannot accumulate time until a
                 // teleport fits.
                 var chunks = _state.World.GetChunkManager();
+                // A rider standing on an iceberg is grounded, never a hoverer
+                var solids = _state.World.BodySolids;
                 var gap = _state.Elapsed - current.LastStateAt;
                 var verdict = MovementRules.Judge(current.Position, position, gap, current.Flying, chunks,
-                    current.Movement, out var accepted);
+                    current.Movement, out var accepted, solids);
                 current.Position = accepted;
                 switch (verdict)
                 {
@@ -105,10 +107,10 @@ internal sealed class PlayerSessions
                         break;
                     case MoveVerdict.Clamped:
                         Log.Warn($"net: clamped a move from {client.Name} (#{client.Id})");
-                        current.ObserveAcceptedState(chunks, gap);
+                        current.ObserveAcceptedState(chunks, gap, solids);
                         break;
                     default:
-                        current.ObserveAcceptedState(chunks, gap);
+                        current.ObserveAcceptedState(chunks, gap, solids);
                         break;
                 }
             }

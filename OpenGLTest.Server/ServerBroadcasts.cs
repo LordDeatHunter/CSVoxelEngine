@@ -54,10 +54,11 @@ internal sealed class ServerBroadcasts
         var drops = _state.World.Drops;
         var primed = _state.World.PrimedTnt;
         var falling = _state.World.Falling;
+        var icebergs = _state.World.Icebergs;
         _entitySeen.Clear();
 
         using var writer = new PacketWriter(NetMessage.EntityList);
-        writer.Write(mobs.Count + drops.Count + primed.Count + falling.Count);
+        writer.Write(mobs.Count + drops.Count + primed.Count + falling.Count + icebergs.Count);
         for (var i = 0; i < mobs.Count; i++)
         {
             var mob = mobs[i];
@@ -119,6 +120,21 @@ internal sealed class ServerBroadcasts
             writer.Write(0);
             writer.Write(block.BlockId);
             writer.Write(Vector3.Zero);
+        }
+
+        // An iceberg's fields are packed as NetEntity documents: turns in the yaw, the seed in the
+        // health, the scale and sinking in the ammo, the variant in the byte
+        for (var i = 0; i < icebergs.Count; i++)
+        {
+            var berg = icebergs[i];
+            writer.Write((byte)NetEntityKind.Iceberg);
+            writer.Write(IdFor(berg));
+            writer.Write(berg.Center);
+            writer.Write(NetEntity.YawFromTurns(berg.Turns));
+            writer.Write(berg.Seed);
+            writer.Write(NetEntity.PackIcebergAmmo(berg.Scale, berg.Sink01));
+            writer.Write((byte)berg.Variant);
+            writer.Write(berg.Velocity);
         }
 
         _state.Broadcast(writer.ToArray());
