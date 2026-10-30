@@ -41,10 +41,11 @@ public static class MovementRules
     /// player whose server-granted flight flag is <paramref name="flying"/>.
     /// <paramref name="accepted"/> is the eye the player stands at afterwards: <paramref name="to"/>
     /// when accepted, the clamped point when clamped, and <paramref name="from"/> when rejected.
-    /// <paramref name="state"/> carries the hover time across calls.
+    /// <paramref name="state"/> carries the hover time across calls. <paramref name="solids"/> (the
+    /// server's icebergs) only count as ground for the hover rule: a rider is never a hoverer.
     /// </summary>
     public static MoveVerdict Judge(Vector3 from, Vector3 to, double delta, bool flying, ChunkManager chunks,
-        MovementState state, out Vector3 accepted)
+        MovementState state, out Vector3 accepted, IBodySolids? solids = null)
     {
         var verdict = NetValidation.AcceptMove(from, to, delta, NetworkConfig.NetMaxMoveBlocksPerSecond,
             out var bounded)
@@ -60,6 +61,8 @@ public static class MovementRules
             return verdict;
         }
 
+        // Blocks only: a client stands on its mirror of a berg, which lags the server's own by up to
+        // a snapshot, so a body touching a berg cannot be judged here (a documented gap).
         if (BodyCollision.BodyCollides(bounded, chunks) && !BodyCollision.BodyCollides(from, chunks))
         {
             accepted = from;
@@ -80,7 +83,7 @@ public static class MovementRules
             return MoveVerdict.Rejected;
         }
 
-        var hovering = !PlayerBodyProbe.Grounded(bounded, chunks)
+        var hovering = !PlayerBodyProbe.Grounded(bounded, chunks, solids)
                        && !PlayerBodyProbe.InWater(bounded, chunks)
                        && bounded.Y >= from.Y - HoverSinkToleranceBlocks;
         state.AirborneStillSeconds = hovering ? state.AirborneStillSeconds + delta : 0;

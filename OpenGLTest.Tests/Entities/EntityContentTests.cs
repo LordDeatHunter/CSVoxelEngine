@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Slimes;
 using Xunit;
 
 namespace VoxelEngine.Tests.Entities;
@@ -62,5 +63,45 @@ public sealed class EntityContentTests
         Assert.Equal(32, model.TextureWidth);
         Assert.Equal(32, model.TextureHeight);
         Assert.NotEmpty(model.TexturePixels);
+    }
+
+    [Fact]
+    public void EveryEntityHasItsModelAsTheFirstVariant()
+    {
+        Assert.NotEmpty(EntityRegistry.ByName);
+        foreach (var type in EntityRegistry.ByName.Values)
+        {
+            Assert.NotEmpty(type.Variants);
+            Assert.Same(type.Model, type.Variants[0]);
+            Assert.Equal(type.ModelPath, type.VariantPaths[0]);
+            Assert.Equal(type.Variants.Count, type.VariantPaths.Count);
+        }
+    }
+
+    [Fact]
+    public void AMobRefusesATypeWithoutAHealthPool()
+    {
+        var slime = EntityRegistry.Require("slime");
+        var poolless = new EntityType
+        {
+            Name = slime.Name,
+            DisplayName = slime.DisplayName,
+            MaxHealth = 0,
+            LootTable = slime.LootTable,
+            ModelPath = slime.ModelPath,
+            Model = slime.Model,
+        };
+
+        Assert.Throws<InvalidOperationException>(() => new Slime(poolless, Vector3.Zero));
+    }
+
+    [Fact]
+    public void FromDataBakesTheSameCubesAsLoad()
+    {
+        var type = EntityRegistry.Require("slime");
+        var loaded = EntityModel.Load(type.ModelPath);
+
+        Assert.Equal(EntityModel.CubeBoxes(type.Model), loaded.BakedBoxes());
+        Assert.Equal(loaded.BakedBoxes(), EntityModel.FromData(type.Model, type.ModelPath).BakedBoxes());
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
@@ -21,4 +22,5 @@ public readonly record struct ReflectionEntities(
     IReadOnlyList<Slime> Slimes,
     IReadOnlyList<Goblin> Goblins,
     IReadOnlyList<TopplingTree> Toppling,
-    PlayerModel? Player);
+    PlayerModel? Player,
+    IReadOnlyList<Iceberg> Icebergs);

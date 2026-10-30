@@ -38,19 +38,54 @@ public sealed class EntityModel
     /// Loads a model and its skin. Entity models carry no required groups, so whatever the
     /// project authored is kept; a missing texture is a content error that names the file.
     /// </summary>
-    public static EntityModel Load(string path)
+    public static EntityModel Load(string path) =>
+        FromData(BbmodelLoader.Load(path, Array.Empty<string>()), path);
+
+    /// <summary>
+    /// Builds a model from an already parsed project (<see cref="EntityType.Variants"/>), so a
+    /// renderer never parses a file twice. <paramref name="path"/> only names the file in errors.
+    /// </summary>
+    public static EntityModel FromData(BbmodelData data, string path)
     {
-        var data = BbmodelLoader.Load(path, Array.Empty<string>());
+        RequireTexture(data, path);
+
+        var model = new EntityModel(data.TexturePixels!, data.TextureWidth, data.TextureHeight);
+        foreach (var part in data.Parts.Values)
+            foreach (var cube in part.Cubes)
+                model._cubes.Add((CubeMin(part, cube), CubeMax(part, cube), cube.Faces));
+        return model;
+    }
+
+    /// <summary>
+    /// Every cube of a project in model space, in blocks: the one cube frame the baked mesh is
+    /// built in (each part's pivot added back), so collision read from a model agrees with what
+    /// <see cref="BuildMesh"/> draws.
+    /// </summary>
+    public static IEnumerable<(Vector3 Min, Vector3 Max)> CubeBoxes(BbmodelData data)
+    {
+        foreach (var part in data.Parts.Values)
+            foreach (var cube in part.Cubes)
+                yield return (CubeMin(part, cube), CubeMax(part, cube));
+    }
+
+    /// <summary>Throws naming the file when a project carries no skin; an entity model needs one.</summary>
+    internal static void RequireTexture(BbmodelData data, string path)
+    {
         if (data.TexturePixels == null)
             throw new InvalidOperationException(
                 $"Entity model '{path}' has no texture; add a 'textures' entry pointing at its skin.");
-
-        var model = new EntityModel(data.TexturePixels, data.TextureWidth, data.TextureHeight);
-        foreach (var part in data.Parts.Values)
-            foreach (var cube in part.Cubes)
-                model._cubes.Add((cube.Min + part.Pivot, cube.Max + part.Pivot, cube.Faces));
-        return model;
     }
+
+    /// <summary>The model-space boxes of the baked cubes, in build order (test seam).</summary>
+    internal IEnumerable<(Vector3 Min, Vector3 Max)> BakedBoxes()
+    {
+        foreach (var (min, max, _) in _cubes)
+            yield return (min, max);
+    }
+
+    private static Vector3 CubeMin(BbmodelPart part, BbmodelCube cube) => cube.Min + part.Pivot;
+
+    private static Vector3 CubeMax(BbmodelPart part, BbmodelCube cube) => cube.Max + part.Pivot;
 
     /// <summary>Builds the one mesh a draw needs. The caller owns and disposes it.</summary>
     public Mesh BuildMesh(GL gl)

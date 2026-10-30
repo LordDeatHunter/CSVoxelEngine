@@ -1,0 +1,478 @@
+{
+    "meta": {
+        "format_version": "4.0",
+        "model_format": "free",
+        "box_uv": false
+    },
+    "name": "iceberg_large",
+    "resolution": {
+        "width": 32,
+        "height": 32
+    },
+    "textures": [
+        {
+            "id": "0",
+            "name": "iceberg.png",
+            "source": "iceberg.png",
+            "width": 32,
+            "height": 32,
+            "uv_width": 32,
+            "uv_height": 32,
+            "particle": false,
+            "use_as_default": false,
+            "render_mode": "default"
+        }
+    ],
+    "elements": [
+        {
+            "name": "Keel",
+            "uuid": "1cebe600-0000-4000-8000-000200000001",
+            "type": "cube",
+            "from": [-48, -128, -48],
+            "to": [48, -88, 40],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                },
+                "east": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                },
+                "south": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                },
+                "west": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                },
+                "up": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                },
+                "down": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                }
+            }
+        },
+        {
+            "name": "Base",
+            "uuid": "1cebe600-0000-4000-8000-000200000002",
+            "type": "cube",
+            "from": [-72, -88, -64],
+            "to": [72, -32, 72],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                },
+                "east": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                },
+                "south": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                },
+                "west": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                },
+                "up": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                },
+                "down": {
+                    "uv": [0, 16, 16, 32],
+                    "texture": 0
+                }
+            }
+        },
+        {
+            "name": "Shelf",
+            "uuid": "1cebe600-0000-4000-8000-000200000003",
+            "type": "cube",
+            "from": [-64, -32, -56],
+            "to": [64, 8, 64],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": {
+                    "uv": [16, 6, 32, 16],
+                    "texture": 0
+                },
+                "east": {
+                    "uv": [16, 6, 32, 16],
+                    "texture": 0
+                },
+                "south": {
+                    "uv": [16, 6, 32, 16],
+                    "texture": 0
+                },
+                "west": {
+                    "uv": [16, 6, 32, 16],
+                    "texture": 0
+                },
+                "up": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "down": {
+                    "uv": [16, 16, 32, 32],
+                    "texture": 0,
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "name": "Step1",
+            "uuid": "1cebe600-0000-4000-8000-000200000004",
+            "type": "cube",
+            "from": [-56, 8, -48],
+            "to": [56, 16, 56],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "east": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "south": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "west": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "up": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "down": {
+                    "uv": [16, 16, 32, 32],
+                    "texture": 0,
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "name": "Step2",
+            "uuid": "1cebe600-0000-4000-8000-000200000005",
+            "type": "cube",
+            "from": [-48, 16, -40],
+            "to": [48, 24, 48],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "east": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "south": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "west": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "up": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "down": {
+                    "uv": [16, 16, 32, 32],
+                    "texture": 0,
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "name": "Step3",
+            "uuid": "1cebe600-0000-4000-8000-000200000006",
+            "type": "cube",
+            "from": [-40, 24, -32],
+            "to": [40, 32, 40],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "east": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "south": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "west": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "up": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "down": {
+                    "uv": [16, 16, 32, 32],
+                    "texture": 0,
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "name": "Step4",
+            "uuid": "1cebe600-0000-4000-8000-000200000007",
+            "type": "cube",
+            "from": [-32, 32, -24],
+            "to": [32, 40, 32],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "east": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "south": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "west": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "up": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "down": {
+                    "uv": [16, 16, 32, 32],
+                    "texture": 0,
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "name": "Step5",
+            "uuid": "1cebe600-0000-4000-8000-000200000008",
+            "type": "cube",
+            "from": [-24, 40, -16],
+            "to": [24, 48, 24],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "east": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "south": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "west": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "up": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "down": {
+                    "uv": [16, 16, 32, 32],
+                    "texture": 0,
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "name": "Step6",
+            "uuid": "1cebe600-0000-4000-8000-000200000009",
+            "type": "cube",
+            "from": [-16, 48, -8],
+            "to": [16, 56, 16],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "east": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "south": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "west": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "up": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "down": {
+                    "uv": [16, 16, 32, 32],
+                    "texture": 0,
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "name": "Step7",
+            "uuid": "1cebe600-0000-4000-8000-00020000000a",
+            "type": "cube",
+            "from": [-8, 56, 0],
+            "to": [8, 64, 8],
+            "box_uv": false,
+            "rescale": false,
+            "locked": false,
+            "rotation": {
+                "origin": [0, 0, 0],
+                "axis": "y",
+                "angle": 0,
+                "rescale": false
+            },
+            "faces": {
+                "north": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "east": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "south": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "west": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "up": {
+                    "uv": [0, 0, 16, 16],
+                    "texture": 0
+                },
+                "down": {
+                    "uv": [16, 16, 32, 32],
+                    "texture": 0,
+                    "enabled": false
+                }
+            }
+        }
+    ],
+    "outliner": [
+        {
+            "name": "Berg",
+            "origin": [0, 0, 0],
+            "uuid": "1cebe600-0000-4000-8000-0002000000a0",
+            "export": true,
+            "visibility": true,
+            "rotation": [0, 0, 0],
+            "children": [
+                "1cebe600-0000-4000-8000-000200000001",
+                "1cebe600-0000-4000-8000-000200000002",
+                "1cebe600-0000-4000-8000-000200000003",
+                "1cebe600-0000-4000-8000-000200000004",
+                "1cebe600-0000-4000-8000-000200000005",
+                "1cebe600-0000-4000-8000-000200000006",
+                "1cebe600-0000-4000-8000-000200000007",
+                "1cebe600-0000-4000-8000-000200000008",
+                "1cebe600-0000-4000-8000-000200000009",
+                "1cebe600-0000-4000-8000-00020000000a"
+            ]
+        }
+    ]
+}

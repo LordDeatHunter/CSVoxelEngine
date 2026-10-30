@@ -106,8 +106,9 @@ internal sealed class WorldRenderer
         // Depth-only sun pass first: every world draw below samples the shadow map it fills
         FrameProfiler.Begin(ProfileSection.Shadows);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.Shadows);
+        renderManager.IcebergPasses.Time = _world.LightingTime;
         renderManager.Shadows.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
-            _lodManager.RegionList, goblins: Goblins);
+            _lodManager.RegionList, goblins: Goblins, icebergs: _world.Icebergs);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.Shadows);
         FrameProfiler.End(ProfileSection.Shadows);
 
@@ -118,7 +119,7 @@ internal sealed class WorldRenderer
         renderManager.Terrain.CullWater(Camera, _chunkManager.TranslucentRenderable, _lodManager.RegionList);
         renderManager.Reflection.RenderReflection(Camera, _chunkManager.Renderable, _lodManager.RegionList,
             new ReflectionEntities(_dropManager.Drops, _projectiles, _tntManager.Primed, _falling.Falling, Slimes, Goblins,
-                _toppling, Player));
+                _toppling, Player, _world.Icebergs));
         renderManager.GpuTimer.EndGpuPass(ProfileSection.Reflection);
         FrameProfiler.End(ProfileSection.Reflection);
 
@@ -164,6 +165,7 @@ internal sealed class WorldRenderer
         renderManager.Objects.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.Mobs.RenderSlimes(Camera, Slimes);
         renderManager.Mobs.RenderGoblins(Camera, Goblins);
+        renderManager.IcebergPasses.RenderIcebergs(Camera.GetViewProjection(), _world.Icebergs);
         renderManager.Players.RenderRemotePlayers(Camera, _remotePlayers);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);

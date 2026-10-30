@@ -241,6 +241,26 @@ public sealed class MovementRulesTests
     }
 
     [Fact]
+    public void APlayerStandingOnABodySolidIsNotAHoverer()
+    {
+        var course = Course();
+        var grace = (float)NetworkConfig.NetHoverGraceSeconds;
+        var air = Eye(2.5f, 5f, 2.5f);
+        var still = Line(air, Vector3.Zero, grace * 2f);
+
+        // Still in mid-air: a hover, rejected after the grace
+        Assert.True(FirstRejection(course, still) > 0);
+
+        // The same states standing on a solid box (an iceberg's top) under the feet: never a hover
+        var solids = new BoxSolids().Add(new Vector3(1f, 4f, 1f), new Vector3(4f, 5f, 4f));
+        var state = new MovementState();
+        var at = still[0];
+        for (var i = 1; i < still.Count; i++)
+            Assert.NotEqual(MoveVerdict.Rejected,
+                MovementRules.Judge(at, still[i], Dt, false, course, state, out at, solids));
+    }
+
+    [Fact]
     public void UnloadedCellsAreNeverJudged()
     {
         var course = Course();

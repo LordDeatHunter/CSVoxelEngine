@@ -244,4 +244,29 @@ public sealed class EntityPreviewStateTests
         Assert.True(state.SetMode(listed.ToUpperInvariant()));
         Assert.Equal(listed, state.Mode);
     }
+
+    [Fact]
+    public void AMultiVariantEntityOffersOneModePerVariantAndNoHurt()
+    {
+        var state = new EntityPreviewState();
+        Assert.True(state.SelectByName("iceberg"));
+        var type = state.Selected!;
+        Assert.True(type.Variants.Count > 1);
+
+        Assert.Equal(type.Variants.Count, state.Modes.Count);
+        Assert.DoesNotContain(EntityPreviewState.HurtMode, state.Modes, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(0, state.SelectedVariant);
+
+        for (var i = 0; i < state.Modes.Count; i++)
+        {
+            Assert.True(state.SetMode(state.Modes[i]));
+            Assert.Equal(i, state.SelectedVariant);
+            for (var frame = 0; frame < (int)(1f / Dt); frame++) state.Update(Dt);
+            Assert.Equal(i, state.SelectedVariant);
+        }
+
+        // Another entity draws its one model again.
+        Assert.True(state.SelectByName("goblin"));
+        Assert.Equal(0, state.SelectedVariant);
+    }
 }

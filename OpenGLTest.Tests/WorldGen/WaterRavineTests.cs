@@ -51,8 +51,10 @@ public sealed class WaterRavineTests
     public void ARavineUnderAWaterBodyStaysWetAndFills()
     {
         var checkedColumn = false;
-        for (var x = 0; x < 2048 && !checkedColumn; x += 4)
-        for (var z = 0; z < 2048 && !checkedColumn; z += 4)
+        // Highlands lift the land past the river carve, so the box is wide enough to hold lowland
+        // water bodies whatever the relief does near the origin
+        for (var x = -4096; x < 4096 && !checkedColumn; x += 4)
+        for (var z = -4096; z < 4096 && !checkedColumn; z += 4)
         {
             var cx = x >> Chunk.SizeShift;
             var cz = z >> Chunk.SizeShift;
@@ -75,7 +77,7 @@ public sealed class WaterRavineTests
             checkedColumn = true;
         }
 
-        Assert.True(checkedColumn, "no ravine under a water body found near the origin");
+        Assert.True(checkedColumn, "no ravine under a water body found within 4096 blocks of the origin");
     }
 
     [Fact]

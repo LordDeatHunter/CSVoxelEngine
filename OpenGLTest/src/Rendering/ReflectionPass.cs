@@ -8,6 +8,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Lod;
 using VoxelEngine.Player;
@@ -61,6 +62,7 @@ internal sealed class ReflectionPass
     private readonly List<FallingBlock> _mirrorFalling = new(8);
     private readonly List<Slime> _mirrorSlimes = new(16);
     private readonly List<Goblin> _mirrorGoblins = new(8);
+    private readonly List<Iceberg> _mirrorIcebergs = new(8);
     private readonly List<TopplingTree> _mirrorToppling = new(4);
 
     /// <summary>The reflection color texture the world draws bind on unit 2.</summary>
@@ -394,6 +396,7 @@ internal sealed class ReflectionPass
         _mirrorFalling.Clear();
         _mirrorSlimes.Clear();
         _mirrorGoblins.Clear();
+        _mirrorIcebergs.Clear();
         _mirrorToppling.Clear();
 
         foreach (var drop in entities.Drops)
@@ -410,6 +413,9 @@ internal sealed class ReflectionPass
         if (Mobs.GoblinMeshes != null)
             foreach (var goblin in entities.Goblins)
                 if (KeepForMirror(eye, goblin.Position)) _mirrorGoblins.Add(goblin);
+        // A berg's waterline center feeds the reuse motion signal, so a drifting berg refreshes it
+        foreach (var berg in entities.Icebergs)
+            if (KeepForMirror(eye, berg.Center)) _mirrorIcebergs.Add(berg);
         // A felled tree's base stays put while it swings, so its crown stands in for it.
         foreach (var tree in entities.Toppling)
             if (KeepForMirror(eye, Vector3.Transform(new Vector3(0f, 4f, 0f), tree.Model)))
@@ -439,6 +445,7 @@ internal sealed class ReflectionPass
         if (_mirrorFalling.Count > 0) Objects.DrawFallingBlocks(_mirrorFalling, _reflViewProj, mirror: true);
         if (_mirrorSlimes.Count > 0) Mobs.DrawSlimes(_mirrorSlimes, _reflViewProj, mirror: true);
         if (_mirrorGoblins.Count > 0) Mobs.DrawGoblins(_mirrorGoblins, _reflViewProj, mirror: true);
+        if (_mirrorIcebergs.Count > 0) _owner.IcebergPasses.DrawIcebergs(_reflViewProj, _mirrorIcebergs, mirror: true);
         foreach (var tree in _mirrorToppling) Objects.DrawTopplingTree(tree, _reflViewProj, mirror: true);
         if (player != null) Players.DrawPlayer(camera, player, _reflViewProj, fullBody: true, mirror: true);
     }
@@ -454,6 +461,7 @@ internal sealed class ReflectionPass
         _mirrorFalling.Clear();
         _mirrorSlimes.Clear();
         _mirrorGoblins.Clear();
+        _mirrorIcebergs.Clear();
         _mirrorToppling.Clear();
         _reflMirrorValid = false;
     }

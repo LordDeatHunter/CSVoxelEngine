@@ -10,6 +10,7 @@ using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen;
@@ -29,6 +30,7 @@ internal sealed class BlockPlacer
     private readonly World _world;
     private readonly ChunkManager _chunkManager;
     private readonly FallingBlockManager _falling;
+    private readonly IcebergManager? _icebergs;
     private readonly QuernManager _querns;
     private readonly FluidManager _fluidManager;
     private readonly LeafDecayManager _leafDecay;
@@ -44,12 +46,14 @@ internal sealed class BlockPlacer
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
     private LeftClickAction LeftClick => _world.LeftClick;
 
-    internal BlockPlacer(World world, ChunkManager chunkManager, FallingBlockManager falling, QuernManager querns,
-        FluidManager fluidManager, LeafDecayManager leafDecay, LodManager lodManager, bool clientMode, bool serverMode)
+    internal BlockPlacer(World world, ChunkManager chunkManager, FallingBlockManager falling, IcebergManager? icebergs,
+        QuernManager querns, FluidManager fluidManager, LeafDecayManager leafDecay, LodManager lodManager,
+        bool clientMode, bool serverMode)
     {
         _world = world;
         _chunkManager = chunkManager;
         _falling = falling;
+        _icebergs = icebergs;
         _querns = querns;
         _fluidManager = fluidManager;
         _leafDecay = leafDecay;
@@ -226,8 +230,10 @@ internal sealed class BlockPlacer
             return false;
 
         // A live cube owns its cell until it lands: placing into one would cement the cube
-        // inside the new block, so the placement fails and the caller keeps its item
-        if (_falling.OverlapsAny((int)placePos.X, (int)placePos.Y, (int)placePos.Z))
+        // inside the new block, so the placement fails and the caller keeps its item. An iceberg's
+        // boxes own their cells the same way (the air above a low ledge stays free).
+        if (_falling.OverlapsAny((int)placePos.X, (int)placePos.Y, (int)placePos.Z)
+            || _icebergs?.OverlapsCell((int)placePos.X, (int)placePos.Y, (int)placePos.Z) == true)
             return false;
 
         // A solid block inside a player's body would trap them (or force the physics to
@@ -288,7 +294,7 @@ internal sealed class BlockPlacer
         int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
         if (!_chunkManager.TryGetCell(x, y, z, out var id, out var state) || !Placement.CanOccupy(id, state))
             return false;
-        if (_falling.OverlapsAny(x, y, z)) return false;
+        if (_falling.OverlapsAny(x, y, z) || _icebergs?.OverlapsCell(x, y, z) == true) return false;
         return !(BlockType.IsSolid(upperId) && BodyBlocksPlacement(cell));
     }
 

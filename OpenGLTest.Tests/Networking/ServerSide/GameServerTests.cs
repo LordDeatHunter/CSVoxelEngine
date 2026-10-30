@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
 using VoxelEngine.Content.Recipes;
+using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Networking;
@@ -1018,6 +1019,48 @@ public sealed class GameServerTests : IDisposable
             Tick(0.05);
         Assert.NotNull(inbox.Entities);
         Assert.DoesNotContain(inbox.Entities!, e => e.Kind == NetEntityKind.PrimedTnt);
+    }
+
+    [Fact]
+    public void AnIcebergReachesTheClientsEntityList()
+    {
+        using var client = Connect("Watcher");
+        var spawn = client.Server!.Value.Spawn;
+        var icebergs = _world.IcebergManager!;
+        var chunks = _world.GetChunkManager();
+
+        // A small berg hanging in the open air high over the player, once the cells there are loaded
+        var center = spawn + new Vector3(0.5f, 40f, 0.5f);
+        Iceberg? served = null;
+        var sw = Stopwatch.StartNew();
+        while (served == null && sw.Elapsed.TotalSeconds < 60)
+        {
+            served = icebergs.Spawn(chunks, 0, IcebergConfig.ScaleMax, 1, 77, center, IcebergConfig.LifeMaxSeconds);
+            if (served == null)
+                Tick(0.05);
+        }
+        Assert.NotNull(served);
+
+        var inbox = InboxOf(client);
+        NetEntity? carried = null;
+        sw.Restart();
+        while (carried == null && sw.Elapsed.TotalSeconds < 5)
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+            DrainAll();
+            if (inbox.Entities?.Find(e => e.Kind == NetEntityKind.Iceberg) is { Kind: NetEntityKind.Iceberg } found)
+                carried = found;
+        }
+
+        Assert.NotNull(carried);
+        var entry = carried!.Value;
+        NetEntity.UnpackIcebergAmmo(entry.Ammo, out var scale, out _);
+        Assert.Equal(served.Variant, entry.ItemId);
+        Assert.Equal(served.Seed, entry.Health);
+        Assert.Equal(served.Turns, NetEntity.TurnsFromYaw(entry.Yaw));
+        Assert.Equal(served.Scale, scale, 2);
+        Assert.True(Vector3.Distance(served.Center, entry.Position) < 1f);
     }
 
     [Fact]

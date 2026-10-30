@@ -6,7 +6,10 @@ public sealed class EntityDefinition
     /// <summary>Display name; defaults to the file name when omitted.</summary>
     public string? Name { get; set; }
 
-    /// <summary>Maximum (and starting) hit points of one spawn. Required, at least 1.</summary>
+    /// <summary>
+    /// Maximum (and starting) hit points of one spawn. Optional, at least 1 when present. An
+    /// entity with no hp has no health pool and cannot back a mob.
+    /// </summary>
     public int? Hp { get; set; }
 
     /// <summary>
@@ -21,4 +24,11 @@ public sealed class EntityDefinition
     /// <c>textures</c> entry supplies the skin, resolved next to the model file.
     /// </summary>
     public string? Model { get; set; }
+
+    /// <summary>
+    /// Blockbench projects to render the entity from, relative to the working directory, one per
+    /// size class or look; each supplies its own skin like <see cref="Model"/>. When present the
+    /// list is non-empty and <see cref="Model"/> must be omitted; the first entry is the model.
+    /// </summary>
+    public string[]? Variants { get; set; }
 }

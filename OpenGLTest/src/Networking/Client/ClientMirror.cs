@@ -6,11 +6,13 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Icebergs;
 
 namespace VoxelEngine.Networking.Client;
 
@@ -46,9 +48,10 @@ internal sealed class ClientMirror
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
 
     internal ClientMirror(World world, ChunkManager chunkManager, DropManager dropManager, TntManager tntManager,
-        FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, CampfireManager campfires,
-        QuernManager querns, KilnManager kilns, CastingManager casting, BlockDebrisSystem debris, PlayerHealth health,
-        List<RemotePlayer> remotePlayers, bool clientMode, bool serverMode)
+        FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, IcebergManager? icebergs,
+        CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
+        BlockDebrisSystem debris, PlayerHealth health, List<RemotePlayer> remotePlayers, bool clientMode,
+        bool serverMode)
     {
         _world = world;
         _chunkManager = chunkManager;
@@ -57,6 +60,7 @@ internal sealed class ClientMirror
         _falling = falling;
         _slimes = slimes;
         _goblins = goblins;
+        _icebergs = icebergs;
         _campfires = campfires;
         _querns = querns;
         _kilns = kilns;
@@ -86,6 +90,11 @@ internal sealed class ClientMirror
     private readonly List<int> _netTntRemovals = [];
     private readonly List<(Vector3 Center, byte BlockId)> _netFalling = [];
     private readonly List<(Vector3 Center, byte BlockId)> _netFallingPrevious = [];
+    // Multiplayer client: the server's icebergs by network id, mirrored without simulation
+    private readonly IcebergManager? _icebergs;
+    private readonly Dictionary<int, Iceberg> _netIcebergs = [];
+    private readonly HashSet<int> _netIcebergsSeen = [];
+    private readonly List<int> _netIcebergRemovals = [];
 
     /// <summary>
     /// Applies a batch of server cell values (an explosion, a fluid step, a fell, or the correction
@@ -249,6 +258,43 @@ internal sealed class ClientMirror
 
         _tntManager.ReplaceMirrors(_netTnt.Values);
         _falling.ReplaceMirrors(_netFalling);
+        ApplyNetworkIcebergs(entities);
+    }
+
+    /// <summary>
+    /// A client's icebergs from a server snapshot: a berg already mirrored under the same id snaps
+    /// to its new center, velocity and sinking, a new one is mirrored fully emerged, an unlisted one
+    /// goes. Between snapshots they only dead-reckon (<see cref="IcebergManager.AnimateMirrors"/>).
+    /// </summary>
+    private void ApplyNetworkIcebergs(IReadOnlyList<NetEntity> entities)
+    {
+        if (_icebergs == null)
+            return;
+        _netIcebergsSeen.Clear();
+        foreach (var netEntity in entities)
+        {
+            if (netEntity.Kind != NetEntityKind.Iceberg)
+                continue;
+            var variant = Math.Clamp((int)netEntity.ItemId, 0, _icebergs.VariantCount - 1);
+            NetEntity.UnpackIcebergAmmo(netEntity.Ammo, out var scale, out var sink01);
+            scale = Math.Clamp(scale, IcebergConfig.ScaleMin, IcebergConfig.ScaleMax);
+            _netIcebergsSeen.Add(netEntity.Id);
+            if (_netIcebergs.TryGetValue(netEntity.Id, out var existing))
+                existing.MirrorSetState(netEntity.Position, netEntity.Velocity, sink01);
+            else
+                _netIcebergs[netEntity.Id] = Iceberg.Mirror(_icebergs.ShapeOf(variant), variant, scale,
+                    NetEntity.TurnsFromYaw(netEntity.Yaw), netEntity.Health, netEntity.Position, netEntity.Velocity,
+                    sink01);
+        }
+
+        _netIcebergRemovals.Clear();
+        foreach (var id in _netIcebergs.Keys)
+            if (!_netIcebergsSeen.Contains(id))
+                _netIcebergRemovals.Add(id);
+        foreach (var id in _netIcebergRemovals)
+            _netIcebergs.Remove(id);
+
+        _icebergs.ReplaceMirrors(_netIcebergs.Values);
     }
 
     /// <summary>Whether a falling-cube mirror of <paramref name="blockId"/> from the newest or the

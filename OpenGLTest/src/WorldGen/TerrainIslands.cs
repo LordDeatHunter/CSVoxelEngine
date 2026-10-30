@@ -4,7 +4,7 @@ using System.Numerics;
 namespace VoxelEngine.WorldGen;
 
 /// <summary>
-/// The ocean-gated island term of BIOMEGEN 13.2: a 0..1 island land weight that
+/// The ocean-gated island term of BIOMEGEN §6: a 0..1 island land weight that
 /// <see cref="BiomeClassifier.BiomeWeights(float, float, out float, out float, out float)"/> folds into the
 /// ocean weight as oceanWeight * (1 - island). Two noise channels rise out of deep water, a large one
 /// (<see cref="TerrainNoise.IslandNoise"/>) and a small one (<see cref="TerrainNoise.IslandSmallNoise"/>), and a

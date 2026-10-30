@@ -254,4 +254,18 @@ public sealed class VisualScenarioTests
             () => VisualScenario.Load("does/not/exist.json"));
         Assert.Contains("does/not/exist.json", ex.Message);
     }
+
+    [Fact]
+    public void TheIcebergScenarioParses()
+    {
+        // visual-examples/ is not copied to the build output: it sits in the game project
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "icebergs.json")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        var scenario = VisualScenario.Load(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "icebergs.json"));
+
+        Assert.Contains(scenario.Steps, step => step.Op == "spawn" && step.Entity == "iceberg");
+        Assert.Contains(scenario.Steps, step => step.Op == "screenshot");
+    }
 }

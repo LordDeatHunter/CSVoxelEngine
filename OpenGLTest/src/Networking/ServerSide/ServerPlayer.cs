@@ -144,6 +144,9 @@ public sealed class ServerPlayer : IMobTarget
     /// <summary>Server-owned flight flag; only ever set together with <see cref="Creative"/>.</summary>
     public bool Flying { get; set; }
 
+    /// <summary>The mob-target view of <see cref="Flying"/>: a flying player pushes no iceberg.</summary>
+    public bool IsFlying => Flying;
+
     /// <summary>
     /// The player's health pool, owned by the server: falls, lava and mob hits land here, and the
     /// client only mirrors it. Persisted with the player.
@@ -249,13 +252,14 @@ public sealed class ServerPlayer : IMobTarget
     /// (<see cref="NetValidation.AllowedDistance"/>), so nothing an accepted state can do is ever
     /// mistaken for a teleport; only the server's own teleports reset the fall. A dead player, or
     /// one whose surroundings are not loaded (<see cref="PlayerBodyProbe.IsKnown"/>), is not judged.
+    /// <paramref name="solids"/> (the server's icebergs) count as ground, so a rider lands on its berg.
     /// </summary>
-    public void ObserveAcceptedState(ChunkManager chunks, double stateGapSeconds)
+    public void ObserveAcceptedState(ChunkManager chunks, double stateGapSeconds, IBodySolids? solids = null)
     {
         if (IsDead || !PlayerBodyProbe.IsKnown(Position, chunks))
             return;
         var feet = Position.Y - Camera.EyeHeight;
-        var fall = _fall.Observe(feet, PlayerBodyProbe.Grounded(Position, chunks), Flying,
+        var fall = _fall.Observe(feet, PlayerBodyProbe.Grounded(Position, chunks, solids), Flying,
             PlayerBodyProbe.InWater(Position, chunks), Creative,
             NetValidation.AllowedDistance(stateGapSeconds, NetworkConfig.NetMaxMoveBlocksPerSecond));
         if (fall > 0)

@@ -1,13 +1,14 @@
 using System.Collections.Generic;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 
 namespace VoxelEngine.Saves;
 
 /// <summary>
 /// The JSON shape of a world's <c>entities.json</c> (<see cref="EntitySaveCodec"/>): the live
-/// mobs and the item drops lying in the world when it was saved. Every field is optional, so an
+/// mobs, the item drops lying in the world and the drifting icebergs when it was saved. Every field is optional, so an
 /// older or hand-edited file degrades field by field instead of failing the load; vectors travel
 /// as <c>float[3]</c>.
 /// <para>
@@ -20,6 +21,7 @@ public sealed class EntitySaveData
 {
     public List<MobData>? Mobs { get; set; }
     public List<DropData>? Drops { get; set; }
+    public List<IcebergData>? Icebergs { get; set; }
 
     /// <summary>One live mob. AI timers are not recorded: they restart on load.</summary>
     public sealed class MobData
@@ -60,5 +62,29 @@ public sealed class EntitySaveData
 
         /// <summary>Seconds since the drop appeared, which carries its pickup delay.</summary>
         public float? Age { get; set; }
+    }
+
+    /// <summary>One drifting iceberg (<see cref="Iceberg"/>). Absent fields restore defaults.</summary>
+    public sealed class IcebergData
+    {
+        /// <summary>The variant (size class) index in the iceberg entity's variant list.</summary>
+        public int? Variant { get; set; }
+
+        /// <summary>The horizontal scale.</summary>
+        public float? Scale { get; set; }
+
+        /// <summary>Quarter turns about the vertical axis, 0..3.</summary>
+        public int? Turns { get; set; }
+
+        /// <summary>The seed of the drift spread and wobble.</summary>
+        public int? Seed { get; set; }
+
+        /// <summary>The waterline center (<see cref="Iceberg.Center"/>).</summary>
+        public float[]? Position { get; set; }
+
+        public float[]? Velocity { get; set; }
+
+        /// <summary>Seconds of life left before it sinks.</summary>
+        public float? Life { get; set; }
     }
 }

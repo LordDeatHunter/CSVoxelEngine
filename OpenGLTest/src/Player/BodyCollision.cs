@@ -2,6 +2,7 @@ using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.Entities.Icebergs;
 
 namespace VoxelEngine.Player;
 
@@ -19,7 +20,7 @@ internal static class BodyCollision
     private const float StepClearance = 0.001f;
 
     internal static Vector3? TryStepUp(Vector3 start, Vector3 frameMovement, float stepHeight,
-        ChunkManager chunkManager)
+        ChunkManager chunkManager, IBodySolids? solids = null)
     {
         if (stepHeight <= 0f)
             return null;
@@ -29,11 +30,11 @@ internal static class BodyCollision
         {
             var lift = MathF.Min(i * BoxSweep.StepSize, stepHeight) + StepClearance;
             var lifted = BoxSweep.OffsetAxis(start, 1, lift);
-            if (BodyCollides(lifted, chunkManager))
+            if (BodyCollides(lifted, chunkManager, solids))
                 continue;
 
-            var stepped = MoveOnAxis(lifted, frameMovement.X, 0, chunkManager, out var blockedX);
-            stepped = MoveOnAxis(stepped, frameMovement.Z, 2, chunkManager, out var blockedZ);
+            var stepped = MoveOnAxis(lifted, frameMovement.X, 0, chunkManager, out var blockedX, solids);
+            stepped = MoveOnAxis(stepped, frameMovement.Z, 2, chunkManager, out var blockedZ, solids);
             if (blockedX || blockedZ)
                 continue;
 
@@ -48,7 +49,8 @@ internal static class BodyCollision
         return null;
     }
 
-    internal static Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunkManager, out bool collided)
+    internal static Vector3 MoveOnAxis(Vector3 start, float delta, int axis, ChunkManager chunkManager, out bool collided,
+        IBodySolids? solids = null)
     {
         collided = false;
         if (MathF.Abs(delta) < float.Epsilon)
@@ -62,7 +64,7 @@ internal static class BodyCollision
             var step = MathUtils.ClampStep(remaining, BoxSweep.StepSize);
             var candidate = BoxSweep.OffsetAxis(position, axis, step);
 
-            if (BodyCollides(candidate, chunkManager))
+            if (BodyCollides(candidate, chunkManager, solids))
             {
                 collided = true;
                 break;
@@ -80,18 +82,13 @@ internal static class BodyCollision
     /// cell. Player body only: drops, slimes and falling blocks still see the full cell. The rule
     /// has no simulation state, so the server can judge a connected player's body
     /// (<see cref="PlayerBodyProbe"/>) by the very rule the client's own physics moves it under.
-    /// An unloaded cell reads as air.
+    /// An unloaded cell reads as air. <paramref name="solids"/> adds the non-block solids (the
+    /// iceberg boxes), tested after the cells.
     /// </summary>
-    public static bool BodyCollides(Vector3 eyePosition, ChunkManager chunkManager)
+    public static bool BodyCollides(Vector3 eyePosition, ChunkManager chunkManager, IBodySolids? solids = null)
     {
-        var min = new Vector3(
-            eyePosition.X - PlayerPhysics.PlayerRadius,
-            eyePosition.Y - PlayerPhysics.EyeHeight,
-            eyePosition.Z - PlayerPhysics.PlayerRadius);
-        var max = new Vector3(
-            eyePosition.X + PlayerPhysics.PlayerRadius,
-            eyePosition.Y - PlayerPhysics.EyeHeight + PlayerPhysics.PlayerHeight,
-            eyePosition.Z + PlayerPhysics.PlayerRadius);
+        var min = IcebergContact.BodyMin(eyePosition);
+        var max = IcebergContact.BodyMax(eyePosition);
 
         VoxelCoords.CellRange(min, max, out var minX, out var minY, out var minZ, out var maxX, out var maxY, out var maxZ);
 
@@ -115,33 +112,36 @@ internal static class BodyCollision
                 return true;
         }
 
-        return false;
+        return solids?.Overlaps(min, max) == true;
     }
 
     /// <summary>
-    /// The shove behind <see cref="Camera.PushOutOf"/>: pushes <paramref name="camera"/>'s body out of a falling cube along the smallest-penetration axis that does not park the eye inside a solid (see <see cref="BodyCollides"/>).
+    /// The shove behind <see cref="Camera.PushOutOf"/>: pushes <paramref name="camera"/>'s body out of a falling cube (see <see cref="PushOutOfBox"/>).
     /// </summary>
-    internal static void PushOutOf(Camera camera, Vector3 center, float halfExtent, ChunkManager chunkManager)
+    internal static void PushOutOf(Camera camera, Vector3 center, float halfExtent, ChunkManager chunkManager) =>
+        PushOutOfBox(camera, center - new Vector3(halfExtent), center + new Vector3(halfExtent), chunkManager, null);
+
+    /// <summary>
+    /// Pushes <paramref name="camera"/>'s body out of the box from <paramref name="eMin"/> to
+    /// <paramref name="eMax"/> (a falling cube, an iceberg box) along the smallest-penetration axis
+    /// that does not park the eye inside a solid (see <see cref="BodyCollides"/>, with
+    /// <paramref name="solids"/>). Never while flying.
+    /// </summary>
+    internal static void PushOutOfBox(Camera camera, Vector3 eMin, Vector3 eMax, ChunkManager chunkManager,
+        IBodySolids? solids)
     {
         if (camera.IsFlying) return;
 
-        var min = new Vector3(
-            camera.Position.X - PlayerPhysics.PlayerRadius,
-            camera.Position.Y - Camera.EyeHeight,
-            camera.Position.Z - PlayerPhysics.PlayerRadius);
-        var max = new Vector3(
-            camera.Position.X + PlayerPhysics.PlayerRadius,
-            camera.Position.Y - Camera.EyeHeight + PlayerPhysics.PlayerHeight,
-            camera.Position.Z + PlayerPhysics.PlayerRadius);
-        var eMin = center - new Vector3(halfExtent);
-        var eMax = center + new Vector3(halfExtent);
+        var min = IcebergContact.BodyMin(camera.Position);
+        var max = IcebergContact.BodyMax(camera.Position);
+        var center = (eMin + eMax) * 0.5f;
 
         var ox = Math.Min(max.X, eMax.X) - Math.Max(min.X, eMin.X);
         var oy = Math.Min(max.Y, eMax.Y) - Math.Max(min.Y, eMin.Y);
         var oz = Math.Min(max.Z, eMax.Z) - Math.Max(min.Z, eMin.Z);
         if (ox <= 0f || oy <= 0f || oz <= 0f) return;
 
-        // Signed shove per axis that moves the body fully clear of the cube; ties go negative.
+        // Signed shove per axis that moves the body fully clear of the box; ties go negative.
         // Shallowest first, so the shove moves the player the least.
         var bodyCenterY = camera.Position.Y - Camera.EyeHeight + PlayerPhysics.PlayerHeight * 0.5f;
         Span<float> pushes = [
@@ -164,7 +164,7 @@ internal static class BodyCollision
                 _ => camera.Position + new Vector3(0f, 0f, pushes[2]),
             };
 
-            if (BodyCollides(candidate, chunkManager)) continue;
+            if (BodyCollides(candidate, chunkManager, solids)) continue;
 
             camera.SetPosition(candidate);
             return;

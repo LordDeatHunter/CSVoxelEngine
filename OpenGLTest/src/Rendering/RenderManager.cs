@@ -317,6 +317,9 @@ public class RenderManager : IDisposable
     /// goblin rig, its part meshes and its skin.</summary>
     internal MobPasses Mobs { get; private set; }
 
+    /// <summary>The iceberg draws: one mesh and skin per iceberg variant.</summary>
+    internal IcebergPasses IcebergPasses { get; private set; }
+
     /// <summary>The depth-only sun shadow passes: the near and far cascades' casters; owns the
     /// CHUNK_DRAW shadow program's uniform locations.</summary>
     internal ShadowPass Shadows { get; private set; }
@@ -548,6 +551,7 @@ public class RenderManager : IDisposable
         Stations = new StationPasses(gl, this);
         Players = new PlayerPasses(gl, this);
         Mobs = new MobPasses(gl, this);
+        IcebergPasses = new IcebergPasses(gl, this);
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
         // The damage numbers are laid out from the HUD's font; without one there is nothing to draw
         if (ui.Font is { } font)
@@ -988,6 +992,7 @@ public class RenderManager : IDisposable
         itemMeshes.Dispose();
         Stations.Dispose();
         Players.Dispose();
+        IcebergPasses.Dispose();
         Mobs.Dispose();
         worldShader.Dispose();
         chunkShader.Dispose();

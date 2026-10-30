@@ -20,7 +20,8 @@ public sealed class EntityType
     /// <summary>Display name for logs and future UI.</summary>
     public required string DisplayName { get; init; }
 
-    /// <summary>Starting (and maximum) health of one spawn.</summary>
+    /// <summary>Starting (and maximum) health of one spawn; 0 means the kind has no health pool
+    /// (it cannot back a <see cref="Mob"/>).</summary>
     public required int MaxHealth { get; init; }
 
     /// <summary>Table rolled on death; null drops nothing.</summary>
@@ -34,6 +35,30 @@ public sealed class EntityType
     /// entity, the renderer and the debugger. Parsed once at content load, GL-free.
     /// </summary>
     public required BbmodelData Model { get; init; }
+
+    private IReadOnlyList<string>? _variantPaths;
+    private IReadOnlyList<BbmodelData>? _variants;
+
+    /// <summary>
+    /// The Blockbench project of every variant (size class or look), index-parallel to
+    /// <see cref="Variants"/>. A kind without authored variants has exactly one,
+    /// <see cref="ModelPath"/>.
+    /// </summary>
+    public IReadOnlyList<string> VariantPaths
+    {
+        get => _variantPaths ??= [ModelPath];
+        init => _variantPaths = value;
+    }
+
+    /// <summary>
+    /// The parsed model of every variant. Never empty: <c>Variants[0]</c> is always
+    /// <see cref="Model"/>, so a kind without authored variants has exactly that one.
+    /// </summary>
+    public IReadOnlyList<BbmodelData> Variants
+    {
+        get => _variants ??= [Model];
+        init => _variants = value;
+    }
 }
 
 /// <summary>

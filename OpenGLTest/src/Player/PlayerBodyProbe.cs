@@ -32,10 +32,11 @@ public static class PlayerBodyProbe
     /// Whether the body stands on something: the body box lowered by
     /// <see cref="NetworkConfig.NetGroundProbeBlocks"/> collides under the player-body rule
     /// (<see cref="BodyCollision.BodyCollides"/>). A body already inside a solid reads grounded
-    /// too, so a buried player is never billed a fall.
+    /// too, so a buried player is never billed a fall. <paramref name="solids"/> adds the non-block
+    /// solids (the server's icebergs), so a rider stands on its berg.
     /// </summary>
-    public static bool Grounded(Vector3 eye, ChunkManager chunks) =>
-        BodyCollision.BodyCollides(eye - new Vector3(0f, NetworkConfig.NetGroundProbeBlocks, 0f), chunks);
+    public static bool Grounded(Vector3 eye, ChunkManager chunks, IBodySolids? solids = null) =>
+        BodyCollision.BodyCollides(eye - new Vector3(0f, NetworkConfig.NetGroundProbeBlocks, 0f), chunks, solids);
 
     /// <summary>
     /// Whether the body swims: a fluid surface over its footprint reaches above the feet, within

@@ -6,7 +6,7 @@ using Xunit;
 namespace VoxelEngine.Tests.Saves;
 
 /// <summary>
-/// <see cref="EntitySaveCodec"/>: mobs and drops survive a write and a read, a missing list
+/// <see cref="EntitySaveCodec"/>: mobs, drops and icebergs survive a write and a read, a missing list
 /// reads as null, and bad input reads as "no file" instead of throwing. Content-free: the codec
 /// never resolves a name.
 /// </summary>
@@ -74,12 +74,47 @@ public sealed class EntitySaveCodecTests
     }
 
     [Fact]
+    public void RoundTripsIcebergs()
+    {
+        var original = new EntitySaveData
+        {
+            Icebergs =
+            [
+                new EntitySaveData.IcebergData
+                {
+                    Variant = 2, Scale = 1.125f, Turns = 3, Seed = -17, Position = [-952.5f, 0.875f, -2536.5f],
+                    Velocity = [0.125f, 0f, -0.0625f], Life = 312.5f,
+                },
+                new EntitySaveData.IcebergData { Position = [1f, 2f, 3f] },
+            ],
+        };
+
+        var back = EntitySaveCodec.TryParse(EntitySaveCodec.ToBytes(original));
+
+        Assert.NotNull(back?.Icebergs);
+        Assert.Equal(original.Icebergs.Count, back.Icebergs.Count);
+        for (var i = 0; i < original.Icebergs.Count; i++)
+        {
+            var a = original.Icebergs[i];
+            var b = back.Icebergs[i];
+            Assert.Equal(a.Variant, b.Variant);
+            Assert.Equal(a.Scale, b.Scale);
+            Assert.Equal(a.Turns, b.Turns);
+            Assert.Equal(a.Seed, b.Seed);
+            Assert.Equal(a.Position, b.Position);
+            Assert.Equal(a.Velocity, b.Velocity);
+            Assert.Equal(a.Life, b.Life);
+        }
+    }
+
+    [Fact]
     public void MissingListsReadAsNullAndBadInputAsNoFile()
     {
         var empty = EntitySaveCodec.TryParse("{}"u8.ToArray());
         Assert.NotNull(empty);
         Assert.Null(empty.Mobs);
         Assert.Null(empty.Drops);
+        Assert.Null(empty.Icebergs);
 
         var valid = EntitySaveCodec.ToBytes(new EntitySaveData
         {

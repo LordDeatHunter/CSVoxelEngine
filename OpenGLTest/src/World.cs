@@ -11,6 +11,7 @@ using VoxelEngine.Chunks.Streaming;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
@@ -25,6 +26,7 @@ using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
@@ -59,6 +61,7 @@ public class World
     private readonly TntManager _tntManager = new();
     private readonly FallingBlockManager _falling = new();
     private readonly SlimeManager? _slimes;
+    private readonly IcebergManager? _icebergs;
     private readonly GoblinManager? _goblins;
     private readonly SaplingManager _saplings = new();
     // The natural and hard mob caps every manager above spawns under, counted over all of them.
@@ -274,6 +277,15 @@ public class World
     /// <summary>Live goblins, feeding the entity, shadow and mirror passes.</summary>
     public IReadOnlyList<Goblin> Goblins => _goblins?.Goblins ?? [];
 
+    /// <summary>Live icebergs (a client's mirrors of the server's); public for the server's broadcast.</summary>
+    public IReadOnlyList<Iceberg> Icebergs => _icebergs?.Icebergs ?? [];
+
+    /// <summary>The iceberg simulation, when the iceberg entity exists.</summary>
+    internal IcebergManager? IcebergManager => _icebergs;
+
+    /// <summary>The non-block solids a player body collides with (the icebergs), for the server's judging.</summary>
+    public IBodySolids? BodySolids => _icebergs;
+
     // Every live mob of every kind, rebuilt once a frame after the mob managers ran
     // (MobDirector.RefreshMobs), so punch, slice, thrown items and healthbars target them all.
     private readonly List<Mob> _mobs = [];
@@ -388,6 +400,9 @@ public class World
                 _slimes = new SlimeManager(slimeType, _mobCaps);
             if (EntityRegistry.TryGet("goblin") is { } goblinType)
                 _goblins = new GoblinManager(goblinType, _mobCaps);
+            if (EntityRegistry.TryGet("iceberg") is { } icebergType)
+                _icebergs = new IcebergManager(icebergType);
+            Camera.BodySolids = _icebergs;
             // The per-job components: each only stores its references here and reads this world lazily
             Strikes = new MobStrikes(this, _debris, serverMode);
             Ambient = new AmbientEffects(this, _chunkManager, _fire, _torchFire, _bubbles, _debris, _dropManager,
@@ -395,8 +410,8 @@ public class World
             Edits = new BlockEditor(this, _chunkManager, _debris, _dropManager, _campfires, _querns, _kilns, _casting,
                 _fluidManager, _leafDecay, _lodManager, _leaves, _falling, _toppling, clientMode, serverMode);
             LeftClick = new LeftClickAction(this, _chunkManager, _debris, _hitMarker, _mobs, sfx, clientMode);
-            Placer = new BlockPlacer(this, _chunkManager, _falling, _querns, _fluidManager, _leafDecay, _lodManager,
-                clientMode, serverMode);
+            Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
+                _lodManager, clientMode, serverMode);
             Throws = new ThrowAction(this, _chunkManager, _dropManager, _goblins, _mobs, _projectiles, clientMode);
             Interactions = new BlockInteractions(this, _chunkManager, _dropManager, _campfires, _querns, _kilns,
                 _casting, _fluidManager, _leafDecay);
@@ -404,12 +419,12 @@ public class World
                 _lodManager, _tntManager, _campfires, _kilns, _health, _hotbarPops, _debris, clientMode, serverMode);
             RightClick = new RightClickAction(this, clientMode);
             ClientMirror = new ClientMirror(this, _chunkManager, _dropManager, _tntManager, _falling, _slimes, _goblins,
-                _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
-            Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _health,
-                serverMode, savedPlayer, savedEntities);
+                _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
+            Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _icebergs,
+                _health, serverMode, savedPlayer, savedEntities);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
-            Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _debris, _health, _mobs,
-                serverMode, clientMode);
+            Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _icebergs, _debris, _health,
+                _mobs, serverMode, clientMode);
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
                 _leaves, _fire, _lavaFire, _torchFire, _bubbles, _health, _hotbarName, _hotbarPops);
@@ -695,6 +710,7 @@ public class World
         _slimes?.AnimateMirrors((float)deltaTime, _debris);
         _goblins?.AnimateMirrors((float)deltaTime, _debris);
         _tntManager.AnimateMirrors((float)deltaTime);
+        Director.AnimateIcebergMirrors(deltaTime);
         Ambient.GatherStationFires();
         _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
         Ambient.UpdateTorchFlames((float)deltaTime, Wind.Direction(LightingTime));
@@ -821,7 +837,9 @@ public class World
         foreach (var block in _falling.Falling)
             Camera.PushOutOf(block.Position, FallingBlock.HalfExtent, _chunkManager);
 
-        // The mobs: their targets, the slime and goblin updates and the damage they deal (MobDirector.Update)
+        // The icebergs drift and carry their rider, then the mobs: their targets, the slime and goblin
+        // updates and the damage they deal (MobDirector)
+        Director.UpdateIcebergs(deltaTime);
         Director.Update(deltaTime);
 
         // After every mob manager and before the thrown items, so a mob killed or despawned

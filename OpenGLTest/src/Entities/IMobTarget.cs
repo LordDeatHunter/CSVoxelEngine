@@ -22,6 +22,14 @@ public interface IMobTarget
     /// cosmetic flag, which is untrusted but can only ever help the one who claims it.</summary>
     bool IsSneaking => false;
 
+    /// <summary>Whether the player flies (noclip): a flying body neither pushes nor is blocked by
+    /// an iceberg. The camera's own flight flag, or a connected player's server-owned one.</summary>
+    bool IsFlying => false;
+
+    /// <summary>Whether the player is dead: a dead body pushes nothing. Only a connected player
+    /// reports its server-owned death here; the local camera keeps the default.</summary>
+    bool IsDead => false;
+
     /// <summary>A mob hit landed: take <paramref name="damage"/> and a knockback shove along the
     /// horizontal <paramref name="awayHorizontal"/> at <paramref name="knockbackSpeed"/> plus an
     /// upward <paramref name="lift"/>. <paramref name="attacker"/> is the mob's display name, which

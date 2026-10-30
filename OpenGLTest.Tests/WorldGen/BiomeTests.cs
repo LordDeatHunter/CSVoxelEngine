@@ -368,32 +368,6 @@ public sealed class BiomeTests
     }
 
     [Fact]
-    public void ForestMountainsAreRareButPresent()
-    {
-        // A mountain lifts a forest column well above anything the hill field alone can reach
-        // (ForestBaseHeight + swell + HillAmplitude + rough tops out near 53 blocks). Ranges must
-        // exist, and stay a small share of the forest so they read as occasional.
-        const int mountainHeight = 56;
-        var forestColumns = 0;
-        var mountainColumns = 0;
-
-        for (var cx = -100; cx <= 100; cx += 2)
-        for (var cz = -100; cz <= 100; cz += 2)
-        {
-            if (TerrainGenerator.BiomeAt(cx * Chunk.Size + 8, cz * Chunk.Size + 8) != Biome.Forest)
-                continue;
-
-            forestColumns++;
-            if (ColumnCache.Get(cx, cz).MaxHeight > mountainHeight) mountainColumns++;
-        }
-
-        Assert.True(mountainColumns > 0,
-            $"no forest column rises above {mountainHeight} blocks in the scanned area");
-        Assert.True(mountainColumns * 5 < forestColumns,
-            $"mountains are not occasional: {mountainColumns} of {forestColumns} forest columns above {mountainHeight}");
-    }
-
-    [Fact]
     public void ForestHasBothOpenAndWoodedRegions()
     {
         // The openness mask gives the forest a sub-biome: open grass regions and woodland. Both

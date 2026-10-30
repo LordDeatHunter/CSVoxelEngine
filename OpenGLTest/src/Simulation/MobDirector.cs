@@ -12,14 +12,15 @@ using VoxelEngine.Juice;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Icebergs;
 
 namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// The per-frame mob job: the players the mobs chase (the local camera, or every connected player on a
 /// server), the slime and goblin updates with the damage they deal billed to the local player's pool, the
-/// TNT blast shove of the players and mobs, and the rebuild of the shared mob list (<see cref="World.Mobs"/>)
-/// with its scenario seams. Owned by <see cref="World"/>, which runs <see cref="Update"/> inside its entity
+/// TNT blast shove of the players and mobs, the rebuild of the shared mob list (<see cref="World.Mobs"/>)
+/// with its scenario seams, and the icebergs (not mobs, but driven by the same targets). Owned by <see cref="World"/>, which runs <see cref="Update"/> inside its entity
 /// update; main thread only.
 /// </summary>
 internal sealed class MobDirector
@@ -29,6 +30,7 @@ internal sealed class MobDirector
     private readonly DropManager _dropManager;
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
+    private readonly IcebergManager? _icebergs;
     private readonly BlockDebrisSystem _debris;
     private readonly PlayerHealth _health;
     private readonly List<Mob> _mobs;
@@ -44,14 +46,15 @@ internal sealed class MobDirector
     private MobStrikes Strikes => _world.Strikes;
 
     internal MobDirector(World world, ChunkManager chunkManager, DropManager dropManager, SlimeManager? slimes,
-        GoblinManager? goblins, BlockDebrisSystem debris, PlayerHealth health, List<Mob> mobs, bool serverMode,
-        bool clientMode)
+        GoblinManager? goblins, IcebergManager? icebergs, BlockDebrisSystem debris, PlayerHealth health,
+        List<Mob> mobs, bool serverMode, bool clientMode)
     {
         _world = world;
         _chunkManager = chunkManager;
         _dropManager = dropManager;
         _slimes = slimes;
         _goblins = goblins;
+        _icebergs = icebergs;
         _debris = debris;
         _health = health;
         _mobs = mobs;
@@ -59,13 +62,14 @@ internal sealed class MobDirector
         _clientMode = clientMode;
     }
 
-    /// <summary>The mob part of the world's entity update: rebuilds the targets, then runs the slime and goblin managers and bills the damage they dealt.</summary>
-    internal void Update(double deltaTime)
+    /// <summary>
+    /// Rebuilds the players the mobs chase (and the icebergs answer to) this frame. Singleplayer: the
+    /// local camera, whose TakeHit applies only the knockback, since the mob damage still lands on
+    /// this world's own pool. A server: every connected player, each taking its hits on its own pool
+    /// (ServerPlayer.TakeHit), never the hovering camera, so nobody online means nobody chased.
+    /// </summary>
+    internal IReadOnlyList<IMobTarget> RefreshTargets()
     {
-        // The players the mobs chase, rebuilt each frame. Singleplayer: the local camera, whose
-        // TakeHit applies only the knockback, since the damage below still lands on this world's
-        // own pool. A server: every connected player, each taking its hits on its own pool
-        // (ServerPlayer.TakeHit), never the hovering camera, so nobody online means nobody chased.
         _mobTargets.Clear();
         if (_serverMode)
         {
@@ -77,6 +81,36 @@ internal sealed class MobDirector
         {
             _mobTargets.Add(Camera);
         }
+        return _mobTargets;
+    }
+
+    /// <summary>
+    /// The icebergs' frame in the authoritative world: they drift, are pushed and live out their life
+    /// around the targets, then (singleplayer only; a server's camera is nobody) the local player is
+    /// carried by the berg it rides and pushed out of any it is left inside.
+    /// </summary>
+    internal void UpdateIcebergs(double deltaTime)
+    {
+        if (_icebergs == null)
+            return;
+        _icebergs.Update((float)deltaTime, _chunkManager, RefreshTargets(), LightingTime);
+        if (!_serverMode)
+            _icebergs.CarryAndPushOut(Camera, _chunkManager);
+    }
+
+    /// <summary>A client's iceberg mirrors between snapshots: they dead-reckon, and carry the local player.</summary>
+    internal void AnimateIcebergMirrors(double deltaTime)
+    {
+        if (_icebergs == null)
+            return;
+        _icebergs.AnimateMirrors((float)deltaTime);
+        _icebergs.CarryAndPushOut(Camera, _chunkManager);
+    }
+
+    /// <summary>The mob part of the world's entity update: rebuilds the targets, then runs the slime and goblin managers and bills the damage they dealt.</summary>
+    internal void Update(double deltaTime)
+    {
+        RefreshTargets();
 
         // Slimes hop at the player: an airborne touch bills damage, a grounded one is just
         // shoved aside. The manager only reports the amount; the health pool stays here (a
@@ -190,6 +224,34 @@ internal sealed class MobDirector
             if (_goblins?.Spawn(feet + new Vector3(0f, Goblin.Height * 0.5f, 0f)) == null) return false;
             RefreshMobs();
             return true;
+        }
+        if (string.Equals(name, "iceberg", StringComparison.OrdinalIgnoreCase) && _icebergs != null)
+            return SpawnIceberg(feet, size);
+        return false;
+    }
+
+    // How far above the given feet the scenario's iceberg spawn looks for the sea's top water cell
+    // (the snapped feet of an ocean column stand on the sea floor, under the water)
+    private const int IcebergWaterSearchBlocks = 64;
+
+    /// <summary>
+    /// Scenario seam: a berg of size class <paramref name="size"/> (1 the smallest) floating at the
+    /// top water cell of the column under <paramref name="feet"/>, at scale 1, unturned and with a
+    /// full life. The feet's own height is only where the search for the water starts.
+    /// </summary>
+    private bool SpawnIceberg(Vector3 feet, int size)
+    {
+        var x = MathUtils.FloorToInt(feet.X);
+        var z = MathUtils.FloorToInt(feet.Z);
+        var top = MathUtils.FloorToInt(feet.Y) + IcebergWaterSearchBlocks;
+        for (var y = top; y > top - 2 * IcebergWaterSearchBlocks; y--)
+        {
+            if (!IcebergSpawner.TryWaterline(_chunkManager, x, y, z, out var waterline))
+                continue;
+            var variant = Math.Clamp(size - 1, 0, _icebergs!.VariantCount - 1);
+            var seed = x * 73856093 ^ z * 19349663;
+            return _icebergs.Spawn(_chunkManager, variant, 1f, 0, seed, new Vector3(x + 0.5f, waterline, z + 0.5f),
+                IcebergConfig.LifeMaxSeconds) != null;
         }
         return false;
     }

@@ -106,8 +106,11 @@ public static class NetFraming
     /// primed TNT and falling blocks (<see cref="NetEntityKind.PrimedTnt"/>,
     /// <see cref="NetEntityKind.FallingBlock"/>), which a client draws as display-only mirrors.
     /// 7: each <see cref="NetMessage.PlayerList"/> entry ends with the player's last
-    /// <see cref="NetPlayerAction"/> and its counter, and the player flags carry cosmetic movement bits.</summary>
-    public const int ProtocolVersion = 7;
+    /// <see cref="NetPlayerAction"/> and its counter, and the player flags carry cosmetic movement bits.
+    /// 8: <see cref="NetMessage.EntityList"/> also carries icebergs (<see cref="NetEntityKind.Iceberg"/>);
+    /// an older client would neither draw nor collide with them while the server judges a rider's
+    /// hover against them.</summary>
+    public const int ProtocolVersion = 8;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

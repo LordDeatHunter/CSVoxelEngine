@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
@@ -15,7 +16,10 @@ namespace VoxelEngine.ItemDebugger;
 /// order (idle and walk drive the locomotion layer at rest and at the walk reference speed; any other
 /// clip is a one-shot that replays after <see cref="RestBetweenPlays"/>, and the preview consumes the
 /// events it fires so none pile up) and <see cref="HurtMode"/> when it authored no <c>hurt</c> clip of
-/// its own. A clip-less model (the slime) offers the life-cycle modes <see cref="SlimeModes"/>.
+/// its own. A clip-less model (the slime) offers the life-cycle modes <see cref="SlimeModes"/>. An entity
+/// with several model variants (the iceberg's size classes) offers one static mode per variant instead,
+/// named by its file (<see cref="SelectedVariant"/>), and an entity with no health pool is never offered
+/// <see cref="HurtMode"/>.
 /// <para>
 /// A goblin or slime is previewed as the real <see cref="Goblin"/> / <see cref="Slime"/> object, driven
 /// the way a client drives a mob it does not simulate (<see cref="Mob.AnimateMirror"/>), so everything the
@@ -111,10 +115,18 @@ public sealed class EntityPreviewState : IPreviewDriver
 
     private float RestFor(float seconds) => Replay ? seconds : float.MaxValue / 4f;
 
-    /// <summary>True for idle and walk: no start or end of their own, so a clock wraps them.</summary>
+    /// <summary>True for idle, walk and a variant mode: no start or end of their own, so a clock wraps them.</summary>
     public bool IsContinuous =>
-        string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase)
+        _variantModes
+        || string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase)
         || string.Equals(Mode, EntityAnimator.WalkClip, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Index into the selected type's <see cref="EntityType.Variants"/> the preview draws: the active
+    /// mode's variant for a multi-variant entity (one mode per variant), 0 for every other entity.</summary>
+    public int SelectedVariant { get; private set; }
+
+    // True while Modes are the selected type's variants (one per model) rather than clips or life-cycle modes.
+    private bool _variantModes;
 
     /// <summary>Seconds one play of the active mode lasts: its clip's length, or the life-cycle mode's own length.</summary>
     public float Duration
@@ -206,26 +218,33 @@ public sealed class EntityPreviewState : IPreviewDriver
         else if (string.Equals(type.Name, "slime", StringComparison.OrdinalIgnoreCase))
             _slime = NewSlime();
         Animator = _goblin?.Animation ?? new EntityAnimator(clips, MobConfig.GoblinWalkSpeed);
-
-        if (_slime != null)
-        {
-            Modes = SlimeModes;
-        }
-        else if (clips.Count == 0)
-        {
-            Modes = HurtOnly;
-        }
-        else
-        {
-            // A model with its own hurt clip lists it once: the mode hurts the mob and plays the clip.
-            var hasHurtClip = Animator.HasClip(HurtMode);
-            var modes = new string[clips.Count + (hasHurtClip ? 0 : 1)];
-            for (var i = 0; i < clips.Count; i++) modes[i] = clips[i].Name;
-            if (!hasHurtClip) modes[^1] = HurtMode;
-            Modes = modes;
-        }
+        _variantModes = PreviewMob == null && type.Variants.Count > 1;
+        SelectedVariant = 0;
+        Modes = ModesFor(type, clips);
         Mode = Modes[0];
         ResetTimers();
+    }
+
+    // The selected type's modes: the slime's life cycle, one per variant (named by its file), or its clips in file
+    // order plus HURT. An entity with no health pool is never offered HURT, and with no clips shows one static idle.
+    private IReadOnlyList<string> ModesFor(EntityType type, IReadOnlyList<AnimationClip> clips)
+    {
+        if (_slime != null) return SlimeModes;
+        if (_variantModes)
+        {
+            var names = new string[type.VariantPaths.Count];
+            for (var i = 0; i < names.Length; i++) names[i] = Path.GetFileNameWithoutExtension(type.VariantPaths[i]);
+            return names;
+        }
+
+        var hurts = type.MaxHealth > 0;
+        var modes = new List<string>(clips.Count + 1);
+        foreach (var clip in clips)
+            if (hurts || !string.Equals(clip.Name, HurtMode, StringComparison.OrdinalIgnoreCase)) modes.Add(clip.Name);
+        // A model with its own hurt clip lists it once: the mode hurts the mob and plays the clip.
+        if (hurts && !Animator.HasClip(HurtMode)) modes.Add(HurtMode);
+        if (modes.Count == 0) modes.Add(EntityAnimator.IdleClip);
+        return modes;
     }
 
     /// <summary>Selects the entity whose file name or display name matches (ignoring case).</summary>
@@ -251,6 +270,7 @@ public sealed class EntityPreviewState : IPreviewDriver
         {
             if (!string.Equals(Modes[i], mode, StringComparison.OrdinalIgnoreCase)) continue;
             Mode = Modes[i];
+            SelectedVariant = _variantModes ? i : 0;
             if (PreviewMob is { IsDying: true }) Respawn();
             if (_slime != null) _slime = NewSlime();
             ResetTimers();
@@ -391,7 +411,8 @@ public sealed class EntityPreviewState : IPreviewDriver
     // A model that is neither a goblin nor a slime: clips only, with the plain hit-flash pulse.
     private void UpdateGeneric(float dt)
     {
-        if (string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase))
+        // A variant mode (a static model per size class) and an idle mode both just stand.
+        if (_variantModes || string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase))
         {
             Animator.Update(dt, 0f);
         }
@@ -399,7 +420,7 @@ public sealed class EntityPreviewState : IPreviewDriver
         {
             Animator.Update(dt, Animator.WalkReferenceSpeed);
         }
-        else if (Mode == HurtMode)
+        else if (Mode == HurtMode && Selected!.MaxHealth > 0)
         {
             _hurtTimer -= dt;
             if (_hurtTimer <= 0f)

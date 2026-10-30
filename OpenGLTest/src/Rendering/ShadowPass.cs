@@ -5,6 +5,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Lod;
 using VoxelEngine.Player;
@@ -59,7 +60,7 @@ internal sealed class ShadowPass
     /// <summary>
     /// Depth-only passes that fill both shadow cascades. The near pass renders every caster
     /// inside the near light box: opaque chunk meshes, primed TNT, falling blocks, slimes,
-    /// goblins (<paramref name="goblins"/>, the last parameter), toppling trees and the player. The far pass then renders only the opaque chunk casters
+    /// goblins (<paramref name="goblins"/>), icebergs (<paramref name="icebergs"/>, each on its own skin), toppling trees and the player. The far pass then renders only the opaque chunk casters
     /// inside the far box - entities are sub-texel at that range - plus every non-buried LOD
     /// region (<paramref name="lodRegions"/>) it holds, drawn with opaque foliage so the LOD
     /// ring is shadowed by its own hills and canopy out to the far box. Both run first each frame,
@@ -74,7 +75,8 @@ internal sealed class ShadowPass
     internal void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
         PlayerModel? player = null, IReadOnlyList<Slime>? slimes = null,
-        IReadOnlyList<LodRegion>? lodRegions = null, IReadOnlyList<Goblin>? goblins = null)
+        IReadOnlyList<LodRegion>? lodRegions = null, IReadOnlyList<Goblin>? goblins = null,
+        IReadOnlyList<Iceberg>? icebergs = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -179,6 +181,9 @@ internal sealed class ShadowPass
             Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
         }
 
+        if (icebergs != null)
+            DrawIcebergCasters(icebergs, frustum);
+
         foreach (var tree in trees)
         {
             tree.EnsureMesh(_gl);
@@ -256,6 +261,26 @@ internal sealed class ShadowPass
     /// <c>glMultiDrawElementsIndirect</c>. <c>_owner.ChunkShadowShader</c> must be bound with the
     /// cascade's view-proj already set.
     /// </summary>
+    // The bergs inside the near light box, each on its own skin like the goblin casters (its texels
+    // would otherwise be alpha-tested against the atlas)
+    private void DrawIcebergCasters(IReadOnlyList<Iceberg> icebergs, Frustum frustum)
+    {
+        var drew = false;
+        foreach (var berg in icebergs)
+        {
+            var mesh = _owner.IcebergPasses.MeshOf(berg.Variant);
+            if (mesh == null || !frustum.IntersectsAABB(berg.Bounds.Min, berg.Bounds.Max)) continue;
+            Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.IcebergPasses.TextureOf(berg.Variant));
+            var model = IcebergPasses.ModelMatrix(berg, _owner.IcebergPasses.Time);
+            _owner.ShadowShader.SetUniform("uModel", model);
+            _owner.ShadowShader.SetUniform("uLightMVP", model * _owner.NearShadow.ViewProj);
+            mesh.Render();
+            drew = true;
+        }
+        if (drew)
+            Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
+    }
+
     private void DrawChunkCasters(IReadOnlyList<Chunk> chunks, Frustum frustum)
     {
         _owner.ChunkDraws.BeginPass(chunks.Count);

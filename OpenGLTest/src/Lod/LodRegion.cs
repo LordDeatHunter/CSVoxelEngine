@@ -43,7 +43,9 @@ public class LodRegion : IDisposable
     // Rent sizes for a region build's output lists. Every level is 32x32 cells (64/2, 128/4,
     // 256/8) and each cell emits a top quad plus a `top - neighborTop` side skirt per side, so
     // the opaque pair is sized from the measured working set rather than a guess: over each
-    // level's full region ring the peak was 21476 vertices (L0), 18184 (L1), 11508 (L2). At a
+    // level's full region ring the peak was 21476 vertices (L0), 18184 (L1), 11508 (L2), and over
+    // ~250 highland regions per level (relief weight >= 0.5, most of them on mountain ranges)
+    // the steeper side skirts peaked lower still, at 17580 (L0), 11812 (L1), 9548 (L2). At a
     // 24576 rent a list grows 24576 -> 49152 -> 98304 at worst, and AddQuad refuses past
     // ~65532 vertices, so a grown list never passes MeshBufferPool's capacity*4 ceiling and no
     // real region is ever dropped instead of pooled. The sea sheet is one +Y quad per sea cell,

@@ -145,6 +145,23 @@ public sealed class NetworkProtocolTests
         // A status cut short before its knockback is a short frame
         AssertBad<EndOfStreamException>(StatusFrame(w => { w.Write((byte)0); w.Write(50); w.Write(false); }));
     }
+
+    [Fact]
+    public void TheIcebergPackingRoundTrips()
+    {
+        // The scale and sinking survive within their quantization, whatever the other holds
+        foreach (var scale in new[] { 0.5f, 0.85f, 1f, 1.237f, 2f })
+        foreach (var sink in new[] { 0f, 0.3f, 0.999f, 1f })
+        {
+            NetEntity.UnpackIcebergAmmo(NetEntity.PackIcebergAmmo(scale, sink), out var backScale, out var backSink);
+            Assert.InRange(backScale, scale - 0.5e-3f - 1e-6f, scale + 0.5e-3f + 1e-6f);
+            Assert.InRange(backSink, sink - 0.5f / 255f - 1e-6f, sink + 0.5f / 255f + 1e-6f);
+        }
+
+        // Every quarter turn survives the yaw it travels in
+        for (var turns = 0; turns < 4; turns++)
+            Assert.Equal(turns, NetEntity.TurnsFromYaw(NetEntity.YawFromTurns(turns)));
+    }
 }
 
 /// <summary>

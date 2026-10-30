@@ -28,6 +28,13 @@ public class Camera : IMobTarget
     public float Pitch { get; private set; } = SpawnLook.Y;
     public bool IsGrounded { get; private set; }
     public bool IsFlying { get; internal set; }
+
+    /// <summary>
+    /// Non-block solids the body collides with (the iceberg boxes): walking, auto-step, the swim
+    /// exit and landing all treat them as solid. World sets it once; null means blocks only.
+    /// </summary>
+    public IBodySolids? BodySolids { get; set; }
+
     /// <summary>True while sprinting on foot with movement input; drives the run cycle and roll (the FOV
     /// widening reads the sprint key itself, so a flight sprint widens too: see <see cref="SprintFov"/>).</summary>
     public bool IsSprinting { get; private set; }

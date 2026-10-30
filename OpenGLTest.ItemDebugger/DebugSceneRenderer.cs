@@ -61,7 +61,7 @@ public sealed class DebugSceneRenderer : IDisposable
     // against an empty registry.
     private readonly byte _flintId;
     // Entity rigs, built the first time the ENTITIES tab shows each one.
-    private readonly Dictionary<string, EntityPreview> _entityPreviews = new();
+    private readonly Dictionary<(string Type, int Variant), EntityPreview> _entityPreviews = new();
 
     // One entity's per-part meshes (ordinal-sorted names, index-aligned), rig and skin.
     private sealed record EntityPreview(string[] PartNames, Mesh[] Parts, PlayerRig Rig, uint Texture);
@@ -180,7 +180,7 @@ public sealed class DebugSceneRenderer : IDisposable
         BeginScene(viewProj, eyePos, time, size);
         if (state.Selected is not { } type) return;
 
-        var preview = Preview(type);
+        var preview = Preview(type, state.SelectedVariant);
         var animator = state.Animator;
         // The previewed mob's own pose on top of the clips (a goblin's lean, flinch, death fall and spawn pop,
         // a slime's squash) and where its feet are (a hopping slime travels).
@@ -291,11 +291,14 @@ public sealed class DebugSceneRenderer : IDisposable
         ApplyFrameUniforms(viewProj, eyePos, time, size);
     }
 
-    private EntityPreview Preview(EntityType type)
+    // One preview per (entity, variant), built on first use and kept until Dispose.
+    private EntityPreview Preview(EntityType type, int variant)
     {
-        if (_entityPreviews.TryGetValue(type.Name, out var cached)) return cached;
+        variant = Math.Clamp(variant, 0, type.Variants.Count - 1);
+        var key = (type.Name, variant);
+        if (_entityPreviews.TryGetValue(key, out var cached)) return cached;
 
-        var rig = PlayerRig.FromBbmodel(type.Model);
+        var rig = PlayerRig.FromBbmodel(type.Variants[variant]);
         var byName = PlayerRig.BuildMeshes(_gl, rig);
         var names = new string[byName.Count];
         byName.Keys.CopyTo(names, 0);
@@ -306,7 +309,7 @@ public sealed class DebugSceneRenderer : IDisposable
         var texture = TextureLoader.Upload(_gl, rig.TexturePixels, rig.TextureWidth, rig.TextureHeight);
 
         var preview = new EntityPreview(names, meshes, rig, texture);
-        _entityPreviews[type.Name] = preview;
+        _entityPreviews[key] = preview;
         return preview;
     }
 

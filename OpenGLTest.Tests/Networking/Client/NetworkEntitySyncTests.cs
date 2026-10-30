@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Networking;
 using VoxelEngine.WorldGen;
@@ -180,5 +181,45 @@ public sealed class NetworkEntitySyncTests : IDisposable
         local.ClientMirror.ApplyNetworkEntities([tnt, cube]);
         Assert.Empty(local.PrimedTnt);
         Assert.Empty(local.Falling);
+    }
+
+    [Fact]
+    public void IcebergsMirrorFromASnapshotWithoutSimulation()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        _world.GetChunkManager().Headless = true;
+
+        // Far from the camera, over nothing loaded: a mirror never collides or reads the cells
+        var at = new Vector3(500.5f, 0.9f, -300.5f);
+        var velocity = new Vector3(0.5f, 0f, -0.25f);
+        const float scale = 1.1f;
+        var entry = new NetEntity(NetEntityKind.Iceberg, 21, at, NetEntity.YawFromTurns(3), 99,
+            NetEntity.PackIcebergAmmo(scale, 0f), 1, velocity);
+        _world.ClientMirror.ApplyNetworkEntities([entry]);
+
+        var mirrored = Assert.Single(_world.Icebergs);
+        Assert.True(mirrored.IsMirror);
+        Assert.Equal(1, mirrored.Variant);
+        Assert.Equal(3, mirrored.Turns);
+        Assert.Equal(scale, mirrored.Scale, 2);
+        Assert.Equal(at, mirrored.Center);
+
+        // Between snapshots it only dead-reckons along its velocity, never past the lead cap
+        for (var i = 0; i < 30; i++)
+            _world.Update(Dt, null);
+        var lead = mirrored.Center - at;
+        Assert.True(lead.X > 0f && lead.Z < 0f, $"the mirror did not follow its velocity ({lead})");
+        Assert.True(lead.Length() <= velocity.Length() * IcebergConfig.MirrorMaxLeadSeconds + 1e-3f);
+
+        // The next snapshot moves the same mirror
+        var moved = at + new Vector3(1f, 0f, 0f);
+        _world.ClientMirror.ApplyNetworkEntities([entry with { Position = moved }]);
+        Assert.Same(mirrored, Assert.Single(_world.Icebergs));
+        Assert.Equal(moved, mirrored.Center);
+
+        // An empty snapshot removes it
+        _world.ClientMirror.ApplyNetworkEntities([]);
+        Assert.Empty(_world.Icebergs);
     }
 }

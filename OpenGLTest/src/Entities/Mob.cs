@@ -29,6 +29,8 @@ public abstract class Mob
 
     protected Mob(EntityType type, Vector3 position)
     {
+        if (type.MaxHealth < 1)
+            throw new InvalidOperationException($"Entity '{type.Name}' has no hp; a mob needs a health pool.");
         Type = type;
         Position = position;
         Health = type.MaxHealth;
