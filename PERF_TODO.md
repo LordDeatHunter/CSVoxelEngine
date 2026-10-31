@@ -206,6 +206,71 @@ reaches its own radius past its center):
   cells), the one column that touches a lobe; of the 999 columns whose every cell lies beyond the
   footprint, **0** changed.
 
+## Worldgen column cost: great-lake rivers phase E (headless Compute, 2026-10-31)
+
+`TerrainGenerator.Compute` per chunk column, before vs after the great-lake river ramps and outflows
+(BIOMEGEN §6 phase E: `GreatLakes.RiverLevelAt` read through `WaterBodies.SampleSurfaceWater` by the
+carve, `WaterLevelFor` and `WaterLevelAt`, the wider river cull, the outflow channel and the
+bank-raise rule with its `RampRiverBeside` re-scan), measured with the same kind of temporary xUnit
+probe as phases B-D: one `Compute` per listed column after a 64-column warm-up, median ms per
+category, 5 interleaved before/after pairs in fresh processes, the median of the five medians. The
+baseline was a `git worktree` of `d2b5788f` (HEAD before phase E; this time everything earlier was
+committed). The column lists were drawn once in the after tree (fixed SplitMix64 seeds, default
+world seed) and read by both trees, each category defined by the sampled point inside the listed
+column: `all` (2048 random columns 1000..12000 blocks out), `land` (1024 in the same ring whose point
+has a great-lake weight, guard and outflow of exactly 0, the sea river level and no bank, the
+control), `lake` (1024 within 0.8 of a lobe radius of the 14 lobes of the 7 accepted sites inside
++-16000), `ramp` (1024 whose point lies past a ramped site's lobes by less than its `RampLength`) and
+`outflow` (1024 inside the 3 outflow channels; only 31 distinct columns, since the channels are
+small). Absolute times differ from the phase D table on this session's machine state; only the
+pairs measured together compare.
+
+| Columns | Before ms | After ms | Change |
+|---|---|---|---|
+| `all` | 0.3778 | 0.3977 | +5.3 % |
+| `land` | 0.2819 | 0.2844 | +0.9 % |
+| `lake` | 0.2804 | 0.2876 | +2.6 % |
+| `ramp` | 0.2624 | 0.2660 | +1.4 % |
+| `outflow` | 0.2464 | 0.2649 | +7.5 % |
+
+`land` is flat inside its run-to-run spread (before 0.278..0.306, after 0.280..0.291), so it stays
+well under the 3 % bar over phase D: the wider river cull (`RiverCull`, a candidate's reach plus
+`RiverReach`, capped at the old `MaxReach + Guard`) reads a cached verdict for a few more columns, and
+`NearAnyFootprint` a few more for pond candidates, but no noise is read before the cull. `all` is the
+first category each process times, so it absorbs the cold verdict and relief-cache fills (before
+0.363..0.578, after 0.369..0.508); its rise is inside that spread. `lake` and `ramp` rise within
+their spreads (lake before 0.276..0.287, after 0.275..0.294; ramp before 0.251..0.273, after
+0.259..0.284): a ramp column pays `Beyond` (one sqrt per lobe), `RiverLevelAt`, the ramp guard's
+smoothstep and `OutflowWeight`, and the rare dry column under its bank pays the `RampRiverBeside`
+re-scan (four `RiverWeight` reads per ramped candidate). `outflow` is the one systematic rise (before
+0.241..0.254, after 0.253..0.270): those columns now carve a channel and run the bank rule along its
+sides. About 0.02 ms per outflow chunk column, far below the mesh build; not chased.
+
+Verdicts: `BuildSite` timed directly (uncached) over the 234 rolled candidates of the cells covering
++-16000 (grown by `MaxReach` plus the guard), two passes in each of two fresh processes. Every
+accepted site in the box is ramped now (7, none accepted without a ramp, so that bucket is empty).
+Cold pass: accepted median 2.08..2.22 ms, worst 18.9..19.7 ms (cell (13, -7), whose first verdict
+also fills the massif and lone-peak caches it reads); rejected (227) median 0.026..0.028 ms, worst
+12.8..12.9 ms, the very first call (JIT). Warm pass: accepted median 2.09..2.22 ms, worst 4.2..4.9 ms
+(cell (4, 3), the largest ramp with an outflow); rejected median 0.005..0.007 ms, worst 0.93 ms. The
+whole box costs about 61 ms cold and 23 ms warm. Against phase D's warm accepted median (1.28..1.32 ms)
+the ramp's checks (`RiversHoldOnRamp`'s ring walk with five `LandHeight` reads per river sample,
+`TryOutflow`'s ring and corridor) add about 0.8 ms per accepted verdict, once per cell on a worker
+thread; the 10+ ms the plan feared did not show (these ramps are short, 12..48 blocks). The cache
+capacity (512) and generation count (4) were not moved.
+
+Identity against the baseline (a dump of both trees with APIs present in both; the footprint is each
+accepted lobe disc over the cells covering +-23000 (14 sites, 13 ramped, 29 lobes), grown by the guard,
+or by `RiverReach` for a ramped site, plus twice `LakeMaxRadius` plus `GreatLakePondClearance` for the
+ponds that yield to it):
+
+- +-20000 grid at stride 37 (1,170,724 points), `WaterLevelAt`, `SurfaceWaterWeight` bits and
+  `LandHeight` bits: 490 changed (486 levels, 36 weights, **0** land heights); 482 inside a lobe disc
+  grown by its guard or `RiverReach`, 8 in the pond-yield ring (at most 251.9 blocks past a lobe edge);
+  **0** of the 1,164,135 points beyond the footprint changed.
+- `Compute` on 1000 random chunk columns within +-20000 (`Heights`, `WaterLevel`, `Bed`): 1 changed;
+  of the 992 columns whose every cell lies beyond the footprint, **0** changed.
+
 ## Open
 
 1. **Shadow pass GPU cost (6.65 ms avg, 42 % of the GPU frame).** Largest single item and not yet

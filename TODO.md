@@ -505,13 +505,13 @@ single-arc player.
   dead-reckon without collision; an imported (supplied) sea spawns none; and a block that lands or
   hardens inside a berg's bounds is not refused.
 - [ ] **`M-28` · Great-lake gaps** — P3, M.
-  The great-lake tier (`BIOMEGEN.md` §6 great lakes, `WorldGen/GreatLakes.cs`) leaves four gaps: an
+  The great-lake tier (`BIOMEGEN.md` §6 great lakes, `WorldGen/GreatLakes.cs`) leaves three gaps: an
   elevated great lake (surface above `SeaLevel`) mirrors against the single sea-level reflection
-  plane (`RenderManager.WaterPlaneY`), like an elevated pond; an elevated lake's shore gets no beach
-  sand, since `IsBeachHeight` keys on `SeaLevel`; rivers neither carve toward an elevated lake nor
-  flow out of one (a river-fed lake simply rests at `SeaLevel`; the per-column river target level
-  and outflow rivers are phase E); and a hot spring placed on a great-lake shore overrides the
-  stored water level there (`TerrainGenerator.Compute` applies hot springs after the lake carve).
+  plane (`RenderManager.WaterPlaneY`), like an elevated pond; an elevated lake's shore (and its
+  stepped ramp rivers) gets no beach sand, since `IsBeachHeight` keys on `SeaLevel`; and a hot
+  spring placed on a great-lake shore or inside a river ramp overrides the stored water level there
+  (`TerrainGenerator.Compute` applies hot springs after the lake carve and the ramp's bank raise),
+  which the column tests skip, so a leak there would go unflagged.
 - [ ] **`M-13` · Far-LOD canopy for grown trees** — P3, M.
   `PoisonCanopy` only removes canopy, so a grown tree shows no far canopy until reload; needs an
   add-canopy override keyed by column. Also spends `CanopyDisturbedLimit` budget per grow.

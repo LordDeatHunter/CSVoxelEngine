@@ -58,7 +58,7 @@ climate borders bend and wander instead of tracing the smooth contours of the ra
 | `WorldGen/ColumnData.cs` | Per-chunk-column arrays incl. `Biomes[]`, `CornerWarmth`, `CornerWetness`. |
 | `Chunks/ColumnCache.cs` | Column cache + `GenerateColumn` (surface/soil block per biome). |
 | `WorldGen/WaterBodies.cs` | Lakes/rivers/sea level; which biomes may hold surface water. Lake candidates roll, wobble and sample their rim through `TerrainSites`. `SampleSurfaceWater` is the one place ponds, rivers and great lakes compose (`WaterLevelAt`, `SurfaceWaterWeight`, `Compute`). |
-| `WorldGen/GreatLakes.cs`, `GreatLakeSite.cs`, `GreatLakeLobe.cs` | The great-lake tier (§6): the cached verdict `SiteAt` (built by `BuildSite`), the per-column `Sample` (bowl weight, surface, floor, ravine guard), `RiverShare`, `NearAnyLobe` (the pond yield), `ResetCaches` (from `WorldSeed.Apply`); `GreatLakeSite` is one cell's verdict (`default` = none), `GreatLakeLobe` one disc of its outline or its island. |
+| `WorldGen/GreatLakes.cs`, `GreatLakeSite.cs`, `GreatLakeLobe.cs` | The great-lake tier (§6): the cached verdict `SiteAt` (built by `BuildSite`), the per-column `Sample` (bowl weight, surface, floor, ravine guard, river level, river bank, outflow weight), `RiverLevelAt` (the river ramp), `RampRiverBeside` (the bank-raise support test), `RiverShare`, `NearAnyFootprint` (the pond yield), `ResetCaches` (from `WorldSeed.Apply`); `GreatLakeSite` is one cell's verdict (`default` = none) with its ramp length and outflow channel, `GreatLakeLobe` one disc of its outline or its island. |
 | `WorldGen/Features/SnowGenerator.cs` | Snow, ice, `ColdWeightAt` (cold + altitude), `IsFrozenWater` (the pack-ice rule the far LOD shares). |
 | `WorldGen/Features/*`, `WorldGen/Features/Underground/*` | Per-biome vegetation/scenery (see §8). |
 | `Simulation/MobSpawner.cs` | `SpawnsMobs(biome)`: which biomes ring-spawn mobs. |
@@ -407,29 +407,80 @@ highest rim point (the carve would plane it). The surface is the lowest rim poin
 `GreatLakeBankDepth 3`, the floor a rolled `GreatLakeMinDepth 15..MaxDepth 30` below it, and the shore
 ramp share widens from `GreatLakeShoreShareMin 0.2` to `Max 0.4` with the rim spread. A **cutting
 river** (river weight above 0 on lowland that has not dried into a wash) anywhere in a lobe's shore
-annulus makes the lake **river-fed**: it then rests at `SeaLevel`, the river's own waterline, and is
-refused only when its rim-chosen surface lies below `SeaLevel` or more than `GreatLakeRiverFedMaxDrop
-12` above it. An **island** (`GreatLakeIslandChance 0.5`, radius `GreatLakeIslandMinRadius 18..MaxRadius
-60`) rolled into the main lobe's dry-of-shore core is kept only where its whole disc is lake-holding
-land at least a bank above the surface and no cutting river crosses it; a dropped island leaves the
-lake accepted.
+annulus makes the lake **river-fed**; a river-fed lake whose rim-chosen surface lies below `SeaLevel`
+is refused. What happens next is phase E's **river ramp** (below): a lake over the sea that can carry
+one keeps its own surface, and a river-fed lake that cannot falls back to the phase D rule, resting at
+`SeaLevel`, the river's own waterline, refused when its rim-chosen surface lies more than
+`GreatLakeRiverFedMaxDrop 12` above it. An **island** (`GreatLakeIslandChance 0.5`, radius
+`GreatLakeIslandMinRadius 18..MaxRadius 60`) rolled into the main lobe's dry-of-shore core is kept
+only where its whole disc is lake-holding land at least a bank above the surface and no river cutting
+toward the lake's river level (its surface when ramped, else `SeaLevel`) crosses it; a dropped island
+leaves the lake accepted.
+
+**River ramps and outflows (phase E).** A lake standing above `SeaLevel` is offered a ramp of
+`RampLength = (Surface - SeaLevel) * GreatLakeRiverRunBlocks 6` blocks. Past its lobes the **river
+level** is one function, `GreatLakes.RiverLevelAt(site, beyond)`: the surface where `beyond`
+(`GreatLakes.Beyond`, the distance past the nearest lobe's nominal edge, 1-Lipschitz) is at most 0,
+else `max(SeaLevel, Surface - floor(beyond / Run))`, so it steps down one block every `Run` blocks,
+never rises away from the lake, differs by at most a block between 4-neighbors and is exactly
+`SeaLevel` past the ramp. `GreatLakes.Sample` hands it out as `riverLevel` (`SeaLevel` everywhere
+else) and `WaterBodies.SampleSurfaceWater` passes it on, so the three readers agree by construction:
+`Compute`'s river carve targets `riverLevel - RiverBedDepth`, with the lowland fade
+(`WaterBodies.RiverLowland(forestHeight, riverLevel)`) measured above the river's own level, so a
+river dries into a wash relative to the step it runs on; `WaterLevelFor` stores that level as the
+column's `WaterLevel`; and `WaterLevelAt` (with it the far-LOD sheet) reports the same. The ramp is
+kept only when it **fits** (`RampFits`: at most `GreatLakeRampMaxLength 192`, the site's reach plus
+`GreatLakes.RiverReach` (= max ramp + 1 + the guard, 217) within `MaxReach + Guard` so two footprints
+still never meet under the lowest-hash spacing, and out of the spawn clearing) and every
+noise-river sample on it stands in lake-holding, ocean-free, full-gate ground at least
+`GreatLakeRiverBankRise 2` above its own level, at the point and 2 blocks to either side
+(`RiversHoldOnRamp`). A ramped lake may also get an **outflow** (`TryOutflow`): over every lobe's
+Radius + 1 ring the candidates outside every other lobe whose direction moves away from every other
+lobe center (`OutflowRingCount`, `OutflowRingPoint`, `IsOutflowCandidate`), it takes the one on the
+lowest `LandHeight` (the first on a tie) and runs a straight channel radially out from it,
+`GreatLakeOutflowHalfWidth 6` wide, starting back in the lake (where `RiverShare` is 0) and running
+down the same ramp. Its length is capped at `RampLength - HalfWidth - 1` so it lies wholly in the bank
+zone, and is cut short at the first corridor sample whose cross section fails the bank-rise checks or
+whose axis does not carve (`RiverLowland > 0` at its level); under `GreatLakeOutflowMinLength 24`
+there is none. `GreatLakes.OutflowWeight` is a parabola across the channel tapering shut over its last
+`GreatLakeOutflowTaperBlocks 16`, folded into the river weight before `RiverShare`. A river-fed lake
+keeps its ramp (and its surface) whether or not it got an outflow; a rim-fed lake keeps a ramp only to
+carry an outflow. The verdict reads `LandHeight`, `RiverWeight` (pure noise) and the relief caches one
+way, never `Sample`, a pond or `ColumnCache`, so nothing recurses.
+
+A step contour of the ramp would otherwise leave a dry column one block under its wet neighbor (a
+shallow channel edge at the lower level beside water at the upper one), i.e. an exposed one-block
+water wall. `Sample` also returns `riverBank`, `RiverLevelAt(site, beyond - 1)` inside the bank zone
+(`beyond < RampLength + 1`) and `NoWater` elsewhere: the highest level any neighbor can hold. `Compute`
+raises a column left dry after the carve (int height at or above its stored level) and lower than
+`riverBank` to it, but only when `GreatLakes.RampRiverBeside` finds ramp river or outflow weight in a
+4-neighbor (a lazy re-scan of the candidates, paid only on that rare path). The rule only raises dry
+ground, so it opens no leak, and it also covers banks the build-time sampling missed. The ramp's
+ravine guard stays at 1 out to `RampLength + 1` and eases out across the guard band past it, so a
+raised bank is never cut again.
 The per-column `GreatLakes.Sample` rolls only the cells that can reach the column and culls them by
 distance before probing the cache; inside a footprint it reads the shape noise once and returns the
 bowl weight (the max over lobes of `smooth(0, shoreShare, 1 - d/R)`, dipped to 0 over the island by
 `GreatLakeIslandShoreShare`), the site's surface and floor, and a **ravine guard** (1 inside a lobe
-outline, easing to 0 `GreatLakeRavineGuardBlocks 24` past it). `WaterBodies.SampleSurfaceWater` is the
-one place the tiers compose: where the great-lake weight is above 0 it replaces the pond fields and
+outline, easing to 0 `GreatLakeRavineGuardBlocks 24` past it); for a ramped site, culled by its reach
+plus `RiverReach`, it also returns the river level, the river bank and the outflow weight above, and
+the ramp's guard. `WaterBodies.SampleSurfaceWater` is the one place the tiers compose: it folds the
+outflow into the river weight, and where the great-lake weight is above 0 it replaces the pond fields and
 the river weight is multiplied by `GreatLakes.RiverShare` (`1 - smooth(0, WaterBodyThreshold, w)`,
 exactly 0 wherever lake water stands, continuous, so a channel ends without a step); `WaterLevelAt`,
 `SurfaceWaterWeight` and `Compute` all read it, so the stored `WaterLevel`, the flood fill, the
 far-LOD sheet, the shore sand and the carve agree by construction (`ColumnCache` and `LodMeshBuilder`
-are untouched). A pond yields at site level: `TryLakeSite` first refuses a pond `GreatLakes.NearAnyLobe`
-finds within its radius plus `GreatLakePondClearance 16` of a lobe grown by the guard, so no column
+are untouched). A pond yields at site level: `TryLakeSite` first refuses a pond
+`GreatLakes.NearAnyFootprint` finds within its radius plus `GreatLakePondClearance 16` of a lobe grown
+by the guard, or by `RiverReach` for a ramped lake (its whole footprint, ramp included), so no column
 belongs to both tiers and no surface splits. `Compute` feeds `guard * WaterBodyThreshold` into
 `RavineCutFade`, so a ravine has no cut at the outline and tapers in across the guard band instead of
-cutting a bank or an island below the surface. On the default seed within the cells covering ±16700:
-7 accepted of 234 rolled, 5 river-fed, 2 with an island; four of the seven are cold (Taiga or Frozen)
-and freeze into the pack ice like any water.
+cutting a bank or an island below the surface. On the default seed within the cells covering ±17000:
+7 accepted of 234 rolled, all standing above `SeaLevel` (surfaces 2..8) and all ramped (ramps 12..48
+blocks), 5 of them river-fed and 3 with an outflow (29..41 blocks; cells (-8, -8) and (13, -7) are
+rim-fed lakes kept ramped for theirs, (4, 3) is river-fed with one), so no lake in that box falls
+back to `SeaLevel`; four of the seven are cold (Taiga or Frozen) and freeze into the pack ice like any
+water, ramp rivers included. Over ±23000 there are 14 accepted sites, 13 of them ramped.
 
 ### Surface/soil blocks (`ColumnCache.GenerateColumn`)
 | Biome | Top | Soil | Notes |
@@ -450,12 +501,16 @@ from `tools/generate-permafrost-texture.py`.
 * `SurfaceWaterGate(desertWeight)` fades lakes/rivers out over `desertWeight 0.3..0.5`, so ponds close on
   steppe or savanna ground before the desert line (an exact line on both humid and temperate borders).
 * Lakes: hashed 192-block cells, `LakeChance 0.35`, radius 11..46, depth 3..13. Rivers: warped ridge,
-  `RiverBedDepth 3`, dry out as forest-profile height rises (`RiverLowStart 14 .. RiverLowEnd 30`).
+  `RiverBedDepth 3` under their own level, dry out as forest-profile height rises above that level
+  (`RiverLowStart 14 .. RiverLowEnd 30`).
 * Island land (phase C) is land of its climate biome, so it holds lakes and rivers under the same
   rules; nothing gates them on islands (§11).
 * Great lakes (phase D): hashed 1280-block cells, `GreatLakeChance 0.3`, one to three lobes with a
-  main radius 120..400, depth 15..30, the rim-chosen surface, river-fed lakes at `SeaLevel`; composed
-  with ponds and rivers in `WaterBodies.SampleSurfaceWater` (above).
+  main radius 120..400, depth 15..30, the rim-chosen surface; composed with ponds and rivers in
+  `WaterBodies.SampleSurfaceWater` (above).
+* Rivers stand at `SeaLevel`, except on an elevated great lake's ramp (phase E), where their level
+  steps down from the lake's surface (`GreatLakes.RiverLevelAt`); an outflow channel runs down the
+  same ramp. A river-fed lake whose ramp cannot be kept rests at `SeaLevel`.
 
 ### Snow/ice (`SnowGenerator`, reads `ColdWeightAt`, **not** the biome)
 * `SnowColdThreshold 0.55`: snow layer placed above this cold weight (depth grows with cold, noise drift,
@@ -549,7 +604,9 @@ GreatLakeShoreShareMin 0.2    GreatLakeShoreShareMax 0.4    GreatLakeRimBandShar
 GreatLakeRimSpacing 16        GreatLakeInteriorSpacing 32   GreatLakeShapeFrequency 1/120  GreatLakeShapeAmplitude 0.18
 GreatLakeExtraLobeChance 0.6  GreatLakeLobeOffsetMin 0.5    GreatLakeLobeOffsetMax 0.9
 GreatLakeLobeRadiusMin 0.4    GreatLakeLobeRadiusMax 0.7    (extra lobes, in main radii)
-GreatLakeRavineGuardBlocks 24 GreatLakePondClearance 16     GreatLakeRiverFedMaxDrop 12
+GreatLakeRavineGuardBlocks 24 GreatLakePondClearance 16     GreatLakeRiverFedMaxDrop 12 (the sea-level fallback)
+GreatLakeRiverRunBlocks 6     GreatLakeRiverBankRise 2      GreatLakeRampMaxLength 192 (RiverReach = 192 + 1 + 24)
+GreatLakeOutflowHalfWidth 6   GreatLakeOutflowTaperBlocks 16  GreatLakeOutflowMinLength 24
 GreatLakeIslandChance 0.5     GreatLakeIslandMinRadius 18   GreatLakeIslandMaxRadius 60  GreatLakeIslandShoreShare 0.5
 GreatLakeSpawnClearRadius = ReliefSpawnClearStart           GreatLakeSiteCacheCapacity 512  GreatLakeSiteCacheGenerations 4
 Noise seed offsets: ReliefNoise 153, MountainSpineNoise 154, MountainRangeCellWarp 155,
@@ -612,10 +669,24 @@ the rim walk and the river scan rely on (the annulus they sample must cover the 
 shore band; `GreatLakeSiteTests.TheRimWalkCoversTheDryShoreBand`), and keep `GreatLakeBankDepth` above
 the bank lowering the sub-threshold carve causes (about `WaterBodyThreshold * (bank + MaxDepth)`). The
 knobs shipped untuned: `GreatLakeChance`, `GreatLakeSiteFlatness` and `GreatLakeInteriorRiseMax` trade
-count for flatness, and the tests need enough accepted sites in ±16000 (at least one river-fed and
-one with an island); if a bank-leak fact fails, tighten `GreatLakeRimSpacing` or raise the bank depth,
-never loosen the test. A rejected verdict costs about 0.005 ms and an accepted one about 1.3..2.3 ms,
-paid once per cell (`PERF_TODO.md`); raise `GreatLakeInteriorSpacing` first if it ever grows.
+count for flatness, and the tests need enough accepted sites in ±16000 (at least one river-fed, one
+ramped, one with an outflow and one with an island); if a bank-leak fact fails, tighten `GreatLakeRimSpacing` or raise the bank depth,
+never loosen the test. A rejected verdict costs about 0.005 ms and an accepted one about 2.1 ms with
+its ramp checks (phase D's 1.3 plus about 0.8), paid once per cell (`PERF_TODO.md`); raise
+`GreatLakeInteriorSpacing` first if it ever grows.
+
+River-ramp tuning rules (phase E): `GreatLakeRiverRunBlocks` must stay at or above 1, since the
+one-block-between-neighbors step rule rests on `Beyond` being 1-Lipschitz and the run being at least
+a block; `GreatLakeOutflowMinLength` must stay at or above `GreatLakeOutflowTaperBlocks`, or a
+minimal outflow would be all taper; and a ramp is kept only while the site's reach plus
+`RiverReach` stays within `MaxReach + Guard`, which is what keeps footprints apart under the
+unchanged lowest-hash spacing and the `CellRange` unchanged, so `GreatLakeRampMaxLength` is also the
+lever on the river cull's cost (it sizes `RiverReach`). With `SeaLevel` 0 the max ramp at a run of 6
+serves surfaces 1..32, and a lake reaching more than about 447 blocks keeps the sea-level fallback.
+If the default seed's ±16000 scan ever lacks a river-fed lake with a ramp or a lake with an outflow
+(the tests' non-vacuity guards), tune in this order: lower the run (not below 3), then the bank rise
+(not below 1), then the outflow's minimum length (not below the taper); widen the tests' scan box
+rather than weaken a rule, and never loosen a test. The shipped values needed no tuning.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -743,17 +814,37 @@ Grep `Biome\.` to confirm; at time of writing:
    identical: chunk blocks and lake water near islands, since a tree batch grows every tree of its
    64x64 cell together and a continental lake's rim may reach island land (§11).
 16. **Great lakes touch only their footprint.** Every great-lake output (`GreatLakes.Sample`'s
-   weight and guard, `NearAnyLobe`) is exactly 0 outside the accepted lobe discs grown by
-   `GreatLakeRavineGuardBlocks` and within `GreatLakeSpawnClearRadius`, and `SampleSurfaceWater`
-   returns the plain pond and river values wherever the weight is 0, so land elsewhere is
-   bit-identical to the terrain without the tier, except for ponds that yield within pond reach of a
-   lake (`GreatLakeSiteTests.TheSampleIsZeroOutsideEveryFootprintAndNearTheSpawn`; against the tree
-   before phase D, 0 of the 1168181 points of a ±20000 grid at stride 37 beyond that footprint changed).
+   weight, guard and outflow, `NearAnyFootprint`) is exactly 0, its river level `SeaLevel` and its
+   river bank `NoWater`, outside the accepted lobe discs grown by `GreatLakeRavineGuardBlocks` (by
+   `GreatLakes.RiverReach` for a ramped lake) and within `GreatLakeSpawnClearRadius`, and
+   `SampleSurfaceWater` returns the plain pond and river values there (the float expressions of the
+   river carve reduce to the old ones at `SeaLevel`), so land elsewhere is bit-identical to the
+   terrain without the tier, except for ponds that yield within pond reach of a footprint
+   (`GreatLakeSiteTests.TheSampleIsZeroOutsideEveryFootprintAndNearTheSpawn`; against the tree before
+   phase D, 0 of the 1168181 points of a ±20000 grid at stride 37 beyond that footprint changed, and
+   against the tree before phase E, 0 of the 1164135 points beyond the ramped footprints plus the
+   pond-yield ring, and 0 of 992 chunk columns wholly beyond them, changed).
    **Every bank stands at or above its surface** (`GreatLakeTests.GreatLakeBanksStandAtOrAboveTheWater`,
    `GreatLakeSiteTests.ASitesWaterSitsUnderItsRimAndOverItsFloor`), no river carves where lake water
    stands (`RiverShare`, `GreatLakeTests.NoRiverCarvesInsideAGreatLake`), and **no lake overlaps a
    massif or lone peak** (`GreatLakeSiteTests.NoMassifOrLonePeakStandsInAGreatLake`). The verdict reads
    the relief caches one way and is cleared by `WorldSeed.Apply` (`GreatLakes.ResetCaches`).
+17. **A river ramp has one level and never leaks.** The river level is one function,
+   `GreatLakes.RiverLevelAt`, read by the carve, `WaterLevelFor` and `WaterLevelAt` alike (so the
+   stored `WaterLevel`, the flood and the far-LOD sheet agree); it equals the lake's surface at the
+   shore, never rises away from the lake, reaches `SeaLevel` at the ramp's end and differs by at most a
+   block between 4-neighbors (`GreatLakeRiverTests.TheRiverLevelStepsDownFromTheSurfaceToTheSea`,
+   `NeighboringColumnsInARampDifferByAtMostOneBlock`, `AnOutflowNeverStepsUpAwayFromItsLake`,
+   `GreatLakeTests.NoRampWaterStandsMoreThanABlockOverItsWetNeighbor`). A river reaching an elevated
+   lake meets it at the lake's own surface (`GreatLakeRiverTests.AnElevatedLakeARiverReachesKeepsItsOwnSurface`,
+   `GreatLakeTests.ARiverMeetsItsLakeAtTheLakesOwnLevel`). Dry ground beside ramp water is raised to the
+   highest level a neighbor can hold (the bank-raise rule), so every ramp and outflow bank stands at or
+   above the water (`GreatLakeTests.GreatLakeBanksStandAtOrAboveTheWater`, which covers ramp rivers);
+   every sampled river and outflow point stands `GreatLakeRiverBankRise` over its level
+   (`AnOutflowsGroundStandsOverItsLevel`), the outflow leaves through the low side of its lake
+   (`AnOutflowLeavesThroughTheLowSideOfItsLake`, `AnOutflowCarriesWaterAwayFromItsLake`), ramps are
+   ravine-guarded out to `RampLength + 1`, and the ramp and outflow checks read `LandHeight`,
+   `RiverWeight` and the relief caches one way, so nothing recurses.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -843,16 +934,25 @@ Grep `Biome\.` to confirm; at time of writing:
   `NoSiteReachesTheSpawnClearing`, `AcceptedSitesNeverOverlap`, `ALakeStandsWhollyOnLakeGround`,
   `NoMassifOrLonePeakStandsInAGreatLake`, `AnIslandStandsAboveItsLake`,
   `TheRimWalkCoversTheDryShoreBand`, `TheSampleIsZeroOutsideEveryFootprintAndNearTheSpawn`);
-  `OpenGLTest.Tests/WorldGen/GreatLakeTests.cs`, over the chunk columns of up to three real lakes (one
-  river-fed) through `ColumnCache` (`TheStoredLevelIsTheLevelWaterLevelAtReports`, which pins the
-  near water to the far-LOD sheet, `GreatLakeBanksStandAtOrAboveTheWater` with `LakeTests`' leak
-  rule, `NoRiverCarvesInsideAGreatLake`, `TheBowlIsDugDownToItsFloor`, `NoPondShareAGreatLakesGround`,
-  `ARiverMeetsARiverFedLakeAtItsOwnLevel`; oasis and hot-spring columns are skipped, since they
-  override the stored level by design); `LodReliefTests.TheFarLodSitsInsideTheChunkTerrainOverAGreatLake`;
+  `OpenGLTest.Tests/WorldGen/GreatLakeTests.cs`, over the chunk columns of up to three real lakes (a
+  river-fed ramped one and one with an outflow first, windows grown by each ramp) through
+  `ColumnCache` (`TheStoredLevelIsTheLevelWaterLevelAtReports`, which pins the near water to the
+  far-LOD sheet, `GreatLakeBanksStandAtOrAboveTheWater` with `LakeTests`' leak rule over the lake
+  and its ramp rivers, `NoRampWaterStandsMoreThanABlockOverItsWetNeighbor`,
+  `NoRiverCarvesInsideAGreatLake`, `TheBowlIsDugDownToItsFloor`, `NoPondShareAGreatLakesGround` (the
+  ramp and outflow count as lake ground), `ARiverMeetsItsLakeAtTheLakesOwnLevel` (renamed from
+  `ARiverMeetsARiverFedLakeAtItsOwnLevel`), `AnOutflowCarriesWaterAwayFromItsLake`; oasis and
+  hot-spring columns are skipped, as the checked column and as a neighbor, since they override the
+  stored level by design); `OpenGLTest.Tests/WorldGen/GreatLakeRiverTests.cs`, over the accepted sites
+  (`AnElevatedLakeARiverReachesKeepsItsOwnSurface`, `TheRiverLevelStepsDownFromTheSurfaceToTheSea`,
+  `NeighboringColumnsInARampDifferByAtMostOneBlock`, `AnOutflowLeavesThroughTheLowSideOfItsLake`,
+  `AnOutflowNeverStepsUpAwayFromItsLake`, `AnOutflowsGroundStandsOverItsLevel`);
+  `LodReliefTests.TheFarLodSitsInsideTheChunkTerrainOverAGreatLake`;
   and the great-lake cells in `TerrainReliefSeedTests` (`TheReliefIsAPureFunctionOfPositionAndSeed`,
-  and `TheSiteCachesFollowTheSeed`, which now also checks `GreatLakes.SiteAt` against `BuildSite`).
+  and `TheSiteCachesFollowTheSeed`, which now also checks `GreatLakes.SiteAt` against `BuildSite`,
+  ramp length and outflow length included).
   `TerrainGenerator.Compute` identity is not a test: it was a manual diff against a copy of the tree
-  before phase D (`PERF_TODO.md`).
+  before phase D, and again before phase E (`PERF_TODO.md`).
 * Visual: `visual-examples/terrain-shape.json` (`VOXEL_TIME=1090`, shortly after a sunrise, since the
   run lasts about eight minutes and outlasts the afternoon from 147; the origin valley, a
   forest highland, a range along and across its direction, an arid plateau, a highland border, a
@@ -861,13 +961,21 @@ Grep `Biome\.` to confirm; at time of writing:
   massif of cell (0, -4) centered near (1131, -4900) and the lone peak near (-2721, 3061); then phase
   C's `island_far`, `island_beach`, `island_knoll`, `archipelago_chain` and `island_lod_vista`, around
   the island near (4617, 4), the knoll near (5572, 20) and the archipelago of cell (2, 1) centered near
-  (3776, 2601); then phase D's `great_lake_river` (the river meeting the frozen, river-fed lake of
-  cell (4, 3) at one level), `great_lake_lod_vista` (across the river-fed lake of cell (-6, -5)), and
-  `great_lake_shore`, `great_lake_island`, `great_lake_bay` and `great_lake_height` around the rim-fed
-  two-lobe lake of cell (-8, -8) near (-9341, -9791)). It starts at `VOXEL_TIME=1090` (was 1160); to
-  fit the six phase D shots into daylight the waits were shortened rather than the start moved, so
-  the last shot (about 1576) still lands before sunset. The island and great-lake vantages and the
-  audit of the other scenarios (no teleport lies within 400 blocks of a great lake) are in its header:
+  (3776, 2601); then phase D's `great_lake_river` (since phase E the NE river stepping up from 0 to
+  the frozen, river-fed lake of cell (4, 3) at its surface 7), phase E's `great_lake_elevated` (that
+  lake from height, with stepped ramp channels on both sides), `great_lake_outflow` (down its outflow
+  from the rim crossing near (5932, 4453), the levels descending 7 to 3) and `great_lake_inflow` (up
+  the stepped west arm to the lake), `great_lake_lod_vista` (across the river-fed lake of cell
+  (-6, -5), now at its own surface 2 with a 12-block ramp), and `great_lake_shore`,
+  `great_lake_island`, `great_lake_bay` and `great_lake_height` around the rim-fed two-lobe lake of
+  cell (-8, -8) near (-9341, -9791)). Phase E's shots all film (4, 3), the only nearby lake that is
+  river-fed, ramped and has an outflow; it is frozen, so its steps read as snow-capped terraces (the
+  unfrozen outflow of (-8, -8) runs under a closed oak canopy and did not read). It starts at
+  `VOXEL_TIME=1090` (was 1160); to fit the phase D and E shots into daylight the waits were shortened
+  rather than the start moved, so the last shot (about 1609) still lands before sunset. The island
+  and great-lake vantages and the audit of the other scenarios (every teleport outside
+  terrain-shape.json lies at least 4118 blocks outside a great-lake footprint, ramps included) are in
+  its header:
   `icebergs.json` and `biomes.json`'s `pack_ice`/`pack_ice_low` now have an island near (-1100, -2510)
   in or beside the frame; both were re-run, still read, and carry a header note.
 * Run: `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release` (needs .NET 10 SDK; on a
@@ -963,19 +1071,40 @@ Grep `Biome\.` to confirm; at time of writing:
   * An elevated great lake (surface above `SeaLevel`) reflects against the single sea-level mirror
     plane (`RenderManager.WaterPlaneY`), the same approximation an elevated pond has.
   * Its shore gets beach sand only near `SeaLevel` (`IsBeachHeight`), like an elevated pond's.
-  * Rivers do not carve toward an elevated lake: a lake a river reaches is river-fed and rests at
-    `SeaLevel` (a river-fed lake whose rim would put it more than `GreatLakeRiverFedMaxDrop` above the
-    sea is refused). The per-column river target level and outflow rivers are phase E.
-  * A hot spring placed on a great-lake shore overrides the stored level there (`Compute` applies
-    oases and hot springs after the lake carve); oases are desert-only and never meet a lake.
+  * A river-fed lake whose ramp cannot be kept (too long, crowding the spacing, or banks too low)
+    still rests at `SeaLevel` (refused past `GreatLakeRiverFedMaxDrop`); none in the default seed's
+    ±16000 box does.
+  * A hot spring placed on a great-lake shore or inside a ramp overrides the stored level there
+    (`Compute` applies oases and hot springs after the lake carve and the bank raise), and the column
+    tests skip it; oases are desert-only and never meet a lake.
   * Discrete sampling (16-block rim, 32-block interior) cannot prove every bank dry; the bank-leak
     fact found none over the three tested lakes.
   * Cold great lakes freeze into the pack ice like any water, so a Taiga or Frozen one reads in game as
     a flat snow plain (four of the seven default-seed sites in ±16000).
   * Elevated lakes raise `MaxWaterLevel` in their chunks, so more chunks pay the fluid-wake border scan.
   * Cost: every column pays a `CellRange` scan and a roll per reaching great-lake cell (and every pond
-    candidate the same again in `NearAnyLobe`), about +5 % of `Compute` on ordinary land and +22..24 %
-    inside a footprint (`PERF_TODO.md`).
+    candidate the same again in `NearAnyFootprint`), about +5 % of `Compute` on ordinary land and
+    +22..24 % inside a footprint (`PERF_TODO.md`).
+* **Great-lake river ramps and outflows (phase E):**
+  * Generated water stays all-source and static, so a ramp step between two wet columns is a
+    one-block water ledge the fluid wake does not wake (the upper water's side cell is above the
+    lower column's terrain top); it spills only once a player edit wakes it.
+  * The noise river has no direction, so every arm of a river near a ramped lake steps down away from
+    it; an upstream arm usually dries into a wash, since its lowland fade is measured above its own
+    level. A river passing near a lake inside its ramp gets a stepped hump.
+  * An outflow descends only while the ramp lasts and ends in a closed taper inside it (its length is
+    capped at `RampLength - HalfWidth - 1`): it does not reach lower ground or the sea.
+  * The bank-raise rule can lift a dry bank column a few blocks where the verdict's sampling missed
+    low ground, leaving a small raised lip; it never leaks.
+  * Lily pads and pack ice follow the stepped river levels (near and far agree, since both read the
+    stored level), so a cold ramp reads as snow-capped terraces.
+  * Ramp rivers above `SeaLevel` get no beach sand, like an elevated lake's shore (`IsBeachHeight`).
+  * Formerly river-fed lakes re-laid with their own surface, floor and island, and ponds yield inside
+    the wider footprints, so existing saves show seams at the edge of edited chunks inside ramp
+    footprints; land beyond them is bit-identical (invariant 16).
+  * Cost (`PERF_TODO.md`): `Compute` on ordinary land +0.9 % (within noise), +2.6 % inside a lake,
+    +1.4 % on a ramp and +7.5 % in an outflow channel (about 0.02 ms per chunk column); an accepted
+    ramped verdict about 2.1 ms warm, about 0.8 ms over phase D, once per cell.
 * **Undithered borders:** only the desert line dithers. Forest/Steppe/Savanna borders share one grass
   fill and change only in tint, trees and flora, and the Taiga/Frozen line lies under snow, so neither is
   dithered: the tree line and the tint step follow a smooth contour.
@@ -1039,8 +1168,9 @@ Grep `Biome\.` to confirm; at time of writing:
 ## 12. Remaining work (phase E, optional)
 
 Phases A to D of the terrain-shape plan (relief highlands and ranges, hashed massifs and lone peaks,
-islands and archipelagos, great lakes) are done and documented where they live: §4 (the island fold),
-§6 (each mechanism), §7 (constants), §9 (invariants 11-16), §10 (tests) and §11 (limits). Their
+islands and archipelagos, great lakes) and phase E's first item (great-lake river ramps and outflows)
+are done and documented where they live: §4 (the island fold), §6 (each mechanism), §7 (constants),
+§9 (invariants 11-17), §10 (tests) and §11 (limits). Their
 perf numbers are in `PERF_TODO.md`, their shots in `visual-examples/terrain-shape.json`. The design
 principles, the new-biome checklist and the seed-offset and tuning traps live in the
 `biome-worldgen` skill (`.claude/skills/biome-worldgen/SKILL.md`); read it before any change here.
@@ -1048,10 +1178,6 @@ principles, the new-biome checklist and the seed-offset and tuning traps live in
 Open items, none started, in rough priority order. Each keeps the skill's principles and goes through
 plan-and-implement as its own phase; knob names are proposals.
 
-* **Great-lake outflow rivers and a per-column river target level.** Today a river that reaches a
-  great lake makes it river-fed at `SeaLevel` (§6, §11). Instead let the river carve toward an
-  elevated lake's surface (a per-column target level in place of the constant `SeaLevel` for the
-  channel and in `WaterLevelFor`), and add an outflow river on the lake's downhill side.
 * **Desert mesa or butte.** A flat-topped lone peak on the dune profile (clamp the profile at a
   hashed cap height). The site helper exists, but a peak must not be summed into sand: massifs and
   lone peaks reject any ocean or desert weight today (§11).
