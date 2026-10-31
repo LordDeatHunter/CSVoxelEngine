@@ -1,0 +1,11 @@
+{
+  // A hollow stone pine log is worldgen only, so breaking one gives the plain stone pine log
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "block/stone_pine_log", "count": 1 }
+      ]
+    }
+  ]
+}

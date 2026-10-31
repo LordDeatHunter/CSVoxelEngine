@@ -1,0 +1,99 @@
+{
+    // A hollow log lying along Z (the engine's authored facing, north): a square tube with 3 px
+    // walls around a 10x10 px hole and no end caps, so a run of cells reads as one open trunk.
+    // A facing block's model may carry no face covering a whole cell side, so every wall is
+    // split at z = 8 and the top and bottom walls are inset between the side walls; faces
+    // buried inside the model (the z = 8 seams, the top and bottom walls' ends against the side
+    // walls) are left out. #side is the outer bark, #inner the inside of the hole and #end the
+    // wall cross-section at each open end, whose default UVs crop the outer 3/16 band of its
+    // tile. The outer west and east faces turn their uv by 90 degrees so the bark's grain runs
+    // along the log, as the top and bottom faces' default UVs already do; the explicit uv is
+    // written mirrored, the way ModelBaker reads a side face. Each element lists an outer #side
+    // face first, since the baker falls back to the first quad's tile for the block's face
+    // tiles (the mining pop and debris).
+    "textures": {
+        "particle": "#side"
+    },
+    "elements": [
+        {
+            "from": [0, 0, 0],
+            "to": [3, 16, 8],
+            "faces": {
+                "west": { "texture": "#side", "cullface": "west", "uv": [0, 8, 16, 0], "rotation": 90 },
+                "up": { "texture": "#side", "cullface": "up" },
+                "down": { "texture": "#side", "cullface": "down" },
+                "east": { "texture": "#inner" },
+                "north": { "texture": "#end", "cullface": "north" }
+            }
+        },
+        {
+            "from": [0, 0, 8],
+            "to": [3, 16, 16],
+            "faces": {
+                "west": { "texture": "#side", "cullface": "west", "uv": [0, 16, 16, 8], "rotation": 90 },
+                "up": { "texture": "#side", "cullface": "up" },
+                "down": { "texture": "#side", "cullface": "down" },
+                "east": { "texture": "#inner" },
+                "south": { "texture": "#end", "cullface": "south" }
+            }
+        },
+        {
+            "from": [13, 0, 0],
+            "to": [16, 16, 8],
+            "faces": {
+                "east": { "texture": "#side", "cullface": "east", "uv": [0, 0, 16, 8], "rotation": 90 },
+                "up": { "texture": "#side", "cullface": "up" },
+                "down": { "texture": "#side", "cullface": "down" },
+                "west": { "texture": "#inner" },
+                "north": { "texture": "#end", "cullface": "north" }
+            }
+        },
+        {
+            "from": [13, 0, 8],
+            "to": [16, 16, 16],
+            "faces": {
+                "east": { "texture": "#side", "cullface": "east", "uv": [0, 8, 16, 16], "rotation": 90 },
+                "up": { "texture": "#side", "cullface": "up" },
+                "down": { "texture": "#side", "cullface": "down" },
+                "west": { "texture": "#inner" },
+                "south": { "texture": "#end", "cullface": "south" }
+            }
+        },
+        {
+            "from": [3, 0, 0],
+            "to": [13, 3, 8],
+            "faces": {
+                "down": { "texture": "#side", "cullface": "down" },
+                "up": { "texture": "#inner" },
+                "north": { "texture": "#end", "cullface": "north" }
+            }
+        },
+        {
+            "from": [3, 0, 8],
+            "to": [13, 3, 16],
+            "faces": {
+                "down": { "texture": "#side", "cullface": "down" },
+                "up": { "texture": "#inner" },
+                "south": { "texture": "#end", "cullface": "south" }
+            }
+        },
+        {
+            "from": [3, 13, 0],
+            "to": [13, 16, 8],
+            "faces": {
+                "up": { "texture": "#side", "cullface": "up" },
+                "down": { "texture": "#inner" },
+                "north": { "texture": "#end", "cullface": "north" }
+            }
+        },
+        {
+            "from": [3, 13, 8],
+            "to": [13, 16, 16],
+            "faces": {
+                "up": { "texture": "#side", "cullface": "up" },
+                "down": { "texture": "#inner" },
+                "south": { "texture": "#end", "cullface": "south" }
+            }
+        }
+    ]
+}

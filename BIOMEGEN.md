@@ -639,7 +639,9 @@ Grep `Biome\.` to confirm; at time of writing:
 * **Features (per-biome):** `Boulder` (Forest/Taiga/Steppe/Savanna), `Cotton` (Savanna),
   `Flower` (Forest/Steppe), `Foliage` tufts (Forest/Steppe/Savanna; dead shrubs on desert sand and
   frozen permafrost, `TryGetDeadShrub` gated on Desert or Frozen),
-  `DesertWell`, `FallenLog`, `IceSpike` (frozen), `Oasis` (desert, deep), `SeaStack` (ocean), `HotSpring`
+  `DesertWell`, `FallenLog` (the hollow log of the biome's species from its `worldgen.fallenLog`:
+  Forest oak, Taiga spruce, Savanna stone pine; none where the species declares none),
+  `IceSpike` (frozen), `Oasis` (desert, deep), `SeaStack` (ocean), `HotSpring`
   (cold, hashed), `Reed`/`LilyPad`/`Pebble`/`Cairn`/`RuinedPillar`, underground generators.
 * **Mobs:** `Simulation/MobSpawner.cs` `SpawnsMobs` (Forest, Steppe, Savanna); a supplied column reads
   `Biomes[i]`, a generated one the undithered `BiomeAt`. **A new biome gets no mobs unless it is added

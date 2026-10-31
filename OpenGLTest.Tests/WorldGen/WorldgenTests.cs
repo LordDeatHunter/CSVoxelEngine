@@ -107,8 +107,12 @@ public sealed class WorldgenTests
         Assert.True(checkedColumns > 0);
     }
 
+    /// <summary>
+    /// Nothing generated is solid above the heightmap but the blocks that stand on it: tree wood
+    /// and leaves, and the fallen logs lying on the floor.
+    /// </summary>
     [Fact]
-    public void OnlyTreeBlocksStandAboveTheHeightmap()
+    public void OnlyTreeAndFallenLogBlocksStandAboveTheHeightmap()
     {
         var cy = SurfaceChunkY();
         var pos = new Vector3(0, cy, 0);
@@ -123,8 +127,8 @@ public sealed class WorldgenTests
             {
                 if (cy * Chunk.Size + ly <= h) continue;
                 var id = chunk.GetLocalBlock(x, ly, z);
-                Assert.True(!BlockType.IsSolid(id) || TreeGenerator.IsTreeBlock(id),
-                    $"solid non-tree {id} above height {h} at ({x},{ly},{z})");
+                Assert.True(!BlockType.IsSolid(id) || TreeGenerator.IsTreeBlock(id) || FallenLogGenerator.IsFallenLog(id),
+                    $"solid block {id}, neither a tree nor a fallen log, above height {h} at ({x},{ly},{z})");
             }
         }
     }

@@ -1,0 +1,11 @@
+{
+  // A hollow spruce log is worldgen only, so breaking one gives the plain spruce log
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "block/spruce_log", "count": 1 }
+      ]
+    }
+  ]
+}

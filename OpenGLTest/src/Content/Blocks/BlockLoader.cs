@@ -94,6 +94,33 @@ internal static class BlockLoader
     }
 
     /// <summary>
+    /// Resolves a block's <c>pickAs</c>: the block a middle-click picks instead of it. It must be
+    /// another block that has an item, while the owner itself has none (a worldgen-only block picked
+    /// as its plain counterpart) and is not already picked as another block through a
+    /// <c>wallBlock</c> or <c>upperHalf</c>.
+    /// </summary>
+    private static byte ResolvePickAs(string name, string path, byte ownerId)
+    {
+        if (!ContentFiles.TryResolve(name, out var id) || id == BlockType.Air || ItemRegistry.IsItem(id))
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in pickAs, which is not a registered block.");
+        if (id == ownerId)
+            throw new InvalidOperationException($"Block '{path}' names itself in pickAs.");
+        var owner = BlockType.ById[ownerId]!;
+        var target = BlockType.ById[id]!;
+        if (!target.HasItem)
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in pickAs, which has no item to pick.");
+        if (owner.HasItem)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets pickAs but has an item of its own; only a block with hasItem: false is picked as another.");
+        if (owner.ItemBlockId != 0)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets pickAs but is already picked as another block through a wallBlock or upperHalf.");
+        return id;
+    }
+
+    /// <summary>
     /// Resolves a block's <c>upperHalf</c>: the block filling the cell above it (a door's top). The
     /// two halves share one state byte, so they must agree on <c>facing</c> and <c>open</c>; the
     /// lower half is the item and the drop, so only it may be held; each half belongs to one pair;
@@ -156,6 +183,7 @@ internal static class BlockLoader
         var multiblockPending = new List<(byte Id, string? Part, string? Source, string Path)>();
         var wallPending = new List<(byte Id, string Wall, string Path)>();
         var upperPending = new List<(byte Id, string Upper, string Path)>();
+        var pickPending = new List<(byte Id, string Target, string Path)>();
 
         foreach (var (name, path) in files)
         {
@@ -435,6 +463,8 @@ internal static class BlockLoader
                 wallPending.Add((id, definition.WallBlock, path));
             if (definition.UpperHalf != null)
                 upperPending.Add((id, definition.UpperHalf, path));
+            if (definition.PickAs != null)
+                pickPending.Add((id, definition.PickAs, path));
             if (definition.BiomeTint != null)
             {
                 var (palette, faces) = BiomeTintFaces.Expand(definition.BiomeTint, path);
@@ -516,6 +546,11 @@ internal static class BlockLoader
             types[upperId].LowerHalfId = pendingId;
             types[upperId].ItemBlockId = pendingId;
         }
+
+        // A pickAs target may load after its owner too; run last, so an owner the loops above
+        // already made a wall block or an upper half is refused.
+        foreach (var (pendingId, target, pendingPath) in pickPending)
+            types[pendingId].ItemBlockId = ResolvePickAs(target, pendingPath, pendingId);
 
         BlockType.Types = types;
     }

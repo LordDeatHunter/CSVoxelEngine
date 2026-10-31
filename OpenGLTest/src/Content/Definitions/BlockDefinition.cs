@@ -185,6 +185,13 @@ public sealed class BlockDefinition
     public string? WallBlock { get; set; }
 
     /// <summary>
+    /// The block a middle-click picks instead of this one: a worldgen-only block picked as its
+    /// plain counterpart (a hollow log picks its species' log). It must be another registered
+    /// block that has an item, and this block must set <c>hasItem: false</c>.
+    /// </summary>
+    public string? PickAs { get; set; }
+
+    /// <summary>
     /// Whether a block placement aimed at this block fills the block's own cell instead of the
     /// cell across the hit face, discarding whatever it held (layered snow: a block placed against
     /// a partial drift replaces it rather than hovering a layer above the ground). Only fires while

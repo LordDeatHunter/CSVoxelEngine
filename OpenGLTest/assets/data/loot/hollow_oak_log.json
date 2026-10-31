@@ -1,0 +1,11 @@
+{
+  // A hollow oak log is worldgen only, so breaking one gives the plain oak log
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "block/oak_log", "count": 1 }
+      ]
+    }
+  ]
+}

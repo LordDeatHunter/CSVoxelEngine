@@ -42,6 +42,7 @@
     "minSoil": 2,
     "minGround": 1,
     "maxGround": 90,
-    "openness": 0
+    "openness": 0,
+    "fallenLog": "block/hollow_stone_pine_log"
   }
 }

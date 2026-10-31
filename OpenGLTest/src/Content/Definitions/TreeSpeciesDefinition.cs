@@ -170,5 +170,12 @@ public sealed class TreeSpeciesDefinition
 
         /// <summary>Whether the species keeps out of the spawn clearing; default true.</summary>
         public bool? SpawnClear { get; set; }
+
+        /// <summary>
+        /// The facing block worldgen lays as this species' fallen (hollow) log on the floor of the
+        /// biomes it is the tree of (<c>"block/hollow_oak_log"</c> or a bare block name); omitted
+        /// means the species lays no fallen logs.
+        /// </summary>
+        public string? FallenLog { get; set; }
     }
 }

@@ -174,9 +174,11 @@ files waits in TODO.md instead, since there are none to use yet.
 
 ## World
 
-- [x] **Fallen logs.** A rare detached oak log of 3-5 cells lying along X or Z on the forest
-  floor, decided per 32-block cell from a pure hash so chunks agree at borders and clipped there
-  (`FallenLogGenerator`, `WoodState.Detached`; `SceneryTests`).
+- [x] **Fallen logs.** A rare hollow log of 3-5 cells lying along X or Z on the floor, the
+  hollow log of the biome's tree species (oak in the forest, spruce in the taiga, stone pine in
+  the savanna), decided per 32-block cell from a pure hash so chunks agree at borders and clipped
+  there; its facing in the state byte turns the tube along the log (`FallenLogGenerator`,
+  `worldgen.fallenLog`; `SceneryTests`, `HollowLogTests`).
 - [x] **Boulders.** A rare 2-4 cell blob of stone or cobblestone on the forest and taiga floor,
   per 32-block cell from a pure hash, into air only (`BoulderGenerator`; `SceneryTests`).
   *Hook:* one candidate per coarse cell hash (the `PlantClumps` cell pattern), stamped per chunk

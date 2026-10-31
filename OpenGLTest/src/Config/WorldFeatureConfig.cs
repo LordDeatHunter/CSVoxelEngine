@@ -63,7 +63,7 @@ public static class WorldFeatureConfig
     public const float CottonEdgeDensity = 0.1f;
     public const float CottonMaxDesertWeight = 0.5f - WorldGenerationConfig.BiomeBorderDither;
 
-    // --- Fallen logs (FallenLogGenerator): a rare detached oak log on the forest floor ---
+    // --- Fallen logs (FallenLogGenerator): a rare hollow log of the biome's tree species on the floor ---
     public const bool FallenLogsEnabled = true;
     // One candidate log per 2^FallenLogCellShift-block cell, accepted with FallenLogChance
     public const int FallenLogCellShift = 5;

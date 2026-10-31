@@ -27,6 +27,7 @@
     "maxSlope": 2,
     "minSoil": 2,
     "minGround": 4,
-    "maxGround": 90
+    "maxGround": 90,
+    "fallenLog": "block/hollow_spruce_log"
   }
 }

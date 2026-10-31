@@ -55,6 +55,16 @@ internal static class TreeSpeciesLoader
         if (BlockType.ById[species.WoodId]!.Renderer != BlockRenderer.TreeWood)
             throw new InvalidOperationException(
                 $"Tree species '{path}' grows wood '{BlockType.ById[species.WoodId]!.Name}', which does not use renderer \"tree_wood\".");
+        // Worldgen writes the fallen log's axis as a facing into the state byte, so only a facing
+        // model block can carry it
+        if (species.Worldgen is { FallenLogId: not 0 } w)
+        {
+            var log = BlockType.ById[w.FallenLogId]!;
+            if (!log.HasHorizontalFacing || log.Renderer == BlockRenderer.TreeWood || log.Fluid)
+                throw new InvalidOperationException(
+                    $"Tree species '{path}' names fallenLog '{log.Name}', which must be a facing (\"horizontal\") " +
+                    "model block; worldgen writes its facing into the state byte.");
+        }
         return species;
     }
 

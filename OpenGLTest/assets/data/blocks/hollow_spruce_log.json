@@ -1,0 +1,31 @@
+{
+  // A hollow spruce log: worldgen lays a run of these as the fallen log on the floor of the
+  // biomes the spruce is the tree of (FallenLogGenerator). The state byte holds the facing, which
+  // turns the tube along Z (north) or X (west); the model and the four wall boxes are authored
+  // along Z and turned to the other facings. The outside wears the spruce log's bark, and the body
+  // collides with the walls only, so the hole stays open.
+  "name": "Hollow Spruce Log",
+  "model": {
+    "parent": "block/hollow_log",
+    "textures": { "side": "spruce_log_side", "inner": "hollow_spruce_log_inner", "end": "hollow_spruce_log_end" }
+  },
+  "facing": "horizontal",
+  // Half of spruce_log's full-cube 24, so it mines in half the time
+  "hardness": 12,
+  "requiresTool": true,
+  "tools": { "axe": 1 },
+  "sfx": "hit_wood",
+  // Worldgen only: it drops the plain log (loot/hollow_spruce_log.json)
+  "hasItem": false,
+  // A middle-click picks the plain log
+  "pickAs": "block/spruce_log",
+  // A partial block must not darken the floor around it the way a full cube would
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": [
+    { "min": [0, 0, 0], "max": [0.1875, 1, 1] },
+    { "min": [0.8125, 0, 0], "max": [1, 1, 1] },
+    { "min": [0.1875, 0, 0], "max": [0.8125, 0.1875, 1] },
+    { "min": [0.1875, 0.8125, 0], "max": [0.8125, 1, 1] }
+  ]
+}

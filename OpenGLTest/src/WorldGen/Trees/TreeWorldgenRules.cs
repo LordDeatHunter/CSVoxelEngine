@@ -42,6 +42,12 @@ public sealed class TreeWorldgenRules
     /// <summary>Whether the species keeps out of the spawn clearing (<see cref="WorldGenerationConfig.TreeSpawnClearRadius"/>).</summary>
     public bool SpawnClear { get; init; } = true;
 
+    /// <summary>
+    /// The block worldgen lays as this species' fallen (hollow) log on the floor of the biomes it
+    /// is the tree of, a facing model block whose state byte holds the log's axis; 0 means none.
+    /// </summary>
+    public byte FallenLogId { get; init; }
+
     /// <summary>Whether the species grows in <paramref name="biome"/>.</summary>
     public bool GrowsIn(Biome biome)
     {

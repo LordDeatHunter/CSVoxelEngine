@@ -178,11 +178,12 @@ internal static class TreeSpeciesCompiler
             CrownHeightMax = crownMax,
             CrownRadius = crownRadius,
             LodProfile = profile,
-            Worldgen = dto.Worldgen == null ? null : Worldgen(path, dto.Worldgen),
+            Worldgen = dto.Worldgen == null ? null : Worldgen(path, dto.Worldgen, resolveBlock),
         };
     }
 
-    private static TreeWorldgenRules Worldgen(string path, TreeSpeciesDefinition.WorldgenDefinition w)
+    private static TreeWorldgenRules Worldgen(string path, TreeSpeciesDefinition.WorldgenDefinition w,
+        Func<string, byte?> resolveBlock)
     {
         if (w.Biomes == null || w.Biomes.Length == 0)
             throw Fail(path, $"worldgen.biomes must name at least one biome (known: {BiomeNames}).");
@@ -216,6 +217,14 @@ internal static class TreeSpeciesCompiler
         float openness = w.Openness ?? 1f;
         if (!float.IsFinite(openness) || openness < 0f || openness > 1f)
             throw Fail(path, $"worldgen.openness must be 0..1, got {openness}.");
+        byte fallenLogId = 0;
+        if (w.FallenLog != null)
+        {
+            var resolved = resolveBlock(w.FallenLog);
+            if (resolved is null or 0)
+                throw Fail(path, $"worldgen.fallenLog '{w.FallenLog}' is not a block.");
+            fallenLogId = resolved.Value;
+        }
 
         return new TreeWorldgenRules
         {
@@ -229,6 +238,7 @@ internal static class TreeSpeciesCompiler
             MaxGround = maxGround,
             Openness = openness,
             SpawnClear = w.SpawnClear ?? true,
+            FallenLogId = fallenLogId,
         };
     }
 

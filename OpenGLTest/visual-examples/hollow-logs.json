@@ -1,0 +1,60 @@
+{
+  // Hollow fallen logs: run with VOXEL_TIME=147 (noon) and VOXEL_SCRIPT=visual-examples/hollow-logs.json.
+  // Shots land in visual/hollow-logs/.
+  //
+  // A fallen log is the hollow log of its start column's biome tree species (FallenLogGenerator,
+  // worldgen.fallenLog): oak in the forest, spruce in the taiga, stone pine in the savanna. The
+  // three logs below were probed headless under the default seed through
+  // FallenLogGenerator.TryGetPlacedLog, each a clear run (every cell stamped, nothing in its layer):
+  //   forest   start (-6, 15, -62), 3 cells along Z (z -62..-60), ground 14
+  //   taiga    start (-288, 16, 1), 3 cells along Z (z 1..3), ground 15
+  //   savanna  start (305, 9, -218), 5 cells along X (x 305..309), ground 8
+  // Each biome gets two shots: <biome>-axis looks into the log along its axis from 2.5-3.5 blocks
+  // off one end, so the end ring and the open hole show (the forest and savanna ends stand in tall
+  // grass, so those two look down over it at 34 degrees; the taiga one looks straight through);
+  // <biome>-side is a 3/4 view from above the side, with the bark running along the log. Look for
+  // a bark tile matching the surrounding trees, an open hole at both ends, the grain along the axis
+  // and no seams or z-fighting between cells.
+  //   forest-mined  the camera flies (creative), so one single-frame `mine` aimed straight down
+  //                 from 3 blocks over the forest log's middle cell (-6, 15, -61) removes exactly
+  //                 that cell, filmed from the side vantage: the two cells left stay open. The
+  //                 aim is close because the first-person ray walks at most InteractionReach
+  //                 cells, which a diagonal sight line from the side vantage runs out of
+  "steps": [
+    { "op": "fly", "on": true },
+
+    { "op": "teleport", "pos": [-5.5, 40, -56.5], "yaw": -90, "pitch": 0 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "teleport", "pos": [-5.5, 17.2, -56.5], "yaw": -90, "pitch": -34 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "forest-axis", "hideHud": true },
+    { "op": "teleport", "pos": [-2, 18.5, -58], "yaw": -139.4, "pitch": -33.1 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "forest-side", "hideHud": true },
+    { "op": "teleport", "pos": [-5.5, 18.5, -60.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "mine", "seconds": 0.001 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "teleport", "pos": [-2, 18.5, -58], "yaw": -139.4, "pitch": -33.1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "forest-mined", "hideHud": true },
+
+    { "op": "teleport", "pos": [-287.5, 40, 7.5], "yaw": -90, "pitch": 0 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "teleport", "pos": [-287.5, 16.5, 7.5], "yaw": -90, "pitch": 0 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "taiga-axis", "hideHud": true },
+    { "op": "teleport", "pos": [-284, 19.5, 6], "yaw": -135, "pitch": -31.2 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "taiga-side", "hideHud": true },
+
+    { "op": "teleport", "pos": [302.5, 40, -217.5], "yaw": 0, "pitch": 0 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "teleport", "pos": [302.5, 11.2, -217.5], "yaw": 0, "pitch": -34 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "savanna-axis", "hideHud": true },
+    { "op": "teleport", "pos": [304, 12.5, -214], "yaw": -45, "pitch": -31.2 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "savanna-side", "hideHud": true }
+  ]
+}

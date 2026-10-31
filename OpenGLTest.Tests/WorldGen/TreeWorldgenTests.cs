@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using VoxelEngine.WorldGen;
-using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
@@ -45,7 +44,6 @@ public sealed class TreeWorldgenTests
 
         var wood = 0;
         var leaves = 0;
-        var logs = 0;
         foreach (var ((x, y, z), (block, state)) in cells)
         {
             if (leafIds.Contains(block))
@@ -56,15 +54,8 @@ public sealed class TreeWorldgenTests
             }
 
             if (!woodIds.Contains(block)) continue;
-            // Detached wood is the scenery generator's fallen log, not a tree node
-            if (WoodState.IsDetached(state))
-            {
-                Assert.True(IsFallenLogCell(x, y, z), $"detached wood at ({x}, {y}, {z}) is not a fallen log");
-                logs++;
-                continue;
-            }
-
             wood++;
+            // Worldgen stamps no detached wood: every wood cell is a node of a grown tree
             Assert.False(WoodState.IsDetached(state), $"generated wood at ({x}, {y}, {z}) is detached");
             if (!WoodState.TryParentOffset(state, out var dx, out var dy, out var dz)) continue;
             if (!cells.TryGetValue((x + dx, y + dy, z + dz), out var parent)) continue;
@@ -74,28 +65,6 @@ public sealed class TreeWorldgenTests
 
         Assert.True(wood > 0, "no wood was stamped");
         Assert.True(leaves > 0, "no leaves were stamped");
-        _ = logs;
-    }
-
-    // Whether a detached wood cell belongs to a fallen log: some hashed log starts within its own
-    // length behind the cell on its own axis and lies at its start column's ground plus one
-    private static bool IsFallenLogCell(int x, int y, int z)
-    {
-        var shift = WorldFeatureConfig.FallenLogCellShift;
-        for (var back = 0; back < WorldFeatureConfig.FallenLogMaxLength; back++)
-        for (var axis = 0; axis < 2; axis++)
-        {
-            var sx = axis == 0 ? x - back : x;
-            var sz = axis == 0 ? z : z - back;
-            if (!FallenLogGenerator.TryGetLog(sx >> shift, sz >> shift, out var startX, out var startZ,
-                    out var length, out var alongX))
-                continue;
-            if (startX != sx || startZ != sz || back >= length) continue;
-            if (alongX != (axis == 0)) continue;
-            if (y != TreeWorldgenFixture.HeightAt(startX, startZ) + 1) continue;
-            return true;
-        }
-        return false;
     }
 
     [Fact]

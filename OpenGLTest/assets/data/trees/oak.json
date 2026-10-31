@@ -35,6 +35,9 @@
     "maxSlope": 2,
     "minSoil": 2,
     "minGround": 4,
-    "maxGround": 90
+    "maxGround": 90,
+    // The hollow log worldgen lays on the forest floor; a species without one (cactus,
+    // dead_tree, palm, baobab) lays no fallen logs
+    "fallenLog": "block/hollow_oak_log"
   }
 }
