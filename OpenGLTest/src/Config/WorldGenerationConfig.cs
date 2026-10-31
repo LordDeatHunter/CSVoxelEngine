@@ -54,6 +54,12 @@ public static class WorldGenerationConfig
     public const int GreatLakeSiteCacheCapacity = 512;
     public const int GreatLakeSiteCacheGenerations = 4;
 
+    // WaterBodies' pond verdict cache: one (accepted, surface, floor) per lake cell, a pure function
+    // of (cell, seed). Its factory samples the rim (and the river rings for an elevated pond), which
+    // the cache keeps off every column inside a candidate's radius. GENERATIONS matches the other sites.
+    public const int PondSiteCacheCapacity = 4096;
+    public const int PondSiteCacheGenerations = 4;
+
     // Blocks of dirt under the grass: DirtDepthBase +- DirtDepthVariation, varying slowly over the map
     public const float DirtDepthBase = 3f;
     public const float DirtDepthVariation = 1.5f;

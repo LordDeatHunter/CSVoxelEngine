@@ -1,394 +1,405 @@
 # Performance TODO
 
-Closed history (every landed item, the per-round measurement write-ups, the gate machinery) was
-removed on 2026-10-28; it lives in git (`git log -p -- PERF_TODO.md`). What stays: the measurement
-protocol, the current profile, the open items and the do-not-retry **Ruled out** list.
+Closed history (every landed item, the round write-ups, the worldgen phase B-E measurements in full)
+was removed on 2026-10-28 and again on 2026-10-31; it lives in git (`git log -p -- PERF_TODO.md`).
+Code comments still cite old ids (C2, C5, D2, R5, R7, R10, R11, items 19 and 26) that exist only in
+that history. New items are **F#** (frame time) and **G#** (worldgen, meshing, streaming).
 
-Machine for every number below: Release, Quadro T1000 Max-Q (GL 4.6, driver 597.06), 12 CPUs,
-`SustainedLowLatency`, `VOXEL_TIME=60`, `VOXEL_DEBUG=1`.
+Every number names its machine and date. A win not yet measured is labeled *estimated*.
+
+Dangling references (fix in a follow-up, not here): `MESHER_PLAN.md` was deleted, but the AGENTS.md
+project overview (lines 7 and 15) and `.claude/skills/perf-capture/SKILL.md` (line 8) still cite it,
+and the skill asks for a "measurements table" and a box to tick that this file no longer has.
+`StreamingConfig.cs`'s `MaxConcurrentLodGenerations` comment points at a removed "Measurement: D2".
+The old Phase 5 compute cull now lives here as F9.
 
 ## How to measure
 
-Repeatable fly (checked in): `OpenGLTest/visual-examples/perf-fly.json` (10 s settle at spawn,
-teleport + sprint-walk legs over land, water bay (228,-138), a far teleport (-120,100)). Run from
-`OpenGLTest/` so `assets/` resolves:
+Follow `.claude/skills/perf-capture/SKILL.md`: Release only, interleaved before/after pairs in a git
+worktree, `// TEMP-DIAG` counters stripped before commit. The fly, run from `OpenGLTest/`:
 
 ```powershell
-$env:VOXEL_DEBUG="1"; $env:VOXEL_TIME="60"; $env:VOXEL_SCRIPT="visual-examples/perf-fly.json"
-dotnet run --project VoxelEngine.csproj -c Release --no-build
+$env:DOTNET_ROLL_FORWARD='LatestMajor'; $env:VOXEL_DEBUG='1'; $env:VOXEL_TIME='60'; $env:VOXEL_SCRIPT='visual-examples/perf-fly.json'; & "$HOME\.dotnet\dotnet.exe" run --project VoxelEngine.csproj -c Release --no-build
 ```
 
-Read the `perf` console line (`avg~max` per section, `/gpuAvg~gpuMax` on render passes). Traps:
+Scenarios: `perf-fly` (10 s settle at spawn, sprint legs over land, the bay near (228,-138), a far
+teleport to (-120,100)), `tree-perf`, `lod-horizon`. Headless probes, one per invocation (two in one
+filter run in parallel collections and inflate the mesh probe by ~25%), from the repo root:
 
-- **`lighting` CPU is the draw-ring fence wait, not lighting.** It is the frame's first GL work
-  (`BeginFrame` -> `ChunkDrawBatch.BeginFrame` waits on the fence of the slot 3 frames back). Measured
-  with temporary sub-timers: `SetLighting` 0.03 ms, audio 0 ms, clear + sky 0.03 ms, the fence wait
-  0.5 -> 20 ms. A fat `lighting` row therefore means **GPU-bound**; read the GPU suffixes.
-- `gpu` in the header is a sum of the per-pass timers and is `0.1`/partial on frames where GPU timing
-  is gated off (idle interval). Only average the lines whose `worldPass`/`shadows` GPU suffix is non-zero.
-- **The T1000 throttles.** `nvidia-smi` during the fly: 100 % utilization, SM clock 1530 MHz at the start
-  falling to 1080 MHz by the end (throttle reason `0x20`, SW thermal slowdown, 74 C). Late-fly lines
-  are therefore ~30 % slower than early ones for the same scene (fps mean 76 early vs 55 late).
-  Cool the machine / idle it between runs, and compare only interleaved pairs.
-- Worker-thread costs (meshing, worldgen) never show in the per-frame profiler.
+```powershell
+$env:DOTNET_ROLL_FORWARD='LatestMajor'; & "$HOME\.dotnet\dotnet.exe" test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release --filter "FullyQualifiedName~<Probe>" --logger "console;verbosity=detailed"
+```
 
-## Current profile (2026-10-28, `perf-fly`, 3 runs, 113 `perf` lines)
+The probes assert no timing and print through `ITestOutputHelper`:
 
-The game is **GPU-bound**, not CPU-bound: at every point the CPU sections sum to a few ms and the rest
-of the frame is the fence wait in `lighting`. Over the 34 full-GPU-timing lines (mean frame 18.1 ms,
-GPU sum 15.9 ms):
+- `MeshBuildCostProbe` (Chunks/Meshing): warm single-thread `GenerateMeshData` over a cube-and-lamp soup, seed 26.
+- `LodBuildCostProbe` (Lod): regions per level; the first builds are biased by the cold column prefetch.
+- `ColumnCacheReplayProbe`, `ChunkRekeyReplayProbe`, `PlayerPlacedUnloadReplayProbe` (Chunks).
+- `GeometryLayoutReplayProbe` (Rendering/Geometry).
+- No worldgen `Compute` or chunk-fill probe exists; see G1.
 
-| Pass | GPU avg ms | Share | Worst |
+Traps:
+
+- The `lighting` CPU row is the `ChunkDrawBatch` fence wait (`RenderManager.BeginFrame` ->
+  `ChunkDrawBatch.BeginFrame`), so a fat row means GPU-bound. Old sub-timers: `SetLighting` 0.03 ms,
+  clear + sky 0.03 ms, the wait 0.5-20 ms.
+- The `gpu` header is partial on gated frames (`GpuTimingGate`), and once GPU-bound most late lines
+  carry no per-pass suffix. Average only lines with non-zero `shadowNear`/`shadowFar`/`worldPass` GPU
+  suffixes, and remember those lean toward early, lighter frames. The two shadow rows drop their GPU
+  sample independently (`shadowFar` more often, ~40 of 58 lines against every line for `shadowNear`), so
+  sum them only over lines where both report.
+- The T1000 throttles its SM clock from 1530 to ~1080 MHz at ~74 C, so late lines run ~30% slower.
+  Log `nvidia-smi` clocks, cool down between runs, compare interleaved pairs only.
+- Worker costs never appear as rows: worldgen shows only in the `wgen` token (`WorldgenStats`), the
+  mesh build only in `MeshBuildCostProbe`.
+- `uiPass` includes the X overlay's own glyphs.
+
+## Measured baselines
+
+### 2026-10-31 (branch biomes, c8e0f3c6)
+
+`Build: Release | debugger False | serverGC False | latency SustainedLowLatency | cpus 12`;
+`GPU: Quadro T1000 with Max-Q Design/PCIe/SSE2 | NVIDIA Corporation | GL 4.6.0 NVIDIA 597.06`;
+`LodGen: 1 workers`. `perf-fly` x3 (58 lines each), `VOXEL_TIME=60`; SM clock 1530 MHz at start,
+last-10-s average 1086-1292 MHz (min 765) at 74-75 C. GPU table over the 68 full-timing lines
+(frame mean 16.7 ms, pass sum 15.0 ms):
+
+| Pass | GPU avg ms | share | worst |
 |---|---|---|---|
-| `shadows` | 6.65 | 42 % | 19.7 |
-| `worldPass` | 3.64 | 23 % | 7.1 |
-| `reflect` (water on screen only) | 2.54 | 16 % | 10.0 |
-| `cloudPass` | 1.20 | 8 % | 2.7 |
-| `lodPass` | 0.72 | 5 % | 1.9 |
-| `postPass` | 0.46 | 3 % | 1.4 |
-| `waterPass` | 0.35 | 2 % | 1.6 |
-| `uiPass` (X overlay) | 0.35 | 2 % | 1.0 |
-| `aoPass` | 0.25 | 2 % | 0.8 |
+| shadows | 5.35 | 36% | 15.9 |
+| worldPass | 3.90 | 26% | 11.8 |
+| reflect | 2.36 | 16% | 14.1 |
+| cloudPass | 1.08 | 7% | 1.9 |
+| lodPass | 0.91 | 6% | 10.7 |
+| postPass | 0.43 | 3% | 0.95 |
+| uiPass | 0.36 | 2% | 1.0 |
+| waterPass | 0.34 | 2% | 1.5 |
+| aoPass | 0.26 | 2% | 1.9 |
 
-Frame time: early fly 3-10 ms (100-337 fps, small world loaded), streaming 15-30 ms (33-68 fps),
-settled-but-throttled far leg 21-25 ms (~40 fps, `chunkApply`/`lod`/`fluidTick` all ~0).
+`shadows` is the one shadow row before F1 split it into `shadowNear`/`shadowFar` (see Done).
+Averaging every line that carries a pass instead: shadows 5.85 ms (n=137; settle 3.2, land legs 7.7,
+bay 6.7, far 4.3), worldPass 3.79, reflect 2.26, lodPass 0.99. `godPass`/`raysPass` were 0 at this time.
 
-This is ~2x worse than the 2026-09-11 snapshot (settled 9-10 ms). Part is the thermal throttle above, but the
-shadow pass is the outlier and may be a real regression since then; that is open item 1.
+- Frame (avg ms): settle 10.3 (60-264 fps), land legs 24.2, bay 22.1, far 17.1; settled with 17077
+  loaded / 1214-2101 visible chunks 21.6 ms (~46 fps), of which the fence wait is 15-19 ms. GPU-bound throughout.
+- CPU (avg~worst): `chunkApply` 4.1-5.1~530 (5-12 sustained on the land legs), `lod` 0.8~30, `fluidTick`
+  0.25~15, `entities` 0.32~11.5. One 450-740 ms frame per run on the bay teleport (`chunkApply` 530/454
+  ms, or the fence wait 737 ms). The old 1306 ms `lod` spike did not reproduce.
+- GC gen0/s: 10-45 streaming (phase means 16-25), 3-7 settled.
+- `wgen`: 143-5430 chunks/s (~1700 avg), median 1.31 ms/chunk; cold first second 29-34 ms/chunk (tree
+  batches 17.7); full 17077-chunk ring ~12 s after launch.
+- Probes (alone): mesh 5475 us/build, 6223 with blue lamps (+14%; 25188 opaque + 7052 translucent
+  vertices). LOD median/min/mean ms: L0 28.2/17.8/48.1 (cold firsts ~145), L1 22.3/10.0/20.4, L2
+  80.3/3.9/78.6 (max 168); medians swing between invocations with the cold prefetch.
 
-CPU spikes (streaming only, worst single frames): `chunkApply` avg 7 ms with 46 ms worst, `lod` 1306 ms
-worst on a teleport (one frame, seen once in three runs), `fluidTick` up to 18 ms, `entities` 30 ms and
-`camera` 17 ms on the very first frame (startup), `cloudPass` 16 ms CPU / 33 ms GPU on the first frame.
-GC: streaming 20-45 gen0/s, settled 4-11 gen0/s.
+### 2026-10-28 reference (T1000, throttled, perf-fly x3)
 
-## Worldgen column cost: relief phase B (headless Compute, 2026-10-29)
-
-`TerrainGenerator.Compute` per chunk column, before vs after the hashed massifs and lone peaks
-(BIOMEGEN 13 phase B), measured with a temporary xUnit probe: one `Compute` per listed column after a
-64-column warm-up, median ms per category, 5 interleaved before/after pairs in fresh processes, the
-median of the five medians. The column lists (fixed SplitMix64 seeds, default world seed) were
-`all` (2048 random columns 1000..12000 blocks out), `lowland` (1024 columns whose center carries no
-highland, massif or lone-peak term), `massif` (1024 columns within 0.8 radius of the 9 accepted
-massifs inside +-12000) and `peak` (1024 within 0.8 radius of the 234 accepted lone peaks). The
-baseline was a robocopy of the working tree taken before phase B rather than a `git worktree` of
-HEAD, because the phase A relief layer was still uncommitted and HEAD would have measured the wrong
-baseline.
-
-| Columns | Before ms | After ms | Change |
+| Pass | GPU avg ms | share | worst |
 |---|---|---|---|
-| `all` | 0.2221 | 0.2372 | +6.8 % |
-| `lowland` | 0.1869 | 0.1996 | +6.8 % |
-| `massif` | 0.2323 | 0.2700 | +16.2 % |
-| `peak` | 0.2023 | 0.2252 | +11.3 % |
+| shadows | 6.65 | 42% | 19.7 |
+| worldPass | 3.64 | 23% | 7.1 |
+| reflect | 2.54 | 16% | 10.0 |
+| cloudPass | 1.20 | 8% | 2.7 |
+| lodPass | 0.72 | 5% | 1.9 |
+| postPass | 0.46 | 3% | 1.4 |
+| waterPass | 0.35 | 2% | 1.6 |
+| uiPass | 0.35 | 2% | 1.0 |
+| aoPass | 0.25 | 2% | 0.8 |
 
-The lowland rise is small but systematic (every after run above every before run, run-to-run spread
-about 3 %): it is the two `CellRange` scans every `LandHeight` call now pays (a `SpawnClear`, then a
-`TryRoll` hash per reaching cell for massifs and lone peaks), also inside each lake candidate's nine
-rim samples. No cache probe or noise read happens before the distance cull, so the cost does not
-grow with the site caches. Inside a disc the extra is the cached verdict, the wobble noise, the
-spur noise and the `Pow` profile; the first column of a site also pays its verdict (massif: ten
-`ReliefLandHeight` samples; lone peak: ten `PreFeatureLandHeight` samples, each with its own massif
-scan). Not chased: about 0.013 ms per chunk column (50 ns per block column), far below the mesh build; the cache capacities and
-generation counts were not touched.
+Mean frame 18.1 ms, GPU sum 15.9. GPU-bound throughout; `chunkApply` avg 7 / worst 46 ms; one `lod`
+spike of 1306 ms on a far teleport (once in three runs); `fluidTick` up to 18 ms; first-frame
+`cloudPass` 16 ms CPU / 33 ms GPU. GC 20-45 gen0/s streaming, 4-11 settled; ~2x slower than the
+2026-09-11 snapshot (settled 9-10 ms), partly thermal.
 
-## Worldgen column cost: islands phase C (headless Compute, 2026-10-30)
+### Worldgen and LOD (headless)
 
-`TerrainGenerator.Compute` per chunk column, before vs after the ocean-gated island term and the
-hashed archipelagos (BIOMEGEN 13 phase C, `TerrainIslands`), measured with the same temporary xUnit
-probe as phase B: one `Compute` per listed column after a 64-column warm-up, median ms per category,
-5 interleaved before/after pairs in fresh processes, the median of the five medians. The column lists
-(fixed SplitMix64 seeds, default world seed, every center 1000..12000 blocks out) were `all` (2048
-random columns), `land` (1024 columns whose center has a pre-island ocean weight of exactly 0, the
-control), `ocean` (1024 past the shore, `pre > OceanShoreWeight`, with an island weight of 0),
-`island` (1024 whose center is island land: past the shore before the fold, inside it after) and
-`archipelago` (1024 inside an accepted archipelago footprint, past the shore). The baseline was again
-a robocopy of the working tree taken before phase C rather than a `git worktree` of HEAD, because
-phases A and B and the icebergs were still uncommitted and HEAD would have measured the wrong
-baseline. The first baseline run's `all` median (0.6448 ms) was a cold start; the median of five
-discards it.
+Method: a temporary `Compute` probe, 64-column warm-up, median of 5 interleaved pairs in fresh
+processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column); only pairs compare.
 
-| Columns | Before ms | After ms | Change |
-|---|---|---|---|
-| `all` | 0.2425 | 0.2823 | +16.4 % |
-| `land` | 0.2311 | 0.2272 | -1.7 % |
-| `ocean` | 0.2042 | 0.2500 | +22.4 % |
-| `island` | 0.2019 | 0.2822 | +39.8 % |
-| `archipelago` | 0.1789 | 0.2463 | +37.7 % |
+| Phase | feature | `all` | land control | worst category |
+|---|---|---|---|---|
+| B (2026-10-29) | massifs and peaks | +6.8% | +6.8% | massif +16.2% |
+| C (2026-10-30) | islands | +16.4% | -1.7% | island +39.8% |
+| D (2026-10-30) | great lakes | +3.5% | +5.2% | lake +23.5% |
+| E (2026-10-31) | great-lake rivers | +5.3% | +0.9% | outflow +7.5% |
 
-`land` is flat inside its run-to-run spread (before 0.211..0.245, after 0.226..0.237): continental
-land pays one compare (`pre <= OceanShoreWeight`) per `BiomeWeights` call and nothing else, and
-continental massif and lone-peak sites skip the island scaling entirely. Ocean past the shore pays,
-per `BiomeWeights` call (several per column: the column itself, the shore clamp, each lake
-candidate's rim samples), one `SpawnClear`, the archipelago `CellRange` with a `TryRoll` hash per
-reaching cell, and the two 2-octave island noises: about 180 ns per block column. Island and
-archipelago columns pay the same, plus the land work an Ocean-biome column skips once it has become
-land (the lake and river tests `WaterBodies` gates on the biome, the ravine cut the ocean weight fades
-out; the height profiles themselves are computed for every column either way); island massif and lone-peak sites add one
-more continent read and the island noises, but only inside their discs (3 island lone peaks in
-+-20000, no island massif). Not chased: about 0.05 ms per ocean chunk column, far below the mesh
-build; a later saving would be to skip the small-island noise where the large channel already
-saturates. No cache was added (the archipelago verdict is a stateless hash), and no cache capacity
-or generation count was touched.
-
-Identity against the baseline (a dump of both trees with APIs present in both, the pre-island weight
-taken from the baseline's own `BiomeWeights`, which is exactly the pre-island weight there):
-
-- +-20000 grid at stride 37 (1,170,724 points): 105,692 changed in `LandHeight`, the folded ocean
-  weight or the biome; **0** of them where the baseline ocean weight is at or below
-  `OceanShoreWeight` (624,405 points have a baseline weight of exactly 0, none changed).
-- Massif and lone-peak cell verdicts over the box (8,884 cells, 707 sites before, 710 after):
-  **0** changed at a continental candidate center; 3 new island lone peaks (cells (-42,-2), (-11,38)
-  and (-9,30)), each at a baseline center weight of 1.
-- `Compute` on 1000 random chunk columns: 120 changed `Heights` or `WaterLevel`; of the 529 columns
-  whose every cell has a baseline ocean weight of 0, **0** changed. The lake-rim and shared-tree-batch
-  cross-effects BIOMEGEN 11 lists did not show in this sample (tree batches do not enter `Compute`).
-
-## Worldgen column cost: great lakes phase D (headless Compute, 2026-10-30)
-
-`TerrainGenerator.Compute` per chunk column, before vs after the great-lake tier (BIOMEGEN §6
-phase D: `GreatLakes`, wired through `WaterBodies.SampleSurfaceWater`, the pond yield in
-`TryLakeSite` and the ravine guard), measured with the same temporary xUnit probe as phases B and C:
-one `Compute` per listed column after a 64-column warm-up, median ms per category, 5 interleaved
-before/after pairs in fresh processes, the median of the five medians. The column lists (fixed
-SplitMix64 seeds, default world seed) were `all` (2048 random columns 1000..12000 blocks out), `land`
-(1024 random columns in the same ring whose center has a great-lake weight and guard of exactly 0,
-the control), `lake` (1024 columns within 0.8 of a lobe radius of the 13 lobes of the 6 accepted
-sites inside +-16000) and `shore` (1024 columns in the guard band: weight 0, guard above 0). The
-baseline was again a robocopy of the working tree taken before phase D, because the icebergs were
-still uncommitted. Absolute times run higher than the phase C table on this session's machine state;
-only the pairs measured together compare.
-
-| Columns | Before ms | After ms | Change |
-|---|---|---|---|
-| `all` | 0.3861 | 0.3996 | +3.5 % |
-| `land` | 0.3231 | 0.3398 | +5.2 % |
-| `lake` | 0.2622 | 0.3237 | +23.5 % |
-| `shore` | 0.2606 | 0.3173 | +21.8 % |
-
-The `land` rise is small but systematic (before 0.320..0.329, after 0.339..0.364): every block column
-now pays `GreatLakes.Sample`'s spawn test, `CellRange` and a `TryRoll` hash per reaching great-lake
-cell, and every pond candidate in reach pays the same scan again in `NearAnyLobe` before its rim
-samples; no cache probe or noise read happens before the exact distance cull. Inside a footprint
-the extra is the cached verdict, the 2-octave shape noise read once per block column and the
-smoothsteps, about 240 ns per block column. Verdicts are cheap and rare:
-
-- `BuildSite` timed directly (uncached) over the 199 rolled candidates of the cells covering
-  +-16000, two passes in each of two fresh processes. Cold pass: accepted (6) median 1.83..1.87 ms,
-  worst 2.26 ms; rejected (193) median 0.031 ms, worst 12.2..16.2 ms, which is the very first call
-  (JIT and the first massif and lone-peak cache fills). Warm pass: accepted median 1.28..1.32 ms,
-  worst 2.12 ms (cell (11, -7)); rejected median 0.005 ms, worst 0.78 ms. The whole box costs about
-  45 ms cold. The 20-60 ms per accepted verdict the plan feared did not show (the radius skew keeps
-  most lakes small, and most candidates fall to the spacing, spawn, relief or first rim sample), so
-  none of the spacing or ordering fallbacks was applied.
-- Cold sweep, single thread, fresh process: all 203 coarsest-ring regions (8-block cells) within
-  2048 blocks of a point 64 blocks past the east shore of the rim-fed lake of cell (-8, -8): before
-  39.9 / 39.8 s, after 41.5 / 41.0 s (+3.4 %); **5** verdicts built, 7.0 / 7.1 ms in total (a
-  temporary counter in the cache factory, removed afterward). The rest of the rise is the
-  per-column tax above.
-- One finest-ring region (2-block cells, (-146, -153), over that lake's main lobe), first build in
-  a fresh process: before 1525 ms, after 1091 ms (-28 %), second build 6.4 vs 7.0 ms (noise). The
-  cold build is dominated by the column fills and the first ring's tree batches, and the lake now
-  covers what was wooded lowland, so fewer trees grow there; the likely reason it got cheaper.
-
-Not chased: about 0.017 ms per land chunk column and 0.06 ms per lake chunk column, far below the
-mesh build. The cache capacity (512) and generation count (4) were not moved.
-
-Identity against the baseline (a dump of both trees with APIs present in both; the footprint is
-each accepted lobe disc, over a +-23000 cell scan (27 lobes), grown by the guard plus twice
-`LakeMaxRadius` plus `GreatLakePondClearance`, 132 blocks past the edge, since a pond that yields
-reaches its own radius past its center):
-
-- +-20000 grid at stride 37 (1,170,724 points), `WaterLevelAt` and `SurfaceWaterWeight`: 717 changed
-  (651 levels, 717 weights); 714 inside a lobe disc grown by the guard and 3 in the pond-yield ring
-  (at most 64.3 blocks past a lobe edge, so inside the plan's tighter 86-block reach too); **0** of
-  the 1,168,181 points beyond the footprint changed.
-- `Compute` on 1000 random chunk columns (`Heights`, `WaterLevel`, `Bed`): 1 changed (all 256
-  cells), the one column that touches a lobe; of the 999 columns whose every cell lies beyond the
-  footprint, **0** changed.
-
-## Worldgen column cost: great-lake rivers phase E (headless Compute, 2026-10-31)
-
-`TerrainGenerator.Compute` per chunk column, before vs after the great-lake river ramps and outflows
-(BIOMEGEN §6 phase E: `GreatLakes.RiverLevelAt` read through `WaterBodies.SampleSurfaceWater` by the
-carve, `WaterLevelFor` and `WaterLevelAt`, the wider river cull, the outflow channel and the
-bank-raise rule with its `RampRiverBeside` re-scan), measured with the same kind of temporary xUnit
-probe as phases B-D: one `Compute` per listed column after a 64-column warm-up, median ms per
-category, 5 interleaved before/after pairs in fresh processes, the median of the five medians. The
-baseline was a `git worktree` of `d2b5788f` (HEAD before phase E; this time everything earlier was
-committed). The column lists were drawn once in the after tree (fixed SplitMix64 seeds, default
-world seed) and read by both trees, each category defined by the sampled point inside the listed
-column: `all` (2048 random columns 1000..12000 blocks out), `land` (1024 in the same ring whose point
-has a great-lake weight, guard and outflow of exactly 0, the sea river level and no bank, the
-control), `lake` (1024 within 0.8 of a lobe radius of the 14 lobes of the 7 accepted sites inside
-+-16000), `ramp` (1024 whose point lies past a ramped site's lobes by less than its `RampLength`) and
-`outflow` (1024 inside the 3 outflow channels; only 31 distinct columns, since the channels are
-small). Absolute times differ from the phase D table on this session's machine state; only the
-pairs measured together compare.
-
-| Columns | Before ms | After ms | Change |
-|---|---|---|---|
-| `all` | 0.3778 | 0.3977 | +5.3 % |
-| `land` | 0.2819 | 0.2844 | +0.9 % |
-| `lake` | 0.2804 | 0.2876 | +2.6 % |
-| `ramp` | 0.2624 | 0.2660 | +1.4 % |
-| `outflow` | 0.2464 | 0.2649 | +7.5 % |
-
-`land` is flat inside its run-to-run spread (before 0.278..0.306, after 0.280..0.291), so it stays
-well under the 3 % bar over phase D: the wider river cull (`RiverCull`, a candidate's reach plus
-`RiverReach`, capped at the old `MaxReach + Guard`) reads a cached verdict for a few more columns, and
-`NearAnyFootprint` a few more for pond candidates, but no noise is read before the cull. `all` is the
-first category each process times, so it absorbs the cold verdict and relief-cache fills (before
-0.363..0.578, after 0.369..0.508); its rise is inside that spread. `lake` and `ramp` rise within
-their spreads (lake before 0.276..0.287, after 0.275..0.294; ramp before 0.251..0.273, after
-0.259..0.284): a ramp column pays `Beyond` (one sqrt per lobe), `RiverLevelAt`, the ramp guard's
-smoothstep and `OutflowWeight`, and the rare dry column under its bank pays the `RampRiverBeside`
-re-scan (four `RiverWeight` reads per ramped candidate). `outflow` is the one systematic rise (before
-0.241..0.254, after 0.253..0.270): those columns now carve a channel and run the bank rule along its
-sides. About 0.02 ms per outflow chunk column, far below the mesh build; not chased.
-
-Verdicts: `BuildSite` timed directly (uncached) over the 234 rolled candidates of the cells covering
-+-16000 (grown by `MaxReach` plus the guard), two passes in each of two fresh processes. Every
-accepted site in the box is ramped now (7, none accepted without a ramp, so that bucket is empty).
-Cold pass: accepted median 2.08..2.22 ms, worst 18.9..19.7 ms (cell (13, -7), whose first verdict
-also fills the massif and lone-peak caches it reads); rejected (227) median 0.026..0.028 ms, worst
-12.8..12.9 ms, the very first call (JIT). Warm pass: accepted median 2.09..2.22 ms, worst 4.2..4.9 ms
-(cell (4, 3), the largest ramp with an outflow); rejected median 0.005..0.007 ms, worst 0.93 ms. The
-whole box costs about 61 ms cold and 23 ms warm. Against phase D's warm accepted median (1.28..1.32 ms)
-the ramp's checks (`RiversHoldOnRamp`'s ring walk with five `LandHeight` reads per river sample,
-`TryOutflow`'s ring and corridor) add about 0.8 ms per accepted verdict, once per cell on a worker
-thread; the 10+ ms the plan feared did not show (these ramps are short, 12..48 blocks). The cache
-capacity (512) and generation count (4) were not moved.
-
-Identity against the baseline (a dump of both trees with APIs present in both; the footprint is each
-accepted lobe disc over the cells covering +-23000 (14 sites, 13 ramped, 29 lobes), grown by the guard,
-or by `RiverReach` for a ramped site, plus twice `LakeMaxRadius` plus `GreatLakePondClearance` for the
-ponds that yield to it):
-
-- +-20000 grid at stride 37 (1,170,724 points), `WaterLevelAt`, `SurfaceWaterWeight` bits and
-  `LandHeight` bits: 490 changed (486 levels, 36 weights, **0** land heights); 482 inside a lobe disc
-  grown by its guard or `RiverReach`, 8 in the pond-yield ring (at most 251.9 blocks past a lobe edge);
-  **0** of the 1,164,135 points beyond the footprint changed.
-- `Compute` on 1000 random chunk columns within +-20000 (`Heights`, `WaterLevel`, `Bed`): 1 changed;
-  of the 992 columns whose every cell lies beyond the footprint, **0** changed.
+- The tax is the site scans (`TerrainSites.CellRange` + `TryRoll`), paid before any distance cull.
+- `GreatLakes.BuildSite` (cached per cell): warm accepted ~2.1 ms, rejected ~0.005 ms; the +-16000
+  box ~61 ms cold / 23 ms warm.
+- LOD build medians 17.7 / 17.6 / 65.3 ms at levels 0/1/2, tracking the 36/100/324 prefetched
+  columns; cold sweep of 203 coarsest regions ~41 s; first finest region cold 1.1-1.5 s, warm ~7 ms;
+  full 17,077-chunk ring ~5.0 s with 4 generation threads (headless).
+- Identity recipe: dump `LandHeight`, `WaterLevelAt` and `SurfaceWaterWeight` bits before and after
+  on a +-20000 grid at stride 37, plus `Compute` on 1000 random chunk columns; zero changes allowed
+  outside the intended footprint.
 
 ## Open
 
-1. **Shadow pass GPU cost (6.65 ms avg, 42 % of the GPU frame).** Largest single item and not yet
-   explained. Check first: how much of it is the far cascade (352 blocks + non-buried LOD regions)
-   versus the near one (90 blocks); chunk count and vertex volume each cascade draws; whether the far
-   cascade needs to render every frame (a half-rate map is ruled out for the *near* map because the
-   reflection samples it; the far map has not been priced separately); shadow map sizes
-   (`LightingConfig`); and whether it grew since 2026-09-11 (bisect with `perf-fly` on an older commit,
-   interleaved, at matched GPU temperature). Add per-cascade `FrameProfiler`/GPU timer rows before
-   changing anything.
-2. **`worldPass` GPU 3.6 ms** and **`reflect` 2.5 ms (up to 10 ms with the bay in view).** After item 1,
-   the next levers. `reflect` already has temporal reuse; re-check that it is actually skipping frames
-   in a settled bay capture (`reflect` GPU suffix on alternate frames) before pricing more.
-3. **`chunkApply` on the main thread during streaming (avg 7 ms, worst 46 ms).** Upload budget is
-   `MeshUploadBudget`; it competes with the GPU-bound frame, so a lower budget may trade streaming speed
-   for frame time. Capture before moving the budget.
-4. **Single-frame `lod` spike of 1.3 s on a far teleport** (one run of three). Not reproduced; capture
-   with a per-region timer before assuming a cause (region unload storm vs a synchronous build).
-5. **GPU time under the thermal throttle is not stable run to run.** Any before/after claim needs
-   interleaved pairs and a cool-down; consider logging `clocks.sm` next to the `perf` line.
+Ranking: within each group the prerequisite measurement comes first (G1; F1 is done). F2-F8 follow the
+share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%;
+worldPass 26%, reflect 16%, clouds 7%, lodPass 6%); F9 builds on F2 and F4; F10-F12 are CPU-only and matter less while the frame is GPU-bound.
+G follows the `wgen` and probe split. Ties and unmeasured items fall back to effort. Each entry has a
+bold title, then **Files**, **Win** (measured or estimated), **Verify** and **Invariant**.
 
-### Not chasing (recorded so it is not re-proposed)
+### A. Frame time (FPS)
 
-- Hierarchical / compute GPU cull: post-MDI cull+sort+fill is ~2 % of the frame.
-- Shader ALU cuts (caustic Voronoi net, 8 point lights, 4-tap PCF); half-res is the allowed lever.
-- Worldgen noise reduction in `TerrainGenerator` / `NoiseCaves` (changes visuals).
-- `FluidManager`, `Shader` uniform caching, `MeshBufferPool`, `ChunkDrawBatch`, `BlockCubeCache`,
-  `ModelBaker`, `Vertex`, the station/drop/TNT managers, `Camera`: audited, already cached, pooled or
-  allocation-free. (`ChunkDrawBatch`'s fence wait is the *symptom* of a GPU-bound frame, not a bug:
-  3 slots, signaled-at-rest.)
-- `LodColumnCaps` unbounded growth: a correctness item, `TODO.md` `M-11`. It makes two LOD tests
-  intermittent in full-suite runs (`LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem`,
-  `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel`); never "fix" them by touching
-  `ColumnCaps`.
+**F2. Cull shadow casters to the receiver volume** (targets the 36% shadow share).
+- **Files**: `ShadowPass.cs` (`DrawChunkCasters`, the LOD caster loop), `ShadowCascade.cs`, a new
+  GL-free `Rendering/ShadowCasterCull.cs` with xUnit tests. Today casters are culled only by each
+  cascade's ortho box; the far box is 704 blocks wide (`LightingConfig.FarShadowRadiusBlocks` 352).
+  Keep casters whose light-space footprint overlaps the light-space bounds of the frustum slice the
+  cascade serves (near: up to its fade end; far: from the near fade start to `FarShadowRadiusBlocks`),
+  unioned with the mirrored frustum on frames the reflection renders, extruded without limit toward the sun.
+- **Win**: estimated; the casters behind and beside the camera. Measured split (perf-fly x3, 2026-10-31,
+  medians over lines where both rows report): `shadowNear` 2.56 ms, `shadowFar` 3.75 ms GPU, so the far
+  cascade is ~59% of the shadow pass and the near ~41%. Per-cascade caster counts were not captured; add
+  `// TEMP-DIAG` counts in `DrawChunkCasters` and the LOD caster loop to size the cull first.
+  **Verify**: `shadowNear`/`shadowFar` pair; screenshots at `VOXEL_TIME` 430 and over the bay identical.
+- **Invariant**: conservative for every map consumer: world and LOD fragments, the reflection, leaf
+  backlight (`LeafBacklightReachBlocks` toward the sun), caustics, `RenderUnderwaterRays`, godrays
+  (`GodraysMaxDistance`). Interlock with F3: a far map reused across frames must never be rendered
+  from a frustum-culled caster set, so apply F2 to the near cascade only, or invalidate the far cache
+  whenever the frustum's light-space bounds leave the ones it was rendered for.
+
+**F3. Far cascade reuse** (`shadowFar` 3.75 ms GPU, ~59% of the shadow pass on 2026-10-31).
+- **Files**: `ShadowPass.cs`; `ShadowCascade.cs` (`Update`, `StepCenter`); `FrameLighting` (calls
+  `FarShadow.Update(camera.RenderEye, camera.ViewDirection, _sunDir)`, owns the key light);
+  `RenderManager` (the far ViewProj uniform); a new GL-free gate like `ReflectionReuse`, with tests.
+- **Prerequisite**: the far center follows the look (`Update` targets `eye + viewDir * RadiusBlocks *
+  ShadowCascade.ForwardFraction`, ~123 blocks ahead), so any mouse-look moves it by many ~0.34-block
+  texels. While caching, hold the center and re-center only when the target leaves an inner region of
+  the box (hysteresis), or use `ForwardFraction` 0 for the far cascade, so only translation drives it.
+- Re-render when: the re-center fires; the camera's depth along the sun leaves a margin; the key
+  light turns by more than ~half a far texel at the box edge; the `Moonlight` handover; a geometry
+  counter moves (`ChunkManager.MeshVersion` skips remeshes of meshed chunks in `ChunkMeshScheduler`,
+  so add one bumped on every opaque chunk or LOD upload and free); or N frames passed. The cached map
+  is always rendered from the full cascade-box caster set (see F2) and sampled with its own ViewProj.
+- **Win**: estimated as the far cascade's 3.75 ms (~59% of the shadow pass, near 2.56 ms) times the
+  measured skip rate (a `// TEMP-DIAG` hit counter on perf-fly), not far x (1-1/N).
+- **Verify**: perf-fly `shadowFar` pair plus the hit rate; low sun at `VOXEL_TIME` 430; `moonlight.json` at 455.
+- **Invariant**: the near map stays every frame (half-rate near is ruled out); far-map leaf sway
+  freezes (sub-texel); no visible pop at re-render; the hysteresis keeps the view's far-shadow region inside the box.
+
+**F4. Chunk visibility graph (cave culling) for the camera passes** (worldPass 3.90 ms, 26%).
+- **Files**: `Chunks/Meshing/ChunkMeshBuilder.cs` (a 15-bit face-to-face connectivity mask from the
+  padded snapshot through non-occluding cells, `BlockType.Occludes`, on the worker); `ChunkMeshData.cs`
+  and `Chunks/Chunk.cs` (carry and store it); a new GL-free `Chunks/ChunkVisibility.cs` with tests (a
+  BFS from the camera chunk, rerun when the camera chunk or the mesh set changes);
+  `Rendering/TerrainPasses.cs` `RenderWorld` and `CullWater`.
+- **Win**: estimated; disconnected underground chunks leave worldPass (read the drop in `LastVisibleChunkCount`,
+  1214-2101 visible when settled on 2026-10-31).
+- **Verify**: perf-fly pair (worldPass GPU, visible count); cave and ravine screenshots identical.
+- **Invariant**: conservative (unmeshed or missing neighbors count as open); off while the eye is
+  inside an occluding cell (noclip); never applied to the shadow or mirror passes; mesh bytes unchanged
+  (`GreedyMeshingTests`, `StreamedTerrainMeshTests`); the `chunk.lifetime += dt` fade that `RenderWorld`
+  advances keeps advancing for graph-culled chunks (a pass before the cull, as water-only chunks get),
+  or a revealed cave visibly fades in.
+
+**F5. worldPass fragment cost and overdraw** (3.90 ms, 26%; after F4).
+- **Files**: `TerrainPasses.RenderWorld`, `test-fragment.glsl`. Measure overdraw with a `// TEMP-DIAG`
+  additive count view; cutout leaves defeat early-Z. A solid-only depth pre-pass is the candidate, but
+  it is close to the ruled-out early-Z split, so measure it interleaved on two GPUs.
+- **Win**: estimated; unknown until the overdraw count exists. **Verify**: perf-fly worldPass pair on
+  the T1000 and a second GPU; forest screenshots identical.
+- **Invariant**: pixel-identical output; the cutout alpha test and `CutoutMipmap` coverage unchanged.
+
+**F7. Cloud pass** (1.08 ms, 7%; cold first line 16-24 ms GPU worst, 3.9-5.9 ms CPU worst).
+- **Files**: `Rendering/Atmosphere/CloudRenderer.cs` `Render` (`CloudCopies.Gather` culls whole
+  copies, then an instanced draw of the full field mesh after a depth pre-pass), `CloudCopies.cs`,
+  `SkyPasses.RenderClouds`, `cloud-fragment.glsl` (the silver lining reads unit 8). Check first: split
+  pre-pass from color pass with `// TEMP-DIAG` GPU timers and measure how much of a visible copy is off
+  screen. Candidates: tile the field mesh and cull tiles; move the first-frame cost into load if it is lazy init.
+- **Win**: estimated; the off-screen share of each drawn copy. **Verify**: perf-fly `cloudPass` pair;
+  `clouds-mirror.json` and `cloud-shadows.json` screenshots.
+- **Invariant**: the `CloudCopies`/`CloudCover` twins and their tests; the `SkySample` copies
+  (shader-sync); unit 8 stays reserved for the cloud shadow.
+
+**F8. `lod` CPU spike and `lodPass` worst** (low priority; 0.91 ms, 6%, worst 10.7 ms GPU).
+- **Files**: `Lod/LodManager.cs`, `LodCoverPass.cs`, `LodRegionSet.cs`. The 1306 ms single-frame `lod`
+  spike of 2026-10-28 did not reproduce in three 2026-10-31 runs (worst 24-31 ms). If it returns,
+  capture a per-region `// TEMP-DIAG` timer (unload storm vs synchronous work vs cover pass) before assuming a cause.
+- **Win**: estimated; only the rare hitch. **Verify**: perf-fly `lod` worst over three runs, far-teleport
+  leg. **Invariant**: LOD nesting and burial unchanged; GL on the main thread.
+
+**F9. GPU-driven culling: compute cull + `glMultiDrawElementsIndirectCount` + Hi-Z** (the old Phase 5, with occlusion; shadows 36% + worldPass 26%).
+- **Files**: `Rendering/Geometry/ChunkDrawBatch.cs`, a new compute shader under `assets/shaders`,
+  `TerrainPasses`, `ShadowPass`, `RenderTargets`. A persistent SSBO of chunk AABBs and `GeometrySlice`s
+  updated on upload and free; per pass a compute shader tests the frustum plus a Hi-Z pyramid of the
+  previous frame's HDR depth (raw D3D 0..1 depth reprojected through the previous view-proj, two-phase
+  to stay conservative) and appends `DrawElementsIndirectCommand` plus `ChunkInfo` through an atomic
+  count; the draw is `MultiDrawElementsIndirectCount` (GL 4.6 core). After F4 and F2; the occlusion-less
+  version is ruled out.
+- **Win**: estimated; the GPU work of occluded chunks. **Verify**: perf-fly pair (worldPass, shadowNear, shadowFar);
+  cave, forest and water screenshots identical.
+- **Invariant**: the 3-slot fenced ring and per-draw fade alpha; opaque front-to-back order is lost
+  (early-Z) while translucent stays CPU-sorted; `gl_DrawID`/`TO_WORLD` and the sway blocks stay
+  byte-identical (shader-sync, `ChunkDrawShaderTests`).
+
+**F10. chunkApply streaming spikes** (avg 4.1-5.1 ms, 5-12 sustained on land legs, one 454-530 ms frame on the bay teleport).
+- **Files**: `Chunks/Meshing/ChunkMeshScheduler.ApplyCompletedMeshes`, `Rendering/Geometry/ChunkGeometryPool`
+  (its `NamedBufferSubData` upload and grow-by-copy), `Chunk.UpdateMesh`, `StreamingConfig.MaxMeshUploadsPerFrame`
+  (32; `MeshUploadBudget` is raised while loading). Check first: `// TEMP-DIAG` sub-timers (allocate vs
+  upload vs bookkeeping) and whether a pool grow fires mid-play on the teleport (the other run's 737 ms
+  hitch was the fence wait). Candidates: an upload budget in bytes instead of a count; a persistent-mapped
+  staging ring plus `CopyNamedBufferSubData`; pre-growing the pools at load.
+- **Win**: estimated; the teleport hitch is the top CPU spike of 2026-10-31. **Verify**: perf-fly `chunkApply` avg and worst pair.
+- **Invariant**: GL on the main thread only; closest-first order; budgets move only against a capture.
+
+**F11. GC attribution while streaming** (10-45 gen0/s streaming, 3-7 settled, 2026-10-31).
+- **Files**: measure first with `// TEMP-DIAG` `GC.GetAllocatedBytesForCurrentThread` around the main-thread
+  sections and around worker `GenerateBlockData`/`GenerateMeshData`, or `dotnet-counters` if installed.
+  Legitimate: `Chunk` arrays, `TerrainGenerator.Compute`'s per-column arrays (retained by `ColumnCache`).
+  Suspects: `MeshBufferPool` misses, LOH-sized LOD lists.
+- **Win**: estimated; fewer gen0 pauses during streaming. **Verify**: the `gc` token pair.
+  **Invariant**: no new per-frame allocation; pools hold no edit state.
+
+**F12. Shared per-frame chunk walks** (CPU, low priority while GPU-bound).
+- **Files**: `TerrainPasses.RenderWorld`/`CullWater`, `ShadowPass` (two cascades), `ReflectionPass`:
+  each walks `Renderable` with its own frustum tests and several sort. Ideas: one shared camera-frustum
+  visible list for `RenderWorld` and `CullWater`; column-level skips.
+- **Win**: estimated; CPU only, worth it once the frame is CPU-bound. **Verify**: perf-fly CPU rows of
+  the render sections. **Invariant**: zero per-frame allocation; static comparers; per-pass draw order unchanged.
+
+### B. Worldgen, meshing and streaming
+
+**G1. Worldgen cost probe** (prerequisite; `wgen` median 1.31 ms/chunk on 2026-10-31, cold 29-34).
+- **Files**: a new `OpenGLTest.Tests/WorldGen/WorldgenCostProbe.cs` in the `MeshBuildCostProbe` style (`[Fact]`,
+  `ITestOutputHelper`, only an anti-vacuity assert, `[Collection("Worldgen seed")]`, `WorldSeed.Default`). Time
+  `TerrainGenerator.Compute` over fixed `SplitMix64` column lists (all, land, ocean, lake), then the
+  `ChunkTerrainFill.GenerateBlockData` stages in order on fixed surface, deep-stone and sea-floor chunks: the
+  `ColumnCache.GenerateColumn` loop, `NoiseCaves.Carve`, `WormCarver.Carve`, `MalachiteGenerator`/`CoalGenerator.Stamp`,
+  `FillWater`/`StampMud`, `LavaGenerator.Stamp`, `TreeGenerator.Stamp`, the scenery stamps, `ScanFluidFrontier`, the
+  whole call. Optionally add stage buckets to `WorldgenStats` and the `wgen` token (`FrameProfiler.FormatWorldgen`).
+- **Win**: none; it ranks G3, G5 and G6. **Verify**: stable medians over three runs. **Invariant**: no seed or cache state leaks.
+
+**G3. Ore and pocket noise skip** (bit-identical only with a proven bound, else seed-breaking).
+- **Files**: `WorldGen/Features/Underground/MalachiteGenerator.cs`, `CoalGenerator.cs`, `GravelPocketGenerator.cs`.
+  Each `Stamp` evaluates a 3D OpenSimplex2 noise per host cell, up to ~12k calls per deep chunk against ~1000 for
+  the `NoiseCaves` lattice. Bit-identical: sample a coarse lattice (spacing s) and skip a block when every corner
+  plus L*s*sqrt(3)/2 is at or below the threshold, L an analytic gradient bound for that exact FastNoiseLite
+  configuration (type, frequency, octaves, gain) times a documented float-rounding safety factor; brute-force
+  equality is a sanity check, never the proof. Without the bound: lattice plus trilinear interpolation, seed-breaking.
+- **Win**: estimated, deep chunks. **Verify**: G1 stage pairs; byte-equal block and state dumps of N chunks.
+  **Invariant**: `FastNoiseLite.cs` stays vendored and unedited.
+
+**G5. Hoist per-chunk-column work out of `TerrainGenerator.Compute`** (bit-identical).
+- **Files**: `WorldGen/TerrainGenerator.cs`, `BiomeClassifier.cs`, `TerrainSites.cs`, `TerrainPeaks.cs`,
+  `TerrainIslands.cs`, `GreatLakes.cs`. Count noise and site reads per `Compute` first (`// TEMP-DIAG`,
+  `WorldgenReads`-style); then gather the sites reaching the 16x16 column once, iterate them in the same order, and
+  dedupe same-(x, z) re-reads such as repeated `BiomeWeights` calls. Late, optional: a `Vector256` 2D OpenSimplex2
+  in a separate file, only if bit-identical (same operation order, no FMA).
+- **Win**: estimated; `Compute` costs 0.2-0.4 ms per column and feeds every LOD prefetch (the ~41 s cold far sweep).
+  **Verify**: G1 pairs, identity recipe, `LodBuildCostProbe`. **Invariant**: pure in position and seed; summation order kept.
+
+**G6. Chunk-level gates for the feature stamps** (bit-identical).
+- **Files**: `WorldGen/ChunkTerrainFill.cs`, the generators under `WorldGen/Features/`. About 20 `Stamp` calls in
+  `GenerateBlockData` each walk 256 columns even when the chunk's Y range cannot hold the feature; add early-outs
+  from the `ColumnData` height and water ranges plus each feature's vertical reach, including
+  `NoiseCaves.SampleLattice` channels whose depth band excludes the chunk, only where G1 shows a cost.
+- **Win**: estimated, sky and deep chunks. **Verify**: G1 pairs; byte-equal dumps. **Invariant**: gates provably conservative.
+
+**G7. Worker thread balance** (bit-identical; full ring ~12 s after launch on 2026-10-31).
+- **Files**: `Config/StreamingConfig.cs` (`MaxConcurrentBlockDataGenerations` 4, `MaxConcurrentMeshGenerations` 4),
+  `Chunks/Streaming/ChunkGenerationWorker.cs`, `ChunkMeshScheduler` (`MeshRunner`). Measure each pool's busy share
+  and the time to a full ring on the perf-fly teleports, then try 5/3 and 3/5 interleaved.
+- **Win**: estimated, ring fill time. **Verify**: perf-fly `wgen` and fps pairs. **Invariant**: never raise
+  `MaxConcurrentLodGenerations` (C5); an fps guard; no blind budget moves.
+
+**G8. LOD region build** (bit-identical; after G5; L2 median 80 ms on 2026-10-31).
+- **Files**: `Lod/LodMeshBuilder.cs`, `LodRegionClaims.TryBuildOneRegion`. Candidates: a prefetch order that hits
+  already-cached columns; a heights-only column path for levels >= 1 skipping the carver-only fields
+  (`EntranceWeight`, `CaveIntensity`), only if G1 shows they cost, with no double caching.
+- **Win**: estimated, the cold far sweep. **Verify**: `LodBuildCostProbe` pairs. **Invariant**: LOD nesting and
+  burial; identical region meshes (`LodBuildPoolTests`); no more LodGen threads.
+
+**G9. Saved-world restore IO** (measure only).
+- **Files**: `Saves/ChunkSaveStore.cs` (one Deflate file per modified chunk), `Chunk.RestoreFrom` (on the generation
+  worker), `WorldLoadGate`. Time a large save's loading phase before proposing region files (a save-format change).
+- **Win**: unknown until measured. **Verify**: a loading-phase timer on a heavily edited world. **Invariant**: the
+  store's write and lookup ordering (`ChunkSaveStore`'s class doc).
+
+## Done
+
+All 2026-10-31, Quadro T1000 Max-Q, Release, working tree over c8e0f3c6; perf-fly pairs interleaved
+(before = a worktree of c8e0f3c6) at 1530 MHz, 60-73 C; probes are medians of 3, one per invocation.
+None of the four changes anything a player sees.
+
+**F1. Shadow pass split** (diagnostics only). `ProfileSection.Shadows` is now `ShadowNear` and
+`ShadowFar` (rows `shadowNear`/`shadowFar`); `ShadowPass.RenderShadows` times itself, CPU and GPU,
+split at the `FarShadow.Fbo` bind since `TIME_ELAPSED` ranges cannot nest (both open after its one early
+return, so an early-out frame leaves no range open). perf-fly x3, medians over lines where both report:
+near 2.56 ms, far 3.75 ms GPU (far ~59%); their sum 6.31 ms against the old `shadows` row's 5.87 ms in
+the interleaved before runs (spread 5.86-5.99 before, 6.12-6.91 after: the extra query boundary on timed
+frames and thermal drift; F1 changes no shadow work). No caster counts or commit bisect were taken.
+
+**F6. Mirror skips geometry wholly below the water plane** (pixel-identical by construction).
+`ReflectionPass.RenderReflection` drops an opaque chunk or LOD region when `ReflectionCull.MayReachPlane`
+(GL-free, `ReflectionCullTests`) is false: top (`Chunk.WorldMax.Y`, `LodRegion.YMax`) plus
+`TopMarginBlocks` below `RenderManager.WaterPlaneY`, where the mirror's first fragment statement
+discards `fWorldPos.y < uClipY`. The margin is derived: `MeshOverhangBlocks` 1 (a multiblock anchor on a
+chunk's top layer bakes a 2-tall model; a test checks every baked and rotated model) plus
+`VertexLiftBlocks` 0.1 from `test-vertex.glsl` (leaf sway lifts at most 0.072 at `LeafSwayMax`; water and
+lava waves at most 0.085/0.088, only on water-flagged vertices that never sway; the `uWind` lean is XZ
+only). Translucent, entities, sky and clouds untouched. `reflect` GPU on perf-fly: median 2.70 ms before,
+2.82 after, within noise (it reports only on non-reuse frames, ~20 samples a run); the gain is
+view-dependent (near-horizontal views over deep terrain). `water.json` shots match to the degree two
+baseline runs match each other; `clouds-mirror.json` is not a pixel baseline (a death and respawn in its
+wait happens in some runs only), and a cull-off control differed from cull-on runs no more than cull-on
+runs differ among themselves.
+
+**G2. Pond verdict cache** (bit-identical). `WaterBodies.PondSiteAt`, the tenth `GenerationalCache` site
+(`PondSiteCacheCapacity`/`Generations`, reset in `WorldSeed.Apply`), holds `TryLakeSite`'s (accepted,
+surface, floor) per lake cell through the static factory `BuildPondSiteFor`; `LakeSample` keeps its roll,
+spawn-clear and radius culls before the lookup. A temporary probe over 64 pond chunk columns:
+`TerrainGenerator.Compute` 2.197 -> 0.985 ms per column (-55%), `WaterLevelAt` 5.92 -> 0.29 us per call
+(steady-state hits; the cold first visit is unchanged). The identity recipe dump (19,696,688 bytes) was
+byte-equal after the change and at the end. `PondSiteCacheTests` compares cached and uncached verdicts
+and `LakeSample` against an uncached reimplementation.
+
+**G4. Light flood** (byte-identical). `ChunkLighting.ComputeLight` still sets every passable sky cell to
+15 but queues only seeds next to a passable non-seed cell (the cell below a column's first seed, or a
+lateral cell under a neighbor column's seed start); exact because every sun seed enters at the one max
+level and `SpreadLight` is a monotone max BFS. `FillLightSnapshot` copies z runs. `MeshBuildCostProbe`
+(us/build, plain / blue lamps): before 6249.9 / 7299.3; seed pruning 4441.6 / 4902.2; plus run copies
+4292.9 / 4802.7 (kept); final 4275.0 / 4771.7 (-32% / -35%), vertex counts unchanged. An `EdgeFlags`
+table replacing `SpreadLight`'s per-dequeue div/mod gained under 1% (the JIT already turns division by a
+constant into multiply-shift) and was reverted. `LightFloodTests` compares the flood against a naive
+reference (per-slot BFS for tinted light) on eight generated scenes; `SpreadBlockLight` is untouched.
+
+## Not chasing (recorded so it is not re-proposed)
+
+- Shader ALU cuts (caustic Voronoi, 8 point lights, 4-tap PCF): culling and half-res are the allowed levers.
+- Worldgen changes that alter output (coarser 2D terrain lattices, fewer octaves): only bit-identical
+  work qualifies, or a change explicitly accepted as seed-breaking (old saves show seams).
+- Small passes (2026-10-31): postPass 0.43, uiPass 0.36, waterPass 0.34, aoPass 0.26 ms; godrays
+  ~0.35 ms (older figure, not re-measured). Revisit after shadows, world, reflect and clouds.
+- Audited clean: `FluidManager`, `Shader` uniform caching, `MeshBufferPool`, `ChunkDrawBatch` (its
+  fence wait is the GPU-bound symptom), `BlockCubeCache`, `ModelBaker`, `Vertex`, the station, drop
+  and TNT managers, `Camera`.
+- Save and net compression already use `CompressionLevel.Fastest` (`ChunkSaveCodec`,
+  `ColumnFileCodec`, `LodEditState`, `ChunkNetCodec`, `LodNetCodec`).
+- `LodColumnCaps` growth is a correctness item (TODO.md `M-11`); it makes
+  `LodBuildPoolTests.RegionBuildsAreIdenticalWhicheverThreadRunsThem` and
+  `LodHeightSamplingTests.SeparableMinMatchesTheNestedWindowAtEveryLevel` intermittent. Never "fix" it here.
 
 ## Ruled out (do not retry without new evidence)
 
-- Early-Z cutout/solid split: regressed spawn 1.72 -> 1.87 ms and forest
-  1.83 -> 2.13 ms GPU on RTX 3070. Driver keeps the early depth *test*; only the
-  write defers. Change stashed, not in tree.
-- Reflection geometry cutoff (drop LOD / cap mirrored chunks at 192 blocks):
-  leaves a hard terrain/sky seam that the animated wave-normal offset turns into
-  flicker. A planar mirror needs continuous far terrain. (The shipped reflection
-  temporal reuse kept full mirrored geometry and only reuses the finished texture
-  — a different lever, so this entry still stands.)
-- Half-rate shadow map: reflection samples the map every frame, so a 2-frame
-  cadence steps mirrored shading at fps/2. Pair only with a flicker-free design.
-  (Reflection temporal reuse takes the analogous risk on the mirror itself and
-  caps it at one skipped frame behind a camera-delta gate, so mirrored shading
-  never steps at fps/2 for more than a single frame; the shadow map itself stays
-  every-frame.)
-- Compute frustum cull (Phase 5): post-MDI cull+sort+fill is ~2 % of the T1000
-  frame (`worldPass` 0.50, `shadows` 0.26, `waterPass` 0.09, `reflect` 0.83 ms).
-  Retry only if a CPU-bound profile shows cull+sort above ~1 ms.
-- Fluid chunk-cache (16-slot direct-mapped): no spike reduction alone, 16 vs 256
-  slots identical — per-cell cost was the whole-set sort, not dictionary lookups.
-  The sort is gone (per-frame spread); no per-tick cap either (a per-tick cap
-  freezes fluid because wakes schedule 60/s while ticks run 4/s).
-- Mud 6-face gate as specified: not outcome-equivalent (diagonal dirt can be wet
-  with no face-adjacent dirt). Only valid under an unproven scheduling invariant.
-- VSync/limiters, GL debug context, per-frame `GetError`, worker priorities
-  (thread-priority tuning — the landed chunk-scan frontier is the algorithmic
-  change aimed at that scan, not this),
-  shader ALU (4-tap PCF, 8 point lights), uniform location lookups, indexed mesh
-  upload — all audited, not the problem.
-
-- **R3 · Half-res scene copies for water — resolved, PARKED, and closed rather than unparked** —
-  `RenderTargets.CopyScene`, called with color+depth in `TerrainPasses.RenderWorldTranslucent` and
-  depth-only in `ScreenPasses.RenderUnderwaterRays`. The condition R2 left on this bullet was
-  resolved against the code rather than implemented, and it settles three ways.
-  **(a) The depth copy cannot move.** `CopyScene(bool color)` copies depth
-  *unconditionally* — only the color half is gated by the parameter — and both call sites
-  write the same `_sceneDepthTex`, which R2's depth-aware upsample pins at full res. So the
-  color+depth call keeps paying a full-res `DepthComponent24` `CopyTexSubImage2D` whatever R3
-  does, and a second, half-res depth used only by the water pass is the same *additive* cost
-  (an extra texture plus an extra reduction, on top of a full-res copy that still has to
-  happen) that R2 already rejected on the rays side. Only the RGBA8 color copy is left.
-  **(b) The shader claim holds.** `test-fragment.glsl`'s refraction really is
-  resolution-independent: `uv = gl_FragCoord.xy * uInvViewport` (`:267`) against
-  `uInvViewport = 1/_viewportSize` (`RenderManager.ApplyFrameUniformsTo`), bilinear `texture()` fetches
-  (`:270-272`), a `uInvViewProj` unprojection (`:276`) — no `texelFetch` and no pixel indices
-  anywhere in the file. The shader would need zero changes.
-  **(c) But the ceiling is tiny and the change is not "sample less".** The color copy is
-  gated behind `if (_nearWaterVisible)` and sits inside a `waterPass` measured at **0.09 ms
-  GPU total** (the compute-frustum-cull capture in this same section, above) — a figure that
-  also contains every translucent chunk draw and every LOD water sheet. That capture
-  demonstrably *included* the color copy: the same line reports `reflect 0.83 ms`, and
-  `ReflectionPass.RenderReflection` early-returns unless `_nearWaterVisible`
-  (`TerrainPasses.NearWaterVisible`) — the very flag that gates the copy — so near water was on
-  screen when it was taken. 0.09 ms is therefore a real ceiling for the whole pass, not a
-  figure that might have excluded the work. And `CopyTexSubImage2D` cannot downscale, so this
-  is not a sampling change but new plumbing: an FBO, a texture, sizing and teardown across
-  `CreateSceneCopy` / `DeleteSceneCopy` / `SetViewport` / `Dispose`, and a
-  `glBlitFramebuffer` that still *reads* the full-res framebuffer and saves only the write
-  side (arithmetic off the format, no timing claim: 3.69 MB -> 0.92 MB of RGBA8 writes per
-  frame at 1280x720). Its cost is blurring everything seen through water — a perceptual
-  change, which drags R2's full perceptual gate along with it.
-  **Parked, not disproven:** effort M *plus* a perceptual gate, for an unmeasurable slice of
-  an already-gated 0.09 ms pass. Revisit only if a capture ever isolates the color copy as
-  its own row. **Impact low · risk low-med · effort M + perceptual gate.**
-  **Closed on 2026-09-20, and moved here rather than unparked.** It was parked against the code and
-  never disproven; what is left is not a measurement but a perceptual judgment — whether blurring
-  everything seen through water is acceptable in this game — and no capture can answer that. The human
-  closing this round chose to stop carrying it rather than unpark it. It lives here because this
-  section's job is to stop items being re-proposed, so its reasoning travels with it. Retry only on
-  new evidence, which here means a capture that isolates the color copy as its own row.
-- **C5's pool-size lever — "a bigger LodGen pool".** Measured at two sizes and declined at both, on a
-  quantity that was never the limiter. Three `BelowNormal` workers reach a fixed region count **1.31x**
-  sooner and two reach it **1.26x** sooner (disjoint, counterbalanced, p = 0.0143 at each of three
-  region counts) — but three also slow chunk generation **disjointly** (seconds to the full
-  17077-chunk ring 5.0 -> 6.1 median) and cost **30 %** of burst frame rate (median 108.0 -> 75.3 fps),
-  while two, which do clear the chunk-gen and GC guards, still cost **18 %** (110.3 -> 90.7 fps) — paid
-  on every run, in the exact phase this item targets, for 1.26x on a quantity with **7.8-8.2x of drain
-  headroom** (53-55 regions/s measured against a ~433 regions/s drain ceiling). Why it is so far below
-  linear is the reusable half: a LOD build is **terrain generation in disguise** (36 / 100 / 324 column
-  prefetches at levels 0 / 1 / 2, each miss generated on the spot through `Chunk.ColumnCache`), so
-  LodGen workers do not add throughput to an idle resource — they contend with the four chunk-gen
-  threads for the one the burst is already saturating. `StreamingConfig.MaxConcurrentLodGenerations`
-  ships at **1**. The capture is under **"Measurement: C5"** and the argument under **"The C5
-  concurrency argument"**; **everything except the extra threads landed and stays** (see **What
-  landed**). Only the pool size is ruled out, and re-proposing it needs a capture that answers this one.
+- Early-Z cutout/solid split: regressed spawn 1.72->1.87 and forest 1.83->2.13 ms GPU on an RTX
+  3070; stashed, not in the tree.
+- Reflection geometry cutoff (capping mirrored chunks/LOD at 192 blocks): leaves a seam the wave
+  offset turns into flicker. F6 (done) differs: it drops only geometry the clip already discards.
+- Half-rate NEAR shadow map: the reflection samples it every frame, so mirrored shading steps at
+  fps/2. The far cascade was never priced (F3).
+- GPU compute frustum cull without occlusion (old Phase 5): removes only CPU cull+sort+fill, ~2% of
+  the T1000 frame (worldPass 0.50, shadows 0.26, waterPass 0.09, reflect 0.83 ms). Pays only with GPU
+  occlusion (F9) or in a CPU-bound profile above ~1 ms.
+- Fluid 16-slot chunk cache: no spike reduction (16 vs 256 slots identical); a per-tick cap freezes fluid.
+- Mud 6-face gate: not outcome-equivalent (diagonal dirt can be wet).
+- VSync and limiters, GL debug context, per-frame `GetError`, worker priorities, uniform location
+  lookups, indexed mesh upload: audited, not the problem.
+- R3, half-res water scene copy: `RenderTargets.CopyScene` copies full-res depth unconditionally and
+  that depth is needed downstream; only the color copy could shrink, inside a 0.09 ms waterPass, and
+  it would blur everything seen through water. Closed 2026-09-20.
+- C5, a bigger LodGen pool: 2-3 workers built LOD 1.26-1.31x faster but cost 18-30% of burst fps and
+  slowed the full ring 5.0->6.1 s; a LOD build is column generation in disguise.
+  `MaxConcurrentLodGenerations` stays 1; the lever is cheaper columns (G5, G8).

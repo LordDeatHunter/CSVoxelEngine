@@ -27,5 +27,6 @@ Several pieces of logic exist in more than one place on purpose. Change one and 
 ## Rules
 - All chunk shaders are `#version 460 core`; the world/shadow vertex shaders compile twice (`CHUNK_DRAW` define). Both variants must still compile (`ShaderDefinesTests`).
 - Depth is D3D-style 0..1 (`System.Numerics` projection): never write a near/far linearization; reconstruct positions by inverting the matrix that wrote the depth (`uInvViewProj`).
+- Growing the leaf-sway or water/lava wave amplitude in `test-vertex.glsl` or `shadow-vertex.glsl` means rechecking `ReflectionCull.VertexLiftBlocks` (the mirror's below-plane cull margin, derived from those amplitudes).
 - Shaders are loaded from `OpenGLTest/assets/shaders` source at runtime. A temporary debug patch goes there; restore it (`git diff` clean) and do not edit the bin copy.
 - Run the full test suite, then a scripted visual check (`visual-verify` skill; `linear-lighting.json` at VOXEL_TIME 147, 440, 700 covers most lighting changes, `sky.json` the SkySample).

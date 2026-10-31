@@ -14,7 +14,7 @@ Tracking lives in repo-root `PERF_TODO.md` (ranked items + measurements table), 
 - Run-to-run swing at rest is ~0.4 ms and every CPU section moves together, so **compare interleaved pairs, never single runs**.
 
 ## What to read
-`X` (or `VOXEL_DEBUG=1`, which also works in scripted runs, where pressing X never does) prints the profiler snapshot once a second: frame ms, FPS, CPU sum vs GPU `TIME_ELAPSED`, GC collections/s, loaded/visible chunks, one row per section (`chunk*`, `lod`, `entities`, `fluidTick`, `lighting`, `shadows`, `worldPass`, `aoPass`, `waterPass`, `postPass`, `uiPass`, ...) as avg/worst ms. Notes: `other` is unclaimed wall time; GPU passes that do not run every frame (`selectPass`) can read `--`; the overlay's own glyphs land in `uiPass`.
+`X` (or `VOXEL_DEBUG=1`, which also works in scripted runs, where pressing X never does) prints the profiler snapshot once a second: frame ms, FPS, CPU sum vs GPU `TIME_ELAPSED`, GC collections/s, loaded/visible chunks, one row per section (`chunk*`, `lod`, `entities`, `fluidTick`, `lighting`, `shadowNear`, `shadowFar`, `reflect`, `worldPass`, `aoPass`, `waterPass`, `postPass`, `uiPass`, ...) as avg/worst ms. Notes: `other` is unclaimed wall time; `shadowNear` + `shadowFar` is the whole shadow pass, and either one's GPU suffix can be dropped on a line independently (`shadowFar` more often), so sum them only over lines where both report; GPU passes that do not run every frame (`selectPass`) can read `--`; the overlay's own glyphs land in `uiPass`.
 Worker-thread costs (meshing, worldgen) never show in the per-frame profiler.
 
 ## Before/after recipe

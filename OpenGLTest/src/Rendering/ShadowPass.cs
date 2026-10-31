@@ -43,6 +43,7 @@ internal sealed class ShadowPass
     private RenderTargets Targets => _owner.Targets;
     private MobPasses Mobs => _owner.Mobs;
     private PlayerPasses Players => _owner.Players;
+    private GpuPassTimer GpuTimer => _owner.GpuTimer;
 
     internal ShadowPass(GL gl, RenderManager owner)
     {
@@ -70,7 +71,10 @@ internal sealed class ShadowPass
     /// casters: water-only chunks are in it and are skipped here. The chunk casters that
     /// survive the culls are drawn with a single <c>glMultiDrawElementsIndirect</c> per cascade
     /// through <see cref="ChunkDrawBatch"/> (<see cref="DrawChunkCasters"/>); TNT, falling
-    /// blocks and trees keep the plain program.
+    /// blocks and trees keep the plain program. It times itself as the <c>shadowNear</c> and
+    /// <c>shadowFar</c> profiler rows (CPU and GPU), split at the far FBO bind, because
+    /// TIME_ELAPSED ranges cannot nest; both brackets wrap the whole body after the one early
+    /// return, so no range is ever left open.
     /// </summary>
     internal void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
@@ -81,6 +85,9 @@ internal sealed class ShadowPass
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
         if (camera == null || Lighting.ShadowStrengthDry <= 0f) return;
+
+        FrameProfiler.Begin(ProfileSection.ShadowNear);
+        GpuTimer.BeginGpuPass(ProfileSection.ShadowNear);
 
         var size = (uint)_owner.NearShadow.MapSize;
 
@@ -207,7 +214,13 @@ internal sealed class ShadowPass
 
         // The far cascade: the same depth-only chunk casters into its own coarse map. No entity
         // casters - they are sub-texel at this range, and skipping them keeps the pass to one
-        // indirect draw.
+        // indirect draw. The near timing range ends here and the far one starts: TIME_ELAPSED
+        // queries cannot nest, so the two rows are consecutive.
+        GpuTimer.EndGpuPass(ProfileSection.ShadowNear);
+        FrameProfiler.End(ProfileSection.ShadowNear);
+        FrameProfiler.Begin(ProfileSection.ShadowFar);
+        GpuTimer.BeginGpuPass(ProfileSection.ShadowFar);
+
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _owner.FarShadow.Fbo);
         _gl.Viewport(0, 0, (uint)_owner.FarShadow.MapSize, (uint)_owner.FarShadow.MapSize);
         _gl.Clear(ClearBufferMask.DepthBufferBit);
@@ -253,6 +266,9 @@ internal sealed class ShadowPass
         Targets.BindSceneTarget();
         _gl.Enable(EnableCap.Blend);
         _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+        GpuTimer.EndGpuPass(ProfileSection.ShadowFar);
+        FrameProfiler.End(ProfileSection.ShadowFar);
     }
 
     /// <summary>

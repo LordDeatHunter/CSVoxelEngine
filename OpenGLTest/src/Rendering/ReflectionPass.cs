@@ -281,6 +281,8 @@ internal sealed class ReflectionPass
         {
             var chunk = chunks[i];
             if (!chunk.HasMesh) continue;
+            // The mirror clips below RenderManager.WaterPlaneY, so geometry wholly under it draws no pixel.
+            if (!ReflectionCull.MayReachPlane(chunk.WorldMax.Y)) continue;
 
             if (!frustum.IntersectsAABB(chunk.WorldMin, chunk.WorldMax)) continue;
 
@@ -307,6 +309,8 @@ internal sealed class ReflectionPass
         {
             var region = regions[i];
             if (!region.HasMesh || region.IsBuried) continue;
+            // The mirror clips below RenderManager.WaterPlaneY, so geometry wholly under it draws no pixel.
+            if (!ReflectionCull.MayReachPlane(region.YMax)) continue;
 
             var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
             var max = new Vector3(min.X + region.SizeBlocks, region.YMax, min.Z + region.SizeBlocks);

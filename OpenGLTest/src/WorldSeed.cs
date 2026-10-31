@@ -77,6 +77,7 @@ public static class WorldSeed
         TreeGenerator.ResetCaches();
         TerrainPeaks.ResetCaches();
         GreatLakes.ResetCaches();
+        WaterBodies.ResetCaches();
 
         // The previous world's edit state is process-global and must not leak into the next one.
         LodColumnCaps.ResetColumnCaps();

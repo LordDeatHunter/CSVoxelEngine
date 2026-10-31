@@ -754,8 +754,8 @@ Grep `Biome\.` to confirm; at time of writing:
 5. `Climate()` stays evaluated at the column's min corner with exact int-to-float args (bit-identity with
    `BiomeTint` direct path; `BiomeTintTests.TheStoredCornerClimateReproducesTheDirectLatticeEvaluation`),
    and it reads the same `SampleClimate` the biome does.
-6. Caches (`ColumnCache`, nine `GenerationalCache` sites, the massif, lone-peak and great-lake
-   verdicts included) only hold pure functions of the key; a biome
+6. Caches (`ColumnCache`, ten `GenerationalCache` sites, the massif, lone-peak, great-lake
+   and pond verdicts included) only hold pure functions of the key; a biome
    change is picked up via `WorldSeed.Apply` resets, but existing **saved** chunks keep their old terrain
    (only modified chunks are saved; unmodified regenerate, so a biome change causes visible seams at the
    edge of edited areas in old saves).

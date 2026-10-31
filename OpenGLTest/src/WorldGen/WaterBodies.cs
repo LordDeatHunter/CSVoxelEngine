@@ -127,7 +127,48 @@ internal static class WaterBodies
         1f - MathUtils.SmoothStep(WorldGenerationConfig.WaterDesertFadeStart,
             WorldGenerationConfig.WaterDesertFadeEnd, desertWeight);
 
-    private const int LakeSalt = 0x4C414B45;
+    /// <summary>Salt of the pond candidates' <see cref="TerrainSites.TryRoll"/> (internal for the cache tests).</summary>
+    internal const int LakeSalt = 0x4C414B45;
+
+    // One pond verdict per lake cell, accepted or not. A pure function of (cell, seed), so it lives
+    // in the GenerationalCache like the other worldgen caches; sizing knobs in WorldGenerationConfig.
+    private static readonly GenerationalCache<(int X, int Z), (bool Accepted, int Surface, int Floor)> PondCache =
+        new(WorldGenerationConfig.PondSiteCacheCapacity, WorldGenerationConfig.PondSiteCacheGenerations);
+
+    // Static delegate, not a lambda at the call site: a closure would allocate on every call,
+    // hits included, on the generation workers and the LOD builder.
+    private static readonly Func<(int X, int Z), (bool Accepted, int Surface, int Floor)> BuildPondSiteFor =
+        BuildPondSite;
+
+    /// <summary>The cached pond verdict of lake cell (<paramref name="gx"/>, <paramref name="gz"/>):
+    /// <see cref="BuildPondSite"/>, computed once per cell.</summary>
+    internal static (bool Accepted, int Surface, int Floor) PondSiteAt(int gx, int gz) =>
+        PondCache.GetOrAdd((gx, gz), BuildPondSiteFor);
+
+    /// <summary>Drops every cached pond verdict. Only for <see cref="WorldSeed.Apply"/>, while no worldgen
+    /// thread runs: every verdict is a function of the seed.</summary>
+    internal static void ResetCaches() => PondCache.Clear();
+
+    /// <summary>
+    /// The uncached pond verdict of a lake cell: whether its rolled candidate is a pond
+    /// (<see cref="TryLakeSite"/>) and, when it is, the pond's surface and floor; <c>default</c> when the
+    /// cell rolls no candidate or the site is refused. The spawn clearing is not tested here:
+    /// <see cref="LakeSample"/> skips those cells before it asks, and the verdict is the same function
+    /// either way.
+    /// </summary>
+    internal static (bool Accepted, int Surface, int Floor) BuildPondSite((int X, int Z) cell)
+    {
+        if (!TerrainSites.TryRoll(cell.X, cell.Z, WorldGenerationConfig.LakeCellBlocks, LakeSalt,
+                WorldGenerationConfig.LakeChance, WorldGenerationConfig.LakeRadiusSkew, out _, out var centerX,
+                out var centerZ, out var size))
+            return default;
+
+        var nominal = MathUtils.Lerp(WorldGenerationConfig.LakeMinRadius,
+            WorldGenerationConfig.LakeMaxRadius, size);
+        return TryLakeSite(centerX, centerZ, nominal, size, out var surface, out var floor)
+            ? (true, surface, floor)
+            : default;
+    }
 
     /// <summary>
     /// 0..1 lake bowl at (x, z), plus the water level and floor of the lake that reaches the column.
@@ -138,7 +179,9 @@ internal static class WaterBodies
     /// radius wobbled by <see cref="TerrainNoise.LakeShapeNoise"/> so it is ragged rather than a circle.
     /// Candidates near the origin are skipped so the spawn is always on dry land. This is the pond
     /// tier only: a candidate near a great lake yields to it (<see cref="TryLakeSite"/>), and
-    /// <see cref="SampleSurfaceWater"/> composes the two tiers.
+    /// <see cref="SampleSurfaceWater"/> composes the two tiers. Each candidate's verdict (accepted, surface,
+    /// floor) comes from the per-cell cache (<see cref="PondSiteAt"/>), asked only for a column inside the
+    /// candidate's nominal radius.
     /// </summary>
     internal static float LakeSample(float x, float z, out int surface, out int floor)
     {
@@ -168,8 +211,8 @@ internal static class WaterBodies
             // A column past `nominal` is out (this cull clips any outward wobble there) without
             // paying for the rim samples that choosing a water level costs.
             if (d2 >= nominal * nominal) continue;
-            if (!TryLakeSite(centerX, centerZ, nominal, size, out var siteSurface, out var siteFloor))
-                continue;
+            var site = PondSiteAt(gx, gz);
+            if (!site.Accepted) continue;
 
             var radius = TerrainSites.Wobble(nominal, WorldGenerationConfig.LakeShapeAmplitude,
                 TerrainNoise.LakeShapeNoise, x, z);
@@ -179,8 +222,8 @@ internal static class WaterBodies
             if (w > best)
             {
                 best = w;
-                surface = siteSurface;
-                floor = siteFloor;
+                surface = site.Surface;
+                floor = site.Floor;
             }
         }
 

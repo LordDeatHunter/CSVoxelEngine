@@ -33,7 +33,8 @@ public enum ProfileSection
 
     // Render side
     Lighting,
-    Shadows,
+    ShadowNear,
+    ShadowFar,
     Reflection,
     LodPass,
     WorldPass,
@@ -84,7 +85,7 @@ public static class FrameProfiler
         "camera", "chunkUnld", "chunkApply", "chunkDirty", "lod", "entities",
         "fluidWake", "fluidTick", "leafDecay", "raycast", "breaking",
         "progUpdate", "usePlace", "debugLog", "player", "save",
-        "lighting", "shadows", "reflect", "lodPass", "worldPass", "entityPass", "aoPass", "waterPass",
+        "lighting", "shadowNear", "shadowFar", "reflect", "lodPass", "worldPass", "entityPass", "aoPass", "waterPass",
         "cloudPass", "raysPass", "godPass", "selectPass", "postPass", "uiPass",
         "rendShell", "screenshot", "publish",
     ];

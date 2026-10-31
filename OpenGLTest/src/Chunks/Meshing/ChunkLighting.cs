@@ -142,16 +142,37 @@ internal static class ChunkLighting
         Span<int> mapLocal = stackalloc int[LightSize];
         BuildLightAxisMap(mapChunk, mapLocal);
 
+        // The z axis splits into runs of one neighbor chunk with consecutive local indices, so
+        // each (lx, ly) row is a few span copies instead of a per-cell lookup. Every slot of
+        // the map belongs to exactly one run, so a row is fully overwritten (the rented array
+        // arrives dirty).
+        Span<int> runStart = stackalloc int[LightSize];
+        Span<int> runLength = stackalloc int[LightSize];
+        var runCount = 0;
+        for (var lz = 0; lz < LightSize; lz++)
+        {
+            var extends = lz > 0 && mapChunk[lz] == mapChunk[lz - 1] && mapLocal[lz] == mapLocal[lz - 1] + 1;
+            if (extends) { runLength[runCount - 1]++; continue; }
+            runStart[runCount] = lz;
+            runLength[runCount] = 1;
+            runCount++;
+        }
+
         for (var lx = 0; lx < LightSize; lx++)
         for (var ly = 0; ly < LightSize; ly++)
         {
             var rowBase = (lx * LightSize + ly) * LightSize;
             var neighborRow = (mapChunk[lx] * 3 + mapChunk[ly]) * 3;
             var blockRow = (mapLocal[lx] << (2 * SizeShift)) | (mapLocal[ly] << SizeShift);
-            for (var lz = 0; lz < LightSize; lz++)
+            for (var r = 0; r < runCount; r++)
             {
-                var neighbor = neighbors[neighborRow + mapChunk[lz]];
-                light[rowBase + lz] = neighbor?.Blocks[blockRow | mapLocal[lz]] ?? 0;
+                var zStart = runStart[r];
+                var target = light.AsSpan(rowBase + zStart, runLength[r]);
+                var neighbor = neighbors[neighborRow + mapChunk[zStart]];
+                if (neighbor == null) { target.Clear(); continue; }
+                // The low SizeShift bits of blockRow are 0, so blockRow | local == blockRow + local
+                // and the run's local z indices are contiguous in the block array.
+                neighbor.Blocks.AsSpan(blockRow | mapLocal[zStart], runLength[r]).CopyTo(target);
             }
         }
     }
@@ -167,6 +188,14 @@ internal static class ChunkLighting
     /// cross-chunk state. Seeds all enter at the same max level, so a FIFO queue visits
     /// every cell at its final level first, each cell is enqueued at most once, and the
     /// caller-sized queue never overflows.
+    /// <para>
+    /// Every passable sky cell is set to 15, but only the sun seeds that touch a passable
+    /// non-seed cell are queued. That is exact because every sun seed enters at the one max
+    /// level and SpreadLight is a monotone max BFS: a seed whose passable neighbors are all 15
+    /// writes nothing, and any shortest path from a seed to a lit cell can start at the last
+    /// seed on it, which touches a non-seed and so is queued. Seeding sun at varying levels
+    /// would break this.
+    /// </para>
     /// <paramref name="sun"/> and <paramref name="block"/> must be zeroed and hold at
     /// least LightCount entries each, as must <paramref name="queue"/>.
     /// <para>
@@ -198,24 +227,55 @@ internal static class ChunkLighting
         // Leaves seed too: canopies pass light, so the sky reaches straight through them
         // (branch tops under leaves stay lit; only depth falloff dims deep cover). Tree
         // wood seeds as well (see PassesLight): a thin limb never casts a full shadow.
+        // seedStart[col] is the first volume row of a column at or above its terrain height, so
+        // ly >= seedStart[col] is exactly worldY0 + ly >= height (clamped into 0..LightSize).
+        Span<int> seedStart = stackalloc int[LightSq];
         for (var lx = 0; lx < LightSize; lx++)
         {
             var columnRow = mapChunk[lx] * 3;
             var heightRow = mapLocal[lx] << SizeShift;
+            var colRow = lx * LightSize;
             for (var lz = 0; lz < LightSize; lz++)
             {
                 var height = columns[columnRow + mapChunk[lz]].Heights[heightRow | mapLocal[lz]];
-                var columnBase = (lx * LightSize) * LightSize + lz;
-                for (var ly = 0; ly < LightSize; ly++)
+                seedStart[colRow + lz] = Math.Clamp(height - worldY0, 0, LightSize);
+            }
+        }
+
+        // Every passable seed is set to 15, but only the seeds touching a passable non-seed cell
+        // are queued: the cell above a seed is a seed or opaque, the one below is a non-seed only
+        // at the column's first seed row, and a lateral one only under its own column's seedStart.
+        for (var lx = 0; lx < LightSize; lx++)
+        for (var lz = 0; lz < LightSize; lz++)
+        {
+            var col = lx * LightSize + lz;
+            var start = seedStart[col];
+            if (start >= LightSize) continue;
+
+            var westStart = lx > 0 ? seedStart[col - LightSize] : 0;
+            var eastStart = lx < LightSize - 1 ? seedStart[col + LightSize] : 0;
+            var northStart = lz > 0 ? seedStart[col - 1] : 0;
+            var southStart = lz < LightSize - 1 ? seedStart[col + 1] : 0;
+            var sideTop = Math.Max(Math.Max(westStart, eastStart), Math.Max(northStart, southStart));
+
+            var columnBase = (lx * LightSize) * LightSize + lz;
+            for (var ly = start; ly < LightSize; ly++)
+            {
+                var i = columnBase + ly * LightSize;
+                if (!PassesLight(light[i])) continue;
+                sun[i] = 15;
+
+                var touchesNonSeed = ly == start && ly > 0 && PassesLight(light[i - LightSize]);
+                if (!touchesNonSeed && ly < sideTop)
                 {
-                    var i = columnBase + ly * LightSize;
-                    if (!PassesLight(light[i])) continue;
-                    if (worldY0 + ly >= height)
-                    {
-                        sun[i] = 15;
-                        queue[tail++] = i;
-                    }
+                    // An absent neighbor column has start 0, which never exceeds ly
+                    touchesNonSeed = (westStart > ly && PassesLight(light[i - LightSq]))
+                        || (eastStart > ly && PassesLight(light[i + LightSq]))
+                        || (northStart > ly && PassesLight(light[i - 1]))
+                        || (southStart > ly && PassesLight(light[i + 1]));
                 }
+
+                if (touchesNonSeed) queue[tail++] = i;
             }
         }
 

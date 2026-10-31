@@ -103,14 +103,11 @@ internal sealed class WorldRenderer
 
     internal void Render(RenderManager renderManager)
     {
-        // Depth-only sun pass first: every world draw below samples the shadow map it fills
-        FrameProfiler.Begin(ProfileSection.Shadows);
-        renderManager.GpuTimer.BeginGpuPass(ProfileSection.Shadows);
+        // Depth-only sun pass first: every world draw below samples the shadow map it fills. It
+        // times itself as the shadowNear and shadowFar rows.
         renderManager.IcebergPasses.Time = _world.LightingTime;
         renderManager.Shadows.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
             _lodManager.RegionList, goblins: Goblins, icebergs: _world.Icebergs);
-        renderManager.GpuTimer.EndGpuPass(ProfileSection.Shadows);
-        FrameProfiler.End(ProfileSection.Shadows);
 
         FrameProfiler.Begin(ProfileSection.Reflection);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.Reflection);
