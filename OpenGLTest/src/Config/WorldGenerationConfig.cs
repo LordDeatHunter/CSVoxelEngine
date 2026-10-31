@@ -128,9 +128,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // GreatLakeShapeNoise, optionally carrying an island. Like a pond it chooses its own surface
     // from its rim (GreatLakeBankDepth under the lowest rim point) and is refused on a rim that
     // climbs more than GreatLakeSiteFlatness, on ocean, desert or a biome that holds no water, on
-    // interior ground rising over the rim, and over a massif or lone peak. A cutting river reaching
-    // its shore makes it river-fed: it then rests at SeaLevel, the river's own waterline. Ponds
-    // yield to it, the river yields inside its bowl, and a ravine tapers out across its guard band.
+    // interior ground rising over the rim, and over a massif or lone peak. A lake standing above
+    // SeaLevel may get a river ramp: past its lobe edges the river level steps down one block every
+    // GreatLakeRiverRunBlocks until it reaches SeaLevel, so a river reaching its shore meets the lake
+    // at the lake's own surface, and an outflow channel may leave it from the lowest point of its rim,
+    // tapering shut inside the ramp. A cutting river reaching the shore makes the lake river-fed; when
+    // its ramp cannot be kept (too long, crowding a neighbor, banks too low) the lake falls back to
+    // resting at SeaLevel, the river's own waterline. Ponds yield to it, the river yields inside its
+    // bowl, and a ravine tapers out across its guard band (and across a ramp).
     public const bool GreatLakesEnabled = true;      // false: no great lake anywhere (ponds and rivers unchanged)
     public const int GreatLakeCellBlocks = 1280;     // candidate grid, one possible great lake per cell
     public const float GreatLakeChance = 0.3f;       // fraction of cells that roll a candidate
@@ -158,7 +163,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float GreatLakeLobeRadiusMax = 0.7f; // ...up to this
     public const float GreatLakeRavineGuardBlocks = 24f; // band past the outline across which a ravine tapers in
     public const float GreatLakePondClearance = 16f; // a pond keeps this far beyond a great lake's guard band
-    public const float GreatLakeRiverFedMaxDrop = 12f; // the most a river-fed lake may sit below its rim-chosen surface
+    public const float GreatLakeRiverFedMaxDrop = 12f; // the most a river-fed lake whose rivers cannot step down
+                                                       // from its own surface may be lowered to rest at SeaLevel
+    public const float GreatLakeRiverRunBlocks = 6f;  // blocks past a lobe edge per block the river level steps down; >= 1
+    public const float GreatLakeRiverBankRise = 2f;   // ground a ramp's river and outflow need over their level
+    public const float GreatLakeRampMaxLength = 192f; // a longer ramp is not kept; this bounds the river footprint
+    public const float GreatLakeOutflowHalfWidth = 6f; // outflow channel half width
+    public const float GreatLakeOutflowTaperBlocks = 16f; // the outflow tapers shut over its last this many blocks
+    public const float GreatLakeOutflowMinLength = 24f; // a shorter outflow is not kept; >= GreatLakeOutflowTaperBlocks
     public const float GreatLakeIslandChance = 0.5f; // chance a lake carries an island in its main lobe
     public const float GreatLakeIslandMinRadius = 18f; // island radius range
     public const float GreatLakeIslandMaxRadius = 60f;

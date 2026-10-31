@@ -9,8 +9,9 @@ namespace VoxelEngine.Tests.WorldGen;
 
 /// <summary>
 /// The great-lake site verdicts (<see cref="GreatLakes.BuildSite"/>) and the per-column sample
-/// (<see cref="GreatLakes.Sample(float, float, out int, out int, out float, out (int X, int Z))"/>): a
-/// site's water sits under its rim and over its floor, a river-fed lake rests at the sea level, no site
+/// (<see cref="GreatLakes.Sample"/>): a
+/// site's water sits under its rim and over its floor, a river-fed lake without a river ramp rests at the
+/// sea level while a ramped lake keeps its own surface above it, no site
 /// reaches the spawn clearing, accepted sites never overlap, a lake stands wholly on lake-holding land
 /// and clear of every massif and lone peak, an island stands above its lake, the rim walk covers the
 /// dry shore band, and the sample is exactly zero outside every accepted footprint and near the spawn.
@@ -74,6 +75,8 @@ public sealed class GreatLakeSiteTests
             var (sites, rolled) = Scan.Value;
             _output.WriteLine($"{sites.Length} great lakes accepted of {rolled} rolled candidates, "
                               + $"{sites.Count(s => s.Value.RiverFed)} river-fed, "
+                              + $"{sites.Count(s => s.Value.RampLength > 0f)} with a river ramp, "
+                              + $"{sites.Count(s => s.Value.HasOutflow)} with an outflow, "
                               + $"{sites.Count(s => s.Value.Island.Radius > 0f)} with an island");
             Assert.NotEmpty(sites);
             return sites;
@@ -111,9 +114,12 @@ public sealed class GreatLakeSiteTests
         foreach (var (cell, site) in sites)
         {
             Assert.True(site.Floor < site.Surface, $"the great lake in cell {cell} has its floor at or above its surface");
-            if (site.RiverFed)
+            if (site.RiverFed && site.RampLength <= 0f)
                 Assert.True(site.Surface == WorldGenerationConfig.SeaLevel,
-                    $"the river-fed great lake in cell {cell} rests at {site.Surface}, not the river's sea level");
+                    $"the river-fed great lake in cell {cell} has no river ramp but rests at {site.Surface}, not the river's sea level");
+            if (site.RampLength > 0f)
+                Assert.True(site.Surface > WorldGenerationConfig.SeaLevel,
+                    $"the great lake in cell {cell} has a river ramp but rests at {site.Surface}, not above the sea");
 
             foreach (var lobe in Lobes(site))
             foreach (var (x, z) in Ring(lobe.X, lobe.Z, lobe.Radius + 1f, RimRingPoints))
@@ -122,6 +128,7 @@ public sealed class GreatLakeSiteTests
         }
 
         Assert.Contains(sites, s => s.Value.RiverFed);
+        Assert.Contains(sites, s => s.Value.RampLength > 0f);
     }
 
     [Fact]
@@ -255,13 +262,16 @@ public sealed class GreatLakeSiteTests
         var sawGuardOnly = false;
         foreach (var (x, z) in points)
         {
-            var weight = GreatLakes.Sample(x, z, out var surface, out _, out var guard, out var cell);
+            var weight = GreatLakes.Sample(x, z, out var surface, out _, out var guard, out var riverLevel,
+                out var riverBank, out var outflow, out var cell);
             if (weight > 0f) sawWater = true;
             else if (guard > 0f) sawGuardOnly = true;
 
             if (Distance(x, z, 0f, 0f) < clear)
             {
-                Assert.True(weight == 0f && guard == 0f, $"a great lake reaches ({x}, {z}) inside the spawn clearing");
+                Assert.True(weight == 0f && guard == 0f && outflow == 0f, $"a great lake reaches ({x}, {z}) inside the spawn clearing");
+                Assert.True(riverLevel == WorldGenerationConfig.SeaLevel && riverBank == TerrainGenerator.NoWater,
+                    $"a great lake's river ramp reaches ({x}, {z}) inside the spawn clearing");
                 continue;
             }
 
@@ -271,13 +281,19 @@ public sealed class GreatLakeSiteTests
             foreach (var lobe in Lobes(site))
             {
                 var d = Distance(x, z, lobe.X, lobe.Z);
-                if (d < lobe.Radius + Guard) inFootprint = true;
+                var grow = site.RampLength > 0f ? GreatLakes.RiverReach : Guard;
+                if (d < lobe.Radius + grow) inFootprint = true;
                 if (d < lobe.Radius) inLobe = true;
             }
 
             if (!inFootprint)
-                Assert.True(BitConverter.SingleToInt32Bits(weight) == 0 && BitConverter.SingleToInt32Bits(guard) == 0,
-                    $"the great-lake sample at ({x}, {z}) is {weight} (guard {guard}) outside every footprint");
+            {
+                Assert.True(BitConverter.SingleToInt32Bits(weight) == 0 && BitConverter.SingleToInt32Bits(guard) == 0
+                                                                       && BitConverter.SingleToInt32Bits(outflow) == 0,
+                    $"the great-lake sample at ({x}, {z}) is {weight} (guard {guard}, outflow {outflow}) outside every footprint");
+                Assert.True(riverLevel == WorldGenerationConfig.SeaLevel && riverBank == TerrainGenerator.NoWater,
+                    $"the great-lake sample at ({x}, {z}) reports river level {riverLevel} (bank {riverBank}) outside every footprint");
+            }
             if (weight <= 0f) continue;
 
             Assert.True(inLobe, $"the great-lake sample at ({x}, {z}) has weight {weight} outside every lobe");

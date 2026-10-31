@@ -58,6 +58,8 @@ public sealed class TerrainReliefSeedTests
         samples.Add(($"great lake lobe count in cell {cell}", site.LobeCount));
         samples.Add(($"great lake center x in cell {cell}", BitConverter.SingleToInt32Bits(site.Lobe0.X)));
         samples.Add(($"great lake center z in cell {cell}", BitConverter.SingleToInt32Bits(site.Lobe0.Z)));
+        samples.Add(($"great lake river ramp length in cell {cell}", BitConverter.SingleToInt32Bits(site.RampLength)));
+        samples.Add(($"great lake outflow length in cell {cell}", BitConverter.SingleToInt32Bits(site.OutflowLength)));
     }
 
     // The cached massif, lone-peak and great-lake verdicts over the site grid, as raw bits

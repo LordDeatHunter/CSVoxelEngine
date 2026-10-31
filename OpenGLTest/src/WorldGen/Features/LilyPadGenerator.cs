@@ -6,8 +6,10 @@ namespace VoxelEngine.WorldGen.Features;
 /// <summary>
 /// Lily pads: a flat pad stamped on the cell above a still lake's top water cell. A lake is a
 /// column whose own <see cref="ColumnData.WaterLevel"/> sits above the ground and is not the sea
-/// level (<see cref="TerrainGenerator.WaterLevelAt"/> gives the ocean and rivers sea level, a lake
-/// its own surface), and generated water is all sources, so the surface is still by construction.
+/// level (<see cref="TerrainGenerator.WaterLevelAt"/> gives the ocean sea level, a lake its own
+/// surface and a river its own level, which is the sea level except on an elevated great lake's
+/// river ramp, so a stepped ramp river above the sea can carry pads too), and generated water is all
+/// sources, so the surface is still by construction.
 /// A pure per-column hash of (x, z) and the seed; the far LOD shows none.
 /// </summary>
 public static class LilyPadGenerator

@@ -349,7 +349,7 @@ public static class TerrainGenerator
                     out var desertWeight, out var forestHeight);
 
                 // Surface water: a lake is a bowl around its own water level and a river a channel
-                // down to the waterline, each returning to un-carved ground at its edge, so the
+                // down to its own level, each returning to un-carved ground at its edge, so the
                 // water is enclosed by its own banks. A river also fades out as the local land
                 // climbs, so it dries into a wash uphill instead of gorging a hillside. Every land
                 // biome but the desert, gated toward a desert so a body closes before the biome
@@ -359,10 +359,12 @@ public static class TerrainGenerator
                 var lakeSurface = NoWater;
                 var lakeFloor = 0;
                 var riverWeight = 0f;
-                var lakeGuard = 0f;
+                var riverLevel = WorldGenerationConfig.SeaLevel;
+                var riverBank = NoWater;
+                var ravineGuard = 0f;
                 if (WaterBodies.CanHoldSurfaceWater(biome))
                     WaterBodies.SampleSurfaceWater(worldX, worldZ, out lakeWeight, out lakeSurface, out lakeFloor,
-                        out riverWeight, out lakeGuard);
+                        out riverWeight, out riverLevel, out riverBank, out ravineGuard);
 
                 if (lakeWeight > 0f)
                 {
@@ -375,14 +377,21 @@ public static class TerrainGenerator
 
                 if (riverWeight > 0f)
                 {
-                    var lowland = WaterBodies.RiverLowland(forestHeight);
+                    var lowland = WaterBodies.RiverLowland(forestHeight, riverLevel);
                     var river = riverWeight * gate * lowland;
                     if (river > 0f)
-                        heightF = MathUtils.Lerp(heightF,
-                            WorldGenerationConfig.SeaLevel - WorldGenerationConfig.RiverBedDepth, river);
+                        heightF = MathUtils.Lerp(heightF, riverLevel - WorldGenerationConfig.RiverBedDepth, river);
                 }
 
-                waterLevel[i] = WaterBodies.WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
+                waterLevel[i] = WaterBodies.WaterLevelFor(biome, gate, riverWeight, riverLevel, lakeWeight,
+                    lakeSurface);
+
+                // A dry column beside a great lake's ramp water must stand at least at the highest
+                // level a neighbor can hold, or the step between two ramp levels would expose a
+                // water wall. It only ever raises dry ground, so it opens no new leak.
+                var top = (int)heightF;
+                if (riverBank > top && top >= waterLevel[i] && GreatLakes.RampRiverBeside(worldX, worldZ))
+                    heightF = riverBank;
 
                 // An oasis: a hashed deep-desert site marks its disc (the fill and the far LOD
                 // wear grass there) and carves its flat pond into the heightmap
@@ -419,10 +428,10 @@ public static class TerrainGenerator
                 }
 
                 // A great lake's guard 1 maps to the threshold, so a ravine has no cut at the lake's
-                // outline and tapers in across the guard band instead of cutting a bank or an island
-                // below the surface.
+                // outline or across its river ramp's bank zone, and tapers in across the guard band
+                // instead of cutting a bank, a raised ramp bank or an island below the water.
                 var surfaceWater = MathF.Max(lakeWeight, riverWeight) * gate;
-                var guarded = lakeGuard * WorldGenerationConfig.WaterBodyThreshold;
+                var guarded = ravineGuard * WorldGenerationConfig.WaterBodyThreshold;
                 if (guarded > surfaceWater) surfaceWater = guarded;
 
                 // Sampled once and reused: the same value cuts the ravine into the heightmap and

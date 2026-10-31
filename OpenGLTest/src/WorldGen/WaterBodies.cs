@@ -4,7 +4,8 @@ namespace VoxelEngine.WorldGen;
 
 /// <summary>
 /// The surface-water model of the 2D terrain half: where water stands in a column (<see cref="WaterLevelAt"/>: sea level for
-/// the ocean and rivers, a lake's own rim-chosen surface for a lake, <see cref="NoWater"/> elsewhere), the hashed lake bowls
+/// the ocean, a river's own level (sea level, or a ramp stepping down from an elevated great lake), a lake's own rim-chosen
+/// surface for a lake, <see cref="NoWater"/> elsewhere), the hashed lake bowls
 /// and warped river channels <see cref="TerrainGenerator.Compute"/> carves, and the desert gate that closes them. Lakes come
 /// in two tiers, the small hashed ponds here and the rare great lakes of <see cref="GreatLakes"/>, composed in one place,
 /// <see cref="SampleSurfaceWater"/>, which every reader of the water fields goes through. A pure
@@ -17,7 +18,8 @@ internal static class WaterBodies
 
     /// <summary>
     /// The y water in column (x, z) rises to: <see cref="WorldGenerationConfig.SeaLevel"/> for the
-    /// ocean and for rivers, the lake's own surface for a lake, and <see cref="NoWater"/> where the
+    /// ocean, the river's own level (<see cref="SampleSurfaceWater"/>) for a river, the lake's own
+    /// surface for a lake, and <see cref="NoWater"/> where the
     /// column holds none. This is the one definition of where water sits, and it is what lets a pond
     /// rest on the ground it was dug into instead of on one global sea level.
     ///
@@ -33,30 +35,40 @@ internal static class WaterBodies
         var lakeWeight = 0f;
         var lakeSurface = NoWater;
         var riverWeight = 0f;
+        var riverLevel = WorldGenerationConfig.SeaLevel;
         if (CanHoldSurfaceWater(biome))
-            SampleSurfaceWater(x, z, out lakeWeight, out lakeSurface, out _, out riverWeight, out _);
+            SampleSurfaceWater(x, z, out lakeWeight, out lakeSurface, out _, out riverWeight, out riverLevel, out _,
+                out _);
 
-        return WaterLevelFor(biome, gate, riverWeight, lakeWeight, lakeSurface);
+        return WaterLevelFor(biome, gate, riverWeight, riverLevel, lakeWeight, lakeSurface);
     }
 
     /// <summary>
     /// The lake and river fields at (x, z), with both lake tiers composed: the pond bowl of
-    /// <see cref="LakeSample"/>, the great lake of <see cref="GreatLakes.Sample(float, float, out int, out int, out float)"/>
-    /// and the river channel of <see cref="RiverWeight"/>. Ponds never reach a great lake
-    /// (<see cref="TryLakeSite"/> refuses a pond near one), so wherever the great lake has weight it
-    /// is the only lake and its surface and floor replace the pond's; the river yields to it,
-    /// scaled by <see cref="GreatLakes.RiverShare"/>, which is 0 wherever lake water stands, so a
-    /// channel ends at the shore without a step. Wherever the great-lake weight is 0, every out
-    /// equals the pond and river values exactly. <paramref name="lakeGuard"/> is the great lake's
-    /// ravine guard (1 inside an outline, easing to 0 across the guard band). The biome is not
-    /// tested here: callers gate on <see cref="CanHoldSurfaceWater"/> as before.
+    /// <see cref="LakeSample"/>, the great lake of <see cref="GreatLakes.Sample"/> and the river channel
+    /// of <see cref="RiverWeight"/>, joined by a ramped great lake's outflow channel (the larger of the
+    /// two weights). Ponds never reach a great lake's footprint (<see cref="TryLakeSite"/> refuses a pond
+    /// near one), so wherever the great lake has weight it is the only lake and its surface and floor
+    /// replace the pond's; the river yields to it, scaled by <see cref="GreatLakes.RiverShare"/>, which is
+    /// 0 wherever lake water stands, so a channel ends at the shore without a step.
+    /// <paramref name="riverLevel"/> is the level the river channel at this column carves toward and
+    /// floods to: <see cref="WorldGenerationConfig.SeaLevel"/>, or inside a ramped great lake's footprint
+    /// the ramp's level, stepping down from the lake's surface. <paramref name="riverBank"/> is the
+    /// highest level a neighbor of this column can hold inside a ramp's bank zone, and
+    /// <see cref="NoWater"/> elsewhere. <paramref name="ravineGuard"/> is the great lake's ravine guard
+    /// (1 inside an outline or a ramp's bank zone, easing to 0 across the guard band). Outside every
+    /// great-lake footprint every out equals the pond and river values exactly, with the river at
+    /// <see cref="WorldGenerationConfig.SeaLevel"/>. The biome is not tested here: callers gate on
+    /// <see cref="CanHoldSurfaceWater"/> as before.
     /// </summary>
     internal static void SampleSurfaceWater(float x, float z, out float lakeWeight, out int lakeSurface,
-        out int lakeFloor, out float riverWeight, out float lakeGuard)
+        out int lakeFloor, out float riverWeight, out int riverLevel, out int riverBank, out float ravineGuard)
     {
         lakeWeight = LakeSample(x, z, out lakeSurface, out lakeFloor);
         riverWeight = RiverWeight(x, z);
-        var great = GreatLakes.Sample(x, z, out var greatSurface, out var greatFloor, out lakeGuard);
+        var great = GreatLakes.Sample(x, z, out var greatSurface, out var greatFloor, out ravineGuard,
+            out riverLevel, out riverBank, out var outflow, out _);
+        if (outflow > riverWeight) riverWeight = outflow;
         if (great <= 0f) return;
 
         lakeWeight = great;
@@ -75,12 +87,14 @@ internal static class WaterBodies
         WorldGenerationConfig.LakesAndRiversEnabled && biome is not (Biome.Ocean or Biome.Desert);
 
     /// <summary>
-    /// The level a column with these surface-water weights floods to. Shared by
+    /// The level a column with these surface-water weights floods to: the river's own level
+    /// (<paramref name="riverLevel"/>, from <see cref="SampleSurfaceWater"/>) where the channel holds
+    /// water, raised to the lake's surface where a lake stands higher. Shared by
     /// <see cref="WaterLevelAt"/> and by <see cref="TerrainGenerator.Compute"/>, which evaluates the same weights
     /// itself and stores the result per column, so a stored level is by construction the level the
     /// carve that made the bowl was working toward.
     /// </summary>
-    internal static int WaterLevelFor(Biome biome, float gate, float riverWeight, float lakeWeight,
+    internal static int WaterLevelFor(Biome biome, float gate, float riverWeight, int riverLevel, float lakeWeight,
         int lakeSurface)
     {
         // The master water toggle is a compile-time const, so it is folded into these runtime
@@ -91,7 +105,7 @@ internal static class WaterBodies
 
         var level = NoWater;
         if (riverWeight * gate > WorldGenerationConfig.WaterBodyThreshold)
-            level = WorldGenerationConfig.SeaLevel;
+            level = riverLevel;
         if (lakeWeight * gate > WorldGenerationConfig.WaterBodyThreshold && lakeSurface > level)
             level = lakeSurface;
         return level;
@@ -185,15 +199,15 @@ internal static class WaterBodies
     /// standing above the waterline is also dropped when a river channel crosses its footprint
     /// (<see cref="RiverCrossesSite"/>): the channel would cut a bank below the pond's surface.
     /// A candidate within <see cref="WorldGenerationConfig.GreatLakePondClearance"/> of an accepted
-    /// great lake's guarded outline (<see cref="GreatLakes.NearAnyLobe"/>) is dropped first, so the
-    /// two lake tiers never share a column and never split a surface.
+    /// great lake's footprint (<see cref="GreatLakes.NearAnyFootprint"/>: its guarded outline, or its
+    /// river ramp) is dropped first, so the two lake tiers never share a column and never split a surface.
     /// </summary>
     private static bool TryLakeSite(float centerX, float centerZ, float radius, float size,
         out int surface, out int floor)
     {
         // A pond yields to a great lake, so no column belongs to both and no surface is split.
         // Tested first, which also skips the rim samples near a lake.
-        if (GreatLakes.NearAnyLobe(centerX, centerZ, radius + WorldGenerationConfig.GreatLakePondClearance))
+        if (GreatLakes.NearAnyFootprint(centerX, centerZ, radius + WorldGenerationConfig.GreatLakePondClearance))
         {
             surface = 0;
             floor = 0;
@@ -244,10 +258,13 @@ internal static class WaterBodies
     /// <summary>
     /// How much of its channel a river cuts over land of this forest-profile height: 1 in the lowlands,
     /// where it cuts its full channel, easing to 0 above <see cref="WorldGenerationConfig.RiverLowEnd"/>,
-    /// where it is a dry wash.
+    /// where it is a dry wash. The fade is measured above the river's own level,
+    /// <paramref name="riverLevel"/>: at <see cref="WorldGenerationConfig.SeaLevel"/> the measured height is
+    /// <paramref name="forestHeight"/> exactly.
     /// </summary>
-    internal static float RiverLowland(float forestHeight) =>
-        1f - MathUtils.SmoothStep(WorldGenerationConfig.RiverLowStart, WorldGenerationConfig.RiverLowEnd, forestHeight);
+    internal static float RiverLowland(float forestHeight, int riverLevel) =>
+        1f - MathUtils.SmoothStep(WorldGenerationConfig.RiverLowStart, WorldGenerationConfig.RiverLowEnd,
+            forestHeight - (riverLevel - WorldGenerationConfig.SeaLevel));
 
     /// <summary>0..1 river weight: a warped ridge band (|noise| near zero) gated by a rarity mask.</summary>
     internal static float RiverWeight(float x, float z)
@@ -276,7 +293,7 @@ internal static class WaterBodies
     public static float SurfaceWaterWeight(float x, float z)
     {
         BiomeClassifier.BiomeWeights(x, z, out _, out var desertWeight);
-        SampleSurfaceWater(x, z, out var lake, out _, out _, out var river, out _);
+        SampleSurfaceWater(x, z, out var lake, out _, out _, out var river, out _, out _, out _);
         return MathF.Max(lake, river) * SurfaceWaterGate(desertWeight);
     }
 }
