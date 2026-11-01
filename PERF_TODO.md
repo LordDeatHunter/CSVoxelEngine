@@ -137,7 +137,7 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 
 Ranking: within each group the prerequisite measurement comes first (G1; F1 and F2 are done). F3-F8 follow the
 share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%,
-before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%); F9 builds on F2 and F4;
+before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4 was tried and ruled out); F9 builds on F2;
 F10-F12 are CPU-only and matter less while the frame is GPU-bound.
 G follows the `wgen` and probe split. Ties and unmeasured items fall back to effort. Each entry has a
 bold title, then **Files**, **Win** (measured or estimated), **Verify** and **Invariant**.
@@ -170,22 +170,7 @@ after F2).
 - **Invariant**: the near map stays every frame (half-rate near is ruled out); far-map leaf sway
   freezes (sub-texel); no visible pop at re-render; the hysteresis keeps the view's far-shadow region inside the box.
 
-**F4. Chunk visibility graph (cave culling) for the camera passes** (worldPass 3.90 ms, 26%).
-- **Files**: `Chunks/Meshing/ChunkMeshBuilder.cs` (a 15-bit face-to-face connectivity mask from the
-  padded snapshot through non-occluding cells, `BlockType.Occludes`, on the worker); `ChunkMeshData.cs`
-  and `Chunks/Chunk.cs` (carry and store it); a new GL-free `Chunks/ChunkVisibility.cs` with tests (a
-  BFS from the camera chunk, rerun when the camera chunk or the mesh set changes);
-  `Rendering/TerrainPasses.cs` `RenderWorld` and `CullWater`.
-- **Win**: estimated; disconnected underground chunks leave worldPass (read the drop in `LastVisibleChunkCount`,
-  1214-2101 visible when settled on 2026-10-31).
-- **Verify**: perf-fly pair (worldPass GPU, visible count); cave and ravine screenshots identical.
-- **Invariant**: conservative (unmeshed or missing neighbors count as open); off while the eye is
-  inside an occluding cell (noclip); never applied to the shadow or mirror passes; mesh bytes unchanged
-  (`GreedyMeshingTests`, `StreamedTerrainMeshTests`); the `chunk.lifetime += dt` fade that `RenderWorld`
-  advances keeps advancing for graph-culled chunks (a pass before the cull, as water-only chunks get),
-  or a revealed cave visibly fades in.
-
-**F5. worldPass fragment cost and overdraw** (3.90 ms, 26%; after F4).
+**F5. worldPass fragment cost and overdraw** (3.90 ms, 26%).
 - **Files**: `TerrainPasses.RenderWorld`, `test-fragment.glsl`. Measure overdraw with a `// TEMP-DIAG`
   additive count view; cutout leaves defeat early-Z. A solid-only depth pre-pass is the candidate, but
   it is close to the ruled-out early-Z split, so measure it interleaved on two GPUs.
@@ -217,8 +202,9 @@ after F2).
   updated on upload and free; per pass a compute shader tests the frustum plus a Hi-Z pyramid of the
   previous frame's HDR depth (raw D3D 0..1 depth reprojected through the previous view-proj, two-phase
   to stay conservative) and appends `DrawElementsIndirectCommand` plus `ChunkInfo` through an atomic
-  count; the draw is `MultiDrawElementsIndirectCount` (GL 4.6 core). After F4 and F2; the occlusion-less
-  version is ruled out.
+  count; the draw is `MultiDrawElementsIndirectCount` (GL 4.6 core). After F2 (F4, the CPU chunk
+  visibility graph, is ruled out: Hi-Z occlusion is the remaining lever for underground chunks); the
+  occlusion-less version is ruled out.
 - **Win**: estimated; the GPU work of occluded chunks. **Verify**: perf-fly pair (worldPass, shadowNear, shadowFar);
   cave, forest and water screenshots identical.
 - **Invariant**: the 3-slot fenced ring and per-draw fade alpha; opaque front-to-back order is lost
@@ -409,6 +395,31 @@ no more than two before runs differ from each other. Interlock: see F3.
 - GPU compute frustum cull without occlusion (old Phase 5): removes only CPU cull+sort+fill, ~2% of
   the T1000 frame (worldPass 0.50, shadows 0.26, waterPass 0.09, reflect 0.83 ms). Pays only with GPU
   occlusion (F9) or in a CPU-bound profile above ~1 ms.
+- F4, chunk visibility graph (cave culling) for the camera passes, tried and dropped 2026-11-01
+  (T1000 Max-Q, Release, perf-fly `VOXEL_TIME=60`, 3+3 interleaved against a worktree of bba2ca95).
+  The exact form: a 26-portal sight mask per chunk from the padded snapshot on the mesh worker (26-
+  connected non-sealing cells, so edge and corner crossings count; a cell seals only as an opaque
+  full-cube `Model` occluder whose tiles never discard), a main-thread portal walk from the chunk of
+  the true view eye (bob, shake and shoulder offset included) stamping a one-chunk dilation, eye,
+  unmeshed, untracked and fading chunks open, the graph off when an occluding cell lies inside the
+  near-clip box or a leak cell (an occluder that does not seal, the kiln) is reachable; it filtered
+  only `RenderWorld` and `CullWater`'s draw list, the fade lifetime still advancing. Result: of 1218.6
+  frustum-visible chunks it drew 1213.6 (median 2 opaque chunks culled, ~174 triangles); translucent
+  list 399 -> 397.8. worldPass GPU 3.940 -> 3.885 ms (per run 4.19/3.99/3.67 vs 3.92/3.71/3.815,
+  inside the before spread), CPU 0.550 -> 0.570; frame 18.23 -> 19.42 ms, every after run slower: the
+  `chunkVis` row cost 0.905 ms avg (worst 12.75 ms), the walk rerunning 28 times a second at 1.57 ms
+  mean, almost all opening events while streaming (newly fading chunks, exit growth). A headless probe
+  put a rerun at 1.32-1.40 ms after a bit-parallel rewrite of the walk (5.0 ms scalar). Why it culls
+  nothing here: `Renderable` holds only chunks with geometry, an underground chunk has geometry only
+  where it touches caves, the noise caves and worms percolate at chunk level through single edge and
+  corner cells, and the exact one-chunk dilation draws every closed neighbor of reached space. It was
+  not pixel-identical either: a temporary occlusion-query check (the culled chunks redrawn against the
+  frame's depth, under both Lequal and Less) passed 2-3 samples in perf-fly (4 frames), world-events
+  (3 frames) and terrain-shape (975 frames of one static shot, chunk (-91,0,304) at ~175 blocks),
+  unattributed pixel-pair leaks at 130-175 blocks consistent with rasterization or T-junction cracks;
+  0 in eye-adaptation, lava, ores, water, animations and a mining and flight-into-rock run. The whole
+  attempt was reverted (patch with the diagnostics kept outside the tree). Retry only with GPU
+  occlusion (F9's Hi-Z), not a CPU connectivity graph.
 - Fluid 16-slot chunk cache: no spike reduction (16 vs 256 slots identical); a per-tick cap freezes fluid.
 - Mud 6-face gate: not outcome-equivalent (diagonal dirt can be wet).
 - VSync and limiters, GL debug context, per-frame `GetError`, worker priorities, uniform location
