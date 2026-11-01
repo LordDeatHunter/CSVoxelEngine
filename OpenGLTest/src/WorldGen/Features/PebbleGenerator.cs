@@ -123,8 +123,6 @@ public static class PebbleGenerator
         for (var z = 0; z < Chunk.Size; z++)
         {
             var height = column.Heights[(x << Chunk.SizeShift) | z];
-            // Wet columns stay bare: the cell above a sea, lake or river bed is water, not air
-            if (TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, height)) continue;
             var ly = height + 1 - worldY0;
             if ((uint)ly >= Chunk.Size) continue;
             // ly == 0 puts the ground in the chunk below, out of reach of a pure per-chunk
@@ -135,9 +133,20 @@ public static class PebbleGenerator
             if (blocks[i] != BlockType.Air) continue;
             var weight = BlockType.PebbleWeightOf(blocks[Chunk.Idx(x, ly - 1, z)]);
             if (!TryGetPebble(worldX0 + x, worldZ0 + z, weight, out _)) continue;
+            // Wet columns stay bare: the cell above a sea, lake or river bed is water, not air.
+            // Every test is pure, so the order is free: the cheap chunk-local tests run first and
+            // the water level, a noise read, waits for a column they admit.
+            if (TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, height)) continue;
             blocks[i] = PebbleBlock;
         }
     }
+
+    /// <summary>
+    /// Every world y <see cref="Stamp"/> can write in this chunk column: it writes only the cell at
+    /// <c>ly = height + 1 - worldY0</c>, one above a column height, so the band is
+    /// <see cref="StampBand.AboveSurface"/>.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) => StampBand.AboveSurface(column);
 
     /// <summary>
     /// Cell-local center of one stone's slot. Base layouts are defined once, then rotated by

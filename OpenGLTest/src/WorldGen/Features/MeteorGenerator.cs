@@ -81,4 +81,17 @@ public static class MeteorGenerator
             }
         }
     }
+
+    /// <summary>
+    /// The world-y band <see cref="Stamp"/> can write in a chunk whose own column is
+    /// <paramref name="column"/>: only columns inside the chunk are cut, each from its own ground
+    /// (<c>column.Heights</c>) down to <c>ground - (depth - 1)</c>, where
+    /// <c>depth = (int)((radius - distance) * MeteorBowlSlope)</c> never exceeds
+    /// <c>MeteorMaxRadius * MeteorBowlSlope</c>. The ceiling and the dropped +1 keep the floor a
+    /// superset whatever the float rounding.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) =>
+        new(column.MinHeight
+            - (int)MathF.Ceiling(WorldFeatureConfig.MeteorMaxRadius * WorldFeatureConfig.MeteorBowlSlope),
+            column.MaxHeight);
 }

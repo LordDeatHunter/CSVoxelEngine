@@ -18,7 +18,7 @@ internal sealed class WorldgenStageTimer
     /// <summary>The stages of <see cref="ChunkTerrainFill.GenerateBlockData"/>, in production order.</summary>
     internal enum Stage
     {
-        /// <summary>The chunk's own ColumnCache.Get, SurfaceMinY, the tree-reach neighbor MaxHeight scan and needsWater.</summary>
+        /// <summary>The chunk's own ColumnCache.Get, SurfaceMinY, the neighborhood MaxHeight scan (tree and scenery reach) and needsWater.</summary>
         Columns,
         /// <summary>The ColumnCache.GenerateColumn loop.</summary>
         Fill,
@@ -66,7 +66,7 @@ internal sealed class WorldgenStageTimer
         UndergroundPools,
         /// <summary>IceSpikeGenerator.Stamp.</summary>
         IceSpikes,
-        /// <summary>SnowGenerator.Stamp.</summary>
+        /// <summary>SnowGenerator.StampGround and StampCanopy.</summary>
         Snow,
         /// <summary>PebbleGenerator.Stamp.</summary>
         Pebbles,
@@ -89,6 +89,13 @@ internal sealed class WorldgenStageTimer
     private readonly int[] _marks = new int[StageCount];
     private long _last;
 
+    /// <summary>
+    /// A test seam called at the end of every <see cref="Mark"/> with the stage just marked, so a
+    /// test can snapshot the chunk after each stage. Its own time is charged to the following
+    /// stage, which is why the cost probe never sets it.
+    /// </summary>
+    internal Action<Stage>? AfterMark { get; init; }
+
     /// <summary>Starts the clock at <paramref name="timestamp"/> (a <see cref="Stopwatch.GetTimestamp"/> value).</summary>
     internal void Begin(long timestamp) => _last = timestamp;
 
@@ -99,6 +106,7 @@ internal sealed class WorldgenStageTimer
         _ticks[(int)stage] += now - _last;
         _marks[(int)stage]++;
         _last = now;
+        AfterMark?.Invoke(stage);
     }
 
     /// <summary>The <see cref="Stopwatch"/> ticks charged to <paramref name="stage"/> since the last <see cref="Clear"/>.</summary>

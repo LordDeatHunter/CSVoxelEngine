@@ -139,7 +139,7 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 
 ## Open
 
-Ranking: within each group the prerequisite measurement comes first (G1, F1, F2, F7, F9 and F10 are done). F3 and F8 follow the
+Ranking: within each group the prerequisite measurement comes first (G1, G6, F1, F2, F7, F9 and F10 are done). F3 and F8 follow the
 share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%,
 before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4, F5 (an exact worldPass depth
 pre-pass) and F13 (exact reflection cuts) were tried and ruled out; F7 and F9 are done);
@@ -203,9 +203,10 @@ shadow cascades gain nothing (Done), and the frustum test and sort stay on the C
 
 ### B. Worldgen, meshing and streaming
 
-Ranked by the G1 split (`WorldgenCostProbe`, 2026-11-01, medians of 3; G1 under Done has the tables). A warm
-fill (every cache hot) costs 0.38-1.13 ms per filled chunk, spread over the noise-driven stamps: G3's three
-stamps 32.5% of the probe mix, G6's feature stamps 31.5%, `NoiseCaves` 19.6%. A cold fill (every cache cleared)
+Ranked by the G1 split (`WorldgenCostProbe`, 2026-11-01, medians of 3; G1 and G6 under Done have the tables).
+After G6 a warm fill (every cache hot) costs 0.17-0.98 ms per filled chunk (0.38-1.13 before), spread over the
+noise-driven stamps: G3's three stamps 40.4% of the probe mix, `NoiseCaves` 27.1%, the 18 feature stamps G6 gated
+11.9% (31.8% before G6). A cold fill (every cache cleared)
 costs 49-145 ms, of which 69% is tree batch growth, 24% worm cells and 6% neighbor columns (G5). No open item
 targets the first two: they amortize over a 64x64 cell in game, and only a cold-start measurement in game would
 justify one.
@@ -221,24 +222,10 @@ justify one.
   1.10 ms; `GravelPockets` alone 23%), 46% of a cave-heavy fill, 24% of a surface chunk and 32.5% of the probe mix;
   cold they are under 0.5% (0.25-0.3 ms beside 50-145 ms of trees and worm cells). The largest measured share on
   deep and cave chunks, which should be most of a load sphere's filled chunks (not measured); chunks far below the
-  2-5 layers under the surface that the probe samples are unmeasured. G6 nearly ties it on the probe mix and is
-  exact by construction, so it is the cheaper first step. The ~12k calls per deep chunk is still an estimate (G1
-  counted no noise calls). **Verify**: G1 stage pairs; byte-equal block and state dumps of N chunks.
+  2-5 layers under the surface that the probe samples are unmeasured. With G6 done these three are the largest
+  warm share left: 40.4% of the probe mix, 52.8% of a deep-stone fill and 58.5% of a cave-heavy fill. The ~12k
+  calls per deep chunk is still an estimate (G1 counted no noise calls). **Verify**: G1 stage pairs; byte-equal block and state dumps of N chunks.
   **Invariant**: `FastNoiseLite.cs` stays vendored and unedited.
-
-**G6. Chunk-level gates for the feature stamps** (bit-identical).
-- **Files**: `WorldGen/ChunkTerrainFill.cs`, the generators under `WorldGen/Features/`. About 20 `Stamp` calls in
-  `GenerateBlockData` each walk 256 columns even when the chunk's Y range cannot hold the feature; add early-outs
-  from the `ColumnData` height and water ranges plus each feature's vertical reach, including
-  `NoiseCaves.SampleLattice` channels whose depth band excludes the chunk, only where G1 shows a cost.
-- **Win**: measured (G1, warm): the 18 scenery and surface stamps (`FallenLogs` .. `Foliage`, mostly `Pebbles`,
-  `Flowers`, `Foliage` and `Snow` at 0.04-0.07 ms each) cost a near-fixed 0.24-0.30 ms on every filled chunk: 71%
-  of an above-surface fill (the chunk over the terrain top, where `Fill` is another 18% and the G3 stamps 5%), 53%
-  of a sea-floor fill, 25% cave-heavy, 19% deep-stone, 31.5% of the probe mix. `NoiseCaves` already costs nothing on
-  the above-surface chunk (an existing skip) and is 16-19% inside its band on deep and cave chunks, so its
-  depth-band gate has nothing to win in the classes measured. Sky chunks already take the early-out (warm 0.001
-  ms; cold 6.5 ms, all `Columns`, which is G5). Second by share, first by effort. **Verify**: G1 pairs; byte-equal
-  dumps. **Invariant**: gates provably conservative.
 
 **G5. Hoist per-chunk-column work out of `TerrainGenerator.Compute`** (bit-identical).
 - **Files**: `WorldGen/TerrainGenerator.cs`, `BiomeClassifier.cs`, `TerrainSites.cs`, `TerrainPeaks.cs`,
@@ -280,7 +267,7 @@ justify one.
 
 F1, F6, G2 and G4 are all 2026-10-31, Quadro T1000 Max-Q, Release, working tree over c8e0f3c6; perf-fly
 pairs interleaved (before = a worktree of c8e0f3c6) at 1530 MHz, 60-73 C; probes are medians of 3, one
-per invocation. F2, F9, F7, F10 and G1 (2026-11-01) carry their own setup. None of them changes anything a player sees.
+per invocation. F2, F9, F7, F10, G1 and G6 (2026-11-01) carry their own setup. None of them changes anything a player sees.
 
 **F1. Shadow pass split** (diagnostics only). `ProfileSection.Shadows` is now `ShadowNear` and
 `ShadowFar` (rows `shadowNear`/`shadowFar`); `ShadowPass.RenderShadows` times itself, CPU and GPU,
@@ -558,6 +545,85 @@ again with every cache hot. They bracket the in-game rate, never measure it.
   noise-call counts (`FastNoiseLite.cs` is vendored and `GetNoise` is not virtual), so G3's call count stays an
   estimate; no real mesh share: `MeshBuildCostProbe` (5475 us/build on 2026-10-31) builds a synthetic soup, not
   generated terrain, so no mesh-vs-worldgen ratio was measured.
+
+**G6. Chunk-level gates for the feature stamps** (2026-11-01, bit-identical; Quadro T1000 Max-Q machine, 12
+cpus, Release, working tree over ef251bca; `WorldgenCostProbe.ChunkFillCostPerStage`, medians of 3 invocations,
+one per invocation, before and after). Built:
+- `StampBand` (`WorldGen/Features/`, internal): the inclusive world-y range a feature stamp can write, with
+  `Reaches(worldY0)` for one chunk. Every gated generator has a GL-free `WriteBand(...)` derived from its own
+  `Stamp` code (the XML doc names the write that proves it): the surface plants (`Pebbles`, `Flowers`, `Foliage`,
+  `Cotton`) one cell over the column's height range; `Reeds`, `LilyPads` and the snow ground pass also by the
+  column's `MaxWaterLevel` (only ever added to or taken in a `Min`/`Max`, since `NoWater` is `int.MinValue`);
+  `Cairns`, `RuinedPillars`, `IceSpikes` and `Meteors` by their own height plus or minus their own reach, since they
+  write only into columns inside the chunk; `GlowMushrooms`, `CaveFormations` and `UndergroundPools` capped by
+  their burial depth (the pool also by `LavaMaxY` and `SeaLevel`, which replaces its old in-`Stamp` early return);
+  `Geodes` a constant band from `TryGetGeode`'s y and radius ranges. `ChunkTerrainFill.GenerateBlockData` skips a
+  stamp whose band misses the chunk; every `timer?.Mark` stays unconditional, so the stage layout is unchanged.
+- Upper-bound gates for the stamps whose site may sit in a neighbor chunk column (`FallenLogs`, `Boulders`,
+  `DesertWells`): `ChunkTerrainFill.NeighborhoodMaxHeight` (the tree-reach neighbor `MaxHeight` scan pulled out
+  of the `TreesEnabled` block, radius `max(TreeGenerator.ReachChunkRadius, FeatureReachChunks)`), with
+  `BoulderGenerator.HorizontalReach` and `DesertWellGenerator.FootprintRadius` named instead of literal offsets.
+- Per-column guard reorders inside the hot stamps, pure permutations of side-effect-free `continue` tests (the
+  precedent `Cotton` already had): the ly window and the target and ground cells first, the noise and site reads
+  (`IsWaterColumn`, `ColdWeightAt`, the plant rolls, the pool's `PatchNoise`, the mushroom hash) last. This is the
+  sea-floor win: the cell over a submerged floor is water, so the plants reject it before any noise read.
+- `SnowGenerator.Stamp` split into `StampGround` (gated by `GroundWriteBand`) and `StampCanopy` (never gated: its
+  leaves can come from trees rooted in neighbor columns up to `TreeGenerator.ReachUp` higher; reordered only).
+- Test seams: `GenerateBlockData`'s optional `stampGates` (false = every stamp runs, the pre-G6 path; production
+  never passes it) and `WorldgenStageTimer.AfterMark` (a callback after each stage mark, for snapshots; its time
+  is charged to the next stage, so the probe never sets it).
+
+Proof:
+- A temporary identity dump written at the unmodified HEAD (blocks, state bytes, solid count, surface floor, ready
+  flag and fluid frontier per chunk) matched after every step and at the end: 690 chunks (3.38 MB) and an
+  exhaustive 7174 chunks over 1183 chunk columns (35.4 MB), across every biome, ocean, lakes and rivers, highland,
+  massif, great lake and island anchors plus each feature's own placement sites (fallen logs, boulders, cairns,
+  pillars, wells, meteors, geodes, oases, ice spikes), from below the terrain to over the reach of the trees. Removed
+  afterwards; the same sample lives on as `StampGateSample`.
+- `StampGateTests` (permanent): the gated fill is byte-identical to the `stampGates: false` fill on every sample
+  chunk, and every gate both admits and rejects some filled chunk; each of the 18 stamps, called directly on the
+  chunk as it stood before its stage (`AfterMark` snapshots), changes only cells inside its band, and the
+  plants, snow, cave formations, fallen logs, boulders, geodes and meteors each change at least one cell; and
+  `StampBand.Reaches` equals a brute-force check over the chunk's 16 cells. A deliberately tightened band fails both
+  of the first two. Default mode 690 chunks, about 6.7 s alone (the cold worldgen of the sample). Exhaustive:
+  `VOXEL_STAMP_GATES_EXHAUSTIVE=1 DOTNET_ROLL_FORWARD=LatestMajor ~/.dotnet/dotnet.exe test
+  OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release --filter FullyQualifiedName~StampGateTests`, 7174 chunks at
+  the default seed plus a second seed's sample in the identity fact, about 2.5 min.
+
+Result, whole fill per class, ms per chunk (median of 3 invocations of each class's median); "stamps" is the sum of
+the 18 gated stages' means and its share of the warm fill:
+
+| class | warm before | warm after | change | cold before | cold after | stamps before | stamps after |
+|---|---|---|---|---|---|---|---|
+| surface | 1.189 | 0.887 | -25.4% | 121.2 | 117.5 | 0.426 (26.8%) | 0.165 (12.8%) |
+| above-surface | 0.477 | 0.171 | **-64.2%** | 80.8 | 76.6 | 0.353 (71.9%) | 0.125 (48.7%) |
+| deep-stone | 1.141 | 0.977 | -14.4% | 150.8 | 148.0 | 0.259 (18.8%) | 0.110 (9.4%) |
+| cave-heavy | 1.127 | 0.830 | -26.4% | 138.1 | 121.9 | 0.270 (25.2%) | 0.024 (3.0%) |
+| sea-floor | 0.562 | 0.331 | **-41.1%** | 51.4 | 48.6 | 0.311 (53.5%) | 0.037 (11.8%) |
+| all classes | 0.895 | 0.667 | **-25.5%** | 93.5 | 90.1 | 0.295 (31.8%) | 0.081 (11.9%) |
+
+Sky chunks stay on the existing early-out (warm 0.001 / 0.000 ms). Cold barely moves (-2% to -12%): it is `Trees`
+and `WormCaves`. The four stamps G1 named, warm median ms (share) before -> after:
+
+| class | `Pebbles` | `Flowers` | `Foliage` | `Snow` |
+|---|---|---|---|---|
+| surface | 0.076 (5.6%) -> 0.006 (0.7%) | 0.102 (6.9%) -> 0.008 (1.0%) | 0.118 (7.3%) -> 0.044 (3.6%) | 0.054 (3.7%) -> 0.041 (3.4%) |
+| above-surface | 0.075 (17.1%) -> 0 | 0.073 (17.5%) -> 0 | 0.076 (18.0%) -> 0 | 0.067 (12.8%) -> 0.014 |
+| deep-stone | 0.061 (4.7%) -> 0 | 0.059 (4.7%) -> 0 | 0.059 (4.7%) -> 0 | 0.041 (3.2%) -> 0.001 (0.1%) |
+| cave-heavy | 0.069 (6.4%) -> 0 | 0.066 (6.0%) -> 0 | 0.070 (6.2%) -> 0 | 0.044 (4.4%) -> 0.001 (0.1%) |
+| sea-floor | 0.070 (12.1%) -> 0.004 (1.2%) | 0.070 (12.1%) -> 0.004 (1.2%) | 0.070 (12.3%) -> 0.005 (1.6%) | 0.045 (14.2%) -> 0.003 (1.1%) |
+| all classes | 0.069 (7.3%) -> 0.000 (0.3%) | 0.070 (7.8%) -> 0.000 (0.4%) | 0.070 (7.9%) -> 0.000 (1.4%) | 0.046 (5.7%) -> 0.003 (4.4%) |
+
+The gate (above-surface and sea-floor warm each -30%, or the probe mix -15%) passed on all three counts. The
+above-surface `Snow` mean share after (43%) comes from one outlier sample (median 0.014 ms, mean 0.110): the
+ungated canopy pass. What is left of an above-surface fill is mostly `Fill`, now its largest median stage (0.081 ms,
+32.7%), plus the canopy snow and `IceSpikes` (whose band reaches `MaxHeight + IceSpikeMaxHeight`, 0.013 ms).
+
+Not gated, by decision: `GravelPockets`, `Malachite` and `Coal` (G3's domain, untouched); `NoiseCaves`, re-checked:
+0.000 ms on the above-surface class before and after (its existing skip), and inside its band on deep-stone (0.206
+-> 0.208 ms) and cave-heavy (0.207 -> 0.189) it does real carving, so a depth-band gate has nothing to win;
+`Lava` and `Trees`; the snow canopy pass (above); and the lower bounds of the neighbor-site stamps (a neighborhood
+min height would cost extra column lookups for stamps each under 1%).
 
 ## Not chasing (recorded so it is not re-proposed)
 

@@ -81,4 +81,11 @@ public static class CottonGenerator
             blocks[Chunk.Idx(x, ly, z)] = CottonBlock;
         }
     }
+
+    /// <summary>
+    /// Every world y <see cref="Stamp"/> can write in this chunk column: it writes only the cell at
+    /// <c>ly = height + 1 - worldY0</c>, one above a column height, so the band is
+    /// <see cref="StampBand.AboveSurface"/>.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) => StampBand.AboveSurface(column);
 }

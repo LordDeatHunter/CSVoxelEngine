@@ -1,3 +1,4 @@
+using System;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 
@@ -48,18 +49,24 @@ public static class UndergroundPoolGenerator
 
     /// <summary>
     /// Stamps pools onto cave floors: air cells over a solid, non-fluid floor. The bottom layer is
-    /// skipped (its floor lives in the chunk below), so ponded water never floats.
+    /// skipped (its floor lives in the chunk below), so ponded water never floats. Every test is
+    /// pure, so the order is free: the patch noise waits for a column whose band window
+    /// (above the lava, at or below the sea, buried under its surface) overlaps the chunk.
     /// </summary>
     public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
-        if (worldY0 > WorldGenerationConfig.SeaLevel) return;
-
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         {
+            var surfaceHeight = column.Heights[(x << Chunk.SizeShift) | z];
+            // Exactly the y the loop below admits: above the bottom layer and the lava band, at or
+            // below the chunk top, the sea and the burial line
+            var lo = Math.Max(worldY0 + 1, WorldGenerationConfig.LavaMaxY + 1);
+            var hi = Math.Min(Math.Min(worldY0 + Chunk.Size - 1, WorldGenerationConfig.SeaLevel),
+                surfaceHeight - WorldFeatureConfig.PoolBurial);
+            if (hi < lo) continue;
             if (PatchNoise.GetNoise(worldX0 + x, worldZ0 + z) <= WorldFeatureConfig.PoolPatchThreshold)
                 continue;
-            var surfaceHeight = column.Heights[(x << Chunk.SizeShift) | z];
 
             for (var ly = 1; ly < Chunk.Size; ly++)
             {
@@ -78,6 +85,17 @@ public static class UndergroundPoolGenerator
             }
         }
     }
+
+    /// <summary>
+    /// Every world y <see cref="Stamp"/> can write in a chunk over <paramref name="column"/>: a pool
+    /// cell lies above <see cref="WorldGenerationConfig.LavaMaxY"/>, at or below
+    /// <see cref="WorldGenerationConfig.SeaLevel"/> and at or below its column's
+    /// <c>height - PoolBurial &lt;= MaxHeight - PoolBurial</c>. This also carries the old
+    /// above-the-sea early return: a chunk whose floor is over the sea lies outside the band.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) =>
+        new(WorldGenerationConfig.LavaMaxY + 1,
+            Math.Min(WorldGenerationConfig.SeaLevel, column.MaxHeight - WorldFeatureConfig.PoolBurial));
 
     private static float UnitHash(int x, int y, int z)
     {

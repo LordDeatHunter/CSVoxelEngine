@@ -100,10 +100,11 @@ public static class SnowGenerator
     }
 
     /// <summary>
-    /// Freezes this chunk's cold surface water to ice and stamps one snow cell per cold column.
-    /// Runs on a generation worker thread; writes only this chunk's own cells.
+    /// Freezes this chunk's cold surface water to ice and stamps one snow cell per cold column on
+    /// the ground or the ice. Runs on a generation worker thread; writes only this chunk's own
+    /// cells. Runs before <see cref="StampCanopy"/>, which must see the snowed ground.
     /// </summary>
-    public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    public static void StampGround(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
         // The caller gates this on SnowAndIceEnabled, so the body has no toggle of its own.
         var seaBlock = TerrainGenerator.SeaBlock;
@@ -118,17 +119,19 @@ public static class SnowGenerator
             var local = VoxelCoords.ColumnIndex(x, z);
             var height = column.Heights[local];
             var level = column.WaterLevel[local];
-            var cold = ColdWeightAt(worldX, worldZ, height);
-            if (cold <= WorldGenerationConfig.SnowColdThreshold) continue;
+            // Every test before a write is pure, so the order is free: the chunk-local cell tests
+            // come first and the noise reads (the cold, the pack ice) wait for a column they admit.
             int surfaceLy;
             if (height < level)
             {
-                // Open water (a lead in the pack ice, or a hot spring) keeps its surface and no snow
-                if (!IsFrozenWater(worldX, worldZ, cold)) continue;
                 var seaLy = level - worldY0;
                 if ((uint)seaLy >= Chunk.Size) continue;
                 var wi = Chunk.Idx(x, seaLy, z);
                 if (blocks[wi] != seaBlock) continue;
+                var cold = ColdWeightAt(worldX, worldZ, height);
+                if (cold <= WorldGenerationConfig.SnowColdThreshold) continue;
+                // Open water (a lead in the pack ice, or a hot spring) keeps its surface and no snow
+                if (!IsFrozenWater(worldX, worldZ, cold)) continue;
                 blocks[wi] = iceBlock;
                 surfaceLy = seaLy;
             }
@@ -138,6 +141,10 @@ public static class SnowGenerator
                 if ((uint)surfaceLy >= Chunk.Size) continue;
                 var ground = blocks[Chunk.Idx(x, surfaceLy, z)];
                 if (ground == BlockType.Air || BlockType.IsFluid(ground)) continue;
+                var groundSnowLy = surfaceLy + 1;
+                if ((uint)groundSnowLy >= Chunk.Size) continue;
+                if (blocks[Chunk.Idx(x, groundSnowLy, z)] != BlockType.Air) continue;
+                if (ColdWeightAt(worldX, worldZ, height) <= WorldGenerationConfig.SnowColdThreshold) continue;
             }
 
             var snowLy = surfaceLy + 1;
@@ -146,24 +153,50 @@ public static class SnowGenerator
             if (blocks[si] != BlockType.Air) continue;
             blocks[si] = snowBlock;
         }
+    }
 
-        // Taiga spruce crowns wear snow on their top leaves: a cold column's highest non-air cell
-        // with air over it, when it is a leaf, takes a snow cell the way the ground does. The scan
-        // stops at the first non-air cell, so a snowed ground (or any other cover) is left alone.
+    /// <summary>
+    /// The world-y band <see cref="StampGround"/> can write (see <see cref="StampBand"/>). In the
+    /// water branch ice goes at <c>level</c> and snow at <c>level + 1</c>, where
+    /// <c>level &gt; height &gt;= MinHeight</c> and <c>level &lt;= MaxWaterLevel</c>; in the land
+    /// branch snow goes at <c>height + 1</c>, with <c>MinHeight &lt;= height &lt;= MaxHeight</c>.
+    /// <c>MaxWaterLevel</c> may be <see cref="TerrainGenerator.NoWater"/> (int.MinValue); the max
+    /// with <c>MaxHeight</c> keeps the band sane and never subtracts from it.
+    /// </summary>
+    internal static StampBand GroundWriteBand(ColumnData column) =>
+        new(column.MinHeight + 1, Math.Max(column.MaxHeight, column.MaxWaterLevel) + 1);
+
+    /// <summary>
+    /// Taiga spruce crowns wear snow on their top leaves: a cold column's highest non-air cell
+    /// with air over it, when it is a leaf, takes a snow cell the way the ground does. The scan
+    /// stops at the first non-air cell, so a snowed ground (or any other cover) is left alone.
+    /// Runs after <see cref="StampGround"/>; writes only this chunk's own cells. Never gated by a
+    /// band: its leaves can come from trees rooted in neighbor columns.
+    /// </summary>
+    public static void StampCanopy(byte[] blocks, ColumnData column, int worldX0, int worldZ0)
+    {
+        var snowBlock = TerrainGenerator.SnowBlock;
+
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         {
-            var height = column.Heights[(x << Chunk.SizeShift) | z];
-            if (ColdWeightAt(worldX0 + x, worldZ0 + z, height) <= WorldGenerationConfig.SnowColdThreshold)
-                continue;
+            // The scan stops at the first non-air cell whatever the cold, and the cold read is
+            // pure, so the noise read waits for a column whose top cell is a leaf under air.
+            var top = -1;
             for (var ly = Chunk.Size - 2; ly > 0; ly--)
             {
                 var i = Chunk.Idx(x, ly, z);
                 if (blocks[i] == BlockType.Air) continue;
-                if (TreeGenerator.IsLeaf(blocks[i]) && blocks[i + Chunk.Size] == BlockType.Air)
-                    blocks[i + Chunk.Size] = snowBlock;
+                top = i;
                 break;
             }
+
+            if (top < 0) continue;
+            if (!TreeGenerator.IsLeaf(blocks[top]) || blocks[top + Chunk.Size] != BlockType.Air) continue;
+            var height = column.Heights[(x << Chunk.SizeShift) | z];
+            if (ColdWeightAt(worldX0 + x, worldZ0 + z, height) <= WorldGenerationConfig.SnowColdThreshold)
+                continue;
+            blocks[top + Chunk.Size] = snowBlock;
         }
     }
 }

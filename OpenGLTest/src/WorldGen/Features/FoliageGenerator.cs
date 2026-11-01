@@ -107,9 +107,6 @@ public static class FoliageGenerator
         for (var z = 0; z < Chunk.Size; z++)
         {
             var height = column.Heights[(x << Chunk.SizeShift) | z];
-            // Wet columns and beaches stay bare: ground cover is a dry-land plant
-            if (TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, height)) continue;
-            if (TerrainGenerator.IsBeachHeight(height)) continue;
             var ly = height + 1 - worldY0;
             if ((uint)ly >= Chunk.Size) continue;
             // ly == 0 puts the ground in the chunk below, out of reach of a pure per-chunk stamp
@@ -122,13 +119,28 @@ public static class FoliageGenerator
             var free = blocks[i] == BlockType.Air
                        || (ground == PermafrostGroundBlock && blocks[i] == TerrainGenerator.SnowBlock);
             if (!free) continue;
+            // Wet columns and beaches stay bare: ground cover is a dry-land plant. Every test is
+            // pure, so the order is free: the cover rolls run before the water level, a noise read,
+            // which only a column that grows something pays for.
+            if (TerrainGenerator.IsBeachHeight(height)) continue;
 
-            if (ground == GrassGroundBlock && TryGetGrassTuft(worldX0 + x, worldZ0 + z))
-                blocks[i] = GrassTuftBlock;
-            else if (TryGetDeadShrubOn(ground, worldX0 + x, worldZ0 + z))
-                blocks[i] = DeadShrubBlock;
+            // A dead shrub only ever grows over sand or permafrost, so a grass column without a
+            // tuft falls through to no cover
+            var cover = ground == GrassGroundBlock && TryGetGrassTuft(worldX0 + x, worldZ0 + z) ? GrassTuftBlock
+                : TryGetDeadShrubOn(ground, worldX0 + x, worldZ0 + z) ? DeadShrubBlock
+                : BlockType.Air;
+            if (cover == BlockType.Air) continue;
+            if (TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, height)) continue;
+            blocks[i] = cover;
         }
     }
+
+    /// <summary>
+    /// Every world y <see cref="Stamp"/> can write in this chunk column: it writes only the cell at
+    /// <c>ly = height + 1 - worldY0</c>, one above a column height, so the band is
+    /// <see cref="StampBand.AboveSurface"/>.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) => StampBand.AboveSurface(column);
 
     private static float UnitHash(int x, int z, int salt)
     {

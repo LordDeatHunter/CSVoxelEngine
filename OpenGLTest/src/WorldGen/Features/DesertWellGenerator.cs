@@ -17,6 +17,9 @@ public static class DesertWellGenerator
     public static readonly byte SandstoneBlock;
     public static readonly byte WaterBlock;
 
+    /// <summary>The footprint's half width: the 5x5 well reaches this many columns from its center.</summary>
+    internal const int FootprintRadius = 2;
+
     static DesertWellGenerator()
     {
         SandstoneBlock = ContentRegistry.RequireBlock("sandstone").Id;
@@ -49,10 +52,10 @@ public static class DesertWellGenerator
     public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var shift = WorldFeatureConfig.WellCellShift;
-        var minCellX = (worldX0 - 2) >> shift;
-        var maxCellX = (worldX0 + Chunk.Size + 1) >> shift;
-        var minCellZ = (worldZ0 - 2) >> shift;
-        var maxCellZ = (worldZ0 + Chunk.Size + 1) >> shift;
+        var minCellX = (worldX0 - FootprintRadius) >> shift;
+        var maxCellX = (worldX0 + Chunk.Size - 1 + FootprintRadius) >> shift;
+        var minCellZ = (worldZ0 - FootprintRadius) >> shift;
+        var maxCellZ = (worldZ0 + Chunk.Size - 1 + FootprintRadius) >> shift;
         for (var cellX = minCellX; cellX <= maxCellX; cellX++)
         for (var cellZ = minCellZ; cellZ <= maxCellZ; cellZ++)
         {
@@ -66,14 +69,24 @@ public static class DesertWellGenerator
     }
 
     /// <summary>
+    /// The world-y band <see cref="Stamp"/> can write, given the tallest ground height within
+    /// <see cref="FootprintRadius"/> of the chunk: <see cref="StampWell"/> writes only at
+    /// <c>ground</c> (the floor and the water) and <c>ground + 1</c> (the wall), for the center
+    /// column's ground, and a well that writes here has its center within
+    /// <see cref="FootprintRadius"/> of the chunk. Its site may sit in a neighbor chunk column, so
+    /// only the upper bound is used.
+    /// </summary>
+    internal static StampBand WriteBand(int neighborhoodMaxHeight) => new(int.MinValue, neighborhoodMaxHeight + 1);
+
+    /// <summary>
     /// Writes one well centered on column (x, z) whose ground is <paramref name="ground"/>: the
     /// 5x5 wall one cell up, the inner 3x3 ring a sandstone floor at the ground's own level (its
     /// center the water source), into air and the surface cell only. The test seam for the shape.
     /// </summary>
     internal static void StampWell(byte[] blocks, int worldY0, int x, int z, int ground)
     {
-        for (var dx = -2; dx <= 2; dx++)
-        for (var dz = -2; dz <= 2; dz++)
+        for (var dx = -FootprintRadius; dx <= FootprintRadius; dx++)
+        for (var dz = -FootprintRadius; dz <= FootprintRadius; dz++)
         {
             var lx = x + dx - worldX0Of(x);
             var lz = z + dz - worldX0Of(z);
@@ -81,11 +94,11 @@ public static class DesertWellGenerator
             var ring = Math.Max(Math.Abs(dx), Math.Abs(dz));
 
             // The wall one above the ground, the floor at the ground's own level
-            var y = ground + (ring == 2 ? 1 : 0);
+            var y = ground + (ring == FootprintRadius ? 1 : 0);
             var ly = y - worldY0;
             if ((uint)ly >= Chunk.Size) continue;
             var index = Chunk.Idx(lx, ly, lz);
-            if (ring == 2)
+            if (ring == FootprintRadius)
             {
                 if (blocks[index] == BlockType.Air) blocks[index] = SandstoneBlock;
             }
@@ -104,8 +117,8 @@ public static class DesertWellGenerator
     // wall never floats over a dune or buries itself in one
     private static bool IsFlatSite(int x, int z, int ground)
     {
-        for (var dx = -2; dx <= 2; dx++)
-        for (var dz = -2; dz <= 2; dz++)
+        for (var dx = -FootprintRadius; dx <= FootprintRadius; dx++)
+        for (var dz = -FootprintRadius; dz <= FootprintRadius; dz++)
         {
             if (Math.Abs(HeightAt(x + dx, z + dz) - ground) > 1) return false;
         }

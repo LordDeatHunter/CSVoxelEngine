@@ -17,9 +17,11 @@ internal static class ChunkTerrainFill
     /// their air out of the result, floods everything below sea level, then stamps trees onto
     /// the surface. Runs on a generation worker thread. A <see cref="WorldgenStageTimer"/>, passed
     /// only by the tests and the worldgen cost probe (null in production), is charged each stage's
-    /// wall time without changing the output.
+    /// wall time without changing the output. <paramref name="stampGates"/> is a test seam:
+    /// false runs every feature stamp whatever its <see cref="StampBand"/>, exactly as before the
+    /// gates existed, so a test can prove the gated fill identical; production never passes it.
     /// </summary>
-    internal static void GenerateBlockData(Chunk chunk, WorldgenStageTimer? timer = null)
+    internal static void GenerateBlockData(Chunk chunk, WorldgenStageTimer? timer = null, bool stampGates = true)
     {
         // Worldgen timing for the X/VOXEL_DEBUG console line (WorldgenStats, the `wgen` token)
         var genStart = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -31,21 +33,12 @@ internal static class ChunkTerrainFill
         // Entirely above the terrain: nothing to fill, nothing to carve, nothing to stamp.
         // With trees enabled the band above the surface still needs generation (a tree reaches
         // TreeGenerator.ReachUp above its base), and overhanging limbs near cliffs can cross
-        // from higher neighboring columns, so the test uses the tallest column in reach.
+        // from higher neighboring columns, so the test uses the tallest column in reach. The
+        // same neighborhood maximum bounds the scenery whose site may sit in a neighbor column.
+        var neighborhoodMaxHeight = NeighborhoodMaxHeight((int)chunk.Position.X, (int)chunk.Position.Z);
         var maxHeight = column.MaxHeight;
         if (WorldGenerationConfig.TreesEnabled)
-        {
-            var cx = (int)chunk.Position.X;
-            var cz = (int)chunk.Position.Z;
-            var reach = TreeGenerator.ReachChunkRadius;
-            for (var dx = -reach; dx <= reach; dx++)
-            for (var dz = -reach; dz <= reach; dz++)
-            {
-                var neighborMax = ColumnCache.Get(cx + dx, cz + dz).MaxHeight;
-                if (neighborMax > maxHeight) maxHeight = neighborMax;
-            }
-            maxHeight += TreeGenerator.ReachUp + 1;
-        }
+            maxHeight = neighborhoodMaxHeight + TreeGenerator.ReachUp + 1;
 
         // A chunk above the terrain still has water to fill when a body's surface reaches into it:
         // the sea reaches sea level, a lake its own level. A column that holds no water reports
@@ -134,8 +127,11 @@ internal static class ChunkTerrainFill
         WorldgenStats.AddTreeTicks(System.Diagnostics.Stopwatch.GetTimestamp() - treeStart);
         timer?.Mark(Stage.Trees);
 
-        // Scenery on the floor, after the trees so it never displaces one and into air only
-        if (WorldFeatureConfig.FallenLogsEnabled)
+        // Scenery on the floor, after the trees so it never displaces one and into air only.
+        // A log's, boulder's or well's site may sit in a neighbor column, so their bands take
+        // only an upper bound, from the neighborhood maximum.
+        if (WorldFeatureConfig.FallenLogsEnabled
+            && Admits(stampGates, FallenLogGenerator.WriteBand(neighborhoodMaxHeight), lowerBoundY))
         {
             var state = chunk.StateArray;
             FallenLogGenerator.Stamp(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
@@ -143,49 +139,54 @@ internal static class ChunkTerrainFill
         }
         timer?.Mark(Stage.FallenLogs);
 
-        if (WorldFeatureConfig.BouldersEnabled)
+        if (WorldFeatureConfig.BouldersEnabled
+            && Admits(stampGates, BoulderGenerator.WriteBand(neighborhoodMaxHeight), lowerBoundY))
             BoulderGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Boulders);
 
         // A landmark on a summit, after everything else so its stack owns the peak
-        if (WorldFeatureConfig.CairnsEnabled)
+        if (WorldFeatureConfig.CairnsEnabled && Admits(stampGates, CairnGenerator.WriteBand(column), lowerBoundY))
             CairnGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Cairns);
 
         // Ruins on the dry land, clipped at chunk borders
-        if (WorldFeatureConfig.RuinedPillarsEnabled)
+        if (WorldFeatureConfig.RuinedPillarsEnabled
+            && Admits(stampGates, RuinedPillarGenerator.WriteBand(column), lowerBoundY))
             RuinedPillarGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.RuinedPillars);
 
-        if (WorldFeatureConfig.DesertWellsEnabled)
+        if (WorldFeatureConfig.DesertWellsEnabled
+            && Admits(stampGates, DesertWellGenerator.WriteBand(neighborhoodMaxHeight), lowerBoundY))
             DesertWellGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.DesertWells);
 
         // Deep rock features, after the carvers so a geode's heart is not carved again
-        if (WorldFeatureConfig.GeodesEnabled)
+        if (WorldFeatureConfig.GeodesEnabled && Admits(stampGates, GeodeGenerator.WriteBand(), lowerBoundY))
             GeodeGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Geodes);
 
-        if (WorldFeatureConfig.MeteorsEnabled)
+        if (WorldFeatureConfig.MeteorsEnabled && Admits(stampGates, MeteorGenerator.WriteBand(column), lowerBoundY))
             MeteorGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Meteors);
 
         // Pond plants, after the water: reeds may replace the shallow cell they stand in, and a
         // lily pad floats on the cell above a lake's top water cell
-        if (WorldFeatureConfig.ReedsEnabled)
+        if (WorldFeatureConfig.ReedsEnabled && Admits(stampGates, ReedGenerator.WriteBand(column), lowerBoundY))
             ReedGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Reeds);
 
-        if (WorldFeatureConfig.LilyPadsEnabled)
+        if (WorldFeatureConfig.LilyPadsEnabled && Admits(stampGates, LilyPadGenerator.WriteBand(column), lowerBoundY))
             LilyPadGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.LilyPads);
 
         // Cave life, after the carvers and the water: only carved, dry air takes any
-        if (WorldFeatureConfig.GlowMushroomsEnabled)
+        if (WorldFeatureConfig.GlowMushroomsEnabled
+            && Admits(stampGates, GlowMushroomGenerator.WriteBand(column), lowerBoundY))
             GlowMushroomGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.GlowMushrooms);
 
-        if (WorldFeatureConfig.CaveFormationsEnabled)
+        if (WorldFeatureConfig.CaveFormationsEnabled
+            && Admits(stampGates, CaveFormationGenerator.WriteBand(column), lowerBoundY))
             CaveFormationGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.CaveFormations);
 
@@ -195,36 +196,47 @@ internal static class ChunkTerrainFill
         timer?.Mark(Stage.GravelPockets);
 
         // Underground water, after the lava so a pool never sits in a lava cell
-        if (WorldFeatureConfig.UndergroundPoolsEnabled)
+        if (WorldFeatureConfig.UndergroundPoolsEnabled
+            && Admits(stampGates, UndergroundPoolGenerator.WriteBand(column), lowerBoundY))
             UndergroundPoolGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.UndergroundPools);
 
         // Frozen-only ice spikes go down before the snow, so a spike keeps its base cell
-        if (WorldGenerationConfig.SnowAndIceEnabled)
+        if (WorldGenerationConfig.SnowAndIceEnabled
+            && Admits(stampGates, IceSpikeGenerator.WriteBand(column), lowerBoundY))
             IceSpikeGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.IceSpikes);
 
         // Last of the cold features: freezes cold surface water to ice, then lays snow on the dry
-        // ground and the ice sheet that is left
+        // ground and the ice sheet that is left. The canopy pass is never gated: its leaves can come
+        // from trees rooted in neighbor columns, up to TreeGenerator.ReachUp above their ground.
         if (WorldGenerationConfig.SnowAndIceEnabled)
-            SnowGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        {
+            if (Admits(stampGates, SnowGenerator.GroundWriteBand(column), lowerBoundY))
+                SnowGenerator.StampGround(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            SnowGenerator.StampCanopy(chunk.Blocks, column, worldX0, worldZ0);
+        }
+
         timer?.Mark(Stage.Snow);
 
-        if (WorldFeatureConfig.PebblesEnabled)
+        // A stamp's WriteBand is every world y its own code can write (derived from that code, not
+        // from tuning), so a stamp whose band misses this chunk cannot change a cell here and
+        // skipping it is bit-identical. The marks stay unconditional so the stage layout holds.
+        if (WorldFeatureConfig.PebblesEnabled && Admits(stampGates, PebbleGenerator.WriteBand(column), lowerBoundY))
             PebbleGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Pebbles);
 
         // Before the flowers and foliage, so their per-column scatter fills in around a clump
         // instead of eating into it
-        if (WorldFeatureConfig.CottonEnabled)
+        if (WorldFeatureConfig.CottonEnabled && Admits(stampGates, CottonGenerator.WriteBand(column), lowerBoundY))
             CottonGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Cotton);
 
-        if (WorldFeatureConfig.FlowersEnabled)
+        if (WorldFeatureConfig.FlowersEnabled && Admits(stampGates, FlowerGenerator.WriteBand(column), lowerBoundY))
             FlowerGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Flowers);
 
-        if (WorldFeatureConfig.FoliageEnabled)
+        if (WorldFeatureConfig.FoliageEnabled && Admits(stampGates, FoliageGenerator.WriteBand(column), lowerBoundY))
             FoliageGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Foliage);
 
@@ -244,6 +256,35 @@ internal static class ChunkTerrainFill
 
         chunk.IsBlockDataReady = true;
         WorldgenStats.AddChunk(System.Diagnostics.Stopwatch.GetTimestamp() - genStart);
+    }
+
+    /// <summary>Whether a feature stamp runs in the chunk whose floor is <paramref name="worldY0"/>:
+    /// always with the gates off, else only when its <see cref="StampBand"/> reaches the chunk.</summary>
+    private static bool Admits(bool stampGates, StampBand band, int worldY0) => !stampGates || band.Reaches(worldY0);
+
+    // How many chunk columns away the site of a boulder, a desert well or a fallen log can lie
+    // and still write into a chunk: its farthest horizontal reach in blocks, rounded up to chunks
+    private static readonly int FeatureReachChunks =
+        (Math.Max(Math.Max(BoulderGenerator.HorizontalReach, DesertWellGenerator.FootprintRadius),
+             WorldFeatureConfig.FallenLogMaxLength) + Chunk.Size - 1) / Chunk.Size;
+
+    /// <summary>
+    /// The tallest <see cref="ColumnData.MaxHeight"/> over the chunk columns within
+    /// <c>max(TreeGenerator.ReachChunkRadius, FeatureReachChunks)</c> of (cx, cz), the own column
+    /// included, so it bounds every ground height within that many chunks: the trees' reach for the
+    /// above-the-terrain early-out, and the neighbor-site scenery's bands.
+    /// </summary>
+    internal static int NeighborhoodMaxHeight(int cx, int cz)
+    {
+        var reach = Math.Max(TreeGenerator.ReachChunkRadius, FeatureReachChunks);
+        var maxHeight = int.MinValue;
+        for (var dx = -reach; dx <= reach; dx++)
+        for (var dz = -reach; dz <= reach; dz++)
+        {
+            var neighborMax = ColumnCache.Get(cx + dx, cz + dz).MaxHeight;
+            if (neighborMax > maxHeight) maxHeight = neighborMax;
+        }
+        return maxHeight;
     }
 
     /// <summary>

@@ -44,6 +44,16 @@ public static class IceSpikeGenerator
     }
 
     /// <summary>
+    /// The world-y band <see cref="Stamp"/> can write in a chunk whose own column is
+    /// <paramref name="column"/>: a spike only writes when its column lies inside the chunk (lx and
+    /// lz are bounded), so its ground is one of this column's heights, and its cells are
+    /// <c>baseY..baseY + height - 1</c> = <c>ground + 1..ground + height</c>, where
+    /// <see cref="TryGetSpike"/>'s height is at most <see cref="WorldGenerationConfig.IceSpikeMaxHeight"/>.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) =>
+        new(column.MinHeight + 1, column.MaxHeight + WorldGenerationConfig.IceSpikeMaxHeight);
+
+    /// <summary>
     /// Whether (x, z) grows a spike, and how tall. Placement (density roll + lowest-hash spacing +
     /// frozen-biome ground rules) uses one hash stream; the height uses another.
     /// </summary>

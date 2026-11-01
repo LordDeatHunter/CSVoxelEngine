@@ -19,6 +19,9 @@ public static class CairnGenerator
     /// <summary>Hat block (one stone of a pebble pile); resolved once in the static constructor.</summary>
     public static readonly byte PebbleBlock;
 
+    // Cobblestone cells in a cairn's stack, under its pebble hat
+    private const int StackCells = 3;
+
     static CairnGenerator()
     {
         CobblestoneBlock = ContentRegistry.RequireBlock("cobblestone").Id;
@@ -82,6 +85,15 @@ public static class CairnGenerator
     }
 
     /// <summary>
+    /// The world-y band <see cref="Stamp"/> can write in a chunk whose own column is
+    /// <paramref name="column"/>: a cairn is only stamped when its column lies inside the chunk, so
+    /// its ground is one of this column's heights, and <see cref="StampStack"/> writes from
+    /// <c>height + 1</c> up to the hat at <c>height + StackCells + 1</c>.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) =>
+        new(column.MinHeight + 1, column.MaxHeight + StackCells + 1);
+
+    /// <summary>
     /// Writes one cairn's stack at column (x, z) whose ground is <paramref name="height"/>: three
     /// cobblestone cells and a one-stone pebble hat, into air only. The test seam for the shape.
     /// </summary>
@@ -89,7 +101,7 @@ public static class CairnGenerator
     {
         var lx = x - worldX0Of(x);
         var lz = z - worldX0Of(z);
-        for (var i = 1; i <= 3; i++)
+        for (var i = 1; i <= StackCells; i++)
         {
             var ly = height + i - worldY0;
             if ((uint)ly >= Chunk.Size) continue;
@@ -98,7 +110,7 @@ public static class CairnGenerator
             blocks[index] = CobblestoneBlock;
         }
 
-        var hatLy = height + 4 - worldY0;
+        var hatLy = height + StackCells + 1 - worldY0;
         if ((uint)hatLy < Chunk.Size)
         {
             var index = Chunk.Idx(lx, hatLy, lz);

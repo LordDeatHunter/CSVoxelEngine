@@ -28,6 +28,8 @@ public static class GlowMushroomGenerator
     /// Stamps mushrooms onto deep cave floors: air over a solid cell, with air above, at least
     /// <see cref="WorldFeatureConfig.GlowMushroomMinDepth"/> under the column's height. Runs on
     /// a generation worker thread after the carvers and the water, so a flooded cave stays bare.
+    /// Every test is pure, so the order is free: the hash waits for a column whose depth line
+    /// reaches into the chunk.
     /// </summary>
     public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
@@ -35,12 +37,15 @@ public static class GlowMushroomGenerator
         for (var z = 0; z < Chunk.Size; z++)
         {
             var height = column.Heights[(x << Chunk.SizeShift) | z];
-            if (!TryGetMushroom(worldX0 + x, worldZ0 + z)) continue;
 
             // Down from the deepest cell this chunk could hold to the depth line (one short of the
             // chunk top, so the headroom read stays inside the chunk)
             var top = Math.Min(height - WorldFeatureConfig.GlowMushroomMinDepth,
                 worldY0 + Chunk.Size - 2);
+            // The loop below breaks at once on its first cell (ly <= 0), so nothing could be written
+            if (top <= worldY0) continue;
+            if (!TryGetMushroom(worldX0 + x, worldZ0 + z)) continue;
+
             for (var y = top; y >= worldY0; y--)
             {
                 var ly = y - worldY0;
@@ -54,4 +59,13 @@ public static class GlowMushroomGenerator
             }
         }
     }
+
+    /// <summary>
+    /// Every world y <see cref="Stamp"/> can write in a chunk over <paramref name="column"/>: a
+    /// column writes only at a y at or below its <c>top</c>, which is at most
+    /// <c>height - GlowMushroomMinDepth &lt;= MaxHeight - GlowMushroomMinDepth</c>. No lower bound:
+    /// a cave floor may lie at any depth.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) =>
+        new(int.MinValue, column.MaxHeight - WorldFeatureConfig.GlowMushroomMinDepth);
 }

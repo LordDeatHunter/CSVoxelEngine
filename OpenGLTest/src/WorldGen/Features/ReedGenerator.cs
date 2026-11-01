@@ -1,3 +1,4 @@
+using System;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 
@@ -39,7 +40,9 @@ public static class ReedGenerator
     /// Stamps reeds at the water's edge: one cell above the ground where the ground sits within
     /// <see cref="WorldFeatureConfig.ReedShallowDepth"/> under the column's water level (the
     /// shallow water cell itself, or the dry edge level with it). Runs on a generation worker
-    /// thread after the water, so a reed may replace the shallow cell it stands in.
+    /// thread after the water, so a reed may replace the shallow cell it stands in. Every test
+    /// is pure, so the order is free: the clump read waits for a column the cheap depth and cell
+    /// window admit.
     /// </summary>
     public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
@@ -50,14 +53,25 @@ public static class ReedGenerator
             var height = column.Heights[i2];
             var depth = column.WaterLevel[i2] - height;
             if (depth < 0 || depth > WorldFeatureConfig.ReedShallowDepth) continue;
-            if (!TryGetReed(worldX0 + x, worldZ0 + z)) continue;
 
             var ly = height + 1 - worldY0;
             if ((uint)ly >= Chunk.Size || ly == 0) continue;
+            if (!TryGetReed(worldX0 + x, worldZ0 + z)) continue;
+
             var i = Chunk.Idx(x, ly, z);
             // The shallow water cell itself, or the air of a dry edge; never a solid block
             if (blocks[i] != BlockType.Air && !BlockType.IsFluid(blocks[i])) continue;
             blocks[i] = ReedBlock;
         }
     }
+
+    /// <summary>
+    /// Every world y <see cref="Stamp"/> can write in a chunk over <paramref name="column"/>: its one
+    /// write is at <c>height + 1</c>, and only where <c>0 &lt;= level - height</c>, so
+    /// <c>MinHeight &lt;= height &lt;= min(MaxHeight, level)</c> with <c>level &lt;= MaxWaterLevel</c>.
+    /// A dry chunk column (<see cref="TerrainGenerator.NoWater"/>) gives an empty band; the min never
+    /// subtracts from it.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) =>
+        new(column.MinHeight + 1, Math.Min(column.MaxHeight, column.MaxWaterLevel) + 1);
 }

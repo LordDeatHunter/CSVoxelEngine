@@ -145,5 +145,15 @@ public static class FallenLogGenerator
         }
     }
 
+    /// <summary>
+    /// The world-y band <see cref="Stamp"/> can write, given the tallest ground height within
+    /// <see cref="WorldFeatureConfig.FallenLogMaxLength"/> blocks of the chunk: every cell sits at
+    /// <c>ly = ground + 1 - worldY0</c> for the start column's ground, and a log that writes here
+    /// has a cell inside the chunk, so its start lies within its length (at most
+    /// <see cref="WorldFeatureConfig.FallenLogMaxLength"/>) of it. Its site may sit in a neighbor
+    /// chunk column, so only the upper bound is used.
+    /// </summary>
+    internal static StampBand WriteBand(int neighborhoodMaxHeight) => new(int.MinValue, neighborhoodMaxHeight + 1);
+
     private static float Unit(ulong h) => (h >> 40) * (1f / (1 << 24));
 }

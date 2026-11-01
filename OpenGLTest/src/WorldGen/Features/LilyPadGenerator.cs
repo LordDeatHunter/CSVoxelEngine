@@ -28,7 +28,8 @@ public static class LilyPadGenerator
 
     /// <summary>
     /// Stamps pads onto lake surfaces: the cell above the top water cell of a wet, non-sea column,
-    /// into air only. Runs on a generation worker thread after the water.
+    /// into air only. Runs on a generation worker thread after the water. Every test is pure, so
+    /// the order is free: the pad hash waits for a column the cheap level and cell window admit.
     /// </summary>
     public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
@@ -39,13 +40,22 @@ public static class LilyPadGenerator
             var waterLevel = column.WaterLevel[i2];
             // The ocean and rivers are sea level; a lake carries its own surface, above its ground
             if (waterLevel == WorldGenerationConfig.SeaLevel || waterLevel <= column.Heights[i2]) continue;
-            if (!TryGetPad(worldX0 + x, worldZ0 + z)) continue;
 
             var ly = waterLevel - worldY0;
             if ((uint)ly >= Chunk.Size) continue;
+            if (!TryGetPad(worldX0 + x, worldZ0 + z)) continue;
+
             var i = Chunk.Idx(x, ly, z);
             if (blocks[i] != BlockType.Air) continue;
             blocks[i] = PadBlock;
         }
     }
+
+    /// <summary>
+    /// Every world y <see cref="Stamp"/> can write in a chunk over <paramref name="column"/>: its one
+    /// write is at the column's own <c>waterLevel</c>, and only where <c>waterLevel &gt; height</c>,
+    /// so <c>MinHeight &lt; waterLevel &lt;= MaxWaterLevel</c>. A dry chunk column
+    /// (<see cref="TerrainGenerator.NoWater"/>) gives an empty band.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) => new(column.MinHeight + 1, column.MaxWaterLevel);
 }

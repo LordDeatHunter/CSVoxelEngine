@@ -83,4 +83,14 @@ public static class GeodeGenerator
             }
         }
     }
+
+    /// <summary>
+    /// The world-y band <see cref="Stamp"/> can write in any chunk: <see cref="TryGetGeode"/> puts a
+    /// center's y in <see cref="WorldFeatureConfig.GeodeMinY"/>..<see cref="WorldFeatureConfig.GeodeMaxY"/>
+    /// and its radius at most <see cref="WorldFeatureConfig.GeodeMaxRadius"/>, and the stamp only
+    /// writes within the radius of the center on every axis.
+    /// </summary>
+    internal static StampBand WriteBand() =>
+        new(WorldFeatureConfig.GeodeMinY - WorldFeatureConfig.GeodeMaxRadius,
+            WorldFeatureConfig.GeodeMaxY + WorldFeatureConfig.GeodeMaxRadius);
 }

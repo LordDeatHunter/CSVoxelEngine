@@ -66,19 +66,29 @@ public static class FlowerGenerator
         for (var z = 0; z < Chunk.Size; z++)
         {
             var height = column.Heights[(x << Chunk.SizeShift) | z];
-            // Wet columns and beaches stay bare: flowers are a meadow plant
-            if (TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, height)) continue;
-            if (TerrainGenerator.IsBeachHeight(height)) continue;
             var ly = height + 1 - worldY0;
-            if ((uint)ly >= Chunk.Size) continue;
-            if (!TryGetFlower(worldX0 + x, worldZ0 + z)) continue;
+            // ly == 0 puts the ground in the chunk below, out of reach of a pure per-chunk stamp
+            if ((uint)ly >= Chunk.Size || ly == 0) continue;
 
             var i = Chunk.Idx(x, ly, z);
             if (blocks[i] != BlockType.Air) continue;
             // The ground itself must still be grass: carves, ravine rock and tree trunks
             // growing through the column all disqualify it
-            if (ly == 0 || blocks[Chunk.Idx(x, ly - 1, z)] != GrassBlock) continue;
+            if (blocks[Chunk.Idx(x, ly - 1, z)] != GrassBlock) continue;
+            // Wet columns and beaches stay bare: flowers are a meadow plant. Every test is pure, so
+            // the order is free: the cheap tests run first, and the clump membership and the water
+            // level, both noise reads, wait for a column they admit.
+            if (TerrainGenerator.IsBeachHeight(height)) continue;
+            if (!TryGetFlower(worldX0 + x, worldZ0 + z)) continue;
+            if (TerrainGenerator.IsWaterColumn(worldX0 + x, worldZ0 + z, height)) continue;
             blocks[i] = FlowerBlock;
         }
     }
+
+    /// <summary>
+    /// Every world y <see cref="Stamp"/> can write in this chunk column: it writes only the cell at
+    /// <c>ly = height + 1 - worldY0</c>, one above a column height, so the band is
+    /// <see cref="StampBand.AboveSurface"/>.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) => StampBand.AboveSurface(column);
 }

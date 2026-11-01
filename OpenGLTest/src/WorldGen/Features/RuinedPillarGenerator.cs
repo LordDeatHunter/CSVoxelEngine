@@ -64,6 +64,16 @@ public static class RuinedPillarGenerator
     }
 
     /// <summary>
+    /// The world-y band <see cref="Stamp"/> can write in a chunk whose own column is
+    /// <paramref name="column"/>: a pillar is only stamped when its column lies inside the chunk, so
+    /// its ground is one of this column's heights, and <see cref="StampPillar"/> writes level
+    /// 0..height-1 at <c>ground + 1 + level</c>, where <see cref="TryGetPillar"/>'s height is at most
+    /// <see cref="WorldFeatureConfig.PillarMaxHeight"/>.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) =>
+        new(column.MinHeight + 1, column.MaxHeight + WorldFeatureConfig.PillarMaxHeight);
+
+    /// <summary>
     /// Writes one pillar at column (x, z) whose ground is <paramref name="ground"/>: bricks from
     /// one above the ground up to <paramref name="height"/> cells, a level skipped where the
     /// corresponding <paramref name="gaps"/> bit is set (the bottom cell always stands), into air

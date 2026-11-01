@@ -79,6 +79,15 @@ public static class CaveFormationGenerator
         }
     }
 
+    /// <summary>
+    /// Every world y <see cref="Stamp"/> can write in a chunk over <paramref name="column"/>: a
+    /// formation goes at a y at or below its column's <c>top</c>, at most
+    /// <c>height - CaveFormationMinDepth &lt;= MaxHeight - CaveFormationMinDepth</c>, and a drip
+    /// only below its stalactite. No lower bound: a cave may lie at any depth.
+    /// </summary>
+    internal static StampBand WriteBand(ColumnData column) =>
+        new(int.MinValue, column.MaxHeight - WorldFeatureConfig.CaveFormationMinDepth);
+
     // Its drip point: the first free cell over the column's floor below it
     private static void StampDrip(byte[] blocks, int x, int y, int z, int worldY0)
     {

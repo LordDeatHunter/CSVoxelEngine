@@ -21,6 +21,12 @@ public static class BoulderGenerator
     private const ulong ShapeStream = unchecked(AcceptStream * 5);
     private const ulong MaterialStream = unchecked(AcceptStream * 6);
 
+    /// <summary>
+    /// The farthest a boulder cell lies from its center column on either horizontal axis: the
+    /// blob is the center plus at most three of its four face neighbors.
+    /// </summary>
+    internal const int HorizontalReach = 1;
+
     /// <summary>Blocks this generator stamps; resolved once in the static constructor.</summary>
     public static readonly byte StoneBlock;
     public static readonly byte CobblestoneBlock;
@@ -63,10 +69,10 @@ public static class BoulderGenerator
     public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
     {
         var shift = WorldFeatureConfig.BoulderCellShift;
-        var minCellX = (worldX0 - 1) >> shift;
-        var maxCellX = (worldX0 + Chunk.Size) >> shift;
-        var minCellZ = (worldZ0 - 1) >> shift;
-        var maxCellZ = (worldZ0 + Chunk.Size) >> shift;
+        var minCellX = (worldX0 - HorizontalReach) >> shift;
+        var maxCellX = (worldX0 + Chunk.Size - 1 + HorizontalReach) >> shift;
+        var minCellZ = (worldZ0 - HorizontalReach) >> shift;
+        var maxCellZ = (worldZ0 + Chunk.Size - 1 + HorizontalReach) >> shift;
         Span<int> dx = stackalloc int[4];
         Span<int> dz = stackalloc int[4];
         for (var cellX = minCellX; cellX <= maxCellX; cellX++)
@@ -117,6 +123,15 @@ public static class BoulderGenerator
             }
         }
     }
+
+    /// <summary>
+    /// The world-y band <see cref="Stamp"/> can write, given the tallest ground height within
+    /// <see cref="HorizontalReach"/> of the chunk: every cell sits at <c>ly = height + 1 - worldY0</c>
+    /// for the center column's height, and a boulder that writes here has a cell inside the chunk,
+    /// so its center lies within <see cref="HorizontalReach"/> of it. Its site may sit in a neighbor
+    /// chunk column, so only the upper bound is used.
+    /// </summary>
+    internal static StampBand WriteBand(int neighborhoodMaxHeight) => new(int.MinValue, neighborhoodMaxHeight + 1);
 
     private static float Unit(ulong h) => (h >> 40) * (1f / (1 << 24));
 }

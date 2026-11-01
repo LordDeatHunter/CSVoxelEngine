@@ -52,7 +52,8 @@ public sealed class SnowCanopyTests
             blocks[Chunk.Idx(x, 10, z)] = stone;
         blocks[Chunk.Idx(lx, 14, lz)] = leaves;
 
-        SnowGenerator.Stamp(blocks, column, worldX0, 0, worldZ0);
+        SnowGenerator.StampGround(blocks, column, worldX0, 0, worldZ0);
+        SnowGenerator.StampCanopy(blocks, column, worldX0, worldZ0);
 
         var snow = TerrainGenerator.SnowBlock;
         // The leaf crown wears snow, and the ground under it keeps its own layer
