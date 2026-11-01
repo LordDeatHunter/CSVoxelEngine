@@ -137,7 +137,7 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 
 Ranking: within each group the prerequisite measurement comes first (G1; F1, F2 and F9 are done). F3-F8 follow the
 share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%,
-before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4 was tried and ruled out; F9 is done);
+before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4 and F13, exact reflection cuts, were tried and ruled out; F9 is done);
 F10-F12 are CPU-only and matter less while the frame is GPU-bound.
 G follows the `wgen` and probe split. Ties and unmeasured items fall back to effort. Each entry has a
 bold title, then **Files**, **Win** (measured or estimated), **Verify** and **Invariant**.
@@ -188,6 +188,9 @@ after F2).
   `clouds-mirror.json` and `cloud-shadows.json` screenshots.
 - **Invariant**: the `CloudCopies`/`CloudCover` twins and their tests; the `SkySample` copies
   (shader-sync); unit 8 stays reserved for the cloud shadow.
+- **Mirror clouds too** (F13 gate, 2026-11-01): the water mirror redraws the clouds every time it
+  renders: 1.56 ms of its 3.65 ms forced-render sum on perf-fly (clouds-mirror 1.45, water.json
+  0.69), against 0.09 for its sky. A cheaper cloud draw pays in both passes.
 
 **F8. `lod` CPU spike and `lodPass` worst** (low priority; 0.91 ms, 6%, worst 10.7 ms GPU).
 - **Files**: `Lod/LodManager.cs`, `LodCoverPass.cs`, `LodRegionSet.cs`. The 1306 ms single-frame `lod`
@@ -458,6 +461,53 @@ fragment that passes `LEQUAL` against depth already written, fading or not; no h
   (realized share ~95% of predicted, false predictions ~0). The same skip with the two rules ignored
   saved 2.02 ms; the order-preserving segmented cull that landed (F9, Done) got most of it. Shadow cascades:
   ~0% light-space occlusion, nothing to gain.
+- F13, exact cuts of the planar water reflection (`ReflectionPass.RenderReflection`), gated out
+  2026-11-01 before any cut landed (T1000 Max-Q, Release, 1280x720 with the mirror target also
+  1280x720 at reflection quality 1.0, clocks 1380-1530 MHz at 70-72 C; perf-fly `VOXEL_TIME=60`,
+  water.json at 360, clouds-mirror.json at 120). The rule was pixel-identical. Two cuts were weighed:
+  (A) F9's order-preserving segmented Hi-Z cull on the mirror's chunk run against the mirror's own
+  depth, exact on every frame; (B) a scissor of the mirror to the texels the water can sample plus a
+  rect cull of draws outside it. B was bounded by a GL-free twin: tight per-chunk fluid-vertex bounds
+  and per-LOD-region water-sheet bounds, grown by the Y wave lift, clipped to the camera frustum and
+  the fancy-water distance, projected through the mirror, then grown by the 0.08 UV tap offset, the
+  clamp, the bilinear pair and a float-error margin. A `// TEMP-DIAG` GPU tap check (an atomic bound
+  of every mirror texel the water pass read) found 0 texels outside it on render frames and on reuse
+  frames whose region had not escaped. The measurements:
+  - **Forced-render split** (every frame renders; 3 runs, 113 one-second windows; median ms GPU):
+    sky 0.09, chunks 1.33, LOD 0.50, entities 0.00, clouds 1.56, sum 3.65. The windows rendered
+    ~441 chunks (2.0M indices) and ~82 LOD regions (1.1M indices). Plain perf-fly rendered 67.6% of
+    frames and reused 32.4% (2946 vs 1410). Its render-frame `reflect` samples have a median of
+    3.85 ms, consistent with the forced sum. water.json: chunks 0.57, LOD 0.06, clouds 0.69,
+    sum 1.69. clouds-mirror: chunks 1.76, LOD 0.22, clouds 1.45, sum 3.53.
+  - **Hi-Z (A)**: dead. The mirror depth was read back every 30th render and tested with the exact
+    conservative rect and max-depth test. Occluded chunk indices on perf-fly: median 0%, mean 0.33%,
+    max 3.3% over 102 samples, and segmented at 1/8 and 1/2 a mean of 0.19%. Neither masking the
+    depth outside the sample region to far nor clipping the boxes at the plane changed this.
+    water.json: mean 1.8%. clouds-mirror: 0%. At F9's ~1:1 calibration that saves about 0.004 ms
+    (water 0.01). The reason: the mirror looks up from below the plane, the clip discards everything
+    under it, and what is left is terrain against the sky. Almost every chunk's rect reaches a
+    sky texel (depth 1), so few chunks hide behind others.
+  - **Scissor + rect cull (B)**: small, and not exact. The sample region covers a median 94% of the
+    target on perf-fly (83% for this frame's water alone, the rest a superset for reuse frames).
+    Only 0.15% of chunk indices (mean 1.8%) and 0% of LOD indices fall outside it, so the vertex
+    work stays. A timing A/B in 4 s blocks gave 0.31/0.39/0.33 ms per run, but the blocks cover
+    different flight legs. Matched by window against the all-off runs, the saving is a median of
+    0.11 ms (mean 0.26, ~30 windows a side); water.json 0.14 (too few windows); clouds-mirror -0.02.
+    It cannot be exact against HEAD. A reuse frame can sample texels the last render never drew
+    when water is meshed or uploaded after it (escapes: perf-fly 0.24%, water 0.72%, clouds 0.37%
+    of reuse candidates), and the tap check saw it happen on 3 of 6 escape frames. Refreshing on an
+    escape keeps every other frame identical but shows a one-frame-fresher mirror there; that was
+    never accepted, so B was dropped.
+  - **FULL target**: perf-fly 0% for this frame's water and 0.44% for the superset, clouds-mirror
+    0%, water.json 48%. All of water.json's are its low poses near the surface, where nearby water
+    has mirror w near 0 and an unbounded mirrored UV; there the full target is correct, not a
+    loose bound.
+  Rejected without measuring: shrinking the viewport (changes the projection mapping), seeding the
+  depth with the LOD first (reorders draws), and hardware clip planes in place of the `uClipY` discard
+  (edge coverage not provably identical). The diagnostics, the bound twin and its tests were reverted
+  and kept outside the tree. Where the mirror's time actually goes: chunk vertex and fragment work
+  the depth test cannot cull, and the mirrored clouds (F7). Retry only with a cheaper mirror (lower
+  reflection resolution is a setting, not a free cut) or once F7 lands.
 - Fluid 16-slot chunk cache: no spike reduction (16 vs 256 slots identical); a per-tick cap freezes fluid.
 - Mud 6-face gate: not outcome-equivalent (diagonal dirt can be wet).
 - VSync and limiters, GL debug context, per-frame `GetError`, worker priorities, uniform location
