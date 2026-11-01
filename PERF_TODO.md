@@ -135,33 +135,17 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 
 ## Open
 
-Ranking: within each group the prerequisite measurement comes first (G1; F1 is done). F2-F8 follow the
-share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%;
-worldPass 26%, reflect 16%, clouds 7%, lodPass 6%); F9 builds on F2 and F4; F10-F12 are CPU-only and matter less while the frame is GPU-bound.
+Ranking: within each group the prerequisite measurement comes first (G1; F1 and F2 are done). F3-F8 follow the
+share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%,
+before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%); F9 builds on F2 and F4;
+F10-F12 are CPU-only and matter less while the frame is GPU-bound.
 G follows the `wgen` and probe split. Ties and unmeasured items fall back to effort. Each entry has a
 bold title, then **Files**, **Win** (measured or estimated), **Verify** and **Invariant**.
 
 ### A. Frame time (FPS)
 
-**F2. Cull shadow casters to the receiver volume** (targets the 36% shadow share).
-- **Files**: `ShadowPass.cs` (`DrawChunkCasters`, the LOD caster loop), `ShadowCascade.cs`, a new
-  GL-free `Rendering/ShadowCasterCull.cs` with xUnit tests. Today casters are culled only by each
-  cascade's ortho box; the far box is 704 blocks wide (`LightingConfig.FarShadowRadiusBlocks` 352).
-  Keep casters whose light-space footprint overlaps the light-space bounds of the frustum slice the
-  cascade serves (near: up to its fade end; far: from the near fade start to `FarShadowRadiusBlocks`),
-  unioned with the mirrored frustum on frames the reflection renders, extruded without limit toward the sun.
-- **Win**: estimated; the casters behind and beside the camera. Measured split (perf-fly x3, 2026-10-31,
-  medians over lines where both rows report): `shadowNear` 2.56 ms, `shadowFar` 3.75 ms GPU, so the far
-  cascade is ~59% of the shadow pass and the near ~41%. Per-cascade caster counts were not captured; add
-  `// TEMP-DIAG` counts in `DrawChunkCasters` and the LOD caster loop to size the cull first.
-  **Verify**: `shadowNear`/`shadowFar` pair; screenshots at `VOXEL_TIME` 430 and over the bay identical.
-- **Invariant**: conservative for every map consumer: world and LOD fragments, the reflection, leaf
-  backlight (`LeafBacklightReachBlocks` toward the sun), caustics, `RenderUnderwaterRays`, godrays
-  (`GodraysMaxDistance`). Interlock with F3: a far map reused across frames must never be rendered
-  from a frustum-culled caster set, so apply F2 to the near cascade only, or invalidate the far cache
-  whenever the frustum's light-space bounds leave the ones it was rendered for.
-
-**F3. Far cascade reuse** (`shadowFar` 3.75 ms GPU, ~59% of the shadow pass on 2026-10-31).
+**F3. Far cascade reuse** (`shadowFar` 3.75 ms GPU, ~59% of the shadow pass on 2026-10-31; 1.50 ms
+after F2).
 - **Files**: `ShadowPass.cs`; `ShadowCascade.cs` (`Update`, `StepCenter`); `FrameLighting` (calls
   `FarShadow.Update(camera.RenderEye, camera.ViewDirection, _sunDir)`, owns the key light);
   `RenderManager` (the far ViewProj uniform); a new GL-free gate like `ReflectionReuse`, with tests.
@@ -173,9 +157,15 @@ bold title, then **Files**, **Win** (measured or estimated), **Verify** and **In
   light turns by more than ~half a far texel at the box edge; the `Moonlight` handover; a geometry
   counter moves (`ChunkManager.MeshVersion` skips remeshes of meshed chunks in `ChunkMeshScheduler`,
   so add one bumped on every opaque chunk or LOD upload and free); or N frames passed. The cached map
-  is always rendered from the full cascade-box caster set (see F2) and sampled with its own ViewProj.
-- **Win**: estimated as the far cascade's 3.75 ms (~59% of the shadow pass, near 2.56 ms) times the
-  measured skip rate (a `// TEMP-DIAG` hit counter on perf-fly), not far x (1-1/N).
+  is sampled with its own ViewProj.
+- **Interlock with F2** (done): `ShadowPass` now drops every far caster outside this frame's receiver
+  hulls (`ShadowCasterCull`), which is exact only for the frame it was built for. A cached far map must
+  therefore either be rendered from the full cascade-box caster set (bypass `_farCull` for that render)
+  or be invalidated whenever the receiver hulls it was rendered for stop containing this frame's
+  (camera or mirror pyramid moved or turned, the mirror gate flipped on). The first gives back F2's
+  far gain on re-render frames; the second makes re-renders frequent under mouse-look.
+- **Win**: estimated as the far cascade's 1.50 ms after F2 (3.75 ms before) times the measured skip
+  rate (a `// TEMP-DIAG` hit counter on perf-fly), not far x (1-1/N), less whatever the interlock costs.
 - **Verify**: perf-fly `shadowFar` pair plus the hit rate; low sun at `VOXEL_TIME` 430; `moonlight.json` at 455.
 - **Invariant**: the near map stays every frame (half-rate near is ruled out); far-map leaf sway
   freezes (sub-texel); no visible pop at re-render; the hysteresis keeps the view's far-shadow region inside the box.
@@ -320,9 +310,9 @@ bold title, then **Files**, **Win** (measured or estimated), **Verify** and **In
 
 ## Done
 
-All 2026-10-31, Quadro T1000 Max-Q, Release, working tree over c8e0f3c6; perf-fly pairs interleaved
-(before = a worktree of c8e0f3c6) at 1530 MHz, 60-73 C; probes are medians of 3, one per invocation.
-None of the four changes anything a player sees.
+F1, F6, G2 and G4 are all 2026-10-31, Quadro T1000 Max-Q, Release, working tree over c8e0f3c6; perf-fly
+pairs interleaved (before = a worktree of c8e0f3c6) at 1530 MHz, 60-73 C; probes are medians of 3, one
+per invocation. F2 (2026-11-01) carries its own setup. None of them changes anything a player sees.
 
 **F1. Shadow pass split** (diagnostics only). `ProfileSection.Shadows` is now `ShadowNear` and
 `ShadowFar` (rows `shadowNear`/`shadowFar`); `ShadowPass.RenderShadows` times itself, CPU and GPU,
@@ -365,6 +355,32 @@ level and `SpreadLight` is a monotone max BFS. `FillLightSnapshot` copies z runs
 table replacing `SpreadLight`'s per-dequeue div/mod gained under 1% (the JIT already turns division by a
 constant into multiply-shift) and was reverted. `LightFloodTests` compares the flood against a naive
 reference (per-slot BFS for tinted light) on eight generated scenes; `SpreadBlockLight` is untouched.
+
+**F2. Cull shadow casters to the receiver volume** (2026-11-01, pixel-identical by construction; same
+hardware, perf-fly x3 interleaved against a worktree of ba63a233, medians over lines where both rows
+report). `ShadowPass` keeps a chunk or LOD caster only when `ShadowCasterCull` (GL-free,
+`ShadowCasterCullTests`) finds its light-space footprint overlapping a receiver hull of that cascade:
+`shadowNear` GPU 2.60 -> 1.71 ms (-34%), `shadowFar` 3.89 -> 1.50 ms (-61%), about 3.3 ms of GPU a
+frame; CPU 0.33 -> 0.42 and 0.30 -> 0.44 ms (the after runs still carried the diagnostic counters).
+Casters per frame: near chunks ~240 -> ~150 (-37%), far chunks ~627 -> ~266 (-58%), far LOD ~80 -> ~48
+(-40%). Exactness: a depth-only LEQUAL pass stores an order-independent minimum, so dropping a caster
+that rasterizes no texel any sample's bilinear footprint touches leaves every sampled texel bit-identical;
+the hulls are the light-space convex hull of every point any consumer samples, grown by the receiver
+reach (bilinear 1 + normal offset + the near PCF's diagonal half-kernel + 1 texel of float slack) and
+the caster footprint grown by the multiblock overhang plus the shadow-vertex sway bound. Consumers
+(only `test-fragment.glsl`, `rays-fragment.glsl` and `godrays-fragment.glsl` read units 1 and 7): the
+world program (chunks, LOD, entities, water, the held item, leaf backlight whose sun-ward step keeps
+light-space XY, caustics) through the camera pyramid; the mirror through `ReflectionCull.MirrorView`'s
+pyramid, unioned whenever `ReflectionCull.MirrorMayRender` holds, since its refresh and visibility are
+decided after the shadows; the underwater rays and godrays marches through `RenderEye` as an extra hull
+point plus far corners at twice `Camera.FarPlane` (headroom for the sky target's unprojection slide).
+No consumer needed the keep-all fallback. Both cascades use the whole pyramid: the far map is sampled
+wherever the near fade is below 1, inside the near box too, so the old plan's "from the near fade
+start" was wrong. A temporary runtime check drew only the dropped casters into a cleared map, read it
+back and tested every written texel against the hulls: 0 violations over ~475M texels (perf-fly twice,
+`water.json` at 360, `godrays.json` at 395). Screenshots at `VOXEL_TIME` 430 (`linear-lighting.json`),
+`water.json` at 360, `leaf-backlight.json` at 1100 and `godrays.json` at 395 and 147 differ from before
+no more than two before runs differ from each other. Interlock: see F3.
 
 ## Not chasing (recorded so it is not re-proposed)
 

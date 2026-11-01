@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using VoxelEngine.Rendering;
 using Xunit;
 
@@ -89,5 +90,69 @@ public sealed class ReflectionCullTests
         // A full chunk lower nothing can reach the plane: the margin is far under a chunk's height.
         Assert.False(ReflectionCull.MayReachPlane(floorTop - Chunk.Size));
         Assert.False(ReflectionCull.MayReachPlane(floorTop - 4 * Chunk.Size));
+    }
+
+    [Fact]
+    public void TheMirrorMayRenderOnlyWhenReflectionsAreOnAndTheMirrorApplies()
+    {
+        var plane = RenderManager.WaterPlaneY;
+        var sawTrue = false;
+        var sawFalseWhileOn = false;
+        for (var eyeY = plane - 3f; eyeY <= plane + 3f; eyeY += 0.25f)
+        foreach (var inWater in new[] { false, true })
+        {
+            Assert.False(ReflectionCull.MirrorMayRender(false, eyeY, inWater, plane),
+                $"reflections off must never render the mirror (eye y {eyeY}, in water {inWater})");
+
+            var expected = ReflectionReuse.MirrorApplies(eyeY, plane, inWater);
+            var gate = ReflectionCull.MirrorMayRender(true, eyeY, inWater, plane);
+            Assert.Equal(expected, gate);
+            sawTrue |= gate;
+            sawFalseWhileOn |= !gate;
+        }
+
+        Assert.True(sawTrue, "the sweep never let the mirror render");
+        Assert.True(sawFalseWhileOn, "the sweep never refused the mirror with reflections on");
+    }
+
+    [Fact]
+    public void TheMirrorViewLooksFromTheReflectedEyeAlongTheReflectedView()
+    {
+        var plane = RenderManager.WaterPlaneY;
+        var eyes = new[]
+        {
+            new Vector3(0f, plane + 5f, 0f),
+            new Vector3(-40f, plane + 0.5f, 120f),
+            new Vector3(300f, plane + 60f, -75f),
+        };
+        var dirs = new[]
+        {
+            Vector3.Normalize(new Vector3(1f, -0.3f, 0f)),
+            Vector3.Normalize(new Vector3(-0.2f, 0.4f, -1f)),
+            Vector3.Normalize(new Vector3(0.6f, -0.9f, 0.5f)),
+            -Vector3.UnitZ,
+        };
+
+        foreach (var eye in eyes)
+        foreach (var dir in dirs)
+        {
+            var view = ReflectionCull.MirrorView(eye, dir, plane, out var mirroredEye, out var mirroredForward);
+
+            // The mirrored eye sits as far from the plane as the eye, on the other side, straight under it.
+            Assert.Equal(eye.Y - plane, plane - mirroredEye.Y, 3);
+            Assert.Equal(eye.X, mirroredEye.X);
+            Assert.Equal(eye.Z, mirroredEye.Z);
+
+            // The mirrored forward is the view direction reflected across the plane.
+            Assert.Equal(dir.Y, -mirroredForward.Y);
+
+            // A point ahead of the eye, reflected across the plane, lies straight ahead of the mirror view.
+            var ahead = eye + dir * 10f;
+            var reflected = new Vector3(ahead.X, 2f * plane - ahead.Y, ahead.Z);
+            var inView = Vector3.Transform(reflected, view);
+            Assert.True(MathF.Abs(inView.X) < 1e-3f, $"x {inView.X} off the mirror's view axis");
+            Assert.True(MathF.Abs(inView.Y) < 1e-3f, $"y {inView.Y} off the mirror's view axis");
+            Assert.True(inView.Z < 0f, $"the reflected point (view z {inView.Z}) is not in front of the mirror");
+        }
     }
 }

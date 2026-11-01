@@ -38,6 +38,10 @@ internal sealed class ShadowPass
     private int _locChunkShadowWindOffset;
     private int _locChunkShadowOpaque;
 
+    // Per cascade: which chunk and LOD casters can reach a texel any consumer samples this frame.
+    private readonly ShadowCasterCull _nearCull = new();
+    private readonly ShadowCasterCull _farCull = new();
+
     private FrameLighting Lighting => _owner.Lighting;
     private TextureUnits Units => _owner.Units;
     private RenderTargets Targets => _owner.Targets;
@@ -65,8 +69,11 @@ internal sealed class ShadowPass
     /// inside the far box - entities are sub-texel at that range - plus every non-buried LOD
     /// region (<paramref name="lodRegions"/>) it holds, drawn with opaque foliage so the LOD
     /// ring is shadowed by its own hills and canopy out to the far box. Both run first each frame,
-    /// before anything draws to the scene target; water never casts. Culling uses each
-    /// cascade's light frustum, so the caster set is exactly what its box can hold.
+    /// before anything draws to the scene target; water never casts. Chunk and LOD casters are
+    /// culled to each cascade's box and then to those whose light-space footprint can reach a
+    /// texel any consumer samples this frame (<see cref="ShadowCasterCull"/>: the camera pyramid,
+    /// plus the mirror's whenever it may render, unbounded along the sun), which leaves every
+    /// sampled texel bit-identical; entity casters stay culled to the box only.
     /// <paramref name="chunks"/> is <see cref="ChunkManager.Renderable"/>, a superset of the
     /// casters: water-only chunks are in it and are skipped here. The chunk casters that
     /// survive the culls are drawn with a single <c>glMultiDrawElementsIndirect</c> per cascade
@@ -88,6 +95,11 @@ internal sealed class ShadowPass
 
         FrameProfiler.Begin(ProfileSection.ShadowNear);
         GpuTimer.BeginGpuPass(ProfileSection.ShadowNear);
+
+        // The near kernel's diagonal taps mirror the shader's uShadowSoftness <= 0 branch; the far
+        // cascade is read with one tap.
+        BeginReceivers(_nearCull, _owner.NearShadow, pcfKernel: LightingConfig.ShadowSoftnessTexels > 0f, camera);
+        BeginReceivers(_farCull, _owner.FarShadow, pcfKernel: false, camera);
 
         var size = (uint)_owner.NearShadow.MapSize;
 
@@ -119,7 +131,7 @@ internal sealed class ShadowPass
         _owner.ChunkShadowShader.SetUniform(_locChunkShadowWind, Lighting.WindDirection * SkyConfig.WindLean);
         _owner.ChunkShadowShader.SetUniform(_locChunkShadowWindOffset, Lighting.WindOffset);
         _owner.ChunkShadowShader.SetUniform(_locChunkShadowViewProj, _owner.NearShadow.ViewProj);
-        DrawChunkCasters(chunks, frustum);
+        DrawChunkCasters(chunks, frustum, _nearCull);
         _owner.ShadowShader.Use();
 
         foreach (var tnt in primed)
@@ -230,7 +242,7 @@ internal sealed class ShadowPass
         _owner.ChunkShadowShader.Use();
         _owner.ChunkShadowShader.SetUniform(_locChunkShadowViewProj, _owner.FarShadow.ViewProj);
         var farFrustum = new Frustum(_owner.FarShadow.ViewProj);
-        DrawChunkCasters(chunks, farFrustum);
+        DrawChunkCasters(chunks, farFrustum, _farCull);
 
         // The LOD ring casts into the far cascade only: the near box never reaches it. Buried
         // regions are skipped because loaded chunks or finer regions already cast over their
@@ -252,6 +264,8 @@ internal sealed class ShadowPass
                 var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
                 var max = new Vector3(min.X + region.SizeBlocks, region.YMax, min.Z + region.SizeBlocks);
                 if (!farFrustum.IntersectsAABB(min, max)) continue;
+                // A region whose footprint reaches no sampled far texel cannot change the frame.
+                if (!_farCull.MayShadowReceivers(min, max)) continue;
 
                 _owner.ChunkDraws.Add(region.OpaqueSlice!.Value,
                     new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks), 1f);
@@ -271,12 +285,6 @@ internal sealed class ShadowPass
         FrameProfiler.End(ProfileSection.ShadowFar);
     }
 
-    /// <summary>
-    /// Appends every opaque chunk caster that survives the mesh, burial and light-frustum culls
-    /// to one <see cref="ChunkDrawBatch"/> pass and draws it with a single
-    /// <c>glMultiDrawElementsIndirect</c>. <c>_owner.ChunkShadowShader</c> must be bound with the
-    /// cascade's view-proj already set.
-    /// </summary>
     // The bergs inside the near light box, each on its own skin like the goblin casters (its texels
     // would otherwise be alpha-tested against the atlas)
     private void DrawIcebergCasters(IReadOnlyList<Iceberg> icebergs, Frustum frustum)
@@ -297,7 +305,13 @@ internal sealed class ShadowPass
             Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
     }
 
-    private void DrawChunkCasters(IReadOnlyList<Chunk> chunks, Frustum frustum)
+    /// <summary>
+    /// Appends every opaque chunk caster that survives the mesh, burial, light-frustum and
+    /// receiver (<paramref name="cull"/>) culls to one <see cref="ChunkDrawBatch"/> pass and draws
+    /// it with a single <c>glMultiDrawElementsIndirect</c>. <c>_owner.ChunkShadowShader</c> must
+    /// be bound with the cascade's view-proj already set.
+    /// </summary>
+    private void DrawChunkCasters(IReadOnlyList<Chunk> chunks, Frustum frustum, ShadowCasterCull cull)
     {
         _owner.ChunkDraws.BeginPass(chunks.Count);
 
@@ -322,10 +336,36 @@ internal sealed class ShadowPass
 
             if (!frustum.IntersectsAABB(chunk.WorldMin, chunk.WorldMax)) continue;
 
+            // A caster whose footprint reaches no texel any consumer samples cannot change the frame.
+            if (!cull.MayShadowReceivers(chunk.WorldMin, chunk.WorldMax)) continue;
+
             _owner.ChunkDraws.Add(chunk.OpaqueSlice!.Value, chunk.WorldMin, 1f);
         }
 
         _owner.ChunkDraws.Draw(_owner.OpaqueChunkGeometry.Vao, _owner.ChunkShadowShader, _locChunkShadowDrawBase);
+    }
+
+    /// <summary>
+    /// Starts <paramref name="cull"/> for <paramref name="cascade"/> this frame and adds every
+    /// view that can sample it: the camera pyramid (the world program, the leaf backlight, the
+    /// caustics and the rays/godrays marches) and the water mirror's whenever it may render.
+    /// </summary>
+    private static void BeginReceivers(ShadowCasterCull cull, ShadowCascade cascade, bool pcfKernel, Camera camera)
+    {
+        cull.Begin(cascade.ViewProj, cascade.MapSize, ShadowCasterCull.ReceiverReachTexels(pcfKernel),
+            ShadowCasterCull.CasterReachBlocks);
+        var projection = camera.GetProjectionMatrix();
+        // Twice the far plane: headroom for the rays' and godrays' unprojection, which slides a
+        // sky target along its view ray.
+        var far = 2f * Camera.FarPlane;
+        // RenderEye is Lighting.CameraPos, the marches' origin.
+        cull.AddViewPyramid(camera.GetViewMatrix(), projection, far, camera.RenderEye);
+        if (!ReflectionCull.MirrorMayRender(WorldGenerationConfig.WaterEnabled && GameSettings.WaterReflections,
+                camera.RenderEye.Y, camera.IsEyeInWater))
+            return;
+        var mirrorView = ReflectionCull.MirrorView(camera.RenderEye, camera.ViewDirection,
+            RenderManager.WaterPlaneY, out var mirroredEye, out _);
+        cull.AddViewPyramid(mirrorView, projection, far, mirroredEye);
     }
 
     private void DrawPlayerPartShadow(PlayerModel player, string part, Camera camera)

@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace VoxelEngine.Rendering;
 
 /// <summary>
@@ -44,4 +46,33 @@ internal static class ReflectionCull
     /// </summary>
     internal static bool MayReachPlane(float topY, float planeY = RenderManager.WaterPlaneY) =>
         topY + TopMarginBlocks >= planeY;
+
+    /// <summary>
+    /// The one definition of the mirror's pose: the eye reflected across the horizontal plane at
+    /// <paramref name="planeY"/>, looking along the reflected view direction, with world up kept as
+    /// up (pitch stays within ±89°, so it never parallels the view). Returns the mirror's view
+    /// matrix; <c>ReflectionPass.RenderReflection</c> draws through it and the shadow caster cull
+    /// bounds the mirror's receivers with it.
+    /// </summary>
+    internal static Matrix4x4 MirrorView(Vector3 eye, Vector3 viewDir, float planeY,
+        out Vector3 mirroredEye, out Vector3 mirroredForward)
+    {
+        mirroredEye = new Vector3(eye.X, 2f * planeY - eye.Y, eye.Z);
+        mirroredForward = new Vector3(viewDir.X, -viewDir.Y, viewDir.Z);
+        return Matrix4x4.CreateLookAt(mirroredEye, mirroredEye + mirroredForward, Vector3.UnitY);
+    }
+
+    /// <summary>
+    /// Whether the mirror could render this frame, decided conservatively before the shadow pass.
+    /// <c>ReflectionPass.RenderReflection</c>'s own gate also needs <c>TerrainPasses.WaterVisible</c>,
+    /// <c>ReflectionReuse.ShouldRefresh</c> and a live reflection target, but all three are decided
+    /// after <c>ShadowPass.RenderShadows</c>, so this keeps only the parts known by then: reflections
+    /// on and <see cref="ReflectionReuse.MirrorApplies"/>. A reused mirror samples no shadow map of
+    /// the current frame, so true here only ever over-states the mirror's receivers. Any relaxation
+    /// of <c>RenderReflection</c>'s gate must be followed here, or the mirror would sample shadow
+    /// texels the caster cull dropped.
+    /// </summary>
+    internal static bool MirrorMayRender(bool reflectionsOn, float eyeY, bool eyeInWater,
+        float planeY = RenderManager.WaterPlaneY) =>
+        reflectionsOn && ReflectionReuse.MirrorApplies(eyeY, planeY, eyeInWater);
 }

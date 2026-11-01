@@ -178,7 +178,7 @@ public class Camera : IMobTarget
     // large enough that stacked LOD levels ~4 blocks apart don't z-fight at 2048 blocks.
     // Collision keeps geometry at least PlayerRadius (0.3) away, so 0.2 never clips.
     private const float NearPlane = 0.2f;
-    private const float FarPlane = 4096f; // past the outermost LOD ring (2048 blocks + terrain height)
+    internal const float FarPlane = 4096f; // past the outermost LOD ring (2048 blocks + terrain height)
     private static float MouseSensitivity => GameSettings.MouseSensitivity;
 
     /// <summary>Eye above the feet; the player model roots itself here.</summary>

@@ -238,10 +238,8 @@ internal sealed class ReflectionPass
         Units.ActiveUnit(0);
 
         // Mirror position and facing across the horizontal plane.
-        var mirroredPos = new Vector3(camera.RenderEye.X, 2f * RenderManager.WaterPlaneY - camera.RenderEye.Y,
-            camera.RenderEye.Z);
-        var mirroredFwd = new Vector3(fwd.X, -fwd.Y, fwd.Z);
-        var view = Matrix4x4.CreateLookAt(mirroredPos, mirroredPos + mirroredFwd, Vector3.UnitY);
+        var view = ReflectionCull.MirrorView(camera.RenderEye, fwd, RenderManager.WaterPlaneY,
+            out var mirroredPos, out var mirroredFwd);
         _reflViewProj = view * camera.GetProjectionMatrix();
 
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _reflFbo);

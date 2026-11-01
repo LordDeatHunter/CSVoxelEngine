@@ -1439,7 +1439,9 @@ OpenGLTest/
       ReflectionPass.cs        # the planar water mirror: its target (CreateReflectionTarget), the temporal reuse and
                                #   RenderReflection (the mirrored chunks, LOD, sky, clouds and entities)
       ReflectionCull.cs        # GL-free: which opaque chunks and LOD regions can reach the mirror's clip plane
-                               #   (top + TopMarginBlocks at or above WaterPlaneY); the rest draw no pixel
+                               #   (top + TopMarginBlocks at or above WaterPlaneY); the rest draw no pixel;
+                               #   MirrorView is the one mirror pose and MirrorMayRender the conservative
+                               #   could-render gate the shadow pass reads before the mirror decides
       ReflectionReuse.cs       # the GL-free decision behind the reflection pass's temporal reuse
       RenderManager.cs         # the composition root of the frame's GL state: owns every GL resource and fixes
                                #   their creation and disposal order (LoadResources, Dispose); the world programs,
@@ -1463,6 +1465,9 @@ OpenGLTest/
                                #   CopyScene snapshots the frame's color/depth to units 3/4
                                #   for the water pass's refraction (see Water rendering above)
       ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped center (StepCenter) and light view-proj
+      ShadowCasterCull.cs      # GL-free: which chunk/LOD casters can reach a shadow texel any consumer samples
+                               #   this frame (camera and mirror pyramids in light space, PCF/normal-offset reach,
+                               #   sway and overhang growth); its class doc lists every consumer of units 1 and 7
       ShadowPass.cs            # depth-only directional shadow passes (RenderShadows, which times
                                #   itself as shadowNear/shadowFar) run first
                                #   each frame into two cascades: the near one (90 blocks, unit 1)
@@ -1472,7 +1477,11 @@ OpenGLTest/
                                #   SampleShadow in test-fragment.glsl reads the near map and
                                #   blends in one far tap where the near box fades out, and LOD
                                #   fragments receive the far cascade through the same path
-                               #   (the two ShadowCascades are RenderManager's, built by CreateShadowMap)
+                               #   (the two ShadowCascades are RenderManager's, built by CreateShadowMap);
+                               #   chunk and LOD casters are culled to each cascade's box and then to its
+                               #   receiver hull (ShadowCasterCull, pixel-identical), so a new shadow-map
+                               #   consumer or a new world-program view must add its pyramid there or
+                               #   call KeepAll; entity casters are culled to the box only
       TerrainPasses.cs         # the chunk and far-LOD draws: RenderLod (coarsest level first, buried regions
                                #   skipped), RenderWorld (opaque, front to back), CullWater (the translucent and
                                #   water draw lists) and RenderWorldTranslucent (back to front); the four chunk
