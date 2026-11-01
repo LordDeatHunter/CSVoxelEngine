@@ -135,11 +135,11 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 
 ## Open
 
-Ranking: within each group the prerequisite measurement comes first (G1; F1, F2, F7 and F9 are done). F3 and F8 follow the
+Ranking: within each group the prerequisite measurement comes first (G1; F1, F2, F7, F9 and F10 are done). F3 and F8 follow the
 share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%,
 before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4, F5 (an exact worldPass depth
 pre-pass) and F13 (exact reflection cuts) were tried and ruled out; F7 and F9 are done);
-F10-F12 are CPU-only and matter less while the frame is GPU-bound.
+F11-F12 are CPU-only and matter less while the frame is GPU-bound (F10, the chunkApply hitch, is done).
 G follows the `wgen` and probe split. Ties and unmeasured items fall back to effort. Each entry has a
 bold title, then **Files**, **Win** (measured or estimated), **Verify** and **Invariant**.
 
@@ -181,16 +181,6 @@ after F2).
 **F9. GPU occlusion culling** (the old Phase 5): the opaque chunk pass's order-preserving Hi-Z cull
 landed 2026-11-01, see Done. Left open: the mirror and translucent passes are not occlusion-culled, the
 shadow cascades gain nothing (Done), and the frustum test and sort stay on the CPU.
-
-**F10. chunkApply streaming spikes** (avg 4.1-5.1 ms, 5-12 sustained on land legs, one 454-530 ms frame on the bay teleport).
-- **Files**: `Chunks/Meshing/ChunkMeshScheduler.ApplyCompletedMeshes`, `Rendering/Geometry/ChunkGeometryPool`
-  (its `NamedBufferSubData` upload and grow-by-copy), `Chunk.UpdateMesh`, `StreamingConfig.MaxMeshUploadsPerFrame`
-  (32; `MeshUploadBudget` is raised while loading). Check first: `// TEMP-DIAG` sub-timers (allocate vs
-  upload vs bookkeeping) and whether a pool grow fires mid-play on the teleport (the other run's 737 ms
-  hitch was the fence wait). Candidates: an upload budget in bytes instead of a count; a persistent-mapped
-  staging ring plus `CopyNamedBufferSubData`; pre-growing the pools at load.
-- **Win**: estimated; the teleport hitch is the top CPU spike of 2026-10-31. **Verify**: perf-fly `chunkApply` avg and worst pair.
-- **Invariant**: GL on the main thread only; closest-first order; budgets move only against a capture.
 
 **F11. GC attribution while streaming** (10-45 gen0/s streaming, 3-7 settled, 2026-10-31).
 - **Files**: measure first with `// TEMP-DIAG` `GC.GetAllocatedBytesForCurrentThread` around the main-thread
@@ -269,7 +259,7 @@ shadow cascades gain nothing (Done), and the frustum test and sort stay on the C
 
 F1, F6, G2 and G4 are all 2026-10-31, Quadro T1000 Max-Q, Release, working tree over c8e0f3c6; perf-fly
 pairs interleaved (before = a worktree of c8e0f3c6) at 1530 MHz, 60-73 C; probes are medians of 3, one
-per invocation. F2, F9 and F7 (2026-11-01) carry their own setup. None of them changes anything a player sees.
+per invocation. F2, F9, F7 and F10 (2026-11-01) carry their own setup. None of them changes anything a player sees.
 
 **F1. Shadow pass split** (diagnostics only). `ProfileSection.Shadows` is now `ShadowNear` and
 `ShadowFar` (rows `shadowNear`/`shadowFar`); `ShadowPass.RenderShadows` times itself, CPU and GPU,
@@ -437,6 +427,53 @@ from the eye); a test pins that relation.
   of the scene and its depth), reordering the index buffer (changes primitive order), a mirror-plane cull
   (the cloud shader has no clip and the clouds lie above the plane), the water-sample-region scissor
   (not exact, F13) and skipping the pre-pass for some tiles (overlap cannot be proven).
+
+**F10. Pre-size the opaque chunk pool: the mid-play chunkApply hitch** (2026-11-01, exact by
+construction; Quadro T1000 Max-Q 4 GB, driver 597.06, Release, 1280x720; perf-fly `VOXEL_TIME=60` x3
+interleaved against a worktree of d5e6c13d, both builds carrying the same temporary `// TEMP-DIAG`
+instrument: per-frame apply splits, one enqueue-to-apply latency sample per applied mesh, the
+`ChunkDrawBatch` fence wait, GC deltas, a leg mark per teleport). `ChunkGeometryPool.OpaqueInitialUnits`
+262144 -> 524288 units (1024 MB of vertices, 96 MB of indices); nothing else changed. Exact: the pool's
+size decides only where a slice lives, never what is drawn or in what order, and the upload order, the
+count budget and the bytes on screen are untouched.
+- Diagnosis (6 runs before the fix, 3 clean + 3 instrumented, matching within noise): the "bay teleport"
+  hitch was the opaque pool doubling 262144 -> 524288 in every run, 7-10 s into the first land leg
+  (t 17.5-20.3 s), not the bay leg itself (whose worst frames were 23-63 ms). The frame cost 332-534 ms;
+  `Grow()` itself was only 4-18 ms of CPU, the rest the driver stalling on the next GL call into the new
+  buffers (the first `NamedBufferSubData`, 332-383 ms, or once the `lighting` row, 445 ms) while the old
+  560 MB and the new 1120 MB pair coexisted on a card already holding ~2.8 GB: grow plus stall 97-99% of
+  the frame, the next three frames clean, no GC, unload or fence wait on it. VRAM after the grow
+  3305-3384 of 4096 MiB, so pre-sizing changes nothing at steady state.
+- The sustained 5-12 ms land-leg `chunkApply` frames are `glNamedBufferSubData` stalls (81-95% of
+  chunkApply on frames over 5 ms; drain + sort 2-12%, bookkeeping under 0.8 ms), not proportional to
+  bytes (corr(ms, MB) 0.15; p50 0.14 ms/MB, 6.6 ms/MB on stall frames). They are mostly the GPU-bound
+  frame's own wait landing on the first upload: stall frames ran only 2.4-7 ms longer than calm ones,
+  which already wait 8-13.5 ms in `lighting`. Fence wait worst 12.6-16.6 ms, GC ~0.8 ms a frame (F11),
+  `chunkUnld` worst 4-14 ms: none on a hitch. Per-chunk latency is set by the 32-mesh count budget
+  (backlog 4300-5000 on leg 1, latency p95 2.5-3.9 s on the land legs).
+- Result, before -> after median [per run]: mid-play worst frame 458.2 [458.2/420.0/483.1, the grow in
+  3/3 runs] -> 60.6 [60.6/49.0/63.0], -87%, 0 pool grows; wall avg 11.64 [11.64/11.08/11.79] -> 11.53
+  [13.26/11.21/11.53]; wall p99 26.76 [25.40/26.76/28.71] -> 25.29 [34.05/24.66/25.29]; `chunkApply` avg
+  1.90 [1.90/1.65/2.02] -> 1.87 [2.13/1.75/1.87], worst [450.3/25.4/479.2] -> [44.8/45.9/29.0]; land-leg
+  chunkApply + lighting p95 20.47 -> 20.13. The first after run is an environment outlier (idle VRAM 2070
+  MiB against 1608-1801, the lowest clock at 1278 MHz; its legs 3-4, code-identical by then, ran 2-2.6 ms
+  slower too).
+- Streaming is not later: per-chunk latency median 45 -> 48 ms, p95 2517 -> 2425 ms (legs 1/2:
+  3537/3347 -> 3113/2771); time to 95% applied within 0.1 s on every leg. The one cost is the startup
+  frame (before the world plays, `lighting` row): median 199 -> 215 ms (before spread 173-204), the driver
+  touching the larger allocation once; leg-0 settle unchanged (8.6-8.7 s to 95% applied).
+- Rejected: a persistent-mapped 3-slot (6 MB each) staging ring feeding `CopyNamedBufferSubData` took the
+  subData stall out of chunkApply (land "chunkApply minus staging" p95 3.3-7.1 ms) but only moved the
+  GPU-bound wait into its per-frame `FenceSync`, now the frame's first GL call: land chunkApply + lighting
+  p95 20.27 against 20.13 without it, wall avg 12.31 against 11.53, p99 28.04 against 25.29, leg-1 latency
+  p95 4180 against 3113 ms, 16 fallbacks in one run, and a new 348-380 ms hitch at t ~1 s in 3/3 runs
+  (the first copy-engine writes into the 1 GB pool; pre-touching it at load with a clear, a staged copy
+  plus `glFinish` or a 16-byte upload plus `glFinish` only moved where the CPU blocked). Without the
+  pre-size it made the grow hitch worse (603-782 ms). Not run, their rules unmet: a byte upload budget
+  (cost does not follow bytes, and it would lengthen the count-bound latency) and a partial K-nearest
+  selection instead of the full sort (drain + sort 2-12% of chunkApply). Still open: the translucent and
+  LOD pools never grew in any run; a grow past 524288 would hitch the same way (an amortized grow is not
+  designed).
 
 ## Not chasing (recorded so it is not re-proposed)
 

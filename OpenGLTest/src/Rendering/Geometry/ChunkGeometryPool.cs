@@ -56,11 +56,18 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     /// <summary>Indices per unit — 2048 B of vertices and 192 B of indices per unit.</summary>
     public const int IndicesPerUnit = 96;
 
-    /// <summary>Opaque pool start: 262144 units, i.e. 512 MB of vertices and 48 MB of
-    /// indices. Steady state measured 244801/262144 units (93 %), so this starts where
-    /// the old 65536-unit pool settled after two mid-stream doubling copies (item 21).
-    /// Growth still doubles from here if a view ever needs more.</summary>
-    public const int OpaqueInitialUnits = 262144;
+    /// <summary>Opaque pool start: 524288 units, i.e. 1024 MB of vertices and 96 MB of
+    /// indices. Item 21 sized it at 262144 from a steady state of 244801/262144 units (93 %),
+    /// but on today's world that is not where it settles: on <c>perf-fly.json</c>
+    /// (2026-11-01, Quadro T1000 Max-Q 4 GB, driver 597.06, Release, 1280x720, six runs) the
+    /// 262144-unit pool doubled to 524288 in every run, 7-10 s into the first land leg, and
+    /// that frame cost 332-534 ms: the doubling itself was only 4-18 ms of CPU, the rest the
+    /// driver stalling on the next GL call into the new buffers while the old 560 MB and the
+    /// new 1120 MB pair briefly coexisted (PERF_TODO F10). Starting at the size every run
+    /// reached anyway removes that hitch and the transient, and changes nothing at steady
+    /// state: with the grown pool the game held 3305-3384 of 4096 MiB, 17-19 % under the
+    /// card's total. Growth still doubles from here if a view ever needs more.</summary>
+    public const int OpaqueInitialUnits = 524288;
 
     /// <summary>Translucent pool start: 32768 units, i.e. 64 MB of vertices and 6 MB of
     /// indices. The water-heavy fly settles at 65536, so one doubling remains instead of
@@ -80,7 +87,7 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     ///
     /// One pool holds both the LOD region shells and their sea sheets: a region's two meshes are
     /// born from one <c>LodMeshData</c> and freed together in one <c>Dispose</c>, so their
-    /// lifetimes never diverge and the chunk pools' size-driven opaque/translucent split (512 MB
+    /// lifetimes never diverge and the chunk pools' size-driven opaque/translucent split (1024 MB
     /// vs 64 MB) does not transfer.
     ///
     /// Sizing runs off the resident ceiling, not the settled count. The settled live set is 591

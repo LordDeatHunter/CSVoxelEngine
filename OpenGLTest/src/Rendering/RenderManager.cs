@@ -93,7 +93,7 @@ public class RenderManager : IDisposable
     /// AND its sea sheet. One pool covers both because a region's two meshes are born from one
     /// <c>LodMeshData</c> and freed together in one <c>LodRegion.Dispose</c>, so their lifetimes
     /// never diverge; the chunk pools' opaque/translucent split exists for a sizing reason
-    /// (512 MB vs 64 MB), not a correctness one, and does not transfer. See
+    /// (1024 MB vs 64 MB), not a correctness one, and does not transfer. See
     /// <see cref="ChunkGeometryPool.LodInitialUnits"/> for the sizing derivation.
     /// </summary>
     public ChunkGeometryPool LodGeometry { get; private set; }
