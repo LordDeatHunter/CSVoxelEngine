@@ -188,6 +188,22 @@ public sealed unsafe class ChunkDrawBatch : IDisposable
     }
 
     /// <summary>
+    /// The current indirect command buffer. <see cref="Grow"/> (only ever inside
+    /// <see cref="BeginPass"/>) replaces it, so a consumer that binds it elsewhere (the occlusion
+    /// cull binds it as an SSBO) rebinds it on every use.
+    /// </summary>
+    internal uint IndirectBuffer => _indirect;
+
+    /// <summary>
+    /// Ring index of the current pass's first command, which addresses both the indirect buffer and
+    /// the ChunkInfo SSBO. Stable until the next <see cref="BeginPass"/>.
+    /// </summary>
+    internal int PassFirstIndex => _slot * _capacityPerSlot + _passStart;
+
+    /// <summary>Commands added to the current pass so far.</summary>
+    internal int PassCount => _passCount;
+
+    /// <summary>
     /// Issues the current pass as one multi-draw. The caller must already have
     /// <paramref name="shader"/> (a <c>CHUNK_DRAW</c> variant) in use, since <c>uDrawBase</c> is
     /// set on the bound program. Commands execute in array order, so the order chunks were added
@@ -196,20 +212,31 @@ public sealed unsafe class ChunkDrawBatch : IDisposable
     /// <param name="vao">The geometry pool's VAO (opaque or translucent).</param>
     /// <param name="shader">The bound chunk program.</param>
     /// <param name="locDrawBase">Cached location of that program's <c>uDrawBase</c>.</param>
-    public void Draw(uint vao, Shader shader, int locDrawBase)
+    public void Draw(uint vao, Shader shader, int locDrawBase) => DrawRange(vao, shader, locDrawBase, 0, _passCount);
+
+    /// <summary>
+    /// Issues <paramref name="count"/> commands of the current pass from its
+    /// <paramref name="passOffset"/>-th on as one multi-draw, so a pass can be drawn as several
+    /// consecutive ranges with other work between them. A GPU compute may rewrite a range's
+    /// <see cref="DrawElementsIndirectCommand.InstanceCount"/> through an SSBO binding of
+    /// <see cref="IndirectBuffer"/> before it is drawn, followed by
+    /// <c>glMemoryBarrier(GL_COMMAND_BARRIER_BIT)</c>: the storage lacks only
+    /// <c>GL_DYNAMIC_STORAGE_BIT</c>, which governs <c>glBufferSubData</c>, not shader writes.
+    /// </summary>
+    internal void DrawRange(uint vao, Shader shader, int locDrawBase, int passOffset, int count)
     {
-        if (_passCount == 0) return;
+        if (count <= 0) return;
 
         // One index addresses both the SSBO (through uDrawBase) and the indirect buffer (through
         // the byte offset below); the two must never drift apart.
-        var first = _slot * _capacityPerSlot + _passStart;
+        var first = PassFirstIndex + passOffset;
         shader.SetUniform(locDrawBase, first);
 
         _gl.BindVertexArray(vao);
         _gl.BindBuffer(BufferTargetARB.DrawIndirectBuffer, _indirect);
         // Coherent mapping: the writes above are visible to the GPU without a flush of our own.
         _gl.MultiDrawElementsIndirect(PrimitiveType.Triangles, DrawElementsType.UnsignedShort,
-            (void*)(nint)((long)first * CommandBytes), (uint)_passCount, 0);
+            (void*)(nint)((long)first * CommandBytes), (uint)count, 0);
     }
 
     public void Dispose()

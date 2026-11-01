@@ -11,9 +11,9 @@ with `ContextProfile.Core`, and every shader under `assets/shaders/` declares `#
 The chunk draw path uses those 4.6 core features directly — `gl_DrawID`, `BufferStorage`,
 persistent buffer mapping and `glMultiDrawElementsIndirect` (see "Chunk drawing" below) — so this
 is a hard requirement rather than a preference; any 2015+ desktop driver on Windows or Linux
-provides it, but **macOS (stuck at GL 4.1) is no longer supported**. The optional Phase 5 in
-`MESHER_PLAN.md` (a compute cull writing the indirect buffer) would add
-`glMultiDrawElementsIndirectCount`.
+provides it, but **macOS (stuck at GL 4.1) is no longer supported**. The opaque chunk pass also runs compute shaders
+(the Hi-Z occlusion cull, which zeroes culled commands in the indirect buffer in place; see "Chunk
+drawing"), another 4.3+ core feature.
 
 The game is one project under `OpenGLTest/`; the item debugger (`OpenGLTest.ItemDebugger/`) and the dedicated server (`OpenGLTest.Server/`) are separate executables that reference it. Historical naming quirks to be aware of:
 
@@ -846,6 +846,28 @@ sway blocks of `test-vertex.glsl` and `shadow-vertex.glsl` must stay byte-identi
 `TO_WORLD(p)` macro is what lets them be, and `ChunkDrawShaderTests` guards the sway block and
 its weight decode (both read `vColor.a` at location 1).
 
+**Opaque occlusion cull (PERF_TODO F9).** The camera's opaque pass (`TerrainPasses.RenderWorld`)
+adds its whole front-to-back run in one `BeginPass` but draws it as consecutive
+`ChunkDrawBatch.DrawRange` segments, split at the shares of the run in
+`PostProcessConfig.ChunkOcclusionSplits` (`HizOcclusion.SegmentStarts`). At each split
+`ChunkOcclusionCuller.Cull` builds a half-resolution max-depth pyramid (R32F, padded to a power of
+two, `hiz-build-compute.glsl`, twin `HizPyramid`) from the HDR depth the LOD and the earlier segments
+wrote, then `hiz-cull-compute.glsl` (twin `HizOcclusion`) tests every later command: the chunk box
+from its `ChunkInfo` origin grown by `HizOcclusion.ReachBlocks` (`ShadowCasterCull.CasterReachBlocks`:
+the multiblock overhang plus the sway; opaque vertices have no waves), projected with the very
+`uViewProj` the chunk program draws with, its rect rounded outward plus one texel, and a command whose
+nearest corner depth lies strictly behind the pyramid max over the rect plus `DepthMargin` gets its
+`InstanceCount` zeroed in place in the ring (a corner at or behind the eye plane always draws). Nothing
+is reordered and a culled chunk has no fragment that could pass `LEQUAL`, fading or not, so the frame
+is pixel-identical (a temporary occlusion-query and bit-diff check found 0 differences across the
+scenarios, see PERF_TODO F9). Barriers: image access plus texture fetch after every pyramid level, the
+last included, and `COMMAND` after the cull. Bindings: SSBO 0 ChunkInfo, 1 tile materials, 2 the
+indirect ring (rebound every call, since a ring grow renames it); texture units
+`RenderManager.HizDepthUnit` (10, unbound again before the next segment draws into that depth) and
+`HizPyramidUnit` (11); image units 0 and 1. `ChunkOcclusionCullEnabled` switches it off. The cost sits
+inside the `worldPass` row. The shadow cascades, the mirror and the translucent pass are not culled
+this way (light-space occlusion measured ~0%).
+
 ## Layout
 
 ```
@@ -1188,7 +1210,8 @@ OpenGLTest/
       ItemMeshCache.cs         # lazily built extruded-sprite meshes plus their GL textures, one per Item
       Mesh.cs                  # an indexed triangle mesh in the shared Vertex layout
       Shader.cs                # a compiled GL program from vertex/fragment sources, with
-                               #   an optional defines prefix (the CHUNK_DRAW variants)
+                               #   an optional defines prefix (the CHUNK_DRAW variants); CreateCompute builds a
+                               #   compute program (the Hi-Z build and cull)
       TextureAtlas.cs          # loads the individual block textures in
                                #   assets/textures/blocks/*.png into one TEXTURE_2D_ARRAY at startup
       TextureLoader.cs         # uploads textures for the shared Vertex layout
@@ -1429,12 +1452,17 @@ OpenGLTest/
                                         #   its phase (Dry / Wade / Float / Swim)
     Rendering/                 # the GL render passes and their GL-free gates: RenderManager plus its pass components,
                                #   WorldRenderer, GPU timing, the texture-unit cache, shadow cascades, reflection reuse
+      ChunkOcclusionCuller.cs  # the opaque pass's Hi-Z occlusion cull: the pyramid texture, the build and cull compute
+                               #   programs (hiz-build-compute.glsl, hiz-cull-compute.glsl), Cull between segments
       FrameLighting.cs         # the frame's light, sky, fog and eye state, computed once a frame by SetLighting (the
                                #   sun/moon key light, eye adaptation, biome grade, glare, godrays strength, point lights,
                                #   WindDirection) and read live by every pass; FireLightOffset
       GpuPassTimer.cs          # the per-pass TIME_ELAPSED query ring and its once-a-frame GpuTimingGate latch
                                #   (BeginGpuFrame, BeginGpuPass/EndGpuPass, EndGpuFrame, LogQueryCounts)
       GpuTimingGate.cs         # the GL-free decision behind the per-pass GPU timer queries
+      HizOcclusion.cs          # GL-free twin of hiz-cull-compute.glsl: grown chunk box, outward screen rect and nearest
+                               #   depth, the strict occlusion test, SegmentStarts; its exactness proof
+      HizPyramid.cs            # GL-free twin of hiz-build-compute.glsl: the padded max-depth pyramid, LevelFor, MaxOver
       ReflectionEntities.cs    # the live entities ReflectionPass.RenderReflection may draw into the water mirror
       ReflectionPass.cs        # the planar water mirror: its target (CreateReflectionTarget), the temporal reuse and
                                #   RenderReflection (the mirrored chunks, LOD, sky, clouds and entities)
@@ -1520,7 +1548,8 @@ OpenGLTest/
         SkyRenderer.cs         # the full-screen sky dome pass (sky-fragment.glsl)
       Geometry/                # chunk draw plumbing: the geometry pools and their allocator, the indirect draw batch, the mesh list pool
         ChunkDrawBatch.cs      # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +
-                               #   the vec4(origin, alpha) ChunkInfo SSBO read via gl_DrawID
+                               #   the vec4(origin, alpha) ChunkInfo SSBO read via gl_DrawID; DrawRange
+                               #   issues a pass as consecutive segments (the opaque occlusion cull)
         ChunkGeometryPool.cs   # the two shared chunk vertex/index buffers (opaque, translucent):
                                #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy
         GeometryAllocator.cs   # GL-free first-fit free list with coalescing, in units of
@@ -1941,7 +1970,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Particles/                   # every particle system and the dust, splash and pop emitters
   Player/                      # camera, physics, water phases and swimming, health and fall tracking,
                                #   the player model, creative, sprint, the saved-player restore
-  Rendering/                   # render-pass gates: GPU timing, reflection reuse, shadow cascades, the texture-unit cache
+  Rendering/                   # render-pass gates: GPU timing, reflection reuse, shadow cascades, the texture-unit cache,
+                               #   the Hi-Z occlusion twins (HizOcclusionTests)
     Atmosphere/                # cloud copies, cover and shadow
     Geometry/                  # the geometry allocator and the LOD pool; the geometry-layout probe
     Overlays/                  # healthbars, text batching, the HUD text cache

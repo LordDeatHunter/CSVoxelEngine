@@ -74,6 +74,11 @@ public class RenderManager : IDisposable
     /// (<see cref="SkyPasses.RenderClouds"/> and the mirror's clouds); bound only around those draws and
     /// unbound again.</summary>
     internal const int SceneReadUnit = 9;
+
+    /// <summary>Texture units of the opaque pass's occlusion cull (<see cref="ChunkOcclusionCuller"/>):
+    /// the scene depth while its pyramid is built (unbound again straight after) and the pyramid itself.
+    /// Nothing else binds them.</summary>
+    internal const int HizDepthUnit = 10, HizPyramidUnit = 11;
     private Shader chunkShader;
     private Shader chunkShadowShader;
 
@@ -371,6 +376,8 @@ public class RenderManager : IDisposable
     internal Shader ShadowShader => shadowShader;
     internal Shader ChunkShadowShader => chunkShadowShader;
     internal ChunkDrawBatch ChunkDraws => _chunkDraws;
+    /// <summary>The opaque chunk pass's Hi-Z occlusion cull (<see cref="TerrainPasses.RenderWorld"/>).</summary>
+    internal ChunkOcclusionCuller Occlusion { get; private set; }
     internal Shader ChunkShader => chunkShader;
     internal int LocChunkViewProj => _locChunkViewProj;
     internal int LocChunkDrawBase => _locChunkDrawBase;
@@ -506,6 +513,7 @@ public class RenderManager : IDisposable
         TranslucentChunkGeometry = new ChunkGeometryPool(gl, ChunkGeometryPool.TranslucentInitialUnits, "translucent");
         LodGeometry = new ChunkGeometryPool(gl, ChunkGeometryPool.LodInitialUnits, "lod");
         _chunkDraws = new ChunkDrawBatch(gl);
+        Occlusion = new ChunkOcclusionCuller(gl, this);
 
         sunShader = new Shader(gl, sunVs, sunFs);
         sunShader.Use();
@@ -1002,6 +1010,7 @@ public class RenderManager : IDisposable
         chunkShadowShader.Dispose();
         sunShader.Dispose();
         moonShader.Dispose();
+        Occlusion.Dispose();
         gl.DeleteTexture(_moonTexture);
         _clouds?.Dispose();
         _cloudShadow?.Dispose();

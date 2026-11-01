@@ -52,8 +52,9 @@ internal sealed class TerrainPasses
     /// <see cref="ChunkManager.Renderable"/>: every chunk with something to draw, opaque or
     /// translucent — the water-only ones still need their fade lifetime advanced here.
     /// The surviving chunks are frustum-culled and sorted front to back on the CPU exactly as
-    /// before, but they are then appended to <see cref="ChunkDrawBatch"/> and issued as one
-    /// <c>glMultiDrawElementsIndirect</c> out of the opaque <see cref="ChunkGeometryPool"/>.
+    /// before, but they are then appended to <see cref="ChunkDrawBatch"/> and issued out of the
+    /// opaque <see cref="ChunkGeometryPool"/> as a few consecutive <c>glMultiDrawElementsIndirect</c>
+    /// ranges with a GPU occlusion cull between them (<see cref="DrawOpaqueRun"/>).
     /// </summary>
     internal void RenderWorld(Camera camera, IReadOnlyList<Chunk> chunks, double time)
     {
@@ -112,7 +113,44 @@ internal sealed class TerrainPasses
                 MathF.Min(1F, (float)(chunk.lifetime / Chunk.MAX_LIFETIME)));
         }
 
-        _owner.ChunkDraws.Draw(_owner.OpaqueChunkGeometry.Vao, _owner.ChunkShader, _owner.LocChunkDrawBase);
+        DrawOpaqueRun(viewProj);
+    }
+
+    // The segment starts of the current opaque run (HizOcclusion.SegmentStarts), reused every frame.
+    private readonly int[] _segmentStarts = new int[PostProcessConfig.ChunkOcclusionSplits.Length];
+
+    /// <summary>
+    /// Draws the opaque run <see cref="RenderWorld"/> just added, front to back. With the occlusion
+    /// cull on it is drawn in segments (<see cref="PostProcessConfig.ChunkOcclusionSplits"/>): after
+    /// each one <see cref="ChunkOcclusionCuller.Cull"/> builds a max-depth pyramid from the LOD and the
+    /// segments drawn so far and zeroes, in place, every later command whose chunk lies strictly behind
+    /// it. Nothing is reordered and nothing culled could have written a fragment, so the frame is
+    /// pixel-identical to the single multi-draw (see <see cref="HizOcclusion"/>); the culls only spare
+    /// the GPU the vertices and the depth-rejected fragments of hidden chunks.
+    /// </summary>
+    private void DrawOpaqueRun(in Matrix4x4 viewProj)
+    {
+        var draws = _owner.ChunkDraws;
+        var vao = _owner.OpaqueChunkGeometry.Vao;
+        var count = draws.PassCount;
+        var splits = PostProcessConfig.ChunkOcclusionCullEnabled
+            ? HizOcclusion.SegmentStarts(count, PostProcessConfig.ChunkOcclusionSplits, _segmentStarts)
+            : 0;
+
+        var start = 0;
+        for (var s = 0; s < splits; s++)
+        {
+            var next = _segmentStarts[s];
+            draws.DrawRange(vao, _owner.ChunkShader, _owner.LocChunkDrawBase, start, next - start);
+            // Read after DrawRange, never cached: the first index is stable for the pass, but the
+            // command buffer is renamed whenever the ring grows.
+            _owner.Occlusion.Cull(viewProj, draws.IndirectBuffer, draws.PassFirstIndex + next, count - next);
+            // The cull left its compute program bound; the chunk program's uniforms are untouched.
+            _owner.ChunkShader.Use();
+            start = next;
+        }
+
+        draws.DrawRange(vao, _owner.ChunkShader, _owner.LocChunkDrawBase, start, count - start);
     }
 
     // Reused across frames, like _visibleChunks / _visibleRegions

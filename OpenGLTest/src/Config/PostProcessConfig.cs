@@ -100,6 +100,20 @@ public static class PostProcessConfig
     /// it, which would otherwise darken a displaced copy of its silhouette onto that ground.</summary>
     public const float ContactAoReachFar = 2.5f;
 
+    // --- Opaque chunk occlusion cull (ChunkOcclusionCuller, HizOcclusion, PERF_TODO F9) ---
+
+    /// <summary>Master switch for the Hi-Z occlusion cull between the segments of the opaque chunk
+    /// pass. Off, the pass is the single front-to-back multi-draw it was; on, the frame is
+    /// pixel-identical (see <see cref="Rendering.HizOcclusion"/>).</summary>
+    public const bool ChunkOcclusionCullEnabled = true;
+
+    /// <summary>Where the front-to-back opaque run is split, as shares of its chunk count, ascending:
+    /// after each split the pyramid is rebuilt from the depth drawn so far and every later chunk is
+    /// tested against it (<see cref="Rendering.HizOcclusion.SegmentStarts"/>). Each split costs one
+    /// pyramid build and one cull dispatch. Measured on perf-fly (PERF_TODO F9): one to five splits all
+    /// landed within run-to-run noise of each other; two keep a near split for caves at little cost.</summary>
+    public static readonly float[] ChunkOcclusionSplits = [1f / 8f, 1f / 2f];
+
     // --- GPU timer queries (GpuPassTimer.BeginGpuFrame / BeginGpuPass, item R6) ---
     // One frame in this many still issues its TIME_ELAPSED queries while the X overlay is down,
     // so the once-a-second snapshot standing when X is pressed already carries GPU figures

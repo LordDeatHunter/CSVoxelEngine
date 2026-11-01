@@ -135,9 +135,9 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 
 ## Open
 
-Ranking: within each group the prerequisite measurement comes first (G1; F1 and F2 are done). F3-F8 follow the
+Ranking: within each group the prerequisite measurement comes first (G1; F1, F2 and F9 are done). F3-F8 follow the
 share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%,
-before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4 was tried and ruled out); F9 builds on F2;
+before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4 was tried and ruled out; F9 is done);
 F10-F12 are CPU-only and matter less while the frame is GPU-bound.
 G follows the `wgen` and probe split. Ties and unmeasured items fall back to effort. Each entry has a
 bold title, then **Files**, **Win** (measured or estimated), **Verify** and **Invariant**.
@@ -196,20 +196,9 @@ after F2).
 - **Win**: estimated; only the rare hitch. **Verify**: perf-fly `lod` worst over three runs, far-teleport
   leg. **Invariant**: LOD nesting and burial unchanged; GL on the main thread.
 
-**F9. GPU-driven culling: compute cull + `glMultiDrawElementsIndirectCount` + Hi-Z** (the old Phase 5, with occlusion; shadows 36% + worldPass 26%).
-- **Files**: `Rendering/Geometry/ChunkDrawBatch.cs`, a new compute shader under `assets/shaders`,
-  `TerrainPasses`, `ShadowPass`, `RenderTargets`. A persistent SSBO of chunk AABBs and `GeometrySlice`s
-  updated on upload and free; per pass a compute shader tests the frustum plus a Hi-Z pyramid of the
-  previous frame's HDR depth (raw D3D 0..1 depth reprojected through the previous view-proj, two-phase
-  to stay conservative) and appends `DrawElementsIndirectCommand` plus `ChunkInfo` through an atomic
-  count; the draw is `MultiDrawElementsIndirectCount` (GL 4.6 core). After F2 (F4, the CPU chunk
-  visibility graph, is ruled out: Hi-Z occlusion is the remaining lever for underground chunks); the
-  occlusion-less version is ruled out.
-- **Win**: estimated; the GPU work of occluded chunks. **Verify**: perf-fly pair (worldPass, shadowNear, shadowFar);
-  cave, forest and water screenshots identical.
-- **Invariant**: the 3-slot fenced ring and per-draw fade alpha; opaque front-to-back order is lost
-  (early-Z) while translucent stays CPU-sorted; `gl_DrawID`/`TO_WORLD` and the sway blocks stay
-  byte-identical (shader-sync, `ChunkDrawShaderTests`).
+**F9. GPU occlusion culling** (the old Phase 5): the opaque chunk pass's order-preserving Hi-Z cull
+landed 2026-11-01, see Done. Left open: the mirror and translucent passes are not occlusion-culled, the
+shadow cascades gain nothing (Done), and the frustum test and sort stay on the CPU.
 
 **F10. chunkApply streaming spikes** (avg 4.1-5.1 ms, 5-12 sustained on land legs, one 454-530 ms frame on the bay teleport).
 - **Files**: `Chunks/Meshing/ChunkMeshScheduler.ApplyCompletedMeshes`, `Rendering/Geometry/ChunkGeometryPool`
@@ -298,7 +287,7 @@ after F2).
 
 F1, F6, G2 and G4 are all 2026-10-31, Quadro T1000 Max-Q, Release, working tree over c8e0f3c6; perf-fly
 pairs interleaved (before = a worktree of c8e0f3c6) at 1530 MHz, 60-73 C; probes are medians of 3, one
-per invocation. F2 (2026-11-01) carries its own setup. None of them changes anything a player sees.
+per invocation. F2 and F9 (2026-11-01) carry their own setup. None of them changes anything a player sees.
 
 **F1. Shadow pass split** (diagnostics only). `ProfileSection.Shadows` is now `ShadowNear` and
 `ShadowFar` (rows `shadowNear`/`shadowFar`); `ShadowPass.RenderShadows` times itself, CPU and GPU,
@@ -368,6 +357,42 @@ back and tested every written texel against the hulls: 0 violations over ~475M t
 `water.json` at 360, `leaf-backlight.json` at 1100 and `godrays.json` at 395 and 147 differ from before
 no more than two before runs differ from each other. Interlock: see F3.
 
+**F9. Hi-Z occlusion cull of the opaque chunk pass** (2026-11-01, pixel-identical by construction; same
+hardware, 1280x720, perf-fly `VOXEL_TIME=60` x3 interleaved against a worktree of 6c6eeaa6).
+`TerrainPasses.RenderWorld` keeps its frustum cull, sort and fade, adds the whole front-to-back run in
+one `BeginPass` and draws it as `ChunkDrawBatch.DrawRange` segments split at 1/8 and 1/2 of the chunks
+(`PostProcessConfig.ChunkOcclusionSplits`). At each split `ChunkOcclusionCuller` builds a half-res R32F
+max pyramid of the HDR depth the LOD and the earlier segments wrote (`hiz-build-compute.glsl`, twin
+`HizPyramid`) and `hiz-cull-compute.glsl` (twin `HizOcclusion`, `HizOcclusionTests`) zeroes, in place in
+the ring, the `InstanceCount` of every later command whose chunk box, grown by
+`ShadowCasterCull.CasterReachBlocks`, has its nearest corner depth strictly behind the pyramid max over its
+outward rect plus one texel and 8/2^24. Exact because nothing is reordered and a culled chunk has no
+fragment that passes `LEQUAL` against depth already written, fading or not; no history, no reprojection.
+- Gate (same setup, a `// TEMP-DIAG` depth readback every 30 frames with a CPU twin of the test): ~60% of
+  worldPass indices occluded by the frame's own depth, about two thirds of them underground and one third
+  behind hills; skipping them in alternating 4 s blocks cut worldPass GPU by 2.02 ms median
+  (1.28/2.18/2.02), and simulated splits at 1/16, 1/8, 1/4, 1/2 culled 54.9-64.4% of the indices. The
+  history-and-reorder design first planned saved 0.01 ms (Ruled out).
+- worldPass GPU 3.25 -> 2.38 ms median (before runs 2.77/3.60/3.28, after 2.56/2.29/2.27), CPU 0.52 ->
+  0.62 ms (the extra dispatches and uniform sets); frame 15.71 -> 14.01 ms; the worst frame per run
+  26.4-29.1 ms before, 23.7-26.1 after. A first interleave with four splits (1/16, 1/8, 1/4, 1/2): worldPass
+  GPU 3.59 -> 2.63 ms, frame 15.69 -> 14.10 ms. One, two, four and five splits run back to back landed
+  within run-to-run noise of each other (2.26-2.70 ms against 2.93/3.30 with the cull off); two keep a
+  near split for caves at half the pyramid builds.
+- Culled (a temporary readback every 30 frames, frames with >= 500 opaque chunks): two splits median
+  57.9% of the worldPass indices, ~1070 of ~1600 chunks; four splits 63.4%, ~1190 of ~1650.
+- Exactness: a temporary check every 10th frame drew the culled chunks again against the frame's final
+  opaque depth under `LEQUAL` with an occlusion query, and re-rendered the run uncut from a snapshot of
+  the post-LOD color and depth and compared both images bit for bit: 0 samples and 0 differing bits over
+  4,615 checked frames and ~1.79M culled-chunk tests, run with the four splits (perf-fly, eye-adaptation, lava, ores, grass-tint,
+  water at 360, world-events, animations, terrain-shape at 1090). With the margin forced negative both
+  checks fired on every checked frame, so they do see a wrong cull.
+- The cost lives inside the `worldPass` row (sibling `TIME_ELAPSED` ranges would split worldPass into
+  segments that the overlay averages per sample rather than sums).
+- Shadow cascades: not done and not worth it; a light-space estimate on the gate's readback found ~0% of
+  their casters occluded (near median 0.0%, max 0.2-0.4%; far 0.0%), the buried-caster skip already
+  drops them. A depth-only light pass is order-independent, so the same test would need no ordering rule.
+
 ## Not chasing (recorded so it is not re-proposed)
 
 - Shader ALU cuts (caustic Voronoi, 8 point lights, 4-tap PCF): culling and half-res are the allowed levers.
@@ -420,6 +445,19 @@ no more than two before runs differ from each other. Interlock: see F3.
   0 in eye-adaptation, lava, ores, water, animations and a mining and flight-into-rock run. The whole
   attempt was reverted (patch with the diagnostics kept outside the tree). Retry only with GPU
   occlusion (F9's Hi-Z), not a CPU connectivity graph.
+- F9 phase 1 as first planned, a history-predicted two-phase Hi-Z cull with reordering, gated out
+  2026-11-01 before any permanent code (T1000 Max-Q, Release, perf-fly `VOXEL_TIME=60`, 1280x720,
+  3 runs). The design: each chunk carries a 3-frame-late occlusion bit; predicted-occluded chunks move
+  to a phase B drawn after a Hi-Z of phase A's depth, and to stay pixel-identical a chunk may move only
+  if it is not fading, no later fading chunk's screen rect overlaps it (fading chunks blend, so order
+  matters) and no later phase-A chunk is among its 26 neighbors (depth ties). Measured with a
+  `// TEMP-DIAG` readback (every 30 frames, the exact conservative rect/depth test, skip vs draw blocks
+  of 4 s): of ~60% of worldPass indices occluded and ~55% eligible, the fading-overlap rule blocked
+  30-40% and the neighbor rule 5-17% while streaming (60-90 fading chunks on screen), leaving median
+  0.3-3.9% skippable; worldPass GPU saving 0.01 ms median (0.01/0.20/-0.14). History itself was fine
+  (realized share ~95% of predicted, false predictions ~0). The same skip with the two rules ignored
+  saved 2.02 ms; the order-preserving segmented cull that landed (F9, Done) got most of it. Shadow cascades:
+  ~0% light-space occlusion, nothing to gain.
 - Fluid 16-slot chunk cache: no spike reduction (16 vs 256 slots identical); a per-tick cap freezes fluid.
 - Mud 6-face gate: not outcome-equivalent (diagonal dirt can be wet).
 - VSync and limiters, GL debug context, per-frame `GetError`, worker priorities, uniform location

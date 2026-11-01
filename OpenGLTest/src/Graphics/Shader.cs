@@ -45,6 +45,34 @@ public class Shader : IDisposable
         _gl.DeleteShader(fragmentShader);
     }
 
+    private Shader(GL gl, string computeSource, string? defines)
+    {
+        _gl = gl;
+
+        var computeShader = CompileShader(ShaderType.ComputeShader, InjectDefines(computeSource, defines));
+
+        Handle = _gl.CreateProgram();
+        _gl.AttachShader(Handle, computeShader);
+        _gl.LinkProgram(Handle);
+
+        _gl.GetProgram(Handle, GLEnum.LinkStatus, out var status);
+        if (status == 0)
+        {
+            var infoLog = _gl.GetProgramInfoLog(Handle);
+            throw new Exception($"Program linking failed:\n{infoLog}");
+        }
+
+        _gl.DetachShader(Handle, computeShader);
+        _gl.DeleteShader(computeShader);
+    }
+
+    /// <summary>
+    /// A compute program from one source, with the same optional <paramref name="defines"/> prefix
+    /// as the graphics constructor. <see cref="Use"/> and the uniform setters serve it unchanged.
+    /// </summary>
+    public static Shader CreateCompute(GL gl, string computeSource, string? defines = null) =>
+        new(gl, computeSource, defines);
+
     /// <summary>
     /// Returns <paramref name="source"/> with <paramref name="defines"/> spliced in right after
     /// its first line. <c>#version</c> must stay the first line of a GLSL source, so the prefix
