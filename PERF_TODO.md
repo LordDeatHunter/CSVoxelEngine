@@ -135,9 +135,10 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 
 ## Open
 
-Ranking: within each group the prerequisite measurement comes first (G1; F1, F2, F7 and F9 are done). F3-F8 follow the
+Ranking: within each group the prerequisite measurement comes first (G1; F1, F2, F7 and F9 are done). F3 and F8 follow the
 share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%,
-before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4 and F13, exact reflection cuts, were tried and ruled out; F7 and F9 are done);
+before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4, F5 (an exact worldPass depth
+pre-pass) and F13 (exact reflection cuts) were tried and ruled out; F7 and F9 are done);
 F10-F12 are CPU-only and matter less while the frame is GPU-bound.
 G follows the `wgen` and probe split. Ties and unmeasured items fall back to effort. Each entry has a
 bold title, then **Files**, **Win** (measured or estimated), **Verify** and **Invariant**.
@@ -169,14 +170,6 @@ after F2).
 - **Verify**: perf-fly `shadowFar` pair plus the hit rate; low sun at `VOXEL_TIME` 430; `moonlight.json` at 455.
 - **Invariant**: the near map stays every frame (half-rate near is ruled out); far-map leaf sway
   freezes (sub-texel); no visible pop at re-render; the hysteresis keeps the view's far-shadow region inside the box.
-
-**F5. worldPass fragment cost and overdraw** (3.90 ms, 26%).
-- **Files**: `TerrainPasses.RenderWorld`, `test-fragment.glsl`. Measure overdraw with a `// TEMP-DIAG`
-  additive count view; cutout leaves defeat early-Z. A solid-only depth pre-pass is the candidate, but
-  it is close to the ruled-out early-Z split, so measure it interleaved on two GPUs.
-- **Win**: estimated; unknown until the overdraw count exists. **Verify**: perf-fly worldPass pair on
-  the T1000 and a second GPU; forest screenshots identical.
-- **Invariant**: pixel-identical output; the cutout alpha test and `CutoutMipmap` coverage unchanged.
 
 **F8. `lod` CPU spike and `lodPass` worst** (low priority; 0.91 ms, 6%, worst 10.7 ms GPU).
 - **Files**: `Lod/LodManager.cs`, `LodCoverPass.cs`, `LodRegionSet.cs`. The 1306 ms single-frame `lod`
@@ -559,6 +552,67 @@ from the eye); a test pins that relation.
   cloud draw ranges fell 2.09 -> 1.55 ms median on perf-fly (F7's metric, the two sweeps only), and
   its chunk and LOD work is unchanged. Retry only with a cheaper mirror (lower reflection resolution is
   a setting, not a free cut).
+- F5, an exact depth pre-pass for the opaque chunk pass (`TerrainPasses.RenderWorld`), gated out
+  2026-11-01 before any permanent code (T1000 Max-Q, driver 597.06, Release, 1280x720; clocks
+  300-1530 MHz, throttling to 765-915 MHz at 74-75 C late in the runs, which the per-frame interleave
+  cancels; perf-fly `VOXEL_TIME=60`, leaf-backlight.json at 1100, grass-tint.json at 147). The rule was
+  pixel-identical; the gate was a perf-fly worldPass GPU median saving of >= 0.4 ms or >= 15%, with no
+  forest regression. No second GPU was available; the interleaved forest scenes stood in for it.
+  - **Baseline** (HEAD cdb21b20, after F9): perf-fly worldPass GPU 2.625/2.535/2.655 ms, median
+    2.625 (so the gate is 0.39 ms), CPU 0.58-0.60, frame 12.97-16.00 ms; leaf-backlight 2.79 GPU,
+    grass-tint 3.15 GPU. The old 3.90 ms figure predates F9; F9's own record read 2.38.
+  - **Overdraw** (`// TEMP-DIAG` `GL_FRAGMENT_SHADER_INVOCATIONS` and `SAMPLES_PASSED` around the
+    opaque run, chunk-visible pixels from a depth readback every 30th frame): shaded invocations per
+    visible pixel 4.23/4.44 on perf-fly (p10 2.2, p90 6.5; 99% of the frame is chunk-covered), 5.57
+    leaf, 6.13 grass; samples passed per visible pixel 2.3-2.5 / 2.0 / 1.8. An atomic-counter build
+    (early-Z off, so shares of rasterized fragments) put 13-19 rasterized fragments per visible pixel
+    (early-Z plus F9's Hi-Z already reject ~70-78%), sway faces at 66-79% and cutout or partly
+    transparent layers at 70-82% of them (23 of 68 atlas layers: 18 cutout tiles plus 5 with
+    transparent texels). A pre-pass may write depth only from the other ~20-30%.
+  - **Fading chunks** (they blend, so their depth history must stay HEAD's): perf-fly median 42-50 a
+    frame (p90 151-167, max ~790), on screen in ~86% of frames, crossing the eye plane in 12%; the
+    union of their conservative screen rects covers a median 36-41% of the frame (p90 ~0.7-0.77),
+    and merged to at most 4 restore rects 60-63% (p90 ~0.95). leaf: 21 a frame, union 0.32, merged
+    0.52, eye plane 9.5%; grass: 6, 0.05, 0.07, 5.7%. Only ~20% of perf-fly frames (30% leaf, 55%
+    grass) could take an exact pre-pass with a 0.25 coverage cap, 34% at 0.5.
+  - **The exact design evaluated**: a depth-only program built from `test-vertex.glsl` with
+    `invariant gl_Position` (beside an equally invariant shaded program, `chunkShader` left alone for
+    LOD, translucent and the mirror), a fragment that discards sway faces, water-flagged faces and any
+    layer not fully opaque at level 0 or in `CutoutTiles` (an eligible-layer SSBO), the F9 segments
+    run depth-only with the post-LOD depth saved and the merged fading rects restored before every cull,
+    a final whole-run Hi-Z cull, then one shaded `DrawRange` of the run under the unchanged `LEQUAL`
+    and blend; plain HEAD path whenever a fading box crosses the eye plane or the coverage is too high.
+  - **G1, a cost-complete `// TEMP-DIAG` prototype** timed by `glQueryCounter` around the opaque run
+    (median ms, frames with >= 50 commands). Modes: B HEAD, A the exact design, C its pre-pass alone,
+    D HEAD's segments with a trivial fragment (sample, alpha test, albedo), E A without the save and
+    restore blits (inexact, timing only). perf-fly in 4 s blocks, 3 runs: B 3.50/4.01/4.18, A
+    7.98/14.56/14.63, C 1.94/2.57/2.61, D 1.50/1.78/1.73, E 3.31/3.54/3.60. perf-fly rotated per frame,
+    2 runs: B 2.73/4.55, A 11.21/19.57, C 2.21/3.60, D 1.32/2.10, E 4.33/6.40 (E's small win in the
+    blocks is scene-phase confounding, the paired frames contradict it). leaf per frame: B 3.48/3.53,
+    A 10.40/10.64, C 2.15/2.21, D 1.50/1.53, E 4.67/4.88. grass per frame: B 4.39/4.58, A 9.26/9.97,
+    C 2.66/2.64, D 2.04/2.29, E 7.22/6.86. So B - A was -4.5 to -15.0 ms on perf-fly and -4.9 to
+    -7.1 ms on the forest scenes: G1 failed on every run, and the exactness proof (an in-frame bit-diff
+    against HEAD's path) and the interleaved worktree gate were never reached.
+  - **Why**: (1) depth can be primed only from the ~20-30% non-sway, non-cutout fragments, since
+    leaves and plants dominate the overdraw; (2) after F9 has culled the hidden chunks, the pre-pass's
+    full vertex stage and discarding fragment (C, 1.9-3.6 ms, 60-80% of the whole HEAD run) cost more
+    than early-Z saves the shaded pass: even frames with no fading rects lost (perf-fly A 4.44 vs B
+    3.84 per frame, grass 8.1-8.6 vs 5.8-6.2), and E lost 1.2-3.7 ms on every paired run; (3) the
+    restores exactness needs are blits into the scene depth, after which the shaded pass costs several
+    times more (per-frame perf-fly frames with rects: A 13.2 vs B 2.7 ms), apparently losing the
+    hardware's coarse depth culling for the rest of the pass.
+  - Rejected without building: drawing cutout and leaf draws after solid ones (that is the early-Z
+    split above, and equal-depth ties between reordered draws make it unprovable) and an `EQUAL` depth
+    func in the shaded pass (fading blends and depth ties break it).
+  - Not a result, an untested lead: the fragment headroom B - D (1.4-2.4 ms perf-fly, 2.0-2.3 leaf and
+    grass) does not rule out bit-exact fragment early-outs. Most terms in `test-fragment.glsl` are
+    already branch-gated; the one exact zero gate found unused is skipping `SampleShadow` when `fSun`
+    is 0 (every consumer of `shadow` is multiplied by `fSun` or a gate containing it). It helps only
+    sun-sealed fragments, which F9 mostly culls, and FMA contraction could move bits on the lit path,
+    so it needs its own bit-diff proof and gate before anyone acts on it (and "Not chasing" lists
+    shader ALU cuts).
+  The diagnostics and the prototype were reverted and kept outside the tree. Retry only with new
+  evidence (a GPU without the blit penalty, or a far larger opaque, non-sway share of the overdraw).
 - Fluid 16-slot chunk cache: no spike reduction (16 vs 256 slots identical); a per-tick cap freezes fluid.
 - Mud 6-face gate: not outcome-equivalent (diagonal dirt can be wet).
 - VSync and limiters, GL debug context, per-frame `GetError`, worker priorities, uniform location
