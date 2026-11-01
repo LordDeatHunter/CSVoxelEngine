@@ -5,6 +5,7 @@ using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using static VoxelEngine.Chunks.Chunk;
+using Stage = VoxelEngine.WorldGen.WorldgenStageTimer.Stage;
 
 namespace VoxelEngine.WorldGen;
 
@@ -14,12 +15,15 @@ internal static class ChunkTerrainFill
     /// <summary>
     /// Fills the terrain columns (grass / dirt / stone by depth), lets the cave carvers clear
     /// their air out of the result, floods everything below sea level, then stamps trees onto
-    /// the surface. Runs on a generation worker thread.
+    /// the surface. Runs on a generation worker thread. A <see cref="WorldgenStageTimer"/>, passed
+    /// only by the tests and the worldgen cost probe (null in production), is charged each stage's
+    /// wall time without changing the output.
     /// </summary>
-    internal static void GenerateBlockData(Chunk chunk)
+    internal static void GenerateBlockData(Chunk chunk, WorldgenStageTimer? timer = null)
     {
         // Worldgen timing for the X/VOXEL_DEBUG console line (WorldgenStats, the `wgen` token)
         var genStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        timer?.Begin(genStart);
         var column = ColumnCache.Get((int)chunk.Position.X, (int)chunk.Position.Z);
         var lowerBoundY = chunk.LowerBoundY;
         chunk.SurfaceMinY = column.MinHeight;
@@ -48,6 +52,7 @@ internal static class ChunkTerrainFill
         // NoWater, which no y is at or below.
         var needsWater = WorldGenerationConfig.WaterEnabled
                          && lowerBoundY <= column.MaxWaterLevel;
+        timer?.Mark(Stage.Columns);
         if (lowerBoundY > maxHeight + 1 && !needsWater)
         {
             chunk.IsBlockDataReady = true;
@@ -67,6 +72,7 @@ internal static class ChunkTerrainFill
                     lowerBoundY, fillBiome);
             }
         }
+        timer?.Mark(Stage.Fill);
 
         var worldX0 = (int)chunk.Position.X * Size;
         var worldZ0 = (int)chunk.Position.Z * Size;
@@ -83,17 +89,21 @@ internal static class ChunkTerrainFill
 
         if (carvable && WorldGenerationConfig.NoiseCavesEnabled)
             NoiseCaves.Carve(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.NoiseCaves);
 
         if (carvable && WorldGenerationConfig.WormCavesEnabled)
             WormCarver.Carve(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.WormCaves);
 
         // After the carvers, so veins rim cave walls instead of being eaten by them.
         if (WorldGenerationConfig.MalachiteEnabled)
             MalachiteGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Malachite);
 
         // Same pass, same reason; coal's two host rocks let it also fill desert sandstone.
         if (WorldGenerationConfig.CoalEnabled)
             CoalGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Coal);
 
         // After the carvers (so caves under the sea floor flood) and before the trees and
         // pebbles, which skip submerged columns rather than growing underwater
@@ -101,12 +111,15 @@ internal static class ChunkTerrainFill
         if (WorldGenerationConfig.WaterEnabled)
         {
             hasWater = FillWater(chunk, column, lowerBoundY);
+            timer?.Mark(Stage.Water);
             StampMud(chunk, column, worldX0, lowerBoundY, worldZ0);
         }
+        timer?.Mark(Stage.Mud);
 
         // After the sea: flooded cells are water, not air, so only dry cave floors pond lava
         if (WorldGenerationConfig.LavaEnabled)
             LavaGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Lava);
 
         // Every species (cacti included) stamps here, wood and leaves with their state bytes.
         // Through a local: a ref to the volatile field is refused, and nothing else can see the
@@ -119,6 +132,7 @@ internal static class ChunkTerrainFill
             chunk.StateArray = state;
         }
         WorldgenStats.AddTreeTicks(System.Diagnostics.Stopwatch.GetTimestamp() - treeStart);
+        timer?.Mark(Stage.Trees);
 
         // Scenery on the floor, after the trees so it never displaces one and into air only
         if (WorldFeatureConfig.FallenLogsEnabled)
@@ -127,73 +141,92 @@ internal static class ChunkTerrainFill
             FallenLogGenerator.Stamp(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
             chunk.StateArray = state;
         }
+        timer?.Mark(Stage.FallenLogs);
 
         if (WorldFeatureConfig.BouldersEnabled)
             BoulderGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Boulders);
 
         // A landmark on a summit, after everything else so its stack owns the peak
         if (WorldFeatureConfig.CairnsEnabled)
             CairnGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Cairns);
 
         // Ruins on the dry land, clipped at chunk borders
         if (WorldFeatureConfig.RuinedPillarsEnabled)
             RuinedPillarGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.RuinedPillars);
 
         if (WorldFeatureConfig.DesertWellsEnabled)
             DesertWellGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.DesertWells);
 
         // Deep rock features, after the carvers so a geode's heart is not carved again
         if (WorldFeatureConfig.GeodesEnabled)
             GeodeGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Geodes);
 
         if (WorldFeatureConfig.MeteorsEnabled)
             MeteorGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Meteors);
 
         // Pond plants, after the water: reeds may replace the shallow cell they stand in, and a
         // lily pad floats on the cell above a lake's top water cell
         if (WorldFeatureConfig.ReedsEnabled)
             ReedGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Reeds);
 
         if (WorldFeatureConfig.LilyPadsEnabled)
             LilyPadGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.LilyPads);
 
         // Cave life, after the carvers and the water: only carved, dry air takes any
         if (WorldFeatureConfig.GlowMushroomsEnabled)
             GlowMushroomGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.GlowMushrooms);
 
         if (WorldFeatureConfig.CaveFormationsEnabled)
             CaveFormationGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.CaveFormations);
 
         // Loose rock buried inside stone, after the carvers so a pocket never fills a cave
         if (WorldFeatureConfig.GravelPocketsEnabled)
             GravelPocketGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.GravelPockets);
 
         // Underground water, after the lava so a pool never sits in a lava cell
         if (WorldFeatureConfig.UndergroundPoolsEnabled)
             UndergroundPoolGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.UndergroundPools);
 
         // Frozen-only ice spikes go down before the snow, so a spike keeps its base cell
         if (WorldGenerationConfig.SnowAndIceEnabled)
             IceSpikeGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.IceSpikes);
 
         // Last of the cold features: freezes cold surface water to ice, then lays snow on the dry
         // ground and the ice sheet that is left
         if (WorldGenerationConfig.SnowAndIceEnabled)
             SnowGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Snow);
 
         if (WorldFeatureConfig.PebblesEnabled)
             PebbleGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Pebbles);
 
         // Before the flowers and foliage, so their per-column scatter fills in around a clump
         // instead of eating into it
         if (WorldFeatureConfig.CottonEnabled)
             CottonGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Cotton);
 
         if (WorldFeatureConfig.FlowersEnabled)
             FlowerGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Flowers);
 
         if (WorldFeatureConfig.FoliageEnabled)
             FoliageGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Foliage);
 
         // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping.
         // Counting AIR and subtracting beats counting non-air: BlockType.Air is
@@ -201,11 +234,13 @@ internal static class ChunkTerrainFill
         // MemoryExtensions.Count<byte> with no cast, where a "!= Air" predicate would
         // have to run one comparison per cell.
         chunk.SolidCount = BlockCount - chunk.Blocks.AsSpan().Count(BlockType.Air);
+        timer?.Mark(Stage.SolidCount);
 
         // Only a chunk that actually got flooded can have a frontier to report, plus any
         // chunk low enough to hold lava pockets (the scan itself is fluid-generic)
         if (hasWater || (WorldGenerationConfig.LavaEnabled && lowerBoundY <= WorldGenerationConfig.LavaMaxY))
             ScanFluidFrontier(chunk, column, lowerBoundY);
+        timer?.Mark(Stage.FluidFrontier);
 
         chunk.IsBlockDataReady = true;
         WorldgenStats.AddChunk(System.Diagnostics.Stopwatch.GetTimestamp() - genStart);

@@ -36,7 +36,10 @@ The probes assert no timing and print through `ITestOutputHelper`:
 - `LodBuildCostProbe` (Lod): regions per level; the first builds are biased by the cold column prefetch.
 - `ColumnCacheReplayProbe`, `ChunkRekeyReplayProbe`, `PlayerPlacedUnloadReplayProbe` (Chunks).
 - `GeometryLayoutReplayProbe` (Rendering/Geometry).
-- No worldgen `Compute` or chunk-fill probe exists; see G1.
+- `WorldgenCostProbe` (WorldGen): `TerrainGenerator.Compute` per column category (all, land, ocean, lake/river,
+  highland, massif, great lake), cold and warm; per-stage `ChunkTerrainFill.GenerateBlockData` through
+  `WorldgenStageTimer` on surface, above-surface, sky, deep-stone, cave-heavy and sea-floor chunks, cold and warm.
+  Runs in the default suite (~9 s); see G1 under Done for how to read cold and warm.
 
 Traps:
 
@@ -50,8 +53,9 @@ Traps:
   sum them only over lines where both report.
 - The T1000 throttles its SM clock from 1530 to ~1080 MHz at ~74 C, so late lines run ~30% slower.
   Log `nvidia-smi` clocks, cool down between runs, compare interleaved pairs only.
-- Worker costs never appear as rows: worldgen shows only in the `wgen` token (`WorldgenStats`), the
-  mesh build only in `MeshBuildCostProbe`.
+- Worker costs never appear as rows: worldgen shows only in the `wgen` token (`WorldgenStats`), which is
+  one whole-chunk figure; `WorldgenCostProbe` splits it by stage headlessly. The mesh build shows only in
+  `MeshBuildCostProbe`.
 - `uiPass` includes the X overlay's own glyphs.
 
 ## Measured baselines
@@ -135,12 +139,12 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 
 ## Open
 
-Ranking: within each group the prerequisite measurement comes first (G1; F1, F2, F7, F9 and F10 are done). F3 and F8 follow the
+Ranking: within each group the prerequisite measurement comes first (G1, F1, F2, F7, F9 and F10 are done). F3 and F8 follow the
 share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%,
 before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4, F5 (an exact worldPass depth
 pre-pass) and F13 (exact reflection cuts) were tried and ruled out; F7 and F9 are done);
 F11-F12 are CPU-only and matter less while the frame is GPU-bound (F10, the chunkApply hitch, is done).
-G follows the `wgen` and probe split. Ties and unmeasured items fall back to effort. Each entry has a
+G follows the G1 stage split (`WorldgenCostProbe`). Ties and unmeasured items fall back to effort. Each entry has a
 bold title, then **Files**, **Win** (measured or estimated), **Verify** and **Invariant**.
 
 ### A. Frame time (FPS)
@@ -199,25 +203,42 @@ shadow cascades gain nothing (Done), and the frustum test and sort stay on the C
 
 ### B. Worldgen, meshing and streaming
 
-**G1. Worldgen cost probe** (prerequisite; `wgen` median 1.31 ms/chunk on 2026-10-31, cold 29-34).
-- **Files**: a new `OpenGLTest.Tests/WorldGen/WorldgenCostProbe.cs` in the `MeshBuildCostProbe` style (`[Fact]`,
-  `ITestOutputHelper`, only an anti-vacuity assert, `[Collection("Worldgen seed")]`, `WorldSeed.Default`). Time
-  `TerrainGenerator.Compute` over fixed `SplitMix64` column lists (all, land, ocean, lake), then the
-  `ChunkTerrainFill.GenerateBlockData` stages in order on fixed surface, deep-stone and sea-floor chunks: the
-  `ColumnCache.GenerateColumn` loop, `NoiseCaves.Carve`, `WormCarver.Carve`, `MalachiteGenerator`/`CoalGenerator.Stamp`,
-  `FillWater`/`StampMud`, `LavaGenerator.Stamp`, `TreeGenerator.Stamp`, the scenery stamps, `ScanFluidFrontier`, the
-  whole call. Optionally add stage buckets to `WorldgenStats` and the `wgen` token (`FrameProfiler.FormatWorldgen`).
-- **Win**: none; it ranks G3, G5 and G6. **Verify**: stable medians over three runs. **Invariant**: no seed or cache state leaks.
+Ranked by the G1 split (`WorldgenCostProbe`, 2026-11-01, medians of 3; G1 under Done has the tables). A warm
+fill (every cache hot) costs 0.38-1.13 ms per filled chunk, spread over the noise-driven stamps: G3's three
+stamps 32.5% of the probe mix, G6's feature stamps 31.5%, `NoiseCaves` 19.6%. A cold fill (every cache cleared)
+costs 49-145 ms, of which 69% is tree batch growth, 24% worm cells and 6% neighbor columns (G5). No open item
+targets the first two: they amortize over a 64x64 cell in game, and only a cold-start measurement in game would
+justify one.
 
-**G3. Ore and pocket noise skip** (bit-identical only with a proven bound, else seed-breaking).
+**G3. Ore and pocket noise skip** (bit-identical only with a proven bound, else seed-breaking). **Top G target**.
 - **Files**: `WorldGen/Features/Underground/MalachiteGenerator.cs`, `CoalGenerator.cs`, `GravelPocketGenerator.cs`.
   Each `Stamp` evaluates a 3D OpenSimplex2 noise per host cell, up to ~12k calls per deep chunk against ~1000 for
   the `NoiseCaves` lattice. Bit-identical: sample a coarse lattice (spacing s) and skip a block when every corner
   plus L*s*sqrt(3)/2 is at or below the threshold, L an analytic gradient bound for that exact FastNoiseLite
   configuration (type, frequency, octaves, gain) times a documented float-rounding safety factor; brute-force
   equality is a sanity check, never the proof. Without the bound: lattice plus trilinear interpolation, seed-breaking.
-- **Win**: estimated, deep chunks. **Verify**: G1 stage pairs; byte-equal block and state dumps of N chunks.
+- **Win**: measured (G1, warm): `Malachite` + `Coal` + `GravelPockets` are 47% of a deep-stone fill (about 0.57 of
+  1.10 ms; `GravelPockets` alone 23%), 46% of a cave-heavy fill, 24% of a surface chunk and 32.5% of the probe mix;
+  cold they are under 0.5% (0.25-0.3 ms beside 50-145 ms of trees and worm cells). The largest measured share on
+  deep and cave chunks, which should be most of a load sphere's filled chunks (not measured); chunks far below the
+  2-5 layers under the surface that the probe samples are unmeasured. G6 nearly ties it on the probe mix and is
+  exact by construction, so it is the cheaper first step. The ~12k calls per deep chunk is still an estimate (G1
+  counted no noise calls). **Verify**: G1 stage pairs; byte-equal block and state dumps of N chunks.
   **Invariant**: `FastNoiseLite.cs` stays vendored and unedited.
+
+**G6. Chunk-level gates for the feature stamps** (bit-identical).
+- **Files**: `WorldGen/ChunkTerrainFill.cs`, the generators under `WorldGen/Features/`. About 20 `Stamp` calls in
+  `GenerateBlockData` each walk 256 columns even when the chunk's Y range cannot hold the feature; add early-outs
+  from the `ColumnData` height and water ranges plus each feature's vertical reach, including
+  `NoiseCaves.SampleLattice` channels whose depth band excludes the chunk, only where G1 shows a cost.
+- **Win**: measured (G1, warm): the 18 scenery and surface stamps (`FallenLogs` .. `Foliage`, mostly `Pebbles`,
+  `Flowers`, `Foliage` and `Snow` at 0.04-0.07 ms each) cost a near-fixed 0.24-0.30 ms on every filled chunk: 71%
+  of an above-surface fill (the chunk over the terrain top, where `Fill` is another 18% and the G3 stamps 5%), 53%
+  of a sea-floor fill, 25% cave-heavy, 19% deep-stone, 31.5% of the probe mix. `NoiseCaves` already costs nothing on
+  the above-surface chunk (an existing skip) and is 16-19% inside its band on deep and cave chunks, so its
+  depth-band gate has nothing to win in the classes measured. Sky chunks already take the early-out (warm 0.001
+  ms; cold 6.5 ms, all `Columns`, which is G5). Second by share, first by effort. **Verify**: G1 pairs; byte-equal
+  dumps. **Invariant**: gates provably conservative.
 
 **G5. Hoist per-chunk-column work out of `TerrainGenerator.Compute`** (bit-identical).
 - **Files**: `WorldGen/TerrainGenerator.cs`, `BiomeClassifier.cs`, `TerrainSites.cs`, `TerrainPeaks.cs`,
@@ -225,15 +246,22 @@ shadow cascades gain nothing (Done), and the frustum test and sort stay on the C
   `WorldgenReads`-style); then gather the sites reaching the 16x16 column once, iterate them in the same order, and
   dedupe same-(x, z) re-reads such as repeated `BiomeWeights` calls. Late, optional: a `Vector256` 2D OpenSimplex2
   in a separate file, only if bit-identical (same operation order, no FMA).
-- **Win**: estimated; `Compute` costs 0.2-0.4 ms per column and feeds every LOD prefetch (the ~41 s cold far sweep).
-  **Verify**: G1 pairs, identity recipe, `LodBuildCostProbe`. **Invariant**: pure in position and seed; summation order kept.
+- **Win**: measured (G1): `Compute` costs 0.24-0.33 ms per column warm in every category and about the same cold,
+  except a great lake at 0.88 cold / 0.23 warm (its site verdict build; 4 columns). In a chunk fill it is the
+  `Columns` stage: 3-6% of a cold fill (13% sea floor), all 6.5 ms of a cold sky chunk (the tree-reach neighbor
+  columns), ~0.1% warm. So it matters for cold column fills and every LOD prefetch (the ~41 s cold far sweep), not
+  for a warm fill. **Verify**: G1 pairs, identity recipe, `LodBuildCostProbe`. **Invariant**: pure in position and
+  seed; summation order kept.
 
-**G6. Chunk-level gates for the feature stamps** (bit-identical).
-- **Files**: `WorldGen/ChunkTerrainFill.cs`, the generators under `WorldGen/Features/`. About 20 `Stamp` calls in
-  `GenerateBlockData` each walk 256 columns even when the chunk's Y range cannot hold the feature; add early-outs
-  from the `ColumnData` height and water ranges plus each feature's vertical reach, including
-  `NoiseCaves.SampleLattice` channels whose depth band excludes the chunk, only where G1 shows a cost.
-- **Win**: estimated, sky and deep chunks. **Verify**: G1 pairs; byte-equal dumps. **Invariant**: gates provably conservative.
+**G8. LOD region build** (bit-identical; after G5; L2 median 80 ms on 2026-10-31).
+- **Files**: `Lod/LodMeshBuilder.cs`, `LodRegionClaims.TryBuildOneRegion`. Candidates: a prefetch order that hits
+  already-cached columns; a heights-only column path for levels >= 1 skipping the carver-only fields
+  (`EntranceWeight`, `CaveIntensity`), only if a split of `Compute` shows they cost, with no double caching.
+- **Win**: estimated, the cold far sweep. G1 timed whole `Compute` only: at 0.25-0.33 ms a column, a level-2
+  region's 324 prefetched columns come to 81-107 ms against the 80 ms L2 median, so `Compute` dominates a cold
+  build. Whether `EntranceWeight`/`CaveIntensity` cost anything inside it is still open. **Verify**:
+  `LodBuildCostProbe` pairs. **Invariant**: LOD nesting and burial; identical region meshes (`LodBuildPoolTests`);
+  no more LodGen threads.
 
 **G7. Worker thread balance** (bit-identical; full ring ~12 s after launch on 2026-10-31).
 - **Files**: `Config/StreamingConfig.cs` (`MaxConcurrentBlockDataGenerations` 4, `MaxConcurrentMeshGenerations` 4),
@@ -241,13 +269,6 @@ shadow cascades gain nothing (Done), and the frustum test and sort stay on the C
   and the time to a full ring on the perf-fly teleports, then try 5/3 and 3/5 interleaved.
 - **Win**: estimated, ring fill time. **Verify**: perf-fly `wgen` and fps pairs. **Invariant**: never raise
   `MaxConcurrentLodGenerations` (C5); an fps guard; no blind budget moves.
-
-**G8. LOD region build** (bit-identical; after G5; L2 median 80 ms on 2026-10-31).
-- **Files**: `Lod/LodMeshBuilder.cs`, `LodRegionClaims.TryBuildOneRegion`. Candidates: a prefetch order that hits
-  already-cached columns; a heights-only column path for levels >= 1 skipping the carver-only fields
-  (`EntranceWeight`, `CaveIntensity`), only if G1 shows they cost, with no double caching.
-- **Win**: estimated, the cold far sweep. **Verify**: `LodBuildCostProbe` pairs. **Invariant**: LOD nesting and
-  burial; identical region meshes (`LodBuildPoolTests`); no more LodGen threads.
 
 **G9. Saved-world restore IO** (measure only).
 - **Files**: `Saves/ChunkSaveStore.cs` (one Deflate file per modified chunk), `Chunk.RestoreFrom` (on the generation
@@ -259,7 +280,7 @@ shadow cascades gain nothing (Done), and the frustum test and sort stay on the C
 
 F1, F6, G2 and G4 are all 2026-10-31, Quadro T1000 Max-Q, Release, working tree over c8e0f3c6; perf-fly
 pairs interleaved (before = a worktree of c8e0f3c6) at 1530 MHz, 60-73 C; probes are medians of 3, one
-per invocation. F2, F9, F7 and F10 (2026-11-01) carry their own setup. None of them changes anything a player sees.
+per invocation. F2, F9, F7, F10 and G1 (2026-11-01) carry their own setup. None of them changes anything a player sees.
 
 **F1. Shadow pass split** (diagnostics only). `ProfileSection.Shadows` is now `ShadowNear` and
 `ShadowFar` (rows `shadowNear`/`shadowFar`); `ShadowPass.RenderShadows` times itself, CPU and GPU,
@@ -474,6 +495,69 @@ count budget and the bytes on screen are untouched.
   selection instead of the full sort (drain + sort 2-12% of chunkApply). Still open: the translucent and
   LOD pools never grew in any run; a grow past 524288 would hitch the same way (an amortized grow is not
   designed).
+
+**G1. Worldgen cost probe** (2026-11-01, measurement only; Quadro T1000 Max-Q machine, 12 cpus, Release,
+working tree over 6eeb9d24; medians of 3 invocations, one per invocation). Built: `WorldgenStageTimer`
+(`WorldGen/`, internal), passed through a new optional `timer` parameter of `ChunkTerrainFill.GenerateBlockData`
+(null in production: one null check per stage, no allocation); each mark charges the wall time since the
+previous one to one of 31 stages in production order, so the stages sum to the call. `WorldgenStageTimerTests`
+prove blocks, state bytes, solid count, surface floor, fluid frontier and the ready flag byte-identical with and
+without a timer on surface, deep, sea-floor and above-surface chunks, every stage marked once on a filled chunk
+and only `Columns` on an early-out one. `WorldgenCostProbe` (`OpenGLTest.Tests/WorldGen`, `[Collection("Worldgen
+seed")]`, anti-vacuity asserts only, single-threaded) draws its columns and chunks with a fixed `SplitMix64`.
+Cold = `WorldSeed.Apply` plus a GC before each sample, so every worldgen cache is empty; warm = the same work
+again with every cache hot. They bracket the in-game rate, never measure it.
+- `TerrainGenerator.Compute`, ms per column, median cold / warm: all 0.283 / 0.278 (64 columns), land 0.267 /
+  0.243, ocean 0.296 / 0.306, lake/river 0.252 / 0.239, highland 0.325 / 0.310 (32 each), massif 0.314 / 0.326
+  (8), great lake 0.884 / 0.227 (4; the cold site verdict build). The rare categories fall short of 32 within the
+  4000-draw cap.
+- `GenerateBlockData`, whole median ms per chunk cold / warm, and the top warm stages: surface 111.6 / 1.12
+  (`NoiseCaves` 33%, `GravelPockets` 12%, `Foliage` 8%); above-surface 75.6 / 0.38 (`Fill`, `Foliage`, `Flowers`
+  18% each); sky 6.5 / 0.001 (`Columns` only, the early-out); deep-stone 145.0 / 1.10 (`GravelPockets` 23%,
+  `NoiseCaves` 16%, `Malachite` 12%); cave-heavy 122.7 / 1.06 (`GravelPockets` 24%, `NoiseCaves` 19%,
+  `Malachite` 11%); sea-floor 48.8 / 0.55 (`Snow` 15%, `Fill` 13%, `Pebbles` 12%). Cold, every land class is
+  `Trees` 66-93%, `WormCaves` 22-28% (none above the surface) and `Columns` 3-6%; the sea floor is `WormCaves`
+  66%, `Trees` 20%, `Columns` 13%.
+- All classes (the probe's mix: 6 chunks a class, sky 4, so not the in-game distribution; it only ranks
+  stages), whole median 88.9 cold / 0.81 warm:
+
+  | stage | cold share | warm share | warm median ms |
+  |---|---|---|---|
+  | `Trees` | 69.2% | 1.2% | 0.001 |
+  | `WormCaves` | 24.1% | 0.3% | 0.001 |
+  | `Columns` | 5.8% | 0.1% | 0.001 |
+  | `NoiseCaves` | 0.1% | 19.6% | 0.124 |
+  | `GravelPockets` | 0.1% | 15.9% | 0.083 |
+  | `Malachite` | 0.1% | 8.3% | 0.051 |
+  | `Coal` | 0.1% | 8.2% | 0.056 |
+  | `Fill` (0.25 us a column) | 0.1% | 7.9% | 0.071 |
+  | `Foliage` | 0.1% | 7.9% | 0.065 |
+  | `Flowers` | 0.1% | 7.7% | 0.066 |
+  | `Pebbles` | 0.1% | 7.3% | 0.065 |
+  | `Snow` | 0.1% | 5.9% | 0.042 |
+  | `FluidFrontier` | 0.0% | 3.9% | 0.006 |
+  | `Mud` | 0.1% | 2.0% | 0.003 |
+
+  Every other stage is under 1% both ways.
+- Stage sum against the whole: the externally timed call exceeds the stage-sum mean by 0.1-1.6 us in every
+  class (the call, `IsBlockDataReady` and `WorldgenStats.AddChunk`), so the stages cover the call.
+- Bracket: warm filled chunks run 0.38-1.13 ms, below the in-game `wgen` median of 1.31 ms (no worker contention,
+  hot CPU caches); cold samples run 49-145 ms, well above the in-game cold first second of 29-34 ms, because in game
+  neighboring chunks share each tree batch and worm cell while every probe sample rebuilds them alone.
+- Stability: per-class medians of every stage above a 5% share agree within about +-5% across the runs. The
+  pooled all-classes warm `GravelPockets` median swung 0.068-0.095 ms over a fourth run (a median over a two-humped
+  class mix) while its share held 15.3-16.4%, so read the pooled rows by share. The small `Compute` categories
+  (massif, great lake) and ocean cold spread up to about +-20%. Means carry outliers that medians hide:
+  deep-stone `FluidFrontier` median 0.012 ms, mean 0.14 (one chunk's frontier scan); surface `NoiseCaves` median
+  0.145 ms, mean 0.45.
+- Sizing: trimmed to stay in the default suite (both facts about 9 s): one rep of 1 cold plus 2 warm samples per
+  chunk, 6 chunks per class (sky 4), 24 underground candidates, 2 `Compute` reps. No env gate. Steadier figures
+  come from the median of several invocations, not from raising the constants.
+- Not done, by decision: no stage buckets in `WorldgenStats` or the `wgen` token (they would change
+  `TakeWindow`'s signature and add `Interlocked` traffic on four workers for nothing the probe does not show); no
+  noise-call counts (`FastNoiseLite.cs` is vendored and `GetNoise` is not virtual), so G3's call count stays an
+  estimate; no real mesh share: `MeshBuildCostProbe` (5475 us/build on 2026-10-31) builds a synthetic soup, not
+  generated terrain, so no mesh-vs-worldgen ratio was measured.
 
 ## Not chasing (recorded so it is not re-proposed)
 

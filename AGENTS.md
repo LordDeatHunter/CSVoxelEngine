@@ -1802,6 +1802,8 @@ OpenGLTest/
                                #   (PondSiteAt); SampleSurfaceWater composes ponds, rivers and great lakes
       WorldgenReads.cs         # test hook: a flag-gated counter of worldgen entries, noted on a ColumnCache
                                #   miss and in TerrainGenerator.Climate (off in production)
+      WorldgenStageTimer.cs    # test/probe seam: per-stage wall time of ChunkTerrainFill.GenerateBlockData,
+                               #   passed explicitly (null in production)
       WorldgenStats.cs         # lock-free worldgen timing from the generation workers and
                                #   the LOD builder, drained once a second by FrameProfiler
       WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere
@@ -2000,7 +2002,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Menus/                     # main and pause menus, the loading screen, text fields
   VisualTest/                  # scenario parsing and ops, PNG capture
   WorldGen/                    # terrain, biomes, lakes, ravines, clouds, the generational
-                               #   cache, the tree front end and batches, worldgen stats
+                               #   cache, the tree front end and batches, worldgen stats,
+                               #   the worldgen cost probe and the stage-timer tests
     Features/                  # every feature generator (mirrors src/WorldGen/Features)
       Underground/             # coal, malachite, gravel pockets, cave life (mirrors src/WorldGen/Features/Underground)
     Trees/                     # the tree growth engine, flat over src's Trees/Shape, Logics and Features
@@ -4461,8 +4464,9 @@ touch a file that violates one of them, fixing it is in scope.
   root holds the app entry and core types only; a new file goes into the folder of its area
   (a new feature area gets a new folder), never into a catch-all. `Networking/` is split into
   its shared protocol (the folder root), `Client/` and `ServerSide/` (not `Server/`, which would read
-  as the dedicated server's `VoxelEngine.Server`); every src folder holds 22 files or fewer, so the
-  god-class split-outs land in their area's folder without crowding it.
+  as the dedicated server's `VoxelEngine.Server`); every src folder stays near ~30 files (`WorldGen/` is at
+  31, its worldgen core types; its generators already sit in `Features/` and `Trees/`), so the god-class
+  split-outs land in their area's folder without crowding it.
 - **Namespaces mirror the folder tree.** Root namespace is `VoxelEngine`; a file in
   `OpenGLTest/src/WorldGen/Trees/` declares `namespace VoxelEngine.WorldGen.Trees;`, and only
   the six files directly in `src/` (Program, World, WorldPhase, WorldLoadGate, WorldSeed,
