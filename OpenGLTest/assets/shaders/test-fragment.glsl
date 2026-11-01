@@ -756,7 +756,10 @@ void main() {
             // otherwise show, and adding it instead piled a whole extra sky on top of the albedo
             // at grazing angles, where F approaches 1 - obsidian came out pale blue rather than
             // black glass catching the sky. Capped below a full mirror so it keeps its own color.
-            col = mix(col, skyColor, F * metallic * 0.65 * nearFade);
+            // Mixed in display space, like the dry-air fog: a linear mix of the sky over the
+            // near-black ore body read as a pale blue slab once the sRGB encode lifted it.
+            col = SrgbToLinear(mix(LinearToSrgb(min(col, vec3(1.0))), LinearToSrgb(min(skyColor, vec3(1.0))),
+                                   F * metallic * 0.65 * nearFade));
             // Added in linear light, where the display encode lifts a small add on these
             // near-black texels far more than the same add did in display space; uOreSpecScale
             // (SurfaceShadingConfig.OreSpecLinearScale) brings the lift back to the old look.
