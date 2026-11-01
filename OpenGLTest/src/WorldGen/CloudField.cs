@@ -101,18 +101,26 @@ public static class CloudField
     /// fillets, sphere octants, horn-torus junctions, walls, vertical corner cylinders, ledges and
     /// riser patches) are laid out so that they meet on exactly the same boundary curves, which is
     /// what keeps the result a closed surface; CloudTests.RoundedMeshIsWatertight checks that.
+    ///
+    /// Cells are visited x-major (<c>x * sizeZ + z</c>), and each cell's triangles land in the index
+    /// list as one contiguous run: <c>CellIndexStart[x * sizeZ + z]</c> is where cell (x, z)'s run
+    /// begins and the next entry is where it ends, so an empty (level-0) cell has an empty run, and
+    /// the extra last entry is the total index count. Vertices are shared between cells, so a run's
+    /// indices may reference vertices a neighbor emitted.
     /// </summary>
-    public static (CloudVertex[] Vertices, uint[] Indices) BuildMesh(byte[,] levels)
+    public static (CloudVertex[] Vertices, uint[] Indices, int[] CellIndexStart) BuildMesh(byte[,] levels)
     {
         var sizeX = levels.GetLength(0);
         var sizeZ = levels.GetLength(1);
         var s = SkyConfig.CloudCellSize;
         var builder = new MeshBuilder();
         var nb = new int[3, 3];
+        var cellIndexStart = new int[sizeX * sizeZ + 1];
 
         for (var x = 0; x < sizeX; x++)
         for (var z = 0; z < sizeZ; z++)
         {
+            cellIndexStart[x * sizeZ + z] = builder.Indices.Count;
             int level = levels[x, z];
             if (level == 0) continue;
 
@@ -128,7 +136,8 @@ public static class CloudField
             EmitRiserPatches(builder, cell);
         }
 
-        return (builder.Vertices.ToArray(), builder.Indices.ToArray());
+        cellIndexStart[sizeX * sizeZ] = builder.Indices.Count;
+        return (builder.Vertices.ToArray(), builder.Indices.ToArray(), cellIndexStart);
     }
 
     /// <summary>One cell's footprint plus the 3x3 block of levels around it, already wrapped.</summary>

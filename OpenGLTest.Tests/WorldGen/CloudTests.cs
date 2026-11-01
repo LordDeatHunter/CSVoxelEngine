@@ -148,7 +148,7 @@ public sealed class CloudTests(ITestOutputHelper output)
         levels[1, 1] = 1;
         levels[2, 1] = 1;
 
-        var (vertices, indices) = CloudField.BuildMesh(levels);
+        var (vertices, indices, _) = CloudField.BuildMesh(levels);
 
         foreach (var (a, b, c, n) in Triangles(vertices, indices))
         {
@@ -166,7 +166,7 @@ public sealed class CloudTests(ITestOutputHelper output)
         levels[1, 1] = 2;
         levels[2, 1] = 1;
 
-        var (vertices, indices) = CloudField.BuildMesh(levels);
+        var (vertices, indices, _) = CloudField.BuildMesh(levels);
 
         var risers = 0;
         foreach (var (a, b, c, n) in Triangles(vertices, indices))
@@ -194,7 +194,7 @@ public sealed class CloudTests(ITestOutputHelper output)
         levels[0, 1] = 1;
         levels[3, 1] = 1;
 
-        var (vertices, indices) = CloudField.BuildMesh(levels);
+        var (vertices, indices, _) = CloudField.BuildMesh(levels);
 
         foreach (var (a, b, c, n) in Triangles(vertices, indices))
         {
@@ -208,9 +208,34 @@ public sealed class CloudTests(ITestOutputHelper output)
     }
 
     [Fact]
+    public void CellIndexStartsPartitionTheIndexListInCellOrder()
+    {
+        // The tile cull draws a cell's triangles by its index run, so the runs must tile the whole
+        // index list in x-major cell order, and a cell has triangles exactly when it has clouds.
+        var rng = new Random(7);
+        var levels = new byte[6, 5];
+        for (var x = 0; x < 6; x++)
+        for (var z = 0; z < 5; z++)
+            levels[x, z] = (byte)rng.Next(0, 3);
+
+        var (_, indices, starts) = CloudField.BuildMesh(levels);
+
+        Assert.Equal(6 * 5 + 1, starts.Length);
+        Assert.Equal(0, starts[0]);
+        Assert.Equal(indices.Length, starts[^1]);
+        for (var x = 0; x < 6; x++)
+        for (var z = 0; z < 5; z++)
+        {
+            var k = x * 5 + z;
+            Assert.True(starts[k + 1] >= starts[k], $"Cell ({x}, {z}) run ends before it starts");
+            Assert.Equal(levels[x, z] == 0, starts[k + 1] == starts[k]);
+        }
+    }
+
+    [Fact]
     public void FieldMeshWithinBounds()
     {
-        var (vertices, indices) = CloudField.BuildMesh(CloudField.BuildLevels());
+        var (vertices, indices, _) = CloudField.BuildMesh(CloudField.BuildLevels());
         output.WriteLine($"full mesh: {vertices.Length} vertices, {indices.Length} indices");
 
         Assert.True(vertices.Length > 1000, $"Empty sky: {vertices.Length} verts");
@@ -234,7 +259,7 @@ public sealed class CloudTests(ITestOutputHelper output)
     public void WindingIsOutward()
     {
         // Counter-clockwise seen from the normal side, so back-face culling drops the far faces.
-        var (vertices, indices) = CloudField.BuildMesh(CloudField.BuildLevels());
+        var (vertices, indices, _) = CloudField.BuildMesh(CloudField.BuildLevels());
         for (var i = 0; i < indices.Length; i += 3)
         {
             var a = vertices[indices[i]];
@@ -250,7 +275,7 @@ public sealed class CloudTests(ITestOutputHelper output)
     {
         // The fillets, octants and tori carry per-vertex normals, so the shader normalizes nothing:
         // a normal that drifted off unit length would show up as a bright or dark band.
-        var (vertices, _) = CloudField.BuildMesh(CloudField.BuildLevels());
+        var (vertices, _, _) = CloudField.BuildMesh(CloudField.BuildLevels());
         foreach (var vertex in vertices)
             Assert.Equal(1f, vertex.Normal.Length(), tolerance: 1e-3f);
     }
@@ -280,7 +305,7 @@ public sealed class CloudTests(ITestOutputHelper output)
             for (var z = 1; z <= 3; z++)
                 levels[x, z] = (byte)rng.Next(0, testMaxLevels + 1);
 
-            var (vertices, indices) = CloudField.BuildMesh(levels);
+            var (vertices, indices, _) = CloudField.BuildMesh(levels);
             var count = indices.Length / 3;
             var v0 = new Vector3[count];
             var e1 = new Vector3[count];

@@ -135,9 +135,9 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 
 ## Open
 
-Ranking: within each group the prerequisite measurement comes first (G1; F1, F2 and F9 are done). F3-F8 follow the
+Ranking: within each group the prerequisite measurement comes first (G1; F1, F2, F7 and F9 are done). F3-F8 follow the
 share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%,
-before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4 and F13, exact reflection cuts, were tried and ruled out; F9 is done);
+before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4 and F13, exact reflection cuts, were tried and ruled out; F7 and F9 are done);
 F10-F12 are CPU-only and matter less while the frame is GPU-bound.
 G follows the `wgen` and probe split. Ties and unmeasured items fall back to effort. Each entry has a
 bold title, then **Files**, **Win** (measured or estimated), **Verify** and **Invariant**.
@@ -177,20 +177,6 @@ after F2).
 - **Win**: estimated; unknown until the overdraw count exists. **Verify**: perf-fly worldPass pair on
   the T1000 and a second GPU; forest screenshots identical.
 - **Invariant**: pixel-identical output; the cutout alpha test and `CutoutMipmap` coverage unchanged.
-
-**F7. Cloud pass** (1.08 ms, 7%; cold first line 16-24 ms GPU worst, 3.9-5.9 ms CPU worst).
-- **Files**: `Rendering/Atmosphere/CloudRenderer.cs` `Render` (`CloudCopies.Gather` culls whole
-  copies, then an instanced draw of the full field mesh after a depth pre-pass), `CloudCopies.cs`,
-  `SkyPasses.RenderClouds`, `cloud-fragment.glsl` (the silver lining reads unit 8). Check first: split
-  pre-pass from color pass with `// TEMP-DIAG` GPU timers and measure how much of a visible copy is off
-  screen. Candidates: tile the field mesh and cull tiles; move the first-frame cost into load if it is lazy init.
-- **Win**: estimated; the off-screen share of each drawn copy. **Verify**: perf-fly `cloudPass` pair;
-  `clouds-mirror.json` and `cloud-shadows.json` screenshots.
-- **Invariant**: the `CloudCopies`/`CloudCover` twins and their tests; the `SkySample` copies
-  (shader-sync); unit 8 stays reserved for the cloud shadow.
-- **Mirror clouds too** (F13 gate, 2026-11-01): the water mirror redraws the clouds every time it
-  renders: 1.56 ms of its 3.65 ms forced-render sum on perf-fly (clouds-mirror 1.45, water.json
-  0.69), against 0.09 for its sky. A cheaper cloud draw pays in both passes.
 
 **F8. `lod` CPU spike and `lodPass` worst** (low priority; 0.91 ms, 6%, worst 10.7 ms GPU).
 - **Files**: `Lod/LodManager.cs`, `LodCoverPass.cs`, `LodRegionSet.cs`. The 1306 ms single-frame `lod`
@@ -290,7 +276,7 @@ shadow cascades gain nothing (Done), and the frustum test and sort stay on the C
 
 F1, F6, G2 and G4 are all 2026-10-31, Quadro T1000 Max-Q, Release, working tree over c8e0f3c6; perf-fly
 pairs interleaved (before = a worktree of c8e0f3c6) at 1530 MHz, 60-73 C; probes are medians of 3, one
-per invocation. F2 and F9 (2026-11-01) carry their own setup. None of them changes anything a player sees.
+per invocation. F2, F9 and F7 (2026-11-01) carry their own setup. None of them changes anything a player sees.
 
 **F1. Shadow pass split** (diagnostics only). `ProfileSection.Shadows` is now `ShadowNear` and
 `ShadowFar` (rows `shadowNear`/`shadowFar`); `ShadowPass.RenderShadows` times itself, CPU and GPU,
@@ -395,6 +381,69 @@ fragment that passes `LEQUAL` against depth already written, fading or not; no h
 - Shadow cascades: not done and not worth it; a light-space estimate on the gate's readback found ~0% of
   their casters occluded (near median 0.0%, max 0.2-0.4%; far 0.0%), the buried-caster skip already
   drops them. A depth-only light pass is order-independent, so the same test would need no ordering rule.
+
+**F7. Cloud pass: frustum-culled tile runs** (2026-11-01, exact by construction; Quadro T1000 Max-Q,
+driver 597.06, Release, 1280x720, runs starting at 70 C / 765 MHz and ending at 73-74 C / 1335-1530
+MHz; perf-fly `VOXEL_TIME=60` x3 interleaved against a worktree of c045abec, both builds carrying the
+same temporary timer patch). `CloudField.BuildMesh` also returns each cell's index-run start (cells
+are emitted x-major, so the mesh and its bytes are unchanged: SHA-256 of both arrays equal). The GL-free
+`CloudTiles` (`CloudTilesTests`) cuts the 128x128-cell field into 16-cell tiles, bounds each tile by the
+vertices its triangles actually reference (fillets and riser patches cross cell borders), and per pass
+emits, for every surviving copy and every (column, tile row) run whose tile box grown by
+`SkyConfig.CloudTileCullMarginBlocks` (1) still meets that pass's own frustum, one
+`DrawElementsIndirectCommand` with `BaseInstance` = the copy's slot, copy-major and in ascending index
+order, adjacent runs merged. Both sweeps of `CloudRenderer` (depth pre-pass, color) draw that list as
+one `glMultiDrawElementsIndirect`, the main view against `viewProj` and the mirror against
+`_reflViewProj`. GL defines the old instanced draw as instance-major sequential draws and MDI as its
+commands in order, so the new primitive stream is a strict, order-preserving subsequence of the old one
+with the same vertices, instance offsets and shader. The margin must cover GL's -w near clip, which
+`Frustum`'s Direct3D z >= 0 near plane does not model (GL draws down to about `Camera.NearPlane` / 2
+from the eye); a test pins that relation.
+- Metric: the two sweeps' own `TIME_ELAPSED` ranges (temporary rows, so the uniform setup and the
+  instance upload are outside both builds' figures); per run, the median over the one-second lines
+  (line 1 excluded) of the per-line average, main = depth + color, mirror the same on mirror-render
+  frames. Gate A (before any draw change) measured the share of indices a tile cull keeps: main 0.641,
+  mirror 0.670 median on perf-fly (cloud-shadows at 147: 0.417 / 0.089), the depth and color sweeps
+  costing about the same, i.e. geometry-bound.
+- Main cloud GPU 0.980 -> 0.525 ms (before runs 1.190/0.980/0.975, after 0.470/1.390/0.525; per-pair
+  median -0.450), mirror 2.090 -> 1.545 ms (2.230/1.535/2.090 vs 1.535/1.545/1.545; per pair -0.545):
+  combined -1.00 ms per mirrored frame; a forced-mirror pair -0.975 ms; frame-weighted with the mirror
+  rendering 58.7% of frames about -0.78 ms GPU a frame. Frame median 24.27 -> 21.94 ms (direction only,
+  the frame is not cloud-bound).
+- Commands per call: main 338-344, mirror 286-297 (6 copies median). MDI front end: the same split
+  commands drawing the full geometry (a temporary no-cull mode) measured main 1.08 / mirror 2.05 ms
+  against the before medians 0.98 / 2.09, i.e. within noise. CPU: `cloudPass` median 0.010 -> 0.05-0.06
+  ms (the gather, ~36-47 us a call, plus the temporary bookkeeping), the mirror's gather ~+0.03 ms in
+  `reflect`; no stall from the second command upload in a frame.
+- Exactness: an in-frame A/B (every 10th call per view: snapshot the target, draw the old instanced
+  path, restore, draw it again, restore, draw the culled path, compare every texel) found 0 differing
+  depth texels anywhere, but its old-vs-old noise floor is not 0: a handful of color texels per run
+  differ between two identical legacy draws (equal-depth fillet pieces both pass `LEQUAL` in the color
+  sweep and read and write the same texel inside one draw, which GL leaves undefined), and legacy-vs-new
+  differs in the same order. So exactness was proven directly instead: every call, the indices the cull
+  dropped were drawn with the pass's program, viewport and cull state (depth test, depth and color writes
+  off) inside a `SAMPLES_PASSED` query, with the kept runs as a positive control. 0 samples in every call
+  of both views (calls main / mirror): perf-fly 1763 / 1642, clouds-mirror (120) 457 / 301, cloud-shadows
+  (147) 336 / 432, cloud-silver-lining at 343 452 / 100, at 400 446 / 93, at 147 455 / 91, clouds.json
+  382 / 93, water.json (360) 441 / 582, and a scratch flight through the cloud layer (y 159.85-170,
+  looking up 0.15 below a base and down 0.15 above a top) 911 / 209, 574 of those main calls with the eye
+  inside a cloud. The positive control was non-zero everywhere; with the margin forced to -2 the query
+  fired on 281 main and 8 mirror calls (the detector works), at 0 it stayed 0 (that run never put a tile
+  edge in the near band, which the unit test covers). The dropped primitives rasterize no fragment, so
+  the fragment stream is the old one; the A/B residue is the old draw's own race.
+- Cold start: the old 16-24 ms GPU first-line spike sat outside the draw ranges (program first use,
+  uniforms, first upload), and the first cloud `Render` cost 3.3-4.5 ms CPU (line-1 `cloudPass` CPU worst
+  5.5-7.3 ms). The MDI path raised that worst to 17.8-19.9 ms. `CloudRenderer.WarmUp`, at the end of
+  `RenderManager.LoadResources` (one triangle through both sweeps under both cull faces into a private
+  1x1 RGBA16F/Depth24 target, every state restored, 12-27 ms of load CPU), brings it back to 12.5 ms
+  median (10.4-12.9; without it 14.0-23.2, median 19.1): still ~5 ms over the old path, driver work on
+  the first real-target multi-draw that a 1x1 warm-up does not prepay (a full-field warm-up was no
+  better, 14.9/16.1). A second 6-16 ms `cloudPass` CPU spike on lines 4-6 in some runs of every variant
+  lines up with the run's `reflect` CPU hitches: a world hitch landing in the bracket, not the clouds.
+- Rejected without measuring: a fog-distance cull (at full fog the shader still writes an sRGB round trip
+  of the scene and its depth), reordering the index buffer (changes primitive order), a mirror-plane cull
+  (the cloud shader has no clip and the clouds lie above the plane), the water-sample-region scissor
+  (not exact, F13) and skipping the pre-pass for some tiles (overlap cannot be proven).
 
 ## Not chasing (recorded so it is not re-proposed)
 
@@ -506,8 +555,10 @@ fragment that passes `LEQUAL` against depth already written, fading or not; no h
   depth with the LOD first (reorders draws), and hardware clip planes in place of the `uClipY` discard
   (edge coverage not provably identical). The diagnostics, the bound twin and its tests were reverted
   and kept outside the tree. Where the mirror's time actually goes: chunk vertex and fragment work
-  the depth test cannot cull, and the mirrored clouds (F7). Retry only with a cheaper mirror (lower
-  reflection resolution is a setting, not a free cut) or once F7 lands.
+  the depth test cannot cull, and the mirrored clouds (F7). F7 has since landed (Done): the mirror's
+  cloud draw ranges fell 2.09 -> 1.55 ms median on perf-fly (F7's metric, the two sweeps only), and
+  its chunk and LOD work is unchanged. Retry only with a cheaper mirror (lower reflection resolution is
+  a setting, not a free cut).
 - Fluid 16-slot chunk cache: no spike reduction (16 vs 256 slots identical); a per-tick cap freezes fluid.
 - Mud 6-face gate: not outcome-equivalent (diagonal dirt can be wet).
 - VSync and limiters, GL debug context, per-frame `GetError`, worker priorities, uniform location

@@ -1,36 +1,8 @@
 using System;
 using System.Numerics;
-using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
 
 namespace VoxelEngine.Rendering.Geometry;
-
-/// <summary>
-/// One entry of a <c>glMultiDrawElementsIndirect</c> command buffer, laid out exactly as the GL
-/// 4.6 spec (§10.4, "DrawElementsIndirectCommand") requires: five 32-bit words in this order and
-/// nothing else, since the driver reads the buffer memory directly.
-/// </summary>
-[StructLayout(LayoutKind.Sequential, Pack = 4)]
-public struct DrawElementsIndirectCommand
-{
-    /// <summary>Indices to draw, i.e. <see cref="GeometrySlice.IndexCount"/>.</summary>
-    public uint Count;
-
-    /// <summary>Instances; always 1 here — chunks are drawn once each.</summary>
-    public uint InstanceCount;
-
-    /// <summary>First index into the pool's element buffer, i.e. <see cref="GeometrySlice.IndexOffset"/>.</summary>
-    public uint FirstIndex;
-
-    /// <summary>
-    /// Added to every index, i.e. <see cref="GeometrySlice.VertexOffset"/> — this is what lets a
-    /// slice keep its indices slice-relative <c>ushort</c>s however far into the pool it sits.
-    /// </summary>
-    public int BaseVertex;
-
-    /// <summary>First instance; always 0 (nothing here is instanced).</summary>
-    public uint BaseInstance;
-}
 
 /// <summary>
 /// The per-frame command stream behind the pooled chunk draws: each pass (shadow, reflection,

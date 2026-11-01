@@ -568,6 +568,9 @@ public class RenderManager : IDisposable
             _noticePips = new NoticePipRenderer(gl, font);
         }
         Selection = new SelectionPasses(gl, this);
+        // Last, with every target and unit in place: the cloud draw's first-use cost lands here
+        // rather than in the first frames (CloudRenderer.WarmUp restores what it touches).
+        _clouds.WarmUp(Units, SceneReadUnit);
         // Everything above binds raw - the atlas build, the loader, the sun's filter tweak and
         // the three render targets - so nothing the cache thinks it knows survives load.
         Units.InvalidateTextureUnits();

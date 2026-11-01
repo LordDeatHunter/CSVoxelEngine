@@ -1537,7 +1537,16 @@ OpenGLTest/
         CloudCopies.cs         # the GL-free arithmetic behind the cloud layer's 3x3
                                #   sweep: where each copy of the field sits this frame
         CloudCover.cs          # whether the cloud layer, as CloudRenderer draws it, stands between an eye and the sky along a ray
-        CloudRenderer.cs       # draws the cloud layer: one static mesh built once from CloudField
+        CloudTiles.cs          # GL-free twin of the cloud cull: per-tile vertex bounds of the field mesh and the
+                               #   frustum-culled indirect commands both cloud sweeps draw (an order-preserving
+                               #   subsequence of the full instanced draw; the margin covers
+                               #   GL's -w near clip, which Frustum's z >= 0 near plane does not)
+        CloudRenderer.cs       # draws the cloud layer: one static mesh built once from CloudField, drawn as
+                               #   frustum-culled tile runs (CloudTiles), one MultiDrawElementsIndirect per
+                               #   sweep (depth pre-pass, then color), main view and mirror each culled with
+                               #   its own viewProj; WarmUp, called at the end of RenderManager.LoadResources,
+                               #   pays the first-use draw cost at load (one triangle into a private 1x1
+                               #   RGBA16F/Depth24 target under both cull faces, every state restored)
         CloudShadowTexture.cs  # the cloud-shadow coverage map: one R8 GL_TEXTURE_2D of CloudField.Cells texels per side
         SkyDomeFrame.cs        # what the sky dome needs each frame beyond its SkyPalette: the night sky's stars
         SkyPasses.cs           # the sky dome is drawn first, right after the clear (RenderSky,
@@ -1550,6 +1559,8 @@ OpenGLTest/
         ChunkDrawBatch.cs      # persistent-mapped 3-slot ring of DrawElementsIndirectCommands +
                                #   the vec4(origin, alpha) ChunkInfo SSBO read via gl_DrawID; DrawRange
                                #   issues a pass as consecutive segments (the opaque occlusion cull)
+        DrawElementsIndirectCommand.cs # one glMultiDrawElementsIndirect command (GL's layout), shared by the chunk
+                               #   batch and the cloud tile runs
         ChunkGeometryPool.cs   # the two shared chunk vertex/index buffers (opaque, translucent):
                                #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy
         GeometryAllocator.cs   # GL-free first-fit free list with coalescing, in units of
@@ -1746,7 +1757,8 @@ OpenGLTest/
       CaveNode.cs, Worm.cs     # one tunnel sphere (center + radius); a worm's node array plus its AABB
       ChunkTerrainFill.cs      # the worldgen fill of a fresh chunk (column fill, carvers, water, mud, lava, every feature
                                #   stamp, the fluid frontier scan; behind Chunk.GenerateBlockData)
-      CloudField.cs            # the cloud layer as a 2D grid of cells, each holding 0..CloudMaxLevels stacked slabs
+      CloudField.cs            # the cloud layer as a 2D grid of cells, each holding 0..CloudMaxLevels stacked slabs;
+                               #   BuildMesh also returns each cell's index-run start (cells are emitted x-major)
       ColumnData.cs            # per-chunk-column arrays: Heights (ravines cut in), DirtDepth, EntranceWeight,
                                #   CaveIntensity, Biomes, Bed (pre-ravine profile: decides wetness), WaterLevel,
                                #   CornerWarmth/CornerWetness (the climate at the column's tint lattice point)

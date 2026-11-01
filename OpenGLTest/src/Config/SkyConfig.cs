@@ -220,6 +220,22 @@ public const float DayLengthSeconds = 1200f;
     public const int CloudSeed = 9241;
     public const float CloudDriftBlocksPerSecond = 1.5f;
     /// <summary>
+    /// Side of one cull tile of the cloud field mesh, in cells (CloudTiles): each copy of the field
+    /// is drawn as the index runs of the tiles that may rasterize in the pass's frustum.
+    /// </summary>
+    public const int CloudTileCells = 16;
+    /// <summary>
+    /// How far a cloud tile's vertex box is grown on every side before the frustum test
+    /// (CloudTiles.MayRasterize), in blocks. Its job is the near plane: Frustum's near plane is the
+    /// Direct3D z_clip &gt;= 0 plane of the System.Numerics projection, but GL (no glClipControl)
+    /// clips at z_clip &gt;= -w, which with Camera's planes still rasterizes geometry down to about
+    /// half of Camera.NearPlane from the eye. A grown box moves every plane distance by at least the
+    /// margin, so the margin must be at least Camera.NearPlane, plus float slack for evaluating the
+    /// planes on the CPU at field coordinates against the GPU's transform. A smaller margin can cull
+    /// visible near-eye cloud geometry and break the cull's exactness.
+    /// </summary>
+    public const float CloudTileCullMarginBlocks = 1f;
+    /// <summary>
     /// Fraction of direct sun a full-thickness cloud removes from the terrain under its shadow
     /// (test-fragment.glsl CloudShadow); a one-layer cloud removes half of it.
     /// </summary>

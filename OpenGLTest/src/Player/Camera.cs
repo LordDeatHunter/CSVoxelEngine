@@ -177,7 +177,7 @@ public class Camera : IMobTarget
     // Near plane sets depth precision at distance (error ~ z^2 / (near * 2^24)); it must be
     // large enough that stacked LOD levels ~4 blocks apart don't z-fight at 2048 blocks.
     // Collision keeps geometry at least PlayerRadius (0.3) away, so 0.2 never clips.
-    private const float NearPlane = 0.2f;
+    internal const float NearPlane = 0.2f;
     internal const float FarPlane = 4096f; // past the outermost LOD ring (2048 blocks + terrain height)
     private static float MouseSensitivity => GameSettings.MouseSensitivity;
 
