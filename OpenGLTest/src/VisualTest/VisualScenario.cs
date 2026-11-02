@@ -63,7 +63,7 @@ public sealed class VisualStep
 }
 
 /// <summary>
-/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/give/spawn/grow/screenshot steps loaded from
+/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/creative/give/spawn/grow/screenshot steps loaded from
 /// JSON (<c>VOXEL_SCRIPT</c>), driving the real world-update functions for agent screenshots.
 /// </summary>
 public sealed class VisualScenario
@@ -165,6 +165,11 @@ public sealed class VisualScenario
                 Op = "fly",
                 On = !element.TryGetProperty("on", out var on) || on.GetBoolean(),
             },
+            "creative" => new VisualStep
+            {
+                Op = "creative",
+                On = !element.TryGetProperty("on", out var creativeOn) || creativeOn.GetBoolean(),
+            },
             "give" => new VisualStep
             {
                 Op = "give",
@@ -205,7 +210,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, give, spawn, grow, damage, view, player, select or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, view, player, select or screenshot."),
         };
     }
 

@@ -2,6 +2,8 @@
   // Perf fly-around: settle, then teleport legs + sustained sprint walks to force streaming.
   // Run: VOXEL_DEBUG=1 VOXEL_TIME=120 VOXEL_SCRIPT=visual-examples/perf-fly.json
   "steps": [
+    // Creative (no flight): the teleport legs drop the player 30-55 blocks onto the ground
+    { "op": "creative" },
     { "op": "wait", "seconds": 10 },
     { "op": "screenshot", "name": "perf_spawn" },
     { "op": "teleport", "pos": [0.5, 60.5, 0.5], "yaw": -90, "pitch": -10 },

@@ -95,6 +95,14 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 Advance();
                 break;
 
+            case "creative":
+                // Creative alone, no flight: a dropped player still falls and lands, but takes no
+                // fall damage. Turning it off ends flight too, as the C key does.
+                world.Camera.SetModes(step.On, step.On && world.Camera.IsFlying);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} creative {(step.On ? "on" : "off")}");
+                Advance();
+                break;
+
             case "give":
                 var id = ContentRegistry.Require(step.Block!);
                 world.Inventory.Add(id, step.Count);

@@ -140,15 +140,21 @@
     { "op": "wait", "seconds": 8 },
 
     // LEG 1 — leaves: dense canopy, looking up, freshly disturbed.
+    // Each drop lands in creative (no flight, so it still falls) and the mining runs out of it,
+    // since creative breaks a block on the first hit and would leave no hits to chip debris off
+    { "op": "creative" },
     { "op": "teleport", "pos": [-25.5, 32.5, -43.5], "yaw": 180, "pitch": 0 },
     { "op": "wait", "seconds": 3 },
+    { "op": "creative", "on": false },
     { "op": "look", "yaw": 180, "pitch": 25 },
     { "op": "mine", "seconds": 1.5 },
     { "op": "screenshot", "name": "leaves_canopy", "hideHud": true },
 
     // LEG 2 — debris: bright hillside, close mined cell, shutter just after a break.
+    { "op": "creative" },
     { "op": "teleport", "pos": [12.5, 25.5, 30.5], "yaw": 90, "pitch": -25 },
     { "op": "wait", "seconds": 4 },
+    { "op": "creative", "on": false },
     { "op": "mine", "seconds": 2.0 },
     { "op": "mine", "seconds": 0.4 },
     { "op": "screenshot", "name": "debris_hits", "hideHud": true },

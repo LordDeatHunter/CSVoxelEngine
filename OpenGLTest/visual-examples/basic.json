@@ -5,6 +5,8 @@
   // walk {keys?, seconds}, mine {seconds}, place, screenshot {name?, hideHud?}.
   // Walk keys are Silk Key names: W A S D Space ShiftLeft ControlLeft C ...
   "steps": [
+    // Creative (no flight): the teleports drop the player 45-80 blocks onto the ground
+    { "op": "creative" },
     { "op": "wait", "seconds": 5 },
     { "op": "screenshot", "name": "spawn" },
     { "op": "walk", "keys": ["W"], "seconds": 5 },

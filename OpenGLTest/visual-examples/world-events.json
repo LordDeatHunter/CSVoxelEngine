@@ -26,7 +26,7 @@
     { "op": "teleport", "pos": [157.5, 32, 283.5], "yaw": -90, "pitch": -28.37 },
     { "op": "wait", "seconds": 14 },
     { "op": "teleport", "pos": [157.5, 13.63, 283.5], "yaw": -90, "pitch": -28.37 },
-    { "op": "walk", "keys": ["C"], "seconds": 0.15 },
+    { "op": "creative", "on": false },
     { "op": "wait", "seconds": 1.5 },
 
     // LEG 1 — the fuse, the blast shake and the push.

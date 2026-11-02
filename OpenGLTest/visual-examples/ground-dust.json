@@ -5,11 +5,11 @@
   // Particles are RNG- and frame-rate-driven, so this is a presence check judged by eye, never a
   // pixel instrument: each landing is caught in a short burst of shots, since the chips only live
   // a few tenths of a second once they hit the ground.
-  // The player is filmed from the shoulder camera and switched to creative first (the C press), so
+  // The player is filmed from the shoulder camera and switched to creative first (the creative op), so
   // the 10-block drops cost no health; creative on foot falls and lands like survival.
   "steps": [
     { "op": "wait", "seconds": 12 },
-    { "op": "walk", "keys": ["C"], "seconds": 0.05 },
+    { "op": "creative" },
     { "op": "view", "mode": "shoulder" },
 
     // LEG 1 — grass: the spawn clearing (ground top y 10 at x 8, z 8). Stand, then drop 10 blocks.

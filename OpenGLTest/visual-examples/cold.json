@@ -8,6 +8,8 @@
   // no physics, so the pose is held); the ground shots wait to land first. Pitches stay shallow
   // enough to keep the first-person hand out of frame.
   "steps": [
+    // Creative (no flight): every ground shot lands from 8-30 blocks up
+    { "op": "creative" },
     { "op": "teleport", "pos": [-56.5, 45.5, -40.5], "yaw": 0, "pitch": -32 },
     { "op": "wait", "seconds": 12 },
     { "op": "teleport", "pos": [-56.5, 45.5, -40.5], "yaw": 0, "pitch": -32 },

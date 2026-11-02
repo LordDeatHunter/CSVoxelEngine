@@ -3,6 +3,8 @@
   // (working directory OpenGLTest/). Shots land in visual/clouds/.
   // Frames the sky from open air below the layer, level with it, from high above, then inside it.
   "steps": [
+    // Creative (no flight): the first teleport lands the player from 16 blocks up
+    { "op": "creative" },
     { "op": "wait", "seconds": 5 },
     { "op": "teleport", "pos": [0.5, 30.5, 0.5], "yaw": -90, "pitch": 40 },
     { "op": "wait", "seconds": 3 },

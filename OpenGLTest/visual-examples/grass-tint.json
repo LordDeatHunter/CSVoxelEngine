@@ -47,8 +47,9 @@
   //
   // Order matters. The camera shots run first with an empty hand: hideHud hides the HUD but not
   // the first-person hand, and "give" puts its block in the hand for the rest of the run. The
-  // mining shot runs on foot (creative breaks instantly, so no pop), and only then does "fly"
-  // switch creative on (it stays on after fly off), where one instant hit topples the tree. The
+  // camera shots run in creative without flight (falls cost nothing); the mining shot runs on foot
+  // out of creative (creative breaks instantly, so no pop), and only then does "fly" switch
+  // creative back on (it stays on after fly off), where one instant hit topples the tree. The
   // mountain shots come last, hovering with an empty slot selected: the range is nearly 4000 blocks
   // out, and a camera falling 60 blocks onto it on foot dies and respawns at the origin, which
   // unloads the range before the shot.
@@ -56,6 +57,8 @@
   // as streaming time; the hovering shots (the aerials and the spruce) teleport a second time
   // and shoot with no wait, so the pose is held exactly.
   "steps": [
+    // Creative (no flight) so the drops onto the stand points cost no health
+    { "op": "creative" },
     { "op": "teleport", "pos": [-80.5, 90.5, 8.5], "yaw": 0, "pitch": -18 },
     { "op": "wait", "seconds": 10 },
     { "op": "teleport", "pos": [-80.5, 90.5, 8.5], "yaw": 0, "pitch": -18 },
@@ -85,6 +88,7 @@
 
     { "op": "teleport", "pos": [-100.5, 18.5, 13.5], "yaw": 0, "pitch": -15 },
     { "op": "wait", "seconds": 6 },
+    { "op": "creative", "on": false },
     { "op": "give", "block": "grass", "count": 1 },
     { "op": "look", "yaw": 0, "pitch": -15 },
     { "op": "wait", "seconds": 0.5 },

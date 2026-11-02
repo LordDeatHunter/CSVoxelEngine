@@ -39,6 +39,8 @@
 // Run from OpenGLTest/: VOXEL_TIME=20 VOXEL_SCRIPT=visual-examples/lod-horizon.json
 {
   "steps": [
+    // Creative (no flight), so the 30-block drops onto the vantage points cost no health
+    { "op": "creative" },
     { "op": "teleport", "pos": [-191.5, 113.5, -147.5], "yaw": 90, "pitch": -10 },
     { "op": "wait", "seconds": 40 },
     { "op": "screenshot", "name": "lod_a", "hideHud": true },

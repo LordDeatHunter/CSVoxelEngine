@@ -22,14 +22,14 @@
   //   floor-pools  the pools from above, overlapping without block-sized seams
   //   flame-floor, flame-wall  close shots of a floor and a wall torch: a flicker of embers over
   //                each head and a thin wisp of smoke (the "flame" block field)
-  // The player hovers over the patch until it streams in, then drops out of creative with C so
+  // The player hovers over the patch until it streams in, then drops out of creative (and so out of flight) so
   // the mined blocks drop (flight left creative on).
   "steps": [
     { "op": "fly", "on": true },
     { "op": "teleport", "pos": [157.5, 32, 283.5], "yaw": -90, "pitch": -39 },
     { "op": "wait", "seconds": 14 },
     { "op": "teleport", "pos": [157.5, 13.63, 283.5], "yaw": -90, "pitch": -39 },
-    { "op": "walk", "keys": ["C"], "seconds": 0.15 },
+    { "op": "creative", "on": false },
     { "op": "wait", "seconds": 1.5 },
 
     { "op": "give", "block": "torch", "count": 8 },

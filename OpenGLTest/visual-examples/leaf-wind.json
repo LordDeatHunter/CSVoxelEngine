@@ -13,7 +13,7 @@
   // shots), never by pixels.
   "steps": [
     { "op": "wait", "seconds": 10 },
-    { "op": "walk", "keys": ["C"], "seconds": 0.05 },
+    { "op": "creative" },
     { "op": "teleport", "pos": [152.0, 12.62, 136.5], "yaw": 0, "pitch": -24 },
     { "op": "wait", "seconds": 2 },
     { "op": "grow", "species": "oak", "pos": [154, 136], "steps": 40 },

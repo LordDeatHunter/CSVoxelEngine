@@ -127,6 +127,8 @@
 // dry hold would gate off entirely. That is the property the hold exists to guarantee.
 {
   "steps": [
+    // Creative (no flight), so the settle's drop onto the sand costs no health
+    { "op": "creative" },
     { "op": "teleport", "pos": [222.5, 20.5, -106.5], "yaw": -90, "pitch": -3 },
     { "op": "wait", "seconds": 8 },
 

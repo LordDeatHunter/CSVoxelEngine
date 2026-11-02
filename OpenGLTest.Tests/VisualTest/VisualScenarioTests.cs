@@ -141,7 +141,7 @@ public sealed class VisualScenarioTests
     {
         var ex = Assert.Throws<InvalidOperationException>(
             () => VisualScenario.Parse("""{ "steps": [{ "op": "dance" }] }""", "bad"));
-        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "give", "spawn", "grow", "select", "screenshot" })
+        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "creative", "give", "spawn", "grow", "select", "screenshot" })
             Assert.Contains(op, ex.Message);
     }
 
@@ -215,6 +215,18 @@ public sealed class VisualScenarioTests
 
         var off = VisualScenario.Parse("""{ "steps": [{ "op": "fly", "on": false }] }""", "tour");
         Assert.Equal("fly", off.Steps[0].Op);
+        Assert.False(off.Steps[0].On);
+    }
+
+    [Fact]
+    public void CreativeStepDefaultsOnAndCanBeTurnedOff()
+    {
+        var on = VisualScenario.Parse("""{ "steps": [{ "op": "creative" }] }""", "tour");
+        Assert.Equal("creative", on.Steps[0].Op);
+        Assert.True(on.Steps[0].On);
+
+        var off = VisualScenario.Parse("""{ "steps": [{ "op": "creative", "on": false }] }""", "tour");
+        Assert.Equal("creative", off.Steps[0].Op);
         Assert.False(off.Steps[0].On);
     }
 

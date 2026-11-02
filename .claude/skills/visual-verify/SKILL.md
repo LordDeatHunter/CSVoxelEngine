@@ -37,11 +37,11 @@ Start-Process OpenGLTest/bin/Release/net9.0/VoxelEngine.exe -WorkingDirectory Op
 | 700 | night |
 
 ## Scenario ops
-`teleport`, `look`, `wait`, `walk`, `mine`, `place`, `fly`, `give`, `spawn`, `grow`, `screenshot` (`hideHud` optional). Parsing is covered by `VisualScenarioTests`. Existing scenarios live in `OpenGLTest/visual-examples/` (basic, water, flow-water, ponds, lava, trees, goblins, grass-tint, ores, sky, clouds, cloud-shadows, linear-lighting, colored-lights, night-lights, lod-horizon, cold, biomes, particles, ...). **Extend or copy a matching one before writing a new one.**
+`teleport`, `look`, `wait`, `walk`, `mine`, `place`, `fly`, `creative`, `give`, `spawn`, `grow`, `screenshot` (`hideHud` optional). Parsing is covered by `VisualScenarioTests`. Existing scenarios live in `OpenGLTest/visual-examples/` (basic, water, flow-water, ponds, lava, trees, goblins, grass-tint, ores, sky, clouds, cloud-shadows, linear-lighting, colored-lights, night-lights, lod-horizon, cold, biomes, particles, ...). **Extend or copy a matching one before writing a new one.**
 
 ## Pitfalls (all hit before)
 - Early waits: at `wait 5` the spawn is still embedded in unloaded terrain, so every `place` misses and shots are black. Wait ~12 s, `teleport` to a known open spot (`[0.5, 5.0, 0.5]`), wait ~2 s, then act.
-- Gravity keeps acting after `teleport` (34 b/s^2). After an airborne teleport keep waits ~0.3 s, or `fly` first (`"op":"fly"`) to hover; hovering also makes the camera immune to mobs.
+- Gravity keeps acting after `teleport` (34 b/s^2). After an airborne teleport keep waits ~0.3 s, or `fly` first (`"op":"fly"`) to hover; hovering also makes the camera immune to mobs. A walking player dropped from a mid-air teleport dies of the fall in survival: add `{"op":"creative"}` (creative without flight: it still falls and lands, but takes no damage) first, and `{"op":"creative","on":false}` before a `mine` that should take real hits.
 - `give {block, count}` selects the hotbar slot so `place` works without scrolling.
 - `spawn` entity names and `grow` species are checked only when the step runs.
 - Water spots (seed 1337): bay at `[228.5, 10.5, -138.5]` yaw 0 pitch -22; submerged at `[250.5, -3.5, -150.5]`.
