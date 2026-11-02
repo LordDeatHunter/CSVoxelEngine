@@ -61,7 +61,7 @@ internal sealed class AmbientEffects
         _goblins = goblins;
     }
 
-    /// <summary>Every burning cell this frame (campfires, lit kilns and, in the full update,
+    /// <summary>Every burning cell this frame (campfires, lit kilns and
     /// goblin torches), feeding both the fire particles and the warm point lights.</summary>
     internal IReadOnlyList<Vector3> FireCells => _fireCells;
 
@@ -79,7 +79,7 @@ internal sealed class AmbientEffects
     }
 
     /// <summary>Adds every goblin's lit torch to <see cref="_fireCells"/>, right after
-    /// <see cref="GatherStationFires"/>; the full update only, never a client's.</summary>
+    /// <see cref="GatherStationFires"/>, in both update paths (a client's mirrors light their torch from the lighting clock).</summary>
     internal void AddGoblinTorches()
     {
         // A goblin's lit torch: its flame rides the offhand, a few blocks of radius like a campfire

@@ -61,6 +61,17 @@ public sealed class MeshingTests
     }
 
     [Fact]
+    public void AnEmptyBuildLeavesNoNeighborForTheNextBuildOnThisThread()
+    {
+        var (manager, center) = MeshTestWorld.WalledArea();
+        Assert.NotNull(center.GenerateMeshData(manager));
+
+        manager.Chunks.TryRemove(Vector3.UnitX, out _);
+
+        Assert.Null(center.GenerateMeshData(manager));
+    }
+
+    [Fact]
     public void AllAirChunkBuildsEmpty()
     {
         var (manager, center) = MeshTestWorld.WalledArea();

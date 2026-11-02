@@ -85,11 +85,17 @@ public sealed class GoblinManager : IMobPopulation
 
     /// <summary>Advances the death and spawn clocks of the goblins without simulating them (a
     /// client never ticks the AI), dropping the ones whose death is over. A finished death bursts
-    /// into the mob's skin color (<paramref name="debris"/>, null when nothing draws it).</summary>
-    public void AnimateMirrors(float deltaTime, BlockDebrisSystem? debris = null)
+    /// into the mob's skin color (<paramref name="debris"/>, null when nothing draws it). With
+    /// <paramref name="chunks"/> each mirror also reads whether it is dark (<paramref name="night"/>,
+    /// or standing underground by the streamed column), which is what lights a carried torch;
+    /// a column that has not arrived reads as the surface.</summary>
+    public void AnimateMirrors(float deltaTime, BlockDebrisSystem? debris = null, ChunkManager? chunks = null,
+        float night = 0f)
     {
         for (var i = _goblins.Count - 1; i >= 0; i--)
         {
+            if (chunks != null)
+                _goblins[i].SetDark(night, IsUndergroundStreamed(chunks, _goblins[i].Position));
             _goblins[i].AnimateMirror(deltaTime);
             if (!_goblins[i].IsRemovable) continue;
             if (debris != null) GroundDust.DeathPoof(_goblins[i], debris);
@@ -325,6 +331,17 @@ public sealed class GoblinManager : IMobPopulation
         var (x, y, z) = position.BlockCell();
         var source = chunks.WorldSource;
         var column = source.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+        var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
+        return SlimeSize.IsUnderground(y, surface);
+    }
+
+    /// <summary>The client's twin of <see cref="IsUnderground"/>: the surface height comes from the
+    /// streamed column source, never worldgen.</summary>
+    private static bool IsUndergroundStreamed(ChunkManager chunks, Vector3 position)
+    {
+        var (x, y, z) = position.BlockCell();
+        if (!chunks.ColumnSource.TryGet(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z), out var column))
+            return false;
         var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
         return SlimeSize.IsUnderground(y, surface);
     }

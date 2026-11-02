@@ -460,6 +460,12 @@ public static class ContentRegistry
         Array.Clear(BlockType.ReplaceableById);
         Array.Clear(BlockType.ReplaceableByPlacementById);
         Array.Clear(BlockType.FallsById);
+        Array.Clear(BlockType.StackSolidStateById);
+        Array.Clear(BlockType.BounceById);
+        Array.Clear(BlockType.BlocksSightById);
+        Array.Clear(BlockType.ContactDamageById);
+        Array.Clear(BlockType.GreedyById);
+        ModelFiles = null;
 
         // Air owns no definition but still has to let light through and stop nothing
         BlockType.PassesLightById[BlockType.Air] = true;

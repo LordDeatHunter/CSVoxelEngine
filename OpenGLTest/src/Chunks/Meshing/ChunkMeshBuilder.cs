@@ -144,7 +144,13 @@ internal static class ChunkMeshBuilder
             {
                 neighbors[ni] = neighbor;
                 neighborStates[ni] = neighbor.StateArray;
+                continue;
             }
+
+            // The scratch is thread-static: a slot an earlier build filled must not survive as
+            // a stale neighbor of this one
+            neighbors[ni] = null;
+            neighborStates[ni] = null;
         }
 
         foreach (var slot in FaceNeighborSlots)

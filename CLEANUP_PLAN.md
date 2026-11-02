@@ -61,8 +61,6 @@ procedure for applying them lives in the **`code-cleanup` skill**
   - `LodManagerTests.StopJoinsTheLodGenThreads`
   - `GameServerTests.TntOnePlayerPrimesDetonatesForEveryClient`
   - the `LodBuildPoolTests` class (fails under CPU contention in a full run)
-  - `MeshingTests.MissingFaceNeighborAbandonsTheBuild` (depends on run order; caused by the
-    known bug listed under "Bugs found" below, which a cleanup run must not fix)
 - **Resuming an interrupted run.** `resumeFromRunId` only works in the same session and only
   with byte-identical args. In a new session, relaunch the workflow: with no args it picks the
   "In progress" task up again.
@@ -156,8 +154,6 @@ Docs and build:
   (LF-only), the final CRLF of `LeafDecayManager.cs`; verify and normalize in a separate step.
 
 Code:
-- [ ] `ContentRegistry.Reset` does not clear `StackSolidStateById`, `BounceById`, `BlocksSightById`,
-  `ContactDamageById`, `GreedyById`, `BlockType.Types` or `ModelFiles` (candidate bug fix).
 - [ ] The play-time content lookups (`RecipeForResult`, `RecipeByName`, `CastRecipeFor`, `IsCastMold`)
   allocate LINQ closures per call; so does `World.RefreshMobs`, and the per-frame sapling lambda
   in `World.Update`.
@@ -175,18 +171,6 @@ Code:
 - [ ] `Camera.IsCreative`/`IsFlying` are `internal set`; `Inventory` exposes six internal accessors:
   narrow if possible.
 - [ ] `OpenGLTest.Tests/Simulation` holds 23 files (target ~22).
-
-## Bugs found (not cleanup: fix as separate, normal tasks)
-
-- [ ] **`World.UpdateClient` skips goblin torches.** It gathers only campfires and kilns into the fire
-  cells, never goblin torches, though a client draws the torch a mirrored goblin carries.
-- [ ] **`Chunk.GenerateMeshData` stale neighbor slots** (`Chunks/Meshing/ChunkMeshBuilder.cs`). The
-  all-air / fully-enclosed early return never calls `scratch.ClearNeighbors()` and
-  `TryResolveNeighbors` never nulls a missing slot, so a later build on the same thread can reuse
-  the previous build's neighbors (`MeshingTests.MissingFaceNeighborAbandonsTheBuild` fails on an
-  unlucky order). Fix: clear before that return or null the unresolved slots, add a rule test (an
-  empty build then a build with a missing face neighbor returns null), record it in `TODO.md`. A
-  cleanup run must not fix it.
 
 ## Not verified in game
 

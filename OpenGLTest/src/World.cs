@@ -708,10 +708,11 @@ public class World
         _debris.Update((float)deltaTime, _chunkManager);
         _querns.Animate((float)deltaTime);
         _slimes?.AnimateMirrors((float)deltaTime, _debris);
-        _goblins?.AnimateMirrors((float)deltaTime, _debris);
+        _goblins?.AnimateMirrors((float)deltaTime, _debris, _chunkManager, DayCycle.NightFactor(LightingTime));
         _tntManager.AnimateMirrors((float)deltaTime);
         Director.AnimateIcebergMirrors(deltaTime);
         Ambient.GatherStationFires();
+        Ambient.AddGoblinTorches();
         _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
         Ambient.UpdateTorchFlames((float)deltaTime, Wind.Direction(LightingTime));
         Ambient.UpdateBubbles((float)deltaTime);
