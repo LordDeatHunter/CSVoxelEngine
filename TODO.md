@@ -400,10 +400,6 @@ single-arc player.
 - [ ] **`V-5` · Item pickup sparkle & interaction feedback** — P2, S.
 - [ ] **`V-6` · Sky: stars, moon phases, shooting stars, aurora** — P1, M.
   Clouds, the sun disc, the sun glare and twinkling stars exist; finish the sky.
-  - [x] **Moon.** `SkyPasses.RenderMoon` draws the sun's quad with `moon-fragment.glsl` and
-    `moon.png` opposite the sun; `MoonPhase` steps at noon (day 0 full, an 8-day cycle), the disc
-    fades like the stars, reaches the mirror and the Snell window and hides the stars behind it
-    (`moon.json` at 700, 3100 and 4300; `MoonPhaseTests`).
   - [ ] **Shooting stars.** A rare streak across the night dome. *Hook:* `sky-fragment.glsl`'s
     main after the stars, on hashed time slots (a slot index from `uStarTime`, a hashed start
     direction, heading and length per slot, most slots empty), faded by `StarField.Visibility`
