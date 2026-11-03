@@ -203,29 +203,15 @@ shadow cascades gain nothing (Done), and the frustum test and sort stay on the C
 
 ### B. Worldgen, meshing and streaming
 
-Ranked by the G1 split (`WorldgenCostProbe`, 2026-11-01, medians of 3; G1 and G6 under Done have the tables).
-After G6 a warm fill (every cache hot) costs 0.17-0.98 ms per filled chunk (0.38-1.13 before), spread over the
-noise-driven stamps: G3's three stamps 40.4% of the probe mix, `NoiseCaves` 27.1%, the 18 feature stamps G6 gated
-11.9% (31.8% before G6). A cold fill (every cache cleared)
+Ranked by the G1 split (`WorldgenCostProbe`, medians of 3; G1, G6 and G3 under Done have the tables).
+After G3 (2026-11-03) a warm fill (every cache hot) costs 0.11-0.65 ms per filled chunk (0.13-0.85 just before
+it, 0.38-1.13 before G6), led by `NoiseCaves`: 26-34% of the probe mix, then `Fill` 14-16%, G3's three lattice
+stamps about 21% together (42% before G3) and the snow canopy pass about 6%; the 18 feature stamps G6 gated are
+noise. On a deep-stone or cave-heavy fill `NoiseCaves` (about 0.19 ms) now costs about as much as the three ore
+and pocket stamps together (about 0.18 ms). A cold fill (every cache cleared)
 costs 49-145 ms, of which 69% is tree batch growth, 24% worm cells and 6% neighbor columns (G5). No open item
 targets the first two: they amortize over a 64x64 cell in game, and only a cold-start measurement in game would
 justify one.
-
-**G3. Ore and pocket noise skip** (bit-identical only with a proven bound, else seed-breaking). **Top G target**.
-- **Files**: `WorldGen/Features/Underground/MalachiteGenerator.cs`, `CoalGenerator.cs`, `GravelPocketGenerator.cs`.
-  Each `Stamp` evaluates a 3D OpenSimplex2 noise per host cell, up to ~12k calls per deep chunk against ~1000 for
-  the `NoiseCaves` lattice. Bit-identical: sample a coarse lattice (spacing s) and skip a block when every corner
-  plus L*s*sqrt(3)/2 is at or below the threshold, L an analytic gradient bound for that exact FastNoiseLite
-  configuration (type, frequency, octaves, gain) times a documented float-rounding safety factor; brute-force
-  equality is a sanity check, never the proof. Without the bound: lattice plus trilinear interpolation, seed-breaking.
-- **Win**: measured (G1, warm): `Malachite` + `Coal` + `GravelPockets` are 47% of a deep-stone fill (about 0.57 of
-  1.10 ms; `GravelPockets` alone 23%), 46% of a cave-heavy fill, 24% of a surface chunk and 32.5% of the probe mix;
-  cold they are under 0.5% (0.25-0.3 ms beside 50-145 ms of trees and worm cells). The largest measured share on
-  deep and cave chunks, which should be most of a load sphere's filled chunks (not measured); chunks far below the
-  2-5 layers under the surface that the probe samples are unmeasured. With G6 done these three are the largest
-  warm share left: 40.4% of the probe mix, 52.8% of a deep-stone fill and 58.5% of a cave-heavy fill. The ~12k
-  calls per deep chunk is still an estimate (G1 counted no noise calls). **Verify**: G1 stage pairs; byte-equal block and state dumps of N chunks.
-  **Invariant**: `FastNoiseLite.cs` stays vendored and unedited.
 
 **G5. Hoist per-chunk-column work out of `TerrainGenerator.Compute`** (bit-identical).
 - **Files**: `WorldGen/TerrainGenerator.cs`, `BiomeClassifier.cs`, `TerrainSites.cs`, `TerrainPeaks.cs`,
@@ -267,7 +253,8 @@ justify one.
 
 F1, F6, G2 and G4 are all 2026-10-31, Quadro T1000 Max-Q, Release, working tree over c8e0f3c6; perf-fly
 pairs interleaved (before = a worktree of c8e0f3c6) at 1530 MHz, 60-73 C; probes are medians of 3, one
-per invocation. F2, F9, F7, F10, G1 and G6 (2026-11-01) carry their own setup. None of them changes anything a player sees.
+per invocation. F2, F9, F7, F10, G1 and G6 (2026-11-01) and G3 (2026-11-03) carry their own setup. None of them
+changes anything a player sees, except G3, which re-lays the ore veins and gravel pockets by decision.
 
 **F1. Shadow pass split** (diagnostics only). `ProfileSection.Shadows` is now `ShadowNear` and
 `ShadowFar` (rows `shadowNear`/`shadowFar`); `ShadowPass.RenderShadows` times itself, CPU and GPU,
@@ -619,11 +606,78 @@ above-surface `Snow` mean share after (43%) comes from one outlier sample (media
 ungated canopy pass. What is left of an above-surface fill is mostly `Fill`, now its largest median stage (0.081 ms,
 32.7%), plus the canopy snow and `IceSpikes` (whose band reaches `MaxHeight + IceSpikeMaxHeight`, 0.013 ms).
 
-Not gated, by decision: `GravelPockets`, `Malachite` and `Coal` (G3's domain, untouched); `NoiseCaves`, re-checked:
+Not gated, by decision: `GravelPockets`, `Malachite` and `Coal` (G3's domain, untouched here; G3 now skips each
+of the three on a chunk with no host cell, and gravel on a chunk above its burial band); `NoiseCaves`, re-checked:
 0.000 ms on the above-surface class before and after (its existing skip), and inside its band on deep-stone (0.206
 -> 0.208 ms) and cave-heavy (0.207 -> 0.189) it does real carving, so a depth-band gate has nothing to win;
 `Lava` and `Trees`; the snow canopy pass (above); and the lower bounds of the neighbor-site stamps (a neighborhood
 min height would cost extra column lookups for stamps each under 1%).
+
+**G3. Ore and pocket noise on a coarse lattice** (2026-11-03, **seed-breaking by decision**; Quadro T1000 Max-Q
+machine, 12 cpus, Release, working tree over 80a1d569; `WorldgenCostProbe.ChunkFillCostPerStage`, medians of 3
+invocations before and after). Built:
+- `OreNoiseLattice` (`WorldGen/Features/Underground/`, internal): the one sampler `MalachiteGenerator`,
+  `CoalGenerator` and `GravelPocketGenerator` now threshold. Its field samples the generator's own noise on a
+  world-aligned lattice of `WorldGenerationConfig.OreNoiseStride` (2, a power of two dividing `Chunk.Size`) and
+  blends the 8 corners trilinearly at cell centers, in `NoiseCaves`' lerp order. A lattice cell whose 8 corners are
+  all at or below the threshold holds nothing: a trilinear blend never exceeds its largest corner, so the skip is
+  part of the field's definition, not an approximation of it. `Stamp` and the point query `Exceeds` (behind
+  `HasOre` and `HasPocket`) share one `Trilinear` and one corner test on the same int lattice coordinates and the
+  same fraction expression, so the stamp equals the point query bit for bit and neighboring chunks agree at every
+  seam. Pure in position and seed, thread-safe (read-only noise, stack-only scratch); `FastNoiseLite.cs` untouched.
+- `IOreLatticeRule`: a generator's host test and replacement as a `struct` generic argument (no delegate, no
+  allocation). `Stamp` flags the lattice cells holding a host block in one pass and returns at once when there are
+  none (a chunk of air, dirt or water), samples the lattice points lazily (a NaN-filled stack buffer, each point at
+  most once, only for flagged cells), skips a flagged cell under its corner test and interpolates only the host
+  cells of the rest. Gravel keeps its exact per-cell burial band inside its rule and returns before any noise
+  read on a chunk above `column.MaxHeight - GravelPocketMinBurial`.
+- Noise calls per generator per chunk: up to 4096 before (one per host cell), at most 729 (`GridCount`, 9^3) after,
+  and usually far fewer, since only the lattice points of flagged cells are read.
+- Tuning (a probe sweep of stride {4, 2} x frequency scale {1.00, 0.85, 0.70} x threshold, over x 0..127,
+  y -64..31, z 0..127): every frequency kept (malachite 1/18, coal 1/20, gravel 1/24 with 2 octaves); thresholds
+  malachite 0.88 -> 0.83, coal 0.88 -> 0.84, gravel 0.30 -> 0.29. Stride 4 rejected: a piecewise-trilinear field
+  has its maxima on lattice points, and ~50-cell deposits are smaller than a 4^3 cell, so at the thresholds that
+  put stride 4 on the deposit targets the deposit centroids lock to multiples of 4 (phase resultant R mod 4 of
+  0.43-0.50 on all three axes, Rayleigh N*R^2 about 60-85; a free field reads 0.02-0.06, and the old 0.88 thresholds
+  read 0.71-0.79). Stride 2 reads like the per-cell field.
+- Rejected: a bit-identical Lipschitz bound skip (it needs an analytic gradient bound for the vendored
+  OpenSimplex2 in three configurations, gravel's 2-octave FBm included, plus a rounding margin; at a useful
+  spacing the margin keeps about half the host cells on per-cell noise, about a 2x win against the lattice's 3x);
+  and a coarse prefilter before the exact noise (not provably safe, and a missed corner clips a deposit flat).
+- Tests: `OreScan` (the deposit statistics through the real `Stamp` path, shared by `MalachiteTests` and
+  `CoalTests`, whose bands are unchanged); `OreNoiseLatticeTests`: the stamp equals the point query across every
+  seam of a 2x2x2 chunk block at negative coordinates (malachite, coal) and through gravel's burial band under
+  hashed surface heights, only host cells change in a half-stone chunk, the field is a pure function of the seed,
+  and deposits are not locked to the lattice (R below 0.25 for the ores, 0.5 for the few, percolating gravel
+  pockets); `GravelPocketTests.PocketsAreSparseButPresentInDeepStone`. Mutations caught: fractions without the
+  +0.5 or a truncating base fail the seam, burial-band and host facts; stride 4 fails the lock fact (malachite
+  R = 0.517).
+
+Result, warm medians, ms per chunk (median of 3 invocations of each class's median), before -> after:
+
+| class | `Malachite` | `Coal` | `GravelPockets` | the three | whole fill |
+|---|---|---|---|---|---|
+| surface | 0.085 -> 0.031 | 0.083 -> 0.030 | 0.164 -> 0.063 | 0.332 -> 0.124 (0.37x) | 0.784 -> 0.651 (0.83x) |
+| above-surface | 0.006 -> 0.003 | 0.008 -> 0.002 | 0.007 -> 0.000 | 0.021 -> 0.005 | 0.130 -> 0.114 (0.88x) |
+| deep-stone | 0.133 -> 0.045 | 0.130 -> 0.045 | 0.268 -> 0.090 | 0.531 -> 0.181 (0.34x) | 0.847 -> 0.514 (**0.61x**) |
+| cave-heavy | 0.121 -> 0.045 | 0.115 -> 0.043 | 0.241 -> 0.086 | 0.479 -> 0.174 (0.36x) | 0.776 -> 0.464 (**0.60x**) |
+| sea-floor | 0.045 -> 0.020 | 0.043 -> 0.020 | 0.036 -> 0.019 | 0.124 -> 0.059 (0.48x) | 0.321 -> 0.260 (0.81x) |
+| all classes | 0.048 -> 0.022 | 0.052 -> 0.024 | 0.071 -> 0.038 | 0.170 -> 0.084 (0.49x) | 0.659 -> 0.439 (**0.67x**) |
+
+Sky chunks stay on the existing early-out. Per-class stage medians agreed within 0.003 ms across the runs, the
+whole fill within about 5%. Cold fills are unchanged in practice (the three stages were under 0.5% of them).
+
+Field before -> after (same volume, 6-connected deposits, R the larger of the three axes mod 2):
+
+| | deposits | mean size | share of stone | R mod 2 |
+|---|---|---|---|---|
+| malachite | 429 -> 433 | 46.0 -> 45.2 | 1.254% -> 1.243% | 0.063 -> 0.037 |
+| coal | 317 -> 319 | 64.0 -> 60.2 | 1.290% -> 1.221% | 0.041 -> 0.056 |
+| gravel and sand | 91 -> 67 | 3278 -> 4382 | 18.96% -> 18.67% | 0.187 -> 0.134 |
+
+Slices of the stamped field and cave-wall screenshots show rounded, irregular veins and pockets with no grid or
+axis-aligned faceting. Existing saves re-lay their unmodified chunks, so old worlds show ore seams at the edges of
+their edited chunks.
 
 ## Not chasing (recorded so it is not re-proposed)
 

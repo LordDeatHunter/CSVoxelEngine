@@ -7,8 +7,9 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 /// <summary>
 /// Gravel and sand pockets: blobs of loose rock buried inside stone, so mining into one can bring
 /// a small collapse down (both are <c>falls</c> blocks, which <see cref="FallingBlockManager"/>
-/// topples). A low-frequency 3D noise decides the blobs and a per-cell hash picks gravel or sand,
-/// so the pockets are a pure function of world position and neighbors agree without shared state.
+/// topples). A low-frequency 3D noise, sampled on the world-aligned <see cref="OreNoiseLattice"/>
+/// and trilinearly interpolated, decides the blobs and a per-cell hash picks gravel or sand, so the
+/// pockets are a pure function of world position and neighbors agree without shared state.
 /// Only stone within a depth band under the surface is replaced — soil, ore and rock caps are left
 /// alone. Runs on a generation worker thread after the carvers, like <see cref="LavaGenerator"/>.
 /// </summary>
@@ -40,36 +41,41 @@ public static class GravelPocketGenerator
 
     /// <summary>
     /// Whether the stone cell (x, y, z) is inside a pocket, buried at least
-    /// <see cref="WorldFeatureConfig.GravelPocketMinBurial"/> under the column's surface.
+    /// <see cref="WorldFeatureConfig.GravelPocketMinBurial"/> under the column's surface: the
+    /// interpolated <see cref="OreNoiseLattice"/> field exceeds the threshold there. Equals what
+    /// <see cref="Stamp"/> writes for a stone cell.
     /// </summary>
     public static bool HasPocket(int x, int y, int z, int surfaceHeight)
     {
         if (y > surfaceHeight - WorldFeatureConfig.GravelPocketMinBurial) return false;
-        return PocketNoise.GetNoise(x, y, z) > WorldFeatureConfig.GravelPocketThreshold;
+        return OreNoiseLattice.Exceeds(PocketNoise, x, y, z, WorldFeatureConfig.GravelPocketThreshold);
     }
 
     /// <summary>
     /// Replaces stone inside a pocket with gravel or sand: a pure function of the cell, so the
-    /// same world always has the same pockets wherever a chunk is generated.
+    /// same world always has the same pockets wherever a chunk is generated. A chunk lying wholly
+    /// above every column's burial band is skipped outright.
     /// </summary>
     public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
-        for (var x = 0; x < Chunk.Size; x++)
-        for (var z = 0; z < Chunk.Size; z++)
-        {
-            var surfaceHeight = column.Heights[(x << Chunk.SizeShift) | z];
-            for (var ly = 0; ly < Chunk.Size; ly++)
-            {
-                var y = worldY0 + ly;
-                if (y > surfaceHeight - WorldFeatureConfig.GravelPocketMinBurial) continue;
-                var i = Chunk.Idx(x, ly, z);
-                if (blocks[i] != StoneBlock) continue;
-                if (!HasPocket(worldX0 + x, y, worldZ0 + z, surfaceHeight)) continue;
-                blocks[i] = UnitHash(worldX0 + x, y, worldZ0 + z) < WorldFeatureConfig.GravelPocketSandShare
-                    ? SandBlock
-                    : GravelBlock;
-            }
-        }
+        // Every cell's y is at least worldY0, so none can be buried deep enough
+        if (worldY0 > column.MaxHeight - WorldFeatureConfig.GravelPocketMinBurial) return;
+        OreNoiseLattice.Stamp(blocks, PocketNoise, WorldFeatureConfig.GravelPocketThreshold,
+            worldX0, worldY0, worldZ0, new PocketRule(column.Heights, worldY0));
+    }
+
+    /// <summary>
+    /// A pocket replaces stone buried at least <see cref="WorldFeatureConfig.GravelPocketMinBurial"/>
+    /// under its column's surface, with sand or gravel picked by a per-cell hash.
+    /// </summary>
+    private readonly struct PocketRule(int[] heights, int worldY0) : IOreLatticeRule
+    {
+        public bool IsHost(byte block, int localX, int localY, int localZ) =>
+            block == StoneBlock
+            && worldY0 + localY <= heights[(localX << Chunk.SizeShift) | localZ] - WorldFeatureConfig.GravelPocketMinBurial;
+
+        public byte Replacement(int worldX, int worldY, int worldZ) =>
+            UnitHash(worldX, worldY, worldZ) < WorldFeatureConfig.GravelPocketSandShare ? SandBlock : GravelBlock;
     }
 
     private static float UnitHash(int x, int y, int z)

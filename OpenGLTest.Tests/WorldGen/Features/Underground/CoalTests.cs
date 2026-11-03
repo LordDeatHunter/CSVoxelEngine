@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using VoxelEngine.WorldGen.Features.Underground;
 using Xunit;
 
@@ -58,8 +56,13 @@ public sealed class CoalTests
     [Fact]
     public void CoalVeinsAreLargerThanMalachiteVeins()
     {
-        var malachiteMean = MeanDepositSize(MalachiteGenerator.HasOre);
-        var coalMean = MeanDepositSize(CoalGenerator.HasOre);
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var malachite = ContentRegistry.RequireBlock("malachite_ore").Id;
+        var coal = ContentRegistry.RequireBlock("coal_ore").Id;
+        var malachiteMean = OreScan.MeanSize(OreScan.Deposits(
+            OreScan.StampedCells(MalachiteGenerator.Stamp, stone, malachite)));
+        var coalMean = OreScan.MeanSize(OreScan.Deposits(
+            OreScan.StampedCells(CoalGenerator.Stamp, stone, coal)));
 
         Assert.True(malachiteMean > 0 && coalMean > 0, "a generator produced no deposits");
         Assert.True(coalMean > malachiteMean,
@@ -67,50 +70,4 @@ public sealed class CoalTests
         Assert.True(coalMean < malachiteMean * 2,
             $"coal veins should be only slightly larger (coal {coalMean:F1}, malachite {malachiteMean:F1})");
     }
-
-    private static double MeanDepositSize(Func<int, int, int, bool> hasOre)
-    {
-        const int x0 = 0;
-        const int y0 = -64;
-        const int z0 = 0;
-        const int sx = 128;
-        const int sy = 96;
-        const int sz = 128;
-
-        var cells = new HashSet<(int, int, int)>();
-        for (var x = 0; x < sx; x++)
-        for (var y = 0; y < sy; y++)
-        for (var z = 0; z < sz; z++)
-            if (hasOre(x0 + x, y0 + y, z0 + z))
-                cells.Add((x, y, z));
-
-        if (cells.Count == 0) return 0;
-
-        var visited = new HashSet<(int, int, int)>();
-        var work = new Stack<(int, int, int)>();
-        var deposits = 0;
-        var total = 0;
-        foreach (var cell in cells)
-        {
-            if (!visited.Add(cell)) continue;
-            deposits++;
-            work.Push(cell);
-            while (work.Count > 0)
-            {
-                var (cx, cy, cz) = work.Pop();
-                total++;
-                foreach (var d in Offsets)
-                {
-                    var n = (cx + d.Item1, cy + d.Item2, cz + d.Item3);
-                    if (cells.Contains(n) && visited.Add(n)) work.Push(n);
-                }
-            }
-        }
-        return (double)total / deposits;
-    }
-
-    private static readonly (int, int, int)[] Offsets =
-    {
-        (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
-    };
 }

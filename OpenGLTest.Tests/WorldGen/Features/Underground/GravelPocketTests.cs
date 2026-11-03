@@ -20,15 +20,8 @@ public sealed class GravelPocketTests
         var sand = GravelPocketGenerator.SandBlock;
 
         // A hand-built column: the surface at y=30, solid stone from y=1 to the surface
-        var heights = new int[Chunk.Size * Chunk.Size];
-        var water = new int[Chunk.Size * Chunk.Size];
-        for (var i = 0; i < heights.Length; i++)
-        {
-            heights[i] = 30;
-            water[i] = TerrainGenerator.NoWater;
-        }
-        var column = new ColumnData(heights, new byte[heights.Length], new float[heights.Length],
-            new float[heights.Length], waterLevel: water);
+        var column = UniformColumn(30);
+        var heights = column.Heights;
 
         var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
         for (var x = 0; x < Chunk.Size; x++)
@@ -59,6 +52,38 @@ public sealed class GravelPocketTests
         }
 
         Assert.True(pockets > 0, "no pockets in the sampled stone");
+    }
+
+    [Fact]
+    public void PocketsAreSparseButPresentInDeepStone()
+    {
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        var gravel = GravelPocketGenerator.GravelBlock;
+        var sand = GravelPocketGenerator.SandBlock;
+
+        // Every column's surface far above the scan volume, so all of it lies inside the burial band
+        var column = UniformColumn(200);
+        void Stamp(byte[] blocks, int x0, int y0, int z0) => GravelPocketGenerator.Stamp(blocks, column, x0, y0, z0);
+
+        var loose = OreScan.StampedCells(Stamp, stone, b => b == gravel || b == sand);
+        var stoneLeft = OreScan.StampedCells(Stamp, stone, b => b == stone);
+
+        Assert.True(loose.Count > 0, "no pockets anywhere in the deep stone");
+        Assert.True(loose.Count < stoneLeft.Count,
+            $"pockets flood the stone: {loose.Count} loose cells against {stoneLeft.Count} stone left");
+    }
+
+    private static ColumnData UniformColumn(int surfaceHeight)
+    {
+        var heights = new int[Chunk.Size * Chunk.Size];
+        var water = new int[Chunk.Size * Chunk.Size];
+        for (var i = 0; i < heights.Length; i++)
+        {
+            heights[i] = surfaceHeight;
+            water[i] = TerrainGenerator.NoWater;
+        }
+        return new ColumnData(heights, new byte[heights.Length], new float[heights.Length],
+            new float[heights.Length], waterLevel: water);
     }
 
     [Fact]

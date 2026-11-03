@@ -112,7 +112,9 @@ public static class WorldFeatureConfig
     // cave in when mined ---
     public const bool GravelPocketsEnabled = true;
     public const float GravelPocketFrequency = 1f / 24f;
-    public const float GravelPocketThreshold = 0.3f;
+    // Threshold on the OreNoiseLattice-interpolated field, a touch under the per-cell 0.3 so the
+    // smoother field keeps about the same loose share of deep stone
+    public const float GravelPocketThreshold = 0.29f;
     // Blocks under the column's surface a pocket needs (soil and rock caps stay solid)
     public const int GravelPocketMinBurial = 3;
     // Share of a pocket's cells that are sand rather than gravel

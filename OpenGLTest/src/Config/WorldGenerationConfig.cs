@@ -363,23 +363,26 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
 
     // --- Malachite ore (MalachiteGenerator) ---
     // Common coal-like blobs replacing stone at any depth: cells where the vein field
+    // (sampled on the OreNoiseStride lattice and trilinearly interpolated, OreNoiseLattice)
     // exceeds MalachiteThreshold become ore. Deposits average ~50 ores each and most
     // chunk columns hold several, so casual mining runs into ore without a dedicated
     // hunt. Frequency sets the blob diameter; the threshold sets deposit size and
-    // spacing (measured in MalachiteTests, not guessed).
+    // spacing (measured in MalachiteTests, not guessed). The interpolation smooths the
+    // field's peaks, so the threshold sits lower than the old per-cell field's 0.88.
     public const bool MalachiteEnabled = true;
     public const float MalachiteFrequency = 1f / 18f;
-    public const float MalachiteThreshold = 0.88f;
+    public const float MalachiteThreshold = 0.83f;
 
     // --- Coal ore (CoalGenerator) ---
-    // Same threshold-on-noise deposits as malachite, but hostable in sandstone as well as stone,
+    // Same threshold-on-noise deposits as malachite (on the same OreNoiseLattice field), but
+    // hostable in sandstone as well as stone,
     // so desert columns carry shallow coal where malachite only ever shows in rock. A slightly
     // longer wavelength packs each blob over more cells (the threshold alone fixes the ore
     // fraction), which is what makes coal veins a touch larger than malachite's without making
     // the world any richer in ore. Measured relationally in CoalTests, not guessed.
     public const bool CoalEnabled = true;
     public const float CoalFrequency = 1f / 20f;
-    public const float CoalThreshold = 0.88f;
+    public const float CoalThreshold = 0.84f;
 
     // --- Forest terrain shape (smooth rolling hills with flat valleys between them) ---
     // The floor is a broad swell plus a positive-only hill field gated by a low-frequency
@@ -577,6 +580,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const bool NoiseCavesEnabled = true;
     // Noise is sampled every this many blocks and interpolated; must divide Chunk.Size
     public const int CaveNoiseStride = 4;
+
+    /// <summary>
+    /// Lattice spacing, in blocks, of the ore vein and gravel/sand pocket noise
+    /// (<see cref="VoxelEngine.WorldGen.Features.Underground.OreNoiseLattice"/>). Must be a power of
+    /// two dividing <see cref="VoxelEngine.Chunks.Chunk.Size"/>, so the lattice is world-aligned and
+    /// neighboring chunks share their boundary samples.
+    /// </summary>
+    public const int OreNoiseStride = 2;
 
     // Cheese: blobby rooms where a low-frequency field exceeds a threshold that loosens with depth
     public const float CheeseFrequency = 1f / 80f;

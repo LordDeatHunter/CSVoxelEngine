@@ -55,47 +55,20 @@ public sealed class MalachiteTests
     [Fact]
     public void DepositsAverageAroundFiftyOresAndStaySparse()
     {
-        const int x0 = 0;
-        const int y0 = -64;
-        const int z0 = 0;
-        const int sx = 128;
-        const int sy = 96;
-        const int sz = 128;
+        var ore = ContentRegistry.RequireBlock("malachite_ore").Id;
+        var stone = ContentRegistry.RequireBlock("stone").Id;
 
-        var oreCells = new HashSet<(int, int, int)>();
-        for (var x = 0; x < sx; x++)
-        for (var y = 0; y < sy; y++)
-        for (var z = 0; z < sz; z++)
-            if (MalachiteGenerator.HasOre(x0 + x, y0 + y, z0 + z))
-                oreCells.Add((x, y, z));
+        var oreCells = OreScan.StampedCells(MalachiteGenerator.Stamp, stone, ore);
 
         Assert.NotEmpty(oreCells);
 
-        var visited = new HashSet<(int, int, int)>();
+        var deposits = OreScan.Deposits(oreCells);
         var sizes = new List<int>();
-        var work = new Stack<(int, int, int)>();
-        foreach (var cell in oreCells)
-        {
-            if (!visited.Add(cell)) continue;
-            var size = 0;
-            work.Push(cell);
-            while (work.Count > 0)
-            {
-                var (cx, cy, cz) = work.Pop();
-                size++;
-                foreach (var d in Offsets)
-                {
-                    var n = (cx + d.Item1, cy + d.Item2, cz + d.Item3);
-                    if (oreCells.Contains(n) && visited.Add(n)) work.Push(n);
-                }
-            }
-            sizes.Add(size);
-        }
+        foreach (var deposit in deposits) sizes.Add(deposit.Count);
 
         sizes.Sort();
-        var total = 0;
-        foreach (var s in sizes) total += s;
-        var mean = (double)total / sizes.Count;
+        var total = oreCells.Count;
+        var mean = OreScan.MeanSize(deposits);
         var median = sizes[sizes.Count / 2];
 
         Assert.True(mean >= 40 && mean <= 60,
@@ -107,9 +80,4 @@ public sealed class MalachiteTests
         Assert.True(sizes.Count >= 300 && sizes.Count <= 550,
             $"Found {sizes.Count} deposits in a 128x96x128 volume. Expected a few hundred.");
     }
-
-    private static readonly (int, int, int)[] Offsets =
-    {
-        (1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1),
-    };
 }

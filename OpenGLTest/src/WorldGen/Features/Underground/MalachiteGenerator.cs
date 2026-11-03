@@ -1,10 +1,10 @@
-using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 
 namespace VoxelEngine.WorldGen.Features.Underground;
 
 /// <summary>
-/// Malachite ore veins: sparse large blobs where a low-frequency 3D OpenSimplex2 field
+/// Malachite ore veins: sparse large blobs where a low-frequency 3D OpenSimplex2 field,
+/// sampled on the world-aligned <see cref="OreNoiseLattice"/> and trilinearly interpolated,
 /// exceeds its threshold, stamped over stone at any depth. A pure function of world
 /// position like the other generators, so neighbors agree without shared state. Runs
 /// on a generation worker thread after the carvers: carving first leaves cave walls
@@ -33,30 +33,31 @@ public static class MalachiteGenerator
     internal static void Reseed() => VeinNoise = TerrainGenerator.MakeNoise(141, WorldGenerationConfig.MalachiteFrequency);
 
     /// <summary>
-    /// Whether the stone cell (x, y, z) is malachite ore. Threshold test only; the
-    /// caller decides what counts as a replaceable host.
+    /// Whether the stone cell (x, y, z) is malachite ore: the interpolated
+    /// <see cref="OreNoiseLattice"/> field exceeds the threshold there. Threshold test only; the
+    /// caller decides what counts as a replaceable host. Equals what <see cref="Stamp"/> writes.
     /// </summary>
     public static bool HasOre(int x, int y, int z)
     {
-        return VeinNoise.GetNoise(x, y, z) > WorldGenerationConfig.MalachiteThreshold;
+        return OreNoiseLattice.Exceeds(VeinNoise, x, y, z, WorldGenerationConfig.MalachiteThreshold);
     }
 
     /// <summary>
-    /// Replaces stone cells inside a vein blob with ore. Only touches stone, so soil,
-    /// sand, water, lava, air and every other feature's output pass through untouched.
+    /// Replaces stone cells inside a vein blob of the interpolated <see cref="OreNoiseLattice"/>
+    /// field with ore. Only touches stone, so soil, sand, water, lava, air and every other
+    /// feature's output pass through untouched.
     /// </summary>
     public static void Stamp(byte[] blocks, int worldX0, int worldY0, int worldZ0)
     {
-        for (var x = 0; x < Chunk.Size; x++)
-        for (var z = 0; z < Chunk.Size; z++)
-        for (var y = 0; y < Chunk.Size; y++)
-        {
-            var i = Chunk.Idx(x, y, z);
-            if (blocks[i] != RockBlock) continue;
-            if (VeinNoise.GetNoise(worldX0 + x, worldY0 + y, worldZ0 + z)
-                <= WorldGenerationConfig.MalachiteThreshold) continue;
+        OreNoiseLattice.Stamp(blocks, VeinNoise, WorldGenerationConfig.MalachiteThreshold,
+            worldX0, worldY0, worldZ0, new VeinRule());
+    }
 
-            blocks[i] = OreBlock;
-        }
+    /// <summary>Malachite replaces stone only.</summary>
+    private readonly struct VeinRule : IOreLatticeRule
+    {
+        public bool IsHost(byte block, int localX, int localY, int localZ) => block == RockBlock;
+
+        public byte Replacement(int worldX, int worldY, int worldZ) => OreBlock;
     }
 }
