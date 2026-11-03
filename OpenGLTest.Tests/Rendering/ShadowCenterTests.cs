@@ -41,16 +41,6 @@ public sealed class ShadowCenterTests
 
     internal static readonly Vector3[] Suns = [SunAt(1.2f), SunAt(2.4f), SunAt(0.4f)];
 
-    /// <summary>The light's own lateral axes, which are what the steps are counted in.
-    /// <see cref="Vector3.Transform(Vector3, Matrix4x4)"/> treats a matrix as row-vector form, so
-    /// the camera's basis vectors in world space are its COLUMNS.</summary>
-    internal static (Vector3 Right, Vector3 Up) LightAxes(Vector3 sun)
-    {
-        var rotation = Matrix4x4.CreateLookAt(Vector3.Zero, -sun, Vector3.UnitY);
-        return (new Vector3(rotation.M11, rotation.M21, rotation.M31),
-                new Vector3(rotation.M12, rotation.M22, rotation.M32));
-    }
-
     /// <summary>How far a delta leans off a whole number of texels along one axis.</summary>
     internal static float TexelFraction(Vector3 delta, Vector3 axis, float texel)
     {
@@ -86,7 +76,7 @@ public sealed class ShadowCenterTests
     {
         var texel = TexelOf(radius, mapSize);
         var sun = SunAt(1.7f);
-        var (right, up) = LightAxes(sun);
+        var (right, up) = ShadowCascade.LightAxes(sun);
         var anchor = new Vector3(12.5f, 40f, -7.25f);
         var center = Step(anchor, anchor, sun, radius, mapSize);
 
@@ -110,7 +100,7 @@ public sealed class ShadowCenterTests
     {
         var texel = TexelOf(radius, mapSize);
         var sun = SunAt(2.1f);
-        var (right, up) = LightAxes(sun);
+        var (right, up) = ShadowCascade.LightAxes(sun);
         var center = new Vector3(40.5f, 14.5f, -12.25f);
         var desired = center;
         var step = new Vector3(0.0125f, 0.004f, 0.0075f);

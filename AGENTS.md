@@ -206,7 +206,10 @@ of the frame — `camera`, the three `chunk*` rows from `ChunkManager.Update`, `
 logging (`DevDiagnostics.LogDebugLine`) are split out as `usePlace` and `debugLog`, and the autosave of a store-backed world is
 the one `save` row, see "Saves" below), then `lighting`, `shadowNear`/`shadowFar` (the two
 cascades: `ShadowPass.RenderShadows` times itself, split at the far cascade's FBO bind because
-`TIME_ELAPSED` ranges cannot nest, so their sum is the whole shadow pass), `reflect`,
+`TIME_ELAPSED` ranges cannot nest, so their sum is the whole shadow pass; `shadowFar` is
+amortized: about 0 on the frames that reuse the cached far map, the full far-box cost on the frames
+`FarShadowReuse` re-renders it, and the 3-slot GPU query ring drops slow results, so its GPU figure
+leans toward the cheap frames — see PERF_TODO F3), `reflect`,
 `lodPass`, `worldPass`, `entityPass`, `aoPass` (contact AO, see below), `waterPass`, `selectPass`, `postPass` (the tonemap resolve, see
 "Linear lighting" below), `uiPass` on the render side,
 and the `rendShell`/`screenshot`/`publish` frame shell —
@@ -1458,6 +1461,10 @@ OpenGLTest/
                                #   WorldRenderer, GPU timing, the texture-unit cache, shadow cascades, reflection reuse
       ChunkOcclusionCuller.cs  # the opaque pass's Hi-Z occlusion cull: the pyramid texture, the build and cull compute
                                #   programs (hiz-build-compute.glsl, hiz-cull-compute.glsl), Cull between segments
+      FarShadowReuse.cs        # the GL-free gate behind the far cascade's reuse: re-render on no map, the moonlight
+                               #   handover, a key-light turn, a re-center, eye depth along the light, age or a caster
+                               #   geometry change (LightingConfig.FarShadowReuse*); visual-examples/far-shadow.json
+                               #   (VOXEL_TIME=400, shots near 430) is the far-shadow pop check
       FrameLighting.cs         # the frame's light, sky, fog and eye state, computed once a frame by SetLighting (the
                                #   sun/moon key light, eye adaptation, biome grade, glare, godrays strength, point lights,
                                #   WindDirection) and read live by every pass; FireLightOffset
@@ -1496,10 +1503,13 @@ OpenGLTest/
                                #   recreated with the viewport; BindSceneTarget (every mid-frame restore);
                                #   CopyScene snapshots the frame's color/depth to units 3/4
                                #   for the water pass's refraction (see Water rendering above)
-      ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped center (StepCenter) and light view-proj
-      ShadowCasterCull.cs      # GL-free: which chunk/LOD casters can reach a shadow texel any consumer samples
+      ShadowCascade.cs         # one sun shadow cascade: radius, map size, depth FBO/texture, texel-stepped center (StepCenter) and light view-proj;
+                               #   LightAxes, TargetOf; the far one is cached: UpdateReused holds its center and view-proj
+                               #   until FarShadowReuse asks for a render, MarkRendered confirms it, Invalidate drops it
+      ShadowCasterCull.cs      # GL-free: which chunk casters can reach a near shadow texel any consumer samples
                                #   this frame (camera and mirror pyramids in light space, PCF/normal-offset reach,
-                               #   sway and overhang growth); its class doc lists every consumer of units 1 and 7
+                               #   sway and overhang growth); the near cascade only (the cached far map draws its
+                               #   whole box); its class doc lists every consumer of units 1 and 7
       ShadowPass.cs            # depth-only directional shadow passes (RenderShadows, which times
                                #   itself as shadowNear/shadowFar) run first
                                #   each frame into two cascades: the near one (90 blocks, unit 1)
@@ -1510,10 +1520,14 @@ OpenGLTest/
                                #   blends in one far tap where the near box fades out, and LOD
                                #   fragments receive the far cascade through the same path
                                #   (the two ShadowCascades are RenderManager's, built by CreateShadowMap);
-                               #   chunk and LOD casters are culled to each cascade's box and then to its
-                               #   receiver hull (ShadowCasterCull, pixel-identical), so a new shadow-map
-                               #   consumer or a new world-program view must add its pyramid there or
-                               #   call KeepAll; entity casters are culled to the box only
+                               #   the far map is cached: it is re-rendered only on frames FarShadowReuse
+                               #   asks for (decided in FrameLighting.UpdateShadowCamera, since BeginFrame
+                               #   uploads uLightViewProjFar first) and skipped otherwise, and a re-render
+                               #   draws every chunk and LOD caster in its cascade box with no receiver cull;
+                               #   near chunk casters are culled to the box and then to the receiver hull
+                               #   (ShadowCasterCull, pixel-identical), so a new shadow-map consumer or a
+                               #   new world-program view must add its pyramid there or call KeepAll;
+                               #   entity casters are culled to the box only
       TerrainPasses.cs         # the chunk and far-LOD draws: RenderLod (coarsest level first, buried regions
                                #   skipped), RenderWorld (opaque, front to back), CullWater (the translucent and
                                #   water draw lists) and RenderWorldTranslucent (back to front); the four chunk
@@ -1565,10 +1579,13 @@ OpenGLTest/
                                #   issues a pass as consecutive segments (the opaque occlusion cull)
         DrawElementsIndirectCommand.cs # one glMultiDrawElementsIndirect command (GL's layout), shared by the chunk
                                #   batch and the cloud tile runs
-        ChunkGeometryPool.cs   # the two shared chunk vertex/index buffers (opaque, translucent):
-                               #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy
+        ChunkGeometryPool.cs   # the shared chunk vertex/index buffers (opaque, translucent, LOD):
+                               #   BufferStorage VBO+EBO+VAO, NamedBufferSubData uploads, grow by copy;
+                               #   ContentVersion (moves on every upload, free and NoteDrawSetChange, a LOD
+                               #   burial flip), summed by RenderManager.FarCasterVersion for the far shadow
         GeometryAllocator.cs   # GL-free first-fit free list with coalescing, in units of
-                               #   64 vertices / 96 indices; hands out the pools' GeometrySlices
+                               #   64 vertices / 96 indices; hands out the pools' GeometrySlices;
+                               #   ContentVersion moves on every successful allocate and free, never on Grow
         MeshBufferPool.cs      # recycles the vertex and index lists a mesh build fills
       Overlays/                # drawn over the scene: the UI pass (UiPasses, UIRenderer and its page renderers, the text cache), the damage vignette, the
                                #   selection outline and mining pop, and the world-space healthbars, damage numbers, notice pips and particles

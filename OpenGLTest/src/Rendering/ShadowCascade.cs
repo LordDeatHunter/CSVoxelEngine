@@ -11,6 +11,12 @@ namespace VoxelEngine.Rendering;
 /// its own center, so two cascades can never share (or corrupt) one another's texel lattice.
 /// The constructor and <see cref="Update"/> are GL-free; only <see cref="Create"/> and
 /// <see cref="Dispose"/> touch GL, and those only on the main thread.
+/// <para>
+/// The far map is cached: the far instance is driven by <see cref="UpdateReused"/>, which holds the
+/// center and <see cref="ViewProj"/> until <see cref="FarShadowReuse"/> says to render, and the
+/// renderer confirms each render with <see cref="MarkRendered"/>, so <see cref="ViewProj"/> is always
+/// the matrix the map holds. The near cascade keeps the plain <see cref="Update"/> every frame.
+/// </para>
 /// </summary>
 internal sealed class ShadowCascade(float radiusBlocks, int mapSize)
 {
@@ -20,6 +26,17 @@ internal sealed class ShadowCascade(float radiusBlocks, int mapSize)
 
     private Vector3 _center;
     private bool _centerValid;
+
+    // Reuse bookkeeping, far cascade only: the pose the confirmed map was rendered from, the pose a
+    // pending (not yet confirmed) render will hold, whether a confirmed map exists and its age.
+    private FarShadowReuse.Pose _renderedPose;
+    private FarShadowReuse.Pose _pendingPose;
+    private bool _hasMap;
+    private int _framesSinceRender;
+
+    /// <summary>True when the last <see cref="UpdateReused"/> moved the box and the map must be
+    /// re-rendered this frame; false while the cached map and its <see cref="ViewProj"/> hold.</summary>
+    internal bool RenderThisFrame { get; private set; }
 
     public float RadiusBlocks { get; } = radiusBlocks;
     public int MapSize { get; } = mapSize;
@@ -87,12 +104,77 @@ internal sealed class ShadowCascade(float radiusBlocks, int mapSize)
     /// </summary>
     public void Update(Vector3 eye, Vector3 viewDir, Vector3 sunDir)
     {
-        var target = eye + viewDir * (RadiusBlocks * ForwardFraction);
+        var target = TargetOf(eye, viewDir);
         _center = _centerValid
             ? StepCenter(_center, target, sunDir, RadiusBlocks, MapSize)
             : target;
         _centerValid = true;
         ViewProj = LightViewProj(_center, sunDir, RadiusBlocks);
+    }
+
+    /// <summary>
+    /// The far cascade's per-frame update: asks <see cref="FarShadowReuse.Decide"/> whether the cached
+    /// map still holds. On <see cref="FarShadowReuse.Refresh.None"/> the center and
+    /// <see cref="ViewProj"/> stay bit-identical and <see cref="RenderThisFrame"/> is false; on any
+    /// other cause the box re-centers through <see cref="Update"/> (whole-texel steps toward the
+    /// look-following target) and <see cref="RenderThisFrame"/> is true until the renderer confirms
+    /// with <see cref="MarkRendered"/>. A render that is never confirmed leaves no map, so the next
+    /// call reports <see cref="FarShadowReuse.Refresh.NoMap"/> and renders again.
+    /// </summary>
+    internal FarShadowReuse.Refresh UpdateReused(Vector3 eye, Vector3 viewDir, Vector3 keyLight, bool moonLit,
+        int geometryVersion)
+    {
+        var frame = new FarShadowReuse.Frame(TargetOf(eye, viewDir), eye, keyLight, moonLit, geometryVersion);
+        var age = _framesSinceRender + 1;
+        var why = FarShadowReuse.Decide(_renderedPose, frame, _hasMap, age, RadiusBlocks, MapSize);
+        if (why == FarShadowReuse.Refresh.None)
+        {
+            _framesSinceRender = age;
+            RenderThisFrame = false;
+            return why;
+        }
+
+        Update(eye, viewDir, keyLight);
+        _pendingPose = new FarShadowReuse.Pose(_center, eye, keyLight, moonLit, geometryVersion);
+        _hasMap = false;
+        RenderThisFrame = true;
+        return why;
+    }
+
+    /// <summary>Confirms that the render <see cref="UpdateReused"/> asked for this frame happened, so
+    /// the map now holds the pending pose. Does nothing on a reuse frame.</summary>
+    internal void MarkRendered()
+    {
+        if (!RenderThisFrame)
+            return;
+        _renderedPose = _pendingPose;
+        _hasMap = true;
+        _framesSinceRender = 0;
+    }
+
+    /// <summary>Forgets the cached map, so the next <see cref="UpdateReused"/> renders (a frame with no
+    /// shadow pass, or a world torn down).</summary>
+    internal void Invalidate()
+    {
+        _hasMap = false;
+        RenderThisFrame = false;
+    }
+
+    /// <summary>The point the box wants to center on: <see cref="ForwardFraction"/> of the radius
+    /// ahead of the eye along the view.</summary>
+    internal Vector3 TargetOf(Vector3 eye, Vector3 viewDir) => eye + viewDir * (RadiusBlocks * ForwardFraction);
+
+    /// <summary>
+    /// The light's lateral axes in world space, which the center's whole-texel steps are counted in.
+    /// Columns, not rows: <see cref="Vector3.Transform(Vector3, Matrix4x4)"/> treats a matrix as
+    /// row-vector form, so the light camera's basis vectors in world space are the columns of its
+    /// view rotation.
+    /// </summary>
+    internal static (Vector3 Right, Vector3 Up) LightAxes(Vector3 sunDir)
+    {
+        var rotation = Matrix4x4.CreateLookAt(Vector3.Zero, -sunDir, Vector3.UnitY);
+        return (new Vector3(rotation.M11, rotation.M21, rotation.M31),
+                new Vector3(rotation.M12, rotation.M22, rotation.M32));
     }
 
     /// <summary>The orthographic light view-projection of a box of half-extent
@@ -131,11 +213,7 @@ internal sealed class ShadowCascade(float radiusBlocks, int mapSize)
         var delta = desired - previous;
         var along = Vector3.Dot(delta, sunDir);
         var lateral = delta - sunDir * along;
-        // Columns, not rows: Vector3.Transform treats a matrix as row-vector form, so the camera's
-        // basis vectors in world space are the columns of the view rotation.
-        var rotation = Matrix4x4.CreateLookAt(Vector3.Zero, -sunDir, Vector3.UnitY);
-        var right = new Vector3(rotation.M11, rotation.M21, rotation.M31);
-        var up = new Vector3(rotation.M12, rotation.M22, rotation.M32);
+        var (right, up) = LightAxes(sunDir);
         var stepsRight = MathF.Round(Vector3.Dot(lateral, right) / texel);
         var stepsUp = MathF.Round(Vector3.Dot(lateral, up) / texel);
         return previous + sunDir * along + right * (stepsRight * texel) + up * (stepsUp * texel);

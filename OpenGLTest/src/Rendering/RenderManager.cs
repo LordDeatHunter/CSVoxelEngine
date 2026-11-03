@@ -179,8 +179,10 @@ public class RenderManager : IDisposable
     private readonly ShadowCascade _nearShadow =
         new(LightingConfig.ShadowRadiusBlocks, LightingConfig.ShadowMapSize);
 
-    // The coarse far cascade (unit 7): chunk casters only, sampled by SampleShadow where the near
-    // box fades out. Its own ShadowCascade, so it steps its own center on its own texel lattice.
+    // The coarse far cascade (unit 7): chunk and LOD casters only, sampled by SampleShadow where the
+    // near box fades out. Its own ShadowCascade, so it steps its own center on its own texel lattice.
+    // The map is cached: FrameLighting re-renders it only when FarShadowReuse asks, and its ViewProj
+    // is always the matrix the map holds, so the uLightViewProjFar upload samples it correctly.
     private readonly ShadowCascade _farShadow =
         new(LightingConfig.FarShadowRadiusBlocks, LightingConfig.FarShadowMapSize);
 
@@ -350,6 +352,15 @@ public class RenderManager : IDisposable
     internal CloudShadowTexture? CloudShadow => _cloudShadow;
     internal ShadowCascade NearShadow => _nearShadow;
     internal ShadowCascade FarShadow => _farShadow;
+
+    /// <summary>
+    /// Moves whenever the far shadow cascade's caster set may have changed: any opaque chunk
+    /// upload or free, any LOD shell upload or free and any LOD burial flip
+    /// (<see cref="ChunkGeometryPool.ContentVersion"/>). A water-only remesh also frees and
+    /// re-uploads its chunk's opaque slice and so moves it, a known over-invalidation; the
+    /// translucent pool never casts and is not counted. Main thread only.
+    /// </summary>
+    internal int FarCasterVersion => unchecked(OpaqueChunkGeometry.ContentVersion + LodGeometry.ContentVersion);
     internal SkyRenderer? SkyDome => _skyDome;
     internal Shader SunShader => sunShader;
     internal Shader MoonShader => moonShader;

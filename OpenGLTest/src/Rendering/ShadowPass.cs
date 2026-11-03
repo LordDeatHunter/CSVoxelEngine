@@ -19,7 +19,8 @@ namespace VoxelEngine.Rendering;
 /// <summary>
 /// The depth-only sun shadow passes run first each frame: the near cascade with the chunk,
 /// entity and player casters, the far cascade with the chunk casters and the non-buried LOD
-/// regions, each chunk set through one indirect draw of the CHUNK_DRAW shadow program. The
+/// regions, each chunk set through one indirect draw of the CHUNK_DRAW shadow program. The far
+/// map is cached and re-rendered only when <see cref="FarShadowReuse"/> asks. The
 /// cascades, both shadow programs and the chunk-draw ring stay owned by
 /// <see cref="RenderManager"/>, and <see cref="FrameLighting"/> places the cascades' light
 /// boxes. Render thread only.
@@ -38,9 +39,9 @@ internal sealed class ShadowPass
     private int _locChunkShadowWindOffset;
     private int _locChunkShadowOpaque;
 
-    // Per cascade: which chunk and LOD casters can reach a texel any consumer samples this frame.
+    // The near cascade only: which chunk casters can reach a texel any consumer samples this frame.
+    // The far map is cached (FarShadowReuse) and re-rendered from its whole box, never receiver-culled.
     private readonly ShadowCasterCull _nearCull = new();
-    private readonly ShadowCasterCull _farCull = new();
 
     private FrameLighting Lighting => _owner.Lighting;
     private TextureUnits Units => _owner.Units;
@@ -69,19 +70,25 @@ internal sealed class ShadowPass
     /// inside the far box - entities are sub-texel at that range - plus every non-buried LOD
     /// region (<paramref name="lodRegions"/>) it holds, drawn with opaque foliage so the LOD
     /// ring is shadowed by its own hills and canopy out to the far box. Both run first each frame,
-    /// before anything draws to the scene target; water never casts. Chunk and LOD casters are
-    /// culled to each cascade's box and then to those whose light-space footprint can reach a
-    /// texel any consumer samples this frame (<see cref="ShadowCasterCull"/>: the camera pyramid,
-    /// plus the mirror's whenever it may render, unbounded along the sun), which leaves every
-    /// sampled texel bit-identical; entity casters stay culled to the box only.
+    /// before anything draws to the scene target; water never casts. The far map is cached: it is
+    /// re-rendered only on the frames <see cref="FarShadowReuse"/> asks for
+    /// (<see cref="ShadowCascade.RenderThisFrame"/>, decided by <see cref="FrameLighting"/>), and
+    /// each re-render is confirmed with <see cref="ShadowCascade.MarkRendered"/>. A re-render draws
+    /// the full set of chunk and LOD casters in the far box, with no receiver cull, so the cached
+    /// map stays valid for any later view. Only the near cascade's chunk casters are culled to
+    /// those whose light-space footprint can reach a texel any consumer samples this frame
+    /// (<see cref="ShadowCasterCull"/>: the camera pyramid, plus the mirror's whenever it may
+    /// render, unbounded along the sun), which leaves every sampled texel bit-identical; entity
+    /// casters stay culled to the near box only.
     /// <paramref name="chunks"/> is <see cref="ChunkManager.Renderable"/>, a superset of the
     /// casters: water-only chunks are in it and are skipped here. The chunk casters that
     /// survive the culls are drawn with a single <c>glMultiDrawElementsIndirect</c> per cascade
     /// through <see cref="ChunkDrawBatch"/> (<see cref="DrawChunkCasters"/>); TNT, falling
     /// blocks and trees keep the plain program. It times itself as the <c>shadowNear</c> and
-    /// <c>shadowFar</c> profiler rows (CPU and GPU), split at the far FBO bind, because
+    /// <c>shadowFar</c> profiler rows (CPU and GPU), split where the far cascade starts, because
     /// TIME_ELAPSED ranges cannot nest; both brackets wrap the whole body after the one early
-    /// return, so no range is ever left open.
+    /// return, so no range is ever left open, and the <c>shadowFar</c> row is near zero on a
+    /// frame that reuses the cached map.
     /// </summary>
     internal void RenderShadows(Camera camera, IReadOnlyList<Chunk> chunks,
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
@@ -99,7 +106,6 @@ internal sealed class ShadowPass
         // The near kernel's diagonal taps mirror the shader's uShadowSoftness <= 0 branch; the far
         // cascade is read with one tap.
         BeginReceivers(_nearCull, _owner.NearShadow, pcfKernel: LightingConfig.ShadowSoftnessTexels > 0f, camera);
-        BeginReceivers(_farCull, _owner.FarShadow, pcfKernel: false, camera);
 
         var size = (uint)_owner.NearShadow.MapSize;
 
@@ -224,15 +230,40 @@ internal sealed class ShadowPass
             Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
         }
 
-        // The far cascade: the same depth-only chunk casters into its own coarse map. No entity
-        // casters - they are sub-texel at this range, and skipping them keeps the pass to one
-        // indirect draw. The near timing range ends here and the far one starts: TIME_ELAPSED
-        // queries cannot nest, so the two rows are consecutive.
+        // The far cascade: the same depth-only chunk casters into its own coarse map, re-rendered
+        // only when FarShadowReuse asks (a reuse frame keeps the cached map and its held view-proj).
+        // The near timing range ends here and the far one starts: TIME_ELAPSED queries cannot
+        // nest, so the two rows are consecutive, and both stay balanced on a reuse frame.
         GpuTimer.EndGpuPass(ProfileSection.ShadowNear);
         FrameProfiler.End(ProfileSection.ShadowNear);
         FrameProfiler.Begin(ProfileSection.ShadowFar);
         GpuTimer.BeginGpuPass(ProfileSection.ShadowFar);
 
+        if (_owner.FarShadow.RenderThisFrame)
+        {
+            RenderFarCascade(chunks, lodRegions);
+            _owner.FarShadow.MarkRendered();
+        }
+
+        // Back to the HDR scene target (which restores the viewport) and the blend state the
+        // world passes expect
+        Targets.BindSceneTarget();
+        _gl.Enable(EnableCap.Blend);
+        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+
+        GpuTimer.EndGpuPass(ProfileSection.ShadowFar);
+        FrameProfiler.End(ProfileSection.ShadowFar);
+    }
+
+    /// <summary>
+    /// Re-renders the cached far map through its held view-proj: every opaque chunk caster and
+    /// every non-buried LOD region inside the far box, with no receiver cull, so the map stays
+    /// valid for any view until <see cref="FarShadowReuse"/> next asks for a render. No entity
+    /// casters - they are sub-texel at this range, and skipping them keeps the pass to two
+    /// indirect draws. The caller restores the scene target and the blend state.
+    /// </summary>
+    private void RenderFarCascade(IReadOnlyList<Chunk> chunks, IReadOnlyList<LodRegion>? lodRegions)
+    {
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, _owner.FarShadow.Fbo);
         _gl.Viewport(0, 0, (uint)_owner.FarShadow.MapSize, (uint)_owner.FarShadow.MapSize);
         _gl.Clear(ClearBufferMask.DepthBufferBit);
@@ -242,7 +273,7 @@ internal sealed class ShadowPass
         _owner.ChunkShadowShader.Use();
         _owner.ChunkShadowShader.SetUniform(_locChunkShadowViewProj, _owner.FarShadow.ViewProj);
         var farFrustum = new Frustum(_owner.FarShadow.ViewProj);
-        DrawChunkCasters(chunks, farFrustum, _farCull);
+        DrawChunkCasters(chunks, farFrustum, null);
 
         // The LOD ring casts into the far cascade only: the near box never reaches it. Buried
         // regions are skipped because loaded chunks or finer regions already cast over their
@@ -264,8 +295,6 @@ internal sealed class ShadowPass
                 var min = new Vector3(region.X * region.SizeBlocks, region.YMin, region.Z * region.SizeBlocks);
                 var max = new Vector3(min.X + region.SizeBlocks, region.YMax, min.Z + region.SizeBlocks);
                 if (!farFrustum.IntersectsAABB(min, max)) continue;
-                // A region whose footprint reaches no sampled far texel cannot change the frame.
-                if (!_farCull.MayShadowReceivers(min, max)) continue;
 
                 _owner.ChunkDraws.Add(region.OpaqueSlice!.Value,
                     new Vector3(region.X * region.SizeBlocks, 0f, region.Z * region.SizeBlocks), 1f);
@@ -274,15 +303,6 @@ internal sealed class ShadowPass
             _owner.ChunkDraws.Draw(_owner.LodGeometry.Vao, _owner.ChunkShadowShader, _locChunkShadowDrawBase);
             _owner.ChunkShadowShader.SetUniform(_locChunkShadowOpaque, 0);
         }
-
-        // Back to the HDR scene target (which restores the viewport) and the blend state the
-        // world passes expect
-        Targets.BindSceneTarget();
-        _gl.Enable(EnableCap.Blend);
-        _gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-
-        GpuTimer.EndGpuPass(ProfileSection.ShadowFar);
-        FrameProfiler.End(ProfileSection.ShadowFar);
     }
 
     // The bergs inside the near light box, each on its own skin like the goblin casters (its texels
@@ -308,10 +328,11 @@ internal sealed class ShadowPass
     /// <summary>
     /// Appends every opaque chunk caster that survives the mesh, burial, light-frustum and
     /// receiver (<paramref name="cull"/>) culls to one <see cref="ChunkDrawBatch"/> pass and draws
-    /// it with a single <c>glMultiDrawElementsIndirect</c>. <c>_owner.ChunkShadowShader</c> must
+    /// it with a single <c>glMultiDrawElementsIndirect</c>. A null <paramref name="cull"/> (the
+    /// cached far map) keeps every caster in the frustum. <c>_owner.ChunkShadowShader</c> must
     /// be bound with the cascade's view-proj already set.
     /// </summary>
-    private void DrawChunkCasters(IReadOnlyList<Chunk> chunks, Frustum frustum, ShadowCasterCull cull)
+    private void DrawChunkCasters(IReadOnlyList<Chunk> chunks, Frustum frustum, ShadowCasterCull? cull)
     {
         _owner.ChunkDraws.BeginPass(chunks.Count);
 
@@ -337,7 +358,7 @@ internal sealed class ShadowPass
             if (!frustum.IntersectsAABB(chunk.WorldMin, chunk.WorldMax)) continue;
 
             // A caster whose footprint reaches no texel any consumer samples cannot change the frame.
-            if (!cull.MayShadowReceivers(chunk.WorldMin, chunk.WorldMax)) continue;
+            if (cull != null && !cull.MayShadowReceivers(chunk.WorldMin, chunk.WorldMax)) continue;
 
             _owner.ChunkDraws.Add(chunk.OpaqueSlice!.Value, chunk.WorldMin, 1f);
         }
@@ -348,7 +369,9 @@ internal sealed class ShadowPass
     /// <summary>
     /// Starts <paramref name="cull"/> for <paramref name="cascade"/> this frame and adds every
     /// view that can sample it: the camera pyramid (the world program, the leaf backlight, the
-    /// caustics and the rays/godrays marches) and the water mirror's whenever it may render.
+    /// caustics and the rays/godrays marches) and the water mirror's whenever it may render. It
+    /// serves the near cascade only: the far map is cached and re-rendered from its whole box, since
+    /// a map culled to this frame's receivers would be stale for the next view.
     /// </summary>
     private static void BeginReceivers(ShadowCasterCull cull, ShadowCascade cascade, bool pcfKernel, Camera camera)
     {

@@ -110,6 +110,7 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     private readonly GeometryAllocator _allocator;
     private readonly string _name;
     private uint _vbo, _ebo;
+    private int _drawSetChanges;
 
     /// <param name="gl">The render thread's GL context.</param>
     /// <param name="initialUnits">Starting capacity in units; the pool doubles from here on demand.</param>
@@ -149,6 +150,21 @@ public sealed unsafe class ChunkGeometryPool : IDisposable
     /// <summary>Allocate plus free calls since construction (diagnostics; see
     /// <see cref="GeometryAllocator.AllocatorCalls"/>).</summary>
     public long AllocatorCalls => _allocator.AllocatorCalls;
+
+    /// <summary>
+    /// Moves whenever the set of geometry this pool's passes draw may have changed: every slice
+    /// handed out or returned (<see cref="GeometryAllocator.ContentVersion"/>) plus every
+    /// <see cref="NoteDrawSetChange"/>. Compared for equality only. Main thread only, like
+    /// <see cref="Upload"/> and <see cref="Free"/>. A grow does not move it, because slice offsets
+    /// survive the copy.
+    /// </summary>
+    public int ContentVersion => unchecked(_allocator.ContentVersion + _drawSetChanges);
+
+    /// <summary>
+    /// Records that a slice owner started or stopped being drawn without an upload or a free (a
+    /// LOD region's burial flip), so <see cref="ContentVersion"/> moves.
+    /// </summary>
+    public void NoteDrawSetChange() => _drawSetChanges = unchecked(_drawSetChanges + 1);
 
     /// <summary>
     /// Units a mesh of this size occupies: the larger of the two ceilings, since one unit covers

@@ -5,9 +5,17 @@ using VoxelEngine.UI.Menus;
 namespace VoxelEngine.Rendering;
 
 /// <summary>
-/// The GL-free receiver test behind the shadow passes' caster cull: per cascade, which chunk and
-/// far-LOD casters can write a shadow texel that some consumer samples this frame. A caster that
-/// cannot is skipped, and the skip is exact (pixel-identical), not an approximation.
+/// The GL-free receiver test behind the near shadow cascade's caster cull: which chunk casters can
+/// write a near shadow texel that some consumer samples this frame. A caster that cannot is skipped,
+/// and the skip is exact (pixel-identical), not an approximation.
+/// <para>
+/// <b>Only the near cascade is receiver-culled.</b> The far map is cached (PERF_TODO F3,
+/// <see cref="FarShadowReuse"/>) and sampled for many frames after it was drawn, so a map exact
+/// only for this frame's receiver hull would be stale for the next view: a far re-render draws
+/// every caster in its full cascade box. The consumer list below still names every reader of units
+/// 1 and 7; the far map's readers sample it through <c>uLightViewProjFar</c>, which carries the held
+/// <see cref="ShadowCascade.ViewProj"/> the cached map was rendered with.
+/// </para>
 /// <para>
 /// <b>Why a drop changes no pixel.</b> The shadow pass is depth-only with <c>LEQUAL</c> and no color
 /// write, so every texel stores the minimum depth over the casters that cover its center, in any
@@ -23,8 +31,8 @@ namespace VoxelEngine.Rendering;
 /// <c>Camera.GetViewProjection</c> and its <c>fWorldPos</c> is the very (post-displacement) position
 /// its <c>gl_Position</c> was built from, so after clipping it lies inside the camera's view pyramid.
 /// The far map is read wherever the near one fades (<c>fadeN &lt; 1</c>), which includes points
-/// inside the near box, so both cascades take the whole pyramid (the cascade's own ortho frustum test
-/// then clips it to its box).</item>
+/// inside the near box, so a receiver-culled cascade must take the whole pyramid (the cascade's own
+/// ortho frustum test then clips it to its box).</item>
 /// <item>The leaf backlight samples at <c>fWorldPos + uSunDir * reach</c> with <c>N = uSunDir</c> and
 /// <c>ndl = 1</c>: no normal offset, and a step along the sun is pure light depth in the ortho light
 /// view, so its light-space XY is the fragment's own.</item>

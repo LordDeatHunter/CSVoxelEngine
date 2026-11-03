@@ -139,41 +139,15 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 
 ## Open
 
-Ranking: within each group the prerequisite measurement comes first (G1, G6, F1, F2, F7, F9 and F10 are done). F3 and F8 follow the
-share of the 2026-10-31 GPU frame their target pass owns (shadows 36%, of which the far cascade ~59%,
-before F2 cut both cascades; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4, F5 (an exact worldPass depth
-pre-pass) and F13 (exact reflection cuts) were tried and ruled out; F7 and F9 are done);
+Ranking: within each group the prerequisite measurement comes first (G1, G6, F1, F2, F3, F7, F9 and F10 are done). F8 follows the
+share of the 2026-10-31 GPU frame its target pass owns (shadows 36%, of which the far cascade ~59%,
+before F2 and F3 cut it; worldPass 26%, reflect 16%, clouds 7%, lodPass 6%; F4, F5 (an exact worldPass depth
+pre-pass) and F13 (exact reflection cuts) were tried and ruled out; F3, F7 and F9 are done);
 F11-F12 are CPU-only and matter less while the frame is GPU-bound (F10, the chunkApply hitch, is done).
 G follows the G1 stage split (`WorldgenCostProbe`). Ties and unmeasured items fall back to effort. Each entry has a
 bold title, then **Files**, **Win** (measured or estimated), **Verify** and **Invariant**.
 
 ### A. Frame time (FPS)
-
-**F3. Far cascade reuse** (`shadowFar` 3.75 ms GPU, ~59% of the shadow pass on 2026-10-31; 1.50 ms
-after F2).
-- **Files**: `ShadowPass.cs`; `ShadowCascade.cs` (`Update`, `StepCenter`); `FrameLighting` (calls
-  `FarShadow.Update(camera.RenderEye, camera.ViewDirection, _sunDir)`, owns the key light);
-  `RenderManager` (the far ViewProj uniform); a new GL-free gate like `ReflectionReuse`, with tests.
-- **Prerequisite**: the far center follows the look (`Update` targets `eye + viewDir * RadiusBlocks *
-  ShadowCascade.ForwardFraction`, ~123 blocks ahead), so any mouse-look moves it by many ~0.34-block
-  texels. While caching, hold the center and re-center only when the target leaves an inner region of
-  the box (hysteresis), or use `ForwardFraction` 0 for the far cascade, so only translation drives it.
-- Re-render when: the re-center fires; the camera's depth along the sun leaves a margin; the key
-  light turns by more than ~half a far texel at the box edge; the `Moonlight` handover; a geometry
-  counter moves (`ChunkManager.MeshVersion` skips remeshes of meshed chunks in `ChunkMeshScheduler`,
-  so add one bumped on every opaque chunk or LOD upload and free); or N frames passed. The cached map
-  is sampled with its own ViewProj.
-- **Interlock with F2** (done): `ShadowPass` now drops every far caster outside this frame's receiver
-  hulls (`ShadowCasterCull`), which is exact only for the frame it was built for. A cached far map must
-  therefore either be rendered from the full cascade-box caster set (bypass `_farCull` for that render)
-  or be invalidated whenever the receiver hulls it was rendered for stop containing this frame's
-  (camera or mirror pyramid moved or turned, the mirror gate flipped on). The first gives back F2's
-  far gain on re-render frames; the second makes re-renders frequent under mouse-look.
-- **Win**: estimated as the far cascade's 1.50 ms after F2 (3.75 ms before) times the measured skip
-  rate (a `// TEMP-DIAG` hit counter on perf-fly), not far x (1-1/N), less whatever the interlock costs.
-- **Verify**: perf-fly `shadowFar` pair plus the hit rate; low sun at `VOXEL_TIME` 430; `moonlight.json` at 455.
-- **Invariant**: the near map stays every frame (half-rate near is ruled out); far-map leaf sway
-  freezes (sub-texel); no visible pop at re-render; the hysteresis keeps the view's far-shadow region inside the box.
 
 **F8. `lod` CPU spike and `lodPass` worst** (low priority; 0.91 ms, 6%, worst 10.7 ms GPU).
 - **Files**: `Lod/LodManager.cs`, `LodCoverPass.cs`, `LodRegionSet.cs`. The 1306 ms single-frame `lod`
@@ -253,8 +227,9 @@ justify one.
 
 F1, F6, G2 and G4 are all 2026-10-31, Quadro T1000 Max-Q, Release, working tree over c8e0f3c6; perf-fly
 pairs interleaved (before = a worktree of c8e0f3c6) at 1530 MHz, 60-73 C; probes are medians of 3, one
-per invocation. F2, F9, F7, F10, G1 and G6 (2026-11-01) and G3 (2026-11-03) carry their own setup. None of them
-changes anything a player sees, except G3, which re-lays the ore veins and gravel pockets by decision.
+per invocation. F2, F9, F7, F10, G1 and G6 (2026-11-01) and G3 and F3 (2026-11-03) carry their own setup. None of
+them changes anything a player sees, except G3, which re-lays the ore veins and gravel pockets by decision, and F3,
+whose cached far map freezes leaf sway and steps the far key light by under half a texel between renders.
 
 **F1. Shadow pass split** (diagnostics only). `ProfileSection.Shadows` is now `ShadowNear` and
 `ShadowFar` (rows `shadowNear`/`shadowFar`); `ShadowPass.RenderShadows` times itself, CPU and GPU,
@@ -322,7 +297,8 @@ start" was wrong. A temporary runtime check drew only the dropped casters into a
 back and tested every written texel against the hulls: 0 violations over ~475M texels (perf-fly twice,
 `water.json` at 360, `godrays.json` at 395). Screenshots at `VOXEL_TIME` 430 (`linear-lighting.json`),
 `water.json` at 360, `leaf-backlight.json` at 1100 and `godrays.json` at 395 and 147 differ from before
-no more than two before runs differ from each other. Interlock: see F3.
+no more than two before runs differ from each other. The far half was dropped again by F3 (Done): a
+cached far map is drawn from its whole cascade box.
 
 **F9. Hi-Z occlusion cull of the opaque chunk pass** (2026-11-01, pixel-identical by construction; same
 hardware, 1280x720, perf-fly `VOXEL_TIME=60` x3 interleaved against a worktree of 6c6eeaa6).
@@ -679,6 +655,60 @@ Slices of the stamped field and cave-wall screenshots show rounded, irregular ve
 axis-aligned faceting. Existing saves re-lay their unmodified chunks, so old worlds show ore seams at the edges of
 their edited chunks.
 
+**F3. Far shadow cascade reuse** (2026-11-03; Quadro T1000 Max-Q, Release, perf-fly `VOXEL_TIME=60` x3
+interleaved against a worktree of 7f560bcd, medians of the three runs). The far map is cached:
+`FrameLighting.UpdateShadowCamera` asks the GL-free gate `FarShadowReuse` (`FarShadowReuseTests`) through
+`ShadowCascade.UpdateReused`, which holds the far center and `ViewProj` until a refresh cause fires, and
+`ShadowPass` re-renders the far cascade only on those frames and confirms with `MarkRendered` (an unconfirmed
+refresh is retried as `NoMap`). The decision sits in `SetLighting` because `RenderManager.BeginFrame` uploads
+`uLightViewProjFar` before the shadow pass runs, so the far `ViewProj` always means the matrix the map holds and
+no GLSL changed. Causes, first wins: no map (also after `Invalidate`, on every frame the shadow pass skips and
+on `ForgetWorld`); the `Moonlight` handover (the key light is negated there, so it is an explicit flag); a
+key-light turn past `FarShadowReuseMaxTurnTexels` (0.5) of a far texel at the box edge (the sine, a cross-product
+length, since that cosine is below float resolution); the look-following target (`ShadowCascade.TargetOf`, still
+`ForwardFraction` ahead) leaving an inner square of half-extent `FarShadowReuseInnerFraction` (0.25) x radius in
+the cached light's lateral axes (`ShadowCascade.LightAxes`), the hysteresis re-center, which still steps the
+center in whole texels (`StepCenter`); the eye moving `FarShadowReuseDepthMarginFraction` (0.25) x radius along
+the cached key light; `FarShadowReuseMaxFrames` (30); and a caster geometry change once
+`FarShadowReuseGeometryMinFrames` (4) frames have passed. The geometry version is `RenderManager.FarCasterVersion`,
+the sum of the opaque and LOD pools' `ChunkGeometryPool.ContentVersion` (`GeometryAllocator.ContentVersion` moves
+on every successful allocate and every free, `NoteDrawSetChange` on every `LodRegion.IsBuried` flip); every
+upload, free and burial flip happens on the update side, before `SetLighting`.
+- Interlock with F2: the far receiver cull (`_farCull`) was deleted. A map exact only for this frame's receiver
+  hulls would be stale for the next view, so a re-render draws every caster in the far cascade box, i.e. the
+  pre-F2 far cost on those frames; only the near cascade is still receiver-culled.
+- Measurement trap: `GpuPassTimer`'s 3-slot query ring drops a `TIME_ELAPSED` result not ready three frames
+  later, and those are mostly the expensive re-render frames, so the stock overlay read `shadowFar` 0.1-0.3 ms
+  (false). Every figure below came from a temporary 8-slot ring in both trees (0 drops over 708 lines). Measure
+  any pass whose cost alternates between frames the same way.
+- Tuning `FarShadowReuseGeometryMinFrames` (Geometry was ~97% of renders at 1: the version moves on ~64% of
+  frames, 40-60/s while streaming and 9-43/s even hovering still): 1 lost (`shadowFar` GPU whole run 4.09 ms
+  against 2.60 before), 2 was a wash (2.27), 4 won and was kept.
+- `shadowFar` GPU average: whole run 2.60 -> 1.30 ms (before runs 2.21/2.60/2.66, after 1.26/1.30/1.30), last
+  three lines 1.65 -> 0.98 ms. Worst: last three lines 2.22 -> 5.79 ms, whole run 6.25 -> 10.87 ms (a re-render
+  draws the full unculled far box). CPU avg~worst: whole run 0.39~4.78 -> 0.08~4.08 ms, last three lines
+  0.42~2.51 -> 0.07~0.68 ms. `shadowNear` unchanged (GPU 1.93 -> 1.94 ms whole run). Frame average 16.86 ->
+  15.84 ms whole run (within noise); the last-three worst frame 21.47 ms sits inside the before spread
+  (17.2-36.2).
+- Skip rate about 79% (whole run and last three lines). Renders: Geometry first, then the key-light turn (70-90 a
+  run), MaxAge (13-24), Recenter (2-3, only at perf-fly's teleports, where the view cuts anyway), Handover 0: at
+  the moonlight switch the shadow strength is 0, the map is invalidated and the first shadowed frame renders as
+  `NoMap`, so the flag is a safety net.
+- Invariants kept: the near map renders every frame; far-map leaf sway freezes between renders (sub-texel); the
+  key light steps by at most half a far texel per render; the near box's fade band stays inside the far core
+  while the center is held (`ShadowCascadeTests.TheNearBoxsFadeBandLiesInsideTheFarCoreWhileTheFarCenterIsHeld`,
+  every sun, eye and view at 0.98 of the inner region and the depth margin).
+- Pop check: `visual-examples/far-shadow.json` (`VOXEL_TIME=400`, so its shots land near 430 after the load
+  wait) films the far fade band across a low sun, 12 still shots 0.1 s apart and 40 four-block steps. Consecutive
+  pair diffs (mean absolute RGB) after 0.567-0.685 still and 5.537 stepping against before 0.555-0.675 and 5.594;
+  same-shot after-vs-before diffs 0.41-0.46 against before-vs-before 0.58; the diff images show only chunk and LOD
+  pop-in, no band-shaped step. No Recenter fired there (geometry and turn refreshes re-center first), even with
+  geometry refreshes disabled. `linear-lighting.json` at 430 and `moonlight.json` at 455 differ from before no
+  more than two before runs differ.
+- Known over-invalidation: a water-only remesh (`Chunk.UpdateMesh` frees and re-uploads its opaque slice too) and
+  any opaque or LOD upload outside the far box bump the version. A follow-up could filter the version to slices
+  inside the held far box; the two-map crossfade at a Recenter was not needed.
+
 ## Not chasing (recorded so it is not re-proposed)
 
 - Shader ALU cuts (caustic Voronoi, 8 point lights, 4-tap PCF): culling and half-res are the allowed levers.
@@ -702,7 +732,7 @@ their edited chunks.
 - Reflection geometry cutoff (capping mirrored chunks/LOD at 192 blocks): leaves a seam the wave
   offset turns into flicker. F6 (done) differs: it drops only geometry the clip already discards.
 - Half-rate NEAR shadow map: the reflection samples it every frame, so mirrored shading steps at
-  fps/2. The far cascade was never priced (F3).
+  fps/2. The far cascade is cached instead (F3, Done), which is not a fixed rate.
 - GPU compute frustum cull without occlusion (old Phase 5): removes only CPU cull+sort+fill, ~2% of
   the T1000 frame (worldPass 0.50, shadows 0.26, waterPass 0.09, reflect 0.83 ms). Pays only with GPU
   occlusion (F9) or in a CPU-bound profile above ~1 ms.

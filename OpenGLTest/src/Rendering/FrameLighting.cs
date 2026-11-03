@@ -378,7 +378,7 @@ internal sealed class FrameLighting
         // (the scene copy captures it). Only lava, an opaque glow, still hides it.
         _sunVisibility *= 1f - lavaWet;
         _moonVisibility *= 1f - lavaWet;
-        UpdateShadowCamera(camera);
+        UpdateShadowCamera(camera, moonLit);
 
         // The lens glare (SunGlare) is a camera effect, so it fades out with the eye underwater or
         // in lava: the dome stays dry there for the Snell window, and a lens flare seen through the
@@ -458,13 +458,25 @@ internal sealed class FrameLighting
     /// the camera and looking down the sun direction. <see cref="ShadowCascade.StepCenter"/> carries
     /// that center forward in whole shadow texels, or the sub-texel drift as the player walks
     /// makes every shadow edge crawl. Each cascade steps its own center on its own texel lattice.
+    /// The near cascade follows the camera every frame. The far cascade is a cached map: its
+    /// center and view-proj are held (<see cref="ShadowCascade.UpdateReused"/>) and it is
+    /// re-rendered only on a <see cref="FarShadowReuse"/> cause (no map, the moonlight handover,
+    /// a key-light turn, a re-center, eye depth along the light, age or a caster geometry change,
+    /// <paramref name="moonLit"/> naming the handover). The decision is made here rather than in
+    /// <see cref="ShadowPass"/> because <see cref="RenderManager.BeginFrame"/> uploads the far
+    /// view-proj before the shadow pass runs. When the shadow pass will not run, the far map is
+    /// invalidated so the next frame that does run re-renders it.
     /// </summary>
-    private void UpdateShadowCamera(Camera? camera)
+    private void UpdateShadowCamera(Camera? camera, bool moonLit)
     {
-        if (camera == null || _shadowStrengthDry <= 0f) return;
+        if (camera == null || _shadowStrengthDry <= 0f)
+        {
+            _owner.FarShadow.Invalidate();
+            return;
+        }
 
         _owner.NearShadow.Update(camera.RenderEye, camera.ViewDirection, _sunDir);
-        _owner.FarShadow.Update(camera.RenderEye, camera.ViewDirection, _sunDir);
+        _owner.FarShadow.UpdateReused(camera.RenderEye, camera.ViewDirection, _sunDir, moonLit, _owner.FarCasterVersion);
     }
 
     private static float Smooth01(float t) => MathUtils.SmoothStep(t);
@@ -479,5 +491,7 @@ internal sealed class FrameLighting
         _underwaterT = 0f;
         _lavaT = 0f;
         _eyeInLava = false;
+        // The cached far map holds the released world's terrain.
+        _owner.FarShadow.Invalidate();
     }
 }

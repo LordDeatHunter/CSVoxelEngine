@@ -30,6 +30,35 @@ public static class LightingConfig
     // fill cost ever shows up: halving it keeps silhouettes at about 0.7 block per texel.
     public const int FarShadowMapSize = 2048;
 
+    // The far map is cached and re-rendered only when FarShadowReuse asks (PERF_TODO F3).
+    // Half-extent, as a share of FarShadowRadiusBlocks, of the light-space square around the held
+    // far center in which the look-following target may wander before the box re-centers. It must
+    // keep the near box's fade band inside the far core while the center is held (ShadowCascadeTests
+    // checks it), and a re-center moves the far box's own fade band by up to this much in one frame,
+    // so the far-shadow pop check bounds it from above.
+    public const float FarShadowReuseInnerFraction = 0.25f;
+
+    // Eye travel along the key light, as a share of the far radius, before the far map re-renders.
+    // The box is 4r deep along the light, so a quarter radius keeps every caster above a held box
+    // well inside its depth range.
+    public const float FarShadowReuseDepthMarginFraction = 0.25f;
+
+    // Key-light turn, in far texels at the box edge, a cached far map may lag the sun by. Half a
+    // texel keeps the stale silhouettes under the texel the map already quantizes them to.
+    public const float FarShadowReuseMaxTurnTexels = 0.5f;
+
+    // The oldest a far map may get, in frames, whatever else holds still: bounds how long the
+    // frozen leaf sway and any change the other causes miss can stay visible.
+    public const int FarShadowReuseMaxFrames = 30;
+
+    // Frames since the last far render before a caster geometry change (an opaque chunk or LOD
+    // upload or free, a LOD burial flip) forces another, so the bumps of a streaming burst batch
+    // into one render. Measured on perf-fly (PERF_TODO F3): the version moves on about two frames in
+    // three while streaming, so 1 re-rendered the full far box on two frames in three (shadowFar
+    // GPU ~1.6x the culled every-frame pass) and 2 broke even; 4 halves it. A new chunk's far
+    // shadow arrives at most three frames late, far outside the near cascade.
+    public const int FarShadowReuseGeometryMinFrames = 4;
+
     // Whether the depth-only shadow pass runs at all (false leaves the world fully lit)
     public const bool ShadowsEnabled = true;
 

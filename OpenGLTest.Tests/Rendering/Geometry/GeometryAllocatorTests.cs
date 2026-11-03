@@ -13,6 +13,29 @@ namespace VoxelEngine.Tests.Rendering.Geometry;
 public sealed class GeometryAllocatorTests
 {
     [Fact]
+    public void ContentVersionMovesOnEveryAllocationAndFreeButNotOnAFailedAllocationOrAGrow()
+    {
+        var allocator = new GeometryAllocator(8);
+
+        var before = allocator.ContentVersion;
+        Assert.True(allocator.TryAllocate(2, out var offset));
+        var afterAllocate = allocator.ContentVersion;
+        Assert.NotEqual(before, afterAllocate);
+
+        allocator.Free(offset, 2);
+        var afterFree = allocator.ContentVersion;
+        Assert.NotEqual(afterAllocate, afterFree);
+
+        // A request larger than any free block fails and must leave the version alone.
+        Assert.False(allocator.TryAllocate(allocator.LargestFreeBlock + 1, out _));
+        Assert.Equal(afterFree, allocator.ContentVersion);
+
+        // Growing moves no slice, so it is not a content change.
+        allocator.Grow(allocator.Capacity * 2);
+        Assert.Equal(afterFree, allocator.ContentVersion);
+    }
+
+    [Fact]
     public void AllocatesFirstFitDeterministically()
     {
         var allocator = new GeometryAllocator(16);

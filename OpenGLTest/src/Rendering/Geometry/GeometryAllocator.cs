@@ -90,6 +90,14 @@ internal sealed class GeometryAllocator
     /// <summary>Units currently handed out.</summary>
     public int UsedUnits { get; private set; }
 
+    /// <summary>
+    /// Moves on every successful <see cref="TryAllocate"/> and every <see cref="Free"/>, and never on
+    /// a failed <see cref="TryAllocate"/> or on <see cref="Grow"/>, so two reads tell a consumer
+    /// whether any slice was handed out or returned in between. It wraps and is compared for
+    /// equality only.
+    /// </summary>
+    public int ContentVersion { get; private set; }
+
     /// <summary>Number of (coalesced) free blocks — a fragmentation gauge, and asserted by tests.</summary>
     public int FreeBlockCount => _blockCount;
 
@@ -148,6 +156,7 @@ internal sealed class GeometryAllocator
 
         _root = AllocateFrom(_root, units, out offset);
         UsedUnits += units;
+        ContentVersion = unchecked(ContentVersion + 1);
         ScanSteps += _steps;
         AllocatorCalls++;
         return true;
@@ -273,6 +282,7 @@ internal sealed class GeometryAllocator
         }
 
         UsedUnits -= units;
+        ContentVersion = unchecked(ContentVersion + 1);
         ScanSteps += _steps;
         AllocatorCalls++;
 

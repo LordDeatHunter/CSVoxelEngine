@@ -61,8 +61,21 @@ public class LodRegion : IDisposable
     /// <summary>
     /// Set by <see cref="LodManager.Update"/>: every finer-level region overlapping this
     /// one is loaded, so this mesh contributes nothing and is skipped at render time.
+    /// A burial flip changes the far shadow caster set with no upload, so it bumps the pool's
+    /// <see cref="ChunkGeometryPool.ContentVersion"/>.
     /// </summary>
-    public bool IsBuried;
+    public bool IsBuried
+    {
+        get => _isBuried;
+        set
+        {
+            if (_isBuried == value) return;
+            _isBuried = value;
+            _pool?.NoteDrawSetChange();
+        }
+    }
+
+    private bool _isBuried;
 
     /// <summary>
     /// This region's index in <see cref="LodManager.RegionList"/>, or -1 while it is not in
