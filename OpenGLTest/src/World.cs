@@ -226,6 +226,9 @@ public class World
     /// <summary>Current HP, 0-100, drawn as 10 hearts in the HUD.</summary>
     public int Health => _health.Health;
 
+    /// <summary>The air under water as a share of a full lung, 0..1; the HUD's bubbles.</summary>
+    public float AirShare => _health.Breath.Fraction;
+
     /// <summary>The HUD toast line (the day change, a first pickup, a full inventory), drawn while
     /// its alpha is above zero.</summary>
     public HudToast Toast { get; } = new();

@@ -112,6 +112,10 @@ public sealed class NetworkProtocolTests
         Assert.Equal(NetPlayerFlags.Creative | NetPlayerFlags.Flying, overfull.Modes);
         Assert.Equal(0, RoundTrip(dead with { Health = -10 }).Health);
 
+        // The air rides along and is clamped to a full lung
+        Assert.Equal(7, RoundTrip(hurt with { Air = 7 }).Air);
+        Assert.Equal(VoxelEngine.Player.Breath.NetSteps, RoundTrip(hurt with { Air = 250 }).Air);
+
         // A correction: the sequence id the client acks, then the eye it snaps to
         var eye = new Vector3(12.5f, 70.62f, -8.5f);
         using var writer = new PacketWriter(NetMessage.PlayerCorrection);

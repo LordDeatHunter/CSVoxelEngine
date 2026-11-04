@@ -61,6 +61,22 @@ public static class PlayerBodyProbe
     }
 
     /// <summary>
+    /// Whether the eye is under a fluid surface (the eye cell's own fluid height, so a one-block
+    /// pool's 8/9 surface leaves a standing eye dry), and whether that fluid burns
+    /// (<paramref name="inLava"/>). The one eye rule <see cref="PlayerPhysics.UpdateWaterState"/>,
+    /// the shoulder camera's eye and the server's drowning all read.
+    /// </summary>
+    public static bool EyeInFluid(Vector3 eye, ChunkManager chunks, out bool inLava)
+    {
+        inLava = false;
+        var (x, y, z) = eye.BlockCell();
+        if (eye.Y >= chunks.GetFluidSurfaceGlobal(x, y, z))
+            return false;
+        inLava = chunks.TryGetCell(x, y, z, out var id, out _) && BlockType.IsFluid(id) && BlockType.Emission[id] > 0;
+        return true;
+    }
+
+    /// <summary>
     /// Whether any cell of the body box holds a burning fluid (a fluid with a light emission:
     /// lava). Lava burns on body contact, not just eye contact, so a wade through a shallow pool
     /// keeps the eye dry but still hurts. An unloaded cell is not lava.

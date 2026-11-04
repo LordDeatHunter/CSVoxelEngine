@@ -31,6 +31,10 @@ internal sealed class HudRenderer : IDisposable
     private const float HeartDrawHeight = 32f;
     private const float HeartStride = 30f;
     private const float HeartGap = 10f;
+    // The air bubbles ride a row above the hearts, right-aligned with it like Minecraft's
+    private const float BubbleDrawSize = 34f;
+    private const float BubbleStride = 28f;
+    private const float BubbleGap = 6f;
     // The selected item's name (DrawHotbarName) sits this far above the hearts row, leaving room
     // for descenders.
     private const float HotbarNameGap = 12f;
@@ -66,6 +70,8 @@ internal sealed class HudRenderer : IDisposable
     private readonly uint _crosshairTexture;
     private readonly uint _heartTexture;
     private readonly uint _heartEmptyTexture;
+    private readonly uint _bubbleTexture;
+    private readonly Mesh _bubbleMesh;
 
     // Heart sprites with the 1px side padding cropped out of their UVs (see the Heart
     // metrics above): full width for empty/full, left half for a half heart.
@@ -85,6 +91,8 @@ internal sealed class HudRenderer : IDisposable
         _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
         _heartTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/heart.png");
         _heartEmptyTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/heart_empty.png");
+        _bubbleTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/bubble.png");
+        _bubbleMesh = Primitives.CreateRectangle(gl, 1f, 1f);
         var heartUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(31f / 32f, 1f));
         var heartHalfUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(16f / 32f, 1f));
         _heartEmptyMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
@@ -213,6 +221,32 @@ internal sealed class HudRenderer : IDisposable
                 _ui.DrawMesh(_heartHalfMesh,
                     RectTransform(center with { X = center.X - HeartDrawWidth * 0.25f }, halfSize),
                     Rgba.White, _heartTexture);
+        }
+    }
+
+    /// <summary>
+    /// The air meter: <see cref="PlayerHealth.HeartCount"/> bubbles in a row over the hearts, right-aligned
+    /// with them, one per tenth of a lung. A bubble fades with the air in it and an empty slot draws
+    /// nothing, so the row shrinks as the player runs out. Hidden with a full lung or when dead.
+    /// </summary>
+    internal void DrawAir(float airShare, int health)
+    {
+        if (airShare >= 1f || health <= 0)
+            return;
+        var rowRight = _ui.ScreenSize.X * 0.5f
+            + (HeartDrawWidth + (PlayerHealth.HeartCount - 1) * HeartStride) * 0.5f;
+        var hotbarTop = _ui.ScreenSize.Y - BottomMargin - SlotSize;
+        var centerY = hotbarTop - HeartGap - HeartDrawHeight - BubbleGap - BubbleDrawSize * 0.5f;
+        var size = new Vector2(BubbleDrawSize);
+        var bubbles = Math.Clamp(airShare, 0f, 1f) * PlayerHealth.HeartCount;
+        for (var i = 0; i < PlayerHealth.HeartCount; i++)
+        {
+            var fill = Math.Clamp(bubbles - i, 0f, 1f);
+            if (fill <= 0f)
+                continue;
+            // Index 0 is the rightmost: the row empties from the left, the way a lung runs out
+            var center = new Vector2(rowRight - BubbleDrawSize * 0.5f - i * BubbleStride, centerY);
+            _ui.DrawMesh(_bubbleMesh, RectTransform(center, size), Rgba.FromFloat(1f, 1f, 1f, fill), _bubbleTexture);
         }
     }
 
@@ -430,6 +464,8 @@ internal sealed class HudRenderer : IDisposable
         _gl.DeleteTexture(_crosshairTexture);
         _gl.DeleteTexture(_heartTexture);
         _gl.DeleteTexture(_heartEmptyTexture);
+        _gl.DeleteTexture(_bubbleTexture);
+        _bubbleMesh.Dispose();
         _heartEmptyMesh.Dispose();
         _heartFullMesh.Dispose();
         _heartHalfMesh.Dispose();

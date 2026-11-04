@@ -473,13 +473,8 @@ public class Camera : IMobTarget
     {
         var eye = Position + _shoulder.ShoulderOffset;
         var (eyeX, eyeY, eyeZ) = eye.BlockCell();
-        IsEyeInWater = eye.Y < chunkManager.GetFluidSurfaceGlobal(eyeX, eyeY, eyeZ);
-        IsEyeInLava = false;
-        if (IsEyeInWater && chunkManager.TryGetCell(eyeX, eyeY, eyeZ, out var eyeId, out _)
-            && BlockType.IsFluid(eyeId))
-        {
-            IsEyeInLava = BlockType.Emission[eyeId] > 0;
-        }
+        IsEyeInWater = PlayerBodyProbe.EyeInFluid(eye, chunkManager, out var inLava);
+        IsEyeInLava = inLava;
 
         UpdateEyeWaterSurface(chunkManager, eyeX, eyeY, eyeZ);
     }

@@ -140,9 +140,9 @@ the other while still being faster together.
 - [ ] **`P-12` · Farming** — P2, M.
   Seeds, tilled soil, growth stages, harvest -> food and crafting ingredients. Cross-links
   `P-38`, `P-42`, `P-45`.
-- [ ] **`P-13` · Drowning** — P1, S.
-  Fall damage landed with `P-10`; **drowning is still open**, so swimming is harmless. The water
-  systems already expose `IsInWater` / `IsEyeInWater` / `IsSubmerged`.
+- [x] **`P-13` · Drowning** — landed: `Breath` (15 s of air with the eye under water, refilled once it is
+  out, a 10 HP blow per second when empty; creative and flight immune), a row of air bubbles over the
+  hearts, the server's own air in `PlayerStatus` (protocol 9). `BreathTests`, `drowning.json`.
 - [ ] **`P-29` · Death-mitigation gear** — P2, M.
   Counter `P-10`'s drop-everything rule: a **backpack** that expands inventory and drops as one
   item on death; **binding** enchantments that keep an enchanted item through death. Ties into
@@ -476,8 +476,8 @@ single-arc player.
   Data packs already exist; consider a scripting/behavior hook (`M-21`).
 - [ ] **`M-10` · Fix: `TreeCanopy.CanopyDisturbed` loses felled-canopy markers at its cap** —
   P2, S. It is edit state, not a cache: 289 entries per edited block and a wholesale `Clear()` at
-  16384 entries, so after roughly 57 felled trees the LOD redraws cleared canopy, and the `Count`
-  test sits inside the 289-iteration loop (a per-block lock storm). The markers now persist per
+  `CanopyDisturbedLimit` (65536) entries, so after enough felled trees the LOD redraws cleared
+  canopy (the `Count` test is already hoisted out of the per-cell loop). The markers now persist per
   world (`LodEditState`) but the in-session `Clear()` bug stands. **Must NOT** move to
   `GenerationalCache` (eviction = data loss). The real fix derives the set from stored block data
   and is entangled with save/load; the interim is one entry per chunk column and hoisting the

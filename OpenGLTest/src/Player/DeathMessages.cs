@@ -17,6 +17,9 @@ public enum DamageSource : byte
 
     /// <summary>Standing against a cactus.</summary>
     Cactus,
+
+    /// <summary>Out of air with the head under water.</summary>
+    Drowning,
 }
 
 /// <summary>
@@ -35,6 +38,7 @@ public static class DeathMessages
         DamageSource.Fall => $"{player} fell",
         DamageSource.Lava => $"{player} burned in lava",
         DamageSource.Cactus => $"{player} was pricked to death",
+        DamageSource.Drowning => $"{player} drowned",
         _ => $"{player} died",
     };
 }

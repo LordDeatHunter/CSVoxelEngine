@@ -429,6 +429,7 @@ internal sealed class LocalPlayer
             _health.TakeDamage(damage, DamageSource.Fall);
 
         _health.UpdateLava(deltaTime, Camera.IsInLava, Camera.IsCreative || Camera.IsFlying);
+        _health.UpdateBreath(deltaTime, Camera.IsEyeInWater && !Camera.IsEyeInLava, Camera.IsCreative || Camera.IsFlying);
         UpdateCactusContact(deltaTime, chunkManager);
         _health.Update(deltaTime);
 

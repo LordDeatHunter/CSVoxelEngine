@@ -76,4 +76,11 @@ public static class PlayerConfig
 
     // --- Bandage (ItemUseAction.Heal): HP one restores, spent from the stack ---
     public const int BandageHealAmount = 20;
+
+    // --- Drowning (Breath): air with the eye under water, refilled once it is out; at zero air a
+    // blow lands every tick ---
+    public const float AirSeconds = 15f;
+    public const float AirRefillPerSecond = 10f;
+    public const float DrownTickSeconds = 1f;
+    public const int DrownDamagePerTick = 10;
 }

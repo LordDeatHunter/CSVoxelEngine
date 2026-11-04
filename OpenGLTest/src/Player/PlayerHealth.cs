@@ -59,6 +59,7 @@ public sealed class PlayerHealth
         Health = Math.Clamp(health, 0, MaxHealth);
         DamageFlash = 0f;
         _lavaTimer = 0f;
+        Breath.Refill();
     }
 
     public void TakeDamage(int amount)
@@ -122,6 +123,18 @@ public sealed class PlayerHealth
         }
     }
 
+    /// <summary>The air under water; <see cref="UpdateBreath"/> advances it.</summary>
+    public Breath Breath { get; } = new();
+
+    /// <summary>Drains the air while the eye is under water and bills a drowning blow per tick once it
+    /// is empty; <paramref name="immune"/> (creative/flight) never drains.</summary>
+    public void UpdateBreath(float deltaTime, bool eyeUnderWater, bool immune)
+    {
+        var ticks = Breath.Step(deltaTime, eyeUnderWater, immune);
+        for (var i = 0; i < ticks; i++)
+            TakeDamage(PlayerConfig.DrownDamagePerTick, DamageSource.Drowning);
+    }
+
     /// <summary>Decays <see cref="DamageFlash"/>; call every frame.</summary>
     public void Update(float deltaTime) =>
         DamageFlash = Math.Max(0f, DamageFlash - Math.Max(0f, deltaTime) / DamageFlashSeconds);
@@ -131,5 +144,6 @@ public sealed class PlayerHealth
     {
         Health = MaxHealth;
         _lavaTimer = 0f;
+        Breath.Refill();
     }
 }

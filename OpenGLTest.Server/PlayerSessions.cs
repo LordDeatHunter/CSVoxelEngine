@@ -135,7 +135,7 @@ internal sealed class PlayerSessions
         player.TakePendingKnockback(out var knockback, out var lift);
         using var writer = new PacketWriter(NetMessage.PlayerStatus);
         PlayerStatusCodec.Write(writer,
-            new PlayerStatusData(player.GrantedModes, player.Status.Health, player.IsDead, knockback, lift));
+            new PlayerStatusData(player.GrantedModes, player.Status.Health, player.IsDead, knockback, lift, player.Status.Breath.NetStep));
         client.Send(writer.ToArray());
         player.StatusDirty = false;
     }

@@ -270,8 +270,9 @@ public sealed class ServerPlayer : IMobTarget
     }
 
     /// <summary>
-    /// The per-tick half of the status: lava burns a body standing in it (creative and flight are
-    /// immune, an unloaded body is not judged) and the damage flash decays. A dead player is left
+    /// The per-tick half of the status: lava burns a body standing in it, an empty lung drowns one
+    /// with its eye under water (creative and flight are immune, an unloaded body is not judged) and
+    /// the damage flash decays. A dead player is left
     /// as it is until <see cref="Respawn"/>.
     /// </summary>
     public void TickStatus(float dt, ChunkManager chunks)
@@ -279,11 +280,16 @@ public sealed class ServerPlayer : IMobTarget
         if (IsDead)
             return;
         var before = Status.Health;
-        var inLava = PlayerBodyProbe.IsKnown(Position, chunks) && PlayerBodyProbe.InLava(Position, chunks);
+        var airBefore = Status.Breath.NetStep;
+        var known = PlayerBodyProbe.IsKnown(Position, chunks);
+        var inLava = known && PlayerBodyProbe.InLava(Position, chunks);
         Status.UpdateLava(dt, inLava, Creative || Flying);
+        // Drowning: an unloaded body is not judged, so it never drains (it refills)
+        var underWater = known && PlayerBodyProbe.EyeInFluid(Position, chunks, out var eyeInLava) && !eyeInLava;
+        Status.UpdateBreath(dt, underWater, Creative || Flying);
         UpdateCactusContact(dt, chunks);
         Status.Update(dt);
-        if (Status.Health != before || Status.IsDead)
+        if (Status.Health != before || Status.IsDead || Status.Breath.NetStep != airBefore)
             StatusDirty = true;
     }
 

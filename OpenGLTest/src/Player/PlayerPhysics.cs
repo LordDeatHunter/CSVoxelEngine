@@ -465,13 +465,8 @@ internal sealed class PlayerPhysics
         _waterFlow = flowCells > 0 ? flowSum / flowCells : Vector3.Zero;
         camera.SetInWater(inWater);
         var (eyeX, eyeY, eyeZ) = position.BlockCell();
-        camera.SetEyeInWater(position.Y < chunkManager.GetFluidSurfaceGlobal(eyeX, eyeY, eyeZ));
-        camera.SetEyeInLava(false);
-        if (camera.IsEyeInWater && chunkManager.TryGetCell(eyeX, eyeY, eyeZ, out var eyeId, out _)
-            && BlockType.IsFluid(eyeId))
-        {
-            camera.SetEyeInLava(BlockType.Emission[eyeId] > 0);
-        }
+        camera.SetEyeInWater(PlayerBodyProbe.EyeInFluid(position, chunkManager, out var eyeInLava));
+        camera.SetEyeInLava(eyeInLava);
 
         camera.UpdateEyeWaterSurface(chunkManager, eyeX, eyeY, eyeZ);
         var share = WaterImmersion.Share(feetY, surfaceTop);

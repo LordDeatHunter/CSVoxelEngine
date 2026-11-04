@@ -340,6 +340,14 @@ internal sealed class ClientMirror
         }
     }
 
+    /// <summary>A client shows the air the server's status reports; the server alone drains and
+    /// refills it, so nothing is simulated here.</summary>
+    internal void ApplyNetworkAir(int airStep)
+    {
+        if (_clientMode)
+            _health.Breath.SetNetStep(airStep);
+    }
+
     // A slime mirror also has to be the reported size (the ammo field), since a size is fixed for life
     private static bool KindMatches(Mob mob, NetEntity entry) =>
         entry.Kind == NetEntityKind.Slime

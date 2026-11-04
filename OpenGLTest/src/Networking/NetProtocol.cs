@@ -109,8 +109,8 @@ public static class NetFraming
     /// <see cref="NetPlayerAction"/> and its counter, and the player flags carry cosmetic movement bits.
     /// 8: <see cref="NetMessage.EntityList"/> also carries icebergs (<see cref="NetEntityKind.Iceberg"/>);
     /// an older client would neither draw nor collide with them while the server judges a rider's
-    /// hover against them.</summary>
-    public const int ProtocolVersion = 8;
+    /// hover against them. 9: <see cref="NetMessage.PlayerStatus"/> ends with the player's air.</summary>
+    public const int ProtocolVersion = 9;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;
