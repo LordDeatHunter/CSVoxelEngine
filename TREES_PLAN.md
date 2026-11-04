@@ -10,13 +10,14 @@ in `git log` on `tree-rework`. What is left is the residue below, tracked in `TO
 
 ## Open work
 
-- [ ] **`M-10` Felled-canopy markers lose data at their cap.** `TreeCanopy.CanopyDisturbed` clears
-  wholesale at 16384 entries (~57 felled trees) and tests `Count` inside a 289-iteration loop.
-  Interim fix: one entry per chunk column and hoist the `Count` test. Real fix: derive the set from
-  stored block data (entangled with save/load). Must NOT move into `GenerationalCache`.
+- [ ] **`M-10` Felled-canopy markers only ever grow.** The interim fix landed (per-chunk-column
+  bitsets in `TreeCanopy.CanopyDisturbed`, never cleared at a cap); what is left is that the set
+  is edit state that only grows and `lod-edits.bin` lists it column by column. Real fix: derive
+  the set from stored block data (entangled with save/load). Must NOT move into
+  `GenerationalCache`.
 - [ ] **`M-13` Far-LOD canopy for grown trees.** `PoisonCanopy` only removes canopy, so a grown
-  tree shows no far canopy until reload. Needs an add-canopy override keyed by column, and stops
-  spending `CanopyDisturbedLimit` budget per grow.
+  tree shows no far canopy until reload. Needs an add-canopy override keyed by column
+  (`TreeCanopy.CanopyAdded`, persisted in `lod-edits.bin`).
 - [ ] **`M-14` Wide-trunk residue** (three independent items):
   - [ ] A felled tree's mesh is cut off at its one 16³ scratch chunk (`CellBatchMesher.Build` is a
     ready multi-chunk replacement).

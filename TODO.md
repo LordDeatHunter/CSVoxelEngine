@@ -53,15 +53,13 @@ designed in, not retrofitted. Keep these four rules in mind whenever adding cont
 The smallest bundle that makes the world a *game*: stakes, food, and an advance. Mostly content
 JSON plus small systems; high feel, low engine risk.
 
-1. **`P-11` food + hunger + eating** — add the first edibles and repoint the campfire from
-   mud bricks to food. (No edibles exist today.)
-2. **`P-10` death done properly + `U-5` death screen** — decide and ship the drop rule (default
-   drop-everything for the hardcore framing), a respawn point / bed, and the death UI.
-3. **`P-4` complete the copper chain + `P-1` tool durability** — assembly recipes (head + handle
-   -> tool) and per-tool wear; the bronze-age payoff currently dead-ends.
-4. **`P-3` a real furnace / smelter** — `sand -> glass`, `mud -> brick`, generic smelting with
+1. **`P-10` death done properly + `U-5` death screen** — a death screen with a manual respawn,
+   and passive health regen (out of combat, slowed while sprinting). No death drops.
+2. **`P-4` complete the copper chain** — assembly recipes (head + handle -> tool); the
+   bronze-age payoff currently dead-ends.
+3. **`P-3` a real furnace / smelter** — `sand -> glass`, `mud -> brick`, generic smelting with
    fuel; generalizes the kiln pattern and becomes the automation seed.
-5. **`P-7` / `P-25` tier-2 ores + armor** — iron/tin at real depth bands, and armor (part of
+4. **`P-7` / `P-25` tier-2 ores + armor** — iron/tin at real depth bands, and armor (part of
    `P-7`) as a defense stat. The first difficulty curve and the first reason to descend.
 
 ### Milestone 2 — Arc A vertical slice: the first dungeon
@@ -89,11 +87,6 @@ the other while still being faster together.
 
 ### Act I — the shared primitive-tech spine
 
-- [ ] **`P-1` · Finish real tools: durability + shovel/hoe/sword kinds** — P1, M.
-  Tool tags, the `requiresTool` + per-block `tools` tier gate, `tool.power` / `hitDelayMs`
-  mining pace and `blockDamage` landed (`Mining`, `MiningTests`). Still open: **per-instance
-  durability** (only the firestarter spends uses today; `Inventory.DamageTool` / `MaxDurability`
-  already exist) and the **shovel/hoe/sword** kinds.
 - [ ] **`P-2` · Crafting stations gate recipes** — P1, M.
   The `E` panel crafts any recipe from anywhere. Add a `station` field and require the matching
   station (crafting table, campfire, quern, furnace). The shapeless list-and-feed model stays;
@@ -107,8 +100,7 @@ the other while still being faster together.
   The quern crushes `malachite -> crushed_copper`, and the metalworks (kiln crucible + fired
   molds) already **casts** the ingot and the pickaxe/axe **heads**. What is missing is the
   head -> tool **assembly** recipe, so the heads dead-end. Add `copper_pickaxe` / `copper_axe`
-  from head + handle (`P-42` branch), plus the durability from `P-1`. This is the first real
-  "I advanced" moment.
+  from head + handle (`P-42` branch). This is the first real "I advanced" moment.
 - [ ] **`P-5` · Light progression: torch -> lamp -> fire as fuel** — P1, S–M.
   A cheap **torch** block (emission ~14, `needsSupport`) before the existing `lamp` (emission
   15). Wire placed lights into the shader's 8 point-light budget so a torch casts dynamic light,
@@ -126,17 +118,15 @@ the other while still being faster together.
   XP from gathering/crafting/killing; perks that feed both Arc A and Arc B (`P-15`).
 - [ ] **`P-30` · Universal mining tool (power glove / drill)** — P3, S–M.
   A tool that passes every block's `tools` gate no matter its kind (a powered glove or drill),
-  built on `P-1`'s tag gating. Also an Arc B -> Arc A crossover (`P-53`).
+  built on the tool-tag gating. Also an Arc B -> Arc A crossover (`P-53`).
 
 ### Survival basics
 
 - [ ] **`P-10` · Death + respawn, done properly** — P1, M.
   Health, fall damage, lava DoT, mob damage, the damage vignette/shake and simple respawn landed.
-  Still open: a **death screen** (`U-5`), the **drop rule** (default drop-everything for the
-  hardcore framing, relieved later by `P-29`), a **respawn point / bed**, and health regen.
-- [ ] **`P-11` · Hunger / food / eating** — P1, M.
-  Food items, eating, hunger/saturation drain. Cooking currently only makes a building material,
-  so **no edibles exist yet** — add the first real foods here (`P-38`, `P-12`, `P-42`).
+  Still open: a **death screen** (`U-5`) with a manual respawn, and passive **health regen**
+  (out of combat, slowed while sprinting). Decided against: death drops (so `P-29` loses its
+  reason) and, for now, a respawn point / bed.
 - [ ] **`P-12` · Farming** — P2, M.
   Seeds, tilled soil, growth stages, harvest -> food and crafting ingredients. Cross-links
   `P-38`, `P-42`, `P-45`.
@@ -242,7 +232,7 @@ single-arc player.
   Portals, teleport belts, rune-routed item flow as a late alternative to `P-20` belts; also a
   fast-travel network for Arc A (`P-27`).
 - [ ] **`P-51` · Automation of RPG consumables** — P3, M.
-  Production lines for potions (`P-42`), ammo (`F-4`), food (`P-11`) and gear, so a factory
+  Production lines for potions (`P-42`), ammo (`F-4`), food and gear, so a factory
   trivializes the RPG's supply grind — the intended "dabbling helps" payoff.
 - [ ] **`P-52` · Dungeons as gated resource nodes** — P2, M.
   A reactor catalyst / blueprint drops **only** in POIs, so an automation bottleneck routes
@@ -268,7 +258,7 @@ single-arc player.
   Terrain relief (highlands, ranges, massifs, lone peaks) is in `BIOMEGEN.md` §6.
 - [ ] **`P-25` · More ores + deeper strata** — P1, M.
   Tin/iron/gold/… veins placed deterministically like trees/pebbles/malachite; tiers gate tools
-  (`P-1`, `P-7`, `P-44`).
+  (`P-7`, `P-44`).
 - [ ] **`P-26` · Structures & ruins** — P2, L.
   Huts, mineshaft scraps, camps, towers; routes through `DropManager` and needs `M-15`.
 - [ ] **`P-27` · Second dimension + portals** — P3, XL.
@@ -310,7 +300,7 @@ single-arc player.
   Leaves/logs catch, water/rain puts out; emergent danger. The campfire is the seed.
 - [ ] **`F-7` · Climbing — ladders, vines, ropes** — P2, M.
 - [ ] **`F-8` · Sandbox toys — bounce, launch pads, fans** — P3, M.
-- [ ] **`F-9` · Fishing** — P3, M. Ties `P-56` and food (`P-11`).
+- [ ] **`F-9` · Fishing** — P3, M. Ties `P-56` and food.
 - [ ] **`F-10` · Boats / minecarts / transport** — P3, L.
   Moving collision and passenger handling; engine-heavy. Feeds `P-20` carts.
 - [ ] **`F-11` · Ambience moments** — P2, S.
@@ -340,7 +330,7 @@ single-arc player.
 - [ ] **`U-1` · Item tooltips** — P1, S.
   Name, durability, what it is for. `ItemType.Name` already carries the "future tooltips" note.
 - [ ] **`U-2` · Health & hunger HUD** — P1, M.
-  Health hearts landed; add the hunger bar and clearer damage feedback. Depends on `P-10`/`P-11`.
+  Health hearts landed; add clearer damage feedback (no hunger system is planned). Depends on `P-10`.
 - [ ] **`U-3` · Crafting UI polish** — P1, M.
   Keep the shapeless list-and-hand-feed model; polish it (search, "what this makes / what uses
   this", clearer fed/needed counts). Stations reuse this UI, get their own, or craft in-world as
