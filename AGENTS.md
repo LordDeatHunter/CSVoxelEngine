@@ -2097,7 +2097,6 @@ tools/                                # asset generators: tiles, sprites, models
   remove-copper-head-handles.py       # strips the wooden handle from copper_pickaxe_head.png / copper_axe_head.png (re-runs are no-ops)
   generate-slime-block-texture.py     # deterministic generator of the slime block tile (slime_block.png)
   generate-stone-brick-texture.py     # deterministic generator of the stone brick tile (stone_bricks.png)
-  generate-torch-texture.py           # deterministic torch tile; its header pins the stick the torch models crop
   generate-tree-textures.ps1          # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
 ```
 

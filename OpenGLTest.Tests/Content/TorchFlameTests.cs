@@ -23,18 +23,22 @@ public sealed class TorchFlameTests
     private static byte Block(string name) => ContentRegistry.RequireBlock(name).Id;
 
     [Fact]
-    public void EveryTorchsTopFaceWearsTheCharredTopTile()
+    public void EveryTorchsTopFaceCropsTheCapPieceOfTheTorchTile()
     {
-        var top = TextureAtlas.TileOf("torch_top");
+        var tile = TextureAtlas.TileOf("torch");
         foreach (var name in new[] { "torch", "wall_torch" })
         {
             var type = ContentRegistry.RequireBlock(name);
             var up = type.BakedModel!.Quads.Where(q => q.Face == 4).ToArray();
             Assert.NotEmpty(up);
-            // The whole tile, so the top never shows the side crop's char band and wood rows
-            Assert.All(up, q => Assert.Equal(top, q.Tile));
-            Assert.All(up, q => Assert.Equal(0f, q.Uvs.Min(u => MathF.Min(u.X, u.Y))));
-            Assert.All(up, q => Assert.Equal(1f, q.Uvs.Max(u => MathF.Max(u.X, u.Y))));
+            // The 4x4 cap sits right of the body strip, so the top never shows the body's flame and wood rows
+            Assert.All(up, q => Assert.Equal(tile, q.Tile));
+            const float u0 = 4f / 32f, u1 = 8f / 32f, v1 = 4f / 32f;
+            Assert.All(up, q => Assert.All(q.Uvs, uv =>
+            {
+                Assert.InRange(uv.X, u0 - 1e-4f, u1 + 1e-4f);
+                Assert.InRange(uv.Y, -1e-4f, v1 + 1e-4f);
+            }));
         }
     }
 
