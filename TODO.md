@@ -502,8 +502,9 @@ single-arc player.
 - [ ] **`M-14` · Wide-trunk residue (TREES_PLAN phase 7)** — P3, M.
   (1) a felled tree's mesh is truncated to one 16³ scratch chunk (`CellBatchMesher.Build` is a
   ready multi-chunk replacement); (2) cutting a wide core while its shells stand strands the
-  crown for reactive growth; (3) a beveled shell's cap can go stale when an edit lands in an
-  edge-diagonal chunk that face-adjacent dirtying does not remesh.
+  crown for reactive growth (undecided behavior: bridge the gap in `TreeGraph.FromWorld`, or fell
+  the tree). Item (3) landed: `ChunkCellCache.AddTouchedChunks` also dirties the edge-diagonal
+  chunk of a Y-and-horizontal corner (`ChunkCellCacheTests`).
 - [ ] **`M-15` · Structure templates / schematic system** — P2, L.
   A loadable, placeable blueprint format (jigsaw or simple offsets) that `P-16`, `P-26`, `F-14`
   and `P-37` all build on. Prerequisite for all generated POIs.

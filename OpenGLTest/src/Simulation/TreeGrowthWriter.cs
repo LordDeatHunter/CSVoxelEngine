@@ -54,8 +54,9 @@ namespace VoxelEngine.Simulation;
 /// <see cref="LeafDecayManager.ScheduleBox"/>, so the hydration rule stays single-sourced.</para>
 ///
 /// <para><b>Remeshing.</b> Every mesh-affecting write marks its own chunk plus the face-adjacent
-/// chunk on each axis where it sits on a border through <see cref="ChunkManager.MarkDirty"/>, the
-/// <see cref="LeafDecayManager"/> idiom. <c>Chunk.RemeshAfterBatchEdit</c> is avoided: it dirties
+/// chunk on each axis where it sits on a border (and the edge-diagonal chunk of a Y-and-horizontal
+/// corner, which a beveled shell's cap reads) through <see cref="ChunkManager.MarkDirty"/>, the
+/// <see cref="LeafDecayManager"/> idiom, sharing <c>ChunkCellCache.AddTouchedChunks</c>. <c>Chunk.RemeshAfterBatchEdit</c> is avoided: it dirties
 /// the whole light radius around each touched chunk, and leaves and tree wood pass light, cast no
 /// ambient occlusion and occlude nothing, so no other cell's light changes.</para>
 ///
@@ -412,8 +413,8 @@ public sealed class TreeGrowthWriter
         // Decay prunes the leaves the old tips fed, and is the only pruner
         leafDecay?.ScheduleBox(log.Min, log.Max);
 
-        foreach (var (cx, cy, cz) in log.Chunks)
-            chunks.MarkDirty(new Vector3(cx, cy, cz));
+        foreach (var key in log.Chunks)
+            chunks.MarkDirty(ChunkKey.ToVector3(key));
 
         foreach (var (x, z) in log.Columns)
         {
@@ -437,7 +438,7 @@ public sealed class TreeGrowthWriter
         public Vector3 Max = new(float.MinValue);
         public bool Any;
         public readonly List<(int X, int Y, int Z)> IdChanged = [];
-        public readonly HashSet<(int X, int Y, int Z)> Chunks = [];
+        public readonly HashSet<long> Chunks = [];
         public readonly HashSet<(int X, int Z)> Columns = [];
 
         public void Record(int x, int y, int z, bool idChanged, bool mesh)
@@ -452,15 +453,7 @@ public sealed class TreeGrowthWriter
                 return;
 
             Columns.Add((x, z));
-            int cx = x >> Chunk.SizeShift, cy = y >> Chunk.SizeShift, cz = z >> Chunk.SizeShift;
-            Chunks.Add((cx, cy, cz));
-            int lx = x & Chunk.SizeMask, ly = y & Chunk.SizeMask, lz = z & Chunk.SizeMask;
-            if (lx == 0) Chunks.Add((cx - 1, cy, cz));
-            else if (lx == Chunk.SizeMask) Chunks.Add((cx + 1, cy, cz));
-            if (ly == 0) Chunks.Add((cx, cy - 1, cz));
-            else if (ly == Chunk.SizeMask) Chunks.Add((cx, cy + 1, cz));
-            if (lz == 0) Chunks.Add((cx, cy, cz - 1));
-            else if (lz == Chunk.SizeMask) Chunks.Add((cx, cy, cz + 1));
+            ChunkCellCache.AddTouchedChunks(x, y, z, Chunks);
         }
     }
 }

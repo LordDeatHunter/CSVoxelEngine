@@ -22,8 +22,8 @@ in `git log` on `tree-rework`. What is left is the residue below, tracked in `TO
   - [ ] A felled tree's mesh is cut off at its one 16³ scratch chunk (`CellBatchMesher.Build` is a
     ready multi-chunk replacement).
   - [ ] Cutting a wide core while its shells stand strands the crown for reactive growth.
-  - [ ] A beveled shell's cap can go stale when an edit lands in an edge-diagonal chunk that
-    face-adjacent dirtying does not remesh.
+  - [x] A beveled shell's cap went stale when an edit landed in an edge-diagonal chunk:
+    `ChunkCellCache.AddTouchedChunks` now dirties it too.
 
 ## Perf baseline
 

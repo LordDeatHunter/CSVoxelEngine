@@ -120,7 +120,10 @@ internal sealed class ChunkCellCache
     }
 
     /// <summary>Adds the chunk owning a cell, plus the face-adjacent chunk on every axis where
-    /// the cell sits on a chunk border, to <paramref name="into"/> as packed chunk keys.</summary>
+    /// the cell sits on a chunk border, to <paramref name="into"/> as packed chunk keys. A cell on a
+    /// Y border and an X or Z border one also adds the edge-diagonal chunk across both: a beveled
+    /// tree-wood shell's cap reads the vertical neighbor's horizontal neighbors, so an edit there
+    /// changes the mesh of a chunk no face-adjacent rule reaches.</summary>
     internal static void AddTouchedChunks(int x, int y, int z, HashSet<long> into)
     {
         var cx = x >> Chunk.SizeShift;
@@ -132,13 +135,16 @@ internal sealed class ChunkCellCache
         var ly = y & Chunk.SizeMask;
         var lz = z & Chunk.SizeMask;
 
-        if (lx == 0) into.Add(ChunkKey.Pack(cx - 1, cy, cz));
-        else if (lx == Chunk.SizeMask) into.Add(ChunkKey.Pack(cx + 1, cy, cz));
+        var dx = lx == 0 ? -1 : lx == Chunk.SizeMask ? 1 : 0;
+        var dy = ly == 0 ? -1 : ly == Chunk.SizeMask ? 1 : 0;
+        var dz = lz == 0 ? -1 : lz == Chunk.SizeMask ? 1 : 0;
 
-        if (ly == 0) into.Add(ChunkKey.Pack(cx, cy - 1, cz));
-        else if (ly == Chunk.SizeMask) into.Add(ChunkKey.Pack(cx, cy + 1, cz));
+        if (dx != 0) into.Add(ChunkKey.Pack(cx + dx, cy, cz));
+        if (dy != 0) into.Add(ChunkKey.Pack(cx, cy + dy, cz));
+        if (dz != 0) into.Add(ChunkKey.Pack(cx, cy, cz + dz));
 
-        if (lz == 0) into.Add(ChunkKey.Pack(cx, cy, cz - 1));
-        else if (lz == Chunk.SizeMask) into.Add(ChunkKey.Pack(cx, cy, cz + 1));
+        if (dy == 0) return;
+        if (dx != 0) into.Add(ChunkKey.Pack(cx + dx, cy + dy, cz));
+        if (dz != 0) into.Add(ChunkKey.Pack(cx, cy + dy, cz + dz));
     }
 }
