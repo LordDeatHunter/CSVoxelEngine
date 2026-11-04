@@ -174,8 +174,7 @@ internal sealed class MenuRenderer
         switch (view.Page)
         {
             case MainMenuPage.Main:
-                _ui.DrawTextCentered("CSVOXELENGINE", screen.X * 0.5f,
-                    MainMenuLayout.TitleTop(screen, MainMenuPage.Main), _ui.HeadScale, Rgba.White);
+                DrawPageTitle(screen, MainMenuPage.Main, "CSVOXELENGINE");
                 DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 0), "START");
                 DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 1), "MULTIPLAYER");
                 DrawMenuButton(MainMenuLayout.MainButtonCenter(screen, 2), "SETTINGS");
@@ -187,25 +186,21 @@ internal sealed class MenuRenderer
                 break;
 
             case MainMenuPage.AddServer:
-                _ui.DrawTextCentered("ADD SERVER", screen.X * 0.5f,
-                    MainMenuLayout.TitleTop(screen, MainMenuPage.AddServer), _ui.HeadScale, Rgba.White);
+                DrawPageTitle(screen, MainMenuPage.AddServer, "ADD SERVER");
                 DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "NAME", view.ServerName,
                     view.Focus == MenuField.ServerName, WorldNames.DefaultName, time);
                 DrawLabeledField(MainMenuLayout.SeedFieldCenter(screen), "ADDRESS", view.Address,
                     view.Focus == MenuField.Address, "192.168.1.10 or host:25566", time);
                 DrawNotice(view, screen);
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "ADD");
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
+                DrawBottomPair(screen, "ADD");
                 break;
 
             case MainMenuPage.DirectConnect:
-                _ui.DrawTextCentered("DIRECT CONNECT", screen.X * 0.5f,
-                    MainMenuLayout.TitleTop(screen, MainMenuPage.DirectConnect), _ui.HeadScale, Rgba.White);
+                DrawPageTitle(screen, MainMenuPage.DirectConnect, "DIRECT CONNECT");
                 DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "ADDRESS", view.Address,
                     view.Focus == MenuField.Address, "192.168.1.10 or host:25566", time);
                 DrawNotice(view, screen);
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CONNECT");
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
+                DrawBottomPair(screen, "CONNECT");
                 break;
 
             case MainMenuPage.ConfirmDeleteServer:
@@ -218,23 +213,19 @@ internal sealed class MenuRenderer
                 break;
 
             case MainMenuPage.Create:
-                _ui.DrawTextCentered("NEW WORLD", screen.X * 0.5f,
-                    MainMenuLayout.TitleTop(screen, MainMenuPage.Create), _ui.HeadScale, Rgba.White);
+                DrawPageTitle(screen, MainMenuPage.Create, "NEW WORLD");
                 DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "NAME", view.Name,
                     view.Focus == MenuField.Name, WorldNames.DefaultName, time);
                 DrawLabeledField(MainMenuLayout.SeedFieldCenter(screen), "SEED", view.Seed,
                     view.Focus == MenuField.Seed, "random", time);
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CREATE");
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
+                DrawBottomPair(screen, "CREATE");
                 break;
 
             case MainMenuPage.Edit:
-                _ui.DrawTextCentered("EDIT WORLD", screen.X * 0.5f,
-                    MainMenuLayout.TitleTop(screen, MainMenuPage.Edit), _ui.HeadScale, Rgba.White);
+                DrawPageTitle(screen, MainMenuPage.Edit, "EDIT WORLD");
                 DrawLabeledField(MainMenuLayout.NameFieldCenter(screen), "NAME", view.Name,
                     view.Focus == MenuField.Name, WorldNames.DefaultName, time);
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "SAVE");
-                DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
+                DrawBottomPair(screen, "SAVE");
                 break;
 
             case MainMenuPage.ConfirmDelete:
@@ -246,6 +237,18 @@ internal sealed class MenuRenderer
                 DrawSettingsMenu(settings);
                 break;
         }
+    }
+
+    // The title every page draws centered over its content.
+    private void DrawPageTitle(Vector2 screen, MainMenuPage page, string title) =>
+        _ui.DrawTextCentered(title, screen.X * 0.5f, MainMenuLayout.TitleTop(screen, page), _ui.HeadScale,
+            Rgba.White);
+
+    // The confirm / BACK pair across the bottom of a form or list page.
+    private void DrawBottomPair(Vector2 screen, string confirmLabel)
+    {
+        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), confirmLabel);
+        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
     }
 
     // Draws one list row's name, detail line and row buttons under the separator DrawListPage draws.
@@ -286,8 +289,7 @@ internal sealed class MenuRenderer
         DrawListPage(view, screen, "WORLDS", MainMenuPage.Worlds, view.Worlds.Count, view.ScrollOffset,
             "No worlds yet - create one", WorldRow);
 
-        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 0), "CREATE");
-        DrawMenuButton(MainMenuLayout.BottomButtonCenter(screen, 1), "BACK");
+        DrawBottomPair(screen, "CREATE");
     }
 
     // The multiplayer list, shaped like the worlds list, with ADD SERVER / DIRECT CONNECT / BACK.
@@ -306,7 +308,7 @@ internal sealed class MenuRenderer
     private void DrawListPage(MainMenuView view, Vector2 screen, string title, MainMenuPage page,
         int count, float scrollOffset, string emptyText, ListRowDrawer drawRow)
     {
-        _ui.DrawTextCentered(title, screen.X * 0.5f, MainMenuLayout.TitleTop(screen, page), _ui.HeadScale, Rgba.White);
+        DrawPageTitle(screen, page, title);
 
         var left = MainMenuLayout.PanelLeft(screen);
         var top = MainMenuLayout.ListTop();

@@ -115,8 +115,6 @@ never touch it.
 
 ### 3. Duplication
 
-- [ ] `MenuRenderer`'s AddServer, DirectConnect, Create and Edit pages repeat a title, fields,
-  `DrawNotice` and a two-button pattern inline; check the halves really are the same before folding.
 - [ ] Search for more near-identical methods and repeated constants or rules.
 - Deliberately unfolded: `LightFlicker.CellPhase` (own axis order, would move the phases),
   `LeafParticle`/`BubbleParticle` damping, `PlayerPhysics.Gravity` (34, the player's own).
