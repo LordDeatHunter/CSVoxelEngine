@@ -1,4 +1,3 @@
-using System;
 using System.Numerics;
 using VoxelEngine.Rendering;
 using Xunit;

@@ -74,6 +74,13 @@ public class BlockDebris
 
     private float HalfExtent => Size * 0.5f;
 
+    /// <param name="blockId">The block the chip is textured as.</param>
+    /// <param name="position">Spawn center, in world blocks.</param>
+    /// <param name="toss">Launch velocity; null launches with the chip's own random scatter.</param>
+    /// <param name="size">Edge length of the chip; null rolls a random size.</param>
+    /// <param name="random">Randomness source; <see cref="Random.Shared"/> when null.</param>
+    /// <param name="tint">Per-chip color multiplier (a biome tint); null leaves it untinted.</param>
+    /// <param name="look">Which cached cube the chip is drawn with.</param>
     /// <param name="pop">True (a mining chip) adds the random upward pop every chip leaves the
     /// block with on top of <paramref name="toss"/>; false launches at exactly
     /// <paramref name="toss"/>, so a caller that scales the launch (landing dust) owns the whole of it.</param>

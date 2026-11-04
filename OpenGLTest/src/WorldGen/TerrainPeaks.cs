@@ -129,7 +129,7 @@ internal static class TerrainPeaks
         return oceanWeight == 0f && desertWeight == 0f;
     }
 
-    /// <summary>The massif term at (x, z) (<see cref="MassifHeight(float, float, out (int X, int Z))"/>)
+    /// <summary>The massif term at (x, z) (<see cref="MassifHeight(float, float)"/>)
     /// without the winning cell.</summary>
     internal static float MassifHeight(float x, float z) => MassifHeight(x, z, out _);
 
@@ -255,7 +255,7 @@ internal static class TerrainPeaks
         return new TerrainSite(true, centerX, centerZ, nominal, height, OnIsland: !continental);
     }
 
-    /// <summary>The lone-peak term at (x, z) (<see cref="LonePeakHeight(float, float, out (int X, int Z))"/>)
+    /// <summary>The lone-peak term at (x, z) (<see cref="LonePeakHeight(float, float)"/>)
     /// without the winning cell.</summary>
     internal static float LonePeakHeight(float x, float z) => LonePeakHeight(x, z, out _);
 
@@ -263,7 +263,7 @@ internal static class TerrainPeaks
     /// The blocks the strongest lone peak adds at (x, z), and its cell in <paramref name="cell"/>
     /// (<c>default</c> when none reaches): a pointed cone falling from the site's height at its
     /// center to 0 at its inward-wobbled outline. An island site's term is scaled by the island land
-    /// weight at (x, z), as in <see cref="MassifHeight(float, float, out (int X, int Z))"/>. Exactly 0
+    /// weight at (x, z), as in <see cref="MassifHeight(float, float)"/>. Exactly 0
     /// within the spawn clearing (checked before any other read) and outside every accepted site's
     /// disc; each candidate is culled by distance before its cached verdict is read.
     /// </summary>

@@ -131,41 +131,20 @@ never touch it.
 ### 5. Small doc and code follow-ups
 
 Docs and build:
-- [ ] Run the doc build (`-p:GenerateDocumentationFile=true`) and fix what it shows: ~37 CS1573
-  missing param tags (`Shader`, `UIRenderer`, `BlockDebris` ctor, `TreeGrowthWriter.Grow`,
-  `ChunkFaceTables.TiledUv`, `ImportedMapSource`), the CS1574 crefs (`Camera.IsInWater` -> `SwimDepth`,
-  `MeshBuildCostProbe`, `CompletedBuildCount`'s `Interlocked.Read`) and the CS0419 on `Chunk.RestoreFrom`.
-- [ ] Prune unused usings never checked one by one: `ChunkMeshBuilder`, `ChunkTerrainFill`,
-  `ChunkManager`, `ClientConnection`, `Camera.cs`, `LeafDecayManager`, `OrphanWoodCheck`,
-  `TipHydration`, and the redundant `using VoxelEngine.Simulation;` in `Fluids/FluidManager.cs` and
-  `FluidSpread.cs`.
-- [ ] Stale comments: `ChunkRekeyReplayProbe.cs` (157/338/349, `Chunk.TryResolveNeighbors`),
-  `LightVolumeHeightTests.cs:11`, `HitboxCollisionTests.cs:135` (`Camera.IsColliding`),
-  `CameraViewProjectionCacheTests.cs:334` (`EnsureViewCache`), `ChunkManager.cs` prose naming the
-  scheduler's and `PlayerPlacedIndex`'s private fields, `LodManager.cs` (~73, 211-212),
-  `PlayerPhysics.ResetMotion`'s doc (claims it clears the shake), `World.RefreshMobs` and
-  `ThrowAction.RefreshProjectiles` (claim indexed loops, use LINQ), the `FluidSchedule.Enabled` doc.
-- [ ] `AGENTS.md` still cites the deleted `MESHER_PLAN.md`; `PERF_TODO.md` names a probe that never
-  existed (`WorldgenShapeCacheReplayProbe.cs`).
 - [ ] `.claude/workflows/plan-and-implement.js` has a stale REPO preamble (`~/.dotnet/dotnet.exe`,
   `OpenGLTest.sln`); it is the user's file.
+- [ ] Stale comments still unchecked: `ChunkManager.cs` prose naming the scheduler's and
+  `PlayerPlacedIndex`'s private fields, `LodManager.cs` (~73, 211-212).
+- [ ] `LodFaceEmitter`'s constructor takes 27 parameters (a grid bundle if it grows); measure the LodGen
+  build cost of the promoted fields with `LodBuildCostProbe`.
 - [ ] Spot-check `InventoryPanelInput.cs` for mojibake from its cp1252 -> UTF-8 re-encode.
-- [ ] Line endings: `ChunkMeshBuilder.cs`, `MeshScratch.cs`, `MeshingTests.cs` (LF-only), `Inventory.cs`
-  (LF-only), the final CRLF of `LeafDecayManager.cs`; verify and normalize in a separate step.
 
 Code:
 - [ ] The play-time content lookups (`RecipeForResult`, `RecipeByName`, `CastRecipeFor`, `IsCastMold`)
   allocate LINQ closures per call; so does `World.RefreshMobs`, and the per-frame sapling lambda
   in `World.Update`.
-- [ ] `HudRenderer` never disposes its five crosshair meshes.
 - [ ] `PunchPose.TorsoRotation` calls `SecondaryMotion.ComputeMods` once per arm solve and
   `GetPartMatrix` recomputes `GetPose` per part (perf candidates).
-- [ ] The `placeTimer` quirk (starts at 0.0, not 0.2; storeless dev-override path only): make the
-  intent explicit.
-- [ ] `Fluids/FluidFlow.cs` declares two types: move `IFluidCellReader` to its own file.
-- [ ] `LodMeshBuilder.FineHeight`/`FineHeightGen` lack an explicit `private`; `LodFaceEmitter`'s
-  constructor takes 27 parameters (a grid bundle if it grows); measure the LodGen build cost of the
-  promoted fields with `LodBuildCostProbe`.
 - [ ] `TerrainNoise` builds every channel twice on the first `WorldSeed.Apply` (static ctor, then
   `Reseed`); `TreeBatches` vs `TreeBatch` are near-namesakes (rename to `TreeShapeCaches`?).
 - [ ] `Camera.IsCreative`/`IsFlying` are `internal set`; `Inventory` exposes six internal accessors:

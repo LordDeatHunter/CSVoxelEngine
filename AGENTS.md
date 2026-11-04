@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project overview
 
-A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, binary greedy chunk meshing with ambient occlusion (plain cubes are culled by bitmask and merged into larger quads wherever the result is pixel-identical; procedural blocks and fluids keep per-quad emitters — see `MESHER_PLAN.md`), frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`SpawnOverrides.SpawnPosition`), or where they left a saved world; worlds are created, listed and opened from a main menu and saved to disk (see "Launch flow" and "Saves").
+A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, binary greedy chunk meshing with ambient occlusion (plain cubes are culled by bitmask and merged into larger quads wherever the result is pixel-identical; procedural blocks and fluids keep per-quad emitters — see "Chunk meshing"), frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`SpawnOverrides.SpawnPosition`), or where they left a saved world; worlds are created, listed and opened from a main menu and saved to disk (see "Launch flow" and "Saves").
 
 The renderer requires an **OpenGL 4.6 core** context: `WindowManager` requests `APIVersion(4, 6)`
 with `ContextProfile.Core`, and every shader under `assets/shaders/` declares `#version 460 core`.
@@ -1674,6 +1674,7 @@ OpenGLTest/
         FluidCells.cs          # the tick's cell access: its own ChunkCellCache plus the LodManager binding and the far-LOD
                                #   hook in Write
         FluidFlow.cs           # the one definition of which way a fluid flows
+        IFluidCellReader.cs    # the cell read seam FluidFlow is generic over (the live world, the mesher's padded snapshot)
         FluidManager.cs        # the fluid tick's composition root and facade: the tick and its slicing, SetCellImmediate,
                                #   TickCell; the schedule, wake and Update entry points
         FluidMud.cs            # dirt beside settled water turning to mud

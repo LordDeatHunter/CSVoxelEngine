@@ -68,6 +68,10 @@ public static class Primitives
     /// A cube centered on the origin with a per-face texture region, indexed in
     /// <see cref="Chunk.CubeFaces"/> order: -Z, +Z, -X, +X, +Y, -Y.
     /// </summary>
+    /// <param name="gl">The GL context the mesh is created on.</param>
+    /// <param name="size">Edge length of the cube.</param>
+    /// <param name="color">Vertex color; white when null.</param>
+    /// <param name="faceUvs">Per-face texture region, in <see cref="Chunk.CubeFaces"/> order.</param>
     /// <param name="faceShades">
     /// Optional per-face brightness multiplier, so a cube reads as lit without normals in the
     /// vertex format. Defaults to flat, unshaded faces.

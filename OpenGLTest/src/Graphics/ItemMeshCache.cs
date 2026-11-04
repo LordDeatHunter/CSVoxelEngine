@@ -19,6 +19,7 @@ public class ItemMeshCache : IDisposable
     private readonly GL _gl;
     private readonly Dictionary<byte, (Mesh Mesh, Dictionary<int, uint> Textures)> _entries = new();
 
+    /// <param name="gl">The GL context the meshes and textures are created on.</param>
     /// <param name="srgb">Upload every texture this cache builds as <c>SRGB8_ALPHA8</c>, for
     /// item meshes drawn in the lit (tonemapped) world; the UI reads <see cref="IsSrgb"/> to
     /// re-encode them for the gamma framebuffer.</param>

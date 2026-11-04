@@ -154,7 +154,7 @@ public sealed class ChunkRekeyReplayProbe
     /// <summary>
     /// THE AUTHORITY FOLD. A real <see cref="ChunkManager"/>, a real chunk grid spanning both signs
     /// and both sides of the unload radius, scripted placements, a real synchronous mesh build that
-    /// drives <c>Chunk.TryResolveNeighbors</c>' 26 chunk probes, and two real unload passes driven
+    /// drives <c>ChunkMeshBuilder.TryResolveNeighbors</c>' 26 chunk probes, and two real unload passes driven
     /// by <c>TestTeleport</c> + <see cref="ChunkManager.Update(Camera)"/> - folded into one FNV-1a 64 hash
     /// after every phase.
     ///
@@ -335,7 +335,7 @@ public sealed class ChunkRekeyReplayProbe
         hash = FoldState(hash, 3);
 
         // PHASE 4 - a real synchronous mesh build on the test thread, the pattern MeshingTests uses.
-        // This is what exercises Chunk.TryResolveNeighbors' 26 chunk probes deterministically: the
+        // This is what exercises ChunkMeshBuilder.TryResolveNeighbors' 26 chunk probes deterministically: the
         // center chunk has all six face neighbors registered and must build, while (17,0,0) is
         // missing its (18,0,0) neighbor and must abandon the build and return null.
         var stone = ContentRegistry.RequireBlock("stone").Id;

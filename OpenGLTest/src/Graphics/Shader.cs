@@ -13,6 +13,9 @@ public class Shader : IDisposable
 
     private bool _disposed;
 
+    /// <param name="gl">The GL context the program is created on.</param>
+    /// <param name="vertexSource">GLSL source of the vertex stage.</param>
+    /// <param name="fragmentSource">GLSL source of the fragment stage.</param>
     /// <param name="defines">
     /// Optional preprocessor prefix injected right after the <c>#version</c> line of both
     /// sources, so one GLSL file can be compiled as two program variants out of the same text:

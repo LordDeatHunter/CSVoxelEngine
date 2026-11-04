@@ -99,7 +99,7 @@ internal sealed class PlayerPhysics
     /// <summary>Feet-relative eye height of the body being simulated.</summary>
     public const float EyeHeight = Camera.EyeHeight;
 
-    /// <summary>Clears the per-frame velocity and trauma state (a teleport is not a fall).</summary>
+    /// <summary>Clears the vertical, horizontal and knockback velocity (a teleport is not a fall).</summary>
     public void ResetMotion()
     {
         _verticalVelocity = 0f;

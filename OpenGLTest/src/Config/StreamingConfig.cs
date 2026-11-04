@@ -54,7 +54,7 @@ public static class StreamingConfig
     // dropping chunk generation's hot working set along with its own one-shot columns (that set is
     // a radius-16 disc: ~800 columns, 933 once each build's 3x3 heightmap neighborhood is counted).
     // Measured on the replayed key sequences: chunk-gen's own misses during the mixed burst fell
-    // 1219 -> 733. See PERF_TODO's "Measurement: D2".
+    // 1219 -> 733.
     //
     // Everything the pool needed is still here and still correct at N = 1 -- the TryAdd-gated
     // _building claim with both rollbacks, MaxLodBuildsInFlight, the Idle/Throttled split and the

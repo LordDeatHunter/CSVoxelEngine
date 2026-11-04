@@ -93,7 +93,7 @@ public static class TerrainGenerator
     /// <summary>Biome at a world column; a pure function of (x, z) like the rest of the 2D half.</summary>
     public static Biome BiomeAt(float x, float z) => BiomeWeights(x, z, out _, out _);
 
-    /// <summary>The ocean and desert weights and the biome they classify to (<see cref="BiomeClassifier.BiomeWeights"/>).</summary>
+    /// <summary>The ocean and desert weights and the biome they classify to (<see cref="BiomeClassifier.BiomeWeights(float, float, out float, out float)"/>).</summary>
     public static Biome BiomeWeights(float x, float z, out float oceanWeight, out float desertWeight) =>
         BiomeClassifier.BiomeWeights(x, z, out oceanWeight, out desertWeight);
 

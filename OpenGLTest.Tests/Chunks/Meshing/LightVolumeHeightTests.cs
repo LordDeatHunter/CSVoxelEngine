@@ -8,7 +8,7 @@ using Xunit;
 namespace VoxelEngine.Tests.Chunks.Meshing;
 
 /// <summary>
-/// ComputeLight is private and has no direct coverage: the mesh-level sun bytes asserted by
+/// ChunkLighting.ComputeLight has no direct coverage: the mesh-level sun bytes asserted by
 /// MeshingTests/GreedyMeshingTests only prove the greedy and per-voxel paths agree with each
 /// other, not that the lighting input is right. These pin the one input PERF_TODO C2 changed -
 /// the per-column terrain height the sun seeds compare against. The nine precomputed chunk

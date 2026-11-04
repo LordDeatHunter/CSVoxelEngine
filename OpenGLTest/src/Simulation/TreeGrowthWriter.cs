@@ -97,6 +97,16 @@ public sealed class TreeGrowthWriter
     /// cannot take the root). Any read in that window or the rebuild that hits an unloaded chunk
     /// refuses the call (<see cref="TreeGrowthStatus.NotGrowable"/>) before anything is written.
     /// </summary>
+    /// <param name="chunks">The loaded world the tree is read from and written to.</param>
+    /// <param name="species">The species to grow.</param>
+    /// <param name="x">World X of the column.</param>
+    /// <param name="yHint">World Y the root scan is centered on.</param>
+    /// <param name="z">World Z of the column.</param>
+    /// <param name="steps">Pulses to grow, clamped to the per-call maximum.</param>
+    /// <param name="worldSeed">The world seed the tree's growth stream is derived from.</param>
+    /// <param name="fluids">Scheduled around every written cell; null skips it.</param>
+    /// <param name="leafDecay">Scheduled over the written box; null skips it.</param>
+    /// <param name="lod">Told about every changed column; null skips it.</param>
     /// <param name="reserved">Cells growth must not fill (World passes the falling blocks' cells).</param>
     public TreeGrowthResult Grow(ChunkManager chunks, TreeSpecies species, int x, int yHint, int z, int steps,
         int worldSeed, FluidManager? fluids = null, LeafDecayManager? leafDecay = null, LodManager? lod = null,

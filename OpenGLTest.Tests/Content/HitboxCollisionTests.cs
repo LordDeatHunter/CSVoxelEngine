@@ -132,7 +132,7 @@ public sealed class HitboxCollisionTests
         var stone = ContentRegistry.RequireBlock("stone").Id;
         chunk.SetBlockRaw(9, 1, 8, stone, 0);
 
-        // The predicate Camera.IsColliding consults for a flagged id: free above the slab top,
+        // The predicate BodyCollision.BodyCollides consults for a flagged id: free above the slab top,
         // blocked once the body dips into it, and a plain stone cell still blocks the high box.
         Assert.False(TreeWoodShape.OverlapsShape(mold, manager, 8, 1, 8,
             new Vector3(8.2f, 1.3f, 8.2f), new Vector3(8.8f, 1.9f, 8.8f)));

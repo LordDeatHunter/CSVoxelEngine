@@ -221,7 +221,7 @@ internal sealed class LodMeshBuilder
     // The seam path's per-sample read of the EDITED height: the override replaces the generated
     // height, then the cap lowers it, exactly the order the separable fill applies. block is
     // the override's block while that override is the column's drawn height, else 0.
-    int FineHeight(int fineX, int fineZ, out byte block)
+    private int FineHeight(int fineX, int fineZ, out byte block)
     {
         var cx = (fineX >> Chunk.SizeShift) - _baseChunkX;
         var cz = (fineZ >> Chunk.SizeShift) - _baseChunkZ;
@@ -245,7 +245,7 @@ internal sealed class LodMeshBuilder
 
     // The seam path's GENERATED height, ignoring every edit: what the water, beach and rock
     // decisions read, so a player edit never turns a sea cell into land or the reverse.
-    int FineHeightGen(int fineX, int fineZ)
+    private int FineHeightGen(int fineX, int fineZ)
     {
         var cx = (fineX >> Chunk.SizeShift) - _baseChunkX;
         var cz = (fineZ >> Chunk.SizeShift) - _baseChunkZ;

@@ -59,6 +59,7 @@ public sealed class ImportedMapSource : IWorldSource
     /// column file cannot be read: a map is refused whole rather than hosted with holes. A missing
     /// chunks folder means every supplied chunk is air.
     /// </summary>
+    /// <param name="mapDirectory">The map folder holding <c>columns/</c> and <c>chunks/</c>.</param>
     /// <param name="fallback">The source of every column the map does not supply; worldgen
     /// (<see cref="GeneratedWorldSource.Instance"/>) when null.</param>
     public ImportedMapSource(string mapDirectory, IWorldSource? fallback = null)

@@ -7,11 +7,7 @@ that history. New items are **F#** (frame time) and **G#** (worldgen, meshing, s
 
 Every number names its machine and date. A win not yet measured is labeled *estimated*.
 
-Dangling references (fix in a follow-up, not here): `MESHER_PLAN.md` was deleted, but the AGENTS.md
-project overview (lines 7 and 15) and `.claude/skills/perf-capture/SKILL.md` (line 8) still cite it,
-and the skill asks for a "measurements table" and a box to tick that this file no longer has.
-`StreamingConfig.cs`'s `MaxConcurrentLodGenerations` comment points at a removed "Measurement: D2".
-The old Phase 5 compute cull now lives here as F9.
+`MESHER_PLAN.md` was deleted; its old Phase 5 compute cull now lives here as F9.
 
 ## How to measure
 

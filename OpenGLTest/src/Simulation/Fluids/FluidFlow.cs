@@ -4,16 +4,6 @@ using VoxelEngine.Chunks;
 namespace VoxelEngine.Simulation.Fluids;
 
 /// <summary>
-/// Reads one cell's block id and state byte for <see cref="FluidFlow"/>. Returns false when
-/// the cell is not available (an unloaded chunk), which the flow treats like a dam. Implemented
-/// by small structs so the generic flow code is specialized per reader and never boxes.
-/// </summary>
-internal interface IFluidCellReader
-{
-    bool TryGetCell(int x, int y, int z, out byte id, out byte state);
-}
-
-/// <summary>
 /// The one definition of which way a fluid flows, shared by the live world
 /// (<see cref="ChunkManager.GetFluidFlowGlobal"/>, which pushes bodies and drops) and the chunk
 /// mesher (which bakes it into fluid vertices from its padded snapshot). Pure: everything it

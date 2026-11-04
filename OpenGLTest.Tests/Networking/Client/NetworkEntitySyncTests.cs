@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Entities;
-using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Networking;
 using VoxelEngine.WorldGen;

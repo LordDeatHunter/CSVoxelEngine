@@ -347,6 +347,7 @@ internal sealed class HudRenderer : IDisposable
     }
 
     /// <summary>Draws the hotbar centered along the bottom edge, highlighting the selected slot.</summary>
+    /// <param name="inventory">Supplies the hotbar slots and the selected one.</param>
     /// <param name="headingDegrees">Compass heading (0 = north), picking heading-driven sheet frames.</param>
     /// <param name="timeSeconds">Scene clock, picking loop-driven sheet frames.</param>
     /// <param name="pops">Per-slot pickup pops scaling each icon and its count; null draws every slot at rest.</param>
@@ -432,5 +433,8 @@ internal sealed class HudRenderer : IDisposable
         _heartEmptyMesh.Dispose();
         _heartFullMesh.Dispose();
         _heartHalfMesh.Dispose();
+        _crosshairCenterMesh.Dispose();
+        foreach (var arm in _crosshairArmMeshes)
+            arm.Dispose();
     }
 }

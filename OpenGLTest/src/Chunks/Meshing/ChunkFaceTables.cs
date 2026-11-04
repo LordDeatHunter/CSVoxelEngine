@@ -106,6 +106,7 @@ internal static class ChunkFaceTables
     /// mirror <see cref="ModelBaker"/> applies, so baked cubes, procedural boxes and merged quads
     /// all sample identically and bark continues across log/branch joints at one scale.
     /// </summary>
+    /// <param name="face">Engine face index (<see cref="Chunk.CubeFaces"/> order).</param>
     /// <param name="local">Point on the quad, relative to the quad's minimum corner.</param>
     /// <param name="extent">Size of the quad along each axis (1 on its plane axis).</param>
     internal static Vector2 TiledUv(int face, Vector3 local, Vector3 extent)

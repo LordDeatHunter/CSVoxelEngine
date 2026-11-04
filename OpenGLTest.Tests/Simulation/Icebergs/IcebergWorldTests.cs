@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
-using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;

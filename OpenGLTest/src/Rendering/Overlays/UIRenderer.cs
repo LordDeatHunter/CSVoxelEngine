@@ -169,6 +169,10 @@ public class UIRenderer : IDisposable
     internal TopStripRenderer TopStrip { get; }
     internal HudRenderer Hud { get; }
 
+    /// <param name="gl">The GL context every UI resource is created on.</param>
+    /// <param name="atlasTexture">The block atlas array texture the block icons sample.</param>
+    /// <param name="blockCubes">Cached cube meshes the block icons draw.</param>
+    /// <param name="itemMeshes">Cached item meshes the item icons draw.</param>
     /// <param name="atlasIsSrgb">Whether <paramref name="atlasTexture"/> was uploaded as
     /// <c>SRGB8_ALPHA8</c>: its icons are then re-encoded in the shader so they write the same
     /// bytes to the gamma framebuffer as a linear upload would.</param>
@@ -377,6 +381,8 @@ public class UIRenderer : IDisposable
     /// <summary>
     /// A block drawn as a rotated 3D cube. Air (id 0) and unknown ids draw nothing.
     /// </summary>
+    /// <param name="center">Center of the icon, in canvas pixels.</param>
+    /// <param name="blockId">The block to draw.</param>
     /// <param name="size">
     /// Width and height of the box the icon fits in, in pixels — not the cube's edge length,
     /// which is derived from the viewing angle.

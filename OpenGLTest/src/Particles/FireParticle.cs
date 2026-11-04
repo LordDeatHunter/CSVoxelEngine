@@ -54,6 +54,9 @@ public sealed class FireParticle
     private readonly float _swayPhase;
     private float _swayAmp;
 
+    /// <param name="position">Spawn point, in world blocks.</param>
+    /// <param name="kind">Ember, smoke, steam or spark.</param>
+    /// <param name="random">Randomness source; <see cref="Random.Shared"/> when null.</param>
     /// <param name="scale">Shrinks (or grows) the whole particle: its size, growth, lifetime, speed and
     /// sway all scale by it, so a torch's flame (a small scale) is a short, tight flicker over its head
     /// and its smoke a thin wisp, where a campfire's (1) fill a firepit.</param>

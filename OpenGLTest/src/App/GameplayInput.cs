@@ -37,8 +37,8 @@ internal sealed class GameplayInput
     private bool escWasPressed;
 
     // TODO: move this to player class
+    private const double MAX_PLACE_TIMER = 0.2;
     private static double placeTimer = MAX_PLACE_TIMER;
-    private static readonly double MAX_PLACE_TIMER = 0.2;
 
     internal GameplayInput(InputManager inputManager, RenderManager renderManager, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, InventoryPanelInput panelInput, MenuInput menuInput, ClientSession session, DevDiagnostics diagnostics)
     {
