@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Numerics;
 using System.Threading;
+using System.Threading.Tasks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Player;
@@ -15,6 +16,70 @@ namespace VoxelEngine.Tests.Networking;
 
 public sealed class NetFramingTests
 {
+    [Fact]
+    public async Task FailedPartialSendFaultsOnceWithinBoundAndNeverWritesAgain()
+    {
+        using var stream = new HeaderThenFailStream();
+        using var client = new NetworkClient(new ServerAddress("127.0.0.1", 1), "Tester", 1, stream);
+        var payload = new byte[1024];
+        var watch = Stopwatch.StartNew();
+
+        var send = Task.Run(() => client.Send(payload));
+        await send.WaitAsync(TimeSpan.FromSeconds(2)); // watchdog ensures a broken send cannot hang the suite
+        var transitionLatency = watch.Elapsed;
+
+        Assert.Equal(NetworkStatus.Failed, client.Status);
+        Assert.Contains("sending", client.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.InRange(transitionLatency, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+        client.Send(payload);
+        Assert.Equal(2, stream.WriteCalls); // header succeeded; payload failed; later send is inert
+    }
+
+    [Fact]
+    public void SuccessfulSendKeepsConnectionHandshaken()
+    {
+        using var stream = new MemoryStream();
+        using var client = new NetworkClient(new ServerAddress("127.0.0.1", 1), "Tester", 1, stream);
+
+        client.Send(new byte[] { 7, 8, 9 });
+
+        Assert.Equal(NetworkStatus.Handshaken, client.Status);
+        Assert.Null(client.Error);
+        Assert.Equal(new byte[] { 3, 0, 0, 0, 7, 8, 9 }, stream.ToArray());
+    }
+
+    private sealed class HeaderThenFailStream : Stream
+    {
+        public int WriteCalls { get; private set; }
+        public override bool CanRead => false;
+        public override bool CanSeek => false;
+        public override bool CanWrite => true;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count)
+        {
+            WriteCalls++;
+            if (WriteCalls == 2)
+            {
+                Thread.Sleep(40); // deterministic bounded failure latency; watchdog below prevents hangs
+                throw new IOException("simulated payload write timeout");
+            }
+        }
+        public override void Write(ReadOnlySpan<byte> buffer)
+        {
+            WriteCalls++;
+            if (WriteCalls == 2)
+            {
+                Thread.Sleep(40);
+                throw new IOException("simulated payload write timeout");
+            }
+        }
+    }
+
     [Fact]
     public void FramesRoundTripInOrderAndEndCleanly()
     {
