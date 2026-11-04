@@ -48,7 +48,7 @@ public sealed class ClientColumnInvalidationAllocationProbe
             var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
             stopwatch.Restart();
             const int samples = 200;
-            for (var i = 0; i < samples; i++) streamer.ApplyColumn(0, 0, i % 2 == 0 ? payload : changedPayload);
+            for (var i = 0; i < samples; i++) streamer.ApplyColumn(0, 0, i % 2 == 0 ? changedPayload : payload);
             stopwatch.Stop();
             var totalBytes = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
 
