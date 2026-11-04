@@ -34,6 +34,7 @@ uniform float uStarRadiusPx;
 uniform float uStarBrightRadius;
 uniform float uStarHorizonFade;
 uniform float uStarTime;         // seconds, wrapped on the CPU to keep float precision
+uniform vec2 uStarTurn;          // cos and sin of the sky's orbit angle: star space is the world turned by -angle about +Z
 uniform float uStarTwinkleDepth;
 uniform vec2 uStarTwinkleRate;   // slowest and fastest twinkle, cycles per second
 
@@ -295,7 +296,9 @@ void main()
                    * (1.0 - smoothstep(uStarSunMask.x, uStarSunMask.y, dot(dir, uSunDir))) // sun disc
                    * (1.0 - uMoonVisibility * smoothstep(uMoonMask.x, uMoonMask.y, dot(dir, -uSunDir))); // moon disc
         if (fade > 0.0) {
-            vec3 star = Stars(dir, px);
+            // StarField.ToStarSpace: the stars turn with the sun about +Z
+            vec3 starDir = vec3(uStarTurn.x * dir.x + uStarTurn.y * dir.y, -uStarTurn.y * dir.x + uStarTurn.x * dir.y, dir.z);
+            vec3 star = Stars(starDir, px);
             // Most pixels hold no star, so the cloud test (up to three map reads) runs only
             // where one actually shines
             if (dot(star, star) > 1e-10)

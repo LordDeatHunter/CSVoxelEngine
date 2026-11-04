@@ -177,6 +177,32 @@ public sealed class StarFieldTests
         return (float)(Triangle(a, b, c) + Triangle(a, c, d));
     }
 
+    [Fact]
+    public void TheSunKeepsItsPlaceAmongTheStarsAtEveryHour()
+    {
+        var reference = StarField.ToStarSpace(DayCycle.SunDirection(0), DayCycle.OrbitAngle(0));
+        for (var time = 0.0; time < 3 * SkyConfig.DayLengthSeconds; time += 37.0)
+        {
+            var sun = StarField.ToStarSpace(DayCycle.SunDirection(time), DayCycle.OrbitAngle(time));
+            Assert.True(Vector3.Distance(reference, sun) < 1e-3f, $"the sun drifted among the stars at t={time}");
+        }
+    }
+
+    [Fact]
+    public void TheStarsTurnWithTheSkyAndOnlyTurn()
+    {
+        var d = Vector3.Normalize(new Vector3(0.3f, 0.8f, -0.5f));
+        var later = StarField.ToStarSpace(d, DayCycle.OrbitAngle(300));
+        Assert.Equal(1f, later.Length(), 1e-4f);
+        Assert.Equal(d.Z, later.Z, 1e-5f);
+        Assert.True(Vector3.Distance(StarField.ToStarSpace(d, DayCycle.OrbitAngle(0)), later) > 0.1f);
+
+        // A whole day on, the sky is back where it was
+        var day = SkyConfig.DayLengthSeconds;
+        Assert.True(Vector3.Distance(StarField.ToStarSpace(d, DayCycle.OrbitAngle(250)),
+            StarField.ToStarSpace(d, DayCycle.OrbitAngle(250 + day))) < 1e-3f);
+    }
+
     private static (double X, double Y, double Z) Corner(int x, int y, int n)
     {
         var p = StarField.FaceDirection(4, StarField.CellPointUv(x, y, n));

@@ -348,8 +348,10 @@ space too (see the cloud layer above); particle and healthbar fogs are still lin
 `SkySample`, so the fog and `SkySample`'s three twins never see it. Stars live on a grid over the
 sphere of directions (cube face, equi-angular warp, `StarCellsPerFace`² cells, each cell's chance
 scaled by its solid angle), one star per cell kept `StarField.CellMargin` clear of the edges, drawn
-as a pixel-sized gaussian (`fwidth` of the view ray), so they never swim as the view turns and they
-stay put in the sky. Each
+as a pixel-sized gaussian (`fwidth` of the view ray), so they never swim as the view turns. They turn with the sky
+instead: the grid is read in star space, the world direction turned by -`DayCycle.OrbitAngle` about +Z (`uStarTurn`,
+twin `StarField.ToStarSpace`), the sun's own orbit run backward, so the sun and the moon opposite it keep their
+place among the stars while the whole field rises and sets once a day. Each
 star twinkles smoothly on its own rate and phase hashed from its cell (`StarField.Twinkle`, the
 `uStarTime` clock wrapped hourly). Visibility fades over dusk
 and dawn by the sun's elevation (`StarField.Visibility`), out into the horizon haze and around the

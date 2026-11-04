@@ -312,9 +312,9 @@ internal sealed class FrameLighting
             Glow = ColorSpace.SrgbToLinear(_sky.Glow),
         };
         // The stars twinkle on the lighting clock, wrapped hourly so the float keeps its
-        // precision; their cloud cover follows the drawn clouds' drift
+        // precision, and turn about +Z with the sun; their cloud cover follows the drawn clouds' drift
         _skyFrame = new SkyDomeFrame(StarField.Visibility(elevation), (float)(_timeD % 3600.0), _cameraPos,
-            CloudCopies.Drift(_timeD, SkyConfig.CloudFieldSize), Vector3.Zero);
+            CloudCopies.Drift(_timeD, SkyConfig.CloudFieldSize), Vector3.Zero, StarAngle: DayCycle.OrbitAngle(_timeD));
         // The flat sky/fog color is the dome's no-glow horizon sample
         _skyColor = _sky.HazedHorizon;
         // Fog melts the far terrain (and the LOD edge) into the sky, day and night
