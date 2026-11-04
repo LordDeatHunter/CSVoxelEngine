@@ -769,7 +769,7 @@ cells agree at every shared corner. `GenerateMeshData(manager, greedy: false)` i
 `GreedyMeshingTests` rasterizes both outputs into unit cell faces and requires them to be equal
 (`SmoothLightTests` locks down the light rules themselves). Because a merge never crosses a
 lighting or AO difference, this world's rough noise terrain and leaf canopies only give ~15-20 %
-fewer vertices (`PERF_TODO.md` item 11), not the 5-10× of flat worlds; smooth light left that
+fewer vertices (`plans/PERF.md` item 11), not the 5-10× of flat worlds; smooth light left that
 almost untouched (+0.2 % vertices over eight sampled surface and cave chunks, mesh-build time
 within noise), since generated terrain is mostly uniformly lit and only lamp and shadow
 gradients split merges.
@@ -2953,7 +2953,7 @@ pure function of the seed: only **deltas** and the seed are written.
   discarded only after `EntityRestoreTimeoutSeconds` of play. A saved iceberg (`Icebergs` in
   `entities.json`) waits until every chunk under its placed bounds is loaded, and a sinking berg
   is not saved.
-- **Not persisted** (tracked as `M-12` in TODO.md): the station block entities (campfire, quern,
+- **Not persisted** (tracked as `M-12` in `plans/TODO.md`): the station block entities (campfire, quern,
   kiln, casting — a reloaded kiln is plain blocks plus its multiblock state bytes until a
   right-click re-registers it through `KilnManager.Ensure`, with no fuel or crucible), primed
   TNT, falling blocks, projectiles in flight, toppling trees and the sapling clock (a half-grown
@@ -4655,6 +4655,9 @@ touch a file that violates one of them, fixing it is in scope.
   for shader/renderer pairs: one definition, two consumers.
 - **Early returns over nesting.** Guard clauses at the top of a method, `continue`/`break` over
   a wrapped loop body. A loop body that still nests past ~3 levels gets an extracted method.
+- **Plans live in `plans/`.** The roadmap, perf, biome, cleanup and tree plans share one layout
+  (Status / In progress / Open / Reference, `[ ]` checkboxes, finished entries deleted); the guide is
+  `plans/README.md` and the procedure is the `plan-docs` skill.
 - **Keep this file honest.** When a file moves or splits, update the Layout section and any
   path references in this document; stale docs send the next agent to a file that no longer
   exists.

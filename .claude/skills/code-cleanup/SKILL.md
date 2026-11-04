@@ -116,7 +116,7 @@ tool and `scriptPath` set to that file (a workflow launched by `name` is the cop
 session started, so an edit to the script would be ignored). One run at a time: every task shares
 the one working tree.
 
-- **No args**: the next task in `CLEANUP_PLAN.md` (the in-progress one first, then "Still to do"
+- **No args**: the next task in `plans/CLEANUP.md` (the in-progress one first, then "Open"
   in order). **A string** (or `{task}`): that task. Other options: `tasks: n` runs n plan tasks
   back to back, stopping at the first one not accepted; `dryRun: true` stops after the first plan;
   `commit: false` leaves the accepted work uncommitted; `maxFixRounds` (default 1);
@@ -129,7 +129,7 @@ the one working tree.
   advance) and for any step Sonnet leaves blocked, partial or red.
 - **The gate** is baked into the script: the cleanup rules above, the SDK 10 toolchain, no new
   tests or scenario runs, a `--no-incremental` zero-warning Release build and the existing suite
-  (the baseline and the flaky list are read from `CLEANUP_PLAN.md`, so keep them current there).
+  (the baseline and the flaky list are read from `plans/CLEANUP.md`, so keep them current there).
 - **The move-diff residue check** is `move_residue.py` beside this file:
   `python -I .claude/skills/code-cleanup/move_residue.py` (working tree vs HEAD, untracked files
   included) or `--range A..B`. It pairs every removed line with an added one after normalizing
@@ -138,7 +138,7 @@ the one working tree.
   and final-newline state of every changed file. A split that moved verbatim leaves a residue of
   wiring and doc rewording; the auditor lists it and the reviewer reads only that.
 - **Afterwards** the workflow stages the task's paths explicitly (never the junk folders), commits
-  with a one-line subject plus the trailer, records the commit in `CLEANUP_PLAN.md`, and ends the
+  with a one-line subject plus the trailer, records the commit in `plans/CLEANUP.md`, and ends the
   run with one "Update cleanup plan" commit. A task that is not accepted is left uncommitted in
   the tree with its gaps written into the plan's "In progress", and the next run refuses to start
   until the tree is clean again.

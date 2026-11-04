@@ -1,25 +1,42 @@
-# Biome generation: current state (handoff map)
+# Biome generation: handoff map and remaining work
 
-Audience: another model that will modify biome generation. This documents what exists **today**, where
-each rule lives, every tuning constant, what depends on it, and the traps. Paths are relative to the
-repo root; code is under `OpenGLTest/src/`. Read `AGENTS.md` ("Biomes", "Code organization") for the
-repo's standing rules (American English, no dead code, no pointless tests, JSON-for-content, build
-Release with the .NET 10 SDK).
+> Guide: plans/README.md
 
-State: **phases 1 to 4** of the biome plan are in (the semi-dry ramp, Steppe and Savanna; a
-domain-warped climate sample; a permafrost tundra with dead shrubs; a ragged pack-ice edge on cold
-water), plus drifting iceberg entities on the open water at the ice edge (§11), plus **phase A of
-the terrain-shape plan**: a continent-scale relief layer (highlands and linear mountain ranges, `WorldGen/TerrainRelief.cs`,
-§6), and **phase B**: hashed massifs and lone peaks on a shared hashed-site helper
-(`WorldGen/TerrainPeaks.cs`, `WorldGen/TerrainSites.cs`, §6), and **phase C**: ocean-gated islands
-and hashed archipelagos folded into the ocean weight (`WorldGen/TerrainIslands.cs`, §4, §6), and
-**phase D**: a second, rare tier of lobed great lakes with their own cached verdict
-(`WorldGen/GreatLakes.cs`, §6). The rest (phase E, optional polish, §12) is planned and not
-implemented.
+## Status
 
----------------------------------------------------------------------------------------------------
+Audience: another model that will modify biome generation. The Reference section documents what
+exists **today**: where each rule lives, every tuning constant, what depends on it, and the traps.
+Paths are relative to the repo root; code is under `OpenGLTest/src/`. Read `AGENTS.md` ("Biomes",
+"Code organization") for the standing rules, and the `biome-worldgen` skill
+(`.claude/skills/biome-worldgen/SKILL.md`) for the principles, the new-biome checklist and the
+seed-offset and tuning traps before any change here.
 
-## 1. The model in one paragraph
+Done: the semi-dry ramp, Steppe and Savanna; a domain-warped climate sample; a permafrost tundra with
+dead shrubs; a ragged pack-ice edge; drifting icebergs (§11); the terrain-shape phases A to D
+(relief highlands and ranges, massifs and lone peaks, islands and archipelagos, great lakes) and
+phase E's great-lake river ramps and outflows. Each is documented where it lives: §4 (the island
+fold), §6 (each mechanism), §7 (constants), §9 (invariants 11-17), §10 (tests), §11 (limits). Their
+perf numbers are in `PERF.md`, their shots in `visual-examples/terrain-shape.json`.
+Last updated 2026-11-05.
+
+## In progress
+
+Nothing.
+
+## Open
+
+Phase E polish, none started, in rough priority order. Each keeps the skill's principles and goes
+through plan-and-implement as its own phase; knob names are proposals.
+
+- [ ] **Desert mesa or butte.** A flat-topped lone peak on the dune profile (clamp the profile at a hashed cap height). The site helper exists, but a peak must not be summed into sand: massifs and lone peaks reject any ocean or desert weight today (§11).
+- [ ] **Plateaus and terraces.** Quantize a low-frequency height term into steps with `smoothstep` risers under a rarity mask, so an area reads as tablelands (badlands in the desert). Lowest priority.
+- [ ] **Scree or gravel band** between the rock line and the snow line on a massif.
+- [ ] **Archipelago shelf.** A shallower ocean ramp under a chain of islands so the water between them is light and wadeable (§11 notes it is absent).
+- [ ] **Coast warp.** A small-amplitude domain warp (about 1/200, a few tens of blocks) of the continent sample alone, for bays, headlands and fjord-like inlets. It must stay out of `SampleClimate` (invariant 8) and re-lays every coast, so it is gated on actually wanting it. Reefs, shipwrecks and deep-sea points of interest stay `P-56` content.
+
+## Reference
+
+### 1. The model in one paragraph
 
 Biome is a **pure function of world (x, z) and the seed**. Three low-frequency OpenSimplex2 noises
 (continentalness, temperature, humidity) are each pushed through smoothstep "ramps" into 0..1
@@ -42,7 +59,7 @@ climate borders bend and wander instead of tracing the smooth contours of the ra
 
 ---------------------------------------------------------------------------------------------------
 
-## 2. Files
+### 2. Files
 
 | File | Role |
 |---|---|
@@ -71,7 +88,7 @@ climate borders bend and wander instead of tracing the smooth contours of the ra
 
 ---------------------------------------------------------------------------------------------------
 
-## 3. The noises (`TerrainNoise.Reseed`)
+### 3. The noises (`TerrainNoise.Reseed`)
 
 All built by `MakeNoise(seedOffset, frequency, octaves)`: OpenSimplex2, seed = `WorldSeed.Value + offset`,
 FBm when `octaves > 1`. Output is roughly [-1, 1] (single octave spans the full range; FBm is scaled
@@ -125,7 +142,7 @@ inside the desert/snow separation (§9).
 
 ---------------------------------------------------------------------------------------------------
 
-## 4. Weight pipeline (`BiomeClassifier.BiomeWeights`)
+### 4. Weight pipeline (`BiomeClassifier.BiomeWeights`)
 
 Notation: `smooth(a, b, v)` = smoothstep 0 at `v<=a`, 1 at `v>=b`.
 
@@ -212,7 +229,7 @@ Key structural facts:
   **forest height profile**; only Desert (dunes) and Ocean have their own profiles, and the arid weight
   flattens the forest profile's hills on dry and semi-dry land (§6).
 
-### Dither (`DitherBiome`)
+#### Dither (`DitherBiome`)
 
 Only around the desert line, and only inside `|desertWeight - 0.5| < BiomeBorderDither (0.16)`. A
 coherent noise (`BiomeDitherNoise`, 28-block wavelength, flips where it is > 0) flips whole patches,
@@ -237,7 +254,7 @@ label rule, never a Forest flip).
 
 ---------------------------------------------------------------------------------------------------
 
-## 5. Climate axes for color (`TerrainGenerator.Climate`)
+### 5. Climate axes for color (`TerrainGenerator.Climate`)
 
 A second, continuous read of the same climate sample (`SampleClimate`, warped exactly as the biome's,
 so colors and biomes agree), used **only** for tint/grade/aurora, never for placement:
@@ -275,9 +292,9 @@ wetness01 = WetnessOf(h) = 0.5 * (1 - DryOf(h)) + 0.5 * (1 - SemiDryOf(h))
 
 ---------------------------------------------------------------------------------------------------
 
-## 6. What each biome changes
+### 6. What each biome changes
 
-### Terrain height (`TerrainGenerator.LandHeight`)
+#### Terrain height (`TerrainGenerator.LandHeight`)
 1. Forest profile (all land): `ForestBaseHeight 12 + swell (±6, 1/1400, 2 oct) + lift + hills
    (HillAmplitude 32 * hillMask * hillScale) + valley rough (±2.5) + MountainHeight(x, z, highland)`
    (`reliefForest`), then the hashed peaks: `forestHeight = WithLonePeak(WithMassif(reliefForest))`, where
@@ -482,7 +499,7 @@ rim-fed lakes kept ramped for theirs, (4, 3) is river-fed with one), so no lake 
 back to `SeaLevel`; four of the seven are cold (Taiga or Frozen) and freeze into the pack ice like any
 water, ramp rivers included. Over ±23000 there are 14 accepted sites, 13 of them ramped.
 
-### Surface/soil blocks (`ColumnCache.GenerateColumn`)
+#### Surface/soil blocks (`ColumnCache.GenerateColumn`)
 | Biome | Top | Soil | Notes |
 |---|---|---|---|
 | Forest, Taiga, Steppe, Savanna (default case) | grass (dirt if wet column) | dirt `DirtDepth` | sand/gravel on beach height **only** where `SurfaceWaterWeight > 0` (`BiomeTraits.RimsWaterWithSand`) |
@@ -495,7 +512,7 @@ biome. Steppe and Savanna differ from Forest only in tint, trees and flora. `per
 block (`assets/data/blocks/permafrost.json`, `hit_rock`, hand-diggable, drops itself) whose tile comes
 from `tools/generate-permafrost-texture.py`.
 
-### Water (`WaterBodies`)
+#### Water (`WaterBodies`)
 * Ocean: level = `SeaLevel`. Lakes/rivers: every land biome but the desert (`CanHoldSurfaceWater`:
   Forest, Taiga, Frozen, Steppe, Savanna). Desert dry.
 * `SurfaceWaterGate(desertWeight)` fades lakes/rivers out over `desertWeight 0.3..0.5`, so ponds close on
@@ -512,7 +529,7 @@ from `tools/generate-permafrost-texture.py`.
   steps down from the lake's surface (`GreatLakes.RiverLevelAt`); an outflow channel runs down the
   same ramp. A river-fed lake whose ramp cannot be kept rests at `SeaLevel`.
 
-### Snow/ice (`SnowGenerator`, reads `ColdWeightAt`, **not** the biome)
+#### Snow/ice (`SnowGenerator`, reads `ColdWeightAt`, **not** the biome)
 * `SnowColdThreshold 0.55`: snow layer placed above this cold weight (depth grows with cold, noise drift,
   max 8 layers).
 * **Pack ice.** Surface water (the sea, lakes and rivers alike) freezes by one pure function of
@@ -536,7 +553,7 @@ from `tools/generate-permafrost-texture.py`.
   edge of a steppe wears snow, and its water the first floes, before the tundra starts.
 * Cold trees get a snow dusting (`SnowCanopyTests`).
 
-### Vegetation and mobs
+#### Vegetation and mobs
 * Trees (JSON `worldgen.biomes`): oak = forest; spruce = taiga; cactus = desert; dead_tree = desert,
   frozen, steppe (cactus wins the desert: `TreeGenerator.SpeciesByBiome` takes the first non-oasis
   species per biome in ordinal name order); stone_pine = savanna (sparse; its umbrella crown stands in
@@ -553,7 +570,7 @@ from `tools/generate-permafrost-texture.py`.
 
 ---------------------------------------------------------------------------------------------------
 
-## 7. Tuning constants (current values)
+### 7. Tuning constants (current values)
 
 `Config/WorldGenerationConfig.cs` unless noted.
 
@@ -672,7 +689,7 @@ knobs shipped untuned: `GreatLakeChance`, `GreatLakeSiteFlatness` and `GreatLake
 count for flatness, and the tests need enough accepted sites in ±16000 (at least one river-fed, one
 ramped, one with an outflow and one with an island); if a bank-leak fact fails, tighten `GreatLakeRimSpacing` or raise the bank depth,
 never loosen the test. A rejected verdict costs about 0.005 ms and an accepted one about 2.1 ms with
-its ramp checks (phase D's 1.3 plus about 0.8), paid once per cell (`PERF_TODO.md`); raise
+its ramp checks (phase D's 1.3 plus about 0.8), paid once per cell (`PERF.md`); raise
 `GreatLakeInteriorSpacing` first if it ever grows.
 
 River-ramp tuning rules (phase E): `GreatLakeRiverRunBlocks` must stay at or above 1, since the
@@ -690,7 +707,7 @@ rather than weaken a rule, and never loosen a test. The shipped values needed no
 
 ---------------------------------------------------------------------------------------------------
 
-## 8. Everything that branches on biome (the blast radius of adding/changing one)
+### 8. Everything that branches on biome (the blast radius of adding/changing one)
 
 Grep `Biome\.` to confirm; at time of writing:
 
@@ -741,7 +758,7 @@ Grep `Biome\.` to confirm; at time of writing:
 
 ---------------------------------------------------------------------------------------------------
 
-## 9. Invariants that must survive any change
+### 9. Invariants that must survive any change
 
 1. **Pure function of (x, z, seed)**; thread-safe, no shared mutable state. Noises are built once in
    `Reseed` (from `WorldSeed.Apply`, never while a world is live).
@@ -848,7 +865,7 @@ Grep `Biome\.` to confirm; at time of writing:
 
 ---------------------------------------------------------------------------------------------------
 
-## 10. Tests and verification
+### 10. Tests and verification
 
 * `OpenGLTest.Tests/WorldGen/BiomeTests.cs` holds the rules, all relational:
   `TemperatureRampsAreExclusiveWithATemperateBandBetween` (between the ramps a column classifies
@@ -952,7 +969,7 @@ Grep `Biome\.` to confirm; at time of writing:
   and `TheSiteCachesFollowTheSeed`, which now also checks `GreatLakes.SiteAt` against `BuildSite`,
   ramp length and outflow length included).
   `TerrainGenerator.Compute` identity is not a test: it was a manual diff against a copy of the tree
-  before phase D, and again before phase E (`PERF_TODO.md`).
+  before phase D, and again before phase E (`PERF.md`).
 * Visual: `visual-examples/terrain-shape.json` (`VOXEL_TIME=1090`, shortly after a sunrise, since the
   run lasts about eight minutes and outlasts the afternoon from 147; the origin valley, a
   forest highland, a range along and across its direction, an arid plateau, a highland border, a
@@ -995,7 +1012,7 @@ Grep `Biome\.` to confirm; at time of writing:
 
 ---------------------------------------------------------------------------------------------------
 
-## 11. Known quirks / limits (things the next model may want to change)
+### 11. Known quirks / limits (things the next model may want to change)
 
 * Only **three** climate inputs (continentalness, temperature, humidity) decide the biome; relief
   (`ReliefNoise`, §6) is a fourth, orthogonal input that shapes the height only and never the biome.
@@ -1036,7 +1053,7 @@ Grep `Biome\.` to confirm; at time of writing:
   * No scenario vantage moved: every `visual-examples` teleport farther than 1536 blocks from the
     origin lies more than 64 blocks from any massif or lone-peak term.
   * Cost: two `CellRange` scans per `LandHeight` call, about +7 % of `TerrainGenerator.Compute` on
-    ordinary ground (`PERF_TODO.md`).
+    ordinary ground (`PERF.md`).
 * **Islands and archipelagos (phase C):**
   * A small island narrower than a coarse LOD cell vanishes under the far water sheet (the sheet is
     dropped only where a cell's own footprint reaches the level), so distant islets thin out with the
@@ -1055,7 +1072,7 @@ Grep `Biome\.` to confirm; at time of writing:
   * Tree batches grow every tree of a 64x64 cell together, so an island tree can change the
     continental trees of the same or a neighboring cell; and a continental lake whose rim reaches island
     land can be accepted or refused differently. Neither moves `LandHeight` on the continent: 0 of 529
-    all-continental columns of a 1000-column sample changed in `TerrainGenerator.Compute` (`PERF_TODO.md`).
+    all-continental columns of a 1000-column sample changed in `TerrainGenerator.Compute` (`PERF.md`).
   * Many island-land components join a continental coast as peninsulas rather than standing alone:
     about 275 of the 556 components within ±8000 hold no continental dry land within 100 blocks.
   * There is no archipelago shelf (listed in §12).
@@ -1084,7 +1101,7 @@ Grep `Biome\.` to confirm; at time of writing:
   * Elevated lakes raise `MaxWaterLevel` in their chunks, so more chunks pay the fluid-wake border scan.
   * Cost: every column pays a `CellRange` scan and a roll per reaching great-lake cell (and every pond
     candidate the same again in `NearAnyFootprint`), about +5 % of `Compute` on ordinary land and
-    +22..24 % inside a footprint (`PERF_TODO.md`).
+    +22..24 % inside a footprint (`PERF.md`).
 * **Great-lake river ramps and outflows (phase E):**
   * Generated water stays all-source and static, so a ramp step between two wet columns is a
     one-block water ledge the fluid wake does not wake (the upper water's side cell is above the
@@ -1102,7 +1119,7 @@ Grep `Biome\.` to confirm; at time of writing:
   * Formerly river-fed lakes re-laid with their own surface, floor and island, and ponds yield inside
     the wider footprints, so existing saves show seams at the edge of edited chunks inside ramp
     footprints; land beyond them is bit-identical (invariant 16).
-  * Cost (`PERF_TODO.md`): `Compute` on ordinary land +0.9 % (within noise), +2.6 % inside a lake,
+  * Cost (`PERF.md`): `Compute` on ordinary land +0.9 % (within noise), +2.6 % inside a lake,
     +1.4 % on a ramp and +7.5 % in an outflow channel (about 0.02 ms per chunk column); an accepted
     ramped verdict about 2.1 ms warm, about 0.8 ms over phase D, once per cell.
 * **Undithered borders:** only the desert line dithers. Forest/Steppe/Savanna borders share one grass
@@ -1164,29 +1181,3 @@ Grep `Biome\.` to confirm; at time of writing:
   tops, so seams appear at the edge of edited tundra.
 
 ---------------------------------------------------------------------------------------------------
-
-## 12. Remaining work (phase E, optional)
-
-Phases A to D of the terrain-shape plan (relief highlands and ranges, hashed massifs and lone peaks,
-islands and archipelagos, great lakes) and phase E's first item (great-lake river ramps and outflows)
-are done and documented where they live: §4 (the island fold), §6 (each mechanism), §7 (constants),
-§9 (invariants 11-17), §10 (tests) and §11 (limits). Their
-perf numbers are in `PERF_TODO.md`, their shots in `visual-examples/terrain-shape.json`. The design
-principles, the new-biome checklist and the seed-offset and tuning traps live in the
-`biome-worldgen` skill (`.claude/skills/biome-worldgen/SKILL.md`); read it before any change here.
-
-Open items, none started, in rough priority order. Each keeps the skill's principles and goes through
-plan-and-implement as its own phase; knob names are proposals.
-
-* **Desert mesa or butte.** A flat-topped lone peak on the dune profile (clamp the profile at a
-  hashed cap height). The site helper exists, but a peak must not be summed into sand: massifs and
-  lone peaks reject any ocean or desert weight today (§11).
-* **Plateaus and terraces.** Quantize a low-frequency height term into steps with `smoothstep`
-  risers under a rarity mask, so an area reads as tablelands (badlands in the desert). Lowest priority.
-* **Scree or gravel band** between the rock line and the snow line on a massif.
-* **Archipelago shelf.** A shallower ocean ramp under a chain of islands so the water between them
-  is light and wadeable (§11 notes it is absent).
-* **Coast warp.** A small-amplitude domain warp (about 1/200, a few tens of blocks) of the
-  continent sample alone, for bays, headlands and fjord-like inlets. It must stay out of
-  `SampleClimate` (invariant 8) and re-lays every coast, so it is gated on actually wanting it.
-  Reefs, shipwrecks and deep-sea points of interest stay `P-56` content.

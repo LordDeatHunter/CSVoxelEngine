@@ -5,7 +5,7 @@ description: Rules and checklist for changing CSVoxelEngine biome, climate, terr
 
 # Biome and terrain-shape worldgen
 
-`BIOMEGEN.md` (repo root) is the map of what exists today, every tuning constant and the §9 invariants. This skill is the procedure and the principles; read the BIOMEGEN sections it points to before editing.
+`plans/BIOMEGEN.md` is the map of what exists today, every tuning constant and the §9 invariants. This skill is the procedure and the principles; read the BIOMEGEN sections it points to before editing.
 
 ## Principles (every change keeps these)
 
@@ -16,7 +16,7 @@ description: Rules and checklist for changing CSVoxelEngine biome, climate, terr
 - The far LOD follows heightmap and `WaterLevel` by construction, but re-verify LOD level nesting and `LodSkyExposure` against any new height range (`LodReliefTests`).
 - Climate is read only through `BiomeClassifier.SampleClimate` (the one warped sample). Never warp anywhere else, and never warp `ContinentNoise` for climate (it re-lays every coast).
 - Hashed sites go through `TerrainSites` + a `GenerationalCache` verdict; acceptance tests must never read the function they feed (`LandHeight`), or they recurse. Cache factories are static non-capturing delegates; only pure-of-key values live in the cache.
-- Price each phase with the `perf-capture` skill: `LandHeight` and `BiomeWeights` run per column cell, per far-LOD cell and per tree candidate. Record the numbers in `PERF_TODO.md`, not in BIOMEGEN.
+- Price each phase with the `perf-capture` skill: `LandHeight` and `BiomeWeights` run per column cell, per far-LOD cell and per tree candidate. Record the numbers in `plans/PERF.md`, not in BIOMEGEN.
 - One phase per prompt (plan-and-implement workflow), ending with a green Release build and test run, new shots in `visual-examples/terrain-shape.json` or `biomes.json`, and BIOMEGEN §4/§6/§7/§9/§11 plus AGENTS.md "Biomes" updated.
 
 ## Traps
@@ -39,4 +39,4 @@ description: Rules and checklist for changing CSVoxelEngine biome, climate, terr
 6. Features: tree species JSON `worldgen.biomes` (check tree reach), generators that gate on biome (flowers, tufts, cotton, boulders), `MobSpawner.SpawnsMobs`.
 7. LOD (`LodMeshBuilder` + `LodFaceEmitter`) so distance matches near terrain, and the world-source-supplied column path.
 8. Tint palette / grade if it should differ (they key on climate, not biome; a new palette row must keep the grass monotone).
-9. Relational tests in `BiomeTests` computed from the seams; update `AGENTS.md` and `BIOMEGEN.md`; frame it in `visual-examples/biomes.json`.
+9. Relational tests in `BiomeTests` computed from the seams; update `AGENTS.md` and `plans/BIOMEGEN.md`; frame it in `visual-examples/biomes.json`.

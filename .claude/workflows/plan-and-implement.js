@@ -22,7 +22,7 @@ const dryRun = !!(args && args.dryRun)
 const REPO = `
 Repository: C# / .NET 9 Minecraft-style voxel engine using Silk.NET. Working directory is the repo root.
 Read AGENTS.md before anything else — it is the authoritative guide (all code lives under the "VoxelEngine" root namespace with one sub-namespace per folder; Release builds only; GL calls only on the render thread;
-chunk work happens on worker threads). MESHER_PLAN.md, TODO.md and PERF_TODO.md hold in-flight plans and known debt.
+chunk work happens on worker threads). plans/TODO.md and plans/PERF.md hold in-flight plans and known debt.
 The system "dotnet" has no SDK — always use ~/.dotnet/dotnet.exe:
   build: ~/.dotnet/dotnet.exe build OpenGLTest.sln -c Release
   tests: ~/.dotnet/dotnet.exe test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release
@@ -226,7 +226,7 @@ which existing tests cover the area this task touches, and what a new test for t
   {
     key: 'risks',
     prompt: `Lens: RISKS AND DEBT. Identify perf-hot paths this task would touch (per-frame loops, mesh builds, light propagation, chunk streaming),
-threading hazards (GL-thread-only calls, shared mutable state, worker-thread queues), and anything in TODO.md, PERF_TODO.md or MESHER_PLAN.md
+threading hazards (GL-thread-only calls, shared mutable state, worker-thread queues), and anything in plans/TODO.md or plans/PERF.md
 that overlaps or conflicts with this task. Flag places where a naive implementation would regress framerate or introduce races.`,
   },
 ]

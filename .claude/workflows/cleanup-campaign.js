@@ -1,15 +1,15 @@
 export const meta = {
   name: 'cleanup-campaign',
-  description: 'Runs the next CSVoxelEngine cleanup task(s) from CLEANUP_PLAN.md: Opus directs, plans, assigns and reviews; Sonnet surveys, scouts, fact-checks, implements, verifies, audits the move-diff residue and commits; Opus takes the wheel for steps too complex for Sonnet',
-  whenToUse: 'Continuing the codebase cleanup campaign tracked in CLEANUP_PLAN.md (god-class splits, dead code, duplication, nesting, doc follow-ups). No args = the next task in the plan. Args: a task string, or {task?, tasks?, extraContext?, maxFixRounds?, dryRun?, commit?, implementer?}. Commits each accepted task and records it in CLEANUP_PLAN.md unless commit is false; stops at the first task that is not accepted.',
+  description: 'Runs the next CSVoxelEngine cleanup task(s) from plans/CLEANUP.md: Opus directs, plans, assigns and reviews; Sonnet surveys, scouts, fact-checks, implements, verifies, audits the move-diff residue and commits; Opus takes the wheel for steps too complex for Sonnet',
+  whenToUse: 'Continuing the codebase cleanup campaign tracked in plans/CLEANUP.md (god-class splits, dead code, duplication, nesting, doc follow-ups). No args = the next task in the plan. Args: a task string, or {task?, tasks?, extraContext?, maxFixRounds?, dryRun?, commit?, implementer?}. Commits each accepted task and records it in plans/CLEANUP.md unless commit is false; stops at the first task that is not accepted.',
   phases: [
-    { title: 'Survey', detail: 'Sonnet reads CLEANUP_PLAN.md, measures the queue and checks the tree is clean', model: 'sonnet' },
+    { title: 'Survey', detail: 'Sonnet reads plans/CLEANUP.md, measures the queue and checks the tree is clean', model: 'sonnet' },
     { title: 'Direct', detail: 'Opus picks the task, writes its brief and the scout assignments', model: 'opus' },
     { title: 'Scout', detail: 'Sonnet maps the code from the angles Opus asked for', model: 'sonnet' },
     { title: 'Plan', detail: 'Opus plans and assigns every step to Sonnet or itself; Sonnet answers its questions and fact-checks the plan', model: 'opus' },
     { title: 'Implement', detail: 'Sonnet implements step by step; Opus takes the steps it reserved and any step Sonnet could not finish', model: 'sonnet' },
     { title: 'Verify', detail: 'Sonnet builds, tests and audits the move-diff residue; Opus accepts or sends gaps back', model: 'opus' },
-    { title: 'Record', detail: 'Sonnet commits the task and records it in CLEANUP_PLAN.md', model: 'sonnet' },
+    { title: 'Record', detail: 'Sonnet commits the task and records it in plans/CLEANUP.md', model: 'sonnet' },
   ],
 }
 
@@ -36,14 +36,14 @@ const dryRun = !!input.dryRun
 const commit = input.commit !== false
 const forcedImplementer = input.implementer === SONNET || input.implementer === OPUS ? input.implementer : null
 
-const IGNORED = '.claude/worktrees/, .sisyphus/, .run/, .gitattributes, visual/ and CLEANUP_PLAN.md'
+const IGNORED = '.claude/worktrees/, .sisyphus/, .run/, .gitattributes, visual/ and plans/CLEANUP.md'
 
 // The standing context every agent gets. The run facts (baseline, flaky tests) come from the
-// survey, so CLEANUP_PLAN.md stays their one source.
+// survey, so plans/CLEANUP.md stays their one source.
 function context(survey) {
   return `Repository: CSVoxelEngine, a C# / .NET voxel engine (Silk.NET, OpenGL 4.6). Working directory = repo root.
 AGENTS.md (already in your context) is the authoritative guide; its "Code organization (standing rules)" section and
-.claude/skills/code-cleanup/SKILL.md define what clean means. CLEANUP_PLAN.md (repo root) is the campaign's handoff.
+.claude/skills/code-cleanup/SKILL.md define what clean means. plans/CLEANUP.md (repo root) is the campaign's handoff.
 
 Toolchain: the code is C# 14 and needs the .NET 10 SDK, which is the system "dotnet" (~/.dotnet is a 9.0.100 SDK that cannot compile it).
   build: DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release
@@ -63,7 +63,7 @@ Cleanup rules for every agent in this run:
 - The working tree is CRLF (core.autocrlf=true) but a few files are LF-only: keep each file's own line endings, BOM and final-newline state;
   make new .cs files CRLF like their neighbors. Never sed -i a source file; scripted edits follow the crlf-safe-edit skill (byte mode).
 - Do not commit, stash, branch, reset or touch git config unless your role says so. Leave ${IGNORED} and .claude/workflows/ alone
-  (CLEANUP_PLAN.md is edited only by the recorder).`
+  (plans/CLEANUP.md is edited only by the recorder).`
 }
 
 function taskBlock(brief) {
@@ -80,7 +80,7 @@ const SURVEY_SCHEMA = {
   properties: {
     head: { type: 'string', description: 'output of git log --oneline -1' },
     dirtyPaths: { type: 'array', items: { type: 'string' }, description: `every path git status --porcelain reports, EXCEPT ${IGNORED}` },
-    planDirty: { type: 'boolean', description: 'CLEANUP_PLAN.md has uncommitted changes' },
+    planDirty: { type: 'boolean', description: 'plans/CLEANUP.md has uncommitted changes' },
     baseline: { type: 'string', description: 'the baseline the plan records, e.g. "0 warnings, 2441 tests"' },
     flakyTests: { type: 'array', items: { type: 'string' }, description: 'the known flaky tests or classes, names verbatim, with any note on why' },
     inProgress: {
@@ -95,7 +95,7 @@ const SURVEY_SCHEMA = {
     },
     queue: {
       type: 'array',
-      description: 'every remaining entry of "Still to do", in the plan\'s order',
+      description: 'every remaining entry of "Open", in the plan\'s order',
       items: {
         type: 'object',
         properties: {
@@ -109,7 +109,7 @@ const SURVEY_SCHEMA = {
       },
     },
     excluded: { type: 'array', items: { type: 'string' }, description: 'what the plan says is NOT a cleanup task (the "Bugs found" section, vendored files)' },
-    precedentCommits: { type: 'array', items: { type: 'string' }, description: '"hash what" of every Done row' },
+    precedentCommits: { type: 'array', items: { type: 'string' }, description: 'always empty: the plan keeps no Done table any more' },
   },
   required: ['head', 'dirtyPaths', 'planDirty', 'baseline', 'flakyTests', 'inProgress', 'queue', 'excluded', 'precedentCommits'],
 }
@@ -339,7 +339,7 @@ const REVIEW_SCHEMA = {
       },
     },
     remaining: { type: 'string', description: 'what of the task is still undone (targets missed, extractions left), empty when complete' },
-    followUps: { type: 'array', items: { type: 'string' }, description: 'for CLEANUP_PLAN.md: duplication or dead code noticed, bugs seen but not fixed, the next extraction' },
+    followUps: { type: 'array', items: { type: 'string' }, description: 'for plans/CLEANUP.md: duplication or dead code noticed, bugs seen but not fixed, the next extraction' },
     commitSubject: { type: 'string', description: 'one short imperative line in the style of the precedent commits' },
     doneRow: { type: 'string', description: 'the "What" cell of the Done row, in the style of the existing rows' },
   },
@@ -363,7 +363,7 @@ const RECORD_SCHEMA = {
   type: 'object',
   properties: {
     updated: { type: 'boolean' },
-    summary: { type: 'string', description: 'what changed in CLEANUP_PLAN.md' },
+    summary: { type: 'string', description: 'what changed in plans/CLEANUP.md' },
   },
   required: ['updated', 'summary'],
 }
@@ -376,7 +376,7 @@ const LENS_GUIDE = `Recommended scout lenses by kind (adapt them to the task; br
   (a) JOBS MAP: every member of the target grouped into candidate responsibilities, with line ranges, the fields each group reads and
       writes, and a coupling table of which groups call which;
   (b) SURFACE: every reference to the target's members from other files (the game, OpenGLTest.ItemDebugger, OpenGLTest.Server, the tests)
-      and every doc or cref mention (AGENTS.md, .claude/skills, PERF_TODO.md, TODO.md, XML crefs);
+      and every doc or cref mention (AGENTS.md, .claude/skills, plans/PERF.md, TODO.md, XML crefs);
   (c) INVARIANTS: the AGENTS.md rules and the code-level order, threading, GL-thread and allocation constraints the moved code carries,
       and which tests exercise it;
   (d) PRECEDENT AND PLACEMENT: how the done splits wired their components (git show --stat of the precedent commits and a sample of their
@@ -445,9 +445,9 @@ for (let t = 0; t < taskLimit; t++) {
   // ---- Survey (Sonnet) ----------------------------------------------------
   phase('Survey')
   const survey = await agent(`You are the campaign surveyor for the CSVoxelEngine cleanup. Read-only: do NOT modify anything.
-1. Read CLEANUP_PLAN.md (repo root) in full.
+1. Read plans/CLEANUP.md (repo root) in full.
 2. Run git status --porcelain and git log --oneline -1. Report every dirty or untracked path except ${IGNORED}.
-3. For every god-class entry in "Still to do", measure the file's current line count (bash wc -l, or PowerShell (Get-Content <path>).Count;
+3. For every god-class entry in "Open", measure the file's current line count (bash wc -l, or PowerShell (Get-Content <path>).Count;
    the plan's "src/" means OpenGLTest/src/).
 4. Copy the "In progress" task text VERBATIM and in full when there is one.
 Report what the plan says; do not judge or pick a task.`,
@@ -466,11 +466,11 @@ Report what the plan says; do not judge or pick a task.`,
   const brief = await agent(`${ctx}
 
 You direct the CSVoxelEngine cleanup campaign. Sonnet agents do the reading and most of the implementing; you make the calls.
-The surveyor's report on CLEANUP_PLAN.md and the tree is below; do not re-read the plan. Read a file only when a decision hinges on it.
+The surveyor's report on plans/CLEANUP.md and the tree is below; do not re-read the plan. Read a file only when a decision hinges on it.
 
 ${userTask
     ? `The user asked for this task. Use it; when it is terse, expand it into a complete task text in the style of the plan's god-class task:\n${userTask}`
-    : `Pick the next task: the in-progress task when there is one (use its text VERBATIM), otherwise the first entry of "Still to do" in plan
+    : `Pick the next task: the in-progress task when there is one (use its text VERBATIM), otherwise the first entry of "Open" in plan
 order that is worth a run. Skip files the plan says have a stated reason (unless it names a concrete next extraction for them), vendored files,
 borderline and lower-priority entries while better ones remain, and everything in the excluded list: bugs are separate normal tasks, never
 cleanup runs. Set done=true only when nothing worth a run is left.`}
@@ -480,7 +480,7 @@ Write the task text the way the plan's god-class task is written: the goal and t
 move verbatim, a composition root that builds and owns the components, placement and namespace rules); measurable targets; the hard
 constraints that apply to THIS code (update and render order, threading and GL-thread rules, edit-path hooks, per-frame allocation, wire
 formats, the projects and tests that must keep compiling); and the docs to update (AGENTS.md Layout and every reference to moved members,
-the skills, PERF_TODO.md, TODO.md, crefs; a file that stays oversized gets its reason recorded in Code organization).
+the skills, plans/PERF.md, TODO.md, crefs; a file that stays oversized gets its reason recorded in Code organization).
 
 Then brief 3-5 Sonnet scouts, one lens each.
 ${LENS_GUIDE}
@@ -535,7 +535,7 @@ Write a plan an implementer executes step by step with no further design:
   down in advance: untangling state shared between responsibilities, designing the owner wiring of a tangled group, a move that cuts
   across several groups at once, order- or thread-sensitive rewiring that cannot be specified line by line. Prefer specifying a step
   fully over reserving it; most steps should be sonnet.
-- The docs (AGENTS.md Layout and member references, the skills, PERF_TODO.md, TODO.md, crefs) are the final step(s). Never CLEANUP_PLAN.md:
+- The docs (AGENTS.md Layout and member references, the skills, plans/PERF.md, TODO.md, crefs) are the final step(s). Never plans/CLEANUP.md:
   the recorder updates it after the commit.
 - No new tests, no behavior change.
 - openQuestions only for answers that would change the plan.`
@@ -710,7 +710,7 @@ You are the auditor. Read-only: edit nothing. You produce the evidence the Opus 
 4. git diff --stat; the line counts of the task's targets (${brief.targets.join(', ')}) and of every new file; the file count of every
    folder that gained a file.
 5. Leftovers: fields, usings or helpers left unused in the source, and forwarders the plan did not ask for.
-6. Stale references: grep AGENTS.md, .claude/skills, PERF_TODO.md, TODO.md and the XML crefs for moved members named at their old owner.`,
+6. Stale references: grep AGENTS.md, .claude/skills, plans/PERF.md, TODO.md and the XML crefs for moved members named at their old owner.`,
         { label: `${tag}verify:audit${r}`, phase: 'Verify', model: SONNET, schema: AUDIT_SCHEMA }),
     ])
 
@@ -800,7 +800,7 @@ You are the implementer for this fix round. Report stepId "fix-r${round + 1}". $
     if (commit) {
       await agent(`${ctx}
 
-You are the campaign recorder. Edit CLEANUP_PLAN.md only (the Edit tool; keep its CRLF endings, structure and American English).
+You are the campaign recorder. Edit plans/CLEANUP.md only (the Edit tool; keep its CRLF endings, structure and American English).
 The cleanup task "${brief.title}" was NOT accepted. Its uncommitted partial work stays in the working tree for a person to inspect.
 Rewrite the "In progress" section: the task title; the task text verbatim in a fenced block:
 ${brief.taskText}
@@ -824,7 +824,7 @@ Update "Last updated" to today's date (date +%F). Change nothing else.`,
 
 You are the committer. The Opus reviewer accepted the cleanup task "${brief.title}"; commit it. You may run git add and git commit.
 1. git status --porcelain.
-2. Stage the task's changes explicitly: git add -u -- . ':(exclude)CLEANUP_PLAN.md' ':(exclude).claude/workflows' ':(exclude).claude/worktrees'
+2. Stage the task's changes explicitly: git add -u -- . ':(exclude)plans/CLEANUP.md' ':(exclude).claude/workflows' ':(exclude).claude/worktrees'
    then git add -- <path> for every new file the task created: ${newFiles.join(', ') || '(none reported: check git status for new files the build needs)'}.
    Never stage ${IGNORED}, bin/ or obj/. Never git add -A or git add . (the tree holds junk that must never be committed).
 3. git diff --cached --stat: check nothing unrelated slipped in; unstage anything that did.
@@ -844,12 +844,11 @@ You are the committer. The Opus reviewer accepted the cleanup task "${brief.titl
 
   await agent(`${ctx}
 
-You are the campaign recorder. Edit CLEANUP_PLAN.md only (the Edit tool; keep its CRLF endings, structure and American English).
+You are the campaign recorder. Edit plans/CLEANUP.md only (the Edit tool; keep its CRLF endings, structure and American English).
 The cleanup task "${brief.title}" was committed as ${committed.hash} "${committed.subject}".
-- Add a row to the "Done" table: | \`${committed.hash}\` | ${review.doneRow} |
-- If it was the "In progress" task, replace that section's body with one line saying nothing is in progress and the next task is the first
-  entry of "Still to do".
-- In "Still to do", remove the task's entry, or when work remains, keep it with what remains: ${review.remaining || '(nothing remains)'}.
+- Do not add a Done row: the plan keeps no Done table, finished tasks are deleted and the commit (${committed.hash}) is the record.
+- If it was the "In progress" task, replace that section's body with "Nothing." (the next task is the first unchecked entry of "Open").
+- In "Open", delete the task's entry, or when work remains, keep it with what remains: ${review.remaining || '(nothing remains)'}.
   Refresh the line counts of the files this task touched (measure them: ${brief.targets.join(', ')}${audit ? `, ${audit.newFiles.map(f => f.path).join(', ')}` : ''}).
 - Fold these follow-ups into the matching lists (duplication, dead code, small follow-ups, bugs), skipping ones already there:
 ${review.followUps.map(f => `  - ${f}`).join('\n') || '  - (none)'}
@@ -865,10 +864,10 @@ let planCommit = null
 const committedTasks = outcomes.filter(o => o.outcome === 'committed')
 if (commit && committedTasks.length && committedTasks.length === outcomes.length) {
   phase('Record')
-  planCommit = await agent(`You are the committer. Commit CLEANUP_PLAN.md alone; you may run git add and git commit.
-git add -- CLEANUP_PLAN.md, check git diff --cached --stat shows only that file, then
+  planCommit = await agent(`You are the committer. Commit plans/CLEANUP.md alone; you may run git add and git commit.
+git add -- plans/CLEANUP.md, check git diff --cached --stat shows only that file, then
 git commit -m "Update cleanup plan" -m "${TRAILER}"
-Never amend, never change git config, never skip hooks. If CLEANUP_PLAN.md has no changes, commit nothing and say so.
+Never amend, never change git config, never skip hooks. If plans/CLEANUP.md has no changes, commit nothing and say so.
 Report git rev-parse --short HEAD.`,
     { label: 'commit:plan', phase: 'Record', model: SONNET, effort: 'low', schema: COMMIT_SCHEMA })
 }

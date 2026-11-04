@@ -1,91 +1,55 @@
-# TODO — Gameplay Roadmap
+# TODO: gameplay roadmap
 
-> Performance work lives in **PERF_TODO.md**; this file is gameplay and content only.
-> Architecture, content schema and threading rules live in **AGENTS.md**.
-> Tree work lives in **TREES_PLAN.md**.
+> Guide: plans/README.md
 
-## North star
+## Status
 
-One world, three acts.
+Gameplay and content only: performance is in `PERF.md`, tree residue in `TREES.md`, and
+architecture, content schema and threading rules in `AGENTS.md`. Last updated 2026-11-05.
+**Current priority:** finish the Act I survival floor (Milestone 1), then ship one vertical slice
+per arc to prove the dual identity. The engine is far ahead of the content; the next wins are
+content and progression, not systems.
 
-**Act I — Primitive-tech survival** (Minecraft x Vintage Story): knap flint, build a fire,
-grind ore, cook food, survive weather and the dark. This is the shared foundation for both
-endgames, so it is built first and built to serve both.
+## In progress
 
-From that foundation the game branches into two parallel, open-ended arcs. Both live in the
-same world, and a player can move between them freely — neither arc gates the other:
+Nothing.
 
-- **Arc A — Magicraft adventure RPG** (Skyrim-flavored): dungeons, towers, spellcraft,
-  skills, boss encounters.
-- **Arc B — Expert automation** (modded-Minecraft "expert" pack x Factorio): power,
-  logistics, machine chains, up to fusion reactors and off-world colonies.
+## Open
 
-### The dual-identity contract (design rule)
+### Suggested milestones
 
-The whole pitch is that the two arcs share a world and **dabbling in one makes the other
-easier** — not that they are two games glued together. That only happens if cross-links are
-designed in, not retrofitted. Keep these four rules in mind whenever adding content:
-
-1. **Shared inputs.** Some resource must matter to both arcs (a crystal that is a spell
-   reagent *and* a machine/reactor component; food that is both survival and a potion base).
-2. **Cross-tools.** Each arc should build something the other wants: magic that moves/mines/
-   smelts mass material, and automation that mass-produces RPG consumables (potions, ammo,
-   enchanted blanks, gear).
-3. **Gated destinations.** Dungeons are the natural place to gate an automation input (a
-   reactor catalyst, a blueprint), so an RPG run feeds an automation bottleneck, and a machine
-   build opens access to deeper RPG content.
-4. **No forced crossover.** Every gating above must have a slow, manual fallback, so a pure
-   Arc A or pure Arc B player can always finish their arc alone.
-
-## How to read
-
-- Priority: **P0** foundation/do first · **P1** next · **P2** later · **P3** someday/XL.
-- Effort: **S** under a session · **M** a few sessions · **L** a week+ · **XL** weeks.
-- IDs (`P-1`, `U-3`, ...) are stable references; keep them when reordering.
-- **Current priority:** finish the **Act I survival floor** (Milestone 1 below), then ship one
-  vertical slice per arc to prove the dual identity. The engine is far ahead of the content;
-  the next wins are content and progression, not systems.
-
-## Suggested milestones
-
-### Milestone 1 — Act I survival floor (do first)
+#### Milestone 1 — Act I survival floor (do first)
 
 The smallest bundle that makes the world a *game*: stakes, food, and an advance. Mostly content
 JSON plus small systems; high feel, low engine risk.
 
-1. **`P-10` death done properly + `U-5` death screen** — a death screen with a manual respawn,
-   and passive health regen (out of combat, slowed while sprinting). No death drops.
-2. **`P-4` complete the copper chain** — assembly recipes (head + handle -> tool); the
-   bronze-age payoff currently dead-ends.
-3. **`P-3` a real furnace / smelter** — `sand -> glass`, `mud -> brick`, generic smelting with
+1. **`P-3` a real furnace / smelter** — `sand -> glass`, `mud -> brick`, generic smelting with
    fuel; generalizes the kiln pattern and becomes the automation seed.
-4. **`P-7` / `P-25` tier-2 ores + armor** — iron/tin at real depth bands, and armor (part of
+2. **`P-7` / `P-25` tier-2 ores + armor** — iron/tin at real depth bands, and armor (part of
    `P-7`) as a defense stat. The first difficulty curve and the first reason to descend.
 
-### Milestone 2 — Arc A vertical slice: the first dungeon
+#### Milestone 2 — Arc A vertical slice: the first dungeon
 
 Prove the fantasy half. Needs `M-15` (structure templates), `P-16` (dungeons), `P-17` (a boss),
 `P-14` (one spell — fireball), and `F-3` spawners. A single hand-authored crypt with loot, a
 spawner room and a boss is enough to make health, combat and loot matter and to give survival a
 destination.
 
-### Milestone 3 — Arc B vertical slice: first power
+#### Milestone 3 — Arc B vertical slice: first power
 
 Prove the automation half. Needs `P-19` (hand crank -> water wheel -> one powered machine),
 `P-21` (one multi-step chain with a byproduct) and `P-20` (the crudest item movement). This also
 validates "machine tick" as a reusable concept beyond the quern/kiln/casting one-offs.
 
-### Milestone 4 — cross-pollination proof
+#### Milestone 4 — cross-pollination proof
 
 Ship one link from the **Cross-pollination** section end-to-end (`P-47` shared exotic resource,
 `P-52` dungeons as gated resource nodes) and confirm either arc can reach its own endgame without
 the other while still being faster together.
 
----
+### 1. Progression
 
-## 1. Progression
-
-### Act I — the shared primitive-tech spine
+#### Act I — the shared primitive-tech spine
 
 - [ ] **`P-2` · Crafting stations gate recipes** — P1, M.
   The `E` panel crafts any recipe from anywhere. Add a `station` field and require the matching
@@ -96,10 +60,6 @@ the other while still being faster together.
   block-entity pattern. First jobs: `sand -> glass`, `mud -> brick`, and a plain
   `crushed_copper -> copper_ingot` route that does not need the full kiln. Feeds `P-6` and is
   step zero of the automation chain.
-- [x] **`P-4` · Complete the copper chain** — landed: the quern crushes
-  `malachite -> crushed_copper`, the metalworks casts the ingot and the pickaxe/axe heads, and
-  `recipes/copper_pickaxe.json` / `copper_axe.json` assemble a head, a branch and two vines into
-  the tool (`CraftingTests.ACastHeadAndAHandleAssembleIntoTheTool`).
 - [ ] **`P-5` · Light progression: torch -> lamp -> fire as fuel** — P1, S–M.
   A cheap **torch** block (emission ~14, `needsSupport`) before the existing `lamp` (emission
   15). Wire placed lights into the shader's 8 point-light budget so a torch casts dynamic light,
@@ -119,21 +79,13 @@ the other while still being faster together.
   A tool that passes every block's `tools` gate no matter its kind (a powered glove or drill),
   built on the tool-tag gating. Also an Arc B -> Arc A crossover (`P-53`).
 
-### Survival basics
+#### Survival basics
 
-- [x] **`P-10` · Death + respawn, done properly** — landed: health, fall damage, lava DoT, mob
-  damage, the damage vignette/shake, the death screen with a manual respawn (`U-5`) and passive
-  regen (out of combat, slowed while sprinting; `PlayerHealth.UpdateRegen`, `RegenTests`).
-  Decided against: death drops (so `P-29` loses its reason) and, for now, a respawn point / bed.
-  Known gap: a thrown item's hit does not count as combat for the regen delay.
 - [ ] **`P-12` · Farming** — P2, M.
   Seeds, tilled soil, growth stages, harvest -> food and crafting ingredients. Cross-links
   `P-38`, `P-42`, `P-45`.
-- [x] **`P-13` · Drowning** — landed: `Breath` (15 s of air with the eye under water, refilled once it is
-  out, a 10 HP blow per second when empty; creative and flight immune), a row of air bubbles over the
-  hearts, the server's own air in `PlayerStatus` (protocol 9). `BreathTests`, `drowning.json`.
 - [ ] **`P-29` · Death-mitigation gear** — P2, M.
-  Counter `P-10`'s drop-everything rule: a **backpack** that expands inventory and drops as one
+  Counter a death-drop rule (a death currently drops nothing): a **backpack** that expands inventory and drops as one
   item on death; **binding** enchantments that keep an enchanted item through death. Ties into
   `P-18`.
 - [ ] **`P-38` · Animal husbandry & butchering** — P2, L.
@@ -149,7 +101,7 @@ the other while still being faster together.
   A charcoal kiln (log pile -> charcoal) as the renewable fuel, plus burn-time data per wood.
 - [ ] **`P-42` · Branch / handle / tool-economy** — P2, S.
   Branches as the tool handle and a general cheap component: makes the flint and copper tool
-  recipes need a handle, and gives `P-4` its assembly step.
+  recipes need a handle, and gives the copper tool assembly its handle.
 - [ ] **`P-45` · Food spoilage & preservation** — P3, M. *(taste call; can be dropped)*
   Aging food, salt/smoking/drying, an ice box. Vintage Story depth; only worth it if survival
   is meant to be a long act.
@@ -157,7 +109,7 @@ the other while still being faster together.
   Factorio-style unlock progression: some recipes are discovered rather than free. Shared spine —
   an RPG can find schematics in dungeons (`P-55`) where an automation player researches them.
 
-### Arc A — magicraft adventure RPG
+#### Arc A — magicraft adventure RPG
 
 - [ ] **`P-14` · Magic system core** — P2, L.
   Mana (or equivalent), spell slots, casting from a staff/tome, schools (fire/frost/arcane),
@@ -178,7 +130,7 @@ the other while still being faster together.
   Bronze from copper + tin, and later steel; the alloy step that makes mixed mining worthwhile.
   Combines with `P-25`.
 
-### Arc B — expert automation
+#### Arc B — expert automation
 
 - [ ] **`P-19` · Power & rotation** — P2, L.
   Hand crank -> water wheel -> windmill -> steam; drives machines. Generalizes the quern and
@@ -211,7 +163,7 @@ the other while still being faster together.
 - [ ] **`P-37` · Terraforming & off-world bases** — P3, XL.
   Shape a hostile world into a habitable one; combines `P-36` and worldgen control.
 
-### Cross-pollination — the hybrid spine
+#### Cross-pollination — the hybrid spine
 
 The section that makes the game *this* game rather than "Minecraft plus mods." Every entry here
 must respect the dual-identity contract: mandatory for the hybrid player, optional for a
@@ -247,7 +199,7 @@ single-arc player.
   Tech trees learned by research (`P-46`) or found as dungeon schematics (`P-16`); the portable
   knowledge that ties exploration to construction.
 
-### Exploration & world content
+#### Exploration & world content
 
 - [ ] **`P-24` · Biomes** — P1, M.
   Grass, leaves and spruce leaves are already climate-tinted through the `biomeTint` block field.
@@ -275,9 +227,7 @@ single-arc player.
 - [ ] **`P-58` · Landmarks & navigation** — P3, S–M.
   Rare named landmarks, obelisks, map fragments; feeds `U-17` waypoints and exploration goals.
 
----
-
-## 2. Fun
+### 2. Fun
 
 - [ ] **`F-1` · Mobs — ambient critters** — P2, M.
   Fireflies, butterflies, birds. Could share the particle infrastructure — a cheap first step
@@ -288,7 +238,7 @@ single-arc player.
   The slime (hop AI, contact damage) and goblin (throw-then-melee raider, shared `Mob` base,
   `MobSpawner`) landed. Still open: **light/time-keyed and cave spawns**, **voxel pathing**
   (both currently walk/auto-jump straight at the player), more hostile kinds, and spawners
-  (`M-17`). Depends on `P-10`.
+  (`M-17`).
 - [ ] **`F-4` · Combat depth** — P2, L.
   Melee landed: punch, the two-phase obsidian-blade slice (`SliceCombo`), knockback, per-item
   `entityDamage`, and mobs that hit back. Still open: a **bow + arrows**, **right-click
@@ -322,14 +272,12 @@ single-arc player.
 - [ ] **`F-19` · Ocean life & hazards** — P3, M.
   Fish schools, hostile sea mobs, currents, drowning depth (`P-13`); pairs `P-56`.
 
----
-
-## 3. UI
+### 3. UI
 
 - [ ] **`U-1` · Item tooltips** — P1, S.
   Name, durability, what it is for. `ItemType.Name` already carries the "future tooltips" note.
 - [ ] **`U-2` · Health & hunger HUD** — P1, M.
-  Health hearts landed; add clearer damage feedback (no hunger system is planned). Depends on `P-10`.
+  Health hearts landed; add clearer damage feedback (no hunger system is planned).
 - [ ] **`U-3` · Crafting UI polish** — P1, M.
   Keep the shapeless list-and-hand-feed model; polish it (search, "what this makes / what uses
   this", clearer fed/needed counts). Stations reuse this UI, get their own, or craft in-world as
@@ -337,9 +285,6 @@ single-arc player.
 - [ ] **`U-4` · Inventory QoL** — P1, M.
   Shift-click, stack move/split, drag, and a bound drop key (`ThrowAction.ThrowSelected` exists but
   appears unbound).
-- [x] **`U-5` · Death / respawn screen** — landed: YOU DIED, the death line and a RESPAWN button
-  (or Enter) after the death plays, singleplayer and multiplayer (`RespawnPrompt`,
-  `RespawnPromptTests`). Pairs `P-10`.
 - [ ] **`U-7` · Creative palette + dev commands** — P1, M.
   Searchable all-blocks inventory; `/give`, `/tp`, `/time`, `/gamemode`, `/seed` for testing and
   content authoring. Huge for iteration speed.
@@ -375,9 +320,7 @@ single-arc player.
   `ChatRenderer.DrawChat` draws the row. Multiplayer: complete against the client's own content, and
   against the player list for names; the server still judges every command.
 
----
-
-## 4. Visual & particles
+### 4. Visual & particles
 
 - [ ] **`V-1` · Weather visuals — rain/snow particles, darkening, lightning** — P1, M.
   Pairs `F-5`; the particle ring and cloud/day-night passes are the base.
@@ -389,10 +332,6 @@ single-arc player.
 - [ ] **`V-4` · Torch & fire particles** — P1, S. Flame and smoke; the fire/campfire systems
   already produce these.
 - [ ] **`V-5` · Item pickup sparkle & interaction feedback** — P2, S.
-- [ ] **`V-6` · Sky: stars, moon phases, shooting stars, aurora** — P1, M.
-  Clouds, the sun disc, the sun glare and twinkling stars exist; finish the sky.
-  - [x] **Shooting stars.** Landed: hashed time slots, a great-circle streak with a fading tail, hidden by
-    clouds like the stars (`ShootingStar`, `ShootingStarTests`, `shooting-stars.json`).
 - [ ] **`V-7` · Sunrise/sunset color grading** — P2, M.
 - [ ] **`V-8` · Post-processing: bloom, underwater fog gradient, damage/heal flash** — P2, L.
   Bloom for lamps/campfire/sun.
@@ -420,9 +359,7 @@ single-arc player.
   **quality / tier** concept (a tier on `ItemDefinition`, shown on the drop, the tooltip and the
   inventory row), so do the two together. Cosmetic half only is not worth a ticket on its own.
 
----
-
-## 5. Misc / foundations
+### 5. Misc / foundations
 
 - [ ] **`M-2` · Gameplay SFX** — P1, M.
   `SfxManager`/`SfxMixer` play per-block hit groups and pickup, with an SFX volume slider. Still
@@ -448,9 +385,10 @@ single-arc player.
 - [ ] **`M-3` · Keep content JSON-only** — ongoing.
   New blocks/items/recipes/structures stay data, not code, per AGENTS.md. Add schema fields as
   the systems above need them (tool, station, harvest tier, food, spell, machine...).
-- [ ] **`M-4` · Multiplayer (headless server + chunk packets)** — P3, XL.
-  The threading model already isolates sim from GL; still weeks (auth, prediction, edit
-  conflicts).
+- [ ] **`M-4` · Multiplayer hardening** — P3, L.
+  The headless server, streaming, intents and prediction exist (`AGENTS.md` "Multiple players and
+  chat"). Still open: authentication and encryption (players are keyed by name), a persisted
+  operator list command, and the known gaps listed there.
 - [ ] **`M-5` · World options on new game** — P2, S.
   The seed picker landed with the create-world page; still open: **world type, difficulty, and a
   survival/creative choice** (the old main-menu/seed-entry item landed).
@@ -496,15 +434,9 @@ single-arc player.
   spring placed on a great-lake shore or inside a river ramp overrides the stored water level there
   (`TerrainGenerator.Compute` applies hot springs after the lake carve and the ramp's bank raise),
   which the column tests skip, so a leak there would go unflagged.
-- [x] **`M-13` · Far-LOD canopy for grown trees** — landed: a grow records the crown over each
-  written column (`TreeCanopy.CanopyAdded`, read first on every ring, cleared by any later poison,
-  saved in `lod-edits.bin` v2; `CanopyAddedTests`, `AGrownCrownGoesBackToTheFarLod`).
-- [ ] **`M-14` · Wide-trunk residue (TREES_PLAN phase 7)** — P3, M.
-  (1) landed: a felled tree is meshed whole through `CellBatchMesher.Build`, one mesh per chunk
-  it spans (`TreeFellingTests`); (2) cutting a wide core while its shells stand strands the
-  crown for reactive growth (undecided behavior: bridge the gap in `TreeGraph.FromWorld`, or fell
-  the tree). Item (3) landed: `ChunkCellCache.AddTouchedChunks` also dirties the edge-diagonal
-  chunk of a Y-and-horizontal corner (`ChunkCellCacheTests`).
+- [ ] **`M-14` · Wide-trunk residue** — P3, M.
+  Cutting a wide core while its shells stand strands the crown for reactive growth (undecided
+  behavior: bridge the gap in `TreeGraph.FromWorld`, or fell the tree). Mirrored in `TREES.md`.
 - [ ] **`M-15` · Structure templates / schematic system** — P2, L.
   A loadable, placeable blueprint format (jigsaw or simple offsets) that `P-16`, `P-26`, `F-14`
   and `P-37` all build on. Prerequisite for all generated POIs.
@@ -525,7 +457,41 @@ single-arc player.
 - [ ] **`M-22` · Save migration & versioning** — P2, M.
   `world.json` carries a format version; add migration paths so old saves survive schema growth
   (critical once `M-12` lands).
-- [ ] **`M-23` · Dedicated-server hosting** — P3, XL. Depends on `M-4`.
 - [ ] **`M-24` · Data-driven AI behaviors** — P3, L.
   Compose mob behaviors (goals, tasks, senses) from JSON so new hostiles need no C#; backs
   `F-3`, `F-13`, `F-14`.
+
+## Reference
+
+### North star
+
+One world, three acts.
+
+**Act I — Primitive-tech survival** (Minecraft x Vintage Story): knap flint, build a fire,
+grind ore, cook food, survive weather and the dark. This is the shared foundation for both
+endgames, so it is built first and built to serve both.
+
+From that foundation the game branches into two parallel, open-ended arcs. Both live in the
+same world, and a player can move between them freely — neither arc gates the other:
+
+- **Arc A — Magicraft adventure RPG** (Skyrim-flavored): dungeons, towers, spellcraft,
+  skills, boss encounters.
+- **Arc B — Expert automation** (modded-Minecraft "expert" pack x Factorio): power,
+  logistics, machine chains, up to fusion reactors and off-world colonies.
+
+### The dual-identity contract (design rule)
+
+The whole pitch is that the two arcs share a world and **dabbling in one makes the other
+easier** — not that they are two games glued together. That only happens if cross-links are
+designed in, not retrofitted. Keep these four rules in mind whenever adding content:
+
+1. **Shared inputs.** Some resource must matter to both arcs (a crystal that is a spell
+   reagent *and* a machine/reactor component; food that is both survival and a potion base).
+2. **Cross-tools.** Each arc should build something the other wants: magic that moves/mines/
+   smelts mass material, and automation that mass-produces RPG consumables (potions, ammo,
+   enchanted blanks, gear).
+3. **Gated destinations.** Dungeons are the natural place to gate an automation input (a
+   reactor catalyst, a blueprint), so an RPG run feeds an automation bottleneck, and a machine
+   build opens access to deeper RPG content.
+4. **No forced crossover.** Every gating above must have a slow, manual fallback, so a pure
+   Arc A or pure Arc B player can always finish their arc alone.
