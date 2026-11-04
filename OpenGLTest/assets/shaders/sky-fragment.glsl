@@ -37,6 +37,13 @@ uniform float uStarTime;         // seconds, wrapped on the CPU to keep float pr
 uniform float uStarTwinkleDepth;
 uniform vec2 uStarTwinkleRate;   // slowest and fastest twinkle, cycles per second
 
+// Shooting stars (ShootingStar is the C# twin). x slot seconds, y chance a slot holds one, z life
+// seconds, w the head's arc in radians; then x the tail's length in radians, y and z the band of
+// sine-elevations it starts in, w its width in pixels. Set once by SkyRenderer.
+uniform vec4 uShootingA;
+uniform vec4 uShootingB;
+uniform float uShootingBrightness;
+
 // The cloud layer hides the stars behind it: the drawn clouds only cover the dome at their
 // opacity, which would leave bright stars glinting through, so the stars are first dimmed by the
 // cloud cover along the view ray (CloudCover is the C# twin). The coverage map is the cloud
@@ -171,6 +178,44 @@ vec3 Stars(vec3 d, float px)
     return tint * (uStarBrightness * b * point * twinkle);
 }
 
+// The shooting star light in world direction d (px one pixel's angular size): the slot the star clock
+// is in, its streak if the slot holds one, the head and tail along the streak's great circle and
+// the gaussian across it; twin of ShootingStar.Light. The cheap tests (chance, life window) come
+// before any trigonometry, since almost every pixel of almost every frame fails one.
+vec3 ShootingStar(vec3 d, float px)
+{
+    float slot = floor(uStarTime / uShootingA.x);
+    float local = uStarTime - slot * uShootingA.x;
+    uint h = StarHash(uint(int(slot)) ^ 0x5bd1e995u);
+    if (StarUnit(h) >= uShootingA.y) return vec3(0.0);
+
+    uint h2 = StarHash(h);
+    uint h3 = StarHash(h2);
+    uint h4 = StarHash(h3);
+    uint h5 = StarHash(h4);
+    float seconds = local - StarUnit(h5) * max(uShootingA.x - uShootingA.z, 0.0);
+    if (seconds < 0.0 || seconds > uShootingA.z) return vec3(0.0);
+
+    float sinEl = mix(uShootingB.y, uShootingB.z, StarUnit(h2));
+    float cosEl = sqrt(1.0 - sinEl * sinEl);
+    float az = StarUnit(h3) * 6.2831853;
+    vec3 start = vec3(cosEl * cos(az), sinEl, cosEl * sin(az));
+    vec3 east = normalize(cross(vec3(0.0, 1.0, 0.0), start));
+    vec3 north = cross(start, east);
+    float heading = StarUnit(h4) * 6.2831853;
+    vec3 tangent = east * cos(heading) + north * sin(heading);
+
+    float head = seconds / uShootingA.z * uShootingA.w;
+    float tail = max(head - uShootingB.x, 0.0);
+    float phi = atan(dot(d, tangent), dot(d, start));
+    if (phi < tail || phi > head) return vec3(0.0);
+
+    float across = dot(d, cross(start, tangent)) / (px * uShootingB.w);
+    float along = (phi - tail) / max(head - tail, 1e-4);
+    float life = sin(3.14159265 * seconds / uShootingA.z);
+    return vec3(0.85, 0.92, 1.0) * (uShootingBrightness * along * along * life * exp(-across * across));
+}
+
 // How many layers the field cell under world column p stacks; twin of CloudCover.LevelAt.
 // Mirrors CloudCopies.FieldUv, wrapped by hand like the copies (texelFetch ignores REPEAT).
 int CloudLevelAt(vec2 p)
@@ -255,6 +300,9 @@ void main()
             // where one actually shines
             if (dot(star, star) > 1e-10)
                 col += star * (fade * (1.0 - CloudCoverAlongRay(dir)));
+            vec3 streak = ShootingStar(dir, px);
+            if (dot(streak, streak) > 1e-10)
+                col += streak * (fade * (1.0 - CloudCoverAlongRay(dir)));
         }
     }
 

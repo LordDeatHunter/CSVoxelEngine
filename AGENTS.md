@@ -360,6 +360,17 @@ redraws the dome, so the stars reflect, and the Snell window shows them. GL-free
 with the shader (`StarFieldTests`, `CloudCoverTests`). `visual-examples/night-sky.json` (`VOXEL_TIME`
 700, 450, 147, and 350 for the glare) frames them.
 
+**Shooting stars.** A rare streak across the night dome, added in the dome `main` right after the stars
+(`ShootingStar` in `sky-fragment.glsl`, so the fog never sees it; the same fade, sun and moon masks and
+`CloudCoverAlongRay` as the stars). Time is cut into `ShootingStarSlotSeconds` slots of the star clock (the
+slot length divides its hourly wrap); a slot holds a streak with probability `ShootingStarChance`, hashed from
+its index, which starts at a hashed moment inside the slot and lives `ShootingStarLifeSeconds`, so a pixel
+only ever reads one slot, and the chance and life-window tests come before any trigonometry. The head slides
+`ShootingStarArcDegrees` along a great circle through a hashed point of the upper sky (`ShootingStarMin/MaxSinElevation`)
+in a hashed heading, a tail of `ShootingStarTrailDegrees` fading quadratically behind it, a pixel-relative
+gaussian across, eased in and out over its life. It stays fixed in world directions. GL-free twin
+`ShootingStar` (`ShootingStarTests`); `visual-examples/shooting-stars.json` (`VOXEL_TIME=600`).
+
 **Sun glare.** A wide, faint glow around the sun, added in the same dome `main` (`uGlareColor` times
 `cos(angle to the sun)^SunGlareExponent`, `SunGlare.Radial`). Its strength is computed once a frame
 on the CPU (`SunGlare.Intensity`, capped at `SunGlareStrength`): how directly the camera faces the
@@ -1156,6 +1167,7 @@ OpenGLTest/
         Moonlight.cs           # GL-free key-light rule: sun by day, moon at night, handed over with both dark
         MoonPhase.cs           # GL-free moon: the day's phase (steps at noon), its light direction, lit share, visibility
         SkyPalette.cs          # GL-free zenith/horizon/glow sky palette and the C# reference of SkySample
+        ShootingStar.cs        # GL-free twin of the night dome's shooting stars: hashed slots, the great-circle streak, its light
         StarField.cs           # GL-free twin of the night dome's star field (cells, hash, visibility)
         SunGlare.cs            # GL-free sun lens glare: per-frame intensity and its sky falloff
         Wind.cs                # the one wind of the world: a horizontal direction that turns slowly

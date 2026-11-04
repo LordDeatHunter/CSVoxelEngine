@@ -400,11 +400,8 @@ single-arc player.
 - [ ] **`V-5` · Item pickup sparkle & interaction feedback** — P2, S.
 - [ ] **`V-6` · Sky: stars, moon phases, shooting stars, aurora** — P1, M.
   Clouds, the sun disc, the sun glare and twinkling stars exist; finish the sky.
-  - [ ] **Shooting stars.** A rare streak across the night dome. *Hook:* `sky-fragment.glsl`'s
-    main after the stars, on hashed time slots (a slot index from `uStarTime`, a hashed start
-    direction, heading and length per slot, most slots empty), faded by `StarField.Visibility`
-    and hidden by the cloud cover like the stars, with a GL-free twin of the slot hash beside
-    `StarField`. No art needed.
+  - [x] **Shooting stars.** Landed: hashed time slots, a great-circle streak with a fading tail, hidden by
+    clouds like the stars (`ShootingStar`, `ShootingStarTests`, `shooting-stars.json`).
 - [ ] **`V-7` · Sunrise/sunset color grading** — P2, M.
 - [ ] **`V-8` · Post-processing: bloom, underwater fog gradient, damage/heal flash** — P2, L.
   Bloom for lamps/campfire/sun.

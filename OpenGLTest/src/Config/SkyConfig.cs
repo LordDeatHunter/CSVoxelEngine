@@ -138,6 +138,30 @@ public const float DayLengthSeconds = 1200f;
     public const float StarTwinkleRateMin = 0.25f;
     public const float StarTwinkleRateMax = 1.2f;
 
+    // --- Shooting stars (ShootingStar, ShootingStar in sky-fragment.glsl) ---
+    /// <summary>Seconds per slot; a slot holds at most one streak. Must divide the star clock's hourly wrap (3600) so the slots wrap with it.</summary>
+    public const float ShootingStarSlotSeconds = 9f;
+
+    /// <summary>Chance a slot holds a streak: about one every ShootingStarSlotSeconds / this.</summary>
+    public const float ShootingStarChance = 0.3f;
+
+    /// <summary>How long a streak lives; shorter than a slot, so one never spills into the next.</summary>
+    public const float ShootingStarLifeSeconds = 0.9f;
+
+    /// <summary>The angle the head travels along its great circle over its life, and how far the tail trails it.</summary>
+    public const float ShootingStarArcDegrees = 30f;
+    public const float ShootingStarTrailDegrees = 10f;
+
+    /// <summary>The band of sine-elevations a streak starts in (high enough to clear the horizon haze).</summary>
+    public const float ShootingStarMinSinElevation = 0.3f;
+    public const float ShootingStarMaxSinElevation = 0.85f;
+
+    /// <summary>Gaussian radius of the streak across its path in screen pixels (pixel-relative like the stars').</summary>
+    public const float ShootingStarRadiusPixels = 1.5f;
+
+    /// <summary>Linear HDR brightness of the head, like StarBrightness.</summary>
+    public const float ShootingStarBrightness = 2.2f;
+
     // --- Moon (MoonPhase, SkyPasses.RenderMoon, moon-fragment.glsl) ---
     /// <summary>Days from one full moon to the next; the phase steps once a day, at noon.</summary>
     public const int MoonCycleDays = 8;

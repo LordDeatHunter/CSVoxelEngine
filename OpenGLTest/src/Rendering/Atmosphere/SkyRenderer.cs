@@ -57,6 +57,11 @@ public sealed class SkyRenderer : IDisposable
         _shader.SetUniform("uCloudLayer", SkyConfig.CloudLayerThickness);
         _shader.SetUniform("uCloudField", SkyConfig.CloudFieldSize);
         _shader.SetUniform("uCloudFog", new Vector2(LightingConfig.FogNearBlocks, LightingConfig.FogFarBlocks));
+        _shader.SetUniform("uShootingA", new Vector4(SkyConfig.ShootingStarSlotSeconds, SkyConfig.ShootingStarChance,
+            SkyConfig.ShootingStarLifeSeconds, MathUtils.ToRadians(SkyConfig.ShootingStarArcDegrees)));
+        _shader.SetUniform("uShootingB", new Vector4(MathUtils.ToRadians(SkyConfig.ShootingStarTrailDegrees),
+            SkyConfig.ShootingStarMinSinElevation, SkyConfig.ShootingStarMaxSinElevation, SkyConfig.ShootingStarRadiusPixels));
+        _shader.SetUniform("uShootingBrightness", SkyConfig.ShootingStarBrightness);
         _shader.SetUniform("uGlareExponent", SkyConfig.SunGlareExponent);
         _shader.SetUniform("uAuroraBrightness", SkyConfig.AuroraBrightness);
         _shader.SetUniform("uAuroraPeriods", Aurora.Periods);
