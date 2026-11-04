@@ -1786,6 +1786,7 @@ OpenGLTest/
         MainMenuController.cs  # every main-menu page transition, key rule and WorldStore call (tested)
         MainMenuLayout.cs      # main-menu geometry + HitAt: buttons, scrolled world rows, fields, delete popup
         PauseMenu.cs           # pause menu pages, hit kinds, view and PauseMenuLayout (RESUME/SETTINGS/SAVE & QUIT)
+        RespawnPrompt.cs       # GL-free death screen rule (shows after the death plays, one respawn request per death) + DeathScreenLayout
         SettingsMenu.cs        # settings page rows, tabs, sliders and SettingsLayout (shared by both menus)
         TextFieldState.cs      # one single-line text field: printable-ASCII typing rules and length cap
     VisualTest/                # the VOXEL_SCRIPT scenario runner: parsed scenario, director, scripted keyboard, PNG capture
@@ -3301,13 +3302,17 @@ look, flags and modes but never move it, and every intent but `Respawn` is refus
 mirrors all of it: `ClientMirror.ApplyNetworkHealth` (client mode only; lower health is taken as damage
 with the flash and a singleplayer-sized shake, higher is restored outright), `UpdateClient`
 fading the flash, `Camera.AddKnockback` for the shove (the client's own physics applies it) and
-`SetModes`; a client never bills itself damage. On the first dead status the client sends a
-`Respawn` intent at once (`ClientSession.SendRespawn`, from its eye and aim) and re-sends it every
+`SetModes`; a client never bills itself damage. Once the status has read dead for
+`RespawnPrompt.DelaySeconds` the client's **death screen** comes up (`ClientSession`'s
+`RespawnPrompt`, the GL-free rule behind the screen: YOU DIED and a RESPAWN button, Enter works
+too), and only when the player chooses RESPAWN does the client send a `Respawn` intent
+(`ClientSession.RequestRespawn` -> `SendRespawn`, from its eye and aim), re-sent every
 `NetRespawnRetrySeconds` while the status still reads dead; the server judges it before the
 eye-drift and rate rules, so a corpse that kept falling on the client can always come back, brings
 the player back at full health at its `RespawnEye` (else the join spawn, `ServerPlayer.Respawn`),
-snaps the client there with a `PlayerCorrection` and sends the fresh status. There is no death
-screen: the respawn is automatic, as in singleplayer.
+snaps the client there with a `PlayerCorrection` and sends the fresh status. Nothing server-side
+changed: a dead player simply waits for the intent. Singleplayer works the same way
+(`LocalPlayer.RespawnPrompt`: the death plays, then the player stays down until they respawn).
 
 **The movement rubberband.** Every accepted-for-position `PlayerState` goes through
 `MovementRules.Judge` (`Networking/ServerSide/MovementRules.cs`, GL-free, verdict `MoveVerdict` Accepted /
@@ -3469,7 +3474,7 @@ the station mirrors' quern animation and fire particles, the mirrored TNT fuses 
 feeds `ChatView`, `TimeSync` calls `World.SetLightingTime`,
 `PlayerList` reconciles `ClientMirror.SyncRemotePlayers`, `StationState` replaces the station mirrors
 (`ClientMirror.ApplyNetworkStations`), `PlayerStatus` sets the camera's modes and mirrors health, death
-and knockback (and starts the automatic respawn, see "Player status"), `PlayerCorrection` snaps
+and knockback (and starts the death screen's clock, see "Player status"), `PlayerCorrection` snaps
 the camera and makes the next state go out at once with its ack, and `InventoryState` is
 imported as the truth when it is current.
 Inventory edits are predicted then sent (`ClientSession.SendInventoryIntent`): the hotbar keys and `Q`
@@ -3523,9 +3528,8 @@ a hovering cheater is frozen in place by repeated corrections rather than droppe
 collision is judged at a state's endpoint only, so one state may pass through a thin wall within
 its speed allowance, a body already inside a solid may move anywhere, and a descent slower than
 the hover rule's sink tolerance is never caught; knockback is applied by the client's own physics
-(the server only queues it in the status), so a modified client can ignore it; respawn is
-automatic with no death screen, and a dead player's model stays where it died for others until
-the respawn; a player's lava and fall state is judged from its 20 Hz positions, so a long fall
+(the server only queues it in the status), so a modified client can ignore it; a dead player
+waits on the death screen and its model stays where it died for others until the respawn; a player's lava and fall state is judged from its 20 Hz positions, so a long fall
 across a lag gap can go unbilled (lag errs toward no damage, never extra); two far-apart players
 cost roughly two load spheres of generation and memory under the one set of per-frame budgets;
 and while a store-backed server world is still loading, an early joiner is already the streaming
@@ -4351,8 +4355,13 @@ overshoot or jiggle.
   the slice combo, the jab pace and `AttackPacing` never see it, and the world, mobs and movement
   never stop. `Camera.HoldPunchFov` holds the pinch while `PlayerModel.IsHitStopped`. The item
   debugger never requests one. `visual-examples/hit-stop.json` films it.
-- **Death in singleplayer** plays for `LocalPlayer.DeathPlaySeconds` (the view tips over, the body falls)
-  before the respawn; a client has no death screen and still snaps back.
+- **Death** plays for `RespawnPrompt.DelaySeconds` (the view tips over, the body falls), then the
+  **death screen** (`MenuRenderer.DrawDeathScreen`, `DeathScreenLayout`, drawn by
+  `UiPasses.RenderDeathScreen`) covers the world with the death line and a RESPAWN button, in
+  singleplayer and on a client alike. While it is up `GameplayInput` stands every game input down
+  (keys, mining, use, the wheel, ESC, the chat and the [E] panel; `SyncDeathScreen` frees the cursor
+  and the look) and a click on RESPAWN or Enter asks for the respawn (`ClientSession.RequestRespawn`).
+  There are no death drops and no bed: the respawn point stays where the world first settled.
 - **Mob death poof.** A mob bursts into skin-colored chips when its death animation ends
   (`BlockDebrisSystem` + `DebrisLook.Color`, `LandingDust.SkinColor`), the same pool the slime
   splat uses.

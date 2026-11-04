@@ -10,6 +10,7 @@ using VoxelEngine.Particles;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.UI.Menus;
 using VoxelEngine.WorldGen;
 
 namespace VoxelEngine.Player;
@@ -400,14 +401,17 @@ internal sealed class LocalPlayer
         Camera.AddHitKick(-toMob);
     }
 
-    // Seconds the player's death plays (the view tips over, the body falls) before the respawn.
-    private const float DeathPlaySeconds = 0.9f;
-    private float _deathTimer;
+    /// <summary>The death screen's state: the death plays, then the player stays down until they ask to respawn.</summary>
+    internal RespawnPrompt RespawnPrompt { get; } = new();
+
+    /// <summary>The line the death screen shows ("Player fell from a high place"); null while alive.</summary>
+    internal string? DeathLine { get; private set; }
 
     /// <summary>
     /// First-cut survival tick, after <see cref="Camera.Update"/> so grounded state is fresh:
     /// tracks the fall from its highest feet position, burns in lava, decays the damage
-    /// flash, and respawns at spawn keeping the inventory. A multi-block jump in one frame
+    /// flash, and, once the death screen's RESPAWN is chosen, respawns at the respawn eye keeping
+    /// the inventory. A multi-block jump in one frame
     /// is a teleport (spawn settle, scripts), never a fall. Landing in water cushions the
     /// fall; creative and flight skip every damage source.
     /// </summary>
@@ -446,25 +450,27 @@ internal sealed class LocalPlayer
             NotifyPlayerHurt(fromMob: false);
         }
 
+        RespawnPrompt.Update(deltaTime, _health.IsDead);
         if (!_health.IsDead)
         {
-            _deathTimer = 0f;
             _pendingDeathMessage = null;
+            DeathLine = null;
             return;
         }
 
         // The first dead frame posts the death line once; GameplayInput drains it into the chat
-        _pendingDeathMessage ??= DeathMessages.For("Player", _health.LastSource, _health.LastKiller);
+        DeathLine ??= DeathMessages.For("Player", _health.LastSource, _health.LastKiller);
+        _pendingDeathMessage ??= DeathLine;
 
-        // The death plays first: the view tips over and the body falls, then the respawn.
-        _deathTimer += deltaTime;
-        var progress = MathUtils.Clamp01(_deathTimer / DeathPlaySeconds);
+        // The death plays first: the view tips over and the body falls. Then the player stays down
+        // under the death screen until they ask to respawn.
+        var progress = MathUtils.Clamp01(RespawnPrompt.DeadSeconds / RespawnPrompt.DelaySeconds);
         Camera.DeathProgress = progress;
         Player.DeathFall = progress;
-        if (progress < 1f)
+        if (!RespawnPrompt.Requested)
             return;
 
-        _deathTimer = 0f;
+        RespawnPrompt.Reset();
         Camera.DeathProgress = 0f;
         Player.DeathFall = 0f;
         _health.Respawn();

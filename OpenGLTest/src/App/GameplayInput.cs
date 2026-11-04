@@ -35,6 +35,7 @@ internal sealed class GameplayInput
     private bool eWasPressed;
     private bool tWasPressed;
     private bool escWasPressed;
+    private bool deathScreenWasUp;
 
     // TODO: move this to player class
     private const double MAX_PLACE_TIMER = 0.2;
@@ -68,7 +69,31 @@ internal sealed class GameplayInput
     internal void ResetEdges()
     {
         escWasPressed = eWasPressed = qWasPressed = rightWasDown = middleWasPressed = false;
+        deathScreenWasUp = false;
         placeTimer = MAX_PLACE_TIMER;
+    }
+
+    /// <summary>Whether the death screen is up: the player is down and every game input stands aside for it.</summary>
+    internal bool DeathScreenUp(World w) => session.RespawnPromptOf(w).IsShowing;
+
+    /// <summary>The player chose RESPAWN (the button or Enter): a no-op unless the death screen is up.</summary>
+    internal void RequestRespawn(World w)
+    {
+        if (DeathScreenUp(w))
+            session.RequestRespawn(w);
+    }
+
+    /// <summary>On the frame the death screen appears or goes away: puts every other view down and frees or recaptures the cursor and the look.</summary>
+    private void SyncDeathScreen(World w, bool up)
+    {
+        if (up)
+        {
+            chatView.Close();
+            panelInput.SetInventoryOpen(false);
+            menuInput.SetPauseMenu(PauseMenuPage.Closed);
+        }
+        w.Camera.SuppressLook = up;
+        inputManager.Mouse?.Cursor.CursorMode = up ? CursorMode.Normal : CursorMode.Disabled;
     }
 
     /// <summary>A right-button release: the next press uses or places at once.</summary>
@@ -102,11 +127,19 @@ internal sealed class GameplayInput
 
         placeTimer = Math.Min(MAX_PLACE_TIMER, placeTimer + deltaTime);
 
+        // The death screen owns the player while it is up: no keys, clicks or look reach the world
+        var deathUp = DeathScreenUp(w);
+        if (deathUp != deathScreenWasUp)
+        {
+            deathScreenWasUp = deathUp;
+            SyncDeathScreen(w, deathUp);
+        }
+
         // T opens the chat: only from a clean play state, so it is never a hotkey while a panel,
         // the pause menu or the chat itself already owns the keyboard.
         var tPressed = inputManager.Keyboard?.IsKeyPressed(Key.T) == true;
         if (tPressed && !tWasPressed && !chatView.IsOpen && !pauseMenuView.IsOpen
-            && !inventoryView.IsOpen)
+            && !inventoryView.IsOpen && !deathUp)
             chatView.Open();
         tWasPressed = tPressed;
 
@@ -137,7 +170,7 @@ internal sealed class GameplayInput
         // ESC on the settings page steps back to the main page, ESC there resumes the game.
         // An open [E] panel or chat is closed first so they never overlap the menu.
         var escPressed = inputManager.Keyboard?.IsKeyPressed(Key.Escape) == true;
-        if (escPressed && !escWasPressed)
+        if (escPressed && !escWasPressed && !deathUp)
         {
             if (chatView.IsOpen)
                 chatView.Close();
@@ -173,7 +206,7 @@ internal sealed class GameplayInput
         // The [E] panel owns the mouse: clicks equip, hotbar keys rest, and the world runs on.
         // While a text field has focus, E is typing, not a close.
         var ePressed = inputManager.Keyboard?.IsKeyPressed(Key.E) == true;
-        if (ePressed && !eWasPressed && !pauseMenuView.IsOpen && !chatView.IsOpen
+        if (ePressed && !eWasPressed && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp
             && inventoryView.Focus == InventoryFocus.None)
             panelInput.SetInventoryOpen(!inventoryView.IsOpen);
         eWasPressed = ePressed;
@@ -184,7 +217,7 @@ internal sealed class GameplayInput
         if (inventoryView.IsOpen && inventoryView.Focus == InventoryFocus.None && !pauseMenuView.IsOpen)
             panelInput.AssignHoveredRowToHotbar();
 
-        if (!inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen)
+        if (!inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp)
         {
             // 1-10 grabs the hotbar slot directly; scroll still walks it one step at a time
             for (var i = 0; i < InventoryPanelInput.NumberKeys.Length; i++)
@@ -211,7 +244,7 @@ internal sealed class GameplayInput
         // so a mudball cooks on a lit campfire instead of sailing over it. Hold to charge,
         // release to throw.
         var rightDown = inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true;
-        var rightHeld = rightDown && !inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen;
+        var rightHeld = rightDown && !inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp;
         var rightPressed = rightHeld && !rightWasDown;
         switch (rightHeld)
         {
@@ -246,7 +279,7 @@ internal sealed class GameplayInput
             }
         }
         rightWasDown = rightDown;
-        if (!rightHeld && (inventoryView.IsOpen || pauseMenuView.IsOpen || chatView.IsOpen))
+        if (!rightHeld && (inventoryView.IsOpen || pauseMenuView.IsOpen || chatView.IsOpen || deathUp))
         {
             if (w.Throws.IsThrowCharging) w.Throws.CancelThrowCharge();
             if (w.RightClick.IsUseCharging) w.RightClick.CancelUseCharge();
@@ -260,7 +293,7 @@ internal sealed class GameplayInput
             // A focused text field owns the keyboard: pass no board so the camera cannot act on
             // the very keys being typed (E, C, Space, WASD) while the panel or chat is up.
             var board = (inventoryView.IsOpen && inventoryView.Focus != InventoryFocus.None)
-                || chatView.IsOpen
+                || chatView.IsOpen || deathUp
                 ? null
                 : inputManager.Keyboard;
             w.Update((float)deltaTime, board);
@@ -273,11 +306,11 @@ internal sealed class GameplayInput
 
             FrameProfiler.Begin(ProfileSection.Breaking);
             w.LeftClick.UpdateBlockBreaking(deltaTime,
-                !inventoryView.IsOpen && !chatView.IsOpen
+                !inventoryView.IsOpen && !chatView.IsOpen && !deathUp
                 && inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
             FrameProfiler.End(ProfileSection.Breaking);
 
-            var middlePressed = !inventoryView.IsOpen && !chatView.IsOpen
+            var middlePressed = !inventoryView.IsOpen && !chatView.IsOpen && !deathUp
                 && inputManager.Mouse?.IsButtonPressed(MouseButton.Middle) == true;
             if (middlePressed && !middleWasPressed)
             {

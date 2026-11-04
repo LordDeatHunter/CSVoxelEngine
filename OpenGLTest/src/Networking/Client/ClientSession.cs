@@ -55,6 +55,8 @@ internal sealed class ClientSession
     // intent sent while it does
     private bool netDead;
     private float netRespawnTimer;
+    // The client's death screen: it asks the server to respawn only once the player chooses to
+    private readonly RespawnPrompt respawnPrompt = new();
 
     // The BlockChanges filter, made once in the constructor: it reads the live prediction field, and a lambda written at the call would capture this session and allocate a delegate per message
     private readonly Func<NetCellChange, bool> offerServerWrite;
@@ -73,6 +75,26 @@ internal sealed class ClientSession
 
     /// <summary>The connection, null in singleplayer, on the menu and after a disconnect.</summary>
     internal NetworkClient? Client => netClient;
+
+    /// <summary>The death screen's state for the running session: this connection's while connected, else the world's own (singleplayer).</summary>
+    internal RespawnPrompt RespawnPromptOf(World world) =>
+        netClient != null ? respawnPrompt : world.LocalPlayer.RespawnPrompt;
+
+    /// <summary>
+    /// The player chose RESPAWN on the death screen. Connected, it sends the intent (and the retry
+    /// clock keeps asking while the server still reports the player dead); in singleplayer the
+    /// world's next health tick carries the respawn out.
+    /// </summary>
+    internal void RequestRespawn(World world)
+    {
+        if (netClient == null)
+        {
+            world.LocalPlayer.RespawnPrompt.Request();
+            return;
+        }
+        if (respawnPrompt.Request())
+            SendRespawn(world.Camera);
+    }
 
 
     /// <summary>Starts the connect + handshake on a background thread; the loading screen polls it.</summary>
@@ -199,11 +221,12 @@ internal sealed class ClientSession
             client.Send(writer.ToArray());
         }
 
-        // A dead player comes back only through a Respawn intent: the first goes out when the
-        // status says so, and it is asked again while the server still reports the player dead
-        if (netDead)
+        // A dead player comes back only through a Respawn intent, sent when the player chooses
+        // RESPAWN on the death screen and asked again while the server still reports them dead
+        respawnPrompt.Update((float)deltaTime, netDead);
+        if (netDead && respawnPrompt.Requested)
         {
-            netRespawnTimer += deltaTime;
+            netRespawnTimer += (float)deltaTime;
             if (netRespawnTimer >= NetworkConfig.NetRespawnRetrySeconds)
                 SendRespawn(w.Camera);
         }
@@ -318,15 +341,7 @@ internal sealed class ClientSession
                 // A shove that came with lost health was a blow: the damage arc points back at it
                 if (status.Health < healthBefore)
                     w.Camera.AddDamageDirection(knockback);
-                if (status.Dead && !netDead)
-                {
-                    netDead = true;
-                    SendRespawn(w.Camera);
-                }
-                else if (!status.Dead)
-                {
-                    netDead = false;
-                }
+                netDead = status.Dead;
                 break;
             }
             case NetMessage.PlayerCorrection:
@@ -535,6 +550,7 @@ internal sealed class ClientSession
         netCorrectionAck = 0;
         netDead = false;
         netRespawnTimer = 0f;
+        respawnPrompt.Reset();
         prediction = new ClientPrediction();
         if (ActiveWorld == null) return;
         ActiveWorld.ClientMirror.ClearRemotePlayers();

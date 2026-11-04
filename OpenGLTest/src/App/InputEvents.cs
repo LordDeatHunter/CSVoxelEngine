@@ -62,6 +62,15 @@ internal sealed class InputEvents
         }
         if (Screen != AppScreen.Playing) return;
 
+        // The death screen's RESPAWN button; every other click is dead weight while it is up
+        if (gameplay.DeathScreenUp(ActiveWorld!))
+        {
+            if (button == MouseButton.Left && inputManager.Mouse != null
+                && renderManager.Ui.Menu.DeathScreenHitsRespawn(inputManager.Mouse.Position))
+                gameplay.RequestRespawn(ActiveWorld!);
+            return;
+        }
+
         if (pauseMenuView.IsOpen)
         {
             if (button == MouseButton.Left && inputManager.Mouse != null)
@@ -134,7 +143,7 @@ internal sealed class InputEvents
         if (Screen != AppScreen.Playing) return;
         var w = ActiveWorld!;
 
-        if (chatView.IsOpen) return;
+        if (chatView.IsOpen || gameplay.DeathScreenUp(w)) return;
         switch (inventoryView.IsOpen)
         {
             case false when !pauseMenuView.IsOpen:
@@ -197,6 +206,8 @@ internal sealed class InputEvents
                 chatInput.HandleChatKey(key);
             else if (inventoryView.IsOpen && !pauseMenuView.IsOpen)
                 panelInput.HandleInventoryKey(key);
+            else if (key is Key.Enter or Key.KeypadEnter && ActiveWorld is { } world)
+                gameplay.RequestRespawn(world);
             return;
         }
         if (Screen != AppScreen.Menu) return;

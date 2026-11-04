@@ -53,6 +53,25 @@ internal sealed class MenuRenderer
     }
 
     /// <summary>
+    /// The death screen over the still-rendered world: a red-dark dim, "YOU DIED", the death line
+    /// and one RESPAWN button. The geometry is <see cref="DeathScreenLayout"/>'s, which
+    /// <see cref="DeathScreenHitsRespawn"/> also reads.
+    /// </summary>
+    internal void DrawDeathScreen(string? deathLine)
+    {
+        var screen = _ui.ScreenSize;
+        _ui.DrawRect(screen * 0.5f, screen, new Rgba(70, 0, 0, 170));
+        _ui.DrawTextCentered("YOU DIED", screen.X * 0.5f, DeathScreenLayout.TitleTop(screen), _ui.HeadScale, Rgba.White);
+        if (!string.IsNullOrEmpty(deathLine))
+            _ui.DrawTextCentered(deathLine, screen.X * 0.5f, DeathScreenLayout.MessageTop(screen), _ui.CountScale, TextDim);
+        DrawMenuButton(DeathScreenLayout.ButtonCenter(screen), "RESPAWN");
+    }
+
+    /// <summary>Whether a window-pixel point (top-left origin) is on the death screen's RESPAWN button.</summary>
+    internal bool DeathScreenHitsRespawn(Vector2 point) =>
+        DeathScreenLayout.HitsRespawn(_ui.ToCanvas(point), _ui.ScreenSize);
+
+    /// <summary>
     /// The settings page: title, one tab strip (Display/Graphics/Water/Audio/Controls), the
     /// active tab's widget rows, BACK button. The busiest tab holds six rows, so the whole
     /// page fits without scrolling.

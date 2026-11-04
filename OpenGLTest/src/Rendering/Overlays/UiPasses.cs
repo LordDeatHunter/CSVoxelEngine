@@ -120,6 +120,17 @@ internal sealed class UiPasses
         Units.InvalidateTextureUnits();
     }
 
+    /// <summary>Draws the death screen (see <see cref="MenuRenderer.DrawDeathScreen"/>) in its own UI pass over the world and the HUD.</summary>
+    internal void RenderDeathScreen(IWindow window, string? deathLine)
+    {
+        var windowSize = new Vector2(window.Size.X, window.Size.Y);
+        _owner.Ui.Begin(window.Size, window.FramebufferSize,
+            UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
+        _owner.Ui.Menu.DrawDeathScreen(deathLine);
+        _owner.Ui.End();
+        Units.InvalidateTextureUnits();
+    }
+
     /// <summary>Draws one hover tooltip (see <see cref="HudRenderer.DrawTooltip"/>), or nothing when
     /// the cursor hovers nothing.</summary>
     internal void RenderTooltip(IWindow window, (Vector2 Anchor, IReadOnlyList<string> Lines)? tooltip)

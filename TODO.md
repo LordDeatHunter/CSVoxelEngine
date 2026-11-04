@@ -337,7 +337,9 @@ single-arc player.
 - [ ] **`U-4` · Inventory QoL** — P1, M.
   Shift-click, stack move/split, drag, and a bound drop key (`ThrowAction.ThrowSelected` exists but
   appears unbound).
-- [ ] **`U-5` · Death / respawn screen** — P1, S. Pairs `P-10`. **Milestone 1.**
+- [x] **`U-5` · Death / respawn screen** — landed: YOU DIED, the death line and a RESPAWN button
+  (or Enter) after the death plays, singleplayer and multiplayer (`RespawnPrompt`,
+  `RespawnPromptTests`). Pairs `P-10`.
 - [ ] **`U-7` · Creative palette + dev commands** — P1, M.
   Searchable all-blocks inventory; `/give`, `/tp`, `/time`, `/gamemode`, `/seed` for testing and
   content authoring. Huge for iteration speed.
