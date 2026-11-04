@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using VoxelEngine.Interaction;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.ItemDebugger;
@@ -9,7 +10,7 @@ namespace VoxelEngine.ItemDebugger;
 /// <see cref="PlayerModel"/> is showing and the synthetic inputs that drive it, so every pose the game
 /// can put the player in can be looked at without a world. The modes are data (<see cref="AllModes"/>):
 /// <b>continuous</b> poses (idle, walk, run, sneak, a jump loop, swimming) feed the model the speed and
-/// state the game would, and <b>one-shots</b> (punch, slice, throw, hurt, equip, landing, death) fire
+/// state the game would, and <b>one-shots</b> (punch, slice, the sword's cut, back cut and chop, throw, hurt, equip, landing, death) fire
 /// the model's own trigger, wait for it to finish, rest <see cref="RestBetweenPlays"/> and fire again,
 /// so a swing can be watched repeatedly. Nothing here is a second implementation of an animation: it only
 /// calls <see cref="PlayerModel.Update"/> and the triggers the world calls, with the same inputs.
@@ -30,6 +31,9 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public const string HeavyPunch = "heavy punch";
     public const string Slice = "slice";
     public const string SliceBack = "slice back";
+    public const string Cut = "cut";
+    public const string BackCut = "back cut";
+    public const string Chop = "chop";
     public const string Throw = "throw";
     public const string Use = "use";
     public const string Hurt = "hurt";
@@ -40,7 +44,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public static readonly IReadOnlyList<string> AllModes =
     [
         Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface,
-        Punch, HeavyPunch, Slice, SliceBack, Throw, Use, Hurt, Equip, Death,
+        Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Throw, Use, Hurt, Equip, Death,
     ];
 
     /// <summary>Seconds a one-shot rests between the end of one play and the next.</summary>
@@ -53,6 +57,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
         SwimIdle => "FLOAT",
         HeavyPunch => "HEAVY",
         SliceBack => "BACK",
+        BackCut => "B-CUT",
         _ => mode.ToUpperInvariant(),
     };
 
@@ -115,6 +120,9 @@ public sealed class PlayerPreviewState : IPreviewDriver
         Punch => PlayerModel.MineDuration + 0.1f,
         HeavyPunch => PlayerModel.MineDuration / 0.7f + 0.1f,
         Slice or SliceBack => PlayerModel.SliceDuration + 0.1f,
+        Cut => PlayerModel.SwordDuration(SwordSwing.Cut) + 0.1f,
+        BackCut => PlayerModel.SwordDuration(SwordSwing.BackCut) + 0.1f,
+        Chop => PlayerModel.SwordDuration(SwordSwing.Chop) + 0.1f,
         Throw => ThrowChargeSeconds + ThrowHoldSeconds + PlayerModel.ThrowDuration + 0.1f,
         Use => UseChargeSeconds + UseHoldSeconds + 0.4f,
         Hurt => 1f,
@@ -140,7 +148,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public float Elapsed => _clock;
 
     /// <summary>True for the modes that replay a swing or reaction (everything after the swim poses).</summary>
-    public bool IsOneShot => Mode is Punch or HeavyPunch or Slice or SliceBack or Throw or Hurt or Equip or Death or Land;
+    public bool IsOneShot => Mode is Punch or HeavyPunch or Slice or SliceBack or Cut or BackCut or Chop or Throw or Hurt or Equip or Death or Land;
 
     /// <summary>Switches to <paramref name="mode"/> (any case); false when there is no such mode.</summary>
     public bool SetMode(string mode)
@@ -214,6 +222,9 @@ public sealed class PlayerPreviewState : IPreviewDriver
             case HeavyPunch:
             case Slice:
             case SliceBack:
+            case Cut:
+            case BackCut:
+            case Chop:
             case Hurt:
             case Equip:
                 OneShot(deltaTime);
@@ -322,6 +333,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     {
         Punch or HeavyPunch => _model.MineT < 1f,
         Slice or SliceBack => _model.IsSlicing,
+        Cut or BackCut or Chop => _model.IsSwordSwinging,
         Hurt => MathF.Abs(_model.Flinch) > 0.02f,
         Equip => MathF.Abs(_model.EquipLowering) > 0.02f,
         _ => false,
@@ -335,6 +347,9 @@ public sealed class PlayerPreviewState : IPreviewDriver
             case HeavyPunch: _model.Punch(1f); break;
             case Slice: _model.StartSlice(1); break;
             case SliceBack: _model.StartSlice(-1); break;
+            case Cut: _model.StartSword(SwordSwing.Cut); break;
+            case BackCut: _model.StartSword(SwordSwing.BackCut); break;
+            case Chop: _model.StartSword(SwordSwing.Chop); break;
             case Hurt: _model.Hurt(1f); break;
             case Equip: _model.NotifyEquip(); break;
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Interaction;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.Networking.Client;
@@ -14,7 +15,7 @@ public readonly record struct RemotePlayerSnapshot(int Id, string Name, Vector3 
 /// A player connected to the same server, as the client sees them: a target pose from the last
 /// broadcast (smoothed toward between broadcasts) and a <see cref="PlayerModel"/> posed from what
 /// the broadcast says they are doing: the walk cycle runs off the distance actually traveled, and
-/// the sprint, jump, crouch and swim poses and their swings (punch, slice, throw) come from the
+/// the sprint, jump, crouch and swim poses and their swings (punch, slice, sword, throw) come from the
 /// flags and the action counter. GL-free.
 /// </summary>
 public sealed class RemotePlayer
@@ -89,6 +90,9 @@ public sealed class RemotePlayer
             case NetPlayerAction.Punch: Model.Punch(); break;
             case NetPlayerAction.Slice: Model.StartSlice(1); break;
             case NetPlayerAction.SliceReturn: Model.StartSlice(-1); break;
+            case NetPlayerAction.SwordCut: Model.StartSword(SwordSwing.Cut); break;
+            case NetPlayerAction.SwordBackCut: Model.StartSword(SwordSwing.BackCut); break;
+            case NetPlayerAction.SwordChop: Model.StartSword(SwordSwing.Chop); break;
             case NetPlayerAction.Throw: Model.ReleaseThrow(1f); break;
         }
     }

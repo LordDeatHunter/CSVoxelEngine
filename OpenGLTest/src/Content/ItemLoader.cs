@@ -106,8 +106,9 @@ internal static class ItemLoader
             {
                 null or "" or "punch" => AttackPattern.Punch,
                 "slice" => AttackPattern.Slice,
+                "sword" => AttackPattern.Sword,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown attack '{definition.Attack}'; expected punch or slice."),
+                    $"Item '{path}' has unknown attack '{definition.Attack}'; expected punch, slice or sword."),
             };
 
             var blockDamage = definition.BlockDamage ?? Mining.DefaultBlockDamage;

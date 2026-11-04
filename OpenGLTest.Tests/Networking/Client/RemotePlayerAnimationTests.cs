@@ -1,4 +1,5 @@
 using System.Numerics;
+using VoxelEngine.Interaction;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
@@ -51,6 +52,27 @@ public sealed class RemotePlayerAnimationTests
 
         remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, NetPlayerAction.Throw, 2);
         Assert.True(remote.Model.IsThrowing);
+    }
+
+    [Fact]
+    public void EachSwordSwingStartsItsOwnAnimation()
+    {
+        var remote = NewRemote();
+        var eye = new Vector3(0f, 1.62f, 0f);
+        byte seq = 0;
+        foreach (var (action, swing) in new[]
+                 {
+                     (NetPlayerAction.SwordCut, SwordSwing.Cut),
+                     (NetPlayerAction.SwordBackCut, SwordSwing.BackCut),
+                     (NetPlayerAction.SwordChop, SwordSwing.Chop),
+                 })
+        {
+            remote.SetTarget(eye, -90f, 0f, NetPlayerFlags.None, action, ++seq);
+            Assert.True(remote.Model.IsSwordSwinging);
+            Assert.Equal(swing, remote.Model.ActiveSwordSwing);
+            Assert.False(remote.Model.IsSlicing);
+            for (var i = 0; i < 90; i++) remote.Update(Dt);
+        }
     }
 
     [Fact]

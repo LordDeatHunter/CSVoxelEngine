@@ -65,6 +65,8 @@ public sealed class ServerPlayer : IMobTarget
         NetworkConfig.NetEditIntentBurst);
 
     private double _lastAttackAt = double.NegativeInfinity;
+    // The last attack that landed, which paces the next (a sword swing waits for the one before it)
+    private NetAttackKind _lastAttackKind;
 
     // The flags of the last creative/flight request the server refused and reported, so a stream of
     // states still carrying it (sent before the client heard back) is not answered again
@@ -83,14 +85,15 @@ public sealed class ServerPlayer : IMobTarget
 
     /// <summary>
     /// Whether an attack of <paramref name="kind"/> with <paramref name="held"/> may land at
-    /// <paramref name="now"/>: the pace since the last one (<see cref="AttackPacing"/>), less
+    /// <paramref name="now"/>: the pace since the last one and after it (<see cref="AttackPacing"/>), less
     /// <paramref name="slackSeconds"/> of network jitter. An attack that may land is recorded.
     /// </summary>
     public bool TryAttack(NetAttackKind kind, Item? held, double now, double slackSeconds)
     {
-        if (now - _lastAttackAt + slackSeconds < AttackPacing.MinGapSeconds(kind, held))
+        if (now - _lastAttackAt + slackSeconds < AttackPacing.MinGapSeconds(_lastAttackKind, kind, held))
             return false;
         _lastAttackAt = now;
+        _lastAttackKind = kind;
         return true;
     }
 

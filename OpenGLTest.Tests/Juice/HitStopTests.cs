@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
@@ -156,6 +157,44 @@ public sealed class HitStopTests : IDisposable
             held |= model.IsHitStopped;
         }
         return (frames, held);
+    }
+
+    // Plays a sword swing to its end the same way, the hold asked for at the swing's own impact.
+    private static (int Frames, bool Held) PlaySword(PlayerModel model, bool hitAtImpact)
+    {
+        var frames = 0;
+        var held = false;
+        var landed = false;
+        var impact = PlayerModel.SwordImpactProgress(model.ActiveSwordSwing);
+        while (model.IsSwordSwinging && frames < 600)
+        {
+            model.Update(Dt, 0f);
+            frames++;
+            if (hitAtImpact && !landed && model.SwordProgress >= impact)
+            {
+                model.HitStop(PlayerConfig.HitStopHeavySeconds);
+                landed = true;
+            }
+            held |= model.IsHitStopped;
+        }
+        return (frames, held);
+    }
+
+    [Fact]
+    public void ALandedSwordSwingHoldsAndStillEndsOnTime()
+    {
+        foreach (var swing in SwordSwings.All)
+        {
+            var plain = new PlayerModel();
+            var hit = new PlayerModel();
+            plain.StartSword(swing);
+            hit.StartSword(swing);
+            var plainSwing = PlaySword(plain, hitAtImpact: false);
+            var hitSwing = PlaySword(hit, hitAtImpact: true);
+            Assert.False(plainSwing.Held);
+            Assert.True(hitSwing.Held, $"{swing} never held");
+            Assert.InRange(hitSwing.Frames, plainSwing.Frames - 1, plainSwing.Frames + 1);
+        }
     }
 
     [Fact]

@@ -32,13 +32,20 @@ public enum NetIntentKind : byte
     Respawn = 7,
 }
 
-/// <summary>Which left-click attack an <see cref="NetIntentKind.Attack"/> intent carries.</summary>
+/// <summary>Which left-click attack an <see cref="NetIntentKind.Attack"/> intent carries (see
+/// <see cref="NetAttacks"/> for what each maps to).</summary>
 public enum NetAttackKind : byte
 {
     Punch = 0,
     Slice = 1,
     /// <summary>The buffered return swing of a slice combo, at half power.</summary>
     SliceReturn = 2,
+    /// <summary>The sword chain's opening cut (<see cref="Interaction.SwordSwing.Cut"/>).</summary>
+    SwordCut = 3,
+    /// <summary>The sword chain's rising back cut (<see cref="Interaction.SwordSwing.BackCut"/>).</summary>
+    SwordBackCut = 4,
+    /// <summary>The sword chain's overhead chop (<see cref="Interaction.SwordSwing.Chop"/>).</summary>
+    SwordChop = 5,
 }
 
 /// <summary>

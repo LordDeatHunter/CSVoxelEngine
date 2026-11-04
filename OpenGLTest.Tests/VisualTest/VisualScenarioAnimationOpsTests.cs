@@ -13,13 +13,15 @@ public sealed class VisualScenarioAnimationOpsTests
             { "steps": [
                 { "op": "damage", "amount": 3 },
                 { "op": "view", "mode": "Shoulder" },
-                { "op": "player", "action": "slice" }
+                { "op": "player", "action": "slice" },
+                { "op": "player", "action": "chop" }
             ] }
             """, "t");
 
         Assert.Equal(3, scenario.Steps[0].Amount);
         Assert.Equal("shoulder", scenario.Steps[1].Mode);
         Assert.Equal("slice", scenario.Steps[2].Action);
+        Assert.Equal("chop", scenario.Steps[3].Action);
     }
 
     [Theory]

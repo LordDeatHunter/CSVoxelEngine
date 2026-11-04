@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Interaction;
 using VoxelEngine.ItemDebugger;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
@@ -587,6 +588,187 @@ public sealed class PlayerModelTests
         // The hand is lowered by re-posing the arm, so the shoulder joint itself never detaches from the
         // torso; it only slides in a little toward the body as the arm lifts (the shoulder socket, 0.09).
         Assert.InRange(MathF.Abs(rest - strike), 0f, 0.1f);
+    }
+
+    // ---- the sword ----
+
+    private static PlayerModel Swordsman(SwordSwing swing, out Vector3 eye)
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+            player.Update(1f / 60f, 0f);
+        eye = new Vector3(0.5f, 70f, 0.5f);
+        player.StartSword(swing);
+        return player;
+    }
+
+    // Steps a sword swing to a progress (its own duration, not the slice's) at frame rate, as the game does, so the
+    // springs that trail the pose (the shoulder pull) see the whole motion rather than one jump.
+    private static void SwordTo(PlayerModel player, float progress)
+    {
+        var duration = PlayerModel.SwordDuration(player.ActiveSwordSwing);
+        while (player.SwordProgress < progress)
+        {
+            var left = duration * (progress - player.SwordProgress);
+            player.Update(MathF.Min(1f / 60f, left), 0f);
+            if (left <= 1f / 60f) break;
+        }
+    }
+
+    private static Vector3 Hand(PlayerModel player, Vector3 eye) =>
+        Vector3.Transform(Vector3.Zero, player.GetHandAnchorMatrix(eye, -90f));
+
+    [Fact]
+    public void EverySwordSwingFinishesAfterItsOwnDurationAndTheFinisherIsTheSlowest()
+    {
+        foreach (var swing in SwordSwings.All)
+        {
+            var player = new PlayerModel();
+            player.StartSword(swing);
+            Assert.True(player.IsSwordSwinging);
+            Assert.Equal(swing, player.ActiveSwordSwing);
+            Assert.Equal(0f, player.SwordProgress, 3);
+
+            var duration = PlayerModel.SwordDuration(swing);
+            player.Update(duration * 0.9f, 0f);
+            Assert.True(player.IsSwordSwinging);
+            player.Update(duration * 0.1f + 1e-3f, 0f);
+            Assert.False(player.IsSwordSwinging);
+            Assert.Equal(1f, player.SwordProgress, 3);
+            // The damage lands inside the swing, after the wind-up
+            Assert.InRange(PlayerModel.SwordImpactProgress(swing), 0.2f, 0.8f);
+        }
+
+        // The chain's pacing: the quick follow-up, the opener, then the heavy finisher
+        Assert.True(PlayerModel.SwordDuration(SwordSwing.BackCut) < PlayerModel.SwordDuration(SwordSwing.Cut));
+        Assert.True(PlayerModel.SwordDuration(SwordSwing.Cut) < PlayerModel.SwordDuration(SwordSwing.Chop));
+        Assert.Equal(PlayerModel.SwordDuration(SwordSwing.BackCut), PlayerModel.ShortestSwordSwingSeconds);
+    }
+
+    [Fact]
+    public void TheCutComesDownFromHighOnTheRightToLowOnTheLeft()
+    {
+        var player = Swordsman(SwordSwing.Cut, out var eye);
+        var rest = Hand(player, eye);
+
+        SwordTo(player, 0.32f);
+        var wound = Hand(player, eye);
+        SwordTo(player, 0.52f);
+        var struck = Hand(player, eye);
+        SwordTo(player, 1f);
+        var settled = Hand(player, eye);
+
+        // Wound up out to the right and above the shoulder, struck through to the left and well below it
+        Assert.True(wound.X > eye.X, $"wound {wound}");
+        Assert.True(struck.X < eye.X, $"struck {struck}");
+        Assert.True(wound.Y > struck.Y + 0.6f, $"wound {wound} struck {struck}");
+        Assert.True(wound.Y > eye.Y - 0.2f, $"the wind-up is not raised: {wound}");
+        Assert.True(struck.Y < eye.Y - 0.6f, $"the cut does not end low: {struck}");
+        // No teleport: the swing ends at the pose it started from
+        Assert.True(Vector3.Distance(settled, rest) < 0.05f);
+    }
+
+    [Fact]
+    public void TheBackCutRisesFromLowOnTheLeftToHighOnTheRight()
+    {
+        var player = Swordsman(SwordSwing.BackCut, out var eye);
+
+        SwordTo(player, 0.28f);
+        var wound = Hand(player, eye);
+        SwordTo(player, 0.48f);
+        var struck = Hand(player, eye);
+
+        Assert.True(wound.X < eye.X, $"wound {wound}");
+        Assert.True(struck.X > eye.X, $"struck {struck}");
+        Assert.True(struck.Y > wound.Y + 0.6f, $"wound {wound} struck {struck}");
+    }
+
+    [Fact]
+    public void TheChopRaisesTheBladeOverheadAndBringsItStraightDownTheMiddle()
+    {
+        TestContent.EnsureLoaded();
+        var item = ItemRegistry.TryGet(ContentRegistry.RequireItem("iron_sword").Id)!;
+        var player = Swordsman(SwordSwing.Chop, out var eye);
+
+        SwordTo(player, 0.42f);
+        var wound = Hand(player, eye);
+        SwordTo(player, 0.56f);
+        var struck = Hand(player, eye);
+        var blade = item.DisplayMatrix(player.HeldItemRotationOffset) * player.GetHandAnchorMatrix(eye, -90f);
+        var tip = Vector3.Normalize(Vector3.TransformNormal(new Vector3(1, 1, 0), blade));
+
+        // The hand goes over the head and comes down in front, never swinging out to a side
+        Assert.True(wound.Y > eye.Y, $"the wind-up is not overhead: {wound}");
+        Assert.True(struck.Y < eye.Y - 0.5f, $"the chop does not come down: {struck}");
+        Assert.True(MathF.Abs(wound.X - eye.X) < 0.4f && MathF.Abs(struck.X - eye.X) < 0.4f, $"the chop swings sideways: {wound} {struck}");
+        Assert.True(struck.Z < eye.Z - 0.3f, $"the blow does not land in front: {struck}");
+        // At the bottom of the blow the blade points down and forward, not up or across
+        Assert.True(tip.Y < -0.3f, $"the blade is not pointed down at the end of the chop ({tip})");
+        Assert.True(MathF.Abs(tip.X) < 0.5f, $"the blade is turned across at the end of the chop ({tip})");
+    }
+
+    [Fact]
+    public void TheChopSinksTheBodyDeeperAndFoldsItFurtherForwardThanACut()
+    {
+        // The deepest the knees bend and the furthest the torso leans forward over a whole swing (knees bend
+        // backward, negative; a forward lean is a negative torso pitch).
+        (float Knee, float Torso) Deepest(SwordSwing swing)
+        {
+            var player = Swordsman(swing, out _);
+            var knee = float.PositiveInfinity;
+            var torso = float.PositiveInfinity;
+            for (var progress = 0.02f; progress < 1f; progress += 0.02f)
+            {
+                SwordTo(player, progress);
+                var pose = player.GetPose();
+                knee = MathF.Min(knee, pose.LeftKnee);
+                torso = MathF.Min(torso, pose.TorsoPitch);
+            }
+            return (knee, torso);
+        }
+
+        var restPlayer = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++) restPlayer.Update(1f / 60f, 0f);
+        var rest = restPlayer.GetPose();
+        var cut = Deepest(SwordSwing.Cut);
+        var chop = Deepest(SwordSwing.Chop);
+
+        Assert.True(cut.Knee < rest.LeftKnee - 0.1f, $"the cut never sinks ({cut.Knee} vs {rest.LeftKnee})");
+        Assert.True(chop.Knee < cut.Knee - 0.05f, $"the chop sinks no deeper than the cut ({chop.Knee} vs {cut.Knee})");
+        Assert.True(chop.Torso < cut.Torso - 0.1f, $"the chop folds no further than the cut ({chop.Torso} vs {cut.Torso})");
+        Assert.True(chop.Torso < rest.TorsoPitch - 0.3f, $"the chop barely folds ({chop.Torso} vs {rest.TorsoPitch})");
+    }
+
+    [Fact]
+    public void EverySwordSwingKeepsTheShoulderOnTheTorso()
+    {
+        foreach (var swing in SwordSwings.All)
+        {
+            var player = Swordsman(swing, out var eye);
+            float ShoulderToTorso() => Vector3.Distance(
+                player.GetPartMatrix("UpperArmR", eye, -90f, 0f).Translation,
+                player.GetPartMatrix("Torso", eye, -90f, 0f).Translation);
+            var rest = ShoulderToTorso();
+            for (var progress = 0.1f; progress < 1f; progress += 0.1f)
+            {
+                SwordTo(player, progress);
+                Assert.InRange(MathF.Abs(rest - ShoulderToTorso()), 0f, 0.12f);
+            }
+        }
+    }
+
+    [Fact]
+    public void OneBladeSwingAtATime()
+    {
+        var player = new PlayerModel();
+        player.StartSlice(1);
+        player.StartSword(SwordSwing.Cut);
+        Assert.True(player.IsSwordSwinging);
+        Assert.False(player.IsSlicing);
+
+        player.StartSlice(-1);
+        Assert.True(player.IsSlicing);
+        Assert.False(player.IsSwordSwinging);
     }
 
     // World positions with the body at the origin facing -Z (the default look), +X its right.

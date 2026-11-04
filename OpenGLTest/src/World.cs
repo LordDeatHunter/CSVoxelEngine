@@ -650,6 +650,10 @@ public class World
     /// <see cref="LeftClickAction.SliceFor"/>); public for the dedicated server.</summary>
     public int SliceFor(PlayerContext player, bool returnSwing) => LeftClick.SliceFor(player, returnSwing);
 
+    /// <summary>Lands one of <paramref name="player"/>'s sword swings (see
+    /// <see cref="LeftClickAction.SwordFor"/>); public for the dedicated server.</summary>
+    public int SwordFor(PlayerContext player, SwordSwing swing) => LeftClick.SwordFor(player, swing);
+
     /// <summary>Releases a throw of <paramref name="player"/>'s selected throwable (see
     /// <see cref="ThrowAction.ThrowFor"/>); public for the dedicated server.</summary>
     public bool ThrowFor(PlayerContext player, float charge01) => Throws.ThrowFor(player, charge01);

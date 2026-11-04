@@ -334,6 +334,9 @@ internal sealed class LocalPlayer
             case "hurt": NotifyPlayerHurt(fromMob: false); break;
             case "punch": PunchSwing(); break;
             case "slice": Player.StartSlice(1); break;
+            case "cut": Player.StartSword(SwordSwing.Cut); break;
+            case "backcut": Player.StartSword(SwordSwing.BackCut); break;
+            case "chop": Player.StartSword(SwordSwing.Chop); break;
             case "equip": Player.NotifyEquip(); break;
             case "charge": Player.StartThrowCharge(); Player.UpdateThrowCharge(1f); break;
             case "release": Player.ReleaseThrow(1f); break;

@@ -122,12 +122,7 @@ internal sealed class IntentReplay
                 player.NoteAction(NetPlayerAction.Throw);
                 break;
             case NetIntentKind.Attack:
-                player.NoteAction(intent.Attack switch
-                {
-                    NetAttackKind.Slice => NetPlayerAction.Slice,
-                    NetAttackKind.SliceReturn => NetPlayerAction.SliceReturn,
-                    _ => NetPlayerAction.Punch,
-                });
+                player.NoteAction(NetAttacks.ActionOf(intent.Attack));
                 break;
         }
         switch (intent.Kind)
@@ -201,18 +196,27 @@ internal sealed class IntentReplay
 
     private bool AttackFor(ServerPlayer player, in WorldIntent intent)
     {
-        // A slice needs a slicing weapon in hand, a punch anything else, and either one only at its
-        // own pace. A swing that strikes nothing is still a legal swing.
+        // A swing needs the weapon that makes it in hand (a slice a slicing blade, a sword swing a
+        // sword, a punch anything else), and lands only at its own pace. A swing that strikes
+        // nothing is still a legal swing.
         var held = player.Inventory.HeldItem;
-        var slicing = held is { Attack: AttackPattern.Slice };
-        if (slicing != (intent.Attack != NetAttackKind.Punch))
+        if (NetAttacks.PatternOf(intent.Attack) != (held?.Attack ?? AttackPattern.Punch))
             return false;
         if (!player.TryAttack(intent.Attack, held, _state.Elapsed, NetworkConfig.NetAttackSlackSeconds))
             return false;
-        if (intent.Attack == NetAttackKind.Punch)
-            _state.World.PunchFor(player.Context);
-        else
-            _state.World.SliceFor(player.Context, intent.Attack == NetAttackKind.SliceReturn);
+        switch (intent.Attack)
+        {
+            case NetAttackKind.Punch:
+                _state.World.PunchFor(player.Context);
+                break;
+            case NetAttackKind.Slice:
+            case NetAttackKind.SliceReturn:
+                _state.World.SliceFor(player.Context, intent.Attack == NetAttackKind.SliceReturn);
+                break;
+            default:
+                _state.World.SwordFor(player.Context, NetAttacks.SwordSwingOf(intent.Attack));
+                break;
+        }
         return true;
     }
 

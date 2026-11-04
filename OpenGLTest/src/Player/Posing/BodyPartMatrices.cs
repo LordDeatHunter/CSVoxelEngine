@@ -10,22 +10,6 @@ internal sealed class BodyPartMatrices
 
     internal BodyPartMatrices(PlayerModel model) => _model = model;
 
-    // The slicing arm is held out in front, nearly straight, at about chest height: the upper arm raised to
-    // roughly horizontal (SliceArmShoulder, a flexion about X) with only a slight bend at the elbow
-    // (SliceArmElbow), so the forearm points forward along the arm rather than up. The carrying pose (elbow bent
-    // 75 degrees, forearm up) is eased into this as the stroke ramps in, and back out as it ramps out.
-    private const float SliceArmShoulder = 1.5f;
-    private const float SliceArmElbow = 0.3f;
-    // The blade is carried by the wrist: its tip points along the forearm (so it follows the sweep of the arm and
-    // is always across the direction the hand travels, never turned up), rolled about its own length by
-    // SliceBladeRoll (an edge-leading cant, not laid fully flat) and cocked up from the forearm by SliceBladeCant,
-    // the way a blade is held out ahead of the hand. Both mirror with the swing's direction.
-    private const float SliceBladeRoll = 0.8f;
-    private const float SliceBladeCant = 0.12f;
-    // During the main part of the cut (SliceMainWeight) the blade is also turned about the vertical by this much
-    // from the forearm's direction, in the engine's yaw convention (positive: counter-clockwise seen from above, toward the
-    // player's left for the first swing, so the tip leads ahead of the hand's travel). Mirrored for the return.
-    private const float SliceBladeYawOffset = 0.785f;
     private const float PelvisFallback = 0.75f;
 
     /// <summary>The body of <see cref="PlayerModel.GetPartMatrix"/>.</summary>
@@ -45,6 +29,8 @@ internal sealed class BodyPartMatrices
         // (at the default -90 it is the identity, verified against Camera.GetForwardVector).
         // A lagging body faces its own yaw and the head makes up the difference.
         var mods = _model.Secondary.ComputeMods();
+        // The blade swing in progress (a slice or a sword swing), or every term zero
+        var blade = _model.Blade;
         var bodyYawDeg = _model.BodyYawLags && _model.LookKnown ? _model.TrailingBodyYaw : yawDeg;
         var yawRad = -(bodyYawDeg + 90f) * MathF.PI / 180f;
         // Swimming tips the body forward about the hips, a death lays it over about the feet.
@@ -86,11 +72,11 @@ internal sealed class BodyPartMatrices
                             * Matrix4x4.CreateFromAxisAngle(Vector3.UnitY, side * PlayerModel.ArmInwardYaw + sweep + _model.SwayYaw));
             fore = LimbFrames.FrameOf(Matrix4x4.CreateFromAxisAngle(swingAxis, elbow));
             _model.Overlays.ApplyArmFrames(side, ref upper, ref fore);
-            // The arm now hangs off the torso, so the torso's twist turns it too. The authored poses (the
-            // slice sweep, the cocked throw, the punch) were tuned in body space, so while one is showing the twist
+            // The arm now hangs off the torso, so the torso's twist turns it too. The authored poses (a blade
+            // swing's sweep, the cocked throw, the punch) were tuned in body space, so while one is showing the twist
             // is taken back out of the arm's yaw and its hand path stays where it was; an idle arm simply follows
             // the torso round.
-            var authored = side > 0f ? MathUtils.Clamp01(MathF.Max(SliceMotion.SliceStroke(_model.SliceProgress), MathF.Max(_model.ThrowArm.ThrowArmWeight(), _model.Jab.PunchActivity()))) : 0f;
+            var authored = side > 0f ? MathUtils.Clamp01(MathF.Max(blade.Stroke, MathF.Max(_model.ThrowArm.ThrowArmWeight(), _model.Jab.PunchActivity()))) : 0f;
             if (authored > 0f && mods.TorsoYaw != 0f)
                 upper = LimbFrames.FrameOf(Matrix4x4.CreateFromQuaternion(upper) * Matrix4x4.CreateRotationY(-mods.TorsoYaw * authored));
         }
@@ -108,24 +94,22 @@ internal sealed class BodyPartMatrices
             * Matrix4x4.CreateRotationY(-mods.RootYaw * SliceMotion.SliceLegCounter)
             * Matrix4x4.CreateTranslation(pivot) * root;
 
-        var sliceSweep = SliceMotion.SliceSweep(_model.SliceProgress, _model.SliceDir);
         // The jab swings the arm across to the aim's own side as it extends, and back out on the
         // recovery. PunchArmYaw is absolute while UpperArm adds ArmInwardYaw on its own, so that
         // fixed term is taken back out here.
-        var rightArmYaw = sliceSweep + _model.Jab.PunchArmYaw(pitchRad, pose.TorsoPitch) - PlayerModel.ArmInwardYaw;
-        // While slicing the arm is eased from the carrying pose into the extended one (see SliceArmShoulder).
-        var sliceStroke = SliceMotion.SliceStroke(_model.SliceProgress);
-        var rightShoulder = MathUtils.Lerp(pose.RightShoulder, SliceArmShoulder, sliceStroke);
-        var rightElbow = MathUtils.Lerp(pose.RightElbow, SliceArmElbow, sliceStroke);
+        var rightArmYaw = blade.ArmYaw + _model.Jab.PunchArmYaw(pitchRad, pose.TorsoPitch) - PlayerModel.ArmInwardYaw;
+        // Through a blade swing the arm is eased from the carrying pose into the swing's own (the slice's
+        // extended arm, the sword's raised or dropped one) by the stroke.
+        var rightShoulder = MathUtils.Lerp(pose.RightShoulder, blade.Shoulder, blade.Stroke);
+        var rightElbow = MathUtils.Lerp(pose.RightElbow, blade.Elbow, blade.Stroke);
 
-        // Lowering the slice by translating the arm would detach the shoulder from the torso
+        // Lowering the hand by translating the arm would detach the shoulder from the torso
         // (only visible in third person), so instead keep the shoulder fixed and re-solve the
         // shoulder pitch and elbow that land the hand at the same lowered spot.
-        var sliceDrop = SliceMotion.SliceDrop(_model.SliceProgress);
-        if (sliceDrop != 0f)
+        if (blade.HandLift != 0f)
         {
             ArmSolver.ArmHandOffset(rightShoulder, rightElbow, out var handY, out var handZ);
-            (rightShoulder, rightElbow) = ArmSolver.SolveArm(handY + sliceDrop, handZ);
+            (rightShoulder, rightElbow) = ArmSolver.SolveArm(handY + blade.HandLift, handZ);
         }
 
         // Child joints ride their parent: the elbow offset is the file's forearm pivot minus
@@ -173,19 +157,19 @@ internal sealed class BodyPartMatrices
         var rotation = Matrix4x4.CreateRotationX(pitchRad * punch)
                        * Matrix4x4.CreateRotationY(yawRad + _model.Jab.PunchArmYaw(pitchRad, _model.GetPose(pitchDeg).TorsoPitch) + _model.SwayYaw);
 
-        // A slice carries the blade by the wrist: its tip points along the forearm (the item's tip is its local +Y,
+        // A blade swing carries the blade by the wrist: its tip points along the forearm (the item's tip is its local +Y,
         // the forearm's hand end its local -Y), cocked up a little and rolled about its length, and it takes over from
         // the body-space orientation as the stroke ramps in, so the blade follows the hand's sweep instead of a
         // separate formula and never turns up in the middle of the cut.
-        var carried = _model.IsSlicing ? SliceMotion.SliceStroke(_model.SliceProgress) : 0f;
-        if (carried > 0f)
+        var blade = _model.Blade;
+        if (blade.Stroke > 0f)
         {
             var forearmRotation = forearm;
             forearmRotation.Translation = Vector3.Zero;
-            var wrist = Matrix4x4.CreateRotationX(MathF.PI) * Matrix4x4.CreateRotationY(SliceBladeRoll * _model.SliceDir)
-                        * Matrix4x4.CreateRotationX(SliceBladeCant) * forearmRotation
-                        * Matrix4x4.CreateRotationY(SliceBladeYawOffset * _model.SliceDir * SliceMotion.SliceMainWeight(_model.SliceProgress));
-            rotation = Matrix4x4.CreateFromQuaternion(Quaternion.Slerp(LimbFrames.FrameOf(rotation), LimbFrames.FrameOf(wrist), carried));
+            var wrist = Matrix4x4.CreateRotationX(MathF.PI) * Matrix4x4.CreateRotationY(blade.BladeRoll)
+                        * Matrix4x4.CreateRotationX(blade.BladeCant) * forearmRotation
+                        * Matrix4x4.CreateRotationY(blade.BladeYaw);
+            rotation = Matrix4x4.CreateFromQuaternion(Quaternion.Slerp(LimbFrames.FrameOf(rotation), LimbFrames.FrameOf(wrist), blade.Stroke));
         }
 
         return rotation * Matrix4x4.CreateTranslation(fist);

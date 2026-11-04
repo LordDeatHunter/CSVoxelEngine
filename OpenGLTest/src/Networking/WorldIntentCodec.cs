@@ -108,7 +108,7 @@ public static class WorldIntentCodec
             case NetIntentKind.Attack:
             {
                 var attack = (NetAttackKind)reader.ReadByte();
-                if (attack is < NetAttackKind.Punch or > NetAttackKind.SliceReturn)
+                if (attack is < NetAttackKind.Punch or > NetAttacks.Last)
                     throw new InvalidDataException($"unknown attack {(byte)attack}");
                 return new WorldIntent(kind, eye, direction, Attack: attack);
             }

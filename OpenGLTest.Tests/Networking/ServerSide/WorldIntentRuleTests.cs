@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.ServerSide;
@@ -45,6 +47,7 @@ public sealed class WorldIntentRuleTests
             WorldIntent.Use(Eye, direction, null),
             WorldIntent.Throw(Eye, direction, 0.75f),
             WorldIntent.AttackWith(Eye, direction, NetAttackKind.SliceReturn),
+            WorldIntent.AttackWith(Eye, direction, NetAttackKind.SwordChop),
         };
 
         var seq = 40;
@@ -61,6 +64,28 @@ public sealed class WorldIntentRuleTests
             Assert.Equal(intent.Normal, back.Normal);
             Assert.Equal(intent.Charge, back.Charge);
             Assert.Equal(intent.Attack, back.Attack);
+        }
+    }
+
+    [Fact]
+    public void EveryAttackKindNamesOnePatternAndTheSwordKindsRoundTripTheirSwing()
+    {
+        var actions = new HashSet<NetPlayerAction>();
+        for (var kind = NetAttackKind.Punch; kind <= NetAttacks.Last; kind++)
+        {
+            // A swing needs the weapon that makes it: a sword kind needs a sword, the others never do
+            Assert.Equal(NetAttacks.IsSword(kind), NetAttacks.PatternOf(kind) == AttackPattern.Sword);
+            // Every kind is a distinct swing to the other clients
+            Assert.True(actions.Add(NetAttacks.ActionOf(kind)), $"{kind} shares its action");
+            if (!NetAttacks.IsSword(kind))
+                Assert.Throws<ArgumentOutOfRangeException>(() => NetAttacks.SwordSwingOf(kind));
+        }
+
+        foreach (var swing in SwordSwings.All)
+        {
+            var kind = NetAttacks.OfSword(swing);
+            Assert.True(NetAttacks.IsSword(kind));
+            Assert.Equal(swing, NetAttacks.SwordSwingOf(kind));
         }
     }
 

@@ -96,7 +96,7 @@ The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
 display sliders, and the player body: its mode buttons are **every player animation**
 (`OpenGLTest.ItemDebugger/PlayerPreviewState.cs`, GL-free and tested): the poses IDLE WALK RUN SNEAK JUMP
-S-JUMP LAND SWIM FLOAT, and the swings and reactions PUNCH HEAVY SLICE BACK THROW HURT EQUIP DEATH,
+S-JUMP LAND SWIM FLOAT, and the swings and reactions PUNCH HEAVY SLICE BACK CUT B-CUT CHOP THROW HURT EQUIP DEATH,
 which replay on their own after a short rest. Each only feeds the real `PlayerModel` the inputs and
 triggers the game does, so what shows is exactly what the game poses (a jump loop with the landing, a
 swim that strokes as long as forward is held, a throw that charges, holds and releases, a death that
@@ -154,7 +154,7 @@ Environment variables for scripted captures:
 - `ITEM_DEBUGGER_ANIM=<clip|hurt|hop|spawn|death|...>` picks the entity mode. An unknown mode logs a
   warning listing the valid ones.
 - `ITEM_DEBUGGER_PLAYER_ANIM=<mode>` picks the player animation (`idle`, `walk`, `run`, `sneak`, `jump`,
-  `sprint jump`, `land`, `swim`, `swim idle`, `punch`, `heavy punch`, `slice`, `slice back`, `throw`,
+  `sprint jump`, `land`, `swim`, `swim idle`, `punch`, `heavy punch`, `slice`, `slice back`, `cut`, `back cut`, `chop`, `throw`,
   `hurt`, `equip`, `death`) and selects the ITEMS tab. An unknown mode logs a warning listing them.
 - `ITEM_DEBUGGER_SPEED=<0..4>` and `ITEM_DEBUGGER_LOOP=<0|1>` set the timeline's speed and loop at startup.
 - `ITEM_DEBUGGER_SHOT=<png path>` saves one screenshot and closes. Without `ITEM_DEBUGGER_SHOT_AT` it
@@ -170,14 +170,14 @@ Environment variables for scripted captures:
   off the body shows.
 - `ITEM_DEBUGGER_LOOK=yaw,pitch` pins the first-person look angles.
 
-The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `SelectionPasses.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (a search field sits over the tabs: typing names the owned items and the recipes that make or consume a matching thing, ranked with prefix hits and owned items first, and clicking a result picks the item or opens its recipe; blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it, and a focused field takes the keyboard so typing never moves the player). A new survival world starts with **nothing** (`Inventory.Empty`); `C` creative mode turns the same Blocks/Tools/Misc tabs into the **whole item catalog** (`CreativeCatalog`) - clicking a row grants one, each row's `[+1]` / `[+10]` / `[+100]` button grants that many, and a red `[X]` clears the id's counts (`Inventory.RemoveAll`), all through the ordinary            `Inventory.Add` - while the Craft tab keeps listing every recipe. `T` opens the chat (type, Enter sends, Escape closes, the arrow keys walk sent messages; while it is open the keyboard is captured so the player never moves while typing) and works in singleplayer and on a server. `X` to toggle debug logging               
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front; an item declaring `attack: "sword"` — the iron sword — swings a three-swing chain instead: a diagonal cut and a rising back cut over the same hemisphere, hitting the nearest three, then an overhead chop on the one mob under the aim at the highest power and a heavier shove, each swing buffered by a click or chained by a press shortly after the last one ended, see `SwordCombo`/`SwordSwings`), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `SelectionPasses.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (a search field sits over the tabs: typing names the owned items and the recipes that make or consume a matching thing, ranked with prefix hits and owned items first, and clicking a result picks the item or opens its recipe; blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it, and a focused field takes the keyboard so typing never moves the player). A new survival world starts with **nothing** (`Inventory.Empty`); `C` creative mode turns the same Blocks/Tools/Misc tabs into the **whole item catalog** (`CreativeCatalog`) - clicking a row grants one, each row's `[+1]` / `[+10]` / `[+100]` button grants that many, and a red `[X]` clears the id's counts (`Inventory.RemoveAll`), all through the ordinary            `Inventory.Add` - while the Craft tab keeps listing every recipe. `T` opens the chat (type, Enter sends, Escape closes, the arrow keys walk sent messages; while it is open the keyboard is captured so the player never moves while typing) and works in singleplayer and on a server. `X` to toggle debug logging               
            (FPS/position/water state to console), Escape to open the pause menu (RESUME / SETTINGS / SAVE & QUIT;        Escape on its settings page steps back to it, and on the main page resumes). SAVE & QUIT presents a `Saving...` frame, calls `World.SaveAndDispose` on the next update and returns to the main menu's worlds page. None of these keys act while a world is still loading.
 
 **HUD and feedback.** The crosshair is drawn as five pieces cropped out of its 16x16 texture (a
 center dot and four pills): the arms slide outward with the eased `Camera.ThrowCharge` while a throw
 is charged, a ring of dots around it fills with `LeftClickAction.Crosshair.BreakProgress` (0 in creative or
-with no target), and the hit marker flashes an X at the two connecting-hit sites the hit-stop uses (a
-landed punch or slice), fading over `HitMarker.Seconds` (`HitMarkerTests`). At the top of the
+with no target), and the hit marker flashes an X at the connecting-hit sites the hit-stop uses (a
+landed punch, slice or sword swing), fading over `HitMarker.Seconds` (`HitMarkerTests`). At the top of the
 screen the **look-at label** shows the targeted block: its name and a small spinning 3D render of
 it, pushed below the compass or clock strip while one is equipped (`TopStripRenderer.DrawLookLabel` and
 its `LookLabelTop` over `BlockCubeCache`), the name in red while the held item cannot mine
@@ -1294,6 +1294,11 @@ OpenGLTest/
       SelectionOutlineMesh.cs  # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
       SelectionPulse.cs        # GL-free twin of the outline's breathing opacity (steady while mining)
       SliceCombo.cs            # the blade's two-phase slice combo: press/queue/advance state
+      SwordCombo.cs            # the sword's cut / back cut / chop chain: press/queue/advance state and the
+                               #   window after a swing in which the next press continues the chain
+      SwordSwing.cs            # the three sword swings, in chain order
+      SwordSwings.cs           # GL-free per-swing rules: the chain's successor, power, targets, cone vs
+                               #   hemisphere, shove and hit-stop weight
       TallBlock.cs             # GL-free two-cell block rules (a door): each half's partner cell
                                #   and block, and the lower half every half drops and picks as
       ThrowAction.cs           # World component: Q drops, the throw charge and release, the projectiles in flight
@@ -1372,6 +1377,8 @@ OpenGLTest/
       InventoryIntentCodec.cs  # its bounds-checked wire form
       InventoryNetCodec.cs     # the server-owned inventory on the wire (the save JSON shape)
       LodNetCodec.cs           # a far-LOD region's mesh on the wire
+      NetAttacks.cs            # what each NetAttackKind stands for: the attack pattern it needs in hand, the
+                               #   sword swing it names, the NetPlayerAction it is rebroadcast as
       NetEntity.cs             # NetEntityKind/NetEntity and NetCellChange
       NetPlayerAction.cs       # the swing a player just made, as the server rebroadcasts it in each
                                #   player list entry (with a counter that moves on every new one)
@@ -1395,7 +1402,8 @@ OpenGLTest/
         RemotePlayer.cs        # another player as the client sees them: pose smoothing + a PlayerModel
       ServerSide/              # the server's side of a session: the connected player and the rules its intents and
                                #   moves are judged by (the dedicated server itself is OpenGLTest.Server, VoxelEngine.Server)
-        AttackPacing.cs        # GL-free: the shortest gap between two punches or slice swings
+        AttackPacing.cs        # GL-free: the shortest gap from one attack to the next (a punch's pace, a
+                               #   slice's swing, the sword swing before the one asked for)
         BreakProgress.cs       # GL-free: a player's mining on the server, judged against the held item's hits
         InventoryIntentRules.cs # GL-free: what the server accepts of an intent, against that player's inventory
         MovementRules.cs       # GL-free movement rubberband: speed clamp, then collision, rise and hover checks
@@ -1470,6 +1478,8 @@ OpenGLTest/
       Posing/                  # the posing components PlayerModel owns (see PlayerModel.cs), namespace VoxelEngine.Player.Posing
         ArmOverlays.cs         # lays the pose-specific arm frames (jump, swim stroke and float, punch chamber, cocked throw) over the base frames
         ArmSolver.cs           # the two-bone arm math: hand offset for a shoulder pitch and elbow, and the joints that reach an offset
+        BladeSwingFrame.cs     # what the right arm, the body and the held blade do on one frame of a blade swing (a slice
+                               #   or a sword swing): the one struct the body code reads of either
         BodyPartMatrices.cs    # the world matrices of the body parts and the held item's hand anchor (GetPartMatrix/GetHandAnchorMatrix bodies)
         LimbFrames.cs          # the arm-frame builders (FrameOf, UpperFrame, ForeFrame, Blend) and the shoulder socket
         PoseBuilder.cs         # assembles the frame's joint pose: gait and jump blend, then swim, mods, jab, throw and use in order
@@ -1477,7 +1487,9 @@ OpenGLTest/
         PunchPose.cs           # the jab: phase weights and the two-bone IK that drives the fist along the aim
         SecondaryMotion.cs     # the body-wide mods (landing dip, crouch, flinch, sway, twist, swim tilt, death fall) and ApplyMods
         ShoulderReach.cs       # where each shoulder is pulled toward its reaching arm (the target of the owner's pull springs)
-        SliceMotion.cs         # the slice swing's phase shapes as pure functions of the slice clock
+        SliceMotion.cs         # the slice swing's phase shapes as pure functions of the slice clock, and its BladeSwingFrame
+        SwordMotion.cs         # the sword's cut, back cut and chop as pure functions of their clocks (one Shape
+                               #   each), and their BladeSwingFrames
         SwimPose.cs            # the swim stroke shape and the swim and surface-float leg pose
         ThrowPose.cs           # the right arm's throw and timed-use overrides
       PlayerPhysics.cs         # walk/fly/swim input -> body position (moved through BodyCollision),
@@ -2390,7 +2402,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 | `display` | how the item sits in the right hand: `rotation` as `[pitch, yaw, roll]` degrees (composed yaw, then pitch, then roll), `translation` in blocks of hand space, `scale` as a multiplier; omitted means `{"rotation": [-30, 10, 0]}`, i.e. upright over the hand with a slight sideways cant — the pickaxe yaws to 60 so a tip faces forward, the compass uses rotation `[-60, 0, 0]`, scale `0.67` and a lift to face back up at the holder |
 | `blockDamage` | damage one left-click hit removes from a block's `hardness`; default 0.5 (the bare-hand baseline). Independent of `tool`, which only gates *whether* the block may be mined |
 | `entityDamage` | damage one punch or slice deals to an enemy (any `Mob`: a slime or a goblin); default 1 (the bare-hand baseline). A weapon raises it without needing a `tool` block (the obsidian blade is `6`) |
-| `attack` | left-click attack behavior, an `AttackPattern`: `punch` (default; forward cone, hits the nearest one) or `slice` (forward hemisphere, hits the nearest two, two-phase swing — the obsidian blade). See `Combat`/`SliceCombo` |
+| `attack` | left-click attack behavior, an `AttackPattern`: `punch` (default; forward cone, hits the nearest one), `slice` (forward hemisphere, hits the nearest two, two-phase swing — the obsidian blade) or `sword` (a three-swing chain: a diagonal cut and a rising back cut over the hemisphere, hitting the nearest three, then an overhead chop on the one target in the cone at the highest power with a heavier shove — the iron sword). See `Combat`/`SliceCombo`/`SwordCombo`/`SwordSwings` |
 | `fuel.burnSeconds` | seconds one unit of this item keeps a kiln lit (coal 60; 1..3600). Writing the object is what makes an item kiln fuel — a kiln takes up to `KilnManager.MaxFuel` units of **one** kind at a time |
 | `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many milliliters of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent(MaterialId, MoltenMl, PendingMl, PendingInputId)` — the last field is display-only, the last melt input charged in, so the kiln can draw what is waiting to melt; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
 | `model` | optional `block/<name>` model under `assets/models/`, baked into `Item.BakedModel` so the item can be drawn as real 3D geometry while it sits inside a station (the crucible standing in a kiln's hearth). The sprite stays the inventory icon; this only adds a mesh |
@@ -3132,7 +3144,7 @@ climate) instead of the heights alone, so a client derives nothing from worldgen
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 (current) ends `PlayerStatus` with the player's air byte. Version 8 added
+whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 (current) lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 8 added
 `NetEntityKind.Iceberg` (6): `Position` the waterline center, `Yaw` the quarter turns times pi/2
 (`NetEntity.YawFromTurns` / `TurnsFromYaw`), `Health` the seed, `Ammo` the scale in thousandths and
 the sinking in its next byte (`NetEntity.PackIcebergAmmo` / `UnpackIcebergAmmo`), `ItemId` the
@@ -3253,9 +3265,11 @@ empty. Then, by kind:
   (`WorldItemUse._activeContext`), and a chance roll goes through `IItemUseWorld.NextUseRoll`
   (`World.UseRoll`, a test seam).
 - **Throw** — `World.ThrowFor` launches the selected throwable at the intent's charge from the eye.
-- **Attack** — a punch needs a non-slicing hand and a slice a slicing weapon, each at most once per
-  its pace (`ServerPlayer.TryAttack`, `AttackPacing`: the held item's hit gap, or
-  `PlayerModel.SliceDuration`, less `NetAttackSlackSeconds`); `World.PunchFor`/`SliceFor` find
+- **Attack** — a swing needs the weapon that makes it in hand (`NetAttacks.PatternOf`: a slice a
+  slicing blade, a sword swing a sword, a punch anything else), each at most once per its pace
+  (`ServerPlayer.TryAttack`, `AttackPacing`: the held item's hit gap, `PlayerModel.SliceDuration`,
+  or for a sword swing the length of the swing before it, `PlayerModel.SwordDuration` of the
+  player's last attack, less `NetAttackSlackSeconds`); `World.PunchFor`/`SliceFor`/`SwordFor` find
   the targets among the server's mobs from the intent's eye and aim with the `Combat` rules.
 
 Every intent is answered, in order: an intent that can edit cells gets a `BlockCorrection` with
@@ -3998,7 +4012,17 @@ overrides with its `entityDamage` (primitive tools 3, copper tools 5, obsidian b
 blade (`attack: "slice"`) instead swings a two-phase sweep (`LeftClickAction.UpdateSlice` + `SliceCombo`): each
 swing hits the nearest two mobs in a forward hemisphere of the same reach with line of sight, the
 buffered return swing is at half power, and the damage lands at the swing's impact frame rather than on
-the click, with the arm and blade carried across the front by `PlayerModel`.
+the click, with the arm and blade carried across the front by `PlayerModel`. The iron sword
+(`attack: "sword"`) is the long blade: `LeftClickAction.UpdateSword` runs `SwordCombo`, a chain of
+three swings (`SwordSwing`: the cut, the back cut, the chop) that a click buffers while one plays and
+a press within `SwordCombo.ChainWindowSeconds` of the last swing's end continues, a later press
+starting over at the cut. Each swing has its own rules in `SwordSwings`: the cut and the back cut
+sweep the forward hemisphere for the nearest `SweepTargets` mobs (the back cut at reduced power), the
+chop takes only the one mob in the punch cone at the highest power (`Combat.SwordDamage`) with a
+double shove and the heaviest hit-stop, and each has its own length and impact frame
+(`PlayerModel.SwordDuration`/`SwordImpactProgress`), so the chain paces itself. All three blade
+paths land through one `LeftClickAction.StrikeNearest` (nearest first, line of sight required) and
+`MobStrikes.StrikeMob`, whose shove speed a chop doubles.
 
 A larger slime is pushed less: every shove (a punch, a slice, a grounded player walking into it) is
 divided by its body scale (`SlimeSize.ShoveSpeed`, applied in `Slime.Shove`), while a split child's
@@ -4290,7 +4314,7 @@ overshoot or jiggle.
   also travels a diagonal on every slice, from `SliceStartRaiseBlocks` above the chest line (so the cut
   starts high, not horizontal) down to just `SliceEndDropBlocks` below it (`SliceMotion.SliceDiagonal`, through the
   same re-solved arm as the chest-height drop), whichever way the swing goes. The slicing **arm is held out in front,
-  nearly straight, at chest height** (`BodyPartMatrices.SliceArmShoulder`, `SliceArmElbow`): the carrying pose (elbow bent 75
+  nearly straight, at chest height** (`SliceMotion.SliceArmShoulder`, `SliceArmElbow`): the carrying pose (elbow bent 75
   degrees, forearm up, which made the hand look held up by the elbow) is eased into it as the stroke ramps in. The
   **blade is carried by the wrist**: its tip points along the forearm (so it follows the arm's sweep and is
   always across the direction the hand travels, never turned up mid-cut), rolled about its length by
@@ -4317,6 +4341,35 @@ overshoot or jiggle.
   hanging (`LimbFrames.SocketWeight`), so a raised arm stays seated on the body instead of hinging on a point 0.1 outside it
   with a gap; the punch IK includes it. `SliceImpactProgress` (where the damage lands) is the middle of the strike. Filmed by
   `visual-examples/animations-slice.json`.
+- **Blade swing frames** (`Posing/BladeSwingFrame`): everything the body reads of a blade swing in progress (the
+  arm's sweep yaw, the shoulder and elbow it is eased to by the stroke, a hand lift re-solved through the arm, the
+  body's turn, twist, roll, dip and lean, the shoulder pull, the wrist carry's roll, cant and yaw and the display
+  offset) is one struct, `PlayerModel.Blade`, built by `SliceMotion.FrameAt` for a slice and `SwordMotion.FrameAt`
+  for a sword swing. `BodyPartMatrices`, `SecondaryMotion`, `ShoulderReach` and `HeldItemRotationOffset` read only
+  that, so a new swing is a new shape, never a new branch in the body code, and only one blade swing plays at a
+  time (`StartSlice` cuts a sword swing short and `StartSword` a slice).
+- **Sword** (`SwordMotion`, one `Shape` record per `SwordSwing`): a long blade is swung from the shoulder, not
+  carried across at chest height, so each swing drives the shoulder flexion and the elbow themselves (a wound
+  value through the wind-up, carried to a far value through the strike) instead of an extended arm plus a hand
+  drop. The **cut** (0.85 s) winds the arm high over the right shoulder, the elbow folded so the blade lies back,
+  the body coiled toward it, then sweeps across and down to low on the left with the body turning hard (a
+  `BodyYaw` wider than the slice's) and dipping at the impact; the **back cut** (0.75 s) is its mirror in side and
+  height, low on the left rising to high on the right, a little quicker; the **chop** (1.1 s) raises the arm
+  straight overhead with the blade cocked behind the head, reaching the top three quarters through its wind-up
+  and holding there (`WindupReach`, the anticipation), then whips the arm straight down the front while the torso
+  folds forward (`Lean`) and the weight drops to full depth by the impact (`HeldDip`, deeper than any cut), rests
+  at the bottom (`HoldEnd`) and unwinds slowly. The wrist carries the blade as in the slice: the cuts keep the
+  slice's edge roll, cant, leading yaw and display offset (mirrored for the back cut), the chop carries the blade
+  straight along the forearm, so it points down and forward at the bottom of the blow. The far poses are placed
+  for the first-person view as much as the third (the comment above the shapes has the two rules: a forward fold
+  tips the arm down with the torso, a turn toward the sword side swings that shoulder behind the eye), so every
+  impact is on screen while a wind-up may rise out of the frame and a follow-through may leave it. Each
+  swing's damage lands at its own `Impact`, which the hit-stop holds at. The item debugger's CUT, B-CUT and CHOP
+  modes and `visual-examples/animations-sword.json` (`VOXEL_TIME=147`, the three swings from the shoulder camera,
+  then the cut and the chop in first person) show them; `PlayerModelTests` holds the shapes (the cut comes down
+  from high right to low left, the back cut rises the other way, the chop goes over the head and straight down
+  the middle with the blade pointed down at the end, the chop sinks and folds the body further than a cut, no
+  swing snaps at either end, every shoulder stays on the torso) and `HitStopTests` the hold.
 - **Attachment** (`PlayerModel.GetPartMatrix`, its body in `Posing/BodyPartMatrices`): the neck and both shoulders are children of the **torso
   frame** (hip-origin, turning with the torso's lean, twist and roll), so a limb can never come off the body
   or sink into it; only the legs and the pelvis hang off the root. While a tuned pose is showing (the slice
@@ -4516,7 +4569,7 @@ overshoot or jiggle.
   none. `visual-examples/damage-numbers.json` films them.
 - **Verification**: `visual-examples/animations.json` (run with `VOXEL_TIME=147`) films the player's
   poses from the shoulder camera and the mobs' spawn, hit and death; its `damage`, `view` and
-  `player` ops (`hurt`, `punch`, `slice`, `equip`, `charge`, `release`, `die`, `revive`) exist for it. For
+  `player` ops (`hurt`, `punch`, `slice`, `cut`, `backcut`, `chop`, `equip`, `charge`, `release`, `die`, `revive`) exist for it. For
   iterating on a single animation prefer the **item debugger** (see "Build and run"): its ITEMS tab has a
   button for every player animation and its ENTITIES tab previews the goblin and slime life-cycles,
   including the slime's code-driven squash, with `ITEM_DEBUGGER_PLAYER_ANIM` / `ITEM_DEBUGGER_ANIM` and

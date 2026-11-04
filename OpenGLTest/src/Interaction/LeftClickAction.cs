@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Audio;
@@ -17,9 +18,9 @@ namespace VoxelEngine.Interaction;
 /// <summary>
 /// The left-click action and the target it works on: the crosshair raycast that picks the
 /// targeted block (with the face, box and aim a client's intents carry), hit-based mining with its
-/// pop and break overlay, the attack-first punch and the blade's slice combo, the HUD crosshair and
-/// look-at label read from them, and the punch and slice a server lands for a connected player.
-/// Owned by <see cref="World"/>; main thread only.
+/// pop and break overlay, the attack-first punch, the short blade's slice combo and the sword's
+/// three-swing chain, the HUD crosshair and look-at label read from them, and the punch and swings
+/// a server lands for a connected player. Owned by <see cref="World"/>; main thread only.
 /// </summary>
 internal sealed class LeftClickAction
 {
@@ -119,8 +120,13 @@ internal sealed class LeftClickAction
     // and the per-swing latch that lands its damage once at the impact frame.
     private readonly SliceCombo _sliceCombo = new();
     private bool _sliceImpactDone;
-    // Previous frame's left-click state, so the slice combo can see a fresh press.
+    // Sword attack (AttackPattern.Sword): the cut, back cut and chop chain and the same latch.
+    private readonly SwordCombo _swordCombo = new();
+    private bool _swordImpactDone;
+    // Previous frame's left-click state, so the combos can see a fresh press.
     private bool _attackWasPressed;
+    // The mobs a swing reaches, nearest first (reused every swing, so a swing allocates nothing).
+    private readonly List<(float Distance, Mob Mob)> _strikeScratch = [];
 
     // The head ray the selection raycast fired along (Camera.LastAimDirection), which a client's
     // break intents carry so the server's first-person ray lands on the same cell.
@@ -199,6 +205,17 @@ internal sealed class LeftClickAction
     }
 
     /// <summary>
+    /// Lands one of <paramref name="player"/>'s sword swings (<see cref="SwordSwings"/>: the cut and
+    /// back cut on the nearest few mobs in the forward hemisphere, the chop on the one under the
+    /// aim), each with a clear line of sight. Returns how many were struck.
+    /// </summary>
+    internal int SwordFor(PlayerContext player, SwordSwing swing)
+    {
+        if (!IsPlaying) return 0;
+        return ApplySwordDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), swing, player.Health);
+    }
+
+    /// <summary>
     /// Drives the left-click action, attack-first. A mob inside the forward punch cone
     /// (see <see cref="Combat"/>) takes the swing - <c>entityDamage</c> plus a shove - and the
     /// block under the crosshair is left alone for as long as one is there; with the cone clear
@@ -223,8 +240,8 @@ internal sealed class LeftClickAction
         var held = HeldItem();
         var player = LocalPlayer.LocalContext();
 
-        // A slice weapon owns the left-click outright: every press swings the blade (and buffers
-        // the return while one plays), so it never mines.
+        // A blade owns the left-click outright: every press swings it (and buffers the next swing
+        // while one plays), so it never mines.
         if (held is { Attack: AttackPattern.Slice })
         {
             Camera.NotifyPlayerAction();
@@ -232,11 +249,17 @@ internal sealed class LeftClickAction
             StopBreaking();
             return;
         }
+        if (held is { Attack: AttackPattern.Sword })
+        {
+            Camera.NotifyPlayerAction();
+            UpdateSword(justPressed, (float)deltaTime, player);
+            StopBreaking();
+            return;
+        }
 
-        // Switching away from a slice weapon abandons any in-flight combo; its animation still
-        // finishes, it just no longer lands a hit.
-        _sliceCombo.Reset();
-        _sliceImpactDone = false;
+        // Switching away from a blade abandons any in-flight combo; its animation still finishes,
+        // it just no longer lands a hit.
+        ResetCombos();
 
         if (!isHolding)
         {
@@ -497,24 +520,9 @@ internal sealed class LeftClickAction
         {
             _sliceImpactDone = true;
             var returnSwing = _sliceCombo.ReturnSwing;
-            bool connected;
-            if (_clientMode)
-            {
-                _world.RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection,
-                    returnSwing ? NetAttackKind.SliceReturn : NetAttackKind.Slice));
-                // Predicted, like the punch's: the server lands the swing on its own mobs
-                connected = HasSliceTarget(player.Eye, player.ViewDirection, out var predicted);
-                if (predicted != null) Strikes.SpawnHitSparks(predicted, player.Eye);
-            }
-            else
-            {
-                connected = ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(), returnSwing, player.Health) > 0;
-            }
-            // A connecting swing holds at the impact; it still ends on time, so the combo's next
-            // swing is never delayed
-            if (connected)
-                Player.HitStop(SwingHitStop.SecondsFor(0f));
-                _hitMarker.Show();
+            LandSwing(player, returnSwing ? NetAttackKind.SliceReturn : NetAttackKind.Slice,
+                Combat.SliceDamage(HeldItem(), returnSwing), Combat.SliceTargets, cone: false,
+                MobConfig.SlimePunchShoveSpeed, hitStopWeight: 0f);
         }
 
         if (Player.IsSlicing)
@@ -526,74 +534,139 @@ internal sealed class LeftClickAction
     }
 
     /// <summary>
+    /// Advances the sword's chain against the player's clicks (<see cref="SwordCombo"/>): a press
+    /// starts the cut, or the next swing of the chain while the window after the last one is open; a
+    /// press while a swing plays buffers the next. Damage lands once per swing at its impact frame
+    /// (<see cref="PlayerModel.SwordImpactProgress"/>) with that swing's reach, power and shove
+    /// (<see cref="SwordSwings"/>); a connected client sends the swing to the server instead of
+    /// striking anything itself. The swing animation lives in <see cref="PlayerModel"/>.
+    /// </summary>
+    private void UpdateSword(bool justPressed, float deltaTime, PlayerContext player)
+    {
+        _swordCombo.Update(deltaTime);
+        if (justPressed && _swordCombo.Press())
+        {
+            Player.StartSword(_swordCombo.Swing);
+            _swordImpactDone = false;
+        }
+
+        if (!_swordCombo.Active)
+            return;
+
+        var swing = _swordCombo.Swing;
+        if (!_swordImpactDone && Player.SwordProgress >= PlayerModel.SwordImpactProgress(swing))
+        {
+            _swordImpactDone = true;
+            LandSwing(player, NetAttacks.OfSword(swing), Combat.SwordDamage(HeldItem(), swing),
+                SwordSwings.MaxTargets(swing), SwordSwings.IsCone(swing),
+                MobConfig.SlimePunchShoveSpeed * SwordSwings.ShoveFactor(swing), SwordSwings.HitStopWeight(swing));
+        }
+
+        if (Player.IsSwordSwinging)
+            return;
+
+        if (!_swordCombo.Advance()) return;
+        Player.StartSword(_swordCombo.Swing);
+        _swordImpactDone = false;
+    }
+
+    private void ResetCombos()
+    {
+        _sliceCombo.Reset();
+        _sliceImpactDone = false;
+        _swordCombo.Reset();
+        _swordImpactDone = false;
+    }
+
+    /// <summary>
+    /// A blade swing reached its impact frame: lands it on the mobs it reaches, or, on a connected
+    /// client, sends it as <paramref name="kind"/> and predicts the connect (a mob in reach with a clear
+    /// line, since the server's verdict comes back far too late for a freeze that has to start with the
+    /// swing) with its hit sparks. A connecting swing holds at the impact for the hit-stop of
+    /// <paramref name="hitStopWeight"/> and flashes the hit marker; it still ends on time, so the combo's
+    /// next swing is never delayed.
+    /// </summary>
+    private void LandSwing(PlayerContext player, NetAttackKind kind, int damage, int maxTargets, bool cone,
+        float shoveSpeed, float hitStopWeight)
+    {
+        bool connected;
+        if (_clientMode)
+        {
+            _world.RaiseIntent(WorldIntent.AttackWith(player.Eye, player.ViewDirection, kind));
+            connected = HasBladeTarget(player.Eye, player.ViewDirection, cone, out var predicted);
+            if (predicted != null) Strikes.SpawnHitSparks(predicted, player.Eye);
+        }
+        else
+        {
+            connected = StrikeNearest(player.Eye, player.ViewDirection, damage, maxTargets, cone, shoveSpeed, player.Health) > 0;
+        }
+
+        if (!connected) return;
+        Player.HitStop(SwingHitStop.SecondsFor(hitStopWeight));
+        _hitMarker.Show();
+    }
+
+    /// <summary>
     /// Lands one slice swing from <paramref name="origin"/> along <paramref name="direction"/>
     /// with <paramref name="held"/>: the nearest two mobs inside the forward hemisphere with an
     /// unobstructed line of sight each take the swing's damage and a knockback shove. The return
     /// swing is at half power (<paramref name="returnSwing"/>). Returns how many were struck.
     /// </summary>
-    private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing, PlayerHealth? striker)
+    private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing, PlayerHealth? striker) =>
+        StrikeNearest(origin, direction, Combat.SliceDamage(held, returnSwing), Combat.SliceTargets, cone: false,
+            MobConfig.SlimePunchShoveSpeed, striker);
+
+    /// <summary>
+    /// Lands one sword swing from <paramref name="origin"/> along <paramref name="direction"/> with
+    /// <paramref name="held"/>: the nearest mobs the swing reaches (<see cref="SwordSwings"/>) with an
+    /// unobstructed line of sight each take its damage and its shove. Returns how many were struck.
+    /// </summary>
+    private int ApplySwordDamage(Vector3 origin, Vector3 direction, Item? held, SwordSwing swing, PlayerHealth? striker) =>
+        StrikeNearest(origin, direction, Combat.SwordDamage(held, swing), SwordSwings.MaxTargets(swing),
+            SwordSwings.IsCone(swing), MobConfig.SlimePunchShoveSpeed * SwordSwings.ShoveFactor(swing), striker);
+
+    /// <summary>
+    /// Strikes the nearest <paramref name="maxTargets"/> mobs a swing from <paramref name="origin"/> along
+    /// <paramref name="direction"/> reaches (the punch cone when <paramref name="cone"/>, else the forward
+    /// hemisphere; see <see cref="Combat"/>) with an unobstructed line of sight: each takes
+    /// <paramref name="damage"/> and a shove at <paramref name="shoveSpeed"/>. Returns how many were struck.
+    /// </summary>
+    private int StrikeNearest(Vector3 origin, Vector3 direction, int damage, int maxTargets, bool cone,
+        float shoveSpeed, PlayerHealth? striker)
     {
-        var mobs = _mobs;
-        if (mobs.Count == 0)
-            return 0;
-
-        var damage = Combat.SliceDamage(held, returnSwing);
-
-        Mob? first = null;
-        Mob? second = null;
-        var firstDistance = float.PositiveInfinity;
-        var secondDistance = float.PositiveInfinity;
-
-        foreach (var mob in mobs)
-        {
-            if (!Combat.InFrontHemisphere(origin, direction, mob.Position, out var distance))
-                continue;
-            if (BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
-                continue;
-
-            // Keep the two closest, shifting the old nearest down when a closer one arrives.
-            if (distance < firstDistance)
-            {
-                second = first;
-                secondDistance = firstDistance;
-                first = mob;
-                firstDistance = distance;
-            }
-            else if (distance < secondDistance)
-            {
-                second = mob;
-                secondDistance = distance;
-            }
-        }
-
-        var struck = 0;
-        if (first != null)
-        {
-            Strikes.StrikeMob(first, damage, origin, striker);
-            struck++;
-        }
-
-        if (second == null) return struck;
-        Strikes.StrikeMob(second, damage, origin, striker);
-        struck++;
+        GatherReached(origin, direction, cone);
+        var struck = Math.Min(maxTargets, _strikeScratch.Count);
+        for (var i = 0; i < struck; i++)
+            Strikes.StrikeMob(_strikeScratch[i].Mob, damage, origin, striker, shoveSpeed);
         return struck;
     }
 
-    /// <summary>Whether a slice from <paramref name="origin"/> along <paramref name="direction"/> would
-    /// strike anything: some mob in the forward hemisphere with a clear line of sight, the targets
-    /// <see cref="ApplySliceDamage"/> picks from. <paramref name="first"/> is that mob (null when
+    /// <summary>Whether a blade swing from <paramref name="origin"/> along <paramref name="direction"/> would
+    /// strike anything: some mob it reaches (the punch cone when <paramref name="cone"/>, else the forward
+    /// hemisphere) with a clear line of sight. <paramref name="nearest"/> is the nearest such mob (null when
     /// nothing would be struck), which a client's predicted hit-sparks land on.</summary>
-    private bool HasSliceTarget(Vector3 origin, Vector3 direction, out Mob? first)
+    private bool HasBladeTarget(Vector3 origin, Vector3 direction, bool cone, out Mob? nearest)
     {
-        first = null;
+        GatherReached(origin, direction, cone);
+        nearest = _strikeScratch.Count > 0 ? _strikeScratch[0].Mob : null;
+        return nearest != null;
+    }
+
+    // Fills the scratch list with every mob the swing reaches with a clear line of sight, nearest first.
+    private void GatherReached(Vector3 origin, Vector3 direction, bool cone)
+    {
+        _strikeScratch.Clear();
         foreach (var mob in _mobs)
         {
-            if (!Combat.InFrontHemisphere(origin, direction, mob.Position, out _)
-                || BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager)) continue;
-            first = mob;
-            return true;
+            var reached = cone
+                ? Combat.InPunchCone(origin, direction, mob.Position, out var distance)
+                : Combat.InFrontHemisphere(origin, direction, mob.Position, out distance);
+            if (!reached) continue;
+            if (BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
+                continue;
+            _strikeScratch.Add((distance, mob));
         }
-        return false;
+        _strikeScratch.Sort(static (a, b) => a.Distance.CompareTo(b.Distance));
     }
 
     // One hit, one sound: an unknown or air id falls back to the default group, which is what

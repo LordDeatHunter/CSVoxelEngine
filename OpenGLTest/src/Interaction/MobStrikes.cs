@@ -28,9 +28,11 @@ internal sealed class MobStrikes
     }
 
     /// <summary>Deals <paramref name="damage"/> to <paramref name="mob"/> and shoves it away from
-    /// <paramref name="from"/> (the striker's eye, or where a thrown item left it). A landed blow
+    /// <paramref name="from"/> (the striker's eye, or where a thrown item left it) at
+    /// <paramref name="shoveSpeed"/> (a punch's by default; a sword's chop throws harder). A landed blow
     /// from a player (<paramref name="striker"/>) puts that player in combat, which pauses their regeneration.</summary>
-    internal void StrikeMob(Mob mob, int damage, Vector3 from, PlayerHealth? striker = null)
+    internal void StrikeMob(Mob mob, int damage, Vector3 from, PlayerHealth? striker = null,
+        float shoveSpeed = MobConfig.SlimePunchShoveSpeed)
     {
         var hits = mob.HitsTaken;
         mob.TakeDamage(damage);
@@ -39,7 +41,7 @@ internal sealed class MobStrikes
         ShowLandedHit(mob, hits);
         SpawnHitSparks(mob, from);
         var away = new Vector3(mob.Position.X - from.X, 0f, mob.Position.Z - from.Z);
-        mob.Shove(away, MobConfig.SlimePunchShoveSpeed);
+        mob.Shove(away, shoveSpeed);
     }
 
     // A connecting hit throws a few pale chips off the mob's body where the striker faces it

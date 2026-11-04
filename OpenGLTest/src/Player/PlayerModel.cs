@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Particles;
 using VoxelEngine.Player.Posing;
@@ -30,13 +31,27 @@ public class PlayerModel
     /// <summary>Progress through a slice swing at which it crosses the aim and the damage lands.</summary>
     public const float SliceImpactProgress = 0.375f;
 
-    // On top of that, through the main part of the cut the held blade is drawn with this much added to its own display
-    // rotation (HeldItemRotationOffset): the same [pitch, yaw, roll] degrees the item JSON's display.rotation and the item
-    // debugger's Rot sliders use, so a value found by sliding them at a mid-cut frame transfers here as is. The blade's
-    // rest display is yaw -90 / roll 45; mid-cut it reads right at yaw -145 / roll 70. The yaw part mirrors for the
-    // return swing (for a display yaw of -90 the mirror image of yaw -90 + d is yaw -90 - d), the roll does not.
-    private const float SliceBladeDisplayYawDegrees = -55f;
-    private const float SliceBladeDisplayRollDegrees = 25f;
+    // Sword attack (items with AttackPattern.Sword): the cut, back cut and chop chain. Each swing has its
+    // own length and impact (SwordMotion), and like the slice is a wind-up, a strike and a recovery
+    // that equal the idle hold at both ends.
+
+    /// <summary>Seconds one sword swing of <paramref name="swing"/> lasts.</summary>
+    public static float SwordDuration(SwordSwing swing) => SwordMotion.Duration(swing);
+
+    /// <summary>Progress through <paramref name="swing"/> at which its damage lands.</summary>
+    public static float SwordImpactProgress(SwordSwing swing) => SwordMotion.ImpactProgress(swing);
+
+    /// <summary>The shortest sword swing's length, the least gap any sword swing can follow another at.</summary>
+    public static float ShortestSwordSwingSeconds
+    {
+        get
+        {
+            var shortest = float.PositiveInfinity;
+            foreach (var swing in SwordSwings.All)
+                shortest = MathF.Min(shortest, SwordDuration(swing));
+            return shortest;
+        }
+    }
 
     // Charged throw (right-click in the air with a throwable). While held, the right arm
     // rises forward-up overhead into a cocked pre-throw with the elbow extending on the
@@ -72,9 +87,12 @@ public class PlayerModel
     private float _mineWeight;
     private float _sliceT = 1f;
     private int _sliceDir;
-    // Hit-stop of the punch and slice clocks: a swing that connected holds at its impact pose
+    private float _swordT = 1f;
+    private SwordSwing _swordSwing;
+    // Hit-stop of the punch, slice and sword clocks: a swing that connected holds at its impact pose
     private readonly SwingHitStop _mineStop = new();
     private readonly SwingHitStop _sliceStop = new();
+    private readonly SwingHitStop _swordStop = new();
     private float _throwT = 1f;
     private float? _throwCharge01;
     private float? _useCharge01;
@@ -121,8 +139,6 @@ public class PlayerModel
     internal float AirRun => _airRun;
     /// <summary>The current punch's weight, 0 light to 1 heavy (see Punch).</summary>
     internal float MineWeight => _mineWeight;
-    /// <summary>The slice swing's direction: +1 right-to-left, -1 the return.</summary>
-    internal int SliceDir => _sliceDir;
     /// <summary>The charge the last throw was released at, 0..1.</summary>
     internal float ThrowReleaseCharge => _throwReleaseCharge;
     /// <summary>Seconds of Update time, driving the idle arm drift.</summary>
@@ -196,6 +212,21 @@ public class PlayerModel
     /// <summary>Whether a slice swing is currently playing.</summary>
     public bool IsSlicing => _sliceT < 1f;
 
+    /// <summary>Whether a sword swing is currently playing.</summary>
+    public bool IsSwordSwinging => _swordT < 1f;
+
+    /// <summary>Progress of the active sword swing: 0 at the wind-up, 1 when it has finished.</summary>
+    public float SwordProgress => _swordT;
+
+    /// <summary>The sword swing playing, or the last one played.</summary>
+    public SwordSwing ActiveSwordSwing => _swordSwing;
+
+    /// <summary>What the right arm, the body and the held blade do this frame for the blade swing in progress (the
+    /// slice's or the sword's), or <see cref="BladeSwingFrame.None"/> with neither playing.</summary>
+    internal BladeSwingFrame Blade => IsSlicing
+        ? SliceMotion.FrameAt(_sliceT, _sliceDir)
+        : IsSwordSwinging ? SwordMotion.FrameAt(_swordT, _swordSwing) : BladeSwingFrame.None;
+
     /// <summary>Whether a throw swing is currently playing.</summary>
     public bool IsThrowing => _throwT < 1f;
 
@@ -213,11 +244,11 @@ public class PlayerModel
     public float SliceProgress => _sliceT;
 
     /// <summary>True while a swing that connected is held at its impact pose (see <see cref="HitStop"/>).</summary>
-    public bool IsHitStopped => _mineStop.IsHolding || _sliceStop.IsHolding;
+    public bool IsHitStopped => _mineStop.IsHolding || _sliceStop.IsHolding || _swordStop.IsHolding;
 
     /// <summary>
-    /// The swing in progress (the slice if one plays, else the punch) connected with a mob: it holds at
-    /// its impact pose for <paramref name="seconds"/> once it gets there, then replays the rest faster so
+    /// The swing in progress (the slice or sword swing if one plays, else the punch) connected with a mob: it
+    /// holds at its impact pose for <paramref name="seconds"/> once it gets there, then replays the rest faster so
     /// it still ends on time (<see cref="SwingHitStop"/>). Ignored with no swing in progress, so a call
     /// can never freeze a later swing; a new swing drops any hold the last one had.
     /// </summary>
@@ -225,6 +256,8 @@ public class PlayerModel
     {
         if (IsSlicing)
             _sliceStop.Request(seconds);
+        else if (IsSwordSwinging)
+            _swordStop.Request(seconds);
         else if (_mineT < 1f)
             _mineStop.Request(seconds);
     }
@@ -232,13 +265,12 @@ public class PlayerModel
     /// <summary>
     /// Degrees the pose adds to the held item's own display rotation, in the item JSON's <c>[pitch, yaw, roll]</c>
     /// order (what <c>Item.DisplayMatrix</c> and the item debugger's Rot sliders take), so a value found by sliding
-    /// them at a frame of an animation transfers here unchanged. Zero at rest; through the main part of a slice it is
-    /// the blade's mid-cut turn (<see cref="SliceBladeDisplayYawDegrees"/>, <see cref="SliceBladeDisplayRollDegrees"/>),
-    /// the yaw mirrored for the return swing.
+    /// them at a frame of an animation transfers here unchanged. Zero at rest; through the main part of a blade swing
+    /// it is that swing's mid-cut turn (<see cref="SliceMotion.SliceBladeDisplayYawDegrees"/>,
+    /// <see cref="SliceMotion.SliceBladeDisplayRollDegrees"/> for the slice, the yaw mirrored for the return swing;
+    /// <see cref="SwordMotion"/>'s for the sword).
     /// </summary>
-    public Vector3 HeldItemRotationOffset => IsSlicing
-        ? new Vector3(0f, SliceBladeDisplayYawDegrees * _sliceDir, SliceBladeDisplayRollDegrees) * SliceMotion.SliceMainWeight(_sliceT)
-        : Vector3.Zero;
+    public Vector3 HeldItemRotationOffset => Blade.DisplayOffset;
 
     /// <summary>Smoothed 0..1 movement amount driving the swing amplitude.</summary>
     public float MoveBlend => _moveBlend;
@@ -425,6 +457,9 @@ public class PlayerModel
         if (_sliceT < 1f)
             _sliceT = _sliceStop.Advance(_sliceT, deltaTime, 1f / SliceDuration, SliceImpactProgress);
 
+        if (_swordT < 1f)
+            _swordT = _swordStop.Advance(_swordT, deltaTime, 1f / SwordDuration(_swordSwing), SwordImpactProgress(_swordSwing));
+
         if (_throwT < 1f)
             _throwT = Math.Min(1f, _throwT + deltaTime / ThrowDuration);
     }
@@ -452,6 +487,20 @@ public class PlayerModel
         _sliceDir = direction;
         _sliceT = 0f;
         _sliceStop.Reset();
+        // One blade swing at a time: a slice cuts short a sword swing still playing (the item changed)
+        _swordT = 1f;
+    }
+
+    /// <summary>
+    /// Starts one swing of the sword's chain (<see cref="SwordSwing"/>). Its arm, body and blade ride
+    /// <see cref="SwordProgress"/> through <see cref="SwordMotion"/>; a slice still playing is cut short.
+    /// </summary>
+    public void StartSword(SwordSwing swing)
+    {
+        _swordSwing = swing;
+        _swordT = 0f;
+        _swordStop.Reset();
+        _sliceT = 1f;
     }
 
     public void StartThrowCharge() => _throwCharge01 = 0f;

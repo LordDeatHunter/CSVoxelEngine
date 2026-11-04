@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Numerics;
+using VoxelEngine.Interaction;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Player;
@@ -149,18 +150,50 @@ public sealed class ServerPlayerTests : IDisposable
     public void AttacksLandNoFasterThanTheirPace()
     {
         var player = new ServerPlayer(1, "Alice", Vector3.Zero);
-        var punchGap = AttackPacing.MinGapSeconds(NetAttackKind.Punch, null);
+        var punchGap = AttackPacing.MinGapSeconds(NetAttackKind.Punch, NetAttackKind.Punch, null);
         Assert.True(player.TryAttack(NetAttackKind.Punch, null, 10.0, 0.0));
         // A second punch inside the held item's pace is refused, and the refusal records nothing
         Assert.False(player.TryAttack(NetAttackKind.Punch, null, 10.0 + punchGap * 0.5, 0.0));
         Assert.True(player.TryAttack(NetAttackKind.Punch, null, 10.0 + punchGap, 0.0));
 
         // A slice swing paces by the swing, which a buffered return swing cannot beat either
-        var sliceGap = AttackPacing.MinGapSeconds(NetAttackKind.Slice, null);
+        var sliceGap = AttackPacing.MinGapSeconds(NetAttackKind.Punch, NetAttackKind.Slice, null);
         var start = 20.0;
         Assert.True(player.TryAttack(NetAttackKind.Slice, null, start, 0.0));
         Assert.False(player.TryAttack(NetAttackKind.SliceReturn, null, start + sliceGap * 0.5, 0.0));
         Assert.True(player.TryAttack(NetAttackKind.SliceReturn, null, start + sliceGap, 0.0));
+    }
+
+    [Fact]
+    public void ASwordSwingWaitsForTheSwingBeforeItInTheChain()
+    {
+        var player = new ServerPlayer(1, "Alice", Vector3.Zero);
+        var cut = PlayerModel.SwordDuration(SwordSwing.Cut);
+        var backCut = PlayerModel.SwordDuration(SwordSwing.BackCut);
+        var chop = PlayerModel.SwordDuration(SwordSwing.Chop);
+        // The chain's swings differ in length, so each one is paced by the one before it, not by itself
+        Assert.NotEqual(cut, backCut);
+        Assert.NotEqual(backCut, chop);
+
+        var start = 30.0;
+        Assert.True(player.TryAttack(NetAttackKind.SwordCut, null, start, 0.0));
+        // The back cut cannot start before the cut has played out ...
+        Assert.False(player.TryAttack(NetAttackKind.SwordBackCut, null, start + cut * 0.9, 0.0));
+        Assert.True(player.TryAttack(NetAttackKind.SwordBackCut, null, start + cut, 0.0));
+        // ... nor the chop before the back cut, which is the quicker swing ...
+        var backCutAt = start + cut;
+        Assert.False(player.TryAttack(NetAttackKind.SwordChop, null, backCutAt + backCut * 0.9, 0.0));
+        Assert.True(player.TryAttack(NetAttackKind.SwordChop, null, backCutAt + backCut, 0.0));
+        // ... and a fresh cut waits out the whole slow chop.
+        var chopAt = backCutAt + backCut;
+        Assert.False(player.TryAttack(NetAttackKind.SwordCut, null, chopAt + backCut, 0.0));
+        Assert.True(player.TryAttack(NetAttackKind.SwordCut, null, chopAt + chop, 0.0));
+
+        // After some other attack (the item was switched), a sword swing waits for the shortest swing at least
+        var other = new ServerPlayer(2, "Bob", Vector3.Zero);
+        Assert.True(other.TryAttack(NetAttackKind.Punch, null, 40.0, 0.0));
+        Assert.False(other.TryAttack(NetAttackKind.SwordChop, null, 40.0 + PlayerModel.ShortestSwordSwingSeconds * 0.5, 0.0));
+        Assert.True(other.TryAttack(NetAttackKind.SwordChop, null, 40.0 + PlayerModel.ShortestSwordSwingSeconds, 0.0));
     }
 
     [Fact]
