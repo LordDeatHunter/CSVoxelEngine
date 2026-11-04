@@ -368,46 +368,79 @@ public static class ContentRegistry
     public static IReadOnlyList<CraftingRecipe> CraftingRecipes => Recipes;
 
     /// <summary>First recipe making this id, or null when nothing crafts it.</summary>
-    public static CraftingRecipe? RecipeForResult(byte id) =>
-        Recipes.FirstOrDefault(r => r.ResultId == id);
+    public static CraftingRecipe? RecipeForResult(byte id)
+    {
+        foreach (var recipe in Recipes)
+            if (recipe.ResultId == id) return recipe;
+        return null;
+    }
 
     /// <summary>Recipe by file name, or null when there is none.</summary>
-    public static CraftingRecipe? RecipeByName(string name) =>
-        Recipes.FirstOrDefault(r => r.Name.Equals(name, StringComparison.Ordinal));
+    public static CraftingRecipe? RecipeByName(string name)
+    {
+        foreach (var recipe in Recipes)
+            if (recipe.Name.Equals(name, StringComparison.Ordinal)) return recipe;
+        return null;
+    }
 
     /// <summary>First cook recipe taking this id, or null when it is not cookable.</summary>
-    public static CookRecipe? CookRecipeForInput(byte id) =>
-        CookRecipes.FirstOrDefault(r => r.InputId == id);
+    public static CookRecipe? CookRecipeForInput(byte id)
+    {
+        foreach (var recipe in CookRecipes)
+            if (recipe.InputId == id) return recipe;
+        return null;
+    }
 
     /// <summary>First crush recipe taking this id, or null when it is not crushable.</summary>
-    public static CrushRecipe? CrushRecipeForInput(byte id) =>
-        CrushRecipes.FirstOrDefault(r => r.InputId == id);
+    public static CrushRecipe? CrushRecipeForInput(byte id)
+    {
+        foreach (var recipe in CrushRecipes)
+            if (recipe.InputId == id) return recipe;
+        return null;
+    }
 
     /// <summary>Every molten material, in file-name order; ids are 1-based positions in it.</summary>
     public static IReadOnlyList<MoltenMaterial> MoltenMaterials => MoltenMaterialsList;
 
     /// <summary>Molten material by file name, or null when there is none.</summary>
-    public static MoltenMaterial? MoltenMaterialByName(string name) =>
-        MoltenMaterialsList.FirstOrDefault(m => m.Name.Equals(name, StringComparison.Ordinal));
+    public static MoltenMaterial? MoltenMaterialByName(string name)
+    {
+        foreach (var m in MoltenMaterialsList)
+            if (m.Name.Equals(name, StringComparison.Ordinal)) return m;
+        return null;
+    }
 
     /// <summary>Molten material by id, or null for 0 ("no material") and anything out of range.</summary>
     public static MoltenMaterial? MoltenMaterialById(byte id) =>
         id >= 1 && id <= MoltenMaterialsList.Count ? MoltenMaterialsList[id - 1] : null;
 
     /// <summary>The melt recipe taking this id, or null when it does not melt.</summary>
-    public static MeltRecipe? MeltRecipeForInput(byte id) =>
-        MeltRecipes.FirstOrDefault(r => r.InputId == id);
+    public static MeltRecipe? MeltRecipeForInput(byte id)
+    {
+        foreach (var recipe in MeltRecipes)
+            if (recipe.InputId == id) return recipe;
+        return null;
+    }
 
     /// <summary>Every compiled metalworks recipe, in file-name order.</summary>
     public static IReadOnlyList<CastRecipe> CastRecipesList => CastRecipes;
 
     /// <summary>The cast recipe for this mold and molten material, or null when the pair casts nothing.</summary>
-    public static CastRecipe? CastRecipeFor(byte moldId, byte materialId) =>
-        CastRecipes.FirstOrDefault(r => r.MoldId == moldId && r.MaterialId == materialId);
+    public static CastRecipe? CastRecipeFor(byte moldId, byte materialId)
+    {
+        foreach (var recipe in CastRecipes)
+            if (recipe.MoldId == moldId && recipe.MaterialId == materialId) return recipe;
+        return null;
+    }
 
     /// <summary>Whether any cast recipe pours into this block, i.e. whether it is a usable mold.</summary>
-    public static bool IsCastMold(byte id) =>
-        id != BlockType.Air && CastRecipes.Any(r => r.MoldId == id);
+    public static bool IsCastMold(byte id)
+    {
+        if (id == BlockType.Air) return false;
+        foreach (var recipe in CastRecipes)
+            if (recipe.MoldId == id) return true;
+        return false;
+    }
 
     private static void Reset()
     {

@@ -64,6 +64,8 @@ public class World
     private readonly IcebergManager? _icebergs;
     private readonly GoblinManager? _goblins;
     private readonly SaplingManager _saplings = new();
+    // The sapling clock's grow callback, built once: a method group allocates a delegate each time it is converted
+    private Func<string, int, int, int, int, TreeGrowthResult>? _growTree;
     // The natural and hard mob caps every manager above spawns under, counted over all of them.
     private readonly MobCaps _mobCaps = new();
     private readonly FluidManager _fluidManager = new();
@@ -885,8 +887,7 @@ public class World
 
         // A client never grows anything itself: the server owns the world and broadcasts its cells
         if (!_clientMode)
-            _saplings.Update((float)deltaTime, _chunkManager,
-                (species, x, y, z, steps) => TryGrowTree(species, x, y, z, steps));
+            _saplings.Update((float)deltaTime, _chunkManager, _growTree ??= TryGrowTree);
 
         // After the fluid tick, so every edit path of the frame precedes the autosave. The one
         // Save span in the codebase, entered here only and never nested inside another section.

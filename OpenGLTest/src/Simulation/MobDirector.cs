@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Effects.Sky;
@@ -197,10 +196,18 @@ internal sealed class MobDirector
     {
         _mobs.Clear();
         if (_slimes != null)
-            _mobs.AddRange(_slimes.Slimes.Where(t => !t.IsDying));
+            AddLiving(_slimes.Slimes);
 
         if (_goblins != null)
-            _mobs.AddRange(_goblins.Goblins.Where(t => !t.IsDying));
+            AddLiving(_goblins.Goblins);
+    }
+
+    // Appends the mobs that are not dying, with an indexed loop so a frame allocates no enumerator.
+    private void AddLiving<T>(IReadOnlyList<T> mobs) where T : Mob
+    {
+        for (var i = 0; i < mobs.Count; i++)
+            if (!mobs[i].IsDying)
+                _mobs.Add(mobs[i]);
     }
 
     /// <summary>

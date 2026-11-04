@@ -136,9 +136,6 @@ Docs and build:
 - [ ] Spot-check `InventoryPanelInput.cs` for mojibake from its cp1252 -> UTF-8 re-encode.
 
 Code:
-- [ ] The play-time content lookups (`RecipeForResult`, `RecipeByName`, `CastRecipeFor`, `IsCastMold`)
-  allocate LINQ closures per call; so does `World.RefreshMobs`, and the per-frame sapling lambda
-  in `World.Update`.
 - [ ] `PunchPose.TorsoRotation` calls `SecondaryMotion.ComputeMods` once per arm solve and
   `GetPartMatrix` recomputes `GetPose` per part (perf candidates).
 - [ ] `TerrainNoise` builds every channel twice on the first `WorldSeed.Apply` (static ctor, then
