@@ -384,6 +384,16 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float CoalFrequency = 1f / 20f;
     public const float CoalThreshold = 0.84f;
 
+    // --- Hematite ore (HematiteGenerator) ---
+    // Iron: the same OreNoiseLattice deposits on a noise of its own, but deep stone only, in the
+    // lava pockets' band at or below HematiteMaxY. A higher threshold than malachite's keeps the
+    // veins rarer (measured relationally in HematiteTests, not guessed). The ceiling is an
+    // absolute world Y, so HasOre stays a pure (x, y, z) point query equal to what Stamp writes.
+    public const bool HematiteEnabled = true;
+    public const float HematiteFrequency = 1f / 18f;
+    public const float HematiteThreshold = 0.86f;
+    public const int HematiteMaxY = LavaMaxY;
+
     // --- Forest terrain shape (smooth rolling hills with flat valleys between them) ---
     // The floor is a broad swell plus a positive-only hill field gated by a low-frequency
     // hill-region mask, so hill masses rise in patches and flat valleys run between them instead

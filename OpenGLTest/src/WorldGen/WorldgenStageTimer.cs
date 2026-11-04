@@ -30,6 +30,8 @@ internal sealed class WorldgenStageTimer
         Malachite,
         /// <summary>CoalGenerator.Stamp.</summary>
         Coal,
+        /// <summary>HematiteGenerator.Stamp.</summary>
+        Hematite,
         /// <summary>FillWater (marked only while water is enabled).</summary>
         Water,
         /// <summary>StampMud.</summary>

@@ -38,16 +38,25 @@ public sealed class OreNoiseLatticeTests
             MalachiteGenerator.OreBlock, stone, "malachite");
         AssertStampMatchesPointQuery(CoalGenerator.Stamp, CoalGenerator.HasOre,
             CoalGenerator.OreBlock, stone, "coal");
+
+        // Hematite's ceiling runs through chunk c, so the volume straddles it; a wider footprint
+        // keeps the rare ore present in it
+        var c = (WorldGenerationConfig.HematiteMaxY >> 4) << 4;
+        int[] wide = { -32, -16, 0, 16 };
+        AssertStampMatchesPointQuery(HematiteGenerator.Stamp, HematiteGenerator.HasOre,
+            HematiteGenerator.OreBlock, stone, "hematite",
+            seamX: wide, seamY: new[] { c - 16, c }, seamZ: wide);
     }
 
     private static void AssertStampMatchesPointQuery(Action<byte[], int, int, int> stamp,
-        Func<int, int, int, bool> hasOre, byte ore, byte stone, string name)
+        Func<int, int, int, bool> hasOre, byte ore, byte stone, string name,
+        int[]? seamX = null, int[]? seamY = null, int[]? seamZ = null)
     {
         var oreCells = 0;
         var blocks = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
-        foreach (var x0 in SeamX)
-        foreach (var y0 in SeamY)
-        foreach (var z0 in SeamZ)
+        foreach (var x0 in seamX ?? SeamX)
+        foreach (var y0 in seamY ?? SeamY)
+        foreach (var z0 in seamZ ?? SeamZ)
         {
             Array.Fill(blocks, stone);
             stamp(blocks, x0, y0, z0);
@@ -186,7 +195,7 @@ public sealed class OreNoiseLatticeTests
         }
     }
 
-    /// <summary>The malachite and coal cells stamped into the seam chunks, filled with stone.</summary>
+    /// <summary>The malachite, coal and hematite cells stamped into the seam chunks, filled with stone.</summary>
     private static HashSet<(int x, int y, int z, byte ore)> StampedOre()
     {
         var stone = ContentRegistry.RequireBlock("stone").Id;
@@ -199,6 +208,7 @@ public sealed class OreNoiseLatticeTests
             Array.Fill(blocks, stone);
             MalachiteGenerator.Stamp(blocks, x0, y0, z0);
             CoalGenerator.Stamp(blocks, x0, y0, z0);
+            HematiteGenerator.Stamp(blocks, x0, y0, z0);
             for (var x = 0; x < Chunk.Size; x++)
             for (var y = 0; y < Chunk.Size; y++)
             for (var z = 0; z < Chunk.Size; z++)

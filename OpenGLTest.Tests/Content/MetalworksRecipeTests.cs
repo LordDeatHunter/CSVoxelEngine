@@ -45,6 +45,24 @@ public sealed class MetalworksRecipeTests
     }
 
     [Fact]
+    public void IronCrushesInTheQuernButNeverMelts()
+    {
+        var crush = ContentRegistry.CrushRecipeForInput(Item("hematite_ore"));
+        Assert.NotNull(crush);
+        Assert.Equal(Item("crushed_iron"), crush.ResultId);
+
+        // Without a melt recipe KilnManager never accepts the input: that is the "cannot smelt yet" gate.
+        foreach (var id in new[]
+                 {
+                     Item("hematite_ore"), Block("hematite_ore"), Item("crushed_iron"),
+                     Item("iron_sword_head"), Item("iron_sword"),
+                 })
+            Assert.Null(ContentRegistry.MeltRecipeForInput(id));
+
+        Assert.Null(ContentRegistry.MoltenMaterialByName("iron"));
+    }
+
+    [Fact]
     public void ACastMeltsBackIntoExactlyWhatItTook()
     {
         Assert.NotEmpty(ContentRegistry.CastRecipesList);

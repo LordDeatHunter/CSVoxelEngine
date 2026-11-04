@@ -1,0 +1,9 @@
+{
+  "name": "Hematite Ore",
+  "model": { "parent": "block/cube_all", "textures": { "all": "hematite_ore" } },
+  "sfx": "hit_rock",
+  "hardness": 10,
+  "requiresTool": true,
+  "tools": { "pickaxe": 2 },
+  "loot": "hematite_ore"
+}

@@ -96,6 +96,29 @@ public sealed class MiningTests
     }
 
     [Fact]
+    public void HematiteNeedsACopperPickaxeWhereMalachiteTakesAnyPickaxe()
+    {
+        var hematite = BlockOf("hematite_ore");
+        var malachite = BlockOf("malachite_ore");
+        var primitive = ItemOf("primitive_pickaxe");
+        var copper = ItemOf("copper_pickaxe");
+
+        // The primitive pickaxe opens malachite but whiffs on hematite: iron sits a tier above copper.
+        Assert.True(Mining.CanMine(malachite, primitive));
+        Assert.False(Mining.CanMine(hematite, primitive));
+        Assert.Equal(0f, Mining.HitDamage(hematite, primitive), precision: 5);
+
+        Assert.True(Mining.CanMine(hematite, copper));
+        Assert.True(Mining.HitDamage(hematite, copper) > 0f);
+        Assert.False(Mining.CanMine(hematite, null));
+
+        // The gate only tightens: whatever mines hematite also mines malachite.
+        Item?[] held = [primitive, copper, ItemOf("primitive_axe"), ItemOf("copper_axe"), null];
+        foreach (var item in held.Where(item => Mining.CanMine(hematite, item)))
+            Assert.True(Mining.CanMine(malachite, item));
+    }
+
+    [Fact]
     public void FluidCellsRefuseEveryTool()
     {
         var water = BlockOf("water");

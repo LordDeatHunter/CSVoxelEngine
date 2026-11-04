@@ -1,0 +1,7 @@
+{
+  // A hematite chunk ground in the quern into crushed iron. Iron has no melt recipe yet,
+  // so the crushed iron cannot be smelted.
+  "input": "item/hematite_ore",
+  "result": "item/crushed_iron",
+  "count": 1
+}

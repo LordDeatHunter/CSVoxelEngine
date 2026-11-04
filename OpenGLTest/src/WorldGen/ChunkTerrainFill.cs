@@ -98,6 +98,12 @@ internal static class ChunkTerrainFill
             CoalGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Coal);
 
+        // Same pass again, deep stone only: a chunk whose floor is above the ceiling holds no host,
+        // so skipping the call is bit-identical and saves its host scan on every shallower chunk.
+        if (WorldGenerationConfig.HematiteEnabled && lowerBoundY <= WorldGenerationConfig.HematiteMaxY)
+            HematiteGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Hematite);
+
         // After the carvers (so caves under the sea floor flood) and before the trees and
         // pebbles, which skip submerged columns rather than growing underwater
         var hasWater = false;

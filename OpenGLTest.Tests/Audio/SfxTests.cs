@@ -49,7 +49,7 @@ public sealed class SfxTests
     [Fact]
     public void StoneAndWoodFamiliesMapToTheirGroups()
     {
-        foreach (var name in new[] { "stone", "cobblestone", "mud_bricks", "malachite_ore", "gravel", "pebble", "quern" })
+        foreach (var name in new[] { "stone", "cobblestone", "mud_bricks", "malachite_ore", "hematite_ore", "gravel", "pebble", "quern" })
             Assert.Equal(SfxLibrary.StoneGroup, ContentRegistry.RequireBlock(name).Sfx);
         foreach (var name in new[] { "oak_log", "spruce_log", "cactus", "branch_pile" })
             Assert.Equal(SfxLibrary.WoodGroup, ContentRegistry.RequireBlock(name).Sfx);
