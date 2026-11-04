@@ -189,6 +189,42 @@ public sealed class ClientChunkStreamerTests
         }
     }
 
+    [Fact]
+    public void ChangedNegativeColumnRedirtiesEveryYInItsNineColumnNeighborhood()
+    {
+        var manager = new ChunkManager(null!);
+        var streamer = new ClientChunkStreamer(manager, (_, _, _) => { }, (_, _) => { });
+        var before = Terrain(12);
+        var after = Terrain(13);
+        Assert.True(streamer.ApplyColumn(-2, -3, ChunkNetCodec.EncodeColumn(before)));
+
+        // All nine neighboring XZ columns, at multiple Y levels, plus same-Y chunks outside
+        // the neighborhood. Negative coordinates exercise floor-based chunk key packing.
+        var expected = new HashSet<(int X, int Y, int Z)>();
+        for (var x = -3; x <= -1; x++)
+        for (var z = -4; z <= -2; z++)
+        foreach (var y in new[] { -7, -1, 0, 4 })
+        {
+            var pos = new Vector3(x, y, z);
+            manager.Chunks.SetPacked(ChunkKey.Pack(pos), new Chunk(null!, pos, generateBlockData: false));
+            expected.Add((x, y, z));
+        }
+
+        foreach (var pos in new[] { new Vector3(-4, 0, -3), new Vector3(0, 0, -3), new Vector3(-2, 2, -5), new Vector3(-2, 2, -1) })
+            manager.Chunks.SetPacked(ChunkKey.Pack(pos), new Chunk(null!, pos, generateBlockData: false));
+
+        Assert.True(streamer.ApplyColumn(-2, -3, ChunkNetCodec.EncodeColumn(after)));
+        Assert.Equal(expected.Count, manager.DirtyCount);
+        foreach (var pos in expected)
+            Assert.True(manager.IsChunkDirty(ChunkKey.Pack(pos.X, pos.Y, pos.Z)), $"missing dirty chunk {pos}");
+        Assert.False(manager.IsChunkDirty(ChunkKey.Pack(-4, 0, -3)));
+        Assert.False(manager.IsChunkDirty(ChunkKey.Pack(0, 0, -3)));
+        Assert.False(manager.IsChunkDirty(ChunkKey.Pack(-2, 2, -5)));
+        Assert.False(manager.IsChunkDirty(ChunkKey.Pack(-2, 2, -1)));
+        Assert.True(streamer.TryGet(-2, -3, out var served));
+        Assert.True(served.ContentEquals(after));
+    }
+
     // A column of one height and one water level everywhere, with the given corner climate
     private static ColumnTerrain Terrain(int height, int water = TerrainGenerator.NoWater, float warmth = 0.5f, float wetness = 0.5f)
     {
