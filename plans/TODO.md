@@ -6,9 +6,12 @@
 
 Gameplay and content only: performance is in `PERF.md`, tree residue in `TREES.md`, and
 architecture, content schema and threading rules in `AGENTS.md`. Last updated 2026-11-05.
-**Current priority:** finish the Act I survival floor (Milestone 1), then ship one vertical slice
-per arc to prove the dual identity. The engine is far ahead of the content; the next wins are
-content and progression, not systems.
+**Current priority:** playable loop first. Finish the Act I survival floor (Milestone 1:
+persistence, furnace, metal tiers, forge, armor), then the first dungeon slice (Milestone 2), then
+one slice per remaining arc to prove the dual identity. No food/hunger system is planned.
+Worldgen work (`BIOMEGEN.md` phase E is parked) happens only where gameplay needs it: ore depth
+bands for `P-25`, structure sites for the dungeon. The engine is far ahead of the content; the
+next wins are content and progression, not systems.
 
 ## In progress
 
@@ -20,20 +23,29 @@ Nothing.
 
 #### Milestone 1 — Act I survival floor (do first)
 
-The smallest bundle that makes the world a *game*: stakes, food, and an advance. Mostly content
-JSON plus small systems; high feel, low engine risk.
+The smallest bundle that makes the world a *game*: stakes and an advance (no food system).
+Mostly content JSON plus small systems; high feel, low engine risk. In order:
 
-1. **`P-3` a real furnace / smelter** — `sand -> glass`, `mud -> brick`, generic smelting with
-   fuel; generalizes the kiln pattern and becomes the automation seed.
-2. **`P-7` / `P-25` tier-2 ores + armor** — iron/tin at real depth bands, and armor (part of
-   `P-7`) as a defense stat. The first difficulty curve and the first reason to descend.
+1. **`M-12` persist station block entities** — P0, prerequisite: every station below saves from
+   day one instead of being retrofitted.
+2. **`P-3` generic furnace / smelter** — `sand -> glass`, `mud -> brick`, and the iron bloom;
+   generalizes the kiln pattern and becomes the automation seed. Lands before `P-2` gating.
+3. **`P-43` anvil / forge** — pulled into this milestone: iron goes `crushed_iron` -> furnace
+   bloom -> forge-shaped parts (this replaces the earlier idea of routing iron through the kiln's
+   molten path).
+4. **`P-7` / `P-25` metal tiers** — iron, tin, bronze, steel as the tier ladder (`P-44` covers the
+   alloys). Progression, processing requirements and per-tier recipes are **TBD, defined later**.
+5. **Armor (in `P-7`)** — flat damage reduction from summed armor points (capped), equipped from
+   the inventory panel, shown in HUD/tooltip, with worn armor drawn on `PlayerModel` and remote
+   players (this pulls `V-14` in). *Hook:* the damage pipeline (`PlayerHealth`, `IMobTarget.TakeHit`).
 
 #### Milestone 2 — Arc A vertical slice: the first dungeon
 
-Prove the fantasy half. Needs `M-15` (structure templates), `P-16` (dungeons), `P-17` (a boss),
-`P-14` (one spell — fireball), and `F-3` spawners. A single hand-authored crypt with loot, a
-spawner room and a boss is enough to make health, combat and loot matter and to give survival a
-destination.
+Prove the fantasy half. Infrastructure first, in order: `M-15` (structure templates), `M-17`
+(spawner block), then author one crypt (`P-16`, with `M-16` loot depth as needed), then the boss
+(`P-17`), then one spell, the fireball (`P-14`). A single hand-authored crypt with loot, a spawner
+room and a boss is enough to make health, combat and loot matter and to give survival a
+destination. Placing it needs a world-site hook, the one worldgen touch this milestone allows.
 
 #### Milestone 3 — Arc B vertical slice: first power
 
@@ -51,7 +63,7 @@ the other while still being faster together.
 
 #### Act I — the shared primitive-tech spine
 
-- [ ] **`P-2` · Crafting stations gate recipes** — P1, M.
+- [ ] **`P-2` · Crafting stations gate recipes** — P1, M. *(after the furnace, `P-3`)*
   The `E` panel crafts any recipe from anywhere. Add a `station` field and require the matching
   station (crafting table, campfire, quern, furnace). The shapeless list-and-feed model stays;
   this is gating, not a grid rewrite (see `U-3`).
@@ -67,9 +79,11 @@ the other while still being faster together.
 - [ ] **`P-6` · Fuel & fire economy** — P2, M.
   Fire as station fuel; per-wood burn times; campfire already burns ~30 s. Add `P-41` charcoal
   as the renewable, portable fuel. Feeds `P-3` and the kiln.
-- [ ] **`P-7` · Metal tiers beyond copper** — P2, L.
-  Bronze (`P-44`), iron, steel; anvil/forge (`P-43`), tool tiers 2–4, richer ore gating
-  (`P-25`).
+- [ ] **`P-7` · Metal tiers beyond copper** — P1, L. **Milestone 1.**
+  Tier ladder: iron, tin, bronze (`P-44`), steel; anvil/forge (`P-43`), tool tiers 2–4, richer ore
+  gating (`P-25`). Progression, processing requirements and recipes are TBD, defined later.
+  Includes armor: flat capped damage reduction, equip from the inventory panel, HUD/tooltip, and
+  worn models on `PlayerModel`/remote players (`V-14`).
 - [ ] **`P-8` · Advancements / "beats" list** — P1, S–M.
   In-world goals (first flint, first fire, first copper, first spell, first fusion) give a
   session direction without requiring combat, and double as onboarding. Needs the `M-19` backend.
@@ -124,7 +138,7 @@ the other while still being faster together.
 - [ ] **`P-18` · Enchanting / item magic** — P3, L.
   Spell effects bound to gear; a crafting-station cousin of the magic system. Cross-links `P-29`,
   `P-48`.
-- [ ] **`P-43` · Forge & anvil (metal shaping)** — P2, M.
+- [ ] **`P-43` · Forge & anvil (metal shaping)** — P1, M. **Milestone 1.**
   After casting: hammer ingots into shaped parts, the gate to iron/steel tiers (`P-7`).
 - [ ] **`P-44` · Alloys** — P2, M.
   Bronze from copper + tin, and later steel; the alloy step that makes mixed mining worthwhile.
@@ -346,7 +360,8 @@ single-arc player.
   `P-14`, `P-18`.
 - [ ] **`V-13` · Machine & station animation** — P3, M.
   Spinning wheels, belts, pistons, smoke/steam particles, running lights; for `P-19`–`P-22`.
-- [ ] **`V-14` · Armor & weapon models** — P3, M. Worn armor layers, held-weapon meshes.
+- [ ] **`V-14` · Armor & weapon models** — P1 for armor (Milestone 1, with `P-7`), P3 for weapons, M.
+  Worn armor layers, held-weapon meshes.
 - [ ] **`V-15` · Boss intro & death animations** — P3, M. For `P-17`.
 - [ ] **`V-16` · Weather depth** — P3, M. Lightning bolts, thunder flash, storm clouds, snow
   accumulation; builds on `V-1`.
@@ -415,7 +430,8 @@ single-arc player.
   entangled with save/load. Caps now persist per world (`LodEditState`); the growth stands. Must
   preserve `LowerColumnBelow`'s publish ordering. **Expect `LodBuildPoolTests` /
   `LodHeightSamplingTests` intermittents; never "fix" them by touching `ColumnCaps`.**
-- [ ] **`M-12` · Persist station block entities + in-flight entities** — P1, M.
+- [ ] **`M-12` · Persist station block entities + in-flight entities** — P0, M. **Milestone 1,
+  first: new stations (furnace, forge) must save from day one.**
   The save format covers chunks, LOD edit state, the player and mobs/drops, but not the in-memory
   station registries (campfire, quern, kiln, casting), primed TNT, falling blocks, projectiles or
   toppling trees. Add a side-car per registry or one `block-entities.json`, restored like mobs
