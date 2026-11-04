@@ -137,8 +137,12 @@ public sealed class ClientChunkStreamer : IColumnSource
             return false;
         _columns[(cx, cz)] = terrain;
 
-        foreach (var chunk in _chunks.Chunks.Values)
+        // The ConcurrentDictionary.Values property takes a locked, full-table snapshot.
+        // ApplyColumn only needs a weakly-consistent walk: chunks loaded during this walk are
+        // dirtied by their own publication path, and unloaded chunks are harmless to mark.
+        foreach (var entry in _chunks.Chunks.Packed)
         {
+            var chunk = entry.Value;
             var chunkX = (int)chunk.Position.X;
             var chunkZ = (int)chunk.Position.Z;
             if (Math.Abs(chunkX - cx) <= 1 && Math.Abs(chunkZ - cz) <= 1)

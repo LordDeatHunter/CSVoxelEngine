@@ -25,6 +25,8 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     /// <summary>Dirty-set size, for tests asserting the scan cap paces the drain.</summary>
     internal int DirtyCount => _dirtyChunks.Count;
 
+    internal bool IsDirty(long key) => _dirtyChunks.ContainsKey(key);
+
     /// <summary>Mesh-dispatcher state, for MeshSchedulingTests.</summary>
     internal int PendingMeshWorkCount => _pendingMeshWork.Count;
 

@@ -100,6 +100,8 @@ public class ChunkManager
     /// <summary>Dirty-set size, for tests asserting the scan cap paces the drain.</summary>
     internal int DirtyCount => _meshScheduler.DirtyCount;
 
+    internal bool IsChunkDirty(long key) => _meshScheduler.IsDirty(key);
+
     /// <summary>Mesh-dispatcher state, for MeshSchedulingTests.</summary>
     internal int PendingMeshWorkCount => _meshScheduler.PendingMeshWorkCount;
 
