@@ -151,10 +151,14 @@ internal sealed class LeftClickAction
         get
         {
             if (!_hasSelectedBlock) return null;
-            var blockId = Edits.BlockIdAt(_selectedBlockPosition);
+            var cellId = Edits.BlockIdAt(_selectedBlockPosition);
+            var (x, y, z) = _selectedBlockPosition.BlockCell();
+            // Any cell of a multiblock shows the whole structure, not its plain part block
+            var blockId = Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out _, out _, out var anchorType)
+                ? anchorType!.Id
+                : cellId;
             var state = LookLabel.For(blockId, Camera.IsCreative, Inventory.Knows, HeldItem());
             if (state.Text.Length == 0) return null;
-            var (x, y, z) = _selectedBlockPosition.BlockCell();
             return new LookLabelState(state.Text, state.Known, state.Mineable, _selectedBlockPosition,
                 blockId, _chunkManager.GetStateGlobal(x, y, z),
                 EntityLight.Sample(_chunkManager, _selectedBlockPosition));

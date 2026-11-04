@@ -43,9 +43,13 @@ public class BlockCubeCache : IDisposable
 
         // Every registered block is baked at startup; the plain cube is only a safety net so a
         // half-initialized registry still draws something instead of throwing
-        mesh = type.BakedModel != null
-            ? Primitives.CreateBlockModel(_gl, type.BakedModel)
-            : CreateFallbackCube(type);
+        // A multiblock anchor's model spans the whole volume: center it on the volume and
+        // shrink it to the one-cell footprint every other block's cube has
+        mesh = type.BakedModel == null ? CreateFallbackCube(type)
+            : type.Renderer == BlockRenderer.Multiblock
+                ? Primitives.CreateBlockModel(_gl, type.BakedModel.Quads,
+                    1f / MultiblockShape.Size, MultiblockShape.Size / 2f)
+                : Primitives.CreateBlockModel(_gl, type.BakedModel);
         _meshes[blockId] = mesh;
         return mesh;
     }
