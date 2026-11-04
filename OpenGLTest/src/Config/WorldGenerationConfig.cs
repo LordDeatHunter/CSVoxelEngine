@@ -717,9 +717,4 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // capture (PERF_TODO lesson 4).
     public const int TreeProxyCanopyCacheCapacity = 4096;
     public const int TreeProxyCanopyCacheGenerations = 4;
-
-    // Felled-canopy markers kept before TreeCanopy.CanopyDisturbed is wiped wholesale (it only
-    // bounds memory). Sized so a fell's square, (2 * FellPoisonRadius + 1)^2 ~ 1000 columns, wipes
-    // the set no more often than the old 289-column square did against 16384.
-    public const int CanopyDisturbedLimit = 65536;
 }

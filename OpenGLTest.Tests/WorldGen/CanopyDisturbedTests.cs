@@ -46,4 +46,33 @@ public sealed class CanopyDisturbedTests
             TreeCanopy.ResetCanopyDisturbed();
         }
     }
+
+    [Fact]
+    public void MarkersAreNeverLostHoweverManyColumnsAreEdited()
+    {
+        try
+        {
+            TreeCanopy.ResetCanopyDisturbed();
+            // Far more fells than the old 65536-marker cap would have kept
+            const int fells = 120;
+            for (var i = 0; i < fells; i++)
+                TreeGenerator.PoisonCanopy(X + i * 64, Z, TreeGenerator.FellPoisonRadius);
+
+            var marked = TreeCanopy.ExportCanopyDisturbed().ToHashSet();
+            for (var i = 0; i < fells; i++)
+                Assert.Contains((X + i * 64, Z), marked);
+            Assert.Equal(fells * (2 * TreeGenerator.FellPoisonRadius + 1) * (2 * TreeGenerator.FellPoisonRadius + 1),
+                marked.Count);
+
+            // Importing a saved set unions with what is there and round-trips through the export
+            var saved = marked.ToArray();
+            TreeCanopy.ResetCanopyDisturbed();
+            TreeCanopy.ImportCanopyDisturbed(saved);
+            Assert.True(TreeCanopy.ExportCanopyDisturbed().ToHashSet().SetEquals(marked));
+        }
+        finally
+        {
+            TreeCanopy.ResetCanopyDisturbed();
+        }
+    }
 }

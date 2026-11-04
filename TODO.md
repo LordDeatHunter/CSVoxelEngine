@@ -471,14 +471,14 @@ single-arc player.
   old TODO.
 - [ ] **`M-9` · Mod / data-pack behavior hooks** — P3, XL.
   Data packs already exist; consider a scripting/behavior hook (`M-21`).
-- [ ] **`M-10` · Fix: `TreeCanopy.CanopyDisturbed` loses felled-canopy markers at its cap** —
-  P2, S. It is edit state, not a cache: 289 entries per edited block and a wholesale `Clear()` at
-  `CanopyDisturbedLimit` (65536) entries, so after enough felled trees the LOD redraws cleared
-  canopy (the `Count` test is already hoisted out of the per-cell loop). The markers now persist per
-  world (`LodEditState`) but the in-session `Clear()` bug stands. **Must NOT** move to
-  `GenerationalCache` (eviction = data loss). The real fix derives the set from stored block data
-  and is entangled with save/load; the interim is one entry per chunk column and hoisting the
-  `Count` test. Sibling of `M-11`.
+- [ ] **`M-10` · `TreeCanopy.CanopyDisturbed` grows with every felled tree** — P3, S.
+  The interim fix landed: the markers are one bit per fine column in four 64-bit words per chunk
+  column (`TreeCanopy.MarkDisturbed`), so nothing is cleared wholesale and the LOD never redraws a
+  felled crown. Still open: the set is edit state that only grows (a fell is ~1000 columns, and
+  `lod-edits.bin` still lists them column by column, 8 bytes each, so a very long session writes a
+  large file); the real fix derives it from stored block data or writes the per-chunk-column words,
+  and is entangled with save/load. **Must NOT** move to `GenerationalCache` (eviction = data
+  loss). Sibling of `M-11`.
 - [ ] **`M-11` · `LodColumnCaps.ColumnCaps` grows unbounded** — P2, L, blocked on a design.
   A process-global, never-shrinking `ConcurrentDictionary` of ~1 KB per edited chunk column.
   Edit state, not a cache (eviction pops mined terrain back into the far LOD); cannot ride chunk
@@ -507,7 +507,7 @@ single-arc player.
   which the column tests skip, so a leak there would go unflagged.
 - [ ] **`M-13` · Far-LOD canopy for grown trees** — P3, M.
   `PoisonCanopy` only removes canopy, so a grown tree shows no far canopy until reload; needs an
-  add-canopy override keyed by column. Also spends `CanopyDisturbedLimit` budget per grow.
+  add-canopy override keyed by column. Each grow also adds markers to `CanopyDisturbed`.
 - [ ] **`M-14` · Wide-trunk residue (TREES_PLAN phase 7)** — P3, M.
   (1) a felled tree's mesh is truncated to one 16³ scratch chunk (`CellBatchMesher.Build` is a
   ready multi-chunk replacement); (2) cutting a wide core while its shells stand strands the

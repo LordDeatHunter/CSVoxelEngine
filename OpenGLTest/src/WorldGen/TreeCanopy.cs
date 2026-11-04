@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using VoxelEngine.Chunks;
 using VoxelEngine.Lod;
@@ -54,12 +53,36 @@ internal static class TreeCanopy
 
     // Fine columns whose canopy was edited by the player (mined wood/leaves, blasts, fells).
     // The static canopy above knows nothing of edits, so lookups here read 0 (no bump) rather
-    // than resurrecting a chopped crown at long range. Entries are gameplay truth, so the cap
-    // only bounds memory; clearing it can briefly show a stale bump far away, never a hole.
+    // than resurrecting a chopped crown at long range. Entries are gameplay truth and are never
+    // evicted: one bit per fine column, kept per chunk column (4 words of 64 bits, indexed like
+    // the canopy arrays), so a fell costs a handful of 32-byte entries instead of a thousand
+    // dictionary entries, and nothing is ever cleared wholesale. The words are set with an atomic
+    // Or on the main thread and read lock-free by the LOD builders.
     // Process-global but per WORLD: WorldSeed.Apply resets it between worlds (ResetCanopyDisturbed),
-    // and a save carries it across a restart through LodEditState (lod-edits.bin; the wholesale
-    // Clear at CanopyDisturbedLimit makes that lossy in a very long session, M-10).
-    private static readonly ConcurrentDictionary<(int X, int Z), byte> CanopyDisturbed = new();
+    // and a save carries it across a restart through LodEditState (lod-edits.bin).
+    private static readonly ConcurrentDictionary<(int X, int Z), ulong[]> CanopyDisturbed = new();
+
+    private const int DisturbedWords = Chunk.Size * Chunk.Size / 64;
+
+    // Static delegate, not a lambda at the call site (see BuildShapeFor).
+    private static readonly Func<(int X, int Z), ulong[]> NewDisturbedWords = static _ => new ulong[DisturbedWords];
+
+    private static int FineIndex(int x, int z) => ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+
+    private static bool IsDisturbed(int x, int z)
+    {
+        if (!CanopyDisturbed.TryGetValue((x >> Chunk.SizeShift, z >> Chunk.SizeShift), out var words))
+            return false;
+        var i = FineIndex(x, z);
+        return (Volatile.Read(ref words[i >> 6]) & (1UL << (i & 63))) != 0;
+    }
+
+    private static void MarkDisturbed(int x, int z)
+    {
+        var words = CanopyDisturbed.GetOrAdd((x >> Chunk.SizeShift, z >> Chunk.SizeShift), NewDisturbedWords);
+        var i = FineIndex(x, z);
+        Interlocked.Or(ref words[i >> 6], 1UL << (i & 63));
+    }
 
     /// <summary>Drops the cached canopy tops (real and proxy); called by <see cref="TreeGenerator.ResetCaches"/> only.</summary>
     internal static void ResetCaches()
@@ -80,7 +103,7 @@ internal static class TreeCanopy
     /// </summary>
     public static int CanopyTop(int x, int z)
     {
-        if (CanopyDisturbed.ContainsKey((x, z)))
+        if (IsDisturbed(x, z))
             return 0;
 
         return GetCanopyTops(x >> Chunk.SizeShift, z >> Chunk.SizeShift)
@@ -89,7 +112,7 @@ internal static class TreeCanopy
 
     public static byte CanopyLeafBlock(int x, int z)
     {
-        if (CanopyDisturbed.ContainsKey((x, z)))
+        if (IsDisturbed(x, z))
             return BlockType.Air;
 
         TryGetCanopy(x, z, out _, out var leaf);
@@ -111,7 +134,7 @@ internal static class TreeCanopy
     {
         top = 0;
         leaf = BlockType.Air;
-        if (CanopyDisturbed.ContainsKey((x, z)))
+        if (IsDisturbed(x, z))
             return false;
 
         var entry = proxy
@@ -133,14 +156,9 @@ internal static class TreeCanopy
     /// </summary>
     public static void PoisonCanopy(int x, int z, int radius)
     {
-        // One bound check per call, not per cell: ConcurrentDictionary.Count takes every lock, and
-        // the limit only bounds memory, so overshooting it by one call's square is harmless.
-        if (CanopyDisturbed.Count >= WorldGenerationConfig.CanopyDisturbedLimit)
-            CanopyDisturbed.Clear();
-
         for (var dx = -radius; dx <= radius; dx++)
         for (var dz = -radius; dz <= radius; dz++)
-            CanopyDisturbed[(x + dx, z + dz)] = 0;
+            MarkDisturbed(x + dx, z + dz);
 
         Interlocked.Increment(ref _canopyEditVersion);
     }
@@ -151,7 +169,17 @@ internal static class TreeCanopy
     internal static int CanopyEditVersion => Volatile.Read(ref _canopyEditVersion);
 
     /// <summary>Every felled-canopy marker, for the per-world LOD edit save (<c>LodEditState</c>).</summary>
-    internal static (int X, int Z)[] ExportCanopyDisturbed() => CanopyDisturbed.Keys.ToArray();
+    internal static (int X, int Z)[] ExportCanopyDisturbed()
+    {
+        var columns = new List<(int X, int Z)>();
+        foreach (var ((cx, cz), words) in CanopyDisturbed)
+        for (var i = 0; i < Chunk.Size * Chunk.Size; i++)
+        {
+            if ((Volatile.Read(ref words[i >> 6]) & (1UL << (i & 63))) != 0)
+                columns.Add(((cx << Chunk.SizeShift) + (i >> Chunk.SizeShift), (cz << Chunk.SizeShift) + (i & Chunk.SizeMask)));
+        }
+        return columns.ToArray();
+    }
 
     /// <summary>
     /// Adds saved felled-canopy markers to the live set (a marker is a plain flag, so the union is
@@ -160,8 +188,8 @@ internal static class TreeCanopy
     /// </summary>
     internal static void ImportCanopyDisturbed(IEnumerable<(int X, int Z)> columns)
     {
-        foreach (var column in columns)
-            CanopyDisturbed.TryAdd(column, 0);
+        foreach (var (x, z) in columns)
+            MarkDisturbed(x, z);
     }
 
     internal static int[] GetCanopyTops(int chunkX, int chunkZ) => GetCanopyColumns(chunkX, chunkZ).Tops;

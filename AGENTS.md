@@ -2677,8 +2677,7 @@ meshes it with `CellBatchMesher` (`src/Chunks/Meshing/CellBatchMesher.cs`): the 
 scratch chunks as the cells span, each at its real position inside an empty one-chunk ring, so a
 wide or tall tree is never clipped at a chunk seam and wears the real biome tint.
 
-Known gaps, all open: `TreeCanopy.CanopyDisturbed` still clears wholesale at its cap
-(`TODO.md` `M-10`); a grown tree shows no far-LOD canopy until reload, since `PoisonCanopy` only
+Known gaps, all open: a grown tree shows no far-LOD canopy until reload, since `PoisonCanopy` only
 removes canopy (`M-13`); and the wide-trunk residue of `M-14` — the felled mesh is drawn only
 inside its 16³ scratch window (the drops are intact), a wide core cut while its shells stand
 leaves the crown unreachable for reactive growth, and a beveled shell's cap can go stale when an
@@ -2869,9 +2868,9 @@ pure function of the seed: only **deltas** and the seed are written.
 - **The far LOD always reflects the current terrain.** `LodSurface` holds per-column surface
   overrides (the real top height and the block wearing it, REPLACE semantics), beside
   `LodColumnCaps` (MIN semantics, only ever falls, so a dug hole never exposes the buried
-  shell) and `TreeCanopy.CanopyDisturbed` (the edited-canopy markers `PoisonCanopy` writes;
-  its wholesale clear at `CanopyDisturbedLimit` makes them lossy in a very long session, TODO
-  `M-10`); a fine column's LOD height is
+  shell) and `TreeCanopy.CanopyDisturbed` (the edited-canopy markers `PoisonCanopy` writes: one bit per
+  fine column, kept as four 64-bit words per chunk column and never evicted or cleared; the file still
+  lists them column by column, TODO `M-10`); a fine column's LOD height is
   `min(override ?? generated, cap)`, fed in before the erosion window and bias so the nesting and
   burial invariants hold by construction. `LodEditState` exports all three to `lod-edits.bin`
   (only when their combined version moved) and imports them **before** `LodManager.Start`, so
