@@ -121,8 +121,12 @@ never touch it.
 
 ### 4. Early returns / nesting
 
-- [ ] Hot-path depth-4 blocks (`ChunkMeshBuilder` corner loops, `ChunkMesher`'s `while (true)` key probe,
-  `LodMeshBuilder.FillCell`): extract only against a before/after capture.
+- [ ] Hot-path depth-4 blocks (`ChunkMeshBuilder` corner loops, `ChunkMesher`'s `while (true)` key probe
+  at ~line 187, `LodMeshBuilder.FillCell`): extract only against a before/after capture. Needs a
+  workflow run, not a quick edit: measure mesh-build cost before and after with
+  `MeshBuildCostProbe` / `LodBuildCostProbe` (OpenGLTest.Tests) plus the `perf-capture` skill's interleaved
+  Release runs in a git worktree, one site per commit, and revert any extraction the JIT does not inline
+  to the same speed (the loops are per-voxel and per-corner, so a call that is not inlined shows up).
 
 ### 5. Small doc and code follow-ups
 
