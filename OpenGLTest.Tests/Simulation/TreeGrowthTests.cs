@@ -426,6 +426,50 @@ public sealed class TreeGrowthTests
     }
 
     [Fact]
+    public void AGrownCrownGoesBackToTheFarLod()
+    {
+        var test = 400;
+        foreach (var species in LeafySpecies)
+        {
+            var rootX = RootXOf(test++);
+            var tree = StampLoaded(species, rootX);
+            var before = SnapshotReach(tree, rootX);
+
+            Grow(new TreeGrowthWriter(), tree, rootX, 120);
+
+            var after = SnapshotReach(tree, rootX);
+            // Columns where a block appeared (a hydration raise alone remeshes nothing and touches no column)
+            var written = after.Where(kv => before[kv.Key].Id != kv.Value.Id).Select(kv => (kv.Key.X, kv.Key.Z)).ToHashSet();
+            var topLeaf = after.Where(kv => TreeGenerator.IsLeaf(kv.Value.Id))
+                .GroupBy(kv => (kv.Key.X, kv.Key.Z))
+                .ToDictionary(g => g.Key, g => g.MaxBy(kv => kv.Key.Y));
+            Assert.NotEmpty(written);
+
+            var checkedColumns = 0;
+            foreach (var column in written.Where(topLeaf.ContainsKey))
+            {
+                var expected = topLeaf[column];
+                Assert.True(TreeGenerator.TryGetCanopy(column.X, column.Z, proxy: false, out var top, out var leaf),
+                    $"{species.Name}: the far LOD has no crown over a written column that holds leaves");
+                Assert.Equal(expected.Key.Y, top);
+                Assert.Equal(expected.Value.Id, leaf);
+
+                // The far rings read it too
+                Assert.True(TreeGenerator.TryGetCanopy(column.X, column.Z, proxy: true, out var farTop, out _));
+                Assert.Equal(top, farTop);
+                checkedColumns++;
+            }
+
+            Assert.True(checkedColumns > 0, $"{species.Name}: the grow left no written column with leaves");
+
+            // A later edit over the column takes the grown crown away again
+            var first = written.First(topLeaf.ContainsKey);
+            TreeGenerator.PoisonCanopy(first.X, first.Z, 0);
+            Assert.False(TreeGenerator.TryGetCanopy(first.X, first.Z, proxy: false, out _, out _));
+        }
+    }
+
+    [Fact]
     public void GrowthFiresTheEditHooks()
     {
         var test = 90;

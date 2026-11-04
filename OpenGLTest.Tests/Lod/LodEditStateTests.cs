@@ -106,6 +106,47 @@ public sealed class LodEditStateTests
     }
 
     [Fact]
+    public void GrownCrownsRoundTripThroughBlockNames()
+    {
+        var crowns = Bucket(LodSurface.None);
+        crowns[4] = LodSurface.Pack(120, 9);
+        crowns[250] = LodSurface.Pack(-3, 11);
+        var state = new LodEditState([], [], [], [(6, -7, crowns)]);
+
+        var read = Roundtrip(state, id => "b" + id, name => byte.Parse(name[1..]));
+        AssertSameBuckets([(6, -7, crowns)], read, s => s.CanopyAdded);
+
+        // A leaf block this run no longer knows reads back as air, which the canopy ignores
+        var unknown = Roundtrip(state, id => "b" + id, name => name == "b9" ? null : byte.Parse(name[1..]));
+        LodSurface.Unpack(unknown.CanopyAdded.Single().Values[4], out var top, out var leaf);
+        Assert.Equal((120, (byte)0), (top, leaf));
+    }
+
+    [Fact]
+    public void AnOlderFileWithoutCrownsStillReads()
+    {
+        // The first format: magic, version 1, then caps, palette, overrides and disturbed columns
+        using var file = new MemoryStream();
+        file.Write("CVXL"u8);
+        file.WriteByte(LodEditState.FirstVersion);
+        using (var deflate = new System.IO.Compression.DeflateStream(file, System.IO.Compression.CompressionLevel.Fastest, leaveOpen: true))
+        using (var writer = new BinaryWriter(deflate))
+        {
+            writer.Write(0);     // caps
+            writer.Write((byte)0); // palette
+            writer.Write(0);     // overrides
+            writer.Write(1);     // disturbed
+            writer.Write(3);
+            writer.Write(4);
+        }
+
+        var read = LodEditState.TryParse(file.ToArray());
+        Assert.NotNull(read);
+        Assert.Equal([(3, 4)], read.Disturbed);
+        Assert.Empty(read.CanopyAdded);
+    }
+
+    [Fact]
     public void AnUnknownOverrideBlockKeepsItsHeightAndFallsBackToTheGeneratedTile()
     {
         var bucket = Bucket(LodSurface.None);
@@ -167,10 +208,13 @@ public sealed class LodEditStateTests
         var v2 = LodEditState.CombinedVersion;
         TreeGenerator.PoisonCanopy(x + 2, z, TreeGenerator.SingleEditPoisonRadius);
         var v3 = LodEditState.CombinedVersion;
+        TreeGenerator.SetCanopyAdded(x + 3, z, 90, TerrainGenerator.RockBlock);
+        var v4 = LodEditState.CombinedVersion;
 
         Assert.NotEqual(v0, v1);
         Assert.NotEqual(v1, v2);
         Assert.NotEqual(v2, v3);
+        Assert.NotEqual(v3, v4);
     }
 
     [Fact]

@@ -257,6 +257,9 @@ public static class TreeGenerator
     /// <summary>Marks the canopy columns within Chebyshev <paramref name="radius"/> of (x, z) as disturbed (<see cref="TreeCanopy.PoisonCanopy"/>).</summary>
     public static void PoisonCanopy(int x, int z, int radius) => TreeCanopy.PoisonCanopy(x, z, radius);
 
+    /// <summary>Records the crown a reactive growth left over ground column (x, z) for the far LOD; call after <see cref="PoisonCanopy"/> (<see cref="TreeCanopy.SetCanopyAdded"/>).</summary>
+    public static bool SetCanopyAdded(int x, int z, int top, byte leaf) => TreeCanopy.SetCanopyAdded(x, z, top, leaf);
+
     /// <summary>
     /// Drops the cached tree shapes, cell batches and canopy tops (real and proxy); only <see cref="WorldSeed.Apply"/> (and
     /// tests) call it, since both are a function of the seed.

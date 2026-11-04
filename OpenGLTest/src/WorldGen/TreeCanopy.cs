@@ -11,8 +11,8 @@ namespace VoxelEngine.WorldGen;
 /// <summary>
 /// The far-LOD canopy over the tree worldgen: the grown canopy tops per chunk column (the batch
 /// canopy the first LOD ring reads), the species' crown proxies the farther rings read, and the
-/// felled-canopy markers player edits leave (<see cref="PoisonCanopy"/>), which the per-world LOD
-/// edit save carries. Lookups are safe from any thread; the markers are written on the main
+/// felled-canopy markers player edits leave (<see cref="PoisonCanopy"/>) and the crowns a reactive
+/// growth added back (<see cref="SetCanopyAdded"/>), which the per-world LOD edit save carries. Lookups are safe from any thread; the markers are written on the main
 /// thread. <see cref="TreeGenerator"/> forwards its public canopy queries here.
 /// </summary>
 internal static class TreeCanopy
@@ -67,7 +67,51 @@ internal static class TreeCanopy
     // Static delegate, not a lambda at the call site (see BuildShapeFor).
     private static readonly Func<(int X, int Z), ulong[]> NewDisturbedWords = static _ => new ulong[DisturbedWords];
 
+    // Canopy a reactive growth added (TreeGrowthWriter): per fine column, the grown tree's real top
+    // leaf cell and its leaf block, packed like LodSurface (top << 8 | block), LodSurface.None where
+    // none. The generated canopy knows nothing of a tree the player grew, so without this a grown
+    // crown stays invisible at range until a reload. It wins over a disturbed marker (a grow
+    // poisons its columns and then adds the real top back) and over the generated canopy, and
+    // PoisonCanopy clears it, so a later mine, fell, blast or decay removes the grown crown again.
+    // Gameplay truth like CanopyDisturbed, so it never enters a GenerationalCache; same publish
+    // order as LodSurface (the bucket through the dictionary, each element by Volatile.Write).
+    private static readonly ConcurrentDictionary<(int X, int Z), int[]> CanopyAdded = new();
+
+    private static int _canopyAddedVersion;
+
+    private static int[] NewAddedBucket()
+    {
+        var bucket = new int[Chunk.Size * Chunk.Size];
+        Array.Fill(bucket, LodSurface.None);
+        return bucket;
+    }
+
     private static int FineIndex(int x, int z) => ((x & Chunk.SizeMask) << Chunk.SizeShift) | (z & Chunk.SizeMask);
+
+    private static bool TryGetAdded(int x, int z, out int top, out byte leaf)
+    {
+        top = 0;
+        leaf = BlockType.Air;
+        if (!CanopyAdded.TryGetValue((x >> Chunk.SizeShift, z >> Chunk.SizeShift), out var bucket))
+            return false;
+        var value = Volatile.Read(ref bucket[FineIndex(x, z)]);
+        if (value == LodSurface.None)
+            return false;
+        LodSurface.Unpack(value, out top, out leaf);
+        // A leaf block this run no longer knows (a save read it back as air) is no crown at all
+        return leaf != BlockType.Air;
+    }
+
+    private static void ClearAdded(int x, int z)
+    {
+        if (!CanopyAdded.TryGetValue((x >> Chunk.SizeShift, z >> Chunk.SizeShift), out var bucket))
+            return;
+        ref var slot = ref bucket[FineIndex(x, z)];
+        if (Volatile.Read(ref slot) == LodSurface.None)
+            return;
+        Volatile.Write(ref slot, LodSurface.None);
+        Interlocked.Increment(ref _canopyAddedVersion);
+    }
 
     private static bool IsDisturbed(int x, int z)
     {
@@ -92,17 +136,24 @@ internal static class TreeCanopy
     }
 
     /// <summary>
-    /// Forgets every felled-canopy marker, which belongs to the previous world's edits; only
-    /// <see cref="WorldSeed.Apply"/> calls it.
+    /// Forgets every felled-canopy marker and every added grown crown, which belong to the previous
+    /// world's edits; only <see cref="WorldSeed.Apply"/> calls it.
     /// </summary>
-    internal static void ResetCanopyDisturbed() => CanopyDisturbed.Clear();
+    internal static void ResetCanopyDisturbed()
+    {
+        CanopyDisturbed.Clear();
+        CanopyAdded.Clear();
+    }
 
     /// <summary>
     /// Highest canopy cell over the ground column (x, z), or 0 under open sky. Disturbed
-    /// columns (see <see cref="PoisonCanopy"/>) read 0. Safe to call from any thread.
+    /// columns (see <see cref="PoisonCanopy"/>) read 0 unless a grown crown was added back over
+    /// them (<see cref="SetCanopyAdded"/>). Safe to call from any thread.
     /// </summary>
     public static int CanopyTop(int x, int z)
     {
+        if (TryGetAdded(x, z, out var added, out _))
+            return added;
         if (IsDisturbed(x, z))
             return 0;
 
@@ -112,6 +163,8 @@ internal static class TreeCanopy
 
     public static byte CanopyLeafBlock(int x, int z)
     {
+        if (TryGetAdded(x, z, out _, out var addedLeaf))
+            return addedLeaf;
         if (IsDisturbed(x, z))
             return BlockType.Air;
 
@@ -125,13 +178,16 @@ internal static class TreeCanopy
 
     /// <summary>
     /// The canopy top over the ground column (x, z) and the leaf block wearing it; false under
-    /// open sky or where the canopy was disturbed (see <see cref="PoisonCanopy"/>). With
+    /// open sky or where the canopy was disturbed (see <see cref="PoisonCanopy"/>). A grown crown
+    /// added over the column (<see cref="SetCanopyAdded"/>) answers first, on every ring. With
     /// <paramref name="proxy"/> it reads the species' <c>lod</c> crown proxies instead of the
     /// grown trees, which never runs tree growth (the far rings, <see cref="LodLevelSpec.ProxyCanopy"/>).
     /// Safe to call from any thread.
     /// </summary>
     public static bool TryGetCanopy(int x, int z, bool proxy, out int top, out byte leaf)
     {
+        if (TryGetAdded(x, z, out top, out leaf))
+            return true;
         top = 0;
         leaf = BlockType.Air;
         if (IsDisturbed(x, z))
@@ -152,15 +208,82 @@ internal static class TreeCanopy
     /// Marks the canopy columns within Chebyshev <paramref name="radius"/> of (x, z) as disturbed
     /// (see <see cref="CanopyTop"/>). A single mined or blasted wood or leaf cell passes
     /// <see cref="TreeGenerator.SingleEditPoisonRadius"/>; a felled tree passes <see cref="TreeGenerator.FellPoisonRadius"/>
-    /// once at the break, which covers its whole canopy.
+    /// once at the break, which covers its whole canopy. It also clears any grown crown added over
+    /// those columns (<see cref="SetCanopyAdded"/>): add after poisoning, never before.
     /// </summary>
     public static void PoisonCanopy(int x, int z, int radius)
     {
         for (var dx = -radius; dx <= radius; dx++)
         for (var dz = -radius; dz <= radius; dz++)
+        {
             MarkDisturbed(x + dx, z + dz);
+            ClearAdded(x + dx, z + dz);
+        }
 
         Interlocked.Increment(ref _canopyEditVersion);
+    }
+
+    /// <summary>
+    /// Records that a reactive growth left the crown of ground column (x, z) at leaf cell
+    /// <paramref name="top"/> wearing <paramref name="leaf"/>, so the far LOD draws it. Call after
+    /// <see cref="PoisonCanopy"/> for the column, which is what clears an older record. Main
+    /// thread. Returns false when the column already held exactly this record.
+    /// </summary>
+    public static bool SetCanopyAdded(int x, int z, int top, byte leaf)
+    {
+        var packed = LodSurface.Pack(top, leaf);
+        var bucket = CanopyAdded.GetOrAdd((x >> Chunk.SizeShift, z >> Chunk.SizeShift), static _ => NewAddedBucket());
+        ref var slot = ref bucket[FineIndex(x, z)];
+        if (Volatile.Read(ref slot) == packed)
+            return false;
+
+        Volatile.Write(ref slot, packed);
+        Interlocked.Increment(ref _canopyAddedVersion);
+        return true;
+    }
+
+    /// <summary>Bumped by every <see cref="SetCanopyAdded"/> or clear that changes a column, so a save can tell whether anything changed.</summary>
+    internal static int CanopyAddedVersion => Volatile.Read(ref _canopyAddedVersion);
+
+    /// <summary>A copy of every added-canopy bucket that holds a record, for the per-world LOD edit save (<c>LodEditState</c>). Main thread.</summary>
+    internal static List<(int CX, int CZ, int[] Values)> ExportCanopyAdded()
+    {
+        var result = new List<(int CX, int CZ, int[] Values)>();
+        foreach (var (key, bucket) in CanopyAdded)
+        {
+            var copy = new int[bucket.Length];
+            var any = false;
+            for (var i = 0; i < copy.Length; i++)
+            {
+                copy[i] = Volatile.Read(ref bucket[i]);
+                any |= copy[i] != LodSurface.None;
+            }
+
+            if (any) result.Add((key.X, key.Z, copy));
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Merges saved added-canopy records into the live table; a live record always wins, so an
+    /// import never undoes a grow made first. Call before <c>LodManager.Start</c>. Leaves
+    /// <see cref="CanopyAddedVersion"/> alone: the imported state is what the file holds.
+    /// </summary>
+    internal static void ImportCanopyAdded(IEnumerable<(int CX, int CZ, int[] Values)> buckets)
+    {
+        foreach (var (cx, cz, values) in buckets)
+        {
+            int[]? bucket = null;
+            var n = Math.Min(values.Length, Chunk.Size * Chunk.Size);
+            for (var i = 0; i < n; i++)
+            {
+                if (values[i] == LodSurface.None) continue;
+                bucket ??= CanopyAdded.GetOrAdd((cx, cz), static _ => NewAddedBucket());
+                if (Volatile.Read(ref bucket[i]) == LodSurface.None)
+                    Volatile.Write(ref bucket[i], values[i]);
+            }
+        }
     }
 
     private static int _canopyEditVersion;

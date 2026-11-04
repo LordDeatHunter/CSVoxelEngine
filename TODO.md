@@ -496,9 +496,9 @@ single-arc player.
   spring placed on a great-lake shore or inside a river ramp overrides the stored water level there
   (`TerrainGenerator.Compute` applies hot springs after the lake carve and the ramp's bank raise),
   which the column tests skip, so a leak there would go unflagged.
-- [ ] **`M-13` · Far-LOD canopy for grown trees** — P3, M.
-  `PoisonCanopy` only removes canopy, so a grown tree shows no far canopy until reload; needs an
-  add-canopy override keyed by column. Each grow also adds markers to `CanopyDisturbed`.
+- [x] **`M-13` · Far-LOD canopy for grown trees** — landed: a grow records the crown over each
+  written column (`TreeCanopy.CanopyAdded`, read first on every ring, cleared by any later poison,
+  saved in `lod-edits.bin` v2; `CanopyAddedTests`, `AGrownCrownGoesBackToTheFarLod`).
 - [ ] **`M-14` · Wide-trunk residue (TREES_PLAN phase 7)** — P3, M.
   (1) landed: a felled tree is meshed whole through `CellBatchMesher.Build`, one mesh per chunk
   it spans (`TreeFellingTests`); (2) cutting a wide core while its shells stand strands the

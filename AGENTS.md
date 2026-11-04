@@ -80,7 +80,7 @@ timestamps, format version, and an optional `source` only the dedicated server r
 sources"), `chunks/<cx>_<cy>_<cz>.bin` (one Deflate-compressed,
 block-name-paletted snapshot per **modified** chunk, `ChunkSaveCodec`; an untouched chunk is
 never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column caps,
-felled-canopy markers, surface overrides), `player.json` (`PlayerSaveCodec`: position and look,
+felled-canopy markers, grown crowns, surface overrides), `player.json` (`PlayerSaveCodec`: position and look,
 creative/flight, health, respawn eye, lighting clock, the full inventory and hotbar; no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live slimes and
 goblins with health, facing, velocity, ammo and a slime's size plus still-pending entries, up to
@@ -1850,7 +1850,8 @@ OpenGLTest/
       TreeBatches.cs           # the grown tree caches: solo shapes (one tree alone, per trunk) and the
                                #   64x64-cell batches grown together (BuildBatch), their profiler counters
       TreeCanopy.cs            # the far-LOD canopy: grown and crown-proxy canopy tops per chunk column, the
-                               #   felled-canopy markers (CanopyDisturbed, PoisonCanopy) and their save export
+                               #   felled-canopy markers (CanopyDisturbed, PoisonCanopy), the crowns a reactive growth
+                               #   added back (CanopyAdded, SetCanopyAdded) and their save export
       TreeGenerator.cs         # the tree worldgen front end: which columns root which species (worldgen
                                #   rules, TryGetTree), the reach and leaf tables, the cache reset; forwards
                                #   Stamp and the far-LOD canopy lookups (TryGetCanopy, PoisonCanopy)
@@ -2688,9 +2689,15 @@ meshes it with `CellBatchMesher` (`src/Chunks/Meshing/CellBatchMesher.cs`): the 
 scratch chunks as the cells span, each at its real position inside an empty one-chunk ring, so a
 wide or tall tree is never clipped at a chunk seam and wears the real biome tint.
 
-Known gaps, all open: a grown tree shows no far-LOD canopy until reload, since `PoisonCanopy` only
-removes canopy (`M-13`); and the wide-trunk residue of `M-14` — a wide core cut while its shells
-stand leaves the crown unreachable for reactive growth.
+A grown tree shows in the far LOD at once: after poisoning each written column, `TreeGrowthWriter`
+scans the loaded column for its highest leaf and records it through `TreeGenerator.SetCanopyAdded`
+(`TreeCanopy.CanopyAdded`: packed top and leaf block per fine column, read before the disturbed
+marker and the generated canopy on every ring, cleared by any later `PoisonCanopy`, saved in
+`lod-edits.bin` format version 2 with the leaf as a block name, reset by `WorldSeed.Apply`; never
+in a `GenerationalCache`). `CanopyAddedTests`, `AGrownCrownGoesBackToTheFarLod`.
+
+Known gap, open: the wide-trunk residue of `M-14` — a wide core cut while its shells stand leaves
+the crown unreachable for reactive growth.
 
 ### Recipes, cast molds and metalworks
 
@@ -2879,9 +2886,10 @@ pure function of the seed: only **deltas** and the seed are written.
   `LodColumnCaps` (MIN semantics, only ever falls, so a dug hole never exposes the buried
   shell) and `TreeCanopy.CanopyDisturbed` (the edited-canopy markers `PoisonCanopy` writes: one bit per
   fine column, kept as four 64-bit words per chunk column and never evicted or cleared; the file still
-  lists them column by column, TODO `M-10`); a fine column's LOD height is
+  lists them column by column, TODO `M-10`) and `TreeCanopy.CanopyAdded` (the grown crowns a
+  reactive growth added back over those markers); a fine column's LOD height is
   `min(override ?? generated, cap)`, fed in before the erosion window and bias so the nesting and
-  burial invariants hold by construction. `LodEditState` exports all three to `lod-edits.bin`
+  burial invariants hold by construction. `LodEditState` exports all four to `lod-edits.bin`
   (only when their combined version moved) and imports them **before** `LodManager.Start`, so
   the first region build already sees them.
 - **`WorldSeed.Apply(seed)`** is how a world gets its seed (`WorldGenerationConfig.Seed` reads

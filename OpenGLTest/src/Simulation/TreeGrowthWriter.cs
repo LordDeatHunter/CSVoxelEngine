@@ -63,8 +63,10 @@ namespace VoxelEngine.Simulation;
 /// <para><b>Hooks.</b> <see cref="FluidManager.ScheduleAround(int, int, int)"/> for every cell
 /// whose id changed; one <see cref="LeafDecayManager.ScheduleBox"/> over the written box; per
 /// deduplicated column with a mesh-affecting write, <see cref="TreeGenerator.PoisonCanopy"/> with
-/// radius 0 and <see cref="LodManager.MarkEditedColumn"/>. That far-LOD hook only removes the
-/// column's stale canopy bump; there is no path that adds the grown tree to the far LOD.</para>
+/// radius 0 and <see cref="LodManager.MarkEditedColumn"/>. The poison removes the column's stale
+/// canopy bump; the crown that now stands over it (the highest leaf cell the loaded column holds)
+/// goes straight back through <see cref="TreeGenerator.SetCanopyAdded"/>, so the far LOD draws a
+/// grown tree at once and a later mine, fell or decay (which poison again) takes it away.</para>
 ///
 /// <para><b>RNG.</b> Each call seeds its stream from <see cref="GrowSeed"/>: the tree's
 /// <see cref="TreeGrower.SeedFor"/> seed (root cell, world seed, species), the rebuilt graph's
@@ -382,7 +384,7 @@ public sealed class TreeGrowthWriter
             }
         }
 
-        FireHooks(chunks, log, fluids, leafDecay, lod);
+        FireHooks(chunks, log, fluids, leafDecay, lod, ry + TreeRasterizer.ReachOf(species).Up);
         return new TreeGrowthResult(status, rx, ry, rz, added, woodWritten, leavesPlaced, hydrationRaised);
     }
 
@@ -398,9 +400,13 @@ public sealed class TreeGrowthWriter
         log.Record(x, y, z, idChanged, mesh);
     }
 
-    /// <summary>Runs every edit hook once for the call's writes.</summary>
+    /// <summary>
+    /// Runs every edit hook once for the call's writes. <paramref name="scanTop"/> is the highest
+    /// world Y a leaf of this tree can stand at, where the far-LOD crown scan of each written
+    /// column starts.
+    /// </summary>
     private static void FireHooks(ChunkManager chunks, WriteLog log, FluidManager? fluids,
-        LeafDecayManager? leafDecay, LodManager? lod)
+        LeafDecayManager? leafDecay, LodManager? lod, int scanTop)
     {
         if (!log.Any)
             return;
@@ -416,15 +422,41 @@ public sealed class TreeGrowthWriter
         foreach (var key in log.Chunks)
             chunks.MarkDirty(ChunkKey.ToVector3(key));
 
+        // Each written column's old canopy bump is stale (poison), and the crown that now stands
+        // over it goes back to the far LOD (add), in that order: poisoning clears an added crown
         foreach (var (x, z) in log.Columns)
         {
             TreeGenerator.PoisonCanopy(x, z, 0);
+            if (TryFindCrownTop(chunks, x, z, scanTop, (int)log.Min.Y, out var crownTop, out var crownLeaf))
+                TreeGenerator.SetCanopyAdded(x, z, crownTop, crownLeaf);
             lod?.MarkEditedColumn(x, z);
         }
 
         // No FallingBlockManager.TryTopple and no LodSurface edit (NotifyLodEdit): growth only
         // fills air, leaves or cover and never removes or writes a surface solid, so nothing
         // above can lose its support and no column's surface height changes.
+    }
+
+    /// <summary>
+    /// The highest leaf cell of column (x, z) between <paramref name="scanTop"/> and
+    /// <paramref name="scanBottom"/>, read from the loaded world (an unloaded cell reads as no
+    /// leaf), and the leaf block standing there: the crown the far LOD should draw over the column.
+    /// </summary>
+    private static bool TryFindCrownTop(ChunkManager chunks, int x, int z, int scanTop, int scanBottom,
+        out int top, out byte leaf)
+    {
+        for (var y = scanTop; y >= scanBottom; y--)
+        {
+            if (!chunks.TryGetCell(x, y, z, out var id, out _) || !TreeGenerator.IsLeaf(id))
+                continue;
+            top = y;
+            leaf = id;
+            return true;
+        }
+
+        top = 0;
+        leaf = BlockType.Air;
+        return false;
     }
 
     /// <summary>

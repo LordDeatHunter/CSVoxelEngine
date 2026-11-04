@@ -13,8 +13,9 @@ namespace VoxelEngine.Saves;
 
 /// <summary>
 /// One world's far-LOD edit state: the removal caps (<see cref="LodColumnCaps.LowerColumnBelow(int, int, int)"/>),
-/// the surface overrides (<see cref="LodSurface"/>) and the felled-canopy markers
-/// (<see cref="TreeGenerator.PoisonCanopy"/>). All three are process-global tables that only
+/// the surface overrides (<see cref="LodSurface"/>), the felled-canopy markers
+/// (<see cref="TreeGenerator.PoisonCanopy"/>) and the crowns a reactive growth added back
+/// (<see cref="TreeGenerator.SetCanopyAdded"/>). All four are process-global tables that only
 /// record edits, so without this a restart would redraw the far terrain as freshly generated and
 /// a dug-out or built-up area would snap back at range. <see cref="Capture"/> copies the live
 /// tables, <see cref="Import"/> merges a saved copy back in; it must run BEFORE
@@ -24,28 +25,35 @@ namespace VoxelEngine.Saves;
 /// Layout of <see cref="FileName"/>, all little-endian:
 /// <code>
 ///   "CVXL"            4 ASCII bytes of magic
-///   version           byte, currently 1
+///   version           byte, currently 2
 ///   Deflate body:
 ///     int n, then n x (int cx, int cz, 256 x int cap)        caps, int.MaxValue = uncapped
-///     byte p, then p x BinaryWriter string                   override block palette
+///     byte p, then p x BinaryWriter string                   block palette (overrides + added crowns)
 ///     int n, then n x (int cx, int cz, 256 x int override)   int.MinValue = none, else
 ///                                                            top &lt;&lt; 8 | palette index (0 = generated tile)
 ///     int n, then n x (int x, int z)                         felled-canopy columns
+///     int n, then n x (int cx, int cz, 256 x int crown)      version 2 only: grown crowns added back,
+///                                                            int.MinValue = none, else
+///                                                            top &lt;&lt; 8 | palette index (the leaf block)
 /// </code>
-/// Override blocks travel as NAMES for the same reason chunk files do (<see cref="ChunkSaveCodec"/>):
+/// Palette blocks travel as NAMES for the same reason chunk files do (<see cref="ChunkSaveCodec"/>):
 /// block ids are only stable within one run. A name this run no longer knows reads back as 0,
-/// the generated tile rule, keeping the saved height.
+/// the generated tile rule for an override (keeping the saved height) and no leaf for a crown.
 /// </summary>
 public sealed class LodEditState(
     IReadOnlyList<(int CX, int CZ, int[] Values)> caps,
     IReadOnlyList<(int CX, int CZ, int[] Values)> overrides,
-    IReadOnlyList<(int X, int Z)> disturbed)
+    IReadOnlyList<(int X, int Z)> disturbed,
+    IReadOnlyList<(int CX, int CZ, int[] Values)>? canopyAdded = null)
 {
     /// <summary>The file the state is saved to, in the world folder.</summary>
     public const string FileName = "lod-edits.bin";
 
-    /// <summary>The format version this build writes and the only one it reads.</summary>
-    public const byte Version = 1;
+    /// <summary>The format version this build writes; it also reads <see cref="FirstVersion"/>, which has no crown section.</summary>
+    public const byte Version = 2;
+
+    /// <summary>The oldest format version this build still reads.</summary>
+    public const byte FirstVersion = 1;
 
     private static readonly byte[] Magic = "CVXL"u8.ToArray();
 
@@ -65,26 +73,33 @@ public sealed class LodEditState(
     /// <summary>Every felled-canopy column.</summary>
     public IReadOnlyList<(int X, int Z)> Disturbed { get; } = disturbed;
 
+    /// <summary>Per chunk column, the 256 packed grown crowns (<see cref="LodSurface.Pack"/> of the top and the leaf block, this run's ids).</summary>
+    public IReadOnlyList<(int CX, int CZ, int[] Values)> CanopyAdded { get; } = canopyAdded ?? [];
+
     /// <summary>
-    /// The sum of the three tables' edit counters. Any cap, override or canopy edit changes it, so
+    /// The sum of the four tables' edit counters. Any cap, override or canopy edit changes it, so
     /// an autosave can skip rewriting the file while it stands still.
     /// </summary>
     public static int CombinedVersion =>
-        unchecked(LodColumnCaps.CapEditVersion + LodSurface.EditVersion + TreeCanopy.CanopyEditVersion);
+        unchecked(LodColumnCaps.CapEditVersion + LodSurface.EditVersion + TreeCanopy.CanopyEditVersion
+                  + TreeCanopy.CanopyAddedVersion);
 
     /// <summary>Copies the live tables. Main thread, the tables' only writer.</summary>
     public static LodEditState Capture() =>
-        new(LodColumnCaps.ExportColumnCaps(), LodSurface.Export(), TreeCanopy.ExportCanopyDisturbed());
+        new(LodColumnCaps.ExportColumnCaps(), LodSurface.Export(), TreeCanopy.ExportCanopyDisturbed(),
+            TreeCanopy.ExportCanopyAdded());
 
     /// <summary>
-    /// Merges this state into the live tables: the lower cap wins, a live override wins over the
-    /// saved one, and the canopy markers are unioned, so an import never undoes an edit made first.
+    /// Merges this state into the live tables: the lower cap wins, a live override or grown crown
+    /// wins over the saved one, and the canopy markers are unioned, so an import never undoes an
+    /// edit made first.
     /// </summary>
     public void Import()
     {
         LodColumnCaps.ImportColumnCaps(Caps);
         LodSurface.Import(Overrides);
         TreeCanopy.ImportCanopyDisturbed(Disturbed);
+        TreeCanopy.ImportCanopyAdded(CanopyAdded);
     }
 
     /// <summary>Encodes with this run's block names.</summary>
@@ -103,7 +118,7 @@ public sealed class LodEditState(
         Span<byte> paletteIndexOf = stackalloc byte[256];
         paletteIndexOf.Clear();
         var palette = new List<byte>();
-        foreach (var (_, _, values) in Overrides)
+        foreach (var (_, _, values) in Overrides.Concat(CanopyAdded))
         foreach (var value in values)
         {
             if (value == LodSurface.None) continue;
@@ -124,8 +139,24 @@ public sealed class LodEditState(
         writer.Write((byte)palette.Count);
         foreach (var id in palette) writer.Write(nameOf(id) ?? "");
 
-        writer.Write(Overrides.Count);
-        foreach (var (cx, cz, values) in Overrides)
+        WritePackedBuckets(writer, Overrides, paletteIndexOf);
+
+        writer.Write(Disturbed.Count);
+        foreach (var (x, z) in Disturbed)
+        {
+            writer.Write(x);
+            writer.Write(z);
+        }
+
+        WritePackedBuckets(writer, CanopyAdded, paletteIndexOf);
+    }
+
+    // Buckets of packed (top, block) values with each block replaced by its 1-based palette index
+    private static void WritePackedBuckets(BinaryWriter writer, IReadOnlyList<(int CX, int CZ, int[] Values)> buckets,
+        ReadOnlySpan<byte> paletteIndexOf)
+    {
+        writer.Write(buckets.Count);
+        foreach (var (cx, cz, values) in buckets)
         {
             RequireBucketSize(cx, cz, values);
             writer.Write(cx);
@@ -141,13 +172,6 @@ public sealed class LodEditState(
 
                 writer.Write(value);
             }
-        }
-
-        writer.Write(Disturbed.Count);
-        foreach (var (x, z) in Disturbed)
-        {
-            writer.Write(x);
-            writer.Write(z);
         }
     }
 
@@ -172,8 +196,9 @@ public sealed class LodEditState(
             input.ReadExactly(header);
             if (!header[..4].SequenceEqual(Magic))
                 throw new InvalidDataException("not a LOD edit file (bad magic)");
-            if (header[4] != Version)
-                throw new InvalidDataException($"unsupported LOD edit file version {header[4]}");
+            var version = header[4];
+            if (version is < FirstVersion or > Version)
+                throw new InvalidDataException($"unsupported LOD edit file version {version}");
 
             using var deflate = new DeflateStream(input, CompressionMode.Decompress, leaveOpen: true);
             using var reader = new BinaryReader(deflate, Encoding.UTF8, leaveOpen: true);
@@ -193,21 +218,7 @@ public sealed class LodEditState(
                     (unknown ??= []).Add(name.Length > 0 ? name : "<empty>");
             }
 
-            var rawOverrides = ReadBuckets(reader);
-            var overrides = new List<(int CX, int CZ, int[] Values)>(rawOverrides.Count);
-            foreach (var (cx, cz, values) in rawOverrides)
-            {
-                for (var i = 0; i < values.Length; i++)
-                {
-                    if (values[i] == LodSurface.None) continue;
-                    LodSurface.Unpack(values[i], out var top, out var index);
-                    if (index > paletteCount)
-                        throw new InvalidDataException($"override palette index {index} past {paletteCount}");
-                    values[i] = LodSurface.Pack(top, palette[index]);
-                }
-
-                overrides.Add((cx, cz, values));
-            }
+            var overrides = ReadPackedBuckets(reader, palette);
 
             var disturbedCount = reader.ReadInt32();
             if (disturbedCount < 0 || disturbedCount > MaxDisturbed)
@@ -216,10 +227,12 @@ public sealed class LodEditState(
             for (var i = 0; i < disturbedCount; i++)
                 disturbed[i] = (reader.ReadInt32(), reader.ReadInt32());
 
+            var canopyAdded = version >= 2 ? ReadPackedBuckets(reader, palette) : [];
+
             if (unknown != null)
                 Log.Warn($"LOD edits: unknown override blocks {string.Join(", ", unknown)} fall back to the generated tile");
 
-            return new LodEditState(caps, overrides, disturbed);
+            return new LodEditState(caps, overrides, disturbed, canopyAdded);
         }
         catch (EndOfStreamException e)
         {
@@ -269,6 +282,26 @@ public sealed class LodEditState(
     {
         if (values.Length != BucketSize)
             throw new ArgumentException($"bucket ({cx}, {cz}) holds {values.Length} values, not {BucketSize}");
+    }
+
+    // Buckets of packed (top, palette index) values, the index mapped back to this run's block id
+    // (palette[0] = the generated tile / no leaf)
+    private static List<(int CX, int CZ, int[] Values)> ReadPackedBuckets(BinaryReader reader, byte[] palette)
+    {
+        var buckets = ReadBuckets(reader);
+        foreach (var (_, _, values) in buckets)
+        {
+            for (var i = 0; i < values.Length; i++)
+            {
+                if (values[i] == LodSurface.None) continue;
+                LodSurface.Unpack(values[i], out var top, out var index);
+                if (index >= palette.Length)
+                    throw new InvalidDataException($"palette index {index} past {palette.Length - 1}");
+                values[i] = LodSurface.Pack(top, palette[index]);
+            }
+        }
+
+        return buckets;
     }
 
     private static List<(int CX, int CZ, int[] Values)> ReadBuckets(BinaryReader reader)

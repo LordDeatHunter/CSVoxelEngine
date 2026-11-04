@@ -15,9 +15,8 @@ in `git log` on `tree-rework`. What is left is the residue below, tracked in `TO
   is edit state that only grows and `lod-edits.bin` lists it column by column. Real fix: derive
   the set from stored block data (entangled with save/load). Must NOT move into
   `GenerationalCache`.
-- [ ] **`M-13` Far-LOD canopy for grown trees.** `PoisonCanopy` only removes canopy, so a grown
-  tree shows no far canopy until reload. Needs an add-canopy override keyed by column
-  (`TreeCanopy.CanopyAdded`, persisted in `lod-edits.bin`).
+- [x] **`M-13` Far-LOD canopy for grown trees.** Landed: `TreeCanopy.CanopyAdded` (persisted in
+  `lod-edits.bin` v2) puts a grown crown back over the columns a grow poisoned.
 - [ ] **`M-14` Wide-trunk residue** (three independent items):
   - [x] A felled tree's mesh was cut off at its one 16³ scratch chunk: `TopplingTree` now meshes
     through `CellBatchMesher.Build`, one mesh per chunk.

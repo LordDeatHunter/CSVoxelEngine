@@ -147,6 +147,9 @@ public class WorldSeedTests
             var (cx, cz) = FindCanopyColumn();
             TreeGenerator.PoisonCanopy(cx, cz, TreeGenerator.SingleEditPoisonRadius);
             Assert.False(TreeGenerator.TryGetCanopy(cx, cz, out _, out _));
+            // ...and a grown crown a reactive growth added back over it
+            TreeGenerator.SetCanopyAdded(cx, cz, y + 10, TerrainGenerator.RockBlock);
+            Assert.True(TreeGenerator.TryGetCanopy(cx, cz, out _, out _));
 
             // (3) A surface override on another column of the same far region.
             var (x3, z3) = (fx + 20, fz + 20);
