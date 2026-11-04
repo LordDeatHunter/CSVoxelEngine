@@ -96,11 +96,10 @@ the other while still being faster together.
   block-entity pattern. First jobs: `sand -> glass`, `mud -> brick`, and a plain
   `crushed_copper -> copper_ingot` route that does not need the full kiln. Feeds `P-6` and is
   step zero of the automation chain.
-- [ ] **`P-4` · Complete the copper chain** — P1, M.
-  The quern crushes `malachite -> crushed_copper`, and the metalworks (kiln crucible + fired
-  molds) already **casts** the ingot and the pickaxe/axe **heads**. What is missing is the
-  head -> tool **assembly** recipe, so the heads dead-end. Add `copper_pickaxe` / `copper_axe`
-  from head + handle (`P-42` branch). This is the first real "I advanced" moment.
+- [x] **`P-4` · Complete the copper chain** — landed: the quern crushes
+  `malachite -> crushed_copper`, the metalworks casts the ingot and the pickaxe/axe heads, and
+  `recipes/copper_pickaxe.json` / `copper_axe.json` assemble a head, a branch and two vines into
+  the tool (`CraftingTests.ACastHeadAndAHandleAssembleIntoTheTool`).
 - [ ] **`P-5` · Light progression: torch -> lamp -> fire as fuel** — P1, S–M.
   A cheap **torch** block (emission ~14, `needsSupport`) before the existing `lamp` (emission
   15). Wire placed lights into the shader's 8 point-light budget so a torch casts dynamic light,
