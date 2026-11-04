@@ -1,7 +1,7 @@
 export const meta = {
   name: 'plan-and-implement',
   description: 'Sonnet scouts the codebase, Opus designs the plan, Opus implements it step by step, then build/test + Opus acceptance review (set ARCHITECT_MODEL to "fable" to go back to Fable, which falls back to Opus if unavailable)',
-  whenToUse: 'A feature, refactor, or bug fix in CSVoxelEngine that deserves a plan before code. Pass the task as args: a string, or {task, extraContext?, maxFixRounds?, dryRun?}. dryRun stops after the plan.',
+  whenToUse: 'ONLY for larger workloads in CSVoxelEngine: multi-file features, cross-cutting refactors, or bug fixes and audits whose design is unclear and that deserve a plan before code. Before invoking, the calling agent must judge whether it can do the task well enough itself (small or well-scoped changes, single-area fixes, quick investigations): if so, do it directly and do NOT run this workflow, since it costs roughly 20 minutes and 1M tokens. Pass the task as args: a string, or {task, extraContext?, maxFixRounds?, dryRun?}. dryRun stops after the plan.',
   phases: [
     { title: 'Scout', detail: 'Sonnet maps the relevant code from four angles', model: 'sonnet' },
     { title: 'Architect', detail: 'Opus drafts the plan, Sonnet answers its open questions, Opus red-teams and finalizes', model: 'opus' },
