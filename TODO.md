@@ -121,11 +121,11 @@ the other while still being faster together.
 
 ### Survival basics
 
-- [ ] **`P-10` · Death + respawn, done properly** — P1, M.
-  Health, fall damage, lava DoT, mob damage, the damage vignette/shake and simple respawn landed.
-  Still open: a **death screen** (`U-5`) with a manual respawn, and passive **health regen**
-  (out of combat, slowed while sprinting). Decided against: death drops (so `P-29` loses its
-  reason) and, for now, a respawn point / bed.
+- [x] **`P-10` · Death + respawn, done properly** — landed: health, fall damage, lava DoT, mob
+  damage, the damage vignette/shake, the death screen with a manual respawn (`U-5`) and passive
+  regen (out of combat, slowed while sprinting; `PlayerHealth.UpdateRegen`, `RegenTests`).
+  Decided against: death drops (so `P-29` loses its reason) and, for now, a respawn point / bed.
+  Known gap: a thrown item's hit does not count as combat for the regen delay.
 - [ ] **`P-12` · Farming** — P2, M.
   Seeds, tilled soil, growth stages, harvest -> food and crafting ingredients. Cross-links
   `P-38`, `P-42`, `P-45`.

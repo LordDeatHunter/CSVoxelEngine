@@ -179,7 +179,7 @@ internal sealed class LeftClickAction
     {
         if (!IsPlaying) return false;
         if (!TryFindPunchTarget(player.Eye, player.ViewDirection, out var target)) return false;
-        Strikes.StrikeMob(target, Combat.PunchDamage(HeldItem(player.Inventory)), player.Eye);
+        Strikes.StrikeMob(target, Combat.PunchDamage(HeldItem(player.Inventory)), player.Eye, player.Health);
         return true;
     }
 
@@ -191,7 +191,7 @@ internal sealed class LeftClickAction
     internal int SliceFor(PlayerContext player, bool returnSwing)
     {
         if (!IsPlaying) return 0;
-        return ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), returnSwing);
+        return ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), returnSwing, player.Health);
     }
 
     /// <summary>
@@ -420,7 +420,7 @@ internal sealed class LeftClickAction
                 Strikes.SpawnHitSparks(target, player.Eye);
             }
             else
-                Strikes.StrikeMob(target, Combat.PunchDamage(held), player.Eye);
+                Strikes.StrikeMob(target, Combat.PunchDamage(held), player.Eye, player.Health);
             // The punch connected, so the swing holds at full extension for a beat (cosmetic: the
             // punch timer above keeps the pace). A client only predicts the connect - a mob was in
             // the cone with a clear line when the swing landed - since the server's verdict comes
@@ -504,7 +504,7 @@ internal sealed class LeftClickAction
             }
             else
             {
-                connected = ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(), returnSwing) > 0;
+                connected = ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(), returnSwing, player.Health) > 0;
             }
             // A connecting swing holds at the impact; it still ends on time, so the combo's next
             // swing is never delayed
@@ -527,7 +527,7 @@ internal sealed class LeftClickAction
     /// unobstructed line of sight each take the swing's damage and a knockback shove. The return
     /// swing is at half power (<paramref name="returnSwing"/>). Returns how many were struck.
     /// </summary>
-    private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing)
+    private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing, PlayerHealth? striker)
     {
         var mobs = _mobs;
         if (mobs.Count == 0)
@@ -565,12 +565,12 @@ internal sealed class LeftClickAction
         var struck = 0;
         if (first != null)
         {
-            Strikes.StrikeMob(first, damage, origin);
+            Strikes.StrikeMob(first, damage, origin, striker);
             struck++;
         }
 
         if (second == null) return struck;
-        Strikes.StrikeMob(second, damage, origin);
+        Strikes.StrikeMob(second, damage, origin, striker);
         struck++;
         return struck;
     }

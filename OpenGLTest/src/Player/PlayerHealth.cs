@@ -68,6 +68,41 @@ public sealed class PlayerHealth
             return;
         Health = Math.Max(0, Health - amount);
         DamageFlash = 1f;
+        _secondsSinceCombat = 0f;
+    }
+
+    // A fresh pool starts out of combat, so it regenerates at once
+    private float _secondsSinceCombat = PlayerConfig.RegenDelaySeconds;
+    private float _regenCarry;
+
+    /// <summary>The player just landed a blow: the combat clock restarts, like damage taken.</summary>
+    public void NoteCombat() => _secondsSinceCombat = 0f;
+
+    /// <summary>
+    /// Passive regeneration, call every frame: out of combat (no damage taken or dealt for
+    /// <see cref="PlayerConfig.RegenDelaySeconds"/>) the pool refills at
+    /// <see cref="PlayerConfig.RegenPerSecond"/>, scaled by <see cref="PlayerConfig.RegenSprintFactor"/>
+    /// while <paramref name="sprinting"/>. Never past the pool, never while dead, and an
+    /// <paramref name="immune"/> player (creative, flying) needs none.
+    /// </summary>
+    public void UpdateRegen(float deltaTime, bool sprinting, bool immune)
+    {
+        if (IsDead)
+            return;
+        _secondsSinceCombat += Math.Max(0f, deltaTime);
+        if (immune || Health >= MaxHealth || _secondsSinceCombat < PlayerConfig.RegenDelaySeconds)
+        {
+            _regenCarry = 0f;
+            return;
+        }
+
+        var rate = PlayerConfig.RegenPerSecond * (sprinting ? PlayerConfig.RegenSprintFactor : 1f);
+        _regenCarry += rate * Math.Max(0f, deltaTime);
+        var whole = (int)_regenCarry;
+        if (whole <= 0)
+            return;
+        _regenCarry -= whole;
+        Heal(whole);
     }
 
     /// <summary>The source of the last recorded blow, for the death message (see

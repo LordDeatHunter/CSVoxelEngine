@@ -47,7 +47,7 @@ internal sealed class LocalPlayer
         _mobs = mobs;
         _serverMode = serverMode;
         _clientMode = clientMode;
-        _localContext = new PlayerContext(Inventory) { Camera = Camera };
+        _localContext = new PlayerContext(Inventory) { Camera = Camera, Health = _health };
     }
 
     /// <summary>Whether the player rests on real ground at the spawn (or a saved pose placed it).</summary>
@@ -436,6 +436,7 @@ internal sealed class LocalPlayer
         _health.UpdateBreath(deltaTime, Camera.IsEyeInWater && !Camera.IsEyeInLava, Camera.IsCreative || Camera.IsFlying);
         UpdateCactusContact(deltaTime, chunkManager);
         _health.Update(deltaTime);
+        _health.UpdateRegen(deltaTime, Camera.IsSprinting, Camera.IsCreative || Camera.IsFlying);
 
         // The day toast: the line appears the moment the sun rises through dawn, once a day
         var elevation = DayCycle.SunDirection(LightingTime).Y;

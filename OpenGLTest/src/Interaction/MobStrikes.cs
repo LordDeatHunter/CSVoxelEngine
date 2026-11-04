@@ -1,6 +1,7 @@
 using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Particles;
+using VoxelEngine.Player;
 using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.Interaction;
@@ -27,11 +28,14 @@ internal sealed class MobStrikes
     }
 
     /// <summary>Deals <paramref name="damage"/> to <paramref name="mob"/> and shoves it away from
-    /// <paramref name="from"/> (the striker's eye, or where a thrown item left it).</summary>
-    internal void StrikeMob(Mob mob, int damage, Vector3 from)
+    /// <paramref name="from"/> (the striker's eye, or where a thrown item left it). A landed blow
+    /// from a player (<paramref name="striker"/>) puts that player in combat, which pauses their regeneration.</summary>
+    internal void StrikeMob(Mob mob, int damage, Vector3 from, PlayerHealth? striker = null)
     {
         var hits = mob.HitsTaken;
         mob.TakeDamage(damage);
+        if (mob.HitsTaken != hits)
+            striker?.NoteCombat();
         ShowLandedHit(mob, hits);
         SpawnHitSparks(mob, from);
         var away = new Vector3(mob.Position.X - from.X, 0f, mob.Position.Z - from.Z);

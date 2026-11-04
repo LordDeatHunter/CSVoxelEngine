@@ -46,6 +46,9 @@ public sealed class PlayerContext(Inventory inventory)
     /// </summary>
     public bool Present { get; set; } = true;
 
+    /// <summary>The player's health pool, which a landed blow tells the player is in combat; null when the context has none.</summary>
+    public PlayerHealth? Health { get; init; }
+
     /// <summary>The local player's camera, whose raycasts follow its third-person rules; null for a
     /// remote player, whose raycasts are the first-person ray from <see cref="Eye"/>.</summary>
     public Camera? Camera { get; init; }

@@ -40,7 +40,7 @@ public sealed class ServerPlayer : IMobTarget
         Position = position;
         // Cached once, so the per-frame pickup loop never allocates a delegate
         CanAcceptDrop = Inventory.CanAccept;
-        Context = new PlayerContext(Inventory) { Name = name, Eye = position };
+        Context = new PlayerContext(Inventory) { Name = name, Eye = position, Health = Status };
     }
 
     /// <summary>
@@ -289,6 +289,8 @@ public sealed class ServerPlayer : IMobTarget
         Status.UpdateBreath(dt, underWater, Creative || Flying);
         UpdateCactusContact(dt, chunks);
         Status.Update(dt);
+        // Regeneration: the sprint bit is the client's own claim, but it only ever slows its sender's healing
+        Status.UpdateRegen(dt, ((NetPlayerFlags)Flags & NetPlayerFlags.Sprinting) != 0, Creative || Flying);
         if (Status.Health != before || Status.IsDead || Status.Breath.NetStep != airBefore)
             StatusDirty = true;
     }

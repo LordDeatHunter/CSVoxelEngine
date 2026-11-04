@@ -83,4 +83,10 @@ public static class PlayerConfig
     public const float AirRefillPerSecond = 10f;
     public const float DrownTickSeconds = 1f;
     public const int DrownDamagePerTick = 10;
+
+    // --- Passive regeneration: out of combat (no damage taken or dealt for RegenDelaySeconds) the
+    // pool refills; sprinting slows it by RegenSprintFactor (0 would halt it) ---
+    public const float RegenDelaySeconds = 8f;
+    public const float RegenPerSecond = 1.5f;
+    public const float RegenSprintFactor = 0.25f;
 }
