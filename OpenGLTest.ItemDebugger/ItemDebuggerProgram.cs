@@ -228,6 +228,16 @@ public static class ItemDebuggerProgram
             mouse.MouseMove += OnMouseMove;
             mouse.Scroll += OnScroll;
         }
+        if (_input.Keyboard is { } keyboard)
+            keyboard.KeyDown += OnKeyDown;
+    }
+
+    // Space pauses or resumes the animation timeline of the tab being shown.
+    private static void OnKeyDown(IKeyboard keyboard, Key key, int scancode)
+    {
+        if (key != Key.Space || _tab == DebuggerTab.Trees) return;
+
+        ActiveClock.Paused = !ActiveClock.Paused;
     }
 
     private static bool TrySelectByName(string name)
