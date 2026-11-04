@@ -123,8 +123,6 @@ never touch it.
 
 - [ ] Hot-path depth-4 blocks (`ChunkMeshBuilder` corner loops, `ChunkMesher`'s `while (true)` key probe,
   `LodMeshBuilder.FillCell`): extract only against a before/after capture.
-- [ ] `BlockLoader.LoadBlocks` (a ~370-line method) and `ItemLoader.ValidateItemUses`' switch: want
-  extraction, not guard clauses.
 
 ### 5. Small doc and code follow-ups
 

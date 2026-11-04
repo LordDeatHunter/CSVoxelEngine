@@ -232,108 +232,139 @@ internal static class ItemLoader
             switch (item.UseAction)
             {
                 case ItemUseAction.None:
-                    continue;
+                    break;
                 case ItemUseAction.PlaceStack:
-                {
-                    var target = BlockType.ById[item.UseBlockId];
-                    if (target == null)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'place_stack' but its use.block is not a block.");
-                    if (target.Fluid)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'place_stack' but '{target.Name}' is a fluid, whose state byte holds levels.");
-                    if (target.StackMax < 2)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'place_stack' but block '{target.Name}' sets no stackMax.");
-                    if (item.UseResultId != 0)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'place_stack' with a use.result: a stack action spends from its stack, it never morphs.");
-                    if (item.UseFluidId != 0)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'place_stack' with a use.fluid: that field belongs to the bucket actions.");
-                    continue;
-                }
+                    ValidatePlaceStack(item, path);
+                    break;
                 case ItemUseAction.IgniteCampfire:
-                {
-                    var target = BlockType.ById[item.UseBlockId];
-                    if (target == null)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'ignite_campfire' but its use.block is not a block.");
-                    if (target.StackMax < 2)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'ignite_campfire' but block '{target.Name}' sets no stackMax: the firepit must be a max-count pile.");
-                    if (item.UseResultId != 0)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'ignite_campfire' with a use.result: an ignite action spends durability, it never morphs.");
-                    if (item.UseFluidId != 0)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'ignite_campfire' with a use.fluid: that field belongs to the bucket actions.");
-                    if (item.MaxDurability < 1)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'ignite_campfire' without durability: ignite items must declare uses before breaking.");
-                    continue;
-                }
-                case ItemUseAction.Heal when item.UseResultId != 0:
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'heal' with a use.result: a heal spends from its stack, it never morphs.");
-                case ItemUseAction.Heal when item.UseFluidId != 0 || item.UseBlockId != 0:
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'heal' with a use.fluid or use.block: a heal targets nobody.");
+                    ValidateIgniteCampfire(item, path);
+                    break;
                 case ItemUseAction.Heal:
-                    continue;
-                case ItemUseAction.GrowTree when item.UseResultId != 0:
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'grow_tree' with a use.result: a growth spends from its stack, it never morphs.");
-                case ItemUseAction.GrowTree when item.UseFluidId != 0 || item.UseBlockId != 0:
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'grow_tree' with a use.fluid or use.block: the tree is read from the aimed cell.");
+                    ValidateHeal(item, path);
+                    break;
                 case ItemUseAction.GrowTree:
-                    continue;
-                case ItemUseAction.PlantTree when string.IsNullOrWhiteSpace(item.UseTreeName):
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'plant_tree' without use.tree: name the species file under assets/data/trees/.");
-                case ItemUseAction.PlantTree when item.UseResultId != 0:
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'plant_tree' with a use.result: planting spends from its stack, it never morphs.");
-                case ItemUseAction.PlantTree when item.UseFluidId != 0 || item.UseBlockId != 0:
-                    throw new InvalidOperationException(
-                        $"Item '{path}' has use.action 'plant_tree' with a use.fluid or use.block: the ground is read from the aimed cell.");
+                    ValidateGrowTree(item, path);
+                    break;
                 case ItemUseAction.PlantTree:
-                    continue;
+                    ValidatePlantTree(item, path);
+                    break;
                 case ItemUseAction.ConvertMultiblock:
-                {
-                    var source = BlockType.ById[item.UseBlockId];
-                    if (source == null)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'convert_multiblock' but its use.block is not a block.");
-                    var anchor = BlockType.ById[item.UseResultId];
-                    if (anchor == null)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'convert_multiblock' but its use.result is not a block.");
-                    if (anchor.Renderer != BlockRenderer.Multiblock)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'convert_multiblock' but block '{anchor.Name}' is not a multiblock anchor.");
-                    if (anchor.MultiblockSourceId != item.UseBlockId)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'convert_multiblock' naming '{source.Name}' in use.block, but '{anchor.Name}' is built from '{BlockType.ById[anchor.MultiblockSourceId]?.Name}'.");
-                    if (item.UseFluidId != 0)
-                        throw new InvalidOperationException(
-                            $"Item '{path}' has use.action 'convert_multiblock' with a use.fluid: that field belongs to the bucket actions.");
-                    continue;
-                }
+                    ValidateConvertMultiblock(item, path);
+                    break;
+                default:
+                    ValidateFluidAction(item, path);
+                    break;
             }
-
-            if (item.UseBlockId != 0)
-                throw new InvalidOperationException(
-                    $"Item '{path}' has use.action '{item.UseAction}' with a use.block: that field belongs to place_stack.");
-
-            if (!BlockType.IsFluid(item.UseFluidId))
-                throw new InvalidOperationException(
-                    $"Item '{path}' has use.action '{item.UseAction}' but its use.fluid is not a fluid block.");
-
-            if (!ItemRegistry.IsItem(item.UseResultId))
-                throw new InvalidOperationException(
-                    $"Item '{path}' has use.action '{item.UseAction}' but its use.result is not an item.");
         }
+    }
+
+    private static void ValidatePlaceStack(Item item, string path)
+    {
+        var target = BlockType.ById[item.UseBlockId];
+        if (target == null)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'place_stack' but its use.block is not a block.");
+        if (target.Fluid)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'place_stack' but '{target.Name}' is a fluid, whose state byte holds levels.");
+        if (target.StackMax < 2)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'place_stack' but block '{target.Name}' sets no stackMax.");
+        if (item.UseResultId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'place_stack' with a use.result: a stack action spends from its stack, it never morphs.");
+        if (item.UseFluidId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'place_stack' with a use.fluid: that field belongs to the bucket actions.");
+    }
+
+    private static void ValidateIgniteCampfire(Item item, string path)
+    {
+        var target = BlockType.ById[item.UseBlockId];
+        if (target == null)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'ignite_campfire' but its use.block is not a block.");
+        if (target.StackMax < 2)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'ignite_campfire' but block '{target.Name}' sets no stackMax: the firepit must be a max-count pile.");
+        if (item.UseResultId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'ignite_campfire' with a use.result: an ignite action spends durability, it never morphs.");
+        if (item.UseFluidId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'ignite_campfire' with a use.fluid: that field belongs to the bucket actions.");
+        if (item.MaxDurability < 1)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'ignite_campfire' without durability: ignite items must declare uses before breaking.");
+    }
+
+    private static void ValidateHeal(Item item, string path)
+    {
+        if (item.UseResultId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'heal' with a use.result: a heal spends from its stack, it never morphs.");
+        if (item.UseFluidId != 0 || item.UseBlockId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'heal' with a use.fluid or use.block: a heal targets nobody.");
+    }
+
+    private static void ValidateGrowTree(Item item, string path)
+    {
+        if (item.UseResultId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'grow_tree' with a use.result: a growth spends from its stack, it never morphs.");
+        if (item.UseFluidId != 0 || item.UseBlockId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'grow_tree' with a use.fluid or use.block: the tree is read from the aimed cell.");
+    }
+
+    private static void ValidatePlantTree(Item item, string path)
+    {
+        if (string.IsNullOrWhiteSpace(item.UseTreeName))
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'plant_tree' without use.tree: name the species file under assets/data/trees/.");
+        if (item.UseResultId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'plant_tree' with a use.result: planting spends from its stack, it never morphs.");
+        if (item.UseFluidId != 0 || item.UseBlockId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'plant_tree' with a use.fluid or use.block: the ground is read from the aimed cell.");
+    }
+
+    private static void ValidateConvertMultiblock(Item item, string path)
+    {
+        var source = BlockType.ById[item.UseBlockId];
+        if (source == null)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'convert_multiblock' but its use.block is not a block.");
+        var anchor = BlockType.ById[item.UseResultId];
+        if (anchor == null)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'convert_multiblock' but its use.result is not a block.");
+        if (anchor.Renderer != BlockRenderer.Multiblock)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'convert_multiblock' but block '{anchor.Name}' is not a multiblock anchor.");
+        if (anchor.MultiblockSourceId != item.UseBlockId)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'convert_multiblock' naming '{source.Name}' in use.block, but '{anchor.Name}' is built from '{BlockType.ById[anchor.MultiblockSourceId]?.Name}'.");
+        if (item.UseFluidId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'convert_multiblock' with a use.fluid: that field belongs to the bucket actions.");
+    }
+
+    // The bucket actions: pour or scoop a fluid block, morphing into the use.result item.
+    private static void ValidateFluidAction(Item item, string path)
+    {
+        if (item.UseBlockId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action '{item.UseAction}' with a use.block: that field belongs to place_stack.");
+
+        if (!BlockType.IsFluid(item.UseFluidId))
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action '{item.UseAction}' but its use.fluid is not a fluid block.");
+
+        if (!ItemRegistry.IsItem(item.UseResultId))
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action '{item.UseAction}' but its use.result is not an item.");
     }
 }

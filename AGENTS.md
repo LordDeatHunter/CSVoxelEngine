@@ -1021,7 +1021,9 @@ OpenGLTest/
         BlockRenderer.cs, BlockBreakAction.cs,
           AttackPattern.cs, ItemUseAction.cs  # geometry/break/attack/use enums
         BiomeTintFaces.cs      # a block's resolved biomeTint: palette + per-face base/tinted tiles
-        BlockLoader.cs         # data/blocks -> BlockType and the per-id tables: LoadBlocks and its cross-block resolvers
+        BlockFieldRules.cs     # a block JSON's plain per-field rules: renderer, flow, stacking, support, ground traits, tools
+        BlockLinkResolver.cs   # the cross-block references (hardening, multiblock, wall block, upper half, pickAs), queued per file and resolved once all load
+        BlockLoader.cs         # data/blocks -> BlockType and the per-id tables: LoadBlocks, BuildType and RegisterTables
         BlockSchemaParser.cs   # a block JSON's shape fields: material, flame, facing/support, pane, open, hitboxes, tree wood
       Definitions/             # the JSON DTOs
         BlockDefinition.cs, ItemDefinition.cs,
