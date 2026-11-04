@@ -207,7 +207,9 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
         try { _tcp?.Close(); } catch (SocketException) { }
         if (_tcp == null)
             try { _testStream?.Dispose(); } catch (IOException) { }
-        _reader?.Join(1000);
+        var reader = _reader;
+        if (reader != null && (reader.ThreadState & ThreadState.Unstarted) == 0)
+            reader.Join(1000);
         _reader = null;
     }
 }

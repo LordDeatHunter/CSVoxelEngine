@@ -2,11 +2,14 @@ using System;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
+using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
 using System.Threading.Tasks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
+using VoxelEngine.Config;
 using VoxelEngine.Player;
 using VoxelEngine.Server;
 using VoxelEngine.UI.Hud;
@@ -14,25 +17,86 @@ using Xunit;
 
 namespace VoxelEngine.Tests.Networking;
 
+[Collection("Worldgen seed")]
 public sealed class NetFramingTests
 {
+    private readonly Xunit.Abstractions.ITestOutputHelper _output;
+
+    public NetFramingTests(Xunit.Abstractions.ITestOutputHelper output) => _output = output;
+
     [Fact]
-    public async Task FailedPartialSendFaultsOnceWithinBoundAndNeverWritesAgain()
+    public async Task PartialFrameWriteFailureIsTerminalAndNeverWritesAgain()
     {
         using var stream = new HeaderThenFailStream();
         using var client = new NetworkClient(new ServerAddress("127.0.0.1", 1), "Tester", 1, stream);
         var payload = new byte[1024];
-        var watch = Stopwatch.StartNew();
 
         var send = Task.Run(() => client.Send(payload));
         await send.WaitAsync(TimeSpan.FromSeconds(2)); // watchdog ensures a broken send cannot hang the suite
-        var transitionLatency = watch.Elapsed;
 
         Assert.Equal(NetworkStatus.Failed, client.Status);
         Assert.Contains("sending", client.Error, StringComparison.OrdinalIgnoreCase);
-        Assert.InRange(transitionLatency, TimeSpan.Zero, TimeSpan.FromSeconds(1));
         client.Send(payload);
         Assert.Equal(2, stream.WriteCalls); // header succeeded; payload failed; later send is inert
+    }
+
+    [Fact]
+    public async Task ClientWriteToPeerThatStopsReadingFailsWithinConfiguredBound()
+    {
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var address = (IPEndPoint)listener.LocalEndpoint;
+        var acceptAndHandshake = Task.Run(() =>
+        {
+            var peer = listener.AcceptTcpClient();
+            peer.ReceiveBufferSize = 4096;
+            var stream = peer.GetStream();
+            Assert.NotNull(NetFraming.ReadFrame(stream)); // client hello
+            using var hello = new PacketWriter(NetMessage.ServerHello);
+            hello.Write(NetFraming.ProtocolVersion).Write(1).Write("Slow reader")
+                .Write(1).Write(0.0).Write(Vector3.Zero);
+            NetFraming.WriteFrame(stream, hello.ToArray());
+            return peer; // Keep the peer open but never read client payloads.
+        });
+
+        using var client = new NetworkClient(new ServerAddress("127.0.0.1", address.Port), "Tester", 3.0);
+        var connect = Task.Run(client.Connect);
+        TcpClient? peer = null;
+        Task? sendLoop = null;
+        using var sendCancellation = new CancellationTokenSource();
+        TimeSpan elapsed = default;
+        try
+        {
+            peer = await acceptAndHandshake.WaitAsync(TimeSpan.FromSeconds(5));
+            await connect.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(NetworkStatus.Handshaken, client.Status);
+
+            var payload = new byte[NetFraming.MaxPayload];
+            var watch = Stopwatch.StartNew();
+            sendLoop = Task.Run(() =>
+            {
+                while (!sendCancellation.IsCancellationRequested && client.Status == NetworkStatus.Handshaken)
+                    client.Send(payload);
+            });
+
+            await sendLoop.WaitAsync(TimeSpan.FromMilliseconds(NetworkConfig.NetSendTimeoutMs + 3000));
+            elapsed = watch.Elapsed;
+        }
+        finally
+        {
+            sendCancellation.Cancel();
+            peer?.Dispose();
+            client.Dispose();
+            listener.Stop();
+        }
+
+        if (sendLoop != null)
+            await sendLoop.WaitAsync(TimeSpan.FromSeconds(2)); // forced close above is the watchdog cleanup
+        _output.WriteLine("Slow-reader send loop terminal status: {0}; elapsed: {1:F0} ms; configured write bound: {2} ms",
+            client.Status, elapsed.TotalMilliseconds, NetworkConfig.NetSendTimeoutMs);
+        Assert.Equal(NetworkStatus.Failed, client.Status);
+        Assert.False(string.IsNullOrWhiteSpace(client.Error));
+        Assert.InRange(elapsed.TotalMilliseconds, 0, NetworkConfig.NetSendTimeoutMs + 3000);
     }
 
     [Fact]
@@ -64,19 +128,13 @@ public sealed class NetFramingTests
         {
             WriteCalls++;
             if (WriteCalls == 2)
-            {
-                Thread.Sleep(40); // deterministic bounded failure latency; watchdog below prevents hangs
                 throw new IOException("simulated payload write timeout");
-            }
         }
         public override void Write(ReadOnlySpan<byte> buffer)
         {
             WriteCalls++;
             if (WriteCalls == 2)
-            {
-                Thread.Sleep(40);
                 throw new IOException("simulated payload write timeout");
-            }
         }
     }
 
