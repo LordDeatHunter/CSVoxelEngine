@@ -557,14 +557,12 @@ public class Chunk : IDisposable
     /// <summary>
     /// <see cref="GenerateMeshData(ChunkManager)"/> with the binary greedy pass switchable: the
     /// differential test meshes the same chunk both ways and compares. A parameter rather than
-    /// a static flag because test classes run in parallel and pool threads read it.
-    /// <paramref name="tintFields"/> overrides the biome tint field: a build whose chunk is not
-    /// where its blocks really stand (TopplingTree.BuildMeshData's scratch chunk at (256, 0, 256))
-    /// passes the field of the real footprint; null means the chunk's own fields, from the stored
-    /// corner climate of its lattice columns (<see cref="BiomeTint.FieldsFromNeighborhood"/>).
+    /// a static flag because test classes run in parallel and pool threads read it. The biome tint
+    /// field is the chunk's own, from the stored corner climate of its lattice columns
+    /// (<see cref="BiomeTint.FieldsFromNeighborhood"/>).
     /// </summary>
-    internal ChunkMeshData? GenerateMeshData(ChunkManager chunkManager, bool greedy,
-        BiomeTintFields? tintFields = null) => ChunkMeshBuilder.GenerateMeshData(this, chunkManager, greedy, tintFields);
+    internal ChunkMeshData? GenerateMeshData(ChunkManager chunkManager, bool greedy) =>
+        ChunkMeshBuilder.GenerateMeshData(this, chunkManager, greedy);
 
     /// <summary>
     /// Local <see cref="Idx"/> indices of the exposed hot-fluid cells of the last applied mesh

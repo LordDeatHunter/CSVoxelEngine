@@ -19,8 +19,8 @@ in `git log` on `tree-rework`. What is left is the residue below, tracked in `TO
   tree shows no far canopy until reload. Needs an add-canopy override keyed by column
   (`TreeCanopy.CanopyAdded`, persisted in `lod-edits.bin`).
 - [ ] **`M-14` Wide-trunk residue** (three independent items):
-  - [ ] A felled tree's mesh is cut off at its one 16³ scratch chunk (`CellBatchMesher.Build` is a
-    ready multi-chunk replacement).
+  - [x] A felled tree's mesh was cut off at its one 16³ scratch chunk: `TopplingTree` now meshes
+    through `CellBatchMesher.Build`, one mesh per chunk.
   - [ ] Cutting a wide core while its shells stand strands the crown for reactive growth.
   - [x] A beveled shell's cap went stale when an edit landed in an edge-diagonal chunk:
     `ChunkCellCache.AddTouchedChunks` now dirties it too.

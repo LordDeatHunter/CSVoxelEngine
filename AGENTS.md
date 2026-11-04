@@ -836,11 +836,10 @@ same lattice from the region's own origin (`rx * regionChunkSpan`, never the pre
 `baseChunkX`) through `LodFaceEmitter.AddBlockFace`, for grass tops and sides and for the canopy bumps, and a
 tinted canopy's transparent texels fall back to the textureless gray (`vec3(0.1221)`, the decoded
 98) instead of `uLodLeafColor`, so the tint still applies there; chunks, LOD and the felled tree
-all bake the tint into their rgb. The felled tree is meshed by the real chunk mesher in a scratch
-chunk at (256, 0, 256), so `TopplingTree.BuildMeshData` passes `BiomeTint.FieldsAt(min)` (a field
-whose origin is the tree's own min cell) through the `tintFields` override of the internal
-`Chunk.GenerateMeshData(manager, greedy, tintFields)`, or a falling canopy would snap to the climate
-of world (4096, 4096). The mining pop and the break debris are standalone copies drawn at many
+all bake the tint into their rgb. The felled tree is meshed by the real chunk mesher through
+`CellBatchMesher.Build` (one scratch chunk per chunk its cells span, each at its real position), so
+every chunk uses its own `BiomeTint.FieldsFor` and a falling canopy keeps the climate it stood in.
+The mining pop and the break debris are standalone copies drawn at many
 cells from streamed or cached geometry, so they wear the `BiomeTint` tiles (`PopBoxEmitter.EmitBox`'s
 `biomeTint` argument; `BlockCubeCache.GetTinted`/`BuildTintedCube`, one cached debris mesh per
 block, which only the debris asks for) with gray shade-only rgb, and the cell's color comes from
@@ -1745,8 +1744,8 @@ OpenGLTest/
       SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning
       TntManager.cs            # owns the live primed TNT: spawns cubes where firestarter
                                #   strikes and blasts light TNT, ticks their fuses
-      TopplingTree.cs          # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once in
-                               #   a 16^3 scratch chunk, swung flat around the cut, then popped out as drops
+      TopplingTree.cs          # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once by
+                               #   CellBatchMesher (one mesh per chunk it spans), swung flat around the cut, then popped out as drops
       TreeGrowthResult.cs      # the outcome of one TreeGrowthWriter call: its status,
                                #   the root cell, the added nodes and the written cells
       TreeGrowthStatus.cs      # what one TreeGrowthWriter.Grow call did
@@ -2649,7 +2648,8 @@ unloaded read is no link. So a cut limb drops only the limb, a cut 1-wide trunk 
 and a wide trunk falls only once a whole horizontal slice of core and shells is cut. Canopy leaves
 within Chebyshev 2 of the falling wood come along. The search is capped at `TreeFellWoodCap` wood cells and the whole fell at
 `TreeFellTotalCap` (leaves past it are left standing and decay). The falling tree is meshed by the
-real chunk mesher in one 16³ scratch chunk (`TopplingTree.BuildMeshData`) and drops through
+real chunk mesher through `CellBatchMesher.Build` (`TopplingTree.BuildMeshData`: one mesh per chunk
+the felled cells span, so a crown of any size is drawn whole) and drops through
 `TopplingTree.TakeDrops`.
 
 **Reactive growth** (`World.TryGrowTree(species, x, yHint, z, steps)`, refused while loading or
@@ -2689,10 +2689,8 @@ scratch chunks as the cells span, each at its real position inside an empty one-
 wide or tall tree is never clipped at a chunk seam and wears the real biome tint.
 
 Known gaps, all open: a grown tree shows no far-LOD canopy until reload, since `PoisonCanopy` only
-removes canopy (`M-13`); and the wide-trunk residue of `M-14` — the felled mesh is drawn only
-inside its 16³ scratch window (the drops are intact), a wide core cut while its shells stand
-leaves the crown unreachable for reactive growth, and a beveled shell's cap can go stale when an
-edit lands in an edge-diagonal chunk that face-adjacent dirtying does not remesh.
+removes canopy (`M-13`); and the wide-trunk residue of `M-14` — a wide core cut while its shells
+stand leaves the crown unreachable for reactive growth.
 
 ### Recipes, cast molds and metalworks
 

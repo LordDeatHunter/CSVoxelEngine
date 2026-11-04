@@ -156,53 +156,6 @@ public sealed class BiomeTintMeshTests
         Assert.True(grassTops <= stoneTops, $"tinted grass top split into {grassTops} quads, stone into {stoneTops}");
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AFieldOverrideReplacesTheChunksOwnField(bool greedy)
-    {
-        var (manager, center) = Slab(Grass.Id);
-        var bt = GrassTint;
-        var own = BiomeTint.FieldsFor((int)center.Position.X, (int)center.Position.Z).Field(bt.Palette);
-
-        // Any origin whose field differs visibly from the chunk's own; the palette is not
-        // constant, so one exists within a few hundred chunks
-        BiomeTintFields? overrideFields = null;
-        for (var cx = -200; cx <= 200 && overrideFields == null; cx += 10)
-        for (var cz = -200; cz <= 200 && overrideFields == null; cz += 10)
-        {
-            var candidate = BiomeTint.FieldsAt(cx * Chunk.Size + 5, cz * Chunk.Size + 5);
-            var f = candidate.Field(bt.Palette);
-            var differs = new[] { f.C00 - own.C00, f.C10 - own.C10, f.C01 - own.C01, f.C11 - own.C11 }
-                .Select(Vector3.Abs).Any(d => MathF.Max(d.X, MathF.Max(d.Y, d.Z)) > 8f / 255f);
-            if (differs) overrideFields = candidate;
-        }
-        Assert.True(overrideFields.HasValue, "no origin within +-200 chunks has a different tint field");
-
-        var field = overrideFields.Value.Field(bt.Palette);
-        var mesh = center.GenerateMeshData(manager, greedy, overrideFields);
-        Assert.NotNull(mesh);
-
-        var lit = ChunkFaceTables.ShadeLut[(4 << 2) | 3];
-        var tops = mesh.Vertices.Where(v => Face(v) == 4 && v.Layer == bt.Tinted[4]).ToList();
-        Assert.NotEmpty(tops);
-        var discriminating = 0;
-        foreach (var v in tops)
-        {
-            var tint = field.Sample(v.Position.X, v.Position.Z);
-            Assert.True(MatchesSomeShade(v, 4, tint), $"vertex at {v.Position} does not wear the override field");
-
-            // The open slab top is unoccluded, so its shade is the lit one: where the two
-            // fields give visibly different bytes, the vertex must not wear the chunk's own
-            BiomeTint.Shade(lit, tint, out var r, out var g, out var b);
-            BiomeTint.Shade(lit, own.Sample(v.Position.X, v.Position.Z), out var or, out var og, out var ob);
-            if (Math.Max(Math.Abs(r - or), Math.Max(Math.Abs(g - og), Math.Abs(b - ob))) <= 2) continue;
-            discriminating++;
-            Assert.False(Near(v, or, og, ob), $"vertex at {v.Position} still wears the chunk's own field");
-        }
-        Assert.True(discriminating > 0, "no vertex discriminated the override field from the chunk's own");
-    }
-
     private static BlockType Leaves => ContentRegistry.RequireBlock("oak_leaves");
 
     private static BiomeTintFaces LeavesTint =>

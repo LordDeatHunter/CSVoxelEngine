@@ -8,11 +8,10 @@ using VoxelEngine.WorldGen.Trees.Shape;
 namespace VoxelEngine.Chunks.Meshing;
 
 /// <summary>
-/// Meshes an arbitrary set of cells (a grown tree, its ground) with the real chunk mesher, so
-/// tree-wood tubes, wide-trunk shells and their pixel rim, leaves and the biome tint all come out
-/// exactly as they do in game. <see cref="TopplingTree.BuildMeshData"/> meshes one 16^3 scratch
-/// window and silently drops whatever falls outside it, which a felled crown tolerates but an
-/// item-debugger tree spanning several chunks does not. Here every chunk the cells touch is a
+/// Meshes an arbitrary set of cells (a grown tree, its ground, a felled crown) with the real chunk
+/// mesher, so tree-wood tubes, wide-trunk shells and their pixel rim, leaves and the biome tint
+/// all come out exactly as they do in game; <see cref="TopplingTree.BuildMeshData"/> and the item
+/// debugger's TREES tab both mesh through it. Every chunk the cells touch is a
 /// scratch chunk at its <b>real</b> chunk position, inside a throwaway manager whose whole 3D box
 /// is padded by a one-chunk ring of empty, ready chunks (edge and corner diagonals included, since
 /// the beveled-shell cull reads edge neighbors). Chunks therefore see each other across every
@@ -74,7 +73,7 @@ public static class CellBatchMesher
         foreach (var key in touched)
         {
             var chunk = chunks[key];
-            // tintFields stays null: the chunk stands where its cells really are.
+            // The chunk stands where its cells really are, so its own tint field is the true one.
             var mesh = chunk.GenerateMeshData(manager, greedy: true);
             if (mesh == null || (mesh.Vertices.Count == 0 && mesh.TranslucentVertices.Count == 0))
                 continue;

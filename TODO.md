@@ -500,8 +500,8 @@ single-arc player.
   `PoisonCanopy` only removes canopy, so a grown tree shows no far canopy until reload; needs an
   add-canopy override keyed by column. Each grow also adds markers to `CanopyDisturbed`.
 - [ ] **`M-14` · Wide-trunk residue (TREES_PLAN phase 7)** — P3, M.
-  (1) a felled tree's mesh is truncated to one 16³ scratch chunk (`CellBatchMesher.Build` is a
-  ready multi-chunk replacement); (2) cutting a wide core while its shells stand strands the
+  (1) landed: a felled tree is meshed whole through `CellBatchMesher.Build`, one mesh per chunk
+  it spans (`TreeFellingTests`); (2) cutting a wide core while its shells stand strands the
   crown for reactive growth (undecided behavior: bridge the gap in `TreeGraph.FromWorld`, or fell
   the tree). Item (3) landed: `ChunkCellCache.AddTouchedChunks` also dirties the edge-diagonal
   chunk of a Y-and-horizontal corner (`ChunkCellCacheTests`).

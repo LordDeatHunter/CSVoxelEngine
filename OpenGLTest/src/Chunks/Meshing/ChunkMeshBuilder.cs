@@ -21,9 +21,8 @@ namespace VoxelEngine.Chunks.Meshing;
 /// <summary>The per-chunk mesh build behind <see cref="Chunk.GenerateMeshData(ChunkManager)"/>: neighborhood resolve, padded and light snapshots, the light flood (<see cref="ChunkLighting"/>) and the per-voxel emitter loop after <see cref="ChunkMesher.EmitGreedyFaces"/>. Runs on mesh pool threads and on the main thread; allocation-free apart from the result, with every scratch array rented or thread-static.</summary>
 internal static class ChunkMeshBuilder
 {
-    /// <inheritdoc cref="Chunk.GenerateMeshData(ChunkManager, bool, BiomeTintFields?)"/>
-    internal static ChunkMeshData? GenerateMeshData(Chunk chunk, ChunkManager chunkManager, bool greedy,
-        BiomeTintFields? tintFields)
+    /// <inheritdoc cref="Chunk.GenerateMeshData(ChunkManager, bool)"/>
+    internal static ChunkMeshData? GenerateMeshData(Chunk chunk, ChunkManager chunkManager, bool greedy)
     {
         // Resolve before renting or touching anything: an abandoned build should cost nothing.
         // The neighborhood lives in the thread's mesh scratch, not in two fresh arrays.
@@ -88,8 +87,7 @@ internal static class ChunkMeshBuilder
                 packed[Idx(x, y, z)] = (byte)(sunLight[li] << 4 | (b & BlockLevelMask));
                 if (anyTinted) packed[BlockCount + Idx(x, y, z)] = (byte)(b >> 4);
             }
-            return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy,
-                    tintFields)
+            return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy)
                 with { Light = packed };
         }
         finally
@@ -242,7 +240,7 @@ internal static class ChunkMeshBuilder
     /// replays its baked model's quads.
     /// </summary>
     private static ChunkMeshData GenerateMeshDataFromSnapshot(Chunk chunk, byte[] padded, byte[] paddedState,
-        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy, BiomeTintFields? tintFields)
+        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy)
     {
         // Rented, not allocated: ChunkManager returns them once the mesh is on the GPU
         var vertices = pool.RentVertices();
@@ -275,9 +273,8 @@ internal static class ChunkMeshBuilder
         var columns = MeshScratch.Current.Columns;
 
         // Biome tint of grass and leaves, both palettes from the stored corner climate of the
-        // four lattice columns (no noise evaluation). A scratch build away from its blocks' real
-        // position (a felled tree) passes the field of the real footprint instead.
-        var fields = tintFields ?? BiomeTint.FieldsFromNeighborhood(columns);
+        // four lattice columns (no noise evaluation)
+        var fields = BiomeTint.FieldsFromNeighborhood(columns);
         // Corner scratch of a biome-tinted face in the per-voxel loop below
         Span<byte> tShade = stackalloc byte[4];
         Span<float> tSun = stackalloc float[4];

@@ -212,13 +212,13 @@ internal sealed class ShadowPass
         foreach (var tree in trees)
         {
             tree.EnsureMesh(_gl);
-            var mesh = tree.Mesh;
-            if (mesh == null) continue;
+            if (tree.Meshes.Count == 0) continue;
 
             var model = tree.Model;
             _owner.ShadowShader.SetUniform("uModel", model);
             _owner.ShadowShader.SetUniform("uLightMVP", model * _owner.NearShadow.ViewProj);
-            mesh.Render();
+            foreach (var mesh in tree.Meshes)
+                mesh.Render();
         }
 
         if (player != null && camera != null)

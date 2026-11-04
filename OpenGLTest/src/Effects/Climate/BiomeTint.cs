@@ -104,10 +104,9 @@ public static class BiomeTint
     }
 
     /// <summary>
-    /// A 16-block field with its origin at an arbitrary world cell: what a block set meshed in a
-    /// scratch chunk away from its real position (the felled tree, TopplingTree.BuildMeshData)
-    /// uses, so local 0..16 maps onto the standing footprint. A real chunk uses
-    /// <see cref="FieldsFor"/>.
+    /// A 16-block field with its origin at an arbitrary world cell, evaluated straight from the
+    /// climate noise: the reference the stored corner climate behind <see cref="FieldsFor"/> must
+    /// reproduce bit for bit (<c>BiomeTintTests</c>). A real chunk uses <see cref="FieldsFor"/>.
     /// </summary>
     public static BiomeTintFields FieldsAt(int worldX, int worldZ)
     {
