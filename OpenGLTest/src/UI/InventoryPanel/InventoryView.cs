@@ -17,6 +17,9 @@ public enum InventoryFocus
 public sealed class InventoryView
 {
     public bool IsOpen { get; set; }
+
+    /// <summary>The panel's open and close easing, stepped by the UI pass.</summary>
+    public PanelTransition Transition { get; } = new();
     public InventoryCategory Tab { get; set; } = InventoryCategory.Blocks;
 
     /// <summary>The panel's dropdown search field; an empty query shows the tab's own list.</summary>
@@ -102,6 +105,7 @@ public sealed class InventoryView
     public void ResetForNewWorld()
     {
         IsOpen = false;
+        Transition.Reset();
         ClearSelection();
         ClearInput();
         Craft.Clear();

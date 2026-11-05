@@ -2,7 +2,7 @@
 
 ## Status
 
-Tracks particles, animations and other non-gameplay feel work. Last updated 2026-11-05. Nothing in progress.
+Tracks particles, animations and other non-gameplay feel work. Last updated 2026-11-05. Nothing in progress (V-11 and V-12 landed, not yet filmed: no scenario op opens the [E] panel or drops items).
 
 ## In progress
 
@@ -36,11 +36,6 @@ Tracks particles, animations and other non-gameplay feel work. Last updated 2026
 - [ ] **`V-8` Slime gel trail and drips** - P3, M. Scaled by slime size. **Hook**: `Slime` hop landing, `LandingDust.SplatCount`.
 - [ ] **`V-9` Goblin idle fidgets** - P3, M. Scratch and look-around clips while unaware. **Hook**: `tools/generate-goblin-clips.py` (optional clips like `hurt`).
 - [ ] **`V-10` Projectile trails** - P3, S. A faint streak behind goblin stones and player throws. **Hook**: `ThrownProjectile`, `FireParticleKind`.
-
-### UI
-
-- [ ] **`V-11` Pickup fly-to-hotbar** - P2, M. The collected item icon arcs into its hotbar slot. Pairs with `HotbarPickupPop`.
-- [ ] **`V-12` Inventory open/close easing** - P3, S. Slide or fade through `MathUtils` helpers instead of popping.
 
 ## Reference
 

@@ -452,6 +452,28 @@ internal sealed class HudRenderer : IDisposable
         }
     }
 
+    /// <summary>
+    /// Draws every collected drop's icon in flight: from where the drop was (its world position
+    /// projected through <paramref name="viewProjection"/>) arcing into its hotbar slot. A drop
+    /// behind the camera starts from the bottom-center of the screen.
+    /// </summary>
+    internal void DrawFlyingPickups(PickupFlyIcons flying, Matrix4x4 viewProjection, float headingDegrees, float timeSeconds)
+    {
+        var screen = _ui.ScreenSize;
+        for (var i = 0; i < flying.Count; i++)
+        {
+            var icon = flying.At(i);
+            var clip = Vector4.Transform(new Vector4(icon.WorldPosition, 1f), viewProjection);
+            var start = clip.W > 0.001f
+                ? new Vector2((clip.X / clip.W * 0.5f + 0.5f) * screen.X, (0.5f - clip.Y / clip.W * 0.5f) * screen.Y)
+                : new Vector2(screen.X * 0.5f, screen.Y);
+            var progress = PickupFlyIcons.Progress(icon);
+            var position = PickupFlyIcons.Arc(start, HotbarLayout.SlotCenter(icon.Slot, screen), progress);
+            _ui.DrawIdIcon(position, SlotSize * IconFill * PickupFlyIcons.ScaleAt(progress), icon.Id,
+                headingDegrees, timeSeconds);
+        }
+    }
+
     /// <summary>Hotbar slot under a window-pixel point (top-left origin), if any.</summary>
     internal int? HotbarSlotAt(Vector2 point)
     {

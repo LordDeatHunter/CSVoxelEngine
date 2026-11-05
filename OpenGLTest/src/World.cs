@@ -191,6 +191,9 @@ public class World
     // The hotbar's pickup pops, fed from Inventory's slots every frame (a rising count pops)
     private readonly HotbarPickupPop _hotbarPops = new();
 
+    /// <summary>The hotbar's pickup pops and flying pickup icons, fed by <see cref="DropPickup"/>.</summary>
+    internal HotbarPickupPop HotbarPops => _hotbarPops;
+
     /// <summary>The floating damage numbers over struck mobs (see <see cref="DamageNumberPool"/>): from
     /// landed hits in singleplayer, from snapshot health drops on a client.</summary>
     internal DamageNumberPool DamageNumbers { get; } = new(MobConfig.DamageNumberCapacity);

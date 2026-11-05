@@ -90,6 +90,9 @@ internal sealed class UiPasses
             _owner.Ui.Hud.DrawProfiler(FrameProfiler.Lines);
         var heading = camera != null ? Compass.HeadingFromYaw(camera.Yaw) : 0f;
         _owner.Ui.Hud.DrawHotbar(inventory, heading, time, hotbarPops);
+        if (hotbarPops != null && camera != null)
+            _owner.Ui.Hud.DrawFlyingPickups(hotbarPops.Flying, camera.GetViewMatrix() * camera.GetProjectionMatrix(),
+                heading, time);
         // The day/first-pickup/full-inventory toast rides above the item-name row
         if (toast is { Alpha: > 0f, Text.Length: > 0 })
             _owner.Ui.Hud.DrawToast(toast.Text, toast.Alpha);
@@ -100,8 +103,13 @@ internal sealed class UiPasses
             if (hotbarName != null)
                 _owner.Ui.Hud.DrawHotbarName(hotbarName.Name, hotbarName.Alpha);
         }
-        if (view.IsOpen)
+        view.Transition.Step(view.IsOpen, time);
+        if (view.IsOpen || view.Transition.Visible)
+        {
+            _owner.Ui.SetOverlay(new Vector2(0f, view.Transition.SlideY), view.Transition.Alpha);
             _owner.Ui.Panel.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true);
+            _owner.Ui.ClearOverlay();
+        }
         if (menu != null && settings != null)
             _owner.Ui.Menu.DrawPauseMenu(menu, settings);
         _owner.Ui.End();

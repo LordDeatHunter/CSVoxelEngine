@@ -20,6 +20,9 @@ public sealed class HotbarPickupPop
     private readonly float[] _elapsed = new float[Inventory.SlotCount];
     private readonly float[] _flashElapsed = new float[Inventory.SlotCount];
 
+    /// <summary>The collected drops' icons arcing into their slots; advanced with the pops.</summary>
+    public PickupFlyIcons Flying { get; } = new();
+
     public HotbarPickupPop()
     {
         Array.Fill(_elapsed, HudConfig.HotbarPopSeconds);
@@ -54,6 +57,7 @@ public sealed class HotbarPickupPop
     public void Advance(float deltaTime)
     {
         var step = MathF.Max(0f, deltaTime);
+        Flying.Advance(step);
         for (var i = 0; i < _elapsed.Length; i++)
         {
             _elapsed[i] = MathF.Min(HudConfig.HotbarPopSeconds, _elapsed[i] + step);

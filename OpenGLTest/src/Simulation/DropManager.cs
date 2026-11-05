@@ -29,6 +29,8 @@ public class DropManager
     private readonly List<byte> _collected = [];
     // Parallel to _collected after a multi-collector Update: the index of the collector each went to
     private readonly List<int> _collectedBy = [];
+    // Parallel to _collected: where each collected drop was when it was taken
+    private readonly List<Vector3> _collectedAt = [];
     // Reused by SpawnLoot so a break does not allocate; main thread only, like the rest
     private readonly List<byte> _loot = [];
 
@@ -58,6 +60,9 @@ public class DropManager
     /// the single-player overload. Valid until the next update.
     /// </summary>
     public ReadOnlySpan<int> CollectedBy => CollectionsMarshal.AsSpan(_collectedBy);
+
+    /// <summary>World position of each entry of <see cref="Collected"/> when it was collected. Valid until the next update.</summary>
+    public ReadOnlySpan<Vector3> CollectedAt => CollectionsMarshal.AsSpan(_collectedAt);
 
     /// <summary>
     /// Drops a block or item at the center of the cell it occupied. Air and unknown ids drop
@@ -195,6 +200,7 @@ public class DropManager
     {
         _collected.Clear();
         _collectedBy.Clear();
+        _collectedAt.Clear();
         _blockedCollectors.Clear();
         if (_drops.Count == 0) return;
 
@@ -217,6 +223,7 @@ public class DropManager
             if (!wanted && !(canCollect?.Invoke(drop.BlockId) ?? true)) continue;
 
             _collected.Add(drop.BlockId);
+            _collectedAt.Add(drop.Position);
             _drops.RemoveAt(i);
         }
     }
@@ -234,6 +241,7 @@ public class DropManager
     {
         _collected.Clear();
         _collectedBy.Clear();
+        _collectedAt.Clear();
         _blockedCollectors.Clear();
         if (_drops.Count == 0) return;
 
@@ -279,6 +287,7 @@ public class DropManager
             if (!drop.Update(deltaTime, target, nearestSquared <= rangeSquared, chunks)) continue;
 
             _collected.Add(drop.BlockId);
+            _collectedAt.Add(drop.Position);
             _collectedBy.Add(nearest);
             _drops.RemoveAt(i);
         }

@@ -17,6 +17,8 @@ uniform float uAlphaCutoff;
 // into the gamma default framebuffer, so re-encode them to write today's bytes. UI-only
 // textures (font, crosshair, HUD icons) are linear uploads and leave this false.
 uniform bool uSrgbTex;
+// Alpha multiplier for the whole draw: a panel's open/close fade (UIRenderer.SetOverlay). 1 otherwise.
+uniform float uFade;
 
 out vec4 FragColor;
 
@@ -43,4 +45,5 @@ void main()
     }
 
     FragColor = fColor * uColor * texel;
+    FragColor.a *= uFade;
 }

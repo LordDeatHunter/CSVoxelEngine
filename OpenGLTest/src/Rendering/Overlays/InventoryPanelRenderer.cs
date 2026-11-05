@@ -123,7 +123,7 @@ internal sealed class InventoryPanelRenderer
         // preview, crafting card, pause menu and later passes all assume it off, and Begin
         // disables it as a belt-and-braces), and nothing may return from inside this block.
         var (sx, sy, sw, sh) = UiCanvas.ScissorRect(
-            new Vector2(InventoryPanelLayout.PanelLeft, InventoryPanelLayout.ListTop),
+            new Vector2(InventoryPanelLayout.PanelLeft, InventoryPanelLayout.ListTop) + _ui.OverlayOffset,
             new Vector2(InventoryPanelLayout.PanelWidth(_ui.ScreenSize), listHeight),
             _ui.Scale, _ui.WindowSize, _ui.FramebufferSize);
         _gl.Enable(EnableCap.ScissorTest);

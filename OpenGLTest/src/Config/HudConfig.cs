@@ -46,4 +46,17 @@ public static class HudConfig
     // How long a broken tool's hotbar slot flashes, and the strength of its white overlay at the start
     public const float HotbarFlashSeconds = 0.35f;
     public const float HotbarFlashAlpha = 0.6f;
+
+    // --- UI animations (PanelTransition, PickupFlyIcons) ---
+    // The [E] panel fades and slides up into place over the open time and fades away over the
+    // shorter close time; the slide is how many canvas pixels it starts below its place.
+    public const float PanelOpenSeconds = 0.18f;
+    public const float PanelCloseSeconds = 0.12f;
+    public const float PanelSlidePixels = 28f;
+
+    // A collected drop's icon arcs from where the drop was into its hotbar slot over this long,
+    // bowed up by the arc height at mid-flight and shrinking to the end scale on arrival.
+    public const float PickupFlySeconds = 0.4f;
+    public const float PickupFlyArcPixels = 60f;
+    public const float PickupFlyEndScale = 0.6f;
 }

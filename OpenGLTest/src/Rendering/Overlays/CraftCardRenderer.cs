@@ -132,7 +132,7 @@ internal sealed class CraftCardRenderer
             // EnsureDepthCleared before its own list scissor, so the spinning icons' latched
             // depth clear never happens under this scissor. Nothing may return from inside.
             var (sx, sy, sw, sh) = UiCanvas.ScissorRect(
-                new Vector2(layout.Left, top + 2f), new Vector2(layout.Width, layout.ViewHeight - 4f),
+                new Vector2(layout.Left, top + 2f) + _ui.OverlayOffset, new Vector2(layout.Width, layout.ViewHeight - 4f),
                 _ui.Scale, _ui.WindowSize, _ui.FramebufferSize);
             _gl.Enable(EnableCap.ScissorTest);
             _gl.Scissor(sx, sy, (uint)sw, (uint)sh);

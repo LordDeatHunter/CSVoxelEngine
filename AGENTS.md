@@ -193,7 +193,7 @@ set (`Inventory.Knows`, marked in `Add`, saved as names in `player.json` and rid
 "New: <name>" toast on a first pickup or `/give`. `HudToast` draws one line above the item-name row
 for the day toast ("Day N" as the sun rises through dawn), the inventory-full warning and the
 first-find toast; `HotbarNameFade` shows the selected item's name after a slot or item switch and
-`HotbarPickupPop` bumps a slot whose count rises. `ItemTooltip.Lines` builds the hover panel over the
+`HotbarPickupPop` bumps a slot whose count rises, and a collected drop's icon arcs from where it lay into its hotbar slot (`PickupFlyIcons`, owned by the pop, spawned by `DropPickup` for local pickups only, drawn by `HudRenderer.DrawFlyingPickups`; a client sees none since its drops arrive as snapshots). The [E] panel fades and slides up on open and fades on close (`InventoryView.Transition`, `PanelTransition`; `UIRenderer.SetOverlay` shifts the pass's projection and sets `uFade` in `ui-fragment.glsl`, and panel scissors add `OverlayOffset`). `ItemTooltip.Lines` builds the hover panel over the
 [E] panel's rows and the hotbar, and holding Tab draws the player list (a server session only). F2
 saves the finished frame through `VisualCapture`; F1 toggles `GameplayInput`'s `hudVisible`, the gate the scenario
 screenshot's `hideHud` drives. The chat commands are `/help`, `/tp x y z`, `/give <item> [count]`
@@ -1793,6 +1793,7 @@ OpenGLTest/
         HitMarker.cs           # the crosshair's connecting-hit X: its flash clock and fade
         HotbarNameFade.cs      # the selected item's name over the hearts after a switch
         HotbarPickupPop.cs     # the bump a hotbar slot gets when its count rises
+        PickupFlyIcons.cs      # GL-free ring of collected-drop icons arcing into their hotbar slots
         HudToast.cs            # one hold-then-fade HUD line (the day toast, a first find, packs full)
         ItemTooltip.cs         # the hover panel's lines, built from the item's own fields
         LookLabel.cs           # the look-at label's rule: name, "Unknown", the mineable flag
@@ -1811,6 +1812,7 @@ OpenGLTest/
         InventorySaveCodec.cs  # Inventory's player.json mapping (Export/Import forwarders), HandledComponentTypes
         InventorySearch.cs     # GL-free matching of owned items and recipes behind the search field
         InventoryView.cs       # [E] panel selection/scroll/focus state; ResetForNewWorld between worlds
+        PanelTransition.cs     # the [E] panel's open/close easing: eased alpha and slide from a self-clocked progress
         SearchFieldState.cs    # a dropdown search field's query, suggestion cursor and scroll
       Menus/                   # main, pause and settings menus, the loading screen, text fields
         LoadingScreen.cs       # LoadingScreenView (eased monotone progress, fade-out) + LoadingScreenLayout (spinner)

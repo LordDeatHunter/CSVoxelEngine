@@ -59,6 +59,14 @@ internal sealed class DropPickup
     // the transition into the blocked state only
     private bool _pickupBlocked;
 
+    // The hotbar slot a collected item's icon flies to: the first slot showing it, else the selected one
+    private int FlySlot(byte id)
+    {
+        for (var slot = 0; slot < Inventory.SlotCount; slot++)
+            if (Inventory.IdAt(slot) == id) return slot;
+        return Inventory.SelectedIndex;
+    }
+
     /// <summary>Runs this tick's drop pickup: gathers the collectors, updates the drops and credits what they collected.</summary>
     internal void Update(double deltaTime)
     {
@@ -88,6 +96,7 @@ internal sealed class DropPickup
         var pickedUp = false;
         var collected = _dropManager.Collected;
         var collectors = _dropManager.CollectedBy;
+        var collectedAt = _dropManager.CollectedAt;
         for (var i = 0; i < collected.Length; i++)
         {
             if (collectors[i] >= goblinCollectors)
@@ -105,7 +114,10 @@ internal sealed class DropPickup
             }
 
             var known = Inventory.Knows(collected[i]);
-            pickedUp |= Inventory.Add(collected[i]);
+            var added = Inventory.Add(collected[i]);
+            pickedUp |= added;
+            if (added)
+                _world.HotbarPops.Flying.Spawn(collected[i], collectedAt[i], FlySlot(collected[i]));
             // A first find toasts its name: Add marks the id obtained, so read it before
             if (!known)
                 Toast.Show($"New: {Inventory.DisplayName(collected[i])}");

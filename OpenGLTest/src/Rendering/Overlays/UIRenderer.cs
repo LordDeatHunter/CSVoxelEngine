@@ -148,6 +148,10 @@ public class UIRenderer : IDisposable
     // HUD toast and the hotbar item name lower it and restore 1 afterwards, and Begin resets it to 1.
     private float _textFade = 1f;
 
+    // The fade and slide of the panel being drawn (SetOverlay); Begin resets them to none.
+    private Vector2 _overlayOffset;
+    private int _locFade = -1;
+
     // Main-menu and loading-screen string caches, render thread only, so an idle menu allocates
     // nothing per frame: FitText allocates a Substring per trial length, and the seed
     // strings would otherwise be formatted every frame. Fitted strings are keyed by
@@ -208,6 +212,7 @@ public class UIRenderer : IDisposable
             _itemFrames[id] = frames;
         }
         _locAlphaCutoff = _shader.GetUniformLocation("uAlphaCutoff");
+        _locFade = _shader.GetUniformLocation("uFade");
         _unitSquare = Primitives.CreateSquare(gl, 1f);
 
         try
@@ -276,6 +281,7 @@ public class UIRenderer : IDisposable
             _fitCacheScreen = _screenSize;
         }
         _textFade = 1f;
+        _overlayOffset = Vector2.Zero;
         _projection = Matrix4x4.CreateOrthographicOffCenter(
             0f, _screenSize.X, _screenSize.Y, 0f, -DepthRange, DepthRange);
 
@@ -288,7 +294,27 @@ public class UIRenderer : IDisposable
 
         _shader.Use();
         _shader.SetUniform("uProjection", _projection);
+        _shader.SetUniform(_locFade, 1f);
     }
+
+    /// <summary>
+    /// Draws everything until <see cref="ClearOverlay"/> shifted by <paramref name="offset"/> canvas
+    /// units and with its alpha multiplied by <paramref name="alpha"/> (a panel's open and close
+    /// easing). Scissor rects must add <see cref="OverlayOffset"/> themselves.
+    /// </summary>
+    internal void SetOverlay(Vector2 offset, float alpha)
+    {
+        _overlayOffset = offset;
+        _shader.Use();
+        _shader.SetUniform("uProjection", Matrix4x4.CreateTranslation(offset.X, offset.Y, 0f) * _projection);
+        _shader.SetUniform(_locFade, alpha);
+    }
+
+    /// <summary>Ends <see cref="SetOverlay"/>: no shift, full alpha.</summary>
+    internal void ClearOverlay() => SetOverlay(Vector2.Zero, 1f);
+
+    /// <summary>Canvas shift of the overlay being drawn, zero outside one.</summary>
+    internal Vector2 OverlayOffset => _overlayOffset;
 
     public void End()
     {
