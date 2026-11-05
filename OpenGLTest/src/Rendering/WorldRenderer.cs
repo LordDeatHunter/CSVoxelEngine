@@ -181,10 +181,6 @@ internal sealed class WorldRenderer
 
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.EntityPass);
-        renderManager.Billboards.RenderEntityHealthbars(Camera, Mobs);
-        renderManager.Billboards.RenderDamageNumbers(Camera, DamageNumbers);
-        if (_goblins != null)
-            renderManager.Billboards.RenderNoticePips(Camera, _goblins.Goblins);
         renderManager.Objects.RenderBlockDebris(Camera, _debris.Debris);
         foreach (var tree in _toppling)
             renderManager.Objects.RenderTopplingTree(Camera, tree);
@@ -261,6 +257,12 @@ internal sealed class WorldRenderer
         // the clouds are skipped anyway) and used to be the only pass drawn at this point.
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.EntityPass);
+        // Healthbars, damage numbers and notice pips are depthless blended billboards too: drawn
+        // before the water and clouds, those would paint over them even when the bar is in front.
+        renderManager.Billboards.RenderEntityHealthbars(Camera, Mobs);
+        renderManager.Billboards.RenderDamageNumbers(Camera, DamageNumbers);
+        if (_goblins != null)
+            renderManager.Billboards.RenderNoticePips(Camera, _goblins.Goblins);
         renderManager.Billboards.RenderLeafParticles(Camera, _leaves.Particles);
         renderManager.Billboards.RenderFireParticles(Camera, _fire.Particles);
         // Lava embers are a second batch; the renderer re-uploads with BufferSubData, so two
