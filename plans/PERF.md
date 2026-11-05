@@ -44,6 +44,10 @@ bold title, then **Files**, **Win** (measured or estimated), **Verify** and **In
     Suspects: `MeshBufferPool` misses, LOH-sized LOD lists.
   - **Win**: estimated; fewer gen0 pauses during streaming. **Verify**: the `gc` token pair.
     **Invariant**: no new per-frame allocation; pools hold no edit state.
+  - **Scoped result (PR5)**: lazy translucent rents preserve warmed wet buffers across a full dry mesh build.
+    The prior-base fixture measured dry 44,344→8,456 B/build (80.9% less) with matching geometry/light
+    hashes; wet stayed 4,296 B/build. Current-master remeasurement is pending; these fixture bytes do not
+    establish a whole-game allocation or FPS gain.
 
 - [ ] **`F12` Shared per-frame chunk walks** (CPU, low priority while GPU-bound).
   - **Files**: `TerrainPasses.RenderWorld`/`CullWater`, `ShadowPass` (two cascades), `ReflectionPass`:

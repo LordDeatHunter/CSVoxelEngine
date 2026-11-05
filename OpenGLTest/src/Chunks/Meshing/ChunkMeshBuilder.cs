@@ -247,11 +247,10 @@ internal static class ChunkMeshBuilder
         var indices = pool.RentIndices();
         ushort indexOffset = 0;
 
-        // Fluids build a second, blended mesh drawn after the opaque world, so whatever sits
-        // behind the water shows through it. Rented like the opaque lists; chunks without
-        // fluid or glass return them untouched (see MeshBufferPool.Return).
-        var tVertices = pool.RentTranslucentVertices();
-        var tIndices = pool.RentTranslucentIndices();
+        // Rent blended output only at its first emission. A dry chunk must not consume pooled
+        // wet buffers: empty translucent lists are deliberately not retained by the chunk pool.
+        List<Vertex>? tVertices = null;
+        List<ushort>? tIndices = null;
         ushort tIndexOffset = 0;
 
         // Glass shares the translucent lists, so "has a translucent mesh" is not "has water";
@@ -283,7 +282,8 @@ internal static class ChunkMeshBuilder
 
         if (greedy)
             ChunkMesher.EmitGreedyFaces(MeshScratch.Current, padded, paddedState, chunkBaseY,
-                sunLight, blockLight, vertices, indices, ref indexOffset, tVertices, tIndices, ref tIndexOffset, in fields);
+                sunLight, blockLight, vertices, indices, ref indexOffset, pool,
+                ref tVertices, ref tIndices, ref tIndexOffset, in fields);
 
         for (var x = 0; x < Size; x++)
         for (var y = 0; y < Size; y++)
@@ -359,7 +359,7 @@ internal static class ChunkMeshBuilder
             // translucent lists; see EmitFluid
             if (type.Renderer == BlockRenderer.Fluid)
             {
-                FluidEmitter.EmitFluid(tVertices, tIndices, ref tIndexOffset, padded, paddedState, pIdx,
+                FluidEmitter.EmitFluid(pool, ref tVertices, ref tIndices, ref tIndexOffset, padded, paddedState, pIdx,
                     sunLight, blockLight, x, y, z, type, basePos);
                 hasWater = true;
                 if (IsHotFluidVent(padded[pIdx], padded[pIdx + FaceNeighborDelta[4]]))
@@ -379,8 +379,12 @@ internal static class ChunkMeshBuilder
             if (type.Renderer == BlockRenderer.Pane)
             {
                 if (type.Translucent)
+                {
+                    tVertices ??= pool.RentTranslucentVertices();
+                    tIndices ??= pool.RentTranslucentIndices();
                     PaneEmitter.EmitPane(tVertices, tIndices, ref tIndexOffset, padded, paddedState, pIdx,
                         sunLight, blockLight, x, y, z, type, basePos);
+                }
                 else
                     PaneEmitter.EmitPane(vertices, indices, ref indexOffset, padded, paddedState, pIdx,
                         sunLight, blockLight, x, y, z, type, basePos);
@@ -413,8 +417,6 @@ internal static class ChunkMeshBuilder
 
             // Translucent blocks (glass) replay the same baked quads into the blended
             // lists drawn after the opaque world; culling, AO and lighting below are shared.
-            var dstVertices = type.Translucent ? tVertices : vertices;
-            var dstIndices = type.Translucent ? tIndices : indices;
             ref var dstOffset = ref (type.Translucent ? ref tIndexOffset : ref indexOffset);
 
             for (var q = 0; q < quads.Length; q++)
@@ -475,6 +477,8 @@ internal static class ChunkMeshBuilder
 
                 // Meshes are indexed with ushort (mirrors EmitFluid): stop emitting into a
                 // list that is full instead of wrapping the offset
+                var dstVertices = type.Translucent ? tVertices ??= pool.RentTranslucentVertices() : vertices;
+                var dstIndices = type.Translucent ? tIndices ??= pool.RentTranslucentIndices() : indices;
                 if (dstVertices.Count > ushort.MaxValue - 3) continue;
 
                 var sun = sunLight[lightCell] / 15f;
@@ -586,7 +590,7 @@ internal static class ChunkMeshBuilder
             }
         }
 
-        return new ChunkMeshData(vertices, indices, tVertices, tIndices, hasWater)
+        return new ChunkMeshData(vertices, indices, tVertices ?? new List<Vertex>(), tIndices ?? new List<ushort>(), hasWater)
             { HotFluidVents = vents?.ToArray(), SpringVents = springVents?.ToArray(), FlamePoints = flames?.ToArray() };
     }
 }
