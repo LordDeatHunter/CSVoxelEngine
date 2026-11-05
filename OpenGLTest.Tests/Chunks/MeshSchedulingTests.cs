@@ -5,6 +5,7 @@ using System.Numerics;
 using System.Threading;
 using VoxelEngine.Player;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace VoxelEngine.Tests.Chunks;
 
@@ -24,7 +25,13 @@ namespace VoxelEngine.Tests.Chunks;
 /// </summary>
 public sealed class MeshSchedulingTests
 {
-    public MeshSchedulingTests() => TestContent.EnsureLoaded();
+    private readonly ITestOutputHelper _output;
+
+    public MeshSchedulingTests(ITestOutputHelper output)
+    {
+        _output = output;
+        TestContent.EnsureLoaded();
+    }
 
     // A 6x6x6 block of empty, ready chunks (positions -2..3 on each axis) so the inner 4x4x4
     // (positions -1..2, exactly 64 chunks) have all six face neighbors and are therefore the
@@ -170,6 +177,156 @@ public sealed class MeshSchedulingTests
 
         manager.Update(camera);                       // applies the drained result
         Assert.True(center.IsMeshed, "the drained build was never applied");
+    }
+
+    [Fact]
+    public void CompletedPreEditMeshCannotReplaceSynchronousEditWithoutRetry()
+    {
+        var centerPosition = MeshTestWorld.HighAbove;
+        var (manager, center) = MeshTestWorld.WalledArea(centerPosition);
+        manager.Headless = true;
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+
+        var scheduler = manager.MeshSchedulerForTests;
+        var beforeApplyVertexCounts = new List<int>();
+        var asyncBuilds = 0;
+        scheduler.MeshBeforeApplyForTests = (chunk, meshData) =>
+        {
+            if (ReferenceEquals(chunk, center))
+                beforeApplyVertexCounts.Add(meshData.Vertices.Count);
+        };
+        scheduler.BuildAcceptedForTests = chunk =>
+        {
+            if (ReferenceEquals(chunk, center)) Interlocked.Increment(ref asyncBuilds);
+        };
+
+        manager.MarkDirty(centerPosition);
+        scheduler.ProcessDirtyChunks([centerPosition]);
+        Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)), "old mesh build did not drain");
+
+        // Drain waits through publication and claim release but intentionally leaves completed
+        // outputs queued. No Update/consumer pass has run between the old snapshot and the edit.
+        Assert.Equal(0, manager.GeneratingMeshCount);
+        Assert.Equal(1, scheduler.CompletedMeshCount);
+
+        var editedCell = centerPosition * Chunk.Size + new Vector3(8);
+        Assert.True(center.RemoveBlockAt(editedCell, manager));
+        Assert.Single(beforeApplyVertexCounts);
+        Assert.Equal(0, beforeApplyVertexCounts[0]); // The synchronous result is the empty edited mesh.
+        Assert.Equal(1, scheduler.CompletedMeshCount);
+
+        scheduler.ApplyCompletedMeshes([centerPosition]);
+        scheduler.ProcessDirtyChunks([centerPosition]);
+        Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)), "post-edit retry did not drain");
+        scheduler.ApplyCompletedMeshes([centerPosition]);
+
+        // Reach quiescence: the old result must be rejected or followed by a current rebuild.
+        // On the frozen base no retry remains, so the final result is the old one-block mesh.
+        Assert.NotEmpty(beforeApplyVertexCounts);
+        Assert.Equal(0, beforeApplyVertexCounts[^1]);
+        Assert.Equal(0, scheduler.CompletedMeshCount);
+        _output.WriteLine("completed-before-edit: asyncBuilds={0}; preApplyVertexCounts=[{1}]",
+            Volatile.Read(ref asyncBuilds), string.Join(",", beforeApplyVertexCounts));
+    }
+
+    [Fact]
+    public void EditWhileOldBuildIsInFlightLeavesRetryForLatestMesh()
+    {
+        var centerPosition = MeshTestWorld.HighAbove;
+        var (manager, center) = MeshTestWorld.WalledArea(centerPosition);
+        manager.Headless = true;
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+
+        var scheduler = manager.MeshSchedulerForTests;
+        var beforeApplyVertexCounts = new List<int>();
+        var asyncBuilds = 0;
+        var generatedVertexCount = 0;
+        using var generated = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        scheduler.MeshBeforeApplyForTests = (chunk, meshData) =>
+        {
+            if (ReferenceEquals(chunk, center))
+                beforeApplyVertexCounts.Add(meshData.Vertices.Count);
+        };
+        scheduler.BuildAcceptedForTests = chunk =>
+        {
+            if (ReferenceEquals(chunk, center)) Interlocked.Increment(ref asyncBuilds);
+        };
+        scheduler.MeshGeneratedForTests = (chunk, meshData) =>
+        {
+            if (!ReferenceEquals(chunk, center) || Volatile.Read(ref asyncBuilds) != 1) return;
+            generatedVertexCount = meshData.Vertices.Count;
+            generated.Set();
+            if (!release.Wait(TimeSpan.FromSeconds(10)))
+                throw new TimeoutException("mesh test release barrier was not opened");
+        };
+
+        try
+        {
+            manager.MarkDirty(centerPosition);
+            scheduler.ProcessDirtyChunks([centerPosition]);
+            Assert.True(generated.Wait(TimeSpan.FromSeconds(10)), "worker did not finish old snapshot");
+            Assert.True(generatedVertexCount > 0, "old snapshot did not contain the placed stone");
+
+            var editedCell = centerPosition * Chunk.Size + new Vector3(8);
+            Assert.True(center.RemoveBlockAt(editedCell, manager));
+            Assert.Equal(0, beforeApplyVertexCounts[^1]);
+
+            release.Set();
+            Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)), "old build did not drain");
+            scheduler.ApplyCompletedMeshes([centerPosition]);
+
+            scheduler.ProcessDirtyChunks([centerPosition]);
+            Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)), "retry build did not drain");
+            scheduler.ApplyCompletedMeshes([centerPosition]);
+
+            Assert.Equal(0, beforeApplyVertexCounts[^1]);
+            Assert.Equal(0, scheduler.CompletedMeshCount);
+            Assert.Equal(0, manager.GeneratingMeshCount);
+            Assert.Equal(0, manager.PendingMeshWorkCount);
+            Assert.Equal(0, manager.ActiveMeshRunnerCount);
+            _output.WriteLine("in-flight edit: generatedOldVertices={0}; asyncBuilds={1}; preApplyVertexCounts=[{2}]",
+                generatedVertexCount, Volatile.Read(ref asyncBuilds), string.Join(",", beforeApplyVertexCounts));
+        }
+        finally
+        {
+            release.Set();
+            Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)));
+        }
+    }
+
+    [Fact]
+    public void EditWithNoOldOutputDoesNotCreateAsyncMeshBuild()
+    {
+        var centerPosition = MeshTestWorld.HighAbove;
+        var (manager, center) = MeshTestWorld.WalledArea(centerPosition);
+        manager.Headless = true;
+        center.SetBlockRaw(8, 8, 8, ContentRegistry.RequireBlock("stone").Id, 0);
+        var scheduler = manager.MeshSchedulerForTests;
+        var asyncBuilds = 0;
+        var beforeApplyVertexCounts = new List<int>();
+        scheduler.MeshBeforeApplyForTests = (chunk, meshData) =>
+        {
+            if (ReferenceEquals(chunk, center))
+                beforeApplyVertexCounts.Add(meshData.Vertices.Count);
+        };
+        scheduler.BuildAcceptedForTests = chunk =>
+        {
+            if (ReferenceEquals(chunk, center)) Interlocked.Increment(ref asyncBuilds);
+        };
+
+        var editedCell = centerPosition * Chunk.Size + new Vector3(8);
+        Assert.True(center.RemoveBlockAt(editedCell, manager));
+        scheduler.ProcessDirtyChunks([centerPosition]);
+        Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)));
+        scheduler.ApplyCompletedMeshes([centerPosition]);
+
+        Assert.NotEmpty(beforeApplyVertexCounts);
+        Assert.Equal(0, beforeApplyVertexCounts[^1]);
+        Assert.Equal(0, scheduler.CompletedMeshCount);
+        Assert.Equal(0, manager.GeneratingMeshCount);
+        _output.WriteLine("idle edit: asyncBuilds={0}; preApplyVertexCounts=[{1}]",
+            Volatile.Read(ref asyncBuilds), string.Join(",", beforeApplyVertexCounts));
     }
 
     [Fact]

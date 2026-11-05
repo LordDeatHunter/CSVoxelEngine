@@ -32,6 +32,15 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
 
     internal int GeneratingMeshCount => _generatingMeshes.Count;
 
+    /// <summary>Completed output count for deterministic scheduler tests.</summary>
+    internal int CompletedMeshCount => _completedMeshQueue.Count;
+
+    /// <summary>Observes result payloads before the main-thread apply path in headless tests.</summary>
+    internal Action<Chunk, ChunkMeshData>? MeshBeforeApplyForTests { get; set; }
+
+    /// <summary>Pauses after a worker has produced its snapshot result but before publication.</summary>
+    internal Action<Chunk, ChunkMeshData>? MeshGeneratedForTests { get; set; }
+
     // Deterministic worker barriers for the unload/reload regression tests.
     internal Action<Chunk>? BeforeBuildForTests { get; set; }
     internal Action<Chunk>? BuildAcceptedForTests { get; set; }
@@ -257,6 +266,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     /// </summary>
     private void ApplyMesh(Chunk chunk, ChunkMeshData meshData)
     {
+        MeshBeforeApplyForTests?.Invoke(chunk, meshData);
         var wasMeshed = chunk.IsMeshed;
         if (manager.Headless)
             chunk.MarkMeshedHeadless(meshData);
@@ -390,6 +400,8 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
                     _dirtyChunks.TryAdd(key, 0);
                 return;
             }
+
+            MeshGeneratedForTests?.Invoke(chunk, meshData);
 
             _completedMeshQueue.Enqueue((pos, chunk, meshData, Interlocked.Increment(ref _meshSequence)));
         }
