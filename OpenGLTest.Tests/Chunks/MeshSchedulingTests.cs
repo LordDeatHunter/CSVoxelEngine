@@ -238,6 +238,7 @@ public sealed class MeshSchedulingTests
         Assert.Equal(0, manager.GeneratingMeshCount);
         Assert.Equal(0, manager.PendingMeshWorkCount);
         Assert.Equal(0, manager.ActiveMeshRunnerCount);
+        Assert.Equal(1, manager.MeshBuffers.PooledVertexLists);
         Assert.Equal(0, beforeApplyVertexCounts[^1]);
     }
 
@@ -302,6 +303,7 @@ public sealed class MeshSchedulingTests
             Assert.Equal(0, manager.GeneratingMeshCount);
             Assert.Equal(0, manager.PendingMeshWorkCount);
             Assert.Equal(0, manager.ActiveMeshRunnerCount);
+            Assert.Equal(1, manager.MeshBuffers.PooledVertexLists);
             _output.WriteLine("in-flight edit: generatedOldVertices={0}; asyncBuilds={1}; preApplyVertexCounts=[{2}]",
                 generatedVertexCount, Volatile.Read(ref asyncBuilds), string.Join(",", beforeApplyVertexCounts));
         }
