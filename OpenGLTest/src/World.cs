@@ -92,6 +92,9 @@ public class World
 
     private readonly BubbleParticleSystem _bubbles = new();
 
+    // The glowing arcs behind swinging blades, the local player's and the remote players'; cosmetic
+    private readonly SliceTrailSystem _sliceTrails = new();
+
     // Where edited chunks, the far-LOD edit state, the player and the entities are persisted; null = no
     // persistence (tests, VOXEL_SCRIPT runs, and the game until the menu attaches one)
     private readonly ChunkSaveStore? _saveStore;
@@ -432,7 +435,7 @@ public class World
                 _mobs, serverMode, clientMode);
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
-                _leaves, _fire, _lavaFire, _torchFire, _bubbles, _health, _hotbarName, _hotbarPops);
+                _leaves, _fire, _lavaFire, _torchFire, _bubbles, _sliceTrails, _health, _hotbarName, _hotbarPops);
 
             // A store means a real world opened from (or created into) a save: it streams first and
             // plays once the chunks around the player are there. Larger, still bounded budgets
@@ -597,6 +600,20 @@ public class World
     /// <summary>The other players on this client's server, drawn each frame. Empty in singleplayer.</summary>
     public IReadOnlyList<RemotePlayer> RemotePlayers => _remotePlayers;
 
+    /// <summary>The slice trails behind the local and remote players' blade swings; fed outside server mode.</summary>
+    internal SliceTrailSystem SliceTrails => _sliceTrails;
+
+    // Feeds the slice trails right after the remote players moved, from the same eye, look and back
+    // offset the held item is drawn with; cosmetic, so never on a server
+    private void UpdateSliceTrails()
+    {
+        if (_serverMode)
+            return;
+        var held = LocalPlayer.HasHeld ? ItemRegistry.TryGet(LocalPlayer.HeldId) : null;
+        _sliceTrails.Update(Now, Player, held, Camera.Position, Camera.PlayerYaw, Camera.Pitch,
+            HeldItemPose.BackOffset(Camera.ShoulderBlend), _remotePlayers);
+    }
+
     /// <summary>
     /// Raised on a multiplayer client for every cell its own action just changed locally (id 0 for
     /// a removal), with the id and state the cell now holds: the prediction the intent raised right
@@ -701,6 +718,7 @@ public class World
 
         foreach (var remotePlayer in _remotePlayers)
             remotePlayer.Update(deltaTime);
+        UpdateSliceTrails();
 
         // The purely cosmetic systems a client's own edits still feed (mining debris, leaf bursts
         // and the ambient leaf fall) run locally, or what WorldRenderer.Render draws would hang in
@@ -866,6 +884,7 @@ public class World
         // Remote player poses ease toward the last broadcast and drive their own walk cycles.
         for (var i = 0; i < _remotePlayers.Count; i++)
             _remotePlayers[i].Update(deltaTime);
+        UpdateSliceTrails();
         FrameProfiler.End(ProfileSection.Entities);
 
         // Chunks that streamed in this frame hand over their water/air frontier, so a sea a

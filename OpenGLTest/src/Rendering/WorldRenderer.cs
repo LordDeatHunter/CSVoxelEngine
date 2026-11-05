@@ -48,6 +48,7 @@ internal sealed class WorldRenderer
     private readonly FireParticleSystem _lavaFire;
     private readonly FireParticleSystem _torchFire;
     private readonly BubbleParticleSystem _bubbles;
+    private readonly SliceTrailSystem _sliceTrails;
     private readonly PlayerHealth _health;
     private readonly HotbarNameFade _hotbarName;
     private readonly HotbarPickupPop _hotbarPops;
@@ -72,8 +73,8 @@ internal sealed class WorldRenderer
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         List<TopplingTree> toppling, List<ThrownProjectile> projectiles, List<RemotePlayer> remotePlayers,
         BlockDebrisSystem debris, LeafParticleSystem leaves, FireParticleSystem fire, FireParticleSystem lavaFire,
-        FireParticleSystem torchFire, BubbleParticleSystem bubbles, PlayerHealth health, HotbarNameFade hotbarName,
-        HotbarPickupPop hotbarPops)
+        FireParticleSystem torchFire, BubbleParticleSystem bubbles, SliceTrailSystem sliceTrails, PlayerHealth health,
+        HotbarNameFade hotbarName, HotbarPickupPop hotbarPops)
     {
         _world = world;
         _window = window;
@@ -96,6 +97,7 @@ internal sealed class WorldRenderer
         _lavaFire = lavaFire;
         _torchFire = torchFire;
         _bubbles = bubbles;
+        _sliceTrails = sliceTrails;
         _health = health;
         _hotbarName = hotbarName;
         _hotbarPops = hotbarPops;
@@ -267,6 +269,9 @@ internal sealed class WorldRenderer
         renderManager.Billboards.RenderFireParticles(Camera, _lavaFire.Particles);
         renderManager.Billboards.RenderFireParticles(Camera, _torchFire.Particles);
         renderManager.Billboards.RenderBubbleParticles(Camera, _bubbles.Particles);
+        // Slice trails: additive and depthless like the embers, so they go here after the clouds;
+        // never drawn in the mirror or the shadow pass
+        renderManager.Billboards.RenderSliceTrails(Camera, _sliceTrails.Active, Now);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);
         FrameProfiler.End(ProfileSection.EntityPass);
 

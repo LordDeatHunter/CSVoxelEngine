@@ -337,6 +337,13 @@ public class PlayerModel
     public float BodyYaw => BodyYawLags && _lookKnown ? _bodyYaw : _lookYaw;
 
     /// <summary>
+    /// The yaw (degrees) the body, and so the hand anchor, is posed at for the look yaw
+    /// <paramref name="yawDeg"/> passed to <see cref="GetPartMatrix"/>: the trailing body's own yaw
+    /// while <see cref="BodyYawLags"/> holds and a look is known, the passed yaw otherwise.
+    /// </summary>
+    internal float DrawnBodyYaw(float yawDeg) => BodyYawLags && _lookKnown ? _bodyYaw : yawDeg;
+
+    /// <summary>
     /// Reports the current look. The change since the last call lags the arms behind the turn (the
     /// viewmodel sway) and, with <see cref="BodyYawLags"/>, drives the body-yaw follow. Call once a
     /// frame before <see cref="Update"/>.

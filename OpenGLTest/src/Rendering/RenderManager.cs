@@ -110,18 +110,18 @@ public class RenderManager : IDisposable
     // fire light with the same offset.
     /// <summary>Re-exports <see cref="PlayerPasses.PlayerModelPath"/> for the item debugger.</summary>
     public const string PlayerModelPath = PlayerPasses.PlayerModelPath;
-    /// <summary>Re-exports <see cref="PlayerPasses.HeldItemScale"/> for the item debugger and its tests.</summary>
-    public const float HeldItemScale = PlayerPasses.HeldItemScale;
-    /// <summary>Re-exports <see cref="PlayerPasses.HeldItemGrip"/> for the item debugger and its tests.</summary>
-    public static Vector3 HeldItemGrip => PlayerPasses.HeldItemGrip;
-    /// <summary>Re-exports <see cref="PlayerPasses.HeldBlockScale"/> for the item debugger and its tests.</summary>
-    public const float HeldBlockScale = PlayerPasses.HeldBlockScale;
-    /// <summary>Re-exports <see cref="PlayerPasses.HeldBlockGrip"/> for the item debugger and its tests.</summary>
-    public static Vector3 HeldBlockGrip => PlayerPasses.HeldBlockGrip;
-    /// <summary>Re-exports <see cref="PlayerPasses.PoseHeldItem"/> for the item debugger, whose preview
+    /// <summary>Re-exports <see cref="HeldItemPose.HeldItemScale"/> for the item debugger and its tests.</summary>
+    public const float HeldItemScale = HeldItemPose.HeldItemScale;
+    /// <summary>Re-exports <see cref="HeldItemPose.HeldItemGrip"/> for the item debugger and its tests.</summary>
+    public static Vector3 HeldItemGrip => HeldItemPose.HeldItemGrip;
+    /// <summary>Re-exports <see cref="HeldItemPose.HeldBlockScale"/> for the item debugger and its tests.</summary>
+    public const float HeldBlockScale = HeldItemPose.HeldBlockScale;
+    /// <summary>Re-exports <see cref="HeldItemPose.HeldBlockGrip"/> for the item debugger and its tests.</summary>
+    public static Vector3 HeldBlockGrip => HeldItemPose.HeldBlockGrip;
+    /// <summary>Re-exports <see cref="HeldItemPose.Pose"/> for the item debugger, whose preview
     /// poses the held item exactly as the game draws it.</summary>
     public static Matrix4x4 PoseHeldItem(Matrix4x4 hand, Matrix4x4 displayTransform, float scale,
-        Vector3 grip) => PlayerPasses.PoseHeldItem(hand, displayTransform, scale, grip);
+        Vector3 grip) => HeldItemPose.Pose(hand, displayTransform, scale, grip);
     /// <summary>Re-exports <see cref="FrameLighting.FireLightOffset"/>, where a fire cell's warm point
     /// light sits inside it, for the tests.</summary>
     public static Vector3 FireLightOffset => FrameLighting.FireLightOffset;
@@ -165,6 +165,7 @@ public class RenderManager : IDisposable
     private LeafParticleRenderer? _leaves;
     private FireParticleRenderer? _fire;
     private BubbleParticleRenderer? _bubbles;
+    private SliceTrailRenderer? _sliceTrails;
 
     // Entity healthbars: one five-heart billboard row above every live slime.
     // Null until LoadResources builds it.
@@ -371,6 +372,7 @@ public class RenderManager : IDisposable
     internal LeafParticleRenderer? Leaves => _leaves;
     internal FireParticleRenderer? Fire => _fire;
     internal BubbleParticleRenderer? Bubbles => _bubbles;
+    internal SliceTrailRenderer? SliceTrails => _sliceTrails;
     internal EntityHealthbarRenderer? Healthbars => _healthbars;
     internal DamageNumberRenderer? DamageNumbers => _damageNumbers;
     internal NoticePipRenderer? NoticePips => _noticePips;
@@ -559,6 +561,7 @@ public class RenderManager : IDisposable
         _leaves = new LeafParticleRenderer(gl);
         _fire = new FireParticleRenderer(gl);
         _bubbles = new BubbleParticleRenderer(gl);
+        _sliceTrails = new SliceTrailRenderer(gl, linearOutput: true);
         _healthbars = new EntityHealthbarRenderer(gl);
 
         blockCubes = new BlockCubeCache(gl);
@@ -1034,6 +1037,7 @@ public class RenderManager : IDisposable
         _leaves?.Dispose();
         _fire?.Dispose();
         _bubbles?.Dispose();
+        _sliceTrails?.Dispose();
         _healthbars?.Dispose();
         _damageNumbers?.Dispose();
         _noticePips?.Dispose();

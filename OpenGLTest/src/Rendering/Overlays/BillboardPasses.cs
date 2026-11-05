@@ -9,8 +9,9 @@ namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
 /// The billboard draws of the entity pass: the five-heart healthbars over the mobs, the floating
-/// damage numbers, the goblins' notice pips and the falling-leaf, fire and bubble particles. Holds
-/// no GL resource and issues no GL call of its own: the six renderers stay owned by
+/// damage numbers, the goblins' notice pips, the falling-leaf, fire and bubble particles and the
+/// blade slice trails. Holds no GL resource and issues no GL call of its own: the seven renderers
+/// stay owned by
 /// <see cref="RenderManager"/> (their creation is not one contiguous run) and, like the frame's
 /// light and the texture units, are read live through it. Render thread only.
 /// </summary>
@@ -101,5 +102,19 @@ internal sealed class BillboardPasses
             Lighting.FogColor, Lighting.FogNear, Lighting.FogFar);
         // BubbleParticleRenderer binds its own sprite to unit 0.
         Units.InvalidateTextureUnits();
+    }
+
+    /// <summary>
+    /// Draws every active blade slice trail (see <see cref="SliceTrailRenderer"/>) as an additive
+    /// ribbon, faded with the world fog distances.
+    /// </summary>
+    internal void RenderSliceTrails(Camera camera, IReadOnlyList<SliceTrail> trails, double now)
+    {
+        if (camera == null || trails.Count == 0 || _owner.SliceTrails == null) return;
+
+        var viewProj = camera.GetViewProjection();
+        for (var i = 0; i < trails.Count; i++)
+            _owner.SliceTrails.Render(trails[i], now, viewProj, camera.RenderEye, Lighting.FogNear, Lighting.FogFar);
+        // The slice trail renderer binds no texture unit, so the unit cache stays valid.
     }
 }

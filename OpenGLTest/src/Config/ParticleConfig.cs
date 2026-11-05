@@ -1,8 +1,10 @@
+using VoxelEngine.Data;
+
 namespace VoxelEngine.Config;
 
 /// <summary>
 /// Particle tuning: falling leaves, mining debris, campfire, lava and torch embers and smoke,
-/// exhaled bubbles and hot-spring steam.
+/// exhaled bubbles, hot-spring steam and the blade slice trail.
 /// </summary>
 public static class ParticleConfig
 {
@@ -115,4 +117,68 @@ public static class ParticleConfig
     public const int SpringSteamMaxPuffsPerFrame = 4;
     public const int SpringSteamCount = 2;
     public const float SpringSteamSpread = 0.35f;
+
+    // Slice trail (SliceTrail, SliceTrailRibbon, SliceTrailGlow, SliceTrailRenderer)
+    // A glowing ribbon behind a swinging blade's tip: samples in the swinging player's owner
+    // frame, a tapered Catmull-Rom ribbon over them, and a procedural glow drawn additively.
+
+    /// <summary>Committed tip samples one trail keeps; the live head rides on top of them.</summary>
+    public const int SliceTrailMaxSamples = 48;
+
+    /// <summary>Seconds a sample lives before it is pruned from the trail's old end.</summary>
+    public const float SliceTrailLifeSeconds = 0.22f;
+
+    /// <summary>Shortest gap between committed samples, so the ring holds the whole life at any frame rate.</summary>
+    public const float SliceTrailMinSampleSeconds = SliceTrailLifeSeconds / (SliceTrailMaxSamples - 2);
+
+    /// <summary>Owner-frame blocks the tip must travel before another sample is committed.</summary>
+    public const float SliceTrailMinStepBlocks = 0.01f;
+
+    /// <summary>Owner-frame tip speed (blocks per second) below which an update counts as still.</summary>
+    public const float SliceTrailStillBlocksPerSecond = 0.25f;
+
+    /// <summary>Tip speed (blocks per second) at which the trail starts to widen from nothing.</summary>
+    public const float SliceTrailMinSpeed = 4f;
+
+    /// <summary>Tip speed (blocks per second) at which the trail reaches its full width.</summary>
+    public const float SliceTrailFullSpeed = 14f;
+
+    /// <summary>Catmull-Rom steps the ribbon builder draws between two samples.</summary>
+    public const int SliceTrailSubdivisions = 4;
+
+    /// <summary>Share of a segment, from its old end, over which the ribbon tapers in from nothing.</summary>
+    public const float SliceTrailTailTaper = 0.35f;
+
+    /// <summary>Share of its width a cross-section loses by the end of its life.</summary>
+    public const float SliceTrailAgeShrink = 0.6f;
+
+    /// <summary>Tip point along the sprite diagonal (-1 the hilt corner, 1 the tip corner).</summary>
+    public const float SliceTrailTipReach = 0.92f;
+
+    /// <summary>Inner edge point along the sprite diagonal (-1 the hilt corner, 1 the tip corner).</summary>
+    public const float SliceTrailInnerReach = 0.15f;
+
+    /// <summary>Across-ribbon position (0 inner edge, 1 tip edge) of the white core band.</summary>
+    public const float SliceTrailCoreCenter = 0.85f;
+
+    /// <summary>Gaussian half-width of the white core band, across the ribbon.</summary>
+    public const float SliceTrailCoreWidth = 0.08f;
+
+    /// <summary>Extra brightness the core band adds over the colored body.</summary>
+    public const float SliceTrailCoreBoost = 1.2f;
+
+    /// <summary>Exponent of the body's brightening from the inner edge toward the tip edge.</summary>
+    public const float SliceTrailGlowPower = 0.7f;
+
+    /// <summary>Lanes across the ribbon whose wispy streaks switch on one after another.</summary>
+    public const int SliceTrailStreakLanes = 7;
+
+    /// <summary>How deeply a streak lane that is still off dims the body (0 never, 1 to black).</summary>
+    public const float SliceTrailStreakDepth = 0.7f;
+
+    /// <summary>Arc length in blocks over which the streak lanes switch on.</summary>
+    public const float SliceTrailStreakSpanBlocks = 1.2f;
+
+    /// <summary>Trail color of a blade item whose JSON names no <c>trail</c> color (sRGB).</summary>
+    public static readonly Rgba SliceTrailDefaultColor = new(220, 220, 255);
 }

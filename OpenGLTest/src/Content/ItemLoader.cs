@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
+using VoxelEngine.Data;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 
@@ -110,6 +111,7 @@ internal static class ItemLoader
                 _ => throw new InvalidOperationException(
                     $"Item '{path}' has unknown attack '{definition.Attack}'; expected punch, slice or sword."),
             };
+            var trailColor = ParseTrail(definition.Trail, attack, path);
 
             var blockDamage = definition.BlockDamage ?? Mining.DefaultBlockDamage;
             if (!float.IsFinite(blockDamage) || blockDamage <= 0f || blockDamage > 1000f)
@@ -141,10 +143,27 @@ internal static class ItemLoader
                 FuelSeconds: fuelSeconds,
                 CrucibleCapacityMl: crucibleCapacity,
                 UseSeconds: useSeconds,
-                TreeName: use?.Tree));
+                TreeName: use?.Tree,
+                TrailColor: trailColor));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ContentRegistry.ItemIds, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    /// The <c>trail</c> object's color, opaque, or null when the item names none. Only a blade
+    /// (a slice or sword attack) leaves a trail, so a trail on a punch item is refused.
+    /// </summary>
+    internal static Rgba? ParseTrail(ItemDefinition.TrailDefinition? trail, AttackPattern attack, string path)
+    {
+        if (trail == null) return null;
+        if (attack == AttackPattern.Punch)
+            throw new InvalidOperationException(
+                $"Item '{path}' has a trail, but only slice and sword items leave one.");
+        if (trail.Color is not { Length: 3 } color || color.Any(c => c is < 0 or > 255))
+            throw new InvalidOperationException(
+                $"Item '{path}' has a trail.color that is not three integers in 0..255.");
+        return new Rgba((byte)color[0], (byte)color[1], (byte)color[2]);
     }
 
     private readonly record struct ParsedSheet(int Cols, int Rows, int Frames, ItemAnimationMode Mode, float Fps);

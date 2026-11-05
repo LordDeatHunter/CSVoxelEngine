@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Data;
 
 namespace VoxelEngine.Items;
 
@@ -46,7 +47,8 @@ public static class ItemFactory
         float FuelSeconds = 0f,
         int CrucibleCapacityMl = 0,
         float UseSeconds = 0f,
-        string? TreeName = null);
+        string? TreeName = null,
+        Rgba? TrailColor = null);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,

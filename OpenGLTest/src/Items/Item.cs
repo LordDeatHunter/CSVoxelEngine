@@ -3,6 +3,7 @@ using System.Numerics;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Models;
+using VoxelEngine.Data;
 using VoxelEngine.Interaction;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
@@ -105,6 +106,14 @@ public abstract class Item
 
     /// <summary>Attack behavior the left-click drives; see <see cref="AttackPattern"/>.</summary>
     public AttackPattern Attack { get; internal init; } = AttackPattern.Punch;
+
+    /// <summary>sRGB color of the slice trail this blade's swings leave, from its JSON <c>trail</c>
+    /// object; null when it names none (only a slice or sword item may).</summary>
+    public Rgba? TrailColor { get; internal init; }
+
+    /// <summary>The slice trail color a swing of this item is drawn with: its own
+    /// <see cref="TrailColor"/>, else <see cref="ParticleConfig.SliceTrailDefaultColor"/>.</summary>
+    public Rgba TrailColorOrDefault => TrailColor ?? ParticleConfig.SliceTrailDefaultColor;
 
     /// <summary>Damage one left-click hit removes from a block's hardness; the bare-hand
     /// baseline by default.</summary>
@@ -248,6 +257,7 @@ public abstract class Item
         ToolPower = spec.ToolPower;
         HitDelayMs = spec.HitDelayMs;
         Attack = spec.Attack;
+        TrailColor = spec.TrailColor;
         BlockDamage = spec.BlockDamage;
         EntityDamage = spec.EntityDamage;
         ThrowDamage = spec.ThrowDamage;

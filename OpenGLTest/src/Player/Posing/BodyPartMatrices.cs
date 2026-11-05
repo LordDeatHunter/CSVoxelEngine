@@ -31,7 +31,7 @@ internal sealed class BodyPartMatrices
         var mods = _model.Secondary.ComputeMods();
         // The blade swing in progress (a slice or a sword swing), or every term zero
         var blade = _model.Blade;
-        var bodyYawDeg = _model.BodyYawLags && _model.LookKnown ? _model.TrailingBodyYaw : yawDeg;
+        var bodyYawDeg = _model.DrawnBodyYaw(yawDeg);
         var yawRad = -(bodyYawDeg + 90f) * MathF.PI / 180f;
         // Swimming tips the body forward about the hips, a death lays it over about the feet.
         var pelvisY = rig.Parts.TryGetValue("ThighL", out var thigh) ? thigh.Pivot.Y : PelvisFallback;
@@ -149,7 +149,7 @@ internal sealed class BodyPartMatrices
     {
         var forearm = GetPartMatrix("ForearmR", eyePos, yawDeg, pitchDeg, backOffset);
         var fist = Vector3.Transform(new Vector3(0f, _model.HandDepth(), 0f), forearm);
-        var yawRad = -((_model.BodyYawLags && _model.LookKnown ? _model.TrailingBodyYaw : yawDeg) + 90f) * MathF.PI / 180f;
+        var yawRad = -(_model.DrawnBodyYaw(yawDeg) + 90f) * MathF.PI / 180f;
         var pitchRad = MathUtils.ToRadians(pitchDeg);
         // The jab is thrown along the aim rather than the body, so the tool takes the look pitch
         // and the jab's swing for the length of the swing, then drops both as the arm settles.

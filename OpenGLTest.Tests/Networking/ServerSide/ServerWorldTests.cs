@@ -70,6 +70,27 @@ public sealed class ServerWorldTests : IDisposable
     }
 
     [Fact]
+    public void AServerModeWorldFeedsNoSliceTrail()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, serverMode: true);
+        var blade = ContentRegistry.RequireItem("obsidian_blade").Id;
+        _world.Inventory.Add(blade, 1);
+        Assert.True(_world.Inventory.PickBlock(blade));
+
+        // The server camera holds a blade and swings it, yet a headless server draws nothing
+        _world.Player.StartSlice(1);
+        var swung = false;
+        for (var i = 0; i < 20; i++)
+        {
+            _world.Update(1.0 / 60.0, null);
+            swung |= _world.Player.IsSlicing;
+            Assert.Empty(_world.SliceTrails.Active);
+        }
+        Assert.True(swung);
+    }
+
+    [Fact]
     public void APlacementNeverBuriesAConnectedPlayerButTheServerCameraIsNobody()
     {
         WorldSeed.Apply(WorldSeed.Default);

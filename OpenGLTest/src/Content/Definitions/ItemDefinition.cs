@@ -44,6 +44,19 @@ public sealed class ItemDefinition
     public string? Attack { get; set; }
 
     /// <summary>
+    /// Optional slice trail look: the glowing arc a swing of this blade leaves behind. Only legal
+    /// on a <c>slice</c> or <c>sword</c> item; a blade without it uses the default trail color.
+    /// </summary>
+    public TrailDefinition? Trail { get; set; }
+
+    /// <summary>The <c>trail</c> object: the color of the arc a blade swing leaves.</summary>
+    public sealed class TrailDefinition
+    {
+        /// <summary>sRGB <c>[r, g, b]</c>, 0..255 each.</summary>
+        public int[]? Color { get; set; }
+    }
+
+    /// <summary>
     /// Optional tool block: writing it marks the item as a mining tool and carries the numbers
     /// the mining gate reads. <c>power</c> is the item's <em>tier</em> — the number a block's
     /// <c>tools</c> requirement compares against — not its damage, which is

@@ -43,6 +43,12 @@ public static class ItemRegistry
     public static Item? FindByAction(ItemUseAction action) =>
         _byId.Values.FirstOrDefault(i => i is not BlockItem && i.UseAction == action);
 
+    /// <summary>The lowest-id pure item whose left-click drives this attack pattern, or null when
+    /// none does. Deterministic by construction (dictionary order is no guarantee): a client draws
+    /// this blade, and its slice trail, for a remote player whose held item is not on the wire.</summary>
+    public static Item? FindByAttack(AttackPattern attack) =>
+        _byId.Values.Where(i => i is not BlockItem && i.Attack == attack).MinBy(i => i.Id);
+
     /// <summary>Pure item with this display name, or null. Used for spawn stock (compass).</summary>
     public static Item? FindByName(string name) =>
         _byId.Values.FirstOrDefault(i => i is not BlockItem
