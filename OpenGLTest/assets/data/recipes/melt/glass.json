@@ -1,0 +1,7 @@
+{
+  // Mass conservation: a glass block returns the 100 ml that recipes/cast/glass.json poured
+  // into the casting basin.
+  "input": "block/glass",
+  "fluid": "glass",
+  "amountMl": 100
+}

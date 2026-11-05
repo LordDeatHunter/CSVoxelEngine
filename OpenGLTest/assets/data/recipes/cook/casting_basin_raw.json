@@ -1,0 +1,7 @@
+{
+  // A raw basin baked on a lit campfire hardens into the fired one, like the molds.
+  "input": "block/casting_basin_raw",
+  "result": "block/casting_basin",
+  "count": 1,
+  "cookSeconds": 12
+}

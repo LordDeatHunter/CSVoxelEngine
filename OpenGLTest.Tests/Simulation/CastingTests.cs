@@ -109,6 +109,63 @@ public sealed class CastingTests
         Assert.True(CastingRenderer.LiquidHeight(1f) < CastingRenderer.PocketTopY);
     }
 
+
+    /// <summary>The basin's pocket constants follow its baked model, and a mold keeps its own.</summary>
+    [Fact]
+    public void BasinPocketMatchesItsBakedModelAndBlockCastsUseIt()
+    {
+        var pocket = CastingRenderer.Basin;
+        var quads = ContentRegistry.RequireBlock("casting_basin").BakedModel!.Quads
+            .Where(q => q.Face == 4)
+            .ToArray();
+        var levels = quads.Select(q => MathF.Round(q.Positions.Max(p => p.Y), 4)).Distinct().OrderBy(y => y).ToArray();
+        Assert.Equal(new[] { MathF.Round(pocket.FloorY, 4), MathF.Round(pocket.TopY, 4) }, levels);
+
+        foreach (var quad in quads.Where(q => MathF.Abs(q.Positions.Max(p => p.Y) - pocket.FloorY) < 1e-4f))
+            Assert.All(quad.Positions, p =>
+            {
+                Assert.InRange(p.X, pocket.Inset, 1f - pocket.Inset);
+                Assert.InRange(p.Z, pocket.Inset, 1f - pocket.Inset);
+            });
+
+        // Its hitbox reaches the rim top, and a block result stays inside the bowl
+        Assert.Equal(pocket.TopY, ContentRegistry.RequireBlock("casting_basin").Hitboxes![0].Max.Y, precision: 4);
+        Assert.True(pocket.ResultCubeY - pocket.ResultCubeSize / 2f >= pocket.FloorY - 1e-4f);
+        Assert.True(pocket.ResultCubeY + pocket.ResultCubeSize / 2f <= pocket.TopY + 1e-4f);
+        Assert.True(pocket.ResultCubeSize <= pocket.Width);
+        Assert.True(pocket.LiquidHeightAt(1f) < pocket.TopY && pocket.LiquidHeightAt(0f) > pocket.FloorY);
+
+        Assert.Equal(CastingRenderer.Basin, CastingRenderer.PocketFor(resultIsBlock: true));
+        Assert.Equal(CastingRenderer.Mold, CastingRenderer.PocketFor(resultIsBlock: false));
+    }
+
+    [Fact]
+    public void CastingMoltenGlassInABasinYieldsExactlyOneGlassBlockAndConservesMass()
+    {
+        var glass = ContentRegistry.MoltenMaterialByName("glass")!.Id;
+        var basin = ContentRegistry.RequireBlock("casting_basin").Id;
+        var recipe = ContentRegistry.CastRecipeFor(basin, glass)!;
+        Assert.NotNull(recipe);
+
+        var inventory = new Inventory();
+        var start = recipe.AmountMl * 2;
+        var stack = CrucibleInventory.Add(inventory, Crucible.Id, new CrucibleComponent(glass, start, 0))!;
+        var chunks = MoldWorld(basin);
+        var casting = new CastingManager();
+        var drops = new DropManager();
+
+        Assert.True(casting.TryStartPour(Cell, basin, stack));
+        casting.Update(recipe.AmountMl / CastingManager.PourMlPerSecond + 1f, chunks, drops, inventory,
+            stack.InstanceId, Standing, Reach);
+        Assert.Equal(start - recipe.AmountMl, stack.Get<CrucibleComponent>().MoltenMl);
+        casting.Update(recipe.CoolSeconds + 0.01f, chunks, drops, inventory, stack.InstanceId, Standing, Reach);
+
+        Assert.Equal(Enumerable.Repeat(recipe.ResultId, recipe.ResultCount), casting.Collect(Cell));
+
+        // Molten copper has no basin recipe: the pour is refused
+        var copperStack = CrucibleInventory.Add(inventory, Crucible.Id, new CrucibleComponent(Copper, 100, 0))!;
+        Assert.False(casting.TryStartPour(Cell, basin, copperStack));
+    }
     [Fact]
     public void PourDrainsTheSelectedCrucibleAtTheDeclaredRateAndConservesMass()
     {

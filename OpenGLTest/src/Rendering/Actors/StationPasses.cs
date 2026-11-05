@@ -310,20 +310,21 @@ internal sealed class StationPasses : IDisposable
 
         foreach (var (cell, materialId, fill01, cool01, done, resultId) in castings.CastingView())
         {
+            var resultIsItem = ItemRegistry.IsItem(resultId);
+            var pocket = CastingRenderer.PocketFor(!resultIsItem);
             if (done || cool01 > 0f)
             {
-                var resultIsItem = ItemRegistry.IsItem(resultId);
                 var mesh = BindStationMesh(resultId, ref atlasBound);
                 if (mesh == null) continue;
 
                 // The cast lies face-up in the pocket, filling it; a block result is a cube
-                // fitted to the pocket's depth
+                // fitted to its basin
                 var sprite = resultIsItem
                     ? Matrix4x4.CreateScale(CastingRenderer.ResultSize)
                       * SpritePose.LyingFaceUp(0f)
                       * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, CastingRenderer.ResultY, 0.5f))
-                    : Matrix4x4.CreateScale(CastingRenderer.ResultCubeSize)
-                      * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, CastingRenderer.ResultCubeY, 0.5f));
+                    : Matrix4x4.CreateScale(pocket.ResultCubeSize)
+                      * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f, pocket.ResultCubeY, 0.5f));
 
                 _owner.SetDrawUniforms(sprite, sprite * viewProj, done ? 1f : CastingRenderer.ResultAlpha(cool01),
                     _owner.LightAt(cell + new Vector3(0.5f)));
@@ -334,9 +335,9 @@ internal sealed class StationPasses : IDisposable
             if (ContentRegistry.MoltenMaterialById(materialId) is not { } material) continue;
 
             BindAtlas(ref atlasBound);
-            var liquid = Matrix4x4.CreateScale(CastingRenderer.PocketWidth)
+            var liquid = Matrix4x4.CreateScale(pocket.Width)
                         * Matrix4x4.CreateTranslation(cell + new Vector3(0.5f,
-                            CastingRenderer.LiquidHeight(fill01), 0.5f));
+                            pocket.LiquidHeightAt(fill01), 0.5f));
             // Self-lit, like the kiln's pool: molten metal is its own light source
             _owner.SetDrawUniforms(liquid, liquid * viewProj, CastingRenderer.LiquidAlpha(cool01), EntityLightSample.SelfLit);
             MoltenQuad(material).Render();

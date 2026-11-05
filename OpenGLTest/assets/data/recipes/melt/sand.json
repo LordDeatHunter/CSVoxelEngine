@@ -1,0 +1,8 @@
+{
+  // One sand block melts into one block's worth of molten glass: exactly what
+  // recipes/cast/glass.json pours back into a basin, and what a glass block melts back into
+  // (recipes/melt/glass.json). 100 ml is one kiln melt chunk.
+  "input": "block/sand",
+  "fluid": "glass",
+  "amountMl": 100
+}

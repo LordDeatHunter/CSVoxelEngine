@@ -1,5 +1,6 @@
 using System.Linq;
 using VoxelEngine.Graphics;
+using VoxelEngine.Items;
 using Xunit;
 
 namespace VoxelEngine.Tests.Content;
@@ -131,5 +132,29 @@ public sealed class MetalworksRecipeTests
         Assert.Equal(
             Enumerable.Range(1, materials.Count).Select(i => (byte)i).ToArray(),
             materials.Select(m => m.Id).ToArray());
+    }
+
+    [Fact]
+    public void SandAndGlassMeltIntoMoltenGlassAndTheBasinCastsItBackIntoABlock()
+    {
+        var glass = ContentRegistry.MoltenMaterialByName("glass");
+        Assert.NotNull(glass);
+
+        foreach (var input in new[] { Block("sand"), Block("glass") })
+        {
+            var melt = ContentRegistry.MeltRecipeForInput(input);
+            Assert.NotNull(melt);
+            Assert.Equal(glass.Id, melt.MaterialId);
+        }
+
+        // The basin is the mold that turns molten material into a block
+        var cast = ContentRegistry.CastRecipeFor(Block("casting_basin"), glass.Id);
+        Assert.NotNull(cast);
+        Assert.False(ItemRegistry.IsItem(cast.ResultId));
+        Assert.True(ContentRegistry.IsCastMold(Block("casting_basin")));
+
+        // Raw clay is not a mold, and copper has no basin recipe
+        Assert.False(ContentRegistry.IsCastMold(Block("casting_basin_raw")));
+        Assert.Null(ContentRegistry.CastRecipeFor(Block("casting_basin"), ContentRegistry.MoltenMaterialByName("copper")!.Id));
     }
 }
