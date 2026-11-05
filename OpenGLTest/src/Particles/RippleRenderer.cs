@@ -11,8 +11,8 @@ namespace VoxelEngine.Particles;
 /// Draws every live <see cref="WaterRipple"/> as a flat quad lying on the water top, in one dynamic
 /// draw: the bubble billboards' vertex stage and a procedural ring fragment
 /// (<c>ripple-fragment.glsl</c>), blended, depth-tested and depth-write-free. The quad's tint carries
-/// the ring: r = the leading ring's radius and g = its width, both as shares of the quad's half-size,
-/// a = opacity. Main thread only.
+/// the wave train: r = the leading edge's radius, g = the wavelength and b = a per-ripple seed (all
+/// but the seed as shares of the quad's half-size), a = opacity. Main thread only.
 /// </summary>
 public sealed class RippleRenderer : IDisposable
 {
@@ -37,7 +37,7 @@ public sealed class RippleRenderer : IDisposable
             FileUtils.ReadFile("assets/shaders/bubble-particle-vertex.glsl"),
             FileUtils.ReadFile("assets/shaders/ripple-fragment.glsl"));
         _shader.Use();
-        _shader.SetUniform("uTrailShare", ParticleConfig.RippleTrailShare);
+        _shader.SetUniform("uTrainWaves", ParticleConfig.RippleTrainWaves);
 
         _verts = new Vertex[_max * 4];
 
@@ -77,21 +77,20 @@ public sealed class RippleRenderer : IDisposable
         var count = Math.Min(ripples.Count, _max);
         if (count == 0) return;
 
-        // The quad reaches the ring's final radius plus a ring width of soft edge on each side
-        var width = ParticleConfig.RippleRingWidth;
-        var widthByte = (byte)(width * 255f + 0.5f);
         for (var slot = 0; slot < count; slot++)
         {
             var r = ripples[slot];
-            var half = r.MaxRadius / (1f - 2f * width);
+            var half = r.MaxRadius * ParticleConfig.RippleQuadMargin;
             var radiusByte = (byte)(MathUtils.Clamp01(r.Radius / half) * 255f + 0.5f);
+            var waveByte = (byte)(MathUtils.Clamp01(ParticleConfig.RippleWavelength / half) * 255f + 0.5f);
+            var seedByte = (byte)(MathUtils.Clamp01(r.Seed) * 255f + 0.5f);
             var alpha = (byte)(MathUtils.Clamp01(r.Opacity * ParticleConfig.RippleAlpha) * 255f + 0.5f);
 
             for (var c = 0; c < 4; c++)
             {
                 var (sx, sz) = CornerSigns[c];
                 _verts[slot * 4 + c] = new Vertex(r.Position + new Vector3(sx * half, 0f, sz * half),
-                    radiusByte, widthByte, 0, alpha, new Vector2(sx * 0.5f + 0.5f, sz * 0.5f + 0.5f),
+                    radiusByte, waveByte, seedByte, alpha, new Vector2(sx * 0.5f + 0.5f, sz * 0.5f + 0.5f),
                     0f, 0f, Vector3.UnitY);
             }
         }

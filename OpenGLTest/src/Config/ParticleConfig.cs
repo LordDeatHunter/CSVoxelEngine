@@ -118,13 +118,15 @@ public static class ParticleConfig
     public const float RippleMaxRadius = 2.4f;
     public const float RippleMinSeconds = 0.9f;
     public const float RippleMaxSeconds = 1.7f;
-    /// <summary>Ring thickness as a share of the quad's half-size (the fragment's soft edge width).</summary>
-    public const float RippleRingWidth = 0.09f;
-    public const float RippleAlpha = 0.55f;
-    /// <summary>Lift over the water top, so the ring never z-fights the surface it lies on.</summary>
+    public const float RippleAlpha = 0.9f;
+    /// <summary>Lift over the water top, so the wave train never z-fights the surface it lies on.</summary>
     public const float RippleLift = 0.03f;
-    /// <summary>The second, trailing ring: its radius as a share of the first's.</summary>
-    public const float RippleTrailShare = 0.62f;
+    /// <summary>Distance in blocks between two crests of the train behind the leading edge.</summary>
+    public const float RippleWavelength = 0.32f;
+    /// <summary>How many wavelengths of train trail the leading edge before it dies away.</summary>
+    public const float RippleTrainWaves = 3.2f;
+    /// <summary>The quad reaches this far past the final radius, so the last crest is never clipped.</summary>
+    public const float RippleQuadMargin = 1.12f;
 
     // Steam: puffs a second over every vent in range, the reach it gathers within and the cap
     public const float SpringSteamPerSecond = 0.6f;

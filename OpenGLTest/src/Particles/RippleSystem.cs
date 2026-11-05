@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 
@@ -22,7 +23,7 @@ public sealed class RippleSystem
         if (_ripples.Count >= ParticleConfig.RippleMax)
             _ripples.RemoveAt(0);
         _ripples.Add(new WaterRipple(waterTop + new Vector3(0f, ParticleConfig.RippleLift, 0f),
-            MathUtils.Clamp01(strength), sizeScale));
+            MathUtils.Clamp01(strength), sizeScale, Random.Shared.NextSingle()));
     }
 
     public void Update(float deltaTime)

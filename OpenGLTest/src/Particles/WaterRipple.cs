@@ -22,9 +22,13 @@ public sealed class WaterRipple
     /// <summary>Radius in blocks the ring reaches at the end of its life.</summary>
     public float MaxRadius { get; }
 
-    public WaterRipple(Vector3 position, float strength, float sizeScale = 1f)
+    /// <summary>0..1, fixed for life: turns the ring's slight irregularity so no two look alike.</summary>
+    public float Seed { get; }
+
+    public WaterRipple(Vector3 position, float strength, float sizeScale = 1f, float seed = 0f)
     {
         Position = position;
+        Seed = seed;
         Life = MathUtils.Lerp(ParticleConfig.RippleMinSeconds, ParticleConfig.RippleMaxSeconds, strength);
         MaxRadius = MathUtils.Lerp(ParticleConfig.RippleMinRadius, ParticleConfig.RippleMaxRadius, strength)
                     * sizeScale;
