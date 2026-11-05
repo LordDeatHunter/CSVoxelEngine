@@ -12,7 +12,30 @@ and 2026-11-05). Last updated 2026-11-05.
 
 ## In progress
 
-Nothing.
+- [ ] **Release unused `ColumnCache` values after the last quiesced World** (feature branch; PR pending).
+  - **Files**: `WorldSeed.EndWorld`, `ColumnCache.Reset`; no cache-size, hot-read or GC change. The
+    existing generation/LOD joins and mesh drain gate the final owner. Direct cache readers and
+    world lifecycle transitions retain the existing serialized-caller contract.
+  - **Measured result**: on 2026-11-05, exact base `996fdf2` versus candidate `b8290a0`, Release,
+    SDK 10.0.114 / .NET 10.0.14 running net9.0 with `DOTNET_ROLL_FORWARD=LatestMajor`. Three
+    fresh-process interleaved pairs of a headless client-World fixture each cached 8192 identical
+    deterministic columns. After final disposal and a test-only full collection, weakly referenced
+    `ColumnData` values still alive were 8192/8192 on base versus 0/8192 on candidate in every
+    pair. Normalizing post-dispose managed live bytes to each process's before-world value gives
+    51,443,688 B retained growth on base versus 391,480 B on candidate: 51,052,208 B
+    (48.687 MiB) difference for this fixture. The same-seed all-field digest matched.
+  - **Costs and limits**: populated disposal main-thread allocation rose from 136 to 157,504 B;
+    paired same-seed reopen/repopulate time rose by 220.111, 196.313 and 25.630 ms (median
+    196.313 ms). A warm-empty control retained the same 110,808 B growth on both arms; a
+    client-first control (no explicit prior seed reset or cache read) retained 157,520 B more
+    and allocated 326,536 B versus 11,648 B on disposal. First-call/JIT costs are included.
+    This is a forced-GC headless client-World measurement, not a normal-menu, RSS or FPS result; no
+    cause for the reopen-time differences was established. The identical new regression fails
+    on base before the next seed reset and passes on candidate; the candidate's full Release
+    suite passed 2793/2793 and solution build had zero warnings/errors. Failed worker/drain and
+    constructor gates were reviewed in source, not fault-injected. Raw methods and all 18 runs:
+    Nexus task `89f63d82`, archive `tf5276bfa796fa465d`, SHA-256
+    `15c467da9f8af13291e86b8bf31e0b0734f60a2a1efc1bb14c2586231133db72`.
 
 ## Open
 
