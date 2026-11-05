@@ -180,7 +180,7 @@ public sealed class MeshSchedulingTests
     }
 
     [Fact]
-    public void CompletedPreEditMeshCannotReplaceSynchronousEditWithoutRetry()
+    public void CompletedPreEditMeshDoesNotOverwriteSynchronousEdit()
     {
         var centerPosition = MeshTestWorld.HighAbove;
         var (manager, center) = MeshTestWorld.WalledArea(centerPosition);
@@ -190,6 +190,7 @@ public sealed class MeshSchedulingTests
         var scheduler = manager.MeshSchedulerForTests;
         var beforeApplyVertexCounts = new List<int>();
         var asyncBuilds = 0;
+        var generatedOldVertexCount = 0;
         scheduler.MeshBeforeApplyForTests = (chunk, meshData) =>
         {
             if (ReferenceEquals(chunk, center))
@@ -198,6 +199,10 @@ public sealed class MeshSchedulingTests
         scheduler.BuildAcceptedForTests = chunk =>
         {
             if (ReferenceEquals(chunk, center)) Interlocked.Increment(ref asyncBuilds);
+        };
+        scheduler.MeshGeneratedForTests = (chunk, meshData) =>
+        {
+            if (ReferenceEquals(chunk, center)) generatedOldVertexCount = meshData.Vertices.Count;
         };
 
         manager.MarkDirty(centerPosition);
@@ -208,6 +213,7 @@ public sealed class MeshSchedulingTests
         // outputs queued. No Update/consumer pass has run between the old snapshot and the edit.
         Assert.Equal(0, manager.GeneratingMeshCount);
         Assert.Equal(1, scheduler.CompletedMeshCount);
+        Assert.True(generatedOldVertexCount > 0, "old snapshot did not contain the placed stone");
 
         var editedCell = centerPosition * Chunk.Size + new Vector3(8);
         Assert.True(center.RemoveBlockAt(editedCell, manager));
@@ -222,15 +228,20 @@ public sealed class MeshSchedulingTests
 
         // Reach quiescence: the old result must be rejected or followed by a current rebuild.
         // On the frozen base no retry remains, so the final result is the old one-block mesh.
+        _output.WriteLine("completed-before-edit: generatedOldVertices={0}; asyncBuilds={1}; preApplyVertexCounts=[{2}]; completed={3}; generating={4}; pending={5}; runners={6}",
+            generatedOldVertexCount, Volatile.Read(ref asyncBuilds), string.Join(",", beforeApplyVertexCounts),
+            scheduler.CompletedMeshCount, manager.GeneratingMeshCount, manager.PendingMeshWorkCount,
+            manager.ActiveMeshRunnerCount);
         Assert.NotEmpty(beforeApplyVertexCounts);
-        Assert.Equal(0, beforeApplyVertexCounts[^1]);
         Assert.Equal(0, scheduler.CompletedMeshCount);
-        _output.WriteLine("completed-before-edit: asyncBuilds={0}; preApplyVertexCounts=[{1}]",
-            Volatile.Read(ref asyncBuilds), string.Join(",", beforeApplyVertexCounts));
+        Assert.Equal(0, manager.GeneratingMeshCount);
+        Assert.Equal(0, manager.PendingMeshWorkCount);
+        Assert.Equal(0, manager.ActiveMeshRunnerCount);
+        Assert.Equal(0, beforeApplyVertexCounts[^1]);
     }
 
     [Fact]
-    public void EditWhileOldBuildIsInFlightLeavesRetryForLatestMesh()
+    public void EditDuringInFlightBuildPreservesEditedMesh()
     {
         var centerPosition = MeshTestWorld.HighAbove;
         var (manager, center) = MeshTestWorld.WalledArea(centerPosition);
@@ -241,6 +252,7 @@ public sealed class MeshSchedulingTests
         var beforeApplyVertexCounts = new List<int>();
         var asyncBuilds = 0;
         var generatedVertexCount = 0;
+        var hookTimedOut = 0;
         using var generated = new ManualResetEventSlim();
         using var release = new ManualResetEventSlim();
         scheduler.MeshBeforeApplyForTests = (chunk, meshData) =>
@@ -258,7 +270,10 @@ public sealed class MeshSchedulingTests
             generatedVertexCount = meshData.Vertices.Count;
             generated.Set();
             if (!release.Wait(TimeSpan.FromSeconds(10)))
+            {
+                Interlocked.Exchange(ref hookTimedOut, 1);
                 throw new TimeoutException("mesh test release barrier was not opened");
+            }
         };
 
         try
@@ -274,6 +289,7 @@ public sealed class MeshSchedulingTests
 
             release.Set();
             Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)), "old build did not drain");
+            Assert.Equal(0, Volatile.Read(ref hookTimedOut));
             scheduler.ApplyCompletedMeshes([centerPosition]);
 
             scheduler.ProcessDirtyChunks([centerPosition]);
@@ -296,7 +312,7 @@ public sealed class MeshSchedulingTests
     }
 
     [Fact]
-    public void EditWithNoOldOutputDoesNotCreateAsyncMeshBuild()
+    public void EditWithNoOldOutputPreservesSynchronousMesh()
     {
         var centerPosition = MeshTestWorld.HighAbove;
         var (manager, center) = MeshTestWorld.WalledArea(centerPosition);
