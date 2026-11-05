@@ -44,10 +44,12 @@ bold title, then **Files**, **Win** (measured or estimated), **Verify** and **In
     Suspects: `MeshBufferPool` misses, LOH-sized LOD lists.
   - **Win**: estimated; fewer gen0 pauses during streaming. **Verify**: the `gc` token pair.
     **Invariant**: no new per-frame allocation; pools hold no edit state.
-  - **Scoped result (PR5)**: lazy translucent rents preserve warmed wet buffers across a full dry mesh build.
-    The prior-base fixture measured dry 44,344→8,456 B/build (80.9% less) with matching geometry/light
-    hashes; wet stayed 4,296 B/build. Current-master remeasurement is pending; these fixture bytes do not
-    establish a whole-game allocation or FPS gain.
+  - **Scoped result (PR5 refresh, master `996fdf2`)**: eager translucent rents made a dry full mesh
+    consume and discard the returned wet pair; lazy rents keep it available. The matched seed-71234
+    fixture measured dry 44,344→8,456 B/build (−35,888 B, 80.9%) with identical geometry/light/fluid
+    metadata hashes; mixed-wet stayed 4,296 B/build. The wet→dry→wet regression fails on base and passes
+    on the refresh. This fixture result does not establish a whole-game allocation or FPS gain.
+    The catch-up's only conflict was deleted `PERF_TODO.md`; this is the scoped note in its current home.
 
 - [ ] **`F12` Shared per-frame chunk walks** (CPU, low priority while GPU-bound).
   - **Files**: `TerrainPasses.RenderWorld`/`CullWater`, `ShadowPass` (two cascades), `ReflectionPass`:
