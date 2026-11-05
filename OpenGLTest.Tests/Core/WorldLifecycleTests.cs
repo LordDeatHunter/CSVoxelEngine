@@ -199,16 +199,17 @@ public sealed class WorldLifecycleTests : IDisposable
     [Fact]
     public void FinalQuietWorldReleasesColumnValuesWhileAnotherWorldKeepsThem()
     {
-        // Client Worlds also own the process seed even though they have no generation workers.
-        var client = NewWorld(null, clientMode: true);
-        var generated = NewWorld(null);
+        // Client Worlds also own the process seed. Neither generates columns in the background,
+        // so the far-away probe cannot be evicted during this ownership check.
+        var first = NewWorld(null, clientMode: true);
+        var last = NewWorld(null, clientMode: true);
         var (weak, snapshot) = CacheProbe();
 
-        Assert.True(client.SaveAndDispose());
+        Assert.True(first.SaveAndDispose());
         Assert.True(WorldSeed.WorldIsLive);
         AssertProbeStillCached(weak);
 
-        Assert.True(generated.SaveAndDispose());
+        Assert.True(last.SaveAndDispose());
         Assert.False(WorldSeed.WorldIsLive);
         GC.Collect(); // Test-only root check; production does not force a collection.
         GC.WaitForPendingFinalizers();
@@ -217,12 +218,12 @@ public sealed class WorldLifecycleTests : IDisposable
 
         var recomputed = ColumnCache.Get(CacheProbeX, CacheProbeZ);
         snapshot.AssertMatches(recomputed);
-        Assert.True(generated.SaveAndDispose()); // Repeated disposal must not clear a new entry.
+        Assert.True(last.SaveAndDispose()); // Repeated disposal must not clear a new entry.
         Assert.Same(recomputed, ColumnCache.Get(CacheProbeX, CacheProbeZ));
 
         // A menu-launched next world applies even the same seed before construction.
         WorldSeed.Apply(WorldSeed.Value);
-        var reopened = NewWorld(null);
+        var reopened = NewWorld(null, clientMode: true);
         snapshot.AssertMatches(ColumnCache.Get(CacheProbeX, CacheProbeZ));
         Assert.True(reopened.SaveAndDispose());
     }
