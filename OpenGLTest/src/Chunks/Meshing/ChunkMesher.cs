@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
+using VoxelEngine.Rendering.Geometry;
 using static VoxelEngine.Chunks.Chunk;
 using static VoxelEngine.Chunks.Meshing.ChunkLighting;
 
@@ -45,7 +46,8 @@ internal static class ChunkMesher
     internal static void EmitGreedyFaces(MeshScratch scratch, byte[] padded, byte[] paddedState,
         int chunkBaseY, byte[] sunLight, byte[] blockLight,
         List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        List<Vertex> tVertices, List<ushort> tIndices, ref ushort tIndexOffset, in BiomeTintFields fields)
+        MeshBufferPool pool, ref List<Vertex>? tVertices, ref List<ushort>? tIndices,
+        ref ushort tIndexOffset, in BiomeTintFields fields)
     {
         var greedyCols = scratch.GreedyColumns;
         var occCols = scratch.OccluderColumns;
@@ -217,7 +219,11 @@ internal static class ChunkMesher
                     var type = BlockType.ById[key & 0xFF]!;
                     var rows = planeRows.AsSpan(plane * Size, Size);
                     if (type.Translucent)
+                    {
+                        tVertices ??= pool.RentTranslucentVertices();
+                        tIndices ??= pool.RentTranslucentIndices();
                         EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, tint, type, rows, tVertices, tIndices, ref tIndexOffset, in fields);
+                    }
                     else
                         EmitGreedyRun(f, axis, depth, chunkBaseY, key, light, tint, type, rows, vertices, indices, ref indexOffset, in fields);
                 }

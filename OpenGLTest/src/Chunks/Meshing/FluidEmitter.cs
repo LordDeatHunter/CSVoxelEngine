@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Numerics;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Simulation.Fluids;
 using static VoxelEngine.Chunks.Chunk;
 using static VoxelEngine.Chunks.Meshing.ChunkLighting;
@@ -24,7 +25,8 @@ internal static class FluidEmitter
     /// no crack. No face is ever emitted between two fluid cells, so a body of water reads as
     /// a single skin instead of a stack of blended cubes.
     /// </summary>
-    internal static void EmitFluid(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+    internal static void EmitFluid(MeshBufferPool pool, ref List<Vertex>? vertices, ref List<ushort>? indices,
+        ref ushort indexOffset,
         byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
         int x, int y, int z, BlockType type, Vector3 basePos)
     {
@@ -80,7 +82,10 @@ internal static class FluidEmitter
 
             // Meshes are indexed with ushort (mirrors LodFaceEmitter.AddQuad): stop emitting
             // instead of wrapping the offset if a chunk somehow runs past the limit
-            if (vertices.Count > ushort.MaxValue - 3) return;
+            if (vertices is { Count: > ushort.MaxValue - 3 }) return;
+
+            vertices ??= pool.RentTranslucentVertices();
+            indices ??= pool.RentTranslucentIndices();
 
             if (!flowComputed)
             {
