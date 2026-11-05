@@ -133,6 +133,10 @@ internal sealed class AmbientEffects
         Camera.AddShake(ShakeFalloff.Trauma(JuiceConfig.BlastShakeStrength, TntManager.BlastRadius,
             JuiceConfig.BlastShakeRangeBlocks, Vector3.Distance(Camera.Position, center)));
 
+    /// <summary>The live water ripple rings every splash crossing starts (<see cref="UpdateSplashes"/>),
+    /// drawn by <see cref="RippleRenderer"/>.</summary>
+    internal RippleSystem Ripples { get; } = new();
+
     // The local player's water-splash memory (its swim state, Camera.IsInWater)
     private readonly WaterSplashTracker _playerSplash = new();
 
@@ -147,33 +151,34 @@ internal sealed class AmbientEffects
     {
         if (_serverMode)
             return;
+        Ripples.Update(deltaTime);
         WaterSplash.Track(_playerSplash, Camera.Position - new Vector3(0f, Camera.EyeHeight, 0f), deltaTime, 1f,
-            _chunkManager, _debris, inWater: Camera.IsInWater);
+            _chunkManager, _debris, inWater: Camera.IsInWater, ripples: Ripples);
         foreach (var mob in _mobs)
         {
             WaterSplash.Track(mob.Splash, mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f), deltaTime,
-                mob.BodyHalfExtent / PlayerPhysics.PlayerRadius, _chunkManager, _debris);
+                mob.BodyHalfExtent / PlayerPhysics.PlayerRadius, _chunkManager, _debris, ripples: Ripples);
         }
         // Index loops over the read-only lists, so a frame allocates no enumerator
         var drops = _dropManager.Drops;
         foreach (var itemDrop in drops)
             if (!itemDrop.IsAttracted)
                 WaterSplash.Track(itemDrop.Splash, itemDrop.Position - new Vector3(0f, ItemDrop.Size * 0.5f, 0f),
-                    deltaTime, JuiceConfig.WaterSplashSmallScale, _chunkManager, _debris);
+                    deltaTime, JuiceConfig.WaterSplashSmallScale, _chunkManager, _debris, ripples: Ripples);
 
         foreach (var t in _projectiles)
             WaterSplash.Track(t.Splash, t.Position, deltaTime,
-                JuiceConfig.WaterSplashSmallScale, _chunkManager, _debris);
+                JuiceConfig.WaterSplashSmallScale, _chunkManager, _debris, ripples: Ripples);
 
         var falling = _falling.Falling;
         foreach (var fallingBlock in falling)
             WaterSplash.Track(fallingBlock.Splash, fallingBlock.Position - new Vector3(0f, FallingBlock.HalfExtent, 0f),
-                deltaTime, JuiceConfig.WaterSplashCubeScale, _chunkManager, _debris);
+                deltaTime, JuiceConfig.WaterSplashCubeScale, _chunkManager, _debris, ripples: Ripples);
 
         var primed = _tntManager.Primed;
         foreach (var primedTnt in primed)
             WaterSplash.Track(primedTnt.Splash, primedTnt.Position - new Vector3(0f, VoxelEngine.Entities.PrimedTnt.HalfExtent, 0f),
-                deltaTime, JuiceConfig.WaterSplashCubeScale, _chunkManager, _debris);
+                deltaTime, JuiceConfig.WaterSplashCubeScale, _chunkManager, _debris, ripples: Ripples);
     }
 
     /// <summary>

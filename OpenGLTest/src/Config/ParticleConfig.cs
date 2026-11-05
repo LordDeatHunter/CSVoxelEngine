@@ -110,6 +110,22 @@ public static class ParticleConfig
     public const float SwimStrokeBubbleForward = 0.4f;
     public const float SwimStrokeBubbleSpread = 0.15f;
 
+    // --- Water ripple rings (RippleSystem + RippleRenderer, rule WaterRipple) ---
+    // A flat ring spreads over the water top wherever a body crosses the surface (the splash
+    // crossings of WaterSplash); a harder crossing (strength 0..1) spreads wider, slower and longer.
+    public const int RippleMax = 48;
+    public const float RippleMinRadius = 0.7f;
+    public const float RippleMaxRadius = 2.4f;
+    public const float RippleMinSeconds = 0.9f;
+    public const float RippleMaxSeconds = 1.7f;
+    /// <summary>Ring thickness as a share of the quad's half-size (the fragment's soft edge width).</summary>
+    public const float RippleRingWidth = 0.09f;
+    public const float RippleAlpha = 0.55f;
+    /// <summary>Lift over the water top, so the ring never z-fights the surface it lies on.</summary>
+    public const float RippleLift = 0.03f;
+    /// <summary>The second, trailing ring: its radius as a share of the first's.</summary>
+    public const float RippleTrailShare = 0.62f;
+
     // Steam: puffs a second over every vent in range, the reach it gathers within and the cap
     public const float SpringSteamPerSecond = 0.6f;
     public const float SpringSteamRadius = 32f;

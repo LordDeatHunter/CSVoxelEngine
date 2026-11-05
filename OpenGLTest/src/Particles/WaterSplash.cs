@@ -44,15 +44,22 @@ public static class WaterSplash
     /// no water is found, or for a crossing too slow to splash).
     /// </summary>
     public static int Track(WaterSplashTracker tracker, Vector3 bottom, float deltaTime, float scale,
-        ChunkManager chunks, BlockDebrisSystem debris, bool? inWater = null, Random? random = null)
+        ChunkManager chunks, BlockDebrisSystem debris, bool? inWater = null, Random? random = null,
+        RippleSystem? ripples = null)
     {
         var x = MathUtils.FloorToInt(bottom.X);
         var y = MathUtils.FloorToInt(bottom.Y);
         var z = MathUtils.FloorToInt(bottom.Z);
         var wet = inWater ?? bottom.Y < chunks.GetFluidSurfaceGlobal(x, y, z);
         if (!tracker.Step(wet, bottom.Y, deltaTime, out var speed)) return 0;
+        if (!TryWaterTop(chunks, x, y, z, out var top)) return 0;
+
+        // A ring spreads for every crossing the tracker reports, however gentle: a drop landing too
+        // softly to throw droplets still dimples the surface
+        ripples?.Spawn(new Vector3(bottom.X, top, bottom.Z), Strength(speed), RippleScale(scale));
+
         var count = Count(speed, scale);
-        if (count <= 0 || !TryWaterTop(chunks, x, y, z, out var top)) return 0;
+        if (count <= 0) return 0;
 
         debris.Splash(new Vector3(bottom.X, top, bottom.Z), JuiceConfig.WaterSplashColor,
             PlayerPhysics.PlayerRadius * scale, count, Speed(speed), JuiceConfig.WaterSplashSize, random);
@@ -74,7 +81,13 @@ public static class WaterSplash
         return false;
     }
 
-    private static float Strength(float speed) =>
+    /// <summary>How far a body of <paramref name="scale"/> spreads its ring against the player's: wider for a
+    /// big one, never under a third of it so a pebble still reads.</summary>
+    public static float RippleScale(float scale) => MathF.Max(0.33f, MathF.Sqrt(scale));
+
+    /// <summary>The 0..1 strength of a crossing at <paramref name="speed"/>: 0 under the minimum splash
+    /// speed (still a faint ring), 1 at the full one.</summary>
+    public static float Strength(float speed) =>
         MathUtils.ImpactStrength(speed, JuiceConfig.WaterSplashMinSpeed,
             JuiceConfig.WaterSplashFullSpeed);
 }

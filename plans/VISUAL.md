@@ -2,7 +2,7 @@
 
 ## Status
 
-Tracks particles, animations and other non-gameplay feel work. Last updated 2026-11-05. Nothing in progress (V-11 and V-12 landed, not yet filmed: no scenario op opens the [E] panel or drops items).
+Tracks particles, animations and other non-gameplay feel work. Last updated 2026-11-05. Nothing in progress (V-6 landed and filmed; V-11 and V-12 landed, not yet filmed: no scenario op opens the [E] panel or drops items). V-6 follow-up for V-5: rain should call `RippleSystem.Spawn` per drop that lands on water.
 
 ## In progress
 
@@ -28,7 +28,6 @@ Tracks particles, animations and other non-gameplay feel work. Last updated 2026
 
 - [ ] **`V-4` Fireflies and pollen motes** - P2, M. Fireflies in the forest at night, pollen and dust drifting by day, carried by the wind. **Hook**: `Wind.cs`, a `FireParticleSystem`-style system owned by `AmbientEffects`.
 - [ ] **`V-5` Rain and snow weather** - P2, XL. Precipitation particles plus a wet-surface look. **Hook**: `FrameLighting.WindDirection` (already reserved for this), a new weather clock.
-- [ ] **`V-6` Water ripple rings** - P2, M. Expanding rings where a body enters the water, a thrown item lands or rain falls. **Hook**: `WaterSplashTracker` crossings.
 - [ ] **`V-7` Footprints in snow and sand** - P3, L. Fading decals from the player and mobs.
 
 ### Combat and mobs

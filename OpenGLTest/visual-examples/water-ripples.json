@@ -1,0 +1,26 @@
+{
+  // Water ripple rings: run with VOXEL_SCRIPT=visual-examples/water-ripples.json VOXEL_TIME=147 from
+  // OpenGLTest/. Shots land in visual/water-ripples/. The deep sea at x~432, z~0 (sea level 0, surface
+  // at y 0.89): the player drops in from 9 blocks up (creative, so no fall damage) and the ring a hard
+  // entry starts is filmed while it spreads, then fading, then gone.
+  //   ring_a:  just after the entry, the first ring small and bright round the body
+  //   ring_b:  a quarter second on, wider with the trailing ring inside it
+  //   ring_c:  well on, faint and wide
+  //   ring_gone: the surface calm again
+  "steps": [
+    { "op": "teleport", "pos": [432.5, 4.5, 0.5], "yaw": 0, "pitch": -10 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "creative" },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "look", "yaw": 0, "pitch": -25 },
+    { "op": "teleport", "pos": [432.5, 10.0, 0.5], "yaw": 0, "pitch": -25 },
+    { "op": "wait", "seconds": 0.75 },
+    { "op": "screenshot", "name": "ring_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.25 },
+    { "op": "screenshot", "name": "ring_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "ring_c", "hideHud": true },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "ring_gone", "hideHud": true }
+  ]
+}

@@ -165,6 +165,7 @@ public class RenderManager : IDisposable
     private LeafParticleRenderer? _leaves;
     private FireParticleRenderer? _fire;
     private BubbleParticleRenderer? _bubbles;
+    private RippleRenderer? _ripples;
     private SliceTrailRenderer? _sliceTrails;
 
     // Entity healthbars: one five-heart billboard row above every live slime.
@@ -372,6 +373,7 @@ public class RenderManager : IDisposable
     internal LeafParticleRenderer? Leaves => _leaves;
     internal FireParticleRenderer? Fire => _fire;
     internal BubbleParticleRenderer? Bubbles => _bubbles;
+    internal RippleRenderer? Ripples => _ripples;
     internal SliceTrailRenderer? SliceTrails => _sliceTrails;
     internal EntityHealthbarRenderer? Healthbars => _healthbars;
     internal DamageNumberRenderer? DamageNumbers => _damageNumbers;
@@ -561,6 +563,7 @@ public class RenderManager : IDisposable
         _leaves = new LeafParticleRenderer(gl);
         _fire = new FireParticleRenderer(gl);
         _bubbles = new BubbleParticleRenderer(gl);
+        _ripples = new RippleRenderer(gl);
         _sliceTrails = new SliceTrailRenderer(gl, linearOutput: true);
         _healthbars = new EntityHealthbarRenderer(gl);
 
@@ -1037,6 +1040,7 @@ public class RenderManager : IDisposable
         _leaves?.Dispose();
         _fire?.Dispose();
         _bubbles?.Dispose();
+        _ripples?.Dispose();
         _sliceTrails?.Dispose();
         _healthbars?.Dispose();
         _damageNumbers?.Dispose();
