@@ -109,6 +109,8 @@ public class ChunkManager
 
     internal int GeneratingMeshCount => _meshScheduler.GeneratingMeshCount;
 
+    internal ChunkMeshScheduler MeshSchedulerForTests => _meshScheduler;
+
     /// <inheritdoc cref="ChunkMeshScheduler.MeshUploadBudget"/>
     public int MeshUploadBudget { get => _meshScheduler.MeshUploadBudget; set => _meshScheduler.MeshUploadBudget = value; }
 

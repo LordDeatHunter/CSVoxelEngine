@@ -34,6 +34,11 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
 
     internal int GeneratingMeshCount => _generatingMeshes.Count;
 
+    // Deterministic worker barriers for the unload/reload regression tests.
+    internal Action<Chunk>? BeforeBuildForTests { get; set; }
+    internal Action<Chunk>? BuildAcceptedForTests { get; set; }
+    internal Action<Chunk>? BuildFinishedForTests { get; set; }
+
     /// <summary>
     /// Finished meshes <see cref="ApplyCompletedMeshes"/> uploads per frame (the rest wait for the
     /// next). Defaults to <see cref="StreamingConfig.MaxMeshUploadsPerFrame"/>; World raises it
@@ -61,8 +66,9 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     // same 21-bit bit math at block scale.
     private readonly ConcurrentDictionary<long, byte> _dirtyChunks = new();
 
-    // Track active mesh generation to avoid duplicates. Packed keys, like _dirtyChunks above.
-    private readonly ConcurrentDictionary<long, byte> _generatingMeshes = new();
+    // The value owns the claim. An unloaded chunk's old worker must not remove a replacement's
+    // claim for the same packed position when it eventually leaves its finally block.
+    private readonly ConcurrentDictionary<long, Chunk> _generatingMeshes = new();
 
     // Mesh builds are dispatched as plain thread-pool work items rather than one
     // Task.Run(async ...) per chunk: at up to MaxDirtyChunksPerFrame starts a frame, the closure +
@@ -272,7 +278,7 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
     /// </summary>
     private void StartMeshGeneration(long key, Vector3 pos, Chunk chunk)
     {
-        if (!_generatingMeshes.TryAdd(key, 0))
+        if (!_generatingMeshes.TryAdd(key, chunk))
             return;
 
         _pendingMeshWork.Enqueue((pos, chunk));
@@ -369,8 +375,11 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
 
         try
         {
-            if (!manager.Chunks.ContainsPacked(key))
+            BeforeBuildForTests?.Invoke(chunk);
+            if (!manager.Chunks.TryGetPacked(key, out var live) || !ReferenceEquals(live, chunk))
                 return;
+
+            BuildAcceptedForTests?.Invoke(chunk);
 
             var meshData = chunk.GenerateMeshData(manager);
             if (meshData == null)
@@ -379,7 +388,8 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
                 // snapshot, or one of the nine streamed columns is missing; meshing across
                 // that hole would bake border artifacts (or dark light and no water), so the
                 // build is dropped and the chunk retried once the world settles
-                _dirtyChunks.TryAdd(key, 0);
+                if (manager.Chunks.TryGetPacked(key, out live) && ReferenceEquals(live, chunk))
+                    _dirtyChunks.TryAdd(key, 0);
                 return;
             }
 
@@ -391,7 +401,9 @@ internal sealed class ChunkMeshScheduler(ChunkManager manager, ChunkRenderLists 
         }
         finally
         {
-            _generatingMeshes.TryRemove(key, out _);
+            ((ICollection<KeyValuePair<long, Chunk>>)_generatingMeshes)
+                .Remove(new KeyValuePair<long, Chunk>(key, chunk));
+            BuildFinishedForTests?.Invoke(chunk);
         }
     }
 

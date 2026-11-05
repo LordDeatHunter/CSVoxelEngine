@@ -171,4 +171,119 @@ public sealed class MeshSchedulingTests
         manager.Update(camera);                       // applies the drained result
         Assert.True(center.IsMeshed, "the drained build was never applied");
     }
+
+    [Fact]
+    public void OldBuildCleanupDoesNotReleaseReplacementClaim()
+    {
+        var (manager, _) = BuildBlock();
+        var camera = AtOrigin();
+        var pos = Vector3.Zero;
+        var oldChunk = manager.Chunks[pos];
+        var replacement = new Chunk(null!, pos, generateBlockData: false) { IsBlockDataReady = true };
+        using var oldEntered = new ManualResetEventSlim();
+        using var releaseOld = new ManualResetEventSlim();
+        using var oldFinished = new ManualResetEventSlim();
+        using var replacementEntered = new ManualResetEventSlim();
+        using var releaseReplacement = new ManualResetEventSlim();
+        var replacementBuilds = 0;
+        var scheduler = manager.MeshSchedulerForTests;
+        scheduler.BuildAcceptedForTests = chunk =>
+        {
+            if (ReferenceEquals(chunk, oldChunk)) { oldEntered.Set(); releaseOld.Wait(TimeSpan.FromSeconds(10)); }
+            if (ReferenceEquals(chunk, replacement))
+            {
+                Interlocked.Increment(ref replacementBuilds);
+                replacementEntered.Set();
+                releaseReplacement.Wait(TimeSpan.FromSeconds(10));
+            }
+        };
+        scheduler.BuildFinishedForTests = chunk => { if (ReferenceEquals(chunk, oldChunk)) oldFinished.Set(); };
+
+        try
+        {
+            manager.MarkDirty(pos);
+            manager.Update(camera);
+            Assert.True(oldEntered.Wait(TimeSpan.FromSeconds(5)));
+
+            Assert.True(manager.Chunks.TryRemove(pos, out _));
+            scheduler.ForgetChunk(ChunkKey.Pack(pos));
+            manager.Chunks[pos] = replacement;
+            manager.MarkDirty(pos);
+            manager.Update(camera);
+            Assert.True(replacementEntered.Wait(TimeSpan.FromSeconds(5)));
+
+            releaseOld.Set();
+            Assert.True(oldFinished.Wait(TimeSpan.FromSeconds(5)));
+            Assert.Equal(1, manager.GeneratingMeshCount);
+
+            manager.MarkDirty(pos);
+            manager.Update(camera);
+            Assert.Equal(1, manager.GeneratingMeshCount);
+            Assert.Equal(0, manager.PendingMeshWorkCount);
+            Assert.Equal(1, Volatile.Read(ref replacementBuilds));
+
+            releaseReplacement.Set();
+            Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)));
+            manager.Update(camera);
+            Assert.True(WaitUntil(() => Volatile.Read(ref replacementBuilds) == 2));
+        }
+        finally
+        {
+            releaseOld.Set();
+            releaseReplacement.Set();
+            Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)));
+        }
+    }
+
+    [Fact]
+    public void OldQueuedChunkIsNotBuiltAfterReplacement()
+    {
+        var (manager, _) = BuildBlock();
+        var camera = AtOrigin();
+        var pos = Vector3.Zero;
+        var oldChunk = manager.Chunks[pos];
+        var replacement = new Chunk(null!, pos, generateBlockData: false) { IsBlockDataReady = true };
+        var blockers = new HashSet<Chunk>
+        {
+            manager.Chunks[new Vector3(1, 0, 0)],
+            manager.Chunks[new Vector3(0, 1, 0)],
+            manager.Chunks[new Vector3(0, 0, 1)],
+            manager.Chunks[new Vector3(-1, 0, 0)]
+        };
+        using var release = new ManualResetEventSlim();
+        var blocked = 0;
+        var accepted = 0;
+        var scheduler = manager.MeshSchedulerForTests;
+        scheduler.BeforeBuildForTests = chunk =>
+        {
+            if (blockers.Contains(chunk))
+            {
+                Interlocked.Increment(ref blocked);
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+        };
+        scheduler.BuildAcceptedForTests = chunk => { if (ReferenceEquals(chunk, oldChunk)) Interlocked.Increment(ref accepted); };
+
+        try
+        {
+            foreach (var chunk in blockers) manager.MarkDirty(chunk.Position);
+            manager.Update(camera);
+            Assert.True(WaitUntil(() => Volatile.Read(ref blocked) == StreamingConfig.MaxConcurrentMeshGenerations));
+
+            manager.MarkDirty(pos);
+            manager.Update(camera);
+            Assert.Equal(1, manager.PendingMeshWorkCount);
+            Assert.True(manager.Chunks.TryRemove(pos, out _));
+            scheduler.ForgetChunk(ChunkKey.Pack(pos));
+            manager.Chunks[pos] = replacement;
+            release.Set();
+            Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)));
+            Assert.Equal(0, Volatile.Read(ref accepted));
+        }
+        finally
+        {
+            release.Set();
+            Assert.True(manager.DrainMeshWork(TimeSpan.FromSeconds(10)));
+        }
+    }
 }
