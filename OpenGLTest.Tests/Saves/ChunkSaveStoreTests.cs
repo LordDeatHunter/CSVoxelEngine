@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using VoxelEngine.Saves;
 using Xunit;
 
@@ -129,6 +130,115 @@ public sealed class ChunkSaveStoreTests : IDisposable
             Assert.True(reopened.TryLoad(key, out var fromDisk));
             AssertSameData(newer, fromDisk);
             Assert.NotEqual(older.Blocks, fromDisk.Blocks);
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
+        }
+    }
+
+    [Fact]
+    public void RepeatedSavesOfAWaitingChunkKeepOneJobAndWriteOnlyTheNewest()
+    {
+        var blockerKey = ChunkKey.Pack(0, 0, 0);
+        var key = ChunkKey.Pack(1, 0, 0);
+        using var entered = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+        var targetWrites = 0;
+        var queued = 0;
+        var store = new ChunkSaveStore(_world);
+        store.MoveFile = (tmp, final) =>
+        {
+            if (final.EndsWith(WorldStore.ChunkFileName(0, 0, 0), StringComparison.Ordinal))
+            {
+                entered.Set();
+                release.Wait();
+            }
+            else if (final.EndsWith(WorldStore.ChunkFileName(1, 0, 0), StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref targetWrites);
+            }
+            File.Move(tmp, final, overwrite: true);
+        };
+
+        var newest = Snapshot("dirt", seed: 0);
+        try
+        {
+            store.Enqueue(blockerKey, Snapshot("stone", seed: 100));
+            Assert.True(entered.Wait(ShutdownTimeout), "writer did not reach the blocked move");
+            for (var i = 1; i <= 100; i++)
+            {
+                newest = Snapshot("dirt", seed: i);
+                store.Enqueue(key, newest);
+                if (i == 50)
+                    store.EnqueueFile("lod-edits.bin", [4, 5, 6]);
+            }
+
+            Assert.True(store.TryLoad(key, out var pending));
+            AssertSameData(newest, pending);
+            Assert.Equal(new byte[] { 4, 5, 6 }, store.ReadFile("lod-edits.bin"));
+            queued = store.QueuedCount;
+        }
+        finally
+        {
+            release.Set();
+            ShutdownOrFail(store);
+        }
+
+        Assert.Equal(1, targetWrites);
+        Assert.Equal(2, queued);
+        var reopened = new ChunkSaveStore(_world);
+        try
+        {
+            Assert.True(reopened.TryLoad(key, out var disk));
+            AssertSameData(newest, disk);
+            Assert.Equal(new byte[] { 4, 5, 6 }, reopened.ReadFile("lod-edits.bin"));
+        }
+        finally
+        {
+            ShutdownOrFail(reopened);
+        }
+    }
+
+    [Fact]
+    public void NewEnqueueDuringAnInFlightWriteGetsAnotherTurn()
+    {
+        var key = ChunkKey.Pack(4, 0, 0);
+        var first = Snapshot("stone", seed: 11);
+        var newest = Snapshot("dirt", seed: 12);
+        using var entered = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+        var writes = 0;
+        var store = new ChunkSaveStore(_world);
+        store.MoveFile = (tmp, final) =>
+        {
+            if (Interlocked.Increment(ref writes) == 1)
+            {
+                entered.Set();
+                release.Wait();
+            }
+            File.Move(tmp, final, overwrite: true);
+        };
+        try
+        {
+            store.Enqueue(key, first);
+            Assert.True(entered.Wait(ShutdownTimeout));
+            store.Enqueue(key, newest);
+            Assert.Equal(1, store.QueuedCount);
+            Assert.True(store.TryLoad(key, out var pending));
+            AssertSameData(newest, pending);
+        }
+        finally
+        {
+            release.Set();
+            ShutdownOrFail(store);
+        }
+        Assert.Equal(2, writes);
+        var reopened = new ChunkSaveStore(_world);
+        try
+        {
+            Assert.True(reopened.TryLoad(key, out var disk));
+            AssertSameData(newest, disk);
         }
         finally
         {

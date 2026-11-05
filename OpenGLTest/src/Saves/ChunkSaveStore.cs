@@ -18,7 +18,10 @@ namespace VoxelEngine.Saves;
 /// <para>
 /// Writes are asynchronous, in the shape of <see cref="Log"/>: <see cref="Enqueue"/> and
 /// <see cref="EnqueueFile"/> never block, and one background thread ("ChunkSaveWriter") encodes and
-/// writes the jobs in order. The main thread only ever copies arrays
+/// writes queued jobs in order. Waiting chunk jobs carry only a key and resolve its newest pending
+/// snapshot when the writer reaches them; whole-file jobs retain their bytes. A later chunk
+/// snapshot can thus be written before an intervening whole-file job, but each artifact's final
+/// state is the last enqueued one after the writer drains. The main thread only ever copies arrays
 /// (<see cref="Chunk.TakeSnapshot"/>); palette building, Deflate and the disk all happen here.
 /// </para>
 /// <para>
@@ -58,10 +61,13 @@ public sealed class ChunkSaveStore
     /// <summary>The lock file a live store holds in its world folder.</summary>
     public const string LockFileName = "session.lock";
 
-    // Exactly one of Chunk (a chunk job, keyed by Key) or FileName + Bytes (a whole-file job) is set
-    private sealed record SaveJob(long Key, ChunkSnapshot? Chunk, string? FileName, byte[]? Bytes);
+    // A chunk job carries only its key; a whole-file job carries its file name and bytes.
+    private sealed record SaveJob(long Key, string? FileName, byte[]? Bytes);
 
     private readonly ConcurrentDictionary<long, ChunkSnapshot> _pending = new();
+    // One waiting token per chunk key. Removed before the writer captures the snapshot, so an
+    // enqueue during an in-flight write can always schedule the newer state.
+    private readonly ConcurrentDictionary<long, byte> _queuedChunks = new();
     private readonly ConcurrentDictionary<string, byte[]> _pendingFiles = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<long, byte> _index = new();
     // Writes that could not land (kept pending), retried by RetryFailed and at Shutdown
@@ -124,6 +130,9 @@ public sealed class ChunkSaveStore
     /// <summary>Chunk snapshots enqueued but not yet (successfully) on disk.</summary>
     internal int PendingCount => _pending.Count;
 
+    /// <summary>Jobs waiting for the writer, excluding the one in flight.</summary>
+    internal int QueuedCount => _jobs.Count;
+
     /// <summary>Writes (chunks and files) whose last attempt could not land on disk.</summary>
     public int FailedCount => _failedChunks.Count + _failedFiles.Count;
 
@@ -142,7 +151,7 @@ public sealed class ChunkSaveStore
         ArgumentNullException.ThrowIfNull(snapshot);
         // Publish first: the caller forgets the chunk right after this returns
         _pending[key] = snapshot;
-        TryAdd(new SaveJob(key, snapshot, null, null));
+        QueueChunk(key);
     }
 
     /// <summary>
@@ -203,7 +212,7 @@ public sealed class ChunkSaveStore
         ArgumentNullException.ThrowIfNull(bytes);
         ValidateFileName(fileName);
         _pendingFiles[fileName] = bytes;
-        TryAdd(new SaveJob(0, null, fileName, bytes));
+        TryAdd(new SaveJob(0, fileName, bytes));
     }
 
     /// <summary>The contents of <paramref name="fileName"/> in the world folder (the newest pending
@@ -252,9 +261,9 @@ public sealed class ChunkSaveStore
         var retried = 0;
         foreach (var key in _failedChunks.Keys)
         {
-            if (_failedChunks.TryRemove(key, out _) && _pending.TryGetValue(key, out var snapshot))
+            if (_failedChunks.TryRemove(key, out _) && _pending.ContainsKey(key))
             {
-                TryAdd(new SaveJob(key, snapshot, null, null));
+                QueueChunk(key);
                 retried++;
             }
         }
@@ -262,7 +271,7 @@ public sealed class ChunkSaveStore
         {
             if (_failedFiles.TryRemove(fileName, out _) && _pendingFiles.TryGetValue(fileName, out var bytes))
             {
-                TryAdd(new SaveJob(0, null, fileName, bytes));
+                TryAdd(new SaveJob(0, fileName, bytes));
                 retried++;
             }
         }
@@ -308,6 +317,21 @@ public sealed class ChunkSaveStore
         }
     }
 
+    private void QueueChunk(long key)
+    {
+        if (!_queuedChunks.TryAdd(key, 0))
+            return;
+        try
+        {
+            _jobs.Add(new SaveJob(key, null, null));
+        }
+        catch (InvalidOperationException)
+        {
+            _queuedChunks.TryRemove(key, out _);
+            Log.Warn($"Chunk save store for '{WorldDirectory}' is shut down; a write was dropped.");
+        }
+    }
+
     private void WriteLoop()
     {
         try
@@ -318,8 +342,12 @@ public sealed class ChunkSaveStore
                 // every later save of the session.
                 try
                 {
-                    if (job.Chunk != null)
-                        WriteChunk(job.Key, job.Chunk);
+                    if (job.FileName == null)
+                    {
+                        _queuedChunks.TryRemove(job.Key, out _);
+                        if (_pending.TryGetValue(job.Key, out var snapshot))
+                            WriteChunk(job.Key, snapshot);
+                    }
                     else
                         WriteWholeFile(job.FileName!, job.Bytes!);
                 }
