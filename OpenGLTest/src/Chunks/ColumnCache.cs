@@ -28,8 +28,9 @@ public static class ColumnCache
         };
 
     /// <summary>
-    /// Drops every cached column. Only <see cref="WorldSeed.Apply"/> calls it: the columns are a
-    /// function of the seed, so a swap makes all of them wrong.
+    /// Drops every cached column. <see cref="WorldSeed.Apply"/> calls it for a seed/world swap;
+    /// <see cref="WorldSeed.EndWorld"/> also calls it after the last quiesced world releases its
+    /// ownership. Both callers require lifecycle transitions and direct readers to be serialized.
     /// </summary>
     internal static void Reset() => Cache.Clear();
 
