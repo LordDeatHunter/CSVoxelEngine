@@ -34,7 +34,7 @@ and 2026-11-05). Last updated 2026-11-05.
     on base before the next seed reset and passes on candidate; the candidate's full Release
     suite passed 2793/2793 and solution build had zero warnings/errors. Failed worker/drain and
     constructor gates were reviewed in source, not fault-injected. Raw methods and all 18 runs:
-    Nexus task `89f63d82`, archive `tf5276bfa796fa465d`, SHA-256
+    Nexus task `89f63d82`, archive `tff6648498db268146`, SHA-256
     `15c467da9f8af13291e86b8bf31e0b0734f60a2a1efc1bb14c2586231133db72`.
 
 ## Open
