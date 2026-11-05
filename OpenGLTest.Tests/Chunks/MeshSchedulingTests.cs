@@ -202,7 +202,8 @@ public sealed class MeshSchedulingTests
         };
         scheduler.MeshGeneratedForTests = (chunk, meshData) =>
         {
-            if (ReferenceEquals(chunk, center)) generatedOldVertexCount = meshData.Vertices.Count;
+            if (ReferenceEquals(chunk, center) && Volatile.Read(ref asyncBuilds) == 1)
+                generatedOldVertexCount = meshData.Vertices.Count;
         };
 
         manager.MarkDirty(centerPosition);
