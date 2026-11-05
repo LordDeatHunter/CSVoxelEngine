@@ -46,4 +46,28 @@ public sealed class VisualScenarioAnimationOpsTests
         Assert.Contains(scenario.Steps, step => step.Op == "damage");
         Assert.Contains(scenario.Steps, step => step.Op == "player");
     }
+
+    [Fact]
+    public void TheSliceReturnActionParses()
+    {
+        var scenario = VisualScenario.Parse("""
+            { "steps": [ { "op": "player", "action": "SliceReturn" } ] }
+            """, "t");
+
+        Assert.Equal("slicereturn", scenario.Steps[0].Action);
+    }
+
+    [Fact]
+    public void TheShippedSliceTrailScenarioParses()
+    {
+        var path = System.IO.Path.Combine(AppContext.BaseDirectory, "visual-examples", "slice-trail.json");
+        if (!System.IO.File.Exists(path)) return;
+
+        var scenario = VisualScenario.Load(path);
+
+        Assert.Contains(scenario.Steps, step => step.Op == "player" && step.Action == "slice");
+        Assert.Contains(scenario.Steps, step => step.Op == "player" && step.Action == "slicereturn");
+        Assert.Contains(scenario.Steps, step => step.Op == "player" && step.Action == "chop");
+        Assert.Contains(scenario.Steps, step => step.Op == "screenshot");
+    }
 }

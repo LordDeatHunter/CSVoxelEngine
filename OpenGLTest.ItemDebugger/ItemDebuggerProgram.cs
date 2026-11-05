@@ -6,7 +6,9 @@ using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
 using Silk.NET.Windowing;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Items;
+using VoxelEngine.Particles;
 using VoxelEngine.Platform;
 using VoxelEngine.Player;
 using VoxelEngine.VisualTest;
@@ -128,6 +130,7 @@ public static class ItemDebuggerProgram
         _trees = new TreePreviewState();
         _ui = new ItemDebuggerUi();
         _playerAnim = new PlayerPreviewState(new PlayerModel { Rig = _scene.Rig, HoldingItem = true });
+        _playerAnim.TrailSampler = SampleTrail;
         PlayerClock.Attach(_playerAnim);
         EntityClock.Attach(_entities);
 
@@ -384,6 +387,7 @@ public static class ItemDebuggerProgram
 
         Matrix4x4 view;
         float bodyYaw;
+        var cameraEye = eye;
         if (_firstPerson)
         {
             // The model stays put and the camera looks around it. The game turns the body with
@@ -396,10 +400,30 @@ public static class ItemDebuggerProgram
         else
         {
             bodyYaw = BodyYaw;
-            view = BuildView(PlayerOrbitTarget, out _);
+            view = BuildView(PlayerOrbitTarget, out cameraEye);
         }
 
         _scene.Render(view * projection, eye, bodyYaw, 0f, Player, Editor, (float)_time, size, _firstPerson);
+        _scene.RenderSliceTrail(_playerAnim.Trail, _playerAnim.Elapsed, view * projection, cameraEye);
+    }
+
+    // Poses the selected blade exactly as DebugSceneRenderer draws it (the editor's live display, scale
+    // and grip, the same eye, body yaw and back offset), so the trail follows the sliders. False while
+    // the ITEMS tab previews anything but a slicing or sword item.
+    private static bool SampleTrail(PlayerModel model, out Matrix4x4 blade, out Matrix4x4 owner)
+    {
+        blade = owner = Matrix4x4.Identity;
+        if (_tab != DebuggerTab.Items || !Editor.HasSelection || !Editor.IsPureItem) return false;
+        if (ItemRegistry.TryGet(Editor.SelectedId) is not { Attack: AttackPattern.Slice or AttackPattern.Sword } item)
+            return false;
+
+        var eye = BodyEye();
+        var back = _firstPerson ? PlayerModel.FirstPersonBodyBack : 0f;
+        blade = HeldItemPose.Pose(model.GetHandAnchorMatrix(eye, BodyYaw, back, 0f),
+            Editor.DisplayMatrix(model.HeldItemRotationOffset), Editor.ItemHeldScale, Editor.ItemGrip);
+        owner = SliceTrail.OwnerFrameAt(eye, model.DrawnBodyYaw(BodyYaw));
+        _playerAnim.Trail.Color = item.TrailColorOrDefault;
+        return true;
     }
 
     private static void CaptureScreenshot(Vector2D<int> size)

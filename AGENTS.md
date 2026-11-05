@@ -102,6 +102,10 @@ triggers the game does, so what shows is exactly what the game poses (a jump loo
 swim that strokes as long as forward is held, a throw that charges, holds and releases, a death that
 falls over and gets back up). **Use this tab first for any player animation change**: it is faster
 than a scenario and shows the body from any orbit angle (the VIEW button switches to first person).
+The blade modes (SLICE, BACK, CUT, B-CUT, CHOP) with a slice or sword item selected also draw the **slice
+trail**: `PlayerPreviewState.Trail` is fed once per fixed step on the preview's own clock through the
+`SliceTrailSampler` the program installs (posed with the display sliders' live values), so a scrub rebuilds
+exactly the trail playing would have, and a paused or finished clock holds it as it stands.
 Both animated tabs (ITEMS and ENTITIES) share a **timeline** along the bottom of the viewport
 (`AnimationClock`, GL-free and tested): a **Progress** slider (seconds into the current play; dragging it
 scrubs, and the clock stops while it is held), a **Speed** slider (x0 to x4 in steps of 0.1, 0 pauses) and a
@@ -1439,6 +1443,11 @@ OpenGLTest/
       LeafParticleSystem.cs    # falling leaves: ambient fall off canopy near the camera + bursts where it was disturbed
       ParticleRing.cs          # a fixed-capacity, order-preserving particle store
       PopBoxEmitter.cs         # the mining pop's geometry: each hitbox drawn as a box sampling its crop of the block's face tiles
+      SliceTrail.cs            # GL-free ring of blade-tip samples in the swinging player's owner frame, plus a live head
+      SliceTrailGlow.cs        # GL-free twin of slice-trail-fragment.glsl: the soft body, the white core, the streak lanes
+      SliceTrailRenderer.cs    # the additive ribbon draw of one SliceTrail (slice-trail-*.glsl)
+      SliceTrailRibbon.cs      # GL-free builder of the tapered, age-faded Catmull-Rom ribbon quads of a SliceTrail
+      SliceTrailSystem.cs      # World component: feeds the local and remote players' slice trails; AssumedBlade
       WaterSplash.cs           # GL-free splash rule (droplets by crossing speed) + Track: a body's droplets off the water top
       WaterSplashTracker.cs    # GL-free per-body water crossing memory: in water last frame, speed from its own height
     Platform/                  # Silk.NET window and input setup
@@ -1462,6 +1471,8 @@ OpenGLTest/
                                #   (singleplayer's LocalPlayer.UpdateHealth and each ServerPlayer's accepted states)
       IBodySolids.cs           # non-block solids a player body collides with (the iceberg boxes), read by
                                #   BodyCollision, PlayerPhysics (Camera.BodySolids) and the server's grounded probe
+      HeldItemPose.cs          # GL-free held-item sizing and the drawn sprite matrix (SpriteMatrix, BackOffset), shared
+                               #   by PlayerPasses, the slice trail and the item debugger
       HeadMotion.cs            # the per-frame view juice (bob, roll, landing dip, hit kick, FOV punch, sprint FOV, throw
                                #   zoom, strafe tilt, crouch drop, death view, damage arc and droplet aging) folded into
                                #   Roll/BobHeight/BobStrafe/CurrentFov
@@ -1592,7 +1603,8 @@ OpenGLTest/
         ObjectPasses.cs        # drops, thrown items, primed TNT, falling blocks, mining debris and toppling trees
                                #   (Render*/Draw* pairs; the mirror reuses the Draw* cores)
         PlayerPasses.cs        # the player body, held item and remote players (RenderPlayer, RenderHeldItem, RenderRemotePlayers),
-                               #   the player rig and its meshes, the held-item sizing and PoseHeldItem
+                               #   the player rig and its meshes; the held sprite through HeldItemPose and DrawItemSprite,
+                               #   and the assumed blade (SliceTrailSystem.AssumedBlade) while a remote player swings
         StationPasses.cs       # the station passes ride inside entityPass: RenderCampfireCooking,
                                #   RenderQuerns, RenderKilns (crucible mesh, molten pool, the last charged
                                #   input hovering over the rim and shrinking into it, stored
@@ -1638,7 +1650,7 @@ OpenGLTest/
       Overlays/                # drawn over the scene: the UI pass (UiPasses, UIRenderer and its page renderers, the text cache), the damage vignette, the
                                #   selection outline and mining pop, and the world-space healthbars, damage numbers, notice pips and particles
         BillboardPasses.cs     # the world-space billboard draws: healthbars, damage numbers, notice pips and the
-                               #   leaf, fire and bubble particles
+                               #   leaf, fire and bubble particles and the slice trails (RenderSliceTrails)
         ChatRenderer.cs        # the chat HUD: the word-wrapped log and the input line
         CraftCardRenderer.cs   # the [E] panel's crafting card and its hit-tests over the last drawn
                                #   CraftCardLayout
@@ -1991,6 +2003,7 @@ OpenGLTest.ItemDebugger/              # the item/entity/tree preview tool (ITEMS
   ItemDisplayEditor.cs                # editable copy of the selected item's display block plus the debugger-only renderer tweaks
   ItemJsonDisplayWriter.cs            # writes an item's display block back into its JSON file
   PlayerPreviewState.cs               # GL-free state behind the item debugger's player animations (the ITEMS tab)
+  SliceTrailSampler.cs                # the delegate that poses the previewed blade for PlayerPreviewState's slice trail
   TreePreviewState.cs                 # GL-free state of the TREES tab: species, seed, step, per-step
                                       #   snapshots, ground plane and framing bounds
 OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple players and chat")
@@ -2403,6 +2416,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 | `blockDamage` | damage one left-click hit removes from a block's `hardness`; default 0.5 (the bare-hand baseline). Independent of `tool`, which only gates *whether* the block may be mined |
 | `entityDamage` | damage one punch or slice deals to an enemy (any `Mob`: a slime or a goblin); default 1 (the bare-hand baseline). A weapon raises it without needing a `tool` block (the obsidian blade is `6`) |
 | `attack` | left-click attack behavior, an `AttackPattern`: `punch` (default; forward cone, hits the nearest one), `slice` (forward hemisphere, hits the nearest two, two-phase swing — the obsidian blade) or `sword` (a three-swing chain: a diagonal cut and a rising back cut over the hemisphere, hitting the nearest three, then an overhead chop on the one target in the cone at the highest power with a heavier shove — the iron sword). See `Combat`/`SliceCombo`/`SwordCombo`/`SwordSwings` |
+| `trail` | optional `{"color": [r, g, b]}`, sRGB 0..255: the color of the glowing slice trail the item's swings leave (`Item.TrailColor`; omitted, `TrailColorOrDefault` falls back to `ParticleConfig.SliceTrailDefaultColor`). Legal only on a `slice` or `sword` item; a trail on a punch item, or a color that is not three ints in 0..255, throws naming the file (`ItemLoader.ParseTrail`). The obsidian blade is violet, the iron sword pale blue-white |
 | `fuel.burnSeconds` | seconds one unit of this item keeps a kiln lit (coal 60; 1..3600). Writing the object is what makes an item kiln fuel — a kiln takes up to `KilnManager.MaxFuel` units of **one** kind at a time |
 | `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many milliliters of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent(MaterialId, MoltenMl, PendingMl, PendingInputId)` — the last field is display-only, the last melt input charged in, so the kiln can draw what is waiting to melt; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
 | `model` | optional `block/<name>` model under `assets/models/`, baked into `Item.BakedModel` so the item can be drawn as real 3D geometry while it sits inside a station (the crucible standing in a kiln's hearth). The sprite stays the inventory icon; this only adds a mesh |
@@ -4558,6 +4572,39 @@ overshoot or jiggle.
   the shoulder camera's eye counts), aged in `UpdateHeadMotion`, cleared the moment the eye is back
   under, and given a new seed per surfacing; the drop positions, sizes and slides are hashed in the
   shader. `visual-examples/surfacing-droplets.json` films it, `SurfacingDropletsTests` locks it down.
+- **Slice trail** (`Particles/SliceTrail*`): a blade swing (the obsidian blade's slice and its return,
+  the iron sword's cut, back cut and chop) leaves a glowing, curved crescent behind the blade tip that
+  fades out within `SliceTrailLifeSeconds`, in first person and in the shoulder view. The tip and an
+  inner point are read along the held sprite's (1, 1, 0) diagonal (`SliceTrailTipReach`,
+  `SliceTrailInnerReach`) through `HeldItemPose.SpriteMatrix`, the very matrix the held item is drawn
+  with. `SliceTrail` stores its samples in the swinging player's **owner frame** (the eye plus
+  `PlayerModel.DrawnBodyYaw`, so a lagging body keeps the arc on the blade; pitch is not in it) and turns
+  them back at build time, so the arc rides with a walking or turning player and camera motion alone adds
+  nothing. A sample is committed at most once every `SliceTrailMinSampleSeconds` (the life divided over
+  the ring, so the whole life fits `SliceTrailMaxSamples` at any frame rate, since VSync is off) after
+  `SliceTrailMinStepBlocks` of travel, while a live head moves every update and keeps the newest end on
+  the drawn tip. Ages run on `World.Now`: a hit-stop (`PlayerModel.IsHitStopped`) commits nothing while
+  the trail keeps fading, the tip speed counts only the time the tip was really moving, and a paused
+  world keeps fading at render time. A restarted swing progress starts a new segment, so a slice and its
+  return are never bridged. `SliceTrailRibbon` builds the ribbon (Catmull-Rom, `SliceTrailSubdivisions`
+  per gap): the tail tapers by position along the segment (`SliceTrailTailTaper`), the head by tip
+  speed (`SliceTrailMinSpeed..FullSpeed`), the width shrinks and the alpha falls with age, and UV.x is
+  the stable arc length the streaks are keyed on, so the wisps never crawl as the tail expires.
+  `slice-trail-fragment.glsl` (twin `SliceTrailGlow`) draws a soft colored body brightening toward the
+  tip edge, a white core band near it and hashed streak lanes (the `SliceTrailCore*`, `GlowPower` and
+  `Streak*` knobs in `ParticleConfig`); the color is the item's `trail.color` (else
+  `SliceTrailDefaultColor`), decoded from sRGB into the linear HDR target. `SliceTrailRenderer` draws
+  it additively (`SrcAlpha, One`, depth test on, no depth write, no cull) in `WorldRenderer`'s late
+  particle block after the clouds (`BillboardPasses.RenderSliceTrails`), never in the mirror or the
+  shadow pass. `SliceTrailSystem` (World's component, fed right after the remote players update, never
+  in server mode) runs the local trail and one per remote player: a remote's held item is not on the
+  wire, so while it swings the client assumes, and `PlayerPasses.RenderRemotePlayers` draws, the first
+  item with that attack pattern (`SliceTrailSystem.AssumedBlade` over `ItemRegistry.FindByAttack`). The
+  item debugger's trail is fed per fixed step, so a scrub rebuilds it (see "Build and run").
+  `visual-examples/slice-trail.json` (`VOXEL_TIME=147`, using the `player` op's `slicereturn` action)
+  films every swing; `SliceTrailTests`, `SliceTrailRibbonTests`, `SliceTrailGlowTests`,
+  `SliceTrailSystemTests`, `SliceTrailContentTests` and `ServerWorldTests.AServerModeWorldFeedsNoSliceTrail`
+  lock it down.
 - **Floating damage numbers**: a landed hit floats its damage over the mob (`World.DamageNumbers`, a
   fixed `DamageNumberPool` of `DamageNumberCapacity` that replaces its oldest number when full),
   drawn by `DamageNumberRenderer` right after the healthbars with their billboard shader and the HUD's
@@ -4569,7 +4616,7 @@ overshoot or jiggle.
   none. `visual-examples/damage-numbers.json` films them.
 - **Verification**: `visual-examples/animations.json` (run with `VOXEL_TIME=147`) films the player's
   poses from the shoulder camera and the mobs' spawn, hit and death; its `damage`, `view` and
-  `player` ops (`hurt`, `punch`, `slice`, `cut`, `backcut`, `chop`, `equip`, `charge`, `release`, `die`, `revive`) exist for it. For
+  `player` ops (`hurt`, `punch`, `slice`, `slicereturn`, `cut`, `backcut`, `chop`, `equip`, `charge`, `release`, `die`, `revive`) exist for it. For
   iterating on a single animation prefer the **item debugger** (see "Build and run"): its ITEMS tab has a
   button for every player animation and its ENTITIES tab previews the goblin and slime life-cycles,
   including the slime's code-driven squash, with `ITEM_DEBUGGER_PLAYER_ANIM` / `ITEM_DEBUGGER_ANIM` and

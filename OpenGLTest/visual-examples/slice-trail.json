@@ -1,0 +1,78 @@
+{
+  // The slice trail behind the obsidian blade's slice and return and the iron sword's cut, back cut
+  // and chop, from the shoulder camera and then in first person: run with
+  // VOXEL_SCRIPT=visual-examples/slice-trail.json VOXEL_TIME=147 from OpenGLTest/. Shots land in
+  // visual/slice-trail/. The player drops (creative, so for free) onto the meadow of the sword
+  // scenario. A slice lasts 0.7 s (wind-up to ~0.18 s, impact at ~0.26 s, strike over at ~0.34 s);
+  // the cut 0.85 s (~0.27 / ~0.36 / ~0.44 s), the back cut 0.75 s (~0.21 / ~0.29 / ~0.36 s) and the
+  // chop 1.1 s (overhead from ~0.35 s, the blow at ~0.58 s, the bottom held to ~0.75 s). The trail
+  // lives 0.22 s, so the "fading" shots are thinner and dimmer and "gone" shows none. Waits are
+  // cumulative within a swing, and each shot lands a frame or two after its wait, so they are
+  // approximate.
+  "steps": [
+    { "op": "creative" },
+    { "op": "teleport", "pos": [-43.5, 16.5, 60.5], "yaw": 90, "pitch": -10 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "give", "block": "item/obsidian_blade", "count": 1 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "ready", "hideHud": true },
+    { "op": "player", "action": "slice" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "slice_windup_end", "hideHud": true },
+    { "op": "wait", "seconds": 0.06 },
+    { "op": "screenshot", "name": "slice_impact", "hideHud": true },
+    { "op": "wait", "seconds": 0.05 },
+    { "op": "screenshot", "name": "slice_through", "hideHud": true },
+    { "op": "wait", "seconds": 0.05 },
+    { "op": "screenshot", "name": "slice_end", "hideHud": true },
+    { "op": "wait", "seconds": 0.09 },
+    { "op": "screenshot", "name": "slice_fading", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "player", "action": "slicereturn" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "return_windup_end", "hideHud": true },
+    { "op": "wait", "seconds": 0.06 },
+    { "op": "screenshot", "name": "return_impact", "hideHud": true },
+    { "op": "wait", "seconds": 0.05 },
+    { "op": "screenshot", "name": "return_through", "hideHud": true },
+    { "op": "wait", "seconds": 0.05 },
+    { "op": "screenshot", "name": "return_end", "hideHud": true },
+    { "op": "wait", "seconds": 0.09 },
+    { "op": "screenshot", "name": "return_fading", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "give", "block": "item/iron_sword", "count": 1 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "player", "action": "cut" },
+    { "op": "wait", "seconds": 0.36 },
+    { "op": "screenshot", "name": "cut_impact", "hideHud": true },
+    { "op": "wait", "seconds": 0.08 },
+    { "op": "screenshot", "name": "cut_through", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "player", "action": "backcut" },
+    { "op": "wait", "seconds": 0.29 },
+    { "op": "screenshot", "name": "backcut_impact", "hideHud": true },
+    { "op": "wait", "seconds": 0.07 },
+    { "op": "screenshot", "name": "backcut_through", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "player", "action": "chop" },
+    { "op": "wait", "seconds": 0.58 },
+    { "op": "screenshot", "name": "chop_impact", "hideHud": true },
+    { "op": "wait", "seconds": 0.08 },
+    { "op": "screenshot", "name": "chop_through", "hideHud": true },
+    { "op": "wait", "seconds": 0.09 },
+    { "op": "screenshot", "name": "chop_bottom", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "view", "mode": "first" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "player", "action": "cut" },
+    { "op": "wait", "seconds": 0.36 },
+    { "op": "screenshot", "name": "fp_cut_impact", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "player", "action": "chop" },
+    { "op": "wait", "seconds": 0.58 },
+    { "op": "screenshot", "name": "fp_chop_impact", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "gone", "hideHud": true }
+  ]
+}

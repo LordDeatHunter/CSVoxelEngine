@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using VoxelEngine.Interaction;
+using VoxelEngine.Particles;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.ItemDebugger;
@@ -105,6 +107,18 @@ public sealed class PlayerPreviewState : IPreviewDriver
     /// holds; the <see cref="AnimationClock"/> turns it off and owns the replay.</summary>
     public bool Replay { get; set; } = true;
 
+    /// <summary>
+    /// The slice trail the previewed blade leaves. It is fed once per <see cref="Update"/> step on the
+    /// preview's own clock (<see cref="Elapsed"/>), never per rendered frame, so an
+    /// <see cref="AnimationClock.Seek"/> (restart, then step) rebuilds exactly the trail playing produced;
+    /// a paused or finished clock holds the trail as it stands. <see cref="Restart"/> and
+    /// <see cref="SetMode"/> clear it.
+    /// </summary>
+    public SliceTrail Trail { get; } = new();
+
+    /// <summary>Poses the previewed blade for <see cref="Trail"/>; null (the default) feeds no trail.</summary>
+    public SliceTrailSampler? TrailSampler { get; set; }
+
     /// <summary>True for the poses with no start or end (idle, walk, run, sneak, swim): a clock wraps them.</summary>
     public bool IsContinuous => Mode is Idle or Walk or Run or Sneak or Swim or SwimIdle or Surface;
 
@@ -179,6 +193,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
         _model.CancelThrowCharge();
         _model.CancelUseCharge();
         _model.DeathFall = 0f;
+        Trail.Clear();
     }
 
     /// <summary>Advances the model by <paramref name="deltaTime"/> seconds in the active mode.</summary>
@@ -242,6 +257,18 @@ public sealed class PlayerPreviewState : IPreviewDriver
                 _model.Update(deltaTime, 0f);
                 break;
         }
+
+        SampleTrail();
+    }
+
+    // Feeds the trail the blade as this step posed it; a mode that swings no blade only lets it fade.
+    private void SampleTrail()
+    {
+        if (TrailSampler is null) return;
+        var blade = Matrix4x4.Identity;
+        var owner = Matrix4x4.Identity;
+        var swinging = SliceTrail.IsBladeSwing(_model) && TrailSampler(_model, out blade, out owner);
+        Trail.Update(_clock, swinging, SliceTrail.SwingProgress(_model), _model.IsHitStopped, blade, owner);
     }
 
     // A jump loop: stand for a beat, launch, and let the model's own landing detection do the rest.

@@ -14,6 +14,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
+using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering;
 using VoxelEngine.Rendering.Overlays;
@@ -51,6 +52,8 @@ public sealed class DebugSceneRenderer : IDisposable
     private readonly Dictionary<string, Mesh> _playerMeshes;
     private readonly BlockCubeCache _blockCubes;
     private readonly ItemMeshCache _itemMeshes;
+    // The debugger renders straight into display space, so the trail keeps its sRGB color undecoded.
+    private readonly SliceTrailRenderer _sliceTrail;
     private readonly int _locModel;
     private readonly int _locMvp;
     private readonly int _locAlpha;
@@ -135,6 +138,7 @@ public sealed class DebugSceneRenderer : IDisposable
         _playerMeshes = PlayerRig.BuildMeshes(gl, Rig);
         _blockCubes = new BlockCubeCache(gl);
         _itemMeshes = new ItemMeshCache(gl);
+        _sliceTrail = new SliceTrailRenderer(gl, linearOutput: false);
         Ui = new UIRenderer(gl, _atlasTexture, _blockCubes, _itemMeshes, atlasIsSrgb: false);
         _lavaLayer = ContentRegistry.RequireBlock("lava").Top;
     }
@@ -167,6 +171,17 @@ public sealed class DebugSceneRenderer : IDisposable
             DrawPart("Head", viewProj, eyePos, bodyYaw, bodyPitch, player, backOffset);
 
         DrawHeldItem(viewProj, eyePos, bodyYaw, bodyPitch, player, editor, time, backOffset);
+    }
+
+    /// <summary>
+    /// Draws the previewed blade's slice trail additively over the scene <see cref="Render"/> just drew, at
+    /// <paramref name="now"/> on the preview's own clock, with no distance fade, and leaves the world program
+    /// bound again.
+    /// </summary>
+    public void RenderSliceTrail(SliceTrail trail, double now, Matrix4x4 viewProj, Vector3 cameraEye)
+    {
+        _sliceTrail.Render(trail, now, viewProj, cameraEye, 1000f, 2000f);
+        _world.Use();
     }
 
     /// <summary>
@@ -456,6 +471,7 @@ public sealed class DebugSceneRenderer : IDisposable
         Ui.Dispose();
         _itemMeshes.Dispose();
         _blockCubes.Dispose();
+        _sliceTrail.Dispose();
         foreach (var mesh in _playerMeshes.Values) mesh.Dispose();
         foreach (var preview in _entityPreviews.Values)
         {

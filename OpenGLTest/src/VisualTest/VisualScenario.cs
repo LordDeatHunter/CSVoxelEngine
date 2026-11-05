@@ -55,7 +55,8 @@ public sealed class VisualStep
     public string? Mode { get; init; }
 
     /// <summary>What a <c>player</c> step makes the player's model do (<c>hurt</c>, <c>punch</c>,
-    /// <c>slice</c>, <c>equip</c>, <c>charge</c>, <c>release</c>, <c>die</c> or <c>revive</c>).</summary>
+    /// <c>slice</c>, <c>slicereturn</c> (the buffered return slice), <c>cut</c>, <c>backcut</c>,
+    /// <c>chop</c>, <c>equip</c>, <c>charge</c>, <c>release</c>, <c>die</c> or <c>revive</c>).</summary>
     public string? Action { get; init; }
 
     /// <summary>The hotbar slot a <c>select</c> step picks, 1-based like the number keys.</summary>
@@ -192,7 +193,7 @@ public sealed class VisualScenario
             "player" => new VisualStep
             {
                 Op = "player",
-                Action = ReadChoice(element, index, "player", "action", ["hurt", "punch", "slice", "cut", "backcut", "chop", "equip", "charge", "release", "die", "revive"]),
+                Action = ReadChoice(element, index, "player", "action", ["hurt", "punch", "slice", "slicereturn", "cut", "backcut", "chop", "equip", "charge", "release", "die", "revive"]),
             },
             "select" => new VisualStep
             {
