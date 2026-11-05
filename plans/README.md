@@ -13,6 +13,7 @@ The one guide for every file in this folder. Agents: the `plan-docs` skill
 | [CLEANUP.md](CLEANUP.md) | The code cleanup campaign the `cleanup-campaign` workflow runs |
 | [TREES.md](TREES.md) | Residue of the tree rework |
 | [QUICK_WINS.md](QUICK_WINS.md) | One-sitting features |
+| [VISUAL.md](VISUAL.md) | Particles, animations and other visual polish |
 
 Architecture, content schema and threading rules live in `AGENTS.md`, not here.
 
