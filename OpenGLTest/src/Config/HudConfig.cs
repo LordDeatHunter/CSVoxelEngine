@@ -59,4 +59,9 @@ public static class HudConfig
     public const float PickupFlySeconds = 0.4f;
     public const float PickupFlyArcPixels = 60f;
     public const float PickupFlyEndScale = 0.6f;
+
+    // The player's active status effects (HudRenderer.DrawEffects): one icon per effect, this many
+    // canvas pixels square, in a row beside the hearts with this gap between icons and before them.
+    public const float EffectIconSize = 28f;
+    public const float EffectIconGap = 6f;
 }

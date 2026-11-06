@@ -83,6 +83,7 @@ internal static class BlockLoader
         var renderer = BlockFieldRules.ParseRenderer(definition, path);
         var paneProfile = BlockFieldRules.ParsePane(definition, renderer, path);
         BlockFieldRules.ValidateMultiblock(definition, renderer, path);
+        BlockFieldRules.ValidateStatusFlags(definition, path);
         var onBreak = BlockFieldRules.ParseOnBreak(definition, path);
         var (tipHardness, woodLootBands) = BlockFieldRules.ParseWood(definition, renderer, path);
 
@@ -177,7 +178,8 @@ internal static class BlockLoader
             Hitboxes = hitboxes ?? [BlockHitbox.FullCube],
             CollidesByHitbox = collidesByHitbox,
             HardensToId = 0,
-            HardensTouchingId = 0
+            HardensTouchingId = 0,
+            Flammable = definition.Flammable ?? false
         };
         // A facing block's selection boxes turn with it, exactly like its model will in BakeModels
         if (horizontalFacing)
@@ -218,6 +220,9 @@ internal static class BlockLoader
         BlockType.FluidInfiniteById[id] = type.FluidInfinite;
         BlockType.HardensToById[id] = type.HardensToId;
         BlockType.HardensTouchingById[id] = type.HardensTouchingId;
+        BlockType.FlammableById[id] = type.Flammable;
+        BlockType.FreezesToById[id] = type.FreezesToId;
+        BlockType.MeltsToById[id] = type.MeltsToId;
         BlockType.FallsById[id] = type.Falls;
         // Fragile blocks are washed away by a flow instead of stopping it; a flow-resistant
         // one (a cave formation) is rock and stays standing

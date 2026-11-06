@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Data;
 using VoxelEngine.Graphics;
 using VoxelEngine.Player;
@@ -13,11 +14,11 @@ using static VoxelEngine.Rendering.Overlays.UIRenderer;
 namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
-/// The HUD over the world: the crosshair, the hearts, the air, the mana bar, the hotbar and the selected item's name, the
+/// The HUD over the world: the crosshair, the hearts, the air, the mana bar, the status-effect icons, the hotbar and the selected item's name, the
 /// held staff's spell slot, the
 /// toast line, the FPS counter and the profiler table, the hover tooltip and the Tab player list,
 /// plus the hotbar hit-test over the same <see cref="HotbarLayout"/> the draw reads. It owns the
-/// crosshair and heart sprites, which <see cref="UIRenderer"/> creates and deletes through it at
+/// crosshair, heart and effect-icon sprites, which <see cref="UIRenderer"/> creates and deletes through it at
 /// their original points, and draws through the <see cref="UIRenderer"/> primitives. Render thread
 /// only.
 /// </summary>
@@ -80,6 +81,8 @@ internal sealed class HudRenderer : IDisposable
     private readonly uint _heartEmptyTexture;
     private readonly uint _bubbleTexture;
     private readonly Mesh _bubbleMesh;
+    // One HUD icon per status effect id (StatusEffect.Id), 0 where the effect names no icon
+    private readonly uint[] _effectIcons = new uint[StatusEffect.MaxKinds];
 
     // Heart sprites with the 1px side padding cropped out of their UVs (see the Heart
     // metrics above): full width for empty/full, left half for a half heart.
@@ -101,6 +104,9 @@ internal sealed class HudRenderer : IDisposable
         _heartEmptyTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/heart_empty.png");
         _bubbleTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/bubble.png");
         _bubbleMesh = Primitives.CreateRectangle(gl, 1f, 1f);
+        foreach (var effect in StatusEffectRegistry.All)
+            if (effect.IconPath != null)
+                _effectIcons[effect.Id] = TextureLoader.LoadFromFile(gl, effect.IconPath);
         var heartUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(31f / 32f, 1f));
         var heartHalfUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(16f / 32f, 1f));
         _heartEmptyMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
@@ -274,6 +280,39 @@ internal sealed class HudRenderer : IDisposable
         var fill = MathUtils.Clamp01(manaShare) * width;
         if (fill > 0.5f)
             _ui.DrawRect(new Vector2(left + fill * 0.5f, centerY), new Vector2(fill, ManaBarHeight), ManaFill);
+    }
+
+    /// <summary>
+    /// The player's active status effects: one icon per bit of <paramref name="mask"/>
+    /// (<see cref="StatusEffect.Bit"/>) whose effect names one, in id order, in a row ending just left
+    /// of the hearts and centered on them, so it never meets the air bubbles, the item name or the
+    /// toast stacked above the hearts. Hidden while dead or with no effect.
+    /// </summary>
+    internal void DrawEffects(byte mask, int health)
+    {
+        if (mask == 0 || health <= 0)
+            return;
+        var shown = 0;
+        for (var id = 0; id < StatusEffect.MaxKinds; id++)
+            if ((mask & (1 << id)) != 0 && _effectIcons[id] != 0)
+                shown++;
+        if (shown == 0)
+            return;
+
+        const float size = HudConfig.EffectIconSize;
+        const float stride = size + HudConfig.EffectIconGap;
+        var heartsLeft = (_ui.ScreenSize.X - (HeartDrawWidth + (PlayerHealth.HeartCount - 1) * HeartStride)) * 0.5f;
+        var hotbarTop = _ui.ScreenSize.Y - BottomMargin - SlotSize;
+        var centerY = hotbarTop - HeartGap - HeartDrawHeight * 0.5f;
+        var x = heartsLeft - HudConfig.EffectIconGap - (shown - 1) * stride - size * 0.5f;
+        for (var id = 0; id < StatusEffect.MaxKinds; id++)
+        {
+            if ((mask & (1 << id)) == 0 || _effectIcons[id] == 0)
+                continue;
+            _ui.DrawMesh(_bubbleMesh, RectTransform(new Vector2(x, centerY), new Vector2(size)), Rgba.White,
+                _effectIcons[id]);
+            x += stride;
+        }
     }
 
     /// <summary>
@@ -527,6 +566,9 @@ internal sealed class HudRenderer : IDisposable
         _gl.DeleteTexture(_heartTexture);
         _gl.DeleteTexture(_heartEmptyTexture);
         _gl.DeleteTexture(_bubbleTexture);
+        foreach (var icon in _effectIcons)
+            if (icon != 0)
+                _gl.DeleteTexture(icon);
         _bubbleMesh.Dispose();
         _heartEmptyMesh.Dispose();
         _heartFullMesh.Dispose();

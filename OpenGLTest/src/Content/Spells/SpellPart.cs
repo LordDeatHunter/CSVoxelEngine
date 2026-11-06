@@ -10,8 +10,9 @@ namespace VoxelEngine.Content.Spells;
 public sealed class SpellPart
 {
     internal SpellPart(SpellPartKind kind, string name, string displayName, float costShare, float complexity,
-        IReadOnlySet<string> tags, float damageFactor, float rangeFactor)
+        IReadOnlySet<string> tags, float damageFactor, float rangeFactor, string? effect)
     {
+        Effect = effect;
         Kind = kind;
         Name = name;
         DisplayName = displayName;
@@ -46,6 +47,13 @@ public sealed class SpellPart
 
     /// <summary>The factor the part multiplies a spell's range by (1 for every part but a modifier that sets it).</summary>
     public float RangeFactor { get; }
+
+    /// <summary>
+    /// The name of the status effect an element applies to what it hits (a key of
+    /// <see cref="VoxelEngine.Content.StatusEffects.StatusEffectRegistry"/>), read by the spell cast's hit
+    /// (MG-5); null for an element that applies none and for every other kind.
+    /// </summary>
+    public string? Effect { get; }
 
     /// <summary>The registry key, <c>&lt;kind&gt;/&lt;name&gt;</c> (<see cref="KeyOf"/>).</summary>
     public string Key { get; }

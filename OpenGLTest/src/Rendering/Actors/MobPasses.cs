@@ -105,13 +105,18 @@ internal sealed class MobPasses : IDisposable
             var model = SlimeTransform(slime);
             _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(slime.Position));
             _owner.WorldShader.SetUniform(_owner.LocHitFlash, slime.HitFlash);
+            _owner.WorldShader.SetUniform(_owner.LocStatusTint, StatusTintOf(slime));
             _slimeMesh.Render();
             drewFlash = true;
         }
 
-        // uHitFlash is a per-slime value, so put it back rather than tinting whatever draws next.
+        // uHitFlash and uStatusTint are per-slime values, so put them back rather than tinting
+        // whatever draws next.
         if (drewFlash)
+        {
             _owner.WorldShader.SetUniform(_owner.LocHitFlash, 0f);
+            _owner.WorldShader.SetUniform(_owner.LocStatusTint, Vector4.Zero);
+        }
 
         _owner.BindEntityTextures(mirror);
     }
@@ -153,6 +158,7 @@ internal sealed class MobPasses : IDisposable
             var light = _owner.LightAt(goblin.Position);
             var effect = goblin.BodyEffect(feet);
             _owner.WorldShader.SetUniform(_owner.LocHitFlash, goblin.HitFlash);
+            _owner.WorldShader.SetUniform(_owner.LocStatusTint, StatusTintOf(goblin));
             for (var i = 0; i < _goblinMeshes.Length; i++)
             {
                 var model = goblin.Animation.GetPartMatrix(_goblinPartNames[i], _goblinRig, feet, goblin.Facing) * effect;
@@ -181,10 +187,19 @@ internal sealed class MobPasses : IDisposable
             }
         }
 
-        // uHitFlash is a per-goblin value, so put it back rather than tinting whatever draws next.
+        // uHitFlash and uStatusTint are per-goblin values, so put them back rather than tinting
+        // whatever draws next.
         _owner.WorldShader.SetUniform(_owner.LocHitFlash, 0f);
+        _owner.WorldShader.SetUniform(_owner.LocStatusTint, Vector4.Zero);
         _owner.BindEntityTextures(mirror);
     }
+
+    // The uStatusTint value of one mob: its first tinted active effect's linear color at the
+    // configured mix weight, or zero (no tint) when none of its effects carries a tint.
+    private static Vector4 StatusTintOf(Mob mob) =>
+        mob.Effects.TryGetTint(out var tint)
+            ? new Vector4(tint, StatusEffectConfig.MobTintStrength)
+            : Vector4.Zero;
 
     // Position is the body center and the model stands on y = 0, so the rig roots at the feet.
     internal static Vector3 GoblinFeet(Goblin goblin) =>

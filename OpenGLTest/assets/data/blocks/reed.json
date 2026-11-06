@@ -5,6 +5,7 @@
   "name": "Reed",
   "model": { "parent": "block/cross", "textures": { "cross": "reed" } },
   "hardness": 0,
+  "flammable": true,
   "solid": false,
   "occludes": false,
   "castsAO": false,

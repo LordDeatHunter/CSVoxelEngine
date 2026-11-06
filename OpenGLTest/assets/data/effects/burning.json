@@ -1,0 +1,11 @@
+{
+  "name": "Burning",
+  "durationSeconds": 6,
+  "tickSeconds": 1,
+  "damageShare": 0.05,
+  "blocks": { "ignite": true, "thaw": true },
+  "tint": [255, 110, 30],
+  "particle": "ember",
+  "icon": "assets/textures/ui/effect_burning.png",
+  "deathMessage": "burned to death"
+}

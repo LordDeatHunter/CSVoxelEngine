@@ -349,7 +349,7 @@ internal sealed class LeftClickAction
             _breakHardness = Mining.HardnessOf(_breakingBlockId, _breakState);
             _breakAllowed = Mining.CanMine(_breakingBlockId, held);
             _breakPower = Mining.BlockDamage(held);
-            _breakHitSeconds = Mining.HitGapSeconds(held);
+            _breakHitSeconds = Mining.HitGapSeconds(held, Camera.Effects?.AttackFactor ?? 1f);
             // A natural tree's wood keeps the damage it took (only here: a connected client's server counts
             // its own break from zero, and a placed log never keeps any)
             _breakNatural = !_clientMode && BlockType.IsTreeWood(_breakingBlockId) && !WoodState.IsDetached(_breakState);
@@ -520,7 +520,7 @@ internal sealed class LeftClickAction
     private bool UpdatePunch(double deltaTime, PlayerContext player)
     {
         var held = HeldItem();
-        _punchGap = Mining.HitGapSeconds(held);
+        _punchGap = Mining.HitGapSeconds(held, Camera.Effects?.AttackFactor ?? 1f);
         _punchTimer += (float)deltaTime;
 
         if (TryFindPunchTarget(player.Eye, player.ViewDirection, out var target))

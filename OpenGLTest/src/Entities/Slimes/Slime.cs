@@ -210,7 +210,8 @@ public sealed class Slime : Mob
         _clock += deltaTime;
         TickLife(deltaTime);
         _hitFlash = MathF.Max(0f, _hitFlash - deltaTime / HitFlashSeconds);
-        _damageCooldown = MathF.Max(0f, _damageCooldown - deltaTime);
+        // A slowing status effect stretches the contact cooldown and the hop cadence below
+        _damageCooldown = MathF.Max(0f, _damageCooldown - deltaTime * AttackFactor);
 
         var wasGrounded = IsGrounded;
         var fallSpeed = -_velocity.Y;
@@ -238,7 +239,7 @@ public sealed class Slime : Mob
         if (IsDying) return;
         if (playerPosition is not { } target) return;
 
-        _hopTimer += deltaTime;
+        _hopTimer += deltaTime * MoveFactor;
         if (_hopTimer < _nextHop) return;
 
         _hopTimer = 0f;

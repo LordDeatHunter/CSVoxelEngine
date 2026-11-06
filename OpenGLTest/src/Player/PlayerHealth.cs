@@ -1,4 +1,5 @@
 using System;
+using VoxelEngine.Status;
 
 namespace VoxelEngine.Player;
 
@@ -51,7 +52,7 @@ public sealed class PlayerHealth
 
     /// <summary>
     /// Save-restore seam: sets the pool to a saved value, clamped to 0..<see cref="MaxHealth"/>,
-    /// with no damage flash and no partial lava tick. A saved 0 stays 0, so the owner's first
+    /// with no damage flash, no partial lava tick and no status effects. A saved 0 stays 0, so the owner's first
     /// tick respawns the player instead of loading them dead. The mana is left alone: the save
     /// restore and the client mirror set it explicitly.
     /// </summary>
@@ -61,6 +62,7 @@ public sealed class PlayerHealth
         DamageFlash = 0f;
         _lavaTimer = 0f;
         Breath.Refill();
+        Effects.Clear();
     }
 
     public void TakeDamage(int amount)
@@ -182,16 +184,39 @@ public sealed class PlayerHealth
         Mana.Regen(deltaTime);
     }
 
+    /// <summary>The status effects on the player; <see cref="UpdateEffects"/> ticks them in the
+    /// authoritative simulation, and a client's copy is the server's mirror.</summary>
+    public StatusEffectSet Effects { get; } = new();
+
+    /// <summary>
+    /// Ticks the status effects; call every frame in the authoritative simulation only. A dead or
+    /// <paramref name="immune"/> player (creative, flight) has every effect cleared; otherwise a tick's
+    /// damage lands as a <see cref="DamageSource.Magic"/> blow carrying the effect's death phrase.
+    /// </summary>
+    public void UpdateEffects(float deltaTime, bool immune)
+    {
+        if (IsDead || immune)
+        {
+            Effects.Clear();
+            return;
+        }
+        var damage = Effects.Tick(deltaTime, MaxHealth);
+        if (damage > 0)
+            TakeDamage(damage, DamageSource.Magic, Effects.LastDamageEffect?.DeathMessage);
+    }
+
     /// <summary>Decays <see cref="DamageFlash"/>; call every frame.</summary>
     public void Update(float deltaTime) =>
         DamageFlash = Math.Max(0f, DamageFlash - Math.Max(0f, deltaTime) / DamageFlashSeconds);
 
-    /// <summary>Simple respawn: full pool, fresh lava timer, full air and mana. The caller owns the teleport.</summary>
+    /// <summary>Simple respawn: full pool, fresh lava timer, full air and mana, no status effects. The
+    /// caller owns the teleport.</summary>
     public void Respawn()
     {
         Health = MaxHealth;
         _lavaTimer = 0f;
         Breath.Refill();
         Mana.Refill();
+        Effects.Clear();
     }
 }

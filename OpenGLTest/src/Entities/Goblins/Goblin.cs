@@ -360,8 +360,9 @@ public sealed class Goblin : Mob
 
         TickLife(deltaTime);
         _hitFlash = MathF.Max(0f, _hitFlash - deltaTime / HitFlashSeconds);
-        _throwCooldown = MathF.Max(0f, _throwCooldown - deltaTime);
-        _meleeCooldown = MathF.Max(0f, _meleeCooldown - deltaTime);
+        // A slowing status effect stretches the attack cooldowns (AttackFactor 1 = unslowed)
+        _throwCooldown = MathF.Max(0f, _throwCooldown - deltaTime * AttackFactor);
+        _meleeCooldown = MathF.Max(0f, _meleeCooldown - deltaTime * AttackFactor);
         _losRetry = MathF.Max(0f, _losRetry - deltaTime);
         _noticePipElapsed = MathF.Min(MobConfig.GoblinNoticePipSeconds,
             _noticePipElapsed + deltaTime);
@@ -423,13 +424,13 @@ public sealed class Goblin : Mob
             move = Vector3.Zero;
 
         // Walking: ease the horizontal velocity toward the chosen move (or friction toward a
-        // stop), on the ground at full speed and afloat at a paddle.
+        // stop), on the ground at full speed and afloat at a paddle, both slowed by a status effect.
         if (IsGrounded || _inWater)
         {
             var speed = IsGrounded
                 ? MobConfig.GoblinWalkSpeed
-                  * (IsFleeing ? MobConfig.GoblinFleeSpeedFactor : 1f)
-                : MobConfig.GoblinWalkSpeed * SwimSpeedFactor;
+                  * (IsFleeing ? MobConfig.GoblinFleeSpeedFactor : 1f) * MoveFactor
+                : MobConfig.GoblinWalkSpeed * SwimSpeedFactor * MoveFactor;
             var moving = move != Vector3.Zero;
             var rate = moving ? MoveAccel : IsGrounded ? BodyMotion.GroundFriction : 0f;
             if (rate > 0f)

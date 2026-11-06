@@ -129,6 +129,13 @@ public sealed record BlockType
     internal static readonly byte[] HardensToById = new byte[256];
     internal static readonly byte[] HardensTouchingById = new byte[256];
 
+    // Status-effect block interaction (StatusEffectBlockRule): whether an igniting effect burns
+    // the block away, the solid a freezing effect turns a fluid source into, and the fluid a
+    // thawing effect melts a block back into. Zero means the block never freezes or melts.
+    internal static readonly bool[] FlammableById = new bool[256];
+    internal static readonly byte[] FreezesToById = new byte[256];
+    internal static readonly byte[] MeltsToById = new byte[256];
+
     // Gravity checks run per block edit (not per voxel), but the flat shape keeps the
     // support test a single array read like the other per-id questions
     internal static readonly bool[] FallsById = new bool[256];
@@ -436,6 +443,17 @@ public sealed record BlockType
 
     /// <summary>Fluid block id whose contact hardens this one; 0 when it never hardens.</summary>
     public byte HardensTouchingId { get; internal set; }
+
+    /// <summary>Whether an igniting status effect burns this block away to air, dropping nothing.</summary>
+    public bool Flammable { get; init; }
+
+    /// <summary>Solid block a source of this fluid becomes under a freezing status effect;
+    /// 0 when it never freezes.</summary>
+    public byte FreezesToId { get; internal set; }
+
+    /// <summary>Fluid this block becomes, as a source, under a thawing status effect;
+    /// 0 when it never melts.</summary>
+    public byte MeltsToId { get; internal set; }
 
     /// <summary>What happens when the block is destroyed.</summary>
     public BlockBreakAction OnBreak { get; init; } = BlockBreakAction.Drop;

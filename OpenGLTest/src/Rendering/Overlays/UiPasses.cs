@@ -42,7 +42,8 @@ internal sealed class UiPasses
         PauseMenuView? menu = null, SettingsMenuView? settings = null,
         int health = PlayerHealth.MaxHealth, float airShare = 1f, float manaShare = 1f, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
         HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
-        CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null)
+        CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null,
+        byte effectMask = 0)
     {
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
@@ -101,6 +102,7 @@ internal sealed class UiPasses
             _owner.Ui.Hud.DrawHearts(health);
             _owner.Ui.Hud.DrawAir(airShare, health);
             _owner.Ui.Hud.DrawMana(manaShare, health, camera?.IsCreative == true);
+            _owner.Ui.Hud.DrawEffects(effectMask, health);
             if (staffSlot != null)
                 _owner.Ui.Hud.DrawStaffSlot(staffSlot);
             if (hotbarName != null)

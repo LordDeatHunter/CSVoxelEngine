@@ -370,9 +370,12 @@ internal sealed class LocalPlayer
     {
         // A slower tool swings heavier: from the bare hand's pace (no weight) up to a tool with
         // a long hit gap.
-        var gap = Mining.HitGapSeconds(ItemRegistry.TryGet(Inventory.SelectedBlockId));
-        var weight = MathUtils.InverseLerp(Mining.HitGapSeconds(null), Mining.HitGapSeconds(null) + 0.5f, gap);
+        // A slowing status effect lengthens the swing's pace (an axe chop takes longer) but not its
+        // weight, which stays the tool's own.
         var held = ItemRegistry.TryGet(Inventory.SelectedBlockId);
+        var toolGap = Mining.HitGapSeconds(held);
+        var gap = Mining.HitGapSeconds(held, Camera.Effects?.AttackFactor ?? 1f);
+        var weight = MathUtils.InverseLerp(Mining.HitGapSeconds(null), Mining.HitGapSeconds(null) + 0.5f, toolGap);
         // An axe chops: one swing paced to its hits (the click loop starts it early, so the blow comes
         // down as the hit lands, and says so with chopStarted)
         if (Mining.IsAxe(held))
@@ -471,6 +474,8 @@ internal sealed class LocalPlayer
         _health.UpdateRegen(deltaTime, Camera.IsSprinting, Camera.IsCreative || Camera.IsFlying);
         // Singleplayer only: a client mirrors its server's mana and a server ticks ServerPlayer.TickStatus
         _health.UpdateMana(deltaTime);
+        // Singleplayer only, like the mana: a client's effects are the server's mirror
+        _health.UpdateEffects(deltaTime, Camera.IsCreative || Camera.IsFlying);
 
         // The day toast: the line appears the moment the sun rises through dawn, once a day
         var elevation = DayCycle.SunDirection(LightingTime).Y;

@@ -11,6 +11,7 @@ using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.Stations;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Entities;
@@ -84,7 +85,7 @@ public static class ContentRegistry
     /// <summary>
     /// Parses <c>data/items</c>, <c>data/blocks</c>, <c>data/loot</c> and every model they
     /// reference, assigns ids (air = 0, then blocks by name, then items by name) and publishes
-    /// the runtime tables, plus the <c>data/spell</c> parts, which take no ids. Models are flattened here but not baked — that needs the atlas.
+    /// the runtime tables, plus the <c>data/effects</c> status effects and the <c>data/spell</c> parts, which take no block or item ids. Models are flattened here but not baked — that needs the atlas.
     /// </summary>
     public static void Load(string assetsRoot)
     {
@@ -127,6 +128,7 @@ public static class ContentRegistry
         RecipeLoader.LoadCastRecipes(Path.Combine(assetsRoot, "data", "recipes", "cast"));
         EntityLoader.LoadEntities(assetsRoot);
         TreeSpeciesLoader.LoadTreeSpecies(Path.Combine(assetsRoot, "data", "trees"));
+        StatusEffectLoader.LoadEffects(Path.Combine(assetsRoot, "data", "effects"));
         SpellPartLoader.LoadSpellParts(Path.Combine(assetsRoot, "data", "spell"));
         ItemLoader.ValidateItemUses(itemFiles);
     }
@@ -467,6 +469,7 @@ public static class ContentRegistry
         EntityRegistry.Reset();
         TreeSpeciesRegistry.Reset();
         SpellPartRegistry.Reset();
+        StatusEffectRegistry.Reset();
 
         Array.Clear(BlockType.ById);
         Array.Clear(BlockType.Emission);
@@ -493,6 +496,9 @@ public static class ContentRegistry
         Array.Clear(BlockType.FluidInfiniteById);
         Array.Clear(BlockType.HardensToById);
         Array.Clear(BlockType.HardensTouchingById);
+        Array.Clear(BlockType.FlammableById);
+        Array.Clear(BlockType.FreezesToById);
+        Array.Clear(BlockType.MeltsToById);
         Array.Clear(BlockType.ReplaceableById);
         Array.Clear(BlockType.ReplaceableByPlacementById);
         Array.Clear(BlockType.FallsById);

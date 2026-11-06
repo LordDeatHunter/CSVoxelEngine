@@ -1,3 +1,4 @@
+using System;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Items;
@@ -81,6 +82,14 @@ public static class Mining
 
     /// <summary>Seconds between hits for the held item; a bare hand uses the baseline.</summary>
     public static float HitGapSeconds(Item? held) => HitGapMs(held) / 1000f;
+
+    /// <summary>The effect-slowed pace: seconds between hits for the held item while a status
+    /// effect scales the attacker's pace by <paramref name="attackFactor"/> (1 = unslowed, lower =
+    /// slower). Only the local player's own cadence reads it; the server's
+    /// <c>AttackPacing</c> and <c>BreakProgress</c> keep the unslowed overload, since they check
+    /// a minimum gap and a slower client is therefore always legal.</summary>
+    public static float HitGapSeconds(Item? held, float attackFactor) =>
+        HitGapSeconds(held) / MathF.Max(attackFactor, 0.05f);
 
     /// <summary>Milliseconds between hits for the held item; a bare hand uses the baseline.</summary>
     public static float HitGapMs(Item? held) =>

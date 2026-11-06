@@ -26,4 +26,10 @@ public sealed class SpellPartDefinition
 
     /// <summary>Modifier only: the factor the part multiplies a spell's range (projectile flight) by; default 1.</summary>
     public float? RangeFactor { get; set; }
+
+    /// <summary>
+    /// Element only: the name of the status effect (<c>assets/data/effects/&lt;name&gt;.json</c>) the element
+    /// applies on hit; none when unset. Must name a loaded effect.
+    /// </summary>
+    public string? Effect { get; set; }
 }

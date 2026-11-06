@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
 using VoxelEngine.Juice;
 using VoxelEngine.Player;
@@ -13,8 +14,8 @@ namespace VoxelEngine.Particles;
 /// <summary>
 /// The world's ambient effects: the burning cells the fire particles and the warm point lights
 /// share (<see cref="FireCells"/>), steam off hardening lava and hot springs, the embers over
-/// lava vents, the torch flames, the local player's bubbles, the water splashes of every body and
-/// the camera shake of a blast. Never gameplay: nothing here changes the simulation. The fire-cell
+/// lava vents, the torch flames, the particles of the mobs' status effects, the local player's
+/// bubbles, the water splashes of every body and the camera shake of a blast. Never gameplay: nothing here changes the simulation. The fire-cell
 /// and lava-vent gathers run on a headless server too, while the splashes, bubbles and torch flames
 /// skip it. Owned by <see cref="World"/>, which keeps the particle systems it feeds and draws them;
 /// main thread only.
@@ -124,6 +125,53 @@ internal sealed class AmbientEffects
             _fire.Puff(top, JuiceConfig.SteamPuffSmoke, JuiceConfig.SteamPuffSpread,
                 FireParticleKind.Steam);
             puffed++;
+        }
+    }
+
+    // The affected mobs within reach this frame, by squared distance to the eye (UpdateStatusParticles)
+    private readonly List<(float dist2, Mob mob)> _statusEmitters = [];
+    private static readonly Comparison<(float dist2, Mob mob)> NearestEmitterFirst =
+        static (a, b) => a.dist2.CompareTo(b.dist2);
+
+    /// <summary>
+    /// Sheds the particles of the mobs' active status effects: every live mob (<see cref="World.Mobs"/>,
+    /// the server's mirrors on a client) with an effect, within <see cref="ParticleConfig.FireParticleRadius"/>
+    /// of the eye, nearest first and at most <see cref="StatusEffectConfig.MaxParticleEmitters"/> of them,
+    /// puffs each of its effects' particle kind (a burning mob's embers) on the campfire particle
+    /// instance at about <see cref="StatusEffectConfig.ParticlesPerSecond"/> a second. Cosmetic:
+    /// singleplayer and a client, never a headless server.
+    /// </summary>
+    internal void UpdateStatusParticles(float deltaTime)
+    {
+        if (_serverMode || deltaTime <= 0f)
+            return;
+        var eye = Camera.RenderEye;
+        const float reach = ParticleConfig.FireParticleRadius * ParticleConfig.FireParticleRadius;
+        _statusEmitters.Clear();
+        for (var i = 0; i < _mobs.Count; i++)
+        {
+            var mob = _mobs[i];
+            if (mob.IsDying || mob.Effects.Mask == 0) continue;
+            var d2 = Vector3.DistanceSquared(mob.Position, eye);
+            if (d2 <= reach)
+                _statusEmitters.Add((d2, mob));
+        }
+
+        if (_statusEmitters.Count > StatusEffectConfig.MaxParticleEmitters)
+            _statusEmitters.Sort(NearestEmitterFirst);
+        var emitters = Math.Min(_statusEmitters.Count, StatusEffectConfig.MaxParticleEmitters);
+        var chance = StatusEffectConfig.ParticlesPerSecond * deltaTime;
+        for (var i = 0; i < emitters; i++)
+        {
+            var mob = _statusEmitters[i].mob;
+            var mask = mob.Effects.Mask;
+            for (var id = 0; id < StatusEffect.MaxKinds; id++)
+            {
+                if ((mask & (1 << id)) == 0) continue;
+                if (StatusEffectRegistry.ById(id)?.Particle is not { } kind) continue;
+                if (Random.Shared.NextSingle() >= chance) continue;
+                _fire.Puff(mob.Position, 1, mob.BodyHalfExtent * 2f, kind);
+            }
         }
     }
 

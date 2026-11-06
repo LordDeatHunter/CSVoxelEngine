@@ -1,6 +1,6 @@
 ---
 name: add-content
-description: Recipe for adding data-driven content to CSVoxelEngine - a block, item, loot table, model, entity, tree species, molten material, recipe or spell part - as JSON rather than C#. Includes the id-cap check, known traps and which tests to extend.
+description: Recipe for adding data-driven content to CSVoxelEngine - a block, item, loot table, model, entity, tree species, molten material, recipe, spell part or status effect - as JSON rather than C#. Includes the id-cap check, known traps and which tests to extend.
 ---
 
 # Adding content (JSON, not C#)
@@ -19,6 +19,7 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 | molten / melt / cast / craft / cook / crush | `assets/data/molten/`, `recipes/melt/`, `recipes/cast/`, `recipes/`, `recipes/cook/`, `recipes/crush/` |
 | tags | `assets/data/tags/<tag>.json` |
 | spell part | `assets/data/spell/<kind>/<name>.json` (kind = `element`, `shape`, `modifier`, `trigger`) |
+| status effect | `assets/data/effects/<name>.json` (HUD icon in `assets/textures/ui/`, see `tools/generate-effect-icons.py`) |
 | block tile | `assets/textures/blocks/<name>.png` |
 | normal map / material tile | `assets/textures/blocks_material/<name>.png` (**never** in `blocks/`) |
 
@@ -43,7 +44,9 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 - Entities: a new `Mob` kind's manager implements `IMobPopulation` and joins the world's `MobCaps` (the shared natural and hard caps); it gets no cap of its own.
 - Recipes: cook and crush are one per input; craft files are named by result, reverse by `<result>_from_<ingredient>`; a cast must melt back into exactly what it took (`MetalworksRecipeTests`).
 - Spell parts: every part needs a `costShare` in (0,1], a `complexity` >= 0 and at least one tag; `damageFactor`/`rangeFactor` only on modifiers; keep typical spells at 20-40% of `ManaConfig.StartMax` (`SpellRecipeTests` checks every shipped combination).
+- Status effects: at most 8 files (`StatusEffect.MaxKinds`, every wire form is a byte mask; the id is the file-name order). `durationSeconds` is required; `tickSeconds` is required exactly when the effect has a `damageShare` or a `blocks` flag and refused otherwise; factors only slow, in (0,1]; the effect must do something; `particle` is a `FireParticleKind` name; `icon` a `.png` path. An element part's `effect` must name a loaded effect, and only an element may carry one.
+- Status block flags: `flammable` never on a fluid or a multiblock cell; `freezesTo` only on a fluid and names a non-fluid; `meltsTo` only on a non-fluid and names another fluid. Flag only what a burn may safely remove (leaves, plants), never builds or stations.
 - Staffs: an item with a `staff` object (`slots` 1..`SpellConfig.StaffMaxSlots`, `tier` >= 1, non-blank distinct `tags`) stores in the Tools pool and may not declare `use` or `crucible`. It must be craftable (never loot only), and a higher tier needs more slots and a superset of the lower tier's tags (`StaffContentTests`).
 
 ## Tests to extend
-`ContentTests` (schema rules), `EntityContentTests`, `TreeSpeciesContentTests`, `KilnContentTests`, `MetalworksRecipeTests`, `BiomeTintTextureTests`, `SpellRecipeTests`, `SpellPartLoaderTests`, `StaffContentTests`, `StaffBindingTests`. Assert the **rule** the new content must satisfy; do not pin its literal values (see the `functional-tests` skill).
+`ContentTests` (schema rules), `EntityContentTests`, `TreeSpeciesContentTests`, `KilnContentTests`, `MetalworksRecipeTests`, `BiomeTintTextureTests`, `SpellRecipeTests`, `SpellPartLoaderTests`, `StaffContentTests`, `StaffBindingTests`, `StatusEffectLoaderTests` (effect schema rules), `StatusBlockFlagTests` (flammable/freezesTo/meltsTo). Assert the **rule** the new content must satisfy; do not pin its literal values (see the `functional-tests` skill).

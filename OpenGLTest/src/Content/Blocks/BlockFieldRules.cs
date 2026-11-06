@@ -83,6 +83,32 @@ internal static class BlockFieldRules
                 $"Block '{path}' uses a multiblock renderer with cutout, translucent or fluid; a multiblock cell must be an opaque solid so the structure occludes its neighbors.");
     }
 
+    /// <summary>
+    /// The status-effect block interaction flags (<c>flammable</c>, <c>freezesTo</c>,
+    /// <c>meltsTo</c>): a fluid never burns and a multiblock cell never burns out of its structure,
+    /// only a fluid freezes, and only a non-fluid melts. The freeze and melt targets themselves are
+    /// resolved once every block is loaded (<see cref="BlockLinkResolver"/>).
+    /// </summary>
+    internal static void ValidateStatusFlags(BlockDefinition definition, string path)
+    {
+        var fluid = definition.Fluid ?? false;
+        if (definition.Flammable ?? false)
+        {
+            if (fluid)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets flammable on a fluid; only a block can burn away.");
+            if (ParseRenderer(definition, path) is BlockRenderer.Multiblock or BlockRenderer.MultiblockPart)
+                throw new InvalidOperationException(
+                    $"Block '{path}' sets flammable on a multiblock cell; burning one cell would leave the structure broken.");
+        }
+        if (definition.FreezesTo != null && !fluid)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets freezesTo without fluid: true; only a fluid freezes.");
+        if (definition.MeltsTo != null && fluid)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets meltsTo on a fluid; only a solid block melts into a fluid.");
+    }
+
     /// <summary>What mining the block does: roll its loot, or prime TNT.</summary>
     internal static BlockBreakAction ParseOnBreak(BlockDefinition definition, string path) =>
         definition.OnBreak switch

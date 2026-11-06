@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
@@ -12,6 +13,7 @@ using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation.Icebergs;
+using VoxelEngine.Status;
 
 namespace VoxelEngine.Simulation;
 
@@ -35,6 +37,8 @@ internal sealed class MobDirector
     private readonly List<Mob> _mobs;
     private readonly bool _serverMode;
     private readonly bool _clientMode;
+    // Where the bodies' status effects convert cells; null on a client, whose effects are mirrors
+    private readonly StatusEffectBlockWriter? _statusBlocks;
     // The players the mob managers chase this frame, rebuilt right before they run.
     private readonly List<IMobTarget> _mobTargets = [];
 
@@ -46,8 +50,9 @@ internal sealed class MobDirector
 
     internal MobDirector(World world, ChunkManager chunkManager, DropManager dropManager, SlimeManager? slimes,
         GoblinManager? goblins, IcebergManager? icebergs, BlockDebrisSystem debris, PlayerHealth health,
-        List<Mob> mobs, bool serverMode, bool clientMode)
+        List<Mob> mobs, bool serverMode, bool clientMode, StatusEffectBlockWriter? statusBlocks)
     {
+        _statusBlocks = statusBlocks;
         _world = world;
         _chunkManager = chunkManager;
         _dropManager = dropManager;
@@ -106,7 +111,7 @@ internal sealed class MobDirector
         _icebergs.CarryAndPushOut(Camera, _chunkManager);
     }
 
-    /// <summary>The mob part of the world's entity update: rebuilds the targets, then runs the slime and goblin managers and bills the damage they dealt.</summary>
+    /// <summary>The mob part of the world's entity update: rebuilds the targets, runs the slime and goblin managers and bills the damage they dealt, then converts the cells the bodies' status effects pulsed (<see cref="ApplyStatusBlockActions"/>).</summary>
     internal void Update(double deltaTime)
     {
         RefreshTargets();
@@ -144,6 +149,48 @@ internal sealed class MobDirector
                 Camera.AddShake(Math.Clamp(goblinDamage / 20f, 0.2f, 1f));
                 LocalPlayer.NotifyPlayerHurt(fromMob: true);
             }
+        }
+
+        ApplyStatusBlockActions();
+    }
+
+    /// <summary>
+    /// Drains the block actions every body's status effects pulsed since the last frame (a burning
+    /// body's ignite and thaw, a frostburned one's freeze) into <see cref="StatusEffectBlockWriter"/>,
+    /// around the body's feet: each living mob, then each target (the local player, or every connected
+    /// player). Authoritative worlds only; a client has no writer.
+    /// </summary>
+    private void ApplyStatusBlockActions()
+    {
+        if (_statusBlocks == null)
+            return;
+        _statusBlocks.BeginFrame();
+        if (_slimes != null)
+            ApplyMobBlockActions(_slimes.Slimes);
+        if (_goblins != null)
+            ApplyMobBlockActions(_goblins.Goblins);
+        for (var i = 0; i < _mobTargets.Count; i++)
+        {
+            var target = _mobTargets[i];
+            if (target.Effects is not { } effects)
+                continue;
+            var actions = effects.TakeBlockActions();
+            if (actions != StatusEffectBlockAction.None)
+                _statusBlocks.Apply(target.Eye - new Vector3(0f, Camera.EyeHeight, 0f), actions);
+        }
+    }
+
+    // One manager's living mobs, with an indexed loop so a frame allocates no enumerator
+    private void ApplyMobBlockActions<T>(IReadOnlyList<T> mobs) where T : Mob
+    {
+        for (var i = 0; i < mobs.Count; i++)
+        {
+            var mob = mobs[i];
+            if (mob.IsDying)
+                continue;
+            var actions = mob.Effects.TakeBlockActions();
+            if (actions != StatusEffectBlockAction.None)
+                _statusBlocks!.Apply(mob.Position - new Vector3(0f, mob.BodyHalfHeight, 0f), actions);
         }
     }
 

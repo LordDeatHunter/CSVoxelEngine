@@ -28,10 +28,13 @@ public enum NetEntityKind : byte
 /// (its waterline center), <see cref="Yaw"/> (its quarter turns times pi/2,
 /// <see cref="TurnsFromYaw"/>), <see cref="Health"/> (its seed), <see cref="Ammo"/> (its scale and
 /// sinking, <see cref="PackIcebergAmmo"/>), <see cref="ItemId"/> (its variant) and
-/// <see cref="Velocity"/> (its drift, which the client dead-reckons along). GL-free and content-free.
+/// <see cref="Velocity"/> (its drift, which the client dead-reckons along). Every entry ends with
+/// <see cref="Effects"/>, a mob's active status effects as a bitmask of each effect's
+/// <c>StatusEffect.Bit</c> (0 for every other kind); the client drops the bits no loaded effect owns.
+/// GL-free and content-free.
 /// </summary>
 public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Position, float Yaw,
-    int Health, int Ammo, byte ItemId, Vector3 Velocity)
+    int Health, int Ammo, byte ItemId, Vector3 Velocity, byte Effects = 0)
 {
     /// <summary>Whether <paramref name="kind"/> is a mob (a slime or a goblin), the only kinds the
     /// client's mob reconcile spawns; drops, primed TNT and falling blocks are mirrored apart.</summary>

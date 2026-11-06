@@ -87,7 +87,7 @@ goblins with health, facing, velocity, ammo and a slime's size plus still-pendin
 `MaxSavedDrops` item drops, nearest first, and the drifting icebergs) and `stations.json` (`StationSaveCodec`:
 the campfires, querns, kilns and cast molds with their fuel, fire, crucible, cooking and cast progress). See "Saves" below for the rules.
 
-Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `SkyConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`creative`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; `damage` hurts every live mob, or the player's own pool with `"target": "player"`, then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `creative` turns creative mode on
+Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `SkyConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`creative`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; `damage` hurts every live mob, or the player's own pool with `"target": "player"`; `effect` (`{ "op": "effect", "effect": "burning", "target": "mobs"|"player", "scale": 1 }`, target `mobs` by default) applies a status effect through `StatusEffects.Apply`, the name checked only when the step runs (an unknown one is warned and skipped); then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `creative` turns creative mode on
 **without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
 player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
 any scenario that teleports a walking player above the ground, and turn it off again before a
@@ -194,7 +194,7 @@ set (`Inventory.Knows`, marked in `Add`, saved as names in `player.json` and rid
 "New: <name>" toast on a first pickup or `/give`. `HudToast` draws one line above the item-name row
 for the day toast ("Day N" as the sun rises through dawn), the inventory-full warning and the
 first-find toast; `HotbarNameFade` shows the selected item's name after a slot or item switch and
-`HotbarPickupPop` bumps a slot whose count rises, and a collected drop's icon arcs from where it lay into its hotbar slot (`PickupFlyIcons`, owned by the pop, spawned by `DropPickup` for local pickups only, drawn by `HudRenderer.DrawFlyingPickups`; a client sees none since its drops arrive as snapshots). The [E] panel fades and slides up on open and fades on close (`InventoryView.Transition`, `PanelTransition`; `UIRenderer.SetOverlay` shifts the pass's projection and sets `uFade` in `ui-fragment.glsl`, and panel scissors add `OverlayOffset`). `ItemTooltip.Lines` builds the hover panel over the
+`HotbarPickupPop` bumps a slot whose count rises, and a collected drop's icon arcs from where it lay into its hotbar slot (`PickupFlyIcons`, owned by the pop, spawned by `DropPickup` for local pickups only, drawn by `HudRenderer.DrawFlyingPickups`; a client sees none since its drops arrive as snapshots). The [E] panel fades and slides up on open and fades on close (`InventoryView.Transition`, `PanelTransition`; `UIRenderer.SetOverlay` shifts the pass's projection and sets `uFade` in `ui-fragment.glsl`, and panel scissors add `OverlayOffset`). The player's active status effects show as a row of icons left of the hearts (`HudRenderer.DrawEffects`, see "Status effects"). `ItemTooltip.Lines` builds the hover panel over the
 [E] panel's rows and the hotbar, and holding Tab draws the player list (a server session only). F2
 saves the finished frame through `VisualCapture`; F1 toggles `GameplayInput`'s `hudVisible`, the gate the scenario
 screenshot's `hideHud` drives. The chat commands are `/help`, `/tp x y z`, `/give <item> [count]`
@@ -292,6 +292,16 @@ when full). It rides the end of `PlayerStatus` as two ints (protocol 11, the max
 max is not saved, since it follows progression). `HudRenderer.DrawMana` draws it as a thin blue bar
 as wide as the hotbar row in the margin under it, hidden while dead or in creative. The cost a cast
 spends comes from its spell parts (`SpellRecipe`, see "Spell part schema"). `ManaTests`.
+
+**Status effects (MG-4b).** The player's effects are `PlayerHealth.Effects` (a `StatusEffectSet`, see
+"Status effect schema"), ticked by `PlayerHealth.UpdateEffects` in `LocalPlayer.UpdateHealth`
+(singleplayer) and `ServerPlayer.TickStatus` (server); a creative, flying or dead player has them
+cleared, and a respawn or a restore clears them too. Their damage is a `DamageSource.Magic` blow whose
+death line is the effect's own `deathMessage` phrase ("burned to death"), else "was killed by magic". A
+server marks the status dirty whenever the set of active effects changes, and the mask rides the end of
+`PlayerStatus` (protocol 13), which a client only mirrors (`ClientMirror.ApplyNetworkEffects`; a mirror
+never ticks). `HudRenderer.DrawEffects` draws one icon per active effect that has an `icon`, in a row
+ending just left of the hearts, hidden while dead. `StatusEffectSetTests`, `StatusEffectApplyTests`.
 
 **Water rendering** lives in the shared world shader plus two extra passes, the planar mirror (`ReflectionPass.RenderReflection`) and the scene copy. Just before `TerrainPasses.RenderWorldTranslucent` draws, `RenderTargets.CopyScene` snapshots the HDR scene target's color and depth (see "Linear lighting" below; the color copy is `Rgba16f`, like the reflection mirror) into two textures on units 3 and 4 (`CopyTexSubImage2D` from the bound HDR FBO — the water pass depth-tests while sampling, so it cannot read the target directly); the water fragment then composes its own look out of them: a refracted lookup offset along the analytic wave normal, Beer-Lambert absorption over the water's measured thickness (`WaterAbsorb`) plus in-scattered `WaterScatter`, and a Schlick fresnel mix into the planar reflection. Where that view-ray depth thins below `WaterFoamWidthBlocks` (a wall, a bank, a thin trickle) a pale **shore foam** band is mixed over the composed surface in linear light, lit by the shared opaque `light` term and fogged with it, broken up by a value-noise field the ripple phases jiggle and `FlowFoam` (the same two-phase flow map) carries downstream; top faces only, never from below or with the eye submerged, faded out by 160 blocks. The width must stay under a full cell's surface less the swell (`WaterFoamTests`), so open water over a block floor never foams; being screen-space, only contacts the depth copy sees foam (the camera-facing side of a block; a wall seen straight down shows none). `visual-examples/water-foam.json` frames liquid shores at `VOXEL_TIME` 360 and 147. Flowing water carries its baked flow into that normal (`FlowWaveNormal`: a bounded two-phase flow map that scrolls the ripples downstream and stretches them along the flow, identical to `WaveNormal` when the flow is zero), and falling side faces add fast vertical streaks; generated rivers and lakes are all source cells, so they bake no flow and stay still until the simulation makes them flow (`visual-examples/flow-water.json`, `VOXEL_TIME=147`, pours some). The mirror plane itself is the single `RenderManager.WaterPlaneY` at sea level, so a lake whose surface stands above it reflects against that plane rather than its own - an accepted approximation, since only one plane can be mirrored per frame. Seen from below — decided per fragment from the face normal (`fromBehind` in `test-fragment.glsl`), never from the sea plane, since a pond stands above it — the surface is a Snell window: the same scene copy shows through it distorted by the wave normal, the inside fresnel goes to total internal reflection past the critical angle and that band fades to the underwater fog color, and the mirror is never sampled from that side; `ReflectionReuse.MirrorApplies` also skips rendering it whenever `Camera.IsEyeInWater`, and the sky dome (`SkyRenderer`) and the sun disc stay dry in water (lava still fades the dome via `FrameLighting.SkyTintAmount`, eased through its `_lavaT`) so the window shows real sky. World, cloud and sky fog share `SkySample`, duplicated verbatim in `sky-fragment.glsl`, `test-fragment.glsl` and `cloud-fragment.glsl`, with `SkyPalette.Sample` as the tested C# reference, so change all four together. The dome currently samples the flat 28198cc sky color: `SkyPalette.Compute` returns the old night/day mix, pulled toward the dusk orange by `SkyDuskMix`, as both zenith and horizon with zero glow, and `SkyHazeStrength` is 0, so every direction (and every fully fogged fragment) is that one color. The reflection pass now also draws the sun disc and the cloud layer into the mirror, and both it and the scene copies are skipped whenever `TerrainPasses.CullWater` (one frustum pass a frame, feeding the water pass its draw lists) found no water on screen — glass shares the translucent mesh, so `Chunk.HasWaterMesh` is the flag that decides, not `HasTranslucentMesh`. The mirror's opaque chunk and LOD lists skip anything whose top (`Chunk.WorldMax.Y`, `LodRegion.YMax`) plus `ReflectionCull.TopMarginBlocks` (a multiblock's one-block overhang plus the shader's sway and wave lift) lies below the plane, since its clip would discard every fragment. Opaque faces that look into water are flagged by the mesher in bit 3 of `Vertex.Normal` (bits 0-2 stay the face index, bit 5 is the leaf-sway flag, bits 6-7 the low bits of the block-light tint code) and get the animated Voronoi caustic net; bit 4 is the biome-tint flag (see "Biome-tinted grass and leaves" below). The world fragment darkens a submerged face's albedo by `WetDarken` once, before the light multiply, and only at or below that face's own baked surface (`step(fWorldPos.y, fWaterSurfaceY)`; the caustics stop at the same line), so a dry face beside water — a beach top, a bank wall over the waterline — is never darkened or tinted; ore tiles (a non-zero `material.metallic`) are excluded. `SurfaceFresnel` is the GL-free twin (`Schlick`, `WetWeight`). While the eye is submerged, `UnderwaterRaysRenderer` adds one full-screen ray-march for sun shafts, composited in display space (the upsample reads the HDR target it draws into, adds the shafts to the encoded scene with the pre-SH-10 sRGB sun color and strength, clips at 1 and decodes), since the same add in linear light lost the glare toward the sun. Both measure depth from the **local** water surface, never the sea plane: the caustics from the surface baked into each submerged face's vertex (`Vertex.WaterSurface`, read as `fWaterSurfaceY`), the rays from `Camera.EyeWaterSurfaceY` (`ChunkManager.GetFluidColumnTopGlobal` over the eye's column), so a pond above sea level gets both — only the planar mirror still uses the sea plane. The rays are why the shadow map keeps rendering underwater (`FrameLighting.ShadowStrengthDry`, the strength before the underwater fade) even though the world diffuse no longer uses it. **Depth convention**: `Camera.GetProjectionMatrix` comes from `System.Numerics`, which is Direct3D-style (clip depth 0..1), so window depth is *not* the GL -1..1 mapping — never write a near/far linearization. Reconstruct a world position by inverting the very matrix that wrote the depth (`uInvViewProj`), and compare raw depth values directly for "which is nearer". `visual-examples/water.json` (run it with `VOXEL_TIME=360`) frames the shallows, the grazing surface, deep water from height and the underwater shots, including the surface seen from below in the sea and in a pond above sea level (a liquid one — a frozen pond has an ice lid, not a water top face).
 
@@ -1054,6 +1064,8 @@ OpenGLTest/
                                #   gate
       SaveConfig.cs            # autosave, save writer retries and shutdown, teardown joins and drain, entity restore
       SimulationConfig.cs      # fluid tick, tree felling, reactive growth, leaf decay, ash, saplings
+      StatusEffectConfig.cs    # status effects: the duration scale cap, the block writer's reach and write caps,
+                               #   the mob tint strength, the particle emitter cap and rate
       SkyConfig.cs             # day length, sun and glare, sky dome, stars, moon, moonlight, aurora, clouds, wind
       StreamingConfig.cs       # view radius, per-frame mesh, dirty and scan budgets, thread counts, LOD build and
                                #   upload budgets, loading budgets and gate
@@ -1077,8 +1089,10 @@ OpenGLTest/
         BlockRenderer.cs, BlockBreakAction.cs,
           AttackPattern.cs, ItemUseAction.cs  # geometry/break/attack/use enums
         BiomeTintFaces.cs      # a block's resolved biomeTint: palette + per-face base/tinted tiles
-        BlockFieldRules.cs     # a block JSON's plain per-field rules: renderer, flow, stacking, support, ground traits, tools
-        BlockLinkResolver.cs   # the cross-block references (hardening, multiblock, wall block, upper half, pickAs), queued per file and resolved once all load
+        BlockFieldRules.cs     # a block JSON's plain per-field rules: renderer, flow, stacking, support, ground traits, tools,
+                               #   the status flags (ValidateStatusFlags)
+        BlockLinkResolver.cs   # the cross-block references (hardening, freezesTo/meltsTo, multiblock, wall block, upper half,
+                               #   pickAs), queued per file and resolved once all load
         BlockLoader.cs         # data/blocks -> BlockType and the per-id tables: LoadBlocks, BuildType and RegisterTables
         BlockSchemaParser.cs   # a block JSON's shape fields: material, flame, facing/support, pane, open, hitboxes, tree wood
       Definitions/             # the JSON DTOs
@@ -1092,6 +1106,7 @@ OpenGLTest/
         MoltenMaterialDefinition.cs # a molten metal: id, tile, tint
         RecipeDefinition.cs    # JSON shape of assets/data/recipes/<name>.json
         SpellPartDefinition.cs # JSON shape of assets/data/spell/<kind>/<name>.json
+        StatusEffectDefinition.cs # JSON shape of assets/data/effects/<name>.json
         TagDefinition.cs       # JSON shape of assets/data/tags/<name>.json
         TreeSpeciesDefinition.cs # JSON DTO of assets/data/trees/<species>.json
       Loot/                    # compiled loot tables, loot context, wood loot bands
@@ -1138,6 +1153,11 @@ OpenGLTest/
         SpellPartLoader.cs     # data/spell/<kind>/*.json -> parts; ReadParts and Compile are pure (tests)
         SpellRecipe.cs         # element + shape + modifiers + trigger -> cost, verdict, fizzle, factors
         SpellStats.cs, SpellVerdict.cs  # what a recipe compiles to; the first rule it breaks
+      StatusEffects/           # status effects (MG-4b): the compiled effect, its block actions, loader and registry
+        StatusEffect.cs        # one compiled effect: duration, tick, damage share, factors, block actions, visuals; Bit
+        StatusEffectBlockAction.cs # [Flags] Ignite / Freeze / Thaw, what an effect's tick does to the cells around
+        StatusEffectLoader.cs  # data/effects/*.json -> effects (id = file-name order, at most MaxKinds); Compile is pure
+        StatusEffectRegistry.cs # every effect by name and id, KnownMask, published once by ContentRegistry.Load
       Stations/                # GL-free render constants of the kiln, quern and casting passes, molten materials
         KilnRenderer.cs, QuernRenderer.cs,
           CastingRenderer.cs   # GL-free placement/animation
@@ -1708,7 +1728,8 @@ OpenGLTest/
                                   #   a radial fragment gradient, drawn inside the UI pass
         EntityHealthbarRenderer.cs # five hearts floating above every live mob, always facing the camera
         HudRenderer.cs         # crosshair, hearts, hotbar and its feedback, toasts, FPS and profiler, tooltip,
-                               #   player list; owns the crosshair and heart sprites
+                               #   player list, the status effect icons (DrawEffects); owns the crosshair, heart and
+                               #   effect icon sprites
         InventoryPanelRenderer.cs # the [E] panel: tabs, search field, rows, creative catalog buttons,
                                   #   preview, and its hit-tests
         LoadingScreenRenderer.cs # the loading/saving screen and the fade over the first playing frames
@@ -1811,7 +1832,8 @@ OpenGLTest/
         OrphanWoodCheck.cs     # the orphaned-wood test: the parent-chain fast path, the full TreeSupport search, frame memos
         TipHydration.cs        # the leaf hydration rule on world cells: best-first tip offsets, live tips, tip support
       MobDirector.cs           # World component: the per-frame mob job (the targets, the slime and goblin updates and
-                               #   their damage, the blast shove, the mob list and its scenario spawn/damage seams)
+                               #   their damage, the blast shove, the mob list and its scenario spawn/damage seams,
+                               #   the drain of status-effect block actions into the StatusEffectBlockWriter)
       MobSpawner.cs            # the shared dry-forest-surface ring spawn search
       QuernManager.cs          # block-entity registry for querns: one crushable unit per cell plus a one-rotation spin timer
       SaplingManager.cs        # the saplings planted in the world (an acorn, or any
@@ -1827,6 +1849,12 @@ OpenGLTest/
       TreeGrowthWriter.cs      # reactive growth on the live world: rebuild a column's tree from its wood
                                #   state bytes (or plant a sapling), GrowFurther in a WorldTreeSpace, write
                                #   the difference back; TreeGrowthResult.cs / TreeGrowthStatus.cs are its result
+    Status/                    # status effects at run time (MG-4b), see "Status effect schema"
+      StatusEffectSet.cs       # GL-free per-target set: apply (refresh, never stack), tick (DoT, block actions), the
+                               #   lowest move/attack factor, the client mirror mask, the tint
+      StatusEffects.cs         # the one Apply API (a Mob, an IMobTarget, a PlayerHealth), authoritative only
+      StatusEffectBlockRule.cs # GL-free: which cell an ignite/freeze/thaw converts, and whether it holds something up
+      StatusEffectBlockWriter.cs # the authoritative block writes with every edit hook, capped per pulse and per frame
     UI/                        # UI state, layout and rules, mostly GL-free (UIRenderer's page renderers in Rendering/Overlays draw them): canvas, font, settings
       BitmapFont.cs            # TrueType font baked into a GL atlas; CPU glyph layout (printable ASCII)
       GameSettings.cs          # player settings with JSON persistence (settings.json)
@@ -1882,7 +1910,7 @@ OpenGLTest/
       VisualCapture.cs         # reads the finished frame back from the GPU and writes it as a PNG
       VisualDirector.cs        # runs a VisualScenario inside the live game
       VisualScenario.cs        # a scripted in-game run:
-                               #   teleport/look/wait/walk/mine/place/fly/give/spawn/grow/screenshot
+                               #   teleport/look/wait/walk/mine/place/fly/give/spawn/grow/damage/effect/screenshot
                                #   steps loaded from JSON (VOXEL_SCRIPT)
     WorldGen/                  # procedural worldgen: terrain, biomes, caves and worms, the
                                #   tree front end and batches, clouds, the generational cache
@@ -2041,7 +2069,9 @@ OpenGLTest/
   assets/data/recipes/melt/<in>.json  # what a block or item melts into, and how many ml
   assets/data/recipes/cast/<out>.json # (fired mold + material) -> result, amount and cooling time
   assets/data/spell/<kind>/<name>.json # spell parts by kind (element, shape, modifier, trigger): cost share,
-                                      #   complexity, tags, modifier factors
+                                      #   complexity, tags, modifier factors, an element's status `effect`
+  assets/data/effects/<name>.json     # status effects (burning, frostburn): duration, damage over time, speed
+                                      #   factors, block actions, tint, particle, HUD icon, death phrase
   assets/models/block/<name>.json     # Minecraft Java block models, incl. the built-in parents
                                       #   cube, cube_all, cube_column, cube_bottom_top
   assets/models/entity/<name>.bbmodel # Blockbench entity projects (slime, goblin with its four
@@ -2104,7 +2134,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Streaming/                 # the generation workers, the scan frontier, the streaming foci
   Content/                     # the registry and its baked tables: blocks, models, shapes (panes,
                                #   tree wood, multiblocks), loot, recipes, kiln and molds, spell parts and
-                               #   recipes (flat)
+                               #   recipes, status effects and the status block flags (flat)
   Core/                        # the Core utilities and the src-root types (World lifecycle, WorldSeed, WorldLoadGate)
   Effects/                     # mirrors src/Effects: one folder per sub-domain of shader twins
     Climate/                   # the biome tint field and its chunk, LOD, pop and texture consumers
@@ -2151,6 +2181,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
     Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World
+  Status/                      # the status effect set, the Apply API, the speed factors and the block rule and writer
   UI/                          # the canvas, settings, scroll lists, text wrap
     Hud/                       # chat, clock, compass, hit marker, hotbar feedback,
                                #   toasts, tooltips, the look label, screenshot paths
@@ -2172,6 +2203,7 @@ tools/                                # asset generators: tiles, sprites, models
   generate-crystal-texture.py         # deterministic generator of the crystal tile (crystal_block.png)
   generate-crushed-iron-texture.py    # deterministic generator of the crushed iron sprite (crushed_iron.png)
   generate-door-textures.py           # deterministic oak trapdoor (and door) tiles (stdlib PNG writer)
+  generate-effect-icons.py            # deterministic 16x16 HUD icons of the status effects (effect_*.png), --check
   generate-goblin-clips.py            # deterministic generator of the goblin's animation clips (goblin.bbmodel)
   generate-goblin-skin.ps1            # deterministic generator of goblin.png; its header pins the UV layout
   generate-hollow-log-textures.py     # deterministic placeholder inner/end tiles of the hollow logs
@@ -2273,6 +2305,9 @@ trailing commas.
 | `falls` | false | gravity-affected (sand, gravel): topples into a `FallingBlock` entity when the cell below stops being solid, sinks through water, slides off lone supports; never combines with `fluid`/`needsSupport` |
 | `fluid` | false | the block is a flowing fluid (water, lava): forces `solid`, `castsAO`, `hasItem`, `needsSupport` off, `occludes` off and `light.passes` on, and drops nothing whatever the file says |
 | `flow` | water behavior | per-fluid tuning, only legal with `fluid: true`: `tickDivisor` (ticks between updates, lava `2` = half water speed), `range` (sideways spread 1..7, lava `3`), `infinite` (adjacent sources birth new ones, lava `false`), and the `hardensTo` + `hardensTouching` pair (lava hardens to `cobblestone` on touching `block/water`) |
+| `flammable` | false | a status effect with `blocks.ignite` burns the block away to air (no loot, no fire block) when it ticks beside it (`BlockType.FlammableById`). Illegal on a fluid and on a multiblock anchor or part. The leaves and the ground plants set it; planks, logs, TNT and stations do not |
+| `freezesTo` | none | the solid block a fluid **source** freezes into under `blocks.freeze` (`BlockType.FreezesToById`; water -> `ice`). Only legal on a fluid, and the target must be a registered non-fluid block |
+| `meltsTo` | none | the fluid a block thaws into, as a source, under `blocks.thaw` (`BlockType.MeltsToById`; ice -> `water`). Only legal on a non-fluid, and the target must be a fluid other than the block itself |
 | `onBreak` | `"drop"` | `drop` (roll loot) or `prime_tnt` (no drop, spawns a `PrimedTnt`) |
 | `loot` | the table sharing this block's name, else drop self | loot table name; `"none"` drops nothing |
 | `sfx` | `hit_default` | sound group played while the block is mined, e.g. `hit_rock` (the stone blocks) or `hit_wood` (the logs and cactus). A group is every `<group>.wav` / `<group>_N.wav` directly under `assets/sfx`, and one variant is picked at random per hit (`SfxManager`). An unknown group warns yellow and uses the default |
@@ -2918,7 +2953,7 @@ The folder is the part's kind (`element`, `shape`, `modifier`, `trigger`; `Spell
 and a modifier may share a file name, and they take no byte ids. A missing `spell/` folder or kind folder
 is no parts (no trigger ships); an unknown kind folder or a `.json` lying directly in `spell/` is an error
 naming it, and every part error names its file. `SpellPartLoader` (`Content/Spells/`) runs in
-`ContentRegistry.Load` right after the tree species and publishes `SpellPartRegistry` (`TryGet`,
+`ContentRegistry.Load` right after the status effects (which follow the tree species) and publishes `SpellPartRegistry` (`TryGet`,
 `TryGetByKey`, `Require`, `All`), which `ContentRegistry.Reset` clears. Tests read temp folders through the pure
 `SpellPartLoader.ReadParts`/`Compile`, never by replacing the published registry.
 
@@ -2930,6 +2965,7 @@ naming it, and every part error names its file. `SpellPartLoader` (`Content/Spel
 | `tags` | required | at least one non-blank, distinct, lowercase tag (compared ordinally): what a staff tier allows (MG-3). Their own namespace, unrelated to the item tool tags in `data/tags` |
 | `damageFactor` | 1 | modifier only, finite and > 0: multiplies the spell's damage |
 | `rangeFactor` | 1 | modifier only, finite and > 0: multiplies the spell's range (projectile flight) |
+| `effect` | none | element only: the status effect the element applies on hit (`SpellPart.Effect`, read by MG-5), the name of a loaded `assets/data/effects` file; an unknown or blank name, or an `effect` on any other kind, is refused naming the file. `fire` -> `burning`, `frost` -> `frostburn`, `nature` none |
 
 `SpellRecipe` (a flat list of parts) compiles through `Compile(allowedTags)` to a `SpellStats`, GL-free
 and pure (no roll, no registry read). The verdict (`SpellVerdict`) checks, in order: exactly one
@@ -2945,6 +2981,76 @@ is a JSON file, never a `switch` on its name. Slice 1 ships the elements `fire`,
 the shapes `projectile` and `self` and the modifiers `power` (raises damage and cost) and `range`
 (lengthens flight and raises cost), all tagged `basic`; every valid combination costs 20-40% of the
 starting pool (the `ManaConfig` design rule). `SpellRecipeTests`, `SpellPartLoaderTests`.
+
+### Status effect schema (`assets/data/effects/<name>.json`)
+
+One file per effect; the file name is its name (`StatusEffectRegistry.Require(name)`), and an effect's
+byte id is its index in file-name order (`StatusEffect.Bit` = `1 << Id`). At most
+`StatusEffect.MaxKinds` (8) may exist, because every wire form is a one-byte mask; a ninth file is
+refused naming the folder. `StatusEffectLoader` (`Content/StatusEffects/`) runs in
+`ContentRegistry.Load` right **before** the spell parts, so an element's `effect` validates against it,
+and every error names its file. Tests compile in-memory effects through the pure
+`StatusEffectLoader.Compile`/`ReadEffects`.
+
+| field | default | meaning |
+|---|---|---|
+| `name` | file name | display name |
+| `durationSeconds` | required | finite and > 0: how long one application lasts (times the caller's scale, clamped to 0..`StatusEffectConfig.MaxDurationScale`) |
+| `tickSeconds` | none | finite and > 0, required exactly when the effect deals damage or has a block flag, refused otherwise: the pulse interval |
+| `damageShare` | none | in (0, 1]: damage per pulse as a share of the target's max health, at least 1 (`StatusEffectSet.DamagePerTick`) |
+| `moveFactor` | 1 | in (0, 1]: scales the walk and swim speed (the player's `PlayerPhysics`, a goblin's walk, a slime's hop clock) |
+| `attackFactor` | 1 | in (0, 1]: slows the local player's hit gap (`Mining.HitGapSeconds(held, factor)`: punch cadence, mining hits, the axe chop), a goblin's throw and melee cooldowns and a slime's contact cooldown |
+| `blocks.ignite` / `blocks.freeze` / `blocks.thaw` | false | what each pulse does to the cells around the body (`StatusEffectBlockAction`): burn `flammable` blocks to air, freeze a fluid source under the feet into its `freezesTo`, thaw a block into its `meltsTo` fluid source |
+| `tint` | none | sRGB `[r, g, b]`, 0..255 each: the mob tint (`uStatusTint`, decoded to linear) |
+| `particle` | none | a `FireParticleKind` name (`ember`, `smoke`, `steam`, ...), matched case-insensitively: what an affected mob sheds |
+| `icon` | none | a `.png` path under `assets/`: the player's HUD icon |
+| `deathMessage` | none | the phrase after the player's name in a death line ("burned to death") |
+
+An effect must do something: damage, a factor below 1 or a block flag. Two ship: `burning` (fire; 6 s,
+5% a second, ignite and thaw, orange, embers) and `frostburn` (frost; 8 s, 2% every 2 s, half speed, 0.6
+attack, freeze, pale blue, steam), first guesses.
+
+**Rules.** A target's effects are one `StatusEffectSet` (`Status/`, GL-free, allocation-free after the
+first apply): re-applying an active effect refreshes its remaining time to the larger of the two and
+never stacks its damage; damage lands once per `tickSeconds` and never after the duration; the movement
+and attack factors are the **lowest** among the active effects. Effects tick **only in the
+authoritative simulation** (singleplayer and the server): a mob's in `Mob.UpdateHazards` (cleared once it
+is dying), the player's as under "Status effects" above; a client's sets are mirrors
+(`SetMirrorMask`, unknown bits dropped) that never tick. **The one API** MG-5 calls is
+`StatusEffects.Apply(target, effectName, durationScale)`, with overloads for a `Mob` (refused while
+dying or dead), an `IMobTarget` (its default `Effects` member is null, and an immune, dead or effect-less
+target refuses) and a `PlayerHealth` (refused while immune or dead); never call it on a client. The
+visual-scenario `effect` op (`visual-examples/status-effects.json`, `VOXEL_TIME=147`) applies one to every
+mob or to the player.
+
+**Block interaction.** Each pulse ORs the effect's block flags into the set's pending actions, which
+`MobDirector` drains after the mob managers run (mobs at their feet, targets at the eye less
+`Camera.EyeHeight`) into `StatusEffectBlockWriter`, built only when not a client. The writer scans the
+cells within `StatusEffectConfig.BlockReachBlocks` horizontally of the feet, from the cell under them to
+the one above, asks the pure `StatusEffectBlockRule` (freeze only a fluid source whose top is at or below
+the feet, so a body never freezes itself in), skips an unloaded cell, a cell that holds a
+support-fragile neighbor up (`HoldsSomethingUp`, so it never needs a pop path) and a fluid cell a
+falling cube overlaps, and stops at `MaxBlockWritesPerPulse` per body and `MaxBlockWritesPerFrame` in
+all. Each write is `Chunk.SetBlockRaw` (saved, journaled to clients on a server) followed by every
+edit-path hook: `UnmarkPlayerPlaced`, an asynchronous `MarkAreaDirty`, `FluidManager.ScheduleAround`,
+`LeafDecayManager.ScheduleAround`, `FallingBlockManager.TryTopple` above, the LOD edit hook, and for a
+tree block `TreeGenerator.PoisonCanopy` plus `LodManager.MarkEditedColumn`. No loot, no
+`World.BlockEdited`. `StatusEffectBlockTests`.
+
+**Visuals.** An affected mob is tinted by `uStatusTint` (a `vec4` in `test-fragment.glsl` mixed into
+the albedo before the hit flash at `StatusEffectConfig.MobTintStrength`, zero by default and reset every
+frame on the plain program, so everything else is byte-identical; `MobPasses` sets it from
+`StatusEffectSet.TryGetTint`, the lowest-id tinted effect) and sheds its effects' particles through the
+campfire `FireParticleSystem.Puff` (`AmbientEffects.UpdateStatusParticles`, nearest first, at most
+`MaxParticleEmitters` mobs, `ParticlesPerSecond` each, never on a server). The HUD icons come from
+`tools/generate-effect-icons.py`. Tests: `StatusEffectLoaderTests`, `StatusBlockFlagTests`,
+`StatusEffectSetTests`, `StatusEffectApplyTests`, `StatusEffectFactorTests`, `StatusEffectBlockTests`.
+
+Known gaps: effects are not saved (`player.json`, `entities.json`); other players' effects are not shown
+(the `PlayerList` carries none); the player's slowdown is client-trusted (the server rubberband only
+caps speed from above); sword and slice swing durations are not scaled by the attack factor; a blast
+does not consult effects; a slime's split children do not inherit its effects; and icebergs are not
+consulted, so a frostburned rider may freeze water inside a berg's submerged boxes.
 
 ## Architecture: threading model (the most important thing to preserve)
 
@@ -3278,7 +3384,7 @@ climate) instead of the heights alone, so a client derives nothing from worldgen
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 (current) adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 8 added
+whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 13 (current) ends every `EntityList` entry, of every kind, with a status-effect byte mask (`NetEntity.Effects`: a mob's `StatusEffect.Bit`s, 0 for a drop, primed TNT, falling block or iceberg) and ends `PlayerStatus` with the player's own effect mask (`PlayerStatusData.EffectMask`); both codecs carry the mask raw and the client drops unknown bits when it mirrors them, and an older peer would misread every frame after the first entry. Version 8 added
 `NetEntityKind.Iceberg` (6): `Position` the waterline center, `Yaw` the quarter turns times pi/2
 (`NetEntity.YawFromTurns` / `TurnsFromYaw`), `Health` the seed, `Ammo` the scale in thousandths and
 the sinking in its next byte (`NetEntity.PackIcebergAmmo` / `UnpackIcebergAmmo`), `ItemId` the
@@ -3735,7 +3841,10 @@ water disagrees with its columns costs wake work, never a crash; `ImportedMapSou
 column file at construction, so a map of hundreds of thousands of columns costs hundreds of MB
 and a long synchronous start (a lazy per-column load is the follow-up); and the server camera,
 which `SpawnOverrides.SpawnPosition` still places on the generated origin surface, can start inside or
-under the map's terrain until the spawn settle lifts it.
+under the map's terrain until the spawn settle lifts it. From the status effects (MG-4b): other
+players' effects are not shown (the `PlayerList` carries no mask), a client's slowdown is applied by
+its own physics and is not judged (the rubberband only caps speed from above), and the server's attack
+pacing checks a minimum gap only, so a slowed client stays legal but an unslowed one is not caught.
 
 ## Biomes
 
@@ -4421,7 +4530,8 @@ overshoot or jiggle.
 
 - **Mob life-cycle** (`Mob.cs`): every mob has a spawn pop (`SpawnProgress`), a death
   (`BeginDying`/`IsDying`/`DeathProgress`/`IsRemovable`, `DeathSeconds` per kind), a hit recoil spring
-  (`HitKick`) and an eased `HitFlash`. A killed mob **rolls its loot at once**, then stays in the
+  (`HitKick`) and an eased `HitFlash`; an active status effect tints it through `uStatusTint`, mixed
+  under the flash (see "Status effect schema"). A killed mob **rolls its loot at once**, then stays in the
   manager's list (still drawn, no longer a target, a threat, a saved or broadcast mob or part of the
   live count) until its death has played; `MobDirector.RefreshMobs` skips dying mobs, the spawn caps use
   `LivingCount`, and a client's `Remove` (the server stopped reporting it) starts the death instead of

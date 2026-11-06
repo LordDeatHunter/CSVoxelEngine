@@ -1,5 +1,6 @@
 using System.Numerics;
 using VoxelEngine.Player;
+using VoxelEngine.Status;
 
 namespace VoxelEngine.Entities;
 
@@ -29,6 +30,10 @@ public interface IMobTarget
     /// <summary>Whether the player is dead: a dead body pushes nothing. Only a connected player
     /// reports its server-owned death here; the local camera keeps the default.</summary>
     bool IsDead => false;
+
+    /// <summary>The target's status effects, null where nothing may apply them (a stand-in target, a
+    /// server's camera). <see cref="StatusEffects.Apply(IMobTarget, string, float)"/> applies through it.</summary>
+    StatusEffectSet? Effects => null;
 
     /// <summary>A mob hit landed: take <paramref name="damage"/> and a knockback shove along the
     /// horizontal <paramref name="awayHorizontal"/> at <paramref name="knockbackSpeed"/> plus an

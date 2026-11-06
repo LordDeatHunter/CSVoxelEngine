@@ -47,9 +47,16 @@ public sealed class VisualStep
     /// <summary>Health a <c>damage</c> step takes off every live mob, or off the player.</summary>
     public int Amount { get; init; }
 
-    /// <summary>Who a <c>damage</c> step hurts: <c>mobs</c> (the default, every live mob) or
-    /// <c>player</c> (the local player's health pool).</summary>
+    /// <summary>Who a <c>damage</c> or <c>effect</c> step reaches: <c>mobs</c> (the default, every
+    /// live mob) or <c>player</c> (the local player's health pool).</summary>
     public string Target { get; init; } = "mobs";
+
+    /// <summary>The status effect an <c>effect</c> step applies (resolved at run time).</summary>
+    public string? Effect { get; init; }
+
+    /// <summary>The duration scale an <c>effect</c> step applies its effect with (1 when the step
+    /// names none).</summary>
+    public float Scale { get; init; } = 1f;
 
     /// <summary>The camera mode a <c>view</c> step selects (<c>first</c>, <c>shoulder</c> or <c>orbit</c>).</summary>
     public string? Mode { get; init; }
@@ -64,7 +71,7 @@ public sealed class VisualStep
 }
 
 /// <summary>
-/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/creative/give/spawn/grow/screenshot steps loaded from
+/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/creative/give/spawn/grow/damage/effect/screenshot steps loaded from
 /// JSON (<c>VOXEL_SCRIPT</c>), driving the real world-update functions for agent screenshots.
 /// </summary>
 public sealed class VisualScenario
@@ -189,6 +196,7 @@ public sealed class VisualScenario
                     ? ReadChoice(element, index, "damage", "target", ["mobs", "player"])
                     : "mobs",
             },
+            "effect" => ReadEffect(element, index),
             "view" => new VisualStep { Op = "view", Mode = ReadChoice(element, index, "view", "mode", ["first", "shoulder", "orbit"]) },
             "player" => new VisualStep
             {
@@ -211,7 +219,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, view, player, select or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, view, player, select or screenshot."),
         };
     }
 
@@ -305,6 +313,37 @@ public sealed class VisualScenario
             Op = "grow", Species = species.GetString()!.Trim(),
             Pos = new Vector3(values[0], 0f, values[1]), SnapToGround = true,
             GrowSteps = steps,
+        };
+    }
+
+    /// <summary>An <c>effect</c> step: <c>effect</c> names the status effect (validated against the
+    /// registry only when the step runs, so parsing stays content-free), the optional <c>target</c>
+    /// is <c>mobs</c> (the default) or <c>player</c>, and the optional <c>scale</c> (a number above 0,
+    /// default 1) scales the effect's duration.</summary>
+    private static VisualStep ReadEffect(JsonElement element, int index)
+    {
+        if (!element.TryGetProperty("effect", out var effect)
+            || effect.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(effect.GetString()))
+            throw new InvalidOperationException($"Step {index} (effect) needs 'effect'.");
+
+        var scale = 1f;
+        if (element.TryGetProperty("scale", out var scaleElement))
+        {
+            if (scaleElement.ValueKind != JsonValueKind.Number
+                || !float.IsFinite(scale = (float)scaleElement.GetDouble())
+                || scale <= 0f)
+                throw new InvalidOperationException($"Step {index} (effect) needs 'scale' above 0.");
+        }
+
+        return new VisualStep
+        {
+            Op = "effect",
+            Effect = effect.GetString()!.Trim(),
+            Target = element.TryGetProperty("target", out _)
+                ? ReadChoice(element, index, "effect", "target", ["mobs", "player"])
+                : "mobs",
+            Scale = scale,
         };
     }
 

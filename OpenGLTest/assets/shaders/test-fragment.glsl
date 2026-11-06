@@ -92,6 +92,8 @@ uniform vec2 uWindOffset;
 layout (std430, binding = 1) readonly buffer TileMaterialBuffer { vec4 uTileMaterials[]; };
 uniform float uFlash;
 uniform float uHitFlash;
+// A mob's status-effect tint: rgb a linear color, a its mix weight (0 = none, the default).
+uniform vec4 uStatusTint;
 uniform float uAlphaCutoff;
 uniform float uTime;
 uniform vec3 uSunDir;
@@ -641,7 +643,9 @@ void main() {
     } else if (texColor.a < uAlphaCutoff) discard;
     vec3 albedo = texColor.rgb * fColor.rgb * fTintGain; // biome tint gain, see test-vertex.glsl
     // Hit flash tints the albedo before lighting, so it goes dark with the scene instead of
-    // glowing like the emissive uFlash mix at the end.
+    // glowing like the emissive uFlash mix at the end. A status tint goes under it, so a hit
+    // still reads on a burning or frozen mob.
+    albedo = mix(albedo, uStatusTint.rgb, uStatusTint.a);
     albedo = mix(albedo, vec3(1.0, 0.0, 0.0), uHitFlash * 0.6);
     vec3 N = normalize(fNormal);
     float ndl = max(dot(N, uSunDir), 0.0);

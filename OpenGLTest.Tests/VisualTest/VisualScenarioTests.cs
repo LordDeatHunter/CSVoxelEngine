@@ -141,7 +141,7 @@ public sealed class VisualScenarioTests
     {
         var ex = Assert.Throws<InvalidOperationException>(
             () => VisualScenario.Parse("""{ "steps": [{ "op": "dance" }] }""", "bad"));
-        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "creative", "give", "spawn", "grow", "select", "screenshot" })
+        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "creative", "give", "spawn", "grow", "damage", "effect", "select", "screenshot" })
             Assert.Contains(op, ex.Message);
     }
 
@@ -161,6 +161,39 @@ public sealed class VisualScenarioTests
         var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(
             """{ "steps": [{ "op": "damage", "amount": 3, "target": "camera" }] }""", "bad"));
         Assert.Contains("'target'", ex.Message);
+    }
+
+    [Fact]
+    public void TheEffectOpParsesItsTargetAndScale()
+    {
+        // The effect name is never checked against the registry here: parsing stays content-free.
+        var scenario = VisualScenario.Parse("""
+            { "steps": [
+              { "op": "effect", "effect": " not_registered " },
+              { "op": "effect", "effect": "x", "target": "player", "scale": 2.5 },
+            ] }
+            """, "tour");
+        Assert.Equal("effect", scenario.Steps[0].Op);
+        Assert.Equal("not_registered", scenario.Steps[0].Effect);
+        Assert.Equal("mobs", scenario.Steps[0].Target);
+        Assert.Equal(1f, scenario.Steps[0].Scale);
+        Assert.Equal("player", scenario.Steps[1].Target);
+        Assert.Equal(2.5f, scenario.Steps[1].Scale);
+    }
+
+    [Theory]
+    [InlineData("""{ "op": "effect", "effect": "x", "target": "camera" }""", "'target'")]
+    [InlineData("""{ "op": "effect", "target": "mobs" }""", "'effect'")]
+    [InlineData("""{ "op": "effect", "effect": "  " }""", "'effect'")]
+    [InlineData("""{ "op": "effect", "effect": "x", "scale": 0 }""", "'scale'")]
+    [InlineData("""{ "op": "effect", "effect": "x", "scale": -1 }""", "'scale'")]
+    [InlineData("""{ "op": "effect", "effect": "x", "scale": "2" }""", "'scale'")]
+    public void TheEffectOpRejectsAnUnknownTarget(string step, string field)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            VisualScenario.Parse($$"""{ "steps": [{{step}}] }""", "bad"));
+        Assert.Contains(field, ex.Message);
+        Assert.Contains("(effect)", ex.Message);
     }
 
     [Fact]

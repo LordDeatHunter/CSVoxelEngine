@@ -335,6 +335,7 @@ internal sealed class ClientSession
                 w.ClientMirror.ApplyNetworkHealth(status.Health);
                 w.ClientMirror.ApplyNetworkAir(status.Air);
                 w.ClientMirror.ApplyNetworkMana(status.Mana, status.MaxMana);
+                w.ClientMirror.ApplyNetworkEffects(status.EffectMask);
                 var knockback = status.Knockback;
                 // AddKnockback normalizes the direction itself and keeps a lift-only hit's pop
                 if (knockback.LengthSquared() > 0f || status.Lift > 0f)
@@ -395,7 +396,8 @@ internal sealed class ClientSession
                     var ammo = reader.ReadInt();
                     var itemId = reader.ReadByte();
                     var velocity = reader.ReadVector3();
-                    netEntitiesScratch.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity));
+                    var effects = reader.ReadByte();
+                    netEntitiesScratch.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity, effects));
                 }
                 w.ClientMirror.ApplyNetworkEntities(netEntitiesScratch);
                 break;

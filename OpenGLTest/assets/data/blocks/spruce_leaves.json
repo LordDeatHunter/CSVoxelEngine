@@ -2,6 +2,7 @@
   "name": "Spruce Leaves",
   "model": { "parent": "block/cube_all", "textures": { "all": "spruce_leaves" } },
   "hardness": 1,
+  "flammable": true,
   "movementSpeed": 0.5,
   "cutout": true,
   "sway": true,

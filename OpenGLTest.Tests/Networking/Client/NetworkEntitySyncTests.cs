@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Networking;
@@ -103,6 +104,62 @@ public sealed class NetworkEntitySyncTests : IDisposable
         var replaced = Assert.Single(_world.Mobs);
         Assert.NotSame(mirrored, replaced);
         Assert.Equal(SlimeSize.Min, Assert.IsType<Slime>(replaced).Size);
+    }
+
+    [Fact]
+    public void AMobMirrorTakesTheEffectMaskAndDropsUnknownBits()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        _world.GetChunkManager().Headless = true;
+        var burning = StatusEffectRegistry.Require("burning");
+        var unknown = (byte)(~StatusEffectRegistry.KnownMask & 0xFF);
+
+        // A fresh mirror spawns burning, carrying no bit the loaded content does not define
+        var pos = new Vector3(4f, 60f, 4f);
+        _world.ClientMirror.ApplyNetworkEntities(
+            [new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 3, 0, 0, Vector3.Zero, (byte)(burning.Bit | unknown))]);
+        var mirrored = Assert.Single(_world.Slimes);
+        Assert.True(mirrored.Effects.IsActive(burning));
+        Assert.Equal(burning.Bit, mirrored.Effects.Mask);
+
+        // The same mirror updated in place takes the server's newest mask, here none
+        _world.ClientMirror.ApplyNetworkEntities([new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 3, 0, 0, Vector3.Zero)]);
+        Assert.Same(mirrored, Assert.Single(_world.Slimes));
+        Assert.False(mirrored.Effects.IsActive(burning));
+        Assert.Equal(0, mirrored.Effects.Mask);
+
+        // ...and a mask of nothing but unknown bits stays empty
+        _world.ClientMirror.ApplyNetworkEntities(
+            [new NetEntity(NetEntityKind.Slime, 7, pos, 1f, 3, 0, 0, Vector3.Zero, unknown)]);
+        Assert.Equal(0, mirrored.Effects.Mask);
+    }
+
+    [Fact]
+    public void AClientNeverTicksAMirroredPlayerEffect()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        _world.GetChunkManager().Headless = true;
+        var burning = StatusEffectRegistry.Require("burning");
+        Assert.True(burning.DamageShare > 0f && burning.TickSeconds > 0f);
+
+        // The server says the player burns; the client shows it, and its physics reads the same set
+        _world.ClientMirror.ApplyNetworkEffects(burning.Bit);
+        Assert.True(_world.Camera.Effects!.IsActive(burning));
+        var health = _world.Health;
+
+        // Frames spanning several of the effect's tick intervals: the client deals itself no damage
+        // and expires nothing, since only the server ticks effects and reports the health
+        var frames = (int)Math.Ceiling(burning.TickSeconds * 3 / Dt);
+        for (var i = 0; i < frames; i++)
+            _world.Update(Dt, null);
+        Assert.Equal(health, _world.Health);
+        Assert.True(_world.Camera.Effects.IsActive(burning));
+
+        // The server's next status, with the effect gone, clears it
+        _world.ClientMirror.ApplyNetworkEffects(0);
+        Assert.False(_world.Camera.Effects.IsActive(burning));
     }
 
     [Fact]

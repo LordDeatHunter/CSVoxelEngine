@@ -167,6 +167,7 @@ internal sealed class ClientMirror
                 // two snapshots, and that drop is what its damage number floats
                 var before = existing.Health;
                 existing.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
+                existing.Effects.SetMirrorMask(entry.Effects);
                 if (!_serverMode && existing.Health < before)
                     Strikes.ShowDamageNumber(existing, before - existing.Health);
                 continue;
@@ -356,6 +357,15 @@ internal sealed class ClientMirror
             _health.Mana.SetNet(mana, maxMana);
     }
 
+    /// <summary>A client shows the status effects the server's status reports (an effect bitmask,
+    /// unknown bits dropped); the server alone ticks them, so a mirrored effect never deals damage
+    /// here, while the physics and the attack pace still read its factors.</summary>
+    internal void ApplyNetworkEffects(byte mask)
+    {
+        if (_clientMode)
+            _health.Effects.SetMirrorMask(mask);
+    }
+
     // A slime mirror also has to be the reported size (the ammo field), since a size is fixed for life
     private static bool KindMatches(Mob mob, NetEntity entry) =>
         entry.Kind == NetEntityKind.Slime
@@ -372,6 +382,7 @@ internal sealed class ClientMirror
             _ => null,
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
+        mob?.Effects.SetMirrorMask(entry.Effects);
         return mob;
     }
 

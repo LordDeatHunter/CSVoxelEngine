@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using VoxelEngine.Content.Spells;
+using VoxelEngine.Content.StatusEffects;
 using Xunit;
 
 namespace VoxelEngine.Tests.Content;
@@ -92,11 +93,46 @@ public class SpellPartLoaderTests
     [InlineData("shape", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "rangeFactor": 2 }""")]
     [InlineData("modifier", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "damageFactor": 0 }""")]
     [InlineData("modifier", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "rangeFactor": -1 }""")]
+    [InlineData("element", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "effect": "unknown" }""")]
+    [InlineData("element", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "effect": " " }""")]
+    [InlineData("modifier", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "effect": "known" }""")]
+    [InlineData("shape", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "effect": "known" }""")]
     public void InvalidPartNamesItsFile(string kindFolder, string json) => InTempDir(dir =>
     {
         var path = WritePart(dir, kindFolder, "bad", json);
-        Assert.Contains(path, Assert.Throws<InvalidOperationException>(() => SpellPartLoader.ReadParts(dir)).Message);
+        Assert.Contains(path, Assert.Throws<InvalidOperationException>(() => SpellPartLoader.ReadParts(dir, KnownEffect)).Message);
     });
+
+    /// <summary>The effect lookup the temp-folder cases are checked against: only <c>known</c> exists.</summary>
+    private static bool KnownEffect(string name) => name == "known";
+
+    [Fact]
+    public void AnElementKeepsTheEffectItNames() => InTempDir(dir =>
+    {
+        WritePart(dir, "element", "x", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "effect": "known" }""");
+        WritePart(dir, "element", "y", ValidPart);
+        var parts = SpellPartLoader.ReadParts(dir, KnownEffect);
+        Assert.Equal("known", parts[SpellPart.KeyOf(SpellPartKind.Element, "x")].Effect);
+        Assert.Null(parts[SpellPart.KeyOf(SpellPartKind.Element, "y")].Effect);
+    });
+
+    [Fact]
+    public void EveryShippedElementEffectResolves()
+    {
+        TestContent.EnsureLoaded();
+        var withoutEffect = 0;
+        foreach (var part in SpellPartRegistry.All)
+        {
+            if (part.Effect == null)
+            {
+                if (part.Kind == SpellPartKind.Element) withoutEffect++;
+                continue;
+            }
+            Assert.Equal(SpellPartKind.Element, part.Kind);
+            Assert.True(StatusEffectRegistry.TryGet(part.Effect, out _));
+        }
+        Assert.True(withoutEffect > 0);
+    }
 
     [Fact]
     public void RequireNamesAMissingPart()

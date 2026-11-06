@@ -118,8 +118,11 @@ public static class NetFraming
     /// 11: <see cref="NetMessage.PlayerStatus"/> ends with the player's mana and its max.
     /// 12: a <see cref="NetIntentKind.Cast"/> world intent (with its slot) and the
     /// <see cref="NetInventoryAction.SelectStaffSlot"/> inventory action; an older peer would refuse
-    /// either as malformed.</summary>
-    public const int ProtocolVersion = 12;
+    /// either as malformed.
+    /// 13: every <see cref="NetMessage.EntityList"/> entry ends with a status-effect byte mask and
+    /// <see cref="NetMessage.PlayerStatus"/> ends with the player's effect mask; an older peer would
+    /// misread the frames.</summary>
+    public const int ProtocolVersion = 13;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

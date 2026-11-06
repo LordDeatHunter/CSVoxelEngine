@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Particles;
+using VoxelEngine.Status;
 
 namespace VoxelEngine.Entities;
 
@@ -223,16 +224,45 @@ public abstract class Mob
 
     private float _lavaTimer;
 
+    /// <summary>The status effects on this mob (<see cref="StatusEffects"/>): ticked by
+    /// <see cref="UpdateHazards"/> in the authoritative simulation, mirrored from the server on a client.</summary>
+    public StatusEffectSet Effects { get; } = new();
+
+    /// <summary>The movement speed factor of the active status effects (1 when none slows).</summary>
+    public float MoveFactor => Effects.MoveFactor;
+
+    /// <summary>The attack pace factor of the active status effects (1 when none slows).</summary>
+    public float AttackFactor => Effects.AttackFactor;
+
     /// <summary>
     /// The shared world hazards, called by the owning manager once a frame right after the mob's own
-    /// update, in the authoritative simulation only: a body box in lava (<see cref="MobLava"/>) burns
-    /// one damage tick per <see cref="MobConfig.MobLavaTickSeconds"/> with the hit flash, and
-    /// leaving it (or dying) clears the partial tick. A death it causes rolls the loot as usual, since the
-    /// manager checks <see cref="IsDead"/> after this.
+    /// update, in the authoritative simulation only. The status effects tick first (their damage over
+    /// time lands through <see cref="TakeDamage"/>; a dying mob's effects are cleared). Then a body box
+    /// in lava (<see cref="MobLava"/>) burns one damage tick per <see cref="MobConfig.MobLavaTickSeconds"/>
+    /// with the hit flash, and leaving it (or dying) clears the partial tick. A death either causes rolls
+    /// the loot as usual, since the manager checks <see cref="IsDead"/> after this.
     /// </summary>
     public void UpdateHazards(float deltaTime, ChunkManager chunks)
     {
         if (deltaTime <= 0f || chunks == null) return;
+        UpdateEffects(deltaTime);
+        UpdateLava(deltaTime, chunks);
+    }
+
+    private void UpdateEffects(float deltaTime)
+    {
+        if (IsDying)
+        {
+            Effects.Clear();
+            return;
+        }
+
+        var damage = Effects.Tick(deltaTime, MaxHealth);
+        if (damage > 0) TakeDamage(damage);
+    }
+
+    private void UpdateLava(float deltaTime, ChunkManager chunks)
+    {
         if (IsDying || !MobLava.BodyInLava(Position, BodyHalfExtent, BodyHalfHeight, chunks))
         {
             _lavaTimer = 0f;

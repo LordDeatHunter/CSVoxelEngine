@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.StatusEffects;
 
 namespace VoxelEngine.Content.Spells;
 
@@ -20,8 +21,12 @@ internal static class SpellPartLoader
 
     internal static void LoadSpellParts(string folder) => SpellPartRegistry.Publish(ReadParts(folder));
 
-    /// <summary>Every part under <paramref name="folder"/> by key; empty when the folder is missing.</summary>
-    internal static Dictionary<string, SpellPart> ReadParts(string folder)
+    /// <summary>
+    /// Every part under <paramref name="folder"/> by key; empty when the folder is missing.
+    /// <paramref name="effectExists"/> is the status effect lookup an element's <c>effect</c> is checked
+    /// against (see <see cref="Compile"/>).
+    /// </summary>
+    internal static Dictionary<string, SpellPart> ReadParts(string folder, Func<string, bool>? effectExists = null)
     {
         var parts = new Dictionary<string, SpellPart>(StringComparer.Ordinal);
         if (!Directory.Exists(folder)) return parts;
@@ -45,15 +50,20 @@ internal static class SpellPartLoader
             if (!Directory.Exists(kindFolder)) continue;
             foreach (var (name, path) in ContentFiles.JsonFilesIn(kindFolder))
             {
-                var part = Compile(kind, name, ContentFiles.ReadJson<SpellPartDefinition>(path), path);
+                var part = Compile(kind, name, ContentFiles.ReadJson<SpellPartDefinition>(path), path, effectExists);
                 parts[part.Key] = part;
             }
         }
         return parts;
     }
 
-    /// <summary>Compiles one part, throwing an error that names <paramref name="path"/> on any bad field.</summary>
-    internal static SpellPart Compile(SpellPartKind kind, string name, SpellPartDefinition definition, string path)
+    /// <summary>
+    /// Compiles one part, throwing an error that names <paramref name="path"/> on any bad field. An element's
+    /// <c>effect</c> must be found by <paramref name="effectExists"/>, which defaults to
+    /// <see cref="StatusEffectRegistry.Contains"/> (effects load before spell parts).
+    /// </summary>
+    internal static SpellPart Compile(SpellPartKind kind, string name, SpellPartDefinition definition, string path,
+        Func<string, bool>? effectExists = null)
     {
         if (definition.CostShare is not { } costShare || !float.IsFinite(costShare) || costShare <= 0f || costShare > 1f)
             throw new InvalidOperationException(
@@ -78,8 +88,21 @@ internal static class SpellPartLoader
 
         var damageFactor = CheckFactor(kind, definition.DamageFactor, "damageFactor", path);
         var rangeFactor = CheckFactor(kind, definition.RangeFactor, "rangeFactor", path);
+        var effect = CheckEffect(kind, definition.Effect, path, effectExists ?? StatusEffectRegistry.Contains);
 
-        return new SpellPart(kind, name, definition.Name ?? name, costShare, complexity, tags, damageFactor, rangeFactor);
+        return new SpellPart(kind, name, definition.Name ?? name, costShare, complexity, tags, damageFactor, rangeFactor, effect);
+    }
+
+    /// <summary>An element's status effect: null when unset; set only on an element, naming a loaded effect.</summary>
+    private static string? CheckEffect(SpellPartKind kind, string? effect, string path, Func<string, bool> effectExists)
+    {
+        if (effect == null) return null;
+        if (kind != SpellPartKind.Element)
+            throw new InvalidOperationException($"Spell part '{path}' sets effect, which only an element may carry.");
+        if (string.IsNullOrWhiteSpace(effect) || !effectExists(effect))
+            throw new InvalidOperationException(
+                $"Spell part '{path}' names effect '{effect}', which is not a registered status effect.");
+        return effect;
     }
 
     private static bool IsKindFolder(string folderName)

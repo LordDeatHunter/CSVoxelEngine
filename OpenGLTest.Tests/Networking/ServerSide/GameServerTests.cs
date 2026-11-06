@@ -6,6 +6,7 @@ using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
 using VoxelEngine.Content.Recipes;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Content.Spells;
@@ -19,6 +20,7 @@ using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Server;
 using VoxelEngine.Simulation;
+using VoxelEngine.Status;
 using VoxelEngine.Tests.Magic;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Trees;
@@ -84,6 +86,7 @@ public sealed class GameServerTests : IDisposable
         public NetPlayerFlags? Status;
         public int? Health;
         public bool Dead;
+        public byte EffectMask;
         public readonly List<(int Seq, Vector3 Eye)> PlayerCorrections = [];
 
         /// <summary>The newest <see cref="NetMessage.EntityList"/> received, decoded.</summary>
@@ -126,6 +129,7 @@ public sealed class GameServerTests : IDisposable
                         Status = status.Modes;
                         Health = status.Health;
                         Dead = status.Dead;
+                        EffectMask = status.EffectMask;
                         break;
                     }
                     case NetMessage.PlayerCorrection:
@@ -149,7 +153,8 @@ public sealed class GameServerTests : IDisposable
                             var ammo = reader.ReadInt();
                             var itemId = reader.ReadByte();
                             var velocity = reader.ReadVector3();
-                            entities.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity));
+                            var effects = reader.ReadByte();
+                            entities.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity, effects));
                         }
                         Entities = entities;
                         break;
@@ -1157,6 +1162,26 @@ public sealed class GameServerTests : IDisposable
         Assert.Equal(PlayerOf(client).Health, inbox.Health);
         Assert.Equal(PlayerHealth.MaxHealth, inbox.Health);
         Assert.False(inbox.Dead);
+    }
+
+    [Fact]
+    public void AServerAppliedEffectReachesTheClientsStatus()
+    {
+        using var client = Connect("Kindling");
+        var player = PlayerOf(client);
+        player.Creative = false;
+        player.Flying = false;
+        var inbox = InboxOf(client);
+        var burning = StatusEffectRegistry.Require("burning");
+
+        Assert.True(StatusEffects.Apply(player, burning.Name));
+        var sw = Stopwatch.StartNew();
+        while ((inbox.EffectMask & burning.Bit) == 0 && sw.Elapsed.TotalSeconds < 15)
+            Tick(0.05);
+
+        // The status the server sent carries the effect the server applied, and only what it holds
+        Assert.NotEqual(0, inbox.EffectMask & burning.Bit);
+        Assert.Equal(player.Effects.Mask, inbox.EffectMask);
     }
 
     [Fact]

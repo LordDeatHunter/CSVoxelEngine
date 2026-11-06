@@ -7,19 +7,20 @@ namespace VoxelEngine.Content.Blocks;
 
 /// <summary>
 /// Resolves the cross-block references of <c>data/blocks</c> once every file is loaded: files load
-/// alphabetically, so a block's hardening targets, multiblock part and source, wall block, upper
+/// alphabetically, so a block's hardening targets, freeze and melt targets, multiblock part and source, wall block, upper
 /// half and <c>pickAs</c> target may not exist yet while its own file is read. <see cref="BlockLoader"/>
 /// queues each block's references here as it parses it, then <see cref="Resolve"/> runs the lot.
 /// </summary>
 internal sealed class BlockLinkResolver
 {
     private readonly List<(byte Id, string? To, string? Touching, string Path)> _harden = [];
+    private readonly List<(byte Id, string? FreezesTo, string? MeltsTo, string Path)> _status = [];
     private readonly List<(byte Id, string? Part, string? Source, string Path)> _multiblock = [];
     private readonly List<(byte Id, string Wall, string Path)> _wall = [];
     private readonly List<(byte Id, string Upper, string Path)> _upper = [];
     private readonly List<(byte Id, string Target, string Path)> _pick = [];
 
-    /// <summary>Queues the references one block's definition declares (contact hardening, multiblock, wall block, upper half, pickAs).</summary>
+    /// <summary>Queues the references one block's definition declares (contact hardening, freezesTo / meltsTo, multiblock, wall block, upper half, pickAs).</summary>
     internal void Queue(byte id, BlockDefinition definition, string path)
     {
         var flow = definition.Flow;
@@ -27,6 +28,8 @@ internal sealed class BlockLinkResolver
             throw new InvalidOperationException(
                 $"Block '{path}' sets only one of flow.hardensTo / flow.hardensTouching; hardening needs both.");
         _harden.Add((id, flow?.HardensTo, flow?.HardensTouching, path));
+        if (definition.FreezesTo != null || definition.MeltsTo != null)
+            _status.Add((id, definition.FreezesTo, definition.MeltsTo, path));
         if (definition.Multiblock != null)
             _multiblock.Add((id, definition.Multiblock.Part, definition.Multiblock.Source, path));
         if (definition.WallBlock != null)
@@ -46,10 +49,20 @@ internal sealed class BlockLinkResolver
         {
             if (to == null) continue;
             var type = types[pendingId];
-            type.HardensToId = ResolveHardenTarget(to, "flow.hardensTo", pendingPath, requireFluid: false, ownerId: pendingId);
-            type.HardensTouchingId = ResolveHardenTarget(touching, "flow.hardensTouching", pendingPath, requireFluid: true, ownerId: pendingId);
+            type.HardensToId = ResolveFluidLink(to, "flow.hardensTo", pendingPath, requireFluid: false, ownerId: pendingId);
+            type.HardensTouchingId = ResolveFluidLink(touching, "flow.hardensTouching", pendingPath, requireFluid: true, ownerId: pendingId);
             BlockType.HardensToById[pendingId] = type.HardensToId;
             BlockType.HardensTouchingById[pendingId] = type.HardensTouchingId;
+        }
+
+        // Water freezes to ice and ice melts to water: each names a block that loads on the other side of it.
+        foreach (var (pendingId, freezesTo, meltsTo, pendingPath) in _status)
+        {
+            var type = types[pendingId];
+            type.FreezesToId = ResolveFluidLink(freezesTo, "freezesTo", pendingPath, requireFluid: false, ownerId: pendingId);
+            type.MeltsToId = ResolveFluidLink(meltsTo, "meltsTo", pendingPath, requireFluid: true, ownerId: pendingId);
+            BlockType.FreezesToById[pendingId] = type.FreezesToId;
+            BlockType.MeltsToById[pendingId] = type.MeltsToId;
         }
 
         // An anchor's part and source blocks may not exist yet while the anchor's own file is read.
@@ -83,7 +96,12 @@ internal sealed class BlockLinkResolver
             types[pendingId].ItemBlockId = ResolvePickAs(target, pendingPath, pendingId);
     }
 
-    private static byte ResolveHardenTarget(string? name, string field, string path, bool requireFluid, byte ownerId)
+    /// <summary>
+    /// Resolves a block-to-block link of a fluid transformation: with <paramref name="requireFluid"/>
+    /// it must name a fluid other than its owner (<c>flow.hardensTouching</c>, <c>meltsTo</c>),
+    /// otherwise a solid block (<c>flow.hardensTo</c>, <c>freezesTo</c>). Null names no link (0).
+    /// </summary>
+    private static byte ResolveFluidLink(string? name, string field, string path, bool requireFluid, byte ownerId)
     {
         if (name == null) return 0;
 
@@ -95,7 +113,7 @@ internal sealed class BlockLinkResolver
             true when !BlockType.FluidById[id] || id == ownerId => throw new InvalidOperationException(
                 $"Block '{path}' names '{name}' in {field}, which is not a different fluid block."),
             false when BlockType.FluidById[id] => throw new InvalidOperationException(
-                $"Block '{path}' names '{name}' in {field}, which is a fluid; hardening must produce a solid block."),
+                $"Block '{path}' names '{name}' in {field}, which is a fluid; {field} must produce a solid block."),
             _ => id
         };
     }

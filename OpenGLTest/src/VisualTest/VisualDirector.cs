@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using VoxelEngine.Content;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Player;
+using VoxelEngine.Status;
 using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.VisualTest;
@@ -163,6 +165,11 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 Advance();
                 break;
 
+            case "effect":
+                ApplyEffect(step);
+                Advance();
+                break;
+
             case "view":
                 world.Camera.TestSetMode(step.Mode switch
                 {
@@ -212,6 +219,33 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
             _keys.ReleaseAll();
             Advance();
         }
+    }
+
+    /// <summary>An <c>effect</c> step: the effect name is validated here rather than at parse time, so
+    /// parsing stays registry-free; an unknown name warns and the step is skipped.</summary>
+    private void ApplyEffect(VisualStep step)
+    {
+        var label = $"[visual] {_step + 1}/{scenario.Steps.Count} effect {step.Effect} on {step.Target} (x{step.Scale})";
+        if (!StatusEffectRegistry.Contains(step.Effect!))
+        {
+            Log.Warn($"{label}: no status effect '{step.Effect}' is registered; skipped.");
+            return;
+        }
+
+        if (step.Target == "player")
+        {
+            var applied = world.ApplyPlayerEffect(step.Effect!, step.Scale);
+            Log.WriteLine(applied ? label : $"{label}: refused (immune or dead)");
+            return;
+        }
+
+        var count = 0;
+        foreach (var mob in world.Mobs)
+        {
+            if (StatusEffects.Apply(mob, step.Effect!, step.Scale))
+                count++;
+        }
+        Log.WriteLine($"{label}: {count} mob(s)");
     }
 
     private void Advance() => _step++;

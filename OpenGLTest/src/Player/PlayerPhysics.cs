@@ -219,8 +219,10 @@ internal sealed class PlayerPhysics
         if (wading) moveSpeed *= PlayerConfig.WadeSpeedFactor;
         if (sneaking) moveSpeed = BaseSpeed * SneakSpeedFactor;
         // Pass-through blocks scale the walk instead of blocking it; flight is noclip.
+        // A slowing status effect (frostburn) scales the same way; flight ignores both.
         camera.SetMovementFactor(BlockMoveFactor(camera, chunkManager));
-        if (!camera.IsFlying) moveSpeed *= camera.MovementFactor;
+        var statusFactor = camera.Effects?.MoveFactor ?? 1f;
+        if (!camera.IsFlying) moveSpeed *= camera.MovementFactor * statusFactor;
         var wish = new Vector2(moveInput.X * moveSpeed, moveInput.Z * moveSpeed);
         float accelRate;
         if (camera.IsFlying)
@@ -239,7 +241,7 @@ internal sealed class PlayerPhysics
                 SwimStrokeCount++;
                 if (moving)
                 {
-                    var burst = SwimBurstSpeed * (backing ? 0.6f : 1f) * camera.MovementFactor;
+                    var burst = SwimBurstSpeed * (backing ? 0.6f : 1f) * camera.MovementFactor * statusFactor;
                     _horizontalVelocity = new Vector2(moveInput.X, moveInput.Z) * burst;
                 }
                 _pendingSwimVertical = strokeUp ? SwimBurstUp : strokeDown ? SwimBurstDown : 0f;

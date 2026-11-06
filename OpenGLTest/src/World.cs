@@ -29,6 +29,7 @@ using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.LeafDecay;
+using VoxelEngine.Status;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Trees;
@@ -365,6 +366,9 @@ public class World
             // A client never searches the worldgen spawn: it has no terrain of its own, so it
             // starts at the server's spawn (or a fixed placeholder until one is known).
             Camera = new Camera(window, input, clientMode ? spawn ?? Camera.PlaceholderSpawn : spawn);
+            // A server's camera is nobody, so no effect may land on it; a client's carries the mirror
+            if (!serverMode)
+                Camera.Effects = _health.Effects;
             LocalPlayer = new LocalPlayer(this, _health, _dust, _debris, _mobs, serverMode, clientMode);
             var savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
             if (savedPlayer != null)
@@ -441,8 +445,14 @@ public class World
             Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _icebergs,
                 _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
+            // Status effects convert cells only where the world is authoritative: a client's effects
+            // are mirrors, and the server's writes reach it through the journal
+            var statusBlocks = clientMode
+                ? null
+                : new StatusEffectBlockWriter(_chunkManager, _fluidManager, _leafDecay, _falling, _lodManager,
+                    Edits.NotifyLodEdit);
             Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _icebergs, _debris, _health,
-                _mobs, serverMode, clientMode);
+                _mobs, serverMode, clientMode, statusBlocks);
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
                 _leaves, _fire, _lavaFire, _torchFire, _bubbles, _sliceTrails, _health, _hotbarName, _hotbarPops);
@@ -767,6 +777,7 @@ public class World
         _goblins?.AnimateMirrors((float)deltaTime, _debris, _chunkManager, DayCycle.NightFactor(LightingTime));
         _tntManager.AnimateMirrors((float)deltaTime);
         Director.AnimateIcebergMirrors(deltaTime);
+        Ambient.UpdateStatusParticles((float)deltaTime);
         Ambient.GatherStationFires();
         Ambient.AddGoblinTorches();
         _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
@@ -791,6 +802,12 @@ public class World
 
     /// <summary>Scenario seam: damages every live mob (see <see cref="MobDirector.DamageAllMobs"/>).</summary>
     internal void DamageAllMobs(int amount) => Director.DamageAllMobs(amount);
+
+    /// <summary>Scenario seam: applies a status effect to the local player's own pool, refused while
+    /// the camera is immune (creative, flying) or the player is dead (see
+    /// <see cref="StatusEffects.Apply(PlayerHealth, bool, string, float)"/>).</summary>
+    internal bool ApplyPlayerEffect(string effectName, float durationScale) =>
+        StatusEffects.Apply(_health, Camera.IsImmune, effectName, durationScale);
 
     /// <summary>
     /// One gameplay frame. Each block of work runs under its own profiler section; the autosave
@@ -902,9 +919,13 @@ public class World
         // After every mob manager and before the thrown items, so a mob killed or despawned
         // this frame is never hit by a projectile or drawn a healthbar.
         Director.RefreshMobs();
-        // A mob that landed this frame kicks up its dust; a server spawns no particles
+        // A mob that landed this frame kicks up its dust and an affected mob sheds its effects'
+        // particles; a server spawns no particles
         if (!_serverMode)
+        {
             _dust.TakeMobLandings(_mobs, _chunkManager, _debris);
+            Ambient.UpdateStatusParticles((float)deltaTime);
+        }
 
         Edits.UpdateToppling((float)deltaTime);
         Throws.UpdateThrown((float)deltaTime);

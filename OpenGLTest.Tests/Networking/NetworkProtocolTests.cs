@@ -261,6 +261,25 @@ public sealed class NetworkProtocolTests
     }
 
     [Fact]
+    public void PlayerStatusRoundTripsItsEffectMask()
+    {
+        // The mask rides last and raw, every bit kept: the codec is content-free, and the client's
+        // mirror (StatusEffectSet.SetMirrorMask) is what drops bits no loaded effect owns
+        var status = new PlayerStatusData(NetPlayerFlags.None, 40, false, Vector3.Zero, 0f, EffectMask: 0b1010_0101);
+        Assert.Equal(status, RoundTrip(status));
+        Assert.Equal(0, RoundTrip(status with { EffectMask = 0 }).EffectMask);
+        Assert.Equal(byte.MaxValue, RoundTrip(status with { EffectMask = byte.MaxValue }).EffectMask);
+
+        // A status cut short before its mask is a short frame, never a status with no effects
+        using var writer = new PacketWriter(NetMessage.PlayerStatus);
+        PlayerStatusCodec.Write(writer, status);
+        var full = writer.ToArray();
+        using var reader = new PacketReader(full.AsSpan(0, full.Length - 1).ToArray());
+        _ = reader.Message;
+        Assert.Throws<EndOfStreamException>(() => PlayerStatusCodec.Read(reader));
+    }
+
+    [Fact]
     public void ANonFiniteKnockbackIsAMalformedStatus()
     {
         static void AssertBad<T>(byte[] frame) where T : Exception

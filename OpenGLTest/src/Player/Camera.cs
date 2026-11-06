@@ -10,6 +10,7 @@ using VoxelEngine.Data;
 using VoxelEngine.Entities;
 using VoxelEngine.Juice;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.Status;
 using VoxelEngine.UI;
 
 namespace VoxelEngine.Player;
@@ -547,6 +548,11 @@ public class Camera : IMobTarget
 
     /// <inheritdoc />
     public bool IsImmune => IsCreative || IsFlying;
+
+    /// <summary>The local player's status effects (its health pool's set), which the physics and the
+    /// attack pace read: authoritative in singleplayer, the server's mirror on a client. Null on a
+    /// server's camera, which is nobody, and on a camera no world has given a pool.</summary>
+    public StatusEffectSet? Effects { get; internal set; }
 
     /// <summary>
     /// A mob hit on the local player: only the knockback is applied here, and the damage direction

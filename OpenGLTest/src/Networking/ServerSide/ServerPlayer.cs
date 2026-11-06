@@ -6,6 +6,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Magic;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Status;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Networking.ServerSide;
@@ -163,6 +164,10 @@ public sealed class ServerPlayer : IMobTarget
     /// </summary>
     public PlayerHealth Status { get; } = new();
 
+    /// <summary>The player's status effects (its pool's set): mob and spell effects land here, and
+    /// <see cref="TickStatus"/> ticks them.</summary>
+    public StatusEffectSet Effects => Status.Effects;
+
     /// <summary>The player's current health, 0..<see cref="PlayerHealth.MaxHealth"/>.</summary>
     public int Health => Status.Health;
 
@@ -282,13 +287,19 @@ public sealed class ServerPlayer : IMobTarget
     /// <summary>
     /// The per-tick half of the status: lava burns a body standing in it, an empty lung drowns one
     /// with its eye under water (creative and flight are immune, an unloaded body is not judged), the
-    /// damage flash decays and health and mana regenerate. A dead player is left
-    /// as it is until <see cref="Respawn"/>.
+    /// status effects tick (cleared while creative or flying), the damage flash decays and health and
+    /// mana regenerate. A dead player is left as it is until <see cref="Respawn"/>, but for its status
+    /// effects, which are cleared. A change of the active effects (an expiry here, or an application
+    /// since the last tick) marks the status dirty too.
     /// </summary>
     public void TickStatus(float dt, ChunkManager chunks)
     {
         if (IsDead)
+        {
+            Status.Effects.Clear();
+            NoteEffectMask();
             return;
+        }
         var before = Status.Health;
         var airBefore = Status.Breath.NetStep;
         var manaBefore = Status.Mana.NetMana;
@@ -299,6 +310,8 @@ public sealed class ServerPlayer : IMobTarget
         // Drowning: an unloaded body is not judged, so it never drains (it refills)
         var underWater = known && PlayerBodyProbe.EyeInFluid(Position, chunks, out var eyeInLava) && !eyeInLava;
         Status.UpdateBreath(dt, underWater, Creative || Flying);
+        Status.UpdateEffects(dt, Creative || Flying);
+        NoteEffectMask();
         UpdateCactusContact(dt, chunks);
         Status.Update(dt);
         // Regeneration: the sprint bit is the client's own claim, but it only ever slows its sender's healing
@@ -308,6 +321,19 @@ public sealed class ServerPlayer : IMobTarget
         if (Status.Health != before || Status.IsDead || Status.Breath.NetStep != airBefore
             || Status.Mana.NetMana != manaBefore || Status.Mana.Max != maxManaBefore)
             StatusDirty = true;
+    }
+
+    // The effect mask the client was last told about (or is about to be, once StatusDirty is answered)
+    private byte _reportedEffectMask;
+
+    // Marks the status dirty when the active effects differ from the last reported mask
+    private void NoteEffectMask()
+    {
+        var mask = Status.Effects.Mask;
+        if (mask == _reportedEffectMask)
+            return;
+        _reportedEffectMask = mask;
+        StatusDirty = true;
     }
 
     // Standing against a cactus pricks: one tick per ContactDamage.TickSeconds while the reported

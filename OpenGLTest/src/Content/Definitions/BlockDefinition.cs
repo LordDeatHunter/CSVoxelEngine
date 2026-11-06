@@ -210,6 +210,18 @@ public sealed class BlockDefinition
     /// The registry forces the flags that follow from it rather than trusting the file.</summary>
     public bool? Fluid { get; set; }
 
+    /// <summary>Whether a status effect that ignites (burning) burns the block away to air, with
+    /// no loot. Default false; never on a fluid or a multiblock cell.</summary>
+    public bool? Flammable { get; set; }
+
+    /// <summary>The solid block a source of this fluid becomes under a freezing status effect
+    /// (water's <c>"ice"</c>). Only on a fluid; omitted means it never freezes.</summary>
+    public string? FreezesTo { get; set; }
+
+    /// <summary>The fluid this block becomes, as a source, under a thawing status effect (ice's
+    /// <c>"water"</c>). Only on a non-fluid block; omitted means it never melts.</summary>
+    public string? MeltsTo { get; set; }
+
     public LightDefinition? Light { get; set; }
 
     /// <summary>

@@ -262,6 +262,7 @@ public class RenderManager : IDisposable
     private int _locEntityTint;
     private int _locFlash;
     private int _locHitFlash;
+    private int _locStatusTint;
     private int _locAlphaCutoff;
     private int[] _locPointPos = [];
     private int[] _locPointColor = [];
@@ -388,6 +389,7 @@ public class RenderManager : IDisposable
     internal int LocAlpha => _locAlpha;
     internal int LocFlash => _locFlash;
     internal int LocHitFlash => _locHitFlash;
+    internal int LocStatusTint => _locStatusTint;
     internal Shader ShadowShader => shadowShader;
     internal Shader ChunkShadowShader => chunkShadowShader;
     internal ChunkDrawBatch ChunkDraws => _chunkDraws;
@@ -466,6 +468,7 @@ public class RenderManager : IDisposable
         // nothing else on this program ever writes them.
         chunkShader.SetUniform("uFlash", 0f);
         chunkShader.SetUniform("uHitFlash", 0f);
+        chunkShader.SetUniform("uStatusTint", Vector4.Zero);
         chunkShader.SetUniform("uAlphaCutoff", LightingConfig.AlphaCutoff);
         // The HDR target first, so every creator after it restores to the scene target it made.
         Targets.CreateHdrTarget();
@@ -486,6 +489,7 @@ public class RenderManager : IDisposable
         _locEntityTint = worldShader.GetUniformLocation("uEntityTint");
         _locFlash = worldShader.GetUniformLocation("uFlash");
         _locHitFlash = worldShader.GetUniformLocation("uHitFlash");
+        _locStatusTint = worldShader.GetUniformLocation("uStatusTint");
         _locAlphaCutoff = worldShader.GetUniformLocation("uAlphaCutoff");
         _locPointPos = worldShader.GetUniformArrayLocations("uPointPos", LightingConfig.MaxPointLights);
         _locPointColor = worldShader.GetUniformArrayLocations("uPointColor", LightingConfig.MaxPointLights);
@@ -905,8 +909,8 @@ public class RenderManager : IDisposable
     /// these and every later world pass in the frame inherits them. Everything it reads is final
     /// by then: <see cref="FrameLighting.SetLighting"/> (including <c>_nearShadow.ViewProj</c>) runs before
     /// <see cref="BeginFrame"/>, and nothing in a world pass writes these fields.
-    /// <c>uFlash</c>/<c>uHitFlash</c> are entity-only (primed TNT / hurt slimes), so they are
-    /// reset on the plain program alone.
+    /// <c>uFlash</c>/<c>uHitFlash</c>/<c>uStatusTint</c> are entity-only (primed TNT / hurt or
+    /// status-affected mobs), so they are reset on the plain program alone.
     /// Leaves <c>worldShader</c> bound, which is what every caller assumes.
     /// </summary>
     internal void ApplyFrameUniforms()
@@ -917,6 +921,7 @@ public class RenderManager : IDisposable
         ApplyFrameUniformsTo(worldShader, _locPointPos, _locPointColor, _locBlockLightPalette);
         worldShader.SetUniform(_locFlash, 0f);
         worldShader.SetUniform(_locHitFlash, 0f);
+        worldShader.SetUniform(_locStatusTint, Vector4.Zero);
     }
 
     /// <summary>The body of <see cref="ApplyFrameUniforms"/>, run once per world program.

@@ -79,6 +79,8 @@ internal sealed class ServerBroadcasts
             // The byte field is a goblin's torch count (a slime carries none)
             writer.Write(mob is Goblin torchGoblin ? (byte)torchGoblin.Torches : (byte)0);
             writer.Write(mob.Velocity);
+            // Every entry ends with a status-effect mask (NetEntity.Effects), a mob's own
+            writer.Write(mob.Effects.Mask);
         }
 
         for (var i = 0; i < drops.Count; i++)
@@ -92,6 +94,7 @@ internal sealed class ServerBroadcasts
             writer.Write(0);
             writer.Write(drop.BlockId);
             writer.Write(drop.Velocity);
+            writer.Write((byte)0);
         }
 
         // The fuse travels in milliseconds in the two int fields, so the client's flash and swell
@@ -107,6 +110,7 @@ internal sealed class ServerBroadcasts
             writer.Write((int)MathF.Round(tnt.FuseDuration * 1000f));
             writer.Write(tnt.BlockId);
             writer.Write(Vector3.Zero);
+            writer.Write((byte)0);
         }
 
         for (var i = 0; i < falling.Count; i++)
@@ -120,6 +124,7 @@ internal sealed class ServerBroadcasts
             writer.Write(0);
             writer.Write(block.BlockId);
             writer.Write(Vector3.Zero);
+            writer.Write((byte)0);
         }
 
         // An iceberg's fields are packed as NetEntity documents: turns in the yaw, the seed in the
@@ -135,6 +140,7 @@ internal sealed class ServerBroadcasts
             writer.Write(NetEntity.PackIcebergAmmo(berg.Scale, berg.Sink01));
             writer.Write((byte)berg.Variant);
             writer.Write(berg.Velocity);
+            writer.Write((byte)0);
         }
 
         _state.Broadcast(writer.ToArray());

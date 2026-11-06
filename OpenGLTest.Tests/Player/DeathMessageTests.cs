@@ -33,6 +33,23 @@ public sealed class DeathMessageTests
     }
 
     [Fact]
+    public void MagicDeathSaysTheEffectPhrase()
+    {
+        const string phrase = "burned to death";
+        var line = DeathMessages.For("Player", DamageSource.Magic, phrase);
+        Assert.StartsWith("Player", line);
+        Assert.Contains(phrase, line);
+
+        // Without a phrase the line still names the player
+        foreach (var none in new[] { null, "" })
+        {
+            var plain = DeathMessages.For("Player", DamageSource.Magic, none);
+            Assert.StartsWith("Player", plain);
+            Assert.NotEqual("Player", plain.Trim());
+        }
+    }
+
+    [Fact]
     public void TheHealthPoolRemembersTheLastNamedBlow()
     {
         var health = new PlayerHealth();

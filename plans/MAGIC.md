@@ -6,9 +6,9 @@
 
 Tracks the magic system of Arc A (`TODO.md` `P-14`, which points here): mana, staffs, the station-built
 spell builder, the unlock chain and the spell rules. Design interview done (two rounds). Last updated
-2026-11-06. Everything below is a design decision, not a measurement. The first slice is the builder with
-a few parts (`MG-1`..`MG-10`, plus `MG-4b` status effects), not a lone fireball. Work them in ID order,
-`MG-4b` between `MG-4` and `MG-5`.
+2026-11-07. Everything below is a design decision, not a measurement. The first slice is the builder with
+a few parts (`MG-1`..`MG-10`, plus the `MG-4b` status effects, shipped), not a lone fireball. Work them
+in ID order.
 
 `MG-1` shipped: the mana pool (`Player/PlayerMana.cs`, owned by `PlayerHealth`; tuning in
 `Config/ManaConfig.cs`) regenerates slowly, refills on respawn, is spent through `TrySpend` (free in
@@ -52,6 +52,27 @@ predicts only: it checks and paces, never spends and never fires the effect. The
 punch swing until `MG-10`, and nothing rolls the fizzle chance yet (`MG-6`). The 0.5 s cooldown and
 0.1 s slack are first guesses.
 
+`MG-4b` shipped: status effects are data, `assets/data/effects/<name>.json`, compiled by
+`StatusEffectLoader` into `StatusEffectRegistry` (`Content/StatusEffects/`; id = file-name order, at
+most 8, since every wire form is a byte mask) before the spell parts, and an element part names its
+effect in a new `effect` field (fire -> `burning`, frost -> `frostburn`, nature none), validated at load.
+A target's effects are a GL-free `Status/StatusEffectSet` (on `Mob` and `PlayerHealth`, exposed through
+`IMobTarget.Effects`): a refresh never stacks, damage over time is `DamageSource.Magic` (the effect's
+`deathMessage` phrase is the death line), the lowest move and attack factor wins, and only the
+authoritative simulation ticks (a mob in `UpdateHazards`, the player in `LocalPlayer.UpdateHealth` or
+`ServerPlayer.TickStatus`; creative, flying or dead players are cleared). `MG-5` calls
+`Status/StatusEffects.Apply(target, name, durationScale)`. Block interaction is data too: blocks gain
+`flammable`, `freezesTo` and `meltsTo`, effects `blocks.ignite/freeze/thaw`, and the authoritative
+`StatusEffectBlockWriter` (drained by `MobDirector`) writes cells with every edit-path hook, capped per
+pulse and per frame. Protocol 13 ends each `EntityList` entry with an effect mask and `PlayerStatus` with
+the player's; a client mirrors them. Visuals: the `uStatusTint` mob tint, embers or steam through the
+campfire particles, HUD icons left of the hearts (`tools/generate-effect-icons.py`), and the scenario op
+`effect` (`visual-examples/status-effects.json`). First guesses: burning 6 s, 5% a second, ignites and
+thaws; frostburn 8 s, 2% every 2 s, half speed, 0.6 attack, freezes. Known gaps: effects are not saved,
+other players' effects are not shown, the player slowdown is client-trusted, blade swing durations are
+not scaled by the attack factor, a blast does not consult effects, a slime's split children do not
+inherit them, and icebergs are not consulted when freezing.
+
 ## In progress
 
 Nothing.
@@ -60,25 +81,14 @@ Nothing.
 
 ### Slice 1 — the builder with a few parts
 
-Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), a data-driven status-effect system, one station
+Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), one station
 UI, one bindable staff (two tiers). In order:
 
-- [ ] **`MG-4b` Status effects** — P1, L.
-  A full data-driven system: `assets/data/effects/<name>.json`, loaded beside the other content (a
-  loader like `RecipeLoader`, `add-content` skill). An effect may declare damage over time (tick
-  interval, damage share), a movement and attack speed factor (strongest wins on stacking), block
-  interaction (burning ignites flammable blocks, frost freezes water or melts ice), and visuals (mob
-  tint, particle kind, HUD icon for the player). Effects apply to mobs and the player, tick only in the
-  authoritative simulation and sync (`EntityList` entries, `PlayerStatus`; `MG-1` took protocol 11
-  and `MG-4` took 12, so this bumps it again). Fire applies burning, frost applies frostburn,
-  nature has none. Damage uses the new `DamageSource.Magic` (own `DeathMessages` line, e.g. burned by
-  their own fireball). **Hook:** `Entities/Mob.cs`, `Player/PlayerHealth.cs`, `PlayerStatusCodec`,
-  `NetEntity`, `HudRenderer`, `BillboardPasses`/`Particles/`. **Invariant:** block interaction writes
-  cells, so it follows the `edit-path-checklist` skill and runs server-side only.
 - [ ] **`MG-5` Shapes and elements** — P1, L.
   Projectile (reuse `ThrownProjectile`/`ThrowAction` flight) and self first; beam, cone, area, touch and
   rune later. Elements: fire ignites TNT, campfires, kilns and leaves and applies burning; frost freezes
-  water, hardens lava and applies frostburn; nature grows saplings (`TreeGrowthWriter`). No
+  water, hardens lava and applies frostburn; nature grows saplings (`TreeGrowthWriter`). The status
+  effect comes from the element's `SpellPart.Effect` through `StatusEffects.Apply` (`MG-4b`). No
   element-vs-element rules and no mob weaknesses for now. **Hook:** `TntManager`, `FluidManager`,
   `SaplingManager`, `MobStrikes`. Any block write follows the `edit-path-checklist` skill.
 - [ ] **`MG-6` Risk: self-damage and fizzle** — P1, S–M.

@@ -5,6 +5,7 @@
   "name": "Palm Leaves",
   "model": { "parent": "block/cube_all", "textures": { "all": "oak_leaves" } },
   "hardness": 1,
+  "flammable": true,
   "movementSpeed": 0.5,
   "cutout": true,
   "sway": true,
