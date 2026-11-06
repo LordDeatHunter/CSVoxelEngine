@@ -25,9 +25,6 @@ Tracks particles, animations and other non-gameplay feel work. Last updated 2026
   Creative flight gets its own pose: the legs sway a little and trail "bent" back, both scaling with flight velocity and clamped by max caps (new knobs in `PlayerConfig`, curves through `MathUtils`). Remote players: `NetPlayerFlags.Flying` already rides the wire and the velocity is derived from the broadcast position delta, like the walk phase (no protocol bump).
   **Hook**: `PlayerModel.Update`, `Posing/SecondaryMotion` (lean), `Posing/PoseBuilder` (leg pose), `LocalPlayer.UpdatePlayerModel`.
   **Verify**: a `FLY` mode in `PlayerPreviewState` (`ITEM_DEBUGGER_PLAYER_ANIM=fly`); a `PlayerModelTests` relation (sway and lean grow with speed, never past the cap); fly steps in `animations.json`.
-- [ ] **`V-14` Swim leg animation** - P2, S.
-  The legs are nearly static in the swim stroke and the surface float. Add a flutter kick synced to `SwimStrokeProgress` (snap with the thrust, draw up in the recovery) and a gentler idle kick for float and swim-idle.
-  **Hook**: `Posing/SwimPose`. **Verify**: the `SWIM` and `SURFACE` modes in the item debugger; extend `SurfaceFloatPoseTests`.
 - [ ] **`V-15` Bow animation** - P2, M.
   A two-handed draw, hold and release: the off arm holds the bow out, the drawing arm pulls back to the cheek as the charge rises, snaps back on release, the shoulders turn side-on. Reuses the throw's charge clock (`ThrowPose`, `ArmOverlays`, `Camera.ThrowCharge` and `ThrowZoom`). Needs the bow item itself; the gameplay is in `F-4`.
   **Hook**: `Posing/ThrowPose`, `HeldItemPose`, `PlayerPreviewState` (a new `BOW` mode). **Verify**: item debugger, then a scenario in `animations.json`.

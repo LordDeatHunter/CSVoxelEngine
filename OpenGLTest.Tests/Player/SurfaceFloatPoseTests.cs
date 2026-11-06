@@ -85,6 +85,34 @@ public sealed class SurfaceFloatPoseTests
     }
 
     [Fact]
+    public void TheSwimmersLegsFlutterOutOfStepAndKickHardestAtTheBurst()
+    {
+        // A kick that never dies away entirely, strongest at the burst and never growing during the recovery
+        var previous = float.MaxValue;
+        for (var t = 0f; t <= 1f; t += 0.05f)
+        {
+            var kick = VoxelEngine.Player.Posing.SwimPose.KickAmount(t);
+            Assert.True(kick <= previous + 1e-6f);
+            Assert.True(kick > 0f);
+            previous = kick;
+        }
+
+        // Gliding at rest the two hips still pass each other: the legs alternate rather than moving as one
+        var swimmer = Made(swimming: true, floating: false);
+        var minGap = float.MaxValue;
+        var maxGap = float.MinValue;
+        for (var t = 0f; t < 2f; t += Dt)
+        {
+            swimmer.Update(Dt, 0f, swimming: true, floating: false);
+            var pose = swimmer.GetPose();
+            var gap = pose.LeftHip - pose.RightHip;
+            minGap = MathF.Min(minGap, gap);
+            maxGap = MathF.Max(maxGap, gap);
+        }
+        Assert.True(maxGap - minGap > 0.1f);
+    }
+
+    [Fact]
     public void AStrokeHandsTheFloaterToTheSwimPoseAndItEasesBackWithoutSnapping()
     {
         var model = Made(swimming: true, floating: true);
