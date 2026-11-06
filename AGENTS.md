@@ -1493,7 +1493,8 @@ OpenGLTest/
       Posing/                  # the posing components PlayerModel owns (see PlayerModel.cs), namespace VoxelEngine.Player.Posing
         ArmOverlays.cs         # lays the pose-specific arm frames (jump, swim stroke and float, punch chamber, cocked throw) over the base frames
         ArmSolver.cs           # the two-bone arm math: hand offset for a shoulder pitch and elbow, and the joints that reach an offset
-        BladeSwingFrame.cs     # what the right arm, the body and the held blade do on one frame of a blade swing (a slice
+        BowPose.cs             # a bow's two-handed draw: item arm out, string arm to the cheek, side-on torso, the release snap (UsePose.Bow)
+      BladeSwingFrame.cs     # what the right arm, the body and the held blade do on one frame of a blade swing (a slice
                                #   or a sword swing): the one struct the body code reads of either
         BodyPartMatrices.cs    # the world matrices of the body parts and the held item's hand anchor (GetPartMatrix/GetHandAnchorMatrix bodies)
         FlightPose.cs          # the creative-flight pose: legs sway and trail bent back, the torso leans, scaling with flight speed to the PlayerConfig.Flight* caps
@@ -2417,6 +2418,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 | field | meaning |
 |---|---|
 | `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item), `place_fluid` (pour one into the targeted cell), `place_stack` (build a stack block up), `ignite_campfire` (strike a branch pile, or a kiln that has fuel), `convert_multiblock` (turn a 2x2x2 volume into a structure), `heal` (restore health to the user, refused at full health) or `grow_tree` (grow the tree the aimed cell belongs to, `AshGrowthPulses` pulses) |
+| `use.pose` | the pose held while a `use.seconds` charge runs: `raise` (default, the hand presenting the item) or `bow` (`UsePose`, `BowPose`): the item arm out forward, the other arm drawn to the cheek as the charge rises, the shoulders turned side-on, holding at full draw until the button is let go (the use never runs by itself; `RightClickAction.UpdateUseCharge`), then the string arm snaps back and the body settles. Needs `use.seconds`. The `bow` item has no shot yet (`F-4`), and a remote player is not shown drawing one (the draw is not on the wire) |
 | `use.seconds` | seconds holding right-click takes before the use runs: the world charges a use pose (`PlayerModel.StartUseCharge`/`ThrowPose.WithUse`) and only runs the use at completion, so letting go early cancels it and spends nothing (`RightClickAction.TryBeginUseCharge`/`UpdateUseCharge`/`CancelUseCharge`, the twin of `ThrowAction`'s throw charge). 0 (omitted) keeps the old instant use. The firestarter's `useDelay` stays the cooldown after a use |
 | `use.block` | for `convert_multiblock`, the **source** block the volume must be built from (`block/mud_bricks`); for `place_stack`, the stack block it builds |
 | `use.result` (`convert_multiblock`) | the multiblock **anchor** block the volume becomes (`block/mud_brick_kiln`). The registry checks at startup that the anchor really is a `multiblock` renderer built from that very source, so a mismatched pair names its file instead of failing in play. The converter itself is spent by nothing and never morphs |
@@ -4345,6 +4347,7 @@ overshoot or jiggle.
   the **throw charge** (the upper arm out to the right and a little behind the body, the forearm bent up
   at about a right angle, the shoulders wound back toward the throwing side, then a whip forward and a
   settle) and the **swim stroke**. The hand anchor follows the forearm frame, so the held item does too.
+- **Bow draw** (`UsePose.Bow`, `BowPose`): an item whose `use.pose` is `bow` (the `bow`) holds a two-handed draw while the timed use charges: the right (item) arm goes out forward through `ArmOverlays`, the left arm is folded back to the cheek, and the torso twists side-on and leans back a little (`SecondaryMotion`), all weighted by the use charge (`BowPose.BodyWeight`/`DrawWeight`). It holds at full draw and, when the button is let go (`PlayerModel.CancelUseCharge` from a real draw), the string arm snaps back within `BowPose.SnapShare` of `ReleaseSeconds` and the rest follows; the camera narrows with the draw like a throw's charge (`Camera.ThrowCharge` is fed `Player.BowCharge`). The item debugger's `BOW` mode and the `draw`/`loose` player ops of `animations.json` show it.
 - **Axe chop** (`SwordSwing.AxeChop`, a fourth swing that is not in the sword's chain): an item in the `axe`
   tag (`Mining.IsAxe`) swings an overhead chop instead of a punch whenever `LocalPlayer.PunchSwing` runs, through
   `PlayerModel.StartAxeChop(seconds)` over the same `SwordMotion` shape machinery and `BladeSwingFrame`. Its length

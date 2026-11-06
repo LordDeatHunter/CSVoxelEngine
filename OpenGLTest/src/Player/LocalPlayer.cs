@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Interaction;
@@ -315,7 +316,8 @@ internal sealed class LocalPlayer
         // A hit-stop holds the punch pinch with the arm (read by the camera's next update)
         Camera.HoldPunchFov = Player.IsHitStopped;
         // The throw being wound up narrows the view with the arm (ThrowZoom, the camera's next update)
-        Camera.ThrowCharge = Player.ThrowCharge;
+        // (a drawn bow narrows it the same way)
+        Camera.ThrowCharge = Player.ThrowCharge ?? Player.BowCharge;
         // The dust a landing or a sprinting footfall kicks up: cosmetic, so a headless server spawns none
         if (!_serverMode)
             _dust.UpdatePlayer(Camera, Player.WalkPhase, horizontalSpeed, chunkManager, _debris);
@@ -345,6 +347,9 @@ internal sealed class LocalPlayer
             case "equip": Player.NotifyEquip(); break;
             case "charge": Player.StartThrowCharge(); Player.UpdateThrowCharge(1f); break;
             case "release": Player.ReleaseThrow(1f); break;
+            // A bow drawn to full and held, then let go (the world drives the same through RightClickAction)
+            case "draw": Player.StartUseCharge(UsePose.Bow); Player.UpdateUseCharge(1f); break;
+            case "loose": Player.CancelUseCharge(); break;
             // Launches the selected throwable at full charge (the model plays its own release separately)
             case "throw": _world.Throws.ThrowFor(LocalContext(), 1f); Player.ReleaseThrow(1f); break;
             case "die": Player.DeathFall = 1f; Camera.DeathProgress = 1f; break;

@@ -127,7 +127,7 @@ internal sealed class RightClickAction
         IsUseCharging = true;
         _useChargeSeconds = 0f;
         _useItemId = id;
-        Player.StartUseCharge();
+        Player.StartUseCharge(item.UsePose);
         return true;
     }
 
@@ -147,7 +147,9 @@ internal sealed class RightClickAction
         }
 
         _useChargeSeconds += Math.Max(0f, deltaTime);
-        if (_useChargeSeconds < seconds)
+        // A drawn bow holds at full draw until the button is let go (CancelUseCharge): its use never runs by itself
+        var bow = ItemRegistry.TryGet(_useItemId)?.UsePose == UsePose.Bow;
+        if (bow || _useChargeSeconds < seconds)
         {
             Player.UpdateUseCharge(MathUtils.Clamp01(_useChargeSeconds / seconds));
             return;

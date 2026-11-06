@@ -193,7 +193,7 @@ public sealed class VisualScenario
             "player" => new VisualStep
             {
                 Op = "player",
-                Action = ReadChoice(element, index, "player", "action", ["hurt", "punch", "slice", "slicereturn", "cut", "backcut", "chop", "axechop", "equip", "charge", "release", "throw", "die", "revive"]),
+                Action = ReadChoice(element, index, "player", "action", ["hurt", "punch", "slice", "slicereturn", "cut", "backcut", "chop", "axechop", "equip", "charge", "release", "throw", "draw", "loose", "die", "revive"]),
             },
             "select" => new VisualStep
             {

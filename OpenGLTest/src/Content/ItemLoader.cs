@@ -50,6 +50,15 @@ internal static class ItemLoader
             if (!float.IsFinite(useSeconds) || useSeconds < 0f || useSeconds > 10f)
                 throw new InvalidOperationException(
                     $"Item '{path}' has use.seconds {use?.Seconds}; expected 0..10 seconds.");
+            var usePose = use?.Pose?.Trim().ToLowerInvariant() switch
+            {
+                null or "" or "raise" => UsePose.Raise,
+                "bow" => UsePose.Bow,
+                _ => throw new InvalidOperationException(
+                    $"Item '{path}' has unknown use.pose '{use!.Pose}'; expected raise or bow."),
+            };
+            if (usePose == UsePose.Bow && useSeconds <= 0f)
+                throw new InvalidOperationException($"Item '{path}' has use.pose bow but no use.seconds to draw over.");
             var chance = use?.Chance ?? 1f;
             if (!float.IsFinite(chance) || chance <= 0f || chance > 1f)
                 throw new InvalidOperationException(
@@ -148,7 +157,8 @@ internal static class ItemLoader
                 UseSeconds: useSeconds,
                 TreeName: use?.Tree,
                 TrailColor: trailColor,
-                ThrowAligned: definition.ThrowAligned));
+                ThrowAligned: definition.ThrowAligned,
+                UsePose: usePose));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ContentRegistry.ItemIds, StringComparer.Ordinal));

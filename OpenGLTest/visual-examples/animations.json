@@ -71,10 +71,21 @@
     { "op": "wait", "seconds": 0.5 },
     { "op": "screenshot", "name": "first-person" },
     { "op": "view", "mode": "shoulder" },
+    { "op": "give", "block": "item/bow", "count": 1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "player", "action": "draw" },
+    { "op": "wait", "seconds": 0.7 },
+    { "op": "screenshot", "name": "bow-draw" },
+    { "op": "player", "action": "loose" },
+    { "op": "wait", "seconds": 0.1 },
+    { "op": "screenshot", "name": "bow-release" },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "look", "pitch": 0 },
     { "op": "fly" },
+    { "op": "walk", "keys": ["Space"], "seconds": 0.5 },
     { "op": "wait", "seconds": 0.8 },
     { "op": "screenshot", "name": "fly-hover" },
-    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 1.2 },
+    { "op": "walk", "keys": ["W", "ShiftLeft"], "seconds": 0.5 },
     { "op": "screenshot", "name": "fly-fast" }
   ]
 }

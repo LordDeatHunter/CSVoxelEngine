@@ -1,9 +1,11 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
 using VoxelEngine.ItemDebugger;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
+using VoxelEngine.Player.Posing;
 using Xunit;
 
 namespace VoxelEngine.Tests.Player;
@@ -932,5 +934,78 @@ public sealed class PlayerModelTests
 
         Assert.True(highest > rest + 0.3f);
         Assert.True(atImpact < highest - 0.3f);
+    }
+
+    // ---- the bow ----
+
+    private static PlayerModel Archer(float charge, out Vector3 eye)
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++) player.Update(1f / 60f, 0f);
+        eye = new Vector3(0.5f, 70f, 0.5f);
+        player.StartUseCharge(UsePose.Bow);
+        player.UpdateUseCharge(charge);
+        for (var i = 0; i < 120; i++) player.Update(1f / 60f, 0f);
+        return player;
+    }
+
+    private static Vector3 LeftHand(PlayerModel player, Vector3 eye) =>
+        Vector3.Transform(new Vector3(0f, player.HandDepth(), 0f), player.GetPartMatrix("ForearmL", eye, -90f, 0f));
+
+    [Fact]
+    public void TheBowDrawPullsTheStringHandBackAndTurnsTheShouldersMoreWithTheCharge()
+    {
+        var rest = Archer(0f, out var eye);
+        var half = Archer(0.5f, out _);
+        var full = Archer(1f, out _);
+
+        // The string hand comes up to the face as the draw rises
+        float ToHead(PlayerModel m) => Vector3.Distance(LeftHand(m, eye),
+            Vector3.Transform(Vector3.Zero, m.GetPartMatrix("Head", eye, -90f, 0f)));
+        Assert.True(ToHead(half) < ToHead(rest));
+        Assert.True(ToHead(full) < ToHead(half));
+        Assert.True(MathF.Abs(full.Bow.TorsoTwist()) > MathF.Abs(half.Bow.TorsoTwist()));
+        Assert.Equal(0f, rest.Bow.TorsoTwist(), 3);
+    }
+
+    [Fact]
+    public void ReleasingABowSnapsTheStringArmBackFirstThenSettlesTheBody()
+    {
+        var player = Archer(1f, out _);
+        player.CancelUseCharge();
+        Assert.True(player.BowReleaseProgress < 1f);
+
+        // Shortly after the let-go the string arm is already mostly gone while the body still shows the draw
+        player.Update(BowPose.ReleaseSeconds * BowPose.SnapShare, 0f);
+        Assert.True(player.Bow.DrawWeight() < 0.1f);
+        Assert.True(player.Bow.BodyWeight() > player.Bow.DrawWeight() + 0.2f);
+
+        player.Update(BowPose.ReleaseSeconds, 0f);
+        Assert.Equal(1f, player.BowReleaseProgress, 3);
+        Assert.Equal(0f, player.Bow.DrawWeight(), 3);
+        Assert.Equal(0f, player.Bow.BodyWeight(), 3);
+    }
+
+    [Fact]
+    public void ATapThatDrewNothingShowsNoRelease()
+    {
+        var player = new PlayerModel();
+        player.StartUseCharge(UsePose.Bow);
+        player.UpdateUseCharge(BowPose.MinReleaseCharge * 0.5f);
+        player.CancelUseCharge();
+        Assert.Equal(1f, player.BowReleaseProgress);
+    }
+
+    [Fact]
+    public void ARaisedUseIsNotABowDraw()
+    {
+        var player = new PlayerModel();
+        player.StartUseCharge();
+        player.UpdateUseCharge(1f);
+        player.Update(1f / 60f, 0f);
+        Assert.Equal(0f, player.Bow.DrawWeight());
+        Assert.Equal(0f, player.Bow.BodyWeight());
+        player.CancelUseCharge();
+        Assert.Equal(1f, player.BowReleaseProgress);
     }
 }

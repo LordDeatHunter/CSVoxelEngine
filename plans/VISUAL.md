@@ -2,19 +2,13 @@
 
 ## Status
 
-Tracks particles, animations and other non-gameplay feel work. Last updated 2026-11-06. Nothing in progress (V-6 landed and filmed; V-11 and V-12 landed, not yet filmed: no scenario op opens the [E] panel or drops items). V-6 follow-up for V-5: rain should call `RippleSystem.Spawn` per drop that lands on water.
+Tracks particles, animations and other non-gameplay feel work. Last updated 2026-11-06. Nothing in progress. The player and tools section has landed and been filmed (V-1 axe chop with its chips, canopy shake and trunk notch, V-2, V-3, V-13 flight, V-14 swim legs, V-15 bow, V-16 spear). V-6 landed and filmed; V-11 and V-12 landed, not yet filmed: no scenario op opens the [E] panel or drops items. Open follow-ups: rain should call `RippleSystem.Spawn` per drop that lands on water (for V-5); a remote player shows neither another player's axe chop nor bow draw (neither is on the wire); a thrown spear does not stick in the block it hits and the trunk itself never shudders (only its leaves shake).
 
 ## In progress
 
 (none)
 
 ## Open
-
-### Player and tools
-
-- [ ] **`V-15` Bow animation** - P2, M.
-  A two-handed draw, hold and release: the off arm holds the bow out, the drawing arm pulls back to the cheek as the charge rises, snaps back on release, the shoulders turn side-on. Reuses the throw's charge clock (`ThrowPose`, `ArmOverlays`, `Camera.ThrowCharge` and `ThrowZoom`). Needs the bow item itself; the gameplay is in `F-4`.
-  **Hook**: `Posing/ThrowPose`, `HeldItemPose`, `PlayerPreviewState` (a new `BOW` mode). **Verify**: item debugger, then a scenario in `animations.json`.
 
 ### World ambience
 

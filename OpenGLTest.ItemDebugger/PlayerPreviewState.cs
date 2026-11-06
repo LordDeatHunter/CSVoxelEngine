@@ -2,9 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Config;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
+using VoxelEngine.Player.Posing;
 
 namespace VoxelEngine.ItemDebugger;
 
@@ -41,6 +43,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public const string Axe = "axe";
     public const string Throw = "throw";
     public const string Use = "use";
+    public const string Bow = "bow";
     public const string Hurt = "hurt";
     public const string Equip = "equip";
     public const string Death = "death";
@@ -49,7 +52,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public static readonly IReadOnlyList<string> AllModes =
     [
         Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface, Fly,
-        Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Axe, Throw, Use, Hurt, Equip, Death,
+        Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Axe, Throw, Use, Bow, Hurt, Equip, Death,
     ];
 
     /// <summary>Seconds a one-shot rests between the end of one play and the next.</summary>
@@ -82,6 +85,8 @@ public sealed class PlayerPreviewState : IPreviewDriver
     // How long the timed-use pose takes to rise and how long it is held before letting go
     private const float UseChargeSeconds = 1.0f;
     private const float UseHoldSeconds = 0.3f;
+    // A bow holds its full draw longer, to be looked at, before the release
+    private const float BowHoldSeconds = 0.8f;
     private const float DeathHoldSeconds = 0.7f;
     private const float DeathFallSeconds = 0.9f;
 
@@ -146,6 +151,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
         Axe => PlayerModel.SwordDuration(SwordSwing.AxeChop) + 0.1f,
         Throw => ThrowChargeSeconds + ThrowHoldSeconds + PlayerModel.ThrowDuration + 0.1f,
         Use => UseChargeSeconds + UseHoldSeconds + 0.4f,
+        Bow => UseChargeSeconds + BowHoldSeconds + BowPose.ReleaseSeconds + 0.5f,
         Hurt => 1f,
         Equip => 1.2f,
         Death => DeathFallSeconds + DeathHoldSeconds,
@@ -259,7 +265,10 @@ public sealed class PlayerPreviewState : IPreviewDriver
                 Throwing(deltaTime);
                 break;
             case Use:
-                Using(deltaTime);
+                Using(deltaTime, UsePose.Raise, UseHoldSeconds);
+                break;
+            case Bow:
+                Using(deltaTime, UsePose.Bow, BowHoldSeconds);
                 break;
             case Death:
                 Dying(deltaTime);
@@ -429,14 +438,14 @@ public sealed class PlayerPreviewState : IPreviewDriver
     }
 
     // A timed use: raise the held item over the use time, hold the pose a beat, let it down.
-    private void Using(float dt)
+    private void Using(float dt, UsePose pose, float holdSeconds)
     {
         _model.Update(dt, 0f);
         if (!_useCharging)
         {
             _rest -= dt;
             if (_rest > 0f) return;
-            _model.StartUseCharge();
+            _model.StartUseCharge(pose);
             _useCharging = true;
             _useTimer = 0f;
             return;
@@ -448,7 +457,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
             _model.UpdateUseCharge(MathUtils.Clamp01(_useTimer / UseChargeSeconds));
             return;
         }
-        if (_useTimer <= UseChargeSeconds + UseHoldSeconds)
+        if (_useTimer <= UseChargeSeconds + holdSeconds)
         {
             _model.UpdateUseCharge(1f);
             return;

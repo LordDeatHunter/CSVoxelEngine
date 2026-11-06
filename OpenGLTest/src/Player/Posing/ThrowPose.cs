@@ -36,7 +36,8 @@ internal sealed class ThrowPose
     // generic pose for every use time; a strike, a wrap and a sprinkle can follow.
     internal Pose WithUse(in Pose pose)
     {
-        if (!_model.UseCharge.HasValue) return pose;
+        // A bow draws through BowPose, not the raised presenting pose
+        if (!_model.UseCharge.HasValue || _model.UsePoseActive == Content.Blocks.UsePose.Bow) return pose;
         var raised = MathUtils.SmoothStep(_model.UseCharge.Value);
         var fromShoulder = MathUtils.Lerp(pose.RightShoulder, UseShoulder, raised);
         var fromElbow = MathUtils.Lerp(pose.RightElbow, UseElbow, raised);

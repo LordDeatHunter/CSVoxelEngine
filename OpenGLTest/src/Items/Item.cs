@@ -141,6 +141,9 @@ public abstract class Item
     /// </summary>
     public float UseSeconds { get; internal init; }
 
+    /// <summary>The pose held while the timed use charges (<see cref="UseSeconds"/>).</summary>
+    public UsePose UsePose { get; internal init; }
+
     /// <summary>The tree species an <c>plant_tree</c> use plants (an acorn plants an oak), or null.</summary>
     public string? UseTreeName { get; internal init; }
 
@@ -247,6 +250,7 @@ public abstract class Item
         CrucibleCapacityMl = spec.CrucibleCapacityMl;
         UseDelaySeconds = spec.UseDelay;
         UseSeconds = spec.UseSeconds;
+        UsePose = spec.UsePose;
         UseTreeName = spec.TreeName;
         SpriteCols = spec.SpriteCols;
         SpriteRows = spec.SpriteRows;

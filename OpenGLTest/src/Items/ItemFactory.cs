@@ -49,7 +49,8 @@ public static class ItemFactory
         float UseSeconds = 0f,
         string? TreeName = null,
         Rgba? TrailColor = null,
-        bool ThrowAligned = false);
+        bool ThrowAligned = false,
+        UsePose UsePose = UsePose.Raise);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,

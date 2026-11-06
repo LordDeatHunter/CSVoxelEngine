@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Particles;
@@ -91,6 +92,11 @@ public class PlayerModel
     private SwordSwing _swordSwing;
     // Seconds the swing in progress lasts: its own length, or an axe chop's, set to the axe's hit pace
     private float _swordSeconds = 1f;
+    // The pose the timed use in progress (or the last one) holds, and a bow's release: the charge it was
+    // let go at and its progress (1 = no release playing)
+    private UsePose _usePose;
+    private float _bowReleaseT = 1f;
+    private float _bowReleaseCharge;
     // Hit-stop of the punch, slice and sword clocks: a swing that connected holds at its impact pose
     private readonly SwingHitStop _mineStop = new();
     private readonly SwingHitStop _sliceStop = new();
@@ -175,6 +181,9 @@ public class PlayerModel
     /// <summary>The creative-flight leg sway, trail and lean.</summary>
     internal FlightPose Flight { get; }
 
+    /// <summary>A bow's two-handed draw.</summary>
+    internal BowPose Bow { get; }
+
     /// <summary>The throw and timed-use arm overrides.</summary>
     internal ThrowPose ThrowArm { get; }
 
@@ -197,6 +206,7 @@ public class PlayerModel
     {
         Swim = new SwimPose(this);
         Flight = new FlightPose(this);
+        Bow = new BowPose(this);
         ThrowArm = new ThrowPose(this);
         Secondary = new SecondaryMotion(this);
         Jab = new PunchPose(this);
@@ -490,6 +500,9 @@ public class PlayerModel
 
         if (_throwT < 1f)
             _throwT = Math.Min(1f, _throwT + deltaTime / ThrowDuration);
+
+        if (_bowReleaseT < 1f)
+            _bowReleaseT = Math.Min(1f, _bowReleaseT + deltaTime / BowPose.ReleaseSeconds);
     }
 
     /// <summary>
@@ -545,7 +558,24 @@ public class PlayerModel
     public void StartThrowCharge() => _throwCharge01 = 0f;
 
     /// <summary>Starts the timed-use pose (see <see cref="VoxelEngine.Interaction.RightClickAction.TryBeginUseCharge"/>).</summary>
-    public void StartUseCharge() => _useCharge01 = 0f;
+    public void StartUseCharge(UsePose pose = UsePose.Raise)
+    {
+        _usePose = pose;
+        _useCharge01 = 0f;
+        _bowReleaseT = 1f;
+    }
+
+    /// <summary>The pose the timed use in progress (or the last one) holds.</summary>
+    internal UsePose UsePoseActive => _usePose;
+
+    /// <summary>The charge a bow is drawn to (the use charge of a <see cref="UsePose.Bow"/> use), or null with no draw.</summary>
+    public float? BowCharge => _usePose == UsePose.Bow ? _useCharge01 : null;
+
+    /// <summary>Progress of a bow's release, 0 at the let-go to 1 when it has settled (also with none playing).</summary>
+    public float BowReleaseProgress => _bowReleaseT;
+
+    /// <summary>The charge the last bow release was let go at, 0..1.</summary>
+    public float BowReleaseCharge => _bowReleaseCharge;
 
     /// <summary>Advances the timed-use pose; <paramref name="charge01"/> is the hold's share.</summary>
     public void UpdateUseCharge(float charge01)
@@ -555,7 +585,16 @@ public class PlayerModel
     }
 
     /// <summary>Lets the timed-use pose go; the arm eases back to whatever it was doing.</summary>
-    public void CancelUseCharge() => _useCharge01 = null;
+    public void CancelUseCharge()
+    {
+        // A bow let go from a real draw snaps back instead of just dropping the pose
+        if (_usePose == UsePose.Bow && _useCharge01 is > BowPose.MinReleaseCharge)
+        {
+            _bowReleaseCharge = _useCharge01.Value;
+            _bowReleaseT = 0f;
+        }
+        _useCharge01 = null;
+    }
 
     public void UpdateThrowCharge(float charge01)
     {

@@ -214,6 +214,10 @@ public sealed class ItemDefinition
         /// </summary>
         public float? Seconds { get; set; }
 
+        /// <summary>The pose held while the timed use charges: <c>raise</c> (default) or <c>bow</c>. See
+        /// <see cref="Content.Blocks.UsePose"/>; only meaningful with <see cref="Seconds"/>.</summary>
+        public string? Pose { get; set; }
+
         /// <summary>
         /// Tree species an <c>plant_tree</c> use plants (an acorn plants an oak): the file name
         /// under <c>assets/data/trees/</c>, checked when the use runs.
