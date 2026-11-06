@@ -294,18 +294,17 @@ internal static class TreeWoodEmitter
         }
     }
 
-    // The bite of a chopped cell, in pixels of the 16 across a cell: the band of height it is cut over
-    // (the cells above and below keep their own faces) and how far it goes in. Its width along the face
-    // is the eaten share (WoodDamage.EatenColumns).
-    private const int BiteBottomPx = 3;
-    private const int BiteTopPx = 13;
-    private const int BiteDepthPx = 4;
+    // The slit of a chopped cell, in pixels of the 16 across a cell: the small band of height it is cut over
+    // (the cells above and below keep their own faces). It always spans the whole face; how far it goes in is
+    // the damage (WoodDamage.BiteDepthPx).
+    private const int BiteBottomPx = 6;
+    private const int BiteTopPx = 10;
     private const int MaxBiteQuads = 40;
 
     /// <summary>
-    /// Emits a full-cube wood cell whose side face <paramref name="biteFace"/> (0..3) has been eaten away
-    /// over <paramref name="eatenColumns"/> of its 16 columns, from the viewer's left edge toward the right
-    /// (<see cref="WoodDamage"/>): the cube minus one box in a band of the face, every cell face
+    /// Emits a full-cube wood cell whose side face <paramref name="biteFace"/> (0..3) has a slit cut into it,
+    /// the whole width of the face and <paramref name="depthPx"/> pixels deep (<see cref="WoodDamage"/>): the cube
+    /// minus one low box across the face, every cell face
     /// kept whole except where the box reaches it (the face is then drawn as the bars around the hole, so a
     /// cut that runs to a side edge also opens the neighboring face), the box's inner walls in the cut wood's
     /// own tile (the log's end grain), and a cap where the box meets a face a neighbor hides, so the bite is
@@ -313,7 +312,7 @@ internal static class TreeWoodEmitter
     /// </summary>
     internal static void EmitEaten(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
-        int x, int y, int z, BlockType type, Vector3 basePos, int biteFace, int eatenColumns)
+        int x, int y, int z, BlockType type, Vector3 basePos, int biteFace, int depthPx)
     {
         if (vertices.Count > ushort.MaxValue - 4 * MaxBiteQuads) return;
         var id = type.Id;
@@ -323,20 +322,16 @@ internal static class TreeWoodEmitter
             lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
 
         const float Px = 1f / RimPx;
-        var width = Math.Clamp(eatenColumns, 1, WoodDamage.FaceColumns) * Px;
-        var depth = BiteDepthPx * Px;
+        var depth = Math.Clamp(depthPx, 1, WoodDamage.MaxDepthPx) * Px;
         var y0 = BiteBottomPx * Px;
         var y1 = BiteTopPx * Px;
-        // The viewer's left of each face, along its +x/+z running axis: the +Z and -X faces start at 0, the others at 1
-        var u0 = biteFace is 1 or 2 ? 0f : 1f - width;
-        var u1 = u0 + width;
         Vector3 bmin, bmax;
         switch (biteFace)
         {
-            case 0: bmin = new Vector3(u0, y0, 0f); bmax = new Vector3(u1, y1, depth); break;
-            case 1: bmin = new Vector3(u0, y0, 1f - depth); bmax = new Vector3(u1, y1, 1f); break;
-            case 2: bmin = new Vector3(0f, y0, u0); bmax = new Vector3(depth, y1, u1); break;
-            default: bmin = new Vector3(1f - depth, y0, u0); bmax = new Vector3(1f, y1, u1); break;
+            case 0: bmin = new Vector3(0f, y0, 0f); bmax = new Vector3(1f, y1, depth); break;
+            case 1: bmin = new Vector3(0f, y0, 1f - depth); bmax = new Vector3(1f, y1, 1f); break;
+            case 2: bmin = new Vector3(0f, y0, 0f); bmax = new Vector3(depth, y1, 1f); break;
+            default: bmin = new Vector3(1f - depth, y0, 0f); bmax = new Vector3(1f, y1, 1f); break;
         }
 
         var biteLight = lights[biteFace];

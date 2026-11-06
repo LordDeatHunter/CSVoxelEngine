@@ -36,24 +36,24 @@ public sealed class ChoppedWoodTests : IDisposable
     }
 
     [Fact]
-    public void TheEatenShareGrowsWithTheDamageAndCoversTheFaceOnlyAtTheBreak()
+    public void TheSlitDeepensWithTheDamageAndIsAtItsDeepestOnlyAtTheBreak()
     {
-        Assert.Equal(0, WoodDamage.EatenColumns(0f, 24f));
-        Assert.Equal(0, WoodDamage.EatenColumns(5f, 0f));
+        Assert.Equal(0, WoodDamage.BiteDepthPx(0f, 24f));
+        Assert.Equal(0, WoodDamage.BiteDepthPx(5f, 0f));
 
         var previous = 0;
         for (var damage = 0.05f; damage < 24f; damage += 0.25f)
         {
-            var columns = WoodDamage.EatenColumns(damage, 24f);
-            Assert.True(columns >= previous);
-            Assert.InRange(columns, 1, WoodDamage.FaceColumns);
-            previous = columns;
+            var depth = WoodDamage.BiteDepthPx(damage, 24f);
+            Assert.True(depth >= previous);
+            Assert.InRange(depth, 1, WoodDamage.MaxDepthPx);
+            previous = depth;
         }
 
-        // Any damage already shows, and the whole face is only for the damage that breaks the block
-        Assert.True(WoodDamage.EatenColumns(0.01f, 24f) >= 1);
-        Assert.True(WoodDamage.EatenColumns(23.9f, 24f) <= WoodDamage.FaceColumns);
-        Assert.Equal(WoodDamage.FaceColumns, WoodDamage.EatenColumns(24f, 24f));
+        // Any damage already shows, and the deepest slit is only for the damage that breaks the block
+        Assert.True(WoodDamage.BiteDepthPx(0.01f, 24f) >= 1);
+        Assert.True(WoodDamage.BiteDepthPx(23.9f, 24f) <= WoodDamage.MaxDepthPx);
+        Assert.Equal(WoodDamage.MaxDepthPx, WoodDamage.BiteDepthPx(24f, 24f));
     }
 
     [Fact]
@@ -107,27 +107,27 @@ public sealed class ChoppedWoodTests : IDisposable
     [InlineData(1)]
     [InlineData(2)]
     [InlineData(3)]
-    public void AChoppedFaceIsACubeWithAClosedBiteAsWideAsTheDamageSaysAndNeverSeeThrough(int face)
+    public void AChoppedFaceIsACubeWithAClosedFullWidthSlitThatOnlyDeepensAndNeverSeesThrough(int face)
     {
         var (manager, center) = LogInAir(Natural);
         var whole = Volume(center.GenerateMeshData(manager)!);
         Assert.NotEqual(0f, whole);
 
         var previous = 1f;
-        var firstEaten = 0f;
-        foreach (var columns in new[] { 1, 2, 4, 8, 12, 16 })
+        var firstTaken = 0f;
+        foreach (var depth in new[] { 1, 2, 4, 8, 12, WoodDamage.MaxDepthPx })
         {
-            // Damage that eats exactly this many columns
-            var damage = Hardness() * (columns - 0.5f) / WoodDamage.FaceColumns;
+            // Damage that cuts exactly this deep
+            var damage = Hardness() * (depth - 0.5f) / WoodDamage.MaxDepthPx;
             manager.ChopDamage.Set(8, 8, 8, damage, face);
             var ratio = Volume(center.GenerateMeshData(manager)!) / whole;
 
-            // A closed surface that has lost a box: less volume as the cut widens, never nothing, and the
-            // volume taken out is in proportion to the width
-            Assert.True(ratio < previous, $"{columns} columns did not remove more than the cut before");
+            // A closed surface that has lost a box: less volume as the slit deepens, never nothing, and the
+            // volume taken out is in proportion to the depth (the slit is as wide and as tall at every depth)
+            Assert.True(ratio < previous, $"depth {depth} did not remove more than the cut before");
             Assert.True(ratio > 0.5f);
-            if (columns == 1) firstEaten = 1f - ratio;
-            Assert.Equal(firstEaten * columns, 1f - ratio, 3);
+            if (depth == 1) firstTaken = 1f - ratio;
+            Assert.InRange(1f - ratio, firstTaken * depth - 0.005f, firstTaken * depth + 0.005f);
             previous = ratio;
         }
     }

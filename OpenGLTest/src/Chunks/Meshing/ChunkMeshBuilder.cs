@@ -322,9 +322,9 @@ internal static class ChunkMeshBuilder
                     && chopDamage.TryGet(worldX0 + x, worldY0 + y, worldZ0 + z, out var chop)
                     && chop.Face != WoodDamage.NoFace)
                 {
-                    var eaten = WoodDamage.EatenColumns(chop.Damage, Mining.HardnessOf(blockId, paddedState[pIdx]));
+                    var biteDepth = WoodDamage.BiteDepthPx(chop.Damage, Mining.HardnessOf(blockId, paddedState[pIdx]));
                     TreeWoodEmitter.EmitEaten(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight,
-                        blockLight, x, y, z, type, basePos, chop.Face, eaten);
+                        blockLight, x, y, z, type, basePos, chop.Face, biteDepth);
                     continue;
                 }
 

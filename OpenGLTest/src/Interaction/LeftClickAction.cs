@@ -461,7 +461,7 @@ internal sealed class LeftClickAction
 
     /// <summary>
     /// Keeps the damage so far on the natural trunk cell being chopped for good (<see cref="WoodDamage"/>) and
-    /// remeshes its chunk when more of its face shows eaten (<see cref="WoodDamage.EatenColumns"/>). The bite is
+    /// remeshes its chunk when the slit in its face got deeper (<see cref="WoodDamage.BiteDepthPx"/>). The bite is
     /// on the side face the first hit landed on; a hit on a top or bottom face shows none.
     /// </summary>
     private void RecordChop()
@@ -469,16 +469,16 @@ internal sealed class LeftClickAction
         var cell = _breakingBlockPosition;
         int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
         var damage = _chunkManager.ChopDamage;
-        var before = ShownColumns(damage, x, y, z);
+        var before = ShownDepth(damage, x, y, z);
         damage.Set(x, y, z, _breakDamage, _breakFace < 0 ? WoodDamage.NoFace : _breakFace);
-        if (WoodState.IsFullCube(_breakState) && ShownColumns(damage, x, y, z) != before)
+        if (WoodState.IsFullCube(_breakState) && ShownDepth(damage, x, y, z) != before)
             _chunkManager.ImmediateRemesh(VoxelCoords.ChunkPosOf(cell));
     }
 
-    // How many face columns the cell's stored damage shows eaten (0 with no damage or no side face)
-    private int ShownColumns(WoodDamage damage, int x, int y, int z) =>
+    // How deep the slit of the cell's stored damage is (0 with no damage or no side face)
+    private int ShownDepth(WoodDamage damage, int x, int y, int z) =>
         damage.TryGet(x, y, z, out var entry) && entry.Face != WoodDamage.NoFace
-            ? WoodDamage.EatenColumns(entry.Damage, _breakHardness) : 0;
+            ? WoodDamage.BiteDepthPx(entry.Damage, _breakHardness) : 0;
 
     /// <summary>A hit on tree wood shakes some of the canopy above and around it loose.</summary>
     private void ShudderCanopy(Vector3 woodCell)

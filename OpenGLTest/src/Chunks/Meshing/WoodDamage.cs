@@ -10,15 +10,15 @@ namespace VoxelEngine.Chunks.Meshing;
 /// the damage dealt so far and the side face the first hit landed on. Damage on a natural tree
 /// (never a placed, detached log) is kept, not reset when the player stops, so a half-felled tree stays
 /// half-felled, and it is saved with the world. The mesher reads it (on its pool threads) when it emits a
-/// full-cube wood cell, so a damaged cell is drawn with its hit face eaten away from the viewer's left edge
-/// to the right as the damage rises (<see cref="TreeWoodEmitter.EmitEaten"/>); the hitbox and collision
+/// full-cube wood cell, so a damaged cell is drawn with a full-width, low slit cut into its hit face that
+/// gets deeper as the damage rises (<see cref="TreeWoodEmitter.EmitEaten"/>); the hitbox and collision
 /// stay the whole cube. Per world, owned by <see cref="ChunkManager"/>, written by the local player's
 /// mining only (the main thread); a client and a server hold none.
 /// </summary>
 public sealed class WoodDamage
 {
-    /// <summary>Columns (pixels of the 16 across a cell) the cut can eat along the face.</summary>
-    public const int FaceColumns = 16;
+    /// <summary>The deepest the slit goes, in pixels of the 16 across a cell (a thin core of wood stays while the block stands).</summary>
+    public const int MaxDepthPx = 14;
 
     /// <summary>The face stored for a hit that was not on a side (top or bottom): the cell shows no bite.</summary>
     public const int NoFace = 4;
@@ -36,15 +36,15 @@ public sealed class WoodDamage
     public bool IsEmpty => _cells.IsEmpty;
 
     /// <summary>
-    /// How many of the face's <see cref="FaceColumns"/> columns a block that has taken
-    /// <paramref name="damage"/> of <paramref name="hardness"/> has had eaten: 0 untouched, at least 1 after
-    /// any damage, rising with it, and the whole face only at full damage (the block is gone by then).
+    /// How deep, in pixels, the slit of a block that has taken <paramref name="damage"/> of
+    /// <paramref name="hardness"/> goes: 0 untouched, at least 1 after any damage, rising with it, and
+    /// <see cref="MaxDepthPx"/> only at full damage (the block is gone by then).
     /// </summary>
-    public static int EatenColumns(float damage, float hardness)
+    public static int BiteDepthPx(float damage, float hardness)
     {
         if (hardness <= 0f || damage <= 0f) return 0;
         var share = Math.Clamp(damage / hardness, 0f, 1f);
-        return Math.Clamp((int)MathF.Ceiling(share * FaceColumns), 1, FaceColumns);
+        return Math.Clamp((int)MathF.Ceiling(share * MaxDepthPx), 1, MaxDepthPx);
     }
 
     /// <summary>

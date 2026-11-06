@@ -989,7 +989,7 @@ OpenGLTest/
         ChunkMeshData.cs       # CPU-side mesh of one chunk (opaque + translucent lists, light snapshot, vents, flame points)
         ChunkMeshScheduler.cs  # the dirty set, the per-frame dirty scan, the thread-pool mesh runners, the completed queue and budgeted upload,
                                #   the immediate remesh paths (behind ChunkManager.Update, MarkDirty, ImmediateRemesh*)
-        WoodDamage.cs          # the permanent chop damage per natural trunk cell (damage + first-hit side face) the mesher reads, and the damage -> eaten columns rule
+        WoodDamage.cs          # the permanent chop damage per natural trunk cell (damage + first-hit side face) the mesher reads, and the damage -> slit depth rule
       ChunkMesher.cs         # the binary greedy pass, the biome-tinted cube face and model-tint helpers, and the box-face/quad primitives the emitters share
         FaceLight.cs           # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
         FluidEmitter.cs        # a fluid cell's surface and side quads: order-independent corner heights, corner light, per-corner flow codes
@@ -4364,9 +4364,9 @@ overshoot or jiggle.
   `WoodDamageCodec`, written by `WorldPersistence` when its version moved, read in the `World` constructor before any
   chunk meshes). The cell is cleared when it is mined (`Chunk.RemoveBlockAt`) or felled (`BlockEditor.FellWood`); a
   client and a server keep none (the server counts a break from zero). A full-cube trunk cell shows that damage as its
-  hit face **eaten away** from the viewer's left edge to the right (`WoodDamage.EatenColumns`, of `FaceColumns` = 16,
-  at least one after any damage and all of them only at the break) in a band of the face a few pixels deep:
-  `RecordChop` remeshes the chunk when the eaten width grows (`ImmediateRemesh` takes a chunk position) and
+  hit face cut by a **slit**: the whole width of the face from the first hit, a few pixels high (it never grows
+  taller), and deeper with every hit (`WoodDamage.BiteDepthPx`, at least 1 px after any damage and `MaxDepthPx` only
+  at the break): `RecordChop` remeshes the chunk when the slit gets deeper (`ImmediateRemesh` takes a chunk position) and
   `TreeWoodEmitter.EmitEaten` draws the cube minus that box (each cell face as the bars around the hole, the box's
   walls in the log's end-grain tile, a cap where the neighbor hides a face, so it is never see-through; a cut that
   reaches the cell's side also opens the neighboring face). It is cosmetic (the hitbox stays the whole cube), it
