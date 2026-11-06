@@ -89,6 +89,8 @@ public class PlayerModel
     private int _sliceDir;
     private float _swordT = 1f;
     private SwordSwing _swordSwing;
+    // Seconds the swing in progress lasts: its own length, or an axe chop's, set to the axe's hit pace
+    private float _swordSeconds = 1f;
     // Hit-stop of the punch, slice and sword clocks: a swing that connected holds at its impact pose
     private readonly SwingHitStop _mineStop = new();
     private readonly SwingHitStop _sliceStop = new();
@@ -484,7 +486,7 @@ public class PlayerModel
             _sliceT = _sliceStop.Advance(_sliceT, deltaTime, 1f / SliceDuration, SliceImpactProgress);
 
         if (_swordT < 1f)
-            _swordT = _swordStop.Advance(_swordT, deltaTime, 1f / SwordDuration(_swordSwing), SwordImpactProgress(_swordSwing));
+            _swordT = _swordStop.Advance(_swordT, deltaTime, 1f / _swordSeconds, SwordImpactProgress(_swordSwing));
 
         if (_throwT < 1f)
             _throwT = Math.Min(1f, _throwT + deltaTime / ThrowDuration);
@@ -524,9 +526,20 @@ public class PlayerModel
     public void StartSword(SwordSwing swing)
     {
         _swordSwing = swing;
+        _swordSeconds = SwordDuration(swing);
         _swordT = 0f;
         _swordStop.Reset();
         _sliceT = 1f;
+    }
+
+    /// <summary>
+    /// Starts an axe's chop (<see cref="SwordSwing.AxeChop"/>) lasting <paramref name="seconds"/>, the
+    /// pace of the axe's hits, so the blow comes down as a hit lands and the next wind-up follows at once.
+    /// </summary>
+    public void StartAxeChop(float seconds)
+    {
+        StartSword(SwordSwing.AxeChop);
+        _swordSeconds = MathF.Max(seconds, 0.05f);
     }
 
     public void StartThrowCharge() => _throwCharge01 = 0f;

@@ -892,4 +892,45 @@ public sealed class PlayerModelTests
         Assert.Equal(cocked, player.GetPose().RightShoulder, 4);
         Assert.True(player.GetPose().RightShoulder > rest + 0.5f);
     }
+
+    [Theory]
+    [InlineData(0.25f)]
+    [InlineData(0.6f)]
+    public void AnAxeChopLastsExactlyTheSecondsItWasGivenAndLandsItsBlowInsideIt(float seconds)
+    {
+        var player = new PlayerModel();
+        player.StartAxeChop(seconds);
+        Assert.True(player.IsSwordSwinging);
+        Assert.Equal(SwordSwing.AxeChop, player.ActiveSwordSwing);
+
+        player.Update(seconds * 0.9f, 0f);
+        Assert.True(player.IsSwordSwinging);
+        player.Update(seconds * 0.1f + 1e-3f, 0f);
+        Assert.False(player.IsSwordSwinging);
+        Assert.InRange(PlayerModel.SwordImpactProgress(SwordSwing.AxeChop), 0.3f, 0.8f);
+    }
+
+    [Fact]
+    public void AnAxeChopRaisesTheArmOverTheHeadThenBringsItDown()
+    {
+        var player = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++) player.Update(1f / 60f, 0f);
+        var eye = new Vector3(0.5f, 70f, 0.5f);
+        var rest = Hand(player, eye).Y;
+        player.StartAxeChop(0.4f);
+
+        var highest = float.MinValue;
+        var atImpact = float.MaxValue;
+        while (player.IsSwordSwinging)
+        {
+            player.Update(1f / 60f, 0f);
+            var y = Hand(player, eye).Y;
+            highest = MathF.Max(highest, y);
+            if (player.SwordProgress >= PlayerModel.SwordImpactProgress(SwordSwing.AxeChop) && atImpact == float.MaxValue)
+                atImpact = y;
+        }
+
+        Assert.True(highest > rest + 0.3f);
+        Assert.True(atImpact < highest - 0.3f);
+    }
 }

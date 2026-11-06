@@ -54,6 +54,10 @@ public static class PlayerConfig
     public const float FlightHoverSway = 0.35f;
     public const float FlightSwayRate = 2.6f;
 
+    // An axe's chop (SwordSwing.AxeChop) lasts the axe's hit gap, held between these (seconds)
+    public const float AxeChopMinSeconds = 0.25f;
+    public const float AxeChopMaxSeconds = 0.8f;
+
     // Break kick (BreakKick): a landed mining hit on a block harder than the min nudges the view,
     // rising to the max strength at the full hardness (a trunk, an ore); the hit that breaks the
     // block kicks the final factor harder

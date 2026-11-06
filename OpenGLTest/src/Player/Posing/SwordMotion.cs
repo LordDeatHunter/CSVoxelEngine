@@ -84,10 +84,26 @@ internal static class SwordMotion
         BladeRoll: 0f, BladeCant: 0f, BladeYaw: 0f,
         DisplayYaw: 0f, DisplayRoll: 0f);
 
+    // The axe's chop: the sword's chop made quick and short-recovered so one swing fits an axe's hit
+    // pace, the wind-up shorter, the blade carried the same way (straight along the forearm). Its length
+    // is rescaled to the axe's hit gap at play time, so only the shares matter.
+    private static readonly Shape AxeChop = new(
+        Duration: 0.4f, WindupEnd: 0.5f, WindupReach: 0.85f, Impact: 0.6f, StrikeEnd: 0.66f, HoldEnd: 0.72f,
+        Dir: 1,
+        YawWindup: 0.08f, YawFar: 0.05f,
+        ShoulderWindup: 2.85f, ShoulderFar: 1.6f,
+        ElbowWindup: 0.85f, ElbowFar: 0.15f,
+        BodyWindup: 0.1f, BodyFar: 0.15f, BodyYaw: 0.2f, TorsoYaw: 0.25f, Roll: 0f,
+        LeanWindup: 0.15f, LeanFar: -0.2f, DipDepth: 1.1f, DipHeld: true,
+        PullWindup: new Vector3(0f, 0.03f, 0.02f), PullFar: new Vector3(0f, -0.012f, -0.04f),
+        BladeRoll: 0f, BladeCant: 0f, BladeYaw: 0f,
+        DisplayYaw: 0f, DisplayRoll: 0f);
+
     private static Shape Of(SwordSwing swing) => swing switch
     {
         SwordSwing.BackCut => BackCut,
         SwordSwing.Chop => Chop,
+        SwordSwing.AxeChop => AxeChop,
         _ => Cut,
     };
 

@@ -105,7 +105,7 @@ public sealed class PlayerPreviewStateTests
     {
         foreach (var mode in new[] { PlayerPreviewState.Punch, PlayerPreviewState.HeavyPunch, PlayerPreviewState.Slice,
                      PlayerPreviewState.SliceBack, PlayerPreviewState.Cut, PlayerPreviewState.BackCut,
-                     PlayerPreviewState.Chop, PlayerPreviewState.Throw, PlayerPreviewState.Hurt,
+                     PlayerPreviewState.Chop, PlayerPreviewState.Axe, PlayerPreviewState.Throw, PlayerPreviewState.Hurt,
                      PlayerPreviewState.Equip, PlayerPreviewState.Death })
         {
             var (state, model) = Make(mode);
@@ -120,7 +120,7 @@ public sealed class PlayerPreviewStateTests
                 {
                     PlayerPreviewState.Punch or PlayerPreviewState.HeavyPunch => model.MineT < 1f,
                     PlayerPreviewState.Slice or PlayerPreviewState.SliceBack => model.IsSlicing,
-                    PlayerPreviewState.Cut or PlayerPreviewState.BackCut or PlayerPreviewState.Chop => model.IsSwordSwinging,
+                    PlayerPreviewState.Cut or PlayerPreviewState.BackCut or PlayerPreviewState.Chop or PlayerPreviewState.Axe => model.IsSwordSwinging,
                     PlayerPreviewState.Throw => model.IsThrowing || model.ThrowCharge.HasValue,
                     PlayerPreviewState.Hurt => MathF.Abs(model.Flinch) > 0.05f,
                     PlayerPreviewState.Equip => model.EquipLowering > 0.05f,

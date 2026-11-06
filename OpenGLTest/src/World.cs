@@ -422,7 +422,7 @@ public class World
                 _falling, _tntManager, _mobs, _projectiles, serverMode, _campfires, _kilns, _goblins);
             Edits = new BlockEditor(this, _chunkManager, _debris, _dropManager, _campfires, _querns, _kilns, _casting,
                 _fluidManager, _leafDecay, _lodManager, _leaves, _falling, _toppling, clientMode, serverMode);
-            LeftClick = new LeftClickAction(this, _chunkManager, _debris, _hitMarker, _mobs, sfx, clientMode);
+            LeftClick = new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
             Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
                 _lodManager, _debris, clientMode, serverMode);
             Throws = new ThrowAction(this, _chunkManager, _dropManager, _goblins, _mobs, _projectiles, clientMode);

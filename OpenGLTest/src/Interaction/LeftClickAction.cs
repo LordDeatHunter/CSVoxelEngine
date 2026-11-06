@@ -12,6 +12,7 @@ using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen;
 
 namespace VoxelEngine.Interaction;
 
@@ -27,6 +28,8 @@ internal sealed class LeftClickAction
     private readonly World _world;
     private readonly ChunkManager _chunkManager;
     private readonly BlockDebrisSystem _debris;
+    private readonly LeafParticleSystem _leaves;
+    private readonly List<Vector3> _shudderCells = [];
     private readonly HitMarker _hitMarker;
     private readonly List<Mob> _mobs;
     private readonly SfxManager? _sfx;
@@ -40,9 +43,10 @@ internal sealed class LeftClickAction
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
     private MobStrikes Strikes => _world.Strikes;
 
-    internal LeftClickAction(World world, ChunkManager chunkManager, BlockDebrisSystem debris, HitMarker hitMarker,
-        List<Mob> mobs, SfxManager? sfx, bool clientMode)
+    internal LeftClickAction(World world, ChunkManager chunkManager, BlockDebrisSystem debris, LeafParticleSystem leaves,
+        HitMarker hitMarker, List<Mob> mobs, SfxManager? sfx, bool clientMode)
     {
+        _leaves = leaves;
         _world = world;
         _chunkManager = chunkManager;
         _debris = debris;
@@ -108,6 +112,8 @@ internal sealed class LeftClickAction
     private float _breakHitSeconds = Mining.DefaultHitGapMs / 1000f;
     private bool _breakAllowed;
     private float _hitTimer;
+    // An axe's chop already started ahead of the coming hit, so the blow lands with it
+    private bool _chopStarted;
     private float _popElapsed = BlockPopSeconds;
 
     // Punch cadence: the left-click attack runs on the held item's mining pace. Seeded to
@@ -359,11 +365,25 @@ internal sealed class LeftClickAction
         _hitTimer += (float)deltaTime;
         _popElapsed += (float)deltaTime;
 
+        // An axe winds up ahead of the hit: its chop starts early enough that the blade reaches the block
+        // as the hit lands (the first hit of a break lands at once, so it chops a beat late)
+        if (_breakAllowed && !_chopStarted && Mining.IsAxe(held) && _hitTimer < _breakHitSeconds)
+        {
+            var chopSeconds = LocalPlayer.AxeChopSeconds(_breakHitSeconds);
+            var lead = chopSeconds * PlayerModel.SwordImpactProgress(SwordSwing.AxeChop);
+            if (_hitTimer >= _breakHitSeconds - lead)
+            {
+                Player.StartAxeChop(chopSeconds);
+                _chopStarted = true;
+            }
+        }
+
         // A long frame can carry more than one hit; the leftover time rolls into the next
         while (_hitTimer >= _breakHitSeconds)
         {
             _hitTimer -= _breakHitSeconds;
-            LocalPlayer.PunchSwing();
+            LocalPlayer.PunchSwing(_chopStarted);
+            _chopStarted = false;
             PlayHitSfx(_breakingBlockId);
 
             // Start the pop from where the hit actually landed inside this frame, not from
@@ -378,6 +398,8 @@ internal sealed class LeftClickAction
             _breakDamage += _breakPower;
 
             var breaks = _breakDamage >= _breakHardness;
+            if (BlockType.IsTreeWood(_breakingBlockId) && !breaks)
+                ShudderCanopy(_breakingBlockPosition);
             var kick = BreakKick.Strength(_breakHardness, breaks);
             if (kick > 0f) Camera.AddHitKick(Vector3.Zero, kick);
 
@@ -405,9 +427,19 @@ internal sealed class LeftClickAction
         _world.RaiseIntent(WorldIntent.BreakComplete(Camera.Position, _selectedAimDirection, cell));
     }
 
+    /// <summary>A hit on tree wood shakes some of the canopy above and around it loose.</summary>
+    private void ShudderCanopy(Vector3 woodCell)
+    {
+        TreeShudder.Gather(woodCell, (x, y, z) => TreeGenerator.IsLeaf(_chunkManager.GetBlockGlobal(x, y, z)),
+            _shudderCells, ParticleConfig.TreeShudderCells, ParticleConfig.TreeShudderReachBlocks,
+            ParticleConfig.TreeShudderHeightBlocks);
+        _leaves.BurstCells(_shudderCells, ParticleConfig.TreeShudderCells * ParticleConfig.TreeShudderLeavesPerCell);
+    }
+
     private void StopBreaking()
     {
         _isBreaking = false;
+        _chopStarted = false;
         _breakDamage = 0f;
         _breakHardness = 0f;
         _breakAllowed = false;

@@ -36,6 +36,10 @@ public static class Mining
         return block is { Fluid: false } && !Refused(block, held);
     }
 
+    /// <summary>Whether <paramref name="held"/> is an axe: a member of the <c>axe</c> tag, which swings an
+    /// overhead chop at what it mines instead of a punch.</summary>
+    public static bool IsAxe(Item? held) => held != null && ContentRegistry.IsInTag("axe", held.Id);
+
     /// <summary>Damage one hit deals, or 0 when the block's gate refuses the held item.</summary>
     public static float HitDamage(byte blockId, Item? held)
     {

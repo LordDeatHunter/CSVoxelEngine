@@ -44,6 +44,13 @@ public static class ParticleConfig
 
     public const int LeafParticleBurstThud = 20;
 
+    // An axe hit on tree wood shakes the canopy (TreeShudder): at most this many leaf cells of the box
+    // above the hit, each shedding a leaf or two
+    public const int TreeShudderCells = 5;
+    public const int TreeShudderLeavesPerCell = 1;
+    public const int TreeShudderReachBlocks = 4;
+    public const int TreeShudderHeightBlocks = 14;
+
     // --- Campfire particles (FireParticleSystem + FireParticleRenderer) ---
     // Embers and smoke rising off lit firepits, spawned per lit cell near the camera.
     public const float FireEmberLifetime = 1.8f;

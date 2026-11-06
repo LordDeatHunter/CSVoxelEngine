@@ -38,6 +38,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public const string Cut = "cut";
     public const string BackCut = "back cut";
     public const string Chop = "chop";
+    public const string Axe = "axe";
     public const string Throw = "throw";
     public const string Use = "use";
     public const string Hurt = "hurt";
@@ -48,7 +49,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public static readonly IReadOnlyList<string> AllModes =
     [
         Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface, Fly,
-        Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Throw, Use, Hurt, Equip, Death,
+        Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Axe, Throw, Use, Hurt, Equip, Death,
     ];
 
     /// <summary>Seconds a one-shot rests between the end of one play and the next.</summary>
@@ -142,6 +143,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
         Cut => PlayerModel.SwordDuration(SwordSwing.Cut) + 0.1f,
         BackCut => PlayerModel.SwordDuration(SwordSwing.BackCut) + 0.1f,
         Chop => PlayerModel.SwordDuration(SwordSwing.Chop) + 0.1f,
+        Axe => PlayerModel.SwordDuration(SwordSwing.AxeChop) + 0.1f,
         Throw => ThrowChargeSeconds + ThrowHoldSeconds + PlayerModel.ThrowDuration + 0.1f,
         Use => UseChargeSeconds + UseHoldSeconds + 0.4f,
         Hurt => 1f,
@@ -167,7 +169,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public float Elapsed => _clock;
 
     /// <summary>True for the modes that replay a swing or reaction (everything after the swim poses).</summary>
-    public bool IsOneShot => Mode is Punch or HeavyPunch or Slice or SliceBack or Cut or BackCut or Chop or Throw or Hurt or Equip or Death or Land;
+    public bool IsOneShot => Mode is Punch or HeavyPunch or Slice or SliceBack or Cut or BackCut or Chop or Axe or Throw or Hurt or Equip or Death or Land;
 
     /// <summary>Switches to <paramref name="mode"/> (any case); false when there is no such mode.</summary>
     public bool SetMode(string mode)
@@ -248,6 +250,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
             case Cut:
             case BackCut:
             case Chop:
+            case Axe:
             case Hurt:
             case Equip:
                 OneShot(deltaTime);
@@ -376,7 +379,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     {
         Punch or HeavyPunch => _model.MineT < 1f,
         Slice or SliceBack => _model.IsSlicing,
-        Cut or BackCut or Chop => _model.IsSwordSwinging,
+        Cut or BackCut or Chop or Axe => _model.IsSwordSwinging,
         Hurt => MathF.Abs(_model.Flinch) > 0.02f,
         Equip => MathF.Abs(_model.EquipLowering) > 0.02f,
         _ => false,
@@ -393,6 +396,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
             case Cut: _model.StartSword(SwordSwing.Cut); break;
             case BackCut: _model.StartSword(SwordSwing.BackCut); break;
             case Chop: _model.StartSword(SwordSwing.Chop); break;
+            case Axe: _model.StartAxeChop(PlayerModel.SwordDuration(SwordSwing.AxeChop)); break;
             case Hurt: _model.Hurt(1f); break;
             case Equip: _model.NotifyEquip(); break;
         }

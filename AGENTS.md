@@ -1450,6 +1450,7 @@ OpenGLTest/
       SliceTrailRenderer.cs    # the additive ribbon draw of one SliceTrail (slice-trail-*.glsl)
       SliceTrailRibbon.cs      # GL-free builder of the tapered, age-faded Catmull-Rom ribbon quads of a SliceTrail
       SliceTrailSystem.cs      # World component: feeds the local and remote players' slice trails; AssumedBlade
+      TreeShudder.cs           # GL-free: the leaf cells above and around a chopped trunk cell, thinned to a few, that an axe hit shakes loose
       WaterSplash.cs           # GL-free splash rule (droplets by crossing speed) + Track: a body's droplets off the water top
       WaterSplashTracker.cs    # GL-free per-body water crossing memory: in water last frame, speed from its own height
     Platform/                  # Silk.NET window and input setup
@@ -4342,6 +4343,15 @@ overshoot or jiggle.
   the **throw charge** (the upper arm out to the right and a little behind the body, the forearm bent up
   at about a right angle, the shoulders wound back toward the throwing side, then a whip forward and a
   settle) and the **swim stroke**. The hand anchor follows the forearm frame, so the held item does too.
+- **Axe chop** (`SwordSwing.AxeChop`, a fourth swing that is not in the sword's chain): an item in the `axe`
+  tag (`Mining.IsAxe`) swings an overhead chop instead of a punch whenever `LocalPlayer.PunchSwing` runs, through
+  `PlayerModel.StartAxeChop(seconds)` over the same `SwordMotion` shape machinery and `BladeSwingFrame`. Its length
+  is the axe's hit gap (`LocalPlayer.AxeChopSeconds`, held within `PlayerConfig.AxeChopMin/MaxSeconds`), and while
+  mining `LeftClickAction.UpdateBlockBreaking` starts the swing ahead of each hit by the shape's impact share of that
+  gap, so the blade comes down as the hit lands (the first hit of a break lands at once, so that one chops a beat
+  late). A hit on tree wood also shakes leaves loose from the canopy above it (`TreeShudder` into
+  `LeafParticleSystem.BurstCells`, `ParticleConfig.TreeShudder*`), and a heavy hit nudges the camera (`BreakKick`).
+  The item debugger's `AXE` mode and `visual-examples/animations-axe.json` (`VOXEL_TIME=147`) show it.
 - **Slice** (`SliceMotion.SlicePhase`): a whole-body motion in uneven phases of the same 0.7 s: a slow
   wind-up that coils the body (to 0.26), a strike about twice as fast as before centered on the impact
   (0.26..0.49, a steeper `EaseInOutCubic` through the middle) and a long eased recovery, so the contrast

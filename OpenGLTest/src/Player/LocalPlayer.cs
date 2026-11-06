@@ -349,15 +349,30 @@ internal sealed class LocalPlayer
         }
     }
 
+    /// <summary>How long an axe's chop lasts for a hit gap of <paramref name="hitGapSeconds"/>: the gap
+    /// itself, held between the shortest swing that still reads and the longest that stays crisp.</summary>
+    internal static float AxeChopSeconds(float hitGapSeconds) =>
+        Math.Clamp(hitGapSeconds, PlayerConfig.AxeChopMinSeconds, PlayerConfig.AxeChopMaxSeconds);
+
     // A swing of the fist: the arm throws the jab and the view pinches in for a beat. Returns the
     // swing's weight, which a connecting punch's hit-stop reads.
-    internal float PunchSwing()
+    internal float PunchSwing(bool chopStarted = false)
     {
         // A slower tool swings heavier: from the bare hand's pace (no weight) up to a tool with
         // a long hit gap.
         var gap = Mining.HitGapSeconds(ItemRegistry.TryGet(Inventory.SelectedBlockId));
         var weight = MathUtils.InverseLerp(Mining.HitGapSeconds(null), Mining.HitGapSeconds(null) + 0.5f, gap);
-        Player.Punch(weight);
+        var held = ItemRegistry.TryGet(Inventory.SelectedBlockId);
+        // An axe chops: one swing paced to its hits (the click loop starts it early, so the blow comes
+        // down as the hit lands, and says so with chopStarted)
+        if (Mining.IsAxe(held))
+        {
+            if (!chopStarted) Player.StartAxeChop(AxeChopSeconds(gap));
+        }
+        else
+        {
+            Player.Punch(weight);
+        }
         Camera.PunchFov(-0.8f - 0.8f * weight);
         return weight;
     }
