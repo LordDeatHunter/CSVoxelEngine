@@ -4730,6 +4730,10 @@ touch a file that violates one of them, fixing it is in scope.
   path references in this document; stale docs send the next agent to a file that no longer
   exists.
 
+## Workflows
+
+Three tiers, cheapest that fits (details in `.claude/workflows/README.md`): **direct** for small or well-scoped changes; `plan-and-implement-lite` for mid-sized work (roughly 2-6 files, design mostly clear: 4 Sonnet scouts, one Opus planner, 1-2 Opus implementers run sequentially, the last one builds, tests and self-reviews; args `{task, extraContext?, effort?: "medium"|"high", dryRun?}`); `plan-and-implement` for large, cross-cutting or design-unclear work (adds plan red-team, a verifier and an acceptance review, ~20 min / ~1M tokens). **Codebase scouting is always Sonnet** in every tier, and any agent you spawn by hand must pass `model` explicitly.
+
 ## Conventions
 
 - C# with file-scoped namespaces (one per folder, see "Code organization"), one type per file, `_camelCase` private fields, PascalCase public members. Primary constructors are used where natural (`ChunkGenerationWorker(ChunkManager chunkManager, StreamingFocus focus)`).
