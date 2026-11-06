@@ -41,7 +41,7 @@ Mostly content JSON plus small systems; high feel, low engine risk. In order:
 
 Prove the fantasy half. Infrastructure first, in order: `M-15` (structure templates), `M-17`
 (spawner block), then author one crypt (`P-16`, with `M-16` loot depth as needed), then the boss
-(`P-17`), then one spell, the fireball (`P-14`). A single hand-authored crypt with loot, a spawner
+(`P-17`), then the first magic slice, the spell builder with a few parts (`P-14`, `MAGIC.md`). A single hand-authored crypt with loot, a spawner
 room and a boss is enough to make health, combat and loot matter and to give survival a
 destination. Placing it needs a world-site hook, the one worldgen touch this milestone allows.
 
@@ -123,9 +123,10 @@ the other while still being faster together.
 
 #### Arc A — magicraft adventure RPG
 
-- [ ] **`P-14` · Magic system core** — P2, L.
-  Mana (or equivalent), spell slots, casting from a staff/tome, schools (fire/frost/arcane),
-  spell scrolls as dungeon loot. First spell to ship is a **fireball**, shared with `F-4`.
+- [ ] **`P-14` · Magic system core** — P2, L. **Tracked in `MAGIC.md` (`MG-*`).**
+  Mana, staffs with bound slots, a station-built spell builder (element + shape + modifiers +
+  trigger), scrolls and research that unlock parts. The first slice is the builder with a few
+  parts; the fireball is one of its signature example spells, shared with `F-4`.
 - [ ] **`P-15` · Skill tree / character build** — P2, L.
   Spend XP (`P-9`) across branches; informs both combat and non-combat perks. Needs `U-12`.
 - [ ] **`P-16` · Dungeons & towers (structured POIs)** — P2, L.
@@ -307,7 +308,7 @@ single-arc player.
 - [ ] **`U-11` · Help screen** — P2, S.
   Key list plus a short "how to survive your first night".
 - [ ] **`U-12` · Skill / perk tree UI** — P3, L. For `P-15`/`P-9`.
-- [ ] **`U-13` · Spell wheel / magic hotbar** — P3, M. For `P-14`.
+- [ ] **`U-13` · Spell wheel / magic hotbar** — P3, M. For `P-14`; the selection options live in `MAGIC.md` `MG-15`.
 - [ ] **`U-14` · Tech / research tree UI** — P3, L. For `P-46`, Factorio-style.
 - [ ] **`U-15` · Quest journal** — P3, M. For `F-16`.
 - [ ] **`U-16` · Bestiary / codex** — P3, M. Mobs, blocks, recipes, lore as discoverable entries.
@@ -355,7 +356,7 @@ single-arc player.
   baked mesh with a procedural squash, **no death animation**, and no hurt pose beyond the flash.
 - [ ] **`V-11` · Ambient critter particles (fireflies, insects)** — P2, S.
 - [ ] **`V-12` · Spell & ability VFX** — P3, L. Projectiles, cast gestures, impact, wards; for
-  `P-14`, `P-18`.
+  `P-14` (`MAGIC.md` `MG-10`), `P-18`.
 - [ ] **`V-13` · Machine & station animation** — P3, M.
   Spinning wheels, belts, pistons, smoke/steam particles, running lights; for `P-19`–`P-22`.
 - [ ] **`V-14` · Armor & weapon models** — P1 for armor (Milestone 1, with `P-7`), P3 for weapons, M.

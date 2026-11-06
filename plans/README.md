@@ -11,6 +11,7 @@ The one guide for every file in this folder. Agents: the `plan-docs` skill
 | [PERF.md](PERF.md) | Frame time, worldgen, meshing and streaming performance, with baselines |
 | [BIOMEGEN.md](BIOMEGEN.md) | Biome, climate and terrain-shape generation: handoff map and remaining work |
 | [CLEANUP.md](CLEANUP.md) | The code cleanup campaign the `cleanup-campaign` workflow runs |
+| [MAGIC.md](MAGIC.md) | The magic system (Arc A): mana, staffs, the station-built spell builder |
 | [TREES.md](TREES.md) | Residue of the tree rework |
 | [QUICK_WINS.md](QUICK_WINS.md) | One-sitting features |
 | [VISUAL.md](VISUAL.md) | Particles, animations and other visual polish |
