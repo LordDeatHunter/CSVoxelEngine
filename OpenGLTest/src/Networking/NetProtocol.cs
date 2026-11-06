@@ -60,7 +60,7 @@ public enum NetMessage : byte
     /// <summary>Client to server: a sequence id and an <see cref="InventoryIntent"/>.</summary>
     InventoryRequest = 71,
     /// <summary>Client to server: a <see cref="VoxelEngine.Networking.WorldIntent"/> (break, place, use,
-    /// throw, attack) with its sequence id (<see cref="WorldIntentCodec"/>).</summary>
+    /// throw, attack, cast) with its sequence id (<see cref="WorldIntentCodec"/>).</summary>
     WorldIntent = 80,
     /// <summary>Server to one client: the sequence id of an intent and whether it was accepted.
     /// Every intent gets exactly one, in order, after its correction and inventory snapshot.</summary>
@@ -82,6 +82,7 @@ public enum NetInventoryAction : byte
     CreativeGrant = 5,
     CreativeClear = 6,
     PickBlock = 7,
+    SelectStaffSlot = 8,
 }
 
 /// <summary>
@@ -114,8 +115,11 @@ public static class NetFraming
     /// (<see cref="NetAttackKind.SwordCut"/>, <see cref="NetAttackKind.SwordBackCut"/>,
     /// <see cref="NetAttackKind.SwordChop"/>) and the player list their <see cref="NetPlayerAction"/>s; an
     /// older peer would refuse the intent as malformed and drop the connection.
-    /// 11: <see cref="NetMessage.PlayerStatus"/> ends with the player's mana and its max.</summary>
-    public const int ProtocolVersion = 11;
+    /// 11: <see cref="NetMessage.PlayerStatus"/> ends with the player's mana and its max.
+    /// 12: a <see cref="NetIntentKind.Cast"/> world intent (with its slot) and the
+    /// <see cref="NetInventoryAction.SelectStaffSlot"/> inventory action; an older peer would refuse
+    /// either as malformed.</summary>
+    public const int ProtocolVersion = 12;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

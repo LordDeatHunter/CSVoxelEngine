@@ -59,6 +59,11 @@ public static class NetworkConfig
     public const double NetBreakSlackSeconds = 0.1;
     // The same forgiveness for the pace between two attacks.
     public const double NetAttackSlackSeconds = 0.1;
+    /// <summary>
+    /// The network jitter in seconds the server forgives on a player's cast cooldown
+    /// (<see cref="SpellConfig.CastCooldownSeconds"/>; a first guess).
+    /// </summary>
+    public const double NetCastSlackSeconds = 0.1;
     // A dead client sends a Respawn intent as soon as the server's status says it died, then again
     // this often while the status still reads dead (an earlier one refused, or lost to a race).
     public const double NetRespawnRetrySeconds = 1.0;

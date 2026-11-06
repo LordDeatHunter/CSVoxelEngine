@@ -110,12 +110,58 @@ public sealed class WorldIntentRuleTests
         // The kind past the last one is unknown
         using var writer = new PacketWriter(NetMessage.WorldIntent);
         writer.Write(1);
-        writer.Write((byte)(NetIntentKind.Respawn + 1));
+        writer.Write((byte)(NetIntentKind.Cast + 1));
         writer.Write(Eye);
         writer.Write(Vector3.UnitX);
         using var reader = new PacketReader(writer.ToArray());
         _ = reader.Message;
         Assert.Throws<InvalidDataException>(() => WorldIntentCodec.Read(reader, out _));
+    }
+
+    [Fact]
+    public void ACastRoundTripsEverySlotAStaffCanHaveAndEditsNoCell()
+    {
+        var direction = Vector3.Normalize(new Vector3(0.5f, -0.25f, -1f));
+        for (var slot = 0; slot < SpellConfig.StaffMaxSlots; slot++)
+        {
+            var back = RoundTrip(slot + 1, WorldIntent.Cast(Eye, direction, slot), out var readSeq);
+            Assert.Equal(slot + 1, readSeq);
+            Assert.Equal(NetIntentKind.Cast, back.Kind);
+            Assert.Equal(slot, back.Slot);
+            Assert.Equal(Eye, back.Eye);
+            Assert.True(Vector3.Distance(direction, back.Direction) < 1e-5f);
+            Assert.False(back.HasCell);
+
+            // A cast writes no cell, so it waits on no correction, but it still draws an edit token
+            Assert.False(back.EditsCells);
+            Assert.True(back.IsRateLimited);
+        }
+    }
+
+    [Fact]
+    public void ACastSlotPastAnyStaffIsAMalformedFrame()
+    {
+        static PacketReader CastFrame(int slot)
+        {
+            using var writer = new PacketWriter(NetMessage.WorldIntent);
+            writer.Write(1);
+            writer.Write((byte)NetIntentKind.Cast);
+            writer.Write(Eye);
+            writer.Write(Vector3.UnitX);
+            writer.Write((byte)slot);
+            var reader = new PacketReader(writer.ToArray());
+            _ = reader.Message;
+            return reader;
+        }
+
+        using (var last = CastFrame(SpellConfig.StaffMaxSlots - 1))
+            Assert.Equal(SpellConfig.StaffMaxSlots - 1, WorldIntentCodec.Read(last, out _).Slot);
+
+        using (var past = CastFrame(SpellConfig.StaffMaxSlots))
+            Assert.Throws<InvalidDataException>(() => WorldIntentCodec.Read(past, out _));
+
+        using (var far = CastFrame(byte.MaxValue))
+            Assert.Throws<InvalidDataException>(() => WorldIntentCodec.Read(far, out _));
     }
 
     [Fact]

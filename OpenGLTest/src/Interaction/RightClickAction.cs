@@ -1,6 +1,7 @@
 using System;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Items;
+using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
 using VoxelEngine.UI.InventoryPanel;
@@ -9,7 +10,8 @@ namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// The right-click action: the chain that hands a right-click to the first thing that claims it (a
-/// station or an openable block, then the held item's own use, otherwise a placement), for the
+/// station or an openable block, then a held staff's cast, then the held item's own use, otherwise
+/// a placement), for the
 /// local player or a server's player, plus the local player's timed use charge. Owned by
 /// <see cref="World"/>; main thread only.
 /// </summary>
@@ -28,6 +30,7 @@ internal sealed class RightClickAction
     private ThrowAction Throws => _world.Throws;
     private BlockInteractions Interactions => _world.Interactions;
     private WorldItemUse ItemUse => _world.ItemUse;
+    private SpellCaster Caster => _world.Caster;
 
     internal RightClickAction(World world, bool clientMode)
     {
@@ -38,9 +41,15 @@ internal sealed class RightClickAction
     private float _useChargeSeconds;
     private byte _useItemId;
 
+    // The slot the last local cast went out on, which a client's Cast intent names
+    private int _castSlot;
+
     /// <summary>
     /// Right-click: runs the first thing that claims the click - a campfire, quern, kiln or cast
-    /// mold interaction, then the selected slot's own <see cref="Item.OnUse"/> (a bucket scoops
+    /// mold interaction, then a held staff's cast of its selected spell slot (through
+    /// <see cref="SpellCaster"/>; a staff never places, and a client raises a
+    /// <see cref="NetIntentKind.Cast"/> intent for its server to bill and run), then the selected
+    /// slot's own <see cref="Item.OnUse"/> (a bucket scoops
     /// or pours, flint grounds a pile, a firestarter strikes), otherwise places the selected
     /// block. A successful tool use morphs the instance in place, so every hotbar slot holding
     /// that bucket flips with it and scooping and pouring alternate on one button. Returns
@@ -58,6 +67,8 @@ internal sealed class RightClickAction
 
         if (outcome == RightClickOutcome.Place)
             _world.RaiseIntent(WorldIntent.Place(Camera.Position, Camera.LastAimDirection, Placer.LastPlaceHit, Placer.LastPlaceNormal));
+        else if (outcome == RightClickOutcome.Cast)
+            _world.RaiseIntent(WorldIntent.Cast(Camera.Position, Camera.LastAimDirection, _castSlot));
         else
             _world.RaiseIntent(WorldIntent.Use(Camera.Position, Camera.LastAimDirection,
                 LeftClick.HasSelectedBlock ? LeftClick.SelectedBlockPosition : null));
@@ -67,7 +78,8 @@ internal sealed class RightClickAction
 
     /// <summary>
     /// <see cref="TryUseSelected(float)"/> for <paramref name="player"/>: every station
-    /// interaction, the item's own use (its tool morph, durability and cooldown) and the placement
+    /// interaction, the staff's cast (local players only: a server takes casts as their own intent),
+    /// the item's own use (its tool morph, durability and cooldown) and the placement
     /// cost run against that player's inventory, aim and creative flag. Single player passes its
     /// own camera's context; a server passes the acting player's. <paramref name="outcome"/> says
     /// what claimed the click; <paramref name="allowPlace"/> false stops the chain before the
@@ -97,6 +109,17 @@ internal sealed class RightClickAction
             return true;
         }
         var item = player.Inventory.HeldItem;
+        if (item is StaffItem)
+        {
+            // A staff never places; a server's Use replay (no camera) claims nothing, since casts come as Cast intents
+            if (!local) return false;
+            var slot = HeldStaff.SelectedSlot(player.Inventory);
+            if (Caster.CastFor(player, slot, Caster.LocalPacing, _world.Now, 0) != CastVerdict.Cast) return false;
+            _castSlot = slot;
+            LocalPlayer.PunchSwing();
+            outcome = RightClickOutcome.Cast;
+            return true;
+        }
         if (item == null || item is BlockItem || item.UseAction == ItemUseAction.None)
         {
             if (!allowPlace || !Placer.TryPlaceSelectedBlock(maxDistance, player)) return false;

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Recipes;
@@ -439,8 +440,15 @@ public class Inventory
 
     /// <summary>Live tool stack for an instance id, or null when it is gone. Used by the item
     /// use dispatcher to hand the override its per-instance state.</summary>
-    public ItemStack? GetToolStack(int instanceId) =>
-        _tools.FirstOrDefault(t => t.InstanceId == instanceId);
+    public ItemStack? GetToolStack(int instanceId) => TryGetToolStack(instanceId, out var stack) ? stack : null;
+
+    /// <summary>The live tool stack for an instance id, false when it is gone. Allocation-free (a plain
+    /// loop), since the HUD reads the held staff's stack every frame.</summary>
+    public bool TryGetToolStack(int instanceId, [NotNullWhen(true)] out ItemStack? stack)
+    {
+        stack = LiveTool(instanceId);
+        return stack != null;
+    }
 
     /// <summary>Durability left on a tool instance, or null when it has none / is gone.</summary>
     public int? ToolDurabilityLeft(int instanceId)

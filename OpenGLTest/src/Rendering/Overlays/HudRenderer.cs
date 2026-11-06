@@ -14,6 +14,7 @@ namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
 /// The HUD over the world: the crosshair, the hearts, the air, the mana bar, the hotbar and the selected item's name, the
+/// held staff's spell slot, the
 /// toast line, the FPS counter and the profiler table, the hover tooltip and the Tab player list,
 /// plus the hotbar hit-test over the same <see cref="HotbarLayout"/> the draw reads. It owns the
 /// crosshair and heart sprites, which <see cref="UIRenderer"/> creates and deletes through it at
@@ -43,6 +44,8 @@ internal sealed class HudRenderer : IDisposable
     // The selected item's name (DrawHotbarName) sits this far above the hearts row, leaving room
     // for descenders.
     private const float HotbarNameGap = 12f;
+    // The held staff's slot line (DrawStaffSlot) starts this far right of the hotbar row's right edge
+    private const float StaffSlotGap = 12f;
 
     // Hotbar metrics, in pixels
     // Aliases of the shared hotbar geometry (HotbarLayout), so the HUD draws read short names.
@@ -366,6 +369,20 @@ internal sealed class HudRenderer : IDisposable
         {
             _ui.TextFade = 1f;
         }
+    }
+
+    /// <summary>
+    /// The held staff's spell slot line (see <see cref="StaffSlotIndicator"/>), drawn plain like the item
+    /// name just right of the hotbar row and centered on it vertically. Shown in creative too, where the
+    /// selected slot still decides the cast.
+    /// </summary>
+    internal void DrawStaffSlot(string label)
+    {
+        if (_ui.Font == null || string.IsNullOrEmpty(label)) return;
+
+        var left = (_ui.ScreenSize.X + HotbarLayout.RowWidth()) * 0.5f + StaffSlotGap;
+        var top = HotbarLayout.CenterY(_ui.ScreenSize) - CountCapHeight * 0.5f;
+        _ui.DrawText(label, new Vector2(left, top), _ui.CountScale, Rgba.White);
     }
 
     internal void DrawFps(int fps) =>

@@ -1,4 +1,6 @@
+using System;
 using Silk.NET.Input;
+using VoxelEngine.Magic;
 using VoxelEngine.Platform;
 using VoxelEngine.Rendering;
 using VoxelEngine.UI;
@@ -126,7 +128,7 @@ internal sealed class InputEvents
         slider.Set(SettingsLayout.SliderValue(slider, hit.Fraction));
     }
 
-    /// <summary>The wheel: the main menu lists, the hotbar and the [E] panel list or craft card.</summary>
+    /// <summary>The wheel: the main menu lists, the hotbar (or, with Left Ctrl held, a held staff's spell slot) and the [E] panel list or craft card.</summary>
     internal void OnScroll(ScrollWheel wheel)
     {
         if (Screen == AppScreen.Menu)
@@ -147,6 +149,14 @@ internal sealed class InputEvents
         switch (inventoryView.IsOpen)
         {
             case false when !pauseMenuView.IsOpen:
+                // Left Ctrl + wheel with a staff in hand cycles its spell slot instead of the hotbar;
+                // wheel up (positive) steps to the previous slot, as the hotbar scroll does
+                if (inputManager.Keyboard?.IsKeyPressed(Key.ControlLeft) == true
+                    && HeldStaff.TryGet(w.Inventory, out _, out _))
+                {
+                    if (wheel.Y != 0f) gameplay.RequestCycleStaff(-Math.Sign(wheel.Y));
+                    break;
+                }
                 w.Inventory.Scroll(wheel.Y);
                 // While connected the server owns the selection: mirror the step as an intent, or
                 // the next inventory sync would put the slot straight back.

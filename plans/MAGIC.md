@@ -28,14 +28,29 @@ summed complexity (`SpellConfig`). The shares, complexities and fizzle numbers a
 holds one whole spell recipe: the `StaffComponent` on its `ItemStack` carries the part keys
 (`<kind>/<name>`) per slot plus the selected slot, immutable. `StaffBinding` holds the rules: `TryBind`
 binds only a recipe that `SpellRecipe.Compile` finds valid against the staff's tags (so a tier gates its
-parts by tag), plus `Clear`, `Cycle` (wraps both ways) and `Select`; nothing calls them in play yet
-(`MG-4` cycles, `MG-7` binds). Two staffs ship: the wooden staff (tier 1, 2 slots, `basic`; two sticks
+parts by tag), plus `Clear`, `Cycle` (wraps both ways) and `Select`; `MG-4` cycles and selects in
+play, and only binding is left without a caller (`MG-7` binds). Two staffs ship: the wooden staff (tier 1, 2 slots, `basic`; two sticks
 and a crystal block) and the crystal staff (tier 2, 4 slots, `basic` and `advanced`; the wooden staff,
 two crystal blocks and a copper ingot); no `advanced` part ships yet. Bindings are saved as
 `ToolData.Staff` in `player.json` by part key, re-bound on load against this run's parts (what no longer
 binds is dropped with a warning), and ride the inventory snapshot in the same shape (no protocol bump).
 Crafting consumes the least-bound staff first. Known gap: a dropped staff loses its spells, like a
 crucible loses its metal, because an `ItemDrop` carries only an id.
+
+`MG-4` shipped: right-click with a staff casts its selected slot through the one seam,
+`Magic/SpellCaster` (owned by `World`), with the rules in `CastRules`, the pacing in `CastPacing` and the
+staff lookup in `HeldStaff`; the right-click chain runs stations first, then the cast, so a staff never
+places. Left Ctrl + wheel cycles the slot while a staff is held (the plain wheel still moves the hotbar)
+through the `SelectStaffSlot` inventory action, which the server owns: the client predicts and the
+inventory snapshot keeps or reverts it. The server replays the `Cast` world intent (protocol 12) and
+refuses a cast without a staff, on a slot that is not the selected one or is unbound, with an invalid
+recipe, inside `SpellConfig.CastCooldownSeconds` (less `NetworkConfig.NetCastSlackSeconds`) or short of
+mana; it bills exactly the compiled cost, free in creative, and a cast also draws one edit token as a
+spam cap. The effect is the `World.SpellEffect` hook `MG-5` fills (nothing sets it in play yet). A client
+predicts only: it checks and paces, never spends and never fires the effect. The HUD shows
+`StaffSlotIndicator` (the selected slot and its parts, or empty) beside the hotbar. The gesture is a
+punch swing until `MG-10`, and nothing rolls the fizzle chance yet (`MG-6`). The 0.5 s cooldown and
+0.1 s slack are first guesses.
 
 ## In progress
 
@@ -48,22 +63,14 @@ Nothing.
 Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), a data-driven status-effect system, one station
 UI, one bindable staff (two tiers). In order:
 
-- [ ] **`MG-4` Cast pipeline, server-authoritative** — P1, L.
-  Plain right-click with a staff casts the selected slot. **Left Ctrl (crouch) + scroll** cycles the
-  slot while a staff is held; scroll without Ctrl still changes the hotbar item, and Shift/sprint is
-  untouched (a HUD slot indicator shows the selection). A new `Cast` world
-  intent carries slot and aim; the server checks the held staff, the bound recipe, mana and a rate
-  limit, then runs the effect and bills mana, and answers with the usual correction/status. The client
-  predicts only cosmetics. **Hook:** `Networking/WorldIntent*.cs`, `ServerSide/NetValidation.cs`,
-  `RightClickAction`, `PlayerContext`. **Invariant:** a client never edits a cell or damages a mob.
 - [ ] **`MG-4b` Status effects** — P1, L.
   A full data-driven system: `assets/data/effects/<name>.json`, loaded beside the other content (a
   loader like `RecipeLoader`, `add-content` skill). An effect may declare damage over time (tick
   interval, damage share), a movement and attack speed factor (strongest wins on stacking), block
   interaction (burning ignites flammable blocks, frost freezes water or melts ice), and visuals (mob
   tint, particle kind, HUD icon for the player). Effects apply to mobs and the player, tick only in the
-  authoritative simulation and sync (`EntityList` entries, `PlayerStatus`; `MG-1` took protocol 11,
-  so this bumps it again). Fire applies burning, frost applies frostburn,
+  authoritative simulation and sync (`EntityList` entries, `PlayerStatus`; `MG-1` took protocol 11
+  and `MG-4` took 12, so this bumps it again). Fire applies burning, frost applies frostburn,
   nature has none. Damage uses the new `DamageSource.Magic` (own `DeathMessages` line, e.g. burned by
   their own fireball). **Hook:** `Entities/Mob.cs`, `Player/PlayerHealth.cs`, `PlayerStatusCodec`,
   `NetEntity`, `HudRenderer`, `BillboardPasses`/`Particles/`. **Invariant:** block interaction writes

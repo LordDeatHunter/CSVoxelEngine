@@ -1,6 +1,7 @@
 using System;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Recipes;
+using VoxelEngine.Magic;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Networking.ServerSide;
@@ -20,6 +21,7 @@ namespace VoxelEngine.Networking.ServerSide;
 /// with exactly the fed members, so it consumes from this inventory only and nothing when it fails.</item>
 /// <item>Creative grants and clears need the player's server-owned creative flag.</item>
 /// <item>Pick-block only selects or equips what the player owns (<see cref="Inventory.PickBlock"/>).</item>
+/// <item>A staff slot selection needs a staff in hand and a slot it has (<see cref="HeldStaff.TrySelect"/>).</item>
 /// </list>
 /// </summary>
 public static class InventoryIntentRules
@@ -53,6 +55,9 @@ public static class InventoryIntentRules
 
             case NetInventoryAction.PickBlock:
                 return IsId(intent.Id) && inventory.PickBlock((byte)intent.Id);
+
+            case NetInventoryAction.SelectStaffSlot:
+                return HeldStaff.TrySelect(inventory, intent.Slot);
 
             default:
                 return false;

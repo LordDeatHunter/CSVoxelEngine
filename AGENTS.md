@@ -175,7 +175,7 @@ Environment variables for scripted captures:
   off the body shows.
 - `ITEM_DEBUGGER_LOOK=yaw,pitch` pins the first-person look angles.
 
-The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front; an item declaring `attack: "sword"` — the iron sword — swings a three-swing chain instead: a diagonal cut and a rising back cut over the same hemisphere, hitting the nearest three, then an overhead chop on the one mob under the aim at the highest power and a heavier shove, each swing buffered by a click or chained by a press shortly after the last one ended, see `SwordCombo`/`SwordSwings`), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `SelectionPasses.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (a search field sits over the tabs: typing names the owned items and the recipes that make or consume a matching thing, ranked with prefix hits and owned items first, and clicking a result picks the item or opens its recipe; blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it, and a focused field takes the keyboard so typing never moves the player). A new survival world starts with **nothing** (`Inventory.Empty`); `C` creative mode turns the same Blocks/Tools/Misc tabs into the **whole item catalog** (`CreativeCatalog`) - clicking a row grants one, each row's `[+1]` / `[+10]` / `[+100]` button grants that many, and a red `[X]` clears the id's counts (`Inventory.RemoveAll`), all through the ordinary            `Inventory.Add` - while the Craft tab keeps listing every recipe. `T` opens the chat (type, Enter sends, Escape closes, the arrow keys walk sent messages; while it is open the keyboard is captured so the player never moves while typing) and works in singleplayer and on a server. `X` to toggle debug logging               
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front; an item declaring `attack: "sword"` — the iron sword — swings a three-swing chain instead: a diagonal cut and a rising back cut over the same hemisphere, hitting the nearest three, then an overhead chop on the one mob under the aim at the highest power and a heavier shove, each swing buffered by a click or chained by a press shortly after the last one ended, see `SwordCombo`/`SwordSwings`), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `SelectionPasses.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below; with a spell staff held, right-click casts its selected spell slot instead and never places, and Left Ctrl + mouse wheel cycles that slot while the plain wheel still moves the hotbar), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (a search field sits over the tabs: typing names the owned items and the recipes that make or consume a matching thing, ranked with prefix hits and owned items first, and clicking a result picks the item or opens its recipe; blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it, and a focused field takes the keyboard so typing never moves the player). A new survival world starts with **nothing** (`Inventory.Empty`); `C` creative mode turns the same Blocks/Tools/Misc tabs into the **whole item catalog** (`CreativeCatalog`) - clicking a row grants one, each row's `[+1]` / `[+10]` / `[+100]` button grants that many, and a red `[X]` clears the id's counts (`Inventory.RemoveAll`), all through the ordinary            `Inventory.Add` - while the Craft tab keeps listing every recipe. `T` opens the chat (type, Enter sends, Escape closes, the arrow keys walk sent messages; while it is open the keyboard is captured so the player never moves while typing) and works in singleplayer and on a server. `X` to toggle debug logging               
            (FPS/position/water state to console), Escape to open the pause menu (RESUME / SETTINGS / SAVE & QUIT;        Escape on its settings page steps back to it, and on the main page resumes). SAVE & QUIT presents a `Saving...` frame, calls `World.SaveAndDispose` on the next update and returns to the main menu's worlds page. None of these keys act while a world is still loading.
 
 **HUD and feedback.** The crosshair is drawn as five pieces cropped out of its 16x16 texture (a
@@ -939,7 +939,7 @@ OpenGLTest/
                                #   the frame-order OnUpdate/OnRender orchestration
     World.cs                   # the composition root: owns Camera, ChunkManager, ChunkGenerationWorker, LodManager,
                                #   the simulations and the per-job components (BlockEditor, BlockPlacer, LeftClickAction,
-                               #   RightClickAction, ThrowAction, LocalPlayer, ClientMirror, WorldPersistence, MobDirector, WorldRenderer,
+                               #   RightClickAction, ThrowAction, SpellCaster, LocalPlayer, ClientMirror, WorldPersistence, MobDirector, WorldRenderer,
                                #   ...); runs Update/UpdateClient/UpdateLoading, the Loading phase and SaveAndDispose,
                                #   and holds the dedicated server's public facade (BreakBlockFor, TryUseSelected, ...)
     WorldPhase.cs              # Loading / Playing / Disposed
@@ -1040,11 +1040,12 @@ OpenGLTest/
       LightingConfig.cs        # alpha cutoff, atlas anisotropy, light spread, shadow cascades, point and fire
                                #   lights, fog, tonemap exposure, eye adaptation
       ManaConfig.cs            # the mana pool: start max, growth per known part and its cap, the refill time
-      SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap
+      SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap;
+                               #   the staff slot cap and the cast cooldown (CastCooldownSeconds)
       MobConfig.cs             # mob caps and shared mob rules, slimes, goblins (flee, dodge, pack, torches, notice
                                #   pip), healthbars, damage numbers
-      NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules, timeouts, LOD streaming,
-                               #   ServerAllowCreative
+      NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules (the attack and cast slack),
+                               #   timeouts, LOD streaming, ServerAllowCreative
       ParticleConfig.cs        # falling leaves, mining debris, campfire, lava and torch embers and smoke, bubbles,
                                #   spring steam
       PlayerConfig.cs          # break overlay, camera and swing feel (sprint FOV, strafe tilt, hit-stop, throw
@@ -1320,7 +1321,8 @@ OpenGLTest/
                                #   flagged replaceableByPlacement, layered snow, is taken over in
                                #   place), what a placement may write over, and TryMount (a torch
                                #   on a block's side becomes its wallBlock, facing the hit normal)
-      RightClickAction.cs      # World component: the right-click chain (TryUseSelected) and the timed use charge
+      RightClickAction.cs      # World component: the right-click chain (TryUseSelected: stations, a staff's cast,
+                               #   the item's use, placement) and the timed use charge
       RightClickOutcome.cs     # what claimed a right-click: a station, the item's use, or a placement
       SelectionOutlineMesh.cs  # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
       SelectionPulse.cs        # GL-free twin of the outline's breathing opacity (steady while mining)
@@ -1404,6 +1406,15 @@ OpenGLTest/
       LodSkyExposure.cs        # GL-free coarse sky exposure the LOD mesher bakes into Vertex.Sun from its column-top grids
       LodSurface.cs            # per-column far-LOD surface overrides (edited top height + tile), beside LodColumnCaps
       LodWorkerPool.cs         # the LodGen threads: Start (refused while a straggler lives), the worker loop, the joining Stop
+    Magic/                     # the cast pipeline: the one SpellCaster seam and its GL-free rules (see the Cast intent)
+      CastPacing.cs            # one caster's cooldown (SpellConfig.CastCooldownSeconds, network slack passed in)
+      CastRules.cs             # the pure cast judgement: held staff, selected bound slot, valid recipe, pacing,
+                               #   then mana spent (or, for a client's prediction, only checked)
+      CastVerdict.cs           # why a cast was refused, or Cast
+      HeldStaff.cs             # the held staff's stack, its selected slot, and the select/cycle that write it
+      SpellCast.cs             # what the effect hook receives: caster, staff, slot, parts, stats, eye and aim
+      SpellCaster.cs           # World component: the one cast seam (playing gate, CastRules, the Effect hook
+                               #   MG-5 fills; never spends or fires on a client), behind World.CastFor/SpellEffect
     Networking/                # the GL-free multiplayer protocol and codecs both sides share
                                #   (see "Multiple players and chat"); the client and the server side below
       ChunkNetCodec.cs         # chunk blocks/state and column terrain (heights, water levels, corner climate),
@@ -1449,7 +1460,8 @@ OpenGLTest/
         RateLimiter.cs         # GL-free token bucket (a player's edit rate)
         ServerPlayer.cs        # a connected player on the server: own Inventory, creative/flight flags, pose,
                                #   its PlayerContext, newest sequence id, mining progress, edit rate, attack pace,
-                               #   its PlayerHealth/fall tracking/respawn eye, mob-hit sink, correction numbers
+                               #   cast pacing (Casting), its PlayerHealth/fall tracking/respawn eye, mob-hit sink,
+                               #   correction numbers
     Particles/                 # every particle system (debris, bubbles, fire, leaves,
                                #   splashes, dust) and its renderer; the ParticleRing buffer
       AmbientEffects.cs        # World component: the fire cells (campfires, lit kilns, goblin torches), cosmetic
@@ -1838,6 +1850,8 @@ OpenGLTest/
         LookLabel.cs           # the look-at label's rule: name, "Unknown", the mineable flag
         LookLabelState.cs      # what one frame's label draws: text, flags, cell, state byte, light
         ScreenshotPaths.cs     # where F2's capture lands and what it is called
+        StaffSlotIndicator.cs  # GL-free, cached label of the held staff's selected spell slot and its parts (or
+                               #   empty), drawn by HudRenderer.DrawStaffSlot right of the hotbar
       InventoryPanel/          # inventory, item stacks, hotbar, the [E] panel, crafting cards and session, creative catalog, search
         CraftCardLayout.cs, CraftCardLayoutCache.cs  # the crafting card's layout and its memo
         CraftingSession.cs     # the crafting tab's open recipe, copies and fed reservations
@@ -2117,6 +2131,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   hit-stop, the vignette, pops, FOV and tilt, droplets, tool shatter
   Lod/                         # far-LOD regions, the manager, build pool and buffers, column caps, surface
                                #   overrides and their save state, sky exposure; the build-cost probe
+  Magic/                       # the cast rules, pacing and held-staff lookup; its own helper StaffFixture
   Networking/                  # protocol and codecs, end-to-end chunk and imported-world streaming
     Client/                    # client streaming, the mesh gate, predictions and intent flow, the entity
                                #   mirror, remote players, worldgen isolation
@@ -2472,7 +2487,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 | `trail` | optional `{"color": [r, g, b]}`, sRGB 0..255: the color of the glowing slice trail the item's swings leave (`Item.TrailColor`; omitted, `TrailColorOrDefault` falls back to `ParticleConfig.SliceTrailDefaultColor`). Legal only on a `slice` or `sword` item; a trail on a punch item, or a color that is not three ints in 0..255, throws naming the file (`ItemLoader.ParseTrail`). The obsidian blade is violet, the iron sword pale blue-white |
 | `fuel.burnSeconds` | seconds one unit of this item keeps a kiln lit (coal 60; 1..3600). Writing the object is what makes an item kiln fuel — a kiln takes up to `KilnManager.MaxFuel` units of **one** kind at a time |
 | `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many milliliters of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent(MaterialId, MoltenMl, PendingMl, PendingInputId)` — the last field is display-only, the last melt input charged in, so the kiln can draw what is waiting to melt; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
-| `staff` | marks the item a **spell staff**: `{"slots": n, "tier": t, "tags": [..]}`, slots 1..`SpellConfig.StaffMaxSlots`, tier >= 1, non-blank distinct spell part tags (`ItemLoader.ParseStaff`, shape only: spell parts load after items). Builds a `StaffItem`, stored in the **Tools** pool one instance at a time, because each slot's bound spell recipe rides that instance's `ItemStack` as a `StaffComponent` (the part keys `<kind>/<name>` per slot plus the selected slot, immutable). `StaffBinding.TryBind` binds a recipe only when MG-2's `SpellRecipe.Compile` finds it valid against the staff's tags (a part passes when any of its tags is allowed), so a tier gates its parts by tag; `Clear`, `Cycle` (wrapping) and `Select` exist, but no input or intent calls them yet (`MG-4`, `MG-7`). Saved in `player.json` and carried in the inventory snapshot as `ToolData.Staff` by part key, never id, and re-bound on load against this run's parts (what no longer binds is dropped with a warning). Crafting consumes the least-bound instance first. A Q-dropped staff loses its spells like a crucible loses its metal (an `ItemDrop` carries only an id). May not declare `use` or `crucible`; the tier is shown in the tooltip |
+| `staff` | marks the item a **spell staff**: `{"slots": n, "tier": t, "tags": [..]}`, slots 1..`SpellConfig.StaffMaxSlots`, tier >= 1, non-blank distinct spell part tags (`ItemLoader.ParseStaff`, shape only: spell parts load after items). Builds a `StaffItem`, stored in the **Tools** pool one instance at a time, because each slot's bound spell recipe rides that instance's `ItemStack` as a `StaffComponent` (the part keys `<kind>/<name>` per slot plus the selected slot, immutable). `StaffBinding.TryBind` binds a recipe only when MG-2's `SpellRecipe.Compile` finds it valid against the staff's tags (a part passes when any of its tags is allowed), so a tier gates its parts by tag; `Clear`, `Cycle` (wrapping) and `Select` exist; Left Ctrl + wheel cycles the held staff's slot through `HeldStaff` and the server-owned `SelectStaffSlot` inventory action, and only binding still has no caller (`MG-7`). Right-click casts the selected slot (see the **Cast** intent). Saved in `player.json` and carried in the inventory snapshot as `ToolData.Staff` by part key, never id, and re-bound on load against this run's parts (what no longer binds is dropped with a warning). Crafting consumes the least-bound instance first. A Q-dropped staff loses its spells like a crucible loses its metal (an `ItemDrop` carries only an id). May not declare `use` or `crucible`; the tier is shown in the tooltip |
 | `model` | optional `block/<name>` model under `assets/models/`, baked into `Item.BakedModel` so the item can be drawn as real 3D geometry while it sits inside a station (the crucible standing in a kiln's hearth). The sprite stays the inventory icon; this only adds a mesh |
 | `tool` | optional mining numbers: `power` (the item's mining *tier* — the number a block's `tools` requirement is compared against, default 0.5, the bare-hand baseline; it is **not** a damage number, damage is `blockDamage`) and `hitDelayMs` (milliseconds between hits). Writing the object marks the item as a tool; which block `tools` tags it satisfies comes from the tag files, not the item — `assets/data/tags/pickaxe.json` listing `item/primitive_pickaxe` is what makes a block gating on `"pickaxe"` accept it (`Mining.CanMine`). Bare hand and non-tool items mine at the defaults, and creative ignores the gate |
 
@@ -2885,7 +2900,7 @@ progress is saved with the world (`stations.json`, see "Saves"; a pour comes bac
 rather than being forgotten.
 
 The right-click chain in `RightClickAction.TryUseSelected` runs `TryCookOrCollect` -> `TryQuernInteract` ->
-`TryKilnInteract` -> `TryCastInteract` (all on `BlockInteractions`) -> the item's own `use` action or block placement, and the
+`TryKilnInteract` -> `TryCastInteract` (all on `BlockInteractions`) -> a held spell staff's cast (which never places) -> the item's own `use` action or block placement, and the
 first one that claims the click wins. On a kiln: an empty hand lifts the crucible out (and puts it
 straight back when the tools pool is full), a crucible stands one in, a melt input charges it, fuel
 goes into the hearth, a **firestarter falls through** to its own `Item.OnUse` so it can strike and
@@ -2923,7 +2938,7 @@ staff's), every part allowed by it — a part passes when **any** of its tags is
 `ManaConfig.StartMax` times the summed `costShare` (the unit `PlayerMana.TrySpend` takes), so every
 added part raises it; `FizzleChance` is `SpellRecipe.FizzleChanceFor` of the summed complexity: 0 up to
 `SpellConfig.FizzleFreeComplexity`, then `FizzleChancePerComplexity` a unit, capped at
-`FizzleMaxChance` — a chance only, the roll belongs to the cast (MG-4/MG-6). `DamageFactor` and
+`FizzleMaxChance` — a chance only, the roll belongs to the cast (MG-6). `DamageFactor` and
 `RangeFactor` are the products of the parts' factors. Every number is computed even for an invalid
 recipe, so the builder (MG-7) can show it live; a cast must check `IsValid` before spending. A new part
 is a JSON file, never a `switch` on its name. Slice 1 ships the elements `fire`, `frost` and `nature`,
@@ -3263,7 +3278,7 @@ climate) instead of the heights alone, so a client derives nothing from worldgen
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 (current) ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 8 added
+whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 (current) adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 8 added
 `NetEntityKind.Iceberg` (6): `Position` the waterline center, `Yaw` the quarter turns times pi/2
 (`NetEntity.YawFromTurns` / `TurnsFromYaw`), `Health` the seed, `Ammo` the scale in thousandths and
 the sinking in its next byte (`NetEntity.PackIcebergAmmo` / `UnpackIcebergAmmo`), `ItemId` the
@@ -3273,14 +3288,16 @@ them. A
 `WorldIntent` is the sequence id, a `NetIntentKind` byte, the eye and the unit aim the action was
 made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(cell)`,
 `Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)`,
-`Attack(punch | slice | slice return)` and `Respawn` (nothing more; never rate-limited, edits no
-cell). Its reader refuses an unknown kind or attack, a
+`Attack(punch | slice | slice return)`, `Respawn` (nothing more; never rate-limited, edits no
+cell) and `Cast(slot)` (a held staff's spell slot as one byte; never edits a cell, rate-limited). Its
+reader refuses an unknown kind or attack, a cast slot at or past `SpellConfig.StaffMaxSlots`, a
 non-finite or far-out eye, an aim that is not close to a unit vector and a normal component
 outside -1..1 as an `InvalidDataException`, renormalizes the aim and clamps the charge. An
 `InventoryRequest` is the sequence id, then a `NetInventoryAction` byte and only that action's fields
 (`InventoryIntent`): `SelectSlot(slot)`, `DropSelected`/`DropAllSelected`, `Equip(slot, isTool,
 id)` (a stackable's id or a tool's instance id), `Craft(recipe file name, batch, fed member per
-ingredient)`, `CreativeGrant(id, count)`, `CreativeClear(id)` and `PickBlock(id)`. The reader is
+ingredient)`, `CreativeGrant(id, count)`, `CreativeClear(id)`, `PickBlock(id)` and `SelectStaffSlot(slot)` (the held staff's selected spell
+slot, refused without a staff or for a slot it lacks). The reader is
 bounds-checked: an unknown action, an overlong recipe name or more than
 `InventoryIntentCodec.MaxCraftMembers` members is an `InvalidDataException` (the sender is
 dropped like any malformed frame), while merely out-of-range values parse and are refused.
@@ -3390,6 +3407,15 @@ empty. Then, by kind:
   or for a sword swing the length of the swing before it, `PlayerModel.SwordDuration` of the
   player's last attack, less `NetAttackSlackSeconds`); `World.PunchFor`/`SliceFor`/`SwordFor` find
   the targets among the server's mobs from the intent's eye and aim with the `Combat` rules.
+- **Cast** — `World.CastFor` (the `Magic/SpellCaster` seam, rules in `CastRules`) with the player's
+  own `ServerPlayer.Casting` pacing: a spell staff in hand (`HeldStaff`), the intent's slot equal to
+  the staff's selected one and bound, its parts resolving to a valid recipe with a finite cost, the
+  cooldown (`SpellConfig.CastCooldownSeconds` less `NetCastSlackSeconds`) run out, and the mana billed
+  last (`PlayerContext.Health.Mana.TrySpend`, free in creative), so every refusal spends nothing. A
+  spend or a refusal for mana sets `StatusDirty`, so the pool reaches the client in the same `Pump`.
+  An accepted cast fires `World.SpellEffect` (the effect hook `MG-5` fills; nothing sets it in play
+  yet) and is rebroadcast as a punch until `MG-10`. A client runs the same seam to predict only: it
+  checks and paces, never spends and never fires the effect, then raises the intent.
 
 Every intent is answered, in order: an intent that can edit cells gets a `BlockCorrection` with
 the authoritative state of the 3x3x3 cells around its named cell (within edit reach), so whatever

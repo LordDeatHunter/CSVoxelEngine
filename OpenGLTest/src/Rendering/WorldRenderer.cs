@@ -52,6 +52,7 @@ internal sealed class WorldRenderer
     private readonly PlayerHealth _health;
     private readonly HotbarNameFade _hotbarName;
     private readonly HotbarPickupPop _hotbarPops;
+    private readonly StaffSlotIndicator _staffSlot = new();
 
     private Camera Camera => _world.Camera;
     private PlayerModel Player => _world.Player;
@@ -314,7 +315,8 @@ internal sealed class WorldRenderer
         SettingsMenuView? settings = null)
     {
         renderManager.UiPasses.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
-            _health.Health, _health.Breath.Fraction, _health.Mana.Fraction, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, LeftClick.Crosshair, LeftClick.LookAt);
+            _health.Health, _health.Breath.Fraction, _health.Mana.Fraction, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, LeftClick.Crosshair, LeftClick.LookAt,
+            _staffSlot.Label(Inventory));
     }
 
     /// <summary>

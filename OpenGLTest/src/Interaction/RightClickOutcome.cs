@@ -13,4 +13,6 @@ public enum RightClickOutcome
     ItemUse,
     /// <summary>The selected block was placed.</summary>
     Place,
+    /// <summary>The held staff cast its selected slot.</summary>
+    Cast,
 }

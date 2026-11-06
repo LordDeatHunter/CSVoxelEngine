@@ -1,5 +1,6 @@
 using System;
 using Silk.NET.Input;
+using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Platform;
@@ -112,6 +113,18 @@ internal sealed class GameplayInput
     /// slot. Nothing to do in singleplayer.
     /// </summary>
     internal void MirrorSelection(int index) => session.SendInventoryIntent(InventoryIntent.Select(index));
+
+    /// <summary>
+    /// Steps the held staff's selected spell slot (Left Ctrl + wheel). The cycle is predicted
+    /// locally, like the wheel's hotbar step; while connected the absolute slot goes out as an
+    /// intent and the server's snapshot keeps or reverts it. In singleplayer the send returns false
+    /// and the local change stands.
+    /// </summary>
+    internal void RequestCycleStaff(int step)
+    {
+        if (ActiveWorld is not { } w || !HeldStaff.TryCycle(w.Inventory, step, out var selected)) return;
+        session.SendInventoryIntent(InventoryIntent.SelectStaffSlot(selected));
+    }
 
     /// <summary>Throws the held item: a server intent while connected, a local throw otherwise.</summary>
     private void RequestThrowSelected(bool wholeStack)

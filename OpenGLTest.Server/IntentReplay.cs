@@ -1,12 +1,13 @@
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.ServerSide;
 
 namespace VoxelEngine.Server;
 
-/// <summary>Replays a player's intents through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
+/// <summary>Replays a player's intents (breaks, placements, uses, throws, attacks, casts, respawns and inventory actions) through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
 internal sealed class IntentReplay
 {
     private readonly ServerState _state;
@@ -96,7 +97,9 @@ internal sealed class IntentReplay
     /// <summary>
     /// The rules every world intent of a living player passes before the world replays it: the
     /// world is playing, the intent was aimed from (near) where the player is, and an edit fits the
-    /// player's edit rate. A living player has nothing to respawn from, so its respawn is refused.
+    /// player's edit rate (a cast draws from it too, as a spam cap; its own pace is the player's
+    /// <see cref="ServerPlayer.Casting"/>). A living player has nothing to respawn from, so its
+    /// respawn is refused.
     /// </summary>
     private bool ApplyWorldIntent(ServerPlayer player, in WorldIntent intent)
     {
@@ -141,6 +144,8 @@ internal sealed class IntentReplay
                 return _state.World.ThrowFor(context, intent.Charge);
             case NetIntentKind.Attack:
                 return AttackFor(player, intent);
+            case NetIntentKind.Cast:
+                return CastFor(player, intent);
             default:
                 return false;
         }
@@ -217,6 +222,26 @@ internal sealed class IntentReplay
                 _state.World.SwordFor(player.Context, NetAttacks.SwordSwingOf(intent.Attack));
                 break;
         }
+        return true;
+    }
+
+    /// <summary>
+    /// Casts the held staff's slot the intent names through the one cast seam
+    /// (<see cref="World.CastFor"/>): a staff in hand, the slot its selected one and bound to a
+    /// valid recipe, the player's own cast pace, then the mana billed last (free in creative). The
+    /// pool is sent at once on a spend or a refusal for mana.
+    /// </summary>
+    private bool CastFor(ServerPlayer player, in WorldIntent intent)
+    {
+        var verdict = _state.World.CastFor(player.Context, intent.Slot, player.Casting, _state.Elapsed,
+            NetworkConfig.NetCastSlackSeconds);
+        // TickStatus only sees a mana change across its own tick, so a spend between ticks, or a cast
+        // refused on mana the client predicted from a stale mirror, must send the pool now
+        if (verdict is CastVerdict.Cast or CastVerdict.NoMana)
+            player.StatusDirty = true;
+        if (verdict != CastVerdict.Cast)
+            return false;
+        player.NoteAction(NetPlayerAction.Punch); // the cast gesture is MG-10's
         return true;
     }
 

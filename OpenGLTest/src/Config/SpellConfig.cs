@@ -18,4 +18,10 @@ public static class SpellConfig
 
     /// <summary>The most spell slots a staff's JSON may declare (a first guess).</summary>
     public const int StaffMaxSlots = 8;
+
+    /// <summary>
+    /// The shortest gap in seconds between two casts by one caster, locally and on the server
+    /// (<see cref="VoxelEngine.Magic.CastPacing"/>; a first guess).
+    /// </summary>
+    public const float CastCooldownSeconds = 0.5f;
 }

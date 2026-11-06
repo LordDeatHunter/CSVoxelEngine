@@ -27,6 +27,7 @@ public static class InventoryIntentCodec
         switch (intent.Action)
         {
             case NetInventoryAction.SelectSlot:
+            case NetInventoryAction.SelectStaffSlot:
                 writer.Write(intent.Slot);
                 break;
             case NetInventoryAction.DropSelected:
@@ -103,6 +104,8 @@ public static class InventoryIntentCodec
                 return InventoryIntent.CreativeClear(reader.ReadByte());
             case NetInventoryAction.PickBlock:
                 return InventoryIntent.PickBlock(reader.ReadByte());
+            case NetInventoryAction.SelectStaffSlot:
+                return InventoryIntent.SelectStaffSlot(reader.ReadInt());
             default:
                 throw new InvalidDataException($"unknown inventory action {(byte)action}");
         }

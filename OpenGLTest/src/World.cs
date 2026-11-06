@@ -16,6 +16,7 @@ using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 using VoxelEngine.Lod;
+using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
@@ -40,7 +41,7 @@ namespace VoxelEngine;
 /// decay, saplings and the stations) and the per-job components it builds in its constructor:
 /// <see cref="LocalPlayer"/>, <see cref="Strikes"/>, <see cref="Ambient"/>, <see cref="Edits"/>,
 /// <see cref="LeftClick"/>, <see cref="Placer"/>, <see cref="Throws"/>,
-/// <see cref="Interactions"/>, <see cref="ItemUse"/>, <see cref="RightClick"/>,
+/// <see cref="Interactions"/>, <see cref="ItemUse"/>, <see cref="RightClick"/>, <see cref="Caster"/>,
 /// <see cref="ClientMirror"/>, <see cref="Persistence"/>, <see cref="Pickup"/>,
 /// <see cref="Director"/> and <see cref="Renderer"/>. It runs the frame (<see cref="Update"/>, which hands a multiplayer
 /// client to <see cref="UpdateClient"/> and a loading world to <see cref="UpdateLoading"/>) and
@@ -163,6 +164,9 @@ public class World
 
     /// <summary>The right-click action: the station, item-use and placement chain and the timed use charge.</summary>
     internal RightClickAction RightClick { get; }
+
+    /// <summary>The cast seam: every staff cast, local or replayed for a server's player, passes it.</summary>
+    internal SpellCaster Caster { get; }
 
     /// <summary>The multiplayer client's mirror of its server: cell changes, entities, stations, health, remote players.</summary>
     internal ClientMirror ClientMirror { get; }
@@ -431,6 +435,7 @@ public class World
             ItemUse = new WorldItemUse(this, _chunkManager, _dropManager, _fluidManager, _leafDecay, _falling,
                 _lodManager, _tntManager, _campfires, _kilns, _health, _hotbarPops, _debris, clientMode, serverMode);
             RightClick = new RightClickAction(this, clientMode);
+            Caster = new SpellCaster(this, clientMode);
             ClientMirror = new ClientMirror(this, _chunkManager, _dropManager, _tntManager, _falling, _slimes, _goblins,
                 _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
             Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _icebergs,
@@ -685,6 +690,19 @@ public class World
     /// <summary>Releases a throw of <paramref name="player"/>'s selected throwable (see
     /// <see cref="ThrowAction.ThrowFor"/>); public for the dedicated server.</summary>
     public bool ThrowFor(PlayerContext player, float charge01) => Throws.ThrowFor(player, charge01);
+
+    /// <summary>Casts <paramref name="player"/>'s held staff's <paramref name="slot"/> through the one cast
+    /// seam (see <see cref="SpellCaster.CastFor"/>), paced by <paramref name="pacing"/>; public for the
+    /// dedicated server.</summary>
+    public CastVerdict CastFor(PlayerContext player, int slot, CastPacing pacing, double now, double slackSeconds) =>
+        Caster.CastFor(player, slot, pacing, now, slackSeconds);
+
+    /// <summary>The effect every accepted cast fires (see <see cref="SpellCaster.Effect"/>); MG-5 fills it.</summary>
+    public Action<SpellCast>? SpellEffect
+    {
+        get => Caster.Effect;
+        set => Caster.Effect = value;
+    }
 
     /// <summary>Throws <paramref name="inventory"/>'s selected slot onto the ground from an explicit
     /// eye (see <see cref="ThrowAction.ThrowSelected(bool, Vector3, Vector3, Inventory)"/>); public

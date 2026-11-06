@@ -8,7 +8,7 @@ namespace VoxelEngine.Networking;
 /// The wire form of a <see cref="WorldIntent"/>: the sequence id, the kind, the eye and the aim,
 /// then only the fields that kind reads. The reader is bounds-checked: an unknown kind or attack, a
 /// non-finite or far-out eye, an aim that is not (close to) a unit vector, a face normal component
-/// outside -1..1 or a non-finite charge is a malformed frame (<see cref="InvalidDataException"/>),
+/// outside -1..1, a non-finite charge or a cast slot past any staff is a malformed frame (<see cref="InvalidDataException"/>),
 /// which the server answers by dropping the sender; a short frame throws
 /// <see cref="EndOfStreamException"/> the same way. The aim is renormalized and the charge clamped
 /// to 0..1. Values that merely fail a rule (a cell out of reach, a refused tool) parse fine and are
@@ -50,6 +50,9 @@ public static class WorldIntentCodec
                 break;
             case NetIntentKind.Respawn:
                 break;
+            case NetIntentKind.Cast:
+                writer.Write((byte)intent.Slot);
+                break;
             default:
                 throw new ArgumentException($"Unknown world intent {intent.Kind}.", nameof(intent));
         }
@@ -60,7 +63,7 @@ public static class WorldIntentCodec
     {
         seq = reader.ReadInt();
         var kind = (NetIntentKind)reader.ReadByte();
-        if (kind is < NetIntentKind.BreakStart or > NetIntentKind.Respawn)
+        if (kind is < NetIntentKind.BreakStart or > NetIntentKind.Cast)
             throw new InvalidDataException($"unknown world intent {(byte)kind}");
 
         var eye = reader.ReadVector3();
@@ -114,6 +117,13 @@ public static class WorldIntentCodec
             }
             case NetIntentKind.Respawn:
                 return new WorldIntent(kind, eye, direction);
+            case NetIntentKind.Cast:
+            {
+                var slot = reader.ReadByte();
+                if (slot >= SpellConfig.StaffMaxSlots)
+                    throw new InvalidDataException($"cast slot {slot}");
+                return new WorldIntent(kind, eye, direction, Slot: slot);
+            }
             default:
                 throw new InvalidDataException($"unknown world intent {(byte)kind}");
         }

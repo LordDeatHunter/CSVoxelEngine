@@ -3,6 +3,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities;
 using VoxelEngine.Items;
+using VoxelEngine.Magic;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.InventoryPanel;
@@ -63,6 +64,12 @@ public sealed class ServerPlayer : IMobTarget
     /// <summary>Paces this player's edits (breaks, placements, uses and throws).</summary>
     public RateLimiter EditLimiter { get; } = new(NetworkConfig.NetEditIntentsPerSecond,
         NetworkConfig.NetEditIntentBurst);
+
+    /// <summary>
+    /// Paces this player's casts: at most one per <see cref="SpellConfig.CastCooldownSeconds"/>,
+    /// less <see cref="NetworkConfig.NetCastSlackSeconds"/> of network jitter.
+    /// </summary>
+    public CastPacing Casting { get; } = new();
 
     private double _lastAttackAt = double.NegativeInfinity;
     // The last attack that landed, which paces the next (a sword swing waits for the one before it)

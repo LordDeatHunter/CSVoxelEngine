@@ -8,7 +8,10 @@ using System.Threading;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Content.Spells;
 using VoxelEngine.Interaction;
+using VoxelEngine.Items;
+using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
@@ -16,6 +19,7 @@ using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Server;
 using VoxelEngine.Simulation;
+using VoxelEngine.Tests.Magic;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Trees;
 using Xunit;
@@ -1305,5 +1309,185 @@ public sealed class GameServerTests : IDisposable
 
         Assert.Equal(floating, watching.ListedFlags["Floater"]);
         Assert.Equal(NetworkStatus.Handshaken, floater.Status);
+    }
+
+    // Casts (MG-4)
+
+    /// <summary>The casts the world's effect hook saw, and the caster's mana right after the last spend.</summary>
+    private sealed class CastLog
+    {
+        public readonly List<SpellCast> Fired = [];
+        public float ManaAtSpend = float.NaN;
+    }
+
+    // The effect fires right after the spend, so the pool read there is exactly what the cast billed,
+    // before any regeneration of the following ticks
+    private CastLog RecordCasts()
+    {
+        var log = new CastLog();
+        _world.SpellEffect = cast =>
+        {
+            log.Fired.Add(cast);
+            log.ManaAtSpend = cast.Caster.Health!.Mana.Current;
+        };
+        return log;
+    }
+
+    /// <summary>
+    /// Puts a new <paramref name="staffName"/> in the player's hand with a valid recipe bound in slot 0,
+    /// on the test thread between pumps, and returns what a cast of it compiles to.
+    /// </summary>
+    private static SpellStats GiveBoundStaff(ServerPlayer player, string staffName, out StaffItem staff)
+    {
+        StaffFixture.Hold(player.Inventory, staffName, out staff, out var stack);
+        return StaffFixture.Bind(staff, stack, 0, out _);
+    }
+
+    [Fact]
+    public void ACastWithoutAStaffIsRefusedAndSpendsNothing()
+    {
+        using var client = Connect("Mage");
+        var player = PlayerOf(client);
+        var log = RecordCasts();
+
+        var seq = SendWorld(client, WorldIntent.Cast(client.Server!.Value.Spawn, -Vector3.UnitZ, 0));
+        Assert.False(AwaitResult(client, seq));
+        Assert.Empty(log.Fired);
+        Assert.Equal(player.Status.Mana.Max, player.Status.Mana.Current);
+    }
+
+    [Fact]
+    public void ACastOfAnUnboundOrUnselectedSlotIsRefused()
+    {
+        using var client = Connect("Mage");
+        var player = PlayerOf(client);
+        GiveBoundStaff(player, "wooden_staff", out var staff);
+        Assert.True(staff.Slots >= 2 && staff.Slots < SpellConfig.StaffMaxSlots);
+        Assert.Equal(0, HeldStaff.SelectedSlot(player.Inventory));
+        var log = RecordCasts();
+        var eye = client.Server!.Value.Spawn;
+
+        // A slot that is not the selected one, and one past the staff (but still a legal frame)
+        foreach (var slot in new[] { 1, staff.Slots })
+        {
+            var seq = SendWorld(client, WorldIntent.Cast(eye, -Vector3.UnitZ, slot));
+            Assert.False(AwaitResult(client, seq));
+        }
+
+        // The selected slot, but nothing bound in it
+        Assert.True(HeldStaff.TrySelect(player.Inventory, 1));
+        var unbound = SendWorld(client, WorldIntent.Cast(eye, -Vector3.UnitZ, 1));
+        Assert.False(AwaitResult(client, unbound));
+
+        Assert.Empty(log.Fired);
+        Assert.Equal(player.Status.Mana.Max, player.Status.Mana.Current);
+    }
+
+    [Fact]
+    public void AnAcceptedCastBillsExactlyTheRecipeCostAndFiresTheEffectOnce()
+    {
+        using var client = Connect("Mage");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var player = PlayerOf(client);
+        var stats = GiveBoundStaff(player, "wooden_staff", out _);
+        var log = RecordCasts();
+        var inbox = InboxOf(client);
+        var before = player.Status.Mana.Current;
+        Assert.Equal(player.Status.Mana.Max, before);
+
+        // Two casts back to back: the second lands well inside the cooldown
+        var first = SendWorld(client, WorldIntent.Cast(arena.Eye, arena.AimAtFront, 0));
+        var second = SendWorld(client, WorldIntent.Cast(arena.Eye, arena.AimAtFront, 0));
+        var simulated = 0.0;
+        var sw = Stopwatch.StartNew();
+        while (!inbox.Results.ContainsKey(second) && sw.Elapsed.TotalSeconds < 15)
+        {
+            Tick(0.01);
+            simulated += 0.01;
+        }
+
+        Assert.True(inbox.Results.ContainsKey(first) && inbox.Results.ContainsKey(second));
+        Assert.True(simulated < SpellConfig.CastCooldownSeconds - NetworkConfig.NetCastSlackSeconds,
+            "the second cast arrived too late to test the cooldown");
+        Assert.True(inbox.Results[first]);
+        Assert.False(inbox.Results[second]);
+
+        // Billed once, exactly the compiled cost, and the effect fired once with that recipe
+        var cast = Assert.Single(log.Fired);
+        Assert.Equal(stats.Cost, cast.Stats.Cost);
+        Assert.Equal(0, cast.Slot);
+        Assert.Equal(stats.Cost, before - log.ManaAtSpend, 1e-4f);
+        var regen = player.Status.Mana.Max * (float)simulated / ManaConfig.RegenFullSeconds;
+        Assert.True(player.Status.Mana.Current <= before - stats.Cost + regen + 1e-3f);
+
+        // A cast edits no cell
+        Assert.Equal(0, CellAt(arena.Front).Id);
+        Assert.Equal(Dirt, CellAt(arena.FloorAhead).Id);
+    }
+
+    [Fact]
+    public void ACastTheManaCannotCoverIsRefused()
+    {
+        using var client = Connect("Mage");
+        var player = PlayerOf(client);
+        var stats = GiveBoundStaff(player, "wooden_staff", out _);
+        Assert.True(stats.Cost > 0f);
+        Assert.True(player.Status.Mana.TrySpend(player.Status.Mana.Current, false));
+        var log = RecordCasts();
+
+        var seq = SendWorld(client, WorldIntent.Cast(client.Server!.Value.Spawn, -Vector3.UnitZ, 0));
+        Assert.False(AwaitResult(client, seq));
+        Assert.Empty(log.Fired);
+    }
+
+    [Fact]
+    public void ACreativeCastLeavesTheManaUntouched()
+    {
+        using var client = Connect("Mage");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        _server.AllowCreative = true;
+        SendModes(client, NetPlayerFlags.Creative);
+        var player = PlayerOf(client);
+        var sw = Stopwatch.StartNew();
+        while (!player.Creative && sw.Elapsed.TotalSeconds < 15)
+            PumpFor(0.02);
+        Assert.True(player.Creative);
+        GiveBoundStaff(player, "wooden_staff", out _);
+        var log = RecordCasts();
+        var before = player.Status.Mana.Current;
+
+        var seq = SendWorld(client, WorldIntent.Cast(arena.Eye, arena.AimAtFront, 0));
+        Assert.True(AwaitResult(client, seq));
+        Assert.Single(log.Fired);
+        Assert.Equal(before, log.ManaAtSpend);
+    }
+
+    [Fact]
+    public void StaffSlotSelectionIsServerAuthoritative()
+    {
+        using var client = Connect("Mage");
+        var player = PlayerOf(client);
+        GiveBoundStaff(player, "crystal_staff", out var staff);
+        Assert.True(staff.Slots >= 2);
+        var inbox = InboxOf(client);
+
+        // The snapshot answering the newest intent sent (the join snapshot may still be in flight)
+        Inventory Answer()
+        {
+            var mirror = AwaitInventory(client);
+            while (inbox.InventorySeq != inbox.Seq)
+                mirror = AwaitInventory(client);
+            return mirror;
+        }
+
+        // A slot the staff has: the server's staff selects it and the client's snapshot says so
+        SendIntent(client, InventoryIntent.SelectStaffSlot(1));
+        Assert.Equal(1, HeldStaff.SelectedSlot(Answer()));
+        Assert.Equal(1, HeldStaff.SelectedSlot(player.Inventory));
+
+        // One past it: refused, and the snapshot keeps the slot the server has
+        SendIntent(client, InventoryIntent.SelectStaffSlot(staff.Slots));
+        Assert.Equal(1, HeldStaff.SelectedSlot(Answer()));
+        Assert.Equal(1, HeldStaff.SelectedSlot(player.Inventory));
     }
 }

@@ -17,6 +17,8 @@ namespace VoxelEngine.Networking;
 /// in ingredient order).</item>
 /// <item><see cref="NetInventoryAction.CreativeGrant"/>: <see cref="Id"/> and <see cref="Count"/>.</item>
 /// <item><see cref="NetInventoryAction.CreativeClear"/> / <see cref="NetInventoryAction.PickBlock"/>: <see cref="Id"/>.</item>
+/// <item><see cref="NetInventoryAction.SelectStaffSlot"/>: <see cref="Slot"/>, the held staff's spell
+/// slot to select.</item>
 /// </list>
 /// </summary>
 public readonly record struct InventoryIntent(
@@ -48,4 +50,6 @@ public readonly record struct InventoryIntent(
     public static InventoryIntent CreativeClear(byte id) => new(NetInventoryAction.CreativeClear, Id: id);
 
     public static InventoryIntent PickBlock(byte id) => new(NetInventoryAction.PickBlock, Id: id);
+
+    public static InventoryIntent SelectStaffSlot(int slot) => new(NetInventoryAction.SelectStaffSlot, Slot: slot);
 }
