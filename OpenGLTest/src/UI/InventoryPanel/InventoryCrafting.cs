@@ -97,7 +97,10 @@ internal static class InventoryCrafting
     {
         if (Inventory.CategoryOf(id) == InventoryCategory.Tools)
         {
-            foreach (var instance in inventory.Tools.Where(t => t.DefinitionId == id).Take(count).ToArray())
+            // The least-bound instance goes first (a stable order, so otherwise the pool's own), so
+            // upgrading a staff never eats one carrying spells while an empty one is at hand
+            foreach (var instance in inventory.Tools.Where(t => t.DefinitionId == id)
+                         .OrderBy(t => t.Get<StaffComponent>().BoundCount).Take(count).ToArray())
                 inventory.RemoveTool(instance.InstanceId);
             return;
         }

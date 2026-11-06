@@ -103,6 +103,26 @@ public sealed class ItemDefinition
     }
 
     /// <summary>
+    /// Marks the item as a staff: each of its slots holds one bound spell recipe, which rides on its
+    /// own <see cref="ItemStack"/> (a <c>StaffComponent</c>), so a staff stores into the Tools pool one
+    /// instance at a time. Omitted for everything that is not one.
+    /// </summary>
+    public StaffDefinition? Staff { get; set; }
+
+    /// <summary>The <c>staff</c> object: how many spells it holds, its tier and the part tags it allows.</summary>
+    public sealed class StaffDefinition
+    {
+        /// <summary>Spell slots, each holding one bound recipe; 1..<see cref="SpellConfig.StaffMaxSlots"/>.</summary>
+        public int? Slots { get; set; }
+
+        /// <summary>The staff's tier, 1 or more; informational, the tags do the gating.</summary>
+        public int? Tier { get; set; }
+
+        /// <summary>The spell part tags it allows; a part passes when any of its tags is listed.</summary>
+        public string[]? Tags { get; set; }
+    }
+
+    /// <summary>
     /// Optional <c>block/&lt;name&gt;</c> model under <c>assets/models</c>, baked into
     /// <see cref="Item.BakedModel"/> so the item can be drawn as real 3D geometry while it
     /// sits inside a station (a crucible standing in a kiln's hearth). The sprite stays the

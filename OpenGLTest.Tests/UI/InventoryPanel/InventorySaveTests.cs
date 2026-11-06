@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Content.Spells;
 using VoxelEngine.Items;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.InventoryPanel;
@@ -180,9 +181,78 @@ public sealed class InventorySaveTests
         var crucible = new ItemStack(2, ToolItem(i => i.CrucibleCapacityMl > 0));
         crucible.Set(new CrucibleComponent(ContentRegistry.MoltenMaterials.First().Id, 10, 10, Stone));
         stacks.Add(crucible);
+        var staff = ItemRegistry.All.OfType<StaffItem>().First();
+        var bound = new ItemStack(3, staff);
+        bound.Set(BoundStaff(staff, 0));
+        stacks.Add(bound);
 
         foreach (var stack in stacks)
             foreach (var type in stack.ComponentTypes)
                 Assert.Contains(type, InventorySaveCodec.HandledComponentTypes);
+    }
+
+    // A valid element + shape recipe the staff's own tags allow, picked by rule, never by name
+    private static SpellPart[] ValidRecipe(StaffItem staff) =>
+    [
+        SpellPartRegistry.All.First(p => p.Kind == SpellPartKind.Element && p.IsAllowedBy(staff.AllowedTags)),
+        SpellPartRegistry.All.First(p => p.Kind == SpellPartKind.Shape && p.IsAllowedBy(staff.AllowedTags)),
+    ];
+
+    private static StaffComponent BoundStaff(StaffItem staff, int slot)
+    {
+        Assert.True(StaffBinding.TryBind(staff, default, slot, ValidRecipe(staff), out var spells, out _));
+        return spells;
+    }
+
+    [Fact]
+    public void AStaffsBoundSpellsRoundTripByPartKey()
+    {
+        var staff = ItemRegistry.All.OfType<StaffItem>().First();
+        var source = Inventory.Empty();
+        Assert.True(source.Add(staff.Id));
+        var stack = source.GetToolStack(InstanceOf(source, staff.Id))!;
+        var spells = StaffBinding.Cycle(staff, BoundStaff(staff, staff.Slots - 1), 1);
+        stack.Set(spells);
+
+        var data = source.Export();
+        var saved = Assert.Single(data.Tools!, t => t.InstanceId == stack.InstanceId).Staff;
+        Assert.NotNull(saved);
+        Assert.NotNull(saved.Slots);
+        Assert.Equal(ValidRecipe(staff).Select(p => p.Key), saved.Slots[staff.Slots - 1]);
+
+        var restored = Inventory.Empty();
+        restored.Import(data);
+        Assert.Equal(spells, restored.GetToolStack(stack.InstanceId)!.Get<StaffComponent>());
+    }
+
+    [Fact]
+    public void AStaffRestoreDropsWhatThisRunCannotBind()
+    {
+        var staff = ItemRegistry.All.OfType<StaffItem>().First(s => s.Slots >= 3);
+        var valid = ValidRecipe(staff).Select(p => p.Key).ToList();
+        var slots = new List<List<string>?>(new List<string>?[staff.Slots + 1]);
+        slots[0] = ["element/no_such_part", valid[1]];
+        slots[1] = [valid[0]];
+        slots[2] = valid;
+        slots[staff.Slots] = valid;
+
+        var restored = Inventory.Empty();
+        restored.Import(new PlayerSaveData.InventoryData
+        {
+            Tools =
+            [
+                new PlayerSaveData.ToolData
+                {
+                    InstanceId = 1, Name = SaveNames.NameOf(staff.Id),
+                    Staff = new PlayerSaveData.StaffData { Slots = slots, Selected = 99 },
+                },
+            ],
+        });
+
+        var spells = restored.GetToolStack(1)!.Get<StaffComponent>();
+        Assert.Equal(1, spells.BoundCount);
+        Assert.Equal(valid, spells.PartsAt(2));
+        Assert.Empty(spells.PartsAt(staff.Slots));
+        Assert.InRange(spells.Selected, 0, staff.Slots - 1);
     }
 }

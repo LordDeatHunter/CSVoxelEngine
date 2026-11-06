@@ -9,7 +9,7 @@ namespace VoxelEngine.UI.Hud;
 /// <summary>
 /// The hover tooltip's lines, GL-free: the display name, what the thing is (a block, a tool, a
 /// plain pickup) and whichever of the item's own numbers it actually has — tool power and hit
-/// pace, block and entity damage, durability left, fuel seconds, a crucible's capacity. A slice of
+/// pace, block and entity damage, durability left, fuel seconds, a crucible's capacity, a staff's tier and bound spells. A slice of
 /// the UI work (U-1); the panel that draws these lives in <see cref="HudRenderer.DrawTooltip"/>.
 /// </summary>
 public static class ItemTooltip
@@ -40,6 +40,8 @@ public static class ItemTooltip
         }
         if (item.FuelSeconds > 0) lines.Add($"Fuel {item.FuelSeconds:0.#} s");
         if (item.CrucibleCapacityMl > 0) lines.Add($"Holds {item.CrucibleCapacityMl} ml");
+        if (item is StaffItem staff)
+            lines.Add($"Staff tier {staff.Tier}   {stack?.Get<StaffComponent>().BoundCount ?? 0}/{staff.Slots} spells");
         return lines;
     }
 }

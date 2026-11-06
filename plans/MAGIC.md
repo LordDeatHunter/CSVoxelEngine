@@ -20,9 +20,22 @@ as a bar under the hotbar (`HudRenderer.DrawMana`). The 100 start, +10 per known
 `MG-2` shipped: the spell part data (`Content/Spells/`, `assets/data/spell/<kind>/<name>.json`, loaded by
 `SpellPartLoader` into `SpellPartRegistry`; `SpellRecipe.Compile` gives the verdict, cost, fizzle chance
 and effect factors). The slice-1 modifiers are **power** (raises damage and cost) and **range**
-(lengthens projectile flight and raises cost). Every slice-1 part is tagged `basic`; `MG-3` decides what
-each staff tier allows. Cost is the parts' summed `costShare` times `StartMax`, fizzle comes from the
+(lengthens projectile flight and raises cost). Every slice-1 part is tagged `basic`. Cost is the parts' summed `costShare` times `StartMax`, fizzle comes from the
 summed complexity (`SpellConfig`). The shares, complexities and fizzle numbers are first guesses.
+
+`MG-3` shipped: an item whose JSON declares `staff` (`slots`, `tier`, `tags`, checked by
+`ItemLoader.ParseStaff`) is a `StaffItem`, stored in the Tools pool one instance at a time. Each slot
+holds one whole spell recipe: the `StaffComponent` on its `ItemStack` carries the part keys
+(`<kind>/<name>`) per slot plus the selected slot, immutable. `StaffBinding` holds the rules: `TryBind`
+binds only a recipe that `SpellRecipe.Compile` finds valid against the staff's tags (so a tier gates its
+parts by tag), plus `Clear`, `Cycle` (wraps both ways) and `Select`; nothing calls them in play yet
+(`MG-4` cycles, `MG-7` binds). Two staffs ship: the wooden staff (tier 1, 2 slots, `basic`; two sticks
+and a crystal block) and the crystal staff (tier 2, 4 slots, `basic` and `advanced`; the wooden staff,
+two crystal blocks and a copper ingot); no `advanced` part ships yet. Bindings are saved as
+`ToolData.Staff` in `player.json` by part key, re-bound on load against this run's parts (what no longer
+binds is dropped with a warning), and ride the inventory snapshot in the same shape (no protocol bump).
+Crafting consumes the least-bound staff first. Known gap: a dropped staff loses its spells, like a
+crucible loses its metal, because an `ItemDrop` carries only an id.
 
 ## In progress
 
@@ -35,13 +48,6 @@ Nothing.
 Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), a data-driven status-effect system, one station
 UI, one bindable staff (two tiers). In order:
 
-- [ ] **`MG-3` Staff item and slots** — P1, M.
-  An item whose JSON declares `staff` (slot count, allowed part tags, tier). The bound recipes ride the
-  item instance as a component, like `CrucibleComponent`; a higher tier has more slots and opens more
-  parts. Two tiers: tier 1 a wooden staff (about 2 slots, basic parts), tier 2 (about 4 slots, more
-  parts). Crafted from sticks plus a crystal-like part through plain recipe JSON, never found as loot only.
-  **Hook:** `Items/Item.cs`, `ItemFactory`, `InventoryPanel/ItemStack.cs`, item schema in
-  `AGENTS.md`.
 - [ ] **`MG-4` Cast pipeline, server-authoritative** — P1, L.
   Plain right-click with a staff casts the selected slot. **Left Ctrl (crouch) + scroll** cycles the
   slot while a staff is held; scroll without Ctrl still changes the hotbar item, and Shift/sprint is
@@ -131,5 +137,5 @@ UI, one bindable staff (two tiers). In order:
 - **Not wanted for now.** Element-vs-element rules, per-mob weaknesses, a live Magicka-style combo
   queue.
 - **Open questions.** Which example combo the hint scroll teaches; chain depth and mana scaling
-  (`MG-12`); which blocks a utility spell may touch (`MG-11`); what the mana item and the `P-47` reagent are; the exact save and net
-  shape of bound recipes on the staff component; whether research is its own station.
+  (`MG-12`); which blocks a utility spell may touch (`MG-11`); what the mana item and the `P-47` reagent are; whether research is its own
+  station.

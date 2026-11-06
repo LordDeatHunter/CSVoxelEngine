@@ -15,4 +15,7 @@ public static class SpellConfig
 
     /// <summary>The highest fizzle chance any recipe reaches, however complex.</summary>
     public const float FizzleMaxChance = 0.75f;
+
+    /// <summary>The most spell slots a staff's JSON may declare (a first guess).</summary>
+    public const int StaffMaxSlots = 8;
 }

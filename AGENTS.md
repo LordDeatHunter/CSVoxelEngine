@@ -81,7 +81,7 @@ sources"), `chunks/<cx>_<cy>_<cz>.bin` (one Deflate-compressed,
 block-name-paletted snapshot per **modified** chunk, `ChunkSaveCodec`; an untouched chunk is
 never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column caps,
 felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: the permanent chop damage of natural trunk cells, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
-creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar; no position
+creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar (a staff's bound spells by part key); no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live slimes and
 goblins with health, facing, velocity, ammo and a slime's size plus still-pending entries, up to
 `MaxSavedDrops` item drops, nearest first, and the drifting icebergs) and `stations.json` (`StationSaveCodec`:
@@ -1356,6 +1356,9 @@ OpenGLTest/
       PlainItem.cs             # a plain pickup: no right-click behavior (vine, branch, compass)
       PlantTreeItem.cs         # plants a sapling of the item's Item.UseTreeName species
                                #   on the aimed ground (an acorn on dirt or grass)
+      StaffBinding.cs          # GL-free staff slot rules: bind a recipe valid against the staff's tags, clear,
+                               #   cycle (wrapping), select, resolve saved part keys
+      StaffItem.cs             # a spell staff: slots, tier and allowed part tags; its spells ride its ItemStack
       WorldItemUse.cs          # World component: the one IItemUseWorld implementation, DispatchUse and the
                                #   dispatching player (bucket, pile, prime, heal, grow and plant wrappers)
     Juice/                     # game-feel rules: camera shake, kick, FOV and tilt terms, hit-stop,
@@ -1848,6 +1851,7 @@ OpenGLTest/
         InventorySaveCodec.cs  # Inventory's player.json mapping (Export/Import forwarders), HandledComponentTypes
         InventorySearch.cs     # GL-free matching of owned items and recipes behind the search field
         InventoryView.cs       # [E] panel selection/scroll/focus state; ResetForNewWorld between worlds
+        StaffComponent.cs      # a staff's bound spells (part keys per slot) and selected slot, immutable
         PanelTransition.cs     # the [E] panel's open/close easing: eased alpha and slide from a self-clocked progress
         SearchFieldState.cs    # a dropdown search field's query, suggestion cursor and scroll
       Menus/                   # main, pause and settings menus, the loading screen, text fields
@@ -2108,7 +2112,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   ItemDebugger/                # the OpenGLTest.ItemDebugger project: the timeline, the
                                #   preview states, the display editor and its JSON writer
   Items/                       # item uses (acorn, converter, firestarter, heal, grow-tree,
-                               #   timed use) and the hierarchy; its own helper StubItemUseWorld
+                               #   timed use), the staff slot binding and the hierarchy; its own helper StubItemUseWorld
   Juice/                       # game-feel rules: blast shake, damage direction and fringe,
                                #   hit-stop, the vignette, pops, FOV and tilt, droplets, tool shatter
   Lod/                         # far-LOD regions, the manager, build pool and buffers, column caps, surface
@@ -2165,6 +2169,7 @@ tools/                                # asset generators: tiles, sprites, models
   generate-pond-plants.py             # deterministic generator of the pond plants' art
   remove-copper-head-handles.py       # strips the wooden handle from copper_pickaxe_head.png / copper_axe_head.png (re-runs are no-ops)
   generate-slime-block-texture.py     # deterministic generator of the slime block tile (slime_block.png)
+  generate-staff-textures.py          # deterministic placeholder sprites of the wooden and crystal staffs
   generate-stone-brick-texture.py     # deterministic generator of the stone brick tile (stone_bricks.png)
   generate-tree-textures.ps1          # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
 ```
@@ -2422,6 +2427,11 @@ species share to the leafy owner) and refusing, spending nothing, where the cell
 (`GrowTreeItemTests`). The **acorn** plants an oak sapling the same way (`AcornTests`), and
 `World.TryGrowTree` is the reactive growth path behind both (`### Trees`).
 
+**Spell staffs** (`staff` in the item schema): the **wooden staff** (branches and a crystal block) and
+the **crystal staff** it is upgraded into (the wooden staff, crystal blocks and a copper ingot), a
+higher tier with more slots and the `advanced` part tag beside `basic`. Their sprites come from
+`tools/generate-staff-textures.py` (`StaffContentTests`, `StaffBindingTests`).
+
 **Flint from gravel**: the gravel loot table yields the flint inside it sometimes, so a gravel patch
 is worth digging (`GravelPocketTests` covers the pocket side).
 
@@ -2462,6 +2472,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 | `trail` | optional `{"color": [r, g, b]}`, sRGB 0..255: the color of the glowing slice trail the item's swings leave (`Item.TrailColor`; omitted, `TrailColorOrDefault` falls back to `ParticleConfig.SliceTrailDefaultColor`). Legal only on a `slice` or `sword` item; a trail on a punch item, or a color that is not three ints in 0..255, throws naming the file (`ItemLoader.ParseTrail`). The obsidian blade is violet, the iron sword pale blue-white |
 | `fuel.burnSeconds` | seconds one unit of this item keeps a kiln lit (coal 60; 1..3600). Writing the object is what makes an item kiln fuel — a kiln takes up to `KilnManager.MaxFuel` units of **one** kind at a time |
 | `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many milliliters of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent(MaterialId, MoltenMl, PendingMl, PendingInputId)` — the last field is display-only, the last melt input charged in, so the kiln can draw what is waiting to melt; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
+| `staff` | marks the item a **spell staff**: `{"slots": n, "tier": t, "tags": [..]}`, slots 1..`SpellConfig.StaffMaxSlots`, tier >= 1, non-blank distinct spell part tags (`ItemLoader.ParseStaff`, shape only: spell parts load after items). Builds a `StaffItem`, stored in the **Tools** pool one instance at a time, because each slot's bound spell recipe rides that instance's `ItemStack` as a `StaffComponent` (the part keys `<kind>/<name>` per slot plus the selected slot, immutable). `StaffBinding.TryBind` binds a recipe only when MG-2's `SpellRecipe.Compile` finds it valid against the staff's tags (a part passes when any of its tags is allowed), so a tier gates its parts by tag; `Clear`, `Cycle` (wrapping) and `Select` exist, but no input or intent calls them yet (`MG-4`, `MG-7`). Saved in `player.json` and carried in the inventory snapshot as `ToolData.Staff` by part key, never id, and re-bound on load against this run's parts (what no longer binds is dropped with a warning). Crafting consumes the least-bound instance first. A Q-dropped staff loses its spells like a crucible loses its metal (an `ItemDrop` carries only an id). May not declare `use` or `crucible`; the tier is shown in the tooltip |
 | `model` | optional `block/<name>` model under `assets/models/`, baked into `Item.BakedModel` so the item can be drawn as real 3D geometry while it sits inside a station (the crucible standing in a kiln's hearth). The sprite stays the inventory icon; this only adds a mesh |
 | `tool` | optional mining numbers: `power` (the item's mining *tier* — the number a block's `tools` requirement is compared against, default 0.5, the bare-hand baseline; it is **not** a damage number, damage is `blockDamage`) and `hitDelayMs` (milliseconds between hits). Writing the object marks the item as a tool; which block `tools` tags it satisfies comes from the tag files, not the item — `assets/data/tags/pickaxe.json` listing `item/primitive_pickaxe` is what makes a block gating on `"pickaxe"` accept it (`Mining.CanMine`). Bare hand and non-tool items mine at the defaults, and creative ignores the gate |
 
@@ -2893,7 +2904,7 @@ and a modifier may share a file name, and they take no byte ids. A missing `spel
 is no parts (no trigger ships); an unknown kind folder or a `.json` lying directly in `spell/` is an error
 naming it, and every part error names its file. `SpellPartLoader` (`Content/Spells/`) runs in
 `ContentRegistry.Load` right after the tree species and publishes `SpellPartRegistry` (`TryGet`,
-`Require`, `All`), which `ContentRegistry.Reset` clears. Tests read temp folders through the pure
+`TryGetByKey`, `Require`, `All`), which `ContentRegistry.Reset` clears. Tests read temp folders through the pure
 `SpellPartLoader.ReadParts`/`Compile`, never by replacing the published registry.
 
 | field | default | meaning |

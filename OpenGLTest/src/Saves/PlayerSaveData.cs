@@ -93,6 +93,9 @@ public sealed class PlayerSaveData
         /// <summary>A crucible's contents; only written for a crucible.</summary>
         public CrucibleData? Crucible { get; set; }
 
+        /// <summary>A staff's bound spells; only written for a staff with something bound or selected.</summary>
+        public StaffData? Staff { get; set; }
+
         /// <summary>A player rename, or null for the definition name.</summary>
         public string? CustomName { get; set; }
 
@@ -111,6 +114,16 @@ public sealed class PlayerSaveData
 
         /// <summary>The last melt input charged in, as a save name, or null.</summary>
         public string? PendingInput { get; set; }
+    }
+
+    /// <summary>What a staff has bound: <see cref="StaffComponent"/> by spell part key, never by id.</summary>
+    public sealed class StaffData
+    {
+        /// <summary>One entry per slot, each the part keys (<c>&lt;kind&gt;/&lt;name&gt;</c>) of its bound recipe, null for an empty slot.</summary>
+        public List<List<string>?>? Slots { get; set; }
+
+        /// <summary>The selected slot.</summary>
+        public int? Selected { get; set; }
     }
 
     /// <summary>One hotbar slot: a tool instance reference or a stackable name (null = empty).</summary>

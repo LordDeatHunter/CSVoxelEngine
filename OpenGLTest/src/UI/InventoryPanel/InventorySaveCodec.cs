@@ -16,7 +16,8 @@ internal static class InventorySaveCodec
 {
     /// <summary>
     /// Every <see cref="ItemStack"/> component type the save codec accounts for. Durability,
-    /// crucible contents and the rename are written by <see cref="Inventory.Export"/>;
+    /// crucible contents, a staff's bound spells (by part key) and the rename are written by
+    /// <see cref="Inventory.Export"/>;
     /// <see cref="CooldownComponent"/> is handled by deliberate omission, since it holds an
     /// absolute window-clock time that means nothing in another session (a restored stack
     /// starts ready). The coverage test fails when a stack grows a component type not listed
@@ -25,7 +26,7 @@ internal static class InventorySaveCodec
     internal static readonly Type[] HandledComponentTypes =
     [
         typeof(DurabilityComponent), typeof(CrucibleComponent), typeof(DisplayNameComponent),
-        typeof(CooldownComponent),
+        typeof(CooldownComponent), typeof(StaffComponent),
     ];
 
     /// <inheritdoc cref="Inventory.Export"/>
@@ -71,6 +72,13 @@ internal static class InventorySaveCodec
                     PendingMl = crucible.PendingMl,
                     PendingInput = SaveNames.NameOf(crucible.PendingInputId),
                 };
+            }
+            if (stack.Item is StaffItem staff && stack.Get<StaffComponent>() is var spells && spells != default)
+            {
+                var slots = new List<List<string>?>(staff.Slots);
+                for (var i = 0; i < staff.Slots; i++)
+                    slots.Add(spells.IsBound(i) ? spells.PartsAt(i).ToList() : null);
+                tool.Staff = new PlayerSaveData.StaffData { Slots = slots, Selected = spells.Selected };
             }
             tool.CustomName = stack.Get<DisplayNameComponent>().CustomName;
             if (stack.Enchantments.Count > 0)
@@ -186,6 +194,8 @@ internal static class InventorySaveCodec
                         item.MaxDurability));
                 if (item.CrucibleCapacityMl > 0 && tool.Crucible is { } crucible)
                     RestoreCrucible(stack, crucible, item.CrucibleCapacityMl, dropped);
+                if (item is StaffItem staffItem && tool.Staff is { } staffData)
+                    RestoreStaff(stack, staffItem, staffData, tool.Name, dropped);
                 if (tool.CustomName != null)
                     stack.Rename(tool.CustomName);
                 if (tool.Enchantments != null)
@@ -212,6 +222,35 @@ internal static class InventorySaveCodec
         var molten = Math.Clamp(crucible.MoltenMl ?? 0, 0, capacity);
         var pending = Math.Clamp(crucible.PendingMl ?? 0, 0, capacity - molten);
         stack.Set(new CrucibleComponent(material, molten, pending, pendingInput));
+    }
+
+    // Re-binds each saved slot through the binding rules against this run's spell parts and the
+    // staff's own tags, so a slot this run cannot bind (past the slot count, an unknown part, a
+    // recipe now invalid) is dropped and named rather than restored as it was.
+    private static void RestoreStaff(ItemStack stack, StaffItem staff, PlayerSaveData.StaffData data, string? name,
+        List<string> dropped)
+    {
+        var spells = default(StaffComponent);
+        if (data.Slots != null)
+            for (var i = 0; i < data.Slots.Count; i++)
+            {
+                if (data.Slots[i] is not { Count: > 0 } keys) continue;
+                if (i >= staff.Slots)
+                {
+                    dropped.Add($"{name} spell slot {i + 1}");
+                    continue;
+                }
+                if (!StaffBinding.TryResolve(keys, out var parts, out var missing))
+                {
+                    dropped.Add($"spell part {missing}");
+                    continue;
+                }
+                if (StaffBinding.TryBind(staff, spells, i, parts, out var bound, out var verdict)) spells = bound;
+                else dropped.Add($"{name} spell slot {i + 1} ({verdict})");
+            }
+
+        spells = StaffBinding.Select(staff, spells, data.Selected ?? 0);
+        if (spells != default) stack.Set(spells);
     }
 
     private static void ImportHotbar(Inventory inventory, PlayerSaveData.InventoryData data)

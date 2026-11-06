@@ -11,7 +11,7 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 | Thing | Path |
 |---|---|
 | block | `OpenGLTest/assets/data/blocks/<name>.json` (file name = id) |
-| item | `assets/data/items/<name>.json` |
+| item | `assets/data/items/<name>.json` (a spell staff is an item with a `staff` object) |
 | loot | `assets/data/loot/<name>.json` (a block uses the table sharing its name unless `loot` says otherwise) |
 | model | `assets/models/block/<name>.json` (Minecraft Java format; 4 built-in parents: cube, cube_all, cube_column, cube_bottom_top) |
 | entity | `assets/data/entities/<name>.json` + `assets/models/entity/<name>.bbmodel` + skin png |
@@ -43,6 +43,7 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 - Entities: a new `Mob` kind's manager implements `IMobPopulation` and joins the world's `MobCaps` (the shared natural and hard caps); it gets no cap of its own.
 - Recipes: cook and crush are one per input; craft files are named by result, reverse by `<result>_from_<ingredient>`; a cast must melt back into exactly what it took (`MetalworksRecipeTests`).
 - Spell parts: every part needs a `costShare` in (0,1], a `complexity` >= 0 and at least one tag; `damageFactor`/`rangeFactor` only on modifiers; keep typical spells at 20-40% of `ManaConfig.StartMax` (`SpellRecipeTests` checks every shipped combination).
+- Staffs: an item with a `staff` object (`slots` 1..`SpellConfig.StaffMaxSlots`, `tier` >= 1, non-blank distinct `tags`) stores in the Tools pool and may not declare `use` or `crucible`. It must be craftable (never loot only), and a higher tier needs more slots and a superset of the lower tier's tags (`StaffContentTests`).
 
 ## Tests to extend
-`ContentTests` (schema rules), `EntityContentTests`, `TreeSpeciesContentTests`, `KilnContentTests`, `MetalworksRecipeTests`, `BiomeTintTextureTests`, `SpellRecipeTests`, `SpellPartLoaderTests`. Assert the **rule** the new content must satisfy; do not pin its literal values (see the `functional-tests` skill).
+`ContentTests` (schema rules), `EntityContentTests`, `TreeSpeciesContentTests`, `KilnContentTests`, `MetalworksRecipeTests`, `BiomeTintTextureTests`, `SpellRecipeTests`, `SpellPartLoaderTests`, `StaffContentTests`, `StaffBindingTests`. Assert the **rule** the new content must satisfy; do not pin its literal values (see the `functional-tests` skill).

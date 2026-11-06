@@ -19,6 +19,12 @@ public static class SpellPartRegistry
     public static SpellPart? TryGet(SpellPartKind kind, string name) =>
         _byKey.GetValueOrDefault(SpellPart.KeyOf(kind, name));
 
+    /// <summary>
+    /// The part saved under its full key <c>&lt;kind&gt;/&lt;name&gt;</c> (the form save files and staffs
+    /// store), or null for an unknown or null key.
+    /// </summary>
+    public static SpellPart? TryGetByKey(string? key) => key == null ? null : _byKey.GetValueOrDefault(key);
+
     /// <summary>The part of that kind registered under that file name; throws naming the missing content.</summary>
     public static SpellPart Require(SpellPartKind kind, string name)
     {

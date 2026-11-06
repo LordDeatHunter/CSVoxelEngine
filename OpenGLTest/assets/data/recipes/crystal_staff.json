@@ -1,0 +1,11 @@
+{
+  // The wooden staff upgraded with more crystal and a copper band. Crafting consumes the
+  // least-bound wooden staff on hand, so one carrying spells is kept while an empty one exists.
+  "result": "item/crystal_staff",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/wooden_staff", "count": 1 },
+    { "item": "block/crystal_block", "count": 2 },
+    { "item": "item/copper_ingot", "count": 1 }
+  ]
+}

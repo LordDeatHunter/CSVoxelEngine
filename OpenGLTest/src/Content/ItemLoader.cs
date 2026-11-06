@@ -84,6 +84,8 @@ internal static class ItemLoader
                         $"Item '{path}' has crucible.capacityMl {crucible.CapacityMl}; expected 100..10000 milliliters.");
             }
 
+            var staff = ParseStaff(definition, path);
+
             var id = ContentRegistry.ItemIds[name];
 
             // A 3D model for station display; the sprite above stays the inventory icon
@@ -158,7 +160,10 @@ internal static class ItemLoader
                 TreeName: use?.Tree,
                 TrailColor: trailColor,
                 ThrowAligned: definition.ThrowAligned,
-                UsePose: usePose));
+                UsePose: usePose,
+                StaffSlots: staff?.Slots ?? 0,
+                StaffTier: staff?.Tier ?? 0,
+                StaffTags: staff?.Tags));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ContentRegistry.ItemIds, StringComparer.Ordinal));
@@ -178,6 +183,39 @@ internal static class ItemLoader
             throw new InvalidOperationException(
                 $"Item '{path}' has a trail.color that is not three integers in 0..255.");
         return new Rgba((byte)color[0], (byte)color[1], (byte)color[2]);
+    }
+
+    /// <summary>
+    /// The <c>staff</c> object's slots, tier and allowed tags, or null when the item is not a staff.
+    /// Checks the shape only: spell parts load after items, so the tags are not matched against
+    /// any part here. A staff is neither a crucible nor a <c>use</c> item (its right-click is its cast).
+    /// </summary>
+    internal static (int Slots, int Tier, IReadOnlySet<string> Tags)? ParseStaff(ItemDefinition definition,
+        string path)
+    {
+        if (definition.Staff is not { } staff) return null;
+        if (definition.Crucible != null)
+            throw new InvalidOperationException($"Item '{path}' is both a staff and a crucible.");
+        if (definition.Use != null)
+            throw new InvalidOperationException(
+                $"Item '{path}' is a staff but declares a use; a staff's right-click is its cast.");
+        if (staff.Slots is not { } slots || slots < 1 || slots > SpellConfig.StaffMaxSlots)
+            throw new InvalidOperationException(
+                $"Item '{path}' has staff.slots {staff.Slots}; expected 1..{SpellConfig.StaffMaxSlots}.");
+        if (staff.Tier is not { } tier || tier < 1)
+            throw new InvalidOperationException($"Item '{path}' has staff.tier {staff.Tier}; expected 1 or more.");
+        if (staff.Tags is not { Length: > 0 } tags)
+            throw new InvalidOperationException($"Item '{path}' has a staff with no tags; it would allow no spell part.");
+
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var tag in tags)
+        {
+            if (string.IsNullOrWhiteSpace(tag))
+                throw new InvalidOperationException($"Item '{path}' has a blank staff tag.");
+            if (!set.Add(tag))
+                throw new InvalidOperationException($"Item '{path}' lists staff tag '{tag}' twice.");
+        }
+        return (slots, tier, set);
     }
 
     private readonly record struct ParsedSheet(int Cols, int Rows, int Frames, ItemAnimationMode Mode, float Fps);

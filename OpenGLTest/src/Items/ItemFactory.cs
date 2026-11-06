@@ -50,7 +50,10 @@ public static class ItemFactory
         string? TreeName = null,
         Rgba? TrailColor = null,
         bool ThrowAligned = false,
-        UsePose UsePose = UsePose.Raise);
+        UsePose UsePose = UsePose.Raise,
+        int StaffSlots = 0,
+        int StaffTier = 0,
+        IReadOnlySet<string>? StaffTags = null);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,
@@ -75,6 +78,9 @@ public static class ItemFactory
         // Tools pool whatever use action (usually none) its JSON declares.
         if (spec.CrucibleCapacityMl > 0)
             return new CrucibleItem(spec);
+        // A staff's bound spells live on its stack, so like a vessel it needs the Tools pool
+        if (spec.StaffSlots > 0)
+            return new StaffItem(spec);
         return spec.Action switch
         {
             ItemUseAction.PickupFluid => new BucketPickupItem(spec),
