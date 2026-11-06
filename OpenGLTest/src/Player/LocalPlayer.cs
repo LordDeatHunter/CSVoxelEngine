@@ -273,10 +273,12 @@ internal sealed class LocalPlayer
         var horizontalSpeed = 0f;
         var headingForward = 0f;
         var headingSide = 0f;
+        var totalSpeed = 0f;
         if (_hasPrevCamPos && deltaTime > 0.0)
         {
             var step = camPos - _prevCamPos;
             horizontalSpeed = new Vector3(step.X, 0f, step.Z).Length() / (float)deltaTime;
+            totalSpeed = step.Length() / (float)deltaTime;
             // The velocity along and across the body's facing, which tips a swimmer toward its heading.
             var yaw = MathUtils.ToRadians(Camera.PlayerYaw);
             var fx = MathF.Cos(yaw);
@@ -308,7 +310,8 @@ internal sealed class LocalPlayer
         _lastSwimStrokes = strokes;
         Player.Update((float)deltaTime, animSpeed, Camera.IsSprinting, supported,
             Camera.VerticalVelocity, Camera.IsSneaking, waterPhase >= WaterPhase.Float,
-            headingForward, headingSide, floating: waterPhase == WaterPhase.Float);
+            headingForward, headingSide, floating: waterPhase == WaterPhase.Float,
+            flying: Camera.IsFlying, flightSpeed: totalSpeed);
         // A hit-stop holds the punch pinch with the arm (read by the camera's next update)
         Camera.HoldPunchFov = Player.IsHitStopped;
         // The throw being wound up narrows the view with the arm (ThrowZoom, the camera's next update)

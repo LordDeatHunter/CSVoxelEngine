@@ -21,10 +21,6 @@ Tracks particles, animations and other non-gameplay feel work. Last updated 2026
 
   **Hook**: `BlockDebrisSystem` (chips), `LeafParticleSystem` (leaves), `SelectionPasses.RenderBlockBreaking` (nearest hook for the crack; the notch needs a wood-cell mesh variant in `TreeWoodEmitter`), `TopplingTree` (the fell).
   **Verify**: item debugger `ITEM_DEBUGGER_PLAYER_ANIM=chop`; a new `visual-examples/animations-axe.json` (`VOXEL_TIME=147`).
-- [ ] **`V-13` Flight animation** - P2, M.
-  Creative flight gets its own pose: the legs sway a little and trail "bent" back, both scaling with flight velocity and clamped by max caps (new knobs in `PlayerConfig`, curves through `MathUtils`). Remote players: `NetPlayerFlags.Flying` already rides the wire and the velocity is derived from the broadcast position delta, like the walk phase (no protocol bump).
-  **Hook**: `PlayerModel.Update`, `Posing/SecondaryMotion` (lean), `Posing/PoseBuilder` (leg pose), `LocalPlayer.UpdatePlayerModel`.
-  **Verify**: a `FLY` mode in `PlayerPreviewState` (`ITEM_DEBUGGER_PLAYER_ANIM=fly`); a `PlayerModelTests` relation (sway and lean grow with speed, never past the cap); fly steps in `animations.json`.
 - [ ] **`V-15` Bow animation** - P2, M.
   A two-handed draw, hold and release: the off arm holds the bow out, the drawing arm pulls back to the cheek as the charge rises, snaps back on release, the shoulders turn side-on. Reuses the throw's charge clock (`ThrowPose`, `ArmOverlays`, `Camera.ThrowCharge` and `ThrowZoom`). Needs the bow item itself; the gameplay is in `F-4`.
   **Hook**: `Posing/ThrowPose`, `HeldItemPose`, `PlayerPreviewState` (a new `BOW` mode). **Verify**: item debugger, then a scenario in `animations.json`.

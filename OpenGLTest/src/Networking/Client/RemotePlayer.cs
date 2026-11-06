@@ -134,6 +134,7 @@ public sealed class RemotePlayer
             sneaking: _flags.HasFlag(NetPlayerFlags.Sneaking),
             swimming: _flags.HasFlag(NetPlayerFlags.Swimming),
             swimForward: headingForward, swimSide: headingSide,
-            floating: _flags.HasFlag(NetPlayerFlags.Floating));
+            floating: _flags.HasFlag(NetPlayerFlags.Floating),
+            flying: flying, flightSpeed: step.Length() / dt);
     }
 }

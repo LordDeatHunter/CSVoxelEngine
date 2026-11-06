@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Config;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
@@ -29,6 +30,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public const string Swim = "swim";
     public const string SwimIdle = "swim idle";
     public const string Surface = "surface";
+    public const string Fly = "fly";
     public const string Punch = "punch";
     public const string HeavyPunch = "heavy punch";
     public const string Slice = "slice";
@@ -45,7 +47,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     /// <summary>Every mode, in the order the debugger lists them.</summary>
     public static readonly IReadOnlyList<string> AllModes =
     [
-        Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface,
+        Idle, Walk, Run, Sneak, Jump, SprintJump, Land, Swim, SwimIdle, Surface, Fly,
         Punch, HeavyPunch, Slice, SliceBack, Cut, BackCut, Chop, Throw, Use, Hurt, Equip, Death,
     ];
 
@@ -72,6 +74,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     private const float Gravity = 34f;
     private const float LandingFallSpeed = 15f;
     private const float SwimSpeedAhead = 4f;
+    private const float FlyCycleSeconds = 4f;
     // How long the throw charge takes to build, how long it is held cocked, how long death holds the body down.
     private const float ThrowChargeSeconds = 0.8f;
     private const float ThrowHoldSeconds = 0.35f;
@@ -120,7 +123,7 @@ public sealed class PlayerPreviewState : IPreviewDriver
     public SliceTrailSampler? TrailSampler { get; set; }
 
     /// <summary>True for the poses with no start or end (idle, walk, run, sneak, swim): a clock wraps them.</summary>
-    public bool IsContinuous => Mode is Idle or Walk or Run or Sneak or Swim or SwimIdle or Surface;
+    public bool IsContinuous => Mode is Idle or Walk or Run or Sneak or Swim or SwimIdle or Surface or Fly;
 
     /// <summary>Seconds one play of the active mode lasts (a cycle for a continuous pose).</summary>
     public float Duration => Mode switch
@@ -128,6 +131,8 @@ public sealed class PlayerPreviewState : IPreviewDriver
         Walk or Run or Sneak or Idle or SwimIdle => 2f,
         // About two slow sculls of the surface float
         Surface => 3f,
+        // One slow ramp from hovering up to the full-speed trail and back
+        Fly => FlyCycleSeconds,
         Swim => PlayerPhysics.SwimStrokeSeconds * 2f,
         Jump or SprintJump => 2f * JumpSpeed / Gravity + 0.9f,
         Land => 0.25f + 0.9f,
@@ -230,6 +235,9 @@ public sealed class PlayerPreviewState : IPreviewDriver
                 // At rest at the top of deep water (WaterPhase.Float), exactly as the world feeds it
                 _model.Update(deltaTime, 0f, grounded: true, swimming: true, floating: true);
                 break;
+            case Fly:
+                Flying(deltaTime);
+                break;
             case Land:
                 Landing(deltaTime);
                 break;
@@ -327,6 +335,14 @@ public sealed class PlayerPreviewState : IPreviewDriver
 
     // Swimming: a stroke starts as soon as the last one is over, exactly as holding forward would in
     // the game (idle: the arms rest in front and only the floating bob shows).
+    // Creative flight as the world feeds it: no walk speed, the whole speed as the flight speed, ramping
+    // from a hover to the speed the legs are fully trailed at and back so one cycle shows the whole range
+    private void Flying(float dt)
+    {
+        var ramp = 0.5f * (1f - MathF.Cos(_clock / FlyCycleSeconds * MathF.Tau));
+        _model.Update(dt, 0f, grounded: true, flying: true, flightSpeed: PlayerConfig.FlightFullSpeed * ramp);
+    }
+
     private void Swimming(float dt, float speed)
     {
         if (speed > 0f && _model.SwimStrokeProgress >= 1f)

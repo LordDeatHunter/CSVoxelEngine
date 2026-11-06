@@ -85,7 +85,7 @@ internal sealed class PoseBuilder
         // after the two are blended so a swing still plays while running or falling. The swim
         // stroke and the body mods (landing, crouch, flinch, sway) sit between the two.
         if (_model.AirBlend <= 0.001f)
-            return _model.ThrowArm.WithUse(_model.ThrowArm.WithThrow(_model.Jab.WithPunch(SecondaryMotion.ApplyMods(_model.Swim.ApplySwim(ground), _model.Secondary.ComputeMods()), pitchDeg)));
+            return Finish(ground, pitchDeg);
 
         var rise = MathUtils.Clamp01(_model.AirVelocity / 11f);
         var fall = MathUtils.Clamp01(-_model.AirVelocity / 12f);
@@ -118,6 +118,12 @@ internal sealed class PoseBuilder
             MathUtils.Lerp(ground.RightElbow, air.RightElbow, t),
             MathUtils.Lerp(ground.TorsoPitch, air.TorsoPitch, t),
             MathUtils.Lerp(ground.Bob, 0f, t));
-        return _model.ThrowArm.WithUse(_model.ThrowArm.WithThrow(_model.Jab.WithPunch(SecondaryMotion.ApplyMods(_model.Swim.ApplySwim(blended), _model.Secondary.ComputeMods()), pitchDeg)));
+        return Finish(blended, pitchDeg);
     }
+
+    // Flight, then swim, then the body mods, the jab, the throw and the use over the base pose
+    private Pose Finish(in Pose basePose, float pitchDeg) =>
+        _model.ThrowArm.WithUse(_model.ThrowArm.WithThrow(_model.Jab.WithPunch(
+            SecondaryMotion.ApplyMods(_model.Swim.ApplySwim(_model.Flight.Apply(basePose)),
+                _model.Secondary.ComputeMods()), pitchDeg)));
 }

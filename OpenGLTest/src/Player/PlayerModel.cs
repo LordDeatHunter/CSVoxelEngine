@@ -116,6 +116,9 @@ public class PlayerModel
     public const float MaxShoulderPullBlocks = ShoulderReach.MaxShoulderPull;
     private float _crouchBlend;
     private float _swimBlend;
+    // Smoothed 0..1 flight amount (flying in Update) and the smoothed flight speed in blocks/s
+    private float _flightBlend;
+    private float _flightSpeed;
     // Smoothed 0..1 surface-float amount (floating in Update), at most the swim amount
     private float _floatBlend;
     // Seconds since the last swim stroke began; the stroke is over (the arms rest in front) once it
@@ -167,6 +170,9 @@ public class PlayerModel
     /// <summary>The swim stroke shape and the swim and float leg pose.</summary>
     internal SwimPose Swim { get; }
 
+    /// <summary>The creative-flight leg sway, trail and lean.</summary>
+    internal FlightPose Flight { get; }
+
     /// <summary>The throw and timed-use arm overrides.</summary>
     internal ThrowPose ThrowArm { get; }
 
@@ -188,6 +194,7 @@ public class PlayerModel
     public PlayerModel()
     {
         Swim = new SwimPose(this);
+        Flight = new FlightPose(this);
         ThrowArm = new ThrowPose(this);
         Secondary = new SecondaryMotion(this);
         Jab = new PunchPose(this);
@@ -286,6 +293,13 @@ public class PlayerModel
 
     /// <summary>Smoothed 0..1 swimming amount (<c>swimming</c> in <see cref="Update"/>).</summary>
     public float SwimBlend => _swimBlend;
+
+    /// <summary>Smoothed 0..1 flying amount (<c>flying</c> in <see cref="Update"/>).</summary>
+    public float FlightBlend => _flightBlend;
+
+    /// <summary>The smoothed flight speed as a 0..1 share of the speed the pose is fully trailed at
+    /// (see <see cref="FlightPose.SpeedShare"/>).</summary>
+    public float FlightSpeedShare => FlightPose.SpeedShare(_flightSpeed);
 
     /// <summary>
     /// Smoothed 0..1 surface-float amount: eases in while <c>floating</c> in <see cref="Update"/> with no
@@ -393,11 +407,14 @@ public class PlayerModel
     /// knees, falling extends toward landing. <paramref name="floating"/> (with
     /// <paramref name="swimming"/>) is a body at rest at the top of deep water
     /// (<see cref="WaterPhase.Float"/>): the upright surface-float pose eases in over the swim pose,
-    /// except while a stroke is under way.
+    /// except while a stroke is under way. <paramref name="flying"/> is creative flight, whose pose
+    /// (the legs trailing, the lean) follows <paramref name="flightSpeed"/>, the body's whole speed in
+    /// blocks/s.
     /// </summary>
     public void Update(float deltaTime, float horizontalSpeed, bool sprinting = false, bool grounded = true,
         float verticalVelocity = 0f, bool sneaking = false, bool swimming = false,
-        float swimForward = 0f, float swimSide = 0f, bool floating = false)
+        float swimForward = 0f, float swimSide = 0f, bool floating = false,
+        bool flying = false, float flightSpeed = 0f)
     {
         if (deltaTime <= 0f) return;
         _time += deltaTime;
@@ -421,6 +438,8 @@ public class PlayerModel
         }
         _crouchBlend = MathUtils.Damp(_crouchBlend, sneaking ? 1f : 0f, 12f, deltaTime);
         _swimBlend = MathUtils.Damp(_swimBlend, swimming ? 1f : 0f, 6f, deltaTime);
+        _flightBlend = MathUtils.Damp(_flightBlend, flying ? 1f : 0f, PlayerConfig.FlightBlendRate, deltaTime);
+        _flightSpeed = MathUtils.Damp(_flightSpeed, flying ? flightSpeed : 0f, PlayerConfig.FlightSpeedEaseRate, deltaTime);
         _swimBobTime += deltaTime;
         _swimT += deltaTime;
         if (swimming && AutoSwimStroke && _swimT >= PlayerPhysics.SwimStrokeSeconds && horizontalSpeed > 0.8f)

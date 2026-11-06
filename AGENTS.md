@@ -97,7 +97,7 @@ The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
 display sliders, and the player body: its mode buttons are **every player animation**
 (`OpenGLTest.ItemDebugger/PlayerPreviewState.cs`, GL-free and tested): the poses IDLE WALK RUN SNEAK JUMP
-S-JUMP LAND SWIM FLOAT, and the swings and reactions PUNCH HEAVY SLICE BACK CUT B-CUT CHOP THROW HURT EQUIP DEATH,
+S-JUMP LAND SWIM FLOAT SURFACE FLY, and the swings and reactions PUNCH HEAVY SLICE BACK CUT B-CUT CHOP THROW HURT EQUIP DEATH,
 which replay on their own after a short rest. Each only feeds the real `PlayerModel` the inputs and
 triggers the game does, so what shows is exactly what the game poses (a jump loop with the landing, a
 swim that strokes as long as forward is held, a throw that charges, holds and releases, a death that
@@ -159,7 +159,7 @@ Environment variables for scripted captures:
 - `ITEM_DEBUGGER_ANIM=<clip|hurt|hop|spawn|death|...>` picks the entity mode. An unknown mode logs a
   warning listing the valid ones.
 - `ITEM_DEBUGGER_PLAYER_ANIM=<mode>` picks the player animation (`idle`, `walk`, `run`, `sneak`, `jump`,
-  `sprint jump`, `land`, `swim`, `swim idle`, `punch`, `heavy punch`, `slice`, `slice back`, `cut`, `back cut`, `chop`, `throw`,
+  `sprint jump`, `land`, `swim`, `swim idle`, `surface`, `fly`, `punch`, `heavy punch`, `slice`, `slice back`, `cut`, `back cut`, `chop`, `throw`,
   `hurt`, `equip`, `death`) and selects the ITEMS tab. An unknown mode logs a warning listing them.
 - `ITEM_DEBUGGER_SPEED=<0..4>` and `ITEM_DEBUGGER_LOOP=<0|1>` set the timeline's speed and loop at startup.
 - `ITEM_DEBUGGER_SHOT=<png path>` saves one screenshot and closes. Without `ITEM_DEBUGGER_SHOT_AT` it
@@ -1494,6 +1494,7 @@ OpenGLTest/
         BladeSwingFrame.cs     # what the right arm, the body and the held blade do on one frame of a blade swing (a slice
                                #   or a sword swing): the one struct the body code reads of either
         BodyPartMatrices.cs    # the world matrices of the body parts and the held item's hand anchor (GetPartMatrix/GetHandAnchorMatrix bodies)
+        FlightPose.cs          # the creative-flight pose: legs sway and trail bent back, the torso leans, scaling with flight speed to the PlayerConfig.Flight* caps
         LimbFrames.cs          # the arm-frame builders (FrameOf, UpperFrame, ForeFrame, Blend) and the shoulder socket
         PoseBuilder.cs         # assembles the frame's joint pose: gait and jump blend, then swim, mods, jab, throw and use in order
         PoseMods.cs            # the secondary-motion values ComputeMods hands to ApplyMods

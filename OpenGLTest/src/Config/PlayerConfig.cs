@@ -38,6 +38,22 @@ public static class PlayerConfig
     // waits on it (the slice combo's next swing, the next jab) is ever delayed. A punch, whose
     // follow-through is short, therefore holds for less than HitStopSeconds.
     public const float HitStopMaxRecoveryShare = 0.7f;
+    // Creative-flight pose (FlightPose): the legs trail back and bend, and the torso leans, up to the
+    // caps below at FlightFullSpeed blocks per second (the 10x flight sprint is 80, so it holds the caps
+    // from half of it); the legs also sway out of step, a little (FlightHoverSway of the full sway)
+    // even when hovering
+    public const float FlightFullSpeed = 40f;
+    public const float FlightBlendRate = 6f;
+    public const float FlightSpeedEaseRate = 5f;
+    public const float FlightTrailHip = 0.5f;
+    public const float FlightTrailKnee = 0.9f;
+    public const float FlightRestKnee = 0.12f;
+    public const float FlightLean = 0.45f;
+    public const float FlightSwayHip = 0.2f;
+    public const float FlightSwayKnee = 0.2f;
+    public const float FlightHoverSway = 0.35f;
+    public const float FlightSwayRate = 2.6f;
+
     // Break kick (BreakKick): a landed mining hit on a block harder than the min nudges the view,
     // rising to the max strength at the full hardness (a trunk, an ore); the hit that breaks the
     // block kicks the final factor harder
