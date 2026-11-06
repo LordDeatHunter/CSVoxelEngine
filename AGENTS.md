@@ -290,7 +290,8 @@ when full). It rides the end of `PlayerStatus` as two ints (protocol 11, the max
 1..`MaxCap` and the mana into it on read) and a client only mirrors it
 (`ClientMirror.ApplyNetworkMana`). It is saved as `Mana` in `player.json` (absent reads as full; the
 max is not saved, since it follows progression). `HudRenderer.DrawMana` draws it as a thin blue bar
-as wide as the hotbar row in the margin under it, hidden while dead or in creative. `ManaTests`.
+as wide as the hotbar row in the margin under it, hidden while dead or in creative. The cost a cast
+spends comes from its spell parts (`SpellRecipe`, see "Spell part schema"). `ManaTests`.
 
 **Water rendering** lives in the shared world shader plus two extra passes, the planar mirror (`ReflectionPass.RenderReflection`) and the scene copy. Just before `TerrainPasses.RenderWorldTranslucent` draws, `RenderTargets.CopyScene` snapshots the HDR scene target's color and depth (see "Linear lighting" below; the color copy is `Rgba16f`, like the reflection mirror) into two textures on units 3 and 4 (`CopyTexSubImage2D` from the bound HDR FBO — the water pass depth-tests while sampling, so it cannot read the target directly); the water fragment then composes its own look out of them: a refracted lookup offset along the analytic wave normal, Beer-Lambert absorption over the water's measured thickness (`WaterAbsorb`) plus in-scattered `WaterScatter`, and a Schlick fresnel mix into the planar reflection. Where that view-ray depth thins below `WaterFoamWidthBlocks` (a wall, a bank, a thin trickle) a pale **shore foam** band is mixed over the composed surface in linear light, lit by the shared opaque `light` term and fogged with it, broken up by a value-noise field the ripple phases jiggle and `FlowFoam` (the same two-phase flow map) carries downstream; top faces only, never from below or with the eye submerged, faded out by 160 blocks. The width must stay under a full cell's surface less the swell (`WaterFoamTests`), so open water over a block floor never foams; being screen-space, only contacts the depth copy sees foam (the camera-facing side of a block; a wall seen straight down shows none). `visual-examples/water-foam.json` frames liquid shores at `VOXEL_TIME` 360 and 147. Flowing water carries its baked flow into that normal (`FlowWaveNormal`: a bounded two-phase flow map that scrolls the ripples downstream and stretches them along the flow, identical to `WaveNormal` when the flow is zero), and falling side faces add fast vertical streaks; generated rivers and lakes are all source cells, so they bake no flow and stay still until the simulation makes them flow (`visual-examples/flow-water.json`, `VOXEL_TIME=147`, pours some). The mirror plane itself is the single `RenderManager.WaterPlaneY` at sea level, so a lake whose surface stands above it reflects against that plane rather than its own - an accepted approximation, since only one plane can be mirrored per frame. Seen from below — decided per fragment from the face normal (`fromBehind` in `test-fragment.glsl`), never from the sea plane, since a pond stands above it — the surface is a Snell window: the same scene copy shows through it distorted by the wave normal, the inside fresnel goes to total internal reflection past the critical angle and that band fades to the underwater fog color, and the mirror is never sampled from that side; `ReflectionReuse.MirrorApplies` also skips rendering it whenever `Camera.IsEyeInWater`, and the sky dome (`SkyRenderer`) and the sun disc stay dry in water (lava still fades the dome via `FrameLighting.SkyTintAmount`, eased through its `_lavaT`) so the window shows real sky. World, cloud and sky fog share `SkySample`, duplicated verbatim in `sky-fragment.glsl`, `test-fragment.glsl` and `cloud-fragment.glsl`, with `SkyPalette.Sample` as the tested C# reference, so change all four together. The dome currently samples the flat 28198cc sky color: `SkyPalette.Compute` returns the old night/day mix, pulled toward the dusk orange by `SkyDuskMix`, as both zenith and horizon with zero glow, and `SkyHazeStrength` is 0, so every direction (and every fully fogged fragment) is that one color. The reflection pass now also draws the sun disc and the cloud layer into the mirror, and both it and the scene copies are skipped whenever `TerrainPasses.CullWater` (one frustum pass a frame, feeding the water pass its draw lists) found no water on screen — glass shares the translucent mesh, so `Chunk.HasWaterMesh` is the flag that decides, not `HasTranslucentMesh`. The mirror's opaque chunk and LOD lists skip anything whose top (`Chunk.WorldMax.Y`, `LodRegion.YMax`) plus `ReflectionCull.TopMarginBlocks` (a multiblock's one-block overhang plus the shader's sway and wave lift) lies below the plane, since its clip would discard every fragment. Opaque faces that look into water are flagged by the mesher in bit 3 of `Vertex.Normal` (bits 0-2 stay the face index, bit 5 is the leaf-sway flag, bits 6-7 the low bits of the block-light tint code) and get the animated Voronoi caustic net; bit 4 is the biome-tint flag (see "Biome-tinted grass and leaves" below). The world fragment darkens a submerged face's albedo by `WetDarken` once, before the light multiply, and only at or below that face's own baked surface (`step(fWorldPos.y, fWaterSurfaceY)`; the caustics stop at the same line), so a dry face beside water — a beach top, a bank wall over the waterline — is never darkened or tinted; ore tiles (a non-zero `material.metallic`) are excluded. `SurfaceFresnel` is the GL-free twin (`Schlick`, `WetWeight`). While the eye is submerged, `UnderwaterRaysRenderer` adds one full-screen ray-march for sun shafts, composited in display space (the upsample reads the HDR target it draws into, adds the shafts to the encoded scene with the pre-SH-10 sRGB sun color and strength, clips at 1 and decodes), since the same add in linear light lost the glare toward the sun. Both measure depth from the **local** water surface, never the sea plane: the caustics from the surface baked into each submerged face's vertex (`Vertex.WaterSurface`, read as `fWaterSurfaceY`), the rays from `Camera.EyeWaterSurfaceY` (`ChunkManager.GetFluidColumnTopGlobal` over the eye's column), so a pond above sea level gets both — only the planar mirror still uses the sea plane. The rays are why the shadow map keeps rendering underwater (`FrameLighting.ShadowStrengthDry`, the strength before the underwater fade) even though the world diffuse no longer uses it. **Depth convention**: `Camera.GetProjectionMatrix` comes from `System.Numerics`, which is Direct3D-style (clip depth 0..1), so window depth is *not* the GL -1..1 mapping — never write a near/far linearization. Reconstruct a world position by inverting the very matrix that wrote the depth (`uInvViewProj`), and compare raw depth values directly for "which is nearer". `visual-examples/water.json` (run it with `VOXEL_TIME=360`) frames the shallows, the grazing surface, deep water from height and the underwater shots, including the surface seen from below in the sea and in a pond above sea level (a liquid one — a frozen pond has an ice lid, not a water top face).
 
@@ -1039,6 +1040,7 @@ OpenGLTest/
       LightingConfig.cs        # alpha cutoff, atlas anisotropy, light spread, shadow cascades, point and fire
                                #   lights, fog, tonemap exposure, eye adaptation
       ManaConfig.cs            # the mana pool: start max, growth per known part and its cap, the refill time
+      SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap
       MobConfig.cs             # mob caps and shared mob rules, slimes, goblins (flee, dodge, pack, torches, notice
                                #   pip), healthbars, damage numbers
       NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules, timeouts, LOD streaming,
@@ -1088,6 +1090,7 @@ OpenGLTest/
         MeltRecipeDefinition.cs # block/item -> (material, ml)
         MoltenMaterialDefinition.cs # a molten metal: id, tile, tint
         RecipeDefinition.cs    # JSON shape of assets/data/recipes/<name>.json
+        SpellPartDefinition.cs # JSON shape of assets/data/spell/<kind>/<name>.json
         TagDefinition.cs       # JSON shape of assets/data/tags/<name>.json
         TreeSpeciesDefinition.cs # JSON DTO of assets/data/trees/<species>.json
       Loot/                    # compiled loot tables, loot context, wood loot bands
@@ -1127,6 +1130,13 @@ OpenGLTest/
         TreeWoodShape.cs       # the one tree_wood shape rule: which cells connect (parent
                                #   edges, never detached wood), node and tube hitboxes,
                                #   body overlap and the beveled pixel-rim boxes (RimBoxes)
+      Spells/                  # spell parts and recipes (MG-2): kinds, the compiled part, its registry and
+                               #   loader, the recipe compile
+        SpellPartKind.cs, SpellPart.cs  # element/shape/modifier/trigger; one compiled part keyed <kind>/<name>
+        SpellPartRegistry.cs   # every part by key, published once by ContentRegistry.Load
+        SpellPartLoader.cs     # data/spell/<kind>/*.json -> parts; ReadParts and Compile are pure (tests)
+        SpellRecipe.cs         # element + shape + modifiers + trigger -> cost, verdict, fizzle, factors
+        SpellStats.cs, SpellVerdict.cs  # what a recipe compiles to; the first rule it breaks
       Stations/                # GL-free render constants of the kiln, quern and casting passes, molten materials
         KilnRenderer.cs, QuernRenderer.cs,
           CastingRenderer.cs   # GL-free placement/animation
@@ -2012,6 +2022,8 @@ OpenGLTest/
   assets/data/recipes/crush/<in>.json # quern recipes: input -> crushed result
   assets/data/recipes/melt/<in>.json  # what a block or item melts into, and how many ml
   assets/data/recipes/cast/<out>.json # (fired mold + material) -> result, amount and cooling time
+  assets/data/spell/<kind>/<name>.json # spell parts by kind (element, shape, modifier, trigger): cost share,
+                                      #   complexity, tags, modifier factors
   assets/models/block/<name>.json     # Minecraft Java block models, incl. the built-in parents
                                       #   cube, cube_all, cube_column, cube_bottom_top
   assets/models/entity/<name>.bbmodel # Blockbench entity projects (slime, goblin with its four
@@ -2073,7 +2085,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Sources/                   # the generated and imported world sources
     Streaming/                 # the generation workers, the scan frontier, the streaming foci
   Content/                     # the registry and its baked tables: blocks, models, shapes (panes,
-                               #   tree wood, multiblocks), loot, recipes, kiln and molds (flat)
+                               #   tree wood, multiblocks), loot, recipes, kiln and molds, spell parts and
+                               #   recipes (flat)
   Core/                        # the Core utilities and the src-root types (World lifecycle, WorldSeed, WorldLoadGate)
   Effects/                     # mirrors src/Effects: one folder per sub-domain of shader twins
     Climate/                   # the biome tint field and its chunk, LOD, pop and texture consumers
@@ -2871,6 +2884,41 @@ never places anything, while a block in hand still falls through and molds can b
 each other. After the cast step comes `TryToggleOpenable`: a click on an openable block (a
 trapdoor, either half of a door, which swings both) flips its open bit whatever is in hand, so
 nothing places against it.
+
+### Spell part schema (`assets/data/spell/<kind>/<name>.json`)
+
+The folder is the part's kind (`element`, `shape`, `modifier`, `trigger`; `SpellPartKind`, folder name
+`SpellPart.FolderOf`), never a field. Parts are keyed `<kind>/<name>` (`SpellPart.Key`), so an element
+and a modifier may share a file name, and they take no byte ids. A missing `spell/` folder or kind folder
+is no parts (no trigger ships); an unknown kind folder or a `.json` lying directly in `spell/` is an error
+naming it, and every part error names its file. `SpellPartLoader` (`Content/Spells/`) runs in
+`ContentRegistry.Load` right after the tree species and publishes `SpellPartRegistry` (`TryGet`,
+`Require`, `All`), which `ContentRegistry.Reset` clears. Tests read temp folders through the pure
+`SpellPartLoader.ReadParts`/`Compile`, never by replacing the published registry.
+
+| field | default | meaning |
+|---|---|---|
+| `name` | file name | display name |
+| `costShare` | required | the share of `ManaConfig.StartMax` the part adds to a spell's cost, in 0..1, exclusive of 0 |
+| `complexity` | required | 0 or more; summed over a recipe it feeds the fizzle chance |
+| `tags` | required | at least one non-blank, distinct, lowercase tag (compared ordinally): what a staff tier allows (MG-3). Their own namespace, unrelated to the item tool tags in `data/tags` |
+| `damageFactor` | 1 | modifier only, finite and > 0: multiplies the spell's damage |
+| `rangeFactor` | 1 | modifier only, finite and > 0: multiplies the spell's range (projectile flight) |
+
+`SpellRecipe` (a flat list of parts) compiles through `Compile(allowedTags)` to a `SpellStats`, GL-free
+and pure (no roll, no registry read). The verdict (`SpellVerdict`) checks, in order: exactly one
+element, exactly one shape, at most one trigger, no modifier twice, and, when a tag set is given (the
+staff's), every part allowed by it — a part passes when **any** of its tags is in the set. `Cost` is
+`ManaConfig.StartMax` times the summed `costShare` (the unit `PlayerMana.TrySpend` takes), so every
+added part raises it; `FizzleChance` is `SpellRecipe.FizzleChanceFor` of the summed complexity: 0 up to
+`SpellConfig.FizzleFreeComplexity`, then `FizzleChancePerComplexity` a unit, capped at
+`FizzleMaxChance` — a chance only, the roll belongs to the cast (MG-4/MG-6). `DamageFactor` and
+`RangeFactor` are the products of the parts' factors. Every number is computed even for an invalid
+recipe, so the builder (MG-7) can show it live; a cast must check `IsValid` before spending. A new part
+is a JSON file, never a `switch` on its name. Slice 1 ships the elements `fire`, `frost` and `nature`,
+the shapes `projectile` and `self` and the modifiers `power` (raises damage and cost) and `range`
+(lengthens flight and raises cost), all tagged `basic`; every valid combination costs 20-40% of the
+starting pool (the `ManaConfig` design rule). `SpellRecipeTests`, `SpellPartLoaderTests`.
 
 ## Architecture: threading model (the most important thing to preserve)
 

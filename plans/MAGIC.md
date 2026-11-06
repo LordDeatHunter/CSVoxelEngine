@@ -17,6 +17,13 @@ creative, refused when short), grows through `SetKnownParts` (no caller yet, see
 as a bar under the hotbar (`HudRenderer.DrawMana`). The 100 start, +10 per known part, 300 cap and
 150 s refill are first guesses.
 
+`MG-2` shipped: the spell part data (`Content/Spells/`, `assets/data/spell/<kind>/<name>.json`, loaded by
+`SpellPartLoader` into `SpellPartRegistry`; `SpellRecipe.Compile` gives the verdict, cost, fizzle chance
+and effect factors). The slice-1 modifiers are **power** (raises damage and cost) and **range**
+(lengthens projectile flight and raises cost). Every slice-1 part is tagged `basic`; `MG-3` decides what
+each staff tier allows. Cost is the parts' summed `costShare` times `StartMax`, fizzle comes from the
+summed complexity (`SpellConfig`). The shares, complexities and fizzle numbers are first guesses.
+
 ## In progress
 
 Nothing.
@@ -25,16 +32,9 @@ Nothing.
 
 ### Slice 1 — the builder with a few parts
 
-Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (the implementer picks
-and flags them; power and range are the simple default), a data-driven status-effect system, one station
+Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), a data-driven status-effect system, one station
 UI, one bindable staff (two tiers). In order:
 
-- [ ] **`MG-2` Spell part data model** — P1, M.
-  Parts are JSON like blocks and items: `assets/data/spell/<kind>/<name>.json` with kind `element`,
-  `shape`, `modifier`, `trigger`. A `SpellRecipe` (one element + one shape + modifiers + optional
-  trigger) compiles to a cost, a validity verdict and a fizzle chance, GL-free and tested. A new part
-  must be data, never a `switch` on a name. **Hook:** `Content/ContentRegistry.cs` (a loader beside
-  `RecipeLoader`), `add-content` skill.
 - [ ] **`MG-3` Staff item and slots** — P1, M.
   An item whose JSON declares `staff` (slot count, allowed part tags, tier). The bound recipes ride the
   item instance as a component, like `CrucibleComponent`; a higher tier has more slots and opens more
@@ -130,7 +130,6 @@ UI, one bindable staff (two tiers). In order:
   workflow that picks its own tier, so each `MG-*` is a self-contained sitting.
 - **Not wanted for now.** Element-vs-element rules, per-mob weaknesses, a live Magicka-style combo
   queue.
-- **Open questions.** Which two modifiers ship (implementer picks and records it here); which
-  example combo the hint scroll teaches; chain depth and mana scaling (`MG-12`); which blocks a utility
-  spell may touch (`MG-11`); what the mana item and the `P-47` reagent are; the exact save and net
+- **Open questions.** Which example combo the hint scroll teaches; chain depth and mana scaling
+  (`MG-12`); which blocks a utility spell may touch (`MG-11`); what the mana item and the `P-47` reagent are; the exact save and net
   shape of bound recipes on the staff component; whether research is its own station.

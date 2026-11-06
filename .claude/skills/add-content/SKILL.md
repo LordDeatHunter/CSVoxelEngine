@@ -1,6 +1,6 @@
 ---
 name: add-content
-description: Recipe for adding data-driven content to CSVoxelEngine - a block, item, loot table, model, entity, tree species, molten material or recipe - as JSON rather than C#. Includes the id-cap check, known traps and which tests to extend.
+description: Recipe for adding data-driven content to CSVoxelEngine - a block, item, loot table, model, entity, tree species, molten material, recipe or spell part - as JSON rather than C#. Includes the id-cap check, known traps and which tests to extend.
 ---
 
 # Adding content (JSON, not C#)
@@ -18,6 +18,7 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 | tree species | `assets/data/trees/<species>.json` |
 | molten / melt / cast / craft / cook / crush | `assets/data/molten/`, `recipes/melt/`, `recipes/cast/`, `recipes/`, `recipes/cook/`, `recipes/crush/` |
 | tags | `assets/data/tags/<tag>.json` |
+| spell part | `assets/data/spell/<kind>/<name>.json` (kind = `element`, `shape`, `modifier`, `trigger`) |
 | block tile | `assets/textures/blocks/<name>.png` |
 | normal map / material tile | `assets/textures/blocks_material/<name>.png` (**never** in `blocks/`) |
 
@@ -41,6 +42,7 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 - Tree species: `wood` must be a `tree_wood` block; two species may share a wood only if they agree on `thickness.rim`. Species with no `worldgen` block never generate.
 - Entities: a new `Mob` kind's manager implements `IMobPopulation` and joins the world's `MobCaps` (the shared natural and hard caps); it gets no cap of its own.
 - Recipes: cook and crush are one per input; craft files are named by result, reverse by `<result>_from_<ingredient>`; a cast must melt back into exactly what it took (`MetalworksRecipeTests`).
+- Spell parts: every part needs a `costShare` in (0,1], a `complexity` >= 0 and at least one tag; `damageFactor`/`rangeFactor` only on modifiers; keep typical spells at 20-40% of `ManaConfig.StartMax` (`SpellRecipeTests` checks every shipped combination).
 
 ## Tests to extend
-`ContentTests` (schema rules), `EntityContentTests`, `TreeSpeciesContentTests`, `KilnContentTests`, `MetalworksRecipeTests`, `BiomeTintTextureTests`. Assert the **rule** the new content must satisfy; do not pin its literal values (see the `functional-tests` skill).
+`ContentTests` (schema rules), `EntityContentTests`, `TreeSpeciesContentTests`, `KilnContentTests`, `MetalworksRecipeTests`, `BiomeTintTextureTests`, `SpellRecipeTests`, `SpellPartLoaderTests`. Assert the **rule** the new content must satisfy; do not pin its literal values (see the `functional-tests` skill).

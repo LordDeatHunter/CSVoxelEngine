@@ -9,6 +9,7 @@ using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.Stations;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Lighting;
@@ -83,7 +84,7 @@ public static class ContentRegistry
     /// <summary>
     /// Parses <c>data/items</c>, <c>data/blocks</c>, <c>data/loot</c> and every model they
     /// reference, assigns ids (air = 0, then blocks by name, then items by name) and publishes
-    /// the runtime tables. Models are flattened here but not baked — that needs the atlas.
+    /// the runtime tables, plus the <c>data/spell</c> parts, which take no ids. Models are flattened here but not baked — that needs the atlas.
     /// </summary>
     public static void Load(string assetsRoot)
     {
@@ -126,6 +127,7 @@ public static class ContentRegistry
         RecipeLoader.LoadCastRecipes(Path.Combine(assetsRoot, "data", "recipes", "cast"));
         EntityLoader.LoadEntities(assetsRoot);
         TreeSpeciesLoader.LoadTreeSpecies(Path.Combine(assetsRoot, "data", "trees"));
+        SpellPartLoader.LoadSpellParts(Path.Combine(assetsRoot, "data", "spell"));
         ItemLoader.ValidateItemUses(itemFiles);
     }
 
@@ -464,6 +466,7 @@ public static class ContentRegistry
         ItemRegistry.Reset();
         EntityRegistry.Reset();
         TreeSpeciesRegistry.Reset();
+        SpellPartRegistry.Reset();
 
         Array.Clear(BlockType.ById);
         Array.Clear(BlockType.Emission);
