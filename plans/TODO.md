@@ -254,7 +254,8 @@ single-arc player.
   (`M-17`).
 - [ ] **`F-4` · Combat depth** — P2, L.
   Melee landed: punch, the two-phase obsidian-blade slice (`SliceCombo`), knockback, per-item
-  `entityDamage`, and mobs that hit back. Still open: a **bow + arrows**, **right-click
+  `entityDamage`, and mobs that hit back. Still open: a **bow + arrows** (animation `V-15`), a throwable
+  **spear** (reuses the throw animations, `V-16`), **right-click
   shield/block**, the **fireball** bridging to `P-14`, attack cooldown, and armor (`P-7`).
 - [ ] **`F-5` · Weather & day/night threat** — P1, M.
   Rain/snow, thunder, cold at night so shelter matters; drives `V-1` and `P-39`. Pairs `P-57`.

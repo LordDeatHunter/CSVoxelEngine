@@ -2,7 +2,7 @@
 
 ## Status
 
-Tracks particles, animations and other non-gameplay feel work. Last updated 2026-11-05. Nothing in progress (V-6 landed and filmed; V-11 and V-12 landed, not yet filmed: no scenario op opens the [E] panel or drops items). V-6 follow-up for V-5: rain should call `RippleSystem.Spawn` per drop that lands on water.
+Tracks particles, animations and other non-gameplay feel work. Last updated 2026-11-06. Nothing in progress (V-6 landed and filmed; V-11 and V-12 landed, not yet filmed: no scenario op opens the [E] panel or drops items). V-6 follow-up for V-5: rain should call `RippleSystem.Spawn` per drop that lands on water.
 
 ## In progress
 
@@ -23,6 +23,19 @@ Tracks particles, animations and other non-gameplay feel work. Last updated 2026
   **Verify**: item debugger `ITEM_DEBUGGER_PLAYER_ANIM=chop`; a new `visual-examples/animations-axe.json` (`VOXEL_TIME=147`).
 - [ ] **`V-2` Dust puff on block place** - P2, S. A small puff tinted by the placed block. **Hook**: `BlockDebrisSystem.Puff`, `BlockPlacer`.
 - [ ] **`V-3` Block-break camera nudge** - P2, S. A tiny camera kick on heavy hits (a chop, an ore break). **Hook**: `HeadMotion` hit kick.
+- [ ] **`V-13` Flight animation** - P2, M.
+  Creative flight gets its own pose: the legs sway a little and trail "bent" back, both scaling with flight velocity and clamped by max caps (new knobs in `PlayerConfig`, curves through `MathUtils`). Remote players: `NetPlayerFlags.Flying` already rides the wire and the velocity is derived from the broadcast position delta, like the walk phase (no protocol bump).
+  **Hook**: `PlayerModel.Update`, `Posing/SecondaryMotion` (lean), `Posing/PoseBuilder` (leg pose), `LocalPlayer.UpdatePlayerModel`.
+  **Verify**: a `FLY` mode in `PlayerPreviewState` (`ITEM_DEBUGGER_PLAYER_ANIM=fly`); a `PlayerModelTests` relation (sway and lean grow with speed, never past the cap); fly steps in `animations.json`.
+- [ ] **`V-14` Swim leg animation** - P2, S.
+  The legs are nearly static in the swim stroke and the surface float. Add a flutter kick synced to `SwimStrokeProgress` (snap with the thrust, draw up in the recovery) and a gentler idle kick for float and swim-idle.
+  **Hook**: `Posing/SwimPose`. **Verify**: the `SWIM` and `SURFACE` modes in the item debugger; extend `SurfaceFloatPoseTests`.
+- [ ] **`V-15` Bow animation** - P2, M.
+  A two-handed draw, hold and release: the off arm holds the bow out, the drawing arm pulls back to the cheek as the charge rises, snaps back on release, the shoulders turn side-on. Reuses the throw's charge clock (`ThrowPose`, `ArmOverlays`, `Camera.ThrowCharge` and `ThrowZoom`). Needs the bow item itself; the gameplay is in `F-4`.
+  **Hook**: `Posing/ThrowPose`, `HeldItemPose`, `PlayerPreviewState` (a new `BOW` mode). **Verify**: item debugger, then a scenario in `animations.json`.
+- [ ] **`V-16` Spear (charge and throw)** - P2, M.
+  A spear item whose charge and throw reuse the existing throw animations unchanged (`ThrowPose`, `ThrowAction`, `ThrownProjectile`). The visual work is the item sprite and `display` pose, and a projectile that points along its velocity (optionally sticking in the block it hits, and a trail via `V-10`). Damage, pickup and durability are gameplay, in `F-4`.
+  **Verify**: the `THROW` mode in the item debugger with the spear selected.
 
 ### World ambience
 
