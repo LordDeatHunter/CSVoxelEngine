@@ -320,6 +320,37 @@ public sealed class WorldLifecycleTests : IDisposable
     }
 
     [Fact]
+    public void StationsSurviveASaveAndReloadWhileTheirChunkIsAway()
+    {
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+        var seeded = new ChunkSaveStore(_dir);
+        seeded.EnqueueFile(StationSaveCodec.FileName, StationSaveCodec.ToBytes(new StationSaveData
+        {
+            Querns = [new StationSaveData.QuernData { Cell = [0, 0, 0], Input = "item/malachite_ore" }],
+            Campfires = [new StationSaveData.CampfireData { Cell = [4, 0, 0], Lit = true, BurnLeft = 12f }],
+        }));
+        Assert.True(seeded.Shutdown(TimeSpan.FromSeconds(10)));
+
+        // The stations' cells are nowhere near the player, so their chunks never load: the managers
+        // freeze them (no sweep), and a save must still carry them
+        var world = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(world, () => world.IsLoaded, LoadWallSeconds), "the world did not finish loading");
+        // Play a moment (RunUntil reports false when its time runs out, which is the point here)
+        Assert.False(RunUntil(world, () => false, 0.5));
+        Assert.True(world.SaveAndDispose());
+
+        var store = new ChunkSaveStore(_dir);
+        var data = StationSaveCodec.TryParse(store.ReadFile(StationSaveCodec.FileName));
+        Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
+        Assert.NotNull(data);
+        var quern = Assert.Single(data!.Querns!);
+        Assert.Equal("item/malachite_ore", quern.Input);
+        var fire = Assert.Single(data.Campfires!);
+        Assert.True(fire.Lit);
+        Assert.Equal(12f, fire.BurnLeft);
+    }
+
+    [Fact]
     public void AFarSavedDropWaitsForItsChunk()
     {
         var rock = SaveNames.NameOf(TerrainGenerator.RockBlock);

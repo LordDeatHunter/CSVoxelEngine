@@ -29,6 +29,10 @@ internal sealed class WorldPersistence
     private readonly IcebergManager? _icebergs;
     private readonly PlayerHealth _health;
     private readonly bool _serverMode;
+    private readonly CampfireManager _campfires;
+    private readonly QuernManager _querns;
+    private readonly KilnManager _kilns;
+    private readonly CastingManager _casting;
 
     private WorldPhase Phase => _world.Phase;
     private double LightingTime => _world.LightingTime;
@@ -40,9 +44,16 @@ internal sealed class WorldPersistence
 
     internal WorldPersistence(World world, ChunkSaveStore? saveStore, ChunkManager chunkManager,
         DropManager dropManager, SlimeManager? slimes, GoblinManager? goblins, IcebergManager? icebergs,
-        PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities)
+        PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
+        CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
+        StationSaveData? savedStations)
     {
         _world = world;
+        _campfires = campfires;
+        _querns = querns;
+        _kilns = kilns;
+        _casting = casting;
+        RestoreStations(savedStations);
         _saveStore = saveStore;
         _chunkManager = chunkManager;
         _dropManager = dropManager;
@@ -261,6 +272,7 @@ internal sealed class WorldPersistence
         SaveLodEditStateIfChanged();
         SavePlayerState();
         SaveEntityState();
+        SaveStationState();
     }
 
     /// <summary>
@@ -404,6 +416,34 @@ internal sealed class WorldPersistence
     }
 
     /// <summary>
+    /// Fills the (empty) station registries from <c>stations.json</c>. No wait for chunks is needed:
+    /// each manager freezes a cell in an unloaded chunk and, once the chunk is there, its own update
+    /// sweeps an entry whose block is gone (dropping what it held), so a stale entry never lives on.
+    /// One warning covers every entry dropped for a name that no longer resolves.
+    /// </summary>
+    private void RestoreStations(StationSaveData? saved)
+    {
+        if (saved == null)
+            return;
+        var skipped = _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
+            + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts);
+        if (skipped > 0)
+            Log.Warn($"Station save: dropped {skipped} saved station entr{(skipped == 1 ? "y" : "ies")} that no longer resolve");
+    }
+
+    /// <summary>Enqueues <see cref="StationSaveCodec.FileName"/>; does nothing without a save store.</summary>
+    private void SaveStationState()
+    {
+        _saveStore?.EnqueueFile(StationSaveCodec.FileName, StationSaveCodec.ToBytes(new StationSaveData
+        {
+            Campfires = _campfires.Capture(),
+            Querns = _querns.Capture(),
+            Kilns = _kilns.Capture(),
+            Casts = _casting.Capture(),
+        }));
+    }
+
+    /// <summary>
     /// Enqueues <see cref="LodEditState.FileName"/> when the LOD edit state moved since the last
     /// write (<see cref="LodEditState.CombinedVersion"/>), or unconditionally when
     /// <paramref name="force"/> is set. Main thread only: <see cref="LodEditState.Capture"/>
@@ -440,6 +480,7 @@ internal sealed class WorldPersistence
         SaveLodEditStateIfChanged(force: true);
         SavePlayerState();
         SaveEntityState();
+        SaveStationState();
         _autosaveTimer = 0;
     }
 }

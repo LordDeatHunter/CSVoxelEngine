@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
@@ -10,6 +11,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Lod;
 using VoxelEngine.Networking;
 using VoxelEngine.Particles;
+using VoxelEngine.Saves;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Simulation;
@@ -39,8 +41,9 @@ namespace VoxelEngine.Simulation;
 /// registry, or a generic one.
 /// </para>
 ///
-/// Main thread only, like <see cref="QuernManager"/> and <see cref="CampfireManager"/>, and
-/// in-memory only — fuel and lit state do not survive a restart.
+/// Main thread only, like <see cref="QuernManager"/> and <see cref="CampfireManager"/>. Fuel,
+/// fire, crucible and melt progress are saved to <c>stations.json</c> (<see cref="Capture"/>,
+/// <see cref="Restore"/>).
 /// </summary>
 public sealed class KilnManager
 {
@@ -453,6 +456,99 @@ public sealed class KilnManager
             _litCells.Add(KilnRenderer.ToWorld(anchor, state.Facing, KilnRenderer.FireLocal)
                 - FireParticleSystem.SpawnOffset);
         }
+    }
+
+    /// <summary>Every tracked kiln by content name, for <c>stations.json</c> (at most
+    /// <see cref="StationNetCodec.MaxEntries"/>). A kiln whose anchor block has no save name is
+    /// skipped.</summary>
+    internal List<StationSaveData.KilnData> Capture()
+    {
+        var result = new List<StationSaveData.KilnData>();
+        foreach (var ((x, y, z), state) in _kilns)
+        {
+            if (result.Count >= StationNetCodec.MaxEntries) break;
+            if (SaveNames.NameOf(state.AnchorId) is not { } anchor) continue;
+            result.Add(new StationSaveData.KilnData
+            {
+                Cell = [x, y, z],
+                Anchor = anchor,
+                Facing = state.Facing,
+                Fuel = state.Fuel,
+                FuelItem = SaveNames.NameOf(state.FuelItemId),
+                FuelSeconds = state.FuelSeconds,
+                Lit = state.Lit,
+                BurnLeft = state.BurnLeft,
+                Crucible = state.HasCrucible ? SaveNames.NameOf(state.CrucibleItemId) : null,
+                Material = SaveNames.MaterialNameOf(state.Contents.MaterialId),
+                MoltenMl = state.Contents.MoltenMl,
+                PendingMl = state.Contents.PendingMl,
+                PendingInput = SaveNames.NameOf(state.Contents.PendingInputId),
+                MeltLeft = state.MeltLeft,
+            });
+        }
+        return result;
+    }
+
+    /// <summary>Adds the kilns saved by <see cref="Capture"/> to an empty registry. A kiln whose
+    /// anchor no longer resolves, or whose numbers are out of range, is dropped; a fuel or
+    /// crucible that no longer resolves is dropped alone. Returns how many things were dropped.</summary>
+    internal int Restore(IReadOnlyList<StationSaveData.KilnData>? saved)
+    {
+        var skipped = 0;
+        if (saved == null) return 0;
+        foreach (var data in saved.Take(StationNetCodec.MaxEntries))
+        {
+            if (!StationSaveCodec.TryCell(data.Cell, out var key)
+                || !SaveNames.TryResolve(data.Anchor, out var anchor)
+                || data.Facing is < 0 or > 3 || data.Fuel is < 0 or > MaxFuel
+                || data.MoltenMl < 0 || data.PendingMl < 0
+                || !float.IsFinite(data.FuelSeconds) || !float.IsFinite(data.BurnLeft)
+                || !float.IsFinite(data.MeltLeft))
+            {
+                skipped++;
+                continue;
+            }
+            var state = new KilnState
+            {
+                AnchorId = anchor,
+                Facing = data.Facing,
+                Fuel = data.Fuel,
+                FuelSeconds = data.FuelSeconds,
+                Lit = data.Lit,
+                BurnLeft = data.BurnLeft,
+                MeltLeft = data.MeltLeft,
+            };
+            if (data.Fuel > 0 || data.FuelItem != null)
+            {
+                if (SaveNames.TryResolve(data.FuelItem, out var fuel))
+                    state.FuelItemId = fuel;
+                else
+                {
+                    state.Fuel = 0;
+                    skipped++;
+                }
+            }
+            if (data.Crucible != null)
+            {
+                if (SaveNames.TryResolve(data.Crucible, out var crucible))
+                {
+                    state.HasCrucible = true;
+                    state.CrucibleItemId = crucible;
+                    SaveNames.TryResolveMaterial(data.Material, out var material);
+                    SaveNames.TryResolve(data.PendingInput, out var pendingInput);
+                    state.Contents = material == 0
+                        ? default
+                        : new CrucibleComponent(material, data.MoltenMl, data.PendingMl, pendingInput);
+                }
+                else
+                {
+                    skipped++;
+                }
+            }
+            _kilns[key] = state;
+        }
+        RefreshCells();
+        return skipped;
     }
 
     /// <summary>Writes every tracked kiln (fuel, fire, crucible and melt), for the station

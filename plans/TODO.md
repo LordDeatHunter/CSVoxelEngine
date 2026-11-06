@@ -26,16 +26,14 @@ Nothing.
 The smallest bundle that makes the world a *game*: stakes and an advance (no food system).
 Mostly content JSON plus small systems; high feel, low engine risk. In order:
 
-1. **`M-12` persist station block entities** — P0, prerequisite: every station below saves from
-   day one instead of being retrofitted.
-2. **`P-3` generic furnace / smelter** — `sand -> glass`, `mud -> brick`, and the iron bloom;
+1. **`P-3` generic furnace / smelter** — `sand -> glass`, `mud -> brick`, and the iron bloom;
    generalizes the kiln pattern and becomes the automation seed. Lands before `P-2` gating.
-3. **`P-43` anvil / forge** — pulled into this milestone: iron goes `crushed_iron` -> furnace
+2. **`P-43` anvil / forge** — pulled into this milestone: iron goes `crushed_iron` -> furnace
    bloom -> forge-shaped parts (this replaces the earlier idea of routing iron through the kiln's
    molten path).
-4. **`P-7` / `P-25` metal tiers** — iron, tin, bronze, steel as the tier ladder (`P-44` covers the
+3. **`P-7` / `P-25` metal tiers** — iron, tin, bronze, steel as the tier ladder (`P-44` covers the
    alloys). Progression, processing requirements and per-tier recipes are **TBD, defined later**.
-5. **Armor (in `P-7`)** — flat damage reduction from summed armor points (capped), equipped from
+4. **Armor (in `P-7`)** — flat damage reduction from summed armor points (capped), equipped from
    the inventory panel, shown in HUD/tooltip, with worn armor drawn on `PlayerModel` and remote
    players (this pulls `V-14` in). *Hook:* the damage pipeline (`PlayerHealth`, `IMobTarget.TakeHit`).
 
@@ -430,12 +428,11 @@ single-arc player.
   entangled with save/load. Caps now persist per world (`LodEditState`); the growth stands. Must
   preserve `LowerColumnBelow`'s publish ordering. **Expect `LodBuildPoolTests` /
   `LodHeightSamplingTests` intermittents; never "fix" them by touching `ColumnCaps`.**
-- [ ] **`M-12` · Persist station block entities + in-flight entities** — P0, M. **Milestone 1,
-  first: new stations (furnace, forge) must save from day one.**
-  The save format covers chunks, LOD edit state, the player and mobs/drops, but not the in-memory
-  station registries (campfire, quern, kiln, casting), primed TNT, falling blocks, projectiles or
-  toppling trees. Add a side-car per registry or one `block-entities.json`, restored like mobs
-  once the cell's chunk loads.
+- [ ] **`M-12` · Persist in-flight entities** — P3, M.
+  The station registries now save (`stations.json`; **a new station registry must add its own
+  `Capture`/`Restore` and a list in `StationSaveData`**), but primed TNT, falling blocks,
+  projectiles, toppling trees and the sapling clock are still lost on a save & quit. All are
+  transient and self-resolving; primed TNT mid-fuse is the only one with a real argument.
 - [ ] **`M-27` · Iceberg gaps** — P3, M.
   Drifting icebergs (`AGENTS.md` "Icebergs") ignore item drops, mobs, projectiles, TNT blasts, the
   punch/slice cones and the block raycast; the server judges a rider's hover against them but not
@@ -472,7 +469,7 @@ single-arc player.
 - [ ] **`M-21` · Scripting / behavior hook API** — P3, XL. Extends `M-9`; the real mod story.
 - [ ] **`M-22` · Save migration & versioning** — P2, M.
   `world.json` carries a format version; add migration paths so old saves survive schema growth
-  (critical once `M-12` lands).
+  (critical now that `stations.json` exists).
 - [ ] **`M-24` · Data-driven AI behaviors** — P3, L.
   Compose mob behaviors (goals, tasks, senses) from JSON so new hostiles need no C#; backs
   `F-3`, `F-13`, `F-14`.

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
@@ -7,6 +8,7 @@ using VoxelEngine.Content.Recipes;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
+using VoxelEngine.Saves;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Simulation;
@@ -271,6 +273,61 @@ public sealed class CastingManager
         foreach (var (key, state) in _casts)
             yield return (new Vector3(key.X, key.Y, key.Z), state.Recipe.MaterialId,
                 state.Fill01, state.Cool01, state.Done, state.Recipe.ResultId);
+    }
+
+    /// <summary>Every mold cell holding a pour by content name, for <c>stations.json</c> (at most
+    /// <see cref="StationNetCodec.MaxEntries"/>). A pour in progress is saved paused: the crucible
+    /// binding is transient and a right-click resumes it.</summary>
+    internal List<StationSaveData.CastData> Capture()
+    {
+        var result = new List<StationSaveData.CastData>();
+        foreach (var ((x, y, z), state) in _casts)
+        {
+            if (result.Count >= StationNetCodec.MaxEntries) break;
+            if (SaveNames.NameOf(state.Recipe.MoldId) is not { } mold
+                || SaveNames.MaterialNameOf(state.Recipe.MaterialId) is not { } material)
+                continue;
+            result.Add(new StationSaveData.CastData
+            {
+                Cell = [x, y, z],
+                Mold = mold,
+                Material = material,
+                FilledMl = state.FilledMl,
+                Cooling = state.Cooling,
+                CoolLeft = state.CoolLeft,
+                Done = state.Done,
+            });
+        }
+        return result;
+    }
+
+    /// <summary>Adds the casts saved by <see cref="Capture"/> to an empty registry, all paused. An
+    /// entry with a bad cell, a name that no longer resolves or no cast recipe for its mold and
+    /// metal is dropped; returns how many were.</summary>
+    internal int Restore(IReadOnlyList<StationSaveData.CastData>? saved)
+    {
+        var skipped = 0;
+        if (saved == null) return 0;
+        foreach (var data in saved.Take(StationNetCodec.MaxEntries))
+        {
+            if (!StationSaveCodec.TryCell(data.Cell, out var key)
+                || !SaveNames.TryResolve(data.Mold, out var mold)
+                || !SaveNames.TryResolveMaterial(data.Material, out var material)
+                || ContentRegistry.CastRecipeFor(mold, material) is not { } recipe
+                || data.FilledMl < 0 || !float.IsFinite(data.CoolLeft))
+            {
+                skipped++;
+                continue;
+            }
+            _casts[key] = new CastState(recipe)
+            {
+                FilledMl = Math.Min(data.FilledMl, recipe.AmountMl),
+                Cooling = data.Cooling,
+                CoolLeft = Math.Clamp(data.CoolLeft, 0f, recipe.CoolSeconds),
+                Done = data.Done,
+            };
+        }
+        return skipped;
     }
 
     /// <summary>Writes every mold cell holding a pour (its recipe by mold and metal, fill, cooling),

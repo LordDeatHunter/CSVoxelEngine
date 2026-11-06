@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Stations;
 using VoxelEngine.Networking;
+using VoxelEngine.Saves;
 
 namespace VoxelEngine.Simulation;
 
@@ -175,6 +177,56 @@ public sealed class QuernManager
             state.Angle %= TwoPi;
             state.Spinning = false;
         }
+    }
+
+    /// <summary>Every tracked quern by content name, for <c>stations.json</c> (at most
+    /// <see cref="StationNetCodec.MaxEntries"/>).</summary>
+    internal List<StationSaveData.QuernData> Capture()
+    {
+        var result = new List<StationSaveData.QuernData>();
+        foreach (var ((x, y, z), state) in _querns)
+        {
+            if (result.Count >= StationNetCodec.MaxEntries) break;
+            result.Add(new StationSaveData.QuernData
+            {
+                Cell = [x, y, z],
+                Input = SaveNames.NameOf(state.InputId),
+                Angle = state.Angle,
+                Spinning = state.Spinning,
+            });
+        }
+        return result;
+    }
+
+    /// <summary>Adds the querns saved by <see cref="Capture"/> to an empty registry. An entry
+    /// with a bad cell, or whose input no longer resolves, is dropped (a quern with a vanished
+    /// input is still registered, empty); returns how many were dropped.</summary>
+    internal int Restore(IReadOnlyList<StationSaveData.QuernData>? saved)
+    {
+        var skipped = 0;
+        if (saved == null) return 0;
+        foreach (var data in saved.Take(StationNetCodec.MaxEntries))
+        {
+            if (!StationSaveCodec.TryCell(data.Cell, out var key))
+            {
+                skipped++;
+                continue;
+            }
+            var state = new QuernState
+            {
+                Angle = float.IsFinite(data.Angle) ? Math.Clamp(data.Angle, 0f, TwoPi) : 0f,
+                Spinning = data.Spinning,
+            };
+            if (data.Input != null)
+            {
+                if (SaveNames.TryResolve(data.Input, out var input))
+                    state.InputId = input;
+                else
+                    skipped++;
+            }
+            _querns[key] = state;
+        }
+        return skipped;
     }
 
     /// <summary>Writes every tracked quern (its input, top angle and spin), for the station

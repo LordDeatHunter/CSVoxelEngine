@@ -366,10 +366,12 @@ public class World
             if (savedPlayer != null)
                 LocalPlayer.ApplySavedPlayer(savedPlayer);
             EntitySaveData? savedEntities = null;
+            StationSaveData? savedStations = null;
             if (saveStore != null)
             {
                 // Held until the Loading -> Playing flip, then spawned as their chunks load
                 savedEntities = EntitySaveCodec.TryParse(saveStore.ReadFile(EntitySaveCodec.FileName));
+                savedStations = StationSaveCodec.TryParse(saveStore.ReadFile(StationSaveCodec.FileName));
             }
             LocalPlayer.RecordSpawn();
             _chunkManager = new ChunkManager(gl, opaqueGeometry, translucentGeometry, saveStore);
@@ -432,7 +434,7 @@ public class World
             ClientMirror = new ClientMirror(this, _chunkManager, _dropManager, _tntManager, _falling, _slimes, _goblins,
                 _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
             Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _icebergs,
-                _health, serverMode, savedPlayer, savedEntities);
+                _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
             Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _icebergs, _debris, _health,
                 _mobs, serverMode, clientMode);
