@@ -127,15 +127,16 @@ internal sealed class PlayerSessions
 
     /// <summary>
     /// Tells <paramref name="client"/> its player's server-owned status: the granted modes, the
-    /// health, whether it is dead, and the knockback queued since the last status (handed over and
-    /// cleared here, zero when none). Clears <see cref="ServerPlayer.StatusDirty"/>.
+    /// health, whether it is dead, the knockback queued since the last status (handed over and
+    /// cleared here, zero when none), the air and the mana. Clears <see cref="ServerPlayer.StatusDirty"/>.
     /// </summary>
     internal static void SendPlayerStatus(ClientConnection client, ServerPlayer player)
     {
         player.TakePendingKnockback(out var knockback, out var lift);
         using var writer = new PacketWriter(NetMessage.PlayerStatus);
         PlayerStatusCodec.Write(writer,
-            new PlayerStatusData(player.GrantedModes, player.Status.Health, player.IsDead, knockback, lift, player.Status.Breath.NetStep));
+            new PlayerStatusData(player.GrantedModes, player.Status.Health, player.IsDead, knockback, lift, player.Status.Breath.NetStep,
+                player.Status.Mana.NetMana, player.Status.Mana.Max));
         client.Send(writer.ToArray());
         player.StatusDirty = false;
     }

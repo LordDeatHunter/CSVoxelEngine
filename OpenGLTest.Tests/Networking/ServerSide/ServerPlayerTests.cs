@@ -119,10 +119,12 @@ public sealed class ServerPlayerTests : IDisposable
         };
         hurt.Status.TakeDamage(PlayerHealth.MaxHealth / 3);
         Assert.True(hurt.Health < PlayerHealth.MaxHealth);
+        Assert.True(hurt.Status.Mana.TrySpend(hurt.Status.Mana.Max / 3f, creative: false));
 
         var back = new ServerPlayer(2, "Alice", Vector3.Zero);
         back.Restore(PlayerSaveCodec.TryParse(PlayerSaveCodec.ToBytes(hurt.Capture())), allowCreative: false);
         Assert.Equal(hurt.Health, back.Health);
+        Assert.Equal(hurt.Status.Mana.Current, back.Status.Mana.Current);
         Assert.Equal(hurt.RespawnEye, back.RespawnEye);
 
         // A player who never had a respawn eye comes back without one, so it respawns at the spawn

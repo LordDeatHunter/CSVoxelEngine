@@ -302,6 +302,7 @@ internal sealed class WorldPersistence
             Creative = Camera.IsCreative,
             Flying = Camera.IsFlying,
             Health = _health.Health,
+            Mana = _health.Mana.Current,
             LightingClock = Phase == WorldPhase.Loading ? _savedPlayer?.LightingClock ?? LightingTime : LightingTime,
             RespawnEye = LocalPlayer.HasRespawnEye ? [LocalPlayer.RespawnEye.X, LocalPlayer.RespawnEye.Y, LocalPlayer.RespawnEye.Z] : null,
             Inventory = Inventory.Export()
@@ -326,6 +327,7 @@ internal sealed class WorldPersistence
             Creative = _hostedPlayer?.Creative ?? false,
             Flying = _hostedPlayer?.Flying ?? false,
             Health = _hostedPlayer?.Health ?? _health.Health,
+            Mana = _hostedPlayer?.Mana ?? _health.Mana.Current,
             // Like a game world: until the flip has applied the saved clock, keep the saved one
             LightingClock = Phase == WorldPhase.Loading ? _hostedPlayer?.LightingClock ?? LightingTime : LightingTime,
             RespawnEye = _hostedPlayer?.RespawnEye,

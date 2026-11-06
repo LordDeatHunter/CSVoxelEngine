@@ -274,8 +274,8 @@ public sealed class ServerPlayer : IMobTarget
 
     /// <summary>
     /// The per-tick half of the status: lava burns a body standing in it, an empty lung drowns one
-    /// with its eye under water (creative and flight are immune, an unloaded body is not judged) and
-    /// the damage flash decays. A dead player is left
+    /// with its eye under water (creative and flight are immune, an unloaded body is not judged), the
+    /// damage flash decays and health and mana regenerate. A dead player is left
     /// as it is until <see cref="Respawn"/>.
     /// </summary>
     public void TickStatus(float dt, ChunkManager chunks)
@@ -284,6 +284,8 @@ public sealed class ServerPlayer : IMobTarget
             return;
         var before = Status.Health;
         var airBefore = Status.Breath.NetStep;
+        var manaBefore = Status.Mana.NetMana;
+        var maxManaBefore = Status.Mana.Max;
         var known = PlayerBodyProbe.IsKnown(Position, chunks);
         var inLava = known && PlayerBodyProbe.InLava(Position, chunks);
         Status.UpdateLava(dt, inLava, Creative || Flying);
@@ -294,7 +296,10 @@ public sealed class ServerPlayer : IMobTarget
         Status.Update(dt);
         // Regeneration: the sprint bit is the client's own claim, but it only ever slows its sender's healing
         Status.UpdateRegen(dt, ((NetPlayerFlags)Flags & NetPlayerFlags.Sprinting) != 0, Creative || Flying);
-        if (Status.Health != before || Status.IsDead || Status.Breath.NetStep != airBefore)
+        Status.UpdateMana(dt);
+        // Mana is reported in whole units, so a regenerating pool sends about one status a second
+        if (Status.Health != before || Status.IsDead || Status.Breath.NetStep != airBefore
+            || Status.Mana.NetMana != manaBefore || Status.Mana.Max != maxManaBefore)
             StatusDirty = true;
     }
 
@@ -388,6 +393,8 @@ public sealed class ServerPlayer : IMobTarget
             Inventory.Import(inventory);
         if (saved.Health is { } health)
             Status.Restore(health);
+        if (saved.Mana is { } mana)
+            Status.Mana.Restore(mana);
         if (saved.RespawnEye is { Length: 3 } r)
             RespawnEye = new Vector3(r[0], r[1], r[2]);
         Creative = allowCreative && saved.Creative == true;
@@ -409,6 +416,7 @@ public sealed class ServerPlayer : IMobTarget
         Creative = Creative,
         Flying = Flying,
         Health = Status.Health,
+        Mana = Status.Mana.Current,
         RespawnEye = RespawnEye is { } r ? [r.X, r.Y, r.Z] : null,
         Inventory = Inventory.Export(),
     };

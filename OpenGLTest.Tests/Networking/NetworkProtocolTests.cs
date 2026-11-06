@@ -195,8 +195,8 @@ public sealed class NetFramingTests
 
 /// <summary>
 /// The protocol-4 player messages: a <see cref="NetMessage.PlayerStatus"/> carries the granted
-/// modes, the health (clamped to the pool), the dead flag and a knockback through
-/// <see cref="PlayerStatusCodec"/>, refusing a non-finite shove as a malformed frame, and a
+/// modes, the health (clamped to the pool), the dead flag, a knockback, the air and the mana (each
+/// clamped) through <see cref="PlayerStatusCodec"/>, refusing a non-finite shove as a malformed frame, and a
 /// <see cref="NetMessage.PlayerCorrection"/> carries its sequence id and eye.
 /// </summary>
 public sealed class NetworkProtocolTests
@@ -238,6 +238,17 @@ public sealed class NetworkProtocolTests
         // The air rides along and is clamped to a full lung
         Assert.Equal(7, RoundTrip(hurt with { Air = 7 }).Air);
         Assert.Equal(VoxelEngine.Player.Breath.NetSteps, RoundTrip(hurt with { Air = 250 }).Air);
+
+        // The mana and its max ride along; the max is clamped to 1..MaxCap and the mana into it
+        var casting = hurt with { Mana = 12, MaxMana = ManaConfig.StartMax + ManaConfig.MaxPerKnownPart };
+        Assert.Equal(casting, RoundTrip(casting));
+        var overflowing = RoundTrip(hurt with { Mana = 5000, MaxMana = 50 });
+        Assert.Equal(50, overflowing.Mana);
+        Assert.Equal(50, overflowing.MaxMana);
+        Assert.Equal(ManaConfig.MaxCap, RoundTrip(hurt with { MaxMana = int.MaxValue }).MaxMana);
+        var negative = RoundTrip(hurt with { Mana = -3, MaxMana = 0 });
+        Assert.Equal(0, negative.Mana);
+        Assert.Equal(1, negative.MaxMana);
 
         // A correction: the sequence id the client acks, then the eye it snaps to
         var eye = new Vector3(12.5f, 70.62f, -8.5f);

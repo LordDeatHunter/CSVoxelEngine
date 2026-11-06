@@ -5,7 +5,7 @@ namespace VoxelEngine.Saves;
 
 /// <summary>
 /// The JSON shape of a world's <c>player.json</c>: where the player stands and looks, which
-/// modes are on, their health, the lighting clock and everything they carry.
+/// modes are on, their health and mana, the lighting clock and everything they carry.
 ///
 /// <para>
 /// Content is referenced by name only, through <see cref="SaveNames"/> (<c>block/&lt;name&gt;</c>,
@@ -32,6 +32,10 @@ public sealed class PlayerSaveData
     public bool? Flying { get; set; }
 
     public int? Health { get; set; }
+
+    /// <summary>Mana left in the pool; absent reads as a full pool. The max is not saved: it follows
+    /// the player's progression.</summary>
+    public float? Mana { get; set; }
 
     /// <summary>The absolute lighting clock (window time plus the world's time offset), so
     /// the time of day resumes where it was.</summary>

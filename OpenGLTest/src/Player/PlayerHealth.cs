@@ -52,7 +52,8 @@ public sealed class PlayerHealth
     /// <summary>
     /// Save-restore seam: sets the pool to a saved value, clamped to 0..<see cref="MaxHealth"/>,
     /// with no damage flash and no partial lava tick. A saved 0 stays 0, so the owner's first
-    /// tick respawns the player instead of loading them dead.
+    /// tick respawns the player instead of loading them dead. The mana is left alone: the save
+    /// restore and the client mirror set it explicitly.
     /// </summary>
     public void Restore(int health)
     {
@@ -170,15 +171,27 @@ public sealed class PlayerHealth
             TakeDamage(PlayerConfig.DrownDamagePerTick, DamageSource.Drowning);
     }
 
+    /// <summary>The mana pool; <see cref="UpdateMana"/> regenerates it.</summary>
+    public PlayerMana Mana { get; } = new();
+
+    /// <summary>Regenerates the mana; call every frame. A dead player does not regenerate.</summary>
+    public void UpdateMana(float deltaTime)
+    {
+        if (IsDead)
+            return;
+        Mana.Regen(deltaTime);
+    }
+
     /// <summary>Decays <see cref="DamageFlash"/>; call every frame.</summary>
     public void Update(float deltaTime) =>
         DamageFlash = Math.Max(0f, DamageFlash - Math.Max(0f, deltaTime) / DamageFlashSeconds);
 
-    /// <summary>Simple respawn: full pool, fresh lava timer. The caller owns the teleport.</summary>
+    /// <summary>Simple respawn: full pool, fresh lava timer, full air and mana. The caller owns the teleport.</summary>
     public void Respawn()
     {
         Health = MaxHealth;
         _lavaTimer = 0f;
         Breath.Refill();
+        Mana.Refill();
     }
 }

@@ -40,7 +40,7 @@ internal sealed class UiPasses
     internal void RenderUI(IWindow window, Inventory inventory, InventoryView view, float time,
         int fps, bool showProfiler, Camera? camera = null, bool showCoordinates = true,
         PauseMenuView? menu = null, SettingsMenuView? settings = null,
-        int health = PlayerHealth.MaxHealth, float airShare = 1f, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
+        int health = PlayerHealth.MaxHealth, float airShare = 1f, float manaShare = 1f, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
         HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
         CrosshairState crosshair = default, LookLabelState? lookAt = null)
     {
@@ -100,6 +100,7 @@ internal sealed class UiPasses
         {
             _owner.Ui.Hud.DrawHearts(health);
             _owner.Ui.Hud.DrawAir(airShare, health);
+            _owner.Ui.Hud.DrawMana(manaShare, health, camera?.IsCreative == true);
             if (hotbarName != null)
                 _owner.Ui.Hud.DrawHotbarName(hotbarName.Name, hotbarName.Alpha);
         }

@@ -24,6 +24,7 @@ public sealed class PlayerSaveCodecTests
             Creative = true,
             Flying = false,
             Health = 42,
+            Mana = 37.5f,
             LightingClock = 1234.5678,
             RespawnEye = [1f, 70.5f, -2f],
             Inventory = new PlayerSaveData.InventoryData
@@ -67,6 +68,7 @@ public sealed class PlayerSaveCodecTests
         Assert.Equal(original.Creative, back.Creative);
         Assert.Equal(original.Flying, back.Flying);
         Assert.Equal(original.Health, back.Health);
+        Assert.Equal(original.Mana, back.Mana);
         Assert.Equal(original.LightingClock, back.LightingClock);
         Assert.Equal(original.RespawnEye, back.RespawnEye);
 
@@ -125,6 +127,7 @@ public sealed class PlayerSaveCodecTests
         Assert.Null(empty.Creative);
         Assert.Null(empty.Flying);
         Assert.Null(empty.Health);
+        Assert.Null(empty.Mana);
         Assert.Null(empty.LightingClock);
         Assert.Null(empty.RespawnEye);
         Assert.Null(empty.Inventory);

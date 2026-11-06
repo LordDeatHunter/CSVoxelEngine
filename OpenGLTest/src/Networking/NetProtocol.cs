@@ -24,10 +24,10 @@ public enum NetMessage : byte
     PlayerJoined = 22,
     PlayerLeft = 23,
     /// <summary>Server to one client: the player's server-owned status,
-    /// <c>(byte flags, int health, bool dead, Vector3 knockbackImpulse, float lift)</c>
+    /// <c>(byte flags, int health, bool dead, Vector3 knockbackImpulse, float lift, byte air, int mana, int maxMana)</c>
     /// (<see cref="PlayerStatusCodec"/>): the creative and flight modes the server granted, the
-    /// health pool, whether the player is dead, and a mob hit's shove for the client's own physics
-    /// to apply (zero when none). Sent when the status changed and when a mode request was refused.</summary>
+    /// health pool, whether the player is dead, a mob hit's shove for the client's own physics
+    /// to apply (zero when none), the air in whole steps and the mana pool in whole units. Sent when the status changed and when a mode request was refused.</summary>
     PlayerStatus = 24,
     /// <summary>Server to one client: <c>(int seq, Vector3 eye)</c>, an illegal move (or a respawn)
     /// put the player back at <c>eye</c>. The client snaps there and acks <c>seq</c> in every
@@ -113,8 +113,9 @@ public static class NetFraming
     /// 10: an <see cref="NetIntentKind.Attack"/> intent may carry the sword's swings
     /// (<see cref="NetAttackKind.SwordCut"/>, <see cref="NetAttackKind.SwordBackCut"/>,
     /// <see cref="NetAttackKind.SwordChop"/>) and the player list their <see cref="NetPlayerAction"/>s; an
-    /// older peer would refuse the intent as malformed and drop the connection.</summary>
-    public const int ProtocolVersion = 10;
+    /// older peer would refuse the intent as malformed and drop the connection.
+    /// 11: <see cref="NetMessage.PlayerStatus"/> ends with the player's mana and its max.</summary>
+    public const int ProtocolVersion = 11;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

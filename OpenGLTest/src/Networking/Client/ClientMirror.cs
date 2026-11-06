@@ -348,6 +348,14 @@ internal sealed class ClientMirror
             _health.Breath.SetNetStep(airStep);
     }
 
+    /// <summary>A client shows the mana the server's status reports; the server alone regenerates
+    /// and spends it, so nothing is simulated here.</summary>
+    internal void ApplyNetworkMana(int mana, int maxMana)
+    {
+        if (_clientMode)
+            _health.Mana.SetNet(mana, maxMana);
+    }
+
     // A slime mirror also has to be the reported size (the ammo field), since a size is fixed for life
     private static bool KindMatches(Mob mob, NetEntity entry) =>
         entry.Kind == NetEntityKind.Slime

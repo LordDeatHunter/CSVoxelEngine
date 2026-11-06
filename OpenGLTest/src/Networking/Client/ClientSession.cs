@@ -334,6 +334,7 @@ internal sealed class ClientSession
                 var healthBefore = w.Health;
                 w.ClientMirror.ApplyNetworkHealth(status.Health);
                 w.ClientMirror.ApplyNetworkAir(status.Air);
+                w.ClientMirror.ApplyNetworkMana(status.Mana, status.MaxMana);
                 var knockback = status.Knockback;
                 // AddKnockback normalizes the direction itself and keeps a lift-only hit's pop
                 if (knockback.LengthSquared() > 0f || status.Lift > 0f)

@@ -129,7 +129,7 @@ internal sealed class LocalPlayer
     /// Applies a parsed <see cref="PlayerSaveCodec.FileName"/> field by field: a saved position
     /// restores the pose and marks the spawn settled (a restored player is never relocated to the
     /// surface), and without one the modes still apply at the current pose. The respawn eye,
-    /// health and inventory are restored when present. The lighting clock waits for the
+    /// health, mana and inventory are restored when present. The lighting clock waits for the
     /// Loading -> Playing flip (<see cref="World.FinishLoading"/>).
     /// </summary>
     internal void ApplySavedPlayer(PlayerSaveData saved)
@@ -153,6 +153,8 @@ internal sealed class LocalPlayer
 
         if (saved.Health is { } hp)
             _health.Restore(hp);
+        if (saved.Mana is { } mana)
+            _health.Mana.Restore(mana);
         if (saved.Inventory is { } inventory)
             Inventory.Import(inventory);
     }
@@ -467,6 +469,8 @@ internal sealed class LocalPlayer
         UpdateCactusContact(deltaTime, chunkManager);
         _health.Update(deltaTime);
         _health.UpdateRegen(deltaTime, Camera.IsSprinting, Camera.IsCreative || Camera.IsFlying);
+        // Singleplayer only: a client mirrors its server's mana and a server ticks ServerPlayer.TickStatus
+        _health.UpdateMana(deltaTime);
 
         // The day toast: the line appears the moment the sun rises through dawn, once a day
         var elevation = DayCycle.SunDirection(LightingTime).Y;

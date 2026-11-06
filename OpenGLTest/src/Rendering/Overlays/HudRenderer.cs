@@ -13,7 +13,7 @@ using static VoxelEngine.Rendering.Overlays.UIRenderer;
 namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
-/// The HUD over the world: the crosshair, the hearts, the hotbar and the selected item's name, the
+/// The HUD over the world: the crosshair, the hearts, the air, the mana bar, the hotbar and the selected item's name, the
 /// toast line, the FPS counter and the profiler table, the hover tooltip and the Tab player list,
 /// plus the hotbar hit-test over the same <see cref="HotbarLayout"/> the draw reads. It owns the
 /// crosshair and heart sprites, which <see cref="UIRenderer"/> creates and deletes through it at
@@ -35,6 +35,11 @@ internal sealed class HudRenderer : IDisposable
     private const float BubbleDrawSize = 34f;
     private const float BubbleStride = 28f;
     private const float BubbleGap = 6f;
+    // The mana bar sits in the margin under the hotbar, so it never meets the bubbles, the item name
+    // or the toast, which all stack above the hearts
+    private const float ManaBarHeight = 6f;
+    private static readonly Rgba ManaTrack = Rgba.Gray(0.04f, 0.6f);
+    private static readonly Rgba ManaFill = new(70, 130, 255, 230);
     // The selected item's name (DrawHotbarName) sits this far above the hearts row, leaving room
     // for descenders.
     private const float HotbarNameGap = 12f;
@@ -248,6 +253,24 @@ internal sealed class HudRenderer : IDisposable
             var center = new Vector2(rowRight - BubbleDrawSize * 0.5f - i * BubbleStride, centerY);
             _ui.DrawMesh(_bubbleMesh, RectTransform(center, size), Rgba.FromFloat(1f, 1f, 1f, fill), _bubbleTexture);
         }
+    }
+
+    /// <summary>
+    /// The mana bar: a thin bar as wide as the hotbar row, centered in the margin under it, its blue
+    /// fill growing from the left with <paramref name="manaShare"/>. Hidden while dead and in
+    /// <paramref name="creative"/>, which casts for free.
+    /// </summary>
+    internal void DrawMana(float manaShare, int health, bool creative)
+    {
+        if (health <= 0 || creative)
+            return;
+        var width = HotbarLayout.RowWidth();
+        var centerY = _ui.ScreenSize.Y - BottomMargin * 0.5f;
+        var left = (_ui.ScreenSize.X - width) * 0.5f;
+        _ui.DrawRect(new Vector2(_ui.ScreenSize.X * 0.5f, centerY), new Vector2(width, ManaBarHeight), ManaTrack);
+        var fill = MathUtils.Clamp01(manaShare) * width;
+        if (fill > 0.5f)
+            _ui.DrawRect(new Vector2(left + fill * 0.5f, centerY), new Vector2(fill, ManaBarHeight), ManaFill);
     }
 
     /// <summary>

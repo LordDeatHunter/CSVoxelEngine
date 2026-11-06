@@ -81,7 +81,7 @@ sources"), `chunks/<cx>_<cy>_<cz>.bin` (one Deflate-compressed,
 block-name-paletted snapshot per **modified** chunk, `ChunkSaveCodec`; an untouched chunk is
 never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column caps,
 felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: the permanent chop damage of natural trunk cells, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
-creative/flight, health, respawn eye, lighting clock, the full inventory and hotbar; no position
+creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar; no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live slimes and
 goblins with health, facing, velocity, ammo and a slime's size plus still-pending entries, up to
 `MaxSavedDrops` item drops, nearest first, and the drifting icebergs) and `stations.json` (`StationSaveCodec`:
@@ -277,6 +277,20 @@ punches and slices; a thrown item does not count yet) it refills at `RegenPerSec
 full pool are left alone. Singleplayer ticks it in `LocalPlayer.UpdateHealth`, a server in
 `ServerPlayer.TickStatus` (the sprint bit is the client's claim and only slows its own healing),
 and the heal reaches a client through the usual `PlayerStatus` health. `RegenTests`.
+
+**Mana (MG-1).** The magic pool is `PlayerHealth.Mana` (`PlayerMana`, GL-free, tuning in
+`ManaConfig`): it regenerates at `Max / ManaConfig.RegenFullSeconds` per second
+(`PlayerHealth.UpdateMana`), never while dead, and refills on a respawn. `TrySpend(cost, creative)`
+is free in creative and refused, changing nothing, when the pool is short. The max starts at
+`ManaConfig.StartMax` and grows through `MaxFor`/`SetKnownParts`, the progression hook the known
+spell parts (MG-8) will feed, up to `ManaConfig.MaxCap`. Singleplayer ticks it in
+`LocalPlayer.UpdateHealth`, a server in `ServerPlayer.TickStatus`, which marks the status dirty only
+when the whole-unit `NetMana` or the `Max` moves (about one status a second while it refills, none
+when full). It rides the end of `PlayerStatus` as two ints (protocol 11, the max clamped to
+1..`MaxCap` and the mana into it on read) and a client only mirrors it
+(`ClientMirror.ApplyNetworkMana`). It is saved as `Mana` in `player.json` (absent reads as full; the
+max is not saved, since it follows progression). `HudRenderer.DrawMana` draws it as a thin blue bar
+as wide as the hotbar row in the margin under it, hidden while dead or in creative. `ManaTests`.
 
 **Water rendering** lives in the shared world shader plus two extra passes, the planar mirror (`ReflectionPass.RenderReflection`) and the scene copy. Just before `TerrainPasses.RenderWorldTranslucent` draws, `RenderTargets.CopyScene` snapshots the HDR scene target's color and depth (see "Linear lighting" below; the color copy is `Rgba16f`, like the reflection mirror) into two textures on units 3 and 4 (`CopyTexSubImage2D` from the bound HDR FBO — the water pass depth-tests while sampling, so it cannot read the target directly); the water fragment then composes its own look out of them: a refracted lookup offset along the analytic wave normal, Beer-Lambert absorption over the water's measured thickness (`WaterAbsorb`) plus in-scattered `WaterScatter`, and a Schlick fresnel mix into the planar reflection. Where that view-ray depth thins below `WaterFoamWidthBlocks` (a wall, a bank, a thin trickle) a pale **shore foam** band is mixed over the composed surface in linear light, lit by the shared opaque `light` term and fogged with it, broken up by a value-noise field the ripple phases jiggle and `FlowFoam` (the same two-phase flow map) carries downstream; top faces only, never from below or with the eye submerged, faded out by 160 blocks. The width must stay under a full cell's surface less the swell (`WaterFoamTests`), so open water over a block floor never foams; being screen-space, only contacts the depth copy sees foam (the camera-facing side of a block; a wall seen straight down shows none). `visual-examples/water-foam.json` frames liquid shores at `VOXEL_TIME` 360 and 147. Flowing water carries its baked flow into that normal (`FlowWaveNormal`: a bounded two-phase flow map that scrolls the ripples downstream and stretches them along the flow, identical to `WaveNormal` when the flow is zero), and falling side faces add fast vertical streaks; generated rivers and lakes are all source cells, so they bake no flow and stay still until the simulation makes them flow (`visual-examples/flow-water.json`, `VOXEL_TIME=147`, pours some). The mirror plane itself is the single `RenderManager.WaterPlaneY` at sea level, so a lake whose surface stands above it reflects against that plane rather than its own - an accepted approximation, since only one plane can be mirrored per frame. Seen from below — decided per fragment from the face normal (`fromBehind` in `test-fragment.glsl`), never from the sea plane, since a pond stands above it — the surface is a Snell window: the same scene copy shows through it distorted by the wave normal, the inside fresnel goes to total internal reflection past the critical angle and that band fades to the underwater fog color, and the mirror is never sampled from that side; `ReflectionReuse.MirrorApplies` also skips rendering it whenever `Camera.IsEyeInWater`, and the sky dome (`SkyRenderer`) and the sun disc stay dry in water (lava still fades the dome via `FrameLighting.SkyTintAmount`, eased through its `_lavaT`) so the window shows real sky. World, cloud and sky fog share `SkySample`, duplicated verbatim in `sky-fragment.glsl`, `test-fragment.glsl` and `cloud-fragment.glsl`, with `SkyPalette.Sample` as the tested C# reference, so change all four together. The dome currently samples the flat 28198cc sky color: `SkyPalette.Compute` returns the old night/day mix, pulled toward the dusk orange by `SkyDuskMix`, as both zenith and horizon with zero glow, and `SkyHazeStrength` is 0, so every direction (and every fully fogged fragment) is that one color. The reflection pass now also draws the sun disc and the cloud layer into the mirror, and both it and the scene copies are skipped whenever `TerrainPasses.CullWater` (one frustum pass a frame, feeding the water pass its draw lists) found no water on screen — glass shares the translucent mesh, so `Chunk.HasWaterMesh` is the flag that decides, not `HasTranslucentMesh`. The mirror's opaque chunk and LOD lists skip anything whose top (`Chunk.WorldMax.Y`, `LodRegion.YMax`) plus `ReflectionCull.TopMarginBlocks` (a multiblock's one-block overhang plus the shader's sway and wave lift) lies below the plane, since its clip would discard every fragment. Opaque faces that look into water are flagged by the mesher in bit 3 of `Vertex.Normal` (bits 0-2 stay the face index, bit 5 is the leaf-sway flag, bits 6-7 the low bits of the block-light tint code) and get the animated Voronoi caustic net; bit 4 is the biome-tint flag (see "Biome-tinted grass and leaves" below). The world fragment darkens a submerged face's albedo by `WetDarken` once, before the light multiply, and only at or below that face's own baked surface (`step(fWorldPos.y, fWaterSurfaceY)`; the caustics stop at the same line), so a dry face beside water — a beach top, a bank wall over the waterline — is never darkened or tinted; ore tiles (a non-zero `material.metallic`) are excluded. `SurfaceFresnel` is the GL-free twin (`Schlick`, `WetWeight`). While the eye is submerged, `UnderwaterRaysRenderer` adds one full-screen ray-march for sun shafts, composited in display space (the upsample reads the HDR target it draws into, adds the shafts to the encoded scene with the pre-SH-10 sRGB sun color and strength, clips at 1 and decodes), since the same add in linear light lost the glare toward the sun. Both measure depth from the **local** water surface, never the sea plane: the caustics from the surface baked into each submerged face's vertex (`Vertex.WaterSurface`, read as `fWaterSurfaceY`), the rays from `Camera.EyeWaterSurfaceY` (`ChunkManager.GetFluidColumnTopGlobal` over the eye's column), so a pond above sea level gets both — only the planar mirror still uses the sea plane. The rays are why the shadow map keeps rendering underwater (`FrameLighting.ShadowStrengthDry`, the strength before the underwater fade) even though the world diffuse no longer uses it. **Depth convention**: `Camera.GetProjectionMatrix` comes from `System.Numerics`, which is Direct3D-style (clip depth 0..1), so window depth is *not* the GL -1..1 mapping — never write a near/far linearization. Reconstruct a world position by inverting the very matrix that wrote the depth (`uInvViewProj`), and compare raw depth values directly for "which is nearer". `visual-examples/water.json` (run it with `VOXEL_TIME=360`) frames the shallows, the grazing surface, deep water from height and the underwater shots, including the surface seen from below in the sea and in a pond above sea level (a liquid one — a frozen pond has an ice lid, not a water top face).
 
@@ -1024,6 +1038,7 @@ OpenGLTest/
                                #   sparkle, low-health vignette, damage arc, surfacing droplets
       LightingConfig.cs        # alpha cutoff, atlas anisotropy, light spread, shadow cascades, point and fire
                                #   lights, fog, tonemap exposure, eye adaptation
+      ManaConfig.cs            # the mana pool: start max, growth per known part and its cap, the refill time
       MobConfig.cs             # mob caps and shared mob rules, slimes, goblins (flee, dodge, pack, torches, notice
                                #   pip), healthbars, damage numbers
       NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules, timeouts, LOD streaming,
@@ -1488,6 +1503,8 @@ OpenGLTest/
       PlayerContext.cs         # who an interaction runs for: eye, aim, inventory, creative (local camera or a
                                #   server's connected player), threaded through every World interaction path
       PlayerHealth.cs          # the player's survival pool, 0-100 HP drawn as 10 hearts (1 heart = 10 HP)
+      PlayerMana.cs            # GL-free mana pool: slow regen, spend (creative free, short refused), max from known
+                               #   parts (SetKnownParts), wire values (see "Mana")
       PlayerModel.cs           # blocky Minecraft-like player model with two-segment limbs: the state owner and facade
                                #   (Update, triggers, GetPose/GetPartMatrix/GetHandAnchorMatrix) over Posing/
       Posing/                  # the posing components PlayerModel owns (see PlayerModel.cs), namespace VoxelEngine.Player.Posing
@@ -3165,8 +3182,8 @@ hellos. Messages: `ClientHello` (version, name), `ServerHello` (version, player 
 seed, day clock, spawn), `KeepAlive`, `ChatSend`/`ChatMessage` (kind, sender, text),
 `PlayerState` (eye, yaw, pitch, flags, the newest correction it acks), `PlayerStatus` (the
 player's server-owned status, `PlayerStatusCodec`: the creative/flight flags the server actually
-granted, health, a dead flag, and the knockback impulse and lift of the mob hits since the last
-one; sent at join, whenever it changed, and once when a mode request was refused),
+granted, health, a dead flag, the knockback impulse and lift of the mob hits since the last
+one, the air and the mana; sent at join, whenever it changed, and once when a mode request was refused),
 `PlayerCorrection` (a numbered eye the client must snap to: an illegal move undone, or a
 respawn), `PlayerList` (id, name, eye, yaw, pitch, flags), `WorldIntent` (a client's world action, `WorldIntentCodec`), `IntentResult` (sequence id,
 accepted), `BlockCorrection` (sequence id, then the authoritative cells around the intent's target),
@@ -3182,12 +3199,12 @@ Version 4 added the status payload of `PlayerStatus`, the
 `PlayerCorrection` message (id 25), the correction ack in `PlayerState` and the `Respawn` intent.
 Version 5 made a column answer the whole `ColumnTerrain` (heights, water levels and the corner
 climate) instead of the heights alone, so a client derives nothing from worldgen.
-`ProtocolVersion` 6 is the current one: `EntityList` also carries `NetEntityKind.PrimedTnt` (4;
+`ProtocolVersion` 6: `EntityList` also carries `NetEntityKind.PrimedTnt` (4;
 `ItemId` the block that primed, `Health` the fuse remaining and `Ammo` the whole fuse, both in
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 (current) lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 8 added
+whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 (current) ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 8 added
 `NetEntityKind.Iceberg` (6): `Position` the waterline center, `Yaw` the quarter turns times pi/2
 (`NetEntity.YawFromTurns` / `TurnsFromYaw`), `Health` the seed, `Ammo` the scale in thousandths and
 the sinking in its next byte (`NetEntity.PackIcebergAmmo` / `UnpackIcebergAmmo`), `ItemId` the
@@ -3375,8 +3392,8 @@ damage; a body over unloaded chunks is not judged. Lava and the damage flash tic
 (`ServerPlayer.TickStatus` from `PlayerSessions.TickPlayers`), creative or flying being immune as in
 singleplayer. Mob hits land through `IMobTarget.TakeHit` (below), which bills the player's own
 pool and queues the knockback. Whatever changed the status marks `StatusDirty`, and `TickPlayers`
-then sends that player a `PlayerStatus` (modes, health, dead, and the queued knockback, handed
-over and cleared by `TakePendingKnockback`); one more goes out at join, so a returning player's
+then sends that player a `PlayerStatus` (modes, health, dead, the queued knockback, handed
+over and cleared by `TakePendingKnockback`, the air and the mana); one more goes out at join, so a returning player's
 health (or death) is mirrored at once. The status is saved with the player (health and respawn
 eye in `players/<slug>.json`). A **dead** player stays where it died: its states still record
 look, flags and modes but never move it, and every intent but `Respawn` is refused. The client
