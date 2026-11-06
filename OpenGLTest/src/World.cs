@@ -456,6 +456,12 @@ public class World
                 Camera.SuppressLook = true;
             }
 
+            // The chop damage of natural trunks, before any chunk meshes so the first meshes already show it;
+            // only a singleplayer world keeps any (a server and a client never chop for themselves)
+            if (!serverMode && !clientMode)
+                if (WoodDamageCodec.TryParse(_saveStore?.ReadFile(WoodDamageCodec.FileName)) is { } savedDamage)
+                    _chunkManager.ChopDamage.Import(savedDamage);
+
             // A client never generates: its chunks stream from the server (ClientChunkStreamer).
             if (!clientMode)
                 _generationWorker.Start();

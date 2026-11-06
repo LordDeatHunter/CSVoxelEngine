@@ -1,14 +1,15 @@
 {
-  // The axe's chop at the oak trees.json films (full-thickness trunk cell at (-79, 14, -2), hardness
-  // 24, so the primitive axe's 1.0 per 0.3 s takes about 7 s): run with
-  // VOXEL_SCRIPT=visual-examples/animations-axe.json VOXEL_TIME=147 from OpenGLTest/. Shots land in
-  // visual/animations-axe/. The player hovers while the chunks load, then drops to the ground and
-  // stands in survival 2.5 blocks south of the trunk facing it and
-  // really mines it, so each hit shows the swing, the chips off the trunk, the camera nudge and a few
-  // leaves shaken loose from the crown and a notch that deepens in the trunk (the deep_cut shots, taken
-  while the chop is still held: the notch heals when the button is released). The wind-up starts ahead of each hit, so every shot after the
-  // first hit catches the blade on its way down as the hit lands. Shots are approximate (a frame or
-  // two after their wait); the last one is the trunk after the tree came down.
+  // The axe's side swing and the permanent chop damage at the oak trees.json films (full-thickness
+  // trunk cell at (-79, 14, -2), hardness 24, so the primitive axe's 1.0 per 0.3 s takes about 7 s): run
+  // with VOXEL_SCRIPT=visual-examples/animations-axe.json VOXEL_TIME=147 from OpenGLTest/. Shots land
+  // in visual/animations-axe/. The player hovers while the chunks load, then drops to the ground and
+  // stands in survival 2.5 blocks south of the trunk facing it and really mines it, so each hit shows
+  // the side swing, the chips off the trunk, the camera nudge and a few leaves shaken loose from the
+  // crown. The face being hit is eaten away from the viewer's left to the right as the damage builds
+  // (instead of the crack overlay), and it stays eaten: bite_kept is taken after letting go. The wind-up
+  // starts ahead of each hit, so every shot after the first hit catches the blade on its way across as
+  // the hit lands. Shots are approximate (a frame or two after their wait); the last one is the trunk
+  // after the tree came down.
   "steps": [
     { "op": "fly" },
     { "op": "teleport", "pos": [-78.5, 15.7, -4.5], "yaw": 90, "pitch": -5 },
@@ -25,20 +26,27 @@
     { "op": "wait", "seconds": 0.1 },
     { "op": "screenshot", "name": "first_hit", "hideHud": true },
     { "op": "mine", "seconds": 0.4 },
-    { "op": "screenshot", "name": "chop_a", "hideHud": true },
+    { "op": "screenshot", "name": "swing_a", "hideHud": true },
     { "op": "mine", "seconds": 0.12 },
-    { "op": "screenshot", "name": "chop_b", "hideHud": true },
+    { "op": "screenshot", "name": "swing_b", "hideHud": true },
     { "op": "mine", "seconds": 0.12 },
-    { "op": "screenshot", "name": "chop_c", "hideHud": true },
+    { "op": "screenshot", "name": "swing_c", "hideHud": true },
+    { "op": "mine", "seconds": 0.6 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "bite_kept", "hideHud": true },
+    { "op": "mine", "seconds": 1.8 },
+    { "op": "screenshot", "name": "bite_b", "hideHud": true },
+    { "op": "mine", "seconds": 1.8 },
+    { "op": "screenshot", "name": "bite_c", "hideHud": true },
     { "op": "view", "mode": "first" },
-    { "op": "mine", "seconds": 0.7 },
+    { "op": "mine", "seconds": 0.5 },
     { "op": "screenshot", "name": "first_person_a", "hideHud": true },
     { "op": "mine", "seconds": 0.13 },
     { "op": "screenshot", "name": "first_person_b", "hideHud": true },
-    { "op": "mine", "seconds": 4.5 },
-    { "op": "screenshot", "name": "deep_cut_first", "hideHud": true },
+    { "op": "mine", "seconds": 1.2 },
+    { "op": "screenshot", "name": "bite_d_first", "hideHud": true },
     { "op": "view", "mode": "shoulder" },
-    { "op": "screenshot", "name": "deep_cut", "hideHud": true },
+    { "op": "screenshot", "name": "bite_d", "hideHud": true },
     { "op": "mine", "seconds": 3 },
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "felled", "hideHud": true }

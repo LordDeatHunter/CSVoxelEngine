@@ -80,7 +80,7 @@ timestamps, format version, and an optional `source` only the dedicated server r
 sources"), `chunks/<cx>_<cy>_<cz>.bin` (one Deflate-compressed,
 block-name-paletted snapshot per **modified** chunk, `ChunkSaveCodec`; an untouched chunk is
 never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column caps,
-felled-canopy markers, grown crowns, surface overrides), `player.json` (`PlayerSaveCodec`: position and look,
+felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: the permanent chop damage of natural trunk cells, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
 creative/flight, health, respawn eye, lighting clock, the full inventory and hotbar; no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live slimes and
 goblins with health, facing, velocity, ammo and a slime's size plus still-pending entries, up to
@@ -989,7 +989,7 @@ OpenGLTest/
         ChunkMeshData.cs       # CPU-side mesh of one chunk (opaque + translucent lists, light snapshot, vents, flame points)
         ChunkMeshScheduler.cs  # the dirty set, the per-frame dirty scan, the thread-pool mesh runners, the completed queue and budgeted upload,
                                #   the immediate remesh paths (behind ChunkManager.Update, MarkDirty, ImmediateRemesh*)
-        WoodNotches.cs         # the cosmetic axe notches per trunk cell (side face + step) the mesher reads, and the damage -> step rule
+        WoodDamage.cs          # the permanent chop damage per natural trunk cell (damage + first-hit side face) the mesher reads, and the damage -> eaten columns rule
       ChunkMesher.cs         # the binary greedy pass, the biome-tinted cube face and model-tint helpers, and the box-face/quad primitives the emitters share
         FaceLight.cs           # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
         FluidEmitter.cs        # a fluid cell's surface and side quads: order-independent corner heights, corner light, per-corner flow codes
@@ -1720,6 +1720,7 @@ OpenGLTest/
       WorldInfo.cs             # one listed world: world.json metadata + its folder (slug fixed at creation);
                                #   SourceName = the raw world.json `source` (null when absent), Source = it
                                #   resolved (`generated` when unset), read by the dedicated server only
+      WoodDamageCodec.cs       # reads/writes wood-damage.bin: the permanent chop damage of natural trunk cells
       WorldNames.cs            # name normalizing, the "Unnamed World" default, unique numeric suffix, folder slug
       WorldPersistence.cs      # World component: autosave, FlushAll, the player and entity capture and the
                                #   pending entity restore and the station restore (player.json, entities.json, stations.json, lod-edits.bin)
@@ -4349,20 +4350,29 @@ overshoot or jiggle.
   settle) and the **swim stroke**. The hand anchor follows the forearm frame, so the held item does too.
 - **Bow draw** (`UsePose.Bow`, `BowPose`): an item whose `use.pose` is `bow` (the `bow`) holds a two-handed draw while the timed use charges: the right (item) arm goes out forward through `ArmOverlays`, the left arm is folded back to the cheek, and the torso twists side-on and leans back a little (`SecondaryMotion`), all weighted by the use charge (`BowPose.BodyWeight`/`DrawWeight`). It holds at full draw and, when the button is let go (`PlayerModel.CancelUseCharge` from a real draw), the string arm snaps back within `BowPose.SnapShare` of `ReleaseSeconds` and the rest follows; the camera narrows with the draw like a throw's charge (`Camera.ThrowCharge` is fed `Player.BowCharge`). The item debugger's `BOW` mode and the `draw`/`loose` player ops of `animations.json` show it.
 - **Axe chop** (`SwordSwing.AxeChop`, a fourth swing that is not in the sword's chain): an item in the `axe`
-  tag (`Mining.IsAxe`) swings an overhead chop instead of a punch whenever `LocalPlayer.PunchSwing` runs, through
+  tag (`Mining.IsAxe`) swings a chop from the side (a flat sweep across the front from the right, the elbow straightening into the blow) instead of a punch whenever `LocalPlayer.PunchSwing` runs, through
   `PlayerModel.StartAxeChop(seconds)` over the same `SwordMotion` shape machinery and `BladeSwingFrame`. Its length
   is the axe's hit gap (`LocalPlayer.AxeChopSeconds`, held within `PlayerConfig.AxeChopMin/MaxSeconds`), and while
   mining `LeftClickAction.UpdateBlockBreaking` starts the swing ahead of each hit by the shape's impact share of that
   gap, so the blade comes down as the hit lands (the first hit of a break lands at once, so that one chops a beat
   late). A hit on tree wood also shakes leaves loose from the canopy above it (`TreeShudder` into
   `LeafParticleSystem.BurstCells`, `ParticleConfig.TreeShudder*`), and a heavy hit nudges the camera (`BreakKick`).
-  Chopping a full-cube trunk cell also carves a **notch** into the side face the crosshair hit, deepening with the
-  damage (`WoodNotches.StepFor`, `MaxSteps` steps of `PixelsPerStep` px): `LeftClickAction.UpdateNotch` records it in
-  the world's `ChunkManager.Notches` and remeshes the chunk (`ImmediateRemesh` takes a chunk position), and
-  `TreeWoodEmitter.EmitNotched` draws the cube minus the bite, its walls in the log's end-grain tile. It is cosmetic (the
-  hitbox stays the whole cube, nothing is saved or sent), heals when the chop stops (release, retarget, switch;
-  `ClearNotch`), and while it shows the crack overlay skips that face (`SelectionPasses.RenderBlockBreaking`'s
-  `skipFace`).
+  Chopping a **natural** tree's wood (tree wood whose state is not `WoodState.Detached`; a placed log never) keeps its
+  damage **for good**, in singleplayer: `LeftClickAction.RecordChop` stores the damage and the side face of the first
+  hit in the world's `ChunkManager.ChopDamage` (`WoodDamage`), a break of that cell seeds its damage from it, so
+  releasing, retargeting or switching tools never heals it, and it is saved with the world (`wood-damage.bin`,
+  `WoodDamageCodec`, written by `WorldPersistence` when its version moved, read in the `World` constructor before any
+  chunk meshes). The cell is cleared when it is mined (`Chunk.RemoveBlockAt`) or felled (`BlockEditor.FellWood`); a
+  client and a server keep none (the server counts a break from zero). A full-cube trunk cell shows that damage as its
+  hit face **eaten away** from the viewer's left edge to the right (`WoodDamage.EatenColumns`, of `FaceColumns` = 16,
+  at least one after any damage and all of them only at the break) in a band of the face a few pixels deep:
+  `RecordChop` remeshes the chunk when the eaten width grows (`ImmediateRemesh` takes a chunk position) and
+  `TreeWoodEmitter.EmitEaten` draws the cube minus that box (each cell face as the bars around the hole, the box's
+  walls in the log's end-grain tile, a cap where the neighbor hides a face, so it is never see-through; a cut that
+  reaches the cell's side also opens the neighboring face). It is cosmetic (the hitbox stays the whole cube), it
+  replaces the crack overlay and the mining pop cube for that cell (`LeftClickAction.ShowsEatenFace`; the pop box is
+  a whole cube and would cover the bite), and a thin branch cell or a hit on a top or bottom face still keeps the
+  damage but shows the usual crack overlay.
   The item debugger's `AXE` mode and `visual-examples/animations-axe.json` (`VOXEL_TIME=147`) show it.
 - **Slice** (`SliceMotion.SlicePhase`): a whole-body motion in uneven phases of the same 0.7 s: a slow
   wind-up that coils the body (to 0.26), a strike about twice as fast as before centered on the impact

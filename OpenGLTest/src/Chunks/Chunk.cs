@@ -423,6 +423,8 @@ public class Chunk : IDisposable
         MarkModified();
 
         chunkManager.UnmarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
+        // Chop damage belongs to the wood that was here (a no-op unless the cell was chopped)
+        chunkManager.ChopDamage.Clear((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
         chunkManager.ImmediateRemeshWithBorders(Position, worldPos);
         MarkNeighborsDirty(worldPos, chunkManager);
         CellWritten?.Invoke((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z, 0, 0);

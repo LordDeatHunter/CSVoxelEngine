@@ -294,91 +294,175 @@ internal static class TreeWoodEmitter
         }
     }
 
-    // A notch's bite, in pixels of the 16 across a cell: the width across the face, and the band of
-    // height it is cut over (centered). Its depth is WoodNotches.PixelsPerStep per step.
-    private const int NotchWidthPx = 10;
-    private const int NotchBottomPx = 4;
-    private const int NotchTopPx = 12;
-    private const int MaxNotchQuads = 4 + 5 + 5;
+    // The bite of a chopped cell, in pixels of the 16 across a cell: the band of height it is cut over
+    // (the cells above and below keep their own faces) and how far it goes in. Its width along the face
+    // is the eaten share (WoodDamage.EatenColumns).
+    private const int BiteBottomPx = 3;
+    private const int BiteTopPx = 13;
+    private const int BiteDepthPx = 4;
+    private const int MaxBiteQuads = 40;
 
     /// <summary>
-    /// Emits a full-cube wood cell with the bite of an axe cut taken out of its side face
-    /// <paramref name="notchFace"/> (0..3), <paramref name="step"/> steps deep (<see cref="WoodNotches"/>):
-    /// the cube's other five faces whole (dropped where a neighbor hides them, as a plain cube's
-    /// are), the notch face as the four bars around the bite, and the bite's five walls in the cut
-    /// wood's own tile (the log's end grain). The hitboxes stay the whole cube; the notch is cosmetic.
+    /// Emits a full-cube wood cell whose side face <paramref name="biteFace"/> (0..3) has been eaten away
+    /// over <paramref name="eatenColumns"/> of its 16 columns, from the viewer's left edge toward the right
+    /// (<see cref="WoodDamage"/>): the cube minus one box in a band of the face, every cell face
+    /// kept whole except where the box reaches it (the face is then drawn as the bars around the hole, so a
+    /// cut that runs to a side edge also opens the neighboring face), the box's inner walls in the cut wood's
+    /// own tile (the log's end grain), and a cap where the box meets a face a neighbor hides, so the bite is
+    /// never see-through. The hitboxes stay the whole cube; the bite is cosmetic.
     /// </summary>
-    internal static void EmitNotched(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+    internal static void EmitEaten(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
         byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
-        int x, int y, int z, BlockType type, Vector3 basePos, int notchFace, int step)
+        int x, int y, int z, BlockType type, Vector3 basePos, int biteFace, int eatenColumns)
     {
-        if (vertices.Count > ushort.MaxValue - 4 * MaxNotchQuads) return;
+        if (vertices.Count > ushort.MaxValue - 4 * MaxBiteQuads) return;
         var id = type.Id;
         Span<FaceLight> lights = stackalloc FaceLight[6];
         var lightBase = LightIdx(x, y, z);
         for (var i = 0; i < 6; i++)
             lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
 
-        // The five faces that stay whole: culled against an occluder or a same-wood full cube, like a cube's
+        const float Px = 1f / RimPx;
+        var width = Math.Clamp(eatenColumns, 1, WoodDamage.FaceColumns) * Px;
+        var depth = BiteDepthPx * Px;
+        var y0 = BiteBottomPx * Px;
+        var y1 = BiteTopPx * Px;
+        // The viewer's left of each face, along its +x/+z running axis: the +Z and -X faces start at 0, the others at 1
+        var u0 = biteFace is 1 or 2 ? 0f : 1f - width;
+        var u1 = u0 + width;
+        Vector3 bmin, bmax;
+        switch (biteFace)
+        {
+            case 0: bmin = new Vector3(u0, y0, 0f); bmax = new Vector3(u1, y1, depth); break;
+            case 1: bmin = new Vector3(u0, y0, 1f - depth); bmax = new Vector3(u1, y1, 1f); break;
+            case 2: bmin = new Vector3(0f, y0, u0); bmax = new Vector3(depth, y1, u1); break;
+            default: bmin = new Vector3(1f - depth, y0, u0); bmax = new Vector3(1f, y1, u1); break;
+        }
+
+        var biteLight = lights[biteFace];
         for (var face = 0; face < 6; face++)
         {
-            if (face == notchFace) continue;
+            var touches = BoxTouchesFace(bmin, bmax, face);
             var nbIdx = pIdx + ChunkFaceTables.FaceNeighborDelta[face];
             var nb = padded[nbIdx];
-            if (BlockType.Occludes(nb) || (nb == id && WoodState.IsFullCube(paddedState[nbIdx]))) continue;
+            var hidden = BlockType.Occludes(nb) || (nb == id && WoodState.IsFullCube(paddedState[nbIdx]));
             var tile = face == 4 ? type.Top : face == 5 ? type.Bottom : type.Side;
-            ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos, Vector3.Zero, Vector3.One, face,
-                tile, ChunkFaceTables.ShadeLut[(face << 2) | 3], lights[face]);
+            var shade = ChunkFaceTables.ShadeLut[(face << 2) | 3];
+            if (hidden)
+            {
+                // The neighbor hides this face: where the bite reaches it, cap the bite so it is not see-through
+                if (touches)
+                    EmitCap(vertices, indices, ref indexOffset, basePos, bmin, bmax, face, type.Top, biteLight);
+                continue;
+            }
+
+            if (touches)
+                EmitFaceMinusRect(vertices, indices, ref indexOffset, basePos, face, tile, shade, lights[face], bmin, bmax);
+            else
+                ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos, Vector3.Zero, Vector3.One, face, tile,
+                    shade, lights[face]);
         }
 
-        const float Px = 1f / RimPx;
-        var a = (RimPx - NotchWidthPx) / 2 * Px;
-        var b = 1f - a;
-        var yb = NotchBottomPx * Px;
-        var yt = NotchTopPx * Px;
-        var depth = Math.Min(step, WoodNotches.MaxSteps) * WoodNotches.PixelsPerStep * Px;
-        var f = notchFace;
-        var sideShade = ChunkFaceTables.ShadeLut[(f << 2) | 3];
-        var light = lights[f];
-        // The faces toward -u and +u of the notch face's frame (u runs along the face)
-        var minusU = f < 2 ? 2 : 0;
-        var plusU = minusU + 1;
-
-        // The four bars on the notch face, at its outer surface (n = 0)
-        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, 0f, a, 0f, 1f, 0f, 0f, f, type.Side, sideShade, light);
-        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, b, 1f, 0f, 1f, 0f, 0f, f, type.Side, sideShade, light);
-        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, b, 0f, yb, 0f, 0f, f, type.Side, sideShade, light);
-        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, b, yt, 1f, 0f, 0f, f, type.Side, sideShade, light);
-
-        // The bite's walls, lit from the open side: the back, the two sides, the floor and the ceiling
-        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, b, yb, yt, depth, depth, f,
-            type.Top, sideShade, light);
-        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, a, yb, yt, 0f, depth, plusU,
-            type.Top, ChunkFaceTables.ShadeLut[(plusU << 2) | 3], light);
-        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, b, b, yb, yt, 0f, depth, minusU,
-            type.Top, ChunkFaceTables.ShadeLut[(minusU << 2) | 3], light);
-        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, b, yb, yb, 0f, depth, 4,
-            type.Top, ChunkFaceTables.ShadeLut[(4 << 2) | 3], light);
-        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, b, yt, yt, 0f, depth, 5,
-            type.Top, ChunkFaceTables.ShadeLut[(5 << 2) | 3], light);
+        // The walls of the bite that stand inside the cell, facing into the open box
+        if (bmin.X > 0f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 3, type.Top, biteLight);
+        if (bmax.X < 1f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 2, type.Top, biteLight);
+        if (bmin.Z > 0f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 1, type.Top, biteLight);
+        if (bmax.Z < 1f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 0, type.Top, biteLight);
+        if (bmin.Y > 0f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 4, type.Top, biteLight);
+        if (bmax.Y < 1f) EmitWall(vertices, indices, ref indexOffset, basePos, bmin, bmax, 5, type.Top, biteLight);
     }
 
-    // One face of a box given in the notch face's frame: u along the face (0..1), y up, n the depth in
-    // from the outer surface, mapped onto the cell for side face f (0 -Z, 1 +Z, 2 -X, 3 +X)
-    private static void EmitFrameFace(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
-        Vector3 basePos, int f, float u0, float u1, float y0, float y1, float n0, float n1, int face,
-        ushort tile, byte shade, in FaceLight light)
+    // Whether the box reaches the plane of the cell's face (a box that stops short leaves it whole)
+    private static bool BoxTouchesFace(Vector3 bmin, Vector3 bmax, int face) => face switch
     {
-        Vector3 min, max;
-        switch (f)
+        0 => bmin.Z <= 0f,
+        1 => bmax.Z >= 1f,
+        2 => bmin.X <= 0f,
+        3 => bmax.X >= 1f,
+        4 => bmax.Y >= 1f,
+        _ => bmin.Y <= 0f,
+    };
+
+    // One wall of the box with its normal <paramref name="face"/>, sitting at the box side that faces the
+    // other way (the side of the box on the solid material's edge)
+    private static void EmitWall(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, Vector3 bmin, Vector3 bmax, int face, ushort tile, in FaceLight light)
+    {
+        // The normal +X (3) wall is the box's min-X side, -X (2) the max-X side, and so on
+        var min = bmin;
+        var max = bmax;
+        switch (face)
         {
-            case 0: min = new Vector3(u0, y0, n0); max = new Vector3(u1, y1, n1); break;
-            case 1: min = new Vector3(u0, y0, 1f - n1); max = new Vector3(u1, y1, 1f - n0); break;
-            case 2: min = new Vector3(n0, y0, u0); max = new Vector3(n1, y1, u1); break;
-            default: min = new Vector3(1f - n1, y0, u0); max = new Vector3(1f - n0, y1, u1); break;
+            case 3: max.X = bmin.X; break;
+            case 2: min.X = bmax.X; break;
+            case 1: max.Z = bmin.Z; break;
+            case 0: min.Z = bmax.Z; break;
+            case 4: max.Y = bmin.Y; break;
+            default: min.Y = bmax.Y; break;
         }
 
-        ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, face, tile, shade, light);
+        ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, face, tile,
+            ChunkFaceTables.ShadeLut[(face << 2) | 3], light);
+    }
+
+    // The bite's wall on the plane of a cell face its neighbor hides: its normal points back into the box
+    private static void EmitCap(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, Vector3 bmin, Vector3 bmax, int cellFace, ushort tile, in FaceLight light)
+    {
+        var min = bmin;
+        var max = bmax;
+        switch (cellFace)
+        {
+            case 0: max.Z = min.Z; break;
+            case 1: min.Z = max.Z; break;
+            case 2: max.X = min.X; break;
+            case 3: min.X = max.X; break;
+            case 4: min.Y = max.Y; break;
+            default: max.Y = min.Y; break;
+        }
+
+        var face = cellFace ^ 1;
+        ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, face, tile,
+            ChunkFaceTables.ShadeLut[(face << 2) | 3], light);
+    }
+
+    // A whole cell face minus the rectangle the box leaves on its plane: the (up to four) bars around the hole
+    private static void EmitFaceMinusRect(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, int face, ushort tile, byte shade, in FaceLight light, Vector3 hmin, Vector3 hmax)
+    {
+        // The face's in-plane axes (0 x, 1 y, 2 z) and the plane's own coordinate
+        var (pa, qa, na) = face switch { 0 or 1 => (0, 1, 2), 2 or 3 => (2, 1, 0), _ => (0, 2, 1) };
+        var plane = face is 1 or 3 or 4 ? 1f : 0f;
+        var p0 = Axis(hmin, pa);
+        var p1 = Axis(hmax, pa);
+        var q0 = Axis(hmin, qa);
+        var q1 = Axis(hmax, qa);
+
+        // Below and above the hole across the whole width, then the strips left and right of it
+        Bar(vertices, indices, ref indexOffset, basePos, face, tile, shade, light, pa, qa, na, plane, 0f, 1f, 0f, q0);
+        Bar(vertices, indices, ref indexOffset, basePos, face, tile, shade, light, pa, qa, na, plane, 0f, 1f, q1, 1f);
+        Bar(vertices, indices, ref indexOffset, basePos, face, tile, shade, light, pa, qa, na, plane, 0f, p0, q0, q1);
+        Bar(vertices, indices, ref indexOffset, basePos, face, tile, shade, light, pa, qa, na, plane, p1, 1f, q0, q1);
+    }
+
+    private static void Bar(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset, Vector3 basePos,
+        int face, ushort tile, byte shade, in FaceLight light, int pa, int qa, int na, float plane,
+        float p0, float p1, float q0, float q1)
+    {
+        if (p1 <= p0 || q1 <= q0) return;
+        ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos,
+            WithAxes(pa, p0, qa, q0, na, plane), WithAxes(pa, p1, qa, q1, na, plane), face, tile, shade, light);
+    }
+
+    private static float Axis(Vector3 v, int axis) => axis == 0 ? v.X : axis == 1 ? v.Y : v.Z;
+
+    private static Vector3 WithAxes(int a, float av, int b, float bv, int c, float cv)
+    {
+        Span<float> s = stackalloc float[3];
+        s[a] = av;
+        s[b] = bv;
+        s[c] = cv;
+        return new Vector3(s[0], s[1], s[2]);
     }
 
     // A Z wall at depth zb spanning [x0, x1) minus the span [c0, c1) the adjacent box covers:

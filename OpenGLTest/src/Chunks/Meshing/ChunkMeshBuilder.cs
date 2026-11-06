@@ -8,6 +8,7 @@ using VoxelEngine.Content.Stations;
 using VoxelEngine.Data;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Lighting;
+using VoxelEngine.Interaction;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features.Underground;
@@ -87,7 +88,7 @@ internal static class ChunkMeshBuilder
                 packed[Idx(x, y, z)] = (byte)(sunLight[li] << 4 | (b & BlockLevelMask));
                 if (anyTinted) packed[BlockCount + Idx(x, y, z)] = (byte)(b >> 4);
             }
-            return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy, chunkManager.Notches)
+            return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy, chunkManager.ChopDamage)
                 with { Light = packed };
         }
         finally
@@ -240,7 +241,7 @@ internal static class ChunkMeshBuilder
     /// replays its baked model's quads.
     /// </summary>
     private static ChunkMeshData GenerateMeshDataFromSnapshot(Chunk chunk, byte[] padded, byte[] paddedState,
-        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy, WoodNotches notches)
+        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy, WoodDamage chopDamage)
     {
         // Rented, not allocated: ChunkManager returns them once the mesh is on the GPU
         var vertices = pool.RentVertices();
@@ -315,13 +316,15 @@ internal static class ChunkMeshBuilder
                     continue;
                 }
 
-                // A trunk cell an axe is cutting is drawn with its bite taken out (the shell bevel, if any,
-                // is not drawn for it: the notch lasts only while the cell is being chopped)
-                if (notches.TryGet(worldX0 + x, worldY0 + y, worldZ0 + z, out var notchFace, out var notchStep)
-                    && WoodState.IsFullCube(paddedState[pIdx]))
+                // A natural trunk cell that has been chopped is drawn with its hit face eaten away (the shell
+                // bevel, if any, is not drawn for it); a placed, detached log never is
+                if (WoodState.IsFullCube(paddedState[pIdx]) && !WoodState.IsDetached(paddedState[pIdx])
+                    && chopDamage.TryGet(worldX0 + x, worldY0 + y, worldZ0 + z, out var chop)
+                    && chop.Face != WoodDamage.NoFace)
                 {
-                    TreeWoodEmitter.EmitNotched(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight,
-                        blockLight, x, y, z, type, basePos, notchFace, notchStep);
+                    var eaten = WoodDamage.EatenColumns(chop.Damage, Mining.HardnessOf(blockId, paddedState[pIdx]));
+                    TreeWoodEmitter.EmitEaten(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight,
+                        blockLight, x, y, z, type, basePos, chop.Face, eaten);
                     continue;
                 }
 

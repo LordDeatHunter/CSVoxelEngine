@@ -66,8 +66,8 @@ public class ChunkManager
     /// <summary>Recycled opaque mesh buffers; see <see cref="MeshBufferPool"/>.</summary>
     public MeshBufferPool MeshBuffers { get; } = new();
 
-    /// <summary>The notches an axe is cutting into trunk cells, which the mesher reads (see <see cref="WoodNotches"/>).</summary>
-    public WoodNotches Notches { get; } = new();
+    /// <summary>The permanent chop damage of natural trunk cells, which the mesher reads (see <see cref="WoodDamage"/>).</summary>
+    public WoodDamage ChopDamage { get; } = new();
 
     /// <inheritdoc cref="ChunkRenderLists.MeshVersion"/>
     public int MeshVersion => _renderLists.MeshVersion;

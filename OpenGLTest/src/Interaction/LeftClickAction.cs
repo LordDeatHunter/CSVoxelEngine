@@ -14,6 +14,7 @@ using VoxelEngine.Player;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.Interaction;
 
@@ -78,9 +79,12 @@ internal sealed class LeftClickAction
     /// <summary>The id of the block being mined.</summary>
     internal byte BreakingBlockId => _breakingBlockId;
 
-    /// <summary>The side face of the chopped trunk cell that carries the axe's notch, whose crack overlay
-    /// stays off (the bite is its progress), or -1 with no notch.</summary>
-    internal int NotchedFace => _hasNotch ? _breakFace : -1;
+    /// <summary>Whether the cell being mined shows its progress as an eaten-away face (a natural full-cube trunk
+    /// with a side bite), so the crack overlay stays off for it.</summary>
+    internal bool ShowsEatenFace =>
+        _isBreaking && _breakNatural && WoodState.IsFullCube(_breakState)
+        && _chunkManager.ChopDamage.TryGet((int)_breakingBlockPosition.X, (int)_breakingBlockPosition.Y,
+            (int)_breakingBlockPosition.Z, out var chop) && chop.Face != WoodDamage.NoFace;
 
     /// <summary>
     /// Fires this frame's crosshair raycast: the targeted block, its face and box, and the head ray
@@ -119,9 +123,10 @@ internal sealed class LeftClickAction
     private float _hitTimer;
     // An axe's chop already started ahead of the coming hit, so the blow lands with it
     private bool _chopStarted;
-    // The trunk cell the break is notching and the side face the bite is on (see UpdateNotch)
-    private bool _hasNotch;
-    private Vector3 _notchCell;
+    // A natural tree's wood keeps its chop damage for good (WoodDamage): the break is of such a cell, the
+    // state byte it was started with, and the side face the crosshair hit (-1 for a top or bottom)
+    private bool _breakNatural;
+    private byte _breakState;
     private int _breakFace;
     private float _popElapsed = BlockPopSeconds;
 
@@ -333,19 +338,23 @@ internal sealed class LeftClickAction
         // all belong to that pairing, so carrying progress over would apply the wrong numbers
         if (!_isBreaking || _selectedBlockPosition != _breakingBlockPosition || heldId != _breakingHeldId)
         {
-            ClearNotch();
             _isBreaking = true;
             _breakFace = SideFaceOf(_selectedFaceNormal);
             _breakingBlockPosition = _selectedBlockPosition;
             _breakingBlockId = Edits.BlockIdAt(_selectedBlockPosition);
             _breakingHeldId = heldId;
             // Tree wood's hardness follows its thickness, which lives in the state byte
-            _breakHardness = Mining.HardnessOf(_breakingBlockId, _chunkManager.GetStateGlobal(
-                (int)_selectedBlockPosition.X, (int)_selectedBlockPosition.Y, (int)_selectedBlockPosition.Z));
+            _breakState = _chunkManager.GetStateGlobal(
+                (int)_selectedBlockPosition.X, (int)_selectedBlockPosition.Y, (int)_selectedBlockPosition.Z);
+            _breakHardness = Mining.HardnessOf(_breakingBlockId, _breakState);
             _breakAllowed = Mining.CanMine(_breakingBlockId, held);
             _breakPower = Mining.BlockDamage(held);
             _breakHitSeconds = Mining.HitGapSeconds(held);
-            _breakDamage = 0f;
+            // A natural tree's wood keeps the damage it took (only here: a connected client's server counts
+            // its own break from zero, and a placed log never keeps any)
+            _breakNatural = !_clientMode && BlockType.IsTreeWood(_breakingBlockId) && !WoodState.IsDetached(_breakState);
+            _breakDamage = _breakNatural && _chunkManager.ChopDamage.TryGet((int)_selectedBlockPosition.X,
+                (int)_selectedBlockPosition.Y, (int)_selectedBlockPosition.Z, out var kept) ? kept.Damage : 0f;
             // Seed the timer a whole interval in so the loop below lands the first hit this
             // frame: a tap then counts as one hit instead of being released before the gap
             // it would have to survive.
@@ -412,7 +421,7 @@ internal sealed class LeftClickAction
             if (BlockType.IsTreeWood(_breakingBlockId) && !breaks)
             {
                 ShudderCanopy(_breakingBlockPosition);
-                UpdateNotch();
+                if (_breakNatural) RecordChop();
             }
             var kick = BreakKick.Strength(_breakHardness, breaks);
             if (kick > 0f) Camera.AddHitKick(Vector3.Zero, kick);
@@ -451,32 +460,25 @@ internal sealed class LeftClickAction
     }
 
     /// <summary>
-    /// Carves the notch of the damage so far into the trunk cell being chopped, on the side face the
-    /// crosshair hit, and remeshes its chunk when the notch deepened (<see cref="WoodNotches.StepFor"/>).
-    /// A hit on a top or bottom face cuts none.
+    /// Keeps the damage so far on the natural trunk cell being chopped for good (<see cref="WoodDamage"/>) and
+    /// remeshes its chunk when more of its face shows eaten (<see cref="WoodDamage.EatenColumns"/>). The bite is
+    /// on the side face the first hit landed on; a hit on a top or bottom face shows none.
     /// </summary>
-    private void UpdateNotch()
+    private void RecordChop()
     {
-        if (_breakFace < 0) return;
-        var step = WoodNotches.StepFor(_breakDamage, _breakHardness);
         var cell = _breakingBlockPosition;
-        if (!_chunkManager.Notches.Set((int)cell.X, (int)cell.Y, (int)cell.Z, _breakFace, step)) return;
-        _hasNotch = step > 0;
-        _notchCell = cell;
-        _chunkManager.ImmediateRemesh(VoxelCoords.ChunkPosOf(cell));
-    }
-
-    /// <summary>Heals the notch of a chop that ended (released, retargeted or switched): the cell is
-    /// whole again, and remeshed unless it is gone.</summary>
-    private void ClearNotch()
-    {
-        if (!_hasNotch) return;
-        _hasNotch = false;
-        var cell = _notchCell;
-        _chunkManager.Notches.Set((int)cell.X, (int)cell.Y, (int)cell.Z, 0, 0);
-        if (BlockType.IsTreeWood(Edits.BlockIdAt(cell)))
+        int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
+        var damage = _chunkManager.ChopDamage;
+        var before = ShownColumns(damage, x, y, z);
+        damage.Set(x, y, z, _breakDamage, _breakFace < 0 ? WoodDamage.NoFace : _breakFace);
+        if (WoodState.IsFullCube(_breakState) && ShownColumns(damage, x, y, z) != before)
             _chunkManager.ImmediateRemesh(VoxelCoords.ChunkPosOf(cell));
     }
+
+    // How many face columns the cell's stored damage shows eaten (0 with no damage or no side face)
+    private int ShownColumns(WoodDamage damage, int x, int y, int z) =>
+        damage.TryGet(x, y, z, out var entry) && entry.Face != WoodDamage.NoFace
+            ? WoodDamage.EatenColumns(entry.Damage, _breakHardness) : 0;
 
     /// <summary>A hit on tree wood shakes some of the canopy above and around it loose.</summary>
     private void ShudderCanopy(Vector3 woodCell)
@@ -489,8 +491,8 @@ internal sealed class LeftClickAction
 
     private void StopBreaking()
     {
-        ClearNotch();
         _isBreaking = false;
+        _breakNatural = false;
         _chopStarted = false;
         _breakDamage = 0f;
         _breakHardness = 0f;

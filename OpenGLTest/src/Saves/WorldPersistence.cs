@@ -122,6 +122,9 @@ internal sealed class WorldPersistence
     // autosave always writes it
     private int _lodStateVersionSaved = -1;
 
+    // WoodDamage.Version when wood-damage.bin was last enqueued; 0 is a store nothing ever changed, which writes nothing
+    private int _woodDamageVersionSaved;
+
     /// <summary>
     /// Spawns every pending saved mob and drop whose chunk is loaded, through the managers' own
     /// spawn paths, and restores its health, facing and motion. Each waits for its chunk because
@@ -270,6 +273,7 @@ internal sealed class WorldPersistence
 
         _autosaveTimer = 0;
         SaveLodEditStateIfChanged();
+        SaveWoodDamageIfChanged();
         SavePlayerState();
         SaveEntityState();
         SaveStationState();
@@ -443,6 +447,18 @@ internal sealed class WorldPersistence
         }));
     }
 
+    /// <summary>Enqueues <see cref="WoodDamageCodec.FileName"/> when the chop damage changed since the last
+    /// write; does nothing without a save store.</summary>
+    private void SaveWoodDamageIfChanged()
+    {
+        var damage = _chunkManager.ChopDamage;
+        var version = damage.Version;
+        if (_saveStore == null || version == _woodDamageVersionSaved)
+            return;
+        _saveStore.EnqueueFile(WoodDamageCodec.FileName, WoodDamageCodec.ToBytes(damage.Export()));
+        _woodDamageVersionSaved = version;
+    }
+
     /// <summary>
     /// Enqueues <see cref="LodEditState.FileName"/> when the LOD edit state moved since the last
     /// write (<see cref="LodEditState.CombinedVersion"/>), or unconditionally when
@@ -478,6 +494,7 @@ internal sealed class WorldPersistence
             return;
         _chunkManager.FlushModified(int.MaxValue);
         SaveLodEditStateIfChanged(force: true);
+        SaveWoodDamageIfChanged();
         SavePlayerState();
         SaveEntityState();
         SaveStationState();

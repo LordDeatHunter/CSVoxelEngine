@@ -84,20 +84,22 @@ internal static class SwordMotion
         BladeRoll: 0f, BladeCant: 0f, BladeYaw: 0f,
         DisplayYaw: 0f, DisplayRoll: 0f);
 
-    // The axe's chop: the sword's chop made quick and short-recovered so one swing fits an axe's hit
-    // pace, the wind-up shorter, the blade carried the same way (straight along the forearm). Its length
-    // is rescaled to the axe's hit gap at play time, so only the shares matter.
+    // The axe's chop: a swing from the side, the way a tree is felled. The arm winds out to the right
+    // at about shoulder height with the elbow bent and the body coiled toward it, then the whole body
+    // turns through the strike and the arm sweeps flat across the front to the left, the elbow
+    // straightening into the blow, and it recovers quickly so one swing fits an axe's hit pace. Its
+    // length is rescaled to the axe's hit gap at play time, so only the shares matter.
     private static readonly Shape AxeChop = new(
-        Duration: 0.4f, WindupEnd: 0.5f, WindupReach: 0.85f, Impact: 0.6f, StrikeEnd: 0.66f, HoldEnd: 0.72f,
+        Duration: 0.4f, WindupEnd: 0.45f, WindupReach: 0.9f, Impact: 0.58f, StrikeEnd: 0.66f, HoldEnd: 0.72f,
         Dir: 1,
-        YawWindup: 0.08f, YawFar: 0.05f,
-        ShoulderWindup: 2.85f, ShoulderFar: 1.6f,
-        ElbowWindup: 0.85f, ElbowFar: 0.15f,
-        BodyWindup: 0.1f, BodyFar: 0.15f, BodyYaw: 0.2f, TorsoYaw: 0.25f, Roll: 0f,
-        LeanWindup: 0.15f, LeanFar: -0.2f, DipDepth: 1.1f, DipHeld: true,
-        PullWindup: new Vector3(0f, 0.03f, 0.02f), PullFar: new Vector3(0f, -0.012f, -0.04f),
-        BladeRoll: 0f, BladeCant: 0f, BladeYaw: 0f,
-        DisplayYaw: 0f, DisplayRoll: 0f);
+        YawWindup: 1.0f, YawFar: 0.6f,
+        ShoulderWindup: 1.35f, ShoulderFar: 1.4f,
+        ElbowWindup: 0.6f, ElbowFar: 0.2f,
+        BodyWindup: 1f, BodyFar: 0.9f, BodyYaw: 0.35f, TorsoYaw: 0.5f, Roll: 0.12f,
+        LeanWindup: 0.05f, LeanFar: -0.1f, DipDepth: 0.6f, DipHeld: false,
+        PullWindup: new Vector3(0.04f, 0.02f, 0.02f), PullFar: new Vector3(-0.04f, -0.01f, -0.03f),
+        BladeRoll: 0.8f, BladeCant: 0.12f, BladeYaw: 0.785f,
+        DisplayYaw: -55f, DisplayRoll: 25f);
 
     private static Shape Of(SwordSwing swing) => swing switch
     {

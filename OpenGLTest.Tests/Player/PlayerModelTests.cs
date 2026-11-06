@@ -913,27 +913,40 @@ public sealed class PlayerModelTests
     }
 
     [Fact]
-    public void AnAxeChopRaisesTheArmOverTheHeadThenBringsItDown()
+    public void AnAxeChopSweepsFlatAcrossTheFrontFromTheRightToTheLeft()
     {
         var player = new PlayerModel { HoldingItem = true };
         for (var i = 0; i < 120; i++) player.Update(1f / 60f, 0f);
         var eye = new Vector3(0.5f, 70f, 0.5f);
-        var rest = Hand(player, eye).Y;
         player.StartAxeChop(0.4f);
 
+        var impact = PlayerModel.SwordImpactProgress(SwordSwing.AxeChop);
+        Vector3? wound = null, struck = null;
         var highest = float.MinValue;
-        var atImpact = float.MaxValue;
+        var lowest = float.MaxValue;
         while (player.IsSwordSwinging)
         {
             player.Update(1f / 60f, 0f);
-            var y = Hand(player, eye).Y;
-            highest = MathF.Max(highest, y);
-            if (player.SwordProgress >= PlayerModel.SwordImpactProgress(SwordSwing.AxeChop) && atImpact == float.MaxValue)
-                atImpact = y;
+            var hand = Hand(player, eye);
+            if (player.SwordProgress >= 0.3f && player.SwordProgress < impact)
+            {
+                // The hand at its furthest right before the blow
+                if (wound == null || hand.X > wound.Value.X) wound = hand;
+            }
+            if (player.SwordProgress >= impact && struck == null) struck = hand;
+            if (player.SwordProgress < impact + 0.1f)
+            {
+                highest = MathF.Max(highest, hand.Y);
+                lowest = MathF.Min(lowest, hand.Y);
+            }
         }
 
-        Assert.True(highest > rest + 0.3f);
-        Assert.True(atImpact < highest - 0.3f);
+        // Wound out to the right, struck across to the left of the body: a swing from the side...
+        Assert.True(wound!.Value.X > eye.X, $"wound {wound}");
+        Assert.True(struck!.Value.X < wound.Value.X - 0.5f, $"wound {wound} struck {struck}");
+        // ...that stays at one height instead of going over the head
+        Assert.True(highest < eye.Y, $"the arm goes over the head: {highest}");
+        Assert.True(highest - lowest < 0.5f, $"the swing is not flat: {lowest}..{highest}");
     }
 
     // ---- the bow ----

@@ -208,8 +208,9 @@ internal sealed class WorldRenderer
                 var popGrow = LeftClick.IsBreaking ? LeftClick.BlockPopGrowNow : 0f;
 
                 // The chunk mesh still holds the block at rest size, so the popped cube is only
-                // needed (and only hides it) while it is grown
-                if (popGrow > 0f)
+                // needed (and only hides it) while it is grown; a trunk showing its eaten face keeps the
+                // mesh on screen, since the popped whole cube would cover the bite
+                if (popGrow > 0f && !LeftClick.ShowsEatenFace)
                     renderManager.Selection.RenderBlockPop(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId, popGrow,
                         HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
 
@@ -217,10 +218,10 @@ internal sealed class WorldRenderer
                 renderManager.Selection.RenderBlockSelection(Camera, LeftClick.SelectedBlockPosition, LeftClick.SelectedFaceNormal, popGrow,
                     selectedId, LeftClick.SelectedBoxIndex, HitboxesAt(LeftClick.SelectedBlockPosition, selectedId), mining: LeftClick.IsBreaking);
 
-                if (LeftClick.IsBreaking)
+                // A chopped natural trunk shows its progress as the eaten face instead of the crack overlay
+                if (LeftClick.IsBreaking && !LeftClick.ShowsEatenFace)
                     renderManager.Selection.RenderBlockBreaking(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakProgress, popGrow, LeftClick.BreakingBlockId,
-                        HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId),
-                        skipFace: LeftClick.NotchedFace);
+                        HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
             }
 
             // A just-placed block pops in; skipped while that same cell is the one being mined,

@@ -222,7 +222,7 @@ internal sealed class SelectionPasses : IDisposable
     /// mining.
     /// </summary>
     internal void RenderBlockBreaking(Camera camera, Vector3 blockPosition, float progress, float grow = 0f,
-        byte blockId = 0, BlockHitbox[]? boxes = null, int skipFace = -1)
+        byte blockId = 0, BlockHitbox[]? boxes = null)
     {
         if (progress <= 0f) return;
 
@@ -251,7 +251,6 @@ internal sealed class SelectionPasses : IDisposable
             _owner.BreakShader.SetUniform("uMVP", model * viewProj);
             for (var face = 0; face < 6; face++)
             {
-                if (face == skipFace) continue;
                 var (offset, scale) = BreakOverlayUv.ForFace(face, box);
                 _owner.BreakShader.SetUniform("uUvOffset", offset);
                 _owner.BreakShader.SetUniform("uUvScale", scale);

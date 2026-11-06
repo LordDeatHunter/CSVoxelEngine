@@ -281,6 +281,7 @@ internal sealed class BlockEditor
 
             // A player-built extension felled with the tree stops counting as placed
             _chunkManager.UnmarkPlayerPlaced((int)block.Cell.X, (int)block.Cell.Y, (int)block.Cell.Z);
+            _chunkManager.ChopDamage.Clear((int)block.Cell.X, (int)block.Cell.Y, (int)block.Cell.Z);
             touchedChunks.Add(chunkPos);
             _fluidManager.ScheduleAround(block.Cell);
             min = Vector3.Min(min, block.Cell);
