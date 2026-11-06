@@ -21,7 +21,6 @@ Tracks particles, animations and other non-gameplay feel work. Last updated 2026
 
   **Hook**: `BlockDebrisSystem` (chips), `LeafParticleSystem` (leaves), `SelectionPasses.RenderBlockBreaking` (nearest hook for the crack; the notch needs a wood-cell mesh variant in `TreeWoodEmitter`), `TopplingTree` (the fell).
   **Verify**: item debugger `ITEM_DEBUGGER_PLAYER_ANIM=chop`; a new `visual-examples/animations-axe.json` (`VOXEL_TIME=147`).
-- [ ] **`V-3` Block-break camera nudge** - P2, S. A tiny camera kick on heavy hits (a chop, an ore break). **Hook**: `HeadMotion` hit kick.
 - [ ] **`V-13` Flight animation** - P2, M.
   Creative flight gets its own pose: the legs sway a little and trail "bent" back, both scaling with flight velocity and clamped by max caps (new knobs in `PlayerConfig`, curves through `MathUtils`). Remote players: `NetPlayerFlags.Flying` already rides the wire and the velocity is derived from the broadcast position delta, like the walk phase (no protocol bump).
   **Hook**: `PlayerModel.Update`, `Posing/SecondaryMotion` (lean), `Posing/PoseBuilder` (leg pose), `LocalPlayer.UpdatePlayerModel`.

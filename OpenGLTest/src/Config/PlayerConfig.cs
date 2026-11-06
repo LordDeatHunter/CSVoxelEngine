@@ -38,6 +38,14 @@ public static class PlayerConfig
     // waits on it (the slice combo's next swing, the next jab) is ever delayed. A punch, whose
     // follow-through is short, therefore holds for less than HitStopSeconds.
     public const float HitStopMaxRecoveryShare = 0.7f;
+    // Break kick (BreakKick): a landed mining hit on a block harder than the min nudges the view,
+    // rising to the max strength at the full hardness (a trunk, an ore); the hit that breaks the
+    // block kicks the final factor harder
+    public const float BreakKickMinHardness = 6f;
+    public const float BreakKickFullHardness = 24f;
+    public const float BreakKickMaxStrength = 0.25f;
+    public const float BreakKickFinalFactor = 1.6f;
+
     // Throw charge zoom (ThrowZoom): degrees the view narrows by at a full throw charge, added to the
     // base FOV, the sprint widening and the punch pinch. A spring follows the charge and springs back
     // on release; its rate in Hz and damping ratio (below 1 overshoots a touch wider on the release).

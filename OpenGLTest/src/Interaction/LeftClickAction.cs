@@ -377,7 +377,11 @@ internal sealed class LeftClickAction
 
             _breakDamage += _breakPower;
 
-            if (_breakDamage < _breakHardness)
+            var breaks = _breakDamage >= _breakHardness;
+            var kick = BreakKick.Strength(_breakHardness, breaks);
+            if (kick > 0f) Camera.AddHitKick(Vector3.Zero, kick);
+
+            if (!breaks)
             {
                 _debris.Burst(_breakingBlockPosition, _breakingBlockId, ParticleConfig.BlockDebrisPerHit,
                     columns: _chunkManager.ColumnSource);

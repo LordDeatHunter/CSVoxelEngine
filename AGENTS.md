@@ -1335,6 +1335,7 @@ OpenGLTest/
     Juice/                     # game-feel rules: camera shake, kick, FOV and tilt terms, hit-stop,
                                #   damage direction and fringe, the low-health vignette, pops and shatters
       BlastImpulse.cs          # GL-free TNT blast shove: away from the center, falling to zero at the radius
+      BreakKick.cs             # GL-free camera nudge of a heavy mining hit: strength from the block's hardness, harder on the breaking hit
       DamageDirection.cs       # GL-free damage direction arc: the last blow's world direction, its fade and
                                #   its screen direction from the view yaw (the vignette pass's third term)
       DamageFringe.cs          # GL-free twin of the post pass's damage chromatic fringe: strength from the flash, edge weight
