@@ -23,6 +23,39 @@ public sealed class ThrownProjectile
     private Vector3 _velocity;
     private float _age;
 
+    /// <summary>The projectile's velocity in blocks per second.</summary>
+    public Vector3 Velocity => _velocity;
+
+    /// <summary>Whether it flies point first along its velocity (a spear) instead of tumbling.</summary>
+    public bool Aligned => ItemRegistry.TryGet(ItemId)?.ThrowAligned == true;
+
+    /// <summary>
+    /// The rotation that points a sprite's tip, on its (1, 1) diagonal as every blade's is, along
+    /// <paramref name="velocity"/>, rolled a quarter-right so it reads from the side and from behind.
+    /// Identity-like (a tip toward +X+Y) for a velocity too small to give a heading.
+    /// </summary>
+    public static Matrix4x4 AlignedRotation(Vector3 velocity)
+    {
+        if (velocity.LengthSquared() < 1e-8f) return Matrix4x4.Identity;
+        var forward = Vector3.Normalize(velocity);
+        var side = Vector3.Cross(Vector3.UnitY, forward);
+        side = side.LengthSquared() < 1e-6f ? Vector3.UnitX : Vector3.Normalize(side);
+        var up = Vector3.Cross(forward, side);
+        // Rolled 45 degrees about the heading
+        const float r = MathF.PI / 4f;
+        var rolled = MathF.Cos(r) * up - MathF.Sin(r) * side;
+        var normal = Vector3.Cross(forward, rolled);
+        // Local x = (tip - perpendicular) / sqrt(2), local y = (tip + perpendicular) / sqrt(2), local z = the normal
+        const float h = 0.70710678f;
+        var x = (forward - rolled) * h;
+        var y = (forward + rolled) * h;
+        return new Matrix4x4(
+            x.X, x.Y, x.Z, 0f,
+            y.X, y.Y, y.Z, 0f,
+            normal.X, normal.Y, normal.Z, 0f,
+            0f, 0f, 0f, 1f);
+    }
+
     /// <summary>The projectile's water-splash memory, stepped by the world from its center each frame
     /// (<see cref="WaterSplash.Track"/>).</summary>
     internal WaterSplashTracker Splash { get; } = new();

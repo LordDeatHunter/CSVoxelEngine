@@ -341,9 +341,12 @@ internal sealed class LocalPlayer
             case "cut": Player.StartSword(SwordSwing.Cut); break;
             case "backcut": Player.StartSword(SwordSwing.BackCut); break;
             case "chop": Player.StartSword(SwordSwing.Chop); break;
+            case "axechop": Player.StartAxeChop(AxeChopSeconds(Mining.HitGapSeconds(ItemRegistry.TryGet(Inventory.SelectedBlockId)))); break;
             case "equip": Player.NotifyEquip(); break;
             case "charge": Player.StartThrowCharge(); Player.UpdateThrowCharge(1f); break;
             case "release": Player.ReleaseThrow(1f); break;
+            // Launches the selected throwable at full charge (the model plays its own release separately)
+            case "throw": _world.Throws.ThrowFor(LocalContext(), 1f); Player.ReleaseThrow(1f); break;
             case "die": Player.DeathFall = 1f; Camera.DeathProgress = 1f; break;
             case "revive": Player.DeathFall = 0f; Camera.DeathProgress = 0f; break;
         }

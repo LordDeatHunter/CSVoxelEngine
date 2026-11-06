@@ -116,8 +116,11 @@ internal sealed class ObjectPasses
                 if (mesh == null) continue;
             }
 
+            var orientation = projectile.Aligned
+                ? ThrownProjectile.AlignedRotation(projectile.Velocity)
+                : Matrix4x4.CreateRotationY(projectile.Spin);
             var model = Matrix4x4.CreateScale(projectile.Scale)
-                        * Matrix4x4.CreateRotationY(projectile.Spin)
+                        * orientation
                         * Matrix4x4.CreateTranslation(projectile.Position);
 
             _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(projectile.Position));

@@ -128,6 +128,9 @@ public abstract class Item
     /// <summary>Whether right-click in the air can charge and release this item as a projectile.</summary>
     public bool IsThrowable => ThrowDamage.HasValue;
 
+    /// <summary>Whether a thrown copy flies point first along its velocity (a spear) rather than tumbling.</summary>
+    public bool ThrowAligned { get; internal init; }
+
     /// <summary>Seconds between uses of this item; 0 means the global click rate applies.</summary>
     public float UseDelaySeconds { get; internal init; }
 
@@ -261,5 +264,6 @@ public abstract class Item
         BlockDamage = spec.BlockDamage;
         EntityDamage = spec.EntityDamage;
         ThrowDamage = spec.ThrowDamage;
+        ThrowAligned = spec.ThrowAligned;
     }
 }

@@ -15,9 +15,6 @@ Tracks particles, animations and other non-gameplay feel work. Last updated 2026
 - [ ] **`V-15` Bow animation** - P2, M.
   A two-handed draw, hold and release: the off arm holds the bow out, the drawing arm pulls back to the cheek as the charge rises, snaps back on release, the shoulders turn side-on. Reuses the throw's charge clock (`ThrowPose`, `ArmOverlays`, `Camera.ThrowCharge` and `ThrowZoom`). Needs the bow item itself; the gameplay is in `F-4`.
   **Hook**: `Posing/ThrowPose`, `HeldItemPose`, `PlayerPreviewState` (a new `BOW` mode). **Verify**: item debugger, then a scenario in `animations.json`.
-- [ ] **`V-16` Spear (charge and throw)** - P2, M.
-  A spear item whose charge and throw reuse the existing throw animations unchanged (`ThrowPose`, `ThrowAction`, `ThrownProjectile`). The visual work is the item sprite and `display` pose, and a projectile that points along its velocity (optionally sticking in the block it hits, and a trail via `V-10`). Damage, pickup and durability are gameplay, in `F-4`.
-  **Verify**: the `THROW` mode in the item debugger with the spear selected.
 
 ### World ambience
 

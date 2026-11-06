@@ -38,6 +38,13 @@ public sealed class ItemDefinition
     public float? ThrowDamage { get; set; }
 
     /// <summary>
+    /// A throwable that flies point first along its velocity (a spear) instead of tumbling about the
+    /// vertical like a thrown stone. Needs <see cref="ThrowDamage"/>; the sprite's tip is on its (1, 1)
+    /// diagonal, as a held blade's is.
+    /// </summary>
+    public bool ThrowAligned { get; set; }
+
+    /// <summary>
     /// Attack behavior the left-click drives: <c>punch</c> (default), <c>slice</c> or <c>sword</c>. See
     /// <see cref="AttackPattern"/>.
     /// </summary>

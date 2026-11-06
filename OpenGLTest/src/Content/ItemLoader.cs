@@ -130,6 +130,9 @@ internal static class ItemLoader
                         $"Item '{path}' has throwDamage {definition.ThrowDamage}; expected 0..1000.");
             }
 
+            if (definition.ThrowAligned && throwDamage == null)
+                throw new InvalidOperationException($"Item '{path}' sets throwAligned but has no throwDamage.");
+
             types[id] = ItemFactory.Create(name, new ItemFactory.ItemSpec(
                 id, definition.Name ?? name, definition.Texture,
                 action,
@@ -144,7 +147,8 @@ internal static class ItemLoader
                 CrucibleCapacityMl: crucibleCapacity,
                 UseSeconds: useSeconds,
                 TreeName: use?.Tree,
-                TrailColor: trailColor));
+                TrailColor: trailColor,
+                ThrowAligned: definition.ThrowAligned));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ContentRegistry.ItemIds, StringComparer.Ordinal));

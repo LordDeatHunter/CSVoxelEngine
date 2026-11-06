@@ -1,0 +1,5 @@
+{ "name": "Spear", "texture": "assets/textures/items/spear.png",
+  "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.6 },
+  "entityDamage": 3,
+  "throwDamage": 6,
+  "throwAligned": true }

@@ -48,7 +48,8 @@ public static class ItemFactory
         int CrucibleCapacityMl = 0,
         float UseSeconds = 0f,
         string? TreeName = null,
-        Rgba? TrailColor = null);
+        Rgba? TrailColor = null,
+        bool ThrowAligned = false);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,
