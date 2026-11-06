@@ -7,6 +7,7 @@ using VoxelEngine.Juice;
 using VoxelEngine.Lod;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.ServerSide;
+using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
@@ -35,6 +36,7 @@ internal sealed class BlockPlacer
     private readonly FluidManager _fluidManager;
     private readonly LeafDecayManager _leafDecay;
     private readonly LodManager _lodManager;
+    private readonly BlockDebrisSystem _debris;
     private readonly bool _clientMode;
     private readonly bool _serverMode;
 
@@ -48,8 +50,9 @@ internal sealed class BlockPlacer
 
     internal BlockPlacer(World world, ChunkManager chunkManager, FallingBlockManager falling, IcebergManager? icebergs,
         QuernManager querns, FluidManager fluidManager, LeafDecayManager leafDecay, LodManager lodManager,
-        bool clientMode, bool serverMode)
+        BlockDebrisSystem debris, bool clientMode, bool serverMode)
     {
+        _debris = debris;
         _world = world;
         _chunkManager = chunkManager;
         _falling = falling;
@@ -177,6 +180,7 @@ internal sealed class BlockPlacer
         if (!PlaceBlockAtFace(hitPos, hitNormal, blockId, state: 0, player.ViewDirection, out var placePos)) return false;
 
         LocalPlayer.PunchSwing();
+        PuffPlaced(placePos, hitNormal, blockId);
         // Sand placed into thin air falls at once instead of hovering (stackable piles never
         // fall - the registry forbids the combination - so only the block path topples). A
         // client never ticks falling blocks, so it leaves the fall to the server, which topples
@@ -185,6 +189,19 @@ internal sealed class BlockPlacer
             _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
                 (int)placePos.X, (int)placePos.Y, (int)placePos.Z);
         return true;
+    }
+
+    /// <summary>
+    /// A small puff of the placed block's own chips off the face it was pressed against. Cosmetic, so a
+    /// headless server never raises it; only a solid block puffs (a torch or a flower sets down
+    /// quietly).
+    /// </summary>
+    private void PuffPlaced(Vector3 placedCell, Vector3 hitNormal, byte blockId)
+    {
+        if (_serverMode || !BlockType.IsSolid(blockId)) return;
+        var contact = placedCell + new Vector3(0.5f) - hitNormal * 0.5f;
+        _debris.Puff(contact, placedCell, blockId, JuiceConfig.PlaceDustCount, JuiceConfig.PlaceDustSpeed,
+            JuiceConfig.PlaceDustSize, columns: _chunkManager.ColumnSource);
     }
 
     /// <summary>

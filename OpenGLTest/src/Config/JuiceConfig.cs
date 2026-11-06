@@ -60,6 +60,12 @@ public static class JuiceConfig
     // wears on every face, so BiomeTint.VertexTint lands the chip on its target color
     public const string ColorChipTile = "grass_top_textureless";
 
+    // --- Placement dust (BlockPlacer): a placed solid block puffs a few of its own chips off the
+    // face it was pressed against ---
+    public const int PlaceDustCount = 6;
+    public const float PlaceDustSpeed = 1.2f;
+    public const float PlaceDustSize = 0.07f;
+
     // --- Sprint footstep dust (FootstepDust rules, GroundDust): while sprinting on foot over loose
     // ground (a block with "footstepDust"), every footfall of the gait kicks up a tiny puff ---
     public const int FootstepDustCount = 5;
