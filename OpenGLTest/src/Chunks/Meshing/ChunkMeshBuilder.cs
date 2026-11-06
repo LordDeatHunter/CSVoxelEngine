@@ -87,7 +87,7 @@ internal static class ChunkMeshBuilder
                 packed[Idx(x, y, z)] = (byte)(sunLight[li] << 4 | (b & BlockLevelMask));
                 if (anyTinted) packed[BlockCount + Idx(x, y, z)] = (byte)(b >> 4);
             }
-            return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy)
+            return GenerateMeshDataFromSnapshot(chunk, padded, paddedState, sunLight, blockLight, chunkManager.MeshBuffers, greedy, chunkManager.Notches)
                 with { Light = packed };
         }
         finally
@@ -240,7 +240,7 @@ internal static class ChunkMeshBuilder
     /// replays its baked model's quads.
     /// </summary>
     private static ChunkMeshData GenerateMeshDataFromSnapshot(Chunk chunk, byte[] padded, byte[] paddedState,
-        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy)
+        byte[] sunLight, byte[] blockLight, MeshBufferPool pool, bool greedy, WoodNotches notches)
     {
         // Rented, not allocated: ChunkManager returns them once the mesh is on the GPU
         var vertices = pool.RentVertices();
@@ -269,6 +269,7 @@ internal static class ChunkMeshBuilder
         var chunkBaseY = chunk.LowerBoundY;
         var worldX0 = (int)chunk.Position.X * Size;
         var worldZ0 = (int)chunk.Position.Z * Size;
+        var worldY0 = (int)chunk.Position.Y * Size;
         var columns = MeshScratch.Current.Columns;
 
         // Biome tint of grass and leaves, both palettes from the stored corner climate of the
@@ -311,6 +312,16 @@ internal static class ChunkMeshBuilder
                 {
                     TreeWoodEmitter.EmitTreeWood(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight, blockLight,
                         x, y, z, type, basePos);
+                    continue;
+                }
+
+                // A trunk cell an axe is cutting is drawn with its bite taken out (the shell bevel, if any,
+                // is not drawn for it: the notch lasts only while the cell is being chopped)
+                if (notches.TryGet(worldX0 + x, worldY0 + y, worldZ0 + z, out var notchFace, out var notchStep)
+                    && WoodState.IsFullCube(paddedState[pIdx]))
+                {
+                    TreeWoodEmitter.EmitNotched(vertices, indices, ref indexOffset, padded, paddedState, pIdx, sunLight,
+                        blockLight, x, y, z, type, basePos, notchFace, notchStep);
                     continue;
                 }
 

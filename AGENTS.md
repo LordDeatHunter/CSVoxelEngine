@@ -989,7 +989,8 @@ OpenGLTest/
         ChunkMeshData.cs       # CPU-side mesh of one chunk (opaque + translucent lists, light snapshot, vents, flame points)
         ChunkMeshScheduler.cs  # the dirty set, the per-frame dirty scan, the thread-pool mesh runners, the completed queue and budgeted upload,
                                #   the immediate remesh paths (behind ChunkManager.Update, MarkDirty, ImmediateRemesh*)
-        ChunkMesher.cs         # the binary greedy pass, the biome-tinted cube face and model-tint helpers, and the box-face/quad primitives the emitters share
+        WoodNotches.cs         # the cosmetic axe notches per trunk cell (side face + step) the mesher reads, and the damage -> step rule
+      ChunkMesher.cs         # the binary greedy pass, the biome-tinted cube face and model-tint helpers, and the box-face/quad primitives the emitters share
         FaceLight.cs           # a cell face's four smooth corner-light codes, bilinearly sampled by the procedural emitters
         FluidEmitter.cs        # a fluid cell's surface and side quads: order-independent corner heights, corner light, per-corner flow codes
         MeshScratch.cs         # per-thread scratch buffers of the binary greedy mesh pass
@@ -4351,6 +4352,13 @@ overshoot or jiggle.
   gap, so the blade comes down as the hit lands (the first hit of a break lands at once, so that one chops a beat
   late). A hit on tree wood also shakes leaves loose from the canopy above it (`TreeShudder` into
   `LeafParticleSystem.BurstCells`, `ParticleConfig.TreeShudder*`), and a heavy hit nudges the camera (`BreakKick`).
+  Chopping a full-cube trunk cell also carves a **notch** into the side face the crosshair hit, deepening with the
+  damage (`WoodNotches.StepFor`, `MaxSteps` steps of `PixelsPerStep` px): `LeftClickAction.UpdateNotch` records it in
+  the world's `ChunkManager.Notches` and remeshes the chunk (`ImmediateRemesh` takes a chunk position), and
+  `TreeWoodEmitter.EmitNotched` draws the cube minus the bite, its walls in the log's end-grain tile. It is cosmetic (the
+  hitbox stays the whole cube, nothing is saved or sent), heals when the chop stops (release, retarget, switch;
+  `ClearNotch`), and while it shows the crack overlay skips that face (`SelectionPasses.RenderBlockBreaking`'s
+  `skipFace`).
   The item debugger's `AXE` mode and `visual-examples/animations-axe.json` (`VOXEL_TIME=147`) show it.
 - **Slice** (`SliceMotion.SlicePhase`): a whole-body motion in uneven phases of the same 0.7 s: a slow
   wind-up that coils the body (to 0.26), a strike about twice as fast as before centered on the impact

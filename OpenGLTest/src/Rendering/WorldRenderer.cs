@@ -219,7 +219,8 @@ internal sealed class WorldRenderer
 
                 if (LeftClick.IsBreaking)
                     renderManager.Selection.RenderBlockBreaking(Camera, LeftClick.BreakingBlockPosition, LeftClick.BreakProgress, popGrow, LeftClick.BreakingBlockId,
-                        HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId));
+                        HitboxesAt(LeftClick.BreakingBlockPosition, LeftClick.BreakingBlockId),
+                        skipFace: LeftClick.NotchedFace);
             }
 
             // A just-placed block pops in; skipped while that same cell is the one being mined,

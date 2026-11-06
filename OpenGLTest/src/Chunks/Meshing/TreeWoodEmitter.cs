@@ -294,6 +294,93 @@ internal static class TreeWoodEmitter
         }
     }
 
+    // A notch's bite, in pixels of the 16 across a cell: the width across the face, and the band of
+    // height it is cut over (centered). Its depth is WoodNotches.PixelsPerStep per step.
+    private const int NotchWidthPx = 10;
+    private const int NotchBottomPx = 4;
+    private const int NotchTopPx = 12;
+    private const int MaxNotchQuads = 4 + 5 + 5;
+
+    /// <summary>
+    /// Emits a full-cube wood cell with the bite of an axe cut taken out of its side face
+    /// <paramref name="notchFace"/> (0..3), <paramref name="step"/> steps deep (<see cref="WoodNotches"/>):
+    /// the cube's other five faces whole (dropped where a neighbor hides them, as a plain cube's
+    /// are), the notch face as the four bars around the bite, and the bite's five walls in the cut
+    /// wood's own tile (the log's end grain). The hitboxes stay the whole cube; the notch is cosmetic.
+    /// </summary>
+    internal static void EmitNotched(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        byte[] padded, byte[] paddedState, int pIdx, byte[] sunLight, byte[] blockLight,
+        int x, int y, int z, BlockType type, Vector3 basePos, int notchFace, int step)
+    {
+        if (vertices.Count > ushort.MaxValue - 4 * MaxNotchQuads) return;
+        var id = type.Id;
+        Span<FaceLight> lights = stackalloc FaceLight[6];
+        var lightBase = LightIdx(x, y, z);
+        for (var i = 0; i < 6; i++)
+            lights[i] = EmitterFaceLight(i, padded, pIdx, sunLight, blockLight, lightBase, lightBase);
+
+        // The five faces that stay whole: culled against an occluder or a same-wood full cube, like a cube's
+        for (var face = 0; face < 6; face++)
+        {
+            if (face == notchFace) continue;
+            var nbIdx = pIdx + ChunkFaceTables.FaceNeighborDelta[face];
+            var nb = padded[nbIdx];
+            if (BlockType.Occludes(nb) || (nb == id && WoodState.IsFullCube(paddedState[nbIdx]))) continue;
+            var tile = face == 4 ? type.Top : face == 5 ? type.Bottom : type.Side;
+            ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos, Vector3.Zero, Vector3.One, face,
+                tile, ChunkFaceTables.ShadeLut[(face << 2) | 3], lights[face]);
+        }
+
+        const float Px = 1f / RimPx;
+        var a = (RimPx - NotchWidthPx) / 2 * Px;
+        var b = 1f - a;
+        var yb = NotchBottomPx * Px;
+        var yt = NotchTopPx * Px;
+        var depth = Math.Min(step, WoodNotches.MaxSteps) * WoodNotches.PixelsPerStep * Px;
+        var f = notchFace;
+        var sideShade = ChunkFaceTables.ShadeLut[(f << 2) | 3];
+        var light = lights[f];
+        // The faces toward -u and +u of the notch face's frame (u runs along the face)
+        var minusU = f < 2 ? 2 : 0;
+        var plusU = minusU + 1;
+
+        // The four bars on the notch face, at its outer surface (n = 0)
+        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, 0f, a, 0f, 1f, 0f, 0f, f, type.Side, sideShade, light);
+        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, b, 1f, 0f, 1f, 0f, 0f, f, type.Side, sideShade, light);
+        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, b, 0f, yb, 0f, 0f, f, type.Side, sideShade, light);
+        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, b, yt, 1f, 0f, 0f, f, type.Side, sideShade, light);
+
+        // The bite's walls, lit from the open side: the back, the two sides, the floor and the ceiling
+        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, b, yb, yt, depth, depth, f,
+            type.Top, sideShade, light);
+        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, a, yb, yt, 0f, depth, plusU,
+            type.Top, ChunkFaceTables.ShadeLut[(plusU << 2) | 3], light);
+        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, b, b, yb, yt, 0f, depth, minusU,
+            type.Top, ChunkFaceTables.ShadeLut[(minusU << 2) | 3], light);
+        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, b, yb, yb, 0f, depth, 4,
+            type.Top, ChunkFaceTables.ShadeLut[(4 << 2) | 3], light);
+        EmitFrameFace(vertices, indices, ref indexOffset, basePos, f, a, b, yt, yt, 0f, depth, 5,
+            type.Top, ChunkFaceTables.ShadeLut[(5 << 2) | 3], light);
+    }
+
+    // One face of a box given in the notch face's frame: u along the face (0..1), y up, n the depth in
+    // from the outer surface, mapped onto the cell for side face f (0 -Z, 1 +Z, 2 -X, 3 +X)
+    private static void EmitFrameFace(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,
+        Vector3 basePos, int f, float u0, float u1, float y0, float y1, float n0, float n1, int face,
+        ushort tile, byte shade, in FaceLight light)
+    {
+        Vector3 min, max;
+        switch (f)
+        {
+            case 0: min = new Vector3(u0, y0, n0); max = new Vector3(u1, y1, n1); break;
+            case 1: min = new Vector3(u0, y0, 1f - n1); max = new Vector3(u1, y1, 1f - n0); break;
+            case 2: min = new Vector3(n0, y0, u0); max = new Vector3(n1, y1, u1); break;
+            default: min = new Vector3(1f - n1, y0, u0); max = new Vector3(1f - n0, y1, u1); break;
+        }
+
+        ChunkMesher.EmitBoxFace(vertices, indices, ref indexOffset, basePos, min, max, face, tile, shade, light);
+    }
+
     // A Z wall at depth zb spanning [x0, x1) minus the span [c0, c1) the adjacent box covers:
     // 0, 1 or 2 full-height segments
     internal static void EmitWallRemainder(List<Vertex> vertices, List<ushort> indices, ref ushort indexOffset,

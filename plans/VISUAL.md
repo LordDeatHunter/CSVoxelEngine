@@ -12,9 +12,6 @@ Tracks particles, animations and other non-gameplay feel work. Last updated 2026
 
 ### Player and tools
 
-- [ ] **`V-1` Axe tree-chopping animation** - P1, L. The swing (`SwordSwing.AxeChop`, paced to the axe's hits and wound up ahead of each one), the chips, the camera nudge and a leaf shake per hit (`TreeShudder`) have landed; the trunk itself does not move. Left: a **progressive notch** carved into the trunk as damage builds, before the tree topples.
-  **Hook**: `SelectionPasses.RenderBlockBreaking` (nearest hook for the crack; the notch needs a wood-cell mesh variant in `TreeWoodEmitter`), `LeftClickAction` (the damage fraction of the cell being mined).
-  **Verify**: `visual-examples/animations-axe.json` (`VOXEL_TIME=147`, `deep_cut` shot).
 - [ ] **`V-15` Bow animation** - P2, M.
   A two-handed draw, hold and release: the off arm holds the bow out, the drawing arm pulls back to the cheek as the charge rises, snaps back on release, the shoulders turn side-on. Reuses the throw's charge clock (`ThrowPose`, `ArmOverlays`, `Camera.ThrowCharge` and `ThrowZoom`). Needs the bow item itself; the gameplay is in `F-4`.
   **Hook**: `Posing/ThrowPose`, `HeldItemPose`, `PlayerPreviewState` (a new `BOW` mode). **Verify**: item debugger, then a scenario in `animations.json`.
