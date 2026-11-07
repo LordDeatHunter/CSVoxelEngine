@@ -91,7 +91,7 @@ Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated
 **without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
 player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
 any scenario that teleports a walking player above the ground, and turn it off again before a
-`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, and an optional `"size"` (an integer from 1, default 1) is a slime's size; the entity name (`slime` or `goblin`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, and an optional `"size"` (an integer from 1, default 1) is a slime's size; the entity name (`slime`, `goblin`, `hellbrute` or `cinderwitch`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
@@ -120,10 +120,11 @@ mode). Both preview states are drivers: each mode has a `Duration`, the clock tu
 through its `EntityAnimator` (`DebugSceneRenderer.RenderEntity`). The mode buttons are data-driven: one
 per clip in the selected model's `.bbmodel`, in file order, plus HURT (hurts the mob: the hit flash,
 its recoil and the `hurt` clip as an overlay, listed once when the model has that clip). For the goblin
-they read IDLE WALK THROW MELEE HURT DEATH SPAWN. A goblin or slime is previewed as the real `Goblin` /
-`Slime` object driven like a client drives a mob it does not simulate (`Mob.AnimateMirror`, and
+they read IDLE WALK THROW MELEE HURT DEATH SPAWN, for the hellbrute IDLE WALK MELEE HURT DEATH SPAWN and for
+the cinderwitch IDLE WALK THROW HURT DEATH SPAWN (its cast is named `throw`). A goblin, a hell mob or a
+slime is previewed as the real `Goblin` / `Hellbrute` / `Cinderwitch` / `Slime` object driven like a client drives a mob it does not simulate (`Mob.AnimateMirror`, and
 `NetworkSetState` for the walk velocity), so what the game layers on the clips shows too: the spawn pop,
-the hit recoil, the death, the goblin's body pose (`Goblin.BodyEffect`, applied to every part and the
+the hit recoil, the death, the rigged mob's body pose (`RiggedMob.BodyEffect`, applied to every part and the
 held flint) and the slime's spring squash. The clipless slime offers IDLE HOP HURT SPAWN DEATH (it hops on
 a hidden floor toward the camera and restarts). One-shot clips replay after a short rest, and the
 preview consumes their events itself. The GL-free, tested state behind the tab is
@@ -1069,7 +1070,7 @@ OpenGLTest/
       ManaConfig.cs            # the mana pool: start max, growth per known part and its cap, the refill time
       SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap;
                                #   the staff slot cap and the cast cooldown (CastCooldownSeconds)
-      MobConfig.cs             # mob caps and shared mob rules, slimes, goblins (flee, dodge, pack, torches, notice
+      MobConfig.cs             # mob caps and shared mob rules, layer difficulty, hell mobs, slimes, goblins (flee, dodge, pack, torches, notice
                                #   pip), healthbars, damage numbers, the realm layer difficulty step
       NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules (the attack and cast slack),
                                #   timeouts, LOD streaming, ServerAllowCreative
@@ -1280,7 +1281,7 @@ OpenGLTest/
         SurfaceFresnel.cs      # GL-free twin of the surface fresnel terms in test-fragment.glsl:
                                #   the shared Schlick helper the ore path reads
         WaterGlitter.cs        # GL-free twin of the sun glitter on water: mirror lobe, sparkle life and spot, gate
-    Entities/                  # mobs (the Mob base and the shared GL-free mob rules; the goblin and the slime below), item drops, projectiles,
+    Entities/                  # mobs (the Mob base and the shared GL-free mob rules; the goblin, the hell mobs and the slime below), item drops, projectiles,
                                #   primed TNT, falling blocks, damage numbers, the entity animator and clips
       AnimationClip.cs         # GL-free Blockbench keyframe clip: per-bone rotation/position/scale
                                #   tracks, linear/catmull-rom/step, loop/once/hold, timeline events
@@ -1298,7 +1299,9 @@ OpenGLTest/
       IMobTarget.cs            # what a mob chases and hurts: eye, immunity, TakeHit (Camera, ServerPlayer)
       ItemDrop.cs              # a collectable left behind by mining: usually a block, sometimes a pure item (see Item)
       LedgeProbe.cs            # GL-free ledge caution: the drop to the first ground ahead, safe-step rule
-      Mob.cs                   # abstract base of every hostile (Slime, Goblin): position, health,
+      EntityContract.cs        # the startup checks of a clip-animated kind's model: the humanoid groups, a clip,
+                               #   a clip's timeline event (RequireHumanoid), each naming the model file
+      Mob.cs                   # abstract base of every hostile (Slime, Goblin, the hell mobs): position, health,
                                #   facing, hit flash, body box, TakeDamage/Shove
       MobFallDamage.cs         # GL-free mob fall damage: a share of the mob's pool per block past its safe height
       MobInterest.cs           # GL-free per-mob interest: sight checks, losing a hidden target, idle
@@ -1306,6 +1309,9 @@ OpenGLTest/
       MobLava.cs               # GL-free mob lava rule: body box in a burning fluid (BurningFluid), damage per tick
       MobLoot.cs               # GL-free loot toss: the up-and-out launch a killed mob's drops get
       MobTargets.cs            # GL-free target rules: body contact, nearest non-immune target, min distance
+      RiggedMob.cs             # abstract walking mob animated from its clips (Goblin, the hell mobs): the
+                               #   EntityAnimator, walk/auto-jump/float physics, facing, death/spawn/hurt clips,
+                               #   the mirror's animation and BodyEffect
       PrimedTnt.cs             # a primed TNT block: a full-size cube that falls under gravity and
                                #   collides with blocks axis by axis like the player and the item drops (BoxSweep)
       ThrownProjectile.cs      # a thrown item or a goblin stone in flight: falls under Gravity,
@@ -1315,6 +1321,12 @@ OpenGLTest/
                                #   (ValidateContent), animation-driven release/impact events
         GoblinAim.cs           # GL-free low-arc ballistic solver for the thrown stones
         GoblinTorches.cs       # GL-free torch roll for a goblin spawn (night, depth, one uniform roll)
+      HellMobs/                # hell's mobs (see "Hell mobs"): the shared base, the two kinds, the layer difficulty
+        HellMob.cs             # abstract hell mob: layer-scaled pool, the chase frame (face, Decide, walk), the
+                               #   throttled line of sight
+        Hellbrute.cs           # the melee brute: walk, a charge with a clear line, the melee clip's impact event
+        Cinderwitch.cs         # the fire caster: the range band, a cast with a clear line, the release event's bolt
+        LayerDifficulty.cs     # GL-free: the per-layer multiplier (health, damage, cast cooldown) and pack size
       Icebergs/                # drifting icebergs (not mobs): the berg and its GL-free rules, see "Icebergs"
         Iceberg.cs             # one berg: variant, horizontal scale, quarter turns, seed, waterline center,
                                #   velocity, cached world boxes, emerge/sink, the client mirror's dead reckoning
@@ -1730,8 +1742,9 @@ OpenGLTest/
       Actors/                  # the entity and station draws: mobs, loose objects, the player, the stations
         IcebergPasses.cs       # the iceberg draws: one mesh and skin per variant, ModelMatrix (wobble and rise/sink
                                #   over IcebergShape.ModelMatrix), the entity, near-shadow and mirror passes
-        MobPasses.cs           # the slime and goblin draws (RenderSlimes, RenderGoblins), their meshes and skins,
-                               #   SlimeTransform and GoblinFeet
+        MobPasses.cs           # the slime, goblin and hell mob draws (RenderSlimes, RenderGoblins, RenderHellMobs),
+                               #   the slime mesh and skin, one RigMeshes per clip-animated kind, SlimeTransform
+        RigMeshes.cs           # one clip-animated kind's rig, part meshes (ordinal-sorted) and skin, PartMatrix
         ObjectPasses.cs        # drops, thrown items, primed TNT, falling blocks, mining debris and toppling trees
                                #   (Render*/Draw* pairs; the mirror reuses the Draw* cores)
         PlayerPasses.cs        # the player body, held item and remote players (RenderPlayer, RenderHeldItem, RenderRemotePlayers),
@@ -1889,6 +1902,8 @@ OpenGLTest/
         FluidWakeScanner.cs    # waking loaded chunks' water: the worker-found frontier and the border scan
       GoblinManager.cs         # goblins: AI tick, their thrown stones, melee damage at the impact
                                #   event, loot + carried flint on death, ring spawning
+      HellMobManager.cs        # the hell mobs: AI tick, the brute's blow at its impact, the casters' fire bolts
+                               #   (damage + burning), loot, despawn, the hell-only ring spawn (packs by layer)
       Icebergs/                # the iceberg simulation, namespace VoxelEngine.Simulation.Icebergs
         IcebergManager.cs      # the live bergs: forced and ring spawns, drift and push, the terrain/berg/body
                                #   collision, the life cycle, IBodySolids, the rider carry and push-out, client mirrors
@@ -2249,6 +2264,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   lava, ledge, loot), clips and the animator, drops, projectiles, damage numbers
     Goblins/                   # goblin AI, aim and stones, flee, dodge, pack alert,
                                #   torches, the content contract (mirrors src/Entities/Goblins)
+    HellMobs/                  # hell mob contracts, layer difficulty, brute blow, caster cast and bolt burn
     Icebergs/                  # iceberg shape, motion, wobble, spawn band, contact, the berg (mirrors src/Entities/Icebergs)
     Slimes/                    # slime sizes, hops, knockback, split and merge (mirrors src/Entities/Slimes)
   Graphics/                    # shader defines and the chunk-draw shader guard, cutout mips, tile materials
@@ -2312,6 +2328,8 @@ tools/                                # asset generators: tiles, sprites, models
   generate-effect-icons.py            # deterministic 16x16 HUD icons of the status effects (effect_*.png), --check
   generate-goblin-clips.py            # deterministic generator of the goblin's animation clips (goblin.bbmodel)
   generate-goblin-skin.ps1            # deterministic generator of goblin.png; its header pins the UV layout
+  generate-hell-mob-models.py         # deterministic hellbrute/cinderwitch .bbmodel (rig + clips) and skins, and the
+                                      #   ember_shard sprite; its header pins the rig and clip contract, --check
   generate-hollow-log-textures.py     # deterministic placeholder inner/end tiles of the hollow logs
   generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
                                       #   the geometry rules (waterline, shelf, 8 px inset steps) and the UV layout
@@ -3737,7 +3755,9 @@ climate) instead of the heights alone, so a client derives nothing from worldgen
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Version 16 (current) makes a crucible carry one entry per metal (the alloy kiln): a `StationState` kiln entry writes a metal count (at most `CrucibleComponent.MaxMetals`; `StationNetCodec.ReadCrucible` refuses more, a material 0, a repeat or a negative amount) and each metal's id, molten and pending ml, and the `InventoryState` crucible a `Metals` list; an older peer would misread the station frames. Version 13 ends every `EntityList` entry, of every kind, with a status-effect byte mask (`NetEntity.Effects`: a mob's `StatusEffect.Bit`s, 0 for a drop, primed TNT, falling block or iceberg) and ends `PlayerStatus` with the player's own effect mask (`PlayerStatusData.EffectMask`); both codecs carry the mask raw and the client drops unknown bits when it mirrors them, and an older peer would misread every frame after the first entry. Version 8 added
+whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Version 17 (current) lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
+mob fields only: a mirror's layer, and so its pool, follows from where it is first seen); an older client would not
+draw them. Version 16 makes a crucible carry one entry per metal (the alloy kiln): a `StationState` kiln entry writes a metal count (at most `CrucibleComponent.MaxMetals`; `StationNetCodec.ReadCrucible` refuses more, a material 0, a repeat or a negative amount) and each metal's id, molten and pending ml, and the `InventoryState` crucible a `Metals` list; an older peer would misread the station frames. Version 13 ends every `EntityList` entry, of every kind, with a status-effect byte mask (`NetEntity.Effects`: a mob's `StatusEffect.Bit`s, 0 for a drop, primed TNT, falling block or iceberg) and ends `PlayerStatus` with the player's own effect mask (`PlayerStatusData.EffectMask`); both codecs carry the mask raw and the client drops unknown bits when it mirrors them, and an older peer would misread every frame after the first entry. Version 8 added
 `NetEntityKind.Iceberg` (6): `Position` the waterline center, `Yaw` the quarter turns times pi/2
 (`NetEntity.YawFromTurns` / `TurnsFromYaw`), `Health` the seed, `Ammo` the scale in thousandths and
 the sinking in its next byte (`NetEntity.PackIcebergAmmo` / `UnpackIcebergAmmo`), `ItemId` the
@@ -4736,6 +4756,47 @@ share every `MobLavaTickSeconds` with the hit flash, a death it causes rolling l
 heightmap) stops a step or a hop that would land more than `MobLedgeMaxDropBlocks` down unless the
 target stands lower (`LedgeCautionTests`).
 
+### Hell mobs
+
+Hell's cavern pockets hold two harder kinds (plans/LAYERS.md `L-10`), both `HellMob`s
+(`src/Entities/HellMobs/`), which like the goblin are `RiggedMob`s: a walking body animated from its
+`.bbmodel` clips through an `EntityAnimator` (`RiggedMob` owns the walk, auto-jump and float physics, the
+facing, the death, spawn and hurt clips, a mirror's animation and `BodyEffect`; `Goblin` derives from it
+too). Both models, their skins and the `ember_shard` sprite come from `tools/generate-hell-mob-models.py`
+(deterministic, `--check`); both are humanoid rigs (`EntityContract.HumanoidParts`, head and arms under the
+torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateContent` over
+`EntityContract.RequireHumanoid`).
+- **The hellbrute** (`hellbrute.json`, hp 60, loot ember shards and coal) is slow and tanky: it walks at
+  its target, charges at `HellbruteChargeSpeedFactor` once it sees it (a clear line from its eye to the
+  chest, `HellMob.SeesTarget`, throttled) within `HellbruteChargeRangeBlocks`, and in reach plays its
+  `melee` clip, whose `impact` event bills `MeleeDamage` with a heavy knockback to every non-immune target
+  still in reach (`HellMobManager`). A player walking into it barely moves it (`HellbruteShoveSpeed`).
+- **The cinderwitch** (`cinderwitch.json`, hp 24, loot ember shards) keeps
+  `HellCasterMinRange..HellCasterMaxRange` and, grounded off its cooldown with a clear line, plays its cast
+  (the `throw` clip); at its `release` event the manager launches a **fire bolt**: a `ThrownProjectile`
+  of the `ember_shard` item on `GoblinAim`'s low arc (the band stays inside `v^2/g`), merged into the
+  projectile list like the goblin stones (`HellMobManager.Bolts`), shedding embers in flight. A bolt that
+  touches a non-immune target deals the caster's `BoltDamage` and applies `burning` through
+  `StatusEffects.Apply(IMobTarget, "burning", HellBoltBurnScale)`; any touched target or block stops it.
+- **Layer difficulty** (`LayerDifficulty`, GL-free): `1 + layer * MobConfig.LayerDifficultyPerLayer`,
+  capped at `LayerDifficultyMaxMultiplier`, scales a mob's pool (`HellMob.MaxHealth`), its damage and a
+  caster's cooldown, from the hell layer of its spawn height (`HellMob.Layer`, fixed for life, so a save
+  restore and a client mirror at the same spot agree); a ring spawn rolls a pack of up to
+  `LayerDifficulty.PackSize(layer)`.
+- **Spawning** (`HellMobManager`, one manager for both kinds, joined to the world's `MobCaps`): every
+  `HellSpawnIntervalSeconds`, under the natural cap, around a target standing in hell only,
+  `MobSpawner.TryFindHellSpawn` scans ring columns for an open cavern floor whose two standing cells are in
+  hell and whose block light is at most `HellSpawnMaxBlockLight` (no skylight reaches hell); the overworld
+  cave slimes stop above `HellTopY`. `HellCasterShare` of the spawns are casters. Despawn and the shared
+  hazards work as for the goblin.
+- **Plumbing**: `World.HellMobs`, `MobDirector` (update, damage billing, `RefreshMobs`, the `spawn` op names),
+  `MobPasses.RenderHellMobs` and the near shadow cascade (no mirror: hell lies far under the water plane),
+  `entities.json` by kind name, the `EntityList` kinds above and `ClientMirror`'s reconcile, and the item
+  debugger's ENTITIES tab. Tests: `HellMobTests`, `HellMobManagerTests`, the hell round trip in
+  `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload` and `NetworkEntitySyncTests`.
+- Known gaps: the bolts, like the goblin stones, are not on the wire (a client sees only their damage and
+  the burning); a client's mirror shows no attack clip; the casters walk (flight is `L-14`).
+
 ### Icebergs
 
 Drifting icebergs float on the open sea at the pack-ice edge. They are entities, never blocks, and
@@ -4902,7 +4963,7 @@ overshoot or jiggle.
 - **Slime**: squash and stretch ride one under-damped spring (`Slime._squash`): a 0.2 s crouch before
   each hop (the launch waits for it), a stretch kick on take-off, a landing kick in proportion to the
   fall, an idle breath, a ballooning pop on death and an overshooting pop-in.
-- **Goblin**: its facing eases (`Mob.TurnToward`); `Goblin.BodyEffect(feet)` is the pose the clips
+- **Goblin**: its facing eases (`Mob.TurnToward`); `RiggedMob.BodyEffect(feet)` (the goblin's and the hell mobs') is the pose the clips
   cannot give (a lean that follows the walk, the hit flinch, the death fall and shrink, the spawn pop)
   and the renderer multiplies it onto every part and the held flint. The clips are generated by
   `tools/generate-goblin-clips.py` (re-running is byte-identical, `--check` verifies): idle, walk,

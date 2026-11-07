@@ -1,0 +1,6 @@
+{
+  "name": "Ember Shard",
+  "texture": "assets/textures/items/ember_shard.png",
+  // A splinter of hell's fire, dropped by its mobs: it burns in a kiln twice as long as coal
+  "fuel": { "burnSeconds": 120 }
+}

@@ -2,7 +2,7 @@ namespace VoxelEngine.Config;
 
 /// <summary>
 /// Mob tuning: the shared caps and rules (fall damage, lava, loot toss, notice, interest, wander,
-/// torch-safe ground, ledges), the per-layer difficulty, slimes, goblins, healthbars, damage numbers and the goblin notice
+/// torch-safe ground, ledges), the per-layer difficulty, slimes, goblins, the hell mobs, healthbars, damage numbers and the goblin notice
 /// pip.
 /// </summary>
 public static class MobConfig
@@ -22,6 +22,10 @@ public static class MobConfig
     /// first: its health and damage are scaled by <c>1 + index * this</c>, so the deeper layers
     /// keep getting harder with no bottom.</summary>
     public const float LayerDifficultyPerLayer = 0.25f;
+
+    /// <summary>The most a realm mob's difficulty multiplier ever reaches (<see cref="LayerDifficultyPerLayer"/>
+    /// stops adding past it), so a very deep layer stays hard but never one-shots a player.</summary>
+    public const float LayerDifficultyMaxMultiplier = 4f;
 
     // --- Mob fall damage (MobFallDamage, Mob.NoteLanding) ---
     // A mob landing from more than its safe height takes this share of its own full health (at least
@@ -194,6 +198,69 @@ public static class MobConfig
     public const float GoblinKnockbackLift = 3f;
     // Horizontal shove a grounded goblin gets when the player walks into it.
     public const float GoblinShoveSpeed = 3.5f;
+
+    // --- Hell mobs (HellMobManager, Hellbrute, Cinderwitch) ---
+    // Both live only in hell's cavern pockets (MobSpawner.TryFindHellSpawn): a ring like the goblin's
+    // around a player standing in hell, each try scanning a column down from near the player's feet for
+    // an open floor (solid ground, two clear dry cells, block light at most HellSpawnMaxBlockLight, so a
+    // lava-lit pool edge or a torched base stays clear). The layer index scales each spawn's health,
+    // damage and the caster's fire rate (LayerDifficulty) and the pack size: one more mob every
+    // HellPackLayersPerExtra layers, up to HellPackMaxSize. HellCasterShare of the spawns are casters.
+    public const float HellSpawnIntervalSeconds = 10f;
+    public const float HellSpawnMinRadiusBlocks = 20f;
+    public const float HellSpawnMaxRadiusBlocks = 40f;
+    public const int HellSpawnTries = 10;
+    public const int HellSpawnSearchHalfHeight = 16;
+    public const int HellSpawnScanDepth = 40;
+    public const int HellSpawnMaxBlockLight = 10;
+    public const int HellPackLayersPerExtra = 2;
+    public const int HellPackMaxSize = 3;
+    public const float HellPackSpawnRadiusBlocks = 4f;
+    public const float HellCasterShare = 0.4f;
+    public const float HellDespawnRadiusBlocks = 64f;
+    public const float HellMobLosRetrySeconds = 0.3f;
+
+    // The hellbrute: a slow, tanky melee bruiser. It closes at its walk and charges at
+    // HellbruteChargeSpeedFactor of it once it sees its target within HellbruteChargeRangeBlocks
+    // (a clear line from its eye to the target's chest), then swings a heavy fist whose impact lands
+    // at the melee clip's "impact" event only if the target is still in reach, with a big shove.
+    // Barely moved by a player walking into it.
+    public const float HellbruteHeight = 1.95f;
+    public const float HellbruteHalfExtent = 0.45f;
+    public const float HellbruteWalkSpeed = 2.6f;
+    public const float HellbruteChargeSpeedFactor = 1.8f;
+    public const float HellbruteChargeRangeBlocks = 12f;
+    public const float HellbruteJumpSpeed = 8.5f;
+    public const float HellbruteMeleeReach = 2.3f;
+    public const float HellbruteStandoffBlocks = 1.5f;
+    public const int HellbruteMeleeDamage = 16;
+    public const float HellbruteMeleeCooldownSeconds = 1.6f;
+    public const float HellbruteKnockbackSpeed = 9f;
+    public const float HellbruteKnockbackLift = 4.5f;
+    public const float HellbruteShoveSpeed = 1.2f;
+
+    // The cinderwitch: a ranged fire caster. It keeps HellCasterMinRange..HellCasterMaxRange from its
+    // target and, standing on the ground with a clear line to the chest, plays its cast clip and lobs a
+    // fire bolt at the clip's "release" event (GoblinAim's low arc under ThrownProjectile.Gravity, so
+    // the band must stay inside the bolt's level range v^2/g). A bolt that touches a target deals
+    // HellBoltDamage and sets it burning for HellBoltBurnScale of the effect's duration; one that
+    // misses burns out. A fresh caster waits HellCasterFirstCastDelaySeconds before its first cast.
+    public const float HellCasterHeight = 1.7f;
+    public const float HellCasterHalfExtent = 0.3f;
+    public const float HellCasterWalkSpeed = 2.4f;
+    public const float HellCasterJumpSpeed = 8.5f;
+    public const float HellCasterShoveSpeed = 3.5f;
+    public const float HellCasterMinRange = 6f;
+    public const float HellCasterMaxRange = 15f;
+    public const float HellCasterFirstCastDelaySeconds = 1.2f;
+    public const float HellCasterCooldownSeconds = 2.8f;
+    public const float HellCasterCooldownJitter = 0.5f;
+    public const float HellBoltSpeed = 22f;
+    public const int HellBoltDamage = 7;
+    public const float HellBoltKnockbackSpeed = 2f;
+    public const float HellBoltBurnScale = 0.6f;
+    // Embers a bolt in flight sheds per second (cosmetic, never on a server)
+    public const float HellBoltEmbersPerSecond = 30f;
 
     // --- Entity healthbars (EntityHealthbarRenderer) ---
     // Five hearts float above every live mob, billboarded to face the camera, using the same

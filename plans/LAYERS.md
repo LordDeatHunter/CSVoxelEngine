@@ -4,7 +4,7 @@
 
 ## Status
 
-Phase 1 (foundations) done; phase 2 under way (`L-5` to `L-9` done). A Nether- and Aether-like pair of realms inside the one world, as vertical
+Phases 1 (foundations) and 2 (the hell slice, `L-5` to `L-10`) done; phase 3 (the sky) is next. A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
@@ -26,9 +26,13 @@ hellrock, few lava pools), Magma Caverns (basalt, magma blocks, every pool lava)
 nine JSON blocks with tiles from `tools/generate-hell-textures.py` (a spec per block). The pockets
 carry flora per biome (`L-9`, AGENTS.md "Hell flora"): vines and ground plants as part of hell's one
 pure rule (`HellFlora`), and two tree species (`fungal_tree`, `charred_tree`) grown one per 8x8 cell
-and layer by `HellTrees`. The layer index is ready for the hell mobs' difficulty (`L-10`).
-Id budget: 164 of 255 ids used (99 blocks, 64 items, air), 91 left for `L-10` (~3) and the sky
-palette (`L-11`..`L-15`, ~25).
+and layer by `HellTrees`. Two hell mobs live in the pockets (`L-10`, AGENTS.md "Hell mobs"): the melee
+`hellbrute` and the fire-casting `cinderwitch`, `HellMob`s on the shared `RiggedMob` base (the goblin's
+too), spawned only on dim hell floors (`MobSpawner.TryFindHellSpawn`) and scaled by the layer index
+(`LayerDifficulty`: health, damage, cast rate, pack size); their bolts set the player `burning`. They
+are already on the wire (protocol 17) and in `entities.json`; `L-16` adds the loopback tests and the
+flight state. Id budget: 165 of 255 ids used (99 blocks, 65 items with `ember_shard`, air), 90 left for
+the sky palette (`L-11`..`L-15`, ~25).
 Last updated 2026-11-07.
 
 ## In progress
@@ -36,11 +40,6 @@ Last updated 2026-11-07.
 Nothing.
 
 ## Open
-
-### Phase 2: Hell slice
-
-- [ ] **`L-10` Hell mobs.** P1, L. Two, harder than goblin/slime: a melee brute and a ranged/fire
-  caster. Entity JSON, manager, clips (`item-debugger`), realm spawn search scaled by layer index.
 
 ### Phase 3: Sky slice
 
@@ -57,8 +56,9 @@ Nothing.
 
 ### Phase 4: Netcode and polish
 
-- [ ] **`L-16` Network and saves.** P1, M. New entity kinds in `EntityList` (protocol bump), flight
-  state on the wire, `entities.json`, loopback tests (the sink rule in `MovementRules` came with `L-3`).
+- [ ] **`L-16` Network and saves.** P1, M. The sky mobs' kinds in `EntityList` (protocol bump), flight
+  state on the wire, `entities.json`, loopback tests of the realm mobs (the hell kinds already ride
+  `EntityList` and `entities.json` since `L-10`; the sink rule in `MovementRules` came with `L-3`).
 - [ ] **`L-17` Tuning and docs.** P2, S. Visual scenarios for every phase, tuning pass, an AGENTS.md
   section, then prune this file.
 

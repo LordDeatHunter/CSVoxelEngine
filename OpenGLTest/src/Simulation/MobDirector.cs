@@ -31,8 +31,11 @@ internal sealed class MobDirector
     private readonly DropManager _dropManager;
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
+    private readonly HellMobManager? _hellMobs;
     private readonly IcebergManager? _icebergs;
     private readonly BlockDebrisSystem _debris;
+    // The campfire particles a fire bolt's ember trail sheds into; null on a server, which draws nothing
+    private readonly FireParticleSystem? _embers;
     private readonly PlayerHealth _health;
     private readonly List<Mob> _mobs;
     private readonly bool _serverMode;
@@ -49,9 +52,12 @@ internal sealed class MobDirector
     private MobStrikes Strikes => _world.Strikes;
 
     internal MobDirector(World world, ChunkManager chunkManager, DropManager dropManager, SlimeManager? slimes,
-        GoblinManager? goblins, IcebergManager? icebergs, BlockDebrisSystem debris, PlayerHealth health,
-        List<Mob> mobs, bool serverMode, bool clientMode, StatusEffectBlockWriter? statusBlocks)
+        GoblinManager? goblins, HellMobManager? hellMobs, IcebergManager? icebergs, BlockDebrisSystem debris,
+        FireParticleSystem? embers, PlayerHealth health, List<Mob> mobs, bool serverMode, bool clientMode,
+        StatusEffectBlockWriter? statusBlocks)
     {
+        _hellMobs = hellMobs;
+        _embers = embers;
         _statusBlocks = statusBlocks;
         _world = world;
         _chunkManager = chunkManager;
@@ -111,7 +117,7 @@ internal sealed class MobDirector
         _icebergs.CarryAndPushOut(Camera, _chunkManager);
     }
 
-    /// <summary>The mob part of the world's entity update: rebuilds the targets, runs the slime and goblin managers and bills the damage they dealt, then converts the cells the bodies' status effects pulsed (<see cref="ApplyStatusBlockActions"/>).</summary>
+    /// <summary>The mob part of the world's entity update: rebuilds the targets, runs the slime, goblin and hell mob managers and bills the damage they dealt, then converts the cells the bodies' status effects pulsed (<see cref="ApplyStatusBlockActions"/>).</summary>
     internal void Update(double deltaTime)
     {
         RefreshTargets();
@@ -124,12 +130,7 @@ internal sealed class MobDirector
             // The lighting clock's night, so the ring rolls larger slimes after dark
             _slimes.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, DayCycle.NightFactor(LightingTime),
                 _serverMode ? null : _debris);
-            if (!_serverMode && _slimes.DamageDealtThisFrame > 0)
-            {
-                _health.TakeDamage(_slimes.DamageDealtThisFrame, DamageSource.Mob, Camera.LastMobAttacker);
-                Camera.AddShake(Math.Clamp(_slimes.DamageDealtThisFrame / 20f, 0.2f, 1f));
-                LocalPlayer.NotifyPlayerHurt(fromMob: true);
-            }
+            BillLocalPlayer(_slimes.DamageDealtThisFrame);
         }
 
         // Goblins lob their flint and then close in for a club swing; like the slimes, the
@@ -142,16 +143,29 @@ internal sealed class MobDirector
                 aimDirection: _serverMode || _clientMode ? null : Camera.LastAimDirection,
                 aimCharge: _serverMode || _clientMode ? 0f : Camera.ThrowCharge ?? 0f,
                 night: DayCycle.NightFactor(LightingTime));
-            var goblinDamage = _goblins.DamageDealtThisFrame;
-            if (!_serverMode && goblinDamage > 0)
-            {
-                _health.TakeDamage(goblinDamage, DamageSource.Mob, Camera.LastMobAttacker);
-                Camera.AddShake(Math.Clamp(goblinDamage / 20f, 0.2f, 1f));
-                LocalPlayer.NotifyPlayerHurt(fromMob: true);
-            }
+            BillLocalPlayer(_goblins.DamageDealtThisFrame);
+        }
+
+        // Hell's brutes slam and its casters throw fire bolts (which also set the target burning)
+        if (_hellMobs != null)
+        {
+            _hellMobs.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris,
+                _embers);
+            BillLocalPlayer(_hellMobs.DamageDealtThisFrame);
         }
 
         ApplyStatusBlockActions();
+    }
+
+    // Singleplayer's pool takes what a manager dealt this frame (a server's players already took theirs
+    // through TakeHit), with a shake sized by the hit
+    private void BillLocalPlayer(int damage)
+    {
+        if (_serverMode || damage <= 0)
+            return;
+        _health.TakeDamage(damage, DamageSource.Mob, Camera.LastMobAttacker);
+        Camera.AddShake(Math.Clamp(damage / 20f, 0.2f, 1f));
+        LocalPlayer.NotifyPlayerHurt(fromMob: true);
     }
 
     /// <summary>
@@ -169,6 +183,8 @@ internal sealed class MobDirector
             ApplyMobBlockActions(_slimes.Slimes);
         if (_goblins != null)
             ApplyMobBlockActions(_goblins.Goblins);
+        if (_hellMobs != null)
+            ApplyMobBlockActions(_hellMobs.Mobs);
         for (var i = 0; i < _mobTargets.Count; i++)
         {
             var target = _mobTargets[i];
@@ -247,6 +263,9 @@ internal sealed class MobDirector
 
         if (_goblins != null)
             AddLiving(_goblins.Goblins);
+
+        if (_hellMobs != null)
+            AddLiving(_hellMobs.Mobs);
     }
 
     // Appends the mobs that are not dying, with an indexed loop so a frame allocates no enumerator.
@@ -276,6 +295,13 @@ internal sealed class MobDirector
         if (string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
         {
             if (_goblins?.Spawn(feet + new Vector3(0f, Goblin.Height * 0.5f, 0f)) == null) return false;
+            RefreshMobs();
+            return true;
+        }
+        if (_hellMobs != null && HellMobManager.HeightOf(name) > 0f)
+        {
+            if (_hellMobs.Spawn(name, feet + new Vector3(0f, HellMobManager.HeightOf(name) * 0.5f, 0f)) == null)
+                return false;
             RefreshMobs();
             return true;
         }

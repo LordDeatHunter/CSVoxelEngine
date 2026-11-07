@@ -6,6 +6,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
@@ -31,6 +32,7 @@ internal sealed class ClientMirror
     private readonly FallingBlockManager _falling;
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
+    private readonly HellMobManager? _hellMobs;
     private readonly CampfireManager _campfires;
     private readonly QuernManager _querns;
     private readonly KilnManager _kilns;
@@ -48,7 +50,8 @@ internal sealed class ClientMirror
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
 
     internal ClientMirror(World world, ChunkManager chunkManager, DropManager dropManager, TntManager tntManager,
-        FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, IcebergManager? icebergs,
+        FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
+        IcebergManager? icebergs,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         BlockDebrisSystem debris, PlayerHealth health, List<RemotePlayer> remotePlayers, bool clientMode,
         bool serverMode)
@@ -60,6 +63,7 @@ internal sealed class ClientMirror
         _falling = falling;
         _slimes = slimes;
         _goblins = goblins;
+        _hellMobs = hellMobs;
         _icebergs = icebergs;
         _campfires = campfires;
         _querns = querns;
@@ -367,10 +371,14 @@ internal sealed class ClientMirror
     }
 
     // A slime mirror also has to be the reported size (the ammo field), since a size is fixed for life
-    private static bool KindMatches(Mob mob, NetEntity entry) =>
-        entry.Kind == NetEntityKind.Slime
-            ? mob is Slime slime && slime.Size == SlimeSize.Clamp(entry.Ammo)
-            : entry.Kind == NetEntityKind.Goblin && mob is Goblin;
+    private static bool KindMatches(Mob mob, NetEntity entry) => entry.Kind switch
+    {
+        NetEntityKind.Slime => mob is Slime slime && slime.Size == SlimeSize.Clamp(entry.Ammo),
+        NetEntityKind.Goblin => mob is Goblin,
+        NetEntityKind.Hellbrute => mob is Hellbrute,
+        NetEntityKind.Cinderwitch => mob is Cinderwitch,
+        _ => false,
+    };
 
     private Mob? SpawnNetMob(NetEntity entry)
     {
@@ -379,6 +387,9 @@ internal sealed class ClientMirror
             // A slime's size rides the goblin-only ammo field (NetEntity)
             NetEntityKind.Slime => _slimes?.Spawn(entry.Position, entry.Ammo),
             NetEntityKind.Goblin => _goblins?.Spawn(entry.Position, entry.Ammo, entry.ItemId),
+            // A hell mob's layer, and so its pool, follows from where it is first seen, as on the server
+            NetEntityKind.Hellbrute => _hellMobs?.Spawn(Hellbrute.EntityName, entry.Position),
+            NetEntityKind.Cinderwitch => _hellMobs?.Spawn(Cinderwitch.EntityName, entry.Position),
             _ => null,
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
@@ -394,6 +405,7 @@ internal sealed class ClientMirror
         {
             case Slime slime: _slimes?.Remove(slime); break;
             case Goblin goblin: _goblins?.Remove(goblin); break;
+            case HellMob hellMob: _hellMobs?.Remove(hellMob); break;
         }
     }
 

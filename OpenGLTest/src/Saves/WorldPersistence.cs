@@ -5,6 +5,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
@@ -26,6 +27,7 @@ internal sealed class WorldPersistence
     private readonly DropManager _dropManager;
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
+    private readonly HellMobManager? _hellMobs;
     private readonly IcebergManager? _icebergs;
     private readonly PlayerHealth _health;
     private readonly bool _serverMode;
@@ -40,11 +42,12 @@ internal sealed class WorldPersistence
     private Inventory Inventory => _world.Inventory;
     private IReadOnlyList<Slime> Slimes => _world.Slimes;
     private IReadOnlyList<Goblin> Goblins => _world.Goblins;
+    private IReadOnlyList<HellMob> HellMobs => _world.HellMobs;
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
 
     internal WorldPersistence(World world, ChunkSaveStore? saveStore, ChunkManager chunkManager,
-        DropManager dropManager, SlimeManager? slimes, GoblinManager? goblins, IcebergManager? icebergs,
-        PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
+        DropManager dropManager, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
+        IcebergManager? icebergs, PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         StationSaveData? savedStations)
     {
@@ -59,6 +62,7 @@ internal sealed class WorldPersistence
         _dropManager = dropManager;
         _slimes = slimes;
         _goblins = goblins;
+        _hellMobs = hellMobs;
         _icebergs = icebergs;
         _health = health;
         _serverMode = serverMode;
@@ -148,10 +152,7 @@ internal sealed class WorldPersistence
         {
             var mob = _pendingMobs[i];
             var type = mob.Type == null ? null : EntityRegistry.TryGet(mob.Type);
-            var known = type != null
-                && ((_slimes != null && string.Equals(type.Name, "slime", StringComparison.OrdinalIgnoreCase))
-                    || (_goblins != null && string.Equals(type.Name, "goblin", StringComparison.OrdinalIgnoreCase)));
-            if (!known || mob.Position is not { Length: 3 } p)
+            if (type == null || !KnowsKind(type.Name) || mob.Position is not { Length: 3 } p)
             {
                 (dropped ??= []).Add($"mob '{mob.Type ?? "?"}'");
                 _pendingMobs.RemoveAt(i);
@@ -168,11 +169,7 @@ internal sealed class WorldPersistence
             // spawners stay refused until the population falls under the natural cap again. At a full
             // hard cap the entry waits like an unloaded chunk: it stays pending (and is re-saved by
             // CaptureEntities) instead of overfilling the cap-sized healthbar buffers.
-            var isSlime = string.Equals(type!.Name, "slime", StringComparison.OrdinalIgnoreCase);
-            // A file saved before slimes had sizes carries none: those were all the smallest size
-            Mob? spawned = isSlime
-                ? _slimes!.Spawn(center, mob.Size ?? SlimeSize.Min)
-                : _goblins!.Spawn(center, mob.Ammo ?? 0, mob.Torches ?? 0);
+            var spawned = SpawnSaved(type.Name, center, mob);
             if (spawned == null)
                 continue;
 
@@ -340,9 +337,27 @@ internal sealed class WorldPersistence
         _saveStore?.EnqueueFile(PlayerSaveCodec.FileName, PlayerSaveCodec.ToBytes(CapturePlayer()));
     }
 
+    // Whether a saved mob of the named kind can come back: its kind is one this world runs
+    private bool KnowsKind(string name) =>
+        (_slimes != null && string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
+        || (_goblins != null && string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
+        || (_hellMobs != null && HellMobManager.HeightOf(name) > 0f);
+
+    // A forced spawn of a saved mob of a known kind (null at a full hard cap); a hell mob's layer, and so
+    // its pool, follows from its saved position
+    private Mob? SpawnSaved(string name, Vector3 center, EntitySaveData.MobData mob)
+    {
+        // A file saved before slimes had sizes carries none: those were all the smallest size
+        if (string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
+            return _slimes!.Spawn(center, mob.Size ?? SlimeSize.Min);
+        if (string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
+            return _goblins!.Spawn(center, mob.Ammo ?? 0, mob.Torches ?? 0);
+        return _hellMobs!.Spawn(name, center);
+    }
+
     /// <summary>
-    /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime and
-    /// goblin (kind by <see cref="EntityType.Name"/>, body center, health, facing, velocity, a
+    /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime,
+    /// goblin and hell mob (kind by <see cref="EntityType.Name"/>, body center, health, facing, velocity, a
     /// goblin's ammo, a slime's size) and the item drops nearest the player first, capped at
     /// <see cref="SaveConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
     /// with no name is skipped with one warning). Entries still pending a restore are appended, so a
@@ -354,6 +369,7 @@ internal sealed class WorldPersistence
         var mobs = (from t in slimes where !t.IsDead select MobSaveCodec.Capture(t, null, t.Size)).ToList();
         var goblins = Goblins;
         mobs.AddRange(from t in goblins where !t.IsDead select MobSaveCodec.Capture(t, t.Ammo, torches: t.Torches));
+        mobs.AddRange(from t in HellMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(_pendingMobs);
 
         _dropSort.Clear();

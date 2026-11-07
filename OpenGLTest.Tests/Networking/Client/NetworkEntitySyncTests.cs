@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Networking;
 using VoxelEngine.WorldGen;
@@ -39,6 +40,42 @@ public sealed class NetworkEntitySyncTests : IDisposable
         catch (InvalidOperationException)
         {
         }
+    }
+
+    [Fact]
+    public void HellMobsMirrorByKindFromASnapshotAndPlayTheirDeathWhenDropped()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        var brutePos = new Vector3(4f, 60f, 4f);
+        var casterPos = new Vector3(-4f, 60f, 4f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Hellbrute, 7, brutePos, 1f, 30, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Cinderwitch, 8, casterPos, 0.5f, 12, 0, 0, Vector3.Zero),
+        ]);
+        Assert.Equal(2, _world.HellMobs.Count);
+        var brute = Assert.IsType<Hellbrute>(Assert.Single(_world.HellMobs, m => m is Hellbrute));
+        var caster = Assert.IsType<Cinderwitch>(Assert.Single(_world.HellMobs, m => m is Cinderwitch));
+        Assert.Equal(brutePos, brute.Position);
+        Assert.Equal(30, brute.Health);
+        Assert.Equal(12, caster.Health);
+
+        // The same id updates in place; a kind that changed under one id is replaced, not reused
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Hellbrute, 7, brutePos + Vector3.UnitX, 1f, 20, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Hellbrute, 8, casterPos, 0.5f, 12, 0, 0, Vector3.Zero),
+        ]);
+        Assert.Same(brute, Assert.Single(_world.HellMobs, m => m.Position == brutePos + Vector3.UnitX));
+        Assert.Equal(20, brute.Health);
+        Assert.True(caster.IsDying);
+
+        // A mob the server stops reporting plays its death and is then dropped
+        _world.ClientMirror.ApplyNetworkEntities([]);
+        Assert.True(brute.IsDying);
+        for (var i = 0; i < 120 && _world.HellMobs.Count > 0; i++)
+            _world.Update(Dt, null);
+        Assert.Empty(_world.HellMobs);
     }
 
     [Fact]

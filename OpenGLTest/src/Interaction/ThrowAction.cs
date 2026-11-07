@@ -23,6 +23,7 @@ internal sealed class ThrowAction
     private readonly ChunkManager _chunkManager;
     private readonly DropManager _dropManager;
     private readonly GoblinManager? _goblins;
+    private readonly HellMobManager? _hellMobs;
     private readonly List<Mob> _mobs;
     private readonly List<ThrownProjectile> _projectiles;
     private readonly bool _clientMode;
@@ -34,8 +35,9 @@ internal sealed class ThrowAction
     private MobStrikes Strikes => _world.Strikes;
 
     internal ThrowAction(World world, ChunkManager chunkManager, DropManager dropManager, GoblinManager? goblins,
-        List<Mob> mobs, List<ThrownProjectile> projectiles, bool clientMode)
+        HellMobManager? hellMobs, List<Mob> mobs, List<ThrownProjectile> projectiles, bool clientMode)
     {
+        _hellMobs = hellMobs;
         _world = world;
         _chunkManager = chunkManager;
         _dropManager = dropManager;
@@ -55,8 +57,9 @@ internal sealed class ThrowAction
 
     internal float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / PlayerConfig.ThrowChargeSeconds);
 
-    /// <summary>Rebuilds the projectile list (<c>_projectiles</c>) from the player's throws and the
-    /// goblins' stones, with indexed loops so a frame allocates no enumerator.</summary>
+    /// <summary>Rebuilds the projectile list (<c>_projectiles</c>) from the player's throws, the
+    /// goblins' stones and the hell casters' fire bolts, with indexed loops so a frame allocates no
+    /// enumerator.</summary>
     internal void RefreshProjectiles()
     {
         _projectiles.Clear();
@@ -67,6 +70,12 @@ internal sealed class ThrowAction
             var stones = _goblins.Stones;
             for (var i = 0; i < stones.Count; i++)
                 _projectiles.Add(stones[i]);
+        }
+        if (_hellMobs != null)
+        {
+            var bolts = _hellMobs.Bolts;
+            for (var i = 0; i < bolts.Count; i++)
+                _projectiles.Add(bolts[i]);
         }
     }
 

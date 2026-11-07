@@ -12,26 +12,21 @@ namespace VoxelEngine.Entities.Goblins;
 /// standoff band, backing off when the player closes in, and once its stones run out runs in
 /// for a club swing. It walks rather than hops (auto-jumping a one-block step), floats in water
 /// like the slime, and is animated from the Blockbench clips in its model through an
-/// <see cref="EntityAnimator"/>: the stone leaves the hand at the throw clip's
+/// <see cref="EntityAnimator"/> (the body, physics and clips are <see cref="RiggedMob"/>'s): the stone leaves the hand at the throw clip's
 /// <see cref="ReleaseEvent"/> and the swing lands at the melee clip's <see cref="ImpactEvent"/>,
 /// which <c>GoblinManager</c> collects through <see cref="TryTakeThrowRelease"/> and
 /// <see cref="TryTakeMeleeImpact"/>. Main thread only.
 /// </summary>
-public sealed class Goblin : Mob
+public sealed class Goblin : RiggedMob
 {
     /// <summary>Groups the goblin's model must provide; the renderer draws each one.</summary>
-    public static readonly string[] RequiredParts = ["Torso", "Head", "ArmL", "ArmR", "LegL", "LegR"];
+    public static readonly string[] RequiredParts = EntityContract.HumanoidParts;
 
     /// <summary>The part that holds and throws the stone.</summary>
     public const string HandPart = "ArmR";
 
     public const string ThrowClip = "throw";
     public const string MeleeClip = "melee";
-
-    // Optional clips: absent ones simply play nothing, the procedural BodyEffect still shows.
-    public const string HurtClip = "hurt";
-    public const string DeathClip = "death";
-    public const string SpawnClip = "spawn";
 
     /// <summary>Timeline event on the throw clip at which the stone leaves the hand.</summary>
     public const string ReleaseEvent = "release";
@@ -60,37 +55,15 @@ public sealed class Goblin : Mob
     /// feet are at <c>Position.Y - Height / 2</c>.</summary>
     public const float Height = 1.3f;
 
-    // Damp rate of the walking velocity toward the chosen move, so a goblin speeds up and turns
-    // over a few frames instead of snapping to full speed.
-    private const float MoveAccel = 12f;
-
     // A floating goblin paddles toward its goal at this fraction of its walk speed, so it can
     // cross a pond and climb out instead of bobbing in place forever.
     private const float SwimSpeedFactor = 0.5f;
 
-    // Hit flash: snapped to full on TakeDamage, then fades linearly back over this long.
-    private const float HitFlashSeconds = 0.25f;
-
-    // Body language drawn on top of the clips (see BodyEffect): a forward lean that follows the
-    // walk, a flinch on a hit, a fall backward on death and the spawn pop.
-    private const float TurnRate = 14f;
-    private const float LeanPerSpeed = 0.045f;
-    private const float MaxLean = 0.2f;
-    private const float HitLeanPerKick = 1.1f;
-    private const float DeathFallRadians = 1.45f;
-    private const float WaterLean = 0.12f;
-
-    private Vector3 _velocity;
-    private bool _inWater;
-    private float _lean;
-    private bool _facingKnown;
-    private bool _deathPlayed;
     private float _throwCooldown;
     private float _meleeCooldown;
     private float _losRetry;
     private bool _losBlocked;
     private Vector3 _aimTarget;
-    private bool _hitWall;
     // Which way the goblin sidesteps a charged throw aimed at it: fixed per goblin at spawn from
     // its cell, so the same goblin always breaks the same way instead of jittering
     private readonly float _dodgeSide;
@@ -104,41 +77,17 @@ public sealed class Goblin : Mob
     private float _noticePipElapsed = MobConfig.GoblinNoticePipSeconds;
     private bool _noticed;
 
-    public Goblin(EntityType type, Vector3 position, int ammo, bool spawnIn = true, int torches = 0) : base(type, position)
+    public Goblin(EntityType type, Vector3 position, int ammo, bool spawnIn = true, int torches = 0)
+        : base(type, position, MobConfig.GoblinWalkSpeed, spawnIn)
     {
         Ammo = Math.Max(0, ammo);
         Torches = Math.Clamp(torches, 0, MobConfig.GoblinTorchMaxCount);
-        Animation = new EntityAnimator(type.Model.Animations, MobConfig.GoblinWalkSpeed);
         // The dodge side: fixed at spawn from the starting cell, so the same goblin always breaks
         // the same way out of a charged throw's line
         _dodgeSide = ((MathUtils.FloorToInt(position.X) + MathUtils.FloorToInt(position.Z)) & 1) == 0 ? 1f : -1f;
         // A fresh goblin notices the player before its first throw rather than throwing on its
         // first grounded frame; unjittered so scripted shots repeat.
         _throwCooldown = MobConfig.GoblinFirstThrowDelaySeconds;
-        if (spawnIn) Animation.Play(SpawnClip);
-        else FinishSpawn();
-    }
-
-    /// <inheritdoc />
-    public override void TakeDamage(int amount)
-    {
-        var wasDying = IsDying;
-        base.TakeDamage(amount);
-        // A flinch on top of whatever is playing, so a hit never cancels a throw or swing.
-        if (amount > 0 && !wasDying) Animation.PlayOverlay(HurtClip);
-    }
-
-    /// <summary>A client's goblin is driven by server snapshots, not by <see cref="Update"/>: this
-    /// advances the clips from the mirrored velocity so it still walks and idles.</summary>
-    public override void AnimateMirror(float deltaTime)
-    {
-        base.AnimateMirror(deltaTime);
-        Animation.Update(deltaTime, MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z));
-        if (IsDying && !_deathPlayed)
-        {
-            _deathPlayed = true;
-            Animation.Play(DeathClip);
-        }
     }
 
     /// <summary>Stones left to throw; the manager drops what remains on death.</summary>
@@ -178,9 +127,6 @@ public sealed class Goblin : Mob
             return anchor.Translation;
         }
     }
-
-    /// <summary>Whether the goblin currently stands on the ground.</summary>
-    public bool IsGrounded { get; private set; }
 
     /// <summary>
     /// Whether the goblin has given up: at or below <see cref="MobConfig.GoblinFleeHealthShare"/>
@@ -222,48 +168,14 @@ public sealed class Goblin : Mob
     public float NoticePipProgress =>
         MathUtils.Clamp01(_noticePipElapsed / MobConfig.GoblinNoticePipSeconds);
 
-    /// <summary>The goblin's own animation state, driven by its speed and actions.</summary>
-    public EntityAnimator Animation { get; }
-
     /// <inheritdoc />
     public override float DeathSeconds => 0.8f;
 
-    /// <summary>
-    /// The pose the clips cannot give: about the feet, a forward lean into the walk (backward when
-    /// backpedaling), a flinch recoil while the hit spring rings, the fall backward and shrink of
-    /// the death, and the spawn pop. Multiply it after the part matrix (row-vector order).
-    /// </summary>
-    public Matrix4x4 BodyEffect(Vector3 feet)
-    {
-        var scale = MathUtils.EaseOutBack(SpawnProgress)
-                    * (1f - MathUtils.EaseInCubic(MathUtils.InverseLerp(0.7f, 1f, DeathProgress)));
-        var tilt = _lean + HitKick * HitLeanPerKick
-                   + DeathFallRadians * MathUtils.EaseInCubic(MathUtils.InverseLerp(0f, 0.55f, DeathProgress));
-        var right = new Vector3(MathF.Cos(Facing), 0f, -MathF.Sin(Facing));
-        // Positive about the right axis tips the head backward; the lean is stored as forward-positive.
-        return Matrix4x4.CreateTranslation(-feet)
-               * Matrix4x4.CreateScale(MathF.Max(scale, 0.001f))
-               * Matrix4x4.CreateFromAxisAngle(right, -tilt)
-               * Matrix4x4.CreateTranslation(feet);
-    }
+    /// <inheritdoc />
+    public override float BodyHeight => Height;
 
     /// <inheritdoc />
-    public override Vector3 Velocity => _velocity;
-
-    /// <inheritdoc />
-    protected override void SetVelocity(Vector3 velocity) => _velocity = velocity;
-
-    /// <inheritdoc />
-    public override float BodyHalfExtent => HalfExtent;
-
-    /// <inheritdoc />
-    public override float BodyHalfHeight => Height * 0.5f;
-
-    /// <inheritdoc />
-    public override float HeadAboveCenter => Height * 0.5f;
-
-    /// <summary>Unit horizontal direction the goblin faces (the model faces -Z at yaw 0).</summary>
-    private Vector3 Forward => new(-MathF.Sin(Facing), 0f, -MathF.Cos(Facing));
+    public override float BodyHalfWidth => HalfExtent;
 
     /// <summary>Where a thrown stone leaves the hand: a little in front of the body at
     /// shoulder height.</summary>
@@ -279,14 +191,8 @@ public sealed class Goblin : Mob
     /// <see cref="MobConfig.GoblinMeleeReach"/> and roughly level with the player's
     /// body center.
     /// </summary>
-    public static bool InMeleeReach(Vector3 goblinPosition, Vector3 playerEye)
-    {
-        var dx = playerEye.X - goblinPosition.X;
-        var dz = playerEye.Z - goblinPosition.Z;
-        var reach = MobConfig.GoblinMeleeReach;
-        if (dx * dx + dz * dz > reach * reach) return false;
-        return MathF.Abs(goblinPosition.Y - (playerEye.Y - Camera.EyeHeight * 0.5f)) <= 1.5f;
-    }
+    public static bool InMeleeReach(Vector3 goblinPosition, Vector3 playerEye) =>
+        MobTargets.InMeleeReach(goblinPosition, playerEye, MobConfig.GoblinMeleeReach);
 
     /// <summary>
     /// Throws, naming the model file, unless the goblin's model provides every
@@ -295,52 +201,8 @@ public sealed class Goblin : Mob
     /// </summary>
     public static void ValidateContent(EntityType type)
     {
-        var model = type.Model;
-        foreach (var part in RequiredParts)
-        {
-            if (!model.Parts.TryGetValue(part, out var group) || group.Cubes.Count == 0)
-                throw new InvalidOperationException(
-                    $"Goblin model '{type.ModelPath}' needs a non-empty group named '{part}'.");
-        }
-
-        RequireClip(type, EntityAnimator.IdleClip);
-        RequireClip(type, EntityAnimator.WalkClip);
-        RequireEvent(type, RequireClip(type, ThrowClip), ReleaseEvent);
-        RequireEvent(type, RequireClip(type, MeleeClip), ImpactEvent);
-    }
-
-    private static AnimationClip RequireClip(EntityType type, string name)
-    {
-        foreach (var clip in type.Model.Animations)
-        {
-            if (string.Equals(clip.Name, name, StringComparison.OrdinalIgnoreCase))
-                return clip;
-        }
-
-        throw new InvalidOperationException(
-            $"Goblin model '{type.ModelPath}' has no animation named '{name}'.");
-    }
-
-    private static void RequireEvent(EntityType type, AnimationClip clip, string eventName)
-    {
-        foreach (var e in clip.Events)
-        {
-            if (string.Equals(e.Name, eventName, StringComparison.OrdinalIgnoreCase))
-                return;
-        }
-
-        throw new InvalidOperationException(
-            $"Goblin model '{type.ModelPath}' animation '{clip.Name}' has no '{eventName}' timeline event.");
-    }
-
-    /// <inheritdoc />
-    public override void Shove(Vector3 horizontalDirection, float speed)
-    {
-        if (horizontalDirection.LengthSquared() < 1e-6f) return;
-        horizontalDirection.Y = 0f;
-        horizontalDirection = Vector3.Normalize(horizontalDirection);
-        _velocity.X = horizontalDirection.X * speed;
-        _velocity.Z = horizontalDirection.Z * speed;
+        EntityContract.RequireHumanoid(type, "Goblin", MeleeClip, ImpactEvent);
+        EntityContract.RequireEvent(type, "Goblin", EntityContract.RequireClip(type, "Goblin", ThrowClip), ReleaseEvent);
     }
 
     /// <summary>
@@ -358,8 +220,7 @@ public sealed class Goblin : Mob
     {
         if (deltaTime <= 0f || chunks == null) return;
 
-        TickLife(deltaTime);
-        _hitFlash = MathF.Max(0f, _hitFlash - deltaTime / HitFlashSeconds);
+        TickBody(deltaTime);
         // A slowing status effect stretches the attack cooldowns (AttackFactor 1 = unslowed)
         _throwCooldown = MathF.Max(0f, _throwCooldown - deltaTime * AttackFactor);
         _meleeCooldown = MathF.Max(0f, _meleeCooldown - deltaTime * AttackFactor);
@@ -368,15 +229,7 @@ public sealed class Goblin : Mob
             _noticePipElapsed + deltaTime);
 
         var move = Vector3.Zero;
-        if (IsDying)
-        {
-            player = null;
-            if (!_deathPlayed)
-            {
-                _deathPlayed = true;
-                Animation.Play(DeathClip);
-            }
-        }
+        if (IsDying) player = null;
         if (player != null)
         {
             // The first sight of a player starts the pip; it never restarts on a re-notice
@@ -392,75 +245,23 @@ public sealed class Goblin : Mob
             var dist = to.Length();
             var toward = dist > 1e-3f ? to / dist : Vector3.Zero;
             // The model faces -Z at yaw 0, so this rotation points -Z at the player. It turns over a
-            // few frames rather than snapping, except on the very first look.
+            // few frames rather than snapping, except on the very first look; a fleeing goblin faces
+            // down its escape, not at the player it runs from.
             if (dist > 1e-3f)
-            {
-                var yaw = MathF.Atan2(-to.X, -to.Z);
-                // A fleeing goblin faces down its escape, not at the player it runs from
-                if (IsFleeing) yaw += MathF.PI;
-                if (_facingKnown) TurnToward(yaw, TurnRate, deltaTime);
-                else Facing = yaw;
-                _facingKnown = true;
-            }
+                FaceYaw(YawOf(to) + (IsFleeing ? MathF.PI : 0f), deltaTime);
 
             move = Decide(dist, toward, chunks, player, dodgeAimedThrow);
         }
-        else if (wander is { } goal && !IsDying && !Animation.IsActionPlaying)
+        else if (wander is { } goal)
         {
             // Nobody chased (none noticed, or interest lost): stroll toward the wander goal
-            var to = new Vector3(goal.X - Position.X, 0f, goal.Z - Position.Z);
-            var dist = to.Length();
-            if (dist > MobConfig.MobWanderArriveBlocks)
-            {
-                TurnToward(MathF.Atan2(-to.X, -to.Z), TurnRate, deltaTime);
-                _facingKnown = true;
-                move = to / dist * MobConfig.MobWanderSpeedFactor;
-            }
+            move = WanderMove(goal, deltaTime);
         }
 
-        // Ledge caution: never step off a drop the fall would punish unless the target is down there
-        if (move != Vector3.Zero && IsGrounded
-            && IsLedgeAhead(move, HalfExtent + MobConfig.MobLedgeProbeBlocks, chunks, player?.Eye))
-            move = Vector3.Zero;
-
-        // Walking: ease the horizontal velocity toward the chosen move (or friction toward a
-        // stop), on the ground at full speed and afloat at a paddle, both slowed by a status effect.
-        if (IsGrounded || _inWater)
-        {
-            var speed = IsGrounded
-                ? MobConfig.GoblinWalkSpeed
-                  * (IsFleeing ? MobConfig.GoblinFleeSpeedFactor : 1f) * MoveFactor
-                : MobConfig.GoblinWalkSpeed * SwimSpeedFactor * MoveFactor;
-            var moving = move != Vector3.Zero;
-            var rate = moving ? MoveAccel : IsGrounded ? BodyMotion.GroundFriction : 0f;
-            if (rate > 0f)
-            {
-                _velocity.X = MathUtils.Damp(_velocity.X, move.X * speed, rate, deltaTime);
-                _velocity.Z = MathUtils.Damp(_velocity.Z, move.Z * speed, rate, deltaTime);
-            }
-            if (!moving && IsGrounded)
-            {
-                if (MathF.Abs(_velocity.X) < 0.01f) _velocity.X = 0f;
-                if (MathF.Abs(_velocity.Z) < 0.01f) _velocity.Z = 0f;
-            }
-
-            // Auto-jump a one-block step the goblin walked into last frame.
-            if (moving && _hitWall)
-            {
-                _velocity.Y = MobConfig.GoblinJumpSpeed;
-                IsGrounded = false;
-            }
-        }
-
-        ApplyPhysics(deltaTime, chunks);
-
-        var planarSpeed = MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z);
-        Animation.Update(deltaTime, planarSpeed);
-
-        // Lean into the movement along the facing; afloat it leans back a little as it paddles.
-        var along = _velocity.X * Forward.X + _velocity.Z * Forward.Z;
-        var leanTarget = Math.Clamp(along * LeanPerSpeed, -MaxLean, MaxLean) - (_inWater ? WaterLean : 0f);
-        _lean = MathUtils.Damp(_lean, IsDying ? 0f : leanTarget, 8f, deltaTime);
+        // Walking at full speed on the ground and at a paddle afloat, both slowed by a status effect.
+        Walk(move, player?.Eye,
+            MobConfig.GoblinWalkSpeed * (IsFleeing ? MobConfig.GoblinFleeSpeedFactor : 1f) * MoveFactor,
+            MobConfig.GoblinWalkSpeed * SwimSpeedFactor * MoveFactor, MobConfig.GoblinJumpSpeed, deltaTime, chunks);
     }
 
     // Chooses this frame's horizontal move (a unit vector or zero) and starts a throw or swing
@@ -539,48 +340,4 @@ public sealed class Goblin : Mob
     /// <summary>True once per swing, at the melee clip's impact event; the manager decides
     /// whether the player is still in reach.</summary>
     public bool TryTakeMeleeImpact() => Animation.ConsumeEvent(ImpactEvent);
-
-    private void ApplyPhysics(float deltaTime, ChunkManager chunks)
-    {
-        var feetY = Position.Y - Height * 0.5f;
-        var feetCell = new Vector3(Position.X, feetY, Position.Z).BlockCell();
-        var surfaceY = chunks.GetFluidSurfaceGlobal(feetCell.X, feetCell.Y, feetCell.Z);
-        var floating = feetY < surfaceY;
-        _inWater = floating;
-
-        // Buoyancy, the slime's and the item drops' numbers: a floating goblin eases toward a rise
-        // proportional to how far under the surface its feet are, so it climbs and bobs at the top.
-        if (floating)
-        {
-            _velocity.Y = BodyMotion.FloatTowardSurface(_velocity.Y, surfaceY, feetY, deltaTime);
-            BodyMotion.DragInWater(ref _velocity, deltaTime);
-        }
-        else
-        {
-            _velocity.Y = BodyMotion.Fall(_velocity.Y, deltaTime);
-        }
-
-        var movement = _velocity * deltaTime;
-        var half = new Vector3(HalfExtent, Height * 0.5f, HalfExtent);
-
-        Position = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
-        Position = BoxSweep.MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ);
-        Position = BoxSweep.MoveOnAxis(Position, movement.Y, 1, half, chunks, out var hitY);
-
-        if (hitX) _velocity.X = 0f;
-        if (hitZ) _velocity.Z = 0f;
-        _hitWall = hitX || hitZ;
-
-        if (hitY)
-        {
-            // IsGrounded still holds last frame's answer here, so this is the landing frame
-            if (movement.Y < 0f && !IsGrounded) NoteLanding(-_velocity.Y, BodyMotion.Gravity, _inWater);
-            IsGrounded = movement.Y < 0f;
-            _velocity.Y = 0f;
-        }
-        else
-        {
-            IsGrounded = false;
-        }
-    }
 }

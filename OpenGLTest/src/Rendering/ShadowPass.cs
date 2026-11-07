@@ -5,6 +5,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Lod;
@@ -94,7 +95,7 @@ internal sealed class ShadowPass
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
         PlayerModel? player = null, IReadOnlyList<Slime>? slimes = null,
         IReadOnlyList<LodRegion>? lodRegions = null, IReadOnlyList<Goblin>? goblins = null,
-        IReadOnlyList<Iceberg>? icebergs = null)
+        IReadOnlyList<Iceberg>? icebergs = null, IReadOnlyList<HellMob>? hellMobs = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -174,34 +175,37 @@ internal sealed class ShadowPass
             }
         }
 
-        if (goblins != null && goblins.Count > 0 && Mobs.GoblinMeshes != null && Mobs.GoblinRig != null
-            && Mobs.GoblinPartNames != null)
+        if (goblins != null && goblins.Count > 0 && Mobs.GoblinRig is { } goblinRig)
         {
             // The goblin skin on unit 0, like the player casters: cutout texels would otherwise
             // be alpha-tested against the atlas.
-            Units.BindUnit(0, TextureTarget.Texture2DArray, Mobs.GoblinTexture);
+            Units.BindUnit(0, TextureTarget.Texture2DArray, goblinRig.Texture);
             foreach (var goblin in goblins)
             {
-                var feet = MobPasses.GoblinFeet(goblin);
-                for (var i = 0; i < Mobs.GoblinMeshes.Length; i++)
-                {
-                    var model = goblin.Animation.GetPartMatrix(Mobs.GoblinPartNames[i], Mobs.GoblinRig, feet, goblin.Facing);
-                    _owner.ShadowShader.SetUniform("uModel", model);
-                    _owner.ShadowShader.SetUniform("uLightMVP", model * _owner.NearShadow.ViewProj);
-                    Mobs.GoblinMeshes[i].Render();
-                }
+                DrawRigCaster(goblin, goblinRig);
 
                 // The flint in the hand casts too, on its own texture.
                 if (goblin.Ammo > 0 && _owner.ItemMeshes.TryGet(Mobs.FlintId, out var stone, out var stoneTexture))
                 {
                     Units.BindUnit(0, TextureTarget.Texture2DArray, stoneTexture);
                     var held = Matrix4x4.CreateScale(Goblin.HeldStoneScale)
-                               * goblin.Animation.HandAnchor(Goblin.HandPart, Mobs.GoblinRig, feet, goblin.Facing);
+                               * goblin.Animation.HandAnchor(Goblin.HandPart, goblinRig.Rig, goblin.Feet, goblin.Facing);
                     _owner.ShadowShader.SetUniform("uModel", held);
                     _owner.ShadowShader.SetUniform("uLightMVP", held * _owner.NearShadow.ViewProj);
                     stone.Render();
-                    Units.BindUnit(0, TextureTarget.Texture2DArray, Mobs.GoblinTexture);
+                    Units.BindUnit(0, TextureTarget.Texture2DArray, goblinRig.Texture);
                 }
+            }
+            Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
+        }
+
+        if (hellMobs != null && hellMobs.Count > 0)
+        {
+            foreach (var mob in hellMobs)
+            {
+                if (Mobs.HellRigOf(mob.Type) is not { } rig) continue;
+                Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
+                DrawRigCaster(mob, rig);
             }
             Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
         }
@@ -302,6 +306,18 @@ internal sealed class ShadowPass
 
             _owner.ChunkDraws.Draw(_owner.LodGeometry.Vao, _owner.ChunkShadowShader, _locChunkShadowDrawBase);
             _owner.ChunkShadowShader.SetUniform(_locChunkShadowOpaque, 0);
+        }
+    }
+
+    // Every part of one rigged mob into the near cascade; its skin is already bound on unit 0
+    private void DrawRigCaster(RiggedMob mob, RigMeshes rig)
+    {
+        for (var i = 0; i < rig.Meshes.Length; i++)
+        {
+            var model = rig.PartMatrix(mob, i);
+            _owner.ShadowShader.SetUniform("uModel", model);
+            _owner.ShadowShader.SetUniform("uLightMVP", model * _owner.NearShadow.ViewProj);
+            rig.Meshes[i].Render();
         }
     }
 

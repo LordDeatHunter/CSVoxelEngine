@@ -135,8 +135,10 @@ public static class NetFraming
     /// no gesture for an action it does not know.
     /// 16: a crucible carries one entry per metal (the alloy kiln): the <see cref="NetMessage.StationState"/>
     /// kiln entry writes a metal count and each metal's molten and pending ml, and the inventory snapshot's
-    /// crucible a <c>Metals</c> list; an older peer would misread the station frames.</summary>
-    public const int ProtocolVersion = 16;
+    /// crucible a <c>Metals</c> list; an older peer would misread the station frames.
+    /// 17: <see cref="NetMessage.EntityList"/> also carries the hell mobs (<see cref="NetEntityKind.Hellbrute"/>,
+    /// <see cref="NetEntityKind.Cinderwitch"/>); an older client would not draw them.</summary>
+    public const int ProtocolVersion = 17;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

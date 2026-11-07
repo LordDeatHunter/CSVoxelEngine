@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Player;
@@ -11,6 +12,19 @@ namespace VoxelEngine.Entities;
 /// </summary>
 public static class MobTargets
 {
+    /// <summary>
+    /// Whether a mob body centered at <paramref name="mobCenter"/> can land a melee swing of
+    /// <paramref name="reach"/> blocks on a player whose eye is at <paramref name="eye"/>: horizontally
+    /// within the reach and roughly level with the player's body center.
+    /// </summary>
+    public static bool InMeleeReach(Vector3 mobCenter, Vector3 eye, float reach)
+    {
+        var dx = eye.X - mobCenter.X;
+        var dz = eye.Z - mobCenter.Z;
+        if (dx * dx + dz * dz > reach * reach) return false;
+        return MathF.Abs(mobCenter.Y - (eye.Y - Camera.EyeHeight * 0.5f)) <= 1.5f;
+    }
+
     /// <summary>
     /// Whether an entity cube at <paramref name="center"/> with the given half extent touches the
     /// body box of a player whose eye is at <paramref name="eye"/>. Bodies only touch when they

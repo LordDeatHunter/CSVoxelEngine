@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
@@ -271,6 +272,8 @@ public sealed class WorldLifecycleTests : IDisposable
         // A large slime, so the restore cannot pass on the default size either
         Assert.True(first.SpawnEntity("slime", new Vector3(2f, High - 1f, 2f), SlimeSize.Max));
         Assert.True(first.SpawnEntity("goblin", new Vector3(-2f, High - 1f, 3f)));
+        Assert.True(first.SpawnEntity(Hellbrute.EntityName, new Vector3(3f, High - 1f, -3f)));
+        Assert.True(first.SpawnEntity(Cinderwitch.EntityName, new Vector3(-3f, High - 1f, -3f)));
         var slime = Assert.Single(first.Slimes);
         var goblin = Assert.Single(first.Goblins);
         Assert.True(slime.Size > SlimeSize.Min);
@@ -284,6 +287,14 @@ public sealed class WorldLifecycleTests : IDisposable
         var goblinCenter = goblin.Position;
         var goblinAmmo = goblin.Ammo;
         var goblinHealth = goblin.Health;
+        // Both hell kinds wounded and turned, so the restore keeps each kind and its own state
+        var hellSaved = new List<(Type Kind, Vector3 Center, int Health, float Facing)>();
+        foreach (var hellMob in first.HellMobs)
+        {
+            hellMob.RestoreState(hellMob.MaxHealth - 2, 0.75f, Vector3.Zero);
+            hellSaved.Add((hellMob.GetType(), hellMob.Position, hellMob.Health, hellMob.Facing));
+        }
+        Assert.Equal(2, hellSaved.Count);
 
         var rock = EquipRock(first);
         first.Throws.ThrowSelected();
@@ -310,7 +321,15 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(goblinCenter, restoredGoblin.Position);
         Assert.Equal(goblinAmmo, restoredGoblin.Ammo);
         Assert.Equal(goblinHealth, restoredGoblin.Health);
-        Assert.Equal(2, second.Mobs.Count); // RefreshMobs ran at the flip
+        Assert.Equal(hellSaved.Count, second.HellMobs.Count);
+        foreach (var (kind, center, health, facing) in hellSaved)
+        {
+            var restored = Assert.Single(second.HellMobs, m => m.GetType() == kind);
+            Assert.Equal(center, restored.Position);
+            Assert.Equal(health, restored.Health);
+            Assert.Equal(facing, restored.Facing);
+        }
+        Assert.Equal(4, second.Mobs.Count); // RefreshMobs ran at the flip
 
         var restoredDrop = Assert.Single(second.Drops);
         Assert.Equal(rock, restoredDrop.BlockId);

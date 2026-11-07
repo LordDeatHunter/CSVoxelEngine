@@ -14,6 +14,8 @@ public enum NetEntityKind : byte
     PrimedTnt = 4,
     FallingBlock = 5,
     Iceberg = 6,
+    Hellbrute = 7,
+    Cinderwitch = 8,
 }
 
 /// <summary>
@@ -36,9 +38,10 @@ public enum NetEntityKind : byte
 public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Position, float Yaw,
     int Health, int Ammo, byte ItemId, Vector3 Velocity, byte Effects = 0)
 {
-    /// <summary>Whether <paramref name="kind"/> is a mob (a slime or a goblin), the only kinds the
-    /// client's mob reconcile spawns; drops, primed TNT and falling blocks are mirrored apart.</summary>
-    public static bool IsMob(NetEntityKind kind) => kind is NetEntityKind.Slime or NetEntityKind.Goblin;
+    /// <summary>Whether <paramref name="kind"/> is a mob (a slime, a goblin or a hell mob), the only kinds
+    /// the client's mob reconcile spawns; drops, primed TNT and falling blocks are mirrored apart.</summary>
+    public static bool IsMob(NetEntityKind kind) =>
+        kind is NetEntityKind.Slime or NetEntityKind.Goblin or NetEntityKind.Hellbrute or NetEntityKind.Cinderwitch;
 
     // An iceberg's scale in thousandths fills the low 16 bits of Ammo, its sinking (0..255) the next 8
     private const float IcebergScaleUnits = 1000f;

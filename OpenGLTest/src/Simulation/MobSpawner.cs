@@ -100,38 +100,81 @@ public static class MobSpawner
             var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
 
             var top = feetY + Random.Shared.Next(-searchHalfHeight, searchHalfHeight + 1);
-            var clearAbove = 0;
-            for (var y = top; y > top - scanDepth; y--)
+            // The first floor under two clear cells decides this try
+            if (!TryScanFloor(chunks, x, top, z, scanDepth, out var y)) continue;
+            if (!HellGenerator.InHell(y) && SlimeSize.IsUnderground(y, surface) && !IsLitByBlocks(chunks, x, y + 1, z)
+                && (int)MathF.Round(EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 1.5f, z + 0.5f)).Sun * 15f) <= maxSkyLight)
             {
-                if (!chunks.TryGetCell(x, y, z, out var id, out _)) break;
-                if (BlockType.IsFluid(id))
-                {
-                    clearAbove = 0;
-                    continue;
-                }
-                if (!BlockType.IsSolid(id))
-                {
-                    clearAbove++;
-                    continue;
-                }
-                if (clearAbove < 2)
-                {
-                    clearAbove = 0;
-                    continue;
-                }
-
-                // The first floor under two clear cells decides this try
-                if (!HellGenerator.InHell(y) && SlimeSize.IsUnderground(y, surface) && !IsLitByBlocks(chunks, x, y + 1, z)
-                    && (int)MathF.Round(EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 1.5f, z + 0.5f)).Sun * 15f) <= maxSkyLight)
-                {
-                    groundY = y;
-                    return true;
-                }
-                break;
+                groundY = y;
+                return true;
             }
         }
 
         x = groundY = z = 0;
+        return false;
+    }
+
+    /// <summary>
+    /// The hell mobs' search: up to <paramref name="tries"/> random columns in the ring around the
+    /// player, each scanned down from a random height within <paramref name="searchHalfHeight"/> of the
+    /// player's feet for at most <paramref name="scanDepth"/> cells, taking the first open cavern floor
+    /// (solid ground under two clear, dry cells, every cell loaded). The floor and both cells above it
+    /// must lie in hell (<see cref="HellGenerator.InHell"/>), so nothing is ever found in the overworld or
+    /// the barrier band, and the standing cell's block light must stay at or under
+    /// <see cref="MobConfig.HellSpawnMaxBlockLight"/> (a lava-lit pool edge or a torched base stays
+    /// clear; hell has no skylight). On success <paramref name="groundY"/> is the floor cell's Y.
+    /// </summary>
+    public static bool TryFindHellSpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
+        float maxRadius, int tries, int searchHalfHeight, int scanDepth, out int x, out int groundY, out int z)
+    {
+        var feetY = MathUtils.FloorToInt(playerPosition.Y - Camera.EyeHeight);
+        for (var attempt = 0; attempt < tries; attempt++)
+        {
+            var angle = Random.Shared.NextSingle() * MathF.Tau;
+            var radius = MathUtils.Lerp(minRadius, maxRadius, Random.Shared.NextSingle());
+            x = MathUtils.FloorToInt(playerPosition.X + MathF.Cos(angle) * radius);
+            z = MathUtils.FloorToInt(playerPosition.Z + MathF.Sin(angle) * radius);
+            var top = feetY + Random.Shared.Next(-searchHalfHeight, searchHalfHeight + 1);
+            if (!TryScanFloor(chunks, x, top, z, scanDepth, out var y)) continue;
+            if (!HellGenerator.InHell(y + 2)) continue;
+            var light = EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 1.5f, z + 0.5f));
+            if ((int)MathF.Round(light.Block * 15f) > MobConfig.HellSpawnMaxBlockLight) continue;
+
+            groundY = y;
+            return true;
+        }
+
+        x = groundY = z = 0;
+        return false;
+    }
+
+    // Scans column (x, z) down from top for at most scanDepth cells to the first solid floor with two
+    // clear, dry cells above it; false at an unloaded cell, or when the scan ends without one.
+    private static bool TryScanFloor(ChunkManager chunks, int x, int top, int z, int scanDepth, out int floorY)
+    {
+        var clearAbove = 0;
+        for (var y = top; y > top - scanDepth; y--)
+        {
+            if (!chunks.TryGetCell(x, y, z, out var id, out _)) break;
+            if (BlockType.IsFluid(id))
+            {
+                clearAbove = 0;
+                continue;
+            }
+            if (!BlockType.IsSolid(id))
+            {
+                clearAbove++;
+                continue;
+            }
+            if (clearAbove >= 2)
+            {
+                floorY = y;
+                return true;
+            }
+            clearAbove = 0;
+        }
+
+        floorY = 0;
         return false;
     }
 

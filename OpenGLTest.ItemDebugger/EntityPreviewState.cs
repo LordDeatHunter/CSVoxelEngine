@@ -6,6 +6,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Slimes;
 
 namespace VoxelEngine.ItemDebugger;
@@ -21,7 +22,8 @@ namespace VoxelEngine.ItemDebugger;
 /// named by its file (<see cref="SelectedVariant"/>), and an entity with no health pool is never offered
 /// <see cref="HurtMode"/>.
 /// <para>
-/// A goblin or slime is previewed as the real <see cref="Goblin"/> / <see cref="Slime"/> object, driven
+/// A goblin, a hell mob or a slime is previewed as the real <see cref="RiggedMob"/> (<see cref="Goblin"/>,
+/// <see cref="Hellbrute"/>, <see cref="Cinderwitch"/>) or <see cref="Slime"/> object, driven
 /// the way a client drives a mob it does not simulate (<see cref="Mob.AnimateMirror"/>), so everything the
 /// game layers on top of the clips shows up here too: the spawn pop, the hit recoil and flash (and the
 /// goblin's overlay flinch), the death, the goblin's body pose (<see cref="BodyEffect"/>) and the slime's
@@ -64,7 +66,7 @@ public sealed class EntityPreviewState : IPreviewDriver
     private float _rest;
     private float _hurtTimer;
     private float _cycle;
-    private Goblin? _goblin;
+    private RiggedMob? _rigged;
     private Slime? _slime;
     private ChunkManager? _floor;
 
@@ -106,8 +108,8 @@ public sealed class EntityPreviewState : IPreviewDriver
     /// <summary>True when the selected model authored at least one clip.</summary>
     public bool HasClips => Animator.Clips.Count > 0;
 
-    /// <summary>True when the previewed rig has the hand the goblin holds its flint in.</summary>
-    public bool ShowsHeldStone => Selected != null && Selected.Model.Parts.ContainsKey(Goblin.HandPart);
+    /// <summary>True when the previewed mob is a goblin, which holds its flint in its hand.</summary>
+    public bool ShowsHeldStone => _rigged is Goblin;
 
     /// <summary>Whether the modes replay by themselves (a one-shot after a rest, the hurt pulse, a death or spawn starting
     /// over). Off, each plays once and holds; the <see cref="AnimationClock"/> turns it off and owns the replay.</summary>
@@ -148,10 +150,10 @@ public sealed class EntityPreviewState : IPreviewDriver
     public void Restart()
     {
         var showSpawn = string.Equals(Mode, SpawnMode, StringComparison.OrdinalIgnoreCase);
-        if (_goblin != null)
+        if (_rigged != null)
         {
-            _goblin = NewGoblin(showSpawn);
-            Animator = _goblin.Animation;
+            _rigged = NewRigged(showSpawn)!;
+            Animator = _rigged.Animation;
         }
         else if (_slime != null)
         {
@@ -165,8 +167,8 @@ public sealed class EntityPreviewState : IPreviewDriver
         ResetTimers();
     }
 
-    /// <summary>The mob being previewed (a goblin or a slime), or null for any other entity.</summary>
-    public Mob? PreviewMob => (Mob?)_goblin ?? _slime;
+    /// <summary>The mob being previewed (a goblin, a hell mob or a slime), or null for any other entity.</summary>
+    public Mob? PreviewMob => (Mob?)_rigged ?? _slime;
 
     /// <summary>The hit-flash tint to draw with, 0..1.</summary>
     public float HitFlash => PreviewMob?.HitFlash ?? _flash;
@@ -185,13 +187,13 @@ public sealed class EntityPreviewState : IPreviewDriver
 
     /// <summary>
     /// The pose the clips cannot give, to multiply after each part's matrix (row-vector order): the
-    /// goblin's lean, flinch, death fall and spawn pop (<see cref="Goblin.BodyEffect"/>), or the slime's
+    /// goblin's or a hell mob's lean, flinch, death fall and spawn pop (<see cref="RiggedMob.BodyEffect"/>), or the slime's
     /// squash and stretch about its feet. Identity for any other entity.
     /// </summary>
     public Matrix4x4 BodyEffect()
     {
         var feet = DrawOffset;
-        if (_goblin is { } goblin) return goblin.BodyEffect(feet);
+        if (_rigged is { } rigged) return rigged.BodyEffect(feet);
         if (_slime is { } slime)
             return Matrix4x4.CreateTranslation(-feet)
                    * Matrix4x4.CreateScale(slime.HorizontalScale, slime.VerticalScale, slime.HorizontalScale)
@@ -211,13 +213,11 @@ public sealed class EntityPreviewState : IPreviewDriver
         SelectedIndex = Math.Clamp(index, 0, Entries.Count - 1);
         var type = Entries[SelectedIndex];
         var clips = type.Model.Animations;
-        _goblin = null;
         _slime = null;
-        if (string.Equals(type.Name, "goblin", StringComparison.OrdinalIgnoreCase))
-            _goblin = NewGoblin();
-        else if (string.Equals(type.Name, "slime", StringComparison.OrdinalIgnoreCase))
+        _rigged = NewRigged();
+        if (_rigged == null && string.Equals(type.Name, "slime", StringComparison.OrdinalIgnoreCase))
             _slime = NewSlime();
-        Animator = _goblin?.Animation ?? new EntityAnimator(clips, MobConfig.GoblinWalkSpeed);
+        Animator = _rigged?.Animation ?? new EntityAnimator(clips, MobConfig.GoblinWalkSpeed);
         _variantModes = PreviewMob == null && type.Variants.Count > 1;
         SelectedVariant = 0;
         Modes = ModesFor(type, clips);
@@ -286,28 +286,28 @@ public sealed class EntityPreviewState : IPreviewDriver
         Elapsed += deltaTime;
 
         if (_slime != null) UpdateSlime(deltaTime);
-        else if (_goblin != null) UpdateGoblin(deltaTime);
+        else if (_rigged != null) UpdateRigged(deltaTime);
         else UpdateGeneric(deltaTime);
     }
 
-    // ---- goblin --------------------------------------------------------------------------
+    // ---- goblin and hell mobs --------------------------------------------------------------
 
-    private void UpdateGoblin(float dt)
+    private void UpdateRigged(float dt)
     {
-        var goblin = _goblin!;
+        var mob = _rigged!;
         var walking = string.Equals(Mode, EntityAnimator.WalkClip, StringComparison.OrdinalIgnoreCase);
-        // The mirrored velocity is what walks the clip (a client's goblin is driven the same way).
-        goblin.NetworkSetState(Vector3.Zero, 0f, goblin.Health,
+        // The mirrored velocity is what walks the clip (a client's mob is driven the same way).
+        mob.NetworkSetState(Vector3.Zero, 0f, mob.Health,
             walking ? new Vector3(0f, 0f, Animator.WalkReferenceSpeed) : Vector3.Zero);
 
         if (string.Equals(Mode, DeathMode, StringComparison.OrdinalIgnoreCase))
         {
-            if (!goblin.IsDying) goblin.BeginDying();
+            if (!mob.IsDying) mob.BeginDying();
             _cycle += dt;
-            if (Replay && goblin.IsRemovable && _cycle >= goblin.DeathSeconds + RestBetweenPlays)
+            if (Replay && mob.IsRemovable && _cycle >= mob.DeathSeconds + RestBetweenPlays)
             {
-                _goblin = NewGoblin();
-                Animator = _goblin.Animation;
+                _rigged = NewRigged()!;
+                Animator = _rigged.Animation;
                 _cycle = 0f;
             }
         }
@@ -316,32 +316,32 @@ public sealed class EntityPreviewState : IPreviewDriver
             _cycle += dt;
             if (Replay && _cycle >= SpawnPeriod)
             {
-                _goblin = NewGoblin();
-                Animator = _goblin.Animation;
+                _rigged = NewRigged()!;
+                Animator = _rigged.Animation;
                 _cycle = 0f;
             }
         }
         else if (Mode == HurtMode)
         {
-            HurtPulse(goblin, dt);
+            HurtPulse(mob, dt);
         }
         else if (!walking && !string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase))
         {
             // A one-shot (throw, melee): the rest only counts down between plays, so each play ends,
             // rests RestBetweenPlays, then starts again (the first starts at once).
-            if (!goblin.Animation.IsPlaying(Mode))
+            if (!mob.Animation.IsPlaying(Mode))
             {
                 _rest -= dt;
                 if (_rest <= 0f)
                 {
-                    goblin.Animation.Play(Mode);
+                    mob.Animation.Play(Mode);
                     _rest = RestFor(RestBetweenPlays);
                 }
             }
         }
 
-        _goblin!.AnimateMirror(dt);
-        _goblin.Animation.DrainEvents();
+        _rigged!.AnimateMirror(dt);
+        _rigged.Animation.DrainEvents();
     }
 
     // ---- slime ---------------------------------------------------------------------------
@@ -452,10 +452,10 @@ public sealed class EntityPreviewState : IPreviewDriver
 
     private void Respawn()
     {
-        if (_goblin != null)
+        if (_rigged != null)
         {
-            _goblin = NewGoblin();
-            Animator = _goblin.Animation;
+            _rigged = NewRigged()!;
+            Animator = _rigged.Animation;
         }
         else if (_slime != null)
         {
@@ -463,7 +463,19 @@ public sealed class EntityPreviewState : IPreviewDriver
         }
     }
 
-    private Goblin NewGoblin(bool spawnIn = true) => new(Selected!, Vector3.Zero, ammo: 3, spawnIn);
+    // The selected kind's own mob when it is a clip-animated one (a goblin with stones to hold, a hell
+    // mob), else null
+    private RiggedMob? NewRigged(bool spawnIn = true)
+    {
+        var type = Selected!;
+        if (string.Equals(type.Name, "goblin", StringComparison.OrdinalIgnoreCase))
+            return new Goblin(type, Vector3.Zero, ammo: 3, spawnIn);
+        if (string.Equals(type.Name, Hellbrute.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new Hellbrute(type, Vector3.Zero, spawnIn);
+        if (string.Equals(type.Name, Cinderwitch.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new Cinderwitch(type, Vector3.Zero, spawnIn);
+        return null;
+    }
 
     private Slime NewSlime() => new(Selected!, SlimeStart);
 

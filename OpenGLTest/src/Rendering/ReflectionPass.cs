@@ -412,7 +412,7 @@ internal sealed class ReflectionPass
         if (Mobs.SlimeMesh != null)
             foreach (var slime in entities.Slimes)
                 if (KeepForMirror(eye, slime.Position)) _mirrorSlimes.Add(slime);
-        if (Mobs.GoblinMeshes != null)
+        if (Mobs.GoblinRig != null)
             foreach (var goblin in entities.Goblins)
                 if (KeepForMirror(eye, goblin.Position)) _mirrorGoblins.Add(goblin);
         // A berg's waterline center feeds the reuse motion signal, so a drifting berg refreshes it

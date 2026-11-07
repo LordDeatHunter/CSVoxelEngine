@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Networking;
 
@@ -62,7 +63,13 @@ internal sealed class ServerBroadcasts
         for (var i = 0; i < mobs.Count; i++)
         {
             var mob = mobs[i];
-            var kind = mob is Slime ? NetEntityKind.Slime : NetEntityKind.Goblin;
+            var kind = mob switch
+            {
+                Slime => NetEntityKind.Slime,
+                Hellbrute => NetEntityKind.Hellbrute,
+                Cinderwitch => NetEntityKind.Cinderwitch,
+                _ => NetEntityKind.Goblin,
+            };
             // The int field is a goblin's ammo and a slime's size (NetEntity)
             var ammo = mob switch
             {
