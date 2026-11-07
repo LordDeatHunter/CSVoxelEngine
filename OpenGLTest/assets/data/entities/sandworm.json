@@ -1,0 +1,7 @@
+{
+  "name": "Sandworm",
+  // The desert boss: a chain of segments sharing this one pool, summoned with the thumper (plans/SANDWORM.md)
+  "hp": 500,
+  "loot": "sandworm",
+  "model": "assets/models/entity/sandworm.bbmodel"
+}

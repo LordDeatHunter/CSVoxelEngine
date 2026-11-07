@@ -1,0 +1,16 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/sandworm_fang", "weight": 1, "count": { "min": 3, "max": 5 } }
+      ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "block/sandstone", "weight": 1, "count": { "min": 8, "max": 16 } }
+      ]
+    }
+  ]
+}
