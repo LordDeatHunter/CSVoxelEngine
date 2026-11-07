@@ -125,7 +125,7 @@ public sealed class KilnManagerTests
 
         kilns.Update(0.1f, manager, drops);
 
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(Kiln.MultiblockSize))
         {
             var cell = anchor + new Vector3(dx, dy, dz);
             var (id, state) = Cell(manager, cell);
@@ -157,7 +157,7 @@ public sealed class KilnManagerTests
 
         // The anchor's cell is left exactly as the blast left it; only its parts revert
         Assert.Equal(0, Cell(manager, anchor).Id);
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(Kiln.MultiblockSize))
         {
             if (dx == 0 && dy == 0 && dz == 0) continue;
             var (id, state) = Cell(manager, anchor + new Vector3(dx, dy, dz));
@@ -208,14 +208,14 @@ public sealed class KilnManagerTests
             // The list entry is the flame minus the particle offset, so the system's own
             // "cell + SpawnOffset" lands exactly on FireLocal rotated to this facing
             var flame = kilns.LitCells[0] + FireParticleSystem.SpawnOffset - anchor;
-            var expected = MultiblockShape.RotatePoint(KilnRenderer.FireLocal, facing);
+            var expected = MultiblockShape.RotatePoint(KilnRenderer.FireLocal, facing, KilnRenderer.VolumeSize);
             Assert.Equal(expected.X, flame.X, precision: 4);
             Assert.Equal(expected.Y, flame.Y, precision: 4);
             Assert.Equal(expected.Z, flame.Z, precision: 4);
 
             // Inside the structure's footprint, standing on the hearth floor under the lintel
-            Assert.InRange(flame.X, 0f, (float)MultiblockShape.Size);
-            Assert.InRange(flame.Z, 0f, (float)MultiblockShape.Size);
+            Assert.InRange(flame.X, 0f, (float)KilnRenderer.VolumeSize);
+            Assert.InRange(flame.Z, 0f, (float)KilnRenderer.VolumeSize);
             Assert.InRange(flame.Y, KilnRenderer.OpeningFloorY, KilnRenderer.OpeningCeilingY);
 
             // The point light rides 0.65 higher and still clears the lintel

@@ -11,7 +11,7 @@ using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.Content.Blocks;
 
-/// <summary>Reads and validates the shape-related fields of a block's JSON (material, flame, facing and support, pane, facingFromLook, open, tree wood, collidesByHitbox and hitboxes), each error naming the block file.</summary>
+/// <summary>Reads and validates the shape-related fields of a block's JSON (material, flame, facing and support, multiblock size, pane, facingFromLook, open, tree wood, collidesByHitbox and hitboxes), each error naming the block file.</summary>
 internal static class BlockSchemaParser
 {
     /// <summary>
@@ -173,6 +173,23 @@ internal static class BlockSchemaParser
             throw new InvalidOperationException($"Block '{path}' declares an open object without a model.");
         return ParseHitboxes(open.Hitbox, path)
                ?? throw new InvalidOperationException($"Block '{path}' declares an open object without a hitbox.");
+    }
+
+    /// <summary>
+    /// Reads a multiblock anchor's <c>multiblock.size</c>, the edge length of its cubic volume in
+    /// cells: <see cref="MultiblockShape.DefaultSize"/> when omitted, and anything outside
+    /// <see cref="MultiblockShape.MinSize"/>..<see cref="MultiblockShape.MaxSize"/> (the most the
+    /// state byte's two bits per offset hold) throws naming the file. 0 for a block that is not
+    /// an anchor.
+    /// </summary>
+    internal static int ParseMultiblockSize(BlockDefinition.MultiblockDefinition? definition, string path)
+    {
+        if (definition == null) return 0;
+        var size = definition.Size ?? MultiblockShape.DefaultSize;
+        if (!MultiblockShape.IsValidSize(size))
+            throw new InvalidOperationException(
+                $"Block '{path}' has multiblock.size {size}; a multiblock is {MultiblockShape.MinSize}..{MultiblockShape.MaxSize} cells along each edge.");
+        return size;
     }
 
     /// <summary>

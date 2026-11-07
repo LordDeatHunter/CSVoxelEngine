@@ -87,9 +87,9 @@ public sealed class KilnContentTests
         {
             foreach (var position in quad.Positions)
             {
-                Assert.InRange(position.X, -Epsilon, MultiblockShape.Size + Epsilon);
-                Assert.InRange(position.Y, -Epsilon, MultiblockShape.Size + Epsilon);
-                Assert.InRange(position.Z, -Epsilon, MultiblockShape.Size + Epsilon);
+                Assert.InRange(position.X, -Epsilon, anchor.MultiblockSize + Epsilon);
+                Assert.InRange(position.Y, -Epsilon, anchor.MultiblockSize + Epsilon);
+                Assert.InRange(position.Z, -Epsilon, anchor.MultiblockSize + Epsilon);
             }
 
             // A cullface would be tested against the structure's own part cells, and a full
@@ -124,10 +124,10 @@ public sealed class KilnContentTests
         // Rotating to facing 1 turns the opening onto +Z, so the back wall moves with it
         var rotatedWalls = anchor.RotatedModels[1].Quads
             .Where(q => q.Face == 1 &&
-                        MathF.Abs(Range(q, p => p.Z).Max - (MultiblockShape.Size - KilnRenderer.OpeningDepthZ)) <= Epsilon)
+                        MathF.Abs(Range(q, p => p.Z).Max - (anchor.MultiblockSize - KilnRenderer.OpeningDepthZ)) <= Epsilon)
             .ToList();
         var rotatedWall = Assert.Single(rotatedWalls);
-        Assert.Equal(MultiblockShape.Size - KilnRenderer.OpeningDepthZ, Range(rotatedWall, p => p.Z).Min, 3);
+        Assert.Equal(anchor.MultiblockSize - KilnRenderer.OpeningDepthZ, Range(rotatedWall, p => p.Z).Min, 3);
     }
 
     [Fact]

@@ -7,8 +7,9 @@
 Tracks `TODO.md` `P-44` (which points here): tin as a second, weaker and commoner metal, bronze as a
 smeltable alloy (3 copper + 1 tin = 4 bronze) and the 3x3x3 alloy furnace that makes it. Design interview
 done. Last updated 2026-11-07. Everything below is a design decision, not a measurement; numbers are
-first guesses. `A-1` (tin) shipped. Work the items in ID order, one phase per prompt; `A-2` and `A-3` are
-the risky foundation.
+first guesses. `A-1` (tin) and `A-2` (per-structure multiblock size: `multiblock.size` 2..4, two bits per offset in
+the state byte, kiln bytes unchanged) shipped. Work the items in ID order, one phase per prompt; `A-3`
+is the remaining risky foundation.
 
 Decisions already made:
 
@@ -37,13 +38,6 @@ Decisions already made:
 
 ### Furnace foundation
 
-- [ ] **`A-2` Per-structure multiblock size** - P1, M.
-  `Multiblock.Size`/`MultiblockShape.Size` is 2 today. Make the size a property of the structure: the
-  state byte becomes facing (2 bits) + three 2-bit offsets (exactly a byte), the quarter-turn rotation
-  center, `MultiblockPlacement.TryFindVolume`'s candidate search, `Convert`/`Revert`, the integrity check
-  and the kiln sweep all take it. The 2x2x2 kiln must stay byte-identical in behavior.
-  **Hook:** `Interaction/Multiblock.cs`, `MultiblockPlacement.cs`, `Content/Shapes/MultiblockShape.cs`,
-  `Content/Models/ModelBakeSteps.cs` (`ValidateMultiblockBake`).
 - [ ] **`A-3` Data-driven kiln** - P1, M.
   The block's `kiln` flag becomes an object (fuel cap, melt speed factor, can-alloy); `KilnManager`'s
   `MaxFuel`/`MeltSeconds`/`MeltChunkMl` become per-kiln values read through the anchor's block;
@@ -60,8 +54,9 @@ Decisions already made:
   **Tests:** pure rule tests for the 3:1 resolve, refusal in the plain kiln and conservation.
 - [ ] **`A-5` Alloy furnace** - P1, M.
   `alloy_bricks` (cube block + recipe), the furnace anchor and part blocks (3x3x3 model authored in
-  0..48 units, opening on north), the converter item entry, loot (the one brick that cell was built
-  from), fuel 8 and x1.5 melt through `A-3`. Needs `A-2` and `A-3`.
+  0..48 units, opening on north, `multiblock.size: 3`), the converter item entry, loot (the one brick that cell was built
+  from), fuel 8 and x1.5 melt through `A-3`. `KilnRenderer`'s spots (`VolumeSize` 2) describe the
+  2x2x2 kiln's model only, so the furnace needs its own. Needs `A-3`.
   **Hook:** `data/blocks`, `data/models/block`, `ConvertMultiblockItem`.
 - [ ] **`A-6` Bronze** - P1, S-M.
   `data/molten/bronze.json`, bronze ingot, heads and tools, melt and cast recipes (the ingot, axe,

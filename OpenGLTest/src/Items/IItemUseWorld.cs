@@ -74,7 +74,7 @@ public interface IItemUseWorld
     bool IgniteCampfire(int x, int y, int z);
 
     /// <summary>Whether this cell belongs to a kiln structure that is unlit and holds fuel, so a
-    /// strike would light it. Any of the structure's eight cells answers for the whole.</summary>
+    /// strike would light it. Any cell of the structure answers for the whole.</summary>
     bool CanIgniteKiln(int x, int y, int z);
 
     /// <summary>Lights the kiln this cell belongs to, spending its first unit of fuel; false when
@@ -82,7 +82,7 @@ public interface IItemUseWorld
     bool IgniteKiln(int x, int y, int z);
 
     /// <summary>
-    /// Turns the 2x2x2 volume of <paramref name="sourceId"/> that the clicked face belongs to
+    /// Turns the volume (the anchor's size) of <paramref name="sourceId"/> that the clicked face belongs to
     /// into the <paramref name="anchorId"/> multiblock, with its opening pointed back at the
     /// player. The world picks the volume from its own camera (see
     /// <see cref="MultiblockPlacement.TryFindVolume"/>), so item code passes only the hit.

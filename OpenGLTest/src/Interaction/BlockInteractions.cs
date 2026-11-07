@@ -111,7 +111,7 @@ internal sealed class BlockInteractions
 
     /// <summary>
     /// Resolves the kiln structure a cell belongs to and makes sure it is tracked, so any of its
-    /// eight cells answers for the whole. False when the cell is not part of a kiln.
+    /// cells answers for the whole. False when the cell is not part of a kiln.
     /// </summary>
     internal bool TryTrackKilnAt(int x, int y, int z, out Vector3 anchor)
     {

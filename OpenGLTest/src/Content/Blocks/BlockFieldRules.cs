@@ -58,8 +58,8 @@ internal static class BlockFieldRules
     }
 
     /// <summary>
-    /// A multiblock is a structure built out of eight cells: the anchor names the part that fills
-    /// the other seven and the plain block it is built from and reverts to, and only an anchor can
+    /// A multiblock is a structure built out of a cube of cells: the anchor names the part that fills
+    /// the others and the plain block it is built from and reverts to, and only an anchor can
     /// be a kiln. Both halves are ordinary solid full cells to everything but the mesher, so the
     /// anchor's surface really does cover its neighbors - which cutout, translucent and fluid would
     /// all break.

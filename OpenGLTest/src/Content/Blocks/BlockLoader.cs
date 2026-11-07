@@ -155,6 +155,7 @@ internal static class BlockLoader
             FlamePoints = flamePoints,
             Renderer = renderer,
             Pane = paneProfile,
+            MultiblockSize = BlockSchemaParser.ParseMultiblockSize(definition.Multiblock, path),
             Kiln = definition.Kiln ?? false,
             SpellBuilder = definition.SpellBuilder ?? false,
             StackMax = (byte)stack.StackMax,

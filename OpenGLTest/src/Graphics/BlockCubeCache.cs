@@ -48,7 +48,7 @@ public class BlockCubeCache : IDisposable
         mesh = type.BakedModel == null ? CreateFallbackCube(type)
             : type.Renderer == BlockRenderer.Multiblock
                 ? Primitives.CreateBlockModel(_gl, type.BakedModel.Quads,
-                    1f / MultiblockShape.Size, MultiblockShape.Size / 2f)
+                    1f / type.MultiblockSize, type.MultiblockSize / 2f)
                 : Primitives.CreateBlockModel(_gl, type.BakedModel);
         _meshes[blockId] = mesh;
         return mesh;

@@ -346,7 +346,7 @@ internal sealed class BlockEditor
     }
 
     /// <summary>
-    /// Converts the 2x2x2 volume of <paramref name="sourceId"/> that the clicked face belongs
+    /// Converts the volume (the anchor's size) of <paramref name="sourceId"/> that the clicked face belongs
     /// to into the <paramref name="anchorId"/> multiblock, opening toward the player
     /// (see <see cref="MultiblockPlacement.TryFindVolume"/>). The clicked cell's chunk remeshes
     /// synchronously so the click frame already shows the structure; the rest of the touched
@@ -357,12 +357,12 @@ internal sealed class BlockEditor
         Vector3 viewDirection)
     {
         if (BlockType.ById[anchorId] is not { } anchorType) return false;
-        if (!MultiblockPlacement.TryFindVolume(_chunkManager.GetBlockGlobal, sourceId, hitCell,
+        if (!MultiblockPlacement.TryFindVolume(_chunkManager.GetBlockGlobal, sourceId, anchorType.MultiblockSize, hitCell,
                 hitNormal, viewDirection, out var anchor, out var facing))
             return false;
 
         // A live falling cube owns its cell: never bury one inside the structure
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(anchorType.MultiblockSize))
         {
             if (_falling.OverlapsAny((int)anchor.X + dx, (int)anchor.Y + dy, (int)anchor.Z + dz))
                 return false;
@@ -370,7 +370,7 @@ internal sealed class BlockEditor
 
         var touchedChunks = new HashSet<Vector3>();
         Multiblock.Convert(_chunkManager, anchor, facing, anchorType, touchedChunks);
-        NotifyLodEditMultiblock(anchor);
+        NotifyLodEditMultiblock(anchor, anchorType);
 
         _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(hitCell), hitCell);
         foreach (var chunkPos in touchedChunks)
@@ -380,24 +380,24 @@ internal sealed class BlockEditor
         }
 
         OnMultiblockConverted(anchor, facing, anchorType);
-        // A client forwards all eight cells (the anchor and its parts, each with the facing and
+        // A client forwards every cell (the anchor and its parts, each with the facing and
         // offset in its state byte), so the server holds the same structure
-        RaiseBlockEditedMultiblock(anchor);
+        RaiseBlockEditedMultiblock(anchor, anchorType);
         return true;
     }
 
-    /// <summary><see cref="RaiseBlockEdited"/> over every cell of the 2x2x2 structure at
+    /// <summary><see cref="RaiseBlockEdited"/> over every cell of the structure at
     /// <paramref name="anchor"/>.</summary>
-    private void RaiseBlockEditedMultiblock(Vector3 anchor)
+    private void RaiseBlockEditedMultiblock(Vector3 anchor, BlockType anchorType)
     {
         if (BlockEdited == null)
             return;
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(anchorType.MultiblockSize))
             RaiseBlockEdited(anchor + new Vector3(dx, dy, dz));
     }
 
     /// <summary>
-    /// Mining any cell of a multiblock takes the whole structure down: the other seven cells go
+    /// Mining any cell of a multiblock takes the whole structure down: the other cells go
     /// back to the source block in one batch and the mined cell rolls the structure's loot when
     /// <paramref name="dropsLoot"/> (not for a creative break, and never on a client, whose break
     /// is a prediction). An orphaned cell (its anchor already blasted away) just pops on its own.
@@ -414,7 +414,7 @@ internal sealed class BlockEditor
 
         var touchedChunks = new HashSet<Vector3>();
         Multiblock.Revert(_chunkManager, anchor, anchorType, blockPos, touchedChunks);
-        NotifyLodEditMultiblock(anchor);
+        NotifyLodEditMultiblock(anchor, anchorType);
 
         _chunkManager.ImmediateRemeshWithBorders(VoxelCoords.ChunkPosOf(blockPos), blockPos);
         foreach (var chunkPos in touchedChunks)
@@ -427,9 +427,9 @@ internal sealed class BlockEditor
             _dropManager.SpawnLoot(brokenId, blockPos);
 
         OnMultiblockBroken(anchor, anchorType, blockPos);
-        // The other seven cells went back to the source block: a client forwards them too, or
+        // The other cells went back to the source block: a client forwards them too, or
         // the server would keep invisible part cells standing (RemoveBlock reports the mined one)
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(anchorType.MultiblockSize))
         {
             var cell = anchor + new Vector3(dx, dy, dz);
             if (cell != blockPos)
@@ -571,11 +571,11 @@ internal sealed class BlockEditor
             _lodManager.MarkEditedColumn(x, z);
     }
 
-    /// <summary>Runs <see cref="NotifyLodEdit"/> over every cell of the 2x2x2 structure at
+    /// <summary>Runs <see cref="NotifyLodEdit"/> over every cell of the structure at
     /// <paramref name="anchor"/>, after a convert or a revert rewrote them.</summary>
-    private void NotifyLodEditMultiblock(Vector3 anchor)
+    private void NotifyLodEditMultiblock(Vector3 anchor, BlockType anchorType)
     {
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(anchorType.MultiblockSize))
             NotifyLodEdit((int)anchor.X + dx, (int)anchor.Y + dy, (int)anchor.Z + dz);
     }
 }

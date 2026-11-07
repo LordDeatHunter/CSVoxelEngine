@@ -298,7 +298,7 @@ public sealed class KilnManager
 
     /// <summary>
     /// Burns down lit kilns and sweeps broken ones. A structure whose anchor cell no longer holds
-    /// its anchor block, or that lost any of its eight cells, is reverted to the block it was
+    /// its anchor block, or that lost any cell of its volume, is reverted to the block it was
     /// built from, drops its fuel and is forgotten — that is the only cleanup a blast gets, since
     /// <see cref="TntManager"/> clears cells without knowing about structures. A kiln with a cell
     /// in an unloaded chunk freezes instead, so a half-loaded structure is never mangled.
@@ -414,7 +414,7 @@ public sealed class KilnManager
 
         // The cells went back to their source block, which can re-tile the far LOD
         if (lod == null) return;
-        foreach (var (dx, dy, dz) in Multiblock.Offsets)
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(anchorType.MultiblockSize))
         {
             int cx = key.X + dx, cy = key.Y + dy, cz = key.Z + dz;
             if (LodSurface.RecordEdit(chunks, cx, cy, cz))

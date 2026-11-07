@@ -406,7 +406,7 @@ internal static class ChunkMeshBuilder
             }
 
             // A multiblock part is a solid, occluding cell that draws nothing: the anchor's
-            // model already covers the whole 2x2x2 volume it belongs to.
+            // model already covers the whole volume it belongs to.
             if (type.Renderer == BlockRenderer.MultiblockPart) continue;
 
             // ...and the anchor draws that whole model, pre-rotated to the facing its state

@@ -195,7 +195,7 @@ public static class ContentRegistry
             switch (type.Renderer)
             {
                 // A multiblock cell's model says nothing about the cell it sits in: the anchor holds
-                // the whole 2x2x2 structure (so its bake is never a full cube of its own cell) and a
+                // the whole structure (so its bake is never a full cube of its own cell) and a
                 // part draws nothing at all. The surface of the structure really does cover its
                 // neighbors, so it occludes by default; and its quads carry no cullface, so they
                 // are lit from the anchor's own cell, which means light has to reach that cell.
@@ -219,9 +219,9 @@ public static class ContentRegistry
                 type.RotatedModels =
                 [
                     baked,
-                    MultiblockShape.Rotate(baked, 1),
-                    MultiblockShape.Rotate(baked, 2),
-                    MultiblockShape.Rotate(baked, 3),
+                    MultiblockShape.Rotate(baked, 1, type.MultiblockSize),
+                    MultiblockShape.Rotate(baked, 2, type.MultiblockSize),
+                    MultiblockShape.Rotate(baked, 3, type.MultiblockSize),
                 ];
             }
 

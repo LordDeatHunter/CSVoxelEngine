@@ -231,7 +231,7 @@ public sealed class ItemDefinition
         /// for flint. Right-clicking the block adds one unit, right-clicking anything else
         /// grounds a fresh pile of one. For <c>ignite_campfire</c> it names the firepit
         /// block (a max-count branch pile) the spark can light, and for
-        /// <c>convert_multiblock</c> the <em>source block</em> the 2x2x2 volume must be
+        /// <c>convert_multiblock</c> the <em>source block</em> the structure's volume must be
         /// built from, e.g. <c>block/mud_bricks</c>.
         /// </summary>
         public string? Block { get; set; }

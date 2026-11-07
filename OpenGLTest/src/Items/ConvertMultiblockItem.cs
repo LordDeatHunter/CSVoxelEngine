@@ -5,11 +5,11 @@ using VoxelEngine.UI.InventoryPanel;
 namespace VoxelEngine.Items;
 
 /// <summary>
-/// Turns a hand-built 2x2x2 cube of <see cref="Item.UseBlockId"/> into the multiblock anchor
+/// Turns a hand-built cube (the anchor's <see cref="BlockType.MultiblockSize"/>) of <see cref="Item.UseBlockId"/> into the multiblock anchor
 /// named by <see cref="Item.UseResultId"/>: the aimed cell picks the volume (see
-/// <see cref="MultiblockPlacement.TryFindVolume"/>, which tries right-down, right-up, left-down
-/// then left-up and points the structure's opening back at the player), and the world writes the
-/// anchor plus its seven parts.
+/// <see cref="MultiblockPlacement.TryFindVolume"/>, which prefers the volume reaching farthest right,
+/// then farthest down, and points the structure's opening back at the player), and the world writes the
+/// anchor plus its parts.
 ///
 /// The converter is an endless tool: it spends no durability, consumes no stack and never
 /// morphs, so one is enough forever.

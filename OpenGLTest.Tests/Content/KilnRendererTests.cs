@@ -35,7 +35,7 @@ public sealed class KilnRendererTests
         foreach (var x in new[] { KilnRenderer.OpeningMinX, KilnRenderer.OpeningMaxX })
         foreach (var z in new[] { 0f, KilnRenderer.OpeningDepthZ })
         {
-            var corner = MultiblockShape.RotatePoint(new Vector3(x, KilnRenderer.OpeningFloorY, z), facing);
+            var corner = MultiblockShape.RotatePoint(new Vector3(x, KilnRenderer.OpeningFloorY, z), facing, KilnRenderer.VolumeSize);
             minX = MathF.Min(minX, corner.X);
             maxX = MathF.Max(maxX, corner.X);
             minZ = MathF.Min(minZ, corner.Z);

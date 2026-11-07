@@ -197,11 +197,11 @@ public static class LodSurface
     /// <item>BlockEditor.FellWood (the lowest felled cell per column)</item>
     /// <item>IItemUseWorld.MarkLodColumnEdited (item uses: the TNT a firestarter primes)</item>
     /// <item>BlockPlacer.PlaceBlockAtFace (surface-solid placements only)</item>
-    /// <item>BlockEditor.TryConvertMultiblock and BlockEditor.RevertMultiblock (all eight cells)</item>
+    /// <item>BlockEditor.TryConvertMultiblock and BlockEditor.RevertMultiblock (every cell of the volume)</item>
     /// <item>FallingBlockManager.TryTopple (the highest then the lowest cell of the toppled run)
     /// and its Settle (a surface-solid landing)</item>
     /// <item>TntManager.Detonate (the highest then the lowest blasted cell per column)</item>
-    /// <item>KilnManager.Update (the integrity sweep's revert, all eight cells)</item>
+    /// <item>KilnManager.Update (the integrity sweep's revert, every cell of the volume)</item>
     /// <item>FluidCells.Write (block writes above the column's generated water level: lava
     /// hardening, dirt turning to mud)</item>
     /// </list>

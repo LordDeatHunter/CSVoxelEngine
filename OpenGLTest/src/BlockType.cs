@@ -298,7 +298,7 @@ public sealed record BlockType
     /// other renderer.</summary>
     public PaneProfile? Pane { get; init; }
 
-    /// <summary>Block filling the seven non-anchor cells of this multiblock's 2x2x2 volume, or
+    /// <summary>Block filling the non-anchor cells of this multiblock's volume, or
     /// 0 when the block is not a <see cref="BlockRenderer.Multiblock"/> anchor. Resolved after
     /// every block is loaded, since the part's own file may come later alphabetically.</summary>
     public byte MultiblockPartId { get; internal set; }
@@ -306,6 +306,11 @@ public sealed record BlockType
     /// <summary>Plain block this multiblock is built from and reverts to (mud bricks for the
     /// kiln), or 0 when the block is not a multiblock anchor.</summary>
     public byte MultiblockSourceId { get; internal set; }
+
+    /// <summary>Edge length in cells of this multiblock anchor's cubic volume (its
+    /// <c>multiblock.size</c>, 2 for the kiln), which every structure rule and the model's
+    /// rotation center read; 0 when the block is not a multiblock anchor.</summary>
+    public int MultiblockSize { get; init; }
 
     /// <summary>Whether this multiblock anchor is a kiln: it holds fuel, can be lit and is
     /// swept for structural damage. Only ever set on a <see cref="BlockRenderer.Multiblock"/>
@@ -321,7 +326,7 @@ public sealed record BlockType
     /// The baked model pre-rotated to each of the four horizontal facings, indexed by facing 0..3
     /// (<c>[0]</c> is <see cref="BakedModel"/> itself, the authored north-facing bake), which the
     /// mesher picks by the state byte's low two bits. Null for every block but a
-    /// <see cref="BlockRenderer.Multiblock"/> anchor (turned about its 2x2x2 volume, see
+    /// <see cref="BlockRenderer.Multiblock"/> anchor (turned about its own volume, see
     /// <see cref="MultiblockShape.Rotate"/>) and a <see cref="HasHorizontalFacing"/> block
     /// (turned about its own cell, see <see cref="HorizontalFacing.RotateModel"/>).
     /// </summary>

@@ -11,7 +11,7 @@ namespace VoxelEngine.Content.Stations;
 /// it holds sit inside it. Every number here mirrors
 /// <c>assets/models/block/mud_brick_kiln.json</c>, which is authored in 0..32 model units with
 /// the opening on north (-Z) - so these are cell-space values in the volume's local frame,
-/// 0..<see cref="MultiblockShape.Size"/> on every axis, and <see cref="ToWorld"/> turns one of
+/// 0..<see cref="VolumeSize"/> on every axis, and <see cref="ToWorld"/> turns one of
 /// them onto the kiln's actual facing.
 ///
 /// GL-free and pure, like <see cref="QuernRenderer"/>: the manager, the render pass and the
@@ -19,6 +19,10 @@ namespace VoxelEngine.Content.Stations;
 /// </summary>
 public static class KilnRenderer
 {
+    /// <summary>Edge length in cells of the kiln's volume, which its model (0..32 model units)
+    /// and every number here are authored in; the kiln block's <c>multiblock.size</c>.</summary>
+    public const int VolumeSize = MultiblockShape.DefaultSize;
+
     /// <summary>West edge of the opening (model x = 8, between the two piers).</summary>
     public const float OpeningMinX = 8f / 16f;
 
@@ -122,5 +126,5 @@ public static class KilnRenderer
     /// cell (the volume's minimum corner) is <paramref name="anchor"/> and which faces
     /// <paramref name="facing"/>.</summary>
     public static Vector3 ToWorld(Vector3 anchor, int facing, Vector3 local) =>
-        anchor + MultiblockShape.RotatePoint(local, facing);
+        anchor + MultiblockShape.RotatePoint(local, facing, VolumeSize);
 }

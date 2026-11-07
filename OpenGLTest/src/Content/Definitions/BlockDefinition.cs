@@ -335,18 +335,23 @@ public sealed class BlockDefinition
     }
 
     /// <summary>
-    /// The two other blocks a multiblock anchor is tied to: the invisible cells that fill the
-    /// rest of its 2x2x2 volume, and the plain block the structure is built from and reverts to.
+    /// The two other blocks a multiblock anchor is tied to (the invisible cells that fill the
+    /// rest of its volume, and the plain block the structure is built from and reverts to) and
+    /// the volume's edge length.
     /// </summary>
     public sealed class MultiblockDefinition
     {
-        /// <summary>Block filling the seven non-anchor cells; must use the
+        /// <summary>Block filling the non-anchor cells; must use the
         /// <c>"multiblock_part"</c> renderer.</summary>
         public string? Part { get; set; }
 
-        /// <summary>Plain block the 2x2x2 volume is built from, and what each cell turns back
+        /// <summary>Plain block the volume is built from, and what each cell turns back
         /// into when the structure is broken, e.g. <c>"block/mud_bricks"</c>.</summary>
         public string? Source { get; set; }
+
+        /// <summary>Edge length of the cubic volume in cells, 2..4; default 2 (the kiln). The
+        /// model is authored in 0..16 * size model units.</summary>
+        public int? Size { get; set; }
     }
 
     /// <summary>The <c>"open"</c> object: what an openable block looks like and is hit as while
