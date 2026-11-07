@@ -55,14 +55,32 @@ public sealed class KilnManagerTests
     }
 
     [Fact]
-    public void FuelCapsAtFourAndRefusesNonFuel()
+    public void EachKilnHoldsAsMuchFuelAsItsOwnProfileAllows()
+    {
+        foreach (var cap in new[] { KilnProfile.MinFuelCap, KilnProfile.Default.FuelCap * 2 })
+        {
+            var anchor = new Vector3(2, 2, 2);
+            var (_, kilns, _) = ConvertedKiln(anchor);
+            var state = kilns.StateAt(2, 2, 2)!;
+            state.Profile = KilnProfile.Create(cap, KilnProfile.Default.MeltSpeed, false);
+
+            var taken = 0;
+            while (taken <= KilnProfile.MaxFuelCap && kilns.TryAddFuel(anchor, Coal))
+                taken++;
+            Assert.Equal(cap, taken);
+            Assert.Equal(cap, state.Fuel);
+        }
+    }
+
+    [Fact]
+    public void FuelCapsAtTheProfileAndRefusesNonFuel()
     {
         Assert.Equal(60f, Coal.FuelSeconds);
 
         var anchor = new Vector3(2, 2, 2);
         var (_, kilns, _) = ConvertedKiln(anchor);
 
-        for (var i = 0; i < KilnManager.MaxFuel; i++)
+        for (var i = 0; i < Kiln.Kiln!.FuelCap; i++)
             Assert.True(kilns.TryAddFuel(anchor, Coal));
         Assert.False(kilns.TryAddFuel(anchor, Coal));
 
@@ -71,7 +89,7 @@ public sealed class KilnManagerTests
 
         var state = kilns.StateAt(2, 2, 2);
         Assert.NotNull(state);
-        Assert.Equal(KilnManager.MaxFuel, state!.Fuel);
+        Assert.Equal(Kiln.Kiln!.FuelCap, state!.Fuel);
         Assert.Equal(Coal.Id, state.FuelItemId);
 
         // A kiln nobody registered takes nothing
@@ -176,7 +194,7 @@ public sealed class KilnManagerTests
     {
         var anchor = new Vector3(2, 2, 2);
         var (_, kilns, drops) = ConvertedKiln(anchor);
-        AddFuel(kilns, anchor, KilnManager.MaxFuel);
+        AddFuel(kilns, anchor, Kiln.Kiln!.FuelCap);
         Assert.True(kilns.Ignite(anchor));
         Assert.Single(kilns.LitCells);
 

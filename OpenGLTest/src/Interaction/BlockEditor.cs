@@ -468,7 +468,7 @@ internal sealed class BlockEditor
     /// can start tracking it.</summary>
     private void OnMultiblockConverted(Vector3 anchor, int facing, BlockType anchorType)
     {
-        if (anchorType.Kiln)
+        if (anchorType.Kiln != null)
             _kilns.Ensure(anchor, facing, anchorType.Id);
     }
 
@@ -478,7 +478,7 @@ internal sealed class BlockEditor
     private void OnMultiblockBroken(Vector3 anchor, BlockType anchorType, Vector3 blockPos)
     {
         // A client's kiln is a mirror of the server's: it forgets the structure but drops nothing
-        if (anchorType.Kiln)
+        if (anchorType.Kiln != null)
             _kilns.NotifyBlockRemoved(anchor, blockPos, _clientMode ? null : _dropManager);
     }
 

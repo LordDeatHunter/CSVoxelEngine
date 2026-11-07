@@ -2,6 +2,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Stations;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
@@ -117,7 +118,7 @@ internal sealed class BlockInteractions
     {
         anchor = Vector3.Zero;
         if (!Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out var resolved, out var facing, out var anchorType)
-            || anchorType is not { Kiln: true })
+            || anchorType is not { Kiln: not null })
             return false;
 
         _kilns.Ensure(resolved, facing, anchorType.Id);
@@ -129,7 +130,7 @@ internal sealed class BlockInteractions
     /// Right-click on a kiln: an empty hand lifts the crucible out of the hearth (contents and
     /// all), a crucible in hand stands one in, anything with a melt recipe is charged into the
     /// crucible already standing there, fuel goes into the hearth (up to
-    /// <see cref="KilnManager.MaxFuel"/> units of one kind), a firestarter is passed through to
+    /// <see cref="KilnProfile.FuelCap"/> units of one kind), a firestarter is passed through to
     /// its own <see cref="Item.OnUse"/> so it can strike, and a block in hand falls through to
     /// placement against the structure. Any other click on a kiln is spent. Returns whether the
     /// click belonged to the kiln.

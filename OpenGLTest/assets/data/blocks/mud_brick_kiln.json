@@ -9,7 +9,8 @@
   "model": "block/mud_brick_kiln",
   "renderer": "multiblock",
   "multiblock": { "part": "block/mud_brick_kiln_part", "source": "block/mud_bricks" },
-  "kiln": true,
+  // The plain kiln: four fuel units, the base melt pace, one metal at a time.
+  "kiln": { "fuelCap": 4, "meltSpeed": 1, "canAlloy": false },
   // A structure is built from its source block, never held in the inventory.
   "hasItem": false,
   "hardness": 5,

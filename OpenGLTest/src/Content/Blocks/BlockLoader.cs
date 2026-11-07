@@ -156,7 +156,7 @@ internal static class BlockLoader
             Renderer = renderer,
             Pane = paneProfile,
             MultiblockSize = BlockSchemaParser.ParseMultiblockSize(definition.Multiblock, path),
-            Kiln = definition.Kiln ?? false,
+            Kiln = BlockSchemaParser.ParseKiln(definition.Kiln, path),
             SpellBuilder = definition.SpellBuilder ?? false,
             StackMax = (byte)stack.StackMax,
             TipHardness = tipHardness,

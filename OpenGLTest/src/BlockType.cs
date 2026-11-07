@@ -7,6 +7,7 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Stations;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Entities;
@@ -312,10 +313,10 @@ public sealed record BlockType
     /// rotation center read; 0 when the block is not a multiblock anchor.</summary>
     public int MultiblockSize { get; init; }
 
-    /// <summary>Whether this multiblock anchor is a kiln: it holds fuel, can be lit and is
-    /// swept for structural damage. Only ever set on a <see cref="BlockRenderer.Multiblock"/>
-    /// block.</summary>
-    public bool Kiln { get; init; }
+    /// <summary>The kiln profile of this multiblock anchor (its <c>kiln</c> object), or null when
+    /// it is not a kiln. A kiln holds fuel, can be lit and is swept for structural damage. Only
+    /// ever set on a <see cref="BlockRenderer.Multiblock"/> block.</summary>
+    public KilnProfile? Kiln { get; init; }
 
     /// <summary>Whether this block is a spell builder station (the spell table): a right-click
     /// with a staff in hand opens the spell builder UI client-side. It has no block entity and

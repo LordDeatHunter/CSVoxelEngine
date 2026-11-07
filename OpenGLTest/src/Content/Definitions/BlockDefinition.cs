@@ -256,9 +256,9 @@ public sealed class BlockDefinition
     public PaneDefinition? Pane { get; set; }
 
     /// <summary>Marks a multiblock anchor as a kiln, which is what gives it fuel, ignition and
-    /// the integrity sweep of the kiln manager. Only legal on the <c>"multiblock"</c>
-    /// renderer.</summary>
-    public bool? Kiln { get; set; }
+    /// the integrity sweep of the kiln manager, and tunes it. Only legal on the
+    /// <c>"multiblock"</c> renderer.</summary>
+    public KilnDefinition? Kiln { get; set; }
 
     /// <summary>Marks the block as a spell builder station: a right-click opens the spell
     /// builder UI client-side. No block entity. Legal on any block.</summary>
@@ -364,6 +364,22 @@ public sealed class BlockDefinition
         /// <summary>The open selection (and, with <c>collidesByHitbox</c>, collision) boxes, in the
         /// same schema as the block's <c>hitbox</c>, facing north.</summary>
         public JsonElement Hitbox { get; set; }
+    }
+
+    /// <summary>
+    /// The <c>"kiln"</c> object of a kiln anchor: <c>{"fuelCap": 8, "meltSpeed": 1.5}</c>. Every
+    /// field is optional; <c>{}</c> is the plain kiln (fuel cap 4, speed 1, no alloying).
+    /// </summary>
+    public sealed class KilnDefinition
+    {
+        /// <summary>Units of fuel the hearth holds, 1..64. Default 4.</summary>
+        public int? FuelCap { get; set; }
+
+        /// <summary>Multiplier on the melt pace, above 0 and at most 8. Default 1.</summary>
+        public float? MeltSpeed { get; set; }
+
+        /// <summary>Whether the kiln may hold two metals and alloy them. Default false.</summary>
+        public bool? CanAlloy { get; set; }
     }
 
     /// <summary>

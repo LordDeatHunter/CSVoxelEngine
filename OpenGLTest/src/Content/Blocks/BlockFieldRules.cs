@@ -70,9 +70,9 @@ internal static class BlockFieldRules
         if ((renderer == BlockRenderer.Multiblock) != (definition.Multiblock != null))
             throw new InvalidOperationException(
                 $"Block '{path}' {(definition.Multiblock != null ? "declares multiblock.* without renderer: \"multiblock\"" : "uses renderer \"multiblock\" without a multiblock object naming its part and source")}.");
-        if ((definition.Kiln ?? false) && renderer != BlockRenderer.Multiblock)
+        if (definition.Kiln != null && renderer != BlockRenderer.Multiblock)
             throw new InvalidOperationException(
-                $"Block '{path}' sets kiln: true without renderer \"multiblock\"; only a multiblock anchor can be a kiln.");
+                $"Block '{path}' declares a kiln object without renderer \"multiblock\"; only a multiblock anchor can be a kiln.");
         if (!isMultiblock) return;
 
         if (definition.HasItem ?? true)

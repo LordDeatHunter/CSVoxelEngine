@@ -5,6 +5,7 @@ using System.Text.Json;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.Content.Stations;
 using VoxelEngine.Graphics;
 using VoxelEngine.Player;
 using VoxelEngine.WorldGen.Trees;
@@ -190,6 +191,28 @@ internal static class BlockSchemaParser
             throw new InvalidOperationException(
                 $"Block '{path}' has multiblock.size {size}; a multiblock is {MultiblockShape.MinSize}..{MultiblockShape.MaxSize} cells along each edge.");
         return size;
+    }
+
+    /// <summary>
+    /// Reads a kiln anchor's <c>kiln</c> object into its <see cref="KilnProfile"/>: omitted
+    /// fields take the plain kiln's (fuel cap 4, speed 1, no alloying), and a fuel cap or melt
+    /// speed <see cref="KilnProfile.Create"/> refuses throws naming the file. Null for a block
+    /// that is not a kiln.
+    /// </summary>
+    internal static KilnProfile? ParseKiln(BlockDefinition.KilnDefinition? definition, string path)
+    {
+        if (definition == null) return null;
+        try
+        {
+            return KilnProfile.Create(
+                definition.FuelCap ?? KilnProfile.Default.FuelCap,
+                definition.MeltSpeed ?? KilnProfile.Default.MeltSpeed,
+                definition.CanAlloy ?? KilnProfile.Default.CanAlloy);
+        }
+        catch (ArgumentException e)
+        {
+            throw new InvalidOperationException($"Block '{path}' has a kiln object with {e.Message}", e);
+        }
     }
 
     /// <summary>

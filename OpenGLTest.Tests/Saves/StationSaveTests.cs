@@ -155,7 +155,7 @@ public sealed class StationSaveTests
     public void OutOfRangeNumbersAreRefusedNotRestored()
     {
         var data = Running().Capture();
-        data.Kilns![0].Fuel = KilnManager.MaxFuel + 1;
+        data.Kilns![0].Fuel = ContentRegistry.RequireBlock("mud_brick_kiln").Kiln!.FuelCap + 1;
         data.Kilns[0].MoltenMl = -5;
         data.Querns![0].Cell = [1, 2];
 

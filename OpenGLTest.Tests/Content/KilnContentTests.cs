@@ -54,8 +54,8 @@ public sealed class KilnContentTests
             Assert.Equal(new[] { bricks.Id }, RollOnce(cell.LootTable!));
         }
 
-        Assert.True(anchor.Kiln);
-        Assert.False(part.Kiln);
+        Assert.NotNull(anchor.Kiln);
+        Assert.Null(part.Kiln);
         Assert.Equal(BlockRenderer.Multiblock, anchor.Renderer);
         Assert.Equal(BlockRenderer.MultiblockPart, part.Renderer);
         Assert.Equal(part.Id, anchor.MultiblockPartId);

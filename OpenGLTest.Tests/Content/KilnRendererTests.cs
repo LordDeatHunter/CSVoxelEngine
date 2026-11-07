@@ -64,7 +64,7 @@ public sealed class KilnRendererTests
         // fit between the piers and clear the hearth's back wall, and no two units may share a
         // plane
         Assert.True(KilnRenderer.FuelSpacing >= KilnRenderer.FuelSize);
-        var halfRow = (KilnManager.MaxFuel - 1) * 0.5f * KilnRenderer.FuelSpacing
+        var halfRow = (ContentRegistry.RequireBlock("mud_brick_kiln").Kiln!.FuelCap - 1) * 0.5f * KilnRenderer.FuelSpacing
                     + KilnRenderer.FuelSize * 0.5f;
         Assert.True(KilnRenderer.FuelLocal.X - halfRow >= KilnRenderer.OpeningMinX);
         Assert.True(KilnRenderer.FuelLocal.X + halfRow <= KilnRenderer.OpeningMaxX);

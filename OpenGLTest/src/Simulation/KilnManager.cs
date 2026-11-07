@@ -18,15 +18,17 @@ namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Block-entity registry for mud brick kilns, keyed by the structure's anchor cell (the volume's
-/// minimum corner). A kiln stores up to <see cref="MaxFuel"/> units of one fuel item; striking it
-/// with a firestarter burns one unit at once and the next whenever the burn timer runs out, so a
-/// kiln with four coal stays lit for four minutes and then goes out.
+/// minimum corner). How a kiln behaves comes from its anchor block's <see cref="KilnProfile"/>
+/// (<see cref="KilnState.Profile"/>): it stores up to <see cref="KilnProfile.FuelCap"/> units of
+/// one fuel item; striking it with a firestarter burns one unit at once and the next whenever the
+/// burn timer runs out, so a plain kiln with four coal stays lit for four minutes and then goes
+/// out.
 ///
 /// <para>
 /// A kiln also holds one crucible. Right-clicking a melt input into it charges the vessel with
 /// <em>pending</em> metal; a lit kiln then turns <see cref="MeltChunkMl"/> of that pending charge
-/// molten every <see cref="MeltSeconds"/>. Melting only <em>pauses</em> when the fire goes out or
-/// the vessel is taken — <see cref="KilnState.MeltLeft"/> simply stops ticking — so relighting
+/// molten every <see cref="KilnProfile.MeltSeconds"/> of its profile. Melting only
+/// <em>pauses</em> when the fire goes out or the vessel is taken — <see cref="KilnState.MeltLeft"/> simply stops ticking — so relighting
 /// resumes the partial chunk instead of starting it over. <see cref="MeltProgress01"/> and
 /// <see cref="DisplayMoltenMl"/> are what the render pass reads, and neither depends on
 /// <see cref="KilnState.Lit"/>, so the pool never drops when the last unit burns out.
@@ -47,15 +49,9 @@ namespace VoxelEngine.Simulation;
 /// </summary>
 public sealed class KilnManager
 {
-    /// <summary>Units of fuel a kiln holds at once.</summary>
-    public const int MaxFuel = 4;
-
-    /// <summary>Seconds a lit kiln takes to melt one <see cref="MeltChunkMl"/> chunk of a
-    /// crucible's pending charge. Declared here as the single source of that pace.</summary>
-    public const float MeltSeconds = 2f;
-
-    /// <summary>Milliliters that turn molten per <see cref="MeltSeconds"/> while the kiln
-    /// burns.</summary>
+    /// <summary>Milliliters that turn molten per melt interval while a kiln burns, the same for
+    /// every kiln: a faster kiln (<see cref="KilnProfile.MeltSpeed"/>) shortens the interval
+    /// rather than melting bigger chunks.</summary>
     public const int MeltChunkMl = 100;
 
     /// <summary>Live state of one kiln structure.</summary>
@@ -65,10 +61,15 @@ public sealed class KilnManager
         /// integrity sweep can revert the structure even when the anchor cell itself is gone.</summary>
         public byte AnchorId;
 
+        /// <summary>How this kiln behaves, derived from <see cref="AnchorId"/>'s block whenever
+        /// the kiln is registered, restored or mirrored (<see cref="ProfileOf"/>); never saved or
+        /// sent.</summary>
+        public KilnProfile Profile = KilnProfile.Default;
+
         /// <summary>Which way the opening points (engine face index 0..3).</summary>
         public int Facing;
 
-        /// <summary>Unburnt units waiting in the hearth, 0..<see cref="MaxFuel"/>.</summary>
+        /// <summary>Unburnt units waiting in the hearth, 0..<see cref="KilnProfile.FuelCap"/>.</summary>
         public int Fuel;
 
         /// <summary>Item id of the stored fuel; 0 when the hearth is empty.</summary>
@@ -128,7 +129,12 @@ public sealed class KilnManager
         }
         state.Facing = facing;
         state.AnchorId = anchorId;
+        state.Profile = ProfileOf(anchorId);
     }
+
+    /// <summary>The kiln profile of the block <paramref name="anchorId"/>, or
+    /// <see cref="KilnProfile.Default"/> when that block is not (or no longer) a kiln.</summary>
+    public static KilnProfile ProfileOf(byte anchorId) => BlockType.ById[anchorId]?.Kiln ?? KilnProfile.Default;
 
     /// <summary>Live state of the kiln anchored at this cell, or null when none is tracked.</summary>
     public KilnState? StateAt(int x, int y, int z) => _kilns.GetValueOrDefault((x, y, z));
@@ -141,7 +147,7 @@ public sealed class KilnManager
     {
         if (fuel.FuelSeconds <= 0f) return false;
         if (!_kilns.TryGetValue(KeyOf(anchor), out var state)) return false;
-        if (state.Fuel >= MaxFuel) return false;
+        if (state.Fuel >= state.Profile.FuelCap) return false;
         if (state.FuelItemId != 0 && state.FuelItemId != fuel.Id) return false;
 
         state.FuelItemId = fuel.Id;
@@ -170,11 +176,12 @@ public sealed class KilnManager
     /// <see cref="KilnState.Lit"/> term: the flag flips off the frame the last unit burns out,
     /// and gating on it would drop the drawn surface by a whole chunk at burn-out and snap it
     /// back on relight. A kiln that was never lit still reads 0, because
-    /// <see cref="KilnState.MeltLeft"/> sits at <see cref="MeltSeconds"/> until the first lit tick.
+    /// <see cref="KilnState.MeltLeft"/> sits at a whole <see cref="KilnProfile.MeltSeconds"/> until
+    /// the first lit tick.
     /// </summary>
     public static float MeltProgress01(KilnState state) =>
         state.HasCrucible && state.Contents.PendingMl > 0
-            ? 1f - MathUtils.Clamp01(state.MeltLeft / MeltSeconds)
+            ? 1f - MathUtils.Clamp01(state.MeltLeft / state.Profile.MeltSeconds)
             : 0f;
 
     /// <summary>
@@ -218,7 +225,7 @@ public sealed class KilnManager
         state.HasCrucible = true;
         state.CrucibleItemId = itemId;
         state.Contents = contents;
-        state.MeltLeft = MeltSeconds;
+        state.MeltLeft = state.Profile.MeltSeconds;
         return true;
     }
 
@@ -354,11 +361,11 @@ public sealed class KilnManager
                         MoltenMl = state.Contents.MoltenMl + melted,
                         PendingMl = state.Contents.PendingMl - melted,
                     };
-                    state.MeltLeft += MeltSeconds;
+                    state.MeltLeft += state.Profile.MeltSeconds;
                 }
                 // Nothing left to melt: park a full chunk so the next charge starts from scratch
                 if (state.Contents.PendingMl == 0)
-                    state.MeltLeft = MeltSeconds;
+                    state.MeltLeft = state.Profile.MeltSeconds;
             }
 
             if (!state.Lit) continue;
@@ -500,7 +507,7 @@ public sealed class KilnManager
         {
             if (!StationSaveCodec.TryCell(data.Cell, out var key)
                 || !SaveNames.TryResolve(data.Anchor, out var anchor)
-                || data.Facing is < 0 or > 3 || data.Fuel is < 0 or > MaxFuel
+                || data.Facing is < 0 or > 3 || data.Fuel < 0 || data.Fuel > ProfileOf(anchor).FuelCap
                 || data.MoltenMl < 0 || data.PendingMl < 0
                 || !float.IsFinite(data.FuelSeconds) || !float.IsFinite(data.BurnLeft)
                 || !float.IsFinite(data.MeltLeft))
@@ -511,6 +518,7 @@ public sealed class KilnManager
             var state = new KilnState
             {
                 AnchorId = anchor,
+                Profile = ProfileOf(anchor),
                 Facing = data.Facing,
                 Fuel = data.Fuel,
                 FuelSeconds = data.FuelSeconds,
@@ -608,7 +616,8 @@ public sealed class KilnManager
             var pending = reader.ReadInt();
             var pendingInput = reader.ReadByte();
             state.MeltLeft = StationNetCodec.ReadFinite(reader);
-            if (state.Facing > 3 || state.Fuel > MaxFuel || molten < 0 || pending < 0)
+            state.Profile = ProfileOf(state.AnchorId);
+            if (state.Facing > 3 || state.Fuel > state.Profile.FuelCap || molten < 0 || pending < 0)
                 throw new System.IO.InvalidDataException("kiln snapshot out of range");
             state.Contents = new CrucibleComponent(material, molten, pending, pendingInput);
             _kilns[key] = state;
