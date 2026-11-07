@@ -8,11 +8,17 @@ Frame time (F#), worldgen, meshing and streaming (G#). Ids F4, F5 and F13 (and t
 comments still cite) exist only in git history or under Ruled out. Every number names its machine and
 date; a win not yet measured is labeled *estimated*. Landed items are summarized under Reference;
 `git log -p -- plans/PERF.md` has the full write-ups (history was trimmed on 2026-10-28, 2026-10-31
-and 2026-11-05). Last updated 2026-11-05.
+and 2026-11-05). Last updated 2026-11-07.
 
 ## In progress
 
-Nothing.
+- **C1 column fill use-gating (candidate, not landed)**: see [COLUMN_FILL_USE_GATING.md](COLUMN_FILL_USE_GATING.md).
+  On the frozen 2026-11-07 single-thread headless fixture, warm whole-generation paired median was
+  12.20% lower (17.50 ms per 630 chunks), candidate faster in 7/8 pairs. Cold improvement remains
+  unestablished; two cold pairs regressed, including 11.70% in slot 8. This is scoped fixture
+  evidence, not a general streaming or FPS claim. The evidence record includes all pair values,
+  controls, count reductions, identity gates and limitations. Do not mark unrelated G5/G7/F11 work
+  complete.
 
 ## Open
 
