@@ -478,6 +478,7 @@ single-arc player.
   `F-3`, `F-13`, `F-14`.
 
 ## Reference
+- [ ] **`M-29` Far LOD for 3D terrain.** P2, XL. Rework the far LOD to batch real blocks into groups instead of a heightmap shell, so cavern pockets, hell layers and floating sky islands show at distance (`plans/LAYERS.md` ships without it). **Hook:** `Lod/LodMeshBuilder`.
 
 ### North star
 
