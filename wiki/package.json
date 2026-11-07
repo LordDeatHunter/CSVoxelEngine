@@ -1,0 +1,20 @@
+{
+  "name": "csvoxelengine-wiki",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "data": "node scripts/build-data.mjs",
+    "dev": "npm run data && vitepress dev",
+    "build": "npm run data && vitepress build",
+    "preview": "vitepress preview",
+    "test": "node --test scripts/*.test.mjs"
+  },
+  "devDependencies": {
+    "@types/three": "^0.170.0",
+    "vitepress": "1.6.3",
+    "vue": "3.5.13"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  }
+}

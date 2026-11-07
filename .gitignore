@@ -493,3 +493,17 @@ OpenGLTest/visual
 
 # Irrelevant
 reference
+
+# wiki (generated)
+wiki/node_modules/
+wiki/dist/
+wiki/.vitepress/cache/
+wiki/.vitepress/data/
+wiki/public/assets/
+wiki/game/blocks/
+wiki/game/items/
+wiki/game/mobs/
+
+wiki/credits.md
+wiki/public/data/
+wiki/.vitepress/dist/

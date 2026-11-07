@@ -268,7 +268,7 @@ creative and flight are immune, `DeathMessages` says "drowned"). Singleplayer ti
 `LocalPlayer.UpdateHealth`; a server ticks each `ServerPlayer` in `TickStatus` (an unloaded body is not judged) and
 sends the air in `PlayerStatus` as a `Breath.NetSteps` byte (protocol 9; the status goes out whenever the step
 changes), which a client mirrors (`ClientMirror.ApplyNetworkAir`). `HudRenderer.DrawAir` draws ten bubbles
-(`assets/textures/ui/bubble.png`, from the GGJ-2025 project) over the hearts, right-aligned, emptying from the left,
+(`assets/textures/ui/bubble.png`) over the hearts, right-aligned, emptying from the left,
 shown only below a full lung. `BreathTests`, `visual-examples/drowning.json` (`VOXEL_TIME=147`).
 
 **Regeneration.** Out of combat the player heals (`PlayerHealth.UpdateRegen`): once
