@@ -22,6 +22,10 @@ internal sealed class BodyPartMatrices
         var feet = eyePos - new Vector3(0f, Camera.EyeHeight, 0f);
         if (backOffset != 0f)
         {
+            // A forward lean (flight) swings the chest toward the eye; shift the body back by how far the
+            // torso top moves forward, so looking down never lands on the upper torso from behind.
+            var hipY = rig.Parts.TryGetValue("ThighL", out var hipPart) ? hipPart.Pivot.Y : PelvisFallback;
+            backOffset += MathF.Max(0f, MathF.Sin(-pose.TorsoPitch)) * MathF.Max(0f, Camera.EyeHeight - hipY);
             var yawBase = yawDeg * MathF.PI / 180f;
             feet -= new Vector3(MathF.Cos(yawBase) * backOffset, 0f, MathF.Sin(yawBase) * backOffset);
         }
