@@ -48,6 +48,11 @@ public static class SkyBiomes
     /// <summary>The biome <paramref name="island"/> wears: the one at its center.</summary>
     public static SkyBiome OfIsland(in SkyIsland island) => At(island.CenterX, island.CenterZ);
 
+    /// <summary>The biome of column (x, z) of <paramref name="island"/>: an ordinary island wears its center's biome
+    /// whole, a landmass changes biome across its length with the noise.</summary>
+    public static SkyBiome OfColumn(in SkyIsland island, float x, float z) =>
+        island.IsLandmass ? At(x, z) : At(island.CenterX, island.CenterZ);
+
     /// <summary>The palette of <paramref name="biome"/>.</summary>
     public static SkyIslandPalette Palette(SkyBiome biome) => Palettes[(int)biome];
 

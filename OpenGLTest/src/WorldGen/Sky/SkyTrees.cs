@@ -97,7 +97,7 @@ internal static class SkyTrees
         var z = z0 + Margin + (int)(SplitMix64.Unit(hash, 1) * RootSpan);
 
         if (!SkyIslandGenerator.TryGetColumn(x, z, out var island, out _, out var top)) return null;
-        var palette = SkyBiomes.Palette(SkyBiomes.OfIsland(island));
+        var palette = SkyBiomes.Palette(SkyBiomes.OfColumn(island, x, z));
         if (palette.Tree is not { } species || SplitMix64.Unit(hash, 2) >= palette.TreeChance) return null;
         if (SkyFlora.IsSparkle(palette, x, z)) return null;
 

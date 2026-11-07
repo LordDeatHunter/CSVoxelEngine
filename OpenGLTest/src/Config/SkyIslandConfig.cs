@@ -18,22 +18,22 @@ public static class SkyIslandConfig
     // --- Zones: one hashed candidate per zone cell, wide empty sky between them ---
 
     /// <summary>Side of the square cell that rolls at most one island zone.</summary>
-    public const int ZoneCellBlocks = 640;
+    public const int ZoneCellBlocks = 480;
 
     /// <summary>Chance a zone cell rolls a zone candidate.</summary>
-    public const float ZoneChance = 0.85f;
+    public const float ZoneChance = 1f;
 
     /// <summary>Skew of the zone size roll toward small (the size is u^skew), so big zones are rare.</summary>
     public const float ZoneSizeSkew = 2.2f;
 
     /// <summary>Radius of the smallest zone in blocks.</summary>
-    public const float ZoneMinRadius = 150f;
+    public const float ZoneMinRadius = 130f;
 
     /// <summary>Radius of the biggest zone in blocks.</summary>
-    public const float ZoneMaxRadius = 420f;
+    public const float ZoneMaxRadius = 300f;
 
     /// <summary>The least open sky between two zones' nominal outlines; the lower hash wins a crowd.</summary>
-    public const float ZoneGapBlocks = 140f;
+    public const float ZoneGapBlocks = 6f;
 
     /// <summary>Share of its radius a zone's outline is pulled inward by the outline noise.</summary>
     public const float ZoneWobble = 0.3f;
@@ -42,7 +42,7 @@ public static class SkyIslandConfig
     public const float ZoneWobbleFrequency = 1f / 300f;
 
     /// <summary>Share of the outline inside which a zone's weight is full; it eases to 0 at the rim.</summary>
-    public const float ZoneCoreShare = 0.55f;
+    public const float ZoneCoreShare = 0.7f;
 
     /// <summary>The zone size (0..1) from which a zone is tier 1 (medium).</summary>
     public const float ZoneMediumSize = 0.4f;
@@ -53,13 +53,13 @@ public static class SkyIslandConfig
     // --- Islands: one hashed candidate per island cell, accepted inside a zone ---
 
     /// <summary>Side of the square cell that rolls at most one island.</summary>
-    public const int IslandCellBlocks = 48;
+    public const int IslandCellBlocks = 40;
 
     /// <summary>Chance an island cell rolls a candidate (a zone's weight thins it further toward its rim).</summary>
-    public const float IslandChance = 0.85f;
+    public const float IslandChance = 0.95f;
 
     /// <summary>Skew of the island size roll toward small.</summary>
-    public const float IslandSizeSkew = 1.6f;
+    public const float IslandSizeSkew = 1.8f;
 
     /// <summary>Radius of the smallest island.</summary>
     public const float IslandMinRadius = 7f;
@@ -109,6 +109,67 @@ public static class SkyIslandConfig
     /// <summary>Room kept free over the highest island top for its plants and trees: an island's base is
     /// rolled so its top stays this far under the band's top, and a sky tree grows only inside the band.</summary>
     public const int IslandFloraHeadroom = 18;
+
+    // --- Landmasses: great floating continents, one hashed candidate per big cell (SkyLandmasses) ---
+
+    /// <summary>Side of the square cell that rolls at most one landmass.</summary>
+    public const int LandmassCellBlocks = 2400;
+
+    /// <summary>Chance a landmass cell rolls a candidate.</summary>
+    public const float LandmassChance = 0.7f;
+
+    /// <summary>Skew of the landmass size roll toward small.</summary>
+    public const float LandmassSizeSkew = 1.8f;
+
+    /// <summary>Bounding radius of the smallest landmass.</summary>
+    public const float LandmassMinRadius = 220f;
+
+    /// <summary>Bounding radius of the biggest landmass.</summary>
+    public const float LandmassMaxRadius = 1200f;
+
+    /// <summary>The least open sky between two landmasses' bounding discs.</summary>
+    public const float LandmassGapBlocks = 120f;
+
+    /// <summary>Share of the bounding radius that is the ellipse's long semi-axis: the rest is room for the coast's warp.</summary>
+    public const float LandmassBoundShare = 1.35f;
+
+    /// <summary>Least short-over-long ratio of a landmass's elliptical body.</summary>
+    public const float LandmassMinAspect = 0.45f;
+
+    /// <summary>How far the warp pushes a point, as a share of the long semi-axis (under <see cref="LandmassBoundShare"/> - 1).</summary>
+    public const float LandmassWarp = 0.33f;
+
+    /// <summary>Wavelength of the warp noise as a share of the long semi-axis, so a landmass bends about once across its length.</summary>
+    public const float LandmassWarpWavelengthShare = 0.9f;
+
+    /// <summary>Blocks the rim is roughened inward by the island outline noise.</summary>
+    public const float LandmassRimWobble = 9f;
+
+    /// <summary>Blocks in from the coast over which the top rises from the base to its hills.</summary>
+    public const float LandmassTopRamp = 40f;
+
+    /// <summary>Blocks in from the coast over which the underside thickens to its full keel.</summary>
+    public const float LandmassKeelRamp = 170f;
+
+    /// <summary>Least and most height of a landmass's rolling hills over its base.</summary>
+    public const float LandmassMinHills = 8f;
+    public const float LandmassMaxHills = 18f;
+
+    /// <summary>Least and most depth of a landmass's keel under its base.</summary>
+    public const float LandmassMinDepth = 22f;
+    public const float LandmassMaxDepth = 40f;
+
+    /// <summary>Frequency of the hill noise: a hill a hundred blocks across.</summary>
+    public const float LandmassHillFrequency = 1f / 110f;
+
+    /// <summary>Frequency of the keel noise.</summary>
+    public const float LandmassKeelFrequency = 1f / 60f;
+
+    /// <summary>Bounding radius from which a landmass counts as medium (sky mob tier 1).</summary>
+    public const float LandmassMediumTierRadius = 450f;
+
+    /// <summary>Bounding radius from which a landmass counts as big (sky mob tier 2).</summary>
+    public const float LandmassBigTierRadius = 800f;
 
     // --- Sky biomes (L-13): meadow and frost highland, by a coherent 2D noise at the island's center ---
 

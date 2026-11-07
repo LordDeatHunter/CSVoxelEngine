@@ -2187,6 +2187,7 @@ OpenGLTest/
                                #   each biome's palette; the column hash the flora scatters by
         SkyFlora.cs            # an island column's sparkle top, the plant over it and the vine under it: part of the
                                #   one column rule BlockAt and the stamp share
+        SkyLandmasses.cs       # the great sky landmasses: sites, the warped elliptical column rule, the zone and island overlap tests
         SkyIsland.cs           # one accepted island: center, nominal radius, base height, dome, underside depth
         SkyIslandGenerator.cs  # the island column shape (domed top, tapering underside, stalactites), the point query
                                #   (BlockAt, with the flora) and the stamp, which collects a chunk's few islands once
@@ -2798,8 +2799,8 @@ The shape is `WorldGen/Sky/CloudLayer.cs`, which the cloud sea below shares.
 `SkyIslandBottomY..SkyIslandTopY` (320..420) inside **zones**: one hashed candidate per `ZoneCellBlocks`
 cell (`TerrainSites.TryRoll`, salt "SKYZ"), its radius (`ZoneMinRadius..ZoneMaxRadius`) rolled with a
 size skewed small, kept `ZoneGapBlocks` clear of every lower-hash raw neighbor roll
-(`TerrainSites.YieldsToSizedNeighbor`, radius plus radius plus gap), so wide, ocean-like gaps of open
-sky lie between zones (about a ninth of the sky is zone). The outline wobbles inward (noise offset
+(`TerrainSites.YieldsToSizedNeighbor`, radius plus radius plus gap), so gaps of open
+sky still lie between zones (about 30 % of the sky is zone, and the landmasses cover more). The outline wobbles inward (noise offset
 168) and the weight is 1 in the core (`ZoneCoreShare`) easing to 0 at the outline.
 `SkyIslands.ZoneAt(x, z)` is the pure query the sky spawner of `L-15` reads: a `SkyZone` with that
 weight and a `Tier` (0 small, 1 medium, 2 big, from the rolled size by `ZoneMediumSize` /
@@ -2820,6 +2821,21 @@ few islands reaching the chunk once (`SkyIslands.CollectIslands`, after a cheap 
 near, so open sky costs a few hash rolls), then asks each column the same rule `BlockAt` asks: the point
 query equals the stamp across seams, a chunk reads no neighbor and nothing is cached. Islands write
 into air only.
+
+**Sky landmasses** (`WorldGen/Sky/SkyLandmasses.cs`, `SkyIslandConfig.Landmass*`, seed offsets 175-178) are whole
+floating continents beside the ordinary islands: one hashed candidate per `LandmassCellBlocks` (2400) cell
+(`TerrainSites`, salt "SKYL"), a bounding radius skewed toward `LandmassMinRadius` (220) and reaching
+`LandmassMaxRadius` (1200), kept `LandmassGapBlocks` clear of lower-hash neighbors. A landmass is a `SkyIsland` with
+an `Aspect` (`IsLandmass`; `Radius` is its bounding disc, `Dome` its hill height, `Depth` its keel), so `CollectIslands`
+hands it out first and the stamp, flora, sky trees, ruins and mob spawner read it unchanged. Its outline is a long
+ellipse of a hashed turn and aspect (`LandmassMinAspect`..1) whose point is first domain-warped (`LandmassWarp`, noise 175/176
+sampled so one wave spans its length), so the coast bends and cuts bays, then roughened `LandmassRimWobble` blocks inward;
+the top rolls over low hills (noise 177) easing down to the coast over `LandmassTopRamp`, the underside is a shallow keel
+(noise 178) that thickens over `LandmassKeelRamp` blocks with the islands' stalactites, always inside the band (the base roll
+leaves the flora headroom and vine room). Its biome changes along its length (`SkyBiomes.OfColumn`), an ordinary island stays
+whole. No ordinary island stands within a landmass's bounding disc (`OverlapsDisc`), and `ZoneAt` reports a landmass as its own
+zone (tier by radius). A ruin sits only where an island's center column is land, so most landmasses hold none.
+`SkyLandmassTests`; `visual-examples/sky-landmass.json` (`VOXEL_TIME=147`).
 
 **The cloud sea** (`CloudSeaGenerator`, offsets 172-173) is a second, thick `CloudLayer` of the same
 `cloud_block` in `CloudSeaBottomY..CloudSeaTopY` (290..301, from `SkyConfig.SkyCloudSeaHeight` and
@@ -4865,7 +4881,7 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
 - **Budgets**: 175 of the 255 content ids are used (108 blocks, 66 items, air), 80 left. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
-  168 to 171 (sky zones and islands), 172 and 173 (cloud sea) and 174 (sky biomes); the whole table is in
+  168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
   `plans/BIOMEGEN.md`.
 - **Visual checks** (each with `VOXEL_TIME=147`): `barrier.json`, `hell.json`, `hell-flora.json`,
   `hell-mobs.json`, `layers-fog.json`, `clouds-solid.json`, `sky-islands.json`, `sky-biomes.json`,

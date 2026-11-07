@@ -30,6 +30,8 @@ public static class SkyIslandGenerator
     /// </summary>
     public static bool TryGetColumn(in SkyIsland island, int x, int z, out int bottom, out int top)
     {
+        if (island.IsLandmass) return SkyLandmasses.TryGetColumn(island, x, z, out bottom, out top);
+
         bottom = 0;
         top = -1;
         var dx = x - island.CenterX;
@@ -73,7 +75,7 @@ public static class SkyIslandGenerator
     public static byte BlockAt(int x, int y, int z)
     {
         if (!TryGetColumn(x, z, out var island, out var bottom, out var top)) return BlockType.Air;
-        return SkyFlora.BlockAt(SkyBiomes.Palette(SkyBiomes.OfIsland(island)), x, y, z, bottom, top);
+        return SkyFlora.BlockAt(SkyBiomes.Palette(SkyBiomes.OfColumn(island, x, z)), x, y, z, bottom, top);
     }
 
     /// <summary>Writes the islands into the air cells of the chunk whose minimum corner is
@@ -88,11 +90,6 @@ public static class SkyIslandGenerator
         var count = SkyIslands.CollectIslands(worldX0, worldZ0, worldX0 + Chunk.Size - 1, worldZ0 + Chunk.Size - 1, islands);
         if (count == 0) return;
 
-        // Each island wears its biome's palette, read once here
-        Span<SkyBiome> biomes = stackalloc SkyBiome[MaxIslandsPerChunk];
-        for (var k = 0; k < count; k++)
-            biomes[k] = SkyBiomes.OfIsland(islands[k]);
-
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         {
@@ -102,7 +99,7 @@ public static class SkyIslandGenerator
             if (k < 0) continue;
 
             // The column's cells, the plant over its top and the longest vine under it
-            var palette = SkyBiomes.Palette(biomes[k]);
+            var palette = SkyBiomes.Palette(SkyBiomes.OfColumn(islands[k], wx, wz));
             var lo = Math.Max(yMin, bottom - SkyIslandConfig.SkyVineMaxLength - worldY0);
             var hi = Math.Min(yMax, top + 1 - worldY0);
             for (var y = lo; y <= hi; y++)

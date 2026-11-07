@@ -40,6 +40,7 @@ public static class SkyIslands
         OutlineNoise = TerrainGenerator.MakeNoise(169, SkyIslandConfig.IslandWobbleFrequency);
         TopNoise = TerrainGenerator.MakeNoise(170, SkyIslandConfig.IslandTopDetailFrequency);
         StalactiteNoise = TerrainGenerator.MakeNoise(171, SkyIslandConfig.IslandStalactiteFrequency);
+        SkyLandmasses.Reseed();
     }
 
     /// <summary>
@@ -59,6 +60,10 @@ public static class SkyIslands
             var weight = ZoneWeight(centerX, centerZ, radius, x, z);
             if (weight > best.Weight) best = new SkyZone(weight, tier, radius, centerX, centerZ);
         }
+
+        // A landmass is its own zone, as deep as its bounding disc holds the point
+        if (best.Weight < 1f && SkyLandmasses.TryFindNear(x, z, out var landmass))
+            best = new SkyZone(1f, SkyLandmasses.TierOf(landmass), landmass.Radius, landmass.CenterX, landmass.CenterZ);
 
         return best;
     }
@@ -119,6 +124,9 @@ public static class SkyIslands
                 SkyIslandConfig.IslandCellBlocks, IslandSalt, SkyIslandConfig.IslandChance, SkyIslandConfig.IslandSizeSkew))
             return false;
 
+        // A landmass wins its footprint: no island stands within its bounding disc
+        if (SkyLandmasses.OverlapsDisc(centerX, centerZ, radius + SkyIslandConfig.IslandGapBlocks)) return false;
+
         var dome = radius * SkyIslandConfig.IslandDomePerRadius;
         var depth = radius * MathUtils.Lerp(SkyIslandConfig.IslandMinDepthPerRadius,
             SkyIslandConfig.IslandMaxDepthPerRadius, SplitMix64.Unit(hash, 5));
@@ -142,7 +150,8 @@ public static class SkyIslands
     /// </summary>
     public static int CollectIslands(int minX, int minZ, int maxX, int maxZ, Span<SkyIsland> into)
     {
-        if (!AnyZoneNear(minX, minZ, maxX, maxZ)) return 0;
+        var count = SkyLandmasses.Collect(minX, minZ, maxX, maxZ, into, 0);
+        if (!AnyZoneNear(minX, minZ, maxX, maxZ)) return count;
 
         var reach = SkyIslandConfig.IslandMaxRadius;
         TerrainSites.CellRange(minX, SkyIslandConfig.IslandCellBlocks, reach, out var cellMinX, out _);
@@ -150,7 +159,6 @@ public static class SkyIslands
         TerrainSites.CellRange(minZ, SkyIslandConfig.IslandCellBlocks, reach, out var cellMinZ, out _);
         TerrainSites.CellRange(maxZ, SkyIslandConfig.IslandCellBlocks, reach, out _, out var cellMaxZ);
 
-        var count = 0;
         for (var gx = cellMinX; gx <= cellMaxX; gx++)
         for (var gz = cellMinZ; gz <= cellMaxZ; gz++)
         {

@@ -1,0 +1,21 @@
+{
+  // A great sky landmass (SkyLandmasses): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/sky-landmass.json
+  // Shots land in visual/sky-landmass/. With the default seed a landmass of bounding radius 458
+  // (aspect 0.74, turned 0.73 rad, base 373) is centered at (1297, -3318): the camera hovers over
+  // its middle looking down, then along its length and across its keel from below.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [1297.5, 430.5, -3318.5], "yaw": -90, "pitch": -45 },
+    { "op": "wait", "seconds": 25 },
+    { "op": "screenshot", "name": "landmass_above", "hideHud": true },
+
+    { "op": "teleport", "pos": [1297.5, 400.5, -3318.5], "yaw": 45, "pitch": -8 },
+    { "op": "wait", "seconds": 12 },
+    { "op": "screenshot", "name": "landmass_along", "hideHud": true },
+
+    { "op": "teleport", "pos": [1297.5, 345.5, -3318.5], "yaw": 45, "pitch": 30 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "landmass_below", "hideHud": true }
+  ]
+}

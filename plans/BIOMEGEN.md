@@ -636,6 +636,7 @@ Noise seed offsets: ReliefNoise 153, MountainSpineNoise 154, MountainRangeCellWa
   SkyIslands.ZoneNoise 168, OutlineNoise 169, TopNoise 170, StalactiteNoise 171 (the sky islands),
   CloudSeaGenerator cover 172 (2 octaves) and detail 173 (the cloud sea; plans/LAYERS.md),
   SkyBiomes.BiomeNoise 174 (2 octaves, the sky biomes; plans/LAYERS.md L-13)
+  SkyLandmasses warp 175 and 176, hills 177 (3 octaves), keel 178 (the sky landmasses)
 WorldFeatureConfig: CottonMaxDesertWeight = 0.5 - BiomeBorderDither
 PostProcessConfig: BiomeGradeStrength 0.04, ColdStart 0.45, ColdFull 0.85, EaseRate 0.5
 SurfaceShadingConfig: Grass/Foliage Color corners (ColdDry/WarmDry, ColdMid/WarmMid, ColdWet/WarmWet),
