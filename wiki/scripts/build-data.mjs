@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { parseJsonc } from './jsonc.mjs'
 import { resolveModel } from './models.mjs'
 import { buildRecipeIndex, refKey } from './recipes.mjs'
+import { structureFrom } from './structures.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const wikiRoot = path.resolve(here, '..')
@@ -37,6 +38,7 @@ const loadModel = (p) => {
 }
 
 const blocks = {}
+const structures = {}
 for (const { id, file } of listJson(path.join(assets, 'data/blocks'))) {
   const d = readJson(file)
   let model = null
@@ -45,9 +47,12 @@ for (const { id, file } of listJson(path.join(assets, 'data/blocks'))) {
     id, name: d.name ?? id, renderer: d.renderer ?? 'model', hasItem: d.hasItem !== false && !d.fluid,
     hardness: d.hardness ?? 5, requiresTool: !!d.requiresTool, tools: d.tools ?? null, solid: d.solid !== false,
     fluid: !!d.fluid, emission: d.light?.emission ?? 0, facing: d.facing ?? null, loot: d.loot ?? id,
+    size: d.multiblock?.size ?? 1,
     biomeTint: d.biomeTint ? Object.values(d.biomeTint.faces ?? {}).map((f) => f.tile ?? f.overlay).filter(Boolean) : null,
     model
   }
+  const st = structureFrom(id, d)
+  if (st) structures[id] = st
 }
 
 const items = {}
@@ -142,6 +147,7 @@ fs.mkdirSync(outData, { recursive: true })
 for (const f of fs.readdirSync(outData)) if (f.endsWith('.json')) fs.rmSync(path.join(outData, f))
 const writeData = (name, obj) => fs.writeFileSync(path.join(outData, name + '.json'), JSON.stringify(obj))
 writeData('blocks', blocks)
+writeData('structures', structures)
 writeData('items', items)
 writeData('entities', entities)
 writeData('recipes', { recipes, ...recipeIndex })
@@ -197,7 +203,7 @@ const writePage = (rel, body) => {
   fs.mkdirSync(path.dirname(f), { recursive: true })
   fs.writeFileSync(f, body)
 }
-for (const d of ['blocks', 'items', 'mobs', 'trees']) fs.rmSync(path.join(wikiRoot, 'game', d), { recursive: true, force: true })
+for (const d of ['blocks', 'items', 'mobs', 'trees', 'structures']) fs.rmSync(path.join(wikiRoot, 'game', d), { recursive: true, force: true })
 
 const shownBlocks = Object.values(blocks).filter((b) => b.hasItem)
 for (const b of shownBlocks) {
@@ -240,6 +246,35 @@ fs.rmSync(path.join(wikiRoot, 'game/reference'), { recursive: true, force: true 
 const table = (head, rows) => `| ${head.join(' | ')} |\n|${head.map(() => '---').join('|')}|\n${rows.map((r) => `| ${r.join(' | ')} |`).join('\n')}\n`
 const pct = (x) => `${Math.round(x * 100)}%`
 const title = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+
+for (const st of Object.values(structures)) {
+  const rows = [['Size', `${st.size}×${st.size}×${st.size}`], ...st.notes]
+  writePage(`game/structures/${st.id}.md`,
+    `---
+title: ${JSON.stringify(st.name)}
+---
+
+# ${esc(st.name)}
+
+<StructureViewer id="${st.id}" />
+
+` +
+    `## Properties
+
+${table(['Property', 'Value'], rows)}
+## How to build
+
+` +
+    `Craft the bricks (see Materials above), stack them into a ${st.size}×${st.size}×${st.size} cube and right-click a front face with the multiblock converter. The opening ends up facing you.
+`)
+}
+writePage('game/structures/index.md', `# Structures
+
+Multiblocks are built from ordinary blocks and converted in place.
+
+` +
+  table(['Structure', 'Size', 'Built from'], Object.values(structures).map((st) => [`[${esc(st.name)}](/game/structures/${st.id})`, `${st.size}×${st.size}×${st.size}`, ref('block/' + st.source)])))
+
 
 writePage('game/reference/trees.md',
   `# Trees\n\nTrees are grown, not placed from templates: each species is a data file describing how its trunk and branches grow, and every tree in the world is the deterministic result for its position and the world seed.\n\n` +

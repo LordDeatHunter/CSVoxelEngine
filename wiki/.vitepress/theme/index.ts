@@ -2,6 +2,7 @@ import DefaultTheme from 'vitepress/theme'
 import type { Theme } from 'vitepress'
 import ModelViewer from './ModelViewer.vue'
 import TreeViewer from './TreeViewer.vue'
+import StructureViewer from './StructureViewer.vue'
 import RecipeCard from './RecipeCard.vue'
 import ItemGrid from './ItemGrid.vue'
 import MobGrid from './MobGrid.vue'
@@ -12,6 +13,7 @@ export default {
   enhanceApp({ app }) {
     app.component('ModelViewer', ModelViewer)
     app.component('TreeViewer', TreeViewer)
+    app.component('StructureViewer', StructureViewer)
     app.component('RecipeCard', RecipeCard)
     app.component('ItemGrid', ItemGrid)
     app.component('MobGrid', MobGrid)

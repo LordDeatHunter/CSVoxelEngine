@@ -127,7 +127,7 @@ export async function createStage(host: HTMLElement, onFrame?: (dt: number) => v
 
 // ---------------------------------------------------------------- blocks
 /** The block's model as a mesh group in block units (cell centered on the origin), or null without a static model. */
-export async function blockGroup(T: THREE, block: any, base: string): Promise<InstanceType<THREE['Group']> | null> {
+export async function blockGroup(T: THREE, block: any, base: string, size = 1): Promise<InstanceType<THREE['Group']> | null> {
   const elements: any[] = block?.model?.elements ?? []
   if (!elements.length) return null
   const tiles = new Set<string>()
@@ -162,20 +162,22 @@ export async function blockGroup(T: THREE, block: any, base: string): Promise<In
     }
   }
   group.scale.setScalar(1 / 16)
-  group.position.set(-0.5, -0.5, -0.5)
+  group.position.set(-size / 2, -size / 2, -size / 2)
   return group
 }
 
 export async function buildBlock(host: HTMLElement, block: any, base: string): Promise<Built> {
   const stage = await createStage(host)
   const { T, scene } = stage
-  const group = await blockGroup(T, block, base)
+  const size: number = block?.size ?? 1
+  const group = await blockGroup(T, block, base, size)
   if (!group) {
     stage.dispose()
     throw new Error('this block has no static model')
   }
   scene.add(group)
-  stage.frame(new T.Box3(new T.Vector3(-0.5, -0.5, -0.5), new T.Vector3(0.5, 0.5, 0.5)))
+  const h = size / 2
+  stage.frame(new T.Box3(new T.Vector3(-h, -h, -h), new T.Vector3(h, h, h)))
   const note = block.renderer !== 'model' ? 'Representative shape; the in-game form depends on placement.' : ''
   return { dispose: stage.dispose, note }
 }
