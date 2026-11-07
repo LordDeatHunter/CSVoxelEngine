@@ -233,5 +233,51 @@ for (const e of Object.values(entities)) {
 }
 writePage('game/mobs/index.md', `# Mobs\n\n${Object.values(entities).map((e) => `- [${esc(e.name)}](/game/mobs/${e.id})`).join('\n')}\n`)
 
+// ---- generated overview pages (game/reference/) ----
+fs.rmSync(path.join(wikiRoot, 'game/reference'), { recursive: true, force: true })
+const table = (head, rows) => `| ${head.join(' | ')} |\n|${head.map(() => '---').join('|')}|\n${rows.map((r) => `| ${r.join(' | ')} |`).join('\n')}\n`
+const pct = (x) => `${Math.round(x * 100)}%`
+const title = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+
+writePage('game/reference/trees.md',
+  `# Trees\n\nTrees are grown, not placed from templates: each species is a data file describing how its trunk and branches grow, and every tree in the world is the deterministic result for its position and the world seed.\n\n` +
+  table(['Species', 'Wood', 'Leaves', 'Grows in', 'Max trunk (px)', 'Steps to mature'],
+    Object.values(trees).map((t) => [title(t.id.replace(/_/g, ' ')), ref('block/' + String(t.wood).replace(/^block\//, '')),
+      t.leaves ? ref('block/' + String(t.leaves).replace(/^block\//, '')) : '—',
+      t.biomes.length ? t.biomes.map(title).join(', ') : 'special placement', t.maxPx ?? '—', t.maturity ? `${t.maturity[0]}–${t.maturity[1]}` : '—'])) +
+  `\nSpecies with no biome are never planted by ordinary worldgen: the baobab can only be grown, the palm appears at oases, and the hell and sky trees come from their realms' biomes.\n`)
+
+const partRows = (kind) => Object.values(spells).filter((s) => s.kind === kind).map((s) => [
+  esc(s.name), pct(s.costShare), s.complexity, s.tags.join(', '),
+  [s.effect && `applies ${s.effect}`, s.impact.length && `impact: ${s.impact.join(', ')}`, s.damageFactor && `damage ×${s.damageFactor}`, s.rangeFactor && `range ×${s.rangeFactor}`].filter(Boolean).join('; ') || '—'])
+writePage('game/reference/magic.md',
+  `# Magic\n\nA spell is built at a **spell table** with a staff in hand: one element, one shape, any modifiers and optionally a trigger. Each part adds to the mana cost (a share of the starting mana pool) and to the spell's complexity; past a threshold, complex spells can fizzle and backfire. Parts are learned from scrolls.\n\n` +
+  ['element', 'shape', 'modifier', 'trigger'].map((k) => {
+    const rows = partRows(k)
+    return rows.length ? `## ${title(k)}s\n\n${table(['Part', 'Cost share', 'Complexity', 'Staff tags', 'Effect'], rows)}` : ''
+  }).join('\n') +
+  `\n## Status effects\n\n${table(['Effect', 'Duration', 'Damage', 'Move speed', 'Attack speed'], Object.values(effects).map((e) => [
+    esc(e.name), `${e.durationSeconds}s`, e.damageShare ? `${pct(e.damageShare)} of max health every ${e.tickSeconds}s` : '—', pct(e.moveFactor), pct(e.attackFactor)]))}\n` +
+  `\n## Staffs\n\n${Object.values(items).filter((i) => i.staff).map((i) => `- ${ref('item/' + i.id)}: ${i.staff.slots} spell slots, tier ${i.staff.tier}, allows ${i.staff.tags.join(', ')} parts`).join('\n')}\n`)
+
+const byKind = (k) => recipes.filter((r) => r.kind === k)
+const kindText = {
+  craft: ['Crafting', 'Shapeless recipes made in the inventory.'],
+  cook: ['Campfire cooking', 'Right-click a lit branch pile with the item.'],
+  crush: ['Quern', 'Crushing in a quern.'],
+  melt: ['Melting', 'Put the item in a crucible inside a lit kiln.'],
+  cast: ['Casting', 'Pour molten metal from a crucible into a fired mold.'],
+  alloy: ['Alloys', 'Only made in the alloy furnace: a full set of the parts becomes the same total amount of the result.']
+}
+writePage('game/reference/crafting.md',
+  `# Recipes\n\n` + Object.keys(kindText).map((k) => {
+    const rs = byKind(k)
+    if (!rs.length) return ''
+    const lines = k === 'alloy'
+      ? rs.map((r) => `- ${r.parts.map((p) => `${p.ml} ml ${p.fluid}`).join(' + ')} → ${r.parts.reduce((a, p) => a + p.ml, 0)} ml ${r.outputs[0].replace('fluid/', '')}`)
+      : rs.map(recipeLine)
+    return `## ${kindText[k][0]}\n\n${kindText[k][1]}\n\n${lines.join('\n')}\n`
+  }).join('\n'))
+
 for (const w of warnings) console.warn('warn:', w)
 console.log(`wiki data: ${shownBlocks.length} blocks, ${Object.keys(items).length} items, ${Object.keys(entities).length} entities, ${recipes.length} recipes, ${warnings.length} warnings`)
