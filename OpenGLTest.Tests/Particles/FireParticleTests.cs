@@ -64,12 +64,14 @@ public sealed class FireParticleTests
         system.Update(0.03f, litCells, Vector3.Zero, rng);
 
         Assert.Equal(max, system.Particles.Count);
-        for (var i = 0; i < max - 1; i++)
-            Assert.Same(filled[i + 1], system.Particles[i]);
+        // However many spawns the update made, the oldest fill went first and the rest keep their order
+        var survivors = system.Particles.TakeWhile(p => filled.Contains(p)).ToList();
+        Assert.InRange(survivors.Count, 1, max - 1);
+        for (var i = 0; i < survivors.Count; i++)
+            Assert.Same(filled[max - survivors.Count + i], survivors[i]);
         Assert.DoesNotContain(filled[0], system.Particles);
-        // Anti-vacuity: the tail really is a newly spawned ember, not the fill shifted along.
-        Assert.NotSame(filled[max - 1], system.Particles[max - 1]);
-        Assert.Equal(FireParticleKind.Ember, system.Particles[max - 1].Kind);
+        // Anti-vacuity: the tail really is newly spawned, not the fill shifted along.
+        Assert.DoesNotContain(system.Particles[max - 1], filled);
     }
     private static List<Vector3> LitRow(int count)
     {

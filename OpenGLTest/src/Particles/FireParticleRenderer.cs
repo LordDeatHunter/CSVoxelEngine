@@ -99,12 +99,17 @@ public sealed class FireParticleRenderer : IDisposable
             var half = p.Size * 0.5f;
             var alpha = (byte)(MathUtils.Clamp01(p.Alpha) * 255f + 0.5f);
             var (r, g, b) = p.Color;
-            var emissive = p.Kind == FireParticleKind.Ember ? 1f : 0f;
+            var flame = p.Kind == FireParticleKind.Flame;
+            // 1 = a round glowing ember, 2 = a flame tongue: tall, narrow and standing on its spawn point
+            var emissive = flame ? 2f : p.Kind == FireParticleKind.Ember ? 1f : 0f;
+            var halfWidth = flame ? half * ParticleConfig.FireFlameWidthShare : half;
 
             for (var c = 0; c < 4; c++)
             {
                 var (sx, sy) = CornerSigns[c];
-                var offset = right * (sx * half) + up * (sy * half);
+                var offset = flame
+                    ? right * (sx * halfWidth) + up * ((sy + 1f) * half * 1.5f)
+                    : right * (sx * half) + up * (sy * half);
                 _verts[slot * 4 + c] = new Vertex(p.Position + offset,
                     r, g, b, alpha, new Vector2(sx * 0.5f + 0.5f, sy * 0.5f + 0.5f),
                     emissive, 0f, Vector3.UnitY);
@@ -161,7 +166,7 @@ public sealed class FireParticleRenderer : IDisposable
         var tail = n;
         for (var i = 0; i < n; i++)
         {
-            if (kinds[i] == FireParticleKind.Ember) order[head++] = i;
+            if (kinds[i] is FireParticleKind.Ember or FireParticleKind.Flame) order[head++] = i;
             else order[--tail] = i;
         }
 

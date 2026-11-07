@@ -64,6 +64,15 @@ public static class ParticleConfig
     public const float FireEmberPerSecond = 36f;
     public const float FireSmokePerSecond = 8f;
     public const float FireParticleRadius = 48f;
+    /// <summary>Flame tongues per second off each lit cell: soft additive teardrops that rise, shrink and cool from white-yellow to deep red.</summary>
+    public const float FireFlamePerSecond = 34f;
+    public const float FireFlameLifetime = 0.75f;
+    public const float FireFlameRise = 1.05f;
+    public const float FireFlameSize = 0.36f;
+    /// <summary>How much narrower than tall a flame tongue is drawn (its quad is this share as wide as it is high).</summary>
+    public const float FireFlameWidthShare = 0.7f;
+    /// <summary>Share of a cell's spawn scatter a flame's base spreads over; the flame hugs the middle of the fire.</summary>
+    public const float FireFlameSpreadShare = 0.8f;
 
     // --- Lava embers and smoke (a second FireParticleSystem instance in World) ---
     // Exposed lava cells ("hot fluid vents", recorded per chunk by the mesher) emit sparse

@@ -25,19 +25,21 @@ public sealed class FireParticleSystem
     private readonly ParticleRing<FireParticle> _particles;
     private readonly float _embersPerSecond;
     private readonly float _smokePerSecond;
+    private readonly float _flamesPerSecond;
     private readonly int _maxParticles;
     private readonly Vector3 _spawnOffset;
     private readonly float _spawnJitter;
     private readonly float _particleScale;
     private float _emberDebt;
     private float _smokeDebt;
+    private float _flameDebt;
 
     /// <summary>The campfire tuning: <see cref="ParticleConfig.FireEmberPerSecond"/>,
     /// <see cref="ParticleConfig.FireSmokePerSecond"/>, <see cref="ParticleConfig.FireParticleMax"/>
     /// and <see cref="SpawnOffset"/>.</summary>
     public FireParticleSystem()
         : this(ParticleConfig.FireEmberPerSecond, ParticleConfig.FireSmokePerSecond,
-            ParticleConfig.FireParticleMax, SpawnOffset)
+            ParticleConfig.FireParticleMax, SpawnOffset, flamesPerSecond: ParticleConfig.FireFlamePerSecond)
     {
     }
 
@@ -51,8 +53,9 @@ public sealed class FireParticleSystem
     /// particle it spawns (<see cref="FireParticle"/>'s scale).
     /// </summary>
     public FireParticleSystem(float embersPerSecond, float smokePerSecond, int maxParticles, Vector3 spawnOffset,
-        float spawnJitter = 0.5f, float particleScale = 1f)
+        float spawnJitter = 0.5f, float particleScale = 1f, float flamesPerSecond = 0f)
     {
+        _flamesPerSecond = flamesPerSecond;
         _embersPerSecond = embersPerSecond;
         _smokePerSecond = smokePerSecond;
         _maxParticles = maxParticles;
@@ -80,11 +83,17 @@ public sealed class FireParticleSystem
                 continue;
             _emberDebt += deltaTime * _embersPerSecond;
             _smokeDebt += deltaTime * _smokePerSecond;
+            _flameDebt += deltaTime * _flamesPerSecond;
             var origin = cell + _spawnOffset;
             while (_emberDebt >= 1f)
             {
                 _emberDebt -= 1f;
                 Spawn(origin, FireParticleKind.Ember, rng);
+            }
+            while (_flameDebt >= 1f)
+            {
+                _flameDebt -= 1f;
+                SpawnFlame(origin, rng);
             }
             while (_smokeDebt >= 1f)
             {
@@ -96,6 +105,7 @@ public sealed class FireParticleSystem
         {
             _emberDebt = 0f;
             _smokeDebt = 0f;
+            _flameDebt = 0f;
         }
         for (var i = _particles.Count - 1; i >= 0; i--)
         {
@@ -122,6 +132,16 @@ public sealed class FireParticleSystem
                 (rng.NextSingle() - 0.5f) * spread);
             _particles.Add(new FireParticle(origin + jitter, kind, rng));
         }
+    }
+
+    // A flame starts low and near the middle of the fire, so the tongues cluster into one body of flame
+    private void SpawnFlame(Vector3 origin, Random rng)
+    {
+        if (_particles.Count >= _maxParticles)
+            _particles.RemoveAt(0);
+        var spread = _spawnJitter * ParticleConfig.FireFlameSpreadShare;
+        var jitter = new Vector3((rng.NextSingle() - 0.5f) * spread, -0.05f, (rng.NextSingle() - 0.5f) * spread);
+        _particles.Add(new FireParticle(origin + jitter, FireParticleKind.Flame, rng, _particleScale));
     }
 
     private void Spawn(Vector3 origin, FireParticleKind kind, Random rng)

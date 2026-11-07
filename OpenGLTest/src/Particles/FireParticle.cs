@@ -16,6 +16,10 @@ public enum FireParticleKind : byte
     /// <summary>A bright mote where a drop was just collected: drawn like smoke but small, quick
     /// to rise, warm and brief.</summary>
     Spark,
+
+    /// <summary>A tongue of flame: drawn additively like an ember but as a tall soft teardrop, short lived,
+    /// rising while it shrinks and cools from white-yellow through orange to red.</summary>
+    Flame,
 }
 
 /// <summary>
@@ -36,6 +40,7 @@ public sealed class FireParticle
         FireParticleKind.Ember => 1f - MathUtils.Clamp01(_age / _lifetime),
         FireParticleKind.Steam => JuiceConfig.SteamAlpha * (1f - MathUtils.Clamp01(_age / _lifetime)),
         FireParticleKind.Spark => 0.9f * (1f - MathUtils.Clamp01(_age / _lifetime)),
+        FireParticleKind.Flame => 0.5f * (1f - MathUtils.Clamp01(_age / _lifetime) * MathUtils.Clamp01(_age / _lifetime)),
         _ => 0.45f * (1f - MathUtils.Clamp01(_age / _lifetime)),
     };
 
@@ -44,6 +49,7 @@ public sealed class FireParticle
         FireParticleKind.Ember => EmberColor(_age / _lifetime),
         FireParticleKind.Steam => ((byte)236, (byte)238, (byte)242),
         FireParticleKind.Spark => ((byte)255, (byte)238, (byte)170),
+        FireParticleKind.Flame => FlameColor(_age / _lifetime),
         _ => ((byte)110, (byte)110, (byte)115),
     };
 
@@ -86,6 +92,17 @@ public sealed class FireParticle
             Size = ParticleConfig.FireEmberSize * (0.7f + 0.6f * rng.NextSingle());
             _grow = 0f;
         }
+        else if (kind == FireParticleKind.Flame)
+        {
+            _lifetime = ParticleConfig.FireFlameLifetime * (0.7f + 0.6f * rng.NextSingle());
+            _velocity = new Vector3(
+                (rng.NextSingle() * 2f - 1f) * 0.06f,
+                ParticleConfig.FireFlameRise * (0.8f + 0.4f * rng.NextSingle()),
+                (rng.NextSingle() * 2f - 1f) * 0.06f);
+            Size = ParticleConfig.FireFlameSize * (0.75f + 0.5f * rng.NextSingle());
+            // Shrinks to a fifth of its size over its life, so the tip tapers out
+            _grow = -Size * 0.8f / _lifetime;
+        }
         else if (kind == FireParticleKind.Steam)
         {
             _lifetime = JuiceConfig.SteamLifetime * (0.7f + 0.6f * rng.NextSingle());
@@ -117,7 +134,12 @@ public sealed class FireParticle
             _grow = ParticleConfig.FireSmokeGrow;
         }
         _swayPhase = rng.NextSingle() * MathF.Tau;
-        _swayAmp = kind == FireParticleKind.Ember ? 0.35f : 0.15f;
+        _swayAmp = kind switch
+        {
+            FireParticleKind.Ember => 0.35f,
+            FireParticleKind.Flame => 0.5f,
+            _ => 0.15f,
+        };
     }
 
     /// <summary>
@@ -153,6 +175,13 @@ public sealed class FireParticle
         Size += _grow * deltaTime;
         return true;
     }
+
+    private static (byte R, byte G, byte B) FlameColor(float t) => t switch
+    {
+        < 0.25f => ((byte)255, (byte)222, (byte)110),
+        < 0.55f => ((byte)255, (byte)150, (byte)35),
+        _ => ((byte)222, (byte)78, (byte)18),
+    };
 
     private static (byte R, byte G, byte B) EmberColor(float t) => t switch
     {
