@@ -74,6 +74,7 @@ public static class WorldSeed
         CloudPatchGenerator.Reseed();
         CloudSeaGenerator.Reseed();
         SkyIslands.Reseed();
+        SkyBiomes.Reseed();
         LavaGenerator.Reseed();
         PebbleGenerator.Reseed();
         SnowGenerator.Reseed();
@@ -86,6 +87,7 @@ public static class WorldSeed
         WormCarver.ResetCellCache();
         TreeGenerator.ResetCaches();
         HellTrees.ResetCache();
+        SkyTrees.ResetCache();
         TerrainPeaks.ResetCaches();
         GreatLakes.ResetCaches();
         WaterBodies.ResetCaches();

@@ -10,11 +10,13 @@ namespace VoxelEngine.WorldGen.Sky;
 /// whose top domes gently up from its base (highest at the center, roughened by a fine noise) and whose
 /// underside hangs below the base, deepest under the center and tapering to a point at the rim
 /// ((1 - t)^<see cref="SkyIslandConfig.IslandTaperExponent"/>), with stalactites dripping from it. It is
-/// built of a <see cref="SkyIslandPalette"/>. A pure function of (x, z) and the seed: a chunk collects the
+/// built of its sky biome's <see cref="SkyIslandPalette"/> (<see cref="SkyBiomes.OfIsland"/>), with that
+/// biome's sparkle, plants and vines (<see cref="SkyFlora"/>). A pure function of (x, z) and the seed: a chunk collects the
 /// few islands that reach it once and asks <see cref="TryGetColumn(in SkyIsland, int, int, out int, out int)"/>
 /// per column, the very rule <see cref="BlockAt"/> asks, so the point query equals the stamp bit for bit
 /// across chunk seams, and a chunk reads no neighbor. Islands never touch, so at most one holds a column.
-/// It only ever replaces air.
+/// It only ever replaces air; the vines hang below an island and its plants stand on it, still inside the
+/// band, which the island's height roll leaves room for.
 /// </summary>
 public static class SkyIslandGenerator
 {
@@ -55,18 +57,24 @@ public static class SkyIslandGenerator
 
     /// <summary>The island cells of column (x, z): false in open sky. Collects the column's islands itself, so
     /// it is a plain point query, slower than a chunk's stamp.</summary>
-    public static bool TryGetColumn(int x, int z, out int bottom, out int top)
+    public static bool TryGetColumn(int x, int z, out int bottom, out int top) =>
+        TryGetColumn(x, z, out _, out bottom, out top);
+
+    /// <summary>The island holding column (x, z) and its cells: false in open sky.</summary>
+    public static bool TryGetColumn(int x, int z, out SkyIsland island, out int bottom, out int top)
     {
         Span<SkyIsland> islands = stackalloc SkyIsland[MaxIslandsPerChunk];
         var count = SkyIslands.CollectIslands(x, z, x, z, islands);
-        return TryGetColumn(islands[..count], x, z, out bottom, out top);
+        return TryGetColumn(islands[..count], x, z, out island, out bottom, out top);
     }
 
-    /// <summary>The island block at the cell, or air: on air this is what <see cref="Stamp"/> writes.</summary>
-    public static byte BlockAt(int x, int y, int z) =>
-        TryGetColumn(x, z, out var bottom, out var top) && y >= bottom && y <= top
-            ? SkyIslandPalette.Default.BlockAt(y, top)
-            : BlockType.Air;
+    /// <summary>The island block at the cell, with its biome's sparkle, plant and vine, or air: on air this
+    /// is what <see cref="Stamp"/> writes. Trees are separate (<see cref="SkyTrees"/>).</summary>
+    public static byte BlockAt(int x, int y, int z)
+    {
+        if (!TryGetColumn(x, z, out var island, out var bottom, out var top)) return BlockType.Air;
+        return SkyFlora.BlockAt(SkyBiomes.Palette(SkyBiomes.OfIsland(island)), x, y, z, bottom, top);
+    }
 
     /// <summary>Writes the islands into the air cells of the chunk whose minimum corner is
     /// (worldX0, worldY0, worldZ0).</summary>
@@ -80,20 +88,29 @@ public static class SkyIslandGenerator
         var count = SkyIslands.CollectIslands(worldX0, worldZ0, worldX0 + Chunk.Size - 1, worldZ0 + Chunk.Size - 1, islands);
         if (count == 0) return;
 
-        // L-13's sky biomes pick the palette here, per island or per column
-        var palette = SkyIslandPalette.Default;
+        // Each island wears its biome's palette, read once here
+        Span<SkyBiome> biomes = stackalloc SkyBiome[MaxIslandsPerChunk];
+        for (var k = 0; k < count; k++)
+            biomes[k] = SkyBiomes.OfIsland(islands[k]);
+
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         {
-            if (!TryGetColumn(islands[..count], worldX0 + x, worldZ0 + z, out var bottom, out var top)) continue;
+            var wx = worldX0 + x;
+            var wz = worldZ0 + z;
+            var k = IndexOfColumn(islands[..count], wx, wz, out var bottom, out var top);
+            if (k < 0) continue;
 
-            var lo = Math.Max(yMin, bottom - worldY0);
-            var hi = Math.Min(yMax, top - worldY0);
+            // The column's cells, the plant over its top and the longest vine under it
+            var palette = SkyBiomes.Palette(biomes[k]);
+            var lo = Math.Max(yMin, bottom - SkyIslandConfig.SkyVineMaxLength - worldY0);
+            var hi = Math.Min(yMax, top + 1 - worldY0);
             for (var y = lo; y <= hi; y++)
             {
                 var i = Chunk.Idx(x, y, z);
-                if (blocks[i] == BlockType.Air)
-                    blocks[i] = palette.BlockAt(worldY0 + y, top);
+                if (blocks[i] != BlockType.Air) continue;
+                var block = SkyFlora.BlockAt(palette, wx, worldY0 + y, wz, bottom, top);
+                if (block != BlockType.Air) blocks[i] = block;
             }
         }
     }
@@ -102,15 +119,25 @@ public static class SkyIslandGenerator
     internal static StampBand WriteBand() =>
         new(WorldGenerationConfig.SkyIslandBottomY, WorldGenerationConfig.SkyIslandTopY);
 
-    /// <summary>The column of the first island in <paramref name="islands"/> that holds (x, z).</summary>
-    private static bool TryGetColumn(ReadOnlySpan<SkyIsland> islands, int x, int z, out int bottom, out int top)
+    /// <summary>The first island in <paramref name="islands"/> that holds (x, z), and its column.</summary>
+    private static bool TryGetColumn(ReadOnlySpan<SkyIsland> islands, int x, int z, out SkyIsland island,
+        out int bottom, out int top)
     {
-        foreach (ref readonly var island in islands)
-            if (TryGetColumn(island, x, z, out bottom, out top))
-                return true;
+        var k = IndexOfColumn(islands, x, z, out bottom, out top);
+        island = k < 0 ? default : islands[k];
+        return k >= 0;
+    }
+
+    /// <summary>The index of the first island in <paramref name="islands"/> that holds (x, z), and its
+    /// column; -1 when none does.</summary>
+    private static int IndexOfColumn(ReadOnlySpan<SkyIsland> islands, int x, int z, out int bottom, out int top)
+    {
+        for (var k = 0; k < islands.Length; k++)
+            if (TryGetColumn(islands[k], x, z, out bottom, out top))
+                return k;
 
         bottom = 0;
         top = -1;
-        return false;
+        return -1;
     }
 }

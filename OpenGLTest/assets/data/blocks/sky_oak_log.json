@@ -1,0 +1,19 @@
+{
+  // The trunk of the meadow sky islands' broad sky oak (trees/sky_oak.json): tree wood wearing the
+  // oak's own bark, its thickness in the state byte. Its own block, so the sky oak never shares a wood
+  // (or a leaf decay rule) with the overworld oak.
+  "name": "Sky Oak Log",
+  "model": {
+    "parent": "block/cube_column",
+    "textures": { "end": "oak_log_top", "side": "oak_log_side" }
+  },
+  "hardness": 20,
+  "renderer": "tree_wood",
+  "sfx": "hit_wood",
+  "requiresTool": true,
+  "tools": { "axe": 1 },
+  "wood": {
+    "tipHardness": 0.25,
+    "loot": [ { "minThickness": 0, "loot": "wood" }, { "minThickness": 7, "loot": "self" } ]
+  }
+}

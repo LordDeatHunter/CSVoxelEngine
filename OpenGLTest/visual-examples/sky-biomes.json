@@ -1,0 +1,44 @@
+{
+  // Sky biomes and their flora (plans/LAYERS.md L-13): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/sky-biomes.json
+  // Shots land in visual/sky-biomes/. With the default seed (found with SkyIslands.TryGetIsland and
+  // SkyBiomes.OfIsland over the island cells) a meadow island of radius 25 sits at (232, 763) with its
+  // top at 383 and four sky oaks, and a frost highland island of radius 26 at (-254, 265) with its top
+  // at 369 and four crystal trees. Each is framed from the side, from above, standing on it, and from
+  // below (its vines hanging from the underside).
+  "steps": [
+    { "op": "fly", "on": true },
+
+    { "op": "teleport", "pos": [172.5, 382.5, 763.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "meadow_side", "hideHud": true },
+
+    { "op": "teleport", "pos": [232.5, 420.5, 813.5], "yaw": -90, "pitch": -45 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "meadow_above", "hideHud": true },
+
+    { "op": "teleport", "pos": [222.5, 388.5, 773.5], "yaw": 30, "pitch": -10 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "meadow_on", "hideHud": true },
+
+    { "op": "teleport", "pos": [205.5, 345.5, 763.5], "yaw": 0, "pitch": 35 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "meadow_under", "hideHud": true },
+
+    { "op": "teleport", "pos": [-314.5, 368.5, 265.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "frost_side", "hideHud": true },
+
+    { "op": "teleport", "pos": [-254.5, 405.5, 315.5], "yaw": -90, "pitch": -45 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "frost_above", "hideHud": true },
+
+    { "op": "teleport", "pos": [-264.5, 374.5, 275.5], "yaw": 30, "pitch": -10 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "frost_on", "hideHud": true },
+
+    { "op": "teleport", "pos": [-281.5, 325.5, 265.5], "yaw": 0, "pitch": 35 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "frost_under", "hideHud": true }
+  ]
+}

@@ -13,7 +13,7 @@ namespace VoxelEngine.WorldGen;
 /// every other stage is marked once on every filled chunk, an early-out chunk (entirely above
 /// the terrain and any water) marks only <see cref="Stage.Columns"/>, one of those in a sky layer's band
 /// marks <see cref="Stage.Columns"/>, <see cref="Stage.Clouds"/>, <see cref="Stage.CloudSea"/>,
-/// <see cref="Stage.SkyIslands"/>, <see cref="Stage.SolidCount"/> and
+/// <see cref="Stage.SkyIslands"/>, <see cref="Stage.SkyTrees"/>, <see cref="Stage.SolidCount"/> and
 /// <see cref="Stage.FluidFrontier"/>, and a chunk wholly in hell marks
 /// only <see cref="Stage.Columns"/>, <see cref="Stage.Hell"/>, <see cref="Stage.HellTrees"/>, <see cref="Stage.SolidCount"/> and
 /// <see cref="Stage.FluidFrontier"/>.
@@ -91,6 +91,8 @@ internal sealed class WorldgenStageTimer
         CloudSea,
         /// <summary>SkyIslandGenerator.Stamp.</summary>
         SkyIslands,
+        /// <summary>SkyTrees.Stamp (the trees grown on a cache miss included).</summary>
+        SkyTrees,
         /// <summary>BarrierGenerator.Stamp.</summary>
         Barrier,
         /// <summary>HellGenerator.Stamp.</summary>

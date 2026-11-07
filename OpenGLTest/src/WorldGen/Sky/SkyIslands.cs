@@ -123,11 +123,11 @@ public static class SkyIslands
         var depth = radius * MathUtils.Lerp(SkyIslandConfig.IslandMinDepthPerRadius,
             SkyIslandConfig.IslandMaxDepthPerRadius, SplitMix64.Unit(hash, 5));
 
-        // The column shape tops out at dome + detail (rounded) above the base and hangs at most
-        // 1 + depth + a stalactite below it
+        // The column shape tops out at dome + detail (rounded) above the base, with the flora's
+        // headroom over it, and hangs at most 1 + depth + a stalactite + a vine below it
         var baseMin = WorldGenerationConfig.SkyIslandBottomY + 1
-                      + (int)MathF.Ceiling(depth + SkyIslandConfig.IslandStalactiteMax);
-        var baseMax = WorldGenerationConfig.SkyIslandTopY
+                      + (int)MathF.Ceiling(depth + SkyIslandConfig.IslandStalactiteMax) + SkyIslandConfig.SkyVineMaxLength;
+        var baseMax = WorldGenerationConfig.SkyIslandTopY - SkyIslandConfig.IslandFloraHeadroom
                       - (int)MathF.Ceiling(dome + SkyIslandConfig.IslandTopDetail + 0.5f);
         var baseY = baseMin + (int)(SplitMix64.Unit(hash, 6) * (baseMax - baseMin + 1));
         island = new SkyIsland(centerX, centerZ, radius, baseY, dome, depth);

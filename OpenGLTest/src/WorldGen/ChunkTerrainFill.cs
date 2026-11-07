@@ -78,7 +78,7 @@ internal static class ChunkTerrainFill
 
             if (stampGates)
             {
-                StampSky(chunk.Blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size,
+                StampSky(chunk, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size,
                     stampGates, timer);
                 Finish(chunk, column, lowerBoundY, hasWater: false, timer, genStart);
                 return;
@@ -283,7 +283,7 @@ internal static class ChunkTerrainFill
         timer?.Mark(Stage.Foliage);
 
         // The sky layers, into air only: a chunk straddling the cloud slab under a tall tree's reach
-        StampSky(chunk.Blocks, worldX0, lowerBoundY, worldZ0, stampGates, timer);
+        StampSky(chunk, worldX0, lowerBoundY, worldZ0, stampGates, timer);
 
         // Last of every stamp, so nothing writes over it: the barrier band between the overworld
         // and hell. Its core takes every cell, carved air and fluids included, so it is gapless.
@@ -310,11 +310,13 @@ internal static class ChunkTerrainFill
         || (SkyIslandConfig.CloudSeaEnabled && CloudSeaGenerator.WriteBand().Reaches(worldY0))
         || (SkyIslandConfig.SkyIslandsEnabled && SkyIslandGenerator.WriteBand().Reaches(worldY0));
 
-    /// <summary>The sky layers' stamps, each gated by its band: the solid cloud patches, the cloud sea and
-    /// the sky islands. Their bands are disjoint and each writes only air.</summary>
-    private static void StampSky(byte[] blocks, int worldX0, int worldY0, int worldZ0, bool stampGates,
+    /// <summary>The sky layers' stamps, each gated by its band: the solid cloud patches, the cloud sea, the
+    /// sky islands and their trees. Their bands are disjoint and each writes only air (a tree also over the
+    /// islands' plants and vines).</summary>
+    private static void StampSky(Chunk chunk, int worldX0, int worldY0, int worldZ0, bool stampGates,
         WorldgenStageTimer? timer)
     {
+        var blocks = chunk.Blocks;
         if (WorldGenerationConfig.CloudPatchesEnabled && Admits(stampGates, CloudPatchGenerator.WriteBand(), worldY0))
             CloudPatchGenerator.Stamp(blocks, worldX0, worldY0, worldZ0);
         timer?.Mark(Stage.Clouds);
@@ -326,6 +328,15 @@ internal static class ChunkTerrainFill
         if (SkyIslandConfig.SkyIslandsEnabled && Admits(stampGates, SkyIslandGenerator.WriteBand(), worldY0))
             SkyIslandGenerator.Stamp(blocks, worldX0, worldY0, worldZ0);
         timer?.Mark(Stage.SkyIslands);
+
+        if (SkyIslandConfig.SkyIslandsEnabled && Admits(stampGates, SkyTrees.WriteBand(), worldY0))
+        {
+            // Through a local like the overworld trees: a ref to the volatile state field is refused
+            var state = chunk.StateArray;
+            SkyTrees.Stamp(blocks, ref state, worldX0, worldY0, worldZ0);
+            chunk.StateArray = state;
+        }
+        timer?.Mark(Stage.SkyTrees);
     }
 
     /// <summary>The hell trees crossing the chunk (<see cref="HellTrees.Stamp"/>), after the hell stamp,

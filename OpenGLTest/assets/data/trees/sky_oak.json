@@ -1,0 +1,25 @@
+{
+  // The meadow sky islands' broad tree: the oak's growth with more sideways reach and a wider, brighter
+  // crown. No worldgen block: SkyTrees plants it from the meadow's palette (SkyBiomes), one tree cell at a
+  // time, grown inside its 16x16 cell and under the island band's top.
+  "wood": "block/sky_oak_log",
+  "leaves": "block/sky_oak_leaves",
+  "growth": {
+    "logic": "oak",
+    "signalEnergy": 10,
+    "upProbability": 1,
+    "lowestBranchHeight": 3,
+    "maturitySteps": [45, 65]
+  },
+  "thickness": {
+    "tipPx": 1,
+    "pipeExponent": 1.5,
+    "maxPx": 16,
+    "girthProfile": [[0, 2.4], [0.4, 1.6], [1, 1.0]],
+    "trunkShape": "circle",
+    "rim": "block"
+  },
+  "leafCluster": { "shape": "blob", "radius": 3, "hydration": 5, "tipMaxPx": 3, "minRadius": 2, "fullRadiusPx": 12 },
+  // Never drawn (the sky has no far LOD); only has to stay valid
+  "lod": { "crownHeight": [6, 9], "crownRadius": 5, "profile": "dome" }
+}

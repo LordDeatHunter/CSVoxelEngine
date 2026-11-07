@@ -246,6 +246,11 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
   grew 3 rows for it), the `HellTrees` stage warm 0.003 ms and cold 0.6-0.75 ms mean (a cold sample
   regrows every tree it crosses; in game a tree is grown once per cell and layer and cached). Untried:
   a per-column vine pass in the stamp instead of the per-cell scan.
+- Sky biomes and flora (`L-13`, 2026-11-07, `WorldgenCostProbe` `skyIsland` class, one run each): a
+  sky-island chunk warm 0.065 ms against 0.034 before (the island stamp 0.061 ms, now asking the flora
+  rule per cell, and the `SkyTrees` stage 0.006 ms); cold 4.1-4.3 ms against 3.9, of which `SkyTrees`
+  0.33 ms mean (a cold sample regrows every tree it crosses; in game a tree is grown once per cell and
+  cached). Untried: the stamp asking the flora rule only at the top, the plant cell and the vine run.
 - Identity recipe: dump `LandHeight`, `WaterLevelAt` and `SurfaceWaterWeight` bits before and after
   on a +-20000 grid at stride 37, plus `Compute` on 1000 random chunk columns; zero changes allowed
   outside the intended footprint.

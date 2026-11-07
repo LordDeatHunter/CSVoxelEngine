@@ -106,6 +106,49 @@ public static class SkyIslandConfig
     /// <summary>Cells of soil under an island's top cell.</summary>
     public const int IslandSoilDepth = 3;
 
+    /// <summary>Room kept free over the highest island top for its plants and trees: an island's base is
+    /// rolled so its top stays this far under the band's top, and a sky tree grows only inside the band.</summary>
+    public const int IslandFloraHeadroom = 18;
+
+    // --- Sky biomes (L-13): meadow and frost highland, by a coherent 2D noise at the island's center ---
+
+    /// <summary>Frequency of the sky biome noise: regions hundreds of blocks across, about a zone's size.</summary>
+    public const float SkyBiomeFrequency = 1f / 700f;
+
+    /// <summary>The biome noise value above which an island is frost highland; below it is meadow.</summary>
+    public const float SkyFrostMinValue = 0f;
+
+    /// <summary>The longest vine hanging under an island's underside, in cells.</summary>
+    public const int SkyVineMaxLength = 6;
+
+    /// <summary>One meadow underside column in this many hangs a vine.</summary>
+    public const int MeadowVineRate = 14;
+
+    /// <summary>One frost highland underside column in this many hangs a vine.</summary>
+    public const int FrostVineRate = 9;
+
+    /// <summary>One meadow top cell in this many grows a plant (tall grass or a flower).</summary>
+    public const int MeadowPlantRate = 3;
+
+    /// <summary>One frost highland top cell in this many grows a frost fern.</summary>
+    public const int FrostPlantRate = 9;
+
+    /// <summary>One frost highland top cell in this many is a crystal outcrop instead of frosted turf.</summary>
+    public const int FrostCrystalRate = 23;
+
+    /// <summary>Side of a sky tree cell (<c>SkyTrees</c>): each cell roots at most one tree, grown inside
+    /// the cell's columns, so two trees never meet. Divides the chunk size.</summary>
+    public const int SkyTreeCellBlocks = 16;
+
+    /// <summary>How far inside its cell's sides a sky tree's root stands.</summary>
+    public const int SkyTreeCellMargin = 4;
+
+    /// <summary>The chance a meadow tree cell roots a sky oak.</summary>
+    public const float MeadowTreeChance = 0.45f;
+
+    /// <summary>The chance a frost highland tree cell roots a crystal tree.</summary>
+    public const float FrostTreeChance = 0.35f;
+
     // --- The cloud sea under the islands ---
 
     /// <summary>Lowest cell of the cloud sea: <see cref="SkyConfig.SkyCloudSeaHeight"/> as a cell.</summary>

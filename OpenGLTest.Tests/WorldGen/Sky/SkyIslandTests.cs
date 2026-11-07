@@ -52,13 +52,27 @@ public sealed class SkyIslandTests
         return chunk;
     }
 
-    /// <summary>What the sky holds at a cell far above every column's ground: island, cloud sea, cloud
-    /// patch or air, from the three point queries.</summary>
+    /// <summary>What the sky holds at a cell far above every column's ground: a sky tree's cell, island (with
+    /// its flora), cloud sea, cloud patch or air, from the tree shapes and the three point queries.</summary>
     private static byte ExpectedSky(int x, int y, int z)
     {
+        var tree = SkyTreeCell(x, y, z);
         var island = SkyIslandGenerator.BlockAt(x, y, z);
+        // A tree grows over the flora, never into the island
+        if (tree != BlockType.Air && !BlockType.IsSolid(island)) return tree;
         if (island != BlockType.Air) return island;
         if (CloudSeaGenerator.IsCloud(x, y, z) || CloudPatchGenerator.IsCloud(x, y, z)) return CloudPatchGenerator.CloudBlock;
+        return BlockType.Air;
+    }
+
+    /// <summary>The block of the sky tree rooted in the cell's tree cell at (x, y, z), or air.</summary>
+    private static byte SkyTreeCell(int x, int y, int z)
+    {
+        var tree = SkyTrees.TreeOf(SkyTrees.CellOf(x), SkyTrees.CellOf(z));
+        if (tree == null || y < tree.MinY || y > tree.MaxY) return BlockType.Air;
+        foreach (var cell in tree.Cells)
+            if (cell.X == x && cell.Y == y && cell.Z == z)
+                return cell.Block;
         return BlockType.Air;
     }
 
@@ -251,7 +265,8 @@ public sealed class SkyIslandTests
         var islandBlocks = 0;
         var seaBlocks = 0;
         var layers = new List<int> { SkyIslandConfig.CloudSeaBottomY >> Chunk.SizeShift };
-        for (var cy = (island.BaseY - (int)island.Depth - 8) >> Chunk.SizeShift; cy <= (island.BaseY + 8) >> Chunk.SizeShift; cy++)
+        for (var cy = (island.BaseY - (int)island.Depth - 14) >> Chunk.SizeShift;
+             cy <= (island.BaseY + SkyIslandConfig.IslandFloraHeadroom + 8) >> Chunk.SizeShift; cy++)
             layers.Add(cy);
 
         for (var dcx = -1; dcx <= 0; dcx++)
@@ -306,16 +321,19 @@ public sealed class SkyIslandTests
             for (var z = 0; z < Chunk.Size; z++)
             {
                 int bottom = 0, top = -1;
-                var held = false;
+                SkyIslandPalette? palette = null;
                 foreach (var candidate in union[..count])
-                    if (held = SkyIslandGenerator.TryGetColumn(candidate, chunkX0 + x, z0 + z, out bottom, out top))
-                        break;
+                {
+                    if (!SkyIslandGenerator.TryGetColumn(candidate, chunkX0 + x, z0 + z, out bottom, out top)) continue;
+                    palette = SkyBiomes.Palette(SkyBiomes.OfIsland(candidate));
+                    break;
+                }
 
                 for (var y = 0; y < Chunk.Size; y++)
                 {
                     var wy = y0 + y;
-                    var expected = held && wy >= bottom && wy <= top
-                        ? SkyIslandPalette.Default.BlockAt(wy, top)
+                    var expected = palette != null
+                        ? SkyFlora.BlockAt(palette, chunkX0 + x, wy, z0 + z, bottom, top)
                         : BlockType.Air;
                     Assert.Equal(expected, blocks[Chunk.Idx(x, y, z)]);
                     if (expected != BlockType.Air) written++;
@@ -338,7 +356,12 @@ public sealed class SkyIslandTests
         Array.Fill(blocks, marker);
         SkyIslandGenerator.Stamp(blocks, x0, y0, z0);
         CloudSeaGenerator.Stamp(blocks, x0, SkyIslandConfig.CloudSeaBottomY, z0);
+        // A sky tree writes over air and flora only, never over anything solid
+        byte[]? state = null;
+        for (var cy = y0; cy <= y0 + 2 * Chunk.Size; cy += Chunk.Size)
+            SkyTrees.Stamp(blocks, ref state, x0, cy, z0);
         Assert.All(blocks, b => Assert.Equal(marker, b));
+        Assert.Null(state);
     }
 
     [Fact]

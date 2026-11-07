@@ -1,0 +1,10 @@
+{
+  // The frosted turf topping the frost highland's sky islands (SkyBiomes): rimed grass over
+  // permafrost. Tiles from tools/generate-sky-textures.py; the bottom is the permafrost tile.
+  "name": "Frosted Turf",
+  "model": {
+    "parent": "block/cube_bottom_top",
+    "textures": { "top": "frost_grass_top", "bottom": "permafrost", "side": "frost_grass_side" }
+  },
+  "footstepDust": true
+}

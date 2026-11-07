@@ -909,6 +909,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>Generations of the hell tree cache.</summary>
     public const int HellTreeCacheGenerations = 4;
 
+    /// <summary>Capacity of the sky tree cache (one entry per sky tree cell, a tree or none), read by the
+    /// generation workers; see <see cref="TreeShapeCacheCapacity"/>.</summary>
+    public const int SkyTreeCacheCapacity = 4096;
+
+    /// <summary>Generations of the sky tree cache.</summary>
+    public const int SkyTreeCacheGenerations = 4;
+
     /// <summary>Bottom of the solid cloud slab: the patchy real cloud blocks around y 200, above the
     /// relief ceiling (<see cref="ReliefCeilingHeight"/>) and the drawn cloud layer
     /// (<see cref="SkyConfig.CloudHeight"/>).</summary>

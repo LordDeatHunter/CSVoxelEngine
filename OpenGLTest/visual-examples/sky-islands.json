@@ -3,8 +3,8 @@
   //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/sky-islands.json
   // Shots land in visual/sky-islands/. With the default seed a small island zone centered near
   // (-192, 240) lies close to the origin (found with SkyIslands.TryGetIsland over the island cells):
-  // an island of radius 22 at (-195, 202) with its base at 395, one of radius 26 at (-254, 265)
-  // based at 363 and one of radius 24 at (-298, 230) based at 389. The camera looks at the first
+  // an island of radius 22 at (-195, 202) with its base at 384, one of radius 26 at (-254, 265)
+  // based at 365 and one of radius 24 at (-298, 230) based at 381 (the frost highland, L-13). The camera looks at the first
   // from the side (its domed grass top over a stone underside tapering to stalactites), down on the
   // second, across the zone from above it (the open sky past the zone's rim), down on the cloud
   // sea (290..301) and up at it from below; then the player stands on the first island, creative off,
