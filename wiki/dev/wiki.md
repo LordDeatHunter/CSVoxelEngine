@@ -12,6 +12,10 @@ The site is VitePress, in the `wiki/` folder, deployed to GitHub Pages by `.gith
 
 All of that is gitignored and rebuilt in CI. The hand-written pages (controls, biomes, layers and everything under `dev/`) are committed.
 
+## Tree growth data
+
+The tree pages replay data from `OpenGLTest.WikiExport`, a small headless console project that runs the real growth engine (`TreeGrower` and `TreeRasterizer`) for every species with the item debugger's setup: the default seed, a root at (0, 1, 0), flat ground, features from the maturity step on. For each step it writes only the cells to set and remove, because wood thickens, shells appear and leaves come and go as a tree grows. CI installs .NET 10 and runs it before the site build; locally run `npm run trees` in `wiki/` (needs the .NET 10 SDK). `public/data/trees` is gitignored.
+
 ## 3D viewers
 
 `<ModelViewer kind="block|item|entity" id="..."/>` lazily loads three.js when it scrolls into view.
@@ -22,13 +26,16 @@ All of that is gitignored and rebuilt in CI. The hand-written pages (controls, b
 
 Blocks whose shape depends on placement (panes, fluids, tree wood and others) show a representative shape.
 
+`<TreeViewer id="oak"/>` draws a tree from the exporter data: wood as boxes sized by each cell's thickness with tubes toward connected neighbors (the game's `TreeWoodShape` rule, in `tree-shape.ts`), leaves as cubes, over a patch of grass. A slider replays the growth, and `?step=N` in the URL opens any step.
+
 ## Working on it
 
 ```powershell
 cd wiki
 npm install
 npm run dev      # regenerates the data, then serves with hot reload
-npm test         # generator and animation tests
+npm run trees    # export tree growth data (needs the .NET 10 SDK)
+npm test         # generator, animation and tree-shape tests
 npm run build    # the full production build
 ```
 

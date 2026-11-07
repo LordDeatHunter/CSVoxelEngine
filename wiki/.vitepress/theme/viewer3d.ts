@@ -36,7 +36,7 @@ function pushFace(pos: number[], uvs: number[], idx: number[], face: string, fro
   idx.push(base, base + 1, base + 2, base, base + 2, base + 3)
 }
 
-async function loadTexture(T: THREE, url: string) {
+export async function loadTexture(T: THREE, url: string) {
   const tex = await new T.TextureLoader().loadAsync(url)
   tex.magFilter = T.NearestFilter
   tex.minFilter = T.NearestFilter
@@ -45,12 +45,12 @@ async function loadTexture(T: THREE, url: string) {
   return tex
 }
 
-function lit(T: THREE, tex: InstanceType<THREE['Texture']>) {
+export function lit(T: THREE, tex: InstanceType<THREE['Texture']>) {
   return new T.MeshLambertMaterial({ map: tex, transparent: true, alphaTest: 0.5, side: T.DoubleSide })
 }
 
 /** Shared scene shell: renderer, orbit controls, lights, resize and offscreen/hidden pausing. */
-async function createStage(host: HTMLElement, onFrame?: (dt: number) => void) {
+export async function createStage(host: HTMLElement, onFrame?: (dt: number) => void) {
   const T = await import('three')
   const { OrbitControls } = await import('three/examples/jsm/controls/OrbitControls.js')
   const renderer = new T.WebGLRenderer({ antialias: false, alpha: true })

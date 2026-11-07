@@ -7,7 +7,8 @@
     "dev": "npm run data && vitepress dev",
     "build": "npm run data && vitepress build",
     "preview": "vitepress preview",
-    "test": "node --test scripts/*.test.mjs"
+    "test": "node --test scripts/*.test.mjs",
+    "trees": "dotnet run --project ../OpenGLTest.WikiExport -c Release -- public/data/trees"
   },
   "devDependencies": {
     "@types/three": "^0.170.0",

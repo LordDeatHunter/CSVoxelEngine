@@ -132,8 +132,9 @@ for (const { id, file } of listJson(path.join(rdir, 'alloy'))) {
 const recipeIndex = buildRecipeIndex(recipes)
 
 // ---- output ----
-fs.rmSync(outData, { recursive: true, force: true })
+// Only the generated top-level files: public/data/trees is written by the .NET exporter (npm run trees).
 fs.mkdirSync(outData, { recursive: true })
+for (const f of fs.readdirSync(outData)) if (f.endsWith('.json')) fs.rmSync(path.join(outData, f))
 const writeData = (name, obj) => fs.writeFileSync(path.join(outData, name + '.json'), JSON.stringify(obj))
 writeData('blocks', blocks)
 writeData('items', items)
@@ -195,7 +196,7 @@ const writePage = (rel, body) => {
   fs.mkdirSync(path.dirname(f), { recursive: true })
   fs.writeFileSync(f, body)
 }
-for (const d of ['blocks', 'items', 'mobs']) fs.rmSync(path.join(wikiRoot, 'game', d), { recursive: true, force: true })
+for (const d of ['blocks', 'items', 'mobs', 'trees']) fs.rmSync(path.join(wikiRoot, 'game', d), { recursive: true, force: true })
 
 const shownBlocks = Object.values(blocks).filter((b) => b.hasItem)
 for (const b of shownBlocks) {
@@ -242,11 +243,25 @@ const title = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 writePage('game/reference/trees.md',
   `# Trees\n\nTrees are grown, not placed from templates: each species is a data file describing how its trunk and branches grow, and every tree in the world is the deterministic result for its position and the world seed.\n\n` +
   table(['Species', 'Wood', 'Leaves', 'Grows in', 'Max trunk (px)', 'Steps to mature'],
-    Object.values(trees).map((t) => [title(t.id.replace(/_/g, ' ')), ref('block/' + String(t.wood).replace(/^block\//, '')),
+    Object.values(trees).map((t) => [`[${title(t.id.replace(/_/g, ' '))}](/game/trees/${t.id})`, ref('block/' + String(t.wood).replace(/^block\//, '')),
       t.leaves ? ref('block/' + String(t.leaves).replace(/^block\//, '')) : '—',
       t.biomes.length ? t.biomes.map(title).join(', ') : 'special placement', t.maxPx ?? '—', t.maturity ? `${t.maturity[0]}–${t.maturity[1]}` : '—'])) +
-  `\nSpecies with no biome are never planted by ordinary worldgen: the baobab can only be grown, the palm appears at oases, and the hell and sky trees come from their realms' biomes.\n`)
+  `\nOpen a species to watch a sample tree grow. Species with no biome are never planted by ordinary worldgen: the baobab can only be grown, the palm appears at oases, and the hell and sky trees come from their realms' biomes.\n`)
 
+const blockRef = (b) => ref('block/' + String(b).replace(/^block\//, ''))
+for (const t of Object.values(trees)) {
+  const name = title(t.id.replace(/_/g, ' '))
+  writePage(`game/trees/${t.id}.md`,
+    `---\ntitle: ${JSON.stringify(name)}\n---\n\n# ${esc(name)}\n\n<TreeViewer id="${t.id}" />\n\n` +
+    table(['Property', 'Value'], [
+      ['Wood', blockRef(t.wood)],
+      ['Leaves', t.leaves ? blockRef(t.leaves) : 'none'],
+      ['Grows in', t.biomes.length ? t.biomes.map(title).join(', ') : 'special placement'],
+      ['Largest trunk', t.maxPx ? `${t.maxPx} px across` : '—'],
+      ['Steps to mature', t.maturity ? `${t.maturity[0]}–${t.maturity[1]} (depends on the tree)` : '—']
+    ]) +
+    `\n::: info\nThe sample is the tree the real growth engine produces for one fixed seed, standing on flat ground, and the slider replays its growth step by step. Wide-trunk bevels are drawn as plain cubes here, and every tree in the world is a little different.\n:::\n`)
+}
 const partRows = (kind) => Object.values(spells).filter((s) => s.kind === kind).map((s) => [
   esc(s.name), pct(s.costShare), s.complexity, s.tags.join(', '),
   [s.effect && `applies ${s.effect}`, s.impact.length && `impact: ${s.impact.join(', ')}`, s.damageFactor && `damage ×${s.damageFactor}`, s.rangeFactor && `range ×${s.rangeFactor}`].filter(Boolean).join('; ') || '—'])
