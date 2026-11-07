@@ -1,8 +1,0 @@
-{
-  "name": "Barrier",
-  "model": { "parent": "block/cube_all", "textures": { "all": "barrier" } },
-  "sfx": "hit_rock",
-  "hardness": 40,
-  "requiresTool": true,
-  "tools": { "pickaxe": 3 }
-}

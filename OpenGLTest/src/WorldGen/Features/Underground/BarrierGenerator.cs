@@ -27,7 +27,7 @@ public static class BarrierGenerator
     static BarrierGenerator()
     {
         Reseed();
-        BarrierBlock = ContentRegistry.RequireBlock("barrier").Id;
+        BarrierBlock = ContentRegistry.RequireBlock("basalt").Id;
     }
 
     /// <summary>Builds the noise from the current seed (static constructor and <see cref="WorldSeed.Apply"/>).</summary>

@@ -1,9 +1,10 @@
 {
-  // The Magma Caverns floors, walls and ceilings. Tile from tools/generate-hell-textures.py.
+  // The Magma Caverns floors, walls and ceilings, and the barrier band between the overworld and hell,
+  // so only the iron pickaxe digs it. Tile from tools/generate-hell-textures.py.
   "name": "Basalt",
   "model": { "parent": "block/cube_all", "textures": { "all": "basalt" } },
   "sfx": "hit_rock",
-  "hardness": 12,
+  "hardness": 40,
   "requiresTool": true,
-  "tools": { "pickaxe": 1 }
+  "tools": { "pickaxe": 3 }
 }

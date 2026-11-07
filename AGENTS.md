@@ -2475,7 +2475,6 @@ tools/                                # asset generators: tiles, sprites, models
   generate-wiki-shots.mjs             # the wiki's screenshot scenarios (visual-examples/wiki-*.json) and wiki/data/screenshots.json from one spec of poses and captions
   generate-mana-draught-texture.py    # deterministic placeholder sprite of the mana draught (mana_draught.png), --check
   generate-stone-brick-texture.py     # deterministic generator of the stone brick tile (stone_bricks.png)
-  generate-barrier-texture.py         # deterministic generator of the dark barrier tile (barrier.png)
   generate-hell-textures.py           # deterministic hell block tiles from a list of tile specs (hellrock, ash,
                                       #   cinder_soil, scorched_hellrock, basalt, magma_block, ember_crystal, fungal_*,
                                       #   the hell logs, the fungal cap and the cutout plants and vine;
@@ -3347,7 +3346,7 @@ counts and one more armor point each). The `iron_pickaxe` is the top pickaxe tie
 (`MiningTests.IronOutranksBronzeAndMinesEverythingBronzeMines`; sprites from `tools/generate-metal-textures.py iron` and
 `tools/generate-gear-textures.ps1`).
 
-**The barrier** (`barrier`, `BarrierGenerator`) seals the overworld from hell: `requiresTool` with
+**The barrier** (the `basalt` block, `BarrierGenerator`) seals the overworld from hell: `requiresTool` with
 `tools: {"pickaxe": 3}`, so only the iron pickaxe mines it, hardness 40, and it drops itself (no loot
 table, so a player may place it back). Worldgen lays it over `BarrierBottomY..BarrierTopY`: a gapless
 core (`BarrierFullBottomY..BarrierFullTopY`) where every cell becomes barrier, carved air, water and
@@ -3357,7 +3356,7 @@ the band's edge to 1 at the core, a ramp cell is barrier where a 3D OpenSimplex 
 replaced there, so caves stay open and the edges break into patches. The stamp runs last of all the
 features (`Stage.Barrier`), so nothing writes over it; `BarrierGenerator.IsBarrier` is the field it
 writes, bit for bit across chunk seams. Hell starts right below the band (see "Hell" next).
-`BarrierTests`; its tile comes from `tools/generate-barrier-texture.py`;
+`BarrierTests`;
 `visual-examples/barrier.json` (`VOXEL_TIME=147`) frames a ramp cave and the core's faces.
 
 **Hell** (`WorldGen/Hell/HellGenerator.cs`, plans/LAYERS.md) is every cell at or below `HellTopY`, and
@@ -4835,7 +4834,7 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   the drawn cloud layer (160), the solid cloud slab `CloudSlabBottomY..CloudSlabTopY` (198..203); the cloud sea
   (`SkyConfig.SkyCloudSeaHeight`, `SkyCloudSeaThickness`: 290..301); the sky islands
   `SkyIslandBottomY..SkyIslandTopY` (320..420), tuned in `SkyIslandConfig`.
-- **Getting there**: dig down or build up. The barrier and hell's slabs (`barrier`, `hellrock`) need the
+- **Getting there**: dig down or build up. The barrier and hell's slabs (`basalt`, `hellrock`) need the
   `iron_pickaxe` (power 3, made from wrought iron smelted in the bloomery, see "The bloomery and the anvil"), see "The barrier". The sky has no gate: the
   solid clouds and the cloud sea catch a fall (`softLanding`, and `sink` holds the player half a block deep,
   "Sink and soft-landing flags"); hell has no bottom and its falls hurt as usual.
