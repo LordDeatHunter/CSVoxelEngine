@@ -71,9 +71,7 @@ public static class ColumnCache
         var worldX = chunkX * Size + x;
         var worldZ = chunkZ * Size + z;
 
-        var topBlock = TerrainGenerator.IsWaterColumn(worldX, worldZ, bed)
-            ? TerrainGenerator.SoilBlock
-            : TerrainGenerator.SurfaceBlock;
+        var topBlock = TerrainGenerator.SurfaceBlock;
         var soilBlock = TerrainGenerator.SoilBlock;
         var soilDepth = dirtDepth;
 
@@ -114,15 +112,36 @@ public static class ColumnCache
                 // a lake or river rim.
                 // Without the weight test a dry ravine floor in the band would wear sand in the
                 // middle of the forest, which is what made random patches before.
-                if (dirtDepth != 0 && TerrainGenerator.IsBeachHeight(terrainHeight)
-                    && TerrainGenerator.SurfaceWaterWeight(worldX, worldZ) > 0f)
-                {
+                break;
+        }
+
+        // The fill loop's first depth is t, and subsequent depths decrease by one. No material
+        // query is needed when the column starts above this chunk.
+        var t = terrainHeight - lowerBoundY;
+        if (t < 0) return;
+
+        var needTop = soilDepth != 0 && t < Size;
+        var needSoil = soilDepth != 0 && Math.Max(1, t - (Size - 1)) <= Math.Min(soilDepth, t);
+
+        if (biome is not Biome.Desert and not Biome.Ocean and not Biome.Frozen)
+        {
+            var beach = dirtDepth != 0 && TerrainGenerator.IsBeachHeight(terrainHeight)
+                        && (needTop || needSoil)
+                        && TerrainGenerator.SurfaceWaterWeight(worldX, worldZ) > 0f;
+            if (beach)
+            {
+                soilBlock = TerrainGenerator.SandBlock;
+                if (needTop)
                     topBlock = TerrainGenerator.IsGravelPatch(worldX, worldZ)
                         ? TerrainGenerator.GravelBlock
                         : TerrainGenerator.SandBlock;
-                    soilBlock = TerrainGenerator.SandBlock;
-                }
-                break;
+            }
+            else if (needTop)
+            {
+                topBlock = TerrainGenerator.IsWaterColumn(worldX, worldZ, bed)
+                    ? TerrainGenerator.SoilBlock
+                    : TerrainGenerator.SurfaceBlock;
+            }
         }
 
         for (var y = 0; y < Size; y++)
