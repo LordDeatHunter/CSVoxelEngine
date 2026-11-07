@@ -71,7 +71,7 @@ internal sealed class ChatRenderer
 
         if (view.IsOpen)
             _ui.DrawInputField(ChatLayout.InputCenter(screen), ChatLayout.InputSize, view.Input, true,
-                "Say something...", time, showTail: true);
+                "Say something...", time);
     }
 
     // Scratch for DrawChat's wrapping, reused every frame

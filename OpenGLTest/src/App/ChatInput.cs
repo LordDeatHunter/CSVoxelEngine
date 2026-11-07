@@ -4,6 +4,7 @@ using Silk.NET.Input;
 using VoxelEngine.Content;
 using VoxelEngine.Interaction;
 using VoxelEngine.Networking.Client;
+using VoxelEngine.Platform;
 using VoxelEngine.UI.Hud;
 
 namespace VoxelEngine.App;
@@ -14,10 +15,13 @@ internal sealed class ChatInput
     private readonly ChatView chatView;
     private readonly ClientSession session;
 
-    internal ChatInput(ChatView chatView, ClientSession session)
+    private readonly TextFieldKeys textKeys;
+
+    internal ChatInput(ChatView chatView, ClientSession session, InputManager inputManager)
     {
         this.chatView = chatView;
         this.session = session;
+        textKeys = new TextFieldKeys(inputManager);
     }
 
     private World? ActiveWorld => Program.ActiveWorld;
@@ -26,11 +30,11 @@ internal sealed class ChatInput
     /// handler, so closing chat and the pause menu never both fire on one press.</summary>
     internal void HandleChatKey(Key key)
     {
+        // Up and Down recall sent lines here, so only the other editing keys go to the field
+        if (key is not (Key.Up or Key.Down) && textKeys.TryHandle(chatView.Input, key, upDownJump: false, out _))
+            return;
         switch (key)
         {
-            case Key.Backspace:
-                chatView.Backspace();
-                break;
             case Key.Enter or Key.KeypadEnter:
                 SubmitChat();
                 break;

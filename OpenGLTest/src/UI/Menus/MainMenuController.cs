@@ -219,6 +219,20 @@ public sealed class MainMenuController(WorldStore store, ServerStore serverStore
         }
     }
 
+    /// <summary>Focuses the text field a press landed on and returns it; null when the hit is not a field.</summary>
+    public TextFieldState? FocusFieldAt(MainMenuHit hit)
+    {
+        switch (hit.Kind)
+        {
+            case MainMenuHitKind.NameField: View.Focus = MenuField.Name; break;
+            case MainMenuHitKind.SeedField: View.Focus = MenuField.Seed; break;
+            case MainMenuHitKind.ServerNameField: View.Focus = MenuField.ServerName; break;
+            case MainMenuHitKind.AddressField: View.Focus = MenuField.Address; break;
+            default: return null;
+        }
+        return View.FocusedField;
+    }
+
     /// <summary>Types one character into the focused field; refused characters and an unfocused page do nothing.</summary>
     public void Type(char c) => View.FocusedField?.TryAppend(c);
 

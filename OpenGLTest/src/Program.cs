@@ -65,6 +65,7 @@ public static class Program
     private static MenuInput menuInput = null!;
     private static GameplayInput gameplay = null!;
     private static InputEvents inputEvents = null!;
+    private static FieldPointer fieldPointer = null!;
     private static double fpsTimer;
     private static int fpsFrames;
     private static int shownFps;
@@ -131,10 +132,11 @@ public static class Program
         session = new ClientSession(windowManager, inputManager, renderManager, sfx, loadingView, chatView, diagnostics);
         panelInput = new InventoryPanelInput(inputManager, renderManager, inventoryView, pauseMenuView, session);
         builderInput = new SpellBuilderInput(inputManager, renderManager, spellBuilderView, session);
-        chatInput = new ChatInput(chatView, session);
+        chatInput = new ChatInput(chatView, session, inputManager);
         menuInput = new MenuInput(windowManager, inputManager, renderManager, menu, pauseMenuView, settingsMenuView, panelInput, inventoryView, builderInput);
         gameplay = new GameplayInput(inputManager, renderManager, inventoryView, chatView, pauseMenuView, panelInput, builderInput, menuInput, session, diagnostics);
-        inputEvents = new InputEvents(inputManager, renderManager, menu, inventoryView, chatView, pauseMenuView, settingsMenuView, panelInput, builderInput, menuInput, chatInput, gameplay);
+        fieldPointer = new FieldPointer(inputManager, renderManager, menu, inventoryView, pauseMenuView, new TextFieldKeys(inputManager));
+        inputEvents = new InputEvents(inputManager, renderManager, menu, inventoryView, chatView, pauseMenuView, settingsMenuView, panelInput, builderInput, menuInput, chatInput, gameplay, fieldPointer);
 
         // A dev override (VOXEL_SCRIPT/SPAWN/LOOK) takes the old path unchanged: a storeless world
         // built right here, no seed change, no persistence and no menu, so scripted runs stay
@@ -446,6 +448,8 @@ public static class Program
                 PerformPending();
             return;
         }
+
+        fieldPointer.Update();
 
         switch (screen)
         {

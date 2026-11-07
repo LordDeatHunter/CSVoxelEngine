@@ -1027,6 +1027,8 @@ OpenGLTest/
       DevDiagnostics.cs        # the startup build line, the VOXEL_TIME read, the live debug flag (X, VOXEL_DEBUG) and the X debug line
       GameplayInput.cs         # a playing world's per-frame polled input: key edges, hotbar, right-click chain, pause-gated world update, mining, middle pick
       InputEvents.cs           # the window's mouse and keyboard events, routed to whatever owns them on the current screen
+      FieldPointer.cs          # the mouse's side of text fields: a press places the caret, Shift extends, holding drags a selection (menu fields, [E] and chest search)
+      TextFieldKeys.cs         # maps key events (and the Ctrl/Shift state and clipboard) onto TextFieldEditing for the focused field
       InventoryPanelInput.cs   # the [E] panel's input: clicks, scrollbar, search keys, creative buttons, hovered row, tooltip
       MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings
       ScenarioUi.cs            # the app's IScenarioUi: lets a VOXEL_SCRIPT run open the [E] panel and the spell builder, pick a tab or row,
@@ -2079,7 +2081,9 @@ OpenGLTest/
         PauseMenu.cs           # pause menu pages, hit kinds, view and PauseMenuLayout (RESUME/SETTINGS/SAVE & QUIT)
         RespawnPrompt.cs       # GL-free death screen rule (shows after the death plays, one respawn request per death) + DeathScreenLayout
         SettingsMenu.cs        # settings page rows, tabs, sliders and SettingsLayout (shared by both menus)
-        TextFieldState.cs      # one single-line text field: printable-ASCII typing rules and length cap
+        TextFieldState.cs      # one single-line text field: printable-ASCII typing rules, length cap, caret and selection
+        TextFieldEditing.cs    # the editing keys every field shares (arrows, Home/End, Ctrl words, Shift select, Delete, Ctrl+A/C/X/V; Up/Down jump only where the owner asks), over an IClipboard
+        WordBoundary.cs        # the word rule of Ctrl+arrows and Ctrl+Backspace/Delete
       SpellBuilder/            # the spell table's builder: GL-free state, catalog, layout and text (SpellBuilderRenderer draws it)
         SpellBuilderCatalog.cs # the four part columns (element, shape, modifier, trigger) and the known parts of a kind
         SpellBuilderHit.cs     # one hit-test result: kind, column, row or slot

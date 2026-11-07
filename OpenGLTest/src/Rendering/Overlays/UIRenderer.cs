@@ -592,35 +592,87 @@ public class UIRenderer : IDisposable
     /// box's length cap.
     /// </summary>
     public void DrawInputField(Vector2 center, Vector2 size, TextFieldState field, bool focused,
-        string placeholder, float time, bool showTail = false)
+        string placeholder, float time)
     {
         var box = new TextBoxLayout(new UiRect(center, size));
         DrawRect(center, size, SlotBackground);
         DrawBorder(center, size, Border.Standard, focused ? SelectedBorderColor : SlotBorderColor);
 
-        // A field whose cap exceeds what fits (the chat line) shows the tail being typed, so the
-        // caret and the newest characters never leave the box; the short fields show it all.
-        var shown = showTail ? TailThatFits(field.Text, _countScale, box.TextBudget) : field.Text;
         if (field.IsEmpty)
+        {
             DrawTextCenteredY(placeholder, box.TextLeft, box.CenterY, _countScale, TextDim);
-        else
-            DrawTextCenteredY(shown, box.TextLeft, box.CenterY, _countScale, Rgba.White);
+            if (focused && ((int)(time * 2f)) % 2 == 0)
+            {
+                var emptyCaret = box.Caret(0f);
+                DrawRect(emptyCaret.Center, emptyCaret.Size, Rgba.White);
+            }
+            return;
+        }
+
+        // A field wider than its box scrolls to keep the caret in view; the visible slice is
+        // what fits after the view start.
+        var text = field.Text;
+        var start = KeepCaretVisible(field, box.TextBudget);
+        var end = text.Length;
+        while (end > start + 1 && TextWidth(text[start..end], _countScale) > box.TextBudget) end--;
+        var shown = text[start..end];
+
+        if (focused && field.HasSelection)
+        {
+            var from = Math.Clamp(field.SelectionStart, start, end);
+            var to = Math.Clamp(field.SelectionEnd, start, end);
+            if (to > from)
+            {
+                var x0 = box.TextLeft + TextWidth(text[start..from], _countScale);
+                var x1 = box.TextLeft + TextWidth(text[start..to], _countScale);
+                DrawRect(new Vector2((x0 + x1) * 0.5f, box.CenterY), new Vector2(x1 - x0, TextBoxLayout.CaretHeight),
+                    Faded(SelectedBorderColor, 0.55f));
+            }
+        }
+        DrawTextCenteredY(shown, box.TextLeft, box.CenterY, _countScale, Rgba.White);
 
         if (focused && ((int)(time * 2f)) % 2 == 0)
         {
-            var caret = box.Caret(field.IsEmpty ? 0f : TextWidth(shown, _countScale));
+            var caretEnd = Math.Clamp(field.Caret, start, end);
+            var caret = box.Caret(TextWidth(text[start..caretEnd], _countScale));
             DrawRect(caret.Center, caret.Size, Rgba.White);
         }
     }
 
-    /// <summary>The longest suffix of <paramref name="text"/> that fits <paramref name="maxWidth"/>.</summary>
-    private string TailThatFits(string text, float scale, float maxWidth)
+    /// <summary>
+    /// Moves <see cref="TextFieldState.ViewStart"/> the least that keeps the caret inside
+    /// <paramref name="budget"/> and shows as much text as fits after a delete; returns it.
+    /// </summary>
+    private int KeepCaretVisible(TextFieldState field, float budget)
     {
-        if (_font == null || string.IsNullOrEmpty(text)) return text;
-        var start = 0;
-        while (start < text.Length - 1 && _font.MeasureSize(text.AsSpan(start), scale).X > maxWidth)
-            start++;
-        return start == 0 ? text : text[start..];
+        var text = field.Text;
+        var start = Math.Clamp(field.ViewStart, 0, field.Caret);
+        while (start < field.Caret && TextWidth(text[start..field.Caret], _countScale) > budget) start++;
+        while (start > 0 && TextWidth(text[(start - 1)..], _countScale) <= budget) start--;
+        field.ViewStart = start;
+        return start;
+    }
+
+    /// <summary>
+    /// The character boundary of <paramref name="field"/> nearest to the canvas x
+    /// <paramref name="canvasX"/> when drawn in the box at <paramref name="center"/>/<paramref name="size"/>
+    /// (the mouse's caret placement).
+    /// </summary>
+    public int CaretIndexAt(Vector2 center, Vector2 size, TextFieldState field, float canvasX)
+    {
+        var local = canvasX - new TextBoxLayout(new UiRect(center, size)).TextLeft;
+        var text = field.Text;
+        var start = Math.Clamp(field.ViewStart, 0, text.Length);
+        var best = start;
+        var bestDistance = float.MaxValue;
+        for (var i = start; i <= text.Length; i++)
+        {
+            var distance = MathF.Abs(TextWidth(text[start..i], _countScale) - local);
+            if (distance >= bestDistance) break;
+            best = i;
+            bestDistance = distance;
+        }
+        return best;
     }
 
     // A color with its alpha multiplied by factor (clamped to 0..1).

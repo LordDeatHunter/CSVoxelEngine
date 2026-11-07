@@ -24,6 +24,7 @@ internal sealed class ChestInput
     private readonly InventoryView inventoryView;
     private readonly ClientSession session;
     private readonly InventoryPanelInput panel;
+    private readonly TextFieldKeys textKeys;
 
     internal ChestInput(InputManager inputManager, RenderManager renderManager, InventoryView inventoryView,
         ClientSession session, InventoryPanelInput panel)
@@ -33,6 +34,7 @@ internal sealed class ChestInput
         this.inventoryView = inventoryView;
         this.session = session;
         this.panel = panel;
+        textKeys = new TextFieldKeys(inputManager);
     }
 
     private static World? ActiveWorld => Program.ActiveWorld;
@@ -159,10 +161,11 @@ internal sealed class ChestInput
         world.ChestPanel.ScrollOffset = 0f;
     }
 
-    /// <summary>Backspace in the chest search field.</summary>
-    internal void Backspace()
+    /// <summary>An editing key (arrows, Home/End, Delete, Backspace, Ctrl+A/C/X/V) in the chest search field; Up and Down are left alone.</summary>
+    internal void HandleKey(Key key)
     {
-        if (ActiveWorld is { } world && world.ChestPanel.Search.Text.Backspace())
+        if (ActiveWorld is not { } world) return;
+        if (textKeys.TryHandle(world.ChestPanel.Search.Text, key, upDownJump: false, out var changed) && changed)
             world.ChestPanel.ScrollOffset = 0f;
     }
 

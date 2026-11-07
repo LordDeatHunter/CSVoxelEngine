@@ -26,8 +26,9 @@ internal sealed class InputEvents
     private readonly ChatInput chatInput;
     private readonly GameplayInput gameplay;
 
-    internal InputEvents(InputManager inputManager, RenderManager renderManager, MainMenuController menu, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, SettingsMenuView settingsMenuView, InventoryPanelInput panelInput, SpellBuilderInput builderInput, MenuInput menuInput, ChatInput chatInput, GameplayInput gameplay)
+    internal InputEvents(InputManager inputManager, RenderManager renderManager, MainMenuController menu, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, SettingsMenuView settingsMenuView, InventoryPanelInput panelInput, SpellBuilderInput builderInput, MenuInput menuInput, ChatInput chatInput, GameplayInput gameplay, FieldPointer fieldPointer)
     {
+        this.fieldPointer = fieldPointer;
         this.inputManager = inputManager;
         this.renderManager = renderManager;
         this.menu = menu;
@@ -40,7 +41,11 @@ internal sealed class InputEvents
         this.menuInput = menuInput;
         this.chatInput = chatInput;
         this.gameplay = gameplay;
+        textKeys = new TextFieldKeys(inputManager);
     }
+
+    private readonly TextFieldKeys textKeys;
+    private readonly FieldPointer fieldPointer;
 
     private AppScreen Screen => Program.Screen;
 
@@ -119,6 +124,10 @@ internal sealed class InputEvents
         {
             case AppScreen.Loading or AppScreen.Saving:
                 return;
+        }
+        if (button == MouseButton.Left) fieldPointer.Press();
+        switch (Screen)
+        {
             case AppScreen.Playing when inventoryView.IsOpen && !pauseMenuView.IsOpen
                                                              && button == MouseButton.Left && inputManager.Mouse != null:
                 panelInput.HandleInventoryScrollbarPress(inputManager.Mouse.Position);
@@ -229,6 +238,9 @@ internal sealed class InputEvents
             return;
         }
         if (Screen != AppScreen.Menu) return;
+        // Caret, selection, word and clipboard keys edit the focused field; Up and Down jump to its ends
+        if (menu.View.FocusedField is { } field && textKeys.TryHandle(field, key, upDownJump: true, out _))
+            return;
         var menuKey = key switch
         {
             Key.Backspace => MenuKey.Backspace,

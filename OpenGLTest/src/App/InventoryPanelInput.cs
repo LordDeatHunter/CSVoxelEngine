@@ -24,6 +24,7 @@ internal sealed class InventoryPanelInput
     private readonly InventoryView inventoryView;
     private readonly PauseMenuView pauseMenuView;
     private readonly ClientSession session;
+    private readonly TextFieldKeys textKeys;
 
     internal InventoryPanelInput(InputManager inputManager, RenderManager renderManager, InventoryView inventoryView, PauseMenuView pauseMenuView, ClientSession session)
     {
@@ -32,7 +33,8 @@ internal sealed class InventoryPanelInput
         this.inventoryView = inventoryView;
         this.pauseMenuView = pauseMenuView;
         this.session = session;
-        Chest = new ChestInput(inputManager, renderManager, inventoryView, session, this);
+        textKeys = new TextFieldKeys(inputManager);
+        Chest =new ChestInput(inputManager, renderManager, inventoryView, session, this);
     }
 
     /// <summary>The chest panel's input: it opens beside this panel and takes deposits from its list.</summary>
@@ -247,18 +249,24 @@ internal sealed class InventoryPanelInput
     /// polled panel toggle, so one press never does two things.</summary>
     internal void HandleInventoryKey(Key key)
     {
+        // Caret, selection, word and clipboard keys go to the focused field; Up and Down stay the
+        // suggestion highlight's
+        if (inventoryView.Focus == InventoryFocus.ChestSearch)
+        {
+            if (key is not (Key.Up or Key.Down)) Chest.HandleKey(key);
+        }
+        else if (inventoryView.Focus == InventoryFocus.Search
+                 && textKeys.TryHandle(inventoryView.Search.Text, key, upDownJump: false, out var changed))
+        {
+            if (changed)
+            {
+                inventoryView.Search.Highlight = -1;
+                inventoryView.Search.ScrollOffset = 0f;
+            }
+            return;
+        }
         switch (key)
         {
-            case Key.Backspace:
-                if (inventoryView.Focus == InventoryFocus.ChestSearch)
-                {
-                    Chest.Backspace();
-                    break;
-                }
-                if (inventoryView.Focus != InventoryFocus.Search) break;
-                inventoryView.Search.Text.Backspace();
-                inventoryView.Search.Highlight = -1;
-                break;
             case Key.Tab:
                 inventoryView.Focus = InventoryFocus.Search;
                 break;
