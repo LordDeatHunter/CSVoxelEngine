@@ -2,7 +2,7 @@
 > Guide: plans/README.md
 
 ## Status
-Design settled with the user on 2026-11-07; `I-1` (gear core), `I-2` (armor, modifiers, rarity, sets) and `I-4` (chests) are done. Tracks gear (armor and accessories with rarity and
+Design settled with the user on 2026-11-07; `I-1` (gear core), `I-2` (armor, modifiers, rarity, sets), `I-4` (chests) and `I-5` (ruins) are done; `I-3` is partly done. Tracks gear (armor and accessories with rarity and
 rolled modifiers), chests and ruins that hold loot. One phase per prompt: implement it, update this file, stop.
 The gear tab, equipment panel and chest panel build on the UI kit from `plans/INVENTORY_UI.md` (U-1, U-2 first).
 
@@ -18,20 +18,16 @@ Nothing.
   flagged `visible` (a trinket is never drawn today), armor in the shadow pass, and an item debugger equipment mode.
   **Hook:** `PlayerPasses.DrawPart`, `PlayerRig.BuildArmorMesh`, `ShadowPass`, `EntityPreviewState`/`PlayerPreviewState`.
 
-### Phase 5: ruins, loot and polish
-- [ ] **`I-5` Ruins with loot, inventory polish** - P2, L.
-  - [ ] ruin chests roll lazily at first open from hash(cell, world seed) through the seedable `LootTable.RollStacks`
-    (done: the loot depth work, `ruin_*` tables), then persist; untouched chests are never saved
-  - [x] four ruin placements on the M-15 template system (`RuinPlacement`, `data/structures`), each with a band, a stage and a
-    `StampGateTests` row; more templates (biome-flavored shells, mining bases) are only JSON now
-  - [ ] inventory polish: sort, shift-click quick-move, search improvements (no slot-grid rewrite)
-  **Hook:** `WorldGen/Features/DesertWellGenerator.cs` (template), `ChunkTerrainFill`, `StampBand`, `Content/Loot`.
-
 ### Future
 - [ ] **`I-6` Equipment slots that grow with milestones** - P3, M. Needs its own brainstorm; not in scope for I-1..I-5.
   I-1 keeps slot counts in data/config so this stays possible.
 
 ## Reference
+- **What I-5 shipped.** Ruins are templates (`data/structures`, M-15) stamped by `RuinPlacement`: surface, underground, hell and
+  sky, each carrying a `ruin_chest_<kind>` that rolls its `ruin_*` loot table lazily from the hash of its cell (see I-4). More
+  ruins are only JSON now (biome-flavored surface shells, mining bases). The inventory polish line was dropped: the inventory is
+  pooled counts with no order to sort, shift-click quick-move exists in the chest card, and the search already ranks owned
+  items first.
 - **What I-4 shipped.** A chest is a model block with a `chest` object (`slots`, optional `loot` table; `ChestProfile`,
   `BlockType.Chest`): the crafted `wooden_chest`, `bronze_chest` and `iron_chest` (the iron one is plated with crushed
   iron, since iron cannot be smelted yet) and the worldgen-only `ruin_chest_surface`, `_underground`, `_hell` and `_sky`
