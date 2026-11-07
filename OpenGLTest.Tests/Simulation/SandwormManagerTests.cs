@@ -201,6 +201,32 @@ public sealed class SandwormManagerTests
         Assert.Null(manager.Spawn(Burrowed(0, 0)));
     }
 
+    [Fact]
+    public void TheThumperWakesAWormOnlyOnDesertSandWithNoneAlive()
+    {
+        var desert = Desert();
+        var forest = Desert(Biome.Forest);
+        var manager = NewManager();
+
+        Assert.False(manager.CanSummonAt(forest, 0, Top, 0));
+        Assert.False(manager.CanSummonAt(desert, 0, Top + 3, 0));
+        Assert.True(manager.CanSummonAt(desert, 0, Top, 0));
+
+        var worm = manager.Summon(desert, 0, Top, 0)!;
+        Assert.Equal(SandwormPhase.Thump, worm.Phase);
+        Assert.True(worm.Position.Y < Top);
+        Assert.False(manager.CanSummonAt(desert, 5, Top, 5));
+        Assert.Null(manager.Summon(desert, 5, Top, 5));
+    }
+
+    [Fact]
+    public void AnUnloadedCellCannotBeThumped()
+    {
+        var manager = NewManager();
+
+        Assert.False(manager.CanSummonAt(Desert(), 500, Top, 500));
+    }
+
     private sealed class FakePopulation(int living) : IMobPopulation
     {
         public int LivingCount { get; } = living;

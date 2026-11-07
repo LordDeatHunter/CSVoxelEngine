@@ -148,6 +148,14 @@ public interface IItemUseWorld
     /// use is never spent for nothing.
     /// </summary>
     bool PlantTree(string species, Vector3 hit, Vector3 normal);
+
+    /// <summary>
+    /// Wakes the boss <paramref name="entity"/> at the aimed solid <paramref name="cell"/> (the thumper's
+    /// sandworm: the cell must be desert sand, and only one may be alive). A world that simulates spawns it, a
+    /// client only judges the same rule as a prediction. False where it cannot be woken, so the use is never
+    /// spent for nothing.
+    /// </summary>
+    bool SummonBoss(string entity, Vector3 cell);
 }
 
 /// <summary>Inputs to <see cref="Item.OnUse"/> beyond the world itself: how far the aim reaches

@@ -309,5 +309,11 @@ public sealed class ItemDefinition
         /// under <c>assets/data/trees/</c>, checked when the use runs.
         /// </summary>
         public string? Tree { get; set; }
+
+        /// <summary>
+        /// The entity a <c>summon</c> use wakes (the thumper wakes the sandworm): the entity file name under
+        /// <c>assets/data/entities/</c>, checked when the use runs.
+        /// </summary>
+        public string? Entity { get; set; }
     }
 }

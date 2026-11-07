@@ -68,6 +68,24 @@ public sealed class SandwormManager : IMobPopulation
     /// <summary>Whether a worm is alive (the summon item refuses a second).</summary>
     public bool HasLiving => LivingCount > 0;
 
+    /// <summary>
+    /// Whether the thumper may wake a worm at the solid cell (<paramref name="x"/>, <paramref name="y"/>,
+    /// <paramref name="z"/>): none alive, room under the hard cap, the cell loaded desert sand or sandstone.
+    /// </summary>
+    public bool CanSummonAt(ChunkManager chunks, int x, int y, int z) =>
+        _type != null && !HasLiving && _caps.ForcedRoom > 0
+        && chunks.TryGetCell(x, y, z, out var id, out _) && SandwormGround.IsSand(id)
+        && SandwormGround.IsDesert(chunks, x + 0.5f, z + 0.5f);
+
+    /// <summary>Wakes a worm under the sand at that cell when <see cref="CanSummonAt"/> allows; it begins in its
+    /// thump. Null when refused.</summary>
+    public Sandworm? Summon(ChunkManager chunks, int x, int y, int z)
+    {
+        if (!CanSummonAt(chunks, x, y, z)) return null;
+        var surface = SandwormGround.At(chunks, x + 0.5f, z + 0.5f).SurfaceY;
+        return Spawn(new Vector3(x + 0.5f, surface - SandwormConfig.BurrowDepthBlocks, z + 0.5f));
+    }
+
     /// <summary>A client's network reconcile: the server no longer reports this worm, so it plays its death.</summary>
     public bool Remove(Sandworm worm)
     {

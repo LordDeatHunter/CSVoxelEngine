@@ -1,0 +1,10 @@
+{
+  "result": "item/thumper",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/copper_ingot", "count": 2 },
+    { "item": "item/branch", "count": 2 },
+    { "item": "item/vine", "count": 2 },
+    { "item": "block/sandstone", "count": 4 }
+  ]
+}

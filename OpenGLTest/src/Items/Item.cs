@@ -143,6 +143,9 @@ public abstract class Item
     /// <summary>The tree species an <c>plant_tree</c> use plants (an acorn plants an oak), or null.</summary>
     public string? UseTreeName { get; internal init; }
 
+    /// <summary>The entity a <c>summon</c> use wakes (the thumper wakes the sandworm), or null.</summary>
+    public string? UseEntityName { get; internal init; }
+
     /// <summary>Cells across the spritesheet texture; 1 for a plain sprite.</summary>
     public int SpriteCols { get; internal init; } = 1;
 
@@ -248,6 +251,7 @@ public abstract class Item
         UseSeconds = spec.UseSeconds;
         UsePose = spec.UsePose;
         UseTreeName = spec.TreeName;
+        UseEntityName = spec.EntityName;
         SpriteCols = spec.SpriteCols;
         SpriteRows = spec.SpriteRows;
         FrameCount = spec.FrameCount;

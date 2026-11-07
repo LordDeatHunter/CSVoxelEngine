@@ -381,6 +381,9 @@ internal sealed class WorldItemUse : IItemUseWorld
         return result.Status == TreeGrowthStatus.Planted;
     }
 
+    bool IItemUseWorld.SummonBoss(string entity, Vector3 cell) =>
+        _clientMode ? _world.CanSummonBoss(entity, cell) : _world.TrySummonBoss(entity, cell);
+
     void IItemUseWorld.ConsumeSelected() => ActiveInventory.ConsumeSelected();
     #endregion
 

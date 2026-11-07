@@ -178,5 +178,17 @@ internal sealed class StubItemUseWorld : IItemUseWorld
         return Plantable.TryGetValue(species, out var cells) && cells.Contains(cell);
     }
 
+    /// <summary>Cells <see cref="SummonBoss"/> accepts, and every call it got.</summary>
+    public HashSet<(int, int, int)> Summonable { get; } = new();
+
+    public List<(string Entity, int X, int Y, int Z)> SummonCalls { get; } = new();
+
+    public bool SummonBoss(string entity, Vector3 cell)
+    {
+        var key = ((int)cell.X, (int)cell.Y, (int)cell.Z);
+        SummonCalls.Add((entity, key.Item1, key.Item2, key.Item3));
+        return Summonable.Contains(key);
+    }
+
     public void ConsumeSelected() => Consumed++;
 }

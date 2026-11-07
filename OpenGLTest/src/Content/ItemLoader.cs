@@ -7,6 +7,7 @@ using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Data;
+using VoxelEngine.Entities;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 
@@ -38,8 +39,9 @@ internal static class ItemLoader
                 "plant_tree" => ItemUseAction.PlantTree,
                 "learn_parts" => ItemUseAction.LearnParts,
                 "restore_mana" => ItemUseAction.RestoreMana,
+                "summon" => ItemUseAction.Summon,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal, grow_tree, plant_tree, learn_parts or restore_mana."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal, grow_tree, plant_tree, learn_parts, restore_mana or summon."),
             };
             var teaches = ParseTeaches(definition, action, path);
             var restoresMana = ParseRestoresMana(definition, action, path);
@@ -166,6 +168,7 @@ internal static class ItemLoader
                 CrucibleCapacityMl: crucibleCapacity,
                 UseSeconds: useSeconds,
                 TreeName: use?.Tree,
+                EntityName: use?.Entity,
                 TrailColor: trailColor,
                 ThrowAligned: definition.ThrowAligned,
                 UsePose: usePose,
@@ -507,6 +510,9 @@ internal static class ItemLoader
                 case ItemUseAction.LearnParts:
                     ValidateLearnParts(item, path);
                     break;
+                case ItemUseAction.Summon:
+                    ValidateSummon(item, path);
+                    break;
                 default:
                     ValidateFluidAction(item, path);
                     break;
@@ -594,6 +600,19 @@ internal static class ItemLoader
         if (item.UseFluidId != 0 || item.UseBlockId != 0)
             throw new InvalidOperationException(
                 $"Item '{path}' has use.action 'grow_tree' with a use.fluid or use.block: the tree is read from the aimed cell.");
+    }
+
+    private static void ValidateSummon(Item item, string path)
+    {
+        if (string.IsNullOrWhiteSpace(item.UseEntityName))
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'summon' without use.entity: name the entity file under assets/data/entities/.");
+        if (EntityRegistry.TryGet(item.UseEntityName) == null)
+            throw new InvalidOperationException(
+                $"Item '{path}' summons entity '{item.UseEntityName}', which is not under assets/data/entities/.");
+        if (item.UseResultId != 0 || item.UseFluidId != 0 || item.UseBlockId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'summon' with a use.result, use.fluid or use.block: summoning spends from its stack, it never morphs.");
     }
 
     private static void ValidatePlantTree(Item item, string path)

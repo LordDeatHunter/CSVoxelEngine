@@ -371,6 +371,22 @@ internal sealed class MobDirector
         return false;
     }
 
+    /// <summary>Whether the boss <paramref name="entity"/> could be woken at the solid <paramref name="cell"/> now
+    /// (the thumper's rule, the same a client predicts).</summary>
+    internal bool CanSummonBoss(string entity, Vector3 cell) =>
+        _sandworms != null && string.Equals(entity, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase)
+        && _sandworms.CanSummonAt(_chunkManager, (int)cell.X, (int)cell.Y, (int)cell.Z);
+
+    /// <summary>Wakes the boss <paramref name="entity"/> at the solid <paramref name="cell"/> when it can be
+    /// (authoritative worlds only); false when refused.</summary>
+    internal bool SummonBoss(string entity, Vector3 cell)
+    {
+        if (!CanSummonBoss(entity, cell)) return false;
+        if (_sandworms!.Summon(_chunkManager, (int)cell.X, (int)cell.Y, (int)cell.Z) == null) return false;
+        RefreshMobs();
+        return true;
+    }
+
     // How far above the given feet the scenario's iceberg spawn looks for the sea's top water cell
     // (the snapped feet of an ocean column stand on the sea floor, under the water)
     private const int IcebergWaterSearchBlocks = 64;

@@ -563,6 +563,15 @@ public class World
     public bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min) =>
         Director.SpawnEntity(name, feet, size);
 
+    /// <summary>Whether the boss <paramref name="entity"/> could be woken at the solid <paramref name="cell"/>
+    /// now: the world is playing and the thumper's rule holds (desert sand, none alive). A client judges the
+    /// same rule to predict the server's answer.</summary>
+    public bool CanSummonBoss(string entity, Vector3 cell) => IsPlaying && Director.CanSummonBoss(entity, cell);
+
+    /// <summary>Wakes the boss <paramref name="entity"/> at the solid <paramref name="cell"/> when
+    /// <see cref="CanSummonBoss"/> allows; the thumper's entry point, authoritative worlds only.</summary>
+    public bool TrySummonBoss(string entity, Vector3 cell) => IsPlaying && Director.SummonBoss(entity, cell);
+
     /// <summary>
     /// The terrain height of the column at (<paramref name="x"/>, <paramref name="z"/>) from the
     /// world's source (<see cref="ChunkManager.WorldSource"/>: worldgen by default): the top solid

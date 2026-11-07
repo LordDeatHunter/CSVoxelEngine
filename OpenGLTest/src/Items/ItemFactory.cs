@@ -48,6 +48,7 @@ public static class ItemFactory
         int CrucibleCapacityMl = 0,
         float UseSeconds = 0f,
         string? TreeName = null,
+        string? EntityName = null,
         Rgba? TrailColor = null,
         bool ThrowAligned = false,
         UsePose UsePose = UsePose.Raise,
@@ -100,6 +101,7 @@ public static class ItemFactory
             ItemUseAction.PlantTree => new PlantTreeItem(spec),
             ItemUseAction.LearnParts => new LearnPartsItem(spec),
             ItemUseAction.RestoreMana => new RestoreManaItem(spec),
+            ItemUseAction.Summon => new SummonItem(spec),
             _ => new PlainItem(spec),
         };
     }
