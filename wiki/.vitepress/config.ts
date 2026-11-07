@@ -31,7 +31,19 @@ export default defineConfig({
         ] }
       ],
       '/dev/': [
-        { text: 'Developer', items: [{ text: 'Overview', link: '/dev/' }, { text: 'Adding content', link: '/dev/adding-content' }] }
+        { text: 'Developer', items: [
+          { text: 'Overview', link: '/dev/' },
+          { text: 'Architecture', link: '/dev/architecture' },
+          { text: 'Threading model', link: '/dev/threading' },
+          { text: 'Worldgen', link: '/dev/worldgen' },
+          { text: 'Saves and multiplayer', link: '/dev/saves-and-multiplayer' }
+        ] },
+        { text: 'Working with content', items: [
+          { text: 'Content schemas', link: '/dev/content-schemas' },
+          { text: 'Adding content', link: '/dev/adding-content' },
+          { text: 'Testing and visual checks', link: '/dev/testing' },
+          { text: 'This wiki', link: '/dev/wiki' }
+        ] }
       ]
     },
     socialLinks: [{ icon: 'github', link: 'https://github.com/LordDeatHunter/CSVoxelEngine' }]
