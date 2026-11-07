@@ -258,15 +258,23 @@ internal sealed class StationPasses : IDisposable
                     var foot = layout.ToWorld(anchor, facing, layout.PendingLocal);
                     var lumpYaw = KilnRenderer.OpeningYaw(facing);
                     var rise = 0f;
+                    var flat = ItemRegistry.IsItem(inputId);
                     for (var i = 0; i < drawn; i++)
                     {
                         var size = KilnRenderer.PendingSize * (i == drawn - 1 ? lastScale : 1f);
-                        var placed = Matrix4x4.CreateScale(size)
-                                    * Matrix4x4.CreateRotationY(lumpYaw + i * 0.6f)
-                                    * Matrix4x4.CreateTranslation(foot + new Vector3(0f, rise + size * 0.5f, 0f));
+                        // Item sprites lie flat, face-up, in a tight pile; blocks stay cubes stacked on each other
+                        var placed = flat
+                            ? Matrix4x4.CreateScale(size)
+                                * SpritePose.LyingFaceUp(lumpYaw + i * 0.35f)
+                                * Matrix4x4.CreateTranslation(foot + new Vector3(0f, rise + SpritePose.RestingLift(size), 0f))
+                            : Matrix4x4.CreateScale(size)
+                                * Matrix4x4.CreateRotationY(lumpYaw + i * 0.6f)
+                                * Matrix4x4.CreateTranslation(foot + new Vector3(0f, rise + size * 0.5f, 0f));
                         _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
                         lump.Render();
-                        rise += size * KilnRenderer.PendingStackStep;
+                        rise += flat
+                            ? SpritePose.HalfThickness(size, SpritePose.ItemSpriteFrame) * 2f + SpritePose.RestingClearance
+                            : size * KilnRenderer.PendingStackStep;
                     }
                 }
             }
