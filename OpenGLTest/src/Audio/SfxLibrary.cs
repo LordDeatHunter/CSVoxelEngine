@@ -26,6 +26,15 @@ public static class SfxLibrary
     /// <summary>Group played when the player collects an item drop.</summary>
     public const string PickupGroup = "item_pickup";
 
+    /// <summary>Group played when a staff casts a spell (the caster's own cast).</summary>
+    public const string SpellCastGroup = "spell_cast";
+
+    /// <summary>Group played where a spell bolt lands near the camera.</summary>
+    public const string SpellImpactGroup = "spell_impact";
+
+    /// <summary>Group played when the caster's own spell fizzles.</summary>
+    public const string SpellFizzleGroup = "spell_fizzle";
+
     /// <summary>
     /// Every group directly under <paramref name="root"/> (subfolders are ignored, so the
     /// ambience tracks in <c>ambience/</c> never become hit groups). Clips are file-name

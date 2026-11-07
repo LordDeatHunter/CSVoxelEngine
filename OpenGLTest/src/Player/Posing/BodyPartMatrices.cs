@@ -73,10 +73,11 @@ internal sealed class BodyPartMatrices
             fore = LimbFrames.FrameOf(Matrix4x4.CreateFromAxisAngle(swingAxis, elbow));
             _model.Overlays.ApplyArmFrames(side, ref upper, ref fore);
             // The arm now hangs off the torso, so the torso's twist turns it too. The authored poses (a blade
-            // swing's sweep, the cocked throw, the punch) were tuned in body space, so while one is showing the twist
+            // swing's sweep, the cocked throw, the cast, the punch) were tuned in body space, so while one is showing the twist
             // is taken back out of the arm's yaw and its hand path stays where it was; an idle arm simply follows
             // the torso round.
-            var authored = side > 0f ? MathUtils.Clamp01(MathF.Max(blade.Stroke, MathF.Max(_model.ThrowArm.ThrowArmWeight(), _model.Jab.PunchActivity()))) : 0f;
+            var authored = side > 0f ? MathUtils.Clamp01(MathF.Max(MathF.Max(blade.Stroke, CastMotion.Weight(_model.CastProgress)),
+                MathF.Max(_model.ThrowArm.ThrowArmWeight(), _model.Jab.PunchActivity()))) : 0f;
             if (authored > 0f && mods.TorsoYaw != 0f)
                 upper = LimbFrames.FrameOf(Matrix4x4.CreateFromQuaternion(upper) * Matrix4x4.CreateRotationY(-mods.TorsoYaw * authored));
         }

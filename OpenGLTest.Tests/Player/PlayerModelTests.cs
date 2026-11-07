@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
@@ -1020,5 +1022,112 @@ public sealed class PlayerModelTests
         Assert.Equal(0f, player.Bow.BodyWeight());
         player.CancelUseCharge();
         Assert.Equal(1f, player.BowReleaseProgress);
+    }
+
+    // ---- the staff cast ----
+
+    [Fact]
+    public void TheCastWeightIsZeroAtBothEndsAndItsTargetsAndLeanAreContinuous()
+    {
+        Assert.Equal(0f, CastMotion.Weight(0f), 4);
+        Assert.Equal(0f, CastMotion.Weight(1f), 4);
+        Assert.Equal(1f, CastMotion.Weight((CastMotion.RaiseEnd + CastMotion.ThrustEnd) * 0.5f), 4);
+        Assert.Equal(1f, CastMotion.Weight(CastMotion.ThrustEnd), 4);
+        Assert.Equal(0f, CastMotion.Lean(0f), 4);
+        Assert.Equal(0f, CastMotion.Lean(1f), 4);
+        // The thrust leans the body forward (negative pitch)
+        Assert.True(CastMotion.Lean(CastMotion.ThrustEnd) < 0f);
+
+        foreach (var curve in new Func<float, float>[] { CastMotion.Weight, CastMotion.Shoulder, CastMotion.Elbow, CastMotion.Lean })
+        {
+            const int steps = 400;
+            float min = float.MaxValue, max = float.MinValue, largestStep = 0f;
+            var previous = curve(0f);
+            for (var i = 0; i <= steps; i++)
+            {
+                var value = curve(i / (float)steps);
+                min = MathF.Min(min, value);
+                max = MathF.Max(max, value);
+                largestStep = MathF.Max(largestStep, MathF.Abs(value - previous));
+                previous = value;
+            }
+            Assert.True(max > min);
+            Assert.True(largestStep < (max - min) * 0.1f, $"a jump of {largestStep} over a range of {max - min}");
+        }
+    }
+
+    // Two settled carrying models: one casts, the other is the control stepped the same way, so the idle arm drift
+    // cancels out of every comparison.
+    private static (PlayerModel Caster, PlayerModel Control, Vector3 Eye) Casters()
+    {
+        var caster = new PlayerModel { HoldingItem = true };
+        var control = new PlayerModel { HoldingItem = true };
+        for (var i = 0; i < 120; i++)
+        {
+            caster.Update(1f / 60f, 0f);
+            control.Update(1f / 60f, 0f);
+        }
+        caster.Cast();
+        return (caster, control, new Vector3(0.5f, 70f, 0.5f));
+    }
+
+    // The cast's hand offset from the control's, sampled at fine steps over the whole cast and a margin after it.
+    private static List<(float Progress, Vector3 Offset)> CastOffsets(out bool castingAfter)
+    {
+        var (caster, control, eye) = Casters();
+        var samples = new List<(float, Vector3)> { (caster.CastProgress, Hand(caster, eye) - Hand(control, eye)) };
+        const int steps = 300;
+        var dt = PlayerModel.CastDuration / steps;
+        for (var i = 0; i < steps + 30; i++)
+        {
+            caster.Update(dt, 0f);
+            control.Update(dt, 0f);
+            samples.Add((caster.CastProgress, Hand(caster, eye) - Hand(control, eye)));
+        }
+        castingAfter = caster.IsCasting;
+        return samples;
+    }
+
+    [Fact]
+    public void ACastFinishesAfterItsDurationAndLeavesTheHandWhereItStarted()
+    {
+        var (caster, _, _) = Casters();
+        Assert.True(caster.IsCasting);
+        caster.Update(PlayerModel.CastDuration * 0.9f, 0f);
+        Assert.True(caster.IsCasting);
+
+        var samples = CastOffsets(out var castingAfter);
+        Assert.False(castingAfter);
+        Assert.True(samples[0].Offset.Length() < 1e-4f);
+        Assert.True(samples[^1].Offset.Length() < 1e-4f, $"the hand ends {samples[^1].Offset} off its rest");
+    }
+
+    [Fact]
+    public void ACastDoesNotSnapAtEitherEnd()
+    {
+        var samples = CastOffsets(out _);
+        var largest = 0f;
+        for (var i = 1; i < samples.Count; i++)
+            largest = MathF.Max(largest, Vector3.Distance(samples[i].Offset, samples[i - 1].Offset));
+        var first = Vector3.Distance(samples[1].Offset, samples[0].Offset);
+        var finished = samples.FindIndex(s => s.Progress >= 1f);
+        var last = Vector3.Distance(samples[finished].Offset, samples[finished - 1].Offset);
+        Assert.True(largest > 0f);
+        Assert.True(first < largest * 0.1f, $"first step {first}, largest {largest}");
+        Assert.True(last < largest * 0.1f, $"last step {last}, largest {largest}");
+    }
+
+    [Fact]
+    public void ACastRaisesTheHandThenItsForwardReachPeaksAtTheThrust()
+    {
+        var samples = CastOffsets(out _);
+        // The raise lifts the hand above its rest
+        var raised = samples.First(s => s.Progress >= CastMotion.RaiseEnd).Offset;
+        Assert.True(raised.Y > 0.2f, $"raised {raised}");
+
+        // The model faces -Z at yaw -90: the farthest forward the hand reaches is in the thrust, beyond its rest
+        var peak = samples.MinBy(s => s.Offset.Z);
+        Assert.InRange(peak.Progress, CastMotion.RaiseEnd, CastMotion.RecoilEnd);
+        Assert.True(peak.Offset.Z < -0.1f, $"peak {peak.Offset}");
     }
 }

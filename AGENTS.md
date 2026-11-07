@@ -97,7 +97,7 @@ The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
 display sliders, and the player body: its mode buttons are **every player animation**
 (`OpenGLTest.ItemDebugger/PlayerPreviewState.cs`, GL-free and tested): the poses IDLE WALK RUN SNEAK JUMP
-S-JUMP LAND SWIM FLOAT SURFACE FLY, and the swings and reactions PUNCH HEAVY SLICE BACK CUT B-CUT CHOP THROW HURT EQUIP DEATH,
+S-JUMP LAND SWIM FLOAT SURFACE FLY, and the swings and reactions PUNCH HEAVY SLICE BACK CUT B-CUT CHOP THROW HURT EQUIP DEATH and CAST (the staff gesture),
 which replay on their own after a short rest. Each only feeds the real `PlayerModel` the inputs and
 triggers the game does, so what shows is exactly what the game poses (a jump loop with the landing, a
 swim that strokes as long as forward is held, a throw that charges, holds and releases, a death that
@@ -160,7 +160,7 @@ Environment variables for scripted captures:
   warning listing the valid ones.
 - `ITEM_DEBUGGER_PLAYER_ANIM=<mode>` picks the player animation (`idle`, `walk`, `run`, `sneak`, `jump`,
   `sprint jump`, `land`, `swim`, `swim idle`, `surface`, `fly`, `punch`, `heavy punch`, `slice`, `slice back`, `cut`, `back cut`, `chop`, `throw`,
-  `hurt`, `equip`, `death`) and selects the ITEMS tab. An unknown mode logs a warning listing them.
+  `hurt`, `equip`, `death`, `cast`) and selects the ITEMS tab. An unknown mode logs a warning listing them.
 - `ITEM_DEBUGGER_SPEED=<0..4>` and `ITEM_DEBUGGER_LOOP=<0|1>` set the timeline's speed and loop at startup.
 - `ITEM_DEBUGGER_SHOT=<png path>` saves one screenshot and closes. Without `ITEM_DEBUGGER_SHOT_AT` it
   fires on an early frame, so a one-shot is caught near its start.
@@ -970,7 +970,8 @@ OpenGLTest/
                                #   E/Escape or a changed held staff, cursor and look capture, clicks, bind/clear requests
     Audio/                     # sound: the sfx library, mixer and manager, the ambience bed
       AmbienceManager.cs       # looping day/night ambience with a slow crossfade
-      SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups
+      SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups (and names the
+                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle)
       SfxManager.cs            # one-shot sound effects built on the same NAudio stack as AmbienceManager
       SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline
     Chunks/                    # chunk storage and lifecycle, the column cache and column terrain, the light
@@ -1446,18 +1447,24 @@ OpenGLTest/
       KnownSpellParts.cs       # the one known-part rule (creative, or Inventory.KnowsPart) the spell builder, the client
                                #   prediction and the server share; Learn (a scroll) and SizeMana (the pool max follows
                                #   the owned known count)
+      SpellBoltPreview.cs      # GL-free: a casting client's own cosmetic bolts (SpellProjectile's flight and stop
+                               #   test, sparks only; never strikes, applies or writes anything)
       SpellCast.cs             # what the effect hook receives: caster, staff, slot, parts, stats, eye and aim
       SpellBlockImpact.cs      # what an element's impact flags do to a landed-on cell (prime, light, grow, and
                                #   ignite/freeze/thaw through StatusEffectBlockWriter.ApplyAt), every write hooked
-      SpellCaster.cs           # World component: the one cast seam (playing gate, CastRules, the Effect hook;
-                               #   never spends or fires on a client), behind World.CastFor/SpellEffect
+      SpellCaster.cs           # World component: the one cast seam (playing gate, CastRules, the Effect hook and the
+                               #   cosmetic Feedback hook; never spends or fires on a client), behind World.CastFor/SpellEffect
       SpellEffects.cs          # World component (authoritative only): the Effect hook; launches and flies the
-                               #   bolts, lands them on mobs and cells, applies a self cast; the `cast` op's TestCast
+                               #   bolts, lands them on mobs and cells (the impact sound near the camera), applies a
+                               #   self cast; the `cast` op's TestCast
+      SpellFeedback.cs         # World component (never on a headless server): the Feedback hook's cast/fizzle sound and
+                               #   spark burst for the local player's cast, a client's preview bolts, remote cast bursts
       SpellFlight.cs           # what one bolt update ended in: Flying, HitMob, HitCell, Spent
       SpellImpactRules.cs      # GL-free: a bolt's damage and range from the recipe's factors, its element and
                                #   shape, the impacts that are block actions
       SpellProjectile.cs       # GL-free: one bolt in flight (straight, sub-stepped, BoxSweep and first non-air
                                #   cell, mob overlap, spent after its range)
+      SpellSparks.cs           # GL-free: the shared spell sparks (the element's color, the trail, the impact, the cast burst)
     Networking/                # the GL-free multiplayer protocol and codecs both sides share
                                #   (see "Multiple players and chat"); the client and the server side below
       ChunkNetCodec.cs         # chunk blocks/state and column terrain (heights, water levels, corner climate),
@@ -1581,6 +1588,7 @@ OpenGLTest/
         ArmOverlays.cs         # lays the pose-specific arm frames (jump, swim stroke and float, punch chamber, cocked throw) over the base frames
         ArmSolver.cs           # the two-bone arm math: hand offset for a shoulder pitch and elbow, and the joints that reach an offset
         BowPose.cs             # a bow's two-handed draw: item arm out, string arm to the cheek, side-on torso, the release snap (UsePose.Bow)
+        CastMotion.cs          # the staff cast's gesture as pure functions of the cast clock: raise, thrust, recoil, return
       BladeSwingFrame.cs     # what the right arm, the body and the held blade do on one frame of a blade swing (a slice
                                #   or a sword swing): the one struct the body code reads of either
         BodyPartMatrices.cs    # the world matrices of the body parts and the held item's hand anchor (GetPartMatrix/GetHandAnchorMatrix bodies)
@@ -2088,7 +2096,8 @@ OpenGLTest/
   assets/textures/particles/          # particle sprites (bubble)
   assets/textures/ui/                 # HUD icons (hearts); crosshair.png sits in textures/ itself
   assets/fonts/                       # TTF for the UI text
-  assets/sfx/                         # mined-block hit groups (<group>.wav / <group>_N.wav, see `sfx`) and item pickups
+  assets/sfx/                         # mined-block hit groups (<group>.wav / <group>_N.wav, see `sfx`), item pickups and
+                                      #   the spell sounds (spell_cast, spell_impact, spell_fizzle; played by code, never a block)
   assets/sfx/ambience/                # the forest and night ambience beds
   assets/data/blocks/<name>.json      # one file per block; the file name is its string id
   assets/data/items/<name>.json       # vine, branch, flint, bucket, water_bucket, lava_bucket
@@ -2197,7 +2206,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Lod/                         # far-LOD regions, the manager, build pool and buffers, column caps, surface
                                #   overrides and their save state, sky exposure; the build-cost probe
   Magic/                       # the cast rules, pacing and held-staff lookup, the spell effects (bolt flight,
-                               #   impact rules, the element impacts on a server world); its own helper StaffFixture
+                               #   impact rules, the element impacts on a server world), the sparks, the cast
+                               #   feedback and a client's preview bolt; its own helper StaffFixture
   Networking/                  # protocol and codecs, end-to-end chunk and imported-world streaming
     Client/                    # client streaming, the mesh gate, predictions and intent flow, the entity
                                #   mirror, remote players, worldgen isolation
@@ -2254,6 +2264,7 @@ tools/                                # asset generators: tiles, sprites, models
   remove-copper-head-handles.py       # strips the wooden handle from copper_pickaxe_head.png / copper_axe_head.png (re-runs are no-ops)
   generate-slime-block-texture.py     # deterministic generator of the slime block tile (slime_block.png)
   generate-staff-textures.py          # deterministic placeholder sprites of the wooden and crystal staffs
+  generate-spell-sfx.py               # deterministic placeholder spell sounds (spell_cast/impact/fizzle.wav), --check
   generate-mana-draught-texture.py    # deterministic placeholder sprite of the mana draught (mana_draught.png), --check
   generate-stone-brick-texture.py     # deterministic generator of the stone brick tile (stone_bricks.png)
   generate-tree-textures.ps1          # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
@@ -3052,8 +3063,9 @@ spent after `SpellImpactRules.RangeFor` (`ProjectileRangeBlocks` times the `Rang
 `MobStrikes.StrikeMob` and applies the element's `effect`; a cell hit runs `SpellBlockImpact` (the
 `impact` table above). A `self` shape applies the effect to the caster (the camera or the server's
 player, so a creative or flying caster is immune) and the element's ignite/freeze/thaw around its feet;
-prime, light and grow are aimed only. A non-server world shows a bolt as sparks of its effect's tint.
-Known gaps: bolts are not sent to clients (until `MG-10`) and not saved; a frostburned body over lava
+prime, light and grow are aimed only. A non-server world shows a bolt as sparks of its effect's tint
+(`SpellSparks`). Known gaps: bolts are not sent to clients (the caster's own client flies a cosmetic copy,
+`SpellBoltPreview`, see "Cast feedback" below) and not saved; a frostburned body over lava
 crusts it. `SpellImpactRulesTests`, `SpellProjectileTests`, `SpellEffectsTests`.
 
 ### Status effect schema (`assets/data/effects/<name>.json`)
@@ -3601,8 +3613,10 @@ empty. Then, by kind:
   last (`PlayerContext.Health.Mana.TrySpend`, free in creative), so every refusal spends nothing. A
   spend or a refusal for mana sets `StatusDirty`, so the pool reaches the client in the same `Pump`.
   An accepted cast fires `World.SpellEffect`, by default `SpellEffects.Cast`, which launches the bolt
-  or applies the self cast on the server (bolts are not in `EntityList`, so a client sees only their
-  consequences until `MG-10`) and is rebroadcast as a punch until `MG-10`. A client runs the same seam to predict only: it
+  or applies the self cast on the server (bolts are not in `EntityList`, so other clients see only their
+  consequences, while the caster's own client flies a cosmetic preview) and is rebroadcast as
+  `NetPlayerAction.Cast` (8, no protocol bump: the player-list action byte is read unchecked, so an older
+  client just shows no gesture). A client runs the same seam to predict only: it
   checks and paces, never spends and never fires the effect, then raises the intent.
 
 Every intent is answered, in order: an intent that can edit cells gets a `BlockCorrection` with
@@ -4643,6 +4657,7 @@ overshoot or jiggle.
   at about a right angle, the shoulders wound back toward the throwing side, then a whip forward and a
   settle) and the **swim stroke**. The hand anchor follows the forearm frame, so the held item does too.
 - **Bow draw** (`UsePose.Bow`, `BowPose`): an item whose `use.pose` is `bow` (the `bow`) holds a two-handed draw while the timed use charges: the right (item) arm goes out forward through `ArmOverlays`, the left arm is folded back to the cheek, and the torso twists side-on and leans back a little (`SecondaryMotion`), all weighted by the use charge (`BowPose.BodyWeight`/`DrawWeight`). It holds at full draw and, when the button is let go (`PlayerModel.CancelUseCharge` from a real draw), the string arm snaps back within `BowPose.SnapShare` of `ReleaseSeconds` and the rest follows; the camera narrows with the draw like a throw's charge (`Camera.ThrowCharge` is fed `Player.BowCharge`). The item debugger's `BOW` mode and the `draw`/`loose` player ops of `animations.json` show it.
+- **Cast feedback** (MG-10, cosmetic only): a staff cast plays `PlayerModel.Cast`, `PlayerModel.CastDuration` (0.45 s) of `CastMotion` (GL-free pure functions of the cast clock): the right arm raises the staff over the head-front, thrusts it straight forward with a snap (an ease-out) and a small forward lean (`CastMotion.Lean` into `SecondaryMotion`'s torso pitch), recoils a little and eases back, its weight 0 at both ends so the arm leaves and returns to the base pose without a jump; `PoseBuilder` lays it after the throw, and `BodyPartMatrices` counts it as an authored right arm. `LocalPlayer.CastSwing` (the right-click chain's staff branch, and the `player` op's `cast` action, gesture only) adds a light view pinch (`SpellConfig.CastFovKickDegrees`). The server rebroadcasts an accepted cast as `NetPlayerAction.Cast`, which `RemotePlayer` replays. The rest is `Magic/SpellFeedback`, the `SpellCaster.Feedback` hook (never built on a headless server): for the local player's own accepted cast the `spell_cast` sound (`spell_fizzle` on a fizzle, singleplayer only, since a client never learns of one) and a burst of `SpellSparks` at the bolt's launch point in the element's status tint (`SpellSparks.ColorOf`, else `BoltDefaultColor`; gray on a fizzle); on a client a cosmetic preview of the bolt (`SpellBoltPreview`: `SpellProjectile`'s flight and stop test, trail and impact sparks and the impact sound, never a strike, effect or cell write) and a default-colored burst where a remote player cast. `SpellEffects` plays `spell_impact` where a real bolt lands within `ImpactSoundRangeBlocks` of the camera, at most once an update (the sounds are not positional). The wavs come from `tools/generate-spell-sfx.py`. The item debugger's `CAST` mode (`ITEM_DEBUGGER_PLAYER_ANIM=cast`, with `ITEM_DEBUGGER_SELECT=wooden_staff`) and `visual-examples/animations-cast.json` (`VOXEL_TIME=147`) show it. Remote players' bolts stay invisible.
 - **Axe chop** (`SwordSwing.AxeChop`, a fourth swing that is not in the sword's chain): an item in the `axe`
   tag (`Mining.IsAxe`) swings a chop from the side (a flat sweep across the front from the right, the elbow straightening into the blow) instead of a punch whenever `LocalPlayer.PunchSwing` runs, through
   `PlayerModel.StartAxeChop(seconds)` over the same `SwordMotion` shape machinery and `BladeSwingFrame`. Its length
@@ -4891,7 +4906,8 @@ overshoot or jiggle.
 - **Remote players** (protocol 7): the `PlayerState` flags carry cosmetic `Sneaking`, `Swimming`,
   `Sprinting` and `Airborne` bits (rebroadcast untrusted, never acted on) and every `PlayerList`
   entry ends with the player's last `NetPlayerAction` and a counter that moves per swing, so
-  `RemotePlayer` poses the model and replays punches, slices and throws.
+  `RemotePlayer` poses the model and replays punches, slices, throws and staff casts (`NetPlayerAction.Cast`,
+  added without a version bump; `TakeCast` hands the client's `SpellFeedback` one default-colored burst per cast).
   A seventh cosmetic bit, `NetPlayerFlags.Floating` (64), rides beside `Swimming` while the sender
   is in `WaterPhase.Float`, so others see the surface float (`PlayerModel.Update`'s `floating`); the
   client now sets `Swimming` only from `Float` up, so a wader walks for everyone. No protocol version
@@ -4965,7 +4981,7 @@ overshoot or jiggle.
   none. `visual-examples/damage-numbers.json` films them.
 - **Verification**: `visual-examples/animations.json` (run with `VOXEL_TIME=147`) films the player's
   poses from the shoulder camera and the mobs' spawn, hit and death; its `damage`, `view` and
-  `player` ops (`hurt`, `punch`, `slice`, `slicereturn`, `cut`, `backcut`, `chop`, `axechop`, `equip`, `charge`, `release`, `throw`, `die`, `revive`) exist for it. For
+  `player` ops (`hurt`, `punch`, `slice`, `slicereturn`, `cut`, `backcut`, `chop`, `axechop`, `equip`, `charge`, `release`, `throw`, `draw`, `loose`, `cast`, `die`, `revive`) exist for it. For
   iterating on a single animation prefer the **item debugger** (see "Build and run"): its ITEMS tab has a
   button for every player animation and its ENTITIES tab previews the goblin and slime life-cycles,
   including the slime's code-driven squash, with `ITEM_DEBUGGER_PLAYER_ANIM` / `ITEM_DEBUGGER_ANIM` and

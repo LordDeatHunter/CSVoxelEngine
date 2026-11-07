@@ -1449,6 +1449,9 @@ public sealed class GameServerTests : IDisposable
         var regen = player.Status.Mana.Max * (float)simulated / ManaConfig.RegenFullSeconds;
         Assert.True(player.Status.Mana.Current <= before - stats.Cost + regen + 1e-3f);
 
+        // The accepted cast is rebroadcast as the cast gesture, not a punch
+        Assert.Equal(NetPlayerAction.Cast, player.LastAction);
+
         // A cast edits no cell
         Assert.Equal(0, CellAt(arena.Front).Id);
         Assert.Equal(Dirt, CellAt(arena.FloorAhead).Id);

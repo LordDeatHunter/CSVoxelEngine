@@ -111,7 +111,11 @@ public sealed class SfxManager : IDisposable
     /// </summary>
     internal static int PickIndex(int count, Random random) => count <= 0 ? 0 : random.Next(count);
 
-    private static bool TryLoad(string path, out short[] samples)
+    /// <summary>
+    /// Decodes <paramref name="path"/> into interleaved samples; false when it is not 16-bit stereo
+    /// 44100 Hz PCM. Internal as a test seam, so the shipped clips can be proven loadable.
+    /// </summary>
+    internal static bool TryLoad(string path, out short[] samples)
     {
         samples = [];
         using var reader = new WaveFileReader(path);

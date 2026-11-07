@@ -15,7 +15,7 @@ public readonly record struct RemotePlayerSnapshot(int Id, string Name, Vector3 
 /// A player connected to the same server, as the client sees them: a target pose from the last
 /// broadcast (smoothed toward between broadcasts) and a <see cref="PlayerModel"/> posed from what
 /// the broadcast says they are doing: the walk cycle runs off the distance actually traveled, and
-/// the sprint, jump, crouch and swim poses and their swings (punch, slice, sword, throw) come from the
+/// the sprint, jump, crouch and swim poses and their swings (punch, slice, sword, throw, a staff cast) come from the
 /// flags and the action counter. GL-free.
 /// </summary>
 public sealed class RemotePlayer
@@ -32,6 +32,7 @@ public sealed class RemotePlayer
     private bool _hasPrev;
     private bool _hasAction;
     private byte _lastActionSeq;
+    private bool _castPending;
     private float _prevY;
 
     public RemotePlayer(int id, string name, PlayerRig rig)
@@ -94,7 +95,19 @@ public sealed class RemotePlayer
             case NetPlayerAction.SwordBackCut: Model.StartSword(SwordSwing.BackCut); break;
             case NetPlayerAction.SwordChop: Model.StartSword(SwordSwing.Chop); break;
             case NetPlayerAction.Throw: Model.ReleaseThrow(1f); break;
+            case NetPlayerAction.Cast:
+                Model.Cast();
+                _castPending = true;
+                break;
         }
+    }
+
+    /// <summary>True once after the broadcast showed a new cast (the client's cast burst reads it), false otherwise.</summary>
+    public bool TakeCast()
+    {
+        var pending = _castPending;
+        _castPending = false;
+        return pending;
     }
 
     /// <summary>Eases the pose toward the target and drives the model from the distance moved and the flags.</summary>

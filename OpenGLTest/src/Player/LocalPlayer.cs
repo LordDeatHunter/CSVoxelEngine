@@ -348,6 +348,8 @@ internal sealed class LocalPlayer
             // A bow drawn to full and held, then let go (the world drives the same through RightClickAction)
             case "draw": Player.StartUseCharge(UsePose.Bow); Player.UpdateUseCharge(1f); break;
             case "loose": Player.CancelUseCharge(); break;
+            // The staff cast's gesture only (the scenario's cast op fires a real bolt)
+            case "cast": CastSwing(); break;
             // Launches the selected throwable at full charge (the model plays its own release separately)
             case "throw": _world.Throws.ThrowFor(LocalContext(), 1f); Player.ReleaseThrow(1f); break;
             case "die": Player.DeathFall = 1f; Camera.DeathProgress = 1f; break;
@@ -384,6 +386,13 @@ internal sealed class LocalPlayer
         }
         Camera.PunchFov(-0.8f - 0.8f * weight);
         return weight;
+    }
+
+    /// <summary>The staff cast's gesture: the staff raised and thrust forward, with a light view pinch.</summary>
+    internal void CastSwing()
+    {
+        Player.Cast();
+        Camera.PunchFov(SpellConfig.CastFovKickDegrees);
     }
 
     /// <summary>

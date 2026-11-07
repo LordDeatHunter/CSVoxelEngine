@@ -121,9 +121,9 @@ internal sealed class PoseBuilder
         return Finish(blended, pitchDeg);
     }
 
-    // Flight, then swim, then the body mods, the jab, the throw and the use over the base pose
+    // Flight, then swim, then the body mods, the jab, the throw, the cast and the use over the base pose
     private Pose Finish(in Pose basePose, float pitchDeg) =>
-        _model.ThrowArm.WithUse(_model.ThrowArm.WithThrow(_model.Jab.WithPunch(
+        _model.ThrowArm.WithUse(CastMotion.Apply(_model.ThrowArm.WithThrow(_model.Jab.WithPunch(
             SecondaryMotion.ApplyMods(_model.Swim.ApplySwim(_model.Flight.Apply(_model.Bow.Apply(basePose))),
-                _model.Secondary.ComputeMods()), pitchDeg)));
+                _model.Secondary.ComputeMods()), pitchDeg)), _model.CastProgress));
 }

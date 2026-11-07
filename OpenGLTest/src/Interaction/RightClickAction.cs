@@ -130,7 +130,7 @@ internal sealed class RightClickAction
             var slot = HeldStaff.SelectedSlot(player.Inventory);
             if (Caster.CastFor(player, slot, Caster.LocalPacing, _world.Now, 0) != CastVerdict.Cast) return false;
             _castSlot = slot;
-            LocalPlayer.PunchSwing();
+            LocalPlayer.CastSwing();
             outcome = RightClickOutcome.Cast;
             return true;
         }

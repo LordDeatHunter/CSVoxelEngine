@@ -80,4 +80,23 @@ public static class SpellConfig
 
     /// <summary>The sRGB spark color of an element whose status effect has no tint (or that applies none).</summary>
     public static readonly Vector3 BoltDefaultColor = new(0.8f, 0.7f, 1.0f);
+
+    /// <summary>Sparks that burst at the staff when a cast leaves it (cosmetic).</summary>
+    public const int CastBurstSparkCount = 8;
+
+    /// <summary>Launch speed of the cast burst's sparks, in blocks per second (cosmetic).</summary>
+    public const float CastBurstSparkSpeed = 1.6f;
+
+    /// <summary>The sRGB color of the cast burst when the cast fizzles (cosmetic).</summary>
+    public static readonly Vector3 FizzleSparkColor = new(0.55f, 0.55f, 0.55f);
+
+    /// <summary>
+    /// How close to the camera a bolt must land, in blocks, for its impact to be heard (the sound effects are
+    /// not positional, so a far landing stays silent).
+    /// </summary>
+    public const float ImpactSoundRangeBlocks = 32f;
+
+    /// <summary>The view's brief pinch on a cast, in degrees as <c>Camera.PunchFov</c> takes them (negative narrows;
+    /// gentler than a light punch's -0.8, cosmetic).</summary>
+    public const float CastFovKickDegrees = -0.5f;
 }

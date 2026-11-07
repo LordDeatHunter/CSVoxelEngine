@@ -241,7 +241,7 @@ internal sealed class IntentReplay
             player.StatusDirty = true;
         if (verdict != CastVerdict.Cast)
             return false;
-        player.NoteAction(NetPlayerAction.Punch); // the cast gesture is MG-10's
+        player.NoteAction(NetPlayerAction.Cast);
         return true;
     }
 

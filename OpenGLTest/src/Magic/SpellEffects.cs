@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Spells;
-using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
 using VoxelEngine.Items;
 using VoxelEngine.Particles;
@@ -19,8 +19,9 @@ namespace VoxelEngine.Magic;
 /// component flies each update and lands as a direct hit on a mob (<see cref="SpellImpactRules.DamageFor"/>
 /// plus the element's status effect) or as the element's impacts on a cell (<see cref="SpellBlockImpact"/>);
 /// a self cast applies the element's effect to the caster and its block conversions around the caster's
-/// feet. Bolts never hit players, are not saved and are not sent to clients; a non-server world shows
-/// them as a trail of sparks.
+/// feet. Bolts never hit players, are not saved and are not sent to clients (a casting client flies its
+/// own cosmetic copy, <see cref="SpellBoltPreview"/>); a non-server world shows them as a trail of sparks
+/// (<see cref="SpellSparks"/>) and plays the impact sound where one lands near the camera.
 /// </summary>
 internal sealed class SpellEffects
 {
@@ -28,16 +29,18 @@ internal sealed class SpellEffects
     private readonly ChunkManager _chunks;
     private readonly SpellBlockImpact _blocks;
     private readonly BlockDebrisSystem _debris;
+    private readonly SfxManager? _sfx;
     private readonly bool _serverMode;
     private readonly List<SpellProjectile> _projectiles = [];
 
     internal SpellEffects(World world, ChunkManager chunks, StatusEffectBlockWriter writer, WorldItemUse itemUse,
-        BlockDebrisSystem debris, bool serverMode)
+        BlockDebrisSystem debris, SfxManager? sfx, bool serverMode)
     {
         _world = world;
         _chunks = chunks;
         _blocks = new SpellBlockImpact(chunks, writer, itemUse);
         _debris = debris;
+        _sfx = sfx;
         _serverMode = serverMode;
     }
 
@@ -67,7 +70,7 @@ internal sealed class SpellEffects
 
         if (_projectiles.Count >= SpellConfig.MaxLiveProjectiles)
             _projectiles.RemoveAt(0);
-        _projectiles.Add(new SpellProjectile(caster, element, stats, eye, direction) { SparkColor = SparkColorOf(element) });
+        _projectiles.Add(new SpellProjectile(caster, element, stats, eye, direction) { SparkColor = SpellSparks.ColorOf(element) });
     }
 
     /// <summary>Flies every bolt and lands those that hit something; nothing while the world is not playing.</summary>
@@ -75,6 +78,7 @@ internal sealed class SpellEffects
     {
         if (_projectiles.Count == 0 || !_world.IsPlaying) return;
         var mobs = _world.Mobs;
+        var heard = false;
         for (var i = _projectiles.Count - 1; i >= 0; i--)
         {
             var bolt = _projectiles[i];
@@ -90,9 +94,13 @@ internal sealed class SpellEffects
                 HitMob(bolt, bolt.HitMob!);
             else if (flight == SpellFlight.HitCell)
                 _blocks.ApplyAt(bolt.Element, bolt.ImpactCell, bolt.ImpactNormal);
-            if (flight != SpellFlight.Spent && !_serverMode)
-                _debris.Spark(bolt.Position, bolt.SparkColor, SpellConfig.ProjectileHalfExtent,
-                    SpellConfig.ImpactSparkCount, SpellConfig.ImpactSparkSpeed, SpellConfig.BoltSparkSize);
+            if (flight == SpellFlight.Spent || _serverMode) continue;
+            SpellSparks.Impact(_debris, bolt.Position, bolt.SparkColor);
+            // One impact sound per update, so a volley landing together does not stack clips
+            if (heard || Vector3.Distance(bolt.Position, _world.Camera.Position) > SpellConfig.ImpactSoundRangeBlocks)
+                continue;
+            heard = true;
+            _sfx?.Play(SfxLibrary.SpellImpactGroup);
         }
     }
 
@@ -142,16 +150,6 @@ internal sealed class SpellEffects
     private void Trail(SpellProjectile bolt, float deltaTime)
     {
         if (_serverMode) return;
-        bolt.SparkTimer -= deltaTime;
-        if (bolt.SparkTimer > 0f) return;
-        bolt.SparkTimer = SpellConfig.BoltSparkSeconds;
-        _debris.Spark(bolt.Position, bolt.SparkColor, SpellConfig.ProjectileHalfExtent, SpellConfig.BoltSparkCount,
-            SpellConfig.BoltSparkSpeed, SpellConfig.BoltSparkSize);
+        SpellSparks.Trail(_debris, bolt, deltaTime);
     }
-
-    // The element's status tint, else the default bolt color
-    private static Vector3 SparkColorOf(SpellPart element) =>
-        element.Effect != null && StatusEffectRegistry.Require(element.Effect).TintLinear is { } tint
-            ? ColorSpace.LinearToSrgb(tint)
-            : SpellConfig.BoltDefaultColor;
 }

@@ -43,6 +43,7 @@ namespace VoxelEngine;
 /// <see cref="LocalPlayer"/>, <see cref="Strikes"/>, <see cref="Ambient"/>, <see cref="Edits"/>,
 /// <see cref="LeftClick"/>, <see cref="Placer"/>, <see cref="Throws"/>,
 /// <see cref="Interactions"/>, <see cref="ItemUse"/>, <see cref="RightClick"/>, <see cref="Caster"/>,
+/// <see cref="Spells"/>, <see cref="Feedback"/>,
 /// <see cref="ClientMirror"/>, <see cref="Persistence"/>, <see cref="Pickup"/>,
 /// <see cref="Director"/> and <see cref="Renderer"/>. It runs the frame (<see cref="Update"/>, which hands a multiplayer
 /// client to <see cref="UpdateClient"/> and a loading world to <see cref="UpdateLoading"/>) and
@@ -171,6 +172,9 @@ public class World
 
     /// <summary>What accepted casts do: the spell bolts in flight and the element impacts; null on a client.</summary>
     internal SpellEffects? Spells { get; }
+
+    /// <summary>The cosmetic side of casts (the cast burst and sounds, a client's preview bolts); null on a headless server.</summary>
+    internal SpellFeedback? Feedback { get; }
 
     /// <summary>The multiplayer client's mirror of its server: cell changes, entities, stations, health, remote players.</summary>
     internal ClientMirror ClientMirror { get; }
@@ -462,8 +466,10 @@ public class World
                 _mobs, serverMode, clientMode, statusBlocks);
             Spells = statusBlocks == null
                 ? null
-                : new SpellEffects(this, _chunkManager, statusBlocks, ItemUse, _debris, serverMode);
+                : new SpellEffects(this, _chunkManager, statusBlocks, ItemUse, _debris, sfx, serverMode);
             if (Spells != null) Caster.Effect = Spells.Cast;
+            Feedback = serverMode ? null : new SpellFeedback(this, _chunkManager, _debris, sfx, clientMode);
+            if (Feedback != null) Caster.Feedback = Feedback.OnCast;
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
                 _leaves, _fire, _lavaFire, _torchFire, _bubbles, _sliceTrails, _health, _hotbarName, _hotbarPops);
@@ -798,6 +804,7 @@ public class World
         Throws.UpdateThrown((float)deltaTime);
         Throws.RefreshProjectiles();
         Ambient.UpdateSplashes((float)deltaTime);
+        Feedback?.Update((float)deltaTime, _remotePlayers);
         FrameProfiler.End(ProfileSection.Entities);
 
         _hotbarPops.Update(Inventory, (float)deltaTime);

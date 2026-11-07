@@ -130,7 +130,9 @@ public static class NetFraming
     /// <see cref="NetInventoryAction.ClearStaffSlot"/> inventory actions (the MG-7 spell table); an
     /// older peer would refuse them as malformed.
     /// 15: the <c>InventoryState</c> snapshot carries the player's known spell parts (MG-8), which an
-    /// older client would ignore and so bind against nothing.</summary>
+    /// older client would ignore and so bind against nothing. <see cref="NetPlayerAction.Cast"/> (8) was added
+    /// later without a bump: the player list's action byte is read unchecked and an older client simply plays
+    /// no gesture for an action it does not know.</summary>
     public const int ProtocolVersion = 15;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
