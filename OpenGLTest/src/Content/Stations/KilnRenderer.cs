@@ -59,17 +59,31 @@ public static class KilnRenderer
     /// bowl itself.</summary>
     public const float PendingSize = 2f * CrucibleOuterHalf * 0.8f;
 
+    /// <summary>How far up the next lump of the waiting stack sits, as a share of the lump below
+    /// it; under 1 so they nest rather than hover.</summary>
+    public const float PendingStackStep = 0.7f;
+
+    /// <summary>Most waiting lumps drawn at once; a bigger charge still reads as a full stack.</summary>
+    public const int MaxPendingLumps = 6;
+
     /// <summary>
-    /// How big the waiting lump is drawn, as a fraction 0..1 of <see cref="PendingSize"/>: full
-    /// while a whole unit or more is still solid, then shrinking linearly to nothing as the last
-    /// unit melts, so it vanishes exactly when the charge does instead of cutting out - the
-    /// continuity <see cref="KilnManager.DisplayMoltenMl"/> gives the pool below it. A unit size
-    /// of 0 (no melt recipe recorded) still reads as a whole lump while anything is pending.
+    /// The waiting charge as a stack of lumps: <c>Count</c> pieces, all full size except the
+    /// top one, which is drawn at <c>LastScale</c> (0..1, a fraction of <see cref="PendingSize"/>)
+    /// and is the unit currently melting. The drawn volume <c>(Count - 1) + LastScale</c> equals
+    /// the pending units, so it falls continuously and vanishes exactly when the charge does
+    /// - the continuity <see cref="KilnManager.DisplayMoltenMl"/> gives the pool below it. A unit
+    /// size of 0 (no melt recipe recorded) still reads as one whole lump while anything is
+    /// pending.
     /// </summary>
-    public static float PendingScale01(float displayPendingMl, int unitMl) =>
-        unitMl > 0
-            ? MathUtils.Clamp01(displayPendingMl / unitMl)
-            : displayPendingMl > 0f ? 1f : 0f;
+    public static (int Count, float LastScale) PendingStack(float displayPendingMl, int unitMl)
+    {
+        if (displayPendingMl <= 0f) return (0, 0f);
+        if (unitMl <= 0) return (1, 1f);
+
+        var units = displayPendingMl / unitMl;
+        var count = (int)MathF.Ceiling(units);
+        return (count, MathUtils.Clamp01(units - (count - 1)));
+    }
 
     /// <summary>The yaw that turns a prop's local +Z - an upright sprite's front face - out of
     /// the kiln's opening.</summary>

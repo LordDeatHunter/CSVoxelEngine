@@ -203,7 +203,7 @@ internal sealed class StationPasses : IDisposable
     /// <see cref="KilnManager.DisplayMoltenMl"/>, which carries the fraction of the melt tick in
     /// flight, so the surface rises smoothly instead of stepping once per chunk melted; the lump
     /// is its complement (<see cref="KilnManager.DisplayPendingMl"/> through
-    /// <see cref="KilnRenderer.PendingScale01"/>), so what the pool gains the lump loses. The pool
+    /// <see cref="KilnRenderer.PendingStack"/>), so what the pool gains the top lump loses. The pool
     /// holds every molten metal together, tinted as <see cref="KilnManager.PoolMaterial"/>.
     /// </summary>
     internal void RenderKilns(Camera camera, KilnManager kilns)
@@ -249,16 +249,24 @@ internal sealed class StationPasses : IDisposable
                 if (pendingMl > 0f && inputId != 0
                     && BindStationMesh(inputId, ref atlasBound) is { } lump)
                 {
-                    // One piece of the last thing charged in, resting over the rim and facing
-                    // the opening; it shrinks as its last unit melts into the pool below
-                    var size = KilnRenderer.PendingSize
-                             * KilnRenderer.PendingScale01(pendingMl, KilnManager.PendingUnitMl(state));
+                    // One piece per unit of the last thing charged in, stacked over the rim and
+                    // facing the opening; only the top one, the unit melting, shrinks into the
+                    // pool below
+                    var (count, lastScale) = KilnRenderer.PendingStack(pendingMl, KilnManager.PendingUnitMl(state));
+                    var drawn = Math.Min(count, KilnRenderer.MaxPendingLumps);
                     var foot = layout.ToWorld(anchor, facing, layout.PendingLocal);
-                    var placed = Matrix4x4.CreateScale(size)
-                                * Matrix4x4.CreateRotationY(KilnRenderer.OpeningYaw(facing))
-                                * Matrix4x4.CreateTranslation(foot + new Vector3(0f, size * 0.5f, 0f));
-                    _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
-                    lump.Render();
+                    var lumpYaw = KilnRenderer.OpeningYaw(facing);
+                    var rise = 0f;
+                    for (var i = 0; i < drawn; i++)
+                    {
+                        var size = KilnRenderer.PendingSize * (i == drawn - 1 ? lastScale : 1f);
+                        var placed = Matrix4x4.CreateScale(size)
+                                    * Matrix4x4.CreateRotationY(lumpYaw + i * 0.6f)
+                                    * Matrix4x4.CreateTranslation(foot + new Vector3(0f, rise + size * 0.5f, 0f));
+                        _owner.SetDrawUniforms(placed, placed * viewProj, 1f, light);
+                        lump.Render();
+                        rise += size * KilnRenderer.PendingStackStep;
+                    }
                 }
             }
 

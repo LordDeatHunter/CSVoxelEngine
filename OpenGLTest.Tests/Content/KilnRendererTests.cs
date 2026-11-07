@@ -257,27 +257,38 @@ public sealed class KilnRendererTests
             Assert.InRange(lump.Z + half, minZ - Epsilon, maxZ + Epsilon);
         }
 
-        // The size curve: nothing left means nothing drawn, a whole unit (or several) is a whole
-        // lump, and in between it shrinks strictly with what is still solid
+        // The stack: nothing left draws nothing; otherwise the drawn volume equals the pending
+        // units, only the top lump is ever partial, and as the charge melts the volume falls
+        // without a jump (the lump count only drops once the top one has shrunk to nothing)
         const int unit = 100;
-        Assert.Equal(0f, KilnRenderer.PendingScale01(0f, unit), precision: 5);
-        Assert.Equal(1f, KilnRenderer.PendingScale01(unit, unit), precision: 5);
-        Assert.Equal(1f, KilnRenderer.PendingScale01(3 * unit, unit), precision: 5);
+        Assert.Equal(0, KilnRenderer.PendingStack(0f, unit).Count);
 
-        var previous = KilnRenderer.PendingScale01(0f, unit);
-        for (var step = 1; step <= 10; step++)
+        var previousVolume = float.MaxValue;
+        var previousCount = int.MaxValue;
+        for (var ml = 4 * unit; ml > 0; ml -= 5)
         {
-            var scale = KilnRenderer.PendingScale01(unit * (step / 10f), unit);
-            Assert.True(scale > previous);
-            Assert.InRange(scale, 0f, 1f);
-            previous = scale;
+            var (count, lastScale) = KilnRenderer.PendingStack(ml, unit);
+            Assert.InRange(lastScale, 0f, 1f);
+            Assert.Equal(ml / (float)unit, count - 1 + lastScale, precision: 4);
+
+            var volume = count - 1 + lastScale;
+            Assert.True(volume < previousVolume);
+            Assert.True(count <= previousCount);
+            previousVolume = volume;
+            previousCount = count;
         }
 
-        // A charge with no recorded unit size still draws a finite lump rather than dividing by
+        // Several units waiting still show every unit but the melting one at full size
+        var (many, top) = KilnRenderer.PendingStack(3.5f * unit, unit);
+        Assert.True(many > 1);
+        Assert.True(top < 1f);
+
+        // A charge with no recorded unit size still draws one finite lump rather than dividing by
         // zero, and still disappears once nothing is pending
-        Assert.InRange(KilnRenderer.PendingScale01(50f, 0), 0f, 1f);
-        Assert.True(KilnRenderer.PendingScale01(50f, 0) > 0f);
-        Assert.Equal(0f, KilnRenderer.PendingScale01(0f, 0), precision: 5);
+        var (fallbackCount, fallbackScale) = KilnRenderer.PendingStack(50f, 0);
+        Assert.True(fallbackCount > 0);
+        Assert.InRange(fallbackScale, 0.01f, 1f);
+        Assert.Equal(0, KilnRenderer.PendingStack(0f, 0).Count);
     }
 
     /// <summary>
