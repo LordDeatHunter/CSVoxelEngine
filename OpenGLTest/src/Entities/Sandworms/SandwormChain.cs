@@ -1,7 +1,7 @@
 using System;
 using System.Numerics;
 
-namespace VoxelEngine.Entities.Sandworm;
+namespace VoxelEngine.Entities.Sandworms;
 
 /// <summary>Which part of the model a chain segment is drawn with.</summary>
 public enum SandwormSegmentKind

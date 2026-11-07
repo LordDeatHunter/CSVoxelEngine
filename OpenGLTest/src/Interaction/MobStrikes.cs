@@ -37,7 +37,7 @@ internal sealed class MobStrikes
         float shoveSpeed = MobConfig.SlimePunchShoveSpeed)
     {
         var hits = mob.HitsTaken;
-        mob.TakeDamage(damage);
+        mob.TakeDamage(mob.ScaleDamage(damage, from));
         if (mob.HitsTaken != hits)
         {
             striker?.NoteCombat();

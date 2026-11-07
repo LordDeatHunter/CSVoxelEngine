@@ -118,4 +118,21 @@ public static class SandwormConfig
 
     /// <summary>Seconds between two contact hits on the same target.</summary>
     public const float ContactCooldownSeconds = 0.8f;
+
+    // --- Body, damage and reach ---
+
+    /// <summary>Half extent of the head's hit box in blocks; a body segment's is this times its draw scale.</summary>
+    public const float HeadRadiusBlocks = 1.5f;
+
+    /// <summary>The share of a blow's damage that lands when it hits the body or tail instead of the head.</summary>
+    public const float BodyDamageShare = 0.5f;
+
+    /// <summary>The worm hunts a target only within this horizontal distance.</summary>
+    public const float HuntRadiusBlocks = 96f;
+
+    /// <summary>Past this horizontal distance from every target the worm retreats and is gone.</summary>
+    public const float DespawnRadiusBlocks = 160f;
+
+    /// <summary>Seconds the worm's death plays before it is removed.</summary>
+    public const float DeathSeconds = 2.5f;
 }

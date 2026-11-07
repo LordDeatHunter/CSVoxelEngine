@@ -6,6 +6,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
@@ -30,6 +31,7 @@ internal sealed class WorldPersistence
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly SandwormManager? _sandworms;
     private readonly IcebergManager? _icebergs;
     private readonly PlayerHealth _health;
     private readonly bool _serverMode;
@@ -46,11 +48,12 @@ internal sealed class WorldPersistence
     private IReadOnlyList<Goblin> Goblins => _world.Goblins;
     private IReadOnlyList<HellMob> HellMobs => _world.HellMobs;
     private IReadOnlyList<SkyMob> SkyMobs => _world.SkyMobs;
+    private IReadOnlyList<Sandworm> Sandworms => _world.Sandworms;
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
 
     internal WorldPersistence(World world, ChunkSaveStore? saveStore, ChunkManager chunkManager,
         DropManager dropManager, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, IcebergManager? icebergs, PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
+        SkyMobManager? skyMobs, SandwormManager? sandworms, IcebergManager? icebergs, PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         StationSaveData? savedStations)
     {
@@ -67,6 +70,7 @@ internal sealed class WorldPersistence
         _goblins = goblins;
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _sandworms = sandworms;
         _icebergs = icebergs;
         _health = health;
         _serverMode = serverMode;
@@ -346,7 +350,8 @@ internal sealed class WorldPersistence
         (_slimes != null && string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
         || (_goblins != null && string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
         || (_hellMobs != null && HellMobManager.HeightOf(name) > 0f)
-        || (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f);
+        || (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f)
+        || (_sandworms != null && string.Equals(name, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase));
 
     // A forced spawn of a saved mob of a known kind (null at a full hard cap); a hell mob's layer and a sky
     // mob's zone tier, and so its pool, follow from its saved position
@@ -359,6 +364,13 @@ internal sealed class WorldPersistence
             return _goblins!.Spawn(center, mob.Ammo ?? 0, mob.Torches ?? 0);
         if (SkyMobManager.HeightOf(name) > 0f)
             return _skyMobs!.Spawn(name, center);
+        if (string.Equals(name, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase))
+        {
+            // A restored worm resumes the hunt under the sand at once, without a second thump
+            var worm = _sandworms!.Spawn(center, mob.Facing ?? 0f);
+            worm?.Brain.SkipThump();
+            return worm;
+        }
         return _hellMobs!.Spawn(name, center);
     }
 
@@ -378,6 +390,7 @@ internal sealed class WorldPersistence
         mobs.AddRange(from t in goblins where !t.IsDead select MobSaveCodec.Capture(t, t.Ammo, torches: t.Torches));
         mobs.AddRange(from t in HellMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in SkyMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
+        mobs.AddRange(from t in Sandworms where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(_pendingMobs);
 
         _dropSort.Clear();

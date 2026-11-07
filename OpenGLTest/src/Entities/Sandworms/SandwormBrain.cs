@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using VoxelEngine.Config;
 
-namespace VoxelEngine.Entities.Sandworm;
+namespace VoxelEngine.Entities.Sandworms;
 
 /// <summary>What the worm is doing; the brain moves between these.</summary>
 public enum SandwormPhase
@@ -131,6 +131,20 @@ public sealed class SandwormBrain
             case SandwormPhase.Dash: UpdateDash(dt, senses); break;
             case SandwormPhase.Retreat: UpdateRetreat(senses); break;
         }
+    }
+
+    /// <summary>Skips the summon's thump and starts hunting at once (a worm restored from a save).</summary>
+    public void SkipThump()
+    {
+        if (Phase == SandwormPhase.Thump) EnterDig();
+    }
+
+    /// <summary>Gives the hunt up: the worm sinks away and finishes (no target left to hunt).</summary>
+    public void BeginRetreat()
+    {
+        if (Phase == SandwormPhase.Retreat) return;
+        HasLockedPoint = false;
+        Enter(SandwormPhase.Retreat);
     }
 
     private void Enter(SandwormPhase phase)

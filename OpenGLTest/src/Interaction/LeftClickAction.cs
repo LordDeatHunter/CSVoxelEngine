@@ -819,11 +819,12 @@ internal sealed class LeftClickAction
         _strikeScratch.Clear();
         foreach (var mob in _mobs)
         {
+            if (mob.AimPointFrom(origin) is not { } aim) continue;
             var reached = cone
-                ? Combat.InPunchCone(origin, direction, mob.Position, out var distance)
-                : Combat.InFrontHemisphere(origin, direction, mob.Position, out distance);
+                ? Combat.InPunchCone(origin, direction, aim, out var distance)
+                : Combat.InFrontHemisphere(origin, direction, aim, out distance);
             if (!reached) continue;
-            if (BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
+            if (BlockRaycaster.SegmentHitsBlock(origin, aim, _chunkManager))
                 continue;
             _strikeScratch.Add((distance, mob));
         }

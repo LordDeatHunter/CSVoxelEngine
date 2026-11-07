@@ -323,6 +323,30 @@ public abstract class Mob
     /// <summary>The amount of the last hit <see cref="TakeDamage"/> accepted.</summary>
     public int LastHitDamage { get; private set; }
 
+    /// <summary>
+    /// Whether a cube of half extent <paramref name="halfExtent"/> centered at <paramref name="center"/> touches
+    /// this mob's body (with a small slack): the body box by default; a multi-part body (the sandworm) tests
+    /// every exposed part. Shared by thrown items and spell bolts (<see cref="ThrownProjectile.FindMobHit"/>).
+    /// </summary>
+    public virtual bool OverlapsBox(Vector3 center, float halfExtent)
+    {
+        var d = center - Position;
+        var reachXz = halfExtent + BodyHalfExtent + 0.05f;
+        var reachY = halfExtent + BodyHalfHeight + 0.05f;
+        return MathF.Abs(d.X) <= reachXz && MathF.Abs(d.Z) <= reachXz && MathF.Abs(d.Y) <= reachY;
+    }
+
+    /// <summary>
+    /// The point melee swings aim at and test their line of sight to, seen from <paramref name="from"/>: the body
+    /// center by default; a multi-part body gives its nearest exposed part, or null while none can be hit (a worm
+    /// fully under the sand), which keeps the mob out of every swing.
+    /// </summary>
+    public virtual Vector3? AimPointFrom(Vector3 from) => Position;
+
+    /// <summary>The damage a blow of <paramref name="amount"/> from <paramref name="from"/> deals: unchanged by
+    /// default; a multi-part body scales it by the part the blow lands on.</summary>
+    public virtual int ScaleDamage(int amount, Vector3 from) => amount;
+
     /// <summary>Applies a hit; the owner drops the loot and removes the mob once dead.</summary>
     public virtual void TakeDamage(int amount)
     {

@@ -122,10 +122,7 @@ public sealed class ThrownProjectile
         {
             var mob = mobs[i];
             if (mob.IsDead || mob == ignore) continue;
-            var d = position - mob.Position;
-            var reachXz = halfExtent + mob.BodyHalfExtent + 0.05f;
-            var reachY = halfExtent + mob.BodyHalfHeight + 0.05f;
-            if (MathF.Abs(d.X) <= reachXz && MathF.Abs(d.Z) <= reachXz && MathF.Abs(d.Y) <= reachY)
+            if (mob.OverlapsBox(position, halfExtent))
                 return mob;
         }
         return null;

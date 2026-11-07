@@ -6,6 +6,7 @@ using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
+using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
@@ -33,6 +34,7 @@ internal sealed class MobDirector
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly SandwormManager? _sandworms;
     private readonly IcebergManager? _icebergs;
     private readonly BlockDebrisSystem _debris;
     // The campfire particles a fire bolt's ember trail sheds into; null on a server, which draws nothing
@@ -53,13 +55,14 @@ internal sealed class MobDirector
     private MobStrikes Strikes => _world.Strikes;
 
     internal MobDirector(World world, ChunkManager chunkManager, DropManager dropManager, SlimeManager? slimes,
-        GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, IcebergManager? icebergs,
+        GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, SandwormManager? sandworms, IcebergManager? icebergs,
         BlockDebrisSystem debris,
         FireParticleSystem? embers, PlayerHealth health, List<Mob> mobs, bool serverMode, bool clientMode,
         StatusEffectBlockWriter? statusBlocks)
     {
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _sandworms = sandworms;
         _embers = embers;
         _statusBlocks = statusBlocks;
         _world = world;
@@ -164,6 +167,13 @@ internal sealed class MobDirector
             BillLocalPlayer(_skyMobs.DamageDealtThisFrame);
         }
 
+        // The sandworm boss hunts under the sand, erupts under its target and slides at it
+        if (_sandworms != null)
+        {
+            _sandworms.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris);
+            BillLocalPlayer(_sandworms.DamageDealtThisFrame);
+        }
+
         FireWearerPassives((float)deltaTime);
         ApplyStatusBlockActions();
     }
@@ -212,6 +222,8 @@ internal sealed class MobDirector
             ApplyMobBlockActions(_hellMobs.Mobs);
         if (_skyMobs != null)
             ApplyMobBlockActions(_skyMobs.Mobs);
+        if (_sandworms != null)
+            ApplyMobBlockActions(_sandworms.Worms);
         for (var i = 0; i < _mobTargets.Count; i++)
         {
             var target = _mobTargets[i];
@@ -296,6 +308,9 @@ internal sealed class MobDirector
 
         if (_skyMobs != null)
             AddLiving(_skyMobs.Mobs);
+
+        if (_sandworms != null)
+            AddLiving(_sandworms.Worms);
     }
 
     // Appends the mobs that are not dying, with an indexed loop so a frame allocates no enumerator.
@@ -338,6 +353,15 @@ internal sealed class MobDirector
         if (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f)
         {
             if (_skyMobs.Spawn(name, feet + new Vector3(0f, SkyMobManager.HeightOf(name) * 0.5f, 0f)) == null)
+                return false;
+            RefreshMobs();
+            return true;
+        }
+        if (string.Equals(name, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase) && _sandworms != null)
+        {
+            // A scenario worm starts burrowed under the surface at the given spot
+            var surface = SandwormGround.At(_chunkManager, feet.X, feet.Z).SurfaceY;
+            if (_sandworms.Spawn(new Vector3(feet.X, surface - SandwormConfig.BurrowDepthBlocks, feet.Z)) == null)
                 return false;
             RefreshMobs();
             return true;

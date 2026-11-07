@@ -1,9 +1,9 @@
 using System;
 using System.Numerics;
-using VoxelEngine.Entities.Sandworm;
+using VoxelEngine.Entities.Sandworms;
 using Xunit;
 
-namespace VoxelEngine.Tests.Entities.Sandworm;
+namespace VoxelEngine.Tests.Entities.Sandworms;
 
 public class SandwormChainTests
 {
