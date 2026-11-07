@@ -47,6 +47,28 @@ public sealed class MetalworksRecipeTests
     }
 
     [Fact]
+    public void EveryPureBronzeFormMeltsToBronzeAndEveryBronzeMoldCastsIt()
+    {
+        var bronze = ContentRegistry.MoltenMaterialByName("bronze");
+        Assert.NotNull(bronze);
+
+        foreach (var name in new[] { "bronze_ingot", "bronze_pickaxe_head", "bronze_axe_head", "bronze_sword_head" })
+        {
+            var recipe = ContentRegistry.MeltRecipeForInput(Item(name));
+            Assert.NotNull(recipe);
+            Assert.Equal(bronze.Id, recipe.MaterialId);
+        }
+
+        // Bronze is cast in the same fired molds as the other metals; the material picks the result.
+        foreach (var mold in new[] { "fired_mold_ingot", "fired_mold_pickaxe", "fired_mold_axe", "fired_mold_sword" })
+        {
+            var cast = ContentRegistry.CastRecipeFor(Block(mold), bronze.Id);
+            Assert.NotNull(cast);
+            Assert.Equal(bronze.Id, ContentRegistry.MeltRecipeForInput(cast.ResultId)!.MaterialId);
+        }
+    }
+
+    [Fact]
     public void IronCrushesInTheQuernButNeverMelts()
     {
         var crush = ContentRegistry.CrushRecipeForInput(Item("hematite_ore"));

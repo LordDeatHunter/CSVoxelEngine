@@ -1,0 +1,51 @@
+{
+  // Bronze check: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/bronze.json
+  // Shots land in visual/bronze/. The player drops (creative) onto the open meadow of
+  // animations-sword.json and fills the hotbar with the tin, copper and bronze swords (slots 1-3),
+  // the three pickaxes (4-6) and a bronze ingot (7), so the hotbar compares the sprites side by side (a tool added to a
+  // full selection also lands in the first free slot, so slot 8 repeats the bronze sword):
+  //   hotbar          first person, the bronze sword in hand, the whole hotbar under it
+  //   sword_shoulder  the bronze sword held, from the shoulder camera
+  //   sword_cut       mid cut: the bronze trail behind the blade
+  //   pickaxe         the bronze pickaxe held in first person
+  //   ingot           the bronze ingot held in first person
+  "steps": [
+    { "op": "creative" },
+    { "op": "teleport", "pos": [-43.5, 16.5, 60.5], "yaw": 90, "pitch": -10 },
+    { "op": "wait", "seconds": 5 },
+    { "op": "select", "slot": 1 },
+    { "op": "give", "block": "item/tin_sword", "count": 1 },
+    { "op": "select", "slot": 2 },
+    { "op": "give", "block": "item/copper_sword", "count": 1 },
+    { "op": "select", "slot": 4 },
+    { "op": "give", "block": "item/tin_pickaxe", "count": 1 },
+    { "op": "select", "slot": 5 },
+    { "op": "give", "block": "item/copper_pickaxe", "count": 1 },
+    { "op": "select", "slot": 6 },
+    { "op": "give", "block": "item/bronze_pickaxe", "count": 1 },
+    { "op": "select", "slot": 7 },
+    { "op": "give", "block": "item/bronze_ingot", "count": 4 },
+    { "op": "select", "slot": 3 },
+    { "op": "give", "block": "item/bronze_sword", "count": 1 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "hotbar" },
+
+    { "op": "view", "mode": "shoulder" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "sword_shoulder", "hideHud": true },
+    { "op": "player", "action": "cut" },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "sword_cut", "hideHud": true },
+    { "op": "wait", "seconds": 1 },
+
+    { "op": "view", "mode": "first" },
+    { "op": "select", "slot": 6 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "pickaxe", "hideHud": true },
+
+    { "op": "select", "slot": 7 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "ingot" }
+  ]
+}

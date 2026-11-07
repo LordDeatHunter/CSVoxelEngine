@@ -113,7 +113,11 @@ public sealed class MiningTests
         Assert.False(Mining.CanMine(hematite, null));
 
         // The gate only tightens: whatever mines hematite also mines malachite.
-        Item?[] held = [primitive, copper, ItemOf("primitive_axe"), ItemOf("copper_axe"), null];
+        Item?[] held =
+        [
+            primitive, copper, ItemOf("bronze_pickaxe"), ItemOf("primitive_axe"), ItemOf("copper_axe"),
+            ItemOf("bronze_axe"), null,
+        ];
         foreach (var item in held.Where(item => Mining.CanMine(hematite, item)))
             Assert.True(Mining.CanMine(malachite, item));
     }
@@ -131,6 +135,26 @@ public sealed class MiningTests
         Assert.True(ItemOf("tin_sword").EntityDamage < ItemOf("copper_sword").EntityDamage);
         Assert.True(ItemOf("copper_sword").EntityDamage < ItemOf("iron_sword").EntityDamage);
         Assert.False(Mining.CanMine(BlockOf("hematite_ore"), tin));
+    }
+
+    [Fact]
+    public void BronzeOutranksCopperAndMinesWhatCopperMines()
+    {
+        var copper = ItemOf("copper_pickaxe");
+        var bronze = ItemOf("bronze_pickaxe");
+
+        Assert.True(bronze.ToolPower > copper.ToolPower);
+        Assert.True(Mining.BlockDamage(bronze) > Mining.BlockDamage(copper));
+        Assert.True(ItemOf("bronze_sword").EntityDamage > ItemOf("copper_sword").EntityDamage);
+        Assert.True(ItemOf("bronze_axe").ToolPower > ItemOf("copper_axe").ToolPower);
+
+        // A higher tier only widens the gate: every ore copper opens, bronze opens too.
+        foreach (var ore in new[] { "malachite_ore", "tin_ore", "hematite_ore" })
+        {
+            var block = BlockOf(ore);
+            if (Mining.CanMine(block, copper))
+                Assert.True(Mining.CanMine(block, bronze));
+        }
     }
 
     [Fact]

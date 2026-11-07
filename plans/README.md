@@ -12,7 +12,6 @@ The one guide for every file in this folder. Agents: the `plan-docs` skill
 | [BIOMEGEN.md](BIOMEGEN.md) | Biome, climate and terrain-shape generation: handoff map and remaining work |
 | [CLEANUP.md](CLEANUP.md) | The code cleanup campaign the `cleanup-campaign` workflow runs |
 | [MAGIC.md](MAGIC.md) | The magic system (Arc A): mana, staffs, the station-built spell builder |
-| [ALLOYS.md](ALLOYS.md) | Tin, bronze and the 3x3x3 alloy furnace (`TODO.md` `P-44`) |
 | [LAYERS.md](LAYERS.md) | Hell (below) and Sky (above) layers in the one world |
 | [TREES.md](TREES.md) | Residue of the tree rework |
 | [QUICK_WINS.md](QUICK_WINS.md) | One-sitting features |

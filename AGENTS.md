@@ -2970,7 +2970,16 @@ recolors the tin and copper-sword art).
 **Tin** (`tin_ore`, `TinGenerator`) is the second, weaker metal: commoner than malachite, in the
 `TinMinY..TinMaxY` band, mined with any pickaxe; it crushes in the quern into `crushed_tin`, melts as `tin`
 (ingot, axe, pickaxe and sword heads 200 ml, ore and crushed 100 ml) and casts into the four molds. Tin and
-copper each have an axe, pickaxe and sword (`attack: "sword"`), the tool ladder runs primitive < tin < copper.
+copper each have an axe, pickaxe and sword (`attack: "sword"`), the tool ladder runs primitive < tin < copper
+< bronze.
+
+**Bronze** is the alloy (3 copper + 1 tin by ml, made only in the alloy furnace, see the recipe kind
+below) and the top of that ladder: an ingot, axe, pickaxe and sword heads (each 200 ml, melting back
+to `bronze`, cast in the same four molds) and the three tools crafted like the others (head + branch + 2
+vines), in the `axe` and `pickaxe` tags. It has no ore, no blocks and no armor. Its art is
+`tools/generate-metal-textures.py bronze`; `MiningTests.BronzeOutranksCopperAndMinesWhatCopperMines`
+holds the ladder as relations and `visual-examples/bronze.json` (`VOXEL_TIME=147`) shows the tin,
+copper and bronze tools side by side.
 
 **The casting basin** (`casting_basin`, fired on a campfire from `casting_basin_raw`, which is
 pressed from four mudballs) is the mold that makes **blocks**: a hand-authored 8 px bowl (a 2 px
@@ -3006,11 +3015,11 @@ A third kind, `recipes/alloy/<name>.json`, is `{ "result", "parts": [ { "fluid",
 full set of the parts becomes exactly their summed ml of the result, so alloying conserves metal by
 construction. A recipe needs at least two distinct parts, none of them the result, and a metal may
 be a part of one alloy only. `bronze.json` ships: 600 ml copper + 200 ml tin = 800 ml bronze
-(`data/molten/bronze.json`; bronze items, melt and cast recipes are `A-6`), which is why the
+(`data/molten/bronze.json`), which is why the
 crucible holds 800 ml: one vessel takes exactly one set (`AlloyKilnTests.OneCrucibleHoldsAFullSetOfEveryAlloy`).
 
 **Iron** has an ore and a quern path but no smelting yet. `hematite_ore` needs a tier-2 (copper)
-pickaxe (`tools: {"pickaxe": 2}`, so the primitive pickaxe whiffs) and drops a hematite chunk (the
+pickaxe (`tools: {"pickaxe": 2}`, so the primitive and tin pickaxes whiff and copper and bronze mine it) and drops a hematite chunk (the
 `hematite_ore` item), which the quern crushes into `crushed_iron` (`recipes/crush/hematite_ore.json`).
 There is no melt recipe and no molten iron, so a kiln refuses
 every iron form (`MetalworksRecipeTests.IronCrushesInTheQuernButNeverMelts`). `iron_sword` (a
