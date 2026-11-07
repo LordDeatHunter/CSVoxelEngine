@@ -66,12 +66,12 @@ const SCENARIOS = [
   day('sky', 30, 'The sky realm.', [
     ['sky_cloud_patches', 'Solid clouds', 'Cloud slabs above every mountain that catch a fall.', 'sky', [-10.5, 201.5, 40.5], -40, 0, 20],
     ['sky_cloud_sea', 'The cloud sea', 'A thick sea of solid cloud under the islands, with holes down to the world.', 'sky', [-180.5, 330.5, 120.5], 60, -35, 20],
-    ['sky_zone', 'A sky island zone', 'Islands float in zones with wide gaps of open sky between.', 'sky', [-30.5, 440.5, 100.5], 150, -25, 20],
-    ['sky_island', 'A floating island', 'Domed grass tops over a tapering, stalactite-hung underside.', 'sky', [-250.5, 392.5, 202.5], 0, 0, 20],
-    ['sky_meadow', 'Meadow island', 'Grass over dirt over stone, with tall grass, flowers and broad sky oaks.', 'sky', [172.5, 382.5, 763.5], 0, -5, 20],
-    ['sky_meadow_above', 'A meadow from above', 'Looking down on a meadow island.', 'sky', [232.5, 420.5, 813.5], -90, -45, 12],
-    ['sky_frost', 'Frost highland island', 'Frosted turf over permafrost, with crystal outcrops and glowing crystal trees.', 'sky', [-314.5, 368.5, 265.5], 0, -5, 20],
-    ['sky_frost_above', 'A frost island from above', 'Looking down on a frost highland island.', 'sky', [-254.5, 405.5, 315.5], -90, -45, 12]
+    ['sky_zone', 'Islands in the sky', 'Islands float everywhere in the band and crowd closer together inside zones.', 'sky', [-30.5, 440.5, 100.5], 150, -25, 20],
+    ['sky_island', 'A floating island', 'Domed grass tops over a tapering, stalactite-hung underside.', 'sky', [120.5, 381.5, 558.5], 0, 0, 20],
+    ['sky_meadow', 'Meadow island', 'Grass over dirt over stone, with tall grass, flowers and broad sky oaks.', 'sky', [199.5, 369.5, 369.5], 0, -5, 20],
+    ['sky_meadow_above', 'A meadow from above', 'Looking down on a meadow island.', 'sky', [259.5, 407.5, 419.5], -90, -45, 12],
+    ['sky_frost', 'Frost highland island', 'Frosted turf over permafrost, with crystal outcrops and glowing crystal trees.', 'sky', [-170.5, 372.5, 180.5], 0, -5, 20],
+    ['sky_frost_above', 'A frost island from above', 'Looking down on a frost highland island.', 'sky', [-110.5, 410.5, 230.5], -90, -45, 12]
   ]),
   day('night', 700, 'The night sky.', [
     ['aurora', 'The aurora', 'Slow green and violet curtains in the night sky of cold lands.', 'night', [-1112.5, 40.5, 584.5], 270, 14, 24],

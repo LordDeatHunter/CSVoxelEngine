@@ -4,7 +4,7 @@ The overworld shares the world with two realms: a Nether-like hell under it and 
 
 | Layer | Height (Y) | What is there |
 |---|---|---|
-| Sky islands | 320 to 420 | Floating islands in zones, with their own biomes, flora and mobs |
+| Sky islands | 320 to 420 | Floating islands everywhere, crowding into zones, with their own biomes, flora and mobs |
 | Cloud sea | 290 to 301 | A thick, nearly continuous sea of solid cloud |
 | Cloud patches | 198 to 203 | Solid cloud slabs above every mountain |
 | Overworld | down to −200 | Everything the biomes page describes |
@@ -36,11 +36,11 @@ Hell is lit only by lava and glowing blocks. Its mobs are the **hellbrute**, a s
 
 <ShotGallery slugs="sky_cloud_patches,sky_cloud_sea,sky_zone" />
 
-The islands float in zones, with wide gaps of open sky between. Each island is one of two biomes:
+Islands float everywhere in the band, so a flyer always has several in view, and crowd closer together inside zones. Each island is one of two biomes:
 
 - **Meadow**: grass over dirt over stone, with tall grass, flowers, sparse vines and broad sky oaks.
 - **Frost highland**: frosted turf over permafrost, with crystal outcrops, frost ferns, thicker vines and glowing crystal trees.
 
 <ShotGallery slugs="sky_island,sky_meadow,sky_meadow_above,sky_frost,sky_frost_above" />
 
-Its mobs are the diving **galeraptor**, a flyer that stoops at you, and the **cloud golem**, a slow bruiser whose slam sends out a shockwave. Bigger zones hold harder mobs, and only the biggest zones hold golems.
+Its mobs are the diving **galeraptor**, a flyer that stoops at you, and the **cloud golem**, a slow bruiser whose slam sends out a shockwave. They spawn only inside zones; bigger zones hold harder mobs, and only the biggest zones hold golems.

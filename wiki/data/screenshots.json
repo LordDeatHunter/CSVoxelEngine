@@ -180,8 +180,8 @@
     "group": "sky"
   },
   "sky_zone": {
-    "title": "A sky island zone",
-    "caption": "Islands float in zones with wide gaps of open sky between.",
+    "title": "Islands in the sky",
+    "caption": "Islands float everywhere in the band and crowd closer together inside zones.",
     "group": "sky"
   },
   "sky_island": {
