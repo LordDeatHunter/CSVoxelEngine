@@ -109,7 +109,7 @@ internal sealed class InventoryPanelRenderer
         else if (view.Tab is InventoryCategory.Tools or InventoryCategory.Gear)
             rowCount = (tools = view.Tab == InventoryCategory.Gear ? inventory.GearEntries() : inventory.ToolEntries()).Count;
         else if (view.Tab == InventoryCategory.Crafting)
-            rowCount = (recipes = ContentRegistry.CraftingRecipes).Count;
+            rowCount = (recipes = inventory.ListedRecipes(creative)).Count;
         else
             rowCount = (rows = inventory.StackEntries(view.Tab)).Count;
 

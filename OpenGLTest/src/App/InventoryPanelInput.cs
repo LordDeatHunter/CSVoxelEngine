@@ -186,7 +186,7 @@ internal sealed class InventoryPanelInput
     internal int RowCountFor(InventoryCategory tab)
     {
         if (tab == InventoryCategory.Crafting)
-            return ContentRegistry.CraftingRecipes.Count;
+            return ActiveWorld!.Inventory.ListedRecipes(ActiveWorld.Camera.IsCreative).Count;
         if (ActiveWorld?.Camera.IsCreative == true)
             return CreativeCatalog.Entries(tab, ActiveWorld.Inventory).Count;
         return tab switch
@@ -483,7 +483,7 @@ internal sealed class InventoryPanelInput
                 break;
             }
             case InventoryCategory.Crafting:
-                inventoryView.Craft.Select(ContentRegistry.CraftingRecipes[row]);
+                inventoryView.Craft.Select(inventory.ListedRecipes(creative)[row]);
                 // A newly opened recipe starts at the top of its card.
                 inventoryView.CraftScrollOffset = 0f;
                 break;

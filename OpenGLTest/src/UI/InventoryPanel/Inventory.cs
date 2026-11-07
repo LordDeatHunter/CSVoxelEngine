@@ -440,6 +440,10 @@ public class Inventory
     /// <summary>Recipes the pools can currently afford, including room for the result.</summary>
     public IReadOnlyList<CraftingRecipe> Craftable() => InventoryCrafting.Craftable(this);
 
+    /// <summary>The recipes the Craft tab lists: all of them in creative, only the affordable ones in survival.</summary>
+    public IReadOnlyList<CraftingRecipe> ListedRecipes(bool creative) =>
+        creative ? VoxelEngine.Content.ContentRegistry.CraftingRecipes : Craftable();
+
     /// <summary>Whether one craft of this recipe would succeed: ingredients on hand plus
     /// room for the result (consumption frees room first, so a full pool still crafts
     /// when the ingredients come out of it). Tag ingredients pool every member's stock.</summary>
