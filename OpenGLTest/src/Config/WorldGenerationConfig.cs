@@ -3,8 +3,8 @@ namespace VoxelEngine.Config;
 /// <summary>
 /// World generation tuning: the seed, terrain shape, dirt depth, sea and water levels, lakes and
 /// rivers, beaches and gravel, snow and ice, biomes, mud, lava pockets, ores, forest hills,
-/// mountains and openness, ravines, caves and worms, tree placement and the deterministic worldgen
-/// cache sizes. Distances and frequencies are in blocks (one block is 0.5 m; a frequency of 1/64
+/// mountains and openness, ravines, caves and worms, tree placement, the deterministic worldgen
+/// cache sizes and the realm layer bands (barrier, hell, cloud slab, sky islands). Distances and frequencies are in blocks (one block is 0.5 m; a frequency of 1/64
 /// means features ~64 blocks across).
 /// </summary>
 public static class WorldGenerationConfig
@@ -736,4 +736,48 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // capture (PERF_TODO lesson 4).
     public const int TreeProxyCanopyCacheCapacity = 4096;
     public const int TreeProxyCanopyCacheGenerations = 4;
+
+    // --- Layers (plans/LAYERS.md): the hell below and the sky above, as vertical bands of the one
+    // world. Every Y range of the realms lives here (the visual cloud sea in SkyConfig), nowhere
+    // else; LayerBandTests holds their ordering. World y, inclusive at both ends of each band.
+
+    /// <summary>Top of the barrier band, where its ramp starts: the barrier block's share of the
+    /// stone rises from 0 here to 100 % at <see cref="BarrierFullTopY"/>.</summary>
+    public const int BarrierTopY = -200;
+
+    /// <summary>Top of the barrier band's solid core: 100 % barrier from here down to
+    /// <see cref="BarrierFullBottomY"/>.</summary>
+    public const int BarrierFullTopY = -230;
+
+    /// <summary>Bottom of the barrier band's solid core; below it the share ramps back to 0 at
+    /// <see cref="BarrierBottomY"/>.</summary>
+    public const int BarrierFullBottomY = -270;
+
+    /// <summary>Bottom of the barrier band, where its lower ramp ends at 0 %.</summary>
+    public const int BarrierBottomY = -300;
+
+    /// <summary>Where hell starts: the first cell under the barrier band. Hell has no bottom.</summary>
+    public const int HellTopY = BarrierBottomY - 1;
+
+    /// <summary>Height of one hell layer: an open cavern pocket plus the hellrock slab under it,
+    /// repeating downward forever from <see cref="HellTopY"/> (the layer index counts these).</summary>
+    public const int HellLayerPeriodBlocks = 96;
+
+    /// <summary>Thickness of the hellrock slab at the bottom of every hell layer, separating one
+    /// pocket from the next.</summary>
+    public const int HellSlabThicknessBlocks = 16;
+
+    /// <summary>Bottom of the solid cloud slab: the patchy real cloud blocks around y 200, above the
+    /// relief ceiling (<see cref="ReliefCeilingHeight"/>) and the drawn cloud layer
+    /// (<see cref="SkyConfig.CloudHeight"/>).</summary>
+    public const int CloudSlabBottomY = 198;
+
+    /// <summary>Top of the solid cloud slab.</summary>
+    public const int CloudSlabTopY = 203;
+
+    /// <summary>Lowest cell a sky island may occupy.</summary>
+    public const int SkyIslandBottomY = 320;
+
+    /// <summary>Highest cell a sky island may occupy.</summary>
+    public const int SkyIslandTopY = 420;
 }

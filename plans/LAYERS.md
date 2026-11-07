@@ -4,9 +4,11 @@
 
 ## Status
 
-Planned, nothing built. A Nether- and Aether-like pair of realms inside the one world, as vertical
+Phase 1 under way. A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
-day 0). Last updated 2026-11-07.
+day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
+`SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
+`MobConfig.LayerDifficultyPerLayer`; `LayerBandTests` holds their order. Last updated 2026-11-07.
 
 ## In progress
 
@@ -16,8 +18,6 @@ Nothing.
 
 ### Phase 1: Foundations
 
-- [ ] **`L-1` Layer bands in config.** P0, S. Every Y range below (barrier, hell, cloud slab, sky
-  islands) lives in `WorldGenerationConfig`/`SkyConfig`, nowhere else. **Hook:** config only.
 - [ ] **`L-2` Iron pickaxe item.** P0, S. Item + `pickaxe` tag entry + tier above the copper one;
   creative catalog grants it. **No recipe, no smelting** (see Future ideas). **Hook:** `add-content`.
 - [ ] **`L-3` Soft-landing and sink block flags.** P0, M. Block JSON flags (fall damage negated on

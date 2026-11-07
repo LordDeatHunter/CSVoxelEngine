@@ -1057,7 +1057,7 @@ OpenGLTest/
       SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap;
                                #   the staff slot cap and the cast cooldown (CastCooldownSeconds)
       MobConfig.cs             # mob caps and shared mob rules, slimes, goblins (flee, dodge, pack, torches, notice
-                               #   pip), healthbars, damage numbers
+                               #   pip), healthbars, damage numbers, the realm layer difficulty step
       NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules (the attack and cast slack),
                                #   timeouts, LOD streaming, ServerAllowCreative
       ParticleConfig.cs        # falling leaves, mining debris, campfire, lava and torch embers and smoke, bubbles,
@@ -1070,7 +1070,8 @@ OpenGLTest/
       SimulationConfig.cs      # fluid tick, tree felling, reactive growth, leaf decay, ash, saplings
       StatusEffectConfig.cs    # status effects: the duration scale cap, the block writer's reach and write caps,
                                #   the mob tint strength, the particle emitter cap and rate
-      SkyConfig.cs             # day length, sun and glare, sky dome, stars, moon, moonlight, aurora, clouds, wind
+      SkyConfig.cs             # day length, sun and glare, sky dome, stars, moon, moonlight, aurora, clouds, wind,
+                               #   the sky-island cloud sea (SkyCloudSea*)
       StreamingConfig.cs       # view radius, per-frame mesh, dirty and scan budgets, thread counts, LOD build and
                                #   upload budgets, loading budgets and gate
       SurfaceShadingConfig.cs  # per-tile shader terms (ore, snow, leaf backlight, grass shimmer, ice, glass, wet
@@ -1080,7 +1081,8 @@ OpenGLTest/
       WorldFeatureConfig.cs    # pebbles, flowers, foliage, cotton and the scenery generators
       WorldGenerationConfig.cs # the seed and every worldgen knob: terrain, water levels, biomes, snow and ice, ores,
                                #   lava, ravines, caves, worms, islands and archipelagos (Island*, Archipelago*),
-                               #   tree placement, worldgen cache sizes
+                               #   tree placement, worldgen cache sizes, and every realm layer Y band (Barrier*,
+                               #   Hell*, CloudSlab*, SkyIsland*; plans/LAYERS.md, ordered by LayerBandTests)
     Content/                   # the data-driven content pipeline (ContentRegistry) — see "Content" below
       ContentRegistry.cs       # the static facade: owns the content tables, assigns byte ids, runs Load / BakeModels /
                                #   Reset in order and serves the public lookups (RequireBlock, recipes, tags, ...)

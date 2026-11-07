@@ -2,7 +2,7 @@ namespace VoxelEngine.Config;
 
 /// <summary>
 /// Mob tuning: the shared caps and rules (fall damage, lava, loot toss, notice, interest, wander,
-/// torch-safe ground, ledges), slimes, goblins, healthbars, damage numbers and the goblin notice
+/// torch-safe ground, ledges), the per-layer difficulty, slimes, goblins, healthbars, damage numbers and the goblin notice
 /// pip.
 /// </summary>
 public static class MobConfig
@@ -16,6 +16,12 @@ public static class MobConfig
     public const int MobNaturalCap = 12;
     public const int MobHardCapFactor = 15;
     public const int MobHardCap = MobNaturalCap * MobHardCapFactor;
+
+    // --- Layer difficulty (plans/LAYERS.md) ---
+    /// <summary>How much harder a realm mob gets per hell layer (or sky-island zone step) past the
+    /// first: its health and damage are scaled by <c>1 + index * this</c>, so the deeper layers
+    /// keep getting harder with no bottom.</summary>
+    public const float LayerDifficultyPerLayer = 0.25f;
 
     // --- Mob fall damage (MobFallDamage, Mob.NoteLanding) ---
     // A mob landing from more than its safe height takes this share of its own full health (at least

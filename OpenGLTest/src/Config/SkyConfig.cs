@@ -230,6 +230,15 @@ public const float DayLengthSeconds = 1200f;
     public const float CloudFieldSize = 2048f;
     public const float CloudCellSize = 16f;
     public const float CloudLayerThickness = 4f;
+
+    /// <summary>Base height of the second, thick cloud sea that lies under the sky islands
+    /// (visual only, plans/LAYERS.md): above the solid cloud slab
+    /// (<see cref="WorldGenerationConfig.CloudSlabTopY"/>) and below
+    /// <see cref="WorldGenerationConfig.SkyIslandBottomY"/>.</summary>
+    public const float SkyCloudSeaHeight = 290f;
+
+    /// <summary>Thickness of the sky-island cloud sea in blocks.</summary>
+    public const float SkyCloudSeaThickness = 12f;
     public const int CloudMaxLevels = 2;
     // Density above which a cell holds a cloud (tuned for 30-45 % coverage; CloudTests asserts it),
     // and how much more density each extra stacked layer needs.
