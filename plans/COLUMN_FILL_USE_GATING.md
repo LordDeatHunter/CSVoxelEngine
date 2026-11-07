@@ -37,8 +37,8 @@ the candidate.
 The paired warm median reduction was **12.2002604%**, saving **17.499709 ms per 630 warm chunks**;
 C was faster in 7/8 pairs. The pair range was -0.1131887% to +20.4453009%. Per-seed warm wins were
 8/8, 8/8 and 7/8. The only warm slowdown was slot 5 for seed -90210. C-first pairs had larger gains,
-showing order sensitivity. P/P warm first-to-second changes were -3.4210%, -6.3529% and -0.3444%;
-these are descriptive controls, not a confidence bound.
+showing order sensitivity. P/P warm changes, calculated as `(first - second) / first`, were
+-3.4210%, -6.3529% and -0.3444%; these are descriptive controls, not a confidence bound.
 
 Cold median reduction was 1.41036%, with C faster in 6/8 pairs. A cold improvement is **not
 established** against variable controls (+3.6758%, -4.8969%, +2.9789%). Two pairs regressed; slot 8
@@ -63,8 +63,10 @@ The fixed timing fixture has no Desert, Frozen, positive-beach-weight or soil-de
 The bounded legacy-equivalence tests cover all seven biomes and default enum behavior, material
 depths including 255, top/soil/deep/above boundaries, negative chunk/floor coordinates, overflow and
 manual-input cases, beach-positive gravel and sand, soil-only beach, zero weight, differing bed and
-height, frozen/desert/ocean behavior, and oasis fill-biome override. They compare complete sentinel
-arrays against the pinned legacy implementation. Full Release solution build passed with zero
+height, and frozen/desert/ocean behavior. The tests call the Forest biome directly; they do not
+exercise `ChunkTerrainFill`'s Oasis-flag-to-fill-biome override. That caller remains unchanged by
+this patch. The tests compare complete sentinel arrays against the pinned legacy implementation.
+Full Release solution build passed with zero
 warnings/errors and the full headless suite passed 3060/3060 on parent `cc62c2b4`; focused tests
 passed 3/3 on test-only successor `2153854`. The full-suite result is not attributed to the
 successor.
@@ -82,8 +84,10 @@ opportunities.
 
 The source evidence remains on research task
 `fa8e6b53-795b-4e6f-8c2d-778e5c315596`; exact captured text and byte/hash manifest are retained
-there. The parent task holds the independently accepted log archive
-`tf95204e1f092dccd1` and review follow-up archive `tf14815aa9c608b164`.
+there. This feature task holds the independently accepted check archive `tf95204e1f092dccd1`,
+review follow-up archive `tf14815aa9c608b164`, and full paired-run archive
+`tf9dc56bf0efaf9378` (SHA-256
+`2a5ce181b6046d9dd98b6c2c9d6d344667913b548a2eb97ef70670f5b6be8048`).
 
 - Prelaunch declaration: doc `d71bb2ed07b3b`.
 - Paired order, analyzer output, process status/PIDs, run summaries and complete 179-file
