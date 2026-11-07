@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.IO;
 using VoxelEngine.Simulation;
+using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Networking;
 
@@ -60,6 +62,40 @@ public static class StationNetCodec
         writer.Write(x);
         writer.Write(y);
         writer.Write(z);
+    }
+
+    /// <summary>Writes a crucible's contents: the metal count, then each metal's material id, molten
+    /// and pending ml, then the last charged input.</summary>
+    internal static void WriteCrucible(PacketWriter writer, CrucibleComponent contents)
+    {
+        writer.Write((byte)contents.Metals.Count);
+        foreach (var metal in contents.Metals)
+        {
+            writer.Write(metal.MaterialId);
+            writer.Write(metal.MoltenMl);
+            writer.Write(metal.PendingMl);
+        }
+        writer.Write(contents.PendingInputId);
+    }
+
+    /// <summary>Reads what <see cref="WriteCrucible"/> wrote, refusing more than
+    /// <see cref="CrucibleComponent.MaxMetals"/> metals, a material id 0, a repeated material and a
+    /// negative amount.</summary>
+    internal static CrucibleComponent ReadCrucible(PacketReader reader)
+    {
+        var count = reader.ReadByte();
+        if (count > CrucibleComponent.MaxMetals)
+            throw new InvalidDataException($"crucible with {count} metals");
+        var metals = new List<CrucibleMetal>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var metal = new CrucibleMetal(reader.ReadByte(), reader.ReadInt(), reader.ReadInt());
+            if (metal.MaterialId == 0 || metal.MoltenMl < 0 || metal.PendingMl < 0
+                || metals.Exists(m => m.MaterialId == metal.MaterialId))
+                throw new InvalidDataException("crucible metal out of range");
+            metals.Add(metal);
+        }
+        return new CrucibleComponent(metals, reader.ReadByte());
     }
 
     /// <summary>Reads a float that must be finite.</summary>

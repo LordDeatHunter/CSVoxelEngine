@@ -65,6 +65,7 @@ public static class ContentRegistry
     internal static readonly List<MoltenMaterial> MoltenMaterialsList = [];
     internal static readonly List<MeltRecipe> MeltRecipes = [];
     internal static readonly List<CastRecipe> CastRecipes = [];
+    internal static readonly List<AlloyRecipe> AlloyRecipesList = [];
 
     // Blocks declaring a "biomeTint", validated at load (so a bad face names its file before any
     // GL) and resolved to atlas tiles in BakeModels, the first point the tiles exist.
@@ -126,6 +127,7 @@ public static class ContentRegistry
         RecipeLoader.LoadMoltenMaterials(Path.Combine(assetsRoot, "data", "molten"));
         RecipeLoader.LoadMeltRecipes(Path.Combine(assetsRoot, "data", "recipes", "melt"));
         RecipeLoader.LoadCastRecipes(Path.Combine(assetsRoot, "data", "recipes", "cast"));
+        RecipeLoader.LoadAlloyRecipes(Path.Combine(assetsRoot, "data", "recipes", "alloy"));
         EntityLoader.LoadEntities(assetsRoot);
         TreeSpeciesLoader.LoadTreeSpecies(Path.Combine(assetsRoot, "data", "trees"));
         StatusEffectLoader.LoadEffects(Path.Combine(assetsRoot, "data", "effects"));
@@ -437,6 +439,10 @@ public static class ContentRegistry
         return null;
     }
 
+    /// <summary>Every compiled alloy recipe, in file-name order: what an alloy kiln makes of a
+    /// crucible's mixed metals (<see cref="Simulation.AlloyRules"/>).</summary>
+    public static IReadOnlyList<AlloyRecipe> AlloyRecipes => AlloyRecipesList;
+
     /// <summary>Whether any cast recipe pours into this block, i.e. whether it is a usable mold.</summary>
     public static bool IsCastMold(byte id)
     {
@@ -458,6 +464,7 @@ public static class ContentRegistry
         MoltenMaterialsList.Clear();
         MeltRecipes.Clear();
         CastRecipes.Clear();
+        AlloyRecipesList.Clear();
         BlockModels.Clear();
         OpenModels.Clear();
         ItemModels.Clear();

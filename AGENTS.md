@@ -1102,6 +1102,7 @@ OpenGLTest/
       Definitions/             # the JSON DTOs
         BlockDefinition.cs, ItemDefinition.cs,
           LootTableDefinition.cs, ModelDefinition.cs  # JSON DTOs
+        AlloyRecipeDefinition.cs # JSON shape of assets/data/recipes/alloy/<name>.json: result + parts
         CastRecipeDefinition.cs # (fired mold, material) -> result + cooling
         CookRecipeDefinition.cs # JSON shape of assets/data/recipes/cook/<name>.json
         CrushRecipeDefinition.cs # JSON shape of assets/data/recipes/crush/<name>.json
@@ -1126,13 +1127,14 @@ OpenGLTest/
                                #   animate from their clips)
         BlockModel.cs, ModelLoader.cs  # Minecraft model format: parent chains, #texture refs
         ModelBakeSteps.cs      # BakeModels' steps: facing/multiblock bake checks, BakesGreedy, tint resolution, parent self-check
-      Recipes/                 # compiled craft, cook, crush, melt and cast recipes
+      Recipes/                 # compiled craft, cook, crush, melt, cast and alloy recipes
+        AlloyRecipe.cs         # one alloy: a set of molten parts (material, ml) -> the same ml of the result
         CastRecipe.cs          # (fired mold, material) -> result + cooling
         CookRecipe.cs          # one compiled campfire recipe: raw input, cooked result and seconds on the fire
         CraftingRecipe.cs      # one compiled crafting recipe: what it makes and what one craft consumes
         CrushRecipe.cs         # one compiled quern recipe: crushable input and the crushed result
         MeltRecipe.cs          # block/item -> (material, ml)
-        RecipeLoader.cs        # data/recipes (craft, cook, crush, melt, cast) and data/molten -> the compiled lists
+        RecipeLoader.cs        # data/recipes (craft, cook, crush, melt, cast, alloy) and data/molten -> the compiled lists
       Shapes/                  # hitboxes and the shape resolvers (pane, multiblock, tree wood, snow, facing, break overlay)
         BlockHitbox.cs         # one axis-aligned selection box in cell-local 0..1 space
         BlockShape.cs          # the one live-world box resolver (raycast, outline, pop,
@@ -1798,6 +1800,8 @@ OpenGLTest/
         UnderwaterRaysRenderer.cs # additive full-screen sun shafts while the eye is submerged
     Saves/                     # GL-free world saves: stores, codecs, names, world sources (see "Saves")
       ChunkSaveCodec.cs        # the chunk file format: block-name palette + Deflate body
+      CrucibleSaveCodec.cs     # a crucible's metals by name (CrucibleData), shared by player.json, stations.json
+                               #   and the inventory snapshot; Import clamps to the capacity
       ChunkSaveStore.cs        # one world's chunk files + side cars: pending map, index, async writer thread
       ChunkSnapshot.cs         # immutable copy of a chunk's blocks, state bytes and player-placed cells
       ColumnFileCodec.cs       # an imported column file: magic CVXL, version, Deflate body of ColumnData
@@ -1830,8 +1834,10 @@ OpenGLTest/
     Simulation/                # the main-thread simulations World owns: gravity, TNT, tree growth,
                                #   saplings, the stations (campfire, quern, kiln, casting), drops, the mob managers
                                #   and spawner; the fluids are in Fluids/ and leaf decay in LeafDecay/ below
+      AlloyRules.cs            # GL-free crucible rules: which metals may share a vessel (CanMix), which melts next
+                               #   (NextToMelt; alloy parts wait for their set), full sets -> the alloy (Resolve)
       CampfireManager.cs       # block-entity registry for campfires: lit branch piles with a per-branch burn timer
-      CastingManager.cs        # one cast per mold cell: pour from a held crucible, cool, collect
+      CastingManager.cs        # one cast per mold cell: pour from a held crucible (the metal PourRecipe picks), cool, collect
       DropCollector.cs         # one player a drop may fly to on a multiplayer server
       DropManager.cs           # owns the live item drops: spawns them where blocks break, pulls nearby ones toward the player
       DropPickup.cs            # World component: the per-frame drop collection (the local player, or every
@@ -1918,6 +1924,9 @@ OpenGLTest/
                                #   empty), drawn by HudRenderer.DrawStaffSlot right of the hotbar
       InventoryPanel/          # inventory, item stacks, hotbar, the [E] panel, crafting cards and session, creative catalog, search
         CraftCardLayout.cs, CraftCardLayoutCache.cs  # the crafting card's layout and its memo
+        CrucibleComponent.cs   # what a crucible holds: one CrucibleMetal per molten material (molten + pending ml),
+                               #   immutable, sorted, empty metals dropped; the last charged input
+        CrucibleMetal.cs       # one metal in a crucible: material id, molten ml, pending ml
         CraftingSession.cs     # the crafting tab's open recipe, copies and fed reservations
         CreativeCatalog.cs     # GL-free browsable catalog of every item, grouped by pool and name-sorted
         HotbarLayout.cs        # hotbar strip geometry shared by the draw, its hit-test and the panel
@@ -2108,12 +2117,13 @@ OpenGLTest/
   assets/data/entities/<name>.json    # slime, goblin: display name, hp, loot table, optional model
   assets/data/trees/<species>.json    # tree species (oak, spruce, cactus, baobab, stone_pine): wood and
                                       #   leaves, growth, thickness, leaf cluster, features, LOD crown, worldgen
-  assets/data/molten/<name>.json      # molten materials (copper): tile + tint the liquid is drawn with
+  assets/data/molten/<name>.json      # molten materials (bronze, copper, glass, tin): tile + tint the liquid is drawn with
   assets/data/recipes/<out>.json      # crafting recipes: result, count, ingredients
   assets/data/recipes/cook/<in>.json  # campfire recipes: input -> result after cookSeconds
   assets/data/recipes/crush/<in>.json # quern recipes: input -> crushed result
   assets/data/recipes/melt/<in>.json  # what a block or item melts into, and how many ml
   assets/data/recipes/cast/<out>.json # (fired mold + material) -> result, amount and cooling time
+  assets/data/recipes/alloy/<name>.json # an alloy: result + parts (material, ml); a full set -> the summed ml of the result
   assets/data/spell/<kind>/<name>.json # spell parts by kind (element, shape, modifier, trigger): cost share,
                                       #   complexity, tags, modifier factors, an element's status `effect`
   assets/data/effects/<name>.json     # status effects (burning, frostburn): duration, damage over time, speed
@@ -2597,7 +2607,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 | `attack` | left-click attack behavior, an `AttackPattern`: `punch` (default; forward cone, hits the nearest one), `slice` (forward hemisphere, hits the nearest two, two-phase swing — the obsidian blade) or `sword` (a three-swing chain: a diagonal cut and a rising back cut over the hemisphere, hitting the nearest three, then an overhead chop on the one target in the cone at the highest power with a heavier shove — the iron sword). See `Combat`/`SliceCombo`/`SwordCombo`/`SwordSwings` |
 | `trail` | optional `{"color": [r, g, b]}`, sRGB 0..255: the color of the glowing slice trail the item's swings leave (`Item.TrailColor`; omitted, `TrailColorOrDefault` falls back to `ParticleConfig.SliceTrailDefaultColor`). Legal only on a `slice` or `sword` item; a trail on a punch item, or a color that is not three ints in 0..255, throws naming the file (`ItemLoader.ParseTrail`). The obsidian blade is violet, the iron sword pale blue-white |
 | `fuel.burnSeconds` | seconds one unit of this item keeps a kiln lit (coal 60; 1..3600). Writing the object is what makes an item kiln fuel — a kiln takes up to its `kiln.fuelCap` units of **one** kind at a time |
-| `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many milliliters of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent(MaterialId, MoltenMl, PendingMl, PendingInputId)` — the last field is display-only, the last melt input charged in, so the kiln can draw what is waiting to melt; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
+| `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many milliliters of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent`: one `CrucibleMetal(MaterialId, MoltenMl, PendingMl)` per molten material it holds (copper and tin side by side in an alloy kiln, see "The kiln"), the capacity counted over all of them, plus `PendingInputId`, display-only, the last melt input charged in, so the kiln can draw what is waiting to melt; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
 | `staff` | marks the item a **spell staff**: `{"slots": n, "tier": t, "tags": [..]}`, slots 1..`SpellConfig.StaffMaxSlots`, tier >= 1, non-blank distinct spell part tags (`ItemLoader.ParseStaff`, shape only: spell parts load after items). Builds a `StaffItem`, stored in the **Tools** pool one instance at a time, because each slot's bound spell recipe rides that instance's `ItemStack` as a `StaffComponent` (the part keys `<kind>/<name>` per slot plus the selected slot, immutable). `StaffBinding.TryBind` binds a recipe only when MG-2's `SpellRecipe.Compile` finds it valid against the staff's tags (a part passes when any of its tags is allowed), so a tier gates its parts by tag; `Clear`, `Cycle` (wrapping) and `Select` exist; Left Ctrl + wheel cycles the held staff's slot through `HeldStaff` and the server-owned `SelectStaffSlot` inventory action, and the spell table binds and clears a slot (`HeldStaff.TryBind`/`TryClear`, through the server-owned `BindStaffSlot`/`ClearStaffSlot` inventory actions, see "Spell table"). Right-click casts the selected slot (see the **Cast** intent). Saved in `player.json` and carried in the inventory snapshot as `ToolData.Staff` by part key, never id, and re-bound on load against this run's parts (what no longer binds is dropped with a warning). Crafting consumes the least-bound instance first. A Q-dropped staff loses its spells like a crucible loses its metal (an `ItemDrop` carries only an id). May not declare `use` or `crucible`; the tier is shown in the tooltip |
 | `teaches` | the spell part keys (`<kind>/<name>`) a scroll teaches, a non-empty list of distinct keys; required with, and only legal with, `use.action: "learn_parts"` (`ItemLoader.ParseTeaches` checks the shape, and `ValidateLearnParts` checks every key against `SpellPartRegistry` once the spell parts load, naming the file). Builds a `LearnPartsItem`, a plain Misc stackable; a scroll may not declare `use.result`, `use.fluid` or `use.block`. Its tooltip lists the parts it teaches |
 | `restoresMana` | the share of the mana pool one use restores, in (0, 1]; required with, and only legal with, `use.action: "restore_mana"` (`ItemLoader.ParseRestoresMana`; `RestoreManaItem`, `PlayerMana.TryRestore`; the `mana_draught`) |
@@ -2957,7 +2967,7 @@ floor, a 2 px rim) whose model `assets/models/block/casting_basin.json` is the s
 changed: `CastingManager` keys on the mold block id, so `recipes/cast/glass.json` (mold
 `block/casting_basin`, fluid `glass`, 100 ml, result `block/glass`) is all it takes. **Molten
 glass** (`data/molten/glass.json`) is the first non-copper material: `recipes/melt/sand.json` melts
-a sand block into 100 ml (one kiln melt chunk, so a 400 ml crucible makes four glass) and
+a sand block into 100 ml (one kiln melt chunk, so an 800 ml crucible makes eight glass) and
 `recipes/melt/glass.json` melts a glass block back into the same 100 ml.
 
 **Molten metal is content, not a fluid.** It never enters `FluidManager`, never occupies a cell
@@ -2977,10 +2987,18 @@ Every shipped copper form — the malachite chunk, crushed copper, the ingot and
 has a melt recipe, so **a cast melts back into exactly what it took**: `MetalworksRecipeTests`
 asserts that conservation as a relation rather than pinning any ml figure.
 
+A third kind, `recipes/alloy/<name>.json`, is `{ "result", "parts": [ { "fluid", "ml" }, ... ] }`
+(`AlloyRecipe`, `ContentRegistry.AlloyRecipes`, compiled by `RecipeLoader.CompileAlloyRecipe`): one
+full set of the parts becomes exactly their summed ml of the result, so alloying conserves metal by
+construction. A recipe needs at least two distinct parts, none of them the result, and a metal may
+be a part of one alloy only. `bronze.json` ships: 600 ml copper + 200 ml tin = 800 ml bronze
+(`data/molten/bronze.json`; bronze items, melt and cast recipes are `A-6`), which is why the
+crucible holds 800 ml: one vessel takes exactly one set (`AlloyKilnTests.OneCrucibleHoldsAFullSetOfEveryAlloy`).
+
 **Iron** has an ore and a quern path but no smelting yet. `hematite_ore` needs a tier-2 (copper)
 pickaxe (`tools: {"pickaxe": 2}`, so the primitive pickaxe whiffs) and drops a hematite chunk (the
 `hematite_ore` item), which the quern crushes into `crushed_iron` (`recipes/crush/hematite_ore.json`).
-There is no melt recipe and no molten iron (`data/molten/` holds copper only), so a kiln refuses
+There is no melt recipe and no molten iron, so a kiln refuses
 every iron form (`MetalworksRecipeTests.IronCrushesInTheQuernButNeverMelts`). `iron_sword` (a
 `slice` weapon) and `iron_sword_head` exist as items with no recipe until an iron kiln change.
 
@@ -2993,10 +3011,20 @@ mirrored (`KilnManager.ProfileOf`; never saved or sent, so the state, `stations.
 (`CanIgnite`), and igniting spends the first unit at once, so four coal burn for four minutes and
 then go out. A crucible (crafted from mud bricks) right-clicked in stands in the hearth, and
 anything with a melt recipe right-clicked after that
-charges the vessel with **pending** metal — gated by `KilnManager.CanAccept`,
-which needs room and either an empty vessel or the same material, and needs no fire. A lit kiln
-then turns `KilnManager.MeltChunkMl` (the same for every kiln) of that pending charge molten every
-`KilnProfile.MeltSeconds` of its profile (the base 2 s over its `meltSpeed`). Melting **pauses**
+charges the vessel with **pending** metal — gated by `KilnManager.CanAccept`, which needs room
+(every metal, molten and pending, counted together) and a metal that may join the vessel
+(`AlloyRules.CanMix`): a **plain kiln** (`canAlloy` false) keeps a vessel to **one metal** and refuses
+another while any of the first is in it, molten or pending; an **alloy kiln** (`canAlloy` true) also
+lets the parts and the result of one alloy share it, charged in any order. Charging needs no fire. A
+lit kiln then turns `KilnManager.MeltChunkMl` (the same for every kiln) of one metal's pending
+charge molten every `KilnProfile.MeltSeconds` of its profile (the base 2 s over its `meltSpeed`): the
+lowest-id metal that may melt (`AlloyRules.NextToMelt`, `KilnManager.MeltingMaterial`). In an alloy
+kiln a part **waits**, solid, while another part of its alloy is in the vessel, and each lit tick
+first turns every full set of parts, molten or pending, into the same ml of the result as pending
+charge (`AlloyRules.Resolve`), which then melts at the kiln's pace: so 600 copper + 200 tin become
+800 molten bronze in eight chunks, the surplus of an unfinished set waits for the rest, and the ml in
+always equals the ml out. A lone metal melts in an alloy kiln as in a plain one; a vessel mixed in an
+alloy kiln and carried to a plain one melts each metal on its own there. Melting **pauses**
 rather than resets when the fire dies or the vessel is lifted out: `KilnState.MeltLeft` simply
 stops ticking, so relighting resumes the partial chunk. `MeltProgress01` and `DisplayMoltenMl` are
 what the render pass reads and neither depends on `Lit`, which is what keeps the drawn pool rising
@@ -3005,14 +3033,19 @@ smoothly between chunks and stops it dropping the instant the last unit burns ou
 and `KilnRenderer.PendingScale01` turns it into the lump of the last input
 (`CrucibleComponent.PendingInputId`) hovering over the rim, full-size while a whole unit is solid
 and shrinking to nothing as the last unit melts — so the charge is never invisible and never cuts
-out. Breaking the structure drops the stored fuel and the crucible at the mined cell — the metal
+out. The pool is every molten metal together, tinted as `KilnManager.PoolMaterial` (the metal with the
+most molten ml), and the tooltip of a carried crucible lists each metal's molten and unmelted ml.
+Breaking the structure drops the stored fuel and the crucible at the mined cell — the metal
 inside is lost.
 
 **Casting** (`Simulation/CastingManager.cs`, one `CastState` per mold cell) is the other half.
 Right-clicking a fired mold with a crucible binds that tool instance and pours at
-`CastingManager.PourMlPerSecond`, draining the stack a little every frame; the pour **pauses**
-(losing nothing) when the crucible is deselected, carried out of `World.InteractionReach`, emptied
-or found holding the wrong material, and another right-click resumes it. The frame that completes
+`CastingManager.PourMlPerSecond`, draining the stack a little every frame. An empty mold takes, of
+the vessel's molten metals it has a cast recipe for, the one with the most ml (`CastingManager.PourRecipe`,
+the lowest material id on a tie), and a half-filled one only more of the metal it was started with,
+so a mixed crucible pours one metal and keeps the rest. The pour **pauses**
+(losing nothing) when the crucible is deselected, carried out of `World.InteractionReach` or emptied
+of that metal, and another right-click resumes it. The frame that completes
 the fill starts the cooling instead of cooling in the same frame, so the two phases are never
 ambiguous; `Cool01` then runs 0..1 over the recipe's `coolSeconds` and the liquid dissolves into
 the result through `CastingRenderer.LiquidAlpha` / `ResultAlpha`, a complementary `MathUtils.SmoothStep`
@@ -3494,7 +3527,7 @@ climate) instead of the heights alone, so a client derives nothing from worldgen
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 (current) adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Version 13 ends every `EntityList` entry, of every kind, with a status-effect byte mask (`NetEntity.Effects`: a mob's `StatusEffect.Bit`s, 0 for a drop, primed TNT, falling block or iceberg) and ends `PlayerStatus` with the player's own effect mask (`PlayerStatusData.EffectMask`); both codecs carry the mask raw and the client drops unknown bits when it mirrors them, and an older peer would misread every frame after the first entry. Version 8 added
+whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Version 16 (current) makes a crucible carry one entry per metal (the alloy kiln): a `StationState` kiln entry writes a metal count (at most `CrucibleComponent.MaxMetals`; `StationNetCodec.ReadCrucible` refuses more, a material 0, a repeat or a negative amount) and each metal's id, molten and pending ml, and the `InventoryState` crucible a `Metals` list; an older peer would misread the station frames. Version 13 ends every `EntityList` entry, of every kind, with a status-effect byte mask (`NetEntity.Effects`: a mob's `StatusEffect.Bit`s, 0 for a drop, primed TNT, falling block or iceberg) and ends `PlayerStatus` with the player's own effect mask (`PlayerStatusData.EffectMask`); both codecs carry the mask raw and the client drops unknown bits when it mirrors them, and an older peer would misread every frame after the first entry. Version 8 added
 `NetEntityKind.Iceberg` (6): `Position` the waterline center, `Yaw` the quarter turns times pi/2
 (`NetEntity.YawFromTurns` / `TurnsFromYaw`), `Health` the seed, `Ammo` the scale in thousandths and
 the sinking in its next byte (`NetEntity.PackIcebergAmmo` / `UnpackIcebergAmmo`), `ItemId` the

@@ -44,7 +44,12 @@ public sealed class PlayerSaveCodecTests
                         Name = "item/e",
                         Crucible = new PlayerSaveData.CrucibleData
                         {
-                            Material = "m", MoltenMl = 40, PendingMl = 60, PendingInput = "block/f",
+                            Metals =
+                            [
+                                new PlayerSaveData.MetalData { Material = "m", MoltenMl = 40, PendingMl = 60 },
+                                new PlayerSaveData.MetalData { Material = "n", MoltenMl = 0, PendingMl = 20 },
+                            ],
+                            PendingInput = "block/f",
                         },
                         CustomName = "Old Faithful",
                         Enchantments = new Dictionary<string, int> { ["sharp"] = 2, ["swift"] = 1 },
@@ -97,9 +102,8 @@ public sealed class PlayerSaveCodecTests
             }
 
             Assert.NotNull(tb.Crucible);
-            Assert.Equal(ta.Crucible.Material, tb.Crucible.Material);
-            Assert.Equal(ta.Crucible.MoltenMl, tb.Crucible.MoltenMl);
-            Assert.Equal(ta.Crucible.PendingMl, tb.Crucible.PendingMl);
+            Assert.Equal(ta.Crucible.Metals!.Select(m => (m.Material, m.MoltenMl, m.PendingMl)),
+                tb.Crucible.Metals!.Select(m => (m.Material, m.MoltenMl, m.PendingMl)));
             Assert.Equal(ta.Crucible.PendingInput, tb.Crucible.PendingInput);
         }
 

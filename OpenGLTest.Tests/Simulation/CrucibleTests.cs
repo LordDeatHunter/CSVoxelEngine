@@ -159,7 +159,7 @@ public sealed class CrucibleTests
         var expectedPending = kilns.StateAt(2, 2, 2)!.Contents.PendingMl;
         Assert.True(kilns.TryTakeCrucible(anchor, out var takenId, out var taken));
         Assert.Equal(Crucible.Id, takenId);
-        Assert.Equal(Copper, taken.MaterialId);
+        Assert.Equal([Copper], taken.Metals.Select(m => m.MaterialId));
         Assert.Equal(start.MoltenMl, taken.MoltenMl);
         Assert.Equal(expectedPending, taken.PendingMl);
 
@@ -175,14 +175,14 @@ public sealed class CrucibleTests
         var a = new MeltRecipe("a", 1, 1, unit);
         var b = new MeltRecipe("b", 2, 2, unit);
 
-        Assert.True(KilnManager.CanAccept(default, a, capacity));
+        Assert.True(KilnManager.CanAccept(default, a, capacity, canAlloy: false));
         // A vessel already holding material 1 refuses material 2
-        Assert.False(KilnManager.CanAccept(new CrucibleComponent(1, unit, 0), b, capacity));
+        Assert.False(KilnManager.CanAccept(new CrucibleComponent(1, unit, 0), b, capacity, canAlloy: false));
         // Pending counts toward the capacity just like molten does
-        Assert.False(KilnManager.CanAccept(new CrucibleComponent(1, capacity - unit, unit), a, capacity));
-        Assert.True(KilnManager.CanAccept(new CrucibleComponent(1, capacity - unit, 0), a, capacity));
-        // An empty vessel takes anything, whatever stale material id it still carries
-        Assert.True(KilnManager.CanAccept(new CrucibleComponent(1, 0, 0), b, capacity));
+        Assert.False(KilnManager.CanAccept(new CrucibleComponent(1, capacity - unit, unit), a, capacity, canAlloy: false));
+        Assert.True(KilnManager.CanAccept(new CrucibleComponent(1, capacity - unit, 0), a, capacity, canAlloy: false));
+        // A vessel emptied of material 1 forgets it and takes anything
+        Assert.True(KilnManager.CanAccept(new CrucibleComponent(1, 0, 0), b, capacity, canAlloy: false));
     }
 
     [Fact]
@@ -332,7 +332,7 @@ public sealed class CrucibleTests
         // A second input of the same material: the hint follows the last thing put in
         Assert.True(kilns.TryInsertMelt(anchor, crushed.InputId));
         Assert.Equal(crushed.InputId, state.Contents.PendingInputId);
-        Assert.Equal(Copper, state.Contents.MaterialId);
+        Assert.Equal([Copper], state.Contents.Metals.Select(m => m.MaterialId));
         Assert.Equal(ore.AmountMl + crushed.AmountMl, state.Contents.PendingMl);
 
         Assert.True(kilns.TryTakeCrucible(anchor, out _, out var taken));

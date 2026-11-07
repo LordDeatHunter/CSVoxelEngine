@@ -64,16 +64,7 @@ internal static class InventorySaveCodec
                 tool.MaxUses = durability.MaxUses;
             }
             if (stack.Item.CrucibleCapacityMl > 0)
-            {
-                var crucible = stack.Get<CrucibleComponent>();
-                tool.Crucible = new PlayerSaveData.CrucibleData
-                {
-                    Material = crucible.MaterialId == 0 ? null : SaveNames.MaterialNameOf(crucible.MaterialId),
-                    MoltenMl = crucible.MoltenMl,
-                    PendingMl = crucible.PendingMl,
-                    PendingInput = SaveNames.NameOf(crucible.PendingInputId),
-                };
-            }
+                tool.Crucible = CrucibleSaveCodec.Export(stack.Get<CrucibleComponent>());
             if (stack.Item is StaffItem staff && stack.Get<StaffComponent>() is var spells && spells != default)
             {
                 var slots = new List<List<string>?>(staff.Slots);
@@ -207,7 +198,7 @@ internal static class InventorySaveCodec
                     stack.Set(new DurabilityComponent(Math.Clamp(usesLeft, 0, item.MaxDurability),
                         item.MaxDurability));
                 if (item.CrucibleCapacityMl > 0 && tool.Crucible is { } crucible)
-                    RestoreCrucible(stack, crucible, item.CrucibleCapacityMl, dropped);
+                    stack.Set(CrucibleSaveCodec.Import(crucible, item.CrucibleCapacityMl, dropped));
                 if (item is StaffItem staffItem && tool.Staff is { } staffData)
                     RestoreStaff(stack, staffItem, staffData, tool.Name, dropped);
                 if (tool.CustomName != null)
@@ -219,23 +210,6 @@ internal static class InventorySaveCodec
                 maxRestored = Math.Max(maxRestored, instanceId);
             }
         inventory.NextToolInstance = Math.Max(data.NextToolInstance ?? 1, maxRestored + 1);
-    }
-
-    private static void RestoreCrucible(ItemStack stack, PlayerSaveData.CrucibleData crucible, int capacity,
-        List<string> dropped)
-    {
-        byte material = 0;
-        if (crucible.Material is { Length: > 0 } materialName
-            && !SaveNames.TryResolveMaterial(materialName, out material))
-        {
-            dropped.Add($"molten {materialName}");
-            return;
-        }
-
-        var pendingInput = SaveNames.TryResolve(crucible.PendingInput, out var input) ? input : (byte)0;
-        var molten = Math.Clamp(crucible.MoltenMl ?? 0, 0, capacity);
-        var pending = Math.Clamp(crucible.PendingMl ?? 0, 0, capacity - molten);
-        stack.Set(new CrucibleComponent(material, molten, pending, pendingInput));
     }
 
     // Re-binds each saved slot through the binding rules against this run's spell parts and the

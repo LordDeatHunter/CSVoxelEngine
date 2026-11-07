@@ -93,8 +93,12 @@ public sealed class InventorySaveTests
         var crucibleItem = ToolItem(i => i.CrucibleCapacityMl > 0);
         Assert.True(a.Add(crucibleItem.Id));
         var crucibleInstance = InstanceOf(a, crucibleItem.Id);
-        var material = ContentRegistry.MoltenMaterials.First().Id;
-        a.GetToolStack(crucibleInstance)!.Set(new CrucibleComponent(material, 40, 60, Stone));
+        // Two metals, so every metal the vessel holds survives the trip, not just one
+        a.GetToolStack(crucibleInstance)!.Set(new CrucibleComponent(
+            [
+                new CrucibleMetal(ContentRegistry.MoltenMaterials[0].Id, 40, 60),
+                new CrucibleMetal(ContentRegistry.MoltenMaterials[1].Id, 0, 20),
+            ], Stone));
 
         var durableItem = ToolItem(i => i.MaxDurability > 2);
         Assert.True(a.Add(durableItem.Id));

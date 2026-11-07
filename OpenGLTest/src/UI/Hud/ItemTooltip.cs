@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Content;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
@@ -11,7 +12,7 @@ namespace VoxelEngine.UI.Hud;
 /// <summary>
 /// The hover tooltip's lines, GL-free: the display name, what the thing is (a block, a tool, a
 /// plain pickup) and whichever of the item's own numbers it actually has — tool power and hit
-/// pace, block and entity damage, durability left, fuel seconds, a crucible's capacity, a staff's tier and bound spells, the spell parts a scroll teaches (which is
+/// pace, block and entity damage, durability left, fuel seconds, a crucible's capacity and metals, a staff's tier and bound spells, the spell parts a scroll teaches (which is
 /// how the hint scroll shows its example combo). A slice of
 /// the UI work (U-1); the panel that draws these lives in <see cref="HudRenderer.DrawTooltip"/>.
 /// </summary>
@@ -42,7 +43,8 @@ public static class ItemTooltip
             lines.Add($"Durability {left}/{item.MaxDurability}");
         }
         if (item.FuelSeconds > 0) lines.Add($"Fuel {item.FuelSeconds:0.#} s");
-        if (item.CrucibleCapacityMl > 0) lines.Add($"Holds {item.CrucibleCapacityMl} ml");
+        if (item.CrucibleCapacityMl > 0)
+            AddCrucibleLines(lines, item.CrucibleCapacityMl, stack?.Get<CrucibleComponent>() ?? default);
         if (item is StaffItem staff)
             lines.Add($"Staff tier {staff.Tier}   {stack?.Get<StaffComponent>().BoundCount ?? 0}/{staff.Slots} spells");
         if (item is LearnPartsItem scroll && scroll.Teaches.Count > 0)
@@ -51,5 +53,19 @@ public static class ItemTooltip
         if (item is RestoreManaItem draught)
             lines.Add($"Restores {draught.Restores:P0} mana");
         return lines;
+    }
+
+    /// <summary>The capacity and the vessel's fill, then one line per metal: its molten ml and
+    /// what is still solid.</summary>
+    private static void AddCrucibleLines(List<string> lines, int capacityMl, CrucibleComponent contents)
+    {
+        lines.Add(contents.IsEmpty ? $"Holds {capacityMl} ml" : $"Holds {contents.TotalMl}/{capacityMl} ml");
+        foreach (var metal in contents.Metals)
+        {
+            var name = ContentRegistry.MoltenMaterialById(metal.MaterialId)?.DisplayName ?? $"material {metal.MaterialId}";
+            lines.Add(metal.PendingMl > 0
+                ? $"{name} {metal.MoltenMl} ml + {metal.PendingMl} ml unmelted"
+                : $"{name} {metal.MoltenMl} ml");
+        }
     }
 }

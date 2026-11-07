@@ -107,18 +107,27 @@ public sealed class PlayerSaveData
         public Dictionary<string, int>? Enchantments { get; set; }
     }
 
-    /// <summary>What a crucible holds: <see cref="CrucibleComponent"/> by name.</summary>
+    /// <summary>What a crucible holds: <see cref="CrucibleComponent"/> by name, read and written by
+    /// <see cref="CrucibleSaveCodec"/> (in <c>player.json</c>, <c>stations.json</c> and the inventory
+    /// snapshot alike).</summary>
     public sealed class CrucibleData
     {
-        /// <summary>Molten material file name, or null for "no material".</summary>
-        public string? Material { get; set; }
-
-        public int? MoltenMl { get; set; }
-
-        public int? PendingMl { get; set; }
+        /// <summary>One entry per metal held; null or empty for an empty vessel.</summary>
+        public List<MetalData>? Metals { get; set; }
 
         /// <summary>The last melt input charged in, as a save name, or null.</summary>
         public string? PendingInput { get; set; }
+    }
+
+    /// <summary>One metal in a crucible (<see cref="CrucibleMetal"/>) by name.</summary>
+    public sealed class MetalData
+    {
+        /// <summary>Molten material file name.</summary>
+        public string? Material { get; set; }
+
+        public int MoltenMl { get; set; }
+
+        public int PendingMl { get; set; }
     }
 
     /// <summary>What a staff has bound: <see cref="StaffComponent"/> by spell part key, never by id.</summary>

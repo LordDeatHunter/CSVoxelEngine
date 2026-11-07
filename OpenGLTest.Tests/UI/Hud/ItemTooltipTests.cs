@@ -73,6 +73,21 @@ public sealed class ItemTooltipTests
     }
 
     [Fact]
+    public void AHoveredCrucibleListsEveryMetalItHolds()
+    {
+        var crucible = ContentRegistry.RequireItem("crucible");
+        var metals = ContentRegistry.MoltenMaterials.Take(2).ToArray();
+        var stack = new ItemStack(1, crucible.Id);
+        stack.Set(new CrucibleComponent([new CrucibleMetal(metals[0].Id, 100, 0), new CrucibleMetal(metals[1].Id, 0, 50)]));
+
+        var lines = ItemTooltip.Lines(crucible.Id, stack);
+        Assert.All(metals, m => Assert.Single(lines, l => l.StartsWith(m.DisplayName)));
+        // An empty vessel lists no metal
+        Assert.DoesNotContain(ItemTooltip.Lines(crucible.Id, new ItemStack(2, crucible.Id)),
+            l => metals.Any(m => l.StartsWith(m.DisplayName)));
+    }
+
+    [Fact]
     public void AScrollNamesEveryPartItTeaches()
     {
         var scrolls = ItemRegistry.All.OfType<LearnPartsItem>().ToList();

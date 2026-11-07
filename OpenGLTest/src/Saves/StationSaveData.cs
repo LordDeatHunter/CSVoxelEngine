@@ -61,11 +61,8 @@ public sealed class StationSaveData
         /// <summary>The crucible standing in the hearth, null when there is none.</summary>
         public string? Crucible { get; set; }
 
-        /// <summary>The molten material's file name, null for an empty vessel.</summary>
-        public string? Material { get; set; }
-        public int MoltenMl { get; set; }
-        public int PendingMl { get; set; }
-        public string? PendingInput { get; set; }
+        /// <summary>What that crucible holds (<see cref="CrucibleSaveCodec"/>), null for an empty vessel.</summary>
+        public PlayerSaveData.CrucibleData? Contents { get; set; }
         public float MeltLeft { get; set; }
     }
 

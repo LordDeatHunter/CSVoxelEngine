@@ -203,7 +203,8 @@ internal sealed class StationPasses : IDisposable
     /// <see cref="KilnManager.DisplayMoltenMl"/>, which carries the fraction of the melt tick in
     /// flight, so the surface rises smoothly instead of stepping once per chunk melted; the lump
     /// is its complement (<see cref="KilnManager.DisplayPendingMl"/> through
-    /// <see cref="KilnRenderer.PendingScale01"/>), so what the pool gains the lump loses.
+    /// <see cref="KilnRenderer.PendingScale01"/>), so what the pool gains the lump loses. The pool
+    /// holds every molten metal together, tinted as <see cref="KilnManager.PoolMaterial"/>.
     /// </summary>
     internal void RenderKilns(Camera camera, KilnManager kilns)
     {
@@ -233,7 +234,7 @@ internal sealed class StationPasses : IDisposable
                 _crucibleMesh.Render();
 
                 var ml = KilnManager.DisplayMoltenMl(state);
-                if (ml > 0f && ContentRegistry.MoltenMaterialById(state.Contents.MaterialId) is { } material)
+                if (ml > 0f && ContentRegistry.MoltenMaterialById(KilnManager.PoolMaterial(state)) is { } material)
                 {
                     var liquid = Matrix4x4.CreateScale(KilnRenderer.CrucibleInnerMax - KilnRenderer.CrucibleInnerMin)
                                 * Matrix4x4.CreateTranslation(bowl + new Vector3(0f,

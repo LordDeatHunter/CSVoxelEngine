@@ -87,9 +87,11 @@ public sealed class CastingManager
 
     /// <summary>
     /// Binds <paramref name="crucible"/> to the mold at <paramref name="cell"/> and starts (or
-    /// resumes) the pour. Refuses anything that is not a crucible holding molten metal, a mold
-    /// with no recipe for that metal, a cell already filled with a different cast, and a mold that
-    /// is cooling or waiting to be collected — a refusal never disturbs the state standing there.
+    /// resumes) the pour. A half-filled mold takes more of the metal it was started with; an empty
+    /// one takes, of the crucible's molten metals that cast in this mold, the one with the most ml
+    /// (the lowest material id on a tie). Refuses anything that is not a crucible, a crucible with
+    /// no molten metal this mold casts, and a mold that is cooling or waiting to be collected — a
+    /// refusal never disturbs the state standing there.
     /// <paramref name="source"/> binds the pour to a player other than the one <see cref="Update"/>
     /// is handed (a server's connected player, see <see cref="CastState.PourSource"/>).
     /// </summary>
@@ -97,19 +99,15 @@ public sealed class CastingManager
     {
         if (crucible.Item is not CrucibleItem) return false;
         var contents = crucible.Get<CrucibleComponent>();
-        if (contents.MoltenMl <= 0) return false;
-
-        var recipe = ContentRegistry.CastRecipeFor(moldId, contents.MaterialId);
-        if (recipe == null) return false;
-
         var key = VoxelCoords.BlockCellOf(cell);
         if (_casts.TryGetValue(key, out var state))
         {
-            // A half-filled mold only takes more of the same cast, and never once it is set
-            if (state.Recipe != recipe || state.Cooling || state.Done) return false;
+            // A half-filled mold only takes more of the same metal, and never once it is set
+            if (state.Cooling || state.Done || contents.MoltenOf(state.Recipe.MaterialId) <= 0) return false;
         }
         else
         {
+            if (PourRecipe(moldId, contents) is not { } recipe) return false;
             state = new CastState(recipe);
             _casts[key] = state;
         }
@@ -117,6 +115,23 @@ public sealed class CastingManager
         state.PourInstance = crucible.InstanceId;
         state.PourSource = source;
         return true;
+    }
+
+    /// <summary>The cast recipe an empty mold <paramref name="moldId"/> takes from a crucible holding
+    /// <paramref name="contents"/>: the molten metal with the most ml among those it casts (the lowest
+    /// material id on a tie), or null when it casts none of them.</summary>
+    public static CastRecipe? PourRecipe(byte moldId, CrucibleComponent contents)
+    {
+        CastRecipe? best = null;
+        var bestMl = 0;
+        foreach (var metal in contents.Metals)
+        {
+            if (metal.MoltenMl <= bestMl) continue;
+            if (ContentRegistry.CastRecipeFor(moldId, metal.MaterialId) is not { } recipe) continue;
+            best = recipe;
+            bestMl = metal.MoltenMl;
+        }
+        return best;
     }
 
     /// <summary>
@@ -189,12 +204,12 @@ public sealed class CastingManager
     {
         var stack = inventory.GetToolStack(state.PourInstance);
         var contents = stack?.Get<CrucibleComponent>() ?? default;
+        var material = state.Recipe.MaterialId;
         var center = new Vector3(key.X + 0.5f, key.Y + 0.5f, key.Z + 0.5f);
         if (stack == null
             || state.PourInstance != selectedInstance
             || Vector3.Distance(playerPos, center) > reach
-            || contents.MaterialId != state.Recipe.MaterialId
-            || contents.MoltenMl <= 0)
+            || contents.MoltenOf(material) <= 0)
         {
             state.PourInstance = 0;
             return;
@@ -202,17 +217,14 @@ public sealed class CastingManager
 
         state.PourCarry += PourMlPerSecond * dt;
         var ml = Math.Min((int)state.PourCarry,
-            Math.Min(state.Recipe.AmountMl - state.FilledMl, contents.MoltenMl));
+            Math.Min(state.Recipe.AmountMl - state.FilledMl, contents.MoltenOf(material)));
         state.PourCarry -= ml;
         state.FilledMl += ml;
 
-        var leftMolten = contents.MoltenMl - ml;
-        stack.Set(contents with
-        {
-            MoltenMl = leftMolten,
-            // An emptied vessel forgets its metal, so it will take any charge next
-            MaterialId = leftMolten + contents.PendingMl == 0 ? (byte)0 : contents.MaterialId,
-        });
+        // An emptied metal leaves the vessel's books, so an empty vessel takes any charge next
+        var left = contents.With(material, -ml, 0);
+        stack.Set(left);
+        var leftMolten = left.MoltenOf(material);
 
         if (state.FilledMl >= state.Recipe.AmountMl)
         {

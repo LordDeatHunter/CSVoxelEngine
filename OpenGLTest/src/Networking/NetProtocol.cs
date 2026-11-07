@@ -132,8 +132,11 @@ public static class NetFraming
     /// 15: the <c>InventoryState</c> snapshot carries the player's known spell parts (MG-8), which an
     /// older client would ignore and so bind against nothing. <see cref="NetPlayerAction.Cast"/> (8) was added
     /// later without a bump: the player list's action byte is read unchecked and an older client simply plays
-    /// no gesture for an action it does not know.</summary>
-    public const int ProtocolVersion = 15;
+    /// no gesture for an action it does not know.
+    /// 16: a crucible carries one entry per metal (the alloy kiln): the <see cref="NetMessage.StationState"/>
+    /// kiln entry writes a metal count and each metal's molten and pending ml, and the inventory snapshot's
+    /// crucible a <c>Metals</c> list; an older peer would misread the station frames.</summary>
+    public const int ProtocolVersion = 16;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

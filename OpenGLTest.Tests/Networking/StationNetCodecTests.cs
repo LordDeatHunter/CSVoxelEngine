@@ -26,6 +26,7 @@ public sealed class StationNetCodecTests
     private static Item Coal => ContentRegistry.RequireItem("coal");
     private static BlockType Kiln => ContentRegistry.RequireBlock("mud_brick_kiln");
     private static byte Copper => ContentRegistry.MoltenMaterialByName("copper")!.Id;
+    private static byte Tin => ContentRegistry.MoltenMaterialByName("tin")!.Id;
 
     private sealed record Stations(CampfireManager Campfires, QuernManager Querns, KilnManager Kilns,
         CastingManager Casting)
@@ -54,6 +55,9 @@ public sealed class StationNetCodecTests
         server.Kilns.Ensure(new Vector3(8, 2, 3), 2, Kiln.Id);
         Assert.True(server.Kilns.TryAddFuel(new Vector3(8, 2, 3), Coal));
         Assert.True(server.Kilns.Ignite(new Vector3(8, 2, 3)));
+        // A mixed vessel, so every metal in it has to reach the mirror
+        Assert.True(server.Kilns.TryPlaceCrucible(new Vector3(8, 2, 3), ContentRegistry.RequireItem("crucible").Id,
+            new CrucibleComponent([new CrucibleMetal(Copper, 200, 100), new CrucibleMetal(Tin, 0, 100)], MalachiteChunk)));
 
         var moldId = ContentRegistry.RequireBlock("fired_mold_pickaxe").Id;
         var inventory = Inventory.Empty();
@@ -111,6 +115,27 @@ public sealed class StationNetCodecTests
         client.Querns.Animate(QuernManager.FullRotationSeconds);
         Assert.False(client.Querns.IsSpinning(5, 2, 3));
         Assert.Equal(MalachiteChunk, client.Querns.QuernView().Single().InputId);
+    }
+
+    [Theory]
+    [InlineData(CrucibleComponent.MaxMetals + 1, 1, 1, 0)] // too many metals
+    [InlineData(1, 0, 1, 0)]                               // a metal without a material
+    [InlineData(1, 1, -1, 0)]                              // a negative amount
+    [InlineData(2, 1, 1, 0)]                               // the same material twice
+    public void AMalformedCrucibleIsRefused(int count, int material, int molten, int pending)
+    {
+        using var writer = new PacketWriter(NetMessage.StationState);
+        writer.Write((byte)count);
+        for (var i = 0; i < count; i++)
+        {
+            writer.Write((byte)material);
+            writer.Write(molten);
+            writer.Write(pending);
+        }
+        writer.Write((byte)0);
+        using var reader = new PacketReader(writer.ToArray());
+        _ = reader.Message;
+        Assert.Throws<InvalidDataException>(() => StationNetCodec.ReadCrucible(reader));
     }
 
     [Fact]

@@ -158,13 +158,30 @@ public sealed class KilnManager
 
     /// <summary>
     /// Whether a crucible holding <paramref name="contents"/> can take one more charge of
-    /// <paramref name="recipe"/>: the material has to match (or the vessel be empty, whatever
-    /// stale material id it still remembers) and the charge has to fit inside
-    /// <paramref name="capacityMl"/>, pending and molten counted together.
+    /// <paramref name="recipe"/> in a kiln that may (<paramref name="canAlloy"/>) or may not alloy:
+    /// the metal has to mix with what the vessel holds (<see cref="AlloyRules.CanMix"/> over
+    /// <see cref="ContentRegistry.AlloyRecipes"/>: one metal in a plain kiln, the metals of one
+    /// alloy in an alloy kiln) and the charge has to fit inside <paramref name="capacityMl"/>,
+    /// every metal, pending and molten, counted together.
     /// </summary>
-    public static bool CanAccept(CrucibleComponent contents, MeltRecipe recipe, int capacityMl) =>
-        (contents.IsEmpty || contents.MaterialId == recipe.MaterialId)
+    public static bool CanAccept(CrucibleComponent contents, MeltRecipe recipe, int capacityMl, bool canAlloy) =>
+        AlloyRules.CanMix(contents, recipe.MaterialId, canAlloy, ContentRegistry.AlloyRecipes)
         && contents.TotalMl + recipe.AmountMl <= capacityMl;
+
+    /// <summary>The metal this kiln's next melt chunk melts, or 0 when nothing may melt
+    /// (<see cref="AlloyRules.NextToMelt"/>).</summary>
+    public static byte MeltingMaterial(KilnState state) =>
+        state.HasCrucible
+            ? AlloyRules.NextToMelt(state.Contents, state.Profile.CanAlloy, ContentRegistry.AlloyRecipes)
+            : (byte)0;
+
+    /// <summary>Pending ml of the metal currently melting; what one melt chunk is taken from.</summary>
+    private static int MeltingPendingMl(KilnState state) => state.Contents.PendingOf(MeltingMaterial(state));
+
+    /// <summary>The molten material the drawn pool is tinted as: the metal with the most molten ml,
+    /// else the one melting into an empty pool, else 0.</summary>
+    public static byte PoolMaterial(KilnState state) =>
+        state.Contents.MostMoltenMaterial is var molten and not 0 ? molten : MeltingMaterial(state);
 
     /// <summary>How much the crucible in this kiln holds; 0 when the slot is empty.</summary>
     public static int CrucibleCapacityOf(KilnState state) =>
@@ -180,18 +197,18 @@ public sealed class KilnManager
     /// the first lit tick.
     /// </summary>
     public static float MeltProgress01(KilnState state) =>
-        state.HasCrucible && state.Contents.PendingMl > 0
+        MeltingMaterial(state) != 0
             ? 1f - MathUtils.Clamp01(state.MeltLeft / state.Profile.MeltSeconds)
             : 0f;
 
     /// <summary>
-    /// Milliliters of molten metal the render pass should draw: the settled pool plus the
-    /// fraction of the chunk currently melting. Continuous across a melt tick (the 100 ml the
-    /// bookkeeping moves is exactly the fraction this was already showing) and across burn-out.
+    /// Milliliters of molten metal the render pass should draw: the settled pool (every metal)
+    /// plus the fraction of the chunk currently melting. Continuous across a melt tick (the 100 ml
+    /// the bookkeeping moves is exactly the fraction this was already showing) and across burn-out.
     /// </summary>
     public static float DisplayMoltenMl(KilnState state) =>
         state.Contents.MoltenMl
-        + MeltProgress01(state) * Math.Min(MeltChunkMl, state.Contents.PendingMl);
+        + MeltProgress01(state) * Math.Min(MeltChunkMl, MeltingPendingMl(state));
 
     /// <summary>
     /// Milliliters of solid charge the render pass should still show waiting over the pool: the
@@ -201,7 +218,7 @@ public sealed class KilnManager
     /// </summary>
     public static float DisplayPendingMl(KilnState state) =>
         state.Contents.PendingMl
-        - MeltProgress01(state) * Math.Min(MeltChunkMl, state.Contents.PendingMl);
+        - MeltProgress01(state) * Math.Min(MeltChunkMl, MeltingPendingMl(state));
 
     /// <summary>
     /// Milliliters one unit of the last charged input is worth — the size at which the drawn lump
@@ -247,21 +264,17 @@ public sealed class KilnManager
     /// <summary>
     /// Charges the crucible with one unit of <paramref name="inputId"/>, as pending metal a fire
     /// still has to melt. Refuses anything with no melt recipe, a kiln with no crucible, and a
-    /// vessel with the wrong material or no room. Needs no fire — loading is cold work.
+    /// vessel whose metals the charge may not join (<see cref="CanAccept"/>) or with no room.
+    /// Needs no fire — loading is cold work, and so is nothing else: alloying waits for the fire.
     /// </summary>
     public bool TryInsertMelt(Vector3 anchor, byte inputId)
     {
         var recipe = ContentRegistry.MeltRecipeForInput(inputId);
         if (recipe == null) return false;
         if (!_kilns.TryGetValue(KeyOf(anchor), out var state) || !state.HasCrucible) return false;
-        if (!CanAccept(state.Contents, recipe, CrucibleCapacityOf(state))) return false;
+        if (!CanAccept(state.Contents, recipe, CrucibleCapacityOf(state), state.Profile.CanAlloy)) return false;
 
-        state.Contents = state.Contents with
-        {
-            MaterialId = recipe.MaterialId,
-            PendingMl = state.Contents.PendingMl + recipe.AmountMl,
-            PendingInputId = inputId,
-        };
+        state.Contents = state.Contents.With(recipe.MaterialId, 0, recipe.AmountMl) with { PendingInputId = inputId };
         return true;
     }
 
@@ -347,26 +360,8 @@ public sealed class KilnManager
                 continue;
             }
 
-            // Melting runs off the pre-burn Lit flag, so the frame the fuel runs out still melts.
-            // The timer carries its overshoot, which is what keeps MeltProgress01 continuous
-            // across a tick and lets one big dt melt several chunks.
-            if (state.Lit && state.HasCrucible && state.Contents.PendingMl > 0)
-            {
-                state.MeltLeft -= deltaTime;
-                while (state.MeltLeft <= 0f && state.Contents.PendingMl > 0)
-                {
-                    var melted = Math.Min(MeltChunkMl, state.Contents.PendingMl);
-                    state.Contents = state.Contents with
-                    {
-                        MoltenMl = state.Contents.MoltenMl + melted,
-                        PendingMl = state.Contents.PendingMl - melted,
-                    };
-                    state.MeltLeft += state.Profile.MeltSeconds;
-                }
-                // Nothing left to melt: park a full chunk so the next charge starts from scratch
-                if (state.Contents.PendingMl == 0)
-                    state.MeltLeft = state.Profile.MeltSeconds;
-            }
+            if (state.Lit && state.HasCrucible)
+                Melt(state, deltaTime);
 
             if (!state.Lit) continue;
             state.BurnLeft -= deltaTime;
@@ -401,6 +396,35 @@ public sealed class KilnManager
 
         if (changed)
             RefreshCells();
+    }
+
+    /// <summary>
+    /// One lit kiln's melt step. Runs off the pre-burn <see cref="KilnState.Lit"/> flag, so the
+    /// frame the fuel runs out still melts. An alloy kiln first turns every full set of an alloy's
+    /// parts into the alloy (<see cref="AlloyRules.Resolve"/>), whose charge then melts like any
+    /// other. The timer carries its overshoot, which is what keeps <see cref="MeltProgress01"/>
+    /// continuous across a tick and lets one big dt melt several chunks.
+    /// </summary>
+    private static void Melt(KilnState state, float deltaTime)
+    {
+        if (state.Profile.CanAlloy)
+            state.Contents = AlloyRules.Resolve(state.Contents, ContentRegistry.AlloyRecipes);
+
+        var melting = MeltingMaterial(state);
+        if (melting != 0)
+        {
+            state.MeltLeft -= deltaTime;
+            while (state.MeltLeft <= 0f && melting != 0)
+            {
+                var melted = Math.Min(MeltChunkMl, state.Contents.PendingOf(melting));
+                state.Contents = state.Contents.With(melting, melted, -melted);
+                state.MeltLeft += state.Profile.MeltSeconds;
+                melting = MeltingMaterial(state);
+            }
+        }
+        // Nothing left to melt: park a full chunk so the next charge starts from scratch
+        if (melting == 0)
+            state.MeltLeft = state.Profile.MeltSeconds;
     }
 
     /// <summary>
@@ -486,10 +510,7 @@ public sealed class KilnManager
                 Lit = state.Lit,
                 BurnLeft = state.BurnLeft,
                 Crucible = state.HasCrucible ? SaveNames.NameOf(state.CrucibleItemId) : null,
-                Material = SaveNames.MaterialNameOf(state.Contents.MaterialId),
-                MoltenMl = state.Contents.MoltenMl,
-                PendingMl = state.Contents.PendingMl,
-                PendingInput = SaveNames.NameOf(state.Contents.PendingInputId),
+                Contents = state.HasCrucible && !state.Contents.IsEmpty ? CrucibleSaveCodec.Export(state.Contents) : null,
                 MeltLeft = state.MeltLeft,
             });
         }
@@ -497,8 +518,9 @@ public sealed class KilnManager
     }
 
     /// <summary>Adds the kilns saved by <see cref="Capture"/> to an empty registry. A kiln whose
-    /// anchor no longer resolves, or whose numbers are out of range, is dropped; a fuel or
-    /// crucible that no longer resolves is dropped alone. Returns how many things were dropped.</summary>
+    /// anchor no longer resolves, or whose numbers are out of range, is dropped; a fuel, crucible or
+    /// metal that no longer resolves is dropped alone, and a crucible's amounts are clamped to its
+    /// capacity (<see cref="CrucibleSaveCodec.Import"/>). Returns how many things were dropped.</summary>
     internal int Restore(IReadOnlyList<StationSaveData.KilnData>? saved)
     {
         var skipped = 0;
@@ -508,7 +530,6 @@ public sealed class KilnManager
             if (!StationSaveCodec.TryCell(data.Cell, out var key)
                 || !SaveNames.TryResolve(data.Anchor, out var anchor)
                 || data.Facing is < 0 or > 3 || data.Fuel < 0 || data.Fuel > ProfileOf(anchor).FuelCap
-                || data.MoltenMl < 0 || data.PendingMl < 0
                 || !float.IsFinite(data.FuelSeconds) || !float.IsFinite(data.BurnLeft)
                 || !float.IsFinite(data.MeltLeft))
             {
@@ -542,11 +563,9 @@ public sealed class KilnManager
                 {
                     state.HasCrucible = true;
                     state.CrucibleItemId = crucible;
-                    SaveNames.TryResolveMaterial(data.Material, out var material);
-                    SaveNames.TryResolve(data.PendingInput, out var pendingInput);
-                    state.Contents = material == 0
-                        ? default
-                        : new CrucibleComponent(material, data.MoltenMl, data.PendingMl, pendingInput);
+                    var dropped = new List<string>();
+                    state.Contents = CrucibleSaveCodec.Import(data.Contents, CrucibleCapacityOf(state), dropped);
+                    skipped += dropped.Count;
                 }
                 else
                 {
@@ -579,10 +598,7 @@ public sealed class KilnManager
             writer.Write(state.BurnLeft);
             writer.Write(state.HasCrucible);
             writer.Write(state.CrucibleItemId);
-            writer.Write(state.Contents.MaterialId);
-            writer.Write(state.Contents.MoltenMl);
-            writer.Write(state.Contents.PendingMl);
-            writer.Write(state.Contents.PendingInputId);
+            StationNetCodec.WriteCrucible(writer, state.Contents);
             writer.Write(state.MeltLeft);
         }
     }
@@ -611,15 +627,11 @@ public sealed class KilnManager
                 HasCrucible = reader.ReadBool(),
                 CrucibleItemId = reader.ReadByte(),
             };
-            var material = reader.ReadByte();
-            var molten = reader.ReadInt();
-            var pending = reader.ReadInt();
-            var pendingInput = reader.ReadByte();
+            state.Contents = StationNetCodec.ReadCrucible(reader);
             state.MeltLeft = StationNetCodec.ReadFinite(reader);
             state.Profile = ProfileOf(state.AnchorId);
-            if (state.Facing > 3 || state.Fuel > state.Profile.FuelCap || molten < 0 || pending < 0)
+            if (state.Facing > 3 || state.Fuel > state.Profile.FuelCap)
                 throw new System.IO.InvalidDataException("kiln snapshot out of range");
-            state.Contents = new CrucibleComponent(material, molten, pending, pendingInput);
             _kilns[key] = state;
         }
         RefreshCells();
