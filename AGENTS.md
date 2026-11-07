@@ -498,6 +498,19 @@ room), up to `EyeAdaptMaxExposure` in total darkness. An unknown cell reads as o
 `EyeAdaptationTests`; `visual-examples/eye-adaptation.json` (`VOXEL_TIME` 147) films a dark tunnel on
 arrival and adapted, then the over-bright step back outside settling within a couple of seconds.
 
+**Realm layer fog.** The eye's height colors the sky around it (plans/LAYERS.md): below the barrier
+band, in hell, `FrameLighting.SetLighting` eases `_hellT` (`LayerClimate.HellTarget`: exactly 0 at and
+above hell's top, ramped to 1 over `SkyConfig.HellFogRampBlocks` below it; `LayerClimate.Ease` at
+`LayerFogEaseRate`) and above the solid cloud slab `_altitudeT` (`AltitudeTarget`, full at the sky
+islands). `LayerClimate.Apply` shifts the sRGB `SkyPalette` before it is decoded: the altitude multiplies
+it by `SkyAltitudeTint` (a slightly deeper, brighter day blue; night stays dark), hell mixes zenith and
+horizon toward `HellFogColor` and drops the glow. Every `SkySample` copy reads the shifted palette
+through its usual uniforms, so the dome, the dry world fog, the cloud fog and the clear color all turn
+red with no shader change. Hell also lerps the dry fog toward `HellFogNearBlocks..FarBlocks` and fades
+the sun, moon, stars, aurora, glare and godrays out (`1 - _hellT`); water and lava still override it.
+`LayerClimate.HellLayerIndex` counts the hell layers down from the barrier. `LayerClimateTests`;
+`visual-examples/layers-fog.json` (`VOXEL_TIME=147`).
+
 **Biome color grade.** The post pass multiplies the finished, anti-aliased display image by
 `uGrade` (`PostEffects.Grade`, (1, 1, 1) by default): `BiomeGrade.Tint` of the eye's climate (the same
 `EyeClimate.TryAt` sample the aurora reads), warm where it is warm and dry (the desert's own
@@ -1071,7 +1084,7 @@ OpenGLTest/
       StatusEffectConfig.cs    # status effects: the duration scale cap, the block writer's reach and write caps,
                                #   the mob tint strength, the particle emitter cap and rate
       SkyConfig.cs             # day length, sun and glare, sky dome, stars, moon, moonlight, aurora, clouds, wind,
-                               #   the sky-island cloud sea (SkyCloudSea*)
+                               #   the sky-island cloud sea (SkyCloudSea*), the realm layer fog (HellFog*, SkyAltitudeTint)
       StreamingConfig.cs       # view radius, per-frame mesh, dirty and scan budgets, thread counts, LOD build and
                                #   upload budgets, loading budgets and gate
       SurfaceShadingConfig.cs  # per-tile shader terms (ore, snow, leaf backlight, grass shimmer, ice, glass, wet
@@ -1240,6 +1253,8 @@ OpenGLTest/
         CloudSilverLining.cs   # GL-free twin of the clouds' silver lining: sun gate, forward lobe, thinness along the view
         DayCycle.cs            # GL-free sun direction, dayness and night factor of the lighting clock
                                #   (FrameLighting.SetLighting and the slime size roll both read it)
+        LayerClimate.cs        # GL-free realm layer sky: hell tint and altitude shift of the eye's height, eased,
+                               #   applied to the sRGB SkyPalette; the hell layer index
         Moonlight.cs           # GL-free key-light rule: sun by day, moon at night, handed over with both dark
         MoonPhase.cs           # GL-free moon: the day's phase (steps at noon), its light direction, lit share, visibility
         SkyPalette.cs          # GL-free zenith/horizon/glow sky palette and the C# reference of SkySample

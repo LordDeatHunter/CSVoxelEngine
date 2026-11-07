@@ -203,6 +203,30 @@ public const float DayLengthSeconds = 1200f;
     /// <summary>How fast the curtains drift and ripple along the sky (noise cells per second).</summary>
     public const float AuroraDriftSpeed = 0.035f;
 
+    // --- Realm layers (LayerClimate, FrameLighting.SetLighting; the Y bands are in WorldGenerationConfig) ---
+    /// <summary>sRGB color the sky palette, and with it the fog and the clear color, turns to with the
+    /// eye inside hell: a dim ember red.</summary>
+    public static readonly System.Numerics.Vector3 HellFogColor = new(0.32f, 0.06f, 0.03f);
+
+    /// <summary>Blocks below hell's top over which the hell tint ramps from none to full, so crossing
+    /// the boundary never pops.</summary>
+    public const float HellFogRampBlocks = 24f;
+
+    /// <summary>How fast (MathUtils.Damp rate, per second) the eased hell and altitude amounts follow
+    /// the eye, so a teleport or a fast fall still fades.</summary>
+    public const float LayerFogEaseRate = 2.5f;
+
+    /// <summary>The world fog's near distance in hell, in blocks: the caverns close in.</summary>
+    public const float HellFogNearBlocks = 8f;
+
+    /// <summary>The world fog's far distance in hell, in blocks.</summary>
+    public const float HellFogFarBlocks = 110f;
+
+    /// <summary>Per-channel factor the sky palette is multiplied by at full altitude (the eye at the sky
+    /// islands, ramped in from the cloud slab's top): a slightly deeper, brighter blue that keeps a
+    /// night sky dark.</summary>
+    public static readonly System.Numerics.Vector3 SkyAltitudeTint = new(0.82f, 0.93f, 1.1f);
+
     // --- Moonlight (Moonlight, FrameLighting.SetLighting) ---
     /// <summary>
     /// Sine of the sun's elevation at and below which the moon lights the world instead of the sun.

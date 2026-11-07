@@ -142,6 +142,10 @@ internal sealed class FrameLighting
     // water ones: _eyeInLava is a hard flag that drops the frame the eye leaves lava while
     // _underwaterT is still fading out, which would otherwise pop the sky back in one frame.
     private float _lavaT;
+    // The eased realm-layer amounts at the eye (LayerClimate): hell's red tint and the altitude shift
+    // of the sky over the cloud slab
+    private float _hellT;
+    private float _altitudeT;
 
     private readonly Vector3[] _pointPos = new Vector3[LightingConfig.MaxPointLights];
     private readonly Vector3[] _pointColors = new Vector3[LightingConfig.MaxPointLights];
@@ -302,8 +306,22 @@ internal sealed class FrameLighting
         _ambient = ColorSpace.SrgbToLinear(
             Mix(new Vector3(0.09f, 0.105f, 0.165f), new Vector3(0.42f, 0.45f, 0.52f), dayness));
 
+        // The realm layers color the sky around the eye: hell turns it (and with it the fog and the
+        // clear color) red, the heights above the cloud slab a deeper blue; both eased like the
+        // underwater tint so a teleport or a long fall fades (LayerClimate)
+        if (camera != null)
+        {
+            _hellT = LayerClimate.Ease(_hellT, LayerClimate.HellTarget(camera.RenderEye.Y), dt);
+            _altitudeT = LayerClimate.Ease(_altitudeT, LayerClimate.AltitudeTarget(camera.RenderEye.Y), dt);
+        }
+        // Nothing of the sky shows through hell's rock: the sun, moon, stars, glare and godrays go
+        var open = 1f - _hellT;
+        _sunVisibility *= open;
+        _moonVisibility *= open;
+
         // The warm glow toward the sun only while it crosses the horizon (the day sky stays flat)
-        _sky = SkyPalette.Compute(dayness, duskAmount, SkyPalette.GlowAmount(elevation));
+        _sky = LayerClimate.Apply(SkyPalette.Compute(dayness, duskAmount, SkyPalette.GlowAmount(elevation)),
+            _altitudeT, _hellT);
         // SkyPalette stays authored (and tested) in sRGB; the dome and fog want it linear
         _sky = _sky with
         {
@@ -313,7 +331,7 @@ internal sealed class FrameLighting
         };
         // The stars twinkle on the lighting clock, wrapped hourly so the float keeps its
         // precision, and turn about +Z with the sun; their cloud cover follows the drawn clouds' drift
-        _skyFrame = new SkyDomeFrame(StarField.Visibility(elevation), (float)(_timeD % 3600.0), _cameraPos,
+        _skyFrame = new SkyDomeFrame(StarField.Visibility(elevation) * open, (float)(_timeD % 3600.0), _cameraPos,
             CloudCopies.Drift(_timeD, SkyConfig.CloudFieldSize), Vector3.Zero, StarAngle: DayCycle.OrbitAngle(_timeD));
         // The flat sky/fog color is the dome's no-glow horizon sample
         _skyColor = _sky.HazedHorizon;
@@ -392,12 +410,12 @@ internal sealed class FrameLighting
         _glareCloud = MathUtils.Damp(_glareCloud, glareCover, SkyConfig.SunGlareCloudEaseRate, dt);
         var glare = camera == null
             ? 0f
-            : SunGlare.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud) * (1f - wet);
+            : SunGlare.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud) * (1f - wet) * open;
         // Godrays: strongest facing a low sun, a fraction at noon, dimmed by the cloud over it and
         // gone under water, where the underwater shafts take over (Godrays.Intensity)
         _godrayStrength = camera == null || !PostProcessConfig.GodraysEnabled
             ? 0f
-            : Godrays.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud, wet);
+            : Godrays.Intensity(Vector3.Dot(camera.ViewDirection, _skySunDir), elevation, _glareCloud, wet) * open;
         // The aurora shows only from cold lands: the climate at the eye's column, read from the stored
         // corner climate (never worldgen noise, so a client reads what its server streamed), eased so
         // walking across a border fades it; an unknown column eases it out
@@ -418,13 +436,14 @@ internal sealed class FrameLighting
         {
             GlareColor = _sunDiscColor * glare,
             MoonVisibility = _moonVisibility,
-            Aurora = Aurora.Visibility(_eyeColdness, StarField.Visibility(elevation)),
+            Aurora = Aurora.Visibility(_eyeColdness, StarField.Visibility(elevation)) * open,
             AuroraDrift = Aurora.Drift(time),
         };
 
-        _fogNear = MathUtils.Lerp(LightingConfig.FogNearBlocks,
+        // Hell's caverns close the dry fog in; water closes it further
+        _fogNear = MathUtils.Lerp(MathUtils.Lerp(LightingConfig.FogNearBlocks, SkyConfig.HellFogNearBlocks, _hellT),
             WaterRenderConfig.UnderwaterFogNearBlocks, wet);
-        _fogFar = MathUtils.Lerp(LightingConfig.FogFarBlocks,
+        _fogFar = MathUtils.Lerp(MathUtils.Lerp(LightingConfig.FogFarBlocks, SkyConfig.HellFogFarBlocks, _hellT),
             WaterRenderConfig.UnderwaterFogFarBlocks, wet);
 
         // Reset before the dry early-out, or a tint would stick after leaving water or lava
@@ -491,6 +510,8 @@ internal sealed class FrameLighting
         _underwaterT = 0f;
         _lavaT = 0f;
         _eyeInLava = false;
+        _hellT = 0f;
+        _altitudeT = 0f;
         // The cached far map holds the released world's terrain.
         _owner.FarShadow.Invalidate();
     }

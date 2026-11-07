@@ -4,25 +4,21 @@
 
 ## Status
 
-Phase 1 under way. A Nether- and Aether-like pair of realms inside the one world, as vertical
+Phase 1 (foundations) done; phase 2 next. A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
 `MobConfig.LayerDifficultyPerLayer`; `LayerBandTests` holds their order. The `iron_pickaxe` (power 3,
 creative only) is the barrier's tool. The `softLanding` and `sink` block flags (`SinkLayer`,
-`PlayerConfig.SinkBlockSpeed`) are ready for the cloud blocks of `L-11`; the server accepts the sink. Last updated 2026-11-07.
+`PlayerConfig.SinkBlockSpeed`) are ready for the cloud blocks of `L-11`; the server accepts the sink.
+The eye's height already tints the sky and fog (`LayerClimate`, `FrameLighting`, no shader change):
+red in hell, a deeper blue over the cloud slab. Last updated 2026-11-07.
 
 ## In progress
 
 Nothing.
 
 ## Open
-
-### Phase 1: Foundations
-
-- [ ] **`L-4` Depth-based fog and tint hook.** P0, M. Eye in a hell layer eases to a red-tinted fog
-  (like the underwater/lava eye state); altitude shifts the sky palette. **Hook:** `FrameLighting`;
-  the `SkySample` copies change together (`shader-sync` skill).
 
 ### Phase 2: Hell slice
 
