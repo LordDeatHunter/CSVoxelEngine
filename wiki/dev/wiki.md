@@ -32,6 +32,12 @@ Blocks whose shape depends on placement (panes, fluids, tree wood and others) sh
 
 Recipes are drawn by `<RecipeCard kind="craft" id="..."/>`: framed inventory-style slots with count badges (milliliters for molten metal), an arrow through the station (the quern, kiln, casting basin or alloy furnace block, or a crafting grid), and a glowing output slot. `RecipeSlot` links to the block or item page and shows its name on hover; a tag input ("any axe") cycles through its members. Item icons are their sprites. Block icons are rendered once each from the real block model by one shared offscreen three.js renderer (`icons.ts`) and cached, which also fits multiblock structures, and the same renderer draws the mob portraits (rest pose, from the front) for `<MobGrid>`, the Mobs index. The Blocks and Items index pages use `<ItemGrid>`, a searchable grid of the same icons.
 
+## Screenshots
+
+The in-game screenshots on the Biomes, Terrain and Layers pages are captured from the real game, which needs a GPU and a window, so they are made locally and the converted images are committed (`public/screenshots/*.webp`, about 100 KB each). `tools/generate-wiki-shots.mjs` holds one spec for every shot (camera pose, title, caption, group) and writes the scenarios (`OpenGLTest/visual-examples/wiki-*.json`) and `data/screenshots.json`. The lighting clock follows the wall clock, so each scenario is short and names its own `VOXEL_TIME`.
+
+To refresh them, from `OpenGLTest/` run each scenario in a Release build (`VOXEL_TIME=<its header time> VOXEL_SCRIPT=visual-examples/wiki-<name>.json`, which writes `visual/wiki-<name>/`), then run `npm run shots` in `wiki/` to convert them. `<ShotGallery>` shows shots by group or slug and opens them in a lightbox; a test checks that every manifest entry has its image and every gallery names real shots. Poses found by probing `TerrainGenerator.BiomeAt` go stale when worldgen changes, so re-check a shot that no longer shows its biome.
+
 ## Working on it
 
 ```powershell

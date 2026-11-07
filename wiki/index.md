@@ -8,3 +8,7 @@ hero:
     - { theme: brand, text: Game wiki, link: /game/ }
     - { theme: alt, text: Developer docs, link: /dev/ }
 ---
+
+## A world to explore
+
+<ShotGallery slugs="forest,desert,pack_ice,massif_summit,hell_fungal,sky_island" />

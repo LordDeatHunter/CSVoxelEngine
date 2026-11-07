@@ -17,6 +17,7 @@ export default defineConfig({
         { text: 'Game', items: [{ text: 'Overview', link: '/game/' }, { text: 'Controls', link: '/game/controls' }] },
         { text: 'World', items: [
           { text: 'Biomes', link: '/game/biomes' },
+          { text: 'Terrain', link: '/game/terrain' },
           { text: 'Layers', link: '/game/layers' },
           { text: 'Trees', link: '/game/reference/trees' }
         ] },

@@ -18,6 +18,8 @@ The overworld shares the world with two realms: a Nether-like hell under it and 
 
 ## Hell
 
+<ShotGallery slugs="hell_layer0" hero />
+
 Hell is a stack of layers, each with a cavern pocket over an unbroken slab of hellrock. Deeper layers are more open and pond more lava. The sky is a red fog, with no sun, moon or stars.
 
 | Biome | Look |
@@ -26,13 +28,19 @@ Hell is a stack of layers, each with a cavern pocket over an unbroken slab of he
 | Magma Caverns | Basalt and magma floors with lava pools |
 | Fungal Grove | Fungal moss and glowing teal fungi, glow ferns, thick vines and fungal trees |
 
+<ShotGallery slugs="hell_ashlands,hell_magma,hell_fungal,hell_layer1,hell_layer4" />
+
 Hell is lit only by lava and glowing blocks. Its mobs are the **hellbrute**, a slow, tanky charging melee brute, and the **cinderwitch**, a caster that throws fire bolts that set you burning. Both grow tougher the deeper the layer.
 
 ## Sky
+
+<ShotGallery slugs="sky_cloud_patches,sky_cloud_sea,sky_zone" />
 
 The islands float in zones, with wide gaps of open sky between. Each island is one of two biomes:
 
 - **Meadow**: grass over dirt over stone, with tall grass, flowers, sparse vines and broad sky oaks.
 - **Frost highland**: frosted turf over permafrost, with crystal outcrops, frost ferns, thicker vines and glowing crystal trees.
+
+<ShotGallery slugs="sky_island,sky_meadow,sky_meadow_above,sky_frost,sky_frost_above" />
 
 Its mobs are the diving **galeraptor**, a flyer that stoops at you, and the **cloud golem**, a slow bruiser whose slam sends out a shockwave. Bigger zones hold harder mobs, and only the biggest zones hold golems.
