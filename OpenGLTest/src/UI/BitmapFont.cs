@@ -34,8 +34,6 @@ public sealed class BitmapFont : IDisposable
     private const float BakePixelHeight = 32f;
     private const int MinAtlasSide = 512;
     private const int MaxAtlasSide = 2048;
-    // The longest run one DrawText/Layout call can draw; TextWrap caps its lines at it.
-    public const int MaxLayoutChars = 64;
 
     private readonly GL _gl;
     private readonly StbTrueType.stbtt_bakedchar[] _baked = new StbTrueType.stbtt_bakedchar[NumChars];
@@ -86,33 +84,35 @@ public sealed class BitmapFont : IDisposable
     /// <summary>Pixel size of <paramref name="text"/> at <paramref name="scale"/>, for anchoring.</summary>
     public Vector2 MeasureSize(ReadOnlySpan<char> text, float scale)
     {
-        Span<CharQuad> quads = stackalloc CharQuad[MaxLayoutChars];
-        var n = LayoutQuads(text, scale, quads, out var width, out var minY, out var maxY);
+        var n = Scan(text, scale, default, out var width, out var minY, out var maxY);
         return n == 0 ? Vector2.Zero : new Vector2(width, maxY - minY);
     }
 
     /// <summary>
     /// Lays <paramref name="text"/> out with its top-left corner at <paramref name="topLeft"/>
     /// (screen pixels, Y down). Writes up to <paramref name="outInstances"/>'s length and
-    /// returns how many were written. Unknown and empty glyphs (like space) advance the pen
-    /// but emit nothing.
+    /// returns how many were written (size it to the text length to draw the text whole).
+    /// Unknown and empty glyphs (like space) advance the pen but emit nothing.
     /// </summary>
     public int Layout(ReadOnlySpan<char> text, Vector2 topLeft, float scale, Span<GlyphInstance> outInstances)
     {
-        Span<CharQuad> quads = stackalloc CharQuad[MaxLayoutChars];
-        var n = LayoutQuads(text, scale, quads, out _, out var minY, out _);
-        var count = Math.Min(n, outInstances.Length);
+        // The ink top anchors the run, so a first pass finds it and the second writes the instances.
+        Scan(text, scale, default, out _, out var minY, out _);
+        return Scan(text, scale, outInstances, out _, out _, out _, topLeft, minY);
+    }
 
-        for (var i = 0; i < count; i++)
-        {
-            var q = quads[i];
-            var center = new Vector2(
-                topLeft.X + (q.X0 + q.X1) * 0.5f,
-                topLeft.Y + (q.Y0 + q.Y1) * 0.5f - minY);
-            outInstances[i] = new GlyphInstance(center, new Vector2(q.X1 - q.X0, q.Y1 - q.Y0), _glyphUv[q.Index]!.Value);
-        }
-
-        return count;
+    /// <summary>
+    /// Lays <paramref name="text"/> out starting at <paramref name="left"/> with the digit cap box
+    /// centered on <paramref name="centerY"/>. Unlike <see cref="Layout"/> the vertical place does not
+    /// depend on which glyphs the string holds (no ascender or descender shifts it), so one-line
+    /// labels in a box all center by the same rule.
+    /// </summary>
+    public int LayoutCentered(ReadOnlySpan<char> text, float left, float centerY, float scale,
+        Span<GlyphInstance> outInstances)
+    {
+        var digit = _baked['0' - FirstChar];
+        var capCenter = (digit.yoff + (digit.y1 - digit.y0) * 0.5f) * scale;
+        return Scan(text, scale, outInstances, out _, out _, out _, new Vector2(left, centerY), capCenter);
     }
 
     // Bakes the printable ASCII range into bitmap (top-first coverage bytes). The bake
@@ -176,24 +176,24 @@ public sealed class BitmapFont : IDisposable
         }
     }
 
-    // Quads in baked pixels at scale, with the pen starting at the origin and Y growing
-    // down from the baseline. stbtt_GetBakedQuad mutates only the pen's X (no line breaks
-    // here); the caller anchors vertically from minY/maxY.
-    private unsafe int LayoutQuads(ReadOnlySpan<char> text, float scale, Span<CharQuad> quads,
-        out float width, out float minY, out float maxY)
+    // Walks the text with the pen starting at the origin and Y growing down from the baseline
+    // (stbtt_GetBakedQuad mutates only the pen's X; there are no line breaks here), counting every
+    // inked glyph and tracking the ink's vertical extent. With a non-empty `instances` it also
+    // writes each glyph (at most that many) placed from topLeft, shifted up by anchorY; the return
+    // value is the number of glyphs counted or written.
+    private unsafe int Scan(ReadOnlySpan<char> text, float scale, Span<GlyphInstance> instances,
+        out float width, out float minY, out float maxY, Vector2 topLeft = default, float anchorY = 0f)
     {
-        width = 0f;
         minY = 0f;
         maxY = 0f;
 
         var n = 0;
         var x = 0f;
-        const float y = 0f;
-        var limit = Math.Min(text.Length, quads.Length);
+        var write = !instances.IsEmpty;
 
         fixed (StbTrueType.stbtt_bakedchar* baked = _baked)
         {
-            for (var i = 0; i < limit; i++)
+            for (var i = 0; i < text.Length; i++)
             {
                 var index = text[i] - FirstChar;
                 if (index < 0 || index >= NumChars)
@@ -201,34 +201,44 @@ public sealed class BitmapFont : IDisposable
 
                 StbTrueType.stbtt_aligned_quad q;
                 var qx = x;
-                var qy = y;
+                var qy = 0f;
                 StbTrueType.stbtt_GetBakedQuad(baked, _atlasSide, _atlasSide, index, &qx, &qy, &q, 1);
                 x = qx;
 
                 if (_glyphUv[index] == null)
                     continue;
 
-                var quad = new CharQuad(q.x0 * scale, q.y0 * scale, q.x1 * scale, q.y1 * scale, index);
+                var x0 = q.x0 * scale;
+                var x1 = q.x1 * scale;
+                var y0 = q.y0 * scale;
+                var y1 = q.y1 * scale;
                 if (n == 0)
                 {
-                    minY = quad.Y0;
-                    maxY = quad.Y1;
+                    minY = y0;
+                    maxY = y1;
                 }
                 else
                 {
-                    minY = Math.Min(minY, quad.Y0);
-                    maxY = Math.Max(maxY, quad.Y1);
+                    minY = Math.Min(minY, y0);
+                    maxY = Math.Max(maxY, y1);
                 }
 
-                quads[n++] = quad;
+                if (write)
+                {
+                    if (n >= instances.Length)
+                        break;
+                    instances[n] = new GlyphInstance(
+                        new Vector2(topLeft.X + (x0 + x1) * 0.5f, topLeft.Y + (y0 + y1) * 0.5f - anchorY),
+                        new Vector2(x1 - x0, y1 - y0), _glyphUv[index]!.Value);
+                }
+
+                n++;
             }
         }
 
         width = x * scale;
         return n;
     }
-
-    private readonly record struct CharQuad(float X0, float Y0, float X1, float Y1, int Index);
 
     public void Dispose()
     {

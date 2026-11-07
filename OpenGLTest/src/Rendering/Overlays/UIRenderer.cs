@@ -116,12 +116,10 @@ public class UIRenderer : IDisposable
     // every frame (PERF_TODO R8).
     private readonly UITextCache _textCache = new();
 
-    // Longest run DrawText draws. BitmapFont.Layout clamps its output to the scratch span it
-    // is handed, so this single constant bounds all three text buffers at once — the glyph
-    // scratch, the vertex scratch and the static index buffer — and a longer string is
-    // truncated by layout rather than overrunning any of them.
-    // Must agree with BitmapFont.MaxLayoutChars (layout stops there anyway), so it is defined from it.
-    private const int MaxTextGlyphs = BitmapFont.MaxLayoutChars;
+    // Longest run one text batch holds: the glyph scratch, the vertex scratch and the static index
+    // buffer are all sized from it (the 16-bit indices allow far more). It is a buffer bound far above
+    // any UI string (the longest field is 200 characters), not a layout limit; a longer run is cut here.
+    private const int MaxTextGlyphs = 2048;
 
     // Scratch for one DrawText call; reused so text layout allocates nothing per frame.
     // Safe to share: all UI drawing happens on the main thread.
@@ -381,7 +379,7 @@ public class UIRenderer : IDisposable
         DrawRect(center with { Y = center.Y - half.Y + inset }, horizontal, color);
         DrawRect(center with { Y = center.Y + half.Y - inset }, horizontal, color);
         DrawRect(center with { X = center.X - half.X + inset }, vertical, color);
-        DrawRect(center with { X = center.X + half.X + inset }, vertical, color);
+        DrawRect(center with { X = center.X + half.X - inset }, vertical, color);
     }
 
     internal void DrawDurabilityBar(Vector2 center, float width, float fraction)
@@ -449,7 +447,7 @@ public class UIRenderer : IDisposable
     /// <summary>
     /// Screen-space text with its top-left corner at <paramref name="topLeft"/> (pixels, Y
     /// down). A one-pixel dark shadow is drawn under each glyph so the text reads over
-    /// bright icons. Strings longer than 64 characters are truncated.
+    /// bright icons.
     ///
     /// Every glyph of the run — shadow copies and face copies alike — is written into one
     /// dynamic vertex buffer and drawn with a single <c>GL.DrawElements</c> call
@@ -462,10 +460,27 @@ public class UIRenderer : IDisposable
     {
         if (_font == null || string.IsNullOrEmpty(text))
             return;
-        var instances = _glyphScratch.AsSpan();
-        var n = _font.Layout(text.AsSpan(), topLeft, scale, instances);
+        DrawGlyphs(_font.Layout(text.AsSpan(), topLeft, scale, _glyphScratch), color);
+    }
+
+    /// <summary>
+    /// One-line text starting at <paramref name="left"/> with the digit cap box centered on
+    /// <paramref name="centerY"/>: the shared vertical-centering rule for labels in a box, independent
+    /// of the glyphs in the string (see <see cref="BitmapFont.LayoutCentered"/>).
+    /// </summary>
+    public void DrawTextCenteredY(string text, float left, float centerY, float scale, Rgba color)
+    {
+        if (_font == null || string.IsNullOrEmpty(text))
+            return;
+        DrawGlyphs(_font.LayoutCentered(text.AsSpan(), left, centerY, scale, _glyphScratch), color);
+    }
+
+    // Writes the laid-out glyphs in _glyphScratch as shadow quads then face quads and draws them.
+    private void DrawGlyphs(int n, Rgba color)
+    {
         if (n == 0)
             return;
+        var instances = _glyphScratch.AsSpan();
 
         // _textFade is 1 outside the fading draws, so ordinary text keeps its exact colors.
         var shadow = _textFade >= 1f ? CountShadow : Faded(CountShadow, _textFade);
@@ -606,12 +621,11 @@ public class UIRenderer : IDisposable
         }
     }
 
-    /// <summary>The longest suffix of <paramref name="text"/> that fits <paramref name="maxWidth"/>
-    /// and one text run (<see cref="BitmapFont.MaxLayoutChars"/>).</summary>
+    /// <summary>The longest suffix of <paramref name="text"/> that fits <paramref name="maxWidth"/>.</summary>
     private string TailThatFits(string text, float scale, float maxWidth)
     {
         if (_font == null || string.IsNullOrEmpty(text)) return text;
-        var start = Math.Max(0, text.Length - BitmapFont.MaxLayoutChars);
+        var start = 0;
         while (start < text.Length - 1 && _font.MeasureSize(text.AsSpan(start), scale).X > maxWidth)
             start++;
         return start == 0 ? text : text[start..];
@@ -738,36 +752,29 @@ public class UIRenderer : IDisposable
             ? 0f
             : _font.MeasureSize(text.AsSpan(), scale).X;
 
-    // Truncates text with "..." to fit maxWidth at scale. ASCII dots because the font
-    // only covers printable ASCII (U+2026 would vanish).
-    internal string FitText(string text, float scale, float maxWidth)
-    {
-        if (_font == null || string.IsNullOrEmpty(text)) return text;
-        if (maxWidth <= 0f) return "";
-        if (_font.MeasureSize(text.AsSpan(), scale).X <= maxWidth) return text;
-        const string dots = "...";
-        for (var len = text.Length - 1; len > 0; len--)
-        {
-            var sub = text.Substring(0, len) + dots;
-            if (_font.MeasureSize(sub.AsSpan(), scale).X <= maxWidth) return sub;
-        }
-        return dots;
-    }
-
-    private float FitScale(string text, float scale, float maxWidth)
-    {
-        if (_font == null || string.IsNullOrEmpty(text) || maxWidth <= 0f) return scale;
-        var w = _font.MeasureSize(text.AsSpan(), scale).X;
-        if (w <= maxWidth || w <= 0f) return scale;
-        return Math.Max(scale * 0.7f, scale * maxWidth / w);
-    }
+    // Cuts text with an ellipsis to fit maxWidth at scale (no shrinking: see TextFit.SingleLine).
+    internal string FitText(string text, float scale, float maxWidth) =>
+        _font == null ? text : TextFit.SingleLine(text, scale, maxWidth, Measure, minScaleShare: 1f).Text;
 
     internal void DrawTextCenteredFitted(string text, float centerX, float topY, float scale,
         Rgba color, float maxWidth)
     {
         if (_font == null || string.IsNullOrEmpty(text)) return;
-        var s = FitScale(text, scale, maxWidth);
-        DrawTextCentered(FitText(text, s, maxWidth), centerX, topY, s, color);
+        var fitted = TextFit.SingleLine(text, scale, maxWidth, Measure);
+        DrawTextCentered(fitted.Text, centerX, topY, fitted.Scale, color);
+    }
+
+    // The measure TextFit runs against: the baked font at a given draw scale.
+    private float MeasureAt(ReadOnlySpan<char> text, float scale) => _font!.MeasureSize(text, scale).X;
+    private TextFit.ScaledMeasure? _measure;
+    private TextFit.ScaledMeasure Measure => _measure ??= MeasureAt;
+
+    /// <summary>One-line text centered on <paramref name="center"/> both ways (the cap box vertically,
+    /// see <see cref="DrawTextCenteredY"/>).</summary>
+    internal void DrawTextMiddle(string text, Vector2 center, float scale, Rgba color)
+    {
+        if (_font == null || string.IsNullOrEmpty(text)) return;
+        DrawTextCenteredY(text, center.X - _font.MeasureSize(text.AsSpan(), scale).X * 0.5f, center.Y, scale, color);
     }
 
     /// <summary>

@@ -22,7 +22,7 @@ namespace VoxelEngine.UI.Menus;
 /// </summary>
 public sealed class MainMenuController(WorldStore store, ServerStore serverStore, Func<int> randomSeed)
 {
-    /// <summary>The notice shown after a failed store call (well under <see cref="BitmapFont.MaxLayoutChars"/>).</summary>
+    /// <summary>The notice shown after a failed store call.</summary>
     public const string StoreErrorNotice = "Saves folder error - see the console";
 
     /// <summary>The notice shown when a typed server address cannot be parsed.</summary>

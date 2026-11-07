@@ -322,7 +322,7 @@ internal sealed class MenuRenderer
     }
 
     // A scrolled list page (worlds or multiplayer): title, panel, the scissored rows (name and detail
-    // on their own lines, never concatenated since a layout run stops at MaxLayoutChars), the
+    // on their own lines, never concatenated), the
     // empty-state line and the notice. The page draws its bottom buttons after.
     private void DrawListPage(MainMenuView view, Vector2 screen, string title, MainMenuPage page,
         int count, float scrollOffset, string emptyText, ListRowDrawer drawRow)

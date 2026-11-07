@@ -10,13 +10,10 @@ public delegate float TextMeasure(ReadOnlySpan<char> text);
 /// <summary>Greedy word wrap of UI text against an injected measure; GL-free.</summary>
 public static class TextWrap
 {
-    /// <summary>Longest line ever emitted, so every line fits one DrawText run.</summary>
-    public const int MaxLineChars = BitmapFont.MaxLayoutChars;
-
     /// <summary>Greedy word wrap of <paramref name="text"/> into lines no wider than <paramref name="maxWidth"/>
-    /// under <paramref name="measure"/> and no longer than MaxLineChars, appended to <paramref name="lines"/>.
+    /// under <paramref name="measure"/>, appended to <paramref name="lines"/>.
     /// Words (maximal runs of non-space characters) are kept whole and joined by the source's own spaces;
-    /// a word that alone exceeds the width or the char cap is broken into the longest fitting prefixes,
+    /// a word that alone exceeds the width is broken into the longest fitting prefixes,
     /// at least one character per line so the loop always progresses. Lines carry no leading or trailing
     /// spaces. Null, empty or all-space text appends nothing.</summary>
     public static void Wrap(string? text, float maxWidth, TextMeasure measure, List<string> lines)
@@ -63,7 +60,7 @@ public static class TextWrap
             int pos = wordStart;
             while (true)
             {
-                int max = Math.Min(wordEnd - pos, MaxLineChars);
+                int max = wordEnd - pos;
                 int k = max;
                 while (k > 1 && !Fits(span.Slice(pos, k), maxWidth, measure))
                     k--;
@@ -83,5 +80,5 @@ public static class TextWrap
     }
 
     private static bool Fits(ReadOnlySpan<char> candidate, float maxWidth, TextMeasure measure) =>
-        candidate.Length <= MaxLineChars && measure(candidate) <= maxWidth;
+        measure(candidate) <= maxWidth;
 }

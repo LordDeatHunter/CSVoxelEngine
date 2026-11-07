@@ -31,9 +31,9 @@ internal sealed class ChatRenderer
         var messages = view.Messages;
         if (messages.Count > 0)
         {
-            // A message may be longer than one text run (BitmapFont.MaxLayoutChars) or wider than
+            // A message may be longer than one text run or wider than
             // the log, so it is word-wrapped and the log shows the last VisibleMessages *lines*,
-            // newest at the bottom, rather than cutting a long line off at the run cap.
+            // newest at the bottom, rather than cutting a long line off.
             _chatLines.Clear();
             for (var m = messages.Count - 1; m >= 0 && _chatLines.Count < ChatLayout.VisibleMessages; m--)
             {
