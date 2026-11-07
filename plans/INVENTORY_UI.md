@@ -2,7 +2,7 @@
 > Guide: plans/README.md
 
 ## Status
-Design settled with the user on 2026-11-07; nothing implemented. Tracks the visual and UX cleanup of the list-based
+Design settled with the user on 2026-11-07; `U-1` (the kit and tooling) is done. Tracks the visual and UX cleanup of the list-based
 inventory UIs: the [E] panel and craft card, tooltips and toasts, and the spell builder. The planned gear and chest
 panels (`plans/INVENTORY.md`) are built on the kit from I-U1. One phase per prompt: implement it, update this file,
 stop.
@@ -13,20 +13,6 @@ stop.
 Nothing.
 
 ## Open
-
-### Phase 1: kit and tooling
-- [ ] **`U-1` Theme, text fitting, widget layouts and scenario ops** - P1, L. Polish the current look (same palette and
-  font), do not redesign.
-  - [ ] `UiTheme`: spacing scale 4/8/12/16, border widths, colors, text size scale (caption, body, title, head) on
-    kongtext with consistent line heights and one shared vertical-centering rule (replaces the hand-tuned `-9/-8`)
-  - [ ] text fitting and wrapping helpers: wrap wherever possible, shrink then ellipsis for single-line rows with the
-    full text in the hover tooltip as last resort; remove the silent 64-glyph cap (`BitmapFont.MaxLayoutChars`)
-  - [ ] GL-free widget layouts: Panel frame, Button (states), Tab strip, ListRow, TextBox, ScrollView, Tooltip;
-    renderers only draw
-  - [ ] fix `UIRenderer.DrawBorder` (the right edge is drawn about 2px outside the box; confirm visually first)
-  - [ ] scenario ops: open the [E] panel, pick a tab, type a search, select a row, hover a point, open the spell
-    builder; a baseline scenario in `visual-examples/`
-  **Hook:** `UIRenderer`, `BitmapFont`, `TextWrap`, `UiCanvas`, `VisualDirector`, `HudConfig`.
 
 ### Phase 2: [E] panel two-column rework
 - [ ] **`U-2` List left, detail card right, with states and smooth motion** - P1, L.
@@ -47,6 +33,7 @@ Nothing.
   - [ ] tooltip wraps to a max width and clamps by line count; long crucible and "Teaches:" lines no longer run off
     the edge
   - [ ] toast gets a panel treatment
+  - [ ] the tooltip anchor is the mouse in window pixels but is drawn in canvas units (`UiPasses.RenderTooltip`, `HudRenderer.DrawTooltip`), so it drifts from the cursor whenever the canvas scale is not 1: convert it through `UIRenderer.ToCanvas` and place the box with `TooltipLayout`
   **Hook:** `CraftCardLayout`, `CraftCardRenderer`, `ItemTooltip`, `HudRenderer.DrawTooltip`, `HudToast`.
 
 ### Phase 4: spell builder and shared frame
@@ -67,9 +54,7 @@ Nothing.
   - Unfitted text: preview-card secondary lines, search input text, tab subtitles and tooltip lines.
   - No hover, pressed or focus states; selection, tab switches and scrolling are instant.
   - The spell builder part list has no scroll.
-- **Test gap.** The renderers need GL and a font, so new geometry goes in the layout classes to stay testable. The
-  only inventory scenario today is `visual-examples/hotbar.json`; the panel, tooltip and spell builder cannot be
-  filmed until the U-1 ops exist.
+- **What U-1 shipped.** `UiTheme` (spacing, borders, text sizes `Body`/`Head`, palette; no caption or title sizes until something needs them), `TextFit` and the removal of the 64-glyph cap (the text batch holds 2048 glyphs), `UIRenderer.DrawTextCenteredY`/`DrawTextMiddle` (cap-box centering replaced every hand-tuned `-8/-9`, so one-line labels moved about 2 px down), the `DrawBorder` right-edge fix, `UI/Widgets/` (all seven layouts with tests; `TextBoxLayout` is wired into `DrawInputField`, the rest are first consumed by U-2 to U-4), and the scenario ops (`panel`, `tab`, `search`, `row`, `hover`, `spellbuilder`) with `visual-examples/inventory-ui.json` as the baseline.
 - **Verification.** `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release` for layout and fit rules (no
   text overflow at the minimum panel width, wrapped heights, hit-tests equal draw rects); scenarios with
   `VOXEL_TIME=147` at several window sizes; update AGENTS.md per phase.

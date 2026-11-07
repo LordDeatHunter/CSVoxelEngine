@@ -16,7 +16,7 @@ namespace VoxelEngine.VisualTest;
 /// calling the same <c>World</c> functions real input reaches, with movement keys coming from
 /// a <see cref="ScriptedKeyboard"/>. Steps are timed or instant, so a scenario always ends.
 /// </summary>
-public sealed class VisualDirector(VisualScenario scenario, World world)
+public sealed class VisualDirector(VisualScenario scenario, World world, IScenarioUi? ui = null)
 {
     private readonly ScriptedKeyboard _keys = new();
     private int _step;
@@ -210,6 +210,42 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 Advance();
                 break;
 
+            case "panel":
+                RunUi("panel", u => u.SetPanelOpen(step.On));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} panel {(step.On ? "open" : "closed")}");
+                Advance();
+                break;
+
+            case "tab":
+                RunUi("tab", u => u.SelectTab(step.Tab!));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} tab {step.Tab}");
+                Advance();
+                break;
+
+            case "search":
+                RunUi("search", u => u.TypeSearch(step.Text!));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} search '{step.Text}'");
+                Advance();
+                break;
+
+            case "row":
+                RunUi("row", u => u.PickRow(step.Row - 1));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} row {step.Row}");
+                Advance();
+                break;
+
+            case "hover":
+                RunUi("hover", u => u.SetPointer(step.Point));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} hover {(step.Point is { } p ? p.ToString() : "cleared")}");
+                Advance();
+                break;
+
+            case "spellbuilder":
+                RunUi("spellbuilder", u => u.SetSpellBuilderOpen(step.On));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} spellbuilder {(step.On ? "open" : "closed")}");
+                Advance();
+                break;
+
             case "screenshot":
                 ScreenshotPath = Path.Combine(scenario.OutputDir, $"{_step + 1:D2}-{step.ShotName}.png");
                 ScreenshotHideHud = step.HideHud;
@@ -277,6 +313,22 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
         if (!spells.TestCast(parts))
             throw new InvalidOperationException(
                 $"Step {_step + 1} (cast): '{string.Join(", ", step.Parts)}' is not a valid spell.");
+    }
+
+    // A UI step runs against the live UI; a refusal (no world playing, a creative row, no staff) stops the run
+    // naming the step, like the other run-time checks.
+    private void RunUi(string op, Action<IScenarioUi> action)
+    {
+        if (ui == null)
+            throw new InvalidOperationException($"Step {_step + 1} ({op}) needs the live UI, which this run has none of.");
+        try
+        {
+            action(ui);
+        }
+        catch (InvalidOperationException e)
+        {
+            throw new InvalidOperationException($"Step {_step + 1} ({op}): {e.Message}", e);
+        }
     }
 
     private void Advance() => _step++;

@@ -184,7 +184,7 @@ public static class Program
 
         try
         {
-            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!);
+            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!, new ScenarioUi(panelInput, builderInput));
         }
         catch (Exception e)
         {

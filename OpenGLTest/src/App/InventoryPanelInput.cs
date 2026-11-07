@@ -33,6 +33,18 @@ internal sealed class InventoryPanelInput
 
     private World? ActiveWorld => Program.ActiveWorld;
 
+    /// <summary>Where a scenario holds the pointer, in canvas units; null leaves it to the mouse. Only the visual
+    /// director sets it, so a hover can be filmed without a device cursor.</summary>
+    internal Vector2? ScriptedPointer { get; set; }
+
+    // The pointer in window pixels (what every hit-test takes): the scripted one, else the mouse.
+    private Vector2? PointerWindow()
+    {
+        if (ScriptedPointer is { } scripted)
+            return scripted * renderManager.Ui.Scale;
+        return inputManager?.Mouse is { } mouse ? new Vector2(mouse.Position.X, mouse.Position.Y) : null;
+    }
+
     // Hotbar hotkeys 1-0, hoisted so the per-frame poll allocates nothing.
     internal static readonly Key[] NumberKeys =
         [Key.Number1, Key.Number2, Key.Number3, Key.Number4, Key.Number5,
@@ -45,10 +57,9 @@ internal sealed class InventoryPanelInput
     /// </summary>
     internal (Vector2 Anchor, List<string> Lines)? HoveredTooltip()
     {
-        if (!inventoryView.IsOpen || pauseMenuView.IsOpen || inputManager?.Mouse == null) return null;
+        if (!inventoryView.IsOpen || pauseMenuView.IsOpen || PointerWindow() is not { } position) return null;
         var inventory = ActiveWorld?.Inventory;
         if (inventory == null || renderManager == null) return null;
-        var position = new Vector2(inputManager.Mouse.Position.X, inputManager.Mouse.Position.Y);
 
         // A panel row first (the rows sit over the list), then a hotbar slot
         if (HoveredRow(out var rowId, out var rowTool))
@@ -76,7 +87,7 @@ internal sealed class InventoryPanelInput
         id = 0;
         toolInstance = 0;
         var inventory = ActiveWorld?.Inventory;
-        if (inventory == null || inputManager?.Mouse == null || renderManager == null) return false;
+        if (inventory == null || PointerWindow() is not { } pointer || renderManager == null) return false;
         if (!inventoryView.Search.IsEmpty) return false;
         if (inventoryView.Tab == InventoryCategory.Crafting) return false;
         if (ActiveWorld!.Camera.IsCreative) return false;
@@ -84,8 +95,7 @@ internal sealed class InventoryPanelInput
         var rowCount = RowCountFor(inventoryView.Tab);
         var offset = InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount,
             renderManager.Ui.ScreenSize);
-        var row = renderManager.Ui.Panel.PanelRowAt(
-            new Vector2(inputManager.Mouse.Position.X, inputManager.Mouse.Position.Y), offset, rowCount);
+        var row = renderManager.Ui.Panel.PanelRowAt(pointer, offset, rowCount);
         if (row == null) return false;
 
         if (inventoryView.Tab == InventoryCategory.Tools)
@@ -350,6 +360,92 @@ internal sealed class InventoryPanelInput
         else inventoryView.ScrollOffset = offset;
     }
 
+    /// <summary>The list the panel shows this frame: the search hits (null when not searching), their or the
+    /// tab's row count and the clamped scroll offset.</summary>
+    private readonly record struct ListState(IReadOnlyList<SearchHit>? Hits, int RowCount, float Offset);
+
+    private ListState CurrentList(Inventory inventory, bool creative)
+    {
+        var searching = !inventoryView.Search.IsEmpty;
+        var hits = searching ? InventorySearch.Search(inventoryView.Search.Query, inventory, creative) : null;
+        var rowCount = hits?.Count ?? RowCountFor(inventoryView.Tab);
+        var offset = InventoryPanelLayout.ClampedOffset(
+            searching ? inventoryView.Search.ScrollOffset : inventoryView.ScrollOffset,
+            rowCount, renderManager.Ui.ScreenSize);
+        return new ListState(hits, rowCount, offset);
+    }
+
+    /// <summary>Switches the panel to <paramref name="tab"/> as a click on it does: the search clears and the
+    /// list pick drops.</summary>
+    internal void SelectTab(InventoryCategory tab)
+    {
+        inventoryView.Tab = tab;
+        inventoryView.Search.Clear();
+        inventoryView.ClearSelection();
+    }
+
+    /// <summary>Types <paramref name="text"/> into the search field as the keyboard would (focus first).</summary>
+    internal void TypeSearch(string text)
+    {
+        inventoryView.Focus = InventoryFocus.Search;
+        foreach (var c in text)
+            HandleInventoryType(c);
+    }
+
+    /// <summary>Clicks the listed row <paramref name="row"/> (0-based) of the plain list or search results, as a
+    /// click on it would. The creative catalog rows are buttons at a click position, so they are not reachable
+    /// this way.</summary>
+    internal void PickRow(int row)
+    {
+        var world = ActiveWorld ?? throw new InvalidOperationException("No world to pick a row in.");
+        var creative = world.Camera.IsCreative;
+        var list = CurrentList(world.Inventory, creative);
+        if (creative && list.Hits == null && inventoryView.Tab != InventoryCategory.Crafting)
+            throw new InvalidOperationException("Picking a row needs a survival player (creative rows are buttons).");
+        if (row < 0 || row >= list.RowCount)
+            throw new InvalidOperationException($"Row {row + 1} is not listed ({list.RowCount} rows).");
+        inventoryView.Focus = InventoryFocus.None;
+        ApplyRowClick(row, list, world.Inventory, creative, Vector2.Zero);
+    }
+
+    // What a click on a listed row does, by what the list holds: a search hit acts, a creative row is a button
+    // at the click, and a plain row picks its item, tool instance or recipe.
+    private void ApplyRowClick(int row, ListState list, Inventory inventory, bool creative, Vector2 position)
+    {
+        if (list.Hits != null)
+        {
+            if (row < list.Hits.Count)
+                ApplySearchHit(list.Hits[row]);
+        }
+        else if (creative && inventoryView.Tab != InventoryCategory.Crafting)
+        {
+            var entries = CreativeCatalog.Entries(inventoryView.Tab, inventory);
+            if (row < entries.Count)
+                ApplyCatalogButton(entries[row].Id, row, list.Offset, list.RowCount, position);
+        }
+        else switch (inventoryView.Tab)
+        {
+            case InventoryCategory.Tools:
+                inventoryView.SelectedToolInstance = inventory.ToolEntries()[row].InstanceId;
+                inventoryView.SelectedId = 0;
+                break;
+            case InventoryCategory.Crafting:
+                inventoryView.Craft.Select(ContentRegistry.CraftingRecipes[row]);
+                // A newly opened recipe starts at the top of its card.
+                inventoryView.CraftScrollOffset = 0f;
+                break;
+            default:
+            {
+                var picked = inventory.StackEntries(inventoryView.Tab)[row].Id;
+                inventoryView.SelectedId = picked;
+                inventoryView.SelectedToolInstance = 0;
+                if (inventoryView.Craft.Recipe != null)
+                    inventoryView.Craft.FeedFromInventory(picked, inventory);
+                break;
+            }
+        }
+    }
+
     /// <summary>
     /// Routes one left-click inside the open panel: the field boxes focus, tabs switch, rows
     /// pick for preview (or act on a search result), crafting controls feed the open recipe, and
@@ -371,60 +467,20 @@ internal sealed class InventoryPanelInput
         var tab = renderManager.Ui.Panel.PanelTabAt(position);
         if (tab.HasValue)
         {
-            inventoryView.Tab = tab.Value;
-            inventoryView.Search.Clear();
-            inventoryView.ClearSelection();
+            SelectTab(tab.Value);
             return;
         }
 
-        var searching = !inventoryView.Search.IsEmpty;
-        var hits = searching
-            ? InventorySearch.Search(inventoryView.Search.Query, inventory, creative)
-            : null;
-        var rowCount = hits?.Count ?? RowCountFor(inventoryView.Tab);
-        var offset = searching
-            ? InventoryPanelLayout.ClampedOffset(inventoryView.Search.ScrollOffset, rowCount, renderManager.Ui.ScreenSize)
-            : InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount, renderManager.Ui.ScreenSize);
+        var list = CurrentList(inventory, creative);
         // The scrollbar is handled on press; its release must not fall through to the
         // crafting card or hotbar tests below.
         if (InventoryPanelLayout.ScrollbarHitAt(renderManager.Ui.ToCanvas(position),
-                renderManager.Ui.ScreenSize, offset, rowCount) != ScrollbarHit.None)
+                renderManager.Ui.ScreenSize, list.Offset, list.RowCount) != ScrollbarHit.None)
             return;
-        var row = renderManager.Ui.Panel.PanelRowAt(position, offset, rowCount);
+        var row = renderManager.Ui.Panel.PanelRowAt(position, list.Offset, list.RowCount);
         if (row.HasValue)
         {
-            if (hits != null)
-            {
-                if (row.Value < hits.Count)
-                    ApplySearchHit(hits[row.Value]);
-            }
-            else if (creative && inventoryView.Tab != InventoryCategory.Crafting)
-            {
-                var entries = CreativeCatalog.Entries(inventoryView.Tab, inventory);
-                if (row.Value < entries.Count)
-                    ApplyCatalogButton(entries[row.Value].Id, row.Value, offset, rowCount, position);
-            }
-            else switch (inventoryView.Tab)
-            {
-                case InventoryCategory.Tools:
-                    inventoryView.SelectedToolInstance = inventory.ToolEntries()[row.Value].InstanceId;
-                    inventoryView.SelectedId = 0;
-                    break;
-                case InventoryCategory.Crafting:
-                    inventoryView.Craft.Select(ContentRegistry.CraftingRecipes[row.Value]);
-                    // A newly opened recipe starts at the top of its card.
-                    inventoryView.CraftScrollOffset = 0f;
-                    break;
-                default:
-                {
-                    var picked = inventory.StackEntries(inventoryView.Tab)[row.Value].Id;
-                    inventoryView.SelectedId = picked;
-                    inventoryView.SelectedToolInstance = 0;
-                    if (inventoryView.Craft.Recipe != null)
-                        inventoryView.Craft.FeedFromInventory(picked, inventory);
-                    break;
-                }
-            }
+            ApplyRowClick(row.Value, list, inventory, creative, position);
             return;
         }
 

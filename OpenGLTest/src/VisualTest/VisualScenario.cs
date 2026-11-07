@@ -72,6 +72,19 @@ public sealed class VisualStep
     /// <summary>The spell part keys (<c>&lt;kind&gt;/&lt;name&gt;</c>) a <c>cast</c> step fires, in
     /// recipe order (resolved at run time).</summary>
     public string[] Parts { get; init; } = [];
+
+    /// <summary>The [E] panel tab a <c>tab</c> step opens (<c>blocks</c>, <c>tools</c>, <c>misc</c> or
+    /// <c>crafting</c>).</summary>
+    public string? Tab { get; init; }
+
+    /// <summary>The text a <c>search</c> step types into the [E] panel's search field.</summary>
+    public string? Text { get; init; }
+
+    /// <summary>The listed row a <c>row</c> step picks, 1-based from the top of the list.</summary>
+    public int Row { get; init; }
+
+    /// <summary>Where a <c>hover</c> step puts the pointer, in canvas units; null clears the scripted pointer.</summary>
+    public Vector2? Point { get; init; }
 }
 
 /// <summary>
@@ -217,6 +230,28 @@ public sealed class VisualScenario
                     : throw new InvalidOperationException(
                         $"Step {index} (select) needs 'slot' from 1 to {Inventory.SlotCount}."),
             },
+            "panel" => new VisualStep { Op = "panel", On = ReadOpen(element) },
+            "tab" => new VisualStep
+            {
+                Op = "tab",
+                Tab = ReadChoice(element, index, "tab", "tab", ["blocks", "tools", "misc", "crafting"]),
+            },
+            "search" => new VisualStep
+            {
+                Op = "search",
+                Text = element.TryGetProperty("text", out var searchText) && searchText.ValueKind == JsonValueKind.String
+                    ? searchText.GetString()!
+                    : throw new InvalidOperationException($"Step {index} (search) needs a 'text' string."),
+            },
+            "row" => new VisualStep
+            {
+                Op = "row",
+                Row = element.TryGetProperty("row", out var rowElement) && rowElement.TryGetInt32(out var row) && row >= 1
+                    ? row
+                    : throw new InvalidOperationException($"Step {index} (row) needs 'row', a 1-based row from the top of the list."),
+            },
+            "hover" => ReadHover(element, index),
+            "spellbuilder" => new VisualStep { Op = "spellbuilder", On = ReadOpen(element) },
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -224,8 +259,24 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder or screenshot."),
         };
+    }
+
+    // "open" defaults to true, so a bare panel or spellbuilder step opens it.
+    private static bool ReadOpen(JsonElement element) =>
+        !element.TryGetProperty("open", out var open) || open.GetBoolean();
+
+    // hover needs "pos": [x, y] in canvas units, or "clear": true to hand the pointer back to the mouse.
+    private static VisualStep ReadHover(JsonElement element, int index)
+    {
+        if (element.TryGetProperty("clear", out var clear) && clear.ValueKind == JsonValueKind.True)
+            return new VisualStep { Op = "hover" };
+        var values = ReadPosValues(element, index, "hover", "[x, y]");
+        if (values.Count != 2)
+            throw new InvalidOperationException(
+                $"Step {index} (hover) needs 'pos' with exactly 2 numbers, got {values.Count}.");
+        return new VisualStep { Op = "hover", Point = new Vector2(values[0], values[1]) };
     }
 
     private static string ReadChoice(JsonElement element, int index, string op, string field, string[] choices)
