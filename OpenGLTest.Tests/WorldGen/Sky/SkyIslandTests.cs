@@ -203,7 +203,7 @@ public sealed class SkyIslandTests
             Assert.Equal(r, zone.Radius);
 
             // Just past the nominal radius is open sky: the gap keeps every other zone far away
-            if (SkyLandmasses.TryFindNear(x + r + 1f, z, out _)) continue; // a landmass is a zone too
+            if (SkyLandmasses.TryFindInfluence(x + r + 1f, z, out _, out _)) continue; // a landmass and its fringe are a zone too
             Assert.False(SkyIslands.ZoneAt(x + r + 1f, z).InZone);
         }
     }

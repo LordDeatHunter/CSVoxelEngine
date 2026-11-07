@@ -61,10 +61,11 @@ public static class SkyIslands
             if (weight > best.Weight) best = new SkyZone(weight, tier, radius, centerX, centerZ);
         }
 
-        // A landmass is its own zone, as deep as its bounding disc holds the point
-        if (best.Weight < 1f && SkyLandmasses.TryFindNear(x, z, out var landmass))
-            best = new SkyZone(1f, SkyLandmasses.TierOf(landmass), landmass.Radius, landmass.CenterX, landmass.CenterZ);
-
+        // A landmass is its own zone: full weight over its bounding disc, easing out across its fringe, where
+        // the broken-off islands drift
+        if (best.Weight < 1f && SkyLandmasses.TryFindInfluence(x, z, out var landmass, out var landWeight)
+            && landWeight > best.Weight)
+            best = new SkyZone(landWeight, SkyLandmasses.TierOf(landmass), landmass.Radius, landmass.CenterX, landmass.CenterZ);
         return best;
     }
 
@@ -151,7 +152,7 @@ public static class SkyIslands
     public static int CollectIslands(int minX, int minZ, int maxX, int maxZ, Span<SkyIsland> into)
     {
         var count = SkyLandmasses.Collect(minX, minZ, maxX, maxZ, into, 0);
-        if (!AnyZoneNear(minX, minZ, maxX, maxZ)) return count;
+        if (!AnyZoneNear(minX, minZ, maxX, maxZ) && !SkyLandmasses.AnyNear(minX, minZ, maxX, maxZ)) return count;
 
         var reach = SkyIslandConfig.IslandMaxRadius;
         TerrainSites.CellRange(minX, SkyIslandConfig.IslandCellBlocks, reach, out var cellMinX, out _);

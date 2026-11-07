@@ -110,6 +110,30 @@ public sealed class SkyLandmassTests
     }
 
     [Fact]
+    public void BrokenOffIslandsDriftInTheFringeAroundALandmass()
+    {
+        var landmass = Biggest();
+        var fringe = SkyLandmasses.FringeOf(landmass);
+        var cell = SkyIslandConfig.IslandCellBlocks;
+        var cx = (int)MathF.Floor(landmass.CenterX / cell);
+        var cz = (int)MathF.Floor(landmass.CenterZ / cell);
+        var span = (int)((landmass.Radius + fringe) / cell) + 2;
+        var inFringe = 0;
+        for (var gx = cx - span; gx <= cx + span; gx++)
+        for (var gz = cz - span; gz <= cz + span; gz++)
+        {
+            if (!SkyIslands.TryGetIsland(gx, gz, out var island)) continue;
+            var dx = island.CenterX - landmass.CenterX;
+            var dz = island.CenterZ - landmass.CenterZ;
+            if (dx * dx + dz * dz < (landmass.Radius + fringe) * (landmass.Radius + fringe)
+                && dx * dx + dz * dz >= landmass.Radius * landmass.Radius)
+                inFringe++;
+        }
+
+        Assert.True(inFringe > 0, "no island drifts around the landmass");
+    }
+
+    [Fact]
     public void TheStampOfTwoNeighboringChunksEqualsThePointQuery()
     {
         var landmass = Biggest();

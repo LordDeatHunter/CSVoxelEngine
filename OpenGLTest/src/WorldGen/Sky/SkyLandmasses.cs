@@ -92,10 +92,17 @@ internal static class SkyLandmasses
         return count;
     }
 
-    /// <summary>The landmass whose bounding disc holds (x, z): false in open sky and clear of every landmass.</summary>
-    internal static bool TryFindNear(float x, float z, out SkyIsland landmass)
+    /// <summary>The width of the ring of broken-off islands around <paramref name="landmass"/>.</summary>
+    internal static float FringeOf(in SkyIsland landmass) =>
+        MathF.Min(landmass.Radius * SkyIslandConfig.LandmassFringeShare, SkyIslandConfig.LandmassFringeMaxBlocks);
+
+    /// <summary>
+    /// The landmass whose bounding disc or fringe holds (x, z), with its 0..1 weight there: 1 inside the
+    /// bounding disc, easing to 0 across the fringe. False in open sky clear of every landmass.
+    /// </summary>
+    internal static bool TryFindInfluence(float x, float z, out SkyIsland landmass, out float weight)
     {
-        var reach = SkyIslandConfig.LandmassMaxRadius;
+        var reach = SkyIslandConfig.LandmassMaxRadius + SkyIslandConfig.LandmassFringeMaxBlocks;
         TerrainSites.CellRange(x, SkyIslandConfig.LandmassCellBlocks, reach, out var minX, out var maxX);
         TerrainSites.CellRange(z, SkyIslandConfig.LandmassCellBlocks, reach, out var minZ, out var maxZ);
         for (var gx = minX; gx <= maxX; gx++)
@@ -104,13 +111,39 @@ internal static class SkyLandmasses
             if (!TryGetLandmass(gx, gz, out landmass)) continue;
             var dx = x - landmass.CenterX;
             var dz = z - landmass.CenterZ;
-            if (dx * dx + dz * dz < landmass.Radius * landmass.Radius) return true;
+            var d = MathF.Sqrt(dx * dx + dz * dz);
+            var fringe = FringeOf(landmass);
+            if (d >= landmass.Radius + fringe) continue;
+            weight = 1f - MathUtils.SmoothStep(landmass.Radius, landmass.Radius + fringe, d);
+            return true;
         }
 
         landmass = default;
+        weight = 0f;
         return false;
     }
 
+    /// <summary>Whether any landmass's bounding disc plus fringe reaches the box (inclusive world columns): the cheap
+    /// gate that lets the island scan run beside a continent where no archipelago zone stands.</summary>
+    internal static bool AnyNear(int minX, int minZ, int maxX, int maxZ)
+    {
+        var reach = SkyIslandConfig.LandmassMaxRadius + SkyIslandConfig.LandmassFringeMaxBlocks;
+        TerrainSites.CellRange(minX, SkyIslandConfig.LandmassCellBlocks, reach, out var cellMinX, out _);
+        TerrainSites.CellRange(maxX, SkyIslandConfig.LandmassCellBlocks, reach, out _, out var cellMaxX);
+        TerrainSites.CellRange(minZ, SkyIslandConfig.LandmassCellBlocks, reach, out var cellMinZ, out _);
+        TerrainSites.CellRange(maxZ, SkyIslandConfig.LandmassCellBlocks, reach, out _, out var cellMaxZ);
+        for (var gx = cellMinX; gx <= cellMaxX; gx++)
+        for (var gz = cellMinZ; gz <= cellMaxZ; gz++)
+        {
+            if (!TryGetLandmass(gx, gz, out var landmass)) continue;
+            var dx = landmass.CenterX - Math.Clamp(landmass.CenterX, minX, maxX + 1);
+            var dz = landmass.CenterZ - Math.Clamp(landmass.CenterZ, minZ, maxZ + 1);
+            var range = landmass.Radius + FringeOf(landmass);
+            if (dx * dx + dz * dz < range * range) return true;
+        }
+
+        return false;
+    }
     /// <summary>Whether a disc of <paramref name="radius"/> at (x, z) reaches any landmass's bounding disc, which
     /// is how an ordinary island gives way to a landmass.</summary>
     internal static bool OverlapsDisc(float x, float z, float radius)
