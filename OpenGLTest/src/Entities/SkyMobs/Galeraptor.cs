@@ -75,7 +75,7 @@ public sealed class Galeraptor : SkyMob
     /// <inheritdoc />
     protected override Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, IMobTarget target)
     {
-        if (_diveCooldown > 0f || dist > MobConfig.GaleraptorDiveRangeBlocks || !SeesTarget(Position, target, chunks))
+        if (IsCarrying || _diveCooldown > 0f || dist > MobConfig.GaleraptorDiveRangeBlocks || !SeesTarget(Position, target, chunks))
             return Vector3.Zero;
 
         StartAttack();
@@ -88,6 +88,14 @@ public sealed class Galeraptor : SkyMob
     protected override void Locomote(Vector3 move, IMobTarget? target, Vector3? wander, float deltaTime,
         ChunkManager chunks)
     {
+        if (Carried != null)
+        {
+            // Climb with the prize: the goal sits above the carried target, never into a new dive
+            var up = new Vector3(0f, MobConfig.GaleraptorCarryHeightBlocks, 0f);
+            Fly(Carried.Eye + up, chasing: true, MoveFactor, deltaTime, chunks);
+            return;
+        }
+
         if (target != null)
         {
             var diving = IsDiving;
@@ -102,4 +110,35 @@ public sealed class Galeraptor : SkyMob
     /// <summary>True once per dive, at the dive clip's impact event; the manager decides whether the target is
     /// still in reach.</summary>
     public bool TryTakeDiveImpact() => Animation.ConsumeEvent(ImpactEvent);
+
+    /// <summary>The target the talons hold (lifting it skyward before the drop), or null.</summary>
+    public IMobTarget? Carried { get; private set; }
+
+    private float _carrySecondsLeft;
+    private float _grabY;
+
+    /// <summary>Whether the raptor is carrying a target up.</summary>
+    public bool IsCarrying => Carried != null;
+
+    /// <summary>Takes hold of <paramref name="target"/>: the manager lifts it until it is
+    /// <see cref="MobConfig.GaleraptorCarryHeightBlocks"/> above where it was grabbed, then lets go.</summary>
+    public void Grab(IMobTarget target)
+    {
+        Carried = target;
+        _carrySecondsLeft = MobConfig.GaleraptorCarryMaxSeconds;
+        _grabY = target.Eye.Y;
+    }
+
+    /// <summary>Lets go of whatever is held.</summary>
+    public void Release() => Carried = null;
+
+    /// <summary>Ages the hold and reports whether the carried target should now be dropped: it reached the
+    /// carry height, the time ran out, it became immune or dead, or the raptor itself is going down.</summary>
+    public bool CarryDone(float deltaTime)
+    {
+        if (Carried == null) return false;
+        _carrySecondsLeft -= deltaTime;
+        return _carrySecondsLeft <= 0f || Carried.IsDead || Carried.IsImmune || IsDying
+               || Carried.Eye.Y - _grabY >= MobConfig.GaleraptorCarryHeightBlocks;
+    }
 }

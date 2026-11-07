@@ -205,7 +205,8 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     // per column (SnowGenerator.IsFrozenWater), the ice share rising with the cold, so the edge is
     // ragged pack ice that thickens into a solid sheet.
     public const bool SnowAndIceEnabled = true;
-    public const float SnowColdThreshold = 0.55f;   // ColdWeight above which snow starts to settle
+    public const float SnowColdThreshold = 0.48f;   // ColdWeight above which the first snow patches settle
+    public const float SnowFullColdThreshold = 0.6f; // ColdWeight from which every column is snowed (the ragged snow band ends; must stay at or below PackIceColdStart)
     // ColdWeight above which the first floes form. Must stay at or above SnowColdThreshold: Stamp
     // skips sub-snow columns before it ever freezes, and the far LOD covers a frozen sheet in snow
     // only above the snow line, so ice below the snow line would disagree between near and far.

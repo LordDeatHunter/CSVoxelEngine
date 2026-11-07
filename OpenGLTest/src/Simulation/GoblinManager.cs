@@ -187,7 +187,7 @@ public sealed class GoblinManager : IMobPopulation
     /// <see cref="Update(float, ChunkManager, DropManager, IReadOnlyList{IMobTarget}, BlockDebrisSystem, IReadOnlyList{Slime}, Vector3?, Vector3?, float, float)"/>.</summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, Camera camera,
         BlockDebrisSystem? debris = null, IReadOnlyList<Slime>? slimes = null, Vector3? aimOrigin = null,
-        Vector3? aimDirection = null, float aimCharge = 0f)
+        Vector3? aimDirection = null, float aimCharge = 0f, float night = 0f)
     {
         if (camera == null)
         {
@@ -197,7 +197,7 @@ public sealed class GoblinManager : IMobPopulation
 
         _singleTarget.Clear();
         _singleTarget.Add(camera);
-        Update(deltaTime, chunks, drops, _singleTarget, debris, slimes, aimOrigin, aimDirection, aimCharge);
+        Update(deltaTime, chunks, drops, _singleTarget, debris, slimes, aimOrigin, aimDirection, aimCharge, night);
     }
 
     /// <summary>
@@ -452,6 +452,9 @@ public sealed class GoblinManager : IMobPopulation
         _spawnTimer += deltaTime;
         if (_spawnTimer < MobConfig.GoblinSpawnIntervalSeconds) return;
         _spawnTimer = 0f;
+
+        // Goblins raid only in the dark
+        if (night < MobConfig.GoblinMinNightToSpawn) return;
 
         if (targets.Count == 0) return;
         var index = _spawnCursor % targets.Count;

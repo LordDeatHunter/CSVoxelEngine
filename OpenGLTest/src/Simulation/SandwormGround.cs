@@ -1,3 +1,4 @@
+using System;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.WorldGen;
@@ -24,9 +25,22 @@ public static class SandwormGround
         var i = VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(blockX), VoxelCoords.WorldToLocal(blockZ));
         var height = column.Heights[i];
         var surface = height + 1f;
-        if (height < column.WaterLevel[i]) return (surface, false);
-        if (!chunks.TryGetCell(blockX, height, blockZ, out var id, out _)) return (surface, false);
-        return (surface, IsSand(id));
+        // The worm burrows through any ground; only open water stops it
+        return (surface, height >= column.WaterLevel[i]);
+    }
+
+    /// <summary>Whether (<paramref name="x"/>, <paramref name="z"/>) is desert or within
+    /// <paramref name="reach"/> blocks of it (sampled on a ring of eight points).</summary>
+    public static bool IsNearDesert(ChunkManager chunks, float x, float z, float reach)
+    {
+        if (IsDesert(chunks, x, z)) return true;
+        for (var k = 0; k < 8; k++)
+        {
+            var angle = k * MathF.PI / 4f;
+            if (IsDesert(chunks, x + MathF.Cos(angle) * reach, z + MathF.Sin(angle) * reach)) return true;
+        }
+
+        return false;
     }
 
     /// <summary>Whether the column holding (<paramref name="x"/>, <paramref name="z"/>) is desert: the world

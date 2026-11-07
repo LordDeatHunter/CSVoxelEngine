@@ -144,7 +144,7 @@ public static class WorldFeatureConfig
     // --- Desert wells (DesertWellGenerator): a sandstone ring around a sunken pool ---
     public const bool DesertWellsEnabled = true;
     public const int WellCellShift = 7;
-    public const float WellChance = 0.06f;
+    public const float WellChance = 0.012f;
 
     // --- Ruins (RuinPlacement): hand-authored structure templates with loot chests, stamped on a hashed cell grid ---
     public const bool RuinsEnabled = true;

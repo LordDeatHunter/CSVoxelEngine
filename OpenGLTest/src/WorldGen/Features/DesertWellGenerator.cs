@@ -64,7 +64,7 @@ public static class DesertWellGenerator
             var ground = HeightAt(x, z);
             if (TerrainGenerator.IsWaterColumn(x, z, ground)) continue;
             if (!IsFlatSite(x, z, ground)) continue;
-            StampWell(blocks, worldY0, x, z, ground);
+            StampWell(blocks, worldX0, worldY0, worldZ0, x, z, ground);
         }
     }
 
@@ -81,15 +81,16 @@ public static class DesertWellGenerator
     /// <summary>
     /// Writes one well centered on column (x, z) whose ground is <paramref name="ground"/>: the
     /// 5x5 wall one cell up, the inner 3x3 ring a sandstone floor at the ground's own level (its
-    /// center the water source), into air and the surface cell only. The test seam for the shape.
+    /// center the water source), into air and the surface cell only, clipped to the chunk whose origin
+    /// is (<paramref name="worldX0"/>, <paramref name="worldY0"/>, <paramref name="worldZ0"/>). The test seam for the shape.
     /// </summary>
-    internal static void StampWell(byte[] blocks, int worldY0, int x, int z, int ground)
+    internal static void StampWell(byte[] blocks, int worldX0, int worldY0, int worldZ0, int x, int z, int ground)
     {
         for (var dx = -FootprintRadius; dx <= FootprintRadius; dx++)
         for (var dz = -FootprintRadius; dz <= FootprintRadius; dz++)
         {
-            var lx = x + dx - worldX0Of(x);
-            var lz = z + dz - worldX0Of(z);
+            var lx = x + dx - worldX0;
+            var lz = z + dz - worldZ0;
             if ((uint)lx >= Chunk.Size || (uint)lz >= Chunk.Size) continue;
             var ring = Math.Max(Math.Abs(dx), Math.Abs(dz));
 
@@ -113,14 +114,14 @@ public static class DesertWellGenerator
         }
     }
 
-    // The footprint must sit level: every column within a cell of the center's ground, so the
+    // The footprint must sit exactly level: every column at the center's ground, so the
     // wall never floats over a dune or buries itself in one
     private static bool IsFlatSite(int x, int z, int ground)
     {
         for (var dx = -FootprintRadius; dx <= FootprintRadius; dx++)
         for (var dz = -FootprintRadius; dz <= FootprintRadius; dz++)
         {
-            if (Math.Abs(HeightAt(x + dx, z + dz) - ground) > 1) return false;
+            if (HeightAt(x + dx, z + dz) != ground) return false;
         }
         return true;
     }
@@ -128,7 +129,4 @@ public static class DesertWellGenerator
     private static int HeightAt(int x, int z) =>
         ColumnCache.GetHeights(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z))
             [VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
-
-    // The chunk origin a world column falls in (StampWell is handed the worldY0 alone)
-    private static int worldX0Of(int x) => x & ~Chunk.SizeMask;
 }

@@ -108,9 +108,9 @@ public static class MobConfig
     // is airborne; a grounded touch shoves it instead. Combat values live here so a future
     // player-attack pass reads one place.
     public const float SlimeSpawnIntervalSeconds = 8f;
-    public const float SlimeSpawnMinRadiusBlocks = 20f;
-    public const float SlimeSpawnMaxRadiusBlocks = 40f;
-    public const float SlimeDespawnRadiusBlocks = 64f;
+    public const float SlimeSpawnMinRadiusBlocks = 40f;
+    public const float SlimeSpawnMaxRadiusBlocks = 64f;
+    public const float SlimeDespawnRadiusBlocks = 100f;
     public const int SlimeSpawnTries = 8;
     public const int SlimeContactDamage = 12;
     public const float SlimeShoveSpeed = 3.5f;
@@ -179,10 +179,13 @@ public static class MobConfig
     // under ThrownProjectile.Gravity, with margin for a chest-height target and the
     // semi-implicit Euler drop, or the far edge of the band has no solvable arc.
     public const float GoblinSpawnIntervalSeconds = 14f;
-    public const float GoblinSpawnMinRadiusBlocks = 20f;
-    public const float GoblinSpawnMaxRadiusBlocks = 40f;
+    /// <summary>The night factor (0 day, 1 night) below which no goblin spawns on the surface.</summary>
+    public const float GoblinMinNightToSpawn = 0.35f;
+
+    public const float GoblinSpawnMinRadiusBlocks = 40f;
+    public const float GoblinSpawnMaxRadiusBlocks = 64f;
     public const int GoblinSpawnTries = 8;
-    public const float GoblinDespawnRadiusBlocks = 64f;
+    public const float GoblinDespawnRadiusBlocks = 100f;
     public const float GoblinWalkSpeed = 3.2f;
     public const float GoblinJumpSpeed = 8.5f;
     // Stones (flint) a goblin carries, rolled inclusive at spawn; the rest drop on death.
@@ -228,8 +231,8 @@ public static class MobConfig
     // damage and the caster's fire rate (LayerDifficulty) and the pack size: one more mob every
     // HellPackLayersPerExtra layers, up to HellPackMaxSize. HellCasterShare of the spawns are casters.
     public const float HellSpawnIntervalSeconds = 10f;
-    public const float HellSpawnMinRadiusBlocks = 20f;
-    public const float HellSpawnMaxRadiusBlocks = 40f;
+    public const float HellSpawnMinRadiusBlocks = 30f;
+    public const float HellSpawnMaxRadiusBlocks = 52f;
     public const int HellSpawnTries = 10;
     public const int HellSpawnSearchHalfHeight = 16;
     public const int HellSpawnScanDepth = 40;
@@ -238,7 +241,7 @@ public static class MobConfig
     public const int HellPackMaxSize = 3;
     public const float HellPackSpawnRadiusBlocks = 4f;
     public const float HellCasterShare = 0.4f;
-    public const float HellDespawnRadiusBlocks = 64f;
+    public const float HellDespawnRadiusBlocks = 100f;
 
     // The hellbrute: a slow, tanky melee bruiser. It closes at its walk and charges at
     // HellbruteChargeSpeedFactor of it once it sees its target within HellbruteChargeRangeBlocks
@@ -291,8 +294,8 @@ public static class MobConfig
     // up to SkyPackMaxSize. Only a big zone spawns the golem, as SkyBruiserShare of its spawns; a galeraptor
     // appears SkyFlyerSpawnLiftMin..Max blocks over the island top it was found on.
     public const float SkySpawnIntervalSeconds = 10f;
-    public const float SkySpawnMinRadiusBlocks = 14f;
-    public const float SkySpawnMaxRadiusBlocks = 36f;
+    public const float SkySpawnMinRadiusBlocks = 24f;
+    public const float SkySpawnMaxRadiusBlocks = 48f;
     public const int SkySpawnTries = 16;
     public const int SkySpawnSearchHalfHeight = 16;
     public const int SkySpawnScanDepth = 40;
@@ -303,7 +306,7 @@ public static class MobConfig
     public const float SkyBruiserShare = 0.35f;
     public const float SkyFlyerSpawnLiftMin = 6f;
     public const float SkyFlyerSpawnLiftMax = 14f;
-    public const float SkyDespawnRadiusBlocks = 64f;
+    public const float SkyDespawnRadiusBlocks = 100f;
 
     // The galeraptor: a diving flyer (FlightTuning below). It hovers GaleraptorHoverMin..MaxBlocks above
     // its target's eye and, off its cooldown with a clear line within GaleraptorDiveRangeBlocks
@@ -329,6 +332,13 @@ public static class MobConfig
     public const int GaleraptorDiveDamage = 6;
     public const float GaleraptorKnockbackSpeed = 5f;
     public const float GaleraptorKnockbackLift = 2f;
+
+    /// <summary>How high above where it was grabbed a carried target is lifted before the raptor drops it.</summary>
+    public const float GaleraptorCarryHeightBlocks = 24f;
+    /// <summary>The upward speed the talons give a carried target each frame.</summary>
+    public const float GaleraptorCarryLiftSpeed = 9f;
+    /// <summary>The longest a raptor holds on before letting go regardless of height.</summary>
+    public const float GaleraptorCarryMaxSeconds = 6f;
     // How hard a player shoves a galeraptor touching the ground (a dive that bottoms out); in the air never
     public const float GaleraptorShoveSpeed = 3.5f;
 

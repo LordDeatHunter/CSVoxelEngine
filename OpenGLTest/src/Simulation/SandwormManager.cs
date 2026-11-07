@@ -158,7 +158,9 @@ public sealed class SandwormManager : IMobPopulation
     private void UpdateWorm(Sandworm worm, float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
         var target = PickTarget(worm, chunks, targets);
-        if (target == null && worm.Phase != SandwormPhase.Thump && TargetsAllFar(worm, targets))
+        if (worm.Phase != SandwormPhase.Thump && worm.Phase != SandwormPhase.Retreat
+            && ((target == null && TargetsAllFar(worm, targets))
+                || !SandwormGround.IsNearDesert(chunks, worm.Position.X, worm.Position.Z, SandwormConfig.DesertLeaveBlocks)))
             worm.Brain.BeginRetreat();
         worm.Update(deltaTime, target, (x, z) => SandwormGround.At(chunks, x, z));
     }

@@ -99,6 +99,7 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
         IReadOnlyList<IMobTarget> targets, BlockDebrisSystem? debris, float despawnRadius)
     {
         DamageDealtThisFrame = 0;
+        FrameDelta = deltaTime;
         var despawnSquared = despawnRadius * despawnRadius;
         for (var i = _mobs.Count - 1; i >= 0; i--)
         {
@@ -138,6 +139,10 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
     /// <summary>Lands whatever attack <paramref name="mob"/>'s clip released this frame (at its timeline
     /// event), billing each hit through <see cref="Hit"/>.</summary>
     protected abstract void Attack(TMob mob, IReadOnlyList<IMobTarget> targets);
+
+    /// <summary>The seconds of the frame <see cref="UpdateMobs"/> is running, for attacks that last longer than
+    /// their impact event (a raptor's carry).</summary>
+    protected float FrameDelta { get; private set; }
 
     /// <summary>How fast a player walking into a grounded <paramref name="mob"/> shoves it aside.</summary>
     protected abstract float ShoveSpeedOf(TMob mob);

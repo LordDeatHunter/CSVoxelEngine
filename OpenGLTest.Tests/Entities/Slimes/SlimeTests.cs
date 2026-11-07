@@ -142,7 +142,7 @@ public sealed class SlimeTests
         Assert.True(found);
         var dx = position.X - player.X;
         var dz = position.Z - player.Z;
-        Assert.InRange(MathF.Sqrt(dx * dx + dz * dz), 18f, 42f);
+        Assert.InRange(MathF.Sqrt(dx * dx + dz * dz), MobConfig.SlimeSpawnMinRadiusBlocks - 2f, MobConfig.SlimeSpawnMaxRadiusBlocks + 2f);
         var groundY = (int)MathF.Floor(position.Y - 2f * Slime.HalfExtent);
         Assert.True(BlockType.IsSolid(
             chunks.GetBlockGlobal((int)MathF.Floor(position.X), groundY, (int)MathF.Floor(position.Z))));

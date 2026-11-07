@@ -18,19 +18,19 @@ public static class SkyIslandConfig
     // --- Zones: one hashed candidate per zone cell, wide empty sky between them ---
 
     /// <summary>Side of the square cell that rolls at most one island zone.</summary>
-    public const int ZoneCellBlocks = 480;
+    public const int ZoneCellBlocks = 400;
 
     /// <summary>Chance a zone cell rolls a zone candidate.</summary>
     public const float ZoneChance = 1f;
 
     /// <summary>Skew of the zone size roll toward small (the size is u^skew), so big zones are rare.</summary>
-    public const float ZoneSizeSkew = 2.2f;
+    public const float ZoneSizeSkew = 1.6f;
 
     /// <summary>Radius of the smallest zone in blocks.</summary>
-    public const float ZoneMinRadius = 130f;
+    public const float ZoneMinRadius = 170f;
 
     /// <summary>Radius of the biggest zone in blocks.</summary>
-    public const float ZoneMaxRadius = 300f;
+    public const float ZoneMaxRadius = 440f;
 
     /// <summary>The least open sky between two zones' nominal outlines; the lower hash wins a crowd.</summary>
     public const float ZoneGapBlocks = 6f;
@@ -116,13 +116,13 @@ public static class SkyIslandConfig
     public const int LandmassCellBlocks = 2400;
 
     /// <summary>Chance a landmass cell rolls a candidate.</summary>
-    public const float LandmassChance = 0.7f;
+    public const float LandmassChance = 0.9f;
 
     /// <summary>Skew of the landmass size roll toward small.</summary>
-    public const float LandmassSizeSkew = 1.8f;
+    public const float LandmassSizeSkew = 1.0f;
 
     /// <summary>Bounding radius of the smallest landmass.</summary>
-    public const float LandmassMinRadius = 220f;
+    public const float LandmassMinRadius = 300f;
 
     /// <summary>Bounding radius of the biggest landmass.</summary>
     public const float LandmassMaxRadius = 1200f;

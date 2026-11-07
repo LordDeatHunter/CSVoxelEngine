@@ -71,6 +71,14 @@ public sealed class SkyMobManager : RealmMobManager<SkyMob>
     {
         if (mob is Galeraptor raptor)
         {
+            if (raptor.Carried is { } held)
+            {
+                // Hoist the held target skyward each frame; once high enough (or too long) the talons open
+                if (raptor.CarryDone(FrameDelta)) raptor.Release();
+                else held.TakeHit(0, Vector3.Zero, 0f, MobConfig.GaleraptorCarryLiftSpeed, raptor.Type.DisplayName);
+                return;
+            }
+
             if (!raptor.TryTakeDiveImpact()) return;
             for (var t = 0; t < targets.Count; t++)
             {
@@ -78,6 +86,8 @@ public sealed class SkyMobManager : RealmMobManager<SkyMob>
                 if (target.IsImmune || !Galeraptor.InDiveReach(raptor.Position, target.Eye)) continue;
                 Hit(target, raptor.DiveDamage, raptor.Position, MobConfig.GaleraptorKnockbackSpeed,
                     MobConfig.GaleraptorKnockbackLift, raptor.Type.DisplayName);
+                raptor.Grab(target);
+                break;
             }
             return;
         }

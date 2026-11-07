@@ -192,6 +192,10 @@ public static class SandwormConfig
     /// <summary>Past this horizontal distance from every target the worm retreats and is gone.</summary>
     public const float DespawnRadiusBlocks = 160f;
 
+    /// <summary>How far from the desert the worm may stray before it gives up and retreats: it burrows through any
+    /// ground, but not far from its home biome.</summary>
+    public const float DesertLeaveBlocks = 48f;
+
     /// <summary>Seconds the worm's death plays before it is removed.</summary>
     public const float DeathSeconds = 2.5f;
 }

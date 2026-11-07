@@ -513,7 +513,7 @@ internal sealed class LodMeshBuilder
         // The plain snow line: it also decides snow on land cells. On a sea sheet the emitter
         // draws snow only over a frozen cell, and PackIceColdStart >= SnowColdThreshold makes
         // every frozen cell snow-covered, exactly as the near stamp lays snow on every ice cell.
-        _snowTop[(i + 1) * _heightGrid + (j + 1)] = cold > WorldGenerationConfig.SnowColdThreshold;
+        _snowTop[(i + 1) * _heightGrid + (j + 1)] = SnowGenerator.HasSnow(centerX, centerZ, cold);
         // The near stamp's pack-ice rule. The emitter reads _iceTop only for water cells (the
         // same > NoWater test), so land cells never pay for it, and the hot-spring site test
         // inside it runs only for would-be-frozen water, keeping it off the LodGen threads.

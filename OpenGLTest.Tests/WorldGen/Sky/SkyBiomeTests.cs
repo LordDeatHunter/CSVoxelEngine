@@ -190,7 +190,7 @@ public sealed class SkyBiomeTests : IDisposable
         {
             var palette = SkyBiomes.Palette(biome);
             var leaves = 0;
-            var trees = IslandsOf(biome, 4).SelectMany(TreesOn).ToList();
+            var trees = IslandsOf(biome, 10).SelectMany(TreesOn).ToList();
             Assert.Equal(palette.Tree != null, trees.Count > 0);
 
             foreach (var (tree, cx, cz) in trees)
@@ -221,7 +221,7 @@ public sealed class SkyBiomeTests : IDisposable
         foreach (var biome in AllBiomes)
         {
             // A tree crossing a chunk seam vertically: its cells come from two chunks
-            var (tree, cx, cz) = IslandsOf(biome, 6).SelectMany(TreesOn)
+            var (tree, cx, cz) = IslandsOf(biome, 14).SelectMany(TreesOn)
                 .First(t => t.Tree.MinY >> Chunk.SizeShift != t.Tree.MaxY >> Chunk.SizeShift);
             var expected = tree.Cells.ToDictionary(c => (c.X, c.Y, c.Z), c => (c.Block, c.State));
 
