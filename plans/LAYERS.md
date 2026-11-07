@@ -4,7 +4,7 @@
 
 ## Status
 
-Phase 1 (foundations) done; phase 2 under way (`L-5` to `L-8` done). A Nether- and Aether-like pair of realms inside the one world, as vertical
+Phase 1 (foundations) done; phase 2 under way (`L-5` to `L-9` done). A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
@@ -23,10 +23,12 @@ layer mixes them and the next differs) dress the pockets: Ashlands (ash, cinder 
 hellrock, few lava pools), Magma Caverns (basalt, magma blocks, every pool lava) and Fungal Grove
 (fungal moss and soil, nearly dry); floor, ceiling and wall skins a few cells deep, ceiling lights
 (`ember_crystal`, `fungal_glow`) in two new light colors (5 of 8 palette slots used). The palette is
-nine JSON blocks with tiles from `tools/generate-hell-textures.py` (a spec per block). `L-9` places
-flora per biome through `HellBiomes`; the layer index is ready for the hell mobs' difficulty (`L-10`).
-Id budget: 158 of 255 ids used (93 blocks, 64 items, air), 97 left for `L-9` (~8), `L-10` (~3) and
-the sky palette (`L-11`..`L-15`, ~25).
+nine JSON blocks with tiles from `tools/generate-hell-textures.py` (a spec per block). The pockets
+carry flora per biome (`L-9`, AGENTS.md "Hell flora"): vines and ground plants as part of hell's one
+pure rule (`HellFlora`), and two tree species (`fungal_tree`, `charred_tree`) grown one per 8x8 cell
+and layer by `HellTrees`. The layer index is ready for the hell mobs' difficulty (`L-10`).
+Id budget: 164 of 255 ids used (99 blocks, 64 items, air), 91 left for `L-10` (~3) and the sky
+palette (`L-11`..`L-15`, ~25).
 Last updated 2026-11-07.
 
 ## In progress
@@ -37,8 +39,6 @@ Nothing.
 
 ### Phase 2: Hell slice
 
-- [ ] **`L-9` Hell flora.** P1, M. Fungal/charred tree species (tree JSON), ground glow plants,
-  hanging vines (`support: "above"`).
 - [ ] **`L-10` Hell mobs.** P1, L. Two, harder than goblin/slime: a melee brute and a ranged/fire
   caster. Entity JSON, manager, clips (`item-debugger`), realm spawn search scaled by layer index.
 

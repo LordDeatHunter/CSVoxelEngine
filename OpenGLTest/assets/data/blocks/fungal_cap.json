@@ -1,0 +1,13 @@
+{
+  // The glowing cap of a fungal tree (trees/fungal_tree.json): the species' leaves, so its state
+  // byte is a LeafState and a cap cut off its stem decays. Like every leaf block it passes light,
+  // casts no AO and hides no neighbor face; it glows in the Fungal Grove's teal (the fungal glow's
+  // palette slot). Tile from tools/generate-hell-textures.py.
+  "name": "Fungal Cap",
+  "model": { "parent": "block/cube_all", "textures": { "all": "fungal_cap" } },
+  "hardness": 1,
+  "occludes": false,
+  "castsAO": false,
+  "light": { "emission": 9, "color": [70, 240, 190], "passes": true },
+  "loot": "none"
+}

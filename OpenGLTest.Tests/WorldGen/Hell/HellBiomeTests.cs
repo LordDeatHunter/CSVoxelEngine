@@ -30,6 +30,11 @@ public sealed class HellBiomeTests
     private static IEnumerable<byte> Blocks(HellBiomePalette p) =>
         [p.Surface, p.Soil, p.Wall, p.Ceiling, p.PoolBed, p.CeilingLight, p.FloorLight];
 
+    /// <summary>Air, or the flora (HellFlora) that stands in an air cell.</summary>
+    private static bool IsCavernAir(byte block) =>
+        block == BlockType.Air || block == HellFlora.VineBlock
+        || AllBiomes.Any(b => HellBiomes.Palette(b).GroundPlant == block);
+
     [Fact]
     public void TheBiomeIsAPureFunctionOfPositionAndSeed()
     {
@@ -184,7 +189,7 @@ public sealed class HellBiomeTests
 
                     var biome = HellBiomes.At(wx, wy, wz);
                     var palette = HellBiomes.Palette(biome);
-                    if (block == BlockType.Air)
+                    if (IsCavernAir(block))
                     {
                         Assert.False(HellGenerator.InPool(wy), "an air cell under the lava level");
                         CheckAirNeighbors(blocks, x, y, z, wx, wy, wz, surfacesSeen);
@@ -222,7 +227,7 @@ public sealed class HellBiomeTests
         if (y > 0)
         {
             var below = blocks[Chunk.Idx(x, y - 1, z)];
-            if (below != BlockType.Air && below != HellGenerator.LavaBlock)
+            if (!IsCavernAir(below) && below != HellGenerator.LavaBlock)
             {
                 var biome = HellBiomes.At(wx, wy - 1, wz);
                 var palette = HellBiomes.Palette(biome);
@@ -234,7 +239,7 @@ public sealed class HellBiomeTests
 
         if (y + 1 >= Chunk.Size) return;
         var above = blocks[Chunk.Idx(x, y + 1, z)];
-        if (above == BlockType.Air || above == HellGenerator.LavaBlock) return;
+        if (IsCavernAir(above) || above == HellGenerator.LavaBlock) return;
         for (var d = 1; d <= WorldGenerationConfig.HellFloorSkinBlocks; d++)
             if (HellGenerator.IsOpen(wx, wy + 1 + d, wz)) return;
 

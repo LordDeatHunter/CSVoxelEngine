@@ -1,0 +1,20 @@
+{
+  // A smoldering flower on the Ashlands' ash (HellFlora): a faint ember-colored light (the ember
+  // crystal's palette slot), cutout, swaying, unsupported without its floor and dropping nothing.
+  // Tile from tools/generate-hell-textures.py.
+  "name": "Ember Bloom",
+  "model": { "parent": "block/cross", "textures": { "cross": "ember_bloom" } },
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "sway": true,
+  "light": { "emission": 5, "color": [255, 90, 40], "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "blocksSight": false,
+  "replaceableByPlacement": true,
+  "loot": "none",
+  "hitbox": { "min": [0.25, 0, 0.25], "max": [0.75, 0.7, 0.75] }
+}

@@ -80,7 +80,7 @@ public sealed class HangingBlockTests : IDisposable
     public void AHangingBlockGoesUnderACeilingAndPopsWithIt()
     {
         _world = new SupportTestWorld();
-        var lantern = Hanging().First().Id;
+        var lantern = Hanging().First(t => t.HasItem).Id;
         var ground = _world.Top;
         var (x, z) = (4, 6);
         _world.Load(x, ground + 3, z);

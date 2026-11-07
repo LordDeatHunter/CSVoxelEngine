@@ -40,6 +40,8 @@ internal static class ChunkTerrainFill
             timer?.Mark(Stage.Columns);
             HellGenerator.Stamp(chunk.Blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
             timer?.Mark(Stage.Hell);
+            StampHellTrees(chunk, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
+            timer?.Mark(Stage.HellTrees);
             Finish(chunk, column, lowerBoundY, hasWater: false, timer, genStart);
             return;
         }
@@ -272,11 +274,24 @@ internal static class ChunkTerrainFill
 
         // Hell under the barrier band: it overwrites every cell at or below HellTopY, so only the
         // chunk straddling hell's top gets here with any (wholly hell chunks took the path above)
-        if (WorldGenerationConfig.HellEnabled && Admits(stampGates, HellGenerator.WriteBand(), lowerBoundY))
+        var inHell = WorldGenerationConfig.HellEnabled && Admits(stampGates, HellGenerator.WriteBand(), lowerBoundY);
+        if (inHell)
             HellGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Hell);
+        if (inHell)
+            StampHellTrees(chunk, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.HellTrees);
 
         Finish(chunk, column, lowerBoundY, hasWater, timer, genStart);
+    }
+
+    /// <summary>The hell trees crossing the chunk (<see cref="HellTrees.Stamp"/>), after the hell stamp,
+    /// through a local like the overworld trees: a ref to the volatile state field is refused.</summary>
+    private static void StampHellTrees(Chunk chunk, int worldX0, int worldY0, int worldZ0)
+    {
+        var state = chunk.StateArray;
+        HellTrees.Stamp(chunk.Blocks, ref state, worldX0, worldY0, worldZ0);
+        chunk.StateArray = state;
     }
 
     /// <summary>The tail every filled chunk shares: the solid recount, the fluid frontier and the

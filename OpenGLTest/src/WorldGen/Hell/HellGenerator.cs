@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
@@ -42,16 +43,19 @@ public static class HellGenerator
     private const int FloorSkin = WorldGenerationConfig.HellFloorSkinBlocks;
     private const int CeilingSkin = WorldGenerationConfig.HellCeilingSkinBlocks;
 
-    // The stamp's open mask: the chunk plus a one-cell ring horizontally (the wall test) and the skin
-    // reach above and below (the floor and ceiling scans)
+    // How far above a cell the rules read: the floor skin's scan, or the flora's vine scan
+    private const int AboveReach = FloorSkin > HellFlora.ReachUp ? FloorSkin : HellFlora.ReachUp;
+
+    // The stamp's open mask: the chunk plus a one-cell ring horizontally (the wall test), the ceiling
+    // skin's reach below and the floor skin's or the vines' reach above
     private const int MaskSide = Chunk.Size + 2;
-    private const int MaskRows = Chunk.Size + CeilingSkin + FloorSkin;
+    private const int MaskRows = Chunk.Size + CeilingSkin + AboveReach;
     private const int MaskCount = MaskSide * MaskSide * MaskRows;
 
     // The lattice points the mask reads: x and z from -1 to Cells + 1, y from GyMin to GyMax
     private const int PointsH = Cells + 3;
     private const int GyMin = -((CeilingSkin + Stride - 1) / Stride);
-    private const int GyMax = (Chunk.Size - 1 + FloorSkin) / Stride + 1;
+    private const int GyMax = (Chunk.Size - 1 + AboveReach) / Stride + 1;
     private const int PointsV = GyMax - GyMin + 1;
     private const int PointCount = PointsH * PointsH * PointsV;
 
@@ -172,6 +176,30 @@ public static class HellGenerator
         return field > RowThreshold(y);
     }
 
+    /// <summary><see cref="IsOpen(int, int, int)"/>, the same expression, with each lattice sample
+    /// read through <paramref name="samples"/> (keyed by <see cref="CellKey"/>), so a caller asking
+    /// about many nearby cells (a hell tree's growth, a floor scan) samples each lattice point once.</summary>
+    internal static bool IsOpen(int x, int y, int z, Dictionary<long, float> samples)
+    {
+        if (!RowCanOpen(y)) return false;
+
+        var bx = x & ~Mask;
+        var by = y & ~Mask;
+        var bz = z & ~Mask;
+        var field = OreNoiseLattice.Trilinear(
+            Sample(samples, bx, by, bz), Sample(samples, bx, by, bz + Stride),
+            Sample(samples, bx, by + Stride, bz), Sample(samples, bx, by + Stride, bz + Stride),
+            Sample(samples, bx + Stride, by, bz), Sample(samples, bx + Stride, by, bz + Stride),
+            Sample(samples, bx + Stride, by + Stride, bz), Sample(samples, bx + Stride, by + Stride, bz + Stride),
+            Fraction(x), Fraction(y), Fraction(z));
+        return field > RowThreshold(y);
+    }
+
+    /// <summary>Whether hell cell (x, y, z) is open cavern above its layer's lava level: the air the
+    /// pocket leaves before any flora (<see cref="HellFlora"/>) or tree (<see cref="HellTrees"/>).</summary>
+    internal static bool IsCavernAir(int x, int y, int z, Dictionary<long, float> samples) =>
+        !InPool(y) && IsOpen(x, y, z, samples);
+
     /// <summary>The block hell generates at world cell (x, y, z), y at or below
     /// <see cref="WorldGenerationConfig.HellTopY"/>: exactly what <see cref="Stamp"/> writes there.</summary>
     public static byte BlockAt(int x, int y, int z)
@@ -241,11 +269,11 @@ public static class HellGenerator
 
     /// <summary>Whether a hell row can hold an open cell at all: its threshold is under
     /// <see cref="RowSolidLimit"/>. False above hell.</summary>
-    private static bool RowCanOpen(int y) => InHell(y) && RowThreshold(y) < RowSolidLimit;
+    internal static bool RowCanOpen(int y) => InHell(y) && RowThreshold(y) < RowSolidLimit;
 
     /// <summary>Whether a solid cell of row <paramref name="y"/> can wear a skin: it lies in a pocket
     /// and a row within the skin reach above or below it can open.</summary>
-    private static bool CanWearSkin(int y)
+    internal static bool CanWearSkin(int y)
     {
         if (InSlab(y)) return false;
         for (var r = y - CeilingSkin; r <= y + FloorSkin; r++)
@@ -296,12 +324,13 @@ public static class HellGenerator
         return PaletteAt(ref field, x, y, z).Wall;
     }
 
-    /// <summary>What open cell (x, y, z) holds: air above its layer's lava level; under it lava where
-    /// the column's pool holds lava, else the biome's soil, its top row the biome's surface.</summary>
+    /// <summary>What open cell (x, y, z) holds: above its layer's lava level air or the flora
+    /// <see cref="HellFlora.AirCell"/> puts there; under it lava where the column's pool holds lava,
+    /// else the biome's soil, its top row the biome's surface.</summary>
     private static byte OpenCell<TField>(ref TField field, int x, int y, int z)
         where TField : IHellField, allows ref struct
     {
-        if (!field.InPool(y)) return BlockType.Air;
+        if (!field.InPool(y)) return HellFlora.AirCell(ref field, x, y, z);
 
         var layer = LayerIndex(y);
         if (field.PoolIsLava(x, layer, z)) return LavaBlock;
@@ -314,7 +343,7 @@ public static class HellGenerator
         HellBiomes.Palette(field.Biome(x, LayerIndex(y), z));
 
     /// <summary>A floor's top cell: the biome's surface, now and then its floor light.</summary>
-    private static byte Surface(HellBiomePalette palette, int x, int y, int z) =>
+    internal static byte Surface(HellBiomePalette palette, int x, int y, int z) =>
         palette.FloorLight != BlockType.Air && HellBiomes.Picks(x, y, z, palette.FloorLightRate)
             ? palette.FloorLight
             : palette.Surface;
@@ -379,6 +408,17 @@ public static class HellGenerator
     private static float Sample(int x, int y, int z) =>
         CavernNoise.GetNoise(x, y * WorldGenerationConfig.HellCavernYScale, z);
 
+    /// <summary>The cavern noise at a lattice point, sampled into <paramref name="samples"/> the first
+    /// time it is asked for.</summary>
+    private static float Sample(Dictionary<long, float> samples, int x, int y, int z)
+    {
+        var key = CellKey.Pack(x, y, z);
+        if (samples.TryGetValue(key, out var value)) return value;
+        value = Sample(x, y, z);
+        samples[key] = value;
+        return value;
+    }
+
     /// <summary>The cell's center as a fraction of its lattice cell, the one expression both paths use.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static float Fraction(int v) => ((v & Mask) + 0.5f) * InvStride;
@@ -393,16 +433,6 @@ public static class HellGenerator
         if (float.IsNaN(slot))
             slot = Sample(worldX0 + gx * Stride, worldY0 + gy * Stride, worldZ0 + gz * Stride);
         return slot;
-    }
-
-    /// <summary>The open field, the row rules and the biome lookups <see cref="Classify"/> reads.</summary>
-    private interface IHellField
-    {
-        bool IsOpen(int x, int y, int z);
-        bool CanWearSkin(int y);
-        bool InPool(int y);
-        HellBiome Biome(int x, int layer, int z);
-        bool PoolIsLava(int x, int layer, int z);
     }
 
     /// <summary>The point query's field: everything computed on the spot.</summary>
@@ -432,7 +462,7 @@ public static class HellGenerator
         private readonly int _y0 = worldY0;
         private readonly int _z0 = worldZ0;
         private readonly int _firstLayer =
-            LayerIndex(Math.Min(worldY0 + Chunk.Size - 1 + FloorSkin, WorldGenerationConfig.HellTopY));
+            LayerIndex(Math.Min(worldY0 + Chunk.Size - 1 + AboveReach, WorldGenerationConfig.HellTopY));
 
         public bool IsOpen(int x, int y, int z) =>
             _mask[((y - _y0 + CeilingSkin) * MaskSide + x - _x0 + 1) * MaskSide + z - _z0 + 1];

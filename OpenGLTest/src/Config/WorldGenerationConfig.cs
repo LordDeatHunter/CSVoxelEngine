@@ -873,6 +873,42 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>One Fungal Grove ceiling cell right over open cavern in this many is a fungal glow.</summary>
     public const int HellFungalGlowRate = 18;
 
+    /// <summary>The longest vine (HellFlora) a hell ceiling cell hangs: the flora rule reads this many
+    /// cells over an air cell.</summary>
+    public const int HellVineMaxLength = 6;
+
+    /// <summary>One Fungal Grove ceiling cell over open cavern in this many hangs a vine.</summary>
+    public const int HellFungalVineRate = 4;
+
+    /// <summary>One Ashlands ceiling cell over open cavern in this many hangs a vine.</summary>
+    public const int HellAshlandsVineRate = 45;
+
+    /// <summary>One Fungal Grove air cell over fungal moss in this many grows a glow fern.</summary>
+    public const int HellGlowFernRate = 5;
+
+    /// <summary>One Ashlands air cell over ash in this many grows an ember bloom.</summary>
+    public const int HellEmberBloomRate = 16;
+
+    /// <summary>The side of a hell tree cell (HellTrees): each cell of each layer holds at most one
+    /// tree, grown inside the cell, so a tree never meets another. Divides the chunk size.</summary>
+    public const int HellTreeCellBlocks = 8;
+
+    /// <summary>How far inside its cell's sides a hell tree's root stands.</summary>
+    public const int HellTreeCellMargin = 2;
+
+    /// <summary>The chance a Fungal Grove tree cell roots a fungal tree.</summary>
+    public const float HellFungalTreeChance = 0.6f;
+
+    /// <summary>The chance an Ashlands tree cell roots a charred tree.</summary>
+    public const float HellCharredTreeChance = 0.25f;
+
+    /// <summary>Capacity of the hell tree cache (one entry per tree cell and layer, a tree or none),
+    /// read by the generation workers; see <see cref="TreeShapeCacheCapacity"/>.</summary>
+    public const int HellTreeCacheCapacity = 8192;
+
+    /// <summary>Generations of the hell tree cache.</summary>
+    public const int HellTreeCacheGenerations = 4;
+
     /// <summary>Bottom of the solid cloud slab: the patchy real cloud blocks around y 200, above the
     /// relief ceiling (<see cref="ReliefCeilingHeight"/>) and the drawn cloud layer
     /// (<see cref="SkyConfig.CloudHeight"/>).</summary>

@@ -81,6 +81,7 @@ public static class WorldSeed
         ColumnCache.Reset();
         WormCarver.ResetCellCache();
         TreeGenerator.ResetCaches();
+        HellTrees.ResetCache();
         TerrainPeaks.ResetCaches();
         GreatLakes.ResetCaches();
         WaterBodies.ResetCaches();

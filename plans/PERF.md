@@ -237,6 +237,11 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
   near open cavern is classified; the biome and pool noises sit on per-layer 2D lattices (4 and 9
   points a chunk), which made no measurable difference, so the halo field and the per-cell classify are
   the cost. Untried: a halo only where a wall test can reach it.
+  With the flora (`L-9`, same probe, two runs each): the stamp warm 0.26 ms mean (0.14-0.18 with the
+  flora rule stubbed out: the vine scan reads up to 6 mask cells over every air cell and the mask
+  grew 3 rows for it), the `HellTrees` stage warm 0.003 ms and cold 0.6-0.75 ms mean (a cold sample
+  regrows every tree it crosses; in game a tree is grown once per cell and layer and cached). Untried:
+  a per-column vine pass in the stamp instead of the per-cell scan.
 - Identity recipe: dump `LandHeight`, `WaterLevelAt` and `SurfaceWaterWeight` bits before and after
   on a +-20000 grid at stride 37, plus `Compute` on 1000 random chunk columns; zero changes allowed
   outside the intended footprint.

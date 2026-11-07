@@ -1,3 +1,5 @@
+using VoxelEngine.WorldGen.Trees;
+
 namespace VoxelEngine.WorldGen.Hell;
 
 /// <summary>
@@ -16,6 +18,12 @@ namespace VoxelEngine.WorldGen.Hell;
 /// <paramref name="FloorLightRate"/>, or air for none.</param>
 /// <param name="FloorLightRate">One surface cell in this many is <paramref name="FloorLight"/>.</param>
 /// <param name="LavaShare">The share of the pool columns that hold lava: 1 all, 0 none.</param>
+/// <param name="GroundPlant">The plant one air cell over the biome's surface in
+/// <paramref name="GroundPlantRate"/> holds (<see cref="HellFlora"/>), or air for none.</param>
+/// <param name="GroundPlantRate">One air cell over the surface in this many grows <paramref name="GroundPlant"/>.</param>
+/// <param name="VineRate">One ceiling cell over open cavern in this many hangs a vine; 0 for none.</param>
+/// <param name="Tree">The tree species the biome's tree cells root (<see cref="HellTrees"/>), or null.</param>
+/// <param name="TreeChance">The chance one tree cell roots <paramref name="Tree"/>.</param>
 public sealed record HellBiomePalette(
     byte Surface,
     byte Soil,
@@ -26,4 +34,9 @@ public sealed record HellBiomePalette(
     int CeilingLightRate,
     byte FloorLight,
     int FloorLightRate,
-    float LavaShare);
+    float LavaShare,
+    byte GroundPlant,
+    int GroundPlantRate,
+    int VineRate,
+    TreeSpecies? Tree,
+    float TreeChance);

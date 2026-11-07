@@ -1,0 +1,22 @@
+{
+  // The hell's Ashlands snag: a leafless, burnt tree on the oak logic. No worldgen block: HellTrees
+  // plants it from the Ashlands' palette (HellBiomes), grown inside its 8x8 cell.
+  "wood": "block/charred_log",
+  "growth": {
+    "logic": "oak",
+    "signalEnergy": 7,
+    "upProbability": 2,
+    "lowestBranchHeight": 2,
+    "maturitySteps": [14, 24]
+  },
+  "thickness": {
+    "tipPx": 1,
+    "pipeExponent": 1.5,
+    "maxPx": 10,
+    "girthProfile": [[0, 2.0], [0.5, 1.4], [1, 1.0]],
+    "trunkShape": "circle",
+    "rim": "block"
+  },
+  // leafless: the crown proxy only has to stay valid (hell has no far LOD)
+  "lod": { "crownHeight": [3, 6], "crownRadius": 1, "profile": "column" }
+}

@@ -390,8 +390,9 @@ public class LeafDecayManager
     /// <summary>
     /// Pops, with its loot, every support-fragile block the removed cell <paramref name="holder"/>
     /// held up (see <see cref="BlockSupport"/>): a torch hanging on a decayed leaf, or a pebble on
-    /// crumbled wood, would otherwise float. A popped block may emit light (a torch), so the light
-    /// radius around it rebuilds, not just its own chunk. An unloaded neighbor is left alone.
+    /// crumbled wood, would otherwise float, and so would whatever a popped block held up in turn (a
+    /// vine hanging below a vine). A popped block may emit light (a torch), so the light radius
+    /// around it rebuilds, not just its own chunk. An unloaded neighbor is left alone.
     /// </summary>
     private void PopUnsupportedAround(Vector3 holder)
     {
@@ -407,6 +408,7 @@ public class LeafDecayManager
             _chunks.MarkAreaDirty(cell, cell + Vector3.One, LightingConfig.LightPropagationRadius);
             _drops.SpawnLoot(id, cell,
                 DropManager.PileCount(id, state), DropManager.PileSecondary(id, state), state);
+            PopUnsupportedAround(cell);
         }
     }
 }

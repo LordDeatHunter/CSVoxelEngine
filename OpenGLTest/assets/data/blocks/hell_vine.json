@@ -1,0 +1,22 @@
+{
+  // A vine hanging from the hell pockets' ceilings (HellFlora), thick in the Fungal Grove and sparse
+  // in the Ashlands: each cell hangs from the cell above it (support "above"), a solid ceiling or the
+  // vine cell over it, so mining any cell drops the rest of the vine below it. Cutout, no sway (a
+  // rooted sway would swing its lower end from the floor), dropping nothing. Tile from
+  // tools/generate-hell-textures.py.
+  "name": "Hell Vine",
+  "model": { "parent": "block/cross", "textures": { "cross": "hell_vine" } },
+  "hardness": 0,
+  "solid": false,
+  "occludes": false,
+  "castsAO": false,
+  "cutout": true,
+  "light": { "passes": true },
+  "hasItem": false,
+  "needsSupport": true,
+  "support": "above",
+  "blocksSight": false,
+  "replaceableByPlacement": true,
+  "loot": "none",
+  "hitbox": { "min": [0.25, 0, 0.25], "max": [0.75, 1, 0.75] }
+}

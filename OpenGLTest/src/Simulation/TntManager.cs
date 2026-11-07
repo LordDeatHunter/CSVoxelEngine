@@ -78,6 +78,45 @@ public class TntManager
     }
 
     /// <summary>
+    /// Pops the support-fragile block at (x, y, z) with its loot when the cell holding it up (see
+    /// <see cref="BlockSupport"/>) is loaded and empty, then, the same way, every neighbor that block
+    /// held up in turn, so a hanging chain falls whole. Air, a block that needs no support and a
+    /// support in an unloaded chunk are left alone.
+    /// </summary>
+    private static void PopIfUnsupported(ChunkManager chunks, DropManager drops, HashSet<Vector3> touchedChunks,
+        int x, int y, int z)
+    {
+        var standing = chunks.GetBlockGlobal(x, y, z);
+        if (standing == 0) return;
+        var standingState = chunks.GetStateGlobal(x, y, z);
+        var cell = new Vector3(x, y, z);
+        if (!BlockSupport.TryGetSupportCell(standing, standingState, cell, out var support)) return;
+
+        // Support in an unloaded chunk reads as air: leave those alone.
+        int sx = (int)support.X, sy = (int)support.Y, sz = (int)support.Z;
+        if (!chunks.Chunks.TryGetValue(VoxelCoords.WorldToChunk(sx), VoxelCoords.WorldToChunk(sy),
+                VoxelCoords.WorldToChunk(sz), out _)) return;
+        if (chunks.GetBlockGlobal(sx, sy, sz) != 0) return;
+
+        var chunkPos = VoxelCoords.ChunkPosOf(x, y, z);
+        if (!chunks.Chunks.TryGetValue(chunkPos, out var chunk)) return;
+        if (chunk.ClearBlockAt(cell) == 0) return;
+        chunks.UnmarkPlayerPlaced(x, y, z);
+        touchedChunks.Add(chunkPos);
+
+        drops.SpawnLoot(standing, cell,
+            DropManager.PileCount(standing, standingState),
+            DropManager.PileSecondary(standing, standingState),
+            standingState);
+
+        for (var face = 0; face < 6; face++)
+        {
+            var next = cell + Chunk.CubeFaces[face].normal;
+            PopIfUnsupported(chunks, drops, touchedChunks, (int)next.X, (int)next.Y, (int)next.Z);
+        }
+    }
+
+    /// <summary>
     /// Whether the cell touches fluid on any face, in which case its fuse is wet and it
     /// clears instead of priming. Unloaded neighbors read as absent, never as contact.
     /// </summary>
@@ -204,36 +243,14 @@ public class TntManager
         // blast took their holder away - the ground under a floor block, the wall behind a wall
         // torch (see BlockSupport). The blast box grown by one holds every cell a blasted cell
         // could have held up, and the scan runs after all clearing, bottom-up, so a block found
-        // against air genuinely lost its support (or was already floating).
+        // against air genuinely lost its support (or was already floating). A popped block's own
+        // dependents follow it (a vine hanging below a popped vine cell), wherever they hang.
         if (blastedColumns.Count > 0)
         {
             for (var x = (int)min.X - 1; x <= (int)max.X + 1; x++)
             for (var z = (int)min.Z - 1; z <= (int)max.Z + 1; z++)
             for (var y = (int)min.Y - 1; y <= (int)max.Y + 1; y++)
-            {
-                var standing = chunks.GetBlockGlobal(x, y, z);
-                if (standing == 0) continue;
-                var standingState = chunks.GetStateGlobal(x, y, z);
-                if (!BlockSupport.TryGetSupportCell(standing, standingState, new Vector3(x, y, z), out var support))
-                    continue;
-
-                // Support in an unloaded chunk reads as air: leave those alone.
-                int sx = (int)support.X, sy = (int)support.Y, sz = (int)support.Z;
-                if (!chunks.Chunks.TryGetValue(VoxelCoords.WorldToChunk(sx), VoxelCoords.WorldToChunk(sy),
-                        VoxelCoords.WorldToChunk(sz), out _)) continue;
-                if (chunks.GetBlockGlobal(sx, sy, sz) != 0) continue;
-
-                var pebbleChunkPos = VoxelCoords.ChunkPosOf(x, y, z);
-                if (!chunks.Chunks.TryGetValue(pebbleChunkPos, out var pebbleChunk)) continue;
-                if (pebbleChunk.ClearBlockAt(new Vector3(x, y, z)) == 0) continue;
-                chunks.UnmarkPlayerPlaced(x, y, z);
-                touchedChunks.Add(pebbleChunkPos);
-
-                drops.SpawnLoot(standing, new Vector3(x, y, z),
-                    DropManager.PileCount(standing, standingState),
-                    DropManager.PileSecondary(standing, standingState),
-                    standingState);
-            }
+                PopIfUnsupported(chunks, drops, touchedChunks, x, y, z);
         }
 
         // Everything loose in range is flung away from the center: the other primed TNT, the drops

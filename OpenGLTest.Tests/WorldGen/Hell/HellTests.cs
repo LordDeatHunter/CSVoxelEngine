@@ -187,7 +187,12 @@ public sealed class HellTests
                 var wy = chunk.LowerBoundY + y;
                 if (!HellGenerator.InHell(wy)) continue;
                 var block = chunk.Blocks[Chunk.Idx(x, y, z)];
-                Assert.Equal(HellGenerator.BlockAt(cx * Chunk.Size + x, wy, cz * Chunk.Size + z), block);
+                int wx = cx * Chunk.Size + x, wz = cz * Chunk.Size + z;
+                // A hell tree (HellTrees) grows over the point query's rule, into its air only
+                if (BlockType.IsTreeWood(block) || TreeGenerator.IsLeaf(block))
+                    Assert.True(HellGenerator.IsOpen(wx, wy, wz) && !HellGenerator.InPool(wy));
+                else
+                    Assert.Equal(HellGenerator.BlockAt(wx, wy, wz), block);
                 sawLava |= block == HellGenerator.LavaBlock;
             }
 

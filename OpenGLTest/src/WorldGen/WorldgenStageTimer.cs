@@ -12,7 +12,7 @@ namespace VoxelEngine.WorldGen;
 /// <see cref="Stage.Water"/> stage is marked only while <see cref="WorldGenerationConfig.WaterEnabled"/>;
 /// every other stage is marked once on every filled chunk, an early-out chunk (entirely above
 /// the terrain and any water) marks only <see cref="Stage.Columns"/>, and a chunk wholly in hell marks
-/// only <see cref="Stage.Columns"/>, <see cref="Stage.Hell"/>, <see cref="Stage.SolidCount"/> and
+/// only <see cref="Stage.Columns"/>, <see cref="Stage.Hell"/>, <see cref="Stage.HellTrees"/>, <see cref="Stage.SolidCount"/> and
 /// <see cref="Stage.FluidFrontier"/>.
 /// </summary>
 internal sealed class WorldgenStageTimer
@@ -86,6 +86,8 @@ internal sealed class WorldgenStageTimer
         Barrier,
         /// <summary>HellGenerator.Stamp.</summary>
         Hell,
+        /// <summary>HellTrees.Stamp (the trees grown on a cache miss included).</summary>
+        HellTrees,
         /// <summary>The SolidCount recount.</summary>
         SolidCount,
         /// <summary>ScanFluidFrontier.</summary>

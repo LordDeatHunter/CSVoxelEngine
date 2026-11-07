@@ -1,5 +1,6 @@
 using System;
 using VoxelEngine.Content;
+using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.WorldGen.Hell;
 
@@ -34,15 +35,22 @@ public static class HellBiomes
         Palettes[(int)HellBiome.Ashlands] = new HellBiomePalette(
             Surface: Block("ash"), Soil: Block("cinder_soil"), Wall: scorched, Ceiling: scorched,
             PoolBed: scorched, CeilingLight: emberCrystal, CeilingLightRate: WorldGenerationConfig.HellEmberCrystalRate,
-            FloorLight: BlockType.Air, FloorLightRate: 1, LavaShare: WorldGenerationConfig.HellAshlandsLavaShare);
+            FloorLight: BlockType.Air, FloorLightRate: 1, LavaShare: WorldGenerationConfig.HellAshlandsLavaShare,
+            GroundPlant: Block("ember_bloom"), GroundPlantRate: WorldGenerationConfig.HellEmberBloomRate,
+            VineRate: WorldGenerationConfig.HellAshlandsVineRate,
+            Tree: TreeSpeciesRegistry.Require("charred_tree"), TreeChance: WorldGenerationConfig.HellCharredTreeChance);
         Palettes[(int)HellBiome.MagmaCaverns] = new HellBiomePalette(
             Surface: basalt, Soil: scorched, Wall: basalt, Ceiling: basalt,
             PoolBed: magma, CeilingLight: emberCrystal, CeilingLightRate: WorldGenerationConfig.HellEmberCrystalRate,
-            FloorLight: magma, FloorLightRate: WorldGenerationConfig.HellMagmaFloorRate, LavaShare: 1f);
+            FloorLight: magma, FloorLightRate: WorldGenerationConfig.HellMagmaFloorRate, LavaShare: 1f,
+            GroundPlant: BlockType.Air, GroundPlantRate: 1, VineRate: 0, Tree: null, TreeChance: 0f);
         Palettes[(int)HellBiome.FungalGrove] = new HellBiomePalette(
             Surface: Block("fungal_moss"), Soil: fungalSoil, Wall: hellrock, Ceiling: fungalSoil,
             PoolBed: fungalSoil, CeilingLight: Block("fungal_glow"), CeilingLightRate: WorldGenerationConfig.HellFungalGlowRate,
-            FloorLight: BlockType.Air, FloorLightRate: 1, LavaShare: WorldGenerationConfig.HellFungalLavaShare);
+            FloorLight: BlockType.Air, FloorLightRate: 1, LavaShare: WorldGenerationConfig.HellFungalLavaShare,
+            GroundPlant: Block("glow_fern"), GroundPlantRate: WorldGenerationConfig.HellGlowFernRate,
+            VineRate: WorldGenerationConfig.HellFungalVineRate,
+            Tree: TreeSpeciesRegistry.Require("fungal_tree"), TreeChance: WorldGenerationConfig.HellFungalTreeChance);
     }
 
     /// <summary>Builds the noises from the current seed (static constructor and <see cref="WorldSeed.Apply"/>).</summary>
@@ -141,11 +149,15 @@ public static class HellBiomes
 
     /// <summary>A hash of world cell (x, y, z) and the seed, for the scattered light blocks: one cell in
     /// <paramref name="rate"/> is picked.</summary>
-    public static bool Picks(int x, int y, int z, int rate)
+    public static bool Picks(int x, int y, int z, int rate) => Hash(x, y, z, 0) % (ulong)rate == 0;
+
+    /// <summary>A hash of world cell (x, y, z), <paramref name="salt"/> and the seed: each salt picks
+    /// its own scatter, so two features hashing one cell never line up.</summary>
+    public static ulong Hash(int x, int y, int z, ulong salt)
     {
         var packed = ((ulong)(uint)x * 0x9E3779B97F4A7C15UL) ^ ((ulong)(uint)y * 0xC2B2AE3D27D4EB4FUL)
                      ^ ((ulong)(uint)z * 0x165667B19E3779F9UL);
-        return SplitMix64.Mix(packed ^ SplitMix64.Mix((ulong)(uint)WorldGenerationConfig.Seed)) % (ulong)rate == 0;
+        return SplitMix64.Mix(packed ^ SplitMix64.Mix((ulong)(uint)WorldGenerationConfig.Seed ^ salt));
     }
 
     /// <summary>The world row the biome noise is sampled at for <paramref name="layer"/>: its pocket's middle.</summary>
