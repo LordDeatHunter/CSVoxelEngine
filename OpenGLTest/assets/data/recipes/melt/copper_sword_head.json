@@ -1,0 +1,6 @@
+{
+  // Mass conservation: see recipes/cast/copper_sword_head.json.
+  "input": "item/copper_sword_head",
+  "fluid": "copper",
+  "amountMl": 200
+}

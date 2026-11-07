@@ -394,6 +394,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const float HematiteThreshold = 0.86f;
     public const int HematiteMaxY = LavaMaxY;
 
+    // --- Tin ore (TinGenerator) ---
+    // The weaker, commoner metal: a lower threshold than malachite's (more ore, measured relationally
+    // in TinTests) in a shallower and wider absolute-Y band, so HasOre stays a pure point query.
+    public const bool TinEnabled = true;
+    public const float TinFrequency = 1f / 18f;
+    public const float TinThreshold = 0.8f;
+    public const int TinMinY = -96;
+    public const int TinMaxY = 64;
+
     // --- Forest terrain shape (smooth rolling hills with flat valleys between them) ---
     // The floor is a broad swell plus a positive-only hill field gated by a low-frequency
     // hill-region mask, so hill masses rise in patches and flat valleys run between them instead

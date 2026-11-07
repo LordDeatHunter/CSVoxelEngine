@@ -1,0 +1,8 @@
+{
+  "mold": "block/fired_mold_sword",
+  "fluid": "copper",
+  "amountMl": 200,
+  "coolSeconds": 2,
+  "result": "item/copper_sword_head",
+  "count": 1
+}

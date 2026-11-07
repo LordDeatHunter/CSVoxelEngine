@@ -1,0 +1,9 @@
+{
+  "result": "item/tin_sword",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/tin_sword_head", "count": 1 },
+    { "item": "item/branch", "count": 1 },
+    { "item": "item/vine", "count": 2 }
+  ]
+}

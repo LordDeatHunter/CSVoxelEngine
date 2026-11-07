@@ -7,7 +7,7 @@
 Tracks `TODO.md` `P-44` (which points here): tin as a second, weaker and commoner metal, bronze as a
 smeltable alloy (3 copper + 1 tin = 4 bronze) and the 3x3x3 alloy furnace that makes it. Design interview
 done. Last updated 2026-11-07. Everything below is a design decision, not a measurement; numbers are
-first guesses. Nothing has shipped. Work the items in ID order, one phase per prompt; `A-2` and `A-3` are
+first guesses. `A-1` (tin) shipped. Work the items in ID order, one phase per prompt; `A-2` and `A-3` are
 the risky foundation.
 
 Decisions already made:
@@ -34,19 +34,6 @@ Decisions already made:
 (none)
 
 ## Open
-
-### Tin
-
-- [ ] **`A-1` Tin content** - P1, M.
-  Tin ore through `OreNoiseLattice` (a generator beside `Coal`/`Malachite`/`Hematite` in
-  `WorldGen/Features/Underground/`): commoner than malachite, a shallower and wider Y band, mined with a
-  primitive pickaxe (block JSON, tile, loot, ore item). Quern `crush/tin_ore` -> `crushed_tin`; melt
-  recipes for ore, crushed, ingot and heads; `data/molten/tin.json`; cast recipes into the ingot, axe and
-  pickaxe molds; a new **sword mold** (raw and fired, `tools/generate-mold-models.ps1`, with the mud and
-  uncraft recipes of the other molds); tin ingot, heads and tools; the copper sword head and sword.
-  **Hook:** `ContentRegistry` data, `recipes/{crush,melt,cast}`, `data/tags/{axe,pickaxe}.json`.
-  **Tests:** ore-lattice point-query equality, melt/cast conservation (`MetalworksRecipeTests`), the
-  tool ladder (tin < copper) as a relation, not literals.
 
 ### Furnace foundation
 

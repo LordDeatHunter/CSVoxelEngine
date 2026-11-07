@@ -1,0 +1,8 @@
+{
+  "name": "Tin Pickaxe",
+  "texture": "assets/textures/items/tin_pickaxe.png",
+  "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.4 },
+  "blockDamage": 1.5,
+  "entityDamage": 4,
+  "tool": { "power": 1.5, "hitDelayMs": 275 }
+}

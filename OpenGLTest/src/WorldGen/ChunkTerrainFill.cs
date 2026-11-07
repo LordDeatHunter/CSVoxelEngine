@@ -104,6 +104,10 @@ internal static class ChunkTerrainFill
             HematiteGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Hematite);
 
+        if (WorldGenerationConfig.TinEnabled && lowerBoundY <= WorldGenerationConfig.TinMaxY)
+            TinGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Tin);
+
         // After the carvers (so caves under the sea floor flood) and before the trees and
         // pebbles, which skip submerged columns rather than growing underwater
         var hasWater = false;

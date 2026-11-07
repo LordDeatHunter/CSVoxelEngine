@@ -119,6 +119,21 @@ public sealed class MiningTests
     }
 
     [Fact]
+    public void TinSitsBetweenThePrimitiveAndCopperToolsAndMinesItsOwnOre()
+    {
+        var tinOre = BlockOf("tin_ore");
+        var primitive = ItemOf("primitive_pickaxe");
+        var tin = ItemOf("tin_pickaxe");
+        var copper = ItemOf("copper_pickaxe");
+
+        Assert.True(Mining.CanMine(tinOre, primitive));
+        Assert.True(primitive.ToolPower < tin.ToolPower && tin.ToolPower < copper.ToolPower);
+        Assert.True(ItemOf("tin_sword").EntityDamage < ItemOf("copper_sword").EntityDamage);
+        Assert.True(ItemOf("copper_sword").EntityDamage < ItemOf("iron_sword").EntityDamage);
+        Assert.False(Mining.CanMine(BlockOf("hematite_ore"), tin));
+    }
+
+    [Fact]
     public void FluidCellsRefuseEveryTool()
     {
         var water = BlockOf("water");

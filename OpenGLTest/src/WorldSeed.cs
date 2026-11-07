@@ -65,6 +65,7 @@ public static class WorldSeed
         CoalGenerator.Reseed();
         MalachiteGenerator.Reseed();
         HematiteGenerator.Reseed();
+        TinGenerator.Reseed();
         LavaGenerator.Reseed();
         PebbleGenerator.Reseed();
         SnowGenerator.Reseed();
