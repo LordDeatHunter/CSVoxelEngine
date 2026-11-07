@@ -1,0 +1,48 @@
+{
+  "kind": "underground",
+  "weight": 2,
+  "groundLayer": 1,
+  "palette": {
+    "b": "stone_bricks",
+    "l": "lamp",
+    "C": "ruin_chest_underground"
+  },
+  "layers": [
+    [
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb"
+    ],
+    [
+      "bbbbbbb",
+      "bl...lb",
+      "b.....b",
+      "b..C..b",
+      "b.....b",
+      "bl...lb",
+      "bbbbbbb"
+    ],
+    [
+      "bbbbbbb",
+      "b.....b",
+      "b.....b",
+      "b.....b",
+      "b.....b",
+      "b.....b",
+      "bbbbbbb"
+    ],
+    [
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb",
+      "bbbbbbb"
+    ]
+  ]
+}

@@ -6,6 +6,7 @@ using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
 using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 using static VoxelEngine.Chunks.Chunk;
 using Stage = VoxelEngine.WorldGen.WorldgenStageTimer.Stage;
 
@@ -43,6 +44,7 @@ internal static class ChunkTerrainFill
             timer?.Mark(Stage.Hell);
             StampHellTrees(chunk, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
             timer?.Mark(Stage.HellTrees);
+            StampHellRuins(chunk, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size, stampGates, timer);
             Finish(chunk, column, lowerBoundY, hasWater: false, timer, genStart);
             return;
         }
@@ -202,6 +204,25 @@ internal static class ChunkTerrainFill
             DesertWellGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.DesertWells);
 
+        // Template ruins: after the wells so a ruin owns its footprint, before the deep features and the snow
+        if (WorldFeatureConfig.RuinsEnabled
+            && Admits(stampGates, RuinPlacement.SurfaceBand(neighborhoodMaxHeight), lowerBoundY))
+        {
+            var state = chunk.StateArray;
+            RuinPlacement.StampSurface(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            chunk.StateArray = state;
+        }
+        timer?.Mark(Stage.RuinsSurface);
+
+        if (WorldFeatureConfig.RuinsEnabled
+            && Admits(stampGates, RuinPlacement.UndergroundBand(neighborhoodMaxHeight), lowerBoundY))
+        {
+            var state = chunk.StateArray;
+            RuinPlacement.StampUnderground(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            chunk.StateArray = state;
+        }
+        timer?.Mark(Stage.RuinsUnderground);
+
         // Deep rock features, after the carvers so a geode's heart is not carved again
         if (WorldFeatureConfig.GeodesEnabled && Admits(stampGates, GeodeGenerator.WriteBand(), lowerBoundY))
             GeodeGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
@@ -300,6 +321,8 @@ internal static class ChunkTerrainFill
         if (inHell)
             StampHellTrees(chunk, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.HellTrees);
+        if (inHell)
+            StampHellRuins(chunk, worldX0, lowerBoundY, worldZ0, stampGates, timer);
 
         Finish(chunk, column, lowerBoundY, hasWater, timer, genStart);
     }
@@ -337,6 +360,15 @@ internal static class ChunkTerrainFill
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.SkyTrees);
+
+        if (WorldFeatureConfig.RuinsEnabled && SkyIslandConfig.SkyIslandsEnabled
+            && Admits(stampGates, RuinPlacement.SkyBand(), worldY0))
+        {
+            var state = chunk.StateArray;
+            RuinPlacement.StampSky(blocks, ref state, worldX0, worldY0, worldZ0);
+            chunk.StateArray = state;
+        }
+        timer?.Mark(Stage.RuinsSky);
     }
 
     /// <summary>The hell trees crossing the chunk (<see cref="HellTrees.Stamp"/>), after the hell stamp,
@@ -346,6 +378,20 @@ internal static class ChunkTerrainFill
         var state = chunk.StateArray;
         HellTrees.Stamp(chunk.Blocks, ref state, worldX0, worldY0, worldZ0);
         chunk.StateArray = state;
+    }
+
+    /// <summary>The hell ruins crossing the chunk (<see cref="RuinPlacement.StampHell"/>), after the hell stamp and its trees,
+    /// through a local like the trees: a ref to the volatile state field is refused.</summary>
+    private static void StampHellRuins(Chunk chunk, int worldX0, int worldY0, int worldZ0, bool stampGates,
+        WorldgenStageTimer? timer)
+    {
+        if (WorldFeatureConfig.RuinsEnabled && Admits(stampGates, HellGenerator.WriteBand(), worldY0))
+        {
+            var state = chunk.StateArray;
+            RuinPlacement.StampHell(chunk.Blocks, ref state, worldX0, worldY0, worldZ0);
+            chunk.StateArray = state;
+        }
+        timer?.Mark(Stage.RuinsHell);
     }
 
     /// <summary>The tail every filled chunk shares: the solid recount, the fluid frontier and the

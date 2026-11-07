@@ -146,6 +146,19 @@ public static class WorldFeatureConfig
     public const int WellCellShift = 7;
     public const float WellChance = 0.06f;
 
+    // --- Ruins (RuinPlacement): hand-authored structure templates with loot chests, stamped on a hashed cell grid ---
+    public const bool RuinsEnabled = true;
+    public const int RuinCellShift = 7;
+    public const float RuinSurfaceChance = 0.12f;
+    public const float RuinUndergroundChance = 0.3f;
+    public const float RuinHellChance = 0.35f;
+    public const float RuinSkyChance = 0.6f;
+    // The largest ground step across a surface ruin footprint, and across a sky island top under one
+    public const int RuinSurfaceMaxStep = 2;
+    public const int RuinSkyMaxStep = 2;
+    // Rock an underground room keeps between its roof and the ground over its center
+    public const int RuinUndergroundCover = 16;
+
     // --- Geodes (GeodeGenerator): a crystal-lined hollow sphere deep in rock ---
     public const bool GeodesEnabled = true;
     public const int GeodeCellShift = 7;

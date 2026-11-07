@@ -22,9 +22,8 @@ Nothing.
 - [ ] **`I-5` Ruins with loot, inventory polish** - P2, L.
   - [ ] ruin chests roll lazily at first open from hash(cell, world seed) through the seedable `LootTable.RollStacks`
     (done: the loot depth work, `ruin_*` tables), then persist; untouched chests are never saved
-  - [ ] four per-cell hashed stamps, each with a `StampBand` and a `StampGateTests` row: surface (small broken
-    stone/brick shells, biome-flavored), underground (small abandoned mining base in caves), hell (charred hellrock
-    outposts), sky (ruined temples on island tops)
+  - [x] four ruin placements on the M-15 template system (`RuinPlacement`, `data/structures`), each with a band, a stage and a
+    `StampGateTests` row; more templates (biome-flavored shells, mining bases) are only JSON now
   - [ ] inventory polish: sort, shift-click quick-move, search improvements (no slot-grid rewrite)
   **Hook:** `WorldGen/Features/DesertWellGenerator.cs` (template), `ChunkTerrainFill`, `StampBand`, `Content/Loot`.
 

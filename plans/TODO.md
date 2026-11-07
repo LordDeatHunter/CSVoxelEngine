@@ -456,6 +456,10 @@ single-arc player.
 - [ ] **`M-15` · Structure templates / schematic system** — P2, L.
   A loadable, placeable blueprint format (jigsaw or simple offsets) that `P-16`, `P-26`, `F-14`
   and `P-37` all build on. Prerequisite for all generated POIs.
+  Done: the simple-offsets format (`data/structures`, `StructureRegistry`, `StructureStamper`, four quarter turns with a
+  facing remap) and four ruin placements on it (`RuinPlacement`, see AGENTS.md "Structure templates and ruins"). Left:
+  jigsaw connectors, templates larger than 17 blocks, non-square footprints, a spawner marker (`M-17`), and placing
+  templates by a command or from a scenario op.
 - [ ] **`M-16` · Loot table depth** — P2, M.
   Done: nested tables (`"table"` entries, cycles refused), a seedable `LootTable.Roll(ctx, list, Random)` and
   `RollStacks`, gear entries with a rarity range, pools limited to a world-Y band (`minY`/`maxY`), and the four

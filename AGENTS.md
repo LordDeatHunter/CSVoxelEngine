@@ -4791,6 +4791,31 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   `hell-mobs.json`, `layers-fog.json`, `clouds-solid.json`, `sky-islands.json`, `sky-biomes.json`,
   `sky-mobs.json`.
 
+### Structure templates and ruins
+
+A structure is a hand-authored template under `assets/data/structures/<name>.json`, loaded after the blocks by
+`StructureLoader` into `StructureRegistry` (`Content/Structures/`; errors name the file): `kind` (`surface`, `underground`,
+`hell`, `sky`), `weight`, optional `biomes` (surface only), `groundLayer` (the layer standing on the anchor floor level;
+the layers under it are dug in), a `palette` (a key to a block name, or `{"block", "facing"}`) and `layers`, bottom first, each
+an array of rows north to south of palette keys west to east (a space writes nothing, `.` writes air). A footprint is square, at
+most `StructureRegistry.MaxSize` (17) wide and `MaxHeight` (24) tall. A template precomputes its four clockwise quarter turns,
+mapping (x, z) to (size - 1 - z, x) and turning a `facing` cell low two state bits through `TurnedFacing` (the engine
+north/south/west/east order is not cyclic). Ruin loot chests are ordinary palette entries (`ruin_chest_<kind>`), so there are
+no marker keys and no id cost. `StructureStamper.Stamp` writes a template part inside one chunk, clipped at the border and to a
+world-y window, so every chunk a footprint crosses agrees with no cross-chunk writes.
+
+`RuinPlacement` (`WorldGen/Structures/`) decides where: a hashed cell of `RuinCellShift` blocks per kind rolls its chance, its
+site (jittered), its template and its turn from the hash, a pure function of (cell, seed). **Surface** ruins (stage
+`RuinsSurface`, after the wells) need a land biome, dry ground and a footprint within `RuinSurfaceMaxStep` of level.
+**Underground** rooms (`RuinsUnderground`) sit at a hashed depth between the barrier and `RuinUndergroundCover` under the
+ground at their center and are sealed by their own walls. **Hell** ruins (`RuinsHell`, hooked into both the wholly-hell early
+path and the straddle path through `StampHellRuins`) stand on the first solid pocket floor scanning down from a hashed row,
+per layer, with the whole footprint level and clear above, and their cells stay inside their layer. **Sky** ruins (`RuinsSky`,
+inside `StampSky` after the sky trees) take at most one per island, on its center top when the top is within
+`RuinSkyMaxStep` of level across the footprint. Every placement has a band (`SurfaceBand`, `UndergroundBand`, `SkyBand`, hell
+`HellGenerator.WriteBand`) and a `StampGateTests` row; `StructureTests` holds the template, seam and site rules. The far LOD
+draws none. A new ruin is a JSON file.
+
 ## Entities
 
 Entities (mobs) are data-driven like blocks: `assets/data/entities/<name>.json` gives a display

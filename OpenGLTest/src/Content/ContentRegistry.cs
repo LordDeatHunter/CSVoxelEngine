@@ -12,6 +12,7 @@ using VoxelEngine.Content.Shapes;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.Stations;
 using VoxelEngine.Content.StatusEffects;
+using VoxelEngine.Content.Structures;
 using VoxelEngine.Effects.Climate;
 using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Entities;
@@ -135,6 +136,7 @@ public static class ContentRegistry
         ItemLoader.ValidateItemUses(itemFiles);
         ItemLoader.ValidateGear();
         GearSetLoader.LoadSets(Path.Combine(assetsRoot, "data", "sets"));
+        StructureLoader.LoadStructures(Path.Combine(assetsRoot, "data", "structures"));
     }
 
     /// <summary>

@@ -57,6 +57,10 @@ internal sealed class WorldgenStageTimer
         RuinedPillars,
         /// <summary>DesertWellGenerator.Stamp.</summary>
         DesertWells,
+        /// <summary>RuinPlacement.StampSurface.</summary>
+        RuinsSurface,
+        /// <summary>RuinPlacement.StampUnderground.</summary>
+        RuinsUnderground,
         /// <summary>GeodeGenerator.Stamp.</summary>
         Geodes,
         /// <summary>MeteorGenerator.Stamp.</summary>
@@ -93,12 +97,16 @@ internal sealed class WorldgenStageTimer
         SkyIslands,
         /// <summary>SkyTrees.Stamp (the trees grown on a cache miss included).</summary>
         SkyTrees,
+        /// <summary>RuinPlacement.StampSky.</summary>
+        RuinsSky,
         /// <summary>BarrierGenerator.Stamp.</summary>
         Barrier,
         /// <summary>HellGenerator.Stamp.</summary>
         Hell,
         /// <summary>HellTrees.Stamp (the trees grown on a cache miss included).</summary>
         HellTrees,
+        /// <summary>RuinPlacement.StampHell.</summary>
+        RuinsHell,
         /// <summary>The SolidCount recount.</summary>
         SolidCount,
         /// <summary>ScanFluidFrontier.</summary>

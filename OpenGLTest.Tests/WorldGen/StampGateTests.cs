@@ -7,6 +7,7 @@ using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
 using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 using Xunit;
 using Stage = VoxelEngine.WorldGen.WorldgenStageTimer.Stage;
 
@@ -58,6 +59,10 @@ public sealed class StampGateTests
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => RuinedPillarGenerator.Stamp(b, x, y, z), false),
         new("DesertWells", Stage.DesertWells, (_, nb) => DesertWellGenerator.WriteBand(nb),
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => DesertWellGenerator.Stamp(b, x, y, z), false),
+        new("RuinsSurface", Stage.RuinsSurface, (_, nb) => RuinPlacement.SurfaceBand(nb),
+            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampSurface(b, ref s, x, y, z), false),
+        new("RuinsUnderground", Stage.RuinsUnderground, (_, nb) => RuinPlacement.UndergroundBand(nb),
+            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampUnderground(b, ref s, x, y, z), false),
         new("Geodes", Stage.Geodes, (_, _) => GeodeGenerator.WriteBand(),
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => GeodeGenerator.Stamp(b, x, y, z), true),
         new("Meteors", Stage.Meteors, (c, _) => MeteorGenerator.WriteBand(c),
@@ -90,8 +95,12 @@ public sealed class StampGateTests
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => CloudSeaGenerator.Stamp(b, x, y, z), true),
         new("SkyIslands", Stage.SkyIslands, (_, _) => SkyIslandGenerator.WriteBand(),
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => SkyIslandGenerator.Stamp(b, x, y, z), true),
+        new("RuinsSky", Stage.RuinsSky, (_, _) => RuinPlacement.SkyBand(),
+            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampSky(b, ref s, x, y, z), false),
         new("Barrier", Stage.Barrier, (_, _) => BarrierGenerator.WriteBand(),
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => BarrierGenerator.Stamp(b, x, y, z), true),
+        new("RuinsHell", Stage.RuinsHell, (_, _) => HellGenerator.WriteBand(),
+            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => RuinPlacement.StampHell(b, ref s, x, y, z), false),
         new("Hell", Stage.Hell, (_, _) => HellGenerator.WriteBand(),
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => HellGenerator.Stamp(b, x, y, z), true),
     ];
