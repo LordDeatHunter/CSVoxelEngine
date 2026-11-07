@@ -2836,7 +2836,7 @@ query equals the stamp across seams, a chunk reads no neighbor and nothing is ca
 into air only.
 
 **Sky landmasses** (`WorldGen/Sky/SkyLandmasses.cs`, `SkyIslandConfig.Landmass*`, seed offsets 175-178) are whole
-floating continents beside the ordinary islands: one hashed candidate per `LandmassCellBlocks` (6000) cell
+floating continents beside the ordinary islands: one hashed candidate per `LandmassCellBlocks` (4200) cell
 (`TerrainSites`, salt "SKYL"), a bounding radius spread evenly from `LandmassMinRadius` (1200) to
 `LandmassMaxRadius` (2500), kept `LandmassGapBlocks` clear of lower-hash neighbors. A landmass is a `SkyIsland` with
 an `Aspect` (`IsLandmass`; `Radius` is its bounding disc, `Dome` its hill height, `Depth` its keel), so `CollectIslands`
@@ -2847,7 +2847,7 @@ the top rolls over low hills (noise 177) easing down to the coast over `Landmass
 (noise 178) that thickens over `LandmassKeelRamp` blocks with the islands' stalactites, always inside the band (the base roll
 leaves the flora headroom and vine room). Its biome changes along its length (`SkyBiomes.OfColumn`), an ordinary island stays
 whole. No ordinary island stands within a landmass's bounding disc (`OverlapsDisc`), and `ZoneAt` reports a landmass as its own
-zone (tier by radius). Around it lies a **fringe** (`LandmassFringeShare` of its radius, at most `LandmassFringeMaxBlocks`) whose zone weight eases from 1 to 0, so the ordinary island roll scatters broken-off islands there (`SkyLandmasses.TryFindInfluence`, `AnyNear`). Archipelago zones are three times the old size (cell 1200, radius 510-1320) and hold about ten islands (`IslandCellBlocks` 200, `IslandChance` 0.25). A ruin sits only where an island's center column is land, so most landmasses hold none.
+zone (tier by radius). Around it lies a **fringe** (`LandmassFringeShare` of its radius, at most `LandmassFringeMaxBlocks`) whose zone weight eases from 1 to 0, so the ordinary island roll scatters broken-off islands there (`SkyLandmasses.TryFindInfluence`, `AnyNear`). Archipelago zones are three times the old size (cell 1200, radius 510-1320) and hold roughly ten islands (`IslandCellBlocks` 240, `IslandChance` 0.8). A ruin sits only where an island's center column is land, so most landmasses hold none.
 `SkyLandmassTests`; `visual-examples/sky-landmass.json` (`VOXEL_TIME=147`).
 
 **The cloud sea** (`CloudSeaGenerator`, offsets 172-173) is a second, thick `CloudLayer` of the same

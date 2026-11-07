@@ -53,10 +53,10 @@ public static class SkyIslandConfig
     // --- Islands: one hashed candidate per island cell, accepted inside a zone ---
 
     /// <summary>Side of the square cell that rolls at most one island.</summary>
-    public const int IslandCellBlocks = 200;
+    public const int IslandCellBlocks = 240;
 
     /// <summary>Chance an island cell rolls a candidate (a zone's weight thins it further toward its rim).</summary>
-    public const float IslandChance = 0.25f;
+    public const float IslandChance = 0.8f;
 
     /// <summary>Skew of the island size roll toward small.</summary>
     public const float IslandSizeSkew = 1.8f;
@@ -113,7 +113,7 @@ public static class SkyIslandConfig
     // --- Landmasses: great floating continents, one hashed candidate per big cell (SkyLandmasses) ---
 
     /// <summary>Side of the square cell that rolls at most one landmass.</summary>
-    public const int LandmassCellBlocks = 6000;
+    public const int LandmassCellBlocks = 4200;
 
     /// <summary>Chance a landmass cell rolls a candidate.</summary>
     public const float LandmassChance = 0.9f;
