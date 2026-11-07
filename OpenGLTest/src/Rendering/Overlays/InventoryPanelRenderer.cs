@@ -9,6 +9,7 @@ using VoxelEngine.Items;
 using VoxelEngine.UI;
 using VoxelEngine.UI.InventoryPanel;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
+using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
 
@@ -68,7 +69,7 @@ internal sealed class InventoryPanelRenderer
             _ui.DrawRect(center, new Vector2(tabWidth - 4f, TabHeight),
                 active ? SelectedBackground : SlotBackground);
             if (active)
-                _ui.DrawBorder(center, new Vector2(tabWidth - 4f, TabHeight), SlotBorder, SelectedBorderColor);
+                _ui.DrawBorder(center, new Vector2(tabWidth - 4f, TabHeight), Border.Standard, SelectedBorderColor);
             _ui.DrawTextCenteredFitted(TabTitle(tabs[t]),
                 center.X, top + PanelPad + 6f, _ui.CountScale, Rgba.White, tabWidth - 8f);
             _ui.DrawTextCenteredFitted(TabSubtitle(inventory, tabs[t]),
@@ -239,14 +240,14 @@ internal sealed class InventoryPanelRenderer
         var iconCenter = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 8f, centerY);
         _ui.DrawIdIcon(iconCenter, RowIcon, id, headingDegrees, timeSeconds);
 
-        _ui.DrawText(_ui.FitText(name, _ui.CountScale, RowNameAvail(count, countInset)), new Vector2(iconCenter.X + RowIcon * 0.5f + 8f, centerY - 9f),
+        _ui.DrawTextCenteredY(_ui.FitText(name, _ui.CountScale, RowNameAvail(count, countInset)), iconCenter.X + RowIcon * 0.5f + 8f, centerY,
             _ui.CountScale, dim && !selected ? TextDim : Rgba.White);
 
         if (_ui.Font != null)
         {
             var size = _ui.Font.MeasureSize(count.AsSpan(), _ui.CountScale);
-            _ui.DrawText(count,
-                new Vector2(PanelLeft + PanelWidth - PanelPad - 8f - countInset - size.X, centerY - 9f),
+            _ui.DrawTextCenteredY(count,
+                PanelLeft + PanelWidth - PanelPad - 8f - countInset - size.X, centerY,
                 _ui.CountScale, dim && !selected ? TextDim : Rgba.White);
         }
 
@@ -293,7 +294,7 @@ internal sealed class InventoryPanelRenderer
     {
         var size = new Vector2(InventoryPanelLayout.CatalogButtonWidth, InventoryPanelLayout.CatalogButtonHeight);
         _ui.DrawRect(center, size, ChipBackground);
-        _ui.DrawBorder(center, size, SlotBorder, danger ? DangerRed : AccentGold);
+        _ui.DrawBorder(center, size, Border.Standard, danger ? DangerRed : AccentGold);
         if (_ui.Font == null) return;
 
         // Cap-sized, then shrunk to fit the button's inner width so "+100" never spills into
@@ -343,7 +344,7 @@ internal sealed class InventoryPanelRenderer
         var center = new Vector2(_ui.ScreenSize.X - PreviewRight, _ui.ScreenSize.Y * 0.38f);
         var cardSize = new Vector2(PreviewSize + 40f, PreviewSize + 96f);
         _ui.DrawRect(center, cardSize, PanelBackground);
-        _ui.DrawBorder(center, cardSize, SlotBorder, SlotBorderColor);
+        _ui.DrawBorder(center, cardSize, Border.Standard, SlotBorderColor);
         _ui.DrawRect(new Vector2(center.X, center.Y - cardSize.Y * 0.5f + 3f),
             new Vector2(cardSize.X - 4f, 2f), AccentGold);
 

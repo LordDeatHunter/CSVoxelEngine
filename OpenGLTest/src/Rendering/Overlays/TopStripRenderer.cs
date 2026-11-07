@@ -5,6 +5,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Data;
 using VoxelEngine.UI.Hud;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
+using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
 
@@ -101,9 +102,9 @@ internal sealed class TopStripRenderer
             $"sun {label.Light.Sun:0}   block {label.Light.Block:0}",
             $"chunk {(int)chunkPos.X} {(int)chunkPos.Y} {(int)chunkPos.Z}   cell {(int)label.Cell.X & Chunk.SizeMask} {(int)label.Cell.Y & Chunk.SizeMask} {(int)label.Cell.Z & Chunk.SizeMask}",
         };
-        var linesTop = cubeCenter.Y + LookLabelNameGap + CountCapHeight + 6f;
+        var linesTop = cubeCenter.Y + LookLabelNameGap + TextSize.Body + 6f;
         for (var i = 0; i < lines.Length; i++)
-            _ui.DrawTextCentered(lines[i], center.X, linesTop + i * (CountCapHeight + 4f), _ui.CountScale, TextDim);
+            _ui.DrawTextCentered(lines[i], center.X, linesTop + i * (TextSize.Body + 4f), _ui.CountScale, TextDim);
     }
 
     /// <summary>
@@ -117,7 +118,7 @@ internal sealed class TopStripRenderer
     {
         if (compass)
             return CompassTop + CompassHeight
-                + (coordinates ? CompassCoordsGap + CountCapHeight : 0f) + LookLabelTopGap;
+                + (coordinates ? CompassCoordsGap + TextSize.Body : 0f) + LookLabelTopGap;
         return clock ? CompassTop + CompassHeight + LookLabelTopGap : CompassTop;
     }
 

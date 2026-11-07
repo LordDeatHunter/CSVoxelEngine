@@ -8,6 +8,7 @@ using VoxelEngine.Magic;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.SpellBuilder;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
+using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
 
@@ -23,7 +24,6 @@ namespace VoxelEngine.Rendering.Overlays;
 internal sealed class SpellBuilderRenderer
 {
     private const float LineHeight = 26f;
-    private const float TextLift = 9f;
 
     private static readonly string[] ColumnHeaders = ["Element", "Shape", "Modifiers", "Trigger"];
     private const string NoneKnown = "none known";
@@ -54,15 +54,14 @@ internal sealed class SpellBuilderRenderer
         var canvas = _ui.ScreenSize;
         var panel = SpellBuilderLayout.PanelRect(canvas);
         _ui.DrawRect(panel.Center, panel.Size, PanelBackground);
-        _ui.DrawBorder(panel.Center, panel.Size, SlotBorder, SlotBorderColor);
+        _ui.DrawBorder(panel.Center, panel.Size, Border.Standard, SlotBorderColor);
         _ui.DrawRect(new Vector2(panel.Center.X, panel.Center.Y - panel.Size.Y * 0.5f + 3f),
             new Vector2(panel.Size.X - 4f, 2f), AccentGold);
         _ui.DrawText(SpellBuilderText.Title, SpellBuilderLayout.TitleOrigin(canvas), _ui.HeadScale, Rgba.White);
 
         if (!HeldStaff.TryGet(inventory, out var staff, out var stack))
         {
-            _ui.DrawTextCentered(SpellBuilderText.HoldStaffHint, panel.Center.X, panel.Center.Y - TextLift,
-                _ui.CountScale, TextDim);
+            _ui.DrawTextMiddle(SpellBuilderText.HoldStaffHint, panel.Center, _ui.CountScale, TextDim);
             return;
         }
 
@@ -85,9 +84,9 @@ internal sealed class SpellBuilderRenderer
             var chosen = slot == view.Slot;
             var bound = component.IsBound(slot);
             _ui.DrawRect(center, size, chosen ? SelectedBackground : SlotBackground);
-            _ui.DrawBorder(center, size, SlotBorder,
+            _ui.DrawBorder(center, size, Border.Standard,
                 chosen ? SelectedBorderColor : bound ? AccentGold : SlotBorderColor);
-            _ui.DrawTextCentered(SlotLabels[slot], center.X, center.Y - TextLift, _ui.CountScale,
+            _ui.DrawTextMiddle(SlotLabels[slot], center, _ui.CountScale,
                 bound ? AccentGold : chosen ? Rgba.White : TextDim);
         }
     }
@@ -97,13 +96,13 @@ internal sealed class SpellBuilderRenderer
         for (var column = 0; column < SpellBuilderCatalog.Columns.Length; column++)
         {
             var header = SpellBuilderLayout.HeaderCenter(column, canvas);
-            _ui.DrawTextCentered(ColumnHeaders[column], header.X, header.Y - TextLift, _ui.CountScale, AccentGold);
+            _ui.DrawTextMiddle(ColumnHeaders[column], header, _ui.CountScale, AccentGold);
 
             var parts = view.Column(SpellBuilderCatalog.Columns[column]);
             if (parts.Count == 0)
             {
                 var (emptyCenter, _) = SpellBuilderLayout.PartRect(column, 0, canvas);
-                _ui.DrawTextCentered(NoneKnown, emptyCenter.X, emptyCenter.Y - TextLift, _ui.CountScale, TextDim);
+                _ui.DrawTextMiddle(NoneKnown, emptyCenter, _ui.CountScale, TextDim);
                 continue;
             }
 
@@ -115,9 +114,9 @@ internal sealed class SpellBuilderRenderer
                 var selected = view.IsSelected(part);
                 _ui.DrawRect(center, size, selected ? SelectedBackground : SlotBackground);
                 if (selected)
-                    _ui.DrawBorder(center, size, SlotBorder, SelectedBorderColor);
-                _ui.DrawTextCentered(_ui.FittedText(part.DisplayName, _ui.CountScale, size.X - 12f),
-                    center.X, center.Y - TextLift, _ui.CountScale, selected ? Rgba.White : TextDim);
+                    _ui.DrawBorder(center, size, Border.Standard, SelectedBorderColor);
+                _ui.DrawTextMiddle(_ui.FittedText(part.DisplayName, _ui.CountScale, size.X - 12f),
+                    center, _ui.CountScale, selected ? Rgba.White : TextDim);
             }
         }
     }
@@ -144,8 +143,8 @@ internal sealed class SpellBuilderRenderer
     private void DrawButton((Vector2 Center, Vector2 Size) rect, string label, bool enabled, Rgba accent)
     {
         _ui.DrawRect(rect.Center, rect.Size, enabled ? ChipBackground : SlotBackground);
-        _ui.DrawBorder(rect.Center, rect.Size, SlotBorder, enabled ? accent : SlotBorderColor);
-        _ui.DrawTextCentered(label, rect.Center.X, rect.Center.Y - TextLift, _ui.CountScale,
+        _ui.DrawBorder(rect.Center, rect.Size, Border.Standard, enabled ? accent : SlotBorderColor);
+        _ui.DrawTextMiddle(label, rect.Center, _ui.CountScale,
             enabled ? Rgba.White : TextDim);
     }
 

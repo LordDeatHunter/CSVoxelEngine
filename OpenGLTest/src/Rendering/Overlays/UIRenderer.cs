@@ -8,6 +8,8 @@ using VoxelEngine.Data;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
 using VoxelEngine.UI;
+using VoxelEngine.UI.Widgets;
+using static VoxelEngine.UI.UiTheme;
 using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.Rendering.Overlays;
@@ -42,25 +44,9 @@ public class UIRenderer : IDisposable
     // kept generous since nothing here depends on depth precision.
     private const float DepthRange = 512f;
 
-    internal const float SlotBorder = 2f;
-
     // Hotbar count text, in pixels. Counts sit in the slot's bottom-right corner, sized
     // by digit cap-height so the size survives swapping the font file.
     private const string CountFontPath = "assets/fonts/kongtext.ttf";
-    internal const float CountCapHeight = 14f;
-    private static readonly Rgba CountShadow = new(0, 0, 0, 180);
-
-    // Title text cap height, and the translucent fill every HUD and menu panel shares
-    private const float HeadCapHeight = 22f;
-    internal static readonly Rgba PanelBackground = Rgba.Gray(0.03f, 0.72f);
-
-    // Inventory prettify palette: warm gold accents, green ready states, muted dims
-    internal static readonly Rgba AccentGold = new(232, 184, 72);
-    internal static readonly Rgba ReadyGreen = new(126, 217, 87);
-    internal static readonly Rgba DangerRed = new(230, 110, 110);
-    internal static readonly Rgba TextDim = Rgba.Gray(0.55f, 1f);
-    internal static readonly Rgba CardBackground = Rgba.Gray(0.07f, 0.85f);
-    internal static readonly Rgba ChipBackground = Rgba.Gray(0.12f, 0.9f);
 
     // Durability bar under a tool icon: fraction of the slot width, a few px tall.
     internal const float DurabilityHeight = 5f;
@@ -78,11 +64,6 @@ public class UIRenderer : IDisposable
     // Widest screen-space span of a unit cube under IconRotation. Icons are sized by footprint
     // and divided by this, so retuning the angles above never changes how much room they take.
     private static readonly float IconExtent = UnitCubeExtent(IconRotation);
-
-    internal static readonly Rgba SlotBackground = Rgba.Gray(0.08f, 0.55f);
-    internal static readonly Rgba SlotBorderColor = Rgba.Gray(0.65f, 0.45f);
-    internal static readonly Rgba SelectedBackground = Rgba.Gray(0.18f, 0.65f);
-    internal static readonly Rgba SelectedBorderColor = Rgba.White;
 
     private readonly GL _gl;
     private readonly Shader _shader;
@@ -158,9 +139,6 @@ public class UIRenderer : IDisposable
     private readonly Dictionary<(string Text, float Scale, float Width), string> _fittedTexts = new();
     private Vector2 _fitCacheScreen;
 
-    // The opaque backdrop behind every menu and loading frame: nothing is rendered behind those.
-    internal static readonly Rgba MenuBackdrop = Rgba.Gray(0.08f);
-
     // The pages, built in the constructor; each draws through this renderer's primitives and reads
     // its per-pass state through the accessors below ToCanvas.
     internal ChatRenderer Chat { get; }
@@ -217,8 +195,8 @@ public class UIRenderer : IDisposable
         try
         {
             _font = new BitmapFont(gl, CountFontPath);
-            _countScale = _font.ScaleForCapHeight(CountCapHeight);
-            _headScale = _font.ScaleForCapHeight(HeadCapHeight);
+            _countScale = _font.ScaleForCapHeight(TextSize.Body);
+            _headScale = _font.ScaleForCapHeight(TextSize.Head);
         }
         catch (Exception e) when (e is IOException or InvalidOperationException)
         {
@@ -483,7 +461,7 @@ public class UIRenderer : IDisposable
         var instances = _glyphScratch.AsSpan();
 
         // _textFade is 1 outside the fading draws, so ordinary text keeps its exact colors.
-        var shadow = _textFade >= 1f ? CountShadow : Faded(CountShadow, _textFade);
+        var shadow = _textFade >= 1f ? TextShadow : Faded(TextShadow, _textFade);
         var face = _textFade >= 1f ? color : Faded(color, _textFade);
         for (var i = 0; i < n; i++)
             WriteGlyphQuad(_textVerts.AsSpan(i * 4, 4), instances[i],
@@ -600,24 +578,22 @@ public class UIRenderer : IDisposable
     public void DrawInputField(Vector2 center, Vector2 size, TextFieldState field, bool focused,
         string placeholder, float time, bool showTail = false)
     {
-        const float pad = 12f;
+        var box = new TextBoxLayout(new UiRect(center, size));
         DrawRect(center, size, SlotBackground);
-        DrawBorder(center, size, SlotBorder, focused ? SelectedBorderColor : SlotBorderColor);
+        DrawBorder(center, size, Border.Standard, focused ? SelectedBorderColor : SlotBorderColor);
 
-        var textLeft = center.X - size.X * 0.5f + pad;
-        var textTop = center.Y - 9f;
         // A field whose cap exceeds what fits (the chat line) shows the tail being typed, so the
         // caret and the newest characters never leave the box; the short fields show it all.
-        var shown = showTail ? TailThatFits(field.Text, _countScale, size.X - pad * 2f - 6f) : field.Text;
+        var shown = showTail ? TailThatFits(field.Text, _countScale, box.TextBudget) : field.Text;
         if (field.IsEmpty)
-            DrawText(placeholder, new Vector2(textLeft, textTop), _countScale, TextDim);
+            DrawTextCenteredY(placeholder, box.TextLeft, box.CenterY, _countScale, TextDim);
         else
-            DrawText(shown, new Vector2(textLeft, textTop), _countScale, Rgba.White);
+            DrawTextCenteredY(shown, box.TextLeft, box.CenterY, _countScale, Rgba.White);
 
         if (focused && ((int)(time * 2f)) % 2 == 0)
         {
-            var caretX = textLeft + (field.IsEmpty ? 0f : TextWidth(shown, _countScale)) + 3f;
-            DrawRect(new Vector2(caretX, center.Y), new Vector2(2f, 22f), Rgba.White);
+            var caret = box.Caret(field.IsEmpty ? 0f : TextWidth(shown, _countScale));
+            DrawRect(caret.Center, caret.Size, Rgba.White);
         }
     }
 

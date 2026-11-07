@@ -10,6 +10,7 @@ using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
+using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
 
@@ -57,8 +58,6 @@ internal sealed class HudRenderer : IDisposable
     private const float ToastRowGap = 26f;
     // Smallest width of the Tab player list panel; a long name widens it
     private const float PlayerListWidth = 200f;
-
-    private const float SelectedBorder = 3f;
 
     // Fraction of a slot the icon's footprint fills, leaving a margin inside the border
     private const float IconFill = 0.72f;
@@ -323,7 +322,7 @@ internal sealed class HudRenderer : IDisposable
     {
         if (_ui.Font == null || names.Count == 0) return;
 
-        var lineHeight = CountCapHeight + 6f;
+        var lineHeight = TextSize.Body + 6f;
         var width = PlayerListWidth;
         foreach (var name in names)
             width = MathF.Max(width, _ui.Font.MeasureSize(name, _ui.CountScale).X + 32f);
@@ -348,7 +347,7 @@ internal sealed class HudRenderer : IDisposable
     {
         if (_ui.Font == null || lines.Count == 0) return;
 
-        var lineHeight = CountCapHeight + 6f;
+        var lineHeight = TextSize.Body + 6f;
         var width = TooltipWidth;
         foreach (var line in lines)
             width = MathF.Max(width, _ui.Font.MeasureSize(line, _ui.CountScale).X + 24f);
@@ -357,7 +356,7 @@ internal sealed class HudRenderer : IDisposable
         center.X = Math.Clamp(center.X, width * 0.5f + 4f, _ui.ScreenSize.X - width * 0.5f - 4f);
         center.Y = Math.Clamp(center.Y, height * 0.5f + 4f, _ui.ScreenSize.Y - height * 0.5f - 4f);
         _ui.DrawRect(center, new Vector2(width, height), PanelBackground);
-        _ui.DrawBorder(center, new Vector2(width, height), SlotBorder, SlotBorderColor);
+        _ui.DrawBorder(center, new Vector2(width, height), Border.Standard, SlotBorderColor);
 
         var top = center.Y - height * 0.5f + 8f;
         for (var i = 0; i < lines.Count; i++)
@@ -380,7 +379,7 @@ internal sealed class HudRenderer : IDisposable
         if (_ui.Font == null || a <= 0.004f || string.IsNullOrEmpty(text)) return;
 
         var heartsTop = HotbarLayout.Top(_ui.ScreenSize) - HeartGap - HeartDrawHeight;
-        var top = heartsTop - HotbarNameGap - CountCapHeight - ToastRowGap;
+        var top = heartsTop - HotbarNameGap - TextSize.Body - ToastRowGap;
         _ui.TextFade = a;
         var size = _ui.Font.MeasureSize(text, _ui.CountScale);
         _ui.DrawText(text, new Vector2((_ui.ScreenSize.X - size.X) * 0.5f, top), _ui.CountScale, Rgba.White);
@@ -398,7 +397,7 @@ internal sealed class HudRenderer : IDisposable
         if (_ui.Font == null || a <= 0.004f || string.IsNullOrEmpty(name)) return;
 
         var heartsTop = HotbarLayout.Top(_ui.ScreenSize) - HeartGap - HeartDrawHeight;
-        var top = heartsTop - HotbarNameGap - CountCapHeight;
+        var top = heartsTop - HotbarNameGap - TextSize.Body;
         _ui.TextFade = a;
         try
         {
@@ -420,7 +419,7 @@ internal sealed class HudRenderer : IDisposable
         if (_ui.Font == null || string.IsNullOrEmpty(label)) return;
 
         var left = (_ui.ScreenSize.X + HotbarLayout.RowWidth()) * 0.5f + StaffSlotGap;
-        var top = HotbarLayout.CenterY(_ui.ScreenSize) - CountCapHeight * 0.5f;
+        var top = HotbarLayout.CenterY(_ui.ScreenSize) - TextSize.Body * 0.5f;
         _ui.DrawText(label, new Vector2(left, top), _ui.CountScale, Rgba.White);
     }
 
@@ -478,7 +477,7 @@ internal sealed class HudRenderer : IDisposable
 
             _ui.DrawRect(center, slotSize, selected ? SelectedBackground : SlotBackground);
             _ui.DrawBorder(center, slotSize,
-                selected ? SelectedBorder : SlotBorder,
+                selected ? Border.Selected : Border.Standard,
                 selected ? SelectedBorderColor : SlotBorderColor);
             // A broken tool's slot flashes: a bright panel fading out (HotbarPickupPop.FlashAt)
             var flash = pops?.FlashAt(i) ?? 0f;

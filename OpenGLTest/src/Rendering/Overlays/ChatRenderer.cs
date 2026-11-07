@@ -4,6 +4,7 @@ using VoxelEngine.Data;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
+using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
 
