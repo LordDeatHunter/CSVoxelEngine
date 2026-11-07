@@ -124,6 +124,10 @@ public interface IItemUseWorld
     /// bandage); false when they are at full health, so the use is never spent for nothing.</summary>
     bool Heal(int amount);
 
+    /// <summary>Restores <paramref name="share"/> (0..1) of the mana pool to the player the use runs for (a
+    /// mana draught); false at a full pool, so the use is never spent for nothing.</summary>
+    bool RestoreMana(float share);
+
     /// <summary>Teaches the spell part <paramref name="keys"/> to the player the use runs for (a scroll);
     /// false when every one is already known, so the scroll is never spent for nothing.</summary>
     bool LearnParts(IReadOnlyList<string> keys);

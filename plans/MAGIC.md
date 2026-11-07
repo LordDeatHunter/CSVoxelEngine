@@ -132,6 +132,7 @@ player saved before `MG-8` (an inventory with no known-part list), never twice. 
 tooltip line listing the parts a scroll teaches ("Teaches: Fire + Projectile"). Known gaps: scrolls have no
 loot or research source yet, and the builder shows no hint line of its own.
 
+`MG-9` shipped: an item with `use.action: "restore_mana"` and a `restoresMana` share in (0, 1] (`ItemLoader.ParseRestoresMana`) is a `RestoreManaItem`, the `heal` pattern: a use refills that share of the pool through `PlayerMana.TryRestore` (never past the max), spends one unit (creative none) and is refused, and kept, at a full pool; a server restores the sending player and marks the status dirty. The `mana_draught` (40 percent, a 1 s timed use; one crystal block and one cotton) is the one item; its tooltip says what it restores. There is no `P-47` shared-reagent hook yet, since nothing needs it. The 40 percent is a first guess.
 ## In progress
 
 Nothing.
@@ -143,9 +144,6 @@ Nothing.
 Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), one station
 UI (shipped, `MG-7`), one bindable staff (two tiers). In order:
 
-- [ ] **`MG-9` Mana restoration items** — P1, S.
-  Items restore mana through a `use.action` (the `heal` pattern). Optional shared-reagent hook for
-  `P-47`, never required. **Hook:** `Items/HealItem.cs`, item schema.
 - [ ] **`MG-10` Cast feedback** — P2, M.
   Cast gesture, projectile and impact particles, a few SFX; the item debugger gets a cast mode. **Hook:**
   `Posing/ThrowPose.cs`, `Particles/`, `item-debugger` skill, `V-12`.
@@ -186,5 +184,5 @@ UI (shipped, `MG-7`), one bindable staff (two tiers). In order:
 - **Not wanted for now.** Element-vs-element rules, per-mob weaknesses, a live Magicka-style combo
   queue.
 - **Open questions.** Chain depth and mana scaling
-  (`MG-12`); which blocks a utility spell may touch (`MG-11`); what the mana item and the `P-47` reagent are; whether research is its own
+  (`MG-12`); which blocks a utility spell may touch (`MG-11`); what the `P-47` shared reagent is; whether research is its own
   station.

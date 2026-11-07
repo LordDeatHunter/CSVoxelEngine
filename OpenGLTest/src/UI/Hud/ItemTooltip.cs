@@ -48,6 +48,8 @@ public static class ItemTooltip
         if (item is LearnPartsItem scroll && scroll.Teaches.Count > 0)
             lines.Add("Teaches: " + string.Join(" + ",
                 scroll.Teaches.Select(k => SpellPartRegistry.TryGetByKey(k)?.DisplayName ?? k)));
+        if (item is RestoreManaItem draught)
+            lines.Add($"Restores {draught.Restores:P0} mana");
         return lines;
     }
 }

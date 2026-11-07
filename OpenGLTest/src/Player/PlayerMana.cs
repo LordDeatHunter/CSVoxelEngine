@@ -44,6 +44,19 @@ public sealed class PlayerMana
         Current = Math.Min(_max, Current + Math.Max(0f, deltaTime) * _max / ManaConfig.RegenFullSeconds);
 
     /// <summary>
+    /// Restores <paramref name="share"/> (0..1) of the pool, never past it (a mana item, MG-9). Refused,
+    /// changing nothing, when the pool is already full or the share is not a positive finite number, so
+    /// an item is never spent for nothing.
+    /// </summary>
+    public bool TryRestore(float share)
+    {
+        if (!float.IsFinite(share) || share <= 0f || Current >= _max)
+            return false;
+        Current = Math.Min(_max, Current + share * _max);
+        return true;
+    }
+
+    /// <summary>
     /// Spends <paramref name="cost"/> for a cast (MG-4 calls it). A <paramref name="creative"/> player casts
     /// for free and keeps the pool; a cost the pool cannot cover is refused and changes nothing, so a cast
     /// is never half paid. A non-finite cost is refused, and a cost of zero or less is a free success.

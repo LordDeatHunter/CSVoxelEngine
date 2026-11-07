@@ -68,4 +68,10 @@ public enum ItemUseAction
     /// part is already known.
     /// </summary>
     LearnParts,
+
+    /// <summary>
+    /// Restores the item's <c>restoresMana</c> share of the mana pool to the player the use runs for (a
+    /// mana draught, <see cref="RestoreManaItem"/>), spending one unit. Refused, and not spent, at a full pool.
+    /// </summary>
+    RestoreMana,
 }

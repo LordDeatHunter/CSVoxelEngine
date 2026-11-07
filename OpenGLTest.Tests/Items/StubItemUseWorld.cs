@@ -36,6 +36,11 @@ internal sealed class StubItemUseWorld : IItemUseWorld
     /// <summary>The inventory whose known spell parts <see cref="LearnParts"/> teaches.</summary>
     public Inventory Inventory { get; set; } = Inventory.Empty();
 
+    /// <summary>The mana pool <see cref="RestoreMana"/> fills.</summary>
+    public PlayerMana Mana { get; } = new();
+
+    public bool RestoreMana(float share) => Mana.TryRestore(share);
+
     public bool LearnParts(IReadOnlyList<string> keys) => Inventory.LearnParts(keys);
 
     /// <summary>A fixed chance roll, or null for a real random one.</summary>

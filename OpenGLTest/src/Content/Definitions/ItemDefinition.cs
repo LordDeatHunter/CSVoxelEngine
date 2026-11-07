@@ -130,6 +130,12 @@ public sealed class ItemDefinition
     public string[]? Teaches { get; set; }
 
     /// <summary>
+    /// The share of the mana pool one use restores, in (0, 1]; required by, and only legal with,
+    /// <c>use.action: "restore_mana"</c>.
+    /// </summary>
+    public float? RestoresMana { get; set; }
+
+    /// <summary>
     /// Optional <c>block/&lt;name&gt;</c> model under <c>assets/models</c>, baked into
     /// <see cref="Item.BakedModel"/> so the item can be drawn as real 3D geometry while it
     /// sits inside a station (a crucible standing in a kiln's hearth). The sprite stays the

@@ -36,10 +36,12 @@ internal static class ItemLoader
                 "grow_tree" => ItemUseAction.GrowTree,
                 "plant_tree" => ItemUseAction.PlantTree,
                 "learn_parts" => ItemUseAction.LearnParts,
+                "restore_mana" => ItemUseAction.RestoreMana,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal, grow_tree, plant_tree or learn_parts."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal, grow_tree, plant_tree, learn_parts or restore_mana."),
             };
             var teaches = ParseTeaches(definition, action, path);
+            var restoresMana = ParseRestoresMana(definition, action, path);
 
             var durability = definition.Durability ?? 0;
             if (durability < 0 || durability > 1000)
@@ -167,7 +169,8 @@ internal static class ItemLoader
                 StaffSlots: staff?.Slots ?? 0,
                 StaffTier: staff?.Tier ?? 0,
                 StaffTags: staff?.Tags,
-                Teaches: teaches));
+                Teaches: teaches,
+                RestoresMana: restoresMana));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ContentRegistry.ItemIds, StringComparer.Ordinal));
@@ -251,6 +254,25 @@ internal static class ItemLoader
                 throw new InvalidOperationException($"Item '{path}' teaches '{keys[i]}' twice.");
         }
         return keys;
+    }
+
+    /// <summary>
+    /// The <c>restoresMana</c> share, 0 when the item has none. It belongs to, and is required by,
+    /// <c>use.action: "restore_mana"</c>, and must lie in (0, 1].
+    /// </summary>
+    internal static float ParseRestoresMana(ItemDefinition definition, ItemUseAction action, string path)
+    {
+        var share = definition.RestoresMana;
+        if (action != ItemUseAction.RestoreMana)
+        {
+            if (share != null)
+                throw new InvalidOperationException($"Item '{path}' has restoresMana but its use.action is not restore_mana.");
+            return 0f;
+        }
+        if (share is not { } value || !float.IsFinite(value) || value <= 0f || value > 1f)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'restore_mana' without a restoresMana share in (0, 1].");
+        return value;
     }
 
     private readonly record struct ParsedSheet(int Cols, int Rows, int Frames, ItemAnimationMode Mode, float Fps);
@@ -347,7 +369,10 @@ internal static class ItemLoader
                     ValidateIgniteCampfire(item, path);
                     break;
                 case ItemUseAction.Heal:
-                    ValidateHeal(item, path);
+                    ValidateHeal(item, path, "heal");
+                    break;
+                case ItemUseAction.RestoreMana:
+                    ValidateHeal(item, path, "restore_mana");
                     break;
                 case ItemUseAction.GrowTree:
                     ValidateGrowTree(item, path);
@@ -408,14 +433,15 @@ internal static class ItemLoader
                 $"Item '{path}' has use.action 'ignite_campfire' without durability: ignite items must declare uses before breaking.");
     }
 
-    private static void ValidateHeal(Item item, string path)
+    // A self-restoring use (heal, restore_mana) spends from its stack and targets nobody
+    private static void ValidateHeal(Item item, string path, string action)
     {
         if (item.UseResultId != 0)
             throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'heal' with a use.result: a heal spends from its stack, it never morphs.");
+                $"Item '{path}' has use.action '{action}' with a use.result: it spends from its stack, it never morphs.");
         if (item.UseFluidId != 0 || item.UseBlockId != 0)
             throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'heal' with a use.fluid or use.block: a heal targets nobody.");
+                $"Item '{path}' has use.action '{action}' with a use.fluid or use.block: it targets nobody.");
     }
 
     /// <summary>

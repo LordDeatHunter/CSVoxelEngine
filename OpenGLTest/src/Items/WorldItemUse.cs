@@ -323,6 +323,24 @@ internal sealed class WorldItemUse : IItemUseWorld
         return false;
     }
 
+    bool IItemUseWorld.RestoreMana(float share)
+    {
+        // Same ownership as Heal: this world's own pool in singleplayer and (predicted) on a client,
+        // the sending ServerPlayer's on a server
+        if (!_serverMode)
+            return _health.Mana.TryRestore(share);
+        var context = _activeContext;
+        if (context == null) return false;
+        foreach (var serverPlayer in ServerPlayers)
+        {
+            if (!ReferenceEquals(serverPlayer.Context, context)) continue;
+            if (!serverPlayer.Status.Mana.TryRestore(share)) return false;
+            serverPlayer.StatusDirty = true;
+            return true;
+        }
+        return false;
+    }
+
     bool IItemUseWorld.LearnParts(IReadOnlyList<string> keys)
     {
         // Singleplayer learns and resizes its own pool; a client only predicts the inventory (the
