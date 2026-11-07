@@ -90,10 +90,10 @@ internal sealed class WorldItemUse : IItemUseWorld
     private PlayerContext ActiveContext => _activeContext ?? LocalPlayer.LocalContext();
     private Inventory ActiveInventory => ActiveContext.Inventory;
 
-    /// <summary>Scenario seam: primes the primable block (TNT) in <paramref name="cell"/> the way a
-    /// firestarter strike does, minus its chance roll, so a script can film a blast. False when the
-    /// cell holds nothing primable.</summary>
-    internal bool TestPrimeTnt(Vector3 cell)
+    /// <summary>Primes the primable block (TNT) in <paramref name="cell"/> the way a firestarter strike
+    /// does, minus its chance roll; used by the scenario <c>prime</c> op and a spell's prime impact.
+    /// False when the cell holds nothing primable.</summary>
+    internal bool PrimeTnt(Vector3 cell)
     {
         var x = MathUtils.FloorToInt(cell.X);
         var y = MathUtils.FloorToInt(cell.Y);

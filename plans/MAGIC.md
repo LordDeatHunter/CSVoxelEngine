@@ -46,7 +46,7 @@ inventory snapshot keeps or reverts it. The server replays the `Cast` world inte
 refuses a cast without a staff, on a slot that is not the selected one or is unbound, with an invalid
 recipe, inside `SpellConfig.CastCooldownSeconds` (less `NetworkConfig.NetCastSlackSeconds`) or short of
 mana; it bills exactly the compiled cost, free in creative, and a cast also draws one edit token as a
-spam cap. The effect is the `World.SpellEffect` hook `MG-5` fills (nothing sets it in play yet). A client
+spam cap. The effect is the `World.SpellEffect` hook, which `MG-5`'s `SpellEffects` fills. A client
 predicts only: it checks and paces, never spends and never fires the effect. The HUD shows
 `StaffSlotIndicator` (the selected slot and its parts, or empty) beside the hotbar. The gesture is a
 punch swing until `MG-10`, and nothing rolls the fizzle chance yet (`MG-6`). The 0.5 s cooldown and
@@ -60,8 +60,8 @@ A target's effects are a GL-free `Status/StatusEffectSet` (on `Mob` and `PlayerH
 `IMobTarget.Effects`): a refresh never stacks, damage over time is `DamageSource.Magic` (the effect's
 `deathMessage` phrase is the death line), the lowest move and attack factor wins, and only the
 authoritative simulation ticks (a mob in `UpdateHazards`, the player in `LocalPlayer.UpdateHealth` or
-`ServerPlayer.TickStatus`; creative, flying or dead players are cleared). `MG-5` calls
-`Status/StatusEffects.Apply(target, name, durationScale)`. Block interaction is data too: blocks gain
+`ServerPlayer.TickStatus`; creative, flying or dead players are cleared). `MG-5` applies the element's
+effect through `Status/StatusEffects.Apply(target, name, durationScale)`. Block interaction is data too: blocks gain
 `flammable`, `freezesTo` and `meltsTo`, effects `blocks.ignite/freeze/thaw`, and the authoritative
 `StatusEffectBlockWriter` (drained by `MobDirector`) writes cells with every edit-path hook, capped per
 pulse and per frame. Protocol 13 ends each `EntityList` entry with an effect mask and `PlayerStatus` with
@@ -72,6 +72,26 @@ thaws; frostburn 8 s, 2% every 2 s, half speed, 0.6 attack, freezes. Known gaps:
 other players' effects are not shown, the player slowdown is client-trusted, blade swing durations are
 not scaled by the attack factor, a blast does not consult effects, a slime's split children do not
 inherit them, and icebergs are not consulted when freezing.
+
+`MG-5` shipped: what a cast does is part data. A shape names its `delivery` (`projectile`, the default,
+or `self`), an element its `impact` flags (`ignite`, `freeze`, `thaw`, `prime`, `light`, `grow`) and, with
+`grow`, a `plant` tree species, all validated by `SpellPartLoader`; fire is ignite, thaw, prime and light,
+frost freeze, nature grow with oak. `Magic/SpellEffects` (owned by `World`, built only where the world is
+authoritative, never on a client) is the `World.SpellEffect` hook. A projectile is a `SpellProjectile`:
+straight, no gravity, sub-stepped, colliding through `BoxSweep` like a thrown item, stopping at the first
+non-air cell its center enters or on a mob (`ThrownProjectile.FindMobHit`, shared), and spent after
+`ProjectileRangeBlocks` times the recipe's `RangeFactor`. A mob hit deals `BaseDamage` times the
+`DamageFactor` (at least 1) through `MobStrikes.StrikeMob` and applies the element's effect; a cell hit runs
+`SpellBlockImpact`: prime through `WorldItemUse.PrimeTnt` (a dry TNT block), light a fueled kiln or a full
+unlit branch pile, grow the aimed tree or plant the element's species (`World.TryGrowTree`), and
+ignite/freeze/thaw the cells within `ImpactReachBlocks` through the new `StatusEffectBlockWriter.ApplyAt`
+(a freeze only at or below the impact's level), every write with its edit-path hooks. A self cast applies
+the effect to the caster (the camera or the server's player, so a creative caster is immune) and the block
+conversions around its feet. Frost hardens lava because `lava.json` now freezes to cobblestone. The
+scenario op `cast` (part keys, no staff or mana) drives `visual-examples/spells.json`. First guesses:
+speed 24, range 24 blocks, base damage 4, impact reach 1. Known gaps: bolts are not sent to clients (only
+their consequences, until `MG-10`) and not saved; a self cast never primes, lights or grows (nature + self
+does nothing); bolts never hit players; a frostburned body standing over lava crusts it to cobblestone.
 
 ## In progress
 
@@ -84,13 +104,6 @@ Nothing.
 Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), one station
 UI, one bindable staff (two tiers). In order:
 
-- [ ] **`MG-5` Shapes and elements** — P1, L.
-  Projectile (reuse `ThrownProjectile`/`ThrowAction` flight) and self first; beam, cone, area, touch and
-  rune later. Elements: fire ignites TNT, campfires, kilns and leaves and applies burning; frost freezes
-  water, hardens lava and applies frostburn; nature grows saplings (`TreeGrowthWriter`). The status
-  effect comes from the element's `SpellPart.Effect` through `StatusEffects.Apply` (`MG-4b`). No
-  element-vs-element rules and no mob weaknesses for now. **Hook:** `TntManager`, `FluidManager`,
-  `SaplingManager`, `MobStrikes`. Any block write follows the `edit-path-checklist` skill.
 - [ ] **`MG-6` Risk: self-damage and fizzle** — P1, S–M.
   Your own fire and blasts can hurt you; an over-complex or conflicting recipe fizzles and wastes mana
   instead. The rules are pure functions with a gear bypass hook for later. Self-damage uses

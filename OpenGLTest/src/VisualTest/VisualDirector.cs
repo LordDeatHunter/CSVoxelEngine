@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using VoxelEngine.Content;
+using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Player;
 using VoxelEngine.Status;
@@ -84,7 +85,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
             case "prime":
                 // A firestarter strike that never misses: the scripted keyboard cannot equip a tool
                 // instance, and the strike's chance roll would make a blast scenario flaky
-                if (!world.ItemUse.TestPrimeTnt(step.Pos!.Value))
+                if (!world.ItemUse.PrimeTnt(step.Pos!.Value))
                     throw new InvalidOperationException(
                         $"Step {_step + 1} primes {step.Pos}, which holds no primable block.");
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} prime {step.Pos}");
@@ -170,6 +171,12 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 Advance();
                 break;
 
+            case "cast":
+                Cast(step);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} cast {string.Join(" + ", step.Parts)}");
+                Advance();
+                break;
+
             case "view":
                 world.Camera.TestSetMode(step.Mode switch
                 {
@@ -246,6 +253,21 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 count++;
         }
         Log.WriteLine($"{label}: {count} mob(s)");
+    }
+
+    /// <summary>A <c>cast</c> step: the part keys are resolved here rather than at parse time, so parsing
+    /// stays registry-free; an unknown key or an invalid recipe stops the run.</summary>
+    private void Cast(VisualStep step)
+    {
+        var parts = new SpellPart[step.Parts.Length];
+        for (var i = 0; i < parts.Length; i++)
+            parts[i] = SpellPartRegistry.TryGetByKey(step.Parts[i])
+                       ?? throw new InvalidOperationException($"Step {_step + 1} (cast): no spell part '{step.Parts[i]}'.");
+        var spells = world.Spells
+                     ?? throw new InvalidOperationException($"Step {_step + 1} (cast): this world casts no spells.");
+        if (!spells.TestCast(parts))
+            throw new InvalidOperationException(
+                $"Step {_step + 1} (cast): '{string.Join(", ", step.Parts)}' is not a valid spell.");
     }
 
     private void Advance() => _step++;

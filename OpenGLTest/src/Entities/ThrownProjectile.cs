@@ -105,24 +105,29 @@ public sealed class ThrownProjectile
         Position = next;
         if (hitX || hitY || hitZ) return false;
 
-        if (mobs != null)
+        hit = FindMobHit(Position, HalfExtent, mobs, ignore);
+        return hit == null;
+    }
+
+    /// <summary>
+    /// The first living mob (other than <paramref name="ignore"/>) a box of <paramref name="halfExtent"/>
+    /// centered at <paramref name="position"/> touches, or null. The test is a box overlap against the
+    /// mob's own body, so a tall mob is hittable through its head and shins rather than only near its center.
+    /// Shared by thrown items and spell bolts.
+    /// </summary>
+    public static Mob? FindMobHit(Vector3 position, float halfExtent, IReadOnlyList<Mob>? mobs, Mob? ignore = null)
+    {
+        if (mobs == null) return null;
+        for (var i = 0; i < mobs.Count; i++)
         {
-            // Box overlap against the mob's own body, so a tall mob is hittable through its
-            // head and shins rather than only near its center.
-            for (var i = 0; i < mobs.Count; i++)
-            {
-                var mob = mobs[i];
-                if (mob.IsDead || mob == ignore) continue;
-                var d = Position - mob.Position;
-                var reachXz = HalfExtent + mob.BodyHalfExtent + 0.05f;
-                var reachY = HalfExtent + mob.BodyHalfHeight + 0.05f;
-                if (MathF.Abs(d.X) <= reachXz && MathF.Abs(d.Z) <= reachXz && MathF.Abs(d.Y) <= reachY)
-                {
-                    hit = mob;
-                    return false;
-                }
-            }
+            var mob = mobs[i];
+            if (mob.IsDead || mob == ignore) continue;
+            var d = position - mob.Position;
+            var reachXz = halfExtent + mob.BodyHalfExtent + 0.05f;
+            var reachY = halfExtent + mob.BodyHalfHeight + 0.05f;
+            if (MathF.Abs(d.X) <= reachXz && MathF.Abs(d.Z) <= reachXz && MathF.Abs(d.Y) <= reachY)
+                return mob;
         }
-        return true;
+        return null;
     }
 }

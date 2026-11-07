@@ -10,6 +10,7 @@
   "light": { "emission": 15, "passes": true },
   "hasItem": false,
   "loot": "none",
+  "freezesTo": "cobblestone",
   "flow": {
     "tickDivisor": 2,
     "range": 3,

@@ -116,6 +116,83 @@ public class SpellPartLoaderTests
         Assert.Null(parts[SpellPart.KeyOf(SpellPartKind.Element, "y")].Effect);
     });
 
+    /// <summary>The species lookup the temp-folder cases are checked against: only <c>tree</c> exists.</summary>
+    private static bool KnownSpecies(string name) => name == "tree";
+
+    private static SpellPart CompileOne(string kindFolder, string json)
+    {
+        SpellPart? part = null;
+        InTempDir(dir =>
+        {
+            WritePart(dir, kindFolder, "x", json);
+            part = Assert.Single(SpellPartLoader.ReadParts(dir, KnownEffect, KnownSpecies).Values);
+        });
+        return part!;
+    }
+
+    [Theory]
+    [InlineData("shape", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "impact": ["ignite"] }""")]
+    [InlineData("modifier", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "impact": [] }""")]
+    [InlineData("element", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "delivery": "self" }""")]
+    public void AnImpactOutsideAnElementIsRefused(string kindFolder, string json) => InTempDir(dir =>
+    {
+        var path = WritePart(dir, kindFolder, "bad", json);
+        Assert.Contains(path, Assert.Throws<InvalidOperationException>(() => SpellPartLoader.ReadParts(dir, KnownEffect, KnownSpecies)).Message);
+    });
+
+    [Theory]
+    [InlineData("""{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "impact": ["explode"] }""")]
+    [InlineData("""{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "impact": ["Ignite"] }""")]
+    [InlineData("""{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "impact": ["freeze", "freeze"] }""")]
+    public void AnUnknownOrRepeatedImpactIsRefused(string json) => InTempDir(dir =>
+    {
+        var path = WritePart(dir, "element", "bad", json);
+        Assert.Contains(path, Assert.Throws<InvalidOperationException>(() => SpellPartLoader.ReadParts(dir, KnownEffect, KnownSpecies)).Message);
+    });
+
+    [Theory]
+    [InlineData("element", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "plant": "tree" }""")]
+    [InlineData("element", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "impact": ["ignite"], "plant": "tree" }""")]
+    [InlineData("element", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "impact": ["grow"], "plant": "unknown" }""")]
+    [InlineData("element", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "impact": ["grow"], "plant": " " }""")]
+    [InlineData("shape", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "plant": "tree" }""")]
+    public void APlantNeedsGrowAndAKnownSpecies(string kindFolder, string json) => InTempDir(dir =>
+    {
+        var path = WritePart(dir, kindFolder, "bad", json);
+        Assert.Contains(path, Assert.Throws<InvalidOperationException>(() => SpellPartLoader.ReadParts(dir, KnownEffect, KnownSpecies)).Message);
+    });
+
+    [Theory]
+    [InlineData("modifier", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "delivery": "projectile" }""")]
+    [InlineData("shape", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "delivery": "beam" }""")]
+    [InlineData("shape", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "delivery": "Self" }""")]
+    public void ADeliveryOutsideAShapeOrUnknownIsRefused(string kindFolder, string json) => InTempDir(dir =>
+    {
+        var path = WritePart(dir, kindFolder, "bad", json);
+        Assert.Contains(path, Assert.Throws<InvalidOperationException>(() => SpellPartLoader.ReadParts(dir, KnownEffect, KnownSpecies)).Message);
+    });
+
+    [Fact]
+    public void AShapeWithoutDeliveryIsAProjectile()
+    {
+        Assert.Equal(SpellDelivery.Projectile, CompileOne("shape", ValidPart).Delivery);
+        Assert.Equal(SpellDelivery.Self,
+            CompileOne("shape", """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "delivery": "self" }""").Delivery);
+    }
+
+    [Fact]
+    public void ImpactNamesCompileToTheirFlags()
+    {
+        var part = CompileOne("element",
+            """{ "costShare": 0.1, "complexity": 1, "tags": ["basic"], "impact": ["ignite", "freeze", "grow"], "plant": "tree" }""");
+        Assert.True(part.Impact.HasFlag(SpellImpact.Ignite));
+        Assert.True(part.Impact.HasFlag(SpellImpact.Freeze));
+        Assert.True(part.Impact.HasFlag(SpellImpact.Grow));
+        Assert.False(part.Impact.HasFlag(SpellImpact.Prime));
+        Assert.Equal("tree", part.Plant);
+        Assert.Equal(SpellImpact.None, CompileOne("element", ValidPart).Impact);
+    }
+
     [Fact]
     public void EveryShippedElementEffectResolves()
     {

@@ -169,6 +169,9 @@ public class World
     /// <summary>The cast seam: every staff cast, local or replayed for a server's player, passes it.</summary>
     internal SpellCaster Caster { get; }
 
+    /// <summary>What accepted casts do: the spell bolts in flight and the element impacts; null on a client.</summary>
+    internal SpellEffects? Spells { get; }
+
     /// <summary>The multiplayer client's mirror of its server: cell changes, entities, stations, health, remote players.</summary>
     internal ClientMirror ClientMirror { get; }
 
@@ -453,6 +456,10 @@ public class World
                     Edits.NotifyLodEdit);
             Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _icebergs, _debris, _health,
                 _mobs, serverMode, clientMode, statusBlocks);
+            Spells = statusBlocks == null
+                ? null
+                : new SpellEffects(this, _chunkManager, statusBlocks, ItemUse, _debris, serverMode);
+            if (Spells != null) Caster.Effect = Spells.Cast;
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
                 _leaves, _fire, _lavaFire, _torchFire, _bubbles, _sliceTrails, _health, _hotbarName, _hotbarPops);
@@ -707,7 +714,8 @@ public class World
     public CastVerdict CastFor(PlayerContext player, int slot, CastPacing pacing, double now, double slackSeconds) =>
         Caster.CastFor(player, slot, pacing, now, slackSeconds);
 
-    /// <summary>The effect every accepted cast fires (see <see cref="SpellCaster.Effect"/>); MG-5 fills it.</summary>
+    /// <summary>The effect every accepted cast fires (see <see cref="SpellCaster.Effect"/>): by default
+    /// <see cref="SpellEffects.Cast"/> in an authoritative world; tests may replace it.</summary>
     public Action<SpellCast>? SpellEffect
     {
         get => Caster.Effect;
@@ -930,6 +938,7 @@ public class World
         Edits.UpdateToppling((float)deltaTime);
         Throws.UpdateThrown((float)deltaTime);
         Throws.RefreshProjectiles();
+        Spells?.Update((float)deltaTime);
         Ambient.UpdateSplashes((float)deltaTime);
         // Remote player poses ease toward the last broadcast and drive their own walk cycles.
         for (var i = 0; i < _remotePlayers.Count; i++)

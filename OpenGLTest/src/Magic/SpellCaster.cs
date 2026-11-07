@@ -24,8 +24,8 @@ internal sealed class SpellCaster
     internal CastPacing LocalPacing { get; } = new();
 
     /// <summary>
-    /// The effect seam MG-5 fills: fired once per accepted cast in singleplayer and on a server,
-    /// never on a client.
+    /// The effect seam: fired once per accepted cast in singleplayer and on a server, never on a
+    /// client. <see cref="World"/> installs <see cref="SpellEffects.Cast"/> where it is authoritative.
     /// </summary>
     internal Action<SpellCast>? Effect { get; set; }
 

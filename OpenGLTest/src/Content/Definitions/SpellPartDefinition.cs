@@ -32,4 +32,19 @@ public sealed class SpellPartDefinition
     /// applies on hit; none when unset. Must name a loaded effect.
     /// </summary>
     public string? Effect { get; set; }
+
+    /// <summary>
+    /// Element only: what the element does to the cells it lands on, as flag names (<c>ignite</c>,
+    /// <c>freeze</c>, <c>thaw</c>, <c>prime</c>, <c>light</c>, <c>grow</c>), each at most once; none when unset.
+    /// </summary>
+    public string[]? Impact { get; set; }
+
+    /// <summary>
+    /// Element only, and only with the <c>grow</c> impact: the tree species
+    /// (<c>assets/data/trees/&lt;name&gt;.json</c>) the element plants on bare ground; none when unset.
+    /// </summary>
+    public string? Plant { get; set; }
+
+    /// <summary>Shape only: how the shape delivers its element, <c>projectile</c> (the default) or <c>self</c>.</summary>
+    public string? Delivery { get; set; }
 }

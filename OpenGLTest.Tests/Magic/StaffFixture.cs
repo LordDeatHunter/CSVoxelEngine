@@ -51,6 +51,15 @@ internal static class StaffFixture
     public static SpellStats Bind(StaffItem staff, ItemStack stack, int slot, out SpellPart[] parts)
     {
         parts = ValidRecipe(staff);
+        return Bind(staff, stack, slot, parts);
+    }
+
+    /// <summary>
+    /// Binds <paramref name="parts"/> into <paramref name="slot"/> of the held staff and returns the stats a
+    /// cast of it compiles to.
+    /// </summary>
+    public static SpellStats Bind(StaffItem staff, ItemStack stack, int slot, SpellPart[] parts)
+    {
         Assert.True(StaffBinding.TryBind(staff, stack.Get<StaffComponent>(), slot, parts, out var bound, out _));
         stack.Set(bound);
         return new SpellRecipe(parts).Compile(staff.AllowedTags);

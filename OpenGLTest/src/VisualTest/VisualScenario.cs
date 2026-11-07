@@ -68,10 +68,14 @@ public sealed class VisualStep
 
     /// <summary>The hotbar slot a <c>select</c> step picks, 1-based like the number keys.</summary>
     public int Slot { get; init; }
+
+    /// <summary>The spell part keys (<c>&lt;kind&gt;/&lt;name&gt;</c>) a <c>cast</c> step fires, in
+    /// recipe order (resolved at run time).</summary>
+    public string[] Parts { get; init; } = [];
 }
 
 /// <summary>
-/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/creative/give/spawn/grow/damage/effect/screenshot steps loaded from
+/// A scripted in-game run: teleport/look/wait/walk/mine/place/fly/creative/give/spawn/grow/damage/effect/cast/screenshot steps loaded from
 /// JSON (<c>VOXEL_SCRIPT</c>), driving the real world-update functions for agent screenshots.
 /// </summary>
 public sealed class VisualScenario
@@ -197,6 +201,7 @@ public sealed class VisualScenario
                     : "mobs",
             },
             "effect" => ReadEffect(element, index),
+            "cast" => ReadCast(element, index),
             "view" => new VisualStep { Op = "view", Mode = ReadChoice(element, index, "view", "mode", ["first", "shoulder", "orbit"]) },
             "player" => new VisualStep
             {
@@ -219,7 +224,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, view, player, select or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select or screenshot."),
         };
     }
 
@@ -345,6 +350,27 @@ public sealed class VisualScenario
                 : "mobs",
             Scale = scale,
         };
+    }
+
+    /// <summary>A <c>cast</c> step: <c>parts</c> is a non-empty array of spell part keys, fired from the
+    /// player's eye along its aim with no staff or mana (validated against the registry only when the
+    /// step runs, so parsing stays content-free).</summary>
+    private static VisualStep ReadCast(JsonElement element, int index)
+    {
+        if (!element.TryGetProperty("parts", out var parts)
+            || parts.ValueKind != JsonValueKind.Array
+            || parts.GetArrayLength() == 0)
+            throw new InvalidOperationException($"Step {index} (cast) needs 'parts'.");
+
+        var keys = new string[parts.GetArrayLength()];
+        var i = 0;
+        foreach (var part in parts.EnumerateArray())
+        {
+            if (part.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(part.GetString()))
+                throw new InvalidOperationException($"Step {index} (cast) needs 'parts'.");
+            keys[i++] = part.GetString()!.Trim();
+        }
+        return new VisualStep { Op = "cast", Parts = keys };
     }
 
     private static float? ReadOptionalFloat(JsonElement element, string field) =>

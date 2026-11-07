@@ -141,7 +141,7 @@ public sealed class VisualScenarioTests
     {
         var ex = Assert.Throws<InvalidOperationException>(
             () => VisualScenario.Parse("""{ "steps": [{ "op": "dance" }] }""", "bad"));
-        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "creative", "give", "spawn", "grow", "damage", "effect", "select", "screenshot" })
+        foreach (var op in new[] { "teleport", "look", "wait", "walk", "mine", "place", "fly", "creative", "give", "spawn", "grow", "damage", "effect", "cast", "select", "screenshot" })
             Assert.Contains(op, ex.Message);
     }
 
@@ -311,6 +311,45 @@ public sealed class VisualScenarioTests
         var scenario = VisualScenario.Load(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "icebergs.json"));
 
         Assert.Contains(scenario.Steps, step => step.Op == "spawn" && step.Entity == "iceberg");
+        Assert.Contains(scenario.Steps, step => step.Op == "screenshot");
+    }
+
+    [Fact]
+    public void ACastStepParsesItsPartKeys()
+    {
+        var scenario = VisualScenario.Parse("""
+            { "steps": [
+              { "op": "cast", "parts": [" element/fire ", "shape/projectile", "modifier/not_registered"] },
+            ] }
+            """, "tour");
+        Assert.Equal("cast", scenario.Steps[0].Op);
+        Assert.Equal(["element/fire", "shape/projectile", "modifier/not_registered"], scenario.Steps[0].Parts);
+    }
+
+    [Theory]
+    [InlineData("""{ "op": "cast" }""")]
+    [InlineData("""{ "op": "cast", "parts": [] }""")]
+    [InlineData("""{ "op": "cast", "parts": "element/fire" }""")]
+    [InlineData("""{ "op": "cast", "parts": ["element/fire", "  "] }""")]
+    [InlineData("""{ "op": "cast", "parts": ["element/fire", 3] }""")]
+    public void ACastStepWithoutPartsIsRefused(string step)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            VisualScenario.Parse($$"""{ "steps": [{{step}}] }""", "bad"));
+        Assert.Contains("(cast) needs 'parts'", ex.Message);
+    }
+
+    [Fact]
+    public void TheSpellsScenarioLoads()
+    {
+        // visual-examples/ is not copied to the build output: it sits in the game project
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "spells.json")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        var scenario = VisualScenario.Load(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "spells.json"));
+
+        Assert.Contains(scenario.Steps, step => step.Op == "cast" && step.Parts.Length > 0);
         Assert.Contains(scenario.Steps, step => step.Op == "screenshot");
     }
 }

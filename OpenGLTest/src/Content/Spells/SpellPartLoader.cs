@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.StatusEffects;
+using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.Content.Spells;
 
@@ -21,12 +22,31 @@ internal static class SpellPartLoader
 
     internal static void LoadSpellParts(string folder) => SpellPartRegistry.Publish(ReadParts(folder));
 
+    /// <summary>The <c>impact</c> names an element may list, each with its flag.</summary>
+    private static readonly (string Name, SpellImpact Flag)[] ImpactNames =
+    [
+        ("ignite", SpellImpact.Ignite),
+        ("freeze", SpellImpact.Freeze),
+        ("thaw", SpellImpact.Thaw),
+        ("prime", SpellImpact.Prime),
+        ("light", SpellImpact.Light),
+        ("grow", SpellImpact.Grow),
+    ];
+
+    /// <summary>The <c>delivery</c> names a shape may set, each with its delivery.</summary>
+    private static readonly (string Name, SpellDelivery Delivery)[] DeliveryNames =
+    [
+        ("projectile", SpellDelivery.Projectile),
+        ("self", SpellDelivery.Self),
+    ];
+
     /// <summary>
     /// Every part under <paramref name="folder"/> by key; empty when the folder is missing.
-    /// <paramref name="effectExists"/> is the status effect lookup an element's <c>effect</c> is checked
-    /// against (see <see cref="Compile"/>).
+    /// <paramref name="effectExists"/> and <paramref name="speciesExists"/> are the status effect and tree
+    /// species lookups an element's <c>effect</c> and <c>plant</c> are checked against (see <see cref="Compile"/>).
     /// </summary>
-    internal static Dictionary<string, SpellPart> ReadParts(string folder, Func<string, bool>? effectExists = null)
+    internal static Dictionary<string, SpellPart> ReadParts(string folder, Func<string, bool>? effectExists = null,
+        Func<string, bool>? speciesExists = null)
     {
         var parts = new Dictionary<string, SpellPart>(StringComparer.Ordinal);
         if (!Directory.Exists(folder)) return parts;
@@ -50,7 +70,8 @@ internal static class SpellPartLoader
             if (!Directory.Exists(kindFolder)) continue;
             foreach (var (name, path) in ContentFiles.JsonFilesIn(kindFolder))
             {
-                var part = Compile(kind, name, ContentFiles.ReadJson<SpellPartDefinition>(path), path, effectExists);
+                var part = Compile(kind, name, ContentFiles.ReadJson<SpellPartDefinition>(path), path, effectExists,
+                    speciesExists);
                 parts[part.Key] = part;
             }
         }
@@ -60,10 +81,12 @@ internal static class SpellPartLoader
     /// <summary>
     /// Compiles one part, throwing an error that names <paramref name="path"/> on any bad field. An element's
     /// <c>effect</c> must be found by <paramref name="effectExists"/>, which defaults to
-    /// <see cref="StatusEffectRegistry.Contains"/> (effects load before spell parts).
+    /// <see cref="StatusEffectRegistry.Contains"/> (effects load before spell parts); an element's <c>plant</c>
+    /// must be found by <paramref name="speciesExists"/>, which defaults to <see cref="TreeSpeciesRegistry.TryGet"/>
+    /// (tree species load before them too).
     /// </summary>
     internal static SpellPart Compile(SpellPartKind kind, string name, SpellPartDefinition definition, string path,
-        Func<string, bool>? effectExists = null)
+        Func<string, bool>? effectExists = null, Func<string, bool>? speciesExists = null)
     {
         if (definition.CostShare is not { } costShare || !float.IsFinite(costShare) || costShare <= 0f || costShare > 1f)
             throw new InvalidOperationException(
@@ -89,8 +112,72 @@ internal static class SpellPartLoader
         var damageFactor = CheckFactor(kind, definition.DamageFactor, "damageFactor", path);
         var rangeFactor = CheckFactor(kind, definition.RangeFactor, "rangeFactor", path);
         var effect = CheckEffect(kind, definition.Effect, path, effectExists ?? StatusEffectRegistry.Contains);
+        var impact = CheckImpact(kind, definition.Impact, path);
+        var plant = CheckPlant(kind, definition.Plant, impact, path,
+            speciesExists ?? (species => TreeSpeciesRegistry.TryGet(species) != null));
+        var delivery = CheckDelivery(kind, definition.Delivery, path);
 
-        return new SpellPart(kind, name, definition.Name ?? name, costShare, complexity, tags, damageFactor, rangeFactor, effect);
+        return new SpellPart(kind, name, definition.Name ?? name, costShare, complexity, tags, damageFactor, rangeFactor,
+            effect, impact, plant, delivery);
+    }
+
+    /// <summary>An element's impact flags: none when unset; set only on an element, each a known name at most once.</summary>
+    private static SpellImpact CheckImpact(SpellPartKind kind, string[]? names, string path)
+    {
+        if (names == null) return SpellImpact.None;
+        if (kind != SpellPartKind.Element)
+            throw new InvalidOperationException($"Spell part '{path}' sets impact, which only an element may carry.");
+
+        var impact = SpellImpact.None;
+        foreach (var name in names)
+        {
+            var flag = ImpactFlagOf(name);
+            if (flag == SpellImpact.None)
+                throw new InvalidOperationException(
+                    $"Spell part '{path}' lists impact '{name}'; expected one of {string.Join(", ", ImpactNames.Select(entry => entry.Name))}.");
+            if ((impact & flag) != 0)
+                throw new InvalidOperationException($"Spell part '{path}' lists impact '{name}' twice.");
+            impact |= flag;
+        }
+        return impact;
+    }
+
+    private static SpellImpact ImpactFlagOf(string? name)
+    {
+        foreach (var (known, flag) in ImpactNames)
+        {
+            if (string.Equals(name, known, StringComparison.Ordinal)) return flag;
+        }
+        return SpellImpact.None;
+    }
+
+    /// <summary>An element's planted species: null when unset; set only on an element with the grow impact, naming a loaded species.</summary>
+    private static string? CheckPlant(SpellPartKind kind, string? plant, SpellImpact impact, string path,
+        Func<string, bool> speciesExists)
+    {
+        if (plant == null) return null;
+        if (kind != SpellPartKind.Element)
+            throw new InvalidOperationException($"Spell part '{path}' sets plant, which only an element may carry.");
+        if ((impact & SpellImpact.Grow) == 0)
+            throw new InvalidOperationException($"Spell part '{path}' sets plant without grow.");
+        if (string.IsNullOrWhiteSpace(plant) || !speciesExists(plant))
+            throw new InvalidOperationException(
+                $"Spell part '{path}' names plant '{plant}', which is not a registered tree species.");
+        return plant;
+    }
+
+    /// <summary>A shape's delivery: projectile when unset; set only on a shape, a known name.</summary>
+    private static SpellDelivery CheckDelivery(SpellPartKind kind, string? delivery, string path)
+    {
+        if (delivery == null) return SpellDelivery.Projectile;
+        if (kind != SpellPartKind.Shape)
+            throw new InvalidOperationException($"Spell part '{path}' sets delivery, which only a shape may carry.");
+        foreach (var (known, value) in DeliveryNames)
+        {
+            if (string.Equals(delivery, known, StringComparison.Ordinal)) return value;
+        }
+        throw new InvalidOperationException(
+            $"Spell part '{path}' has delivery '{delivery}'; expected one of {string.Join(", ", DeliveryNames.Select(entry => entry.Name))}.");
     }
 
     /// <summary>An element's status effect: null when unset; set only on an element, naming a loaded effect.</summary>

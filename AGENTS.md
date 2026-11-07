@@ -87,7 +87,7 @@ goblins with health, facing, velocity, ammo and a slime's size plus still-pendin
 `MaxSavedDrops` item drops, nearest first, and the drifting icebergs) and `stations.json` (`StationSaveCodec`:
 the campfires, querns, kilns and cast molds with their fuel, fire, crucible, cooking and cast progress). See "Saves" below for the rules.
 
-Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `SkyConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`creative`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; `damage` hurts every live mob, or the player's own pool with `"target": "player"`; `effect` (`{ "op": "effect", "effect": "burning", "target": "mobs"|"player", "scale": 1 }`, target `mobs` by default) applies a status effect through `StatusEffects.Apply`, the name checked only when the step runs (an unknown one is warned and skipped); then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `creative` turns creative mode on
+Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `SkyConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`creative`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; `damage` hurts every live mob, or the player's own pool with `"target": "player"`; `effect` (`{ "op": "effect", "effect": "burning", "target": "mobs"|"player", "scale": 1 }`, target `mobs` by default) applies a status effect through `StatusEffects.Apply`, the name checked only when the step runs (an unknown one is warned and skipped); `cast` (`{ "op": "cast", "parts": ["element/fire", "shape/projectile"] }`) fires a spell of those part keys from the camera's eye and aim with no staff or mana (`SpellEffects.TestCast`; an unknown key or an invalid recipe stops the run), and `visual-examples/spells.json` (`VOXEL_TIME=147`) films a fire, a frost and a nature bolt; then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `creative` turns creative mode on
 **without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
 player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
 any scenario that teleports a walking player above the ground, and turn it off again before a
@@ -1149,6 +1149,8 @@ OpenGLTest/
       Spells/                  # spell parts and recipes (MG-2): kinds, the compiled part, its registry and
                                #   loader, the recipe compile
         SpellPartKind.cs, SpellPart.cs  # element/shape/modifier/trigger; one compiled part keyed <kind>/<name>
+        SpellDelivery.cs       # how a shape delivers its element: Projectile (default) or Self
+        SpellImpact.cs         # [Flags] what an element does where it lands: ignite, freeze, thaw, prime, light, grow
         SpellPartRegistry.cs   # every part by key, published once by ContentRegistry.Load
         SpellPartLoader.cs     # data/spell/<kind>/*.json -> parts; ReadParts and Compile are pure (tests)
         SpellRecipe.cs         # element + shape + modifiers + trigger -> cost, verdict, fizzle, factors
@@ -1433,8 +1435,17 @@ OpenGLTest/
       CastVerdict.cs           # why a cast was refused, or Cast
       HeldStaff.cs             # the held staff's stack, its selected slot, and the select/cycle that write it
       SpellCast.cs             # what the effect hook receives: caster, staff, slot, parts, stats, eye and aim
-      SpellCaster.cs           # World component: the one cast seam (playing gate, CastRules, the Effect hook
-                               #   MG-5 fills; never spends or fires on a client), behind World.CastFor/SpellEffect
+      SpellBlockImpact.cs      # what an element's impact flags do to a landed-on cell (prime, light, grow, and
+                               #   ignite/freeze/thaw through StatusEffectBlockWriter.ApplyAt), every write hooked
+      SpellCaster.cs           # World component: the one cast seam (playing gate, CastRules, the Effect hook;
+                               #   never spends or fires on a client), behind World.CastFor/SpellEffect
+      SpellEffects.cs          # World component (authoritative only): the Effect hook; launches and flies the
+                               #   bolts, lands them on mobs and cells, applies a self cast; the `cast` op's TestCast
+      SpellFlight.cs           # what one bolt update ended in: Flying, HitMob, HitCell, Spent
+      SpellImpactRules.cs      # GL-free: a bolt's damage and range from the recipe's factors, its element and
+                               #   shape, the impacts that are block actions
+      SpellProjectile.cs       # GL-free: one bolt in flight (straight, sub-stepped, BoxSweep and first non-air
+                               #   cell, mob overlap, spent after its range)
     Networking/                # the GL-free multiplayer protocol and codecs both sides share
                                #   (see "Multiple players and chat"); the client and the server side below
       ChunkNetCodec.cs         # chunk blocks/state and column terrain (heights, water levels, corner climate),
@@ -2161,7 +2172,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   hit-stop, the vignette, pops, FOV and tilt, droplets, tool shatter
   Lod/                         # far-LOD regions, the manager, build pool and buffers, column caps, surface
                                #   overrides and their save state, sky exposure; the build-cost probe
-  Magic/                       # the cast rules, pacing and held-staff lookup; its own helper StaffFixture
+  Magic/                       # the cast rules, pacing and held-staff lookup, the spell effects (bolt flight,
+                               #   impact rules, the element impacts on a server world); its own helper StaffFixture
   Networking/                  # protocol and codecs, end-to-end chunk and imported-world streaming
     Client/                    # client streaming, the mesh gate, predictions and intent flow, the entity
                                #   mirror, remote players, worldgen isolation
@@ -2306,7 +2318,7 @@ trailing commas.
 | `fluid` | false | the block is a flowing fluid (water, lava): forces `solid`, `castsAO`, `hasItem`, `needsSupport` off, `occludes` off and `light.passes` on, and drops nothing whatever the file says |
 | `flow` | water behavior | per-fluid tuning, only legal with `fluid: true`: `tickDivisor` (ticks between updates, lava `2` = half water speed), `range` (sideways spread 1..7, lava `3`), `infinite` (adjacent sources birth new ones, lava `false`), and the `hardensTo` + `hardensTouching` pair (lava hardens to `cobblestone` on touching `block/water`) |
 | `flammable` | false | a status effect with `blocks.ignite` burns the block away to air (no loot, no fire block) when it ticks beside it (`BlockType.FlammableById`). Illegal on a fluid and on a multiblock anchor or part. The leaves and the ground plants set it; planks, logs, TNT and stations do not |
-| `freezesTo` | none | the solid block a fluid **source** freezes into under `blocks.freeze` (`BlockType.FreezesToById`; water -> `ice`). Only legal on a fluid, and the target must be a registered non-fluid block |
+| `freezesTo` | none | the solid block a fluid **source** freezes into under `blocks.freeze` and a spell's `freeze` impact (`BlockType.FreezesToById`; water -> `ice`, lava -> `cobblestone`). Only legal on a fluid, and the target must be a registered non-fluid block |
 | `meltsTo` | none | the fluid a block thaws into, as a source, under `blocks.thaw` (`BlockType.MeltsToById`; ice -> `water`). Only legal on a non-fluid, and the target must be a fluid other than the block itself |
 | `onBreak` | `"drop"` | `drop` (roll loot) or `prime_tnt` (no drop, spawns a `PrimedTnt`) |
 | `loot` | the table sharing this block's name, else drop self | loot table name; `"none"` drops nothing |
@@ -2965,7 +2977,10 @@ naming it, and every part error names its file. `SpellPartLoader` (`Content/Spel
 | `tags` | required | at least one non-blank, distinct, lowercase tag (compared ordinally): what a staff tier allows (MG-3). Their own namespace, unrelated to the item tool tags in `data/tags` |
 | `damageFactor` | 1 | modifier only, finite and > 0: multiplies the spell's damage |
 | `rangeFactor` | 1 | modifier only, finite and > 0: multiplies the spell's range (projectile flight) |
-| `effect` | none | element only: the status effect the element applies on hit (`SpellPart.Effect`, read by MG-5), the name of a loaded `assets/data/effects` file; an unknown or blank name, or an `effect` on any other kind, is refused naming the file. `fire` -> `burning`, `frost` -> `frostburn`, `nature` none |
+| `effect` | none | element only: the status effect the element applies on hit (`SpellPart.Effect`, read by `SpellEffects`), the name of a loaded `assets/data/effects` file; an unknown or blank name, or an `effect` on any other kind, is refused naming the file. `fire` -> `burning`, `frost` -> `frostburn`, `nature` none |
+| `impact` | none | element only: the list of things the element does to the cell it lands on (`SpellPart.Impact`, a `SpellImpact` flag set): `ignite` burns `flammable` blocks to air, `freeze` sets fluid sources at or below the impact to their `freezesTo`, `thaw` melts `meltsTo` blocks to a source (these three within `SpellConfig.ImpactReachBlocks` and, for a self cast, around the caster's feet), `prime` primes a dry primable block (TNT), `light` lights a fueled kiln or a full, unlit branch-pile campfire, `grow` grows the aimed tree or plants `plant`. An unknown or repeated name, or an `impact` on any other kind, is refused naming the file. `fire` ignite, thaw, prime, light; `frost` freeze; `nature` grow |
+| `plant` | none | element only, and only with `grow`: the tree species (a `data/trees` file name) a `grow` impact plants where it lands on ground holding no tree; an unknown or blank species is refused. `nature` -> `oak` |
+| `delivery` | `projectile` | shape only: how the shape delivers its element (`SpellPart.Delivery`), `projectile` (a straight bolt, `SpellProjectile`) or `self` (the caster); anything else, or a `delivery` on another kind, is refused naming the file. `self` -> `self` |
 
 `SpellRecipe` (a flat list of parts) compiles through `Compile(allowedTags)` to a `SpellStats`, GL-free
 and pure (no roll, no registry read). The verdict (`SpellVerdict`) checks, in order: exactly one
@@ -2981,6 +2996,21 @@ is a JSON file, never a `switch` on its name. Slice 1 ships the elements `fire`,
 the shapes `projectile` and `self` and the modifiers `power` (raises damage and cost) and `range`
 (lengthens flight and raises cost), all tagged `basic`; every valid combination costs 20-40% of the
 starting pool (the `ManaConfig` design rule). `SpellRecipeTests`, `SpellPartLoaderTests`.
+
+**What a cast does (MG-5).** `Magic/SpellEffects` (owned by `World`, built only where the world is
+authoritative, so never on a client) is the `World.SpellEffect` hook. A `projectile` shape launches a
+`SpellProjectile` from just in front of the eye: straight at `SpellConfig.ProjectileSpeed` with no gravity,
+sub-stepped (`ProjectileMaxStepBlocks`), stopped by a solid cell through `BoxSweep`, by the first non-air
+cell its center enters (water, lava, leaves, a plant) or by a mob (`ThrownProjectile.FindMobHit`), and
+spent after `SpellImpactRules.RangeFor` (`ProjectileRangeBlocks` times the `RangeFactor`). Bolts tick in
+`World.Update` right after the thrown items and never hit players. A mob hit deals
+`SpellImpactRules.DamageFor` (`BaseDamage` times the `DamageFactor`, at least 1) through
+`MobStrikes.StrikeMob` and applies the element's `effect`; a cell hit runs `SpellBlockImpact` (the
+`impact` table above). A `self` shape applies the effect to the caster (the camera or the server's
+player, so a creative or flying caster is immune) and the element's ignite/freeze/thaw around its feet;
+prime, light and grow are aimed only. A non-server world shows a bolt as sparks of its effect's tint.
+Known gaps: bolts are not sent to clients (until `MG-10`) and not saved; a frostburned body over lava
+crusts it. `SpellImpactRulesTests`, `SpellProjectileTests`, `SpellEffectsTests`.
 
 ### Status effect schema (`assets/data/effects/<name>.json`)
 
@@ -3196,7 +3226,7 @@ pure function of the seed: only **deltas** and the seed are written.
   one aggregated warning, and a cast pour is restored paused (its crucible binding is transient). A
   corrupt file parses to null and is replaced at the next autosave, like `entities.json`.
 - **Not persisted** (tracked as `M-12` in `plans/TODO.md`): primed TNT, falling blocks, projectiles
-  in flight, toppling trees and the sapling clock (a half-grown sapling stands where it is until it
+  in flight, spell bolts in flight, toppling trees and the sapling clock (a half-grown sapling stands where it is until it
   is grown again).
 
 ## Multiple players and chat
@@ -3519,8 +3549,9 @@ empty. Then, by kind:
   cooldown (`SpellConfig.CastCooldownSeconds` less `NetCastSlackSeconds`) run out, and the mana billed
   last (`PlayerContext.Health.Mana.TrySpend`, free in creative), so every refusal spends nothing. A
   spend or a refusal for mana sets `StatusDirty`, so the pool reaches the client in the same `Pump`.
-  An accepted cast fires `World.SpellEffect` (the effect hook `MG-5` fills; nothing sets it in play
-  yet) and is rebroadcast as a punch until `MG-10`. A client runs the same seam to predict only: it
+  An accepted cast fires `World.SpellEffect`, by default `SpellEffects.Cast`, which launches the bolt
+  or applies the self cast on the server (bolts are not in `EntityList`, so a client sees only their
+  consequences until `MG-10`) and is rebroadcast as a punch until `MG-10`. A client runs the same seam to predict only: it
   checks and paces, never spends and never fires the effect, then raises the intent.
 
 Every intent is answered, in order: an intent that can edit cells gets a `BlockCorrection` with
@@ -4804,7 +4835,7 @@ overshoot or jiggle.
   `VOXEL_TIME=700` ends on close shots of a floor and a wall torch).
   `visual-examples/world-events.json` (`VOXEL_TIME=147`) films
   these effects; its blasts use the scenario op `prime` (`{ "op": "prime", "pos": [x, y, z] }`,
-  `WorldItemUse.TestPrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since
+  `WorldItemUse.PrimeTnt`), a firestarter strike on the TNT block in that cell that never misses, since
   `give` cannot equip a tool instance and the strike's chance roll would make the scenario flaky.
 - **Remote players** (protocol 7): the `PlayerState` flags carry cosmetic `Sneaking`, `Swimming`,
   `Sprinting` and `Airborne` bits (rebroadcast untrusted, never acted on) and every `PlayerList`

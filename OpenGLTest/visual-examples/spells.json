@@ -1,0 +1,33 @@
+{
+  // Spells: run with VOXEL_SCRIPT=visual-examples/spells.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/spells/.
+  // `cast` fires a spell of the named part keys (checked when the step runs) from the camera's eye along
+  // its aim, with no staff and no mana. The camera hovers over goblins.json's flat, dry forest clearing
+  // (ground at y 9..10), like status-effects.json; flight keeps it immune while the goblins are filmed.
+  "steps": [
+    { "op": "teleport", "pos": [-43.5, 13.5, 60.5], "yaw": -90, "pitch": -12 },
+    { "op": "fly" },
+    // Chunks must be loaded before anything can stand on them.
+    { "op": "wait", "seconds": 5 },
+    { "op": "spawn", "entity": "goblin", "pos": [-45.5, 53.5] },
+    { "op": "spawn", "entity": "goblin", "pos": [-41.5, 53.5] },
+    { "op": "wait", "seconds": 1 },
+    // A fire bolt at the left goblin: the spark trail, then the burning tint and embers.
+    { "op": "look", "yaw": -105, "pitch": -22 },
+    { "op": "cast", "parts": ["element/fire", "shape/projectile"] },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "fire_bolt" },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "burning" },
+    // A long-range frost bolt at the right goblin: the blue tint and steam.
+    { "op": "look", "yaw": -75, "pitch": -22 },
+    { "op": "cast", "parts": ["element/frost", "shape/projectile", "modifier/range"] },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "frost" },
+    // A nature bolt at open grass in front of the camera plants an oak sapling.
+    { "op": "look", "yaw": -90, "pitch": -40 },
+    { "op": "cast", "parts": ["element/nature", "shape/projectile"] },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "sapling" }
+  ]
+}

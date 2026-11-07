@@ -235,6 +235,66 @@ public sealed class StatusEffectBlockTests
     }
 
     [Fact]
+    public void AnImpactFreezeSetsSourcesAtOrBelowTheImpactOnly()
+    {
+        var rig = Setup();
+        var water = Id("water");
+        for (var x = 3; x <= 7; x++)
+        for (var z = 3; z <= 7; z++)
+        for (var y = 1; y <= 3; y++)
+            rig.Chunk.SetBlockRaw(x, y, z, water, FluidState.Source);
+        var impact = new Vector3(5, 2, 5);
+        var written = 0;
+        for (var i = 0; i < 20; i++)
+        {
+            rig.Writer.BeginFrame();
+            written += rig.Writer.ApplyAt(impact, 1, StatusEffectBlockAction.Freeze);
+        }
+
+        var frozen = BlockType.FreezesToById[water];
+        Assert.True(written > 0);
+        Assert.Equal(frozen, rig.Chunks.GetBlockGlobal(5, 2, 5));
+        Assert.Equal(frozen, rig.Chunks.GetBlockGlobal(5, 1, 5));
+        for (var x = 3; x <= 7; x++)
+        for (var z = 3; z <= 7; z++)
+            Assert.Equal(water, rig.Chunks.GetBlockGlobal(x, 3, z));
+    }
+
+    [Fact]
+    public void AnImpactFreezeHardensALavaSource()
+    {
+        var rig = Setup();
+        var lava = Id("lava");
+        rig.Chunk.SetBlockRaw(5, 1, 5, lava, FluidState.Source);
+        var hardened = BlockType.FreezesToById[lava];
+        Assert.NotEqual(BlockType.Air, hardened);
+        Assert.False(BlockType.IsFluid(hardened));
+
+        rig.Writer.BeginFrame();
+        Assert.Equal(1, rig.Writer.ApplyAt(new Vector3(5, 1, 5), 1, StatusEffectBlockAction.Freeze));
+        Assert.Equal(hardened, rig.Chunks.GetBlockGlobal(5, 1, 5));
+        Assert.True(rig.Fluids.PendingCells > 0);
+    }
+
+    [Fact]
+    public void AnImpactIgniteBurnsAFlammableBlockWithItsHooks()
+    {
+        var rig = Setup();
+        var leaf = Id("oak_leaves");
+        rig.Chunk.SetBlockRaw(5, 2, 5, leaf, 0);
+        rig.Chunk.TakeSnapshot(null);
+
+        rig.Writer.BeginFrame();
+        Assert.Equal(1, rig.Writer.ApplyAt(new Vector3(5, 1, 5), 1, StatusEffectBlockAction.Ignite));
+
+        Assert.Equal(BlockType.Air, rig.Chunks.GetBlockGlobal(5, 2, 5));
+        Assert.Equal(Id("stone"), rig.Chunks.GetBlockGlobal(5, 0, 5));
+        Assert.True(rig.Chunk.ModifiedSinceSave);
+        Assert.True(rig.LeafDecay.PendingCells > 0);
+        Assert.Contains((5, 2, 5), rig.LodEdits);
+    }
+
+    [Fact]
     public void AnUnloadedCellIsSkipped()
     {
         var rig = Setup();

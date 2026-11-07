@@ -10,9 +10,13 @@ namespace VoxelEngine.Content.Spells;
 public sealed class SpellPart
 {
     internal SpellPart(SpellPartKind kind, string name, string displayName, float costShare, float complexity,
-        IReadOnlySet<string> tags, float damageFactor, float rangeFactor, string? effect)
+        IReadOnlySet<string> tags, float damageFactor, float rangeFactor, string? effect,
+        SpellImpact impact, string? plant, SpellDelivery delivery)
     {
         Effect = effect;
+        Impact = impact;
+        Plant = plant;
+        Delivery = delivery;
         Kind = kind;
         Name = name;
         DisplayName = displayName;
@@ -54,6 +58,21 @@ public sealed class SpellPart
     /// (MG-5); null for an element that applies none and for every other kind.
     /// </summary>
     public string? Effect { get; }
+
+    /// <summary>What an element does to the cells it lands on; <see cref="SpellImpact.None"/> for every other kind.</summary>
+    public SpellImpact Impact { get; }
+
+    /// <summary>
+    /// The tree species an element with <see cref="SpellImpact.Grow"/> plants on bare ground (a key of
+    /// <see cref="VoxelEngine.WorldGen.Trees.TreeSpeciesRegistry"/>); null when it plants none and for every other kind.
+    /// </summary>
+    public string? Plant { get; }
+
+    /// <summary>
+    /// How a shape delivers its element. Meaningful only on a shape; every other kind holds
+    /// <see cref="SpellDelivery.Projectile"/>.
+    /// </summary>
+    public SpellDelivery Delivery { get; }
 
     /// <summary>The registry key, <c>&lt;kind&gt;/&lt;name&gt;</c> (<see cref="KeyOf"/>).</summary>
     public string Key { get; }

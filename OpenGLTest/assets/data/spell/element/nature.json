@@ -1,1 +1,1 @@
-{ "name": "Nature", "costShare": 0.10, "complexity": 1, "tags": ["basic"] }
+{ "name": "Nature", "costShare": 0.10, "complexity": 1, "tags": ["basic"], "impact": ["grow"], "plant": "oak" }

@@ -16,7 +16,9 @@ namespace VoxelEngine.Status;
 /// thaws ice, a frostburned one freezes the fluid sources under it. Owned by <see cref="World"/> and
 /// drained by <see cref="MobDirector"/> from every body's <see cref="StatusEffectSet.TakeBlockActions"/>;
 /// main thread only, and built only where the simulation is authoritative (singleplayer and the
-/// server), never on a client, whose effect sets are mirrors that never tick.
+/// server), never on a client, whose effect sets are mirrors that never tick. A second entry point,
+/// <see cref="ApplyAt"/>, makes the same conversions in a cube around the cell a spell lands on (the
+/// element's ignite, freeze and thaw impacts).
 /// <para>
 /// Every write runs the block-edit hooks (the edit-path checklist):
 /// <list type="bullet">
@@ -69,15 +71,40 @@ public sealed class StatusEffectBlockWriter(ChunkManager chunks, FluidManager fl
         var fx = MathUtils.FloorToInt(feet.X);
         var fy = MathUtils.FloorToInt(feet.Y);
         var fz = MathUtils.FloorToInt(feet.Z);
+        return ConvertBox(fx - reach, fx + reach, fy - 1, fy + 1, fz - reach, fz + reach, feet.Y, actions);
+    }
+
+    /// <summary>
+    /// Applies <paramref name="actions"/> where a spell lands: the cube of <paramref name="reach"/> cells
+    /// around the impact cell <paramref name="cell"/> (floored) on all three axes. A freeze only sets the
+    /// sources at or below the impact cell's own level, as if the impact were a body standing on top of
+    /// that cell. Returns how many cells it wrote, stopping at either cap; every write runs the same
+    /// hooks as <see cref="Apply"/>.
+    /// </summary>
+    public int ApplyAt(Vector3 cell, int reach, StatusEffectBlockAction actions)
+    {
+        if (actions == StatusEffectBlockAction.None)
+            return 0;
+
+        var cx = MathUtils.FloorToInt(cell.X);
+        var cy = MathUtils.FloorToInt(cell.Y);
+        var cz = MathUtils.FloorToInt(cell.Z);
+        return ConvertBox(cx - reach, cx + reach, cy - reach, cy + reach, cz - reach, cz + reach, cy + 1, actions);
+    }
+
+    // Every cell of the box, Y outermost, under the per-pulse and per-frame caps
+    private int ConvertBox(int minX, int maxX, int minY, int maxY, int minZ, int maxZ, float freezeCeiling,
+        StatusEffectBlockAction actions)
+    {
         var written = 0;
-        for (var y = fy - 1; y <= fy + 1; y++)
-        for (var x = fx - reach; x <= fx + reach; x++)
-        for (var z = fz - reach; z <= fz + reach; z++)
+        for (var y = minY; y <= maxY; y++)
+        for (var x = minX; x <= maxX; x++)
+        for (var z = minZ; z <= maxZ; z++)
         {
             if (written >= StatusEffectConfig.MaxBlockWritesPerPulse
                 || _writesThisFrame >= StatusEffectConfig.MaxBlockWritesPerFrame)
                 return written;
-            if (TryConvertCell(x, y, z, feet, actions))
+            if (TryConvertCell(x, y, z, freezeCeiling, actions))
             {
                 written++;
                 _writesThisFrame++;
@@ -86,12 +113,13 @@ public sealed class StatusEffectBlockWriter(ChunkManager chunks, FluidManager fl
         return written;
     }
 
-    // One cell: read it, decide, and write it with every hook; false when nothing changed
-    private bool TryConvertCell(int x, int y, int z, Vector3 feet, StatusEffectBlockAction actions)
+    // One cell: read it, decide, and write it with every hook; false when nothing changed. A fluid
+    // freezes only when its top is at or below freezeCeiling (the feet, or just over an impact cell)
+    private bool TryConvertCell(int x, int y, int z, float freezeCeiling, StatusEffectBlockAction actions)
     {
         if (!chunks.TryGetCell(x, y, z, out var id, out var state))
             return false;
-        var belowFeet = y + 1 <= feet.Y + 0.01f;
+        var belowFeet = y + 1 <= freezeCeiling + 0.01f;
         if (!StatusEffectBlockRule.TryConvert(id, state, actions, belowFeet, out var newId, out var newState))
             return false;
 
