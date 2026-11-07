@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Networking;
 
@@ -68,6 +69,8 @@ internal sealed class ServerBroadcasts
                 Slime => NetEntityKind.Slime,
                 Hellbrute => NetEntityKind.Hellbrute,
                 Cinderwitch => NetEntityKind.Cinderwitch,
+                Galeraptor => NetEntityKind.Galeraptor,
+                Cloudgolem => NetEntityKind.Cloudgolem,
                 _ => NetEntityKind.Goblin,
             };
             // The int field is a goblin's ammo and a slime's size (NetEntity)

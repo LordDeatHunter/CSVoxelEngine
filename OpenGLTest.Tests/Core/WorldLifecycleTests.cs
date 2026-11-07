@@ -5,7 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Entities;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
@@ -274,6 +276,8 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(first.SpawnEntity("goblin", new Vector3(-2f, High - 1f, 3f)));
         Assert.True(first.SpawnEntity(Hellbrute.EntityName, new Vector3(3f, High - 1f, -3f)));
         Assert.True(first.SpawnEntity(Cinderwitch.EntityName, new Vector3(-3f, High - 1f, -3f)));
+        Assert.True(first.SpawnEntity(Galeraptor.EntityName, new Vector3(4f, High - 1f, 4f)));
+        Assert.True(first.SpawnEntity(Cloudgolem.EntityName, new Vector3(-4f, High - 1f, 4f)));
         var slime = Assert.Single(first.Slimes);
         var goblin = Assert.Single(first.Goblins);
         Assert.True(slime.Size > SlimeSize.Min);
@@ -287,14 +291,14 @@ public sealed class WorldLifecycleTests : IDisposable
         var goblinCenter = goblin.Position;
         var goblinAmmo = goblin.Ammo;
         var goblinHealth = goblin.Health;
-        // Both hell kinds wounded and turned, so the restore keeps each kind and its own state
-        var hellSaved = new List<(Type Kind, Vector3 Center, int Health, float Facing)>();
-        foreach (var hellMob in first.HellMobs)
+        // Every hell and sky kind wounded and turned, so the restore keeps each kind and its own state
+        var realmSaved = new List<(Type Kind, Vector3 Center, int Health, float Facing)>();
+        foreach (var realmMob in first.HellMobs.Concat<RealmMob>(first.SkyMobs))
         {
-            hellMob.RestoreState(hellMob.MaxHealth - 2, 0.75f, Vector3.Zero);
-            hellSaved.Add((hellMob.GetType(), hellMob.Position, hellMob.Health, hellMob.Facing));
+            realmMob.RestoreState(realmMob.MaxHealth - 2, 0.75f, Vector3.Zero);
+            realmSaved.Add((realmMob.GetType(), realmMob.Position, realmMob.Health, realmMob.Facing));
         }
-        Assert.Equal(2, hellSaved.Count);
+        Assert.Equal(4, realmSaved.Count);
 
         var rock = EquipRock(first);
         first.Throws.ThrowSelected();
@@ -321,15 +325,16 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(goblinCenter, restoredGoblin.Position);
         Assert.Equal(goblinAmmo, restoredGoblin.Ammo);
         Assert.Equal(goblinHealth, restoredGoblin.Health);
-        Assert.Equal(hellSaved.Count, second.HellMobs.Count);
-        foreach (var (kind, center, health, facing) in hellSaved)
+        var restoredRealm = second.HellMobs.Concat<RealmMob>(second.SkyMobs).ToList();
+        Assert.Equal(realmSaved.Count, restoredRealm.Count);
+        foreach (var (kind, center, health, facing) in realmSaved)
         {
-            var restored = Assert.Single(second.HellMobs, m => m.GetType() == kind);
+            var restored = Assert.Single(restoredRealm, m => m.GetType() == kind);
             Assert.Equal(center, restored.Position);
             Assert.Equal(health, restored.Health);
             Assert.Equal(facing, restored.Facing);
         }
-        Assert.Equal(4, second.Mobs.Count); // RefreshMobs ran at the flip
+        Assert.Equal(2 + realmSaved.Count, second.Mobs.Count); // RefreshMobs ran at the flip
 
         var restoredDrop = Assert.Single(second.Drops);
         Assert.Equal(rock, restoredDrop.BlockId);

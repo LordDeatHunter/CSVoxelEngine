@@ -137,8 +137,11 @@ public static class NetFraming
     /// kiln entry writes a metal count and each metal's molten and pending ml, and the inventory snapshot's
     /// crucible a <c>Metals</c> list; an older peer would misread the station frames.
     /// 17: <see cref="NetMessage.EntityList"/> also carries the hell mobs (<see cref="NetEntityKind.Hellbrute"/>,
-    /// <see cref="NetEntityKind.Cinderwitch"/>); an older client would not draw them.</summary>
-    public const int ProtocolVersion = 17;
+    /// <see cref="NetEntityKind.Cinderwitch"/>); an older client would not draw them.
+    /// 18: <see cref="NetMessage.EntityList"/> also carries the sky mobs (<see cref="NetEntityKind.Galeraptor"/>,
+    /// <see cref="NetEntityKind.Cloudgolem"/>); a flyer's whole position rides the entry as for every mob, and its
+    /// flight follows from its kind; an older client would not draw them.</summary>
+    public const int ProtocolVersion = 18;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

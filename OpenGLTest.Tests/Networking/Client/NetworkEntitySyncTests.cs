@@ -5,6 +5,7 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Networking;
 using VoxelEngine.WorldGen;
@@ -76,6 +77,45 @@ public sealed class NetworkEntitySyncTests : IDisposable
         for (var i = 0; i < 120 && _world.HellMobs.Count > 0; i++)
             _world.Update(Dt, null);
         Assert.Empty(_world.HellMobs);
+    }
+
+    [Fact]
+    public void SkyMobsMirrorByKindAndAFlyerKeepsItsHeight()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        var raptorPos = new Vector3(4f, WorldGenerationConfig.SkyIslandBottomY + 40f, 4f);
+        var golemPos = new Vector3(-4f, WorldGenerationConfig.SkyIslandBottomY + 20f, 4f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Galeraptor, 7, raptorPos, 1f, 20, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Cloudgolem, 8, golemPos, 0.5f, 90, 0, 0, Vector3.Zero),
+        ]);
+        Assert.Equal(2, _world.SkyMobs.Count);
+        var raptor = Assert.IsType<Galeraptor>(Assert.Single(_world.SkyMobs, m => m is Galeraptor));
+        var golem = Assert.IsType<Cloudgolem>(Assert.Single(_world.SkyMobs, m => m is Cloudgolem));
+        Assert.Equal(raptorPos, raptor.Position);
+        Assert.Equal(golemPos, golem.Position);
+        Assert.Equal(90, golem.Health);
+
+        // A mirrored flyer neither falls nor drifts between snapshots, and the next one moves it in 3D
+        for (var i = 0; i < 60; i++)
+            raptor.AnimateMirror((float)Dt);
+        Assert.Equal(raptorPos.Y, raptor.Position.Y);
+        var climbed = raptorPos + new Vector3(1f, 3f, 0f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Galeraptor, 7, climbed, 1f, 20, 0, 0, new Vector3(0f, 2f, 0f)),
+            new NetEntity(NetEntityKind.Cloudgolem, 8, golemPos, 0.5f, 90, 0, 0, Vector3.Zero),
+        ]);
+        Assert.Same(raptor, Assert.Single(_world.SkyMobs, m => m is Galeraptor));
+        Assert.Equal(climbed, raptor.Position);
+
+        // A kind that changed under one id is replaced, and a mob the server drops plays its death
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Cloudgolem, 7, climbed, 1f, 20, 0, 0, Vector3.Zero),
+        ]);
+        Assert.True(raptor.IsDying);
+        Assert.True(golem.IsDying);
     }
 
     [Fact]

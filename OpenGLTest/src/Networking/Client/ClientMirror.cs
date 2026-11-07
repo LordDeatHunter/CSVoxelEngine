@@ -8,6 +8,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
@@ -33,6 +34,7 @@ internal sealed class ClientMirror
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
+    private readonly SkyMobManager? _skyMobs;
     private readonly CampfireManager _campfires;
     private readonly QuernManager _querns;
     private readonly KilnManager _kilns;
@@ -51,7 +53,7 @@ internal sealed class ClientMirror
 
     internal ClientMirror(World world, ChunkManager chunkManager, DropManager dropManager, TntManager tntManager,
         FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        IcebergManager? icebergs,
+        SkyMobManager? skyMobs, IcebergManager? icebergs,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         BlockDebrisSystem debris, PlayerHealth health, List<RemotePlayer> remotePlayers, bool clientMode,
         bool serverMode)
@@ -64,6 +66,7 @@ internal sealed class ClientMirror
         _slimes = slimes;
         _goblins = goblins;
         _hellMobs = hellMobs;
+        _skyMobs = skyMobs;
         _icebergs = icebergs;
         _campfires = campfires;
         _querns = querns;
@@ -377,6 +380,8 @@ internal sealed class ClientMirror
         NetEntityKind.Goblin => mob is Goblin,
         NetEntityKind.Hellbrute => mob is Hellbrute,
         NetEntityKind.Cinderwitch => mob is Cinderwitch,
+        NetEntityKind.Galeraptor => mob is Galeraptor,
+        NetEntityKind.Cloudgolem => mob is Cloudgolem,
         _ => false,
     };
 
@@ -390,6 +395,9 @@ internal sealed class ClientMirror
             // A hell mob's layer, and so its pool, follows from where it is first seen, as on the server
             NetEntityKind.Hellbrute => _hellMobs?.Spawn(Hellbrute.EntityName, entry.Position),
             NetEntityKind.Cinderwitch => _hellMobs?.Spawn(Cinderwitch.EntityName, entry.Position),
+            // Likewise a sky mob's zone tier, from the column it is first seen over
+            NetEntityKind.Galeraptor => _skyMobs?.Spawn(Galeraptor.EntityName, entry.Position),
+            NetEntityKind.Cloudgolem => _skyMobs?.Spawn(Cloudgolem.EntityName, entry.Position),
             _ => null,
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
@@ -406,6 +414,7 @@ internal sealed class ClientMirror
             case Slime slime: _slimes?.Remove(slime); break;
             case Goblin goblin: _goblins?.Remove(goblin); break;
             case HellMob hellMob: _hellMobs?.Remove(hellMob); break;
+            case SkyMob skyMob: _skyMobs?.Remove(skyMob); break;
         }
     }
 

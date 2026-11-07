@@ -32,6 +32,7 @@ internal sealed class MobDirector
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
+    private readonly SkyMobManager? _skyMobs;
     private readonly IcebergManager? _icebergs;
     private readonly BlockDebrisSystem _debris;
     // The campfire particles a fire bolt's ember trail sheds into; null on a server, which draws nothing
@@ -52,11 +53,13 @@ internal sealed class MobDirector
     private MobStrikes Strikes => _world.Strikes;
 
     internal MobDirector(World world, ChunkManager chunkManager, DropManager dropManager, SlimeManager? slimes,
-        GoblinManager? goblins, HellMobManager? hellMobs, IcebergManager? icebergs, BlockDebrisSystem debris,
+        GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, IcebergManager? icebergs,
+        BlockDebrisSystem debris,
         FireParticleSystem? embers, PlayerHealth health, List<Mob> mobs, bool serverMode, bool clientMode,
         StatusEffectBlockWriter? statusBlocks)
     {
         _hellMobs = hellMobs;
+        _skyMobs = skyMobs;
         _embers = embers;
         _statusBlocks = statusBlocks;
         _world = world;
@@ -117,7 +120,7 @@ internal sealed class MobDirector
         _icebergs.CarryAndPushOut(Camera, _chunkManager);
     }
 
-    /// <summary>The mob part of the world's entity update: rebuilds the targets, runs the slime, goblin and hell mob managers and bills the damage they dealt, then converts the cells the bodies' status effects pulsed (<see cref="ApplyStatusBlockActions"/>).</summary>
+    /// <summary>The mob part of the world's entity update: rebuilds the targets, runs the slime, goblin, hell and sky mob managers and bills the damage they dealt, then converts the cells the bodies' status effects pulsed (<see cref="ApplyStatusBlockActions"/>).</summary>
     internal void Update(double deltaTime)
     {
         RefreshTargets();
@@ -154,6 +157,13 @@ internal sealed class MobDirector
             BillLocalPlayer(_hellMobs.DamageDealtThisFrame);
         }
 
+        // The sky's galeraptors dive and its golems slam a shockwave into the ground
+        if (_skyMobs != null)
+        {
+            _skyMobs.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris);
+            BillLocalPlayer(_skyMobs.DamageDealtThisFrame);
+        }
+
         ApplyStatusBlockActions();
     }
 
@@ -185,6 +195,8 @@ internal sealed class MobDirector
             ApplyMobBlockActions(_goblins.Goblins);
         if (_hellMobs != null)
             ApplyMobBlockActions(_hellMobs.Mobs);
+        if (_skyMobs != null)
+            ApplyMobBlockActions(_skyMobs.Mobs);
         for (var i = 0; i < _mobTargets.Count; i++)
         {
             var target = _mobTargets[i];
@@ -266,6 +278,9 @@ internal sealed class MobDirector
 
         if (_hellMobs != null)
             AddLiving(_hellMobs.Mobs);
+
+        if (_skyMobs != null)
+            AddLiving(_skyMobs.Mobs);
     }
 
     // Appends the mobs that are not dying, with an indexed loop so a frame allocates no enumerator.
@@ -301,6 +316,13 @@ internal sealed class MobDirector
         if (_hellMobs != null && HellMobManager.HeightOf(name) > 0f)
         {
             if (_hellMobs.Spawn(name, feet + new Vector3(0f, HellMobManager.HeightOf(name) * 0.5f, 0f)) == null)
+                return false;
+            RefreshMobs();
+            return true;
+        }
+        if (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f)
+        {
+            if (_skyMobs.Spawn(name, feet + new Vector3(0f, SkyMobManager.HeightOf(name) * 0.5f, 0f)) == null)
                 return false;
             RefreshMobs();
             return true;

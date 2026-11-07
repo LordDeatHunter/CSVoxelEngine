@@ -13,6 +13,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
@@ -68,6 +69,7 @@ public class World
     private readonly IcebergManager? _icebergs;
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
+    private readonly SkyMobManager? _skyMobs;
     private readonly SaplingManager _saplings = new();
     // The sapling clock's grow callback, built once: a method group allocates a delegate each time it is converted
     private Func<string, int, int, int, int, TreeGrowthResult>? _growTree;
@@ -305,6 +307,9 @@ public class World
     /// <summary>Live hell mobs (brutes and casters), feeding the entity and shadow passes.</summary>
     public IReadOnlyList<HellMob> HellMobs => _hellMobs?.Mobs ?? [];
 
+    /// <summary>Live sky mobs (galeraptors and cloud golems), feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<SkyMob> SkyMobs => _skyMobs?.Mobs ?? [];
+
     /// <summary>Live icebergs (a client's mirrors of the server's); public for the server's broadcast.</summary>
     public IReadOnlyList<Iceberg> Icebergs => _icebergs?.Icebergs ?? [];
 
@@ -441,6 +446,10 @@ public class World
             var casterType = EntityRegistry.TryGet(Cinderwitch.EntityName);
             if (bruteType != null || casterType != null)
                 _hellMobs = new HellMobManager(bruteType, casterType, _mobCaps);
+            var flyerType = EntityRegistry.TryGet(Galeraptor.EntityName);
+            var golemType = EntityRegistry.TryGet(Cloudgolem.EntityName);
+            if (flyerType != null || golemType != null)
+                _skyMobs = new SkyMobManager(flyerType, golemType, _mobCaps);
             if (EntityRegistry.TryGet("iceberg") is { } icebergType)
                 _icebergs = new IcebergManager(icebergType);
             Camera.BodySolids = _icebergs;
@@ -462,9 +471,9 @@ public class World
             RightClick = new RightClickAction(this, clientMode);
             Caster = new SpellCaster(this, clientMode);
             ClientMirror = new ClientMirror(this, _chunkManager, _dropManager, _tntManager, _falling, _slimes, _goblins, _hellMobs,
-                _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
-            Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _icebergs,
-                _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
+                _skyMobs, _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
+            Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs,
+                _icebergs, _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
             // Status effects convert cells only where the world is authoritative: a client's effects
             // are mirrors, and the server's writes reach it through the journal
@@ -472,8 +481,8 @@ public class World
                 ? null
                 : new StatusEffectBlockWriter(_chunkManager, _fluidManager, _leafDecay, _falling, _lodManager,
                     Edits.NotifyLodEdit);
-            Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _icebergs, _debris,
-                serverMode ? null : _fire, _health, _mobs, serverMode, clientMode, statusBlocks);
+            Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _icebergs,
+                _debris, serverMode ? null : _fire, _health, _mobs, serverMode, clientMode, statusBlocks);
             Spells = statusBlocks == null
                 ? null
                 : new SpellEffects(this, _chunkManager, statusBlocks, ItemUse, _debris, sfx, serverMode);
@@ -804,6 +813,7 @@ public class World
         _slimes?.AnimateMirrors((float)deltaTime, _debris);
         _goblins?.AnimateMirrors((float)deltaTime, _debris, _chunkManager, DayCycle.NightFactor(LightingTime));
         _hellMobs?.AnimateMirrors((float)deltaTime, _debris);
+        _skyMobs?.AnimateMirrors((float)deltaTime, _debris);
         _tntManager.AnimateMirrors((float)deltaTime);
         Director.AnimateIcebergMirrors(deltaTime);
         Ambient.UpdateStatusParticles((float)deltaTime);

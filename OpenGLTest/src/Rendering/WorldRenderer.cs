@@ -111,7 +111,8 @@ internal sealed class WorldRenderer
         // times itself as the shadowNear and shadowFar rows.
         renderManager.IcebergPasses.Time = _world.LightingTime;
         renderManager.Shadows.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
-            _lodManager.RegionList, goblins: Goblins, icebergs: _world.Icebergs, hellMobs: _world.HellMobs);
+            _lodManager.RegionList, goblins: Goblins, icebergs: _world.Icebergs, hellMobs: _world.HellMobs,
+            skyMobs: _world.SkyMobs);
 
         FrameProfiler.Begin(ProfileSection.Reflection);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.Reflection);
@@ -166,7 +167,8 @@ internal sealed class WorldRenderer
         renderManager.Objects.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.Mobs.RenderSlimes(Camera, Slimes);
         renderManager.Mobs.RenderGoblins(Camera, Goblins);
-        renderManager.Mobs.RenderHellMobs(Camera, _world.HellMobs);
+        renderManager.Mobs.RenderRealmMobs(Camera, _world.HellMobs);
+        renderManager.Mobs.RenderRealmMobs(Camera, _world.SkyMobs);
         renderManager.IcebergPasses.RenderIcebergs(Camera.GetViewProjection(), _world.Icebergs);
         renderManager.Players.RenderRemotePlayers(Camera, _remotePlayers);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.EntityPass);

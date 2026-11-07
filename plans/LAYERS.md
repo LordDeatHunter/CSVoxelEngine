@@ -4,13 +4,13 @@
 
 ## Status
 
-Phases 1 (foundations) and 2 (the hell slice, `L-5` to `L-10`) done; phase 3 (the sky) has begun with the
-solid cloud patches (`L-11`), the sky islands with their cloud sea (`L-12`), the sky biomes and flora
-(`L-13`) and flight in the shared mob layer (`L-14`). A Nether- and Aether-like pair of realms inside the one world, as vertical
+Phases 1 (foundations), 2 (the hell slice, `L-5` to `L-10`) and 3 (the sky slice: the solid cloud
+patches `L-11`, the sky islands with their cloud sea `L-12`, the sky biomes and flora `L-13`, flight in the
+shared mob layer `L-14` and the sky mobs `L-15`) done; phase 4 (netcode and polish) remains. A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
-`SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
-`MobConfig.LayerDifficultyPerLayer`; `LayerBandTests` holds their order. The `iron_pickaxe` (power 3,
+`SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty steps in
+`MobConfig.LayerDifficultyPerLayer` and `MobConfig.SkyDifficultyPerTier`; `LayerBandTests` holds their order. The `iron_pickaxe` (power 3,
 creative only) is the barrier's tool. The solid cloud patches (`L-11`, AGENTS.md "Solid clouds") fill
 the `CloudSlab` band (198..203) with the translucent `cloud_block` (`softLanding`, `sink` 0.5: a fall is
 free, the player sinks half a block and stands; it breaks by hand) where a 2D noise (seed offsets
@@ -21,7 +21,7 @@ script's bark, rings, fern and vine painters). The sky islands
 (`L-12`, AGENTS.md "Sky islands", `SkyIslandConfig`) float in 320..420 inside hashed zones with wide
 gaps of open sky between them (`SkyIslands`, seed offsets 168-171): islands that never touch, a domed
 grass top over a stone underside tapering to stalactites; `SkyIslands.ZoneAt` gives a zone's tier
-(bigger is rarer) for `L-15`'s spawner. Two sky biomes (`L-13`, AGENTS.md "Sky biomes":
+(bigger is rarer), which the sky mobs' spawner scales by. Two sky biomes (`L-13`, AGENTS.md "Sky biomes":
 `SkyBiome`, `SkyBiomes.At`, a 2D noise at seed offset 174, an island taking its center's biome) dress
 the islands through their `SkyIslandPalette`: the meadow (grass, dirt, stone, tall grass and flowers,
 the broad `sky_oak`) and the frost highland (`frost_grass`, permafrost, `frost_stone`, `crystal_block`
@@ -48,11 +48,16 @@ and layer by `HellTrees`. Two hell mobs live in the pockets (`L-10`, AGENTS.md "
 `hellbrute` and the fire-casting `cinderwitch`, `HellMob`s on the shared `RiggedMob` base (the goblin's
 too), spawned only on dim hell floors (`MobSpawner.TryFindHellSpawn`) and scaled by the layer index
 (`LayerDifficulty`: health, damage, cast rate, pack size); their bolts set the player `burning`. They
-are already on the wire (protocol 17) and in `entities.json`; `L-16` adds the loopback tests. Flight (`L-14`, AGENTS.md "Flying mobs") is ready for `L-15`'s flyer: a `RiggedMob` kind built
+are already on the wire (protocol 17) and in `entities.json`; `L-16` adds the loopback tests. Flight (`L-14`, AGENTS.md "Flying mobs") carries the sky's flyer: a `RiggedMob` kind built
 with a `FlightTuning` flies (`RiggedMob.Fly`, `FlightSteering`: no gravity, fall damage or ledge caution, a
 hover band over its target or the floor, a wall probe that slides and climbs, a 3D wander goal and knock, the
-`fly` clip by 3D speed, pitch and bank); `Flies` comes from the kind, so it needs no wire bit. Id budget: 174 of 255 ids used (108 blocks, 65 items, air; `L-13` added eight
-blocks), 81 left (`L-15`'s sky mob loot needs about 3).
+`fly` clip by 3D speed, pitch and bank); `Flies` comes from the kind, so it needs no wire bit. Two sky mobs
+live on the islands (`L-15`, AGENTS.md "Sky mobs"): the diving flyer `galeraptor` and the slamming ground
+bruiser `cloudgolem`, `SkyMob`s on the shared `RealmMob` base (the hell mobs' too) and the shared
+`RealmMobManager` frame, spawned only on island tops inside the sky band (`MobSpawner.TryFindSkySpawn`) and
+scaled by the zone's tier (`SkyDifficulty`: health, damage, pack size; the golem only in the big zones); both
+drop the `cloud_shard` and are on the wire (protocol 18) and in `entities.json`. Id budget: 175 of 255 ids
+used (108 blocks, 66 items, air), 80 left.
 Last updated 2026-11-07.
 
 ## In progress
@@ -61,16 +66,11 @@ Nothing.
 
 ## Open
 
-### Phase 3: Sky slice
-
-- [ ] **`L-15` Sky mobs.** P1, L. Two: a flyer and a tough ground bruiser; spawn rules scaled by
-  island-zone size.
-
 ### Phase 4: Netcode and polish
 
-- [ ] **`L-16` Network and saves.** P1, M. The sky mobs' kinds in `EntityList` (protocol bump; flight follows
-  from the kind, `L-14`), `entities.json`, loopback tests of the realm mobs (the hell kinds already ride
-  `EntityList` and `entities.json` since `L-10`; the sink rule in `MovementRules` came with `L-3`).
+- [ ] **`L-16` Network and saves.** P1, S. Loopback tests of the hell mobs (every realm kind already rides
+  `EntityList` and `entities.json`, the sky kinds since `L-15` with a loopback test of their own; the sink
+  rule in `MovementRules` came with `L-3`), and showing a mirrored mob's attack clip on a client.
 - [ ] **`L-17` Tuning and docs.** P2, S. Visual scenarios for every phase, tuning pass, an AGENTS.md
   section, then prune this file.
 

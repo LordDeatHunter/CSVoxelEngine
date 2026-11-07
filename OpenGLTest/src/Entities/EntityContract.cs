@@ -9,7 +9,7 @@ namespace VoxelEngine.Entities;
 /// </summary>
 public static class EntityContract
 {
-    /// <summary>The groups every humanoid rig (the goblin, the hell mobs) must provide; the
+    /// <summary>The groups every humanoid rig (the goblin, the hell and sky mobs) must provide; the
     /// renderer draws each one and the shared walk and attack clips key them.</summary>
     public static readonly string[] HumanoidParts = ["Torso", "Head", "ArmL", "ArmR", "LegL", "LegR"];
 
@@ -52,11 +52,21 @@ public static class EntityContract
 
     /// <summary>The humanoid contract with one attack: the <see cref="HumanoidParts"/> groups, the idle and
     /// walk clips, and <paramref name="attackClip"/> carrying <paramref name="attackEvent"/>.</summary>
-    public static void RequireHumanoid(EntityType type, string kind, string attackClip, string attackEvent)
+    public static void RequireHumanoid(EntityType type, string kind, string attackClip, string attackEvent) =>
+        RequireRig(type, kind, EntityAnimator.WalkClip, attackClip, attackEvent);
+
+    /// <summary>The flyer's contract with one attack: the <see cref="HumanoidParts"/> groups (a bird's wings are
+    /// its arms, its talons its legs), the idle and <see cref="EntityAnimator.FlyClip"/> clips, and
+    /// <paramref name="attackClip"/> carrying <paramref name="attackEvent"/>.</summary>
+    public static void RequireFlyer(EntityType type, string kind, string attackClip, string attackEvent) =>
+        RequireRig(type, kind, EntityAnimator.FlyClip, attackClip, attackEvent);
+
+    // The humanoid groups, the idle and moving clips, and the attack clip with its event
+    private static void RequireRig(EntityType type, string kind, string moveClip, string attackClip, string attackEvent)
     {
         RequireParts(type, kind, HumanoidParts);
         RequireClip(type, kind, EntityAnimator.IdleClip);
-        RequireClip(type, kind, EntityAnimator.WalkClip);
+        RequireClip(type, kind, moveClip);
         RequireEvent(type, kind, RequireClip(type, kind, attackClip), attackEvent);
     }
 }

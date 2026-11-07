@@ -24,8 +24,12 @@ public static class LayerDifficulty
 
     /// <summary><paramref name="baseAmount"/> (a health pool or a hit) scaled to <paramref name="layer"/>,
     /// rounded to the nearest whole point and never below the base.</summary>
-    public static int Scale(int baseAmount, int layer) =>
-        Math.Max(baseAmount, (int)MathF.Round(baseAmount * Multiplier(layer), MidpointRounding.AwayFromZero));
+    public static int Scale(int baseAmount, int layer) => ScaleBy(baseAmount, Multiplier(layer));
+
+    /// <summary><paramref name="baseAmount"/> times a realm's difficulty <paramref name="multiplier"/>, rounded
+    /// to the nearest whole point and never below the base; every realm's difficulty rule scales through it.</summary>
+    public static int ScaleBy(int baseAmount, float multiplier) =>
+        Math.Max(baseAmount, (int)MathF.Round(baseAmount * multiplier, MidpointRounding.AwayFromZero));
 
     /// <summary>A cooldown of <paramref name="seconds"/> on <paramref name="layer"/>: divided by the
     /// multiplier, so a deeper caster fires faster.</summary>

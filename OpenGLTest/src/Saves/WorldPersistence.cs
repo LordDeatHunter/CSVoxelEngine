@@ -6,6 +6,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
@@ -28,6 +29,7 @@ internal sealed class WorldPersistence
     private readonly SlimeManager? _slimes;
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
+    private readonly SkyMobManager? _skyMobs;
     private readonly IcebergManager? _icebergs;
     private readonly PlayerHealth _health;
     private readonly bool _serverMode;
@@ -43,11 +45,12 @@ internal sealed class WorldPersistence
     private IReadOnlyList<Slime> Slimes => _world.Slimes;
     private IReadOnlyList<Goblin> Goblins => _world.Goblins;
     private IReadOnlyList<HellMob> HellMobs => _world.HellMobs;
+    private IReadOnlyList<SkyMob> SkyMobs => _world.SkyMobs;
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
 
     internal WorldPersistence(World world, ChunkSaveStore? saveStore, ChunkManager chunkManager,
         DropManager dropManager, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        IcebergManager? icebergs, PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
+        SkyMobManager? skyMobs, IcebergManager? icebergs, PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         StationSaveData? savedStations)
     {
@@ -63,6 +66,7 @@ internal sealed class WorldPersistence
         _slimes = slimes;
         _goblins = goblins;
         _hellMobs = hellMobs;
+        _skyMobs = skyMobs;
         _icebergs = icebergs;
         _health = health;
         _serverMode = serverMode;
@@ -341,10 +345,11 @@ internal sealed class WorldPersistence
     private bool KnowsKind(string name) =>
         (_slimes != null && string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
         || (_goblins != null && string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
-        || (_hellMobs != null && HellMobManager.HeightOf(name) > 0f);
+        || (_hellMobs != null && HellMobManager.HeightOf(name) > 0f)
+        || (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f);
 
-    // A forced spawn of a saved mob of a known kind (null at a full hard cap); a hell mob's layer, and so
-    // its pool, follows from its saved position
+    // A forced spawn of a saved mob of a known kind (null at a full hard cap); a hell mob's layer and a sky
+    // mob's zone tier, and so its pool, follow from its saved position
     private Mob? SpawnSaved(string name, Vector3 center, EntitySaveData.MobData mob)
     {
         // A file saved before slimes had sizes carries none: those were all the smallest size
@@ -352,12 +357,14 @@ internal sealed class WorldPersistence
             return _slimes!.Spawn(center, mob.Size ?? SlimeSize.Min);
         if (string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
             return _goblins!.Spawn(center, mob.Ammo ?? 0, mob.Torches ?? 0);
+        if (SkyMobManager.HeightOf(name) > 0f)
+            return _skyMobs!.Spawn(name, center);
         return _hellMobs!.Spawn(name, center);
     }
 
     /// <summary>
     /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime,
-    /// goblin and hell mob (kind by <see cref="EntityType.Name"/>, body center, health, facing, velocity, a
+    /// goblin, hell and sky mob (kind by <see cref="EntityType.Name"/>, body center, health, facing, velocity, a
     /// goblin's ammo, a slime's size) and the item drops nearest the player first, capped at
     /// <see cref="SaveConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
     /// with no name is skipped with one warning). Entries still pending a restore are appended, so a
@@ -370,6 +377,7 @@ internal sealed class WorldPersistence
         var goblins = Goblins;
         mobs.AddRange(from t in goblins where !t.IsDead select MobSaveCodec.Capture(t, t.Ammo, torches: t.Torches));
         mobs.AddRange(from t in HellMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
+        mobs.AddRange(from t in SkyMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(_pendingMobs);
 
         _dropSort.Clear();

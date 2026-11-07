@@ -8,6 +8,7 @@ using System.Threading;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities.Icebergs;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Interaction;
@@ -1108,6 +1109,46 @@ public sealed class GameServerTests : IDisposable
             var mirrored = Assert.Single(mirror.Slimes);
             Assert.Equal(served.Size, mirrored.Size);
             Assert.Equal(served.Health, mirrored.Health);
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    [Fact]
+    public void SkyMobsReachTheClientsEntityListByKindAndAFlyerAtItsHeight()
+    {
+        using var client = Connect("Watcher");
+        var spawn = client.Server!.Value.Spawn;
+        var feet = spawn - new Vector3(0f, Camera.EyeHeight, 0f);
+        Assert.True(_world.SpawnEntity(Galeraptor.EntityName, feet + new Vector3(3f, 12f, 0f)));
+        Assert.True(_world.SpawnEntity(Cloudgolem.EntityName, feet + new Vector3(-3f, 0f, 0f)));
+        var flyer = Assert.Single(_world.SkyMobs, m => m is Galeraptor);
+
+        var inbox = InboxOf(client);
+        var sw = Stopwatch.StartNew();
+        while (sw.Elapsed.TotalSeconds < 5
+               && (inbox.Entities?.Exists(e => e.Kind == NetEntityKind.Galeraptor) != true
+                   || !inbox.Entities.Exists(e => e.Kind == NetEntityKind.Cloudgolem)))
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+            DrainAll();
+        }
+
+        var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.Galeraptor);
+        Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.Cloudgolem);
+        Assert.Equal(flyer.Position, carried.Position);
+
+        // A client world mirrors both kinds, the flyer at the height the server flies it
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            Assert.Equal(flyer.Position.Y, Assert.Single(mirror.SkyMobs, m => m is Galeraptor).Position.Y);
+            Assert.Single(mirror.SkyMobs, m => m is Cloudgolem);
         }
         finally
         {

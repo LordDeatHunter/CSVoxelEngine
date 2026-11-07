@@ -7,6 +7,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Graphics;
 using VoxelEngine.Player;
@@ -15,7 +16,7 @@ namespace VoxelEngine.Rendering.Actors;
 
 /// <summary>
 /// The mob draws: the live slimes from the shared entity mesh, the goblins part by part with the
-/// flint and the torch they hold, and the hell mobs part by part, for the entity pass and the water
+/// flint and the torch they hold, and the realm (hell and sky) mobs part by part, for the entity pass and the water
 /// mirror. Owns the slime mesh and skin and one <see cref="RigMeshes"/> per clip-animated kind,
 /// built from their Blockbench projects at load; the world program and the item and block caches stay owned by
 /// <see cref="RenderManager"/>. Render thread only.
@@ -33,8 +34,8 @@ internal sealed class MobPasses : IDisposable
     // The goblin rig, posed per frame by each goblin's EntityAnimator. Null only when no 'goblin'
     // entity kind is registered, in which case the passes are no-ops.
     private RigMeshes? _goblin;
-    // The hell mobs' rigs by kind; a kind whose content is not registered has none and is not drawn.
-    private readonly Dictionary<EntityType, RigMeshes> _hellRigs = [];
+    // The realm (hell and sky) mobs' rigs by kind; a kind whose content is not registered has none and is not drawn.
+    private readonly Dictionary<EntityType, RigMeshes> _realmRigs = [];
     // The flint item: the stone a goblin holds while it still has ammo.
     private byte _flintId;
     private byte _torchId;
@@ -46,8 +47,9 @@ internal sealed class MobPasses : IDisposable
 
     private TextureUnits Units => _owner.Units;
 
-    // The hell mob kinds a rig is built for, when their content is registered
-    private static readonly string[] HellRigNames = [Hellbrute.EntityName, Cinderwitch.EntityName];
+    // The realm mob kinds a rig is built for, when their content is registered
+    private static readonly string[] RealmRigNames =
+        [Hellbrute.EntityName, Cinderwitch.EntityName, Galeraptor.EntityName, Cloudgolem.EntityName];
 
     internal MobPasses(GL gl, RenderManager owner)
     {
@@ -63,9 +65,9 @@ internal sealed class MobPasses : IDisposable
         // The parse happened once at content load (EntityType.Model); only GL work is left.
         if (EntityRegistry.TryGet("goblin") is { } goblinType)
             _goblin = RigMeshes.Build(gl, goblinType);
-        foreach (var name in HellRigNames)
-            if (EntityRegistry.TryGet(name) is { } hellType)
-                _hellRigs[hellType] = RigMeshes.Build(gl, hellType);
+        foreach (var name in RealmRigNames)
+            if (EntityRegistry.TryGet(name) is { } realmType)
+                _realmRigs[realmType] = RigMeshes.Build(gl, realmType);
         _flintId = ContentRegistry.RequireItem("flint").Id;
         _torchId = ContentRegistry.RequireBlock("torch").Id;
     }
@@ -179,20 +181,20 @@ internal sealed class MobPasses : IDisposable
     }
 
     /// <summary>
-    /// Draws the live hell mobs part by part, each kind with its own rig and skin, posed by the mob's
-    /// own animator and body effect. Restores the world textures on the way out, like
+    /// Draws one realm's live mobs (hell's or the sky's) part by part, each kind with its own rig and skin,
+    /// posed by the mob's own animator and body effect. Restores the world textures on the way out, like
     /// <see cref="RenderSlimes"/>.
     /// </summary>
-    internal void RenderHellMobs(Camera camera, IReadOnlyList<HellMob> mobs)
+    internal void RenderRealmMobs(Camera camera, IReadOnlyList<RiggedMob> mobs)
     {
-        if (camera == null || mobs.Count == 0 || _hellRigs.Count == 0) return;
+        if (camera == null || mobs.Count == 0 || _realmRigs.Count == 0) return;
 
         var viewProj = camera.GetViewProjection();
         _owner.WorldShader.Use();
         _owner.BindEntityTextures(mirror: false);
         foreach (var mob in mobs)
         {
-            if (!_hellRigs.TryGetValue(mob.Type, out var rig)) continue;
+            if (!_realmRigs.TryGetValue(mob.Type, out var rig)) continue;
             Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
             DrawRigParts(mob, rig, viewProj, _owner.LightAt(mob.Position), mob.BodyEffect(mob.Feet));
         }
@@ -202,9 +204,9 @@ internal sealed class MobPasses : IDisposable
         _owner.BindEntityTextures(mirror: false);
     }
 
-    /// <summary>The rig of a hell mob kind, or null when its content is not registered (the shadow
+    /// <summary>The rig of a realm mob kind, or null when its content is not registered (the shadow
     /// pass's lookup).</summary>
-    internal RigMeshes? HellRigOf(EntityType type) => _hellRigs.GetValueOrDefault(type);
+    internal RigMeshes? RealmRigOf(EntityType type) => _realmRigs.GetValueOrDefault(type);
 
     // Every part of one rigged mob with its hit flash and status tint (the caller resets both after
     // its last mob); the rig's skin is already bound on unit 0
@@ -236,8 +238,8 @@ internal sealed class MobPasses : IDisposable
             _gl.DeleteTexture(_slimeTexture);
         _goblin?.Dispose();
         _goblin = null;
-        foreach (var rig in _hellRigs.Values)
+        foreach (var rig in _realmRigs.Values)
             rig.Dispose();
-        _hellRigs.Clear();
+        _realmRigs.Clear();
     }
 }

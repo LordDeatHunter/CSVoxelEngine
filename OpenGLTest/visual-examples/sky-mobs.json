@@ -1,0 +1,50 @@
+{
+  // Sky mobs check (plans/LAYERS.md L-15): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/sky-mobs.json
+  // Shots land in visual/sky-mobs/. `natural` looks up at whatever the ring spawner put over the island while
+  // the camera loaded (galeraptors, in this zone); the scenario then kills those. The camera loads the meadow island of sky-biomes.json (radius 25 at
+  // (232, 763), its top near 383) from above, then drops onto it in creative mode without flight (immune,
+  // so the mobs still chase it), and spawns a cloud golem a few blocks in front, then a galeraptor in the air,
+  // with the exact-feet form of `spawn` (the [x, z] form snaps onto the overworld surface far below).
+  // `idle` is taken just after they pop in, the four `slam` shots once the golem has walked up and swings (one
+  // of them usually catches the fists up or coming down), then `hover` looking up at the galeraptor over the
+  // camera and the three `dive` shots while it stoops at the camera.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [236.5, 392.5, 763.5], "yaw": 180, "pitch": -10 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "fly", "on": false },
+    { "op": "wait", "seconds": 2 },
+    { "op": "look", "yaw": 150, "pitch": 25 },
+    { "op": "screenshot", "name": "natural", "hideHud": true },
+
+    // Clear the ring's own spawns out of the frame, then spawn the pair to film
+    { "op": "damage", "amount": 1000 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "look", "yaw": 180, "pitch": -10 },
+    { "op": "spawn", "entity": "cloudgolem", "pos": [230.5, 388, 763.5] },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "idle", "hideHud": true },
+    { "op": "look", "yaw": 180, "pitch": 12 },
+    { "op": "wait", "seconds": 1.6 },
+    { "op": "screenshot", "name": "slam_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.35 },
+    { "op": "screenshot", "name": "slam_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.35 },
+    { "op": "screenshot", "name": "slam_c", "hideHud": true },
+    { "op": "wait", "seconds": 0.35 },
+    { "op": "screenshot", "name": "slam_d", "hideHud": true },
+
+    { "op": "spawn", "entity": "galeraptor", "pos": [233.5, 392, 765.5] },
+    { "op": "look", "yaw": 180, "pitch": 50 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "hover", "hideHud": true },
+    { "op": "wait", "seconds": 0.9 },
+    { "op": "screenshot", "name": "dive_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "dive_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "dive_c", "hideHud": true }
+  ]
+}

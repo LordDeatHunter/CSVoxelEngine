@@ -1070,7 +1070,7 @@ OpenGLTest/
       ManaConfig.cs            # the mana pool: start max, growth per known part and its cap, the refill time
       SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap;
                                #   the staff slot cap and the cast cooldown (CastCooldownSeconds)
-      MobConfig.cs             # mob caps and shared mob rules (flight's probes, arrival and wander rise), layer difficulty, hell mobs, slimes, goblins (flee, dodge, pack, torches, notice
+      MobConfig.cs             # mob caps and shared mob rules (flight's probes, arrival and wander rise), layer difficulty, hell and sky mobs, slimes, goblins (flee, dodge, pack, torches, notice
                                #   pip), healthbars, damage numbers, the realm layer difficulty step
       NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules (the attack and cast slack),
                                #   timeouts, LOD streaming, ServerAllowCreative
@@ -1319,7 +1319,9 @@ OpenGLTest/
       MobLava.cs               # GL-free mob lava rule: body box in a burning fluid (BurningFluid), damage per tick
       MobLoot.cs               # GL-free loot toss: the up-and-out launch a killed mob's drops get
       MobTargets.cs            # GL-free target rules: body contact, nearest non-immune target, min distance
-      RiggedMob.cs             # abstract walking or flying mob animated from its clips (Goblin, the hell mobs): the
+      RealmMob.cs              # abstract realm mob (the hell and sky mobs): the chase frame (face, Decide, Locomote: a
+                               #   walk by default, a flyer steers), the throttled line of sight (SeesTarget), ChestOf
+      RiggedMob.cs             # abstract walking or flying mob animated from its clips (Goblin, the realm mobs): the
                                #   EntityAnimator, walk/auto-jump/float physics or Fly, facing, death/spawn/hurt clips,
                                #   the mirror's animation and BodyEffect (a flyer's pitch and bank)
       PrimedTnt.cs             # a primed TNT block: a full-size cube that falls under gravity and
@@ -1332,11 +1334,11 @@ OpenGLTest/
         GoblinAim.cs           # GL-free low-arc ballistic solver for the thrown stones
         GoblinTorches.cs       # GL-free torch roll for a goblin spawn (night, depth, one uniform roll)
       HellMobs/                # hell's mobs (see "Hell mobs"): the shared base, the two kinds, the layer difficulty
-        HellMob.cs             # abstract hell mob: layer-scaled pool, the chase frame (face, Decide, walk), the
-                               #   throttled line of sight
+        HellMob.cs             # abstract hell mob (a RealmMob): the layer it spawned in and its layer-scaled pool
         Hellbrute.cs           # the melee brute: walk, a charge with a clear line, the melee clip's impact event
         Cinderwitch.cs         # the fire caster: the range band, a cast with a clear line, the release event's bolt
-        LayerDifficulty.cs     # GL-free: the per-layer multiplier (health, damage, cast cooldown) and pack size
+        LayerDifficulty.cs     # GL-free: the per-layer multiplier (health, damage, cast cooldown) and pack size;
+                               #   ScaleBy, the rounding every realm's difficulty scales through
       Icebergs/                # drifting icebergs (not mobs): the berg and its GL-free rules, see "Icebergs"
         Iceberg.cs             # one berg: variant, horizontal scale, quarter turns, seed, waterline center,
                                #   velocity, cached world boxes, emerge/sink, the client mirror's dead reckoning
@@ -1347,6 +1349,11 @@ OpenGLTest/
                                #   ModelMatrix, Place, mass
         IcebergSpawnRule.cs    # GL-free spawn band: open water from SpawnColdMin to the freeze threshold
         IcebergWobble.cs       # GL-free render-only bob, pitch and roll of (seed, lighting clock)
+      SkyMobs/                 # the sky islands' mobs (see "Sky mobs"): the shared base, the two kinds, the zone difficulty
+        SkyMob.cs              # abstract sky mob (a RealmMob): the zone tier it spawned in and its tier-scaled pool
+        Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
+        Cloudgolem.cs          # the ground bruiser: walk with ledge caution, the slam clip's impact event, the shockwave
+        SkyDifficulty.cs       # GL-free: the zone tier's multiplier (health, damage), pack size, the bruiser's big-zone gate
       Slimes/                  # the slime: the mob, its sizes and its merge
         Slime.cs               # a slime: a gel cube that hops toward the player and only hurts on contact while it is off the ground
         SlimeMerge.cs          # GL-free slime merge: who merges (same size, touching, past the cooldown),
@@ -1929,10 +1936,14 @@ OpenGLTest/
       MobDirector.cs           # World component: the per-frame mob job (the targets, the slime and goblin updates and
                                #   their damage, the blast shove, the mob list and its scenario spawn/damage seams,
                                #   the drain of status-effect block actions into the StatusEffectBlockWriter)
-      MobSpawner.cs            # the shared dry-forest-surface ring spawn search
+      MobSpawner.cs            # the ring spawn searches: dry forest surface, dark caves, hell floors, sky island tops
+      RealmMobManager.cs       # the realm mob managers' shared frame: the capped list, forced spawn, mirrors, the update
+                               #   loop (target, hazards, loot, attack, shove, despawn), Hit and the spawn turn
       QuernManager.cs          # block-entity registry for querns: one crushable unit per cell plus a one-rotation spin timer
       SaplingManager.cs        # the saplings planted in the world (an acorn, or any
                                #   ItemUseAction.PlantTree use), GL-free and main thread only
+      SkyMobManager.cs         # the sky mobs: the galeraptor's strike at its dive impact, the golem's shockwave at its
+                               #   slam impact, the sky-band ring spawn on island tops (tier-scaled packs, big-zone golems)
       SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning
       TntManager.cs            # owns the live primed TNT: spawns cubes where firestarter
                                #   strikes and blasts light TNT, ticks their fuses
@@ -2274,7 +2285,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Support/                     # cross-area fixtures: TestContent (the headless content load),
                                #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
                                #   WideTreeSpecies, TreeWorldgenFixture, IcebergTestWorld (a hand-built sea with a
-                               #   pack-ice strip), StubTarget, BoxSolids and the three [CollectionDefinition]s
+                               #   pack-ice strip), StubTarget, BoxSolids, SkyZoneFinder (sky zones under the seed)
+                               #   and the three [CollectionDefinition]s
   Audio/                       # the sfx library and the ambience bed
   Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
                                #   column cache, fluid surfaces, lava vents, EntityLight; the replay probes
@@ -2298,6 +2310,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Goblins/                   # goblin AI, aim and stones, flee, dodge, pack alert,
                                #   torches, the content contract (mirrors src/Entities/Goblins)
     HellMobs/                  # hell mob contracts, layer difficulty, brute blow, caster cast and bolt burn
+    SkyMobs/                   # sky mob contracts, zone difficulty, the flyer's hover and dive, the golem's
+                               #   shockwave and ledge caution
     Icebergs/                  # iceberg shape, motion, wobble, spawn band, contact, the berg (mirrors src/Entities/Icebergs)
     Slimes/                    # slime sizes, hops, knockback, split and merge (mirrors src/Entities/Slimes)
   Graphics/                    # shader defines and the chunk-draw shader guard, cutout mips, tile materials
@@ -2366,6 +2380,8 @@ tools/                                # asset generators: tiles, sprites, models
   generate-hell-mob-models.py         # deterministic hellbrute/cinderwitch .bbmodel (rig + clips) and skins, and the
                                       #   ember_shard sprite; its header pins the rig and clip contract, --check
   generate-hollow-log-textures.py     # deterministic placeholder inner/end tiles of the hollow logs
+  generate-sky-mob-models.py          # deterministic galeraptor/cloudgolem .bbmodel (rig + clips) and skins, and the
+                                      #   cloud_shard sprite, on the hell script's machinery; --check
   generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
                                       #   the geometry rules (waterline, shelf, 8 px inset steps) and the UV layout
   generate-lantern-texture.py         # deterministic lantern tile; its header pins the uv of every model part
@@ -3889,7 +3905,10 @@ climate) instead of the heights alone, so a client derives nothing from worldgen
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Version 17 (current) lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
+whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Version 18 (current) lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
+mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
+them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
 mob fields only: a mirror's layer, and so its pool, follows from where it is first seen); an older client would not
 draw them. Version 16 makes a crucible carry one entry per metal (the alloy kiln): a `StationState` kiln entry writes a metal count (at most `CrucibleComponent.MaxMetals`; `StationNetCodec.ReadCrucible` refuses more, a material 0, a repeat or a negative amount) and each metal's id, molten and pending ml, and the `InventoryState` crucible a `Metals` list; an older peer would misread the station frames. Version 13 ends every `EntityList` entry, of every kind, with a status-effect byte mask (`NetEntity.Effects`: a mob's `StatusEffect.Bit`s, 0 for a drop, primed TNT, falling block or iceberg) and ends `PlayerStatus` with the player's own effect mask (`PlayerStatusData.EffectMask`); both codecs carry the mask raw and the client drops unknown bits when it mirrors them, and an older peer would misread every frame after the first entry. Version 8 added
 `NetEntityKind.Iceberg` (6): `Position` the waterline center, `Yaw` the quarter turns times pi/2
@@ -4893,7 +4912,8 @@ target stands lower (`LedgeCautionTests`).
 ### Hell mobs
 
 Hell's cavern pockets hold two harder kinds (plans/LAYERS.md `L-10`), both `HellMob`s
-(`src/Entities/HellMobs/`), which like the goblin are `RiggedMob`s: a walking body animated from its
+(`src/Entities/HellMobs/`), which are `RealmMob`s (the chase frame they share with the sky mobs: facing,
+`Decide`, `Locomote`, the throttled line of sight) and like the goblin `RiggedMob`s: a walking body animated from its
 `.bbmodel` clips through an `EntityAnimator` (`RiggedMob` owns the walk, auto-jump and float physics, the
 facing, the death, spawn and hurt clips, a mirror's animation and `BodyEffect`; `Goblin` derives from it
 too). Both models, their skins and the `ember_shard` sprite come from `tools/generate-hell-mob-models.py`
@@ -4902,7 +4922,7 @@ torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateCon
 `EntityContract.RequireHumanoid`).
 - **The hellbrute** (`hellbrute.json`, hp 60, loot ember shards and coal) is slow and tanky: it walks at
   its target, charges at `HellbruteChargeSpeedFactor` once it sees it (a clear line from its eye to the
-  chest, `HellMob.SeesTarget`, throttled) within `HellbruteChargeRangeBlocks`, and in reach plays its
+  chest, `RealmMob.SeesTarget`, throttled) within `HellbruteChargeRangeBlocks`, and in reach plays its
   `melee` clip, whose `impact` event bills `MeleeDamage` with a heavy knockback to every non-immune target
   still in reach (`HellMobManager`). A player walking into it barely moves it (`HellbruteShoveSpeed`).
 - **The cinderwitch** (`cinderwitch.json`, hp 24, loot ember shards) keeps
@@ -4917,14 +4937,15 @@ torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateCon
   caster's cooldown, from the hell layer of its spawn height (`HellMob.Layer`, fixed for life, so a save
   restore and a client mirror at the same spot agree); a ring spawn rolls a pack of up to
   `LayerDifficulty.PackSize(layer)`.
-- **Spawning** (`HellMobManager`, one manager for both kinds, joined to the world's `MobCaps`): every
+- **Spawning** (`HellMobManager`, one manager for both kinds on the shared `RealmMobManager<TMob>` frame,
+  joined to the world's `MobCaps`): every
   `HellSpawnIntervalSeconds`, under the natural cap, around a target standing in hell only,
   `MobSpawner.TryFindHellSpawn` scans ring columns for an open cavern floor whose two standing cells are in
   hell and whose block light is at most `HellSpawnMaxBlockLight` (no skylight reaches hell); the overworld
   cave slimes stop above `HellTopY`. `HellCasterShare` of the spawns are casters. Despawn and the shared
   hazards work as for the goblin.
 - **Plumbing**: `World.HellMobs`, `MobDirector` (update, damage billing, `RefreshMobs`, the `spawn` op names),
-  `MobPasses.RenderHellMobs` and the near shadow cascade (no mirror: hell lies far under the water plane),
+  `MobPasses.RenderRealmMobs` and the near shadow cascade (no mirror: hell lies far under the water plane),
   `entities.json` by kind name, the `EntityList` kinds above and `ClientMirror`'s reconcile, and the item
   debugger's ENTITIES tab. Tests: `HellMobTests`, `HellMobManagerTests`, the hell round trip in
   `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload` and `NetworkEntitySyncTests`.
@@ -4933,8 +4954,8 @@ torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateCon
 
 ### Flying mobs
 
-The shared mob layer can fly (plans/LAYERS.md `L-14`), as the foundation for the sky flyer (`L-15`); no
-shipped kind flies yet, so the rules are exercised by a test-only flyer (`FlightTests`). A `RiggedMob` kind
+The shared mob layer can fly (plans/LAYERS.md `L-14`): the galeraptor (see "Sky mobs") is the shipped flyer,
+and the rules are also exercised by a test-only flyer (`FlightTests`). A `RiggedMob` kind
 opts in by passing a `FlightTuning` to the base constructor (cruise and vertical speed, the
 `MathUtils.Damp` acceleration, a hover band, a minimum clearance and a bob; `Validate` refuses a misordered
 one). `Mob.Flies` follows from that, so it is a property of the kind and needs no wire bit. A flyer's update
@@ -4966,6 +4987,56 @@ calls `RiggedMob.Fly(goal, chasing, speedFactor, ...)` instead of `Walk`:
   is unchanged.
 - **Mirrors**: a client mirror takes the snapshot's full `Vector3` position and velocity
   (`NetworkSetState`) and never integrates or ground-snaps it, so a flyer keeps its height between snapshots.
+
+### Sky mobs
+
+The sky islands hold two kinds (plans/LAYERS.md `L-15`), both `SkyMob`s (`src/Entities/SkyMobs/`): `RealmMob`s
+like the hell mobs, scaled by the **tier of the island zone** they spawned in (`SkyIslands.ZoneAt`, read once
+from the spawn column into `SkyMob.Tier`, so a save restore and a client mirror over the same column agree).
+Both models, their skins and the `cloud_shard` sprite come from `tools/generate-sky-mob-models.py`
+(deterministic, `--check`; it loads the hell script's rig, UV, PNG and clip machinery from that file, whose
+`main` takes the outputs to write). Both rigs carry the humanoid groups, head and arms under the torso.
+- **The galeraptor** (`galeraptor.json`, hp 24, loot a cloud shard sometimes) is a flyer
+  (`Galeraptor.Tuning`, a `FlightTuning`; `EntityContract.RequireFlyer`: idle, `fly`, and `dive` with an
+  `impact` event; its wings are `ArmL`/`ArmR` and its talons the legs). It hovers `HoverHeight` (inside
+  `GaleraptorHoverMin..MaxBlocks`) over its target's eye (`FlightSteering.ChaseGoal`) and, off its cooldown
+  with a clear line within `GaleraptorDiveRangeBlocks` horizontally, plays `dive` and stoops at the chest at
+  `GaleraptorDiveSpeedFactor` of its flight (`Galeraptor.Locomote` overrides the walk with `Fly`); at the
+  clip's `impact` the manager bills `DiveDamage` to every non-immune target whose chest is within
+  `GaleraptorDiveReach` (`Galeraptor.InDiveReach`), then it climbs back to its hover. Idle it holds its hover
+  band over the island; wandering it flies its 3D wander goal.
+- **The cloud golem** (`cloudgolem.json`, hp 150, loot cloud shards and cobblestone) is a slow ground bruiser,
+  tougher and harder-hitting than a first-layer hellbrute. In `CloudgolemSlamTriggerReach` and off its
+  cooldown it plays `slam`; at its `impact` the **shockwave** bills `SlamDamage` with a big shove and lift to
+  every non-immune target within `CloudgolemShockwaveRadius` horizontally whose feet stand within
+  `CloudgolemShockwaveHeight` of its own (`Cloudgolem.InShockwave`), none beyond. It walks with the shared
+  ledge caution, so the island's edge (a drop to the cloud sea far below, or unloaded cells: bottomless)
+  stops it unless its target is lower; a player barely shoves it.
+- **Zone difficulty** (`SkyDifficulty`, GL-free): `1 + tier * MobConfig.SkyDifficultyPerTier` scales a sky
+  mob's pool and damage (through `LayerDifficulty.ScaleBy`), a ring spawn rolls a pack of up to
+  `PackSize(tier)` (`SkyPackExtraPerTier` more per tier, capped), and only a big zone (`SkyZone.BigTier`)
+  takes the golem (`AllowsBruiser`, `KindFor`: `SkyBruiserShare` of its spawns); a galeraptor spawns in any
+  zone.
+- **Spawning** (`SkyMobManager` on the shared `RealmMobManager<TMob>` frame, joined to the world's `MobCaps`):
+  every `SkySpawnIntervalSeconds`, under the natural cap, around a target whose feet stand in the sky band
+  (`MobSpawner.InSkyBand`, `SkyIslandBottomY..SkyIslandTopY`) only, `MobSpawner.TryFindSkySpawn` scans ring
+  columns for an island top: solid ground under two clear dry cells, all three in the band (so never the cloud
+  sea, the overworld or hell), inside an island zone and not torch-lit. A golem stands on it; a galeraptor
+  appears in open air `SkyFlyerSpawnLiftMin..Max` blocks over it. The overworld's surface and cave searches
+  never land on an island (the surface search reads the terrain heightmap, the cave search wants a floor under
+  its column's surface). Despawn and the shared hazards work as for the other mobs.
+- **Plumbing**: `World.SkyMobs`, `MobDirector` (update, damage billing, `RefreshMobs`, the `spawn` op names
+  `galeraptor`/`cloudgolem`, exact feet with `[x, y, z]`), `MobPasses.RenderRealmMobs` and the near shadow
+  cascade, `entities.json` by kind name, the `EntityList` kinds (protocol 18) and `ClientMirror`'s reconcile,
+  and the item debugger's ENTITIES tab (its `fly` mode moves the mirror like `walk`). Tests: `SkyMobTests`,
+  `SkyMobManagerTests`, the realm round trip in `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`,
+  `NetworkEntitySyncTests.SkyMobsMirrorByKindAndAFlyerKeepsItsHeight` and the loopback
+  `GameServerTests.SkyMobsReachTheClientsEntityListByKindAndAFlyerAtItsHeight`.
+  `visual-examples/sky-mobs.json` (`VOXEL_TIME=147`) films the ring's own spawns, then both kinds on the
+  meadow island.
+- Known gaps: a client's mirror shows no attack clip; the slam's shockwave hits players only (no mobs, no
+  blocks); `cloud_shard` has no use yet; the overworld ring spawners still spawn on the ground far below a
+  player standing on an island.
 
 ### Icebergs
 

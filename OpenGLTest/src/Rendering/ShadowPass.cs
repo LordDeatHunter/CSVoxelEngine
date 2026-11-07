@@ -5,7 +5,6 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
-using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Lod;
@@ -95,7 +94,8 @@ internal sealed class ShadowPass
         IReadOnlyList<PrimedTnt> primed, IReadOnlyList<FallingBlock> falling, IEnumerable<TopplingTree> trees,
         PlayerModel? player = null, IReadOnlyList<Slime>? slimes = null,
         IReadOnlyList<LodRegion>? lodRegions = null, IReadOnlyList<Goblin>? goblins = null,
-        IReadOnlyList<Iceberg>? icebergs = null, IReadOnlyList<HellMob>? hellMobs = null)
+        IReadOnlyList<Iceberg>? icebergs = null, IReadOnlyList<RiggedMob>? hellMobs = null,
+        IReadOnlyList<RiggedMob>? skyMobs = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -199,16 +199,8 @@ internal sealed class ShadowPass
             Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
         }
 
-        if (hellMobs != null && hellMobs.Count > 0)
-        {
-            foreach (var mob in hellMobs)
-            {
-                if (Mobs.HellRigOf(mob.Type) is not { } rig) continue;
-                Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
-                DrawRigCaster(mob, rig);
-            }
-            Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
-        }
+        DrawRealmCasters(hellMobs);
+        DrawRealmCasters(skyMobs);
 
         if (icebergs != null)
             DrawIcebergCasters(icebergs, frustum);
@@ -307,6 +299,20 @@ internal sealed class ShadowPass
             _owner.ChunkDraws.Draw(_owner.LodGeometry.Vao, _owner.ChunkShadowShader, _locChunkShadowDrawBase);
             _owner.ChunkShadowShader.SetUniform(_locChunkShadowOpaque, 0);
         }
+    }
+
+    // One realm's mobs (hell's or the sky's) into the near cascade, each on its own kind's skin; the atlas
+    // goes back on unit 0 after them
+    private void DrawRealmCasters(IReadOnlyList<RiggedMob>? mobs)
+    {
+        if (mobs == null || mobs.Count == 0) return;
+        foreach (var mob in mobs)
+        {
+            if (Mobs.RealmRigOf(mob.Type) is not { } rig) continue;
+            Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
+            DrawRigCaster(mob, rig);
+        }
+        Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
     }
 
     // Every part of one rigged mob into the near cascade; its skin is already bound on unit 0

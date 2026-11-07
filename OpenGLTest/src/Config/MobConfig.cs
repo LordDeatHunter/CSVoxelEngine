@@ -2,7 +2,7 @@ namespace VoxelEngine.Config;
 
 /// <summary>
 /// Mob tuning: the shared caps and rules (fall damage, lava, loot toss, notice, interest, wander,
-/// torch-safe ground, ledges), the per-layer difficulty, slimes, goblins, the hell mobs, healthbars, damage numbers and the goblin notice
+/// torch-safe ground, ledges), the per-layer difficulty, slimes, goblins, the hell and sky mobs, healthbars, damage numbers and the goblin notice
 /// pip.
 /// </summary>
 public static class MobConfig
@@ -215,6 +215,11 @@ public static class MobConfig
     // Horizontal shove a grounded goblin gets when the player walks into it.
     public const float GoblinShoveSpeed = 3.5f;
 
+    // --- Realm mobs (RealmMob: the hell and sky mobs) ---
+    // A realm mob that needs a clear line to its target (a charge, a cast, a dive) raycasts it at most
+    // this often; between checks the last answer stands.
+    public const float RealmMobLosRetrySeconds = 0.3f;
+
     // --- Hell mobs (HellMobManager, Hellbrute, Cinderwitch) ---
     // Both live only in hell's cavern pockets (MobSpawner.TryFindHellSpawn): a ring like the goblin's
     // around a player standing in hell, each try scanning a column down from near the player's feet for
@@ -234,7 +239,6 @@ public static class MobConfig
     public const float HellPackSpawnRadiusBlocks = 4f;
     public const float HellCasterShare = 0.4f;
     public const float HellDespawnRadiusBlocks = 64f;
-    public const float HellMobLosRetrySeconds = 0.3f;
 
     // The hellbrute: a slow, tanky melee bruiser. It closes at its walk and charges at
     // HellbruteChargeSpeedFactor of it once it sees its target within HellbruteChargeRangeBlocks
@@ -277,6 +281,76 @@ public static class MobConfig
     public const float HellBoltBurnScale = 0.6f;
     // Embers a bolt in flight sheds per second (cosmetic, never on a server)
     public const float HellBoltEmbersPerSecond = 30f;
+
+    // --- Sky mobs (SkyMobManager, Galeraptor, Cloudgolem) ---
+    // Both live only on the sky islands (MobSpawner.TryFindSkySpawn): a ring around a player standing in
+    // the sky band, each try scanning a column down from near the player's feet for an island top (solid
+    // ground in the band under two clear dry cells, inside an island zone, no torch light). The zone's
+    // tier (SkyIslands.ZoneAt: 0 small, 1 medium, 2 big) scales each spawn's health and damage by
+    // 1 + tier * SkyDifficultyPerTier (SkyDifficulty) and its pack: SkyPackExtraPerTier more mobs per tier,
+    // up to SkyPackMaxSize. Only a big zone spawns the golem, as SkyBruiserShare of its spawns; a galeraptor
+    // appears SkyFlyerSpawnLiftMin..Max blocks over the island top it was found on.
+    public const float SkySpawnIntervalSeconds = 10f;
+    public const float SkySpawnMinRadiusBlocks = 14f;
+    public const float SkySpawnMaxRadiusBlocks = 36f;
+    public const int SkySpawnTries = 16;
+    public const int SkySpawnSearchHalfHeight = 16;
+    public const int SkySpawnScanDepth = 40;
+    public const float SkyDifficultyPerTier = 0.25f;
+    public const int SkyPackExtraPerTier = 1;
+    public const int SkyPackMaxSize = 3;
+    public const float SkyPackSpawnRadiusBlocks = 5f;
+    public const float SkyBruiserShare = 0.35f;
+    public const float SkyFlyerSpawnLiftMin = 6f;
+    public const float SkyFlyerSpawnLiftMax = 14f;
+    public const float SkyDespawnRadiusBlocks = 64f;
+
+    // The galeraptor: a diving flyer (FlightTuning below). It hovers GaleraptorHoverMin..MaxBlocks above
+    // its target's eye and, off its cooldown with a clear line within GaleraptorDiveRangeBlocks
+    // horizontally, plays its dive clip, stooping at the chest at GaleraptorDiveSpeedFactor of its flight;
+    // the strike lands at the clip's "impact" event only on a target whose chest is then within
+    // GaleraptorDiveReach of its body, then it climbs back to its hover. A fresh one waits
+    // GaleraptorFirstDiveDelaySeconds before its first dive.
+    public const float GaleraptorHeight = 0.9f;
+    public const float GaleraptorHalfExtent = 0.45f;
+    public const float GaleraptorCruiseSpeed = 6f;
+    public const float GaleraptorVerticalSpeed = 5f;
+    public const float GaleraptorAcceleration = 5f;
+    public const float GaleraptorHoverMinBlocks = 3f;
+    public const float GaleraptorHoverMaxBlocks = 5f;
+    public const float GaleraptorMinClearanceBlocks = 0.5f;
+    public const float GaleraptorBobBlocks = 0.25f;
+    public const float GaleraptorBobHz = 0.6f;
+    public const float GaleraptorDiveRangeBlocks = 3f;
+    public const float GaleraptorDiveSpeedFactor = 2.2f;
+    public const float GaleraptorDiveReach = 1.8f;
+    public const float GaleraptorFirstDiveDelaySeconds = 1.5f;
+    public const float GaleraptorDiveCooldownSeconds = 2.8f;
+    public const int GaleraptorDiveDamage = 6;
+    public const float GaleraptorKnockbackSpeed = 5f;
+    public const float GaleraptorKnockbackLift = 2f;
+    // How hard a player shoves a galeraptor touching the ground (a dive that bottoms out); in the air never
+    public const float GaleraptorShoveSpeed = 3.5f;
+
+    // The cloud golem: a slow, very tough bruiser, harder than a first-layer hellbrute. In
+    // CloudgolemSlamTriggerReach and off its cooldown it plays its slam clip; at the clip's "impact" event
+    // the shockwave hits every target within CloudgolemShockwaveRadius horizontally whose feet stand within
+    // CloudgolemShockwaveHeight of its own, with a big shove and lift. Barely moved by a player walking
+    // into it, and it keeps the shared ledge caution, so it never walks off its island after a target that
+    // is not below it.
+    public const float CloudgolemHeight = 2.6f;
+    public const float CloudgolemHalfExtent = 0.7f;
+    public const float CloudgolemWalkSpeed = 1.8f;
+    public const float CloudgolemJumpSpeed = 8.5f;
+    public const float CloudgolemSlamTriggerReach = 2.6f;
+    public const float CloudgolemStandoffBlocks = 2f;
+    public const int CloudgolemSlamDamage = 22;
+    public const float CloudgolemSlamCooldownSeconds = 2.6f;
+    public const float CloudgolemShockwaveRadius = 4.5f;
+    public const float CloudgolemShockwaveHeight = 2f;
+    public const float CloudgolemKnockbackSpeed = 11f;
+    public const float CloudgolemKnockbackLift = 7f;
+    public const float CloudgolemShoveSpeed = 0.6f;
 
     // --- Entity healthbars (EntityHealthbarRenderer) ---
     // Five hearts float above every live mob, billboarded to face the camera, using the same

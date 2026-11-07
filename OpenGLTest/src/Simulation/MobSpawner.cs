@@ -5,6 +5,7 @@ using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Hell;
+using VoxelEngine.WorldGen.Sky;
 
 namespace VoxelEngine.Simulation;
 
@@ -26,10 +27,7 @@ public static class MobSpawner
     {
         for (var attempt = 0; attempt < tries; attempt++)
         {
-            var angle = Random.Shared.NextSingle() * MathF.Tau;
-            var radius = MathUtils.Lerp(minRadius, maxRadius, Random.Shared.NextSingle());
-            x = MathUtils.FloorToInt(playerPosition.X + MathF.Cos(angle) * radius);
-            z = MathUtils.FloorToInt(playerPosition.Z + MathF.Sin(angle) * radius);
+            RingColumn(playerPosition, minRadius, maxRadius, out x, out z);
 
             var chunkX = VoxelCoords.WorldToChunk(x);
             var chunkZ = VoxelCoords.WorldToChunk(z);
@@ -92,10 +90,7 @@ public static class MobSpawner
         var feetY = MathUtils.FloorToInt(playerPosition.Y - Camera.EyeHeight);
         for (var attempt = 0; attempt < tries; attempt++)
         {
-            var angle = Random.Shared.NextSingle() * MathF.Tau;
-            var radius = MathUtils.Lerp(minRadius, maxRadius, Random.Shared.NextSingle());
-            x = MathUtils.FloorToInt(playerPosition.X + MathF.Cos(angle) * radius);
-            z = MathUtils.FloorToInt(playerPosition.Z + MathF.Sin(angle) * radius);
+            RingColumn(playerPosition, minRadius, maxRadius, out x, out z);
             var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
             var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
 
@@ -130,10 +125,7 @@ public static class MobSpawner
         var feetY = MathUtils.FloorToInt(playerPosition.Y - Camera.EyeHeight);
         for (var attempt = 0; attempt < tries; attempt++)
         {
-            var angle = Random.Shared.NextSingle() * MathF.Tau;
-            var radius = MathUtils.Lerp(minRadius, maxRadius, Random.Shared.NextSingle());
-            x = MathUtils.FloorToInt(playerPosition.X + MathF.Cos(angle) * radius);
-            z = MathUtils.FloorToInt(playerPosition.Z + MathF.Sin(angle) * radius);
+            RingColumn(playerPosition, minRadius, maxRadius, out x, out z);
             var top = feetY + Random.Shared.Next(-searchHalfHeight, searchHalfHeight + 1);
             if (!TryScanFloor(chunks, x, top, z, scanDepth, out var y)) continue;
             if (!HellGenerator.InHell(y + 2)) continue;
@@ -146,6 +138,51 @@ public static class MobSpawner
 
         x = groundY = z = 0;
         return false;
+    }
+
+    /// <summary>Whether a body standing at height <paramref name="feetY"/> is in the sky islands' band
+    /// (<see cref="WorldGenerationConfig.SkyIslandBottomY"/>..<see cref="WorldGenerationConfig.SkyIslandTopY"/>),
+    /// the only place the sky mobs spawn around.</summary>
+    public static bool InSkyBand(int feetY) =>
+        feetY >= WorldGenerationConfig.SkyIslandBottomY && feetY <= WorldGenerationConfig.SkyIslandTopY;
+
+    /// <summary>
+    /// The sky mobs' search: up to <paramref name="tries"/> random columns in the ring around the player, each
+    /// scanned down from a random height within <paramref name="searchHalfHeight"/> of the player's feet for at
+    /// most <paramref name="scanDepth"/> cells, taking the first open floor (solid ground under two clear, dry
+    /// cells, every cell loaded). The floor and both cells above it must lie in the sky band
+    /// (<see cref="InSkyBand"/>), so neither the cloud sea under the islands nor the overworld or hell is ever
+    /// found, the column must lie inside an island zone (<see cref="SkyIslands.ZoneAt"/>), and no torch may
+    /// light the standing cell (<see cref="IsLitByBlocks"/>). On success <paramref name="groundY"/> is the
+    /// island top's Y.
+    /// </summary>
+    public static bool TryFindSkySpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
+        float maxRadius, int tries, int searchHalfHeight, int scanDepth, out int x, out int groundY, out int z)
+    {
+        var feetY = MathUtils.FloorToInt(playerPosition.Y - Camera.EyeHeight);
+        for (var attempt = 0; attempt < tries; attempt++)
+        {
+            RingColumn(playerPosition, minRadius, maxRadius, out x, out z);
+            var top = feetY + Random.Shared.Next(-searchHalfHeight, searchHalfHeight + 1);
+            if (!TryScanFloor(chunks, x, top, z, scanDepth, out var y)) continue;
+            if (!InSkyBand(y) || !InSkyBand(y + 2)) continue;
+            if (!SkyIslands.ZoneAt(x + 0.5f, z + 0.5f).InZone || IsLitByBlocks(chunks, x, y + 1, z)) continue;
+
+            groundY = y;
+            return true;
+        }
+
+        x = groundY = z = 0;
+        return false;
+    }
+
+    // A random column in the minRadius..maxRadius ring around the player
+    private static void RingColumn(Vector3 playerPosition, float minRadius, float maxRadius, out int x, out int z)
+    {
+        var angle = Random.Shared.NextSingle() * MathF.Tau;
+        var radius = MathUtils.Lerp(minRadius, maxRadius, Random.Shared.NextSingle());
+        x = MathUtils.FloorToInt(playerPosition.X + MathF.Cos(angle) * radius);
+        z = MathUtils.FloorToInt(playerPosition.Z + MathF.Sin(angle) * radius);
     }
 
     // Scans column (x, z) down from top for at most scanDepth cells to the first solid floor with two

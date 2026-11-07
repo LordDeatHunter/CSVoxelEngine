@@ -1,0 +1,7 @@
+{
+  "name": "Cloud Golem",
+  // A sky bruiser, tougher than a first-layer hellbrute; SkyDifficulty scales it with the zone's tier
+  "hp": 150,
+  "loot": "cloudgolem",
+  "model": "assets/models/entity/cloudgolem.bbmodel"
+}

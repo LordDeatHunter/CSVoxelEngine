@@ -7,6 +7,7 @@ using VoxelEngine.Content;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 
 namespace VoxelEngine.ItemDebugger;
@@ -23,7 +24,8 @@ namespace VoxelEngine.ItemDebugger;
 /// <see cref="HurtMode"/>.
 /// <para>
 /// A goblin, a hell mob or a slime is previewed as the real <see cref="RiggedMob"/> (<see cref="Goblin"/>,
-/// <see cref="Hellbrute"/>, <see cref="Cinderwitch"/>) or <see cref="Slime"/> object, driven
+/// <see cref="Hellbrute"/>, <see cref="Cinderwitch"/>, <see cref="Galeraptor"/>, <see cref="Cloudgolem"/>) or
+/// <see cref="Slime"/> object, driven
 /// the way a client drives a mob it does not simulate (<see cref="Mob.AnimateMirror"/>), so everything the
 /// game layers on top of the clips shows up here too: the spawn pop, the hit recoil and flash (and the
 /// goblin's overlay flinch), the death, the goblin's body pose (<see cref="BodyEffect"/>) and the slime's
@@ -117,11 +119,17 @@ public sealed class EntityPreviewState : IPreviewDriver
 
     private float RestFor(float seconds) => Replay ? seconds : float.MaxValue / 4f;
 
-    /// <summary>True for idle, walk and a variant mode: no start or end of their own, so a clock wraps them.</summary>
+    /// <summary>True for idle, walk, fly and a variant mode: no start or end of their own, so a clock wraps them.</summary>
     public bool IsContinuous =>
         _variantModes
         || string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(Mode, EntityAnimator.WalkClip, StringComparison.OrdinalIgnoreCase);
+        || IsLocomotion(Mode);
+
+    // The moving clips (a walker's walk, a flyer's fly), which the preview plays by moving the mob at the
+    // clip's reference speed
+    private static bool IsLocomotion(string mode) =>
+        string.Equals(mode, EntityAnimator.WalkClip, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(mode, EntityAnimator.FlyClip, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Index into the selected type's <see cref="EntityType.Variants"/> the preview draws: the active
     /// mode's variant for a multi-variant entity (one mode per variant), 0 for every other entity.</summary>
@@ -295,7 +303,7 @@ public sealed class EntityPreviewState : IPreviewDriver
     private void UpdateRigged(float dt)
     {
         var mob = _rigged!;
-        var walking = string.Equals(Mode, EntityAnimator.WalkClip, StringComparison.OrdinalIgnoreCase);
+        var walking = IsLocomotion(Mode);
         // The mirrored velocity is what walks the clip (a client's mob is driven the same way).
         mob.NetworkSetState(Vector3.Zero, 0f, mob.Health,
             walking ? new Vector3(0f, 0f, Animator.WalkReferenceSpeed) : Vector3.Zero);
@@ -416,7 +424,7 @@ public sealed class EntityPreviewState : IPreviewDriver
         {
             Animator.Update(dt, 0f);
         }
-        else if (string.Equals(Mode, EntityAnimator.WalkClip, StringComparison.OrdinalIgnoreCase))
+        else if (IsLocomotion(Mode))
         {
             Animator.Update(dt, Animator.WalkReferenceSpeed);
         }
@@ -463,8 +471,8 @@ public sealed class EntityPreviewState : IPreviewDriver
         }
     }
 
-    // The selected kind's own mob when it is a clip-animated one (a goblin with stones to hold, a hell
-    // mob), else null
+    // The selected kind's own mob when it is a clip-animated one (a goblin with stones to hold, a hell or
+    // sky mob), else null
     private RiggedMob? NewRigged(bool spawnIn = true)
     {
         var type = Selected!;
@@ -474,6 +482,10 @@ public sealed class EntityPreviewState : IPreviewDriver
             return new Hellbrute(type, Vector3.Zero, spawnIn);
         if (string.Equals(type.Name, Cinderwitch.EntityName, StringComparison.OrdinalIgnoreCase))
             return new Cinderwitch(type, Vector3.Zero, spawnIn);
+        if (string.Equals(type.Name, Galeraptor.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new Galeraptor(type, Vector3.Zero, spawnIn);
+        if (string.Equals(type.Name, Cloudgolem.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new Cloudgolem(type, Vector3.Zero, spawnIn);
         return null;
     }
 

@@ -506,10 +506,12 @@ def outputs():
     return files
 
 
-def main():
+def main(make=outputs):
+    """Writes (or with --check compares) every file make() returns; the sky mobs' generator hands its
+    own outputs to this same routine."""
     check = "--check" in sys.argv
     stale = []
-    for path, data, is_text in outputs():
+    for path, data, is_text in make():
         old = None
         if os.path.exists(path):
             with open(path, "rb") as f:
