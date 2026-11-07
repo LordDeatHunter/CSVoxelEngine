@@ -152,7 +152,9 @@ public static class WorldFeatureConfig
     public const float RuinSurfaceChance = 0.12f;
     public const float RuinUndergroundChance = 0.3f;
     public const float RuinHellChance = 0.35f;
-    public const float RuinSkyChance = 0.6f;
+    public const float RuinSkyChance = 0.2f;
+    // The share of sky ruins that keep their loot chest (the rest stand with the chest left out)
+    public const float RuinSkyChestChance = 0.25f;
     // The largest ground step across a surface ruin footprint, and across a sky island top under one
     public const int RuinSurfaceMaxStep = 2;
     public const int RuinSkyMaxStep = 2;

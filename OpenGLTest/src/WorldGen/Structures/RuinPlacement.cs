@@ -189,8 +189,16 @@ public static class RuinPlacement
             if (!TryFindSkySite(islands[k], out var template, out var turns, out var x, out var z, out var top)) continue;
             StructureStamper.Stamp(blocks, ref state, worldX0, worldY0, worldZ0, template, turns,
                 StructureStamper.OriginOf(x, template), top + 1 - template.GroundLayer, StructureStamper.OriginOf(z, template),
-                int.MinValue, int.MaxValue);
+                int.MinValue, int.MaxValue, SkyRuinKeepsChest(islands[k]));
         }
+    }
+
+    // Most sky ruins stand without their chest: a hashed roll per island, one salt away from the ruin's own rolls
+    private static bool SkyRuinKeepsChest(in SkyIsland island)
+    {
+        var hash = SplitMix64.Hash((int)MathF.Floor(island.CenterX), (int)MathF.Floor(island.CenterZ),
+            WorldGenerationConfig.Seed ^ SkySalt);
+        return SplitMix64.Unit(hash, 5) < WorldFeatureConfig.RuinSkyChestChance;
     }
 
     /// <summary>The ruin an island holds, centered on its center column: false when its roll fails or its top is not level

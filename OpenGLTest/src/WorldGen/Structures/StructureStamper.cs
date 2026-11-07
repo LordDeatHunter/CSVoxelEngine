@@ -18,10 +18,11 @@ public static class StructureStamper
     /// Writes the cells of <paramref name="template"/>, turned <paramref name="turns"/> quarter turns clockwise, whose west-north
     /// bottom corner sits at (<paramref name="originX"/>, <paramref name="originY"/>, <paramref name="originZ"/>), into the chunk
     /// whose minimum corner is (<paramref name="worldX0"/>, <paramref name="worldY0"/>, <paramref name="worldZ0"/>). A cell
-    /// outside <paramref name="minY"/>..<paramref name="maxY"/> is skipped. Returns whether anything was written.
+    /// outside <paramref name="minY"/>..<paramref name="maxY"/> is skipped. A chest cell is left empty when
+    /// <paramref name="keepChests"/> is false. Returns whether anything was written.
     /// </summary>
     public static bool Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
-        StructureTemplate template, int turns, int originX, int originY, int originZ, int minY, int maxY)
+        StructureTemplate template, int turns, int originX, int originY, int originZ, int minY, int maxY, bool keepChests = true)
     {
         var size = template.Size;
         var xLo = Math.Max(0, worldX0 - originX);
@@ -41,7 +42,15 @@ public static class StructureStamper
             if (cell < 0) continue;
 
             var index = Chunk.Idx(originX + x - worldX0, originY + y - worldY0, originZ + z - worldZ0);
-            blocks[index] = (byte)(cell & 0xFF);
+            var id = (byte)(cell & 0xFF);
+            if (!keepChests && id != BlockType.Air && BlockType.ById[id].Chest != null)
+            {
+                blocks[index] = 0;
+                if (state != null) state[index] = 0;
+                wrote = true;
+                continue;
+            }
+            blocks[index] = id;
 
             // Assign, never OR: the block id decides what the state byte means
             var cellState = (byte)(cell >> 8);
