@@ -179,7 +179,8 @@ internal sealed class UiPasses
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
-        _owner.Ui.Hud.DrawTooltip(hover.Anchor, hover.Lines, hover.Colors);
+        // The anchor is the pointer in window pixels; the box is laid out and drawn in canvas units
+        _owner.Ui.Hud.DrawTooltip(_owner.Ui.ToCanvas(hover.Anchor), hover.Lines, hover.Colors);
         _owner.Ui.End();
         Units.InvalidateTextureUnits();
     }

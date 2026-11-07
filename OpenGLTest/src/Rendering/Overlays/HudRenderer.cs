@@ -9,6 +9,7 @@ using VoxelEngine.Player;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.UI.Widgets;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
 using static VoxelEngine.UI.UiTheme;
 
@@ -349,27 +350,33 @@ internal sealed class HudRenderer : IDisposable
     {
         if (_ui.Font == null || lines.Count == 0) return;
 
-        var lineHeight = TextSize.Body + 6f;
-        var width = TooltipWidth;
-        foreach (var line in lines)
-            width = MathF.Max(width, _ui.Font.MeasureSize(line, _ui.CountScale).X + 24f);
-        var height = lineHeight * lines.Count + 16f;
-        var center = anchor + new Vector2(16f + width * 0.5f, 18f + height * 0.5f);
-        center.X = Math.Clamp(center.X, width * 0.5f + 4f, _ui.ScreenSize.X - width * 0.5f - 4f);
-        center.Y = Math.Clamp(center.Y, height * 0.5f + 4f, _ui.ScreenSize.Y - height * 0.5f - 4f);
-        _ui.DrawRect(center, new Vector2(width, height), PanelBackground);
-        _ui.DrawBorder(center, new Vector2(width, height), Border.Standard, SlotBorderColor);
-
-        var top = center.Y - height * 0.5f + 8f;
+        // Each source line wraps to the tooltip's width and keeps its own color on every wrapped row; the layout then clamps the
+        // row count and places the box beside the anchor (canvas units) inside the canvas
+        float Measure(ReadOnlySpan<char> text) => _ui.Font.MeasureSize(text.ToString(), _ui.CountScale).X;
+        var wrapped = new List<string>();
+        var rowColors = new List<Rgba>();
         for (var i = 0; i < lines.Count; i++)
         {
-            _ui.DrawText(lines[i], new Vector2(center.X - width * 0.5f + 12f, top + lineHeight * i),
-                _ui.CountScale, colors != null && colors.TryGetValue(i, out var color) ? color : i == 0 ? Rgba.White : TextDim);
+            var before = wrapped.Count;
+            TextWrap.Wrap(lines[i], TooltipMaxTextWidth, Measure, wrapped);
+            var color = colors != null && colors.TryGetValue(i, out var picked) ? picked : i == 0 ? Rgba.White : TextDim;
+            for (var row = before; row < wrapped.Count; row++) rowColors.Add(color);
         }
+
+        var lineHeight = TextSize.Body + 6f;
+        var layout = TooltipLayout.Compute(wrapped, anchor, _ui.ScreenSize, TooltipMaxTextWidth, TooltipMaxLines, lineHeight, Measure);
+        _ui.DrawRect(layout.Box.Center, layout.Box.Size, PanelBackground);
+        _ui.DrawBorder(layout.Box.Center, layout.Box.Size, Border.Standard, SlotBorderColor);
+
+        var pad = UiTheme.Space.Md;
+        for (var i = 0; i < layout.Lines.Count; i++)
+            _ui.DrawText(layout.Lines[i], new Vector2(layout.Box.Left + pad, layout.Box.Top + pad + lineHeight * i),
+                _ui.CountScale, rowColors[i]);
     }
 
-    // Smallest width of a tooltip panel; a long line widens it
-    private const float TooltipWidth = 120f;
+    // The widest a tooltip line runs before it wraps, and the most rows a tooltip shows
+    private const float TooltipMaxTextWidth = 320f;
+    private const int TooltipMaxLines = 18;
 
     /// <summary>
     /// One toast line (<see cref="HudToast"/>) centered a little above the item-name row, at
@@ -384,6 +391,10 @@ internal sealed class HudRenderer : IDisposable
         var top = heartsTop - HotbarNameGap - TextSize.Body - ToastRowGap;
         _ui.TextFade = a;
         var size = _ui.Font.MeasureSize(text, _ui.CountScale);
+        // A small panel behind the line, so it reads over any scene
+        var panel = new Vector2(size.X + UiTheme.Space.Lg * 2f, TextSize.Body + UiTheme.Space.Md);
+        var center = new Vector2(_ui.ScreenSize.X * 0.5f, top + TextSize.Body * 0.5f);
+        _ui.DrawRect(center, panel, new Rgba(PanelBackground.R, PanelBackground.G, PanelBackground.B, (byte)(PanelBackground.A * a)));
         _ui.DrawText(text, new Vector2((_ui.ScreenSize.X - size.X) * 0.5f, top), _ui.CountScale, Rgba.White);
         _ui.TextFade = 1f;
     }

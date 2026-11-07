@@ -26,13 +26,9 @@ Nothing.
   **Hook:** `InventoryPanelLayout`, `InventoryPanelRenderer`, `InventoryPanelInput`, `PanelTransition`, `ScrollList`.
 
 ### Phase 3: craft card, tooltip, toast
-- [ ] **`U-3` Craft card, tooltip and toast on the kit** - P1, M.
+- [ ] **`U-3` Craft card onto the kit** - P1, S. Done: the tooltip wraps to `TooltipLayout` (max width and line cap, per-source-line colors kept on wrapped rows, anchored through `Ui.ToCanvas` so it follows the cursor at any canvas scale) and the toast sits on a small panel. Left:
   - [ ] craft card onto the card frame; move the renderer-side geometry (`fedCx` offsets, icon sizes, step boxes) into
     `CraftCardLayout`; fit the fed-text and max-batch labels
-  - [ ] tooltip wraps to a max width and clamps by line count; long crucible and "Teaches:" lines no longer run off
-    the edge
-  - [ ] toast gets a panel treatment
-  - [ ] the tooltip anchor is the mouse in window pixels but is drawn in canvas units (`UiPasses.RenderTooltip`, `HudRenderer.DrawTooltip`), so it drifts from the cursor whenever the canvas scale is not 1: convert it through `UIRenderer.ToCanvas` and place the box with `TooltipLayout`
   **Hook:** `CraftCardLayout`, `CraftCardRenderer`, `ItemTooltip`, `HudRenderer.DrawTooltip`, `HudToast`.
 
 ### Phase 4: spell builder and shared frame
