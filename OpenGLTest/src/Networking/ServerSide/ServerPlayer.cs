@@ -276,7 +276,8 @@ public sealed class ServerPlayer : IMobTarget
         var feet = Position.Y - Camera.EyeHeight;
         var fall = _fall.Observe(feet, PlayerBodyProbe.Grounded(Position, chunks, solids), Flying,
             PlayerBodyProbe.InWater(Position, chunks), Creative,
-            NetValidation.AllowedDistance(stateGapSeconds, NetworkConfig.NetMaxMoveBlocksPerSecond));
+            NetValidation.AllowedDistance(stateGapSeconds, NetworkConfig.NetMaxMoveBlocksPerSecond),
+            cushioned: PlayerBodyProbe.LandingCushioned(Position, chunks));
         if (fall > 0)
         {
             Status.TakeDamage(fall);

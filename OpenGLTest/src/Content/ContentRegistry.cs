@@ -511,6 +511,8 @@ public static class ContentRegistry
         Array.Clear(BlockType.FallsById);
         Array.Clear(BlockType.StackSolidStateById);
         Array.Clear(BlockType.BounceById);
+        Array.Clear(BlockType.SoftLandingById);
+        Array.Clear(BlockType.SinkById);
         Array.Clear(BlockType.BlocksSightById);
         Array.Clear(BlockType.ContactDamageById);
         Array.Clear(BlockType.GreedyById);

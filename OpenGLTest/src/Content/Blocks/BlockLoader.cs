@@ -125,6 +125,8 @@ internal static class BlockLoader
             hitboxes = paneProfile!.Boxes(0);
             collidesByHitbox = solid;
         }
+        var bodySurface = BlockFieldRules.ParseBodySurface(definition, renderer, fluid, solid, ground.MovementSpeed,
+            collidesByHitbox, stack.StackMax, path);
 
         var type = new BlockType
         {
@@ -141,6 +143,8 @@ internal static class BlockLoader
             PebbleWeight = ground.PebbleWeight,
             FootstepDust = ground.FootstepDust,
             Bounces = definition.Bounce ?? false,
+            SoftLanding = bodySurface.SoftLanding,
+            Sink = bodySurface.Sink,
             BlocksSight = definition.BlocksSight ?? true,
             ContactDamage = ground.ContactDamage,
             CullSelf = definition.CullSelf ?? false,
@@ -211,6 +215,8 @@ internal static class BlockLoader
         BlockType.PebbleWeightById[id] = type.PebbleWeight;
         BlockType.FootstepDustById[id] = type.FootstepDust;
         BlockType.BounceById[id] = type.Bounces;
+        BlockType.SoftLandingById[id] = type.SoftLanding;
+        BlockType.SinkById[id] = type.Sink;
         BlockType.BlocksSightById[id] = type.BlocksSight;
         BlockType.ContactDamageById[id] = type.ContactDamage;
         BlockType.CastsAoById[id] = type.CastsAmbientOcclusion;

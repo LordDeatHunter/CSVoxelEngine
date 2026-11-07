@@ -9,7 +9,8 @@ layers (not dimensions). Dig or build to reach them; no portals. Old saves do no
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
 `MobConfig.LayerDifficultyPerLayer`; `LayerBandTests` holds their order. The `iron_pickaxe` (power 3,
-creative only) is the barrier's tool. Last updated 2026-11-07.
+creative only) is the barrier's tool. The `softLanding` and `sink` block flags (`SinkLayer`,
+`PlayerConfig.SinkBlockSpeed`) are ready for the cloud blocks of `L-11`; the server accepts the sink. Last updated 2026-11-07.
 
 ## In progress
 
@@ -19,10 +20,6 @@ Nothing.
 
 ### Phase 1: Foundations
 
-- [ ] **`L-3` Soft-landing and sink block flags.** P0, M. Block JSON flags (fall damage negated on
-  landing; the body sinks slowly up to 50 % into the block), flat `BlockType` mirrors.
-  **Hook:** `BlockDefinition`, `BlockLoader`, `PlayerPhysics`, `FallTracker`, server `MovementRules`
-  (it must accept the sink and the landing).
 - [ ] **`L-4` Depth-based fog and tint hook.** P0, M. Eye in a hell layer eases to a red-tinted fog
   (like the underwater/lava eye state); altitude shifts the sky palette. **Hook:** `FrameLighting`;
   the `SkySample` copies change together (`shader-sync` skill).
@@ -62,7 +59,7 @@ Nothing.
 ### Phase 4: Netcode and polish
 
 - [ ] **`L-16` Network and saves.** P1, M. New entity kinds in `EntityList` (protocol bump), flight
-  state on the wire, the cloud-sink rule in `MovementRules`, `entities.json`, loopback tests.
+  state on the wire, `entities.json`, loopback tests (the sink rule in `MovementRules` came with `L-3`).
 - [ ] **`L-17` Tuning and docs.** P2, S. Visual scenarios for every phase, tuning pass, an AGENTS.md
   section, then prune this file.
 

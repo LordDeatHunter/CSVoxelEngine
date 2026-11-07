@@ -102,6 +102,10 @@ public static class PlayerConfig
     public const float SlimeBlockBounceRestitution = 0.8f;
     public const float SlimeBlockBounceMinSpeed = 5f;
 
+    // --- Sink blocks (the block "sink" flag, SinkLayer): blocks per second a player body standing
+    // in a sink block's soft top layer descends until it rests on the solid part ---
+    public const float SinkBlockSpeed = 0.6f;
+
     // --- Bandage (ItemUseAction.Heal): HP one restores, spent from the stack ---
     public const int BandageHealAmount = 20;
 

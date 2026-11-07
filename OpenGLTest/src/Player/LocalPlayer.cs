@@ -465,10 +465,10 @@ internal sealed class LocalPlayer
 
         var beforeHp = _health.Health;
         var feet = Camera.Position.Y - Camera.EyeHeight;
-        // A bounce block under the feet cushioned the landing (PlayerPhysics sprang the body back
-        // up): it still counts as a landing, but bills no damage
+        // A bounce block (PlayerPhysics sprang the body back up) or a soft-landing block under the
+        // feet cushioned the landing: it still counts as a landing, but bills no damage
         var damage = _fall.Observe(feet, Camera.IsGrounded, Camera.IsFlying, Camera.IsInWater, Camera.IsCreative,
-            FallTracker.DefaultMaxStepBlocks, cushioned: PlayerPhysics.BounceBelow(Camera, chunkManager));
+            FallTracker.DefaultMaxStepBlocks, cushioned: PlayerBodyProbe.LandingCushioned(Camera.Position, chunkManager));
         if (damage > 0)
             _health.TakeDamage(damage, DamageSource.Fall);
 

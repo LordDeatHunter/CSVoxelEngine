@@ -327,4 +327,28 @@ public sealed class MovementRulesTests
         var hop = Simulated(pool, floating[^1], 4f, [Silk.NET.Input.Key.Space], 0.1f);
         AssertNeverRejected("float stroke hop", pool, hop);
     }
+
+    [Fact]
+    public void ABodySinkingIntoASinkBlockIsNeverCorrectedNorAHoverer()
+    {
+        var sink = SinkTestBlock.Ensure();
+        var clouds = MobTestWorld.Floor(sink);
+        var grace = (float)NetworkConfig.NetHoverGraceSeconds;
+
+        // The client's own fall onto the block, the slow sink and standing sunk for longer than the
+        // hover grace: every state is taken, and the sunk body reads grounded
+        var settle = Simulated(clouds, Eye(4.5f, 6f, 4.5f), 3f + grace * 2f, [], 0f);
+        AssertNeverRejected("fall and sink", clouds, settle);
+        var sunk = settle[^1];
+        Assert.True(sunk.Y - Camera.EyeHeight < 1f - SinkLayer.MaxSink * 0.5f, "the body never sank in");
+        Assert.True(PlayerBodyProbe.Grounded(sunk, clouds));
+
+        // Walking across the sunk layer and jumping back out of it
+        AssertNeverRejected("walk sunk", clouds, Simulated(clouds, sunk, 1.5f, [Silk.NET.Input.Key.W], 1.5f));
+        AssertNeverRejected("jump out", clouds, Simulated(clouds, sunk, 2f, [Silk.NET.Input.Key.Space], 0.1f));
+
+        // The same sunk point over stone is inside a solid: refused
+        var stone = MobTestWorld.Floor(Stone);
+        Assert.Equal(MoveVerdict.Rejected, Judge(stone, Eye(4.5f, Resting, 4.5f), sunk, out _));
+    }
 }

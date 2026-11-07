@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Shapes;
+using VoxelEngine.Player;
 
 namespace VoxelEngine.Content.Blocks;
 
@@ -18,6 +19,9 @@ internal readonly record struct SupportRules(bool NeedsSupport, bool FlowResista
 /// <summary>How a body moves over and through a block: speed, grip, pebbles, footfall dust and contact damage.</summary>
 internal readonly record struct GroundTraits(
     float MovementSpeed, float Friction, float PebbleWeight, bool FootstepDust, float ContactDamage);
+
+/// <summary>How the player body meets a block's top: the soft layer it sinks into and whether a landing on it is free.</summary>
+internal readonly record struct BodySurface(float Sink, bool SoftLanding);
 
 /// <summary>
 /// The plain per-field rules of a block JSON that <see cref="BlockLoader"/> applies: each method
@@ -255,6 +259,31 @@ internal static class BlockFieldRules
                 $"Block '{path}' has contactDamage {definition.ContactDamage}; expected 0..100.");
 
         return new GroundTraits(movementSpeed, friction, pebbleWeight, footstepDust, contactDamage);
+    }
+
+    /// <summary>
+    /// The <c>softLanding</c> and <c>sink</c> flags. A sink layer is cut off the top of a plain
+    /// full-cell collider, so it is refused on anything that collides by another shape or not at
+    /// all (a fluid, a non-solid or pass-through block, a stack, tree wood, a hitbox collider), and
+    /// on a bounce block, whose spring would fight the slow sink.
+    /// </summary>
+    internal static BodySurface ParseBodySurface(BlockDefinition definition, BlockRenderer renderer, bool fluid,
+        bool solid, float movementSpeed, bool collidesByHitbox, int stackMax, string path)
+    {
+        if (fluid && definition.SoftLanding == true)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets softLanding on a fluid: a body never lands on a fluid.");
+
+        var sink = definition.Sink ?? 0f;
+        if (!float.IsFinite(sink) || sink < 0f || sink > SinkLayer.MaxSink)
+            throw new InvalidOperationException(
+                $"Block '{path}' has sink {definition.Sink}; expected 0..{SinkLayer.MaxSink}.");
+        if (sink > 0f && (fluid || !solid || movementSpeed > 0f || collidesByHitbox || stackMax > 0
+                          || renderer == BlockRenderer.TreeWood || definition.Bounce == true))
+            throw new InvalidOperationException(
+                $"Block '{path}' sets sink but is not a plain solid full-cell collider (a fluid, non-solid, pass-through, stack, tree wood, hitbox collider or bounce block); the soft layer is cut off the top of a whole solid cell.");
+
+        return new BodySurface(sink, definition.SoftLanding ?? false);
     }
 
     /// <summary>The block's <c>hardness</c>, 0 or more.</summary>

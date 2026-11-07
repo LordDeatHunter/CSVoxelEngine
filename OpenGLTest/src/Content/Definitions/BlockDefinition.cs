@@ -7,6 +7,7 @@ using VoxelEngine.Effects.Lighting;
 using VoxelEngine.Entities;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
+using VoxelEngine.Player;
 using VoxelEngine.WorldGen.Features;
 
 namespace VoxelEngine.Content.Definitions;
@@ -96,6 +97,22 @@ public sealed class BlockDefinition
     /// Default false; only read for the block under a landing body's feet.
     /// </summary>
     public bool? Bounce { get; set; }
+
+    /// <summary>
+    /// Whether a body landing on the block takes no fall damage (a cloud block), with no spring
+    /// back up. Default false; only read for the block under a landing body's feet. Illegal on a
+    /// fluid.
+    /// </summary>
+    public bool? SoftLanding { get; set; }
+
+    /// <summary>
+    /// The share of the cell's height, 0..<see cref="SinkLayer.MaxSink"/>, a player body sinks
+    /// into slowly: the block collides with the player body only below its top <c>sink</c> share,
+    /// and a body standing in that soft layer descends at <see cref="PlayerConfig.SinkBlockSpeed"/>
+    /// until it rests on the solid part. Default 0 (a plain collider). Only on a solid,
+    /// full-cell collider that is not a fluid, a stack, tree wood or a bounce block.
+    /// </summary>
+    public float? Sink { get; set; }
 
     public bool? Occludes { get; set; }
     public bool? CullSelf { get; set; }

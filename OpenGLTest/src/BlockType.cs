@@ -81,6 +81,12 @@ public sealed record BlockType
     // Whether a body landing on the block is sprung back up (a slime block, see PlayerPhysics).
     internal static readonly bool[] BounceById = new bool[256];
 
+    // Whether a body landing on the block takes no fall damage (a cloud block, see FallTracker).
+    internal static readonly bool[] SoftLandingById = new bool[256];
+
+    // The top share of the cell a player body sinks into (0 = a plain collider), see SinkLayer.
+    internal static readonly float[] SinkById = new float[256];
+
     // Whether the block stops a line of sight (a punch, a throw check); a plant never does.
     internal static readonly bool[] BlocksSightById = new bool[256];
 
@@ -192,6 +198,14 @@ public sealed record BlockType
     /// <see cref="PlayerConfig.SlimeBlockBounceRestitution"/>. Read through
     /// <see cref="BouncesAt"/>.</summary>
     public bool Bounces { get; init; }
+
+    /// <summary>Whether a body landing on the block takes no fall damage (a cloud block). Read
+    /// through <see cref="SoftLandingAt"/>.</summary>
+    public bool SoftLanding { get; init; }
+
+    /// <summary>The top share of the cell a player body sinks into slowly (0 for a plain collider);
+    /// see <see cref="VoxelEngine.Player.SinkLayer"/>. Read through <see cref="SinkOf"/>.</summary>
+    public float Sink { get; init; }
 
     /// <summary>Whether the block stops a line of sight (a punch, a throw check); a plant never
     /// does. Read through <see cref="BlocksSightAt"/> by the sight-only ray walk.</summary>
@@ -572,6 +586,13 @@ public sealed record BlockType
 
     /// <summary>Whether a body landing on the block is sprung back up (a slime block).</summary>
     public static bool BouncesAt(byte blockId) => BounceById[blockId];
+
+    /// <summary>Whether a body landing on the block takes no fall damage (a cloud block).</summary>
+    public static bool SoftLandingAt(byte blockId) => SoftLandingById[blockId];
+
+    /// <summary>The top share of the cell a player body sinks into, 0 for a plain collider.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static float SinkOf(byte blockId) => SinkById[blockId];
 
     /// <summary>Whether the block stops a line of sight (a plant never does).</summary>
     public static bool BlocksSightAt(byte blockId) => BlocksSightById[blockId];

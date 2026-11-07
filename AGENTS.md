@@ -1063,7 +1063,7 @@ OpenGLTest/
       ParticleConfig.cs        # falling leaves, mining debris, campfire, lava and torch embers and smoke, bubbles,
                                #   spring steam
       PlayerConfig.cs          # break overlay, camera and swing feel (sprint FOV, strafe tilt, hit-stop, throw
-                               #   zoom), water depth states, throws, slime block, bandage
+                               #   zoom), water depth states, throws, slime block, sink blocks, bandage
       PostProcessConfig.cs     # biome grade, damage fringe, underwater wobble, FXAA, contact AO, godrays, GPU timer
                                #   gate
       SaveConfig.cs            # autosave, save writer retries and shutdown, teardown joins and drain, entity restore
@@ -1581,8 +1581,9 @@ OpenGLTest/
       LocalPlayer.cs           # World component: the local player's spawn settle, health, death and respawn,
                                #   body model, hurt and punch feedback, the saved-player apply, its PlayerContext
       ModeToggles.cs           # the creative (C) and double-tap flight toggles and the sprint latch
-      PlayerBodyProbe.cs       # GL-free body probes over the live chunk map: known (loaded), grounded,
-                               #   in water, in lava (BurningFluid); what the server judges a remote player's body by
+      PlayerBodyProbe.cs       # GL-free body probes over the live chunk map: known (loaded), grounded (a sink
+                               #   layer counts), in water, in lava (BurningFluid), the sink layer top, a cushioned
+                               #   landing (bounce or softLanding); what the server judges a remote player's body by
       PlayerContext.cs         # who an interaction runs for: eye, aim, inventory, creative (local camera or a
                                #   server's connected player), threaded through every World interaction path
       PlayerHealth.cs          # the player's survival pool, 0-100 HP drawn as 10 hearts (1 heart = 10 HP)
@@ -1617,6 +1618,8 @@ OpenGLTest/
       PlayerRig.cs             # the posed shape: pivots, cuboids, skin palette, mesh building (Blockbench or Steve)
       ShoulderRig.cs           # the F5 rig (mode cycle, shoulder offset march, tilted view direction, orbit body facing)
                                #   and the crosshair raycast along it
+      SinkLayer.cs             # GL-free sink-block rule: the solid part of a sink block, feet in its soft layer,
+                               #   the slow hold (SinkBlockSpeed) the physics, the collision and the server share
       SpawnOverrides.cs        # VOXEL_SPAWN / VOXEL_LOOK parsing and the origin surface spawn search
       SprintToggle.cs          # the sprint latch, GL-free: flipped on each fresh press
                                #   with the sprint-toggle setting on, else it follows the key
@@ -2185,7 +2188,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Support/                     # cross-area fixtures: TestContent (the headless content load),
                                #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
                                #   WideTreeSpecies, TreeWorldgenFixture, IcebergTestWorld (a hand-built sea with a
-                               #   pack-ice strip), StubTarget, BoxSolids and the three [CollectionDefinition]s
+                               #   pack-ice strip), StubTarget, BoxSolids, SinkTestBlock (a test-only sink block on an
+                               #   unused id) and the three [CollectionDefinition]s
   Audio/                       # the sfx library and the ambience bed
   Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
                                #   column cache, fluid surfaces, lava vents, EntityLight; the replay probes
@@ -2336,6 +2340,8 @@ trailing commas.
 | `movementSpeed` | 0 | how fast the player moves through the block, 0..1: `0` (default) is a solid collider, a positive value makes it non-blocking for the player and scales their speed while the body overlaps it (`1` = full speed), so leaves at `0.75` are waded through at 75% speed; never set on fluids |
 | `friction` | 0.99 | grip of the block's top face, 0..1: `1` is instant response, lower slides more (ground response time grows with `1 - friction`); ice sets `0.95`. Only read from the solid block under the feet |
 | `pebbleWeight` | 0 | density multiplier (0..1) for the natural pebble scatter (`PebbleGenerator`) when this block is the exposed surface under the pebble cell: `1` keeps the patch's full density (stone, gravel), a lower value thins the scatter (grass `0.3`), and `0` (the default, e.g. sand and sandstone) means the surface grows no rock piles |
+| `softLanding` | false | a body landing on the block takes no fall damage (no spring back, unlike `bounce`); read over the footprint under a landing player's feet (`PlayerBodyProbe.LandingCushioned`), in singleplayer and on the server. Illegal on a fluid |
+| `sink` | 0 | the top share of the cell, 0..0.5, a player body sinks into slowly (`PlayerConfig.SinkBlockSpeed`) until it stands on the solid part below (`SinkLayer`); the body counts as grounded in the layer. Only on a plain solid full-cell collider: refused on a fluid, a non-solid or pass-through (`movementSpeed`) block, a stack, tree wood, a `collidesByHitbox` block and a `bounce` block. Player body only |
 | `footstepDust` | false | loose ground: a player sprinting on foot over it kicks up a tiny puff of its chips at every footfall (`FootstepDust`, `GroundDust`; sand, snow, dirt and gravel set it, grass does not). Illegal on a fluid |
 | `occludes` | full cube && !cutout | hides a neighboring full cube's face (`OccludesNeighbors`) |
 | `cullSelf` | false | also cull faces against a neighbor of the same block (glass) |
@@ -2556,6 +2562,19 @@ a sweep); breaking that orphan drops the door as usual. The door tiles are from
 **Slime block** (nine slimeballs) carries the `bounce` flag: a body that lands on it is sprung back
 up at `SlimeBlockBounceRestitution` of its impact and bills no fall damage (`FallTracker`'s cushioned
 landing); the tile comes from `tools/generate-slime-block-texture.py` (`SlimeBlockTests`).
+
+**Sink and soft-landing flags** (no block uses them yet; the sky's cloud blocks will, plans/LAYERS.md).
+`softLanding` makes a landing on the block free, like the bounce but with no spring. `sink` (0..0.5)
+cuts a soft layer off the top of a plain solid cell: the player body collides only with the part
+below it (`SinkLayer.SolidHeight`, inside `BodyCollision.BodyCollides`, so the server's endpoint rule
+accepts a sunk body), and a body whose feet stand in the layer (`PlayerBodyProbe.SinkLayerTop`) is
+grounded while `PlayerPhysics.HoldInSinkLayer` holds its descent to `PlayerConfig.SinkBlockSpeed`
+(`SinkLayer.HoldFeet`: a fall is caught at the top) until it rests on the solid part; it jumps, steps
+and walks out as from any ground. `PlayerBodyProbe.Grounded` counts the layer too, so the server's
+hover rule never corrects a sinking body, and the one cushion rule (`PlayerBodyProbe.LandingCushioned`:
+a bounce or soft-landing block under the footprint) feeds the fall tracker in singleplayer and on the
+server alike, so a server no longer bills a slime-block landing either. Player body only: mobs, drops
+and falling blocks see the whole cell (`SinkBlockTests`, `MovementRulesTests.ABodySinkingIntoASinkBlockIsNeverCorrectedNorAHoverer`).
 
 **Bandage** is the first `use.action: "heal"` item (`HealItem` -> `PlayerHealth.Heal`, refused at
 full health, `BandageHealAmount`), its sprite from `tools/generate-bandage-texture.py`

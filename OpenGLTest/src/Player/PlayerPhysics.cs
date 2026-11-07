@@ -376,6 +376,7 @@ internal sealed class PlayerPhysics
             frameMovement.Y = _verticalVelocity * deltaTime;
         }
 
+        var feetBefore = camera.Position.Y - EyeHeight;
         var afterY = BodyCollision.MoveOnAxis(camera.Position, frameMovement.Y, 1, chunkManager, out var collidedY, camera.BodySolids);
         camera.SetPosition(afterY);
 
@@ -403,8 +404,31 @@ internal sealed class PlayerPhysics
             camera.SetGrounded(false);
         }
 
+        if (frameMovement.Y <= 0f)
+            HoldInSinkLayer(camera, chunkManager, feetBefore, deltaTime);
+
         camera.UpdateShoulderOffset(chunkManager, deltaTime);
         camera.RefreshEyeWaterState(chunkManager);
+    }
+
+    /// <summary>
+    /// A sink block's soft top layer (<see cref="SinkLayer"/>, a cloud) holds a body whose feet stand
+    /// in it: they descend no faster than <see cref="PlayerConfig.SinkBlockSpeed"/> (a fall is caught
+    /// at the layer's top) until they rest on the block's solid part, and the body counts as grounded
+    /// meanwhile, so it jumps, steps and lands as on any ground. The held point lies between where the
+    /// feet were and where the collision sweep took them, so it is free.
+    /// </summary>
+    private void HoldInSinkLayer(Camera camera, ChunkManager chunkManager, float feetBefore, float deltaTime)
+    {
+        if (PlayerBodyProbe.SinkLayerTop(camera.Position, chunkManager) is not { } top)
+            return;
+
+        var feet = camera.Position.Y - EyeHeight;
+        var held = SinkLayer.HoldFeet(feetBefore, feet, top, PlayerConfig.SinkBlockSpeed, deltaTime);
+        if (held > feet)
+            camera.SetPosition(camera.Position with { Y = held + EyeHeight });
+        camera.SetGrounded(true);
+        _verticalVelocity = MathF.Max(_verticalVelocity, -PlayerConfig.SinkBlockSpeed);
     }
 
     /// <summary>
