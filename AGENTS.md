@@ -2423,6 +2423,8 @@ tools/                                # asset generators: tiles, sprites, models
                                       #   white mottle with mottled alpha; the L-13 palette: cutout leaves, a turf
                                       #   side, and stone, bark, rings, fern and vine through the hell script's
                                       #   painters; Pillow, plain `python`), --check
+  generate-frost-textures.py         # deterministic frost_grass_top/_side and frost_stone: grass_top, grass_side and stone with each
+                                      #   color swapped one-to-one for an icy one (same pixels, same palette size), --check
   generate-alloy-bricks-texture.py    # deterministic alloy brick tile (alloy_bricks.png), mud_bricks.png recolored bronze and gray
   generate-tree-textures.ps1          # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
 ```
@@ -2798,7 +2800,7 @@ never enter an island and never leave the band. The shape is cached per cell (`S
 `GenerationalCache`, `SkyTreeCacheCapacity`, cleared by `WorldSeed.Apply`) and `SkyTrees.Stamp`
 (`Stage.SkyTrees`, right after the islands in `ChunkTerrainFill.StampSky`) writes each tree's cells with
 their state bytes over air and flora only, never over a solid cell. The tiles come from
-`tools/generate-sky-textures.py`. Cost (`WorldgenCostProbe` `skyIsland` class): a warm sky-island chunk
+`tools/generate-sky-textures.py` (the frost turf and stone from `tools/generate-frost-textures.py`: **pixel art uses a small hand-picked palette, never noise or smooth gradients, so a new tile is a palette swap of the regular tile it mirrors**). Cost (`WorldgenCostProbe` `skyIsland` class): a warm sky-island chunk
 0.065 ms (0.034 before the flora), cold dominated by the column scan as before plus about 0.3 ms of
 trees grown on a cache miss (plans/PERF.md). `SkyBiomeTests`, `SkyIslandTests`; `visual-examples/sky-biomes.json` (`VOXEL_TIME=147`) frames a
 meadow and a frost island from the side, from above, on top and from below.

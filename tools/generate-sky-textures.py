@@ -60,41 +60,6 @@ TILES = [
     },
     # --- The sky palette of L-13 ---
     {
-        "name": "frost_grass_top",
-        "kind": "stone",
-        "cell": 8,
-        "dark": (132, 174, 198),
-        "light": (192, 222, 238),
-        "seam": None,
-        "seam_width": 0.0,
-        "speck": (255, 255, 255),
-        "speck_rate": 37,
-        "salt": 2,
-    },
-    {
-        "name": "frost_grass_side",
-        "kind": "turf_side",
-        "cell": 8,
-        "dark": (132, 174, 198),
-        "light": (192, 222, 238),
-        "soil_dark": (86, 98, 108),
-        "soil_light": (128, 140, 150),
-        "band": 6,
-        "salt": 3,
-    },
-    {
-        "name": "frost_stone",
-        "kind": "stone",
-        "cell": 8,
-        "dark": (118, 136, 156),
-        "light": (170, 188, 206),
-        "seam": (220, 238, 250),
-        "seam_width": 0.04,
-        "speck": (236, 250, 255),
-        "speck_rate": 0,
-        "salt": 4,
-    },
-    {
         "name": "crystal_log_side",
         "kind": "bark",
         "cell": 4,
@@ -227,16 +192,7 @@ def leaves_texel(spec, x, y):
     return clamp_color(color) + (255,)
 
 
-def turf_side_texel(spec, x, y):
-    """A block side: the top tones over a wavy band, the soil tones under it."""
-    salt = spec["salt"] * 7
-    edge = spec["band"] + int(value_noise(x, 0, spec["cell"], salt + 3) * 4)
-    dark, light = (spec["dark"], spec["light"]) if y < edge else (spec["soil_dark"], spec["soil_light"])
-    shade = two_octaves(x, y, spec["cell"], salt)
-    return clamp_color([dark[i] + (light[i] - dark[i]) * shade for i in range(3)]) + (255,)
-
-
-PAINTERS = {"vapor": texel, "leaves": leaves_texel, "turf_side": turf_side_texel}
+PAINTERS = {"vapor": texel, "leaves": leaves_texel}
 
 
 def render(spec, hell):
