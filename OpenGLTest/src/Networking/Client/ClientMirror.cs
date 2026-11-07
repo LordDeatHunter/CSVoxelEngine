@@ -323,8 +323,11 @@ internal sealed class ClientMirror
     /// A client replaces its station mirrors with the server's snapshot: the fires, quern tops,
     /// kilns and pours it draws are the server's, which alone runs them.
     /// </summary>
-    internal void ApplyNetworkStations(PacketReader reader) =>
+    internal void ApplyNetworkStations(PacketReader reader)
+    {
         StationNetCodec.Read(reader, _campfires, _querns, _kilns, _casting);
+        _world.Smithing.ReadNet(reader);
+    }
 
     /// <summary>
     /// A client mirrors the health the server's <see cref="NetMessage.PlayerStatus"/> reports: the

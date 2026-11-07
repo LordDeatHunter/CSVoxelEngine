@@ -75,7 +75,8 @@ public sealed class MetalworksRecipeTests
         Assert.NotNull(crush);
         Assert.Equal(Item("crushed_iron"), crush.ResultId);
 
-        // Without a melt recipe KilnManager never accepts the input: that is the "cannot smelt yet" gate.
+        // Without a melt recipe KilnManager never accepts the input: iron is smelted solid-state in the bloomery,
+        // never melted in a crucible.
         foreach (var id in new[]
                  {
                      Item("hematite_ore"), Block("hematite_ore"), Item("crushed_iron"),

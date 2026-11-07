@@ -77,6 +77,12 @@ internal static class BlockFieldRules
         if (definition.Kiln != null && renderer != BlockRenderer.Multiblock)
             throw new InvalidOperationException(
                 $"Block '{path}' declares a kiln object without renderer \"multiblock\"; only a multiblock anchor can be a kiln.");
+        if (definition.Bloomery != null && renderer != BlockRenderer.Multiblock)
+            throw new InvalidOperationException(
+                $"Block '{path}' declares a bloomery object without renderer \"multiblock\"; only a multiblock anchor can be a bloomery.");
+        if (definition.Bloomery != null && definition.Kiln != null)
+            throw new InvalidOperationException(
+                $"Block '{path}' declares both a kiln and a bloomery object; a structure is one or the other.");
         if (!isMultiblock) return;
 
         if (definition.HasItem ?? true)

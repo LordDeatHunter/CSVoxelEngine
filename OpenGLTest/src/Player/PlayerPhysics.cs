@@ -71,6 +71,10 @@ internal sealed class PlayerPhysics
 
     /// <summary>Counts strokes started, so the body can start its stroke animation on the same frame.</summary>
     public int SwimStrokeCount { get; private set; }
+
+    /// <summary>Counts jumps taken (a land jump, or one off the bottom of a shallow puddle): the bellows of a
+    /// bloomery beside the player reads it (<see cref="Camera.JumpCount"/>).</summary>
+    public int JumpCount { get; private set; }
     internal const float SinkSpeed = -2f;
     // Pushing into a bank while holding Space lifts the player over it, so getting out of
     // water never needs a ramp
@@ -302,6 +306,7 @@ internal sealed class PlayerPhysics
             if (camera.IsGrounded && keyboard.IsKeyPressed(Key.Space))
             {
                 _verticalVelocity = JumpSpeed;
+                JumpCount++;
                 camera.SetGrounded(false);
             }
             else
@@ -329,6 +334,7 @@ internal sealed class PlayerPhysics
             if (camera.IsGrounded && keyboard.IsKeyPressed(Key.Space))
             {
                 _verticalVelocity = JumpSpeed;
+                JumpCount++;
                 camera.SetGrounded(false);
             }
 

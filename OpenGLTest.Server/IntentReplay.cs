@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Interaction;
 using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.ServerSide;
+using VoxelEngine.Simulation.Smithing;
 
 namespace VoxelEngine.Server;
 
@@ -119,6 +121,7 @@ internal sealed class IntentReplay
         {
             case NetIntentKind.BreakStart:
             case NetIntentKind.BreakComplete:
+            case NetIntentKind.Hammer:
                 player.NoteAction(NetPlayerAction.Punch);
                 break;
             case NetIntentKind.Throw:
@@ -146,6 +149,8 @@ internal sealed class IntentReplay
                 return AttackFor(player, intent);
             case NetIntentKind.Cast:
                 return CastFor(player, intent);
+            case NetIntentKind.Hammer:
+                return HammerFor(player, intent);
             default:
                 return false;
         }
@@ -185,6 +190,20 @@ internal sealed class IntentReplay
         var verdict = player.Breaking.Complete(intent.X, intent.Y, intent.Z, id, inventory.SelectedBlockId,
             inventory.SelectedToolInstance, player.Creative, _state.Elapsed, NetworkConfig.NetBreakSlackSeconds);
         return verdict == BreakVerdict.Break && _state.World.BreakBlockFor(player.Context, intent.Cell);
+    }
+
+    /// <summary>
+    /// One hammer hit on the anvil the intent names: a smithing hammer in hand, the player's own ray landing on
+    /// the anvil's cell, and the anvil's own hit gap run down (the hammer's pace, less jitter slack). The anvil
+    /// manager counts the hit and, on the last, drops the result and slag; the station broadcast carries the rest.
+    /// </summary>
+    private bool HammerFor(ServerPlayer player, in WorldIntent intent)
+    {
+        var held = player.Inventory.HeldItem;
+        if (!Mining.IsHammer(held) || !AimsAt(player, intent, out _))
+            return false;
+        var gap = Mining.HitGapSeconds(held, player.Inventory.Equipment.Stats.MiningFactor);
+        return _state.World.HammerFor(intent.Cell, gap, BloomeryConfig.HammerSlackSeconds).Kind != AnvilHitKind.Refused;
     }
 
     private bool PlaceFor(ServerPlayer player, in WorldIntent intent)

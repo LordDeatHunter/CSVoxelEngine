@@ -109,7 +109,8 @@ internal sealed class RightClickAction
         }
 
         if (Interactions.TryCookOrCollect(maxDistance, player) || Interactions.TryQuernInteract(maxDistance, player)
-                                                  || Interactions.TryKilnInteract(maxDistance, player) || Interactions.TryCastInteract(maxDistance, player)
+                                                  || Interactions.TryKilnInteract(maxDistance, player) || Interactions.TryBloomeryInteract(maxDistance, player)
+                                                  || Interactions.TryAnvilInteract(maxDistance, player) || Interactions.TryCastInteract(maxDistance, player)
                                                   || Interactions.TryToggleOpenable(maxDistance, player))
         {
             LocalPlayer.PunchSwing();

@@ -1,0 +1,106 @@
+using System;
+using System.Linq;
+using System.Numerics;
+using VoxelEngine.Content.Shapes;
+using VoxelEngine.Interaction;
+using VoxelEngine.Simulation.Smithing;
+using Xunit;
+
+namespace VoxelEngine.Tests.Interaction;
+
+/// <summary>
+/// The iron works in a live world: a cube of bloomery bricks converts into a tracked bloomery through the world's own
+/// convert path, mining it hands back what it held, a bloomery and an anvil survive the world's save snapshot, and a
+/// hammer hit that finishes a bloom drops the iron and the slag on top of the anvil.
+/// </summary>
+[Collection("Worldgen seed")]
+public sealed class IronWorksWorldTests : IDisposable
+{
+    private SupportTestWorld? _world;
+
+    public IronWorksWorldTests()
+    {
+        TestContent.EnsureLoaded();
+        WorldSeed.Apply(WorldSeed.Default);
+    }
+
+    public void Dispose() => _world?.Dispose();
+
+    private static BlockType Bloomery => ContentRegistry.RequireBlock("bloomery");
+
+    private Vector3 BuildBloomery()
+    {
+        _world = new SupportTestWorld();
+        var anchor = new Vector3(2, _world.Top + 1, 2);
+        _world.Load(3, _world.Top + 2, 3);
+        var size = Bloomery.MultiblockSize;
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(size))
+            _world.Set((int)anchor.X + dx, (int)anchor.Y + dy, (int)anchor.Z + dz, Bloomery.MultiblockSourceId);
+
+        var clicked = anchor + new Vector3(0, 0, size - 1);
+        Assert.True(_world.World.Edits.TryConvertMultiblock(clicked, Vector3.UnitZ, Bloomery.MultiblockSourceId,
+            Bloomery.Id, -Vector3.UnitZ));
+        return anchor;
+    }
+
+    [Fact]
+    public void ConvertingTracksTheBloomeryAndMiningItHandsBackWhatItHeld()
+    {
+        var anchor = BuildBloomery();
+        var bloomeries = _world!.World.Smithing.Bloomeries;
+        var state = bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z);
+        Assert.NotNull(state);
+
+        var profile = Bloomery.Bloomery!;
+        Assert.True(bloomeries.TryAddOre(anchor, profile.OreId));
+        Assert.True(bloomeries.TryAddOre(anchor, profile.OreId));
+        Assert.True(bloomeries.TryAddFuel(anchor, ContentRegistry.RequireItem("coal")));
+
+        var mined = anchor + new Vector3(Bloomery.MultiblockSize - 1, 0, Bloomery.MultiblockSize - 1);
+        Assert.True(_world.Break((int)mined.X, (int)mined.Y, (int)mined.Z));
+
+        Assert.Null(bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z));
+        Assert.Equal(2, _world.World.Drops.Count(d => d.BlockId == profile.OreId));
+        Assert.Equal(1, _world.World.Drops.Count(d => d.BlockId == ContentRegistry.RequireItem("coal").Id));
+    }
+
+    [Fact]
+    public void AHammerHitThatFinishesABloomDropsTheIronAndTheSlagOnTheAnvil()
+    {
+        _world = new SupportTestWorld();
+        var anvilBlock = Enumerable.Range(1, 255).Select(i => BlockType.ById[i]).First(b => b?.Anvil != null)!;
+        var cell = new Vector3(2, _world.Top + 1, 2);
+        _world.Load(3, _world.Top + 2, 3);
+        _world.Set((int)cell.X, (int)cell.Y, (int)cell.Z, anvilBlock.Id);
+
+        var profile = anvilBlock.Anvil!;
+        Assert.True(_world.World.Interactions.TryTrackAnvilAt(cell));
+        Assert.True(_world.World.Smithing.Anvils.TryPlace(cell, profile.InputId));
+
+        for (var hit = 1; hit < profile.Hits; hit++)
+            Assert.Equal(AnvilHitKind.Struck, _world.World.HammerFor(cell, 0f, 0f).Kind);
+        Assert.Empty(_world.World.Drops);
+
+        Assert.Equal(AnvilHitKind.Finished, _world.World.HammerFor(cell, 0f, 0f).Kind);
+        Assert.Equal(BloomeryConfig.IronPerBloom, _world.World.Drops.Count(d => d.BlockId == profile.ResultId));
+        Assert.Equal(BloomeryConfig.SlagPerBloom, _world.World.Drops.Count(d => d.BlockId == profile.SlagId));
+        Assert.All(_world.World.Drops, d => Assert.True(d.Position.Y > cell.Y + 0.5f));
+    }
+
+    [Fact]
+    public void ABloomeryAndAnAnvilWithAPieceSurviveTheWorldsSaveSnapshot()
+    {
+        var anchor = BuildBloomery();
+        var smithing = _world!.World.Smithing;
+        Assert.True(smithing.Bloomeries.TryAddOre(anchor, Bloomery.Bloomery!.OreId));
+
+        var data = new VoxelEngine.Saves.StationSaveData();
+        smithing.Capture(data);
+        var restored = new SmithingStations();
+        Assert.Equal(0, restored.Restore(data));
+
+        var back = restored.Bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z);
+        Assert.NotNull(back);
+        Assert.Equal(1, back!.Ore);
+    }
+}

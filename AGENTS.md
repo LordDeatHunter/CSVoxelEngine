@@ -91,7 +91,7 @@ Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated
 **without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
 player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
 any scenario that teleports a walking player above the ground, and turn it off again before a
-`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, and an optional `"size"` (an integer from 1, default 1) is a slime's size; the entity name (`slime`, `goblin`, `hellbrute` or `cinderwitch`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, and an optional `"size"` (an integer from 1, default 1) is a slime's size; the entity name (`slime`, `goblin`, `hellbrute` or `cinderwitch`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
@@ -1110,6 +1110,7 @@ OpenGLTest/
     Config/                    # every tuning constant, one static class per domain (all const or static
                                #   readonly, read concurrently by every thread; namespace VoxelEngine.Config)
       AudioConfig.cs           # ambience bed paths, volumes and fades; the sfx volume
+      BloomeryConfig.cs        # iron smelting: the bloomery's heat band, bellows pump, smelt and burn times, the anvil's slack
       HudConfig.cs             # selection outline and pulse, hotbar name fade, pop and flash, the loading screen
       IcebergConfig.cs         # icebergs: caps and the spawn ring, the spawn band, size and mass, drift and push,
                                #   wobble, life cycle, the client mirror's lead
@@ -1252,6 +1253,7 @@ OpenGLTest/
                                #   authored model (the crucible bowl, fuel lump and
                                #   pending-charge sizes every kiln shares; the mold
                                #   pocket levels and the cooling dissolve curves)
+        BloomeryProfile.cs     # a bloomery anchor's compiled `bloomery` object (caps and item ids) and an anvil's `anvil` object
         KilnLayout.cs          # one kiln model's opening and its bowl, fire, fuel and mouth spots, per structure
                                #   size (Kiln 2, Furnace 3, ForSize), and ToWorld onto a facing
         KilnProfile.cs         # a kiln anchor's compiled `kiln` object: fuel cap, melt speed (MeltSeconds), can-alloy,
@@ -1981,6 +1983,12 @@ OpenGLTest/
                                #   the footprint clear and loaded, no target near
       KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
                                #   slot and its melt loop, plus the multiblock integrity sweep
+      Smithing/                # the iron works, namespace VoxelEngine.Simulation.Smithing (see "The bloomery and the anvil")
+        AnvilManager.cs        # anvils keyed by cell: one piece, hammer hits gated by the hammer's gap, result and slag
+        BloomeryManager.cs     # bloomeries keyed by anchor: ore, fuel, heat, smelting, the integrity sweep, save and wire
+        BloomeryRules.cs       # GL-free heat model: zones, decay, pump, fuel factor, burning
+        SmithingReadout.cs     # GL-free look-at status lines of a bloomery and an anvil
+        SmithingStations.cs    # both registries as one unit (World.Smithing): update, save, wire
       LeafDecay/               # leaf decay and the orphaned-wood crumble, namespace VoxelEngine.Simulation.LeafDecay
         LeafDecayManager.cs    # the composition root and facade: the scheduled cells, the tick and its slicing,
                                #   ScheduleAround/ScheduleBox from every edit path, TickLeaf/TickWood and the removal
@@ -2544,6 +2552,8 @@ trailing commas.
 | `renderer` | `"model"` | `model` (baked quads), `tree_wood` (a grown tree's wood: its shape, thickness and tree-graph links come from the state byte, see `### Trees`; requires a `wood` object, forces `occludes` and `castsAO` off and `light.passes` on, never meshes greedy, and refuses `cutout`, `translucent`, `fluid`, `falls`, `needsSupport`, `stackMax` and `hitbox`), `pebbles`, `branch_pile`, `snow_layers`, `fluid` or `quern` (procedural emitters), `multiblock` (the anchor cell of a structure, carrying the whole volume's pre-rotated model), `multiblock_part` (one of its other cells, solid and occluding but never meshed) or `pane` (a 2 px post plus an arm toward every horizontal neighbor that is a pane or a solid full cube, derived at mesh time by `PaneEmitter` from `PaneShape`, never stored; a lone pane is just the post, as in Minecraft; the raycast, outline and body collide with the same arms through `BlockShape`; refuses `hitbox`, `fluid`, `falls`, `stackMax` and `needsSupport`, and a solid pane always collides by its arms); a fluid's, layer block's or pane's model only supplies its tile (and the pane's icon) |
 | `multiblock` | none | required on, and only legal with, `renderer: "multiblock"`: `{"part": "block/<name>", "source": "block/<name>", "size": n}` — the block filling the other cells (which must use `multiblock_part`), the plain block the volume is built from and reverts to, and the volume's edge length in cells, `size` 2..4 (default 2, the kiln; `BlockType.MultiblockSize`, `BlockSchemaParser.ParseMultiblockSize`; the state byte holds each offset in two bits, so no more). The anchor and its part must both set `hasItem: false` (a structure is built, never held), and `cutout`/`translucent`/`fluid` are rejected, since both halves are ordinary opaque solids to everything but the mesher. Both default `occludes` and `light.passes` to **true**: the structure's surface really does cover its neighbors, and its quads carry no cullface and are lit from the anchor's own cell, so light has to reach that cell or the whole thing renders black. The model is authored in 0..16 * size model units (0..32 for a 2x2x2) with the opening on **north**, no `cullface` on any face and no face covering a whole cell plane — see `### Multiblocks` below |
 | `kiln` | none | marks a multiblock anchor as a kiln, which is what gives it `KilnManager`'s fuel, ignition, crucible slot and integrity sweep, and tunes it: `{"fuelCap": n, "meltSpeed": s, "canAlloy": b}`, every field optional (`{}` is the plain kiln). `fuelCap` 1..64 (default 4) is how many fuel units the hearth holds, `meltSpeed` above 0 and at most 8 (default 1) divides the melt interval (`KilnProfile.MeltSeconds` = `BaseMeltSeconds / meltSpeed`), `canAlloy` (default false) lets the crucible hold two metals and alloy them (see "Recipes, cast molds and metalworks"). Compiled into `BlockType.Kiln` (a `KilnProfile`, null on a non-kiln) together with the `KilnLayout` of the anchor's `multiblock.size` (`KilnLayout.ForSize`: 2 is the mud brick kiln's model, 3 the alloy furnace's), so a kiln's model must follow the layout of its size and a size with no kiln layout is refused; an out-of-range value throws naming the file. Only legal on the `multiblock` renderer |
+| `bloomery` | none | marks a multiblock anchor as a bloomery (see "The bloomery and the anvil"): `{"oreCap", "fuelCap", "ore", "bloom", "slag"}`, caps 1..64 (default 4), the three names required and resolved at load (`BloomeryProfile`, `BlockType.Bloomery`). Only on the `multiblock` renderer, never with `kiln` |
+| `anvil` | none | marks a plain model block as an anvil: `{"hits", "input", "result", "slag"}`, hits 1..32 (default 3), the three names required (`AnvilProfile`, `BlockType.Anvil`). Not on a multiblock |
 | `spellBuilder` | false | the block is a spell table: a right-click with a staff in hand opens the spell builder (`BlockType.SpellBuilder`, `BlockInteractions.TryOpenSpellTable`, after the other stations and before the staff cast; a block in hand places against it instead). No block entity, no state; legal on any block. `spell_table` |
 | `pane` | glass pane | only legal with `renderer: "pane"`: the post and arm dimensions in pixels, `{"post": p, "arm": a, "rails": [[bottom, top], ...]}` (`PaneProfile`): a full-height post `p` (1..16) wide, arms `a` (1..`p`, default `p`) wide filling each `rails` height band (ascending, apart, inside 0..16, default `[[0, 16]]`). Omitted is the glass pane's 2 px post and arms over the full height, drawn byte-identically to before. Panes join only panes of the same dimensions (interned, so equal dimensions are one `PaneProfile`) and solid full cubes, so a fence never reaches into a glass pane. `oak_fence` is `{"post": 4, "arm": 2, "rails": [[6, 9], [12, 15]]}` |
 | `wood` | none | required on, and only legal with, `renderer: "tree_wood"`: how hardness and loot follow the thickness stored in each cell's `WoodState` (code 0 = 1 px across .. 15 = full cube) |
@@ -3320,16 +3330,18 @@ be a part of one alloy only. `bronze.json` ships: 600 ml copper + 200 ml tin = 8
 (`data/molten/bronze.json`), which is why the
 crucible holds 800 ml: one vessel takes exactly one set (`AlloyKilnTests.OneCrucibleHoldsAFullSetOfEveryAlloy`).
 
-**Iron** has an ore and a quern path but no smelting yet. `hematite_ore` needs a tier-2 (copper)
-pickaxe (`tools: {"pickaxe": 2}`, so the primitive and tin pickaxes whiff and copper and bronze mine it) and drops a hematite chunk (the
-`hematite_ore` item), which the quern crushes into `crushed_iron` (`recipes/crush/hematite_ore.json`).
-There is no melt recipe and no molten iron, so a kiln refuses
-every iron form (`MetalworksRecipeTests.IronCrushesInTheQuernButNeverMelts`). `iron_sword` (a
-`slice` weapon) and `iron_sword_head` exist as items with no recipe until an iron kiln change. The
-`iron_pickaxe` is the top pickaxe tier (power 3, above bronze's 2.5; in the `pickaxe` tag), the tool
-the hell barrier needs (plans/LAYERS.md). It has no recipe either: for now it only comes from the
-creative catalog (`MiningTests.IronOutranksBronzeAndMinesEverythingBronzeMines`; sprite from
-`tools/generate-metal-textures.py iron`).
+**Iron** is smelted solid-state, never molten (see "The bloomery and the anvil" below). `hematite_ore` needs a
+tier-2 (copper) pickaxe (`tools: {"pickaxe": 2}`, so the primitive and tin pickaxes whiff and copper and bronze mine it)
+and drops a hematite chunk (the `hematite_ore` item), which the quern crushes into `crushed_iron`
+(`recipes/crush/hematite_ore.json`). There is no melt recipe and no molten iron, so a kiln refuses every iron form
+(`MetalworksRecipeTests.IronCrushesInTheQuernButNeverMelts`); the bloomery turns crushed iron into a `bloom` and the
+anvil hammers that into `wrought_iron`, which every iron recipe consumes: the heads (`iron_pickaxe_head`,
+`iron_axe_head`, `iron_sword_head`), the tools (`iron_pickaxe`, `iron_axe`, `iron_sword`, each head + branch + 2 vine) and
+the five-piece iron armor set (`iron_cap`, `iron_tunic`, `iron_pants`, `iron_boots`, `iron_gloves`, `sets/iron.json`; bronze's
+counts and one more armor point each). The `iron_pickaxe` is the top pickaxe tier (power 3, above bronze's 2.5; in the
+`pickaxe` tag), the tool the hell barrier needs (plans/LAYERS.md), so hell is now reachable in survival
+(`MiningTests.IronOutranksBronzeAndMinesEverythingBronzeMines`; sprites from `tools/generate-metal-textures.py iron` and
+`tools/generate-gear-textures.ps1`).
 
 **The barrier** (`barrier`, `BarrierGenerator`) seals the overworld from hell: `requiresTool` with
 `tools: {"pickaxe": 3}`, so only the iron pickaxe mines it, hardness 40, and it drops itself (no loot
@@ -3466,6 +3478,59 @@ out. The pool is every molten metal together, tinted as `KilnManager.PoolMateria
 most molten ml), and the tooltip of a carried crucible lists each metal's molten and unmelted ml.
 Breaking the structure drops the stored fuel and the crucible at the mined cell — the metal
 inside is lost.
+
+**The bloomery and the anvil** (`Simulation/Smithing/`, namespace `VoxelEngine.Simulation.Smithing`, tuning in
+`BloomeryConfig`) make iron. `SmithingStations` owns both registries as one unit (`World.Smithing`), so the frame, the
+save and the station broadcast each plumb one object. The flow is crushed iron + fuel -> **bloomery** (the player jumps
+beside it to keep its bellows going) -> `bloom` -> **anvil** + smithing hammer -> `wrought_iron` + `slag`.
+- **The bloomery** (`bloomery` / `bloomery_part`, a 2x2x2 `multiblock` pressed from `bloomery_bricks` by the same
+  converter; it wears the mud brick kiln's model, so its fire burns where `KilnLayout.Kiln` says) is declared by a
+  `bloomery` object on the anchor block: `{"oreCap", "fuelCap", "ore", "bloom", "slag"}` (`BloomeryProfile`, parsed by
+  `BlockSchemaParser.ParseBloomery`, `BlockType.Bloomery`; the three names resolve to ids at load and a missing or unknown
+  one throws naming the file, and it is only legal on a multiblock anchor and never with `kiln`). It does **not** reuse
+  `KilnProfile`/`KilnLayout`, which carry crucible semantics. `BloomeryManager` (keyed by anchor, main thread only) copies
+  the kiln's pattern: `Ensure`, `Update` as the integrity sweep (a blast reverts the structure and drops what it held),
+  `Capture`/`Restore` (`StationSaveData.Bloomeries`), `WriteNet`/`ReadNet`, `NotifyBlockRemoved`.
+  Right-click (`BlockInteractions.TryBloomeryInteract`, in the chain after the kiln) loads the profile's ore and any fuel
+  one unit at a time, a firestarter lights it (`IItemUseWorld.CanIgniteKiln`/`IgniteKiln` cover both structures, so a
+  fire spell does too) once it holds ore and fuel, an empty hand collects the finished blooms and slag, and no new ore
+  goes in before that. **Heat model** (`BloomeryRules`, GL-free): a lit bloomery loses `HeatDecayPerSecond` of its 0..1
+  heat a second, each pump adds `PumpHeat`; below `BandMin` the ore stalls, in or above the band the unit progresses
+  (`SecondsPerOre`), above `BandMax` it also accumulates overheat and burns fuel `OverheatFuelFactor` times faster, and a
+  unit that overheated `BurnSeconds` becomes slag instead of a bloom. One pump per `PumpCooldownSeconds` beats the decay
+  (`BloomeryRulesTests` asserts the relation), so a jump every couple of seconds holds the band.
+- **The bellows is a jump.** `PlayerPhysics.JumpCount` (also `Camera.JumpCount`) moves on each jump; `World.Update` pumps
+  `Bloomeries.Pump(camera position)` on every new one (singleplayer; never on a client). A server cannot see jumps, so
+  `ServerPlayer.ObserveAcceptedState` now returns whether the accepted state was a **jump** (grounded last state,
+  airborne and `NetworkConfig.NetJumpRiseBlocks` higher now; never flying, in water, on the first state or after a
+  teleport), and `PlayerSessions.PumpOnJump` calls `World.PumpBellows(player position)`. `Pump` only heats a lit bloomery
+  whose center is within `PumpRangeBlocks`, and each has its own pump cooldown. `ServerPlayerJumpTests`. A later
+  automation (a mechanical bellows, automated feeding) is `P-59` in plans/TODO.md; `Pump` takes any source of pumps.
+- **The anvil** (`anvil`, a plain model block made of cobblestone so the chain can bootstrap) carries an `anvil` object
+  `{"hits", "input", "result", "slag"}` (`AnvilProfile`, `BlockType.Anvil`). `AnvilManager` holds at most one piece per anvil
+  (right-click with the input lays it on, an empty hand takes it back; `TryAnvilInteract`) and counts hammer hits: `TryHit`
+  is refused until the gap since the last hit has run down (`State.CooldownLeft`, ticked in `Update`, so the pace is the
+  simulation's and not a client's clock, with `BloomeryConfig.HammerSlackSeconds` of jitter allowed on a server), the hit
+  that reaches `hits` replaces the piece with `IronPerBloom` result and `SlagPerBloom` slag dropped on top of the anvil
+  (`BlockInteractions.HammerAnvil`). An anvil whose block is gone is swept and its piece drops. The hammer is any item in
+  the `hammer` tag (`Mining.IsHammer`; the `smithing_hammer`, stone-headed, `tool.hitDelayMs` 2500, so there is no
+  spamming): `LeftClickAction.UpdateAnvilHammer` fires the first hit on press and the next after the hammer's own gap
+  (`Mining.HitGapSeconds`), with the usual swing, sound and chips, and never mines the anvil. A connected client only predicts
+  that (from the mirrored anvil) and raises the new `NetIntentKind.Hammer(cell)` (rate-limited, edits no cell); the server
+  (`IntentReplay.HammerFor`) needs the hammer in hand, its own ray on the cell and the anvil's gap run down, and the result
+  rides the drops and the station broadcast.
+- **Persistence and the wire.** Both registries save into `stations.json` (`Bloomeries`, `Anvils`, only an anvil with a piece
+  on it) and ride the **end** of the `StationState` frame, after the cast molds (`World.WriteStations`,
+  `ClientMirror.ApplyNetworkStations`): protocol **22**. A client's copies are display-only mirrors that never tick.
+- **Look and feel.** `RenderManager.Stations.RenderSmithing` draws the loaded ore and fuel in two rows on the hearth, the
+  finished blooms and slag where the ore stood, and the bloom lying on each anvil, shrinking with every hit. A lit
+  bloomery joins `AmbientEffects.FireCells`, so it throws embers and a point light. The look-at label shows a status line
+  (`LookLabelState.Detail`, `SmithingReadout`): a lit bloomery's heat with `too cold` / `good` / `too hot`, its ore and
+  smelt percentage, a done run's output, or an anvil's `Hammered n/m`.
+- **Slag** (`slag`, from burnt ore and from every hammered bloom) crafts into `slag_bricks`, a plain building block.
+- `IronChainTests` (the chain's relations, including that the anvil and hammer need no iron), `BloomeryRulesTests`,
+  `BloomeryManagerTests`, `AnvilManagerTests`; `visual-examples/bloomery.json` (`VOXEL_TIME=147`, with its `bloomery`,
+  `anvil` and `hammer` ops) films it.
 
 **The alloy furnace** (`alloy_furnace` / `alloy_furnace_part`, `multiblock.size` 3) is the second
 kiln: a 3x3x3 hollow shell of `alloy_bricks` (one mud brick block, a copper and a tin ingot each,
@@ -3976,7 +4041,7 @@ refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's 
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
 whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell or sky mob's `Ammo` carries its
 attack count the same way (`RealmMob.AttackCount`, see "A mirror's attack clip"), with no bump either. Every
-entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 (current) add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 22 (current) appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
 mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
@@ -3992,7 +4057,7 @@ them. A
 made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(cell)`,
 `Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)`,
 `Attack(punch | slice | slice return)`, `Respawn` (nothing more; never rate-limited, edits no
-cell) and `Cast(slot)` (a held staff's spell slot as one byte; never edits a cell, rate-limited). Its
+cell), `Cast(slot)` (a held staff's spell slot as one byte; never edits a cell, rate-limited) and `Hammer(cell)` (one hammer hit on an anvil; never edits a cell, rate-limited). Its
 reader refuses an unknown kind or attack, a cast slot at or past `SpellConfig.StaffMaxSlots`, a
 non-finite or far-out eye, an aim that is not close to a unit vector and a normal component
 outside -1..1 as an `InvalidDataException`, renormalizes the aim and clamps the charge. An
@@ -4129,6 +4194,9 @@ empty. Then, by kind:
   `NetPlayerAction.Cast` (8, no protocol bump: the player-list action byte is read unchecked, so an older
   client just shows no gesture). A client runs the same seam to predict only: it
   checks and paces, never spends and never fires the effect, then raises the intent.
+- **Hammer** — `IntentReplay.HammerFor` -> `World.HammerFor`: a smithing hammer (the `hammer` tag) in hand, the player's own
+  ray landing on the anvil's cell, and the anvil's own hit gap run down (the hammer's pace less
+  `BloomeryConfig.HammerSlackSeconds`); the anvil manager counts the hit and, on the last, drops the result and slag.
 
 Every intent is answered, in order: an intent that can edit cells gets a `BlockCorrection` with
 the authoritative state of the 3x3x3 cells around its named cell (within edit reach), so whatever
@@ -4764,7 +4832,7 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   (`SkyConfig.SkyCloudSeaHeight`, `SkyCloudSeaThickness`: 290..301); the sky islands
   `SkyIslandBottomY..SkyIslandTopY` (320..420), tuned in `SkyIslandConfig`.
 - **Getting there**: dig down or build up. The barrier and hell's slabs (`barrier`, `hellrock`) need the
-  `iron_pickaxe` (power 3; creative only for now, no recipe), see "The barrier". The sky has no gate: the
+  `iron_pickaxe` (power 3, made from wrought iron smelted in the bloomery, see "The bloomery and the anvil"), see "The barrier". The sky has no gate: the
   solid clouds and the cloud sea catch a fall (`softLanding`, and `sink` holds the player half a block deep,
   "Sink and soft-landing flags"); hell has no bottom and its falls hurt as usual.
 - **Worldgen**, a pure function of position like the rest (each chunk alone, the point query equal to the

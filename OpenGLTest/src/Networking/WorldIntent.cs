@@ -34,6 +34,10 @@ public enum NetIntentKind : byte
     /// <summary>Right-click with a staff in hand casts its selected spell slot. The intent carries
     /// the slot and edits no cell.</summary>
     Cast = 8,
+
+    /// <summary>One hammer hit on the anvil cell the intent names: the server judges the hammer in hand and its own
+    /// per-anvil hit gap, and edits no cell.</summary>
+    Hammer = 9,
 }
 
 /// <summary>Which left-click attack an <see cref="NetIntentKind.Attack"/> intent carries (see
@@ -68,6 +72,7 @@ public enum NetAttackKind : byte
 /// <item><see cref="NetIntentKind.Attack"/>: the attack kind.</item>
 /// <item><see cref="NetIntentKind.Respawn"/>: nothing beyond the eye and aim.</item>
 /// <item><see cref="NetIntentKind.Cast"/>: the staff's spell slot (<see cref="Slot"/>).</item>
+/// <item><see cref="NetIntentKind.Hammer"/>: the anvil's cell.</item>
 /// </list>
 /// GL-free and content-free.
 /// </summary>
@@ -105,7 +110,7 @@ public readonly record struct WorldIntent(
     /// spam cap; its gameplay pace is the caster's own <see cref="Magic.CastPacing"/>.</summary>
     public bool IsRateLimited =>
         Kind is NetIntentKind.BreakComplete or NetIntentKind.Place or NetIntentKind.Use or NetIntentKind.Throw
-            or NetIntentKind.Cast;
+            or NetIntentKind.Cast or NetIntentKind.Hammer;
 
     public static WorldIntent BreakStart(Vector3 eye, Vector3 direction, Vector3 cell) =>
         new(NetIntentKind.BreakStart, eye, direction, (int)cell.X, (int)cell.Y, (int)cell.Z, HasCell: true);
@@ -133,4 +138,7 @@ public readonly record struct WorldIntent(
 
     public static WorldIntent Cast(Vector3 eye, Vector3 direction, int slot) =>
         new(NetIntentKind.Cast, eye, direction, Slot: slot);
+
+    public static WorldIntent Hammer(Vector3 eye, Vector3 direction, Vector3 cell) =>
+        new(NetIntentKind.Hammer, eye, direction, (int)cell.X, (int)cell.Y, (int)cell.Z, HasCell: true);
 }

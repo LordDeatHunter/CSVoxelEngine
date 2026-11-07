@@ -246,10 +246,12 @@ internal sealed class WorldItemUse : IItemUseWorld
     bool IItemUseWorld.IgniteCampfire(int x, int y, int z) => _campfires.Ignite(x, y, z);
 
     bool IItemUseWorld.CanIgniteKiln(int x, int y, int z) =>
-        Interactions.TryTrackKilnAt(x, y, z, out var anchor) && _kilns.CanIgnite(anchor);
+        Interactions.TryTrackKilnAt(x, y, z, out var anchor) && _kilns.CanIgnite(anchor)
+        || Interactions.TryTrackBloomeryAt(x, y, z, out var bloomery) && _world.Smithing.Bloomeries.CanIgnite(bloomery);
 
     bool IItemUseWorld.IgniteKiln(int x, int y, int z) =>
-        Interactions.TryTrackKilnAt(x, y, z, out var anchor) && _kilns.Ignite(anchor);
+        Interactions.TryTrackKilnAt(x, y, z, out var anchor) && _kilns.Ignite(anchor)
+        || Interactions.TryTrackBloomeryAt(x, y, z, out var bloomery) && _world.Smithing.Bloomeries.Ignite(bloomery);
 
     bool IItemUseWorld.TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId) =>
         Edits.TryConvertMultiblock(hitCell, hitNormal, sourceId, anchorId, ActiveContext.ViewDirection);

@@ -17,6 +17,12 @@ public sealed class StationSaveData
     public List<KilnData>? Kilns { get; set; }
     public List<CastData>? Casts { get; set; }
 
+    /// <summary>The bloomeries (iron smelters), keyed by anchor cell.</summary>
+    public List<BloomeryData>? Bloomeries { get; set; }
+
+    /// <summary>The anvils with a piece lying on them.</summary>
+    public List<AnvilData>? Anvils { get; set; }
+
     /// <summary>The chests that have been used (a never-opened ruin chest is not here and re-rolls from its seed).</summary>
     public List<ChestData>? Chests { get; set; }
 
@@ -91,6 +97,38 @@ public sealed class StationSaveData
         /// <summary>What that crucible holds (<see cref="CrucibleSaveCodec"/>), null for an empty vessel.</summary>
         public PlayerSaveData.CrucibleData? Contents { get; set; }
         public float MeltLeft { get; set; }
+    }
+
+    /// <summary>One bloomery structure, keyed by its anchor cell.</summary>
+    public sealed class BloomeryData
+    {
+        public int[]? Cell { get; set; }
+        public string? Anchor { get; set; }
+        public int Facing { get; set; }
+        public int Ore { get; set; }
+        public int Fuel { get; set; }
+        public string? FuelItem { get; set; }
+        public float FuelSeconds { get; set; }
+        public bool Lit { get; set; }
+        public float BurnLeft { get; set; }
+        public float Heat { get; set; }
+        public float UnitProgress { get; set; }
+        public float UnitOverheat { get; set; }
+
+        /// <summary>Finished blooms waiting to be collected.</summary>
+        public int Blooms { get; set; }
+
+        /// <summary>Slag waiting to be collected.</summary>
+        public int Slag { get; set; }
+    }
+
+    /// <summary>One anvil with a piece on it.</summary>
+    public sealed class AnvilData
+    {
+        public int[]? Cell { get; set; }
+        public string? Block { get; set; }
+        public int Hits { get; set; }
+        public float Cooldown { get; set; }
     }
 
     /// <summary>One mold cell holding a pour, its recipe named by mold block and material.</summary>

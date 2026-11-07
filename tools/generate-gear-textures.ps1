@@ -12,6 +12,7 @@ function Tone([int[]]$rgb) { [System.Drawing.Color]::FromArgb(255, $rgb[0], $rgb
 $materials = @{
     leather = @{ Dark = (Tone 70, 44, 26);  Mid = (Tone 138, 92, 54);  Light = (Tone 182, 130, 82) }
     bronze  = @{ Dark = (Tone 92, 56, 24);  Mid = (Tone 190, 124, 52); Light = (Tone 236, 178, 96) }
+    iron    = @{ Dark = (Tone 40, 44, 54);  Mid = (Tone 128, 136, 150); Light = (Tone 206, 214, 226) }
     gem     = @{ Dark = (Tone 30, 70, 120); Mid = (Tone 70, 150, 220); Light = (Tone 180, 226, 255) }
     ember   = @{ Dark = (Tone 110, 20, 10); Mid = (Tone 220, 70, 30); Light = (Tone 255, 170, 100) }
     gold    = @{ Dark = (Tone 120, 84, 12); Mid = (Tone 224, 176, 40); Light = (Tone 255, 230, 120) }
@@ -38,7 +39,7 @@ function Block([int]$x, [int]$y, [int]$w, [int]$h, $m) {
     }
 }
 
-foreach ($name in 'leather', 'bronze') {
+foreach ($name in 'leather', 'bronze', 'iron') {
     $m = $materials[$name]
     New-Sprite "${name}_cap" { Block 3 4 10 7 $m; Block 2 9 12 3 $m; Rect 6 11 4 2 ([System.Drawing.Color]::Transparent) }
     New-Sprite "${name}_tunic" {

@@ -332,6 +332,13 @@ public sealed record BlockType
     /// ever set on a <see cref="BlockRenderer.Multiblock"/> block.</summary>
     public KilnProfile? Kiln { get; init; }
 
+    /// <summary>The bloomery profile of this multiblock anchor (its <c>bloomery</c> object), or null when it is not a
+    /// bloomery. Only ever set on a <see cref="BlockRenderer.Multiblock"/> block.</summary>
+    public BloomeryProfile? Bloomery { get; init; }
+
+    /// <summary>The anvil profile of this block (its <c>anvil</c> object), or null when it is not an anvil.</summary>
+    public AnvilProfile? Anvil { get; init; }
+
     /// <summary>The chest profile of this block (its <c>chest</c> object), or null when it is not a chest. A chest is a
     /// block entity: it holds stacks, spills them when it breaks and, for a ruin chest, rolls its loot on first use.</summary>
     public ChestProfile? Chest { get; init; }

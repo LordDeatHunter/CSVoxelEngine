@@ -226,6 +226,58 @@ internal static class BlockSchemaParser
         return profile with { Layout = layout };
     }
 
+    /// <summary>Reads a bloomery anchor's <c>bloomery</c> object into its <see cref="BloomeryProfile"/>: omitted fields
+    /// take the defaults and a cap <see cref="BloomeryProfile.Create"/> refuses throws naming the file. Null for a
+    /// block that is not a bloomery.</summary>
+    internal static BloomeryProfile? ParseBloomery(BlockDefinition.BloomeryDefinition? definition, string path)
+    {
+        if (definition == null) return null;
+        try
+        {
+            return BloomeryProfile.Create(definition.OreCap ?? BloomeryProfile.DefaultOreCap,
+                definition.FuelCap ?? BloomeryProfile.DefaultFuelCap,
+                ResolveItemName(definition.Ore, "bloomery.ore", path),
+                ResolveItemName(definition.Bloom, "bloomery.bloom", path),
+                ResolveItemName(definition.Slag, "bloomery.slag", path));
+        }
+        catch (ArgumentException e)
+        {
+            throw new InvalidOperationException($"Block '{path}' has a bloomery object with {e.Message}", e);
+        }
+    }
+
+    /// <summary>A required block or item name of a block's object, resolved to its shared id; a missing or unknown
+    /// name throws naming the file and the field.</summary>
+    private static byte ResolveItemName(string? name, string field, string path)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new InvalidOperationException($"Block '{path}' needs {field}, which names the item it works.");
+        if (ContentFiles.TryResolve(name, out var id)) return id;
+        throw new InvalidOperationException($"Block '{path}' names '{name}' in {field}, which is not a registered block or item.");
+    }
+
+    /// <summary>Reads a block's <c>anvil</c> object into its <see cref="AnvilProfile"/>. An anvil is a plain model
+    /// block; a multiblock is refused. Null for a block that is not an anvil.</summary>
+    internal static AnvilProfile? ParseAnvil(BlockDefinition.AnvilDefinition? definition, BlockRenderer renderer,
+        string path)
+    {
+        if (definition == null) return null;
+        if (renderer is not BlockRenderer.Model)
+            throw new InvalidOperationException(
+                $"Block '{path}' declares an anvil object with renderer \"{renderer}\"; an anvil is a plain model block.");
+        try
+        {
+            return AnvilProfile.Create(definition.Hits ?? AnvilProfile.DefaultHits,
+                ResolveItemName(definition.Input, "anvil.input", path),
+                ResolveItemName(definition.Result, "anvil.result", path),
+                ResolveItemName(definition.Slag, "anvil.slag", path));
+        }
+        catch (ArgumentException e)
+        {
+            throw new InvalidOperationException($"Block '{path}' has an anvil object with {e.Message}", e);
+        }
+    }
+
     /// <summary>
     /// Reads a block's <c>chest</c> object: its slot count (1..<see cref="ChestConfig.MaxSlots"/>) and the optional loot
     /// table a never-opened one rolls, which must be a loaded loot table (loot tables load before blocks). A chest is a

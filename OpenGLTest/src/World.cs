@@ -32,6 +32,7 @@ using VoxelEngine.Simulation.Chests;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.LeafDecay;
+using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.Status;
 using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.Hud;
@@ -87,6 +88,8 @@ public class World
     private readonly QuernManager _querns = new();
     private readonly ChestManager _chests = new();
     private readonly KilnManager _kilns = new();
+    private readonly SmithingStations _smithing = new();
+    private int _lastJumpCount;
     private readonly CastingManager _casting = new();
     private readonly FireParticleSystem _fire = new();
     // Embers and smoke over exposed lava: a separately tuned instance so a lava lake never
@@ -775,12 +778,32 @@ public class World
     /// <summary>The chest panel's UI state: which chest is open and what it shows (see <see cref="ChestView"/>).</summary>
     public ChestView ChestPanel { get; } = new();
 
-    public bool HasStations => StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting);
+    /// <summary>The bloomeries and anvils (iron works); authoritative worlds tick them, a client's are mirrors.</summary>
+    public SmithingStations Smithing => _smithing;
+
+    /// <summary>Whether this world is a multiplayer client's mirror (the server decides outcomes).</summary>
+    internal bool IsClientMode => _clientMode;
+
+    /// <summary>One bellows pump from a body at <paramref name="position"/> (a jump): heats every lit bloomery in
+    /// range. The server calls it for each player's jump; singleplayer calls it itself. A client never does.</summary>
+    public bool PumpBellows(Vector3 position) => !_clientMode && _smithing.Bloomeries.Pump(position);
+
+    /// <summary>One hammer hit on the anvil at <paramref name="cell"/> (the server replaying a
+    /// <see cref="NetIntentKind.Hammer"/> intent): the hit counts when a piece lies on it and its gap has run down to
+    /// within <paramref name="slackSeconds"/>; the hammer's own pace is <paramref name="gapSeconds"/>. A finished
+    /// piece drops its result and slag on top of the anvil.</summary>
+    public AnvilHit HammerFor(Vector3 cell, float gapSeconds, float slackSeconds) =>
+        Interactions.HammerAnvil(cell, gapSeconds, slackSeconds);
+
+    public bool HasStations => StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting) || _smithing.HasAny;
 
     /// <summary>Writes every station block entity for the server's broadcast
     /// (<see cref="NetMessage.StationState"/>).</summary>
-    public void WriteStations(PacketWriter writer) =>
+    public void WriteStations(PacketWriter writer)
+    {
         StationNetCodec.Write(writer, _campfires, _querns, _kilns, _casting);
+        _smithing.WriteNet(writer);
+    }
 
     /// <summary>
     /// One multiplayer-client frame: no local simulation, only the camera (and only once the chunk
@@ -941,6 +964,14 @@ public class World
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
         _chests.Update(_chunkManager, _dropManager);
         _kilns.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
+        _smithing.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
+        // Every jump of the local body works a bellows (a server pumps per player instead, see PumpBellows)
+        if (Camera.JumpCount != _lastJumpCount)
+        {
+            _lastJumpCount = Camera.JumpCount;
+            if (!_serverMode)
+                _smithing.Bloomeries.Pump(Camera.Position);
+        }
         // A pour bound to a connected player (its PlayerContext) drains that player's crucible; the
         // world's own inventory and camera stand for the local player
         _casting.Update((float)deltaTime, _chunkManager, _dropManager, Inventory,

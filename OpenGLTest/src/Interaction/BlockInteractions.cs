@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
@@ -8,6 +9,7 @@ using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
+using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Interaction;
@@ -185,6 +187,125 @@ internal sealed class BlockInteractions
             inventory.ConsumeSelected();
 
         return true;
+    }
+
+    /// <summary>
+    /// Resolves the bloomery structure a cell belongs to and makes sure it is tracked, so any of its cells answers
+    /// for the whole. False when the cell is not part of a bloomery.
+    /// </summary>
+    internal bool TryTrackBloomeryAt(int x, int y, int z, out Vector3 anchor)
+    {
+        anchor = Vector3.Zero;
+        if (!Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out var resolved, out var facing, out var anchorType)
+            || anchorType is not { Bloomery: not null })
+            return false;
+
+        _world.Smithing.Bloomeries.Ensure(resolved, facing, anchorType.Id);
+        anchor = resolved;
+        return true;
+    }
+
+    /// <summary>
+    /// Right-click on a bloomery: an empty hand collects what a finished run left (blooms, then slag; whatever does
+    /// not fit the inventory drops), the profile's ore and any fuel are loaded one unit at a time, a firestarter is
+    /// passed through to its own <see cref="Item.OnUse"/> so it can strike, and a block in hand falls through to
+    /// placement against the structure. Any other click on a bloomery is spent. Returns whether the click belonged
+    /// to the bloomery.
+    /// </summary>
+    internal bool TryBloomeryInteract(float maxDistance, PlayerContext player)
+    {
+        var inventory = player.Inventory;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var hx = (int)hit.X;
+        var hy = (int)hit.Y;
+        var hz = (int)hit.Z;
+        if (!_chunkManager.TryGetCell(hx, hy, hz, out var hitId, out _)) return false;
+        if (!Multiblock.IsMultiblockCell(hitId)) return false;
+        if (!TryTrackBloomeryAt(hx, hy, hz, out var anchor)) return false;
+
+        var bloomeries = _world.Smithing.Bloomeries;
+        var held = inventory.HeldItem;
+        switch (held)
+        {
+            // The firestarter lights it from its own OnUse, which also spends its durability
+            case { UseAction: ItemUseAction.IgniteCampfire }:
+                return false;
+            // An empty hand collects the run's output
+            case null:
+            {
+                var output = new List<byte>();
+                if (!bloomeries.TryCollect(anchor, output)) return true;
+                foreach (var id in output)
+                    if (!inventory.Add(id))
+                        _dropManager.Spawn(id, anchor);
+                return true;
+            }
+        }
+
+        if (bloomeries.TryAddOre(anchor, held.Id) || (held.FuelSeconds > 0f && bloomeries.TryAddFuel(anchor, held)))
+        {
+            if (!player.IsCreative)
+                inventory.ConsumeSelected();
+            return true;
+        }
+        return held is not BlockItem;
+    }
+
+    /// <summary>
+    /// Right-click on an anvil: the item its profile takes (a bloom) is laid on an empty anvil, and an empty hand
+    /// takes the piece back off. Anything else, a block in hand included, falls through (a hammer is worked with
+    /// the left button; see <see cref="HammerAnvil"/>). Returns whether the click belonged to the anvil.
+    /// </summary>
+    internal bool TryAnvilInteract(float maxDistance, PlayerContext player)
+    {
+        var inventory = player.Inventory;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        var cell = new Vector3((int)hit.X, (int)hit.Y, (int)hit.Z);
+        if (!TryTrackAnvilAt(cell)) return false;
+
+        var anvils = _world.Smithing.Anvils;
+        var held = inventory.HeldItem;
+        if (held == null)
+        {
+            if (!anvils.TryTake(cell, out var taken)) return false;
+            if (!inventory.Add(taken))
+                _dropManager.Spawn(taken, cell);
+            return true;
+        }
+        if (!anvils.TryPlace(cell, held.Id)) return false;
+        if (!player.IsCreative)
+            inventory.ConsumeSelected();
+        return true;
+    }
+
+    /// <summary>Makes sure the anvil block at <paramref name="cell"/> is tracked. False when the cell is not an
+    /// anvil.</summary>
+    internal bool TryTrackAnvilAt(Vector3 cell)
+    {
+        if (!_chunkManager.TryGetCell((int)cell.X, (int)cell.Y, (int)cell.Z, out var id, out _)
+            || BlockType.ById[id]?.Anvil == null)
+            return false;
+        _world.Smithing.Anvils.Ensure(cell, id);
+        return true;
+    }
+
+    /// <summary>
+    /// One hammer hit on the anvil at <paramref name="cell"/>, if a piece lies on it and the gap since the last hit
+    /// has run down (<paramref name="slackSeconds"/> of jitter allowed). A finished piece drops its result and slag on
+    /// top of the anvil. Returns what the hit did; the caller supplies the hammer's own pace.
+    /// </summary>
+    internal AnvilHit HammerAnvil(Vector3 cell, float gapSeconds, float slackSeconds)
+    {
+        if (!TryTrackAnvilAt(cell)) return default;
+        var hit = _world.Smithing.Anvils.TryHit(cell, gapSeconds, slackSeconds);
+        if (hit.Kind != AnvilHitKind.Finished || _world.IsClientMode) return hit;
+
+        var top = cell + new Vector3(0f, 1f, 0f);
+        for (var i = 0; i < hit.ResultCount; i++)
+            _dropManager.Spawn(hit.ResultId, top);
+        for (var i = 0; i < hit.SlagCount; i++)
+            _dropManager.Spawn(hit.SlagId, top);
+        return hit;
     }
 
     /// <summary>

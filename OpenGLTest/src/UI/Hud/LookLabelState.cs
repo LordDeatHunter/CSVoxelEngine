@@ -6,7 +6,8 @@ namespace VoxelEngine.UI.Hud;
 /// <summary>
 /// What the HUD's look-at label draws with this frame, GL-free: the rule's text and flags
 /// (<see cref="LookLabel.State"/>), the targeted cell and its block's state byte, and the voxel
-/// light there (for the debug lines the profiler overlay adds). Built by the world from the
+/// light there (for the debug lines the profiler overlay adds), and an optional status line
+/// (<see cref="Detail"/>, the heat of a bloomery, a hammered piece). Built by the world from the
 /// selection raycast; null with no target.
 /// </summary>
 public readonly record struct LookLabelState(
@@ -16,4 +17,5 @@ public readonly record struct LookLabelState(
     Vector3 Cell,
     byte BlockId,
     byte BlockState,
-    EntityLightSample Light);
+    EntityLightSample Light,
+    string? Detail = null);

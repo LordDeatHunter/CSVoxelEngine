@@ -26,11 +26,12 @@ Nothing.
 The smallest bundle that makes the world a *game*: stakes and an advance (no food system).
 Mostly content JSON plus small systems; high feel, low engine risk. In order:
 
-1. **`P-3` generic furnace / smelter** — `sand -> glass`, `mud -> brick`, and the iron bloom;
-   generalizes the kiln pattern and becomes the automation seed. Lands before `P-2` gating.
-2. **`P-43` anvil / forge** — pulled into this milestone: iron goes `crushed_iron` -> furnace
-   bloom -> forge-shaped parts (this replaces the earlier idea of routing iron through the kiln's
-   molten path).
+1. **`P-3` generic furnace / smelter** — `sand -> glass` and `mud -> brick`; generalizes the kiln
+   pattern and becomes the automation seed. Lands before `P-2` gating. (The iron bloom shipped as the
+   bloomery, see `AGENTS.md` "The bloomery and the anvil".)
+2. **`P-43` anvil / forge** — the iron half shipped: `crushed_iron` -> bloomery bloom -> anvil ->
+   `wrought_iron` -> iron tools and armor (never through the kiln's molten path). What remains is
+   steel (carburizing) and anything else the anvil should shape.
 3. **`P-7` / `P-25` metal tiers** — iron, tin, bronze, steel as the tier ladder (`P-44` covers the
    alloys). Progression, processing requirements and per-tier recipes are **TBD, defined later**.
 4. **Armor (in `P-7`)** — flat damage reduction from summed armor points (capped), equipped from
@@ -69,7 +70,7 @@ the other while still being faster together.
   A timed, fuel-consuming station modeled on the campfire's `cookSeconds` and the quern's
   block-entity pattern. First jobs: `sand -> glass`, `mud -> brick`, and a plain
   `crushed_copper -> copper_ingot` route that does not need the full kiln. Feeds `P-6` and is
-  step zero of the automation chain.
+  step zero of the automation chain. The iron bloomery is the shipped sibling (`P-59` automates it).
 - [ ] **`P-5` · Light progression: torch -> lamp -> fire as fuel** — P1, S–M.
   A cheap **torch** block (emission ~14, `needsSupport`) before the existing `lamp` (emission
   15). Wire placed lights into the shader's 8 point-light budget so a torch casts dynamic light,
@@ -78,7 +79,7 @@ the other while still being faster together.
   Fire as station fuel; per-wood burn times; campfire already burns ~30 s. Add `P-41` charcoal
   as the renewable, portable fuel. Feeds `P-3` and the kiln.
 - [ ] **`P-7` · Metal tiers beyond copper** — P1, L. **Milestone 1.**
-  Tier ladder: iron, tin, bronze (`P-44`), steel; anvil/forge (`P-43`), tool tiers 2–4, richer ore
+  Tier ladder: iron (shipped: bloomery, anvil, iron tools and armor), tin, bronze (`P-44`), steel; anvil/forge (`P-43`), tool tiers 2–4, richer ore
   gating (`P-25`). Progression, processing requirements and recipes are TBD, defined later.
   Includes armor: flat capped damage reduction, equip from the inventory panel, HUD/tooltip, and
   worn models on `PlayerModel`/remote players (`V-14`).
@@ -138,8 +139,9 @@ the other while still being faster together.
 - [ ] **`P-18` · Enchanting / item magic** — P3, L.
   Spell effects bound to gear; a crafting-station cousin of the magic system. Cross-links `P-29`,
   `P-48`.
-- [ ] **`P-43` · Forge & anvil (metal shaping)** — P1, M. **Milestone 1.**
-  After casting: hammer ingots into shaped parts, the gate to iron/steel tiers (`P-7`).
+- [ ] **`P-43` · Forge & anvil (metal shaping)** — P1, S–M. **Milestone 1.**
+  The anvil and the smithing hammer shipped with the bloomery (a bloom hammered into wrought iron). Left: steel
+  (carburizing wrought iron), and shaping parts on the anvil beyond the bloom, the gate to the upper tiers (`P-7`).
 - [ ] **`P-44` · Alloys** — P2, M.
   Bronze from copper + tin (tin ore, the 3x3x3 alloy furnace, bronze tools) shipped (see `AGENTS.md`
   "Recipes, cast molds and metalworks"); steel remains. Combines with `P-25`.
@@ -155,6 +157,11 @@ the other while still being faster together.
 - [ ] **`P-21` · Machine chains & processing** — P2, L.
   Crusher, sawmill, smeltery, assembler; multi-step recipes with byproducts. The quern is step
   zero; `P-3` is step one.
+- [ ] **`P-59` · Bloomery automation** — P3, M. *(after the bloomery lands; not in its scope)*
+  The bloomery's bellows is worked by the player jumping near it. Replace that with a mechanical
+  bellows (water wheel or an automated pump, see `P-19`) and automated ore/fuel feeding (`P-20`), so
+  a smelt can run unattended. Hook: the `BloomeryManager` pump input, which should take any
+  source of pumps, not only the jump count.
 - [ ] **`P-22` · Electronics / logic (redstone-ish)** — P2, L.
   Scheduled-tick logic on top of the `FluidManager` pattern: sensors, gates, moving collision
   (pistons).

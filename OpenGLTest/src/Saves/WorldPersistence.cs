@@ -456,7 +456,8 @@ internal sealed class WorldPersistence
         if (saved == null)
             return;
         var skipped = _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
-            + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts) + _world.Chests.Restore(saved.Chests);
+            + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts) + _world.Chests.Restore(saved.Chests)
+            + _world.Smithing.Restore(saved);
         if (skipped > 0)
             Log.Warn($"Station save: dropped {skipped} saved station entr{(skipped == 1 ? "y" : "ies")} that no longer resolve");
     }
@@ -464,14 +465,17 @@ internal sealed class WorldPersistence
     /// <summary>Enqueues <see cref="StationSaveCodec.FileName"/>; does nothing without a save store.</summary>
     private void SaveStationState()
     {
-        _saveStore?.EnqueueFile(StationSaveCodec.FileName, StationSaveCodec.ToBytes(new StationSaveData
+        if (_saveStore == null) return;
+        var data = new StationSaveData
         {
             Campfires = _campfires.Capture(),
             Querns = _querns.Capture(),
             Kilns = _kilns.Capture(),
             Casts = _casting.Capture(),
             Chests = _world.Chests.Capture(),
-        }));
+        };
+        _world.Smithing.Capture(data);
+        _saveStore.EnqueueFile(StationSaveCodec.FileName, StationSaveCodec.ToBytes(data));
     }
 
     /// <summary>Enqueues <see cref="WoodDamageCodec.FileName"/> when the chop damage changed since the last

@@ -1,0 +1,34 @@
+{
+  // The bloomery and the anvil: run with VOXEL_SCRIPT=visual-examples/bloomery.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/bloomery/. Builds two bloomeries in the forest clearing (one loaded and cold, one lit with its
+  // fire in the band), then an anvil with a bloom on it, and hammers the bloom twice (the last hit drops the iron and
+  // the slag on top). The look-at label under the crosshair carries the heat and ore readout, so the shots aim at the
+  // structures. Facing 1 opens the bloomery toward the player (+Z).
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-45.5, 14, 63.5], "yaw": -90, "pitch": -14 },
+    { "op": "wait", "seconds": 2 },
+
+    { "op": "bloomery", "pos": [-48, 10, 57], "state": 1, "ore": 3, "fuel": 2 },
+    { "op": "bloomery", "pos": [-44, 10, 57], "state": 1, "ore": 4, "fuel": 3, "lit": true, "heat": 0.55 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "bloomeries" },
+
+    { "op": "teleport", "pos": [-43, 11.2, 60.2], "yaw": -90, "pitch": -4 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "lit-readout" },
+
+    { "op": "anvil", "pos": [-40, 10, 58], "piece": true, "hits": 1 },
+    { "op": "teleport", "pos": [-39.5, 12, 61], "yaw": -90, "pitch": -35 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "anvil-bloom" },
+
+    { "op": "hammer", "pos": [-40, 10, 58] },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "anvil-smaller" },
+    { "op": "hammer", "pos": [-40, 10, 58] },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "anvil-done" }
+  ]
+}

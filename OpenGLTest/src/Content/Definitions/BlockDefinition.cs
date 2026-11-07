@@ -277,6 +277,15 @@ public sealed class BlockDefinition
     /// <c>"multiblock"</c> renderer.</summary>
     public KilnDefinition? Kiln { get; set; }
 
+    /// <summary>Marks a multiblock anchor as a bloomery (a solid-state iron smelter: ore and fuel in, a bloom
+    /// out) and sizes its shaft. Only legal on the <c>"multiblock"</c> renderer, and never together with
+    /// <see cref="Kiln"/>.</summary>
+    public BloomeryDefinition? Bloomery { get; set; }
+
+    /// <summary>Marks the block as an anvil: a bloom laid on it is hammered into wrought iron. Not legal on a
+    /// multiblock.</summary>
+    public AnvilDefinition? Anvil { get; set; }
+
     /// <summary>Marks the block as a chest: a right-click opens it and it holds `slots` stacks, kept by the chest
     /// manager (a block entity). `loot` names the loot table a never-opened one rolls at first open or break (a ruin
     /// chest); a crafted chest names none. Only legal on the `model` renderer.</summary>
@@ -412,6 +421,42 @@ public sealed class BlockDefinition
 
         /// <summary>Whether the kiln may hold two metals and alloy them. Default false.</summary>
         public bool? CanAlloy { get; set; }
+    }
+
+    /// <summary>The <c>"bloomery"</c> object of a bloomery anchor: <c>{"oreCap": 4, "fuelCap": 4}</c>, both
+    /// optional (<c>{}</c> is the plain bloomery).</summary>
+    public sealed class BloomeryDefinition
+    {
+        /// <summary>Units of crushed ore the shaft holds, 1..64. Default 4.</summary>
+        public int? OreCap { get; set; }
+
+        /// <summary>Units of fuel the shaft holds, 1..64. Default 4.</summary>
+        public int? FuelCap { get; set; }
+
+        /// <summary>The item the shaft smelts (a name like <c>item/crushed_iron</c>). Required.</summary>
+        public string? Ore { get; set; }
+
+        /// <summary>The item a well-smelted unit becomes. Required.</summary>
+        public string? Bloom { get; set; }
+
+        /// <summary>The item an overheated unit burns to. Required.</summary>
+        public string? Slag { get; set; }
+    }
+
+    /// <summary>The <c>"anvil"</c> object: <c>{"hits": 3, "input": ..., "result": ..., "slag": ...}</c>.</summary>
+    public sealed class AnvilDefinition
+    {
+        /// <summary>Hammer hits the input takes, 1..32. Default 3.</summary>
+        public int? Hits { get; set; }
+
+        /// <summary>The item laid on the anvil. Required.</summary>
+        public string? Input { get; set; }
+
+        /// <summary>What the hits make of it. Required.</summary>
+        public string? Result { get; set; }
+
+        /// <summary>What the hits squeeze out of it. Required.</summary>
+        public string? Slag { get; set; }
     }
 
     /// <summary>

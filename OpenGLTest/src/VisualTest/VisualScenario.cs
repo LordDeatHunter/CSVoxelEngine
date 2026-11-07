@@ -88,6 +88,18 @@ public sealed class VisualStep
 
     /// <summary>Where a <c>hover</c> step puts the pointer, in canvas units; null clears the scripted pointer.</summary>
     public Vector2? Point { get; init; }
+
+    /// <summary>Units of ore a <c>bloomery</c> step loads.</summary>
+    public int Ore { get; init; }
+
+    /// <summary>Units of fuel a <c>bloomery</c> step loads.</summary>
+    public int Fuel { get; init; }
+
+    /// <summary>The heat (0..1) a lit <c>bloomery</c> step holds the fire at.</summary>
+    public float Heat { get; init; }
+
+    /// <summary>Hammer hits an <c>anvil</c> step has already put in the bloom it lays down.</summary>
+    public int Hits { get; init; }
 }
 
 /// <summary>
@@ -265,6 +277,24 @@ public sealed class VisualScenario
                     ? st
                     : 0,
             },
+            "bloomery" => new VisualStep
+            {
+                Op = "bloomery",
+                Pos = ReadPos(element, index, "bloomery"),
+                State = ReadInt(element, "state"),
+                Ore = ReadInt(element, "ore"),
+                Fuel = ReadInt(element, "fuel"),
+                On = element.TryGetProperty("lit", out var lit) && lit.ValueKind == JsonValueKind.True,
+                Heat = element.TryGetProperty("heat", out var heat) && heat.TryGetSingle(out var h) ? h : 0.5f,
+            },
+            "anvil" => new VisualStep
+            {
+                Op = "anvil",
+                Pos = ReadPos(element, index, "anvil"),
+                On = !element.TryGetProperty("piece", out var piece) || piece.ValueKind != JsonValueKind.False,
+                Hits = ReadInt(element, "hits"),
+            },
+            "hammer" => new VisualStep { Op = "hammer", Pos = ReadPos(element, index, "hammer") },
             "chest" => ReadChest(element, index),
             "chestrow" => new VisualStep
             {
@@ -281,9 +311,12 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, chest, chestrow or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, chest, chestrow or screenshot."),
         };
     }
+
+    private static int ReadInt(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var value) && value.TryGetInt32(out var n) ? n : 0;
 
     // chest opens the chest at "pos" [x, y, z] (the [E] list opens beside it), or closes it with "open": false.
     private static VisualStep ReadChest(JsonElement element, int index)

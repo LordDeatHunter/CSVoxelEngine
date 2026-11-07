@@ -162,6 +162,8 @@ internal static class BlockLoader
             Pane = paneProfile,
             MultiblockSize = multiblockSize,
             Kiln = BlockSchemaParser.ParseKiln(definition.Kiln, path, multiblockSize),
+            Bloomery = BlockSchemaParser.ParseBloomery(definition.Bloomery, path),
+            Anvil = BlockSchemaParser.ParseAnvil(definition.Anvil, renderer, path),
             SpellBuilder = definition.SpellBuilder ?? false,
             Chest = BlockSchemaParser.ParseChest(definition.Chest, renderer, path),
             StackMax = (byte)stack.StackMax,

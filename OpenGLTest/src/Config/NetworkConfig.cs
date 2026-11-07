@@ -64,6 +64,11 @@ public static class NetworkConfig
     /// (<see cref="SpellConfig.CastCooldownSeconds"/>; a first guess).
     /// </summary>
     public const double NetCastSlackSeconds = 0.1;
+
+    /// <summary>How far (blocks) a player's feet must rise between two accepted states, starting from the ground,
+    /// for the server to count a jump (<c>ServerPlayer.ObserveAcceptedState</c>): above an auto-step's
+    /// half block, under what a jump rises in one state.</summary>
+    public const float NetJumpRiseBlocks = 0.2f;
     // A dead client sends a Respawn intent as soon as the server's status says it died, then again
     // this often while the status still reads dead (an earlier one refused, or lost to a race).
     public const double NetRespawnRetrySeconds = 1.0;

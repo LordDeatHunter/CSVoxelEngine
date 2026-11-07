@@ -1,0 +1,7 @@
+{
+  // Iron Tunic: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite).
+  "name": "Iron Tunic",
+  "texture": "assets/textures/items/iron_tunic.png",
+  "rarity": "uncommon",
+  "equip": { "slot": "chest", "armor": 5, "modifiers": { "maxHealth": 15 }, "set": "iron", "visible": true }
+}

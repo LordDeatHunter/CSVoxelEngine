@@ -1,0 +1,7 @@
+{
+  "result": "block/slag_bricks",
+  "count": 4,
+  "ingredients": [
+    { "item": "item/slag", "count": 4 }
+  ]
+}

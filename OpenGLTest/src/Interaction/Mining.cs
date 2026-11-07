@@ -41,6 +41,10 @@ public static class Mining
     /// overhead chop at what it mines instead of a punch.</summary>
     public static bool IsAxe(Item? held) => held != null && ContentRegistry.IsInTag("axe", held.Id);
 
+    /// <summary>Whether <paramref name="held"/> is a smithing hammer: a member of the <c>hammer</c> tag, which works
+    /// a bloom on an anvil (<see cref="Simulation.Smithing.AnvilManager"/>) instead of mining it.</summary>
+    public static bool IsHammer(Item? held) => held != null && ContentRegistry.IsInTag("hammer", held.Id);
+
     /// <summary>Damage one hit deals, or 0 when the block's gate refuses the held item.</summary>
     public static float HitDamage(byte blockId, Item? held)
     {

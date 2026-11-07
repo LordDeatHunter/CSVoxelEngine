@@ -946,6 +946,71 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
+    public void AHammerHitIsJudgedByTheHammersGapOnTheServer()
+    {
+        using var client = Connect("Smith");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var anvil = ContentRegistry.RequireBlock("anvil");
+        var cell = arena.Front;
+        SetCell(cell, anvil.Id);
+        Assert.True(_world.Interactions.TryTrackAnvilAt(cell));
+        Assert.True(_world.Smithing.Anvils.TryPlace(cell, anvil.Anvil!.InputId));
+        var state = _world.Smithing.Anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!;
+
+        // Bare-handed, the hit is refused and counts for nothing
+        var bare = SendWorld(client, WorldIntent.Hammer(arena.Eye, arena.AimAtFront, cell));
+        Assert.False(AwaitResult(client, bare));
+        Assert.Equal(0, state.Hits);
+
+        var hammer = ContentRegistry.RequireItem("smithing_hammer");
+        GrantAsSurvival(client, hammer.Id, 1);
+        var first = SendWorld(client, WorldIntent.Hammer(arena.Eye, arena.AimAtFront, cell));
+        Assert.True(AwaitResult(client, first));
+        Assert.Equal(1, state.Hits);
+
+        // Right away again: the hammer's gap has not run down on the server
+        var hurried = SendWorld(client, WorldIntent.Hammer(arena.Eye, arena.AimAtFront, cell));
+        Assert.False(AwaitResult(client, hurried));
+        Assert.Equal(1, state.Hits);
+
+        // After the gap it lands
+        var gap = Mining.HitGapSeconds(hammer);
+        for (var waited = 0.0; waited < gap + 0.1; waited += 0.25)
+            Tick(0.25);
+        var later = SendWorld(client, WorldIntent.Hammer(arena.Eye, arena.AimAtFront, cell));
+        Assert.True(AwaitResult(client, later));
+        Assert.Equal(2, state.Hits);
+    }
+
+    [Fact]
+    public void AJumpBesideALitBloomeryWorksItsBellowsForThatPlayer()
+    {
+        using var client = Connect("Smith");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var bloomery = ContentRegistry.RequireBlock("bloomery");
+        var anchor = arena.Front;
+        Multiblock.Convert(_world.GetChunkManager(), anchor, 0, bloomery, new HashSet<Vector3>());
+        var bloomeries = _world.Smithing.Bloomeries;
+        bloomeries.Ensure(anchor, 0, bloomery.Id);
+        Assert.True(bloomeries.TryAddOre(anchor, bloomery.Bloomery!.OreId));
+        Assert.True(bloomeries.TryAddFuel(anchor, ContentRegistry.RequireItem("coal")));
+        Assert.True(bloomeries.Ignite(anchor));
+        var fire = bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z)!;
+        fire.Heat = 0.3f;
+
+        // Standing, then rising off the ground: one jump
+        SendState(client, arena.Eye, NetPlayerFlags.None);
+        Tick(0.06);
+        Tick(0.06);
+        Assert.Equal(0.3f, fire.Heat, 0.02f);
+
+        SendState(client, arena.Eye + new Vector3(0f, 0.6f, 0f), NetPlayerFlags.Airborne);
+        Tick(0.06);
+        Tick(0.06);
+        Assert.True(fire.Heat > 0.3f + BloomeryConfig.PumpHeat * 0.5f, $"heat {fire.Heat}");
+    }
+
+    [Fact]
     public void TntOnePlayerPrimesDetonatesForEveryClient()
     {
         using var igniter = Connect("Igniter");

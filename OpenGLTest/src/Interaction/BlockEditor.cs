@@ -487,6 +487,8 @@ internal sealed class BlockEditor
     {
         if (anchorType.Kiln != null)
             _kilns.Ensure(anchor, facing, anchorType.Id);
+        if (anchorType.Bloomery != null)
+            _world.Smithing.Bloomeries.Ensure(anchor, facing, anchorType.Id);
     }
 
     /// <summary>Runs right after a structure came down, so the managers that owned it can hand
@@ -497,6 +499,8 @@ internal sealed class BlockEditor
         // A client's kiln is a mirror of the server's: it forgets the structure but drops nothing
         if (anchorType.Kiln != null)
             _kilns.NotifyBlockRemoved(anchor, blockPos, _clientMode ? null : _dropManager);
+        if (anchorType.Bloomery != null)
+            _world.Smithing.Bloomeries.NotifyBlockRemoved(anchor, blockPos, _clientMode ? null : _dropManager);
     }
 
     // Scratch for ThudTree: the landed blocks, split into canopy and trunk

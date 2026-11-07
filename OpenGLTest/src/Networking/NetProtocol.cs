@@ -165,8 +165,11 @@ public static class NetFraming
     /// <see cref="NetMessage.ChestClose"/>, <see cref="NetMessage.ChestContents"/>); chest contents are per player and never
     /// ride the station broadcast. An older peer would ignore them, so a chest would never open.
     /// 21: each <see cref="NetMessage.PlayerList"/> entry ends with one byte per armor slot, the item id of the visible armor
-    /// piece that player wears (0 for none), so others see it on the body; an older peer would misread every entry.</summary>
-    public const int ProtocolVersion = 21;
+    /// piece that player wears (0 for none), so others see it on the body; an older peer would misread every entry.
+    /// 22: the iron works. <see cref="NetMessage.StationState"/> ends with the bloomeries and the anvils (after the
+    /// cast molds), and <see cref="NetIntentKind.Hammer"/> works a bloom on an anvil; an older peer would misread the
+    /// station frames and refuse the intent as malformed.</summary>
+    public const int ProtocolVersion = 22;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

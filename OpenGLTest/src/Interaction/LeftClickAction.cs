@@ -11,6 +11,7 @@ using VoxelEngine.Juice;
 using VoxelEngine.Networking;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen;
@@ -180,15 +181,27 @@ internal sealed class LeftClickAction
             var cellId = Edits.BlockIdAt(_selectedBlockPosition);
             var (x, y, z) = _selectedBlockPosition.BlockCell();
             // Any cell of a multiblock shows the whole structure, not its plain part block
-            var blockId = Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out _, out _, out var anchorType)
+            var blockId = Multiblock.TryResolveAnchor(_chunkManager, x, y, z, out var anchorPos, out _, out var anchorType)
                 ? anchorType!.Id
                 : cellId;
             var state = LookLabel.For(blockId, Camera.IsCreative, Inventory.Knows, HeldItem());
             if (state.Text.Length == 0) return null;
             return new LookLabelState(state.Text, state.Known, state.Mineable, _selectedBlockPosition,
                 blockId, _chunkManager.GetStateGlobal(x, y, z),
-                EntityLight.Sample(_chunkManager, _selectedBlockPosition));
+                EntityLight.Sample(_chunkManager, _selectedBlockPosition),
+                IronWorksDetail(blockId, anchorPos, x, y, z));
         }
+    }
+
+    // The status line of the bloomery or anvil under the crosshair (see SmithingReadout), null for anything else
+    private string? IronWorksDetail(byte blockId, Vector3 anchor, int x, int y, int z)
+    {
+        var type = BlockType.ById[blockId];
+        if (type?.Bloomery != null && _world.Smithing.Bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z) is { } bloomery)
+            return SmithingReadout.Bloomery(bloomery);
+        if (type?.Anvil != null && _world.Smithing.Anvils.StateAt(x, y, z) is { } anvil)
+            return SmithingReadout.Anvil(anvil);
+        return null;
     }
 
     // Break overlay strength. Quantized to whole hits, so it steps with the damage dealt
@@ -256,6 +269,7 @@ internal sealed class LeftClickAction
         if (!IsPlaying) return;
         var justPressed = isHolding && !_attackWasPressed;
         _attackWasPressed = isHolding;
+        _anvilCooldown = MathF.Max(0f, _anvilCooldown - (float)deltaTime);
 
         var held = HeldItem();
         var player = LocalPlayer.LocalContext();
@@ -311,6 +325,14 @@ internal sealed class LeftClickAction
         if (BlockType.IsFluid(Edits.BlockIdAt(_selectedBlockPosition)))
         {
             StopBreaking();
+            return;
+        }
+
+        // A smithing hammer on an anvil works what lies on it instead of mining the anvil
+        if (Mining.IsHammer(held) && BlockType.ById[Edits.BlockIdAt(_selectedBlockPosition)]?.Anvil != null)
+        {
+            StopBreaking();
+            UpdateAnvilHammer(held!, player);
             return;
         }
 
@@ -439,6 +461,48 @@ internal sealed class LeftClickAction
             return;
         }
     }
+
+    // Seconds until the next hammer hit may land: the hammer's own gap, counted down whether or not the button is
+    // held, so releasing and pressing again never skips it
+    private float _anvilCooldown;
+
+    /// <summary>
+    /// One hammer hit on the aimed anvil, while the button is held: the first lands at once, the next after the
+    /// hammer's own gap (<see cref="Mining.HitGapSeconds(Item, float)"/>, a smithing hammer's is a couple of seconds, so
+    /// there is no spamming). A hit with nothing on the anvil does nothing. A connected client only predicts it
+    /// (the swing, sound and chips, from the anvil it mirrors) and raises <see cref="NetIntentKind.Hammer"/>; the
+    /// server judges the gap itself and its snapshot carries the result.
+    /// </summary>
+    private void UpdateAnvilHammer(Item held, PlayerContext player)
+    {
+        if (_anvilCooldown > 0f) return;
+
+        var cell = _selectedBlockPosition;
+        var gap = Mining.HitGapSeconds(held,
+            (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
+        if (_clientMode)
+        {
+            _world.Interactions.TryTrackAnvilAt(cell);
+            if (_world.Smithing.Anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is not { HasPiece: true })
+                return;
+        }
+        else if (_world.HammerFor(cell, gap, 0f).Kind == AnvilHitKind.Refused)
+        {
+            return;
+        }
+
+        _anvilCooldown = gap;
+        Camera.NotifyPlayerAction();
+        LocalPlayer.PunchSwing();
+        var anvilId = Edits.BlockIdAt(cell);
+        PlayHitSfx(anvilId);
+        _debris.Burst(cell, anvilId, ParticleConfig.BlockDebrisPerHit, columns: _chunkManager.ColumnSource);
+        Camera.AddHitKick(Vector3.Zero, BreakKick.Strength(AnvilKickHardness, false));
+        _world.RaiseIntent(WorldIntent.Hammer(Camera.Position, _selectedAimDirection, cell));
+    }
+
+    // The hardness the camera kick of a hammer blow is sized as: a solid knock, like mining stone
+    private const float AnvilKickHardness = 5f;
 
     /// <summary>
     /// Breaks a block the local player's mining finished. On a connected client the break is only

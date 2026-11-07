@@ -107,10 +107,10 @@ internal sealed class PlayerSessions
                         break;
                     case MoveVerdict.Clamped:
                         Log.Warn($"net: clamped a move from {client.Name} (#{client.Id})");
-                        current.ObserveAcceptedState(chunks, gap, solids);
+                        PumpOnJump(current, current.ObserveAcceptedState(chunks, gap, solids));
                         break;
                     default:
-                        current.ObserveAcceptedState(chunks, gap, solids);
+                        PumpOnJump(current, current.ObserveAcceptedState(chunks, gap, solids));
                         break;
                 }
             }
@@ -130,6 +130,14 @@ internal sealed class PlayerSessions
     /// health, whether it is dead, the knockback queued since the last status (handed over and
     /// cleared here, zero when none), the air and the mana. Clears <see cref="ServerPlayer.StatusDirty"/>.
     /// </summary>
+    /// <summary>A jump of <paramref name="player"/> (see <see cref="ServerPlayer.ObserveAcceptedState"/>) works the
+    /// bellows of every lit bloomery within reach of it.</summary>
+    private void PumpOnJump(ServerPlayer player, bool jumped)
+    {
+        if (jumped)
+            _state.World.PumpBellows(player.Position);
+    }
+
     internal static void SendPlayerStatus(ClientConnection client, ServerPlayer player)
     {
         player.TakePendingKnockback(out var knockback, out var lift);

@@ -64,8 +64,9 @@ def main():
     metals = sys.argv[1:] or ['tin', 'copper', 'bronze', 'iron']
     for m in metals:
         if m == 'iron':
-            recolor(os.path.join(ITEMS, 'copper_pickaxe.png'), os.path.join(ITEMS, 'iron_pickaxe.png'),
-                    m, copper_metal, 40, 200)
+            for part in ('pickaxe', 'axe', 'axe_head', 'pickaxe_head'):
+                recolor(os.path.join(ITEMS, 'copper_%s.png' % part), os.path.join(ITEMS, 'iron_%s.png' % part),
+                        m, copper_metal, 40, 200)
             continue
         if m != 'copper':
             for part in ('axe', 'axe_head', 'pickaxe', 'pickaxe_head', 'ingot'):

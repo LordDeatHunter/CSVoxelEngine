@@ -51,6 +51,8 @@ public class Camera : IMobTarget
     public bool IsSneaking { get; private set; }
     /// <summary>Strokes the swimmer has started so far; moves on each one (see <c>PlayerPhysics.SwimStrokeSeconds</c>).</summary>
     public int SwimStrokeCount => _physics.SwimStrokeCount;
+    /// <summary>Jumps the body has taken so far; moves on each one (<c>PlayerPhysics.JumpCount</c>).</summary>
+    public int JumpCount => _physics.JumpCount;
     /// <summary>Current vertical FOV in degrees: the base FOV plus the eased sprint widening plus the punch
     /// pinch plus the throw charge zoom.</summary>
     public float CurrentFov => _head.CurrentFov;

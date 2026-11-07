@@ -1,9 +1,12 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.StatusEffects;
+using VoxelEngine.Interaction;
 using VoxelEngine.Player;
 using VoxelEngine.Status;
 using VoxelEngine.UI.InventoryPanel;
@@ -260,6 +263,25 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 break;
             }
 
+            case "bloomery":
+                BuildBloomery(step);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} bloomery at {step.Pos}");
+                Advance();
+                break;
+
+            case "anvil":
+                BuildAnvil(step);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} anvil at {step.Pos}");
+                Advance();
+                break;
+
+            case "hammer":
+                // One hit that ignores the hammer's gap, so a scenario can film the whole work in a few frames
+                world.HammerFor(step.Pos!.Value, 0f, 0f);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} hammer {step.Pos}");
+                Advance();
+                break;
+
             case "chest":
                 RunUi("chest", u =>
                 {
@@ -311,6 +333,53 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
 
     /// <summary>An <c>effect</c> step: the effect name is validated here rather than at parse time, so
     /// parsing stays registry-free; an unknown name warns and the step is skipped.</summary>
+    // A bloomery at the step's anchor, built the way the converter builds one (a 2x2x2 of its structure, converted
+    // in place) and loaded with the step's ore and fuel; a lit one burns at the step's heat
+    private void BuildBloomery(VisualStep step)
+    {
+        var type = ContentRegistry.RequireBlock("bloomery");
+        var anchor = step.Pos!.Value;
+        var chunks = world.GetChunkManager();
+        var touched = new HashSet<Vector3>();
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(type.MultiblockSize))
+        {
+            var cell = anchor + new Vector3(dx, dy, dz);
+            var chunk = chunks.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)
+                ?? throw new InvalidOperationException($"Step {_step + 1} builds at {cell}, which is not in a loaded chunk.");
+            chunk.PlaceBlockAt(cell, type.MultiblockSourceId, chunks, 0);
+        }
+        Multiblock.Convert(chunks, anchor, step.State & 3, type, touched);
+        foreach (var chunkPos in touched)
+            if (chunks.Chunks.TryGetValue(chunkPos, out var chunk))
+                chunk.RemeshAfterBatchEdit(chunks);
+
+        var bloomeries = world.Smithing.Bloomeries;
+        bloomeries.Ensure(anchor, step.State & 3, type.Id);
+        for (var i = 0; i < step.Ore; i++)
+            bloomeries.TryAddOre(anchor, type.Bloomery!.OreId);
+        var fuel = ContentRegistry.RequireItem("coal");
+        for (var i = 0; i < step.Fuel; i++)
+            bloomeries.TryAddFuel(anchor, fuel);
+        if (step.On && bloomeries.Ignite(anchor))
+            bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z)!.Heat = step.Heat;
+    }
+
+    // An anvil at the step's cell, with a bloom on it that has taken the step's hits
+    private void BuildAnvil(VisualStep step)
+    {
+        var type = ContentRegistry.RequireBlock("anvil");
+        var cell = step.Pos!.Value;
+        var chunks = world.GetChunkManager();
+        var chunk = chunks.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)
+            ?? throw new InvalidOperationException($"Step {_step + 1} builds at {cell}, which is not in a loaded chunk.");
+        chunk.PlaceBlockAt(cell, type.Id, chunks, 0);
+        var anvils = world.Smithing.Anvils;
+        anvils.Ensure(cell, type.Id);
+        if (!step.On) return;
+        anvils.TryPlace(cell, type.Anvil!.InputId);
+        anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!.Hits = Math.Clamp(step.Hits, 0, type.Anvil.Hits - 1);
+    }
+
     private void ApplyEffect(VisualStep step)
     {
         var label = $"[visual] {_step + 1}/{scenario.Steps.Count} effect {step.Effect} on {step.Target} (x{step.Scale})";

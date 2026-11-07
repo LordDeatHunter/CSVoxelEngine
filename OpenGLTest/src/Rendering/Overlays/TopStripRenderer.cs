@@ -93,6 +93,13 @@ internal sealed class TopStripRenderer
         var name = _ui.FittedText(label.Text, _ui.CountScale, LookLabelMaxWidth);
         _ui.DrawTextCentered(name, center.X, cubeCenter.Y + LookLabelNameGap, _ui.CountScale,
             label.Mineable ? Rgba.White : DangerRed);
+        var detailTop = cubeCenter.Y + LookLabelNameGap + TextSize.Body + 6f;
+        if (!string.IsNullOrEmpty(label.Detail))
+        {
+            var detail = _ui.FittedText(label.Detail, _ui.CountScale, LookLabelDetailMaxWidth);
+            _ui.DrawTextCentered(detail, center.X, detailTop, _ui.CountScale, TextDim);
+            detailTop += TextSize.Body + 4f;
+        }
         if (!debug) return;
 
         var chunkPos = VoxelCoords.ChunkPosOf(label.Cell);
@@ -102,7 +109,7 @@ internal sealed class TopStripRenderer
             $"sun {label.Light.Sun:0}   block {label.Light.Block:0}",
             $"chunk {(int)chunkPos.X} {(int)chunkPos.Y} {(int)chunkPos.Z}   cell {(int)label.Cell.X & Chunk.SizeMask} {(int)label.Cell.Y & Chunk.SizeMask} {(int)label.Cell.Z & Chunk.SizeMask}",
         };
-        var linesTop = cubeCenter.Y + LookLabelNameGap + TextSize.Body + 6f;
+        var linesTop = detailTop;
         for (var i = 0; i < lines.Length; i++)
             _ui.DrawTextCentered(lines[i], center.X, linesTop + i * (TextSize.Body + 4f), _ui.CountScale, TextDim);
     }
@@ -134,6 +141,9 @@ internal sealed class TopStripRenderer
     private const float LookLabelTopGap = 6f;
     private const float LookLabelNameGap = 14f;
     private const float LookLabelMaxWidth = 200f;
+
+    // The status line under the name (a bloomery's heat and ore) is longer than a block name
+    private const float LookLabelDetailMaxWidth = 460f;
 
     /// <summary>
     /// The held clock's readout: the same top-center panel the compass uses, showing the day

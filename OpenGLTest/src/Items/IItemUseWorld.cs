@@ -73,12 +73,12 @@ public interface IItemUseWorld
     /// <summary>Lights the campfire entity; false when there is none to light.</summary>
     bool IgniteCampfire(int x, int y, int z);
 
-    /// <summary>Whether this cell belongs to a kiln structure that is unlit and holds fuel, so a
-    /// strike would light it. Any cell of the structure answers for the whole.</summary>
+    /// <summary>Whether this cell belongs to a kiln structure that is unlit and holds fuel, or to a bloomery that is
+    /// unlit and holds ore and fuel, so a strike would light it. Any cell of the structure answers for the whole.</summary>
     bool CanIgniteKiln(int x, int y, int z);
 
-    /// <summary>Lights the kiln this cell belongs to, spending its first unit of fuel; false when
-    /// there is no kiln to light or it holds none.</summary>
+    /// <summary>Lights the kiln or bloomery this cell belongs to, spending its first unit of fuel; false when
+    /// there is none to light or it is not ready.</summary>
     bool IgniteKiln(int x, int y, int z);
 
     /// <summary>

@@ -62,7 +62,7 @@ internal sealed class AmbientEffects
         _goblins = goblins;
     }
 
-    /// <summary>Every burning cell this frame (campfires, lit kilns and
+    /// <summary>Every burning cell this frame (campfires, lit kilns, lit bloomeries and
     /// goblin torches), feeding both the fire particles and the warm point lights.</summary>
     internal IReadOnlyList<Vector3> FireCells => _fireCells;
 
@@ -77,6 +77,7 @@ internal sealed class AmbientEffects
         _fireCells.Clear();
         _fireCells.AddRange(_campfires.LitCells);
         _fireCells.AddRange(_kilns.LitCells);
+        _fireCells.AddRange(_world.Smithing.Bloomeries.LitCells);
     }
 
     /// <summary>Adds every goblin's lit torch to <see cref="_fireCells"/>, right after

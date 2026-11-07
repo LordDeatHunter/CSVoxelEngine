@@ -48,6 +48,7 @@ public sealed class WorldIntentRuleTests
             WorldIntent.Throw(Eye, direction, 0.75f),
             WorldIntent.AttackWith(Eye, direction, NetAttackKind.SliceReturn),
             WorldIntent.AttackWith(Eye, direction, NetAttackKind.SwordChop),
+            WorldIntent.Hammer(Eye, direction, cell),
         };
 
         var seq = 40;
@@ -110,7 +111,7 @@ public sealed class WorldIntentRuleTests
         // The kind past the last one is unknown
         using var writer = new PacketWriter(NetMessage.WorldIntent);
         writer.Write(1);
-        writer.Write((byte)(NetIntentKind.Cast + 1));
+        writer.Write((byte)(NetIntentKind.Hammer + 1));
         writer.Write(Eye);
         writer.Write(Vector3.UnitX);
         using var reader = new PacketReader(writer.ToArray());

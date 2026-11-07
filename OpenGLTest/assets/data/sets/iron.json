@@ -1,0 +1,8 @@
+{
+  // The iron set: wear more of it for more. Members are the items whose equip.set is "iron".
+  "name": "Iron",
+  "bonuses": [
+    { "pieces": 3, "modifiers": { "armor": 3 } },
+    { "pieces": 5, "modifiers": { "maxHealth": 30, "attackDamage": 0.15 } }
+  ]
+}
