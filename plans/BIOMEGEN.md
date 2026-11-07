@@ -632,7 +632,9 @@ Noise seed offsets: ReliefNoise 153, MountainSpineNoise 154, MountainRangeCellWa
   BarrierGenerator.PatchNoise 162 (3D, the barrier band's ramps; plans/LAYERS.md),
   HellGenerator.CavernNoise 163 (3D, 2 octaves, the hell caverns; plans/LAYERS.md)
   HellBiomes.BiomeNoise 164 (3D, 2 octaves, the hell biomes), HellBiomes.PoolNoise 165 (3D, the hell pools),
-  CloudPatchGenerator.PatchNoise 166 (2 octaves) and DetailNoise 167 (the solid cloud patches; plans/LAYERS.md)
+  CloudPatchGenerator.PatchNoise 166 (2 octaves) and DetailNoise 167 (the solid cloud patches; plans/LAYERS.md),
+  SkyIslands.ZoneNoise 168, OutlineNoise 169, TopNoise 170, StalactiteNoise 171 (the sky islands),
+  CloudSeaGenerator cover 172 (2 octaves) and detail 173 (the cloud sea; plans/LAYERS.md)
 WorldFeatureConfig: CottonMaxDesertWeight = 0.5 - BiomeBorderDither
 PostProcessConfig: BiomeGradeStrength 0.04, ColdStart 0.45, ColdFull 0.85, EaseRate 0.5
 SurfaceShadingConfig: Grass/Foliage Color corners (ColdDry/WarmDry, ColdMid/WarmMid, ColdWet/WarmWet),

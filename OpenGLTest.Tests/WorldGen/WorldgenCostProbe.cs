@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Sky;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -13,7 +14,8 @@ namespace VoxelEngine.Tests.WorldGen;
 /// <see cref="TerrainGenerator.Compute"/> per chunk column over fixed, SplitMix64-drawn column
 /// categories (land, ocean, lake/river, highland, massif, great lake), and the per-stage cost of
 /// <c>ChunkTerrainFill.GenerateBlockData</c> through <see cref="WorldgenStageTimer"/> on fixed
-/// surface, above-surface, sky, deep-stone, cave-heavy, sea-floor and hell chunks, each timed cold and
+/// surface, above-surface, sky, deep-stone, cave-heavy, sea-floor, hell, sky-island and cloud-sea chunks,
+/// each timed cold and
 /// warm, so a worldgen change can report its before/after cost on the same workload.
 ///
 /// Nothing here asserts a TIMING: this is a shared dev machine with no CI, so a timing assertion
@@ -66,12 +68,14 @@ public sealed class WorldgenCostProbe
     private const int CaveHeavy = 4;
     private const int SeaFloor = 5;
     private const int Hell = 6;
+    private const int SkyIsland = 7;
+    private const int CloudSea = 8;
 
     // Hell chunks are drawn from this many chunk layers under the one straddling hell's top
     private const int HellChunkLayers = 36;
 
     private static readonly string[] ChunkClassNames =
-        ["surface", "above", "sky", "deepStone", "caveHeavy", "seaFloor", "hell"];
+        ["surface", "above", "sky", "deepStone", "caveHeavy", "seaFloor", "hell", "skyIsland", "cloudSea"];
 
     [Fact]
     public void ComputeCostPerColumnCategory()
@@ -324,6 +328,8 @@ public sealed class WorldgenCostProbe
             var hellCy = (WorldGenerationConfig.HellTopY >> Chunk.SizeShift) - 1
                          - (int)(NextRandom(ref state) % HellChunkLayers);
             TryAdd(classes[Hell], PositionsPerClass, new Vector3(cx, hellCy, cz));
+            TryAdd(classes[CloudSea], PositionsPerClass,
+                new Vector3(cx, SkyIslandConfig.CloudSeaBottomY >> Chunk.SizeShift, cz));
 
             if (underground.Count < UndergroundCandidates)
             {
@@ -331,6 +337,8 @@ public sealed class WorldgenCostProbe
                 underground.Add(new Vector3(cx, (column.MinHeight >> Chunk.SizeShift) - k, cz));
             }
         }
+
+        AddSkyIslandChunks(classes[SkyIsland]);
 
         var ranked = new List<(int Carved, Vector3 Pos)>(underground.Count);
         foreach (var pos in underground)
@@ -363,7 +371,23 @@ public sealed class WorldgenCostProbe
         && classes[Sky].Count >= SkyPositions
         && classes[SeaFloor].Count >= PositionsPerClass
         && classes[Hell].Count >= PositionsPerClass
+        && classes[CloudSea].Count >= PositionsPerClass
         && underground.Count >= UndergroundCandidates;
+
+    /// <summary>The chunk at the base of each of the first sky islands a ring scan of island cells finds
+    /// around the origin: the chunk column of its center, the chunk layer of its base.</summary>
+    private static void AddSkyIslandChunks(List<Vector3> into)
+    {
+        for (var ring = 0; ring < 200 && into.Count < PositionsPerClass; ring++)
+        for (var gx = -ring; gx <= ring; gx++)
+        for (var gz = -ring; gz <= ring; gz++)
+        {
+            if (Math.Max(Math.Abs(gx), Math.Abs(gz)) != ring || into.Count >= PositionsPerClass) continue;
+            if (!SkyIslands.TryGetIsland(gx, gz, out var island)) continue;
+            into.Add(new Vector3((int)MathF.Floor(island.CenterX) >> Chunk.SizeShift, island.BaseY >> Chunk.SizeShift,
+                (int)MathF.Floor(island.CenterZ) >> Chunk.SizeShift));
+        }
+    }
 
     private static void TryAdd(List<Vector3> list, int target, Vector3 pos)
     {

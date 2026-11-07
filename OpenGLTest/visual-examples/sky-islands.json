@@ -1,0 +1,50 @@
+{
+  // Sky islands and the cloud sea (plans/LAYERS.md L-12): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/sky-islands.json
+  // Shots land in visual/sky-islands/. With the default seed a small island zone centered near
+  // (-192, 240) lies close to the origin (found with SkyIslands.TryGetIsland over the island cells):
+  // an island of radius 22 at (-195, 202) with its base at 395, one of radius 26 at (-254, 265)
+  // based at 363 and one of radius 24 at (-298, 230) based at 389. The camera looks at the first
+  // from the side (its domed grass top over a stone underside tapering to stalactites), down on the
+  // second, across the zone from above it (the open sky past the zone's rim), down on the cloud
+  // sea (290..301) and up at it from below; then the player stands on the first island, creative off,
+  // walks off its rim, falls about a hundred blocks onto the cloud sea and lands without damage
+  // (the hearts stay full), then looks back up at the island.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-250.5, 392.5, 202.5], "yaw": 0, "pitch": 0 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "island_side", "hideHud": true },
+
+    { "op": "teleport", "pos": [-254.5, 400.5, 300.5], "yaw": -90, "pitch": -50 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "island_above", "hideHud": true },
+
+    { "op": "teleport", "pos": [-30.5, 440.5, 100.5], "yaw": 150, "pitch": -25 },
+    { "op": "wait", "seconds": 10 },
+    { "op": "screenshot", "name": "zone_aerial", "hideHud": true },
+
+    { "op": "teleport", "pos": [-180.5, 330.5, 120.5], "yaw": 60, "pitch": -35 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "screenshot", "name": "sea_above", "hideHud": true },
+
+    { "op": "teleport", "pos": [-180.5, 270.5, 120.5], "yaw": 60, "pitch": 35 },
+    { "op": "wait", "seconds": 8 },
+    { "op": "screenshot", "name": "sea_below", "hideHud": true },
+
+    { "op": "teleport", "pos": [-195.5, 406.5, 202.5], "yaw": 180, "pitch": -25 },
+    { "op": "fly", "on": false },
+    { "op": "creative", "on": true },
+    { "op": "wait", "seconds": 4 },
+    { "op": "creative", "on": false },
+    { "op": "screenshot", "name": "on_island" },
+    { "op": "walk", "keys": ["W"], "seconds": 7 },
+    { "op": "wait", "seconds": 6 },
+    { "op": "look", "yaw": 180, "pitch": -60 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "landed_on_sea" },
+    { "op": "look", "yaw": 0, "pitch": 40 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "island_from_sea", "hideHud": true }
+  ]
+}

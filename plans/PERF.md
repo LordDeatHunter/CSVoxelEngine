@@ -230,6 +230,10 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
   full 17,077-chunk ring ~5.0 s with 4 generation threads (headless).
 - Hell chunks (`L-6`, 2026-11-07, `WorldgenCostProbe` `hell` class): a wholly-hell chunk skips the
   overworld pipeline, warm 0.024 ms (the stamp 0.019 ms) against deepStone's 0.92 ms; cold 0.33 ms.
+- Sky chunks (`L-12`, 2026-11-07, `WorldgenCostProbe` `skyIsland` and `cloudSea` classes): a chunk in
+  the island band or the cloud sea takes the sky short path, warm 0.031 ms (island stamp 0.030 ms) and
+  0.05-0.11 ms (sea stamp); cold 3.9 / 7.8 ms, all but the stamp being the column-cache neighborhood
+  scan every chunk pays. Open sky in the island band costs a few zone hash rolls (the zone gate).
   With the biomes and skins (`L-7`/`L-8`, same probe and 6 chunks, two runs each against a HEAD
   worktree): the stamp warm 0.15-0.16 ms mean against 0.019-0.022 ms before, cold 0.25-0.30 ms against
   0.03; whole chunk warm 0.16-0.17 ms, still under a fifth of deepStone's ~0.7 ms. The open field now

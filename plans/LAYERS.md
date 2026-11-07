@@ -5,7 +5,7 @@
 ## Status
 
 Phases 1 (foundations) and 2 (the hell slice, `L-5` to `L-10`) done; phase 3 (the sky) has begun with the
-solid cloud patches (`L-11`). A Nether- and Aether-like pair of realms inside the one world, as vertical
+solid cloud patches (`L-11`) and the sky islands with their cloud sea (`L-12`). A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
@@ -14,8 +14,14 @@ creative only) is the barrier's tool. The solid cloud patches (`L-11`, AGENTS.md
 the `CloudSlab` band (198..203) with the translucent `cloud_block` (`softLanding`, `sink` 0.5: a fall is
 free, the player sinks half a block and stands; it breaks by hand) where a 2D noise (seed offsets
 166-167) outlines patches tens of blocks across, thicker in their cores (`WorldGen/Sky/CloudPatchGenerator`);
-a sky chunk in the band takes a short path that stamps only the cloud. Its tile comes from
-`tools/generate-sky-textures.py`, the spec list the sky palette of `L-12`/`L-13` extends.
+a sky chunk in the band takes a short path that stamps only the sky layers. Its tile comes from
+`tools/generate-sky-textures.py`, the spec list the sky palette of `L-13` extends. The sky islands
+(`L-12`, AGENTS.md "Sky islands", `SkyIslandConfig`) float in 320..420 inside hashed zones with wide
+gaps of open sky between them (`SkyIslands`, seed offsets 168-171): islands that never touch, a domed
+grass top over a stone underside tapering to stalactites; `SkyIslands.ZoneAt` gives a zone's tier
+(bigger is rarer) for `L-15`'s spawner, and `SkyIslandPalette` (grass/dirt/stone for now) is the seam
+`L-13`'s sky biomes plug into. Under them a thick, nearly continuous cloud sea of `cloud_block`
+(290..301, offsets 172-173, a `CloudLayer` like the patches) catches a fall off an island.
 The eye's height already tints the sky and fog (`LayerClimate`, `FrameLighting`, no shader change):
 red in hell, a deeper blue over the cloud slab. The barrier band is generated (`BarrierGenerator`, the
 `barrier` block, iron pickaxe only): a gapless core from -230 to -270 that walls up caves and fluids
@@ -36,8 +42,8 @@ and layer by `HellTrees`. Two hell mobs live in the pockets (`L-10`, AGENTS.md "
 too), spawned only on dim hell floors (`MobSpawner.TryFindHellSpawn`) and scaled by the layer index
 (`LayerDifficulty`: health, damage, cast rate, pack size); their bolts set the player `burning`. They
 are already on the wire (protocol 17) and in `entities.json`; `L-16` adds the loopback tests and the
-flight state. Id budget: 166 of 255 ids used (100 blocks with `cloud_block`, 65 items, air), 89 left for
-the sky palette (`L-12`..`L-15`, ~24).
+flight state. Id budget: 166 of 255 ids used (100 blocks with `cloud_block`, 65 items, air; `L-12` added none),
+89 left for the sky palette (`L-13`..`L-15`, ~24).
 Last updated 2026-11-07.
 
 ## In progress
@@ -48,9 +54,6 @@ Nothing.
 
 ### Phase 3: Sky slice
 
-- [ ] **`L-12` Sky islands (Y ~320-420).** P1, L. Island zones from the archipelago noise approach
-  plus hashed island sites (`TerrainIslands`, `TerrainSites`); wide ocean-like gaps; rare big zones
-  hold the hardest mobs. A second thick cloud sea under them (visual).
 - [ ] **`L-13` Sky biomes and flora.** P1, M. Two by noise: meadow and crystal/frost highland; broad
   and crystal tree species, plants, vines; full sky palette.
 - [ ] **`L-14` Flight in `Mob`.** P1, L. A flying movement mode plus animator support.

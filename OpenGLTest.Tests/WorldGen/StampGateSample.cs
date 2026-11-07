@@ -158,9 +158,38 @@ internal static class StampGateSample
                 AddChunk(new Vector3(ccx, cy, ccz));
                 AddChunk(new Vector3(cloudy.Cx, cy, cloudy.Cz));
             }
+
+            // The cloud sea, one chunk past each edge, over the anchor column; and the island band
+            // through the nearest island's column, one chunk past each edge, so the island gate both
+            // admits and skips and the short path meets real island
+            for (var cy = (SkyIslandConfig.CloudSeaBottomY >> Chunk.SizeShift) - 1;
+                 cy <= (SkyIslandConfig.CloudSeaTopY >> Chunk.SizeShift) + 1; cy++)
+                AddChunk(new Vector3(ccx, cy, ccz));
+
+            var island = NearestIslandColumn(ccx, ccz);
+            for (var cy = (WorldGenerationConfig.SkyIslandBottomY >> Chunk.SizeShift) - 1;
+                 cy <= (WorldGenerationConfig.SkyIslandTopY >> Chunk.SizeShift) + 1; cy++)
+                AddChunk(new Vector3(island.Cx, cy, island.Cz));
         }
 
         return chunks;
+    }
+
+    /// <summary>The chunk column of the center of the sky island nearest (cx, cz), by rings of island cells.</summary>
+    private static (int Cx, int Cz) NearestIslandColumn(int cx, int cz)
+    {
+        var gx0 = (cx << Chunk.SizeShift) / SkyIslandConfig.IslandCellBlocks;
+        var gz0 = (cz << Chunk.SizeShift) / SkyIslandConfig.IslandCellBlocks;
+        for (var ring = 0; ring <= 200; ring++)
+        for (var dx = -ring; dx <= ring; dx++)
+        for (var dz = -ring; dz <= ring; dz++)
+        {
+            if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != ring) continue;
+            if (SkyIslands.TryGetIsland(gx0 + dx, gz0 + dz, out var island))
+                return ((int)MathF.Floor(island.CenterX) >> Chunk.SizeShift, (int)MathF.Floor(island.CenterZ) >> Chunk.SizeShift);
+        }
+
+        return (cx, cz);
     }
 
     /// <summary>The chunk column nearest (cx, cz), by rings, with a cloud column at its center.</summary>

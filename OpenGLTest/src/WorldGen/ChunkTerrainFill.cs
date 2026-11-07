@@ -65,12 +65,11 @@ internal static class ChunkTerrainFill
         timer?.Mark(Stage.Columns);
         if (lowerBoundY > maxHeight + 1 && !needsWater)
         {
-            // A sky chunk is all air but for the solid cloud patches. With the gates on it takes
-            // just their stamp; the ungated test path runs the whole pipeline instead, which writes
-            // nothing else up here, and so proves the short path identical.
-            var inClouds = WorldGenerationConfig.CloudPatchesEnabled
-                           && CloudPatchGenerator.WriteBand().Reaches(lowerBoundY);
-            if (!inClouds)
+            // A sky chunk is all air but for the sky layers (the cloud patches, the cloud sea and
+            // the sky islands). With the gates on it takes just their stamps; the ungated test path
+            // runs the whole pipeline instead, which writes nothing else up here, and so proves the
+            // short path identical. A chunk outside every sky band stays empty and skips meshing.
+            if (!InSkyLayers(lowerBoundY))
             {
                 chunk.IsBlockDataReady = true;
                 WorldgenStats.AddChunk(System.Diagnostics.Stopwatch.GetTimestamp() - genStart);
@@ -79,8 +78,8 @@ internal static class ChunkTerrainFill
 
             if (stampGates)
             {
-                CloudPatchGenerator.Stamp(chunk.Blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
-                timer?.Mark(Stage.Clouds);
+                StampSky(chunk.Blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size,
+                    stampGates, timer);
                 Finish(chunk, column, lowerBoundY, hasWater: false, timer, genStart);
                 return;
             }
@@ -283,11 +282,8 @@ internal static class ChunkTerrainFill
             FoliageGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Foliage);
 
-        // The solid cloud slab, into air only: a chunk straddling it under a tall tree's reach
-        if (WorldGenerationConfig.CloudPatchesEnabled
-            && Admits(stampGates, CloudPatchGenerator.WriteBand(), lowerBoundY))
-            CloudPatchGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
-        timer?.Mark(Stage.Clouds);
+        // The sky layers, into air only: a chunk straddling the cloud slab under a tall tree's reach
+        StampSky(chunk.Blocks, worldX0, lowerBoundY, worldZ0, stampGates, timer);
 
         // Last of every stamp, so nothing writes over it: the barrier band between the overworld
         // and hell. Its core takes every cell, carved air and fluids included, so it is gapless.
@@ -306,6 +302,30 @@ internal static class ChunkTerrainFill
         timer?.Mark(Stage.HellTrees);
 
         Finish(chunk, column, lowerBoundY, hasWater, timer, genStart);
+    }
+
+    /// <summary>Whether the chunk whose floor is <paramref name="worldY0"/> meets any sky layer's band.</summary>
+    private static bool InSkyLayers(int worldY0) =>
+        (WorldGenerationConfig.CloudPatchesEnabled && CloudPatchGenerator.WriteBand().Reaches(worldY0))
+        || (SkyIslandConfig.CloudSeaEnabled && CloudSeaGenerator.WriteBand().Reaches(worldY0))
+        || (SkyIslandConfig.SkyIslandsEnabled && SkyIslandGenerator.WriteBand().Reaches(worldY0));
+
+    /// <summary>The sky layers' stamps, each gated by its band: the solid cloud patches, the cloud sea and
+    /// the sky islands. Their bands are disjoint and each writes only air.</summary>
+    private static void StampSky(byte[] blocks, int worldX0, int worldY0, int worldZ0, bool stampGates,
+        WorldgenStageTimer? timer)
+    {
+        if (WorldGenerationConfig.CloudPatchesEnabled && Admits(stampGates, CloudPatchGenerator.WriteBand(), worldY0))
+            CloudPatchGenerator.Stamp(blocks, worldX0, worldY0, worldZ0);
+        timer?.Mark(Stage.Clouds);
+
+        if (SkyIslandConfig.CloudSeaEnabled && Admits(stampGates, CloudSeaGenerator.WriteBand(), worldY0))
+            CloudSeaGenerator.Stamp(blocks, worldX0, worldY0, worldZ0);
+        timer?.Mark(Stage.CloudSea);
+
+        if (SkyIslandConfig.SkyIslandsEnabled && Admits(stampGates, SkyIslandGenerator.WriteBand(), worldY0))
+            SkyIslandGenerator.Stamp(blocks, worldX0, worldY0, worldZ0);
+        timer?.Mark(Stage.SkyIslands);
     }
 
     /// <summary>The hell trees crossing the chunk (<see cref="HellTrees.Stamp"/>), after the hell stamp,
