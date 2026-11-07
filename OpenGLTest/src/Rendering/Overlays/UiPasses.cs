@@ -112,6 +112,7 @@ internal sealed class UiPasses
                 _owner.Ui.Hud.DrawHotbarName(hotbarName.Name, hotbarName.Alpha);
         }
         view.Transition.Step(view.IsOpen, time);
+        view.StepMotion(time);
         if (view.IsOpen || view.Transition.Visible)
         {
             _owner.Ui.SetOverlay(new Vector2(0f, view.Transition.SlideY), view.Transition.Alpha);

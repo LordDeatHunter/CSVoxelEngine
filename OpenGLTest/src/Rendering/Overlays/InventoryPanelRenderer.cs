@@ -8,6 +8,7 @@ using VoxelEngine.Data;
 using VoxelEngine.Items;
 using VoxelEngine.UI;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.UI.Widgets;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
 using static VoxelEngine.UI.UiTheme;
 
@@ -35,11 +36,13 @@ internal sealed class InventoryPanelRenderer
     private const float RowHeight = InventoryPanelLayout.RowHeight;
     private const float RowIcon = 30f;
     private const float PreviewSize = 190f;
-    private const float PreviewRight = 300f;
     private static readonly Rgba RowSelected = Rgba.Gray(0.22f, 0.8f);
 
     private readonly GL _gl;
     private readonly UIRenderer _ui;
+
+    // This frame's pointer (canvas units), read from the view when the panel starts drawing.
+    private Vector2? _hover;
 
     internal InventoryPanelRenderer(GL gl, UIRenderer ui)
     {
@@ -58,23 +61,27 @@ internal sealed class InventoryPanelRenderer
         var top = PanelTop;
         var height = InventoryPanelLayout.PanelHeight(_ui.ScreenSize);
         var panel = new Vector2(PanelLeft + PanelWidth * 0.5f, top + height * 0.5f);
-        _ui.DrawRect(panel, new Vector2(PanelWidth, height), PanelBackground);
+        _hover = view.HoverCanvas;
+        _ui.DrawPanelFrame(new UiRect(panel, new Vector2(PanelWidth, height)), PanelBackground);
 
         var tabs = InventoryPanelLayout.Tabs;
         var tabWidth = InventoryPanelLayout.TabWidth(_ui.ScreenSize);
         for (var t = 0; t < tabs.Length; t++)
         {
-            var center = InventoryPanelLayout.TabCenter(t, _ui.ScreenSize);
+            var (center, size) = InventoryPanelLayout.TabRect(t, _ui.ScreenSize);
             var active = view.Tab == tabs[t];
-            _ui.DrawRect(center, new Vector2(tabWidth - 4f, TabHeight),
-                active ? SelectedBackground : SlotBackground);
-            if (active)
-                _ui.DrawBorder(center, new Vector2(tabWidth - 4f, TabHeight), Border.Standard, SelectedBorderColor);
+            var hovered = !active && _hover is { } p && new UiRect(center, size).Contains(p);
+            _ui.DrawRect(center, size, active ? SelectedBackground : hovered ? HoverBackground : SlotBackground);
             _ui.DrawTextCenteredFitted(TabTitle(tabs[t]),
                 center.X, top + PanelPad + 6f, _ui.CountScale, Rgba.White, tabWidth - 8f);
             _ui.DrawTextCenteredFitted(TabSubtitle(inventory, tabs[t]),
                 center.X, top + PanelPad + 30f, _ui.CountScale, Rgba.White, tabWidth - 8f);
         }
+
+        // The active tab's underline slides between tabs (InventoryView.TabIndicator is eased), so a switch reads as motion.
+        var indicatorCenterX = InventoryPanelLayout.TabCenter(0, _ui.ScreenSize).X + view.TabIndicator * tabWidth;
+        _ui.DrawRect(new Vector2(indicatorCenterX, top + PanelPad + TabHeight - 1f),
+            new Vector2(tabWidth - InventoryPanelLayout.TabGap, 2f), AccentGold);
 
         var (searchCenter, searchSize) = InventoryPanelLayout.SearchBoxRect(_ui.ScreenSize);
         _ui.DrawInputField(searchCenter, searchSize, view.Search.Text,
@@ -230,8 +237,11 @@ internal sealed class InventoryPanelRenderer
     {
         var centerY = InventoryPanelLayout.RowCenterY(row, offset);
         var center = new Vector2(PanelLeft + PanelWidth * 0.5f, centerY);
-        _ui.DrawRect(center, new Vector2(PanelWidth - PanelPad * 2f, RowHeight - 4f),
-            selected ? RowSelected : SlotBackground);
+        var rowSize = new Vector2(PanelWidth - PanelPad * 2f, RowHeight - 4f);
+        var hovered = !selected && _hover is { } pointer && new UiRect(center, rowSize).Contains(pointer)
+            && pointer.Y >= InventoryPanelLayout.ListTop
+            && pointer.Y < InventoryPanelLayout.ListTop + InventoryPanelLayout.ListHeight(_ui.ScreenSize);
+        _ui.DrawRect(center, rowSize, selected ? RowSelected : hovered ? HoverBackground : SlotBackground);
 
         var barColor = accent ?? (selected ? SelectedBorderColor : SlotBorderColor);
         _ui.DrawRect(new Vector2(PanelLeft + PanelPad + 2f, centerY),
@@ -341,24 +351,23 @@ internal sealed class InventoryPanelRenderer
         }
         if (id == 0) return;
 
-        var center = new Vector2(_ui.ScreenSize.X - PreviewRight, _ui.ScreenSize.Y * 0.38f);
-        var cardSize = new Vector2(PreviewSize + 40f, PreviewSize + 96f);
-        _ui.DrawRect(center, cardSize, PanelBackground);
-        _ui.DrawBorder(center, cardSize, Border.Standard, SlotBorderColor);
-        _ui.DrawRect(new Vector2(center.X, center.Y - cardSize.Y * 0.5f + 3f),
-            new Vector2(cardSize.X - 4f, 2f), AccentGold);
+        var (center, cardSize) = InventoryPanelLayout.DetailCardRect(_ui.ScreenSize);
+        _ui.DrawPanelFrame(new UiRect(center, cardSize), PanelBackground);
 
+        // Everything is placed from the card's top edge, so the content always stays inside the frame.
+        var cardTop = center.Y - cardSize.Y * 0.5f;
+        var inner = cardSize.X - UiTheme.Space.Md * 2f;
         var spin = time * 0.9f;
+        var iconCenter = new Vector2(center.X, cardTop + UiTheme.Space.Lg + PreviewSize * 0.35f);
         if (ItemRegistry.IsItem(id))
-            _ui.DrawItemIcon(center with { Y = center.Y - 12f }, PreviewSize * 0.7f, id, spin);
+            _ui.DrawItemIcon(iconCenter, PreviewSize * 0.7f, id, spin);
         else
-            _ui.DrawBlockIconSpinning(center with { Y = center.Y - 12f }, PreviewSize * 0.7f, id, spin);
+            _ui.DrawBlockIconSpinning(iconCenter, PreviewSize * 0.7f, id, spin);
 
-        _ui.DrawTextCenteredFitted(name, center.X, center.Y + PreviewSize * 0.5f + 12f, _ui.HeadScale, Rgba.White,
-            cardSize.X - 16f);
-        _ui.DrawTextCentered(stock, center.X, center.Y + PreviewSize * 0.5f + 40f, _ui.CountScale, TextDim);
-        _ui.DrawTextCentered("Click a hotbar slot to equip", center.X,
-            center.Y + PreviewSize * 0.5f + 58f, _ui.CountScale, TextDim);
+        var textTop = cardTop + UiTheme.Space.Lg * 2f + PreviewSize * 0.7f;
+        _ui.DrawTextCenteredFitted(name, center.X, textTop, _ui.HeadScale, Rgba.White, inner);
+        _ui.DrawTextCenteredFitted(stock, center.X, textTop + 30f, _ui.CountScale, TextDim, inner);
+        _ui.DrawTextCenteredFitted("Click a slot to equip", center.X, textTop + 52f, _ui.CountScale, TextDim, inner);
     }
 
     private float RowNameAvail(string count, float countInset)

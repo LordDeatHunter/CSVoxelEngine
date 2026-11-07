@@ -45,6 +45,13 @@ internal sealed class InventoryPanelInput
         return inputManager?.Mouse is { } mouse ? new Vector2(mouse.Position.X, mouse.Position.Y) : null;
     }
 
+    /// <summary>The pointer in canvas units (the scripted one, else the mouse), for hover looks; null with no pointer
+    /// or no open panel.</summary>
+    internal Vector2? PointerCanvas() =>
+        inventoryView.IsOpen && !pauseMenuView.IsOpen && PointerWindow() is { } window && renderManager != null
+            ? renderManager.Ui.ToCanvas(window)
+            : null;
+
     // Hotbar hotkeys 1-0, hoisted so the per-frame poll allocates nothing.
     internal static readonly Key[] NumberKeys =
         [Key.Number1, Key.Number2, Key.Number3, Key.Number4, Key.Number5,

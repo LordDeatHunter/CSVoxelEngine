@@ -561,6 +561,7 @@ public static class Program
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.UiPass);
         var hideHud = !gameplay.HudVisible
             || (visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud);
+        inventoryView.HoverCanvas = panelInput.PointerCanvas();
         if (!hideHud)
             world.Renderer.RenderUI(renderManager, inventoryView,
                 (float)world.LightingTime, shownFps, diagnostics.DebugEnabled,

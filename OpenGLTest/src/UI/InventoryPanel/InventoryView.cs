@@ -1,3 +1,4 @@
+using System;
 using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.UI.InventoryPanel;
@@ -78,6 +79,29 @@ public sealed class InventoryView
     /// </summary>
     public int ThumbDragRowCount { get; set; }
 
+    /// <summary>The pointer in canvas units, set once a frame before the panel draws; null when there is none.
+    /// Read only for hover looks, never for hit-testing a click.</summary>
+    public System.Numerics.Vector2? HoverCanvas { get; set; }
+
+    /// <summary>Eased tab position (fractional index of <see cref="InventoryPanelLayout.Tabs"/>) the active-tab
+    /// underline sits at.</summary>
+    public float TabIndicator { get; private set; }
+
+    private float _motionTime = float.NaN;
+
+    /// <summary>Steps the panel's eased looks toward the current tab by the time since the last call.</summary>
+    public void StepMotion(float timeSeconds)
+    {
+        var first = float.IsNaN(_motionTime);
+        var dt = first ? 0f : Math.Clamp(timeSeconds - _motionTime, 0f, 0.1f);
+        _motionTime = timeSeconds;
+        var target = Array.IndexOf(InventoryPanelLayout.Tabs, Tab);
+        TabIndicator = first ? target : MathUtils.Damp(TabIndicator, target, TabIndicatorRate, dt);
+    }
+
+    /// <summary>How fast the tab underline catches up with the picked tab (per second, see <see cref="MathUtils.Damp"/>).</summary>
+    public const float TabIndicatorRate = 18f;
+
     /// <summary>Drops the selection picks; the per-tab scroll offsets are kept.</summary>
     public void ClearSelection()
     {
@@ -106,6 +130,8 @@ public sealed class InventoryView
     {
         IsOpen = false;
         Transition.Reset();
+        HoverCanvas = null;
+        _motionTime = float.NaN;
         ClearSelection();
         ClearInput();
         Craft.Clear();

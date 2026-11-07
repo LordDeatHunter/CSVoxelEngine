@@ -43,6 +43,7 @@ public static class UiTheme
     public static readonly Rgba ChipBackground = Rgba.Gray(0.12f, 0.9f);
     public static readonly Rgba SlotBackground = Rgba.Gray(0.08f, 0.55f);
     public static readonly Rgba SelectedBackground = Rgba.Gray(0.18f, 0.65f);
+    public static readonly Rgba HoverBackground = Rgba.Gray(0.14f, 0.6f);
 
     // Frames
     public static readonly Rgba SlotBorderColor = Rgba.Gray(0.65f, 0.45f);

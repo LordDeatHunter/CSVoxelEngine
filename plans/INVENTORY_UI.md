@@ -15,15 +15,14 @@ Nothing.
 ## Open
 
 ### Phase 2: [E] panel two-column rework
-- [ ] **`U-2` List left, detail card right, with states and smooth motion** - P1, L.
-  - [ ] one right-hand detail card (item preview now; craft card, equipment and chest side panels later) on one shared
-    card frame; positions come from layout classes (retire `PreviewRight = 300`, the `+12f` catalog count inset, tab
-    text offsets `+6/+30`, `RowNameAvail`)
-  - [ ] main panel gets the same frame treatment as the cards (it has no border or accent bar today)
-  - [ ] hover on rows, tabs and buttons; pressed and disabled states; all eased through `MathUtils` / `Spring`
-  - [ ] tab underline slide, row selection fade, eased wheel scroll and scroll-to-selection (a newly selected or
-    searched row stays in view)
-  - [ ] tab hit-testing matches the draw rects (it ignores the 4px gap today); fit tab subtitles and row counts
+- [ ] **`U-2` List left, detail card right, with states and smooth motion** - P1, L. Partly done (frame, detail card
+  position, tab hit-test, tab hover and underline slide, row hover); the rest below.
+  - [ ] the craft card moves onto the same card frame and the `DetailCardRect` slot (it still sits at the screen's right
+    edge; U-3 owns its internals); retire the `+12f` catalog count inset, tab text offsets `+6/+30` and `RowNameAvail`
+    (`PreviewRight` is gone)
+  - [ ] pressed and disabled states on rows, tabs and buttons; hover on buttons (catalog `+1/+10/+100/X`)
+  - [ ] row selection fade, eased wheel scroll and scroll-to-selection (a newly selected or searched row stays in
+    view); needs the draw and the hit-test to read one eased offset
   **Hook:** `InventoryPanelLayout`, `InventoryPanelRenderer`, `InventoryPanelInput`, `PanelTransition`, `ScrollList`.
 
 ### Phase 3: craft card, tooltip, toast

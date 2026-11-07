@@ -347,6 +347,18 @@ public class UIRenderer : IDisposable
         DrawMesh(_unitSquare, RectTransform(center, size), tint, texture);
 
     /// <summary>An outline drawn as four rectangles just inside the given bounds.</summary>
+    /// <summary>
+    /// The frame every panel and card shares (<see cref="PanelFrameLayout"/>): the fill, a border just inside
+    /// the outer rectangle and the thin gold accent bar under its top edge.
+    /// </summary>
+    internal void DrawPanelFrame(UiRect outer, Rgba fill)
+    {
+        var frame = PanelFrameLayout.Standard(outer);
+        DrawRect(outer.Center, outer.Size, fill);
+        DrawBorder(outer.Center, outer.Size, frame.BorderWidth, SlotBorderColor);
+        DrawRect(frame.AccentBar.Center, frame.AccentBar.Size, AccentGold);
+    }
+
     public void DrawBorder(Vector2 center, Vector2 size, float thickness, Rgba color)
     {
         var half = size * 0.5f;

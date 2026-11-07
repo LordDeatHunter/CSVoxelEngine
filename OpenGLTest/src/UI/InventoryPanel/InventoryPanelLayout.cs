@@ -150,15 +150,36 @@ public static class InventoryPanelLayout
             ? ScrollbarHitLeft(screen)
             : PanelLeft + PanelWidth(screen) - PanelPad;
 
-    /// <summary>Panel tab under a canvas point, if any.</summary>
+    /// <summary>Gap between neighboring tab rectangles; the draw and the hit-test both leave it out.</summary>
+    public const float TabGap = 4f;
+
+    /// <summary>The drawn (and hit) rectangle of tab <paramref name="t"/>: its strip cell minus the gap.</summary>
+    public static (Vector2 Center, Vector2 Size) TabRect(int t, Vector2 screen) =>
+        (TabCenter(t, screen), new Vector2(TabWidth(screen) - TabGap, TabHeight));
+
+    /// <summary>Panel tab under a canvas point, if any. Matches <see cref="TabRect"/>, so the gap hits nothing.</summary>
     public static InventoryCategory? TabAt(Vector2 point, Vector2 screen)
     {
-        var width = PanelWidth(screen);
-        if (point.X < PanelLeft || point.X > PanelLeft + width) return null;
-        if (point.Y < PanelTop + PanelPad || point.Y > PanelTop + PanelPad + TabHeight) return null;
+        for (var t = 0; t < Tabs.Length; t++)
+            if (InBox(point, TabRect(t, screen))) return Tabs[t];
+        return null;
+    }
 
-        var t = (int)((point.X - PanelLeft - PanelPad) / TabWidth(screen));
-        return t >= 0 && t < Tabs.Length ? Tabs[t] : null;
+    /// <summary>Gap between the list panel and the detail card on its right.</summary>
+    public const float DetailGap = PanelGap;
+
+    /// <summary>Width and height of the detail card (the picked item's preview, later equipment and chest cards).</summary>
+    public static readonly Vector2 DetailCardSize = new(270f, 270f);
+
+    /// <summary>
+    /// The detail card's rectangle: right of the list panel, a gap away, its top level with the panel's.
+    /// Falls back to hugging the screen's right edge when the window is too narrow for both.
+    /// </summary>
+    public static (Vector2 Center, Vector2 Size) DetailCardRect(Vector2 screen)
+    {
+        var left = PanelLeft + PanelWidth(screen) + DetailGap;
+        left = MathF.Min(left, screen.X - PanelRightMargin - DetailCardSize.X);
+        return (new Vector2(left + DetailCardSize.X * 0.5f, PanelTop + DetailCardSize.Y * 0.5f), DetailCardSize);
     }
 
     /// <summary>List row under a canvas point for a list scrolled by <paramref name="offset"/>, if any.</summary>
