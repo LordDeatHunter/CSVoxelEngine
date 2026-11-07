@@ -95,6 +95,11 @@ for (const kind of ['element', 'shape', 'modifier', 'trigger']) {
     spells[`${kind}/${id}`] = { key: `${kind}/${id}`, kind, name: d.name ?? id, costShare: d.costShare, complexity: d.complexity, tags: d.tags ?? [], effect: d.effect ?? null, impact: d.impact ?? [], damageFactor: d.damageFactor ?? null, rangeFactor: d.rangeFactor ?? null }
   }
 }
+const moltens = Object.fromEntries(listJson(path.join(assets, 'data/molten')).map(({ id, file }) => {
+  const d = readJson(file)
+  return [id, { id, name: d.name ?? id, color: d.color ?? [235, 130, 60], texture: d.texture ?? null }]
+}))
+const tags = Object.fromEntries(listJson(path.join(assets, 'data/tags')).map(({ id, file }) => [id, readJson(file).items ?? []]))
 const effects = Object.fromEntries(listJson(path.join(assets, 'data/effects')).map(({ id, file }) => {
   const d = readJson(file)
   return [id, { id, name: d.name ?? id, durationSeconds: d.durationSeconds, tickSeconds: d.tickSeconds ?? null, damageShare: d.damageShare ?? null, moveFactor: d.moveFactor ?? 1, attackFactor: d.attackFactor ?? 1 }]
@@ -144,6 +149,8 @@ writeData('loot', loot)
 writeData('trees', trees)
 writeData('spells', spells)
 writeData('effects', effects)
+writeData('moltens', moltens)
+writeData('tags', tags)
 
 fs.rmSync(outAssets, { recursive: true, force: true })
 const copyDir = (rel) => {
@@ -172,21 +179,15 @@ const ref = (key) => {
   const l = label(key)
   return l.link ? `[${esc(l.text)}](${l.link})` : esc(l.text)
 }
-const recipeLine = (r) => {
-  const outs = r.outputs.map(ref).join(', ')
-  const ins = (r.ingredients ?? r.inputs.map((i) => ({ ref: i, count: 1 }))).map((i) => `${i.count > 1 ? i.count + '× ' : ''}${ref(i.ref)}`).join(' + ')
-  let extra = ''
-  if (r.kind === 'cook') extra = ` (${r.seconds}s on a campfire)`
-  else if (r.kind === 'melt') extra = ` (${r.ml} ml)`
-  else if (r.kind === 'cast') extra = ` (${r.ml} ml, cools ${r.seconds}s)`
-  return `- **${r.kind}**: ${ins} → ${r.count > 1 ? r.count + '× ' : ''}${outs}${extra}`
-}
+/** Recipe cards drawn by the RecipeCard component, which looks each recipe up by kind and id. */
+const recipeCards = (list) =>
+  `<div class="recipe-list">\n${list.map((r) => `<RecipeCard kind="${r.kind}" id="${r.id}" />`).join('\n')}\n</div>\n`
 const recipeSection = (key) => {
   const made = recipeIndex.madeFrom[key] ?? []
   const used = recipeIndex.usedIn[key] ?? []
   let s = ''
-  if (made.length) s += `\n## How to get it\n\n${made.map(recipeLine).join('\n')}\n`
-  if (used.length) s += `\n## Used in\n\n${used.map(recipeLine).join('\n')}\n`
+  if (made.length) s += `\n## How to get it\n\n${recipeCards(made)}\n`
+  if (used.length) s += `\n## Used in\n\n${recipeCards(used)}\n`
   const drops = Object.entries(loot).filter(([, es]) => es.some((e) => e.item === key)).map(([n]) => n)
   if (drops.length) s += `\n## Dropped by\n\nLoot tables: ${drops.map((n) => '`' + n + '`').join(', ')}\n`
   return s
@@ -209,7 +210,7 @@ for (const b of shownBlocks) {
     `| Property | Value |\n|---|---|\n| Hardness | ${b.hardness} |\n| Needs tool | ${b.requiresTool ? tool ?? 'yes' : 'no'} |\n| Light | ${b.emission || 'none'} |\n` +
     note + recipeSection('block/' + b.id))
 }
-writePage('game/blocks/index.md', `# Blocks\n\n${shownBlocks.map((b) => `- [${esc(b.name)}](/game/blocks/${b.id})`).join('\n')}\n`)
+writePage('game/blocks/index.md', '# Blocks\n\n<ItemGrid kind="blocks" />\n')
 
 for (const i of Object.values(items)) {
   const stats = [
@@ -223,7 +224,7 @@ for (const i of Object.values(items)) {
     `---\ntitle: ${JSON.stringify(i.name)}\n---\n\n# ${esc(i.name)}\n\n<ModelViewer kind="item" id="${i.id}" />\n\n` +
     (stats.length ? `| Property | Value |\n|---|---|\n${stats.join('\n')}\n` : '') + recipeSection('item/' + i.id))
 }
-writePage('game/items/index.md', `# Items\n\n${Object.values(items).map((i) => `- [${esc(i.name)}](/game/items/${i.id})`).join('\n')}\n`)
+writePage('game/items/index.md', '# Items\n\n<ItemGrid kind="items" />\n')
 
 for (const e of Object.values(entities)) {
   const drops = e.loot && loot[e.loot] ? loot[e.loot].map((d) => ref(d.item)).join(', ') : null
@@ -288,10 +289,7 @@ writePage('game/reference/crafting.md',
   `# Recipes\n\n` + Object.keys(kindText).map((k) => {
     const rs = byKind(k)
     if (!rs.length) return ''
-    const lines = k === 'alloy'
-      ? rs.map((r) => `- ${r.parts.map((p) => `${p.ml} ml ${p.fluid}`).join(' + ')} → ${r.parts.reduce((a, p) => a + p.ml, 0)} ml ${r.outputs[0].replace('fluid/', '')}`)
-      : rs.map(recipeLine)
-    return `## ${kindText[k][0]}\n\n${kindText[k][1]}\n\n${lines.join('\n')}\n`
+    return `## ${kindText[k][0]}\n\n${kindText[k][1]}\n\n${recipeCards(rs)}`
   }).join('\n'))
 
 for (const w of warnings) console.warn('warn:', w)

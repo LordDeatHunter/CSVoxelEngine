@@ -28,6 +28,10 @@ Blocks whose shape depends on placement (panes, fluids, tree wood and others) sh
 
 `<TreeViewer id="oak"/>` draws a tree from the exporter data: wood as boxes sized by each cell's thickness with tubes toward connected neighbors (the game's `TreeWoodShape` rule, in `tree-shape.ts`), leaves as cubes, over a patch of grass. A slider replays the growth, and `?step=N` in the URL opens any step.
 
+## Recipes and icons
+
+Recipes are drawn by `<RecipeCard kind="craft" id="..."/>`: framed inventory-style slots with count badges (milliliters for molten metal), an arrow through the station (the quern, kiln, casting basin or alloy furnace block, or a crafting grid), and a glowing output slot. `RecipeSlot` links to the block or item page and shows its name on hover; a tag input ("any axe") cycles through its members. Item icons are their sprites. Block icons are rendered once each from the real block model by one shared offscreen three.js renderer (`icons.ts`) and cached, which also fits multiblock structures. The Blocks and Items index pages use `<ItemGrid>`, a searchable grid of the same icons.
+
 ## Working on it
 
 ```powershell
