@@ -822,6 +822,57 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>The highest lava level of any hell layer, in cells above its pocket's floor.</summary>
     public const int HellLavaMaxDepth = 22;
 
+    /// <summary>Frequency of the hell biome noise (seed offset 164, two octaves, 3D): sampled at
+    /// each layer's mid row, so a hell biome region is a few hundred blocks across and differs from
+    /// layer to layer.</summary>
+    public const float HellBiomeFrequency = 1f / 320f;
+
+    /// <summary>Largest hashed lean each hell layer adds to the biome noise, so one layer leans
+    /// toward one biome and the next toward another while each still mixes them.</summary>
+    public const float HellBiomeLayerBias = 0.25f;
+
+    /// <summary>Spacing of the 2D lattice per layer the hell biome noise is read on, blended
+    /// bilinearly: the chunk size, so a chunk reads four points per layer.</summary>
+    public const int HellBiomeLatticeStride = 16;
+
+    /// <summary>Spacing of the hell pool noise's lattice: a power of two dividing the chunk size.</summary>
+    public const int HellPoolLatticeStride = 8;
+
+    /// <summary>A hell column whose biome value is under this is Ashlands.</summary>
+    public const float HellAshlandsMaxValue = -0.1f;
+
+    /// <summary>A hell column whose biome value is over this is a Fungal Grove; between the two
+    /// thresholds it is a Magma Cavern.</summary>
+    public const float HellFungalMinValue = 0.1f;
+
+    /// <summary>Frequency of the hell pool noise (seed offset 165, 3D): which columns of a biome
+    /// with a partial lava share pond lava and which fill their pool rows with soil.</summary>
+    public const float HellPoolFrequency = 1f / 24f;
+
+    /// <summary>How many cells under an open cavern cell take the biome's floor skin: the top one
+    /// its surface, the rest its soil.</summary>
+    public const int HellFloorSkinBlocks = 3;
+
+    /// <summary>How many cells over an open cavern cell take the biome's ceiling skin.</summary>
+    public const int HellCeilingSkinBlocks = 2;
+
+    /// <summary>The share of the pool columns that hold lava in the Ashlands (the rest are ash
+    /// plains at the lava level).</summary>
+    public const float HellAshlandsLavaShare = 0.35f;
+
+    /// <summary>The share of the pool columns that hold lava in a Fungal Grove.</summary>
+    public const float HellFungalLavaShare = 0.08f;
+
+    /// <summary>One ceiling cell right over open cavern in this many is an ember crystal in the
+    /// Ashlands and the Magma Caverns.</summary>
+    public const int HellEmberCrystalRate = 40;
+
+    /// <summary>One Magma Cavern floor surface cell in this many is a glowing magma block.</summary>
+    public const int HellMagmaFloorRate = 7;
+
+    /// <summary>One Fungal Grove ceiling cell right over open cavern in this many is a fungal glow.</summary>
+    public const int HellFungalGlowRate = 18;
+
     /// <summary>Bottom of the solid cloud slab: the patchy real cloud blocks around y 200, above the
     /// relief ceiling (<see cref="ReliefCeilingHeight"/>) and the drawn cloud layer
     /// (<see cref="SkyConfig.CloudHeight"/>).</summary>

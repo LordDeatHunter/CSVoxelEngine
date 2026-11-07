@@ -1,0 +1,11 @@
+{
+  // Glowing magma: the Magma Caverns pool beds and a scatter over their floors, lit in the ember
+  // color. Tile from tools/generate-hell-textures.py.
+  "name": "Magma Block",
+  "model": { "parent": "block/cube_all", "textures": { "all": "magma_block" } },
+  "sfx": "hit_rock",
+  "hardness": 8,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "light": { "emission": 9, "color": [255, 90, 40] }
+}

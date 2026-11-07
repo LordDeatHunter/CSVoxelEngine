@@ -69,6 +69,7 @@ public static class WorldSeed
         TinGenerator.Reseed();
         BarrierGenerator.Reseed();
         HellGenerator.Reseed();
+        HellBiomes.Reseed();
         LavaGenerator.Reseed();
         PebbleGenerator.Reseed();
         SnowGenerator.Reseed();

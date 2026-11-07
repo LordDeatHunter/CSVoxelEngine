@@ -1,0 +1,7 @@
+{
+  // The Fungal Grove soil and ceilings. Tile from tools/generate-hell-textures.py.
+  "name": "Fungal Soil",
+  "model": { "parent": "block/cube_all", "textures": { "all": "fungal_soil" } },
+  "hardness": 4,
+  "footstepDust": true
+}

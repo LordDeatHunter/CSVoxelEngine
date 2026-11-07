@@ -5,8 +5,11 @@
   // forever: an open cavern pocket over a 16-block hellrock slab. The default seed leaves open
   // cavern at each spot below (found by a point-query scan around the origin): layer 0 at -330, its
   // floor dipping into small lava pools; layer 1 at -430; layer 4 at -706, which is more open and
-  // whose floor holds wider lava pools. Lava and the eye adaptation are the only light (no
-  // skylight reaches this deep); the red fog is LayerClimate's hell tint.
+  // whose floor holds wider lava pools. Lava, the ceiling lights and the eye adaptation are the only
+  // light (no skylight reaches this deep); the red fog is LayerClimate's hell tint. Then one spot per
+  // hell biome (L-7/L-8): the Ashlands at layer 0 (ash floor, scorched walls, ember crystals), the
+  // Magma Caverns at layer 1 (basalt, magma blocks, lava pools) and a Fungal Grove at layer 1 (fungal
+  // moss, fungal glow), each looked at ahead, down at the floor and up at the ceiling.
   "steps": [
     { "op": "creative", "on": true },
     { "op": "fly", "on": true },
@@ -31,6 +34,30 @@
     { "op": "look", "yaw": 90, "pitch": -10 },
     { "op": "screenshot", "name": "layer4_cavern", "hideHud": true },
     { "op": "look", "yaw": 180, "pitch": -89 },
-    { "op": "screenshot", "name": "layer4_down", "hideHud": true }
+    { "op": "screenshot", "name": "layer4_down", "hideHud": true },
+
+    { "op": "teleport", "pos": [-7.5, -329.4, -7.5], "yaw": -90, "pitch": -15 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "ashlands_ahead", "hideHud": true },
+    { "op": "look", "yaw": -90, "pitch": -60 },
+    { "op": "screenshot", "name": "ashlands_floor", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": 35 },
+    { "op": "screenshot", "name": "ashlands_ceiling", "hideHud": true },
+
+    { "op": "teleport", "pos": [-23.5, -449.4, 8.5], "yaw": 0, "pitch": -15 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "magma_ahead", "hideHud": true },
+    { "op": "look", "yaw": 0, "pitch": -60 },
+    { "op": "screenshot", "name": "magma_floor", "hideHud": true },
+    { "op": "look", "yaw": 180, "pitch": 35 },
+    { "op": "screenshot", "name": "magma_ceiling", "hideHud": true },
+
+    { "op": "teleport", "pos": [-135.5, -426.4, -103.5], "yaw": 0, "pitch": -15 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "fungal_ahead", "hideHud": true },
+    { "op": "look", "yaw": 0, "pitch": -60 },
+    { "op": "screenshot", "name": "fungal_floor", "hideHud": true },
+    { "op": "look", "yaw": 180, "pitch": 35 },
+    { "op": "screenshot", "name": "fungal_ceiling", "hideHud": true }
   ]
 }

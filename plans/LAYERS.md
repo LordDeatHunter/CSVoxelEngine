@@ -4,7 +4,7 @@
 
 ## Status
 
-Phase 1 (foundations) done; phase 2 under way (`L-5`, `L-6` done). A Nether- and Aether-like pair of realms inside the one world, as vertical
+Phase 1 (foundations) done; phase 2 under way (`L-5` to `L-8` done). A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
@@ -17,9 +17,16 @@ red in hell, a deeper blue over the cloud slab. The barrier band is generated (`
 too, patchy noise ramps above and below it, stamped last. Under it hell is generated
 (`HellGenerator`, `WorldGen/Hell/`): 96-block layers repeating downward forever, a cavern pocket on a
 3D lattice noise over a 16-block slab of `hellrock` (iron pickaxe only), deeper layers more open with
-more lava ponding their floors' dips; a wholly-hell chunk skips the overworld pipeline. Hellrock is
-the only hell block so far: `L-8` completes the palette (`tools/generate-hell-textures.py` takes a
-tile spec per block). The layer index is ready for the hell mobs' difficulty (`L-10`).
+more pools ponding their floors' dips; a wholly-hell chunk skips the overworld pipeline. Three hell
+biomes (`HellBiome`, `HellBiomes.At`: a 3D noise at seed offset 164 plus a hashed lean per layer, so a
+layer mixes them and the next differs) dress the pockets: Ashlands (ash, cinder soil, scorched
+hellrock, few lava pools), Magma Caverns (basalt, magma blocks, every pool lava) and Fungal Grove
+(fungal moss and soil, nearly dry); floor, ceiling and wall skins a few cells deep, ceiling lights
+(`ember_crystal`, `fungal_glow`) in two new light colors (5 of 8 palette slots used). The palette is
+nine JSON blocks with tiles from `tools/generate-hell-textures.py` (a spec per block). `L-9` places
+flora per biome through `HellBiomes`; the layer index is ready for the hell mobs' difficulty (`L-10`).
+Id budget: 158 of 255 ids used (93 blocks, 64 items, air), 97 left for `L-9` (~8), `L-10` (~3) and
+the sky palette (`L-11`..`L-15`, ~25).
 Last updated 2026-11-07.
 
 ## In progress
@@ -30,10 +37,6 @@ Nothing.
 
 ### Phase 2: Hell slice
 
-- [ ] **`L-7` Hell biomes.** P1, M. 2-3 biomes chosen by **3D** noise (they vary by layer and xz).
-- [ ] **`L-8` Hell palette.** P1, M. Full block palette in JSON: hellrock, surface and soil per
-  biome, emissive blocks (new `BlockLightPalette` slots, 8-color cap), lava reuse. Mind the 255 id
-  cap (`add-content` skill).
 - [ ] **`L-9` Hell flora.** P1, M. Fungal/charred tree species (tree JSON), ground glow plants,
   hanging vines (`support: "above"`).
 - [ ] **`L-10` Hell mobs.** P1, L. Two, harder than goblin/slime: a melee brute and a ranged/fire

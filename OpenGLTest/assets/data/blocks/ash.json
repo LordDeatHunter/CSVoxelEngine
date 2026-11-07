@@ -1,0 +1,8 @@
+{
+  // Hell ash (plans/LAYERS.md L-8): the Ashlands floor surface and the top of its dry pools.
+  // Plain solid (not a falls block), loose underfoot. Tile from tools/generate-hell-textures.py.
+  "name": "Ash",
+  "model": { "parent": "block/cube_all", "textures": { "all": "ash" } },
+  "hardness": 3,
+  "footstepDust": true
+}

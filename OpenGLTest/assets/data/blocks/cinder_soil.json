@@ -1,0 +1,7 @@
+{
+  // The Ashlands soil under its ash. Tile from tools/generate-hell-textures.py.
+  "name": "Cinder Soil",
+  "model": { "parent": "block/cube_all", "textures": { "all": "cinder_soil" } },
+  "hardness": 4,
+  "footstepDust": true
+}

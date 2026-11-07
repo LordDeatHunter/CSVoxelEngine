@@ -1,0 +1,9 @@
+{
+  // The Magma Caverns floors, walls and ceilings. Tile from tools/generate-hell-textures.py.
+  "name": "Basalt",
+  "model": { "parent": "block/cube_all", "textures": { "all": "basalt" } },
+  "sfx": "hit_rock",
+  "hardness": 12,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 }
+}
