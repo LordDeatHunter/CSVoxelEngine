@@ -21,7 +21,10 @@ Every part is authored centered on its own origin (0, 0, 0) in pixels (16 px = 1
 chain places a part by a matrix alone. The body ring is BODY_LINK_PX long plus an overlap on each end, so a
 bent chain shows no gap.
 
-Clip contract: idle, bite (its "impact" event is the moment the jaws snap shut) and hurt, all on Head and Jaw.
+Clip contract: idle, bite (its "impact" event is the moment the jaws snap shut) and hurt, all on Head and Jaw. Every
+clip also holds Body and Tail in the display layout (laid out behind the head, one after another), which the game
+never plays (the chain places the parts) but the wiki viewer and the item debugger do, so the model reads as a worm
+instead of three parts stacked at the origin.
 Sign convention (BbmodelLoader.ReadAnimations): a rotation (x, y, z) in degrees maps to engine Euler
 (-x, -y, z); a positive x on Head or Jaw tips the snout down, so a positive Jaw x opens the mouth.
 
@@ -138,6 +141,17 @@ def outliner(rig):
 hell.outliner = outliner
 
 
+BODY_OFFSET_PX = 48
+TAIL_OFFSET_PX = 92
+
+
+def laid_out(clip):
+    """Holds the body ring and the tail behind the head, so a preview shows a worm (see the module doc)."""
+    clip.pos("Body", [(0, v(0, 0, BODY_OFFSET_PX)), (clip.length, v(0, 0, BODY_OFFSET_PX))])
+    clip.pos("Tail", [(0, v(0, 0, TAIL_OFFSET_PX)), (clip.length, v(0, 0, TAIL_OFFSET_PX))])
+    return clip
+
+
 def clips():
     idle = Clip("idle", 2.4, "loop", 1)
     # Breathing: the jaw works slowly and the head sways, as it lies in wait.
@@ -151,7 +165,7 @@ def clips():
     hurt = Clip("hurt", 0.4, "once", 3)
     hurt.rot("Head", [(0, v()), (0.06, v(-14, 10, 4)), (0.2, v(-4, 3, 1)), (0.4, v())])
     hurt.rot("Jaw", [(0, v()), (0.06, v(40)), (0.2, v(16)), (0.4, v())])
-    return [idle, bite, hurt]
+    return [laid_out(idle), laid_out(bite), laid_out(hurt)]
 
 
 # ---- the fang sprite -----------------------------------------------------------------------------

@@ -62,7 +62,7 @@ for (const { id, file } of listJson(path.join(assets, 'data/items'))) {
     id, name: d.name ?? id, texture: d.texture ? path.basename(d.texture) : null,
     entityDamage: d.entityDamage ?? null, blockDamage: d.blockDamage ?? null, tool: d.tool ?? null,
     fuelSeconds: d.fuel?.burnSeconds ?? null, attack: d.attack ?? null, staff: d.staff ?? null, use: d.use?.action ?? null,
-    teaches: d.teaches ?? null
+    teaches: d.teaches ?? null, summons: d.use?.action === 'summon' ? d.use.entity ?? null : null
   }
 }
 const hasBlock = (n) => n in blocks
@@ -85,7 +85,7 @@ for (const { id, file } of listJson(path.join(assets, 'data/entities'))) {
   const mf = path.join(assets, 'models/entity', models[0])
   if (fs.existsSync(mf)) for (const a of JSON.parse(fs.readFileSync(mf, 'utf8')).animations ?? []) clips.push(a.name)
   else warn(`entity ${id}: missing model ${models[0]}`)
-  entities[id] = { id, name: d.name ?? id, hp: d.hp ?? null, loot: d.loot ?? null, models, clips }
+  entities[id] = { id, name: d.name ?? id, hp: d.hp ?? null, loot: d.loot ?? null, boss: d.boss === true, models, clips }
 }
 
 const trees = Object.fromEntries(listJson(path.join(assets, 'data/trees')).map(({ id, file }) => {
@@ -234,9 +234,14 @@ writePage('game/items/index.md', '# Items\n\n<ItemGrid kind="items" />\n')
 
 for (const e of Object.values(entities)) {
   const drops = e.loot && loot[e.loot] ? loot[e.loot].map((d) => ref(d.item)).join(', ') : null
+  // A boss is summoned, never found: name the item that wakes it, whose page carries the recipe
+  const summoners = Object.values(items).filter((i) => i.summons === e.id).map((i) => ref('item/' + i.id))
   writePage(`game/mobs/${e.id}.md`,
-    `---\ntitle: ${JSON.stringify(e.name)}\n---\n\n# ${esc(e.name)}\n\n<ModelViewer kind="entity" id="${e.id}" />\n\n` +
+    `---\ntitle: ${JSON.stringify(e.name)}\n---\n\n# ${esc(e.name)}\n\n` +
+    (e.boss ? '::: warning Boss\nA boss is never found wandering: it has to be summoned.\n:::\n\n' : '') +
+    `<ModelViewer kind="entity" id="${e.id}" />\n\n` +
     `| Property | Value |\n|---|---|\n${e.hp != null ? `| Health | ${e.hp} |\n` : ''}${e.clips.length ? `| Animations | ${e.clips.join(', ')} |\n` : ''}` +
+    (summoners.length ? `\n## Summoned with\n\n${summoners.join(', ')}\n` : '') +
     (drops ? `\n## Drops\n\n${drops}\n` : ''))
 }
 writePage('game/mobs/index.md', '# Mobs\n\n<MobGrid />\n')

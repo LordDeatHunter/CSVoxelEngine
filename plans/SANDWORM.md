@@ -24,9 +24,6 @@ Nothing.
 - [ ] **`SW-3` · Body on the wire** — P3, M.
   Only the head is sent; a client drags its own chain, so a late joiner sees a straight body for a body length. Sending
   the segment positions (extra entries) would fix it at a protocol bump.
-- [ ] **`SW-4` · Item debugger pose** — P3, S.
-  The ENTITIES tab shows the three parts stacked at the origin. A preview that lays a chain out and runs the jaw would
-  make tuning the model faster.
 - [ ] **`SW-5` · Hurts more than players** — P3, M.
   The worm bites players only: mobs, blocks and built structures in its path are untouched (a deliberate first scope).
 

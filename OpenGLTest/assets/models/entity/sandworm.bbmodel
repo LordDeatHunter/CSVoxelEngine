@@ -1057,6 +1057,74 @@
                             "interpolation": "catmullrom"
                         }
                     ]
+                },
+                "4e110000-0000-4000-8000-00f000000102": {
+                    "name": "Body",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "48"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f000010007",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "48"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f000010008",
+                            "time": 2.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "4e110000-0000-4000-8000-00f000000103": {
+                    "name": "Tail",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "92"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f000010009",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "92"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f00001000a",
+                            "time": 2.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
                 }
             }
         },
@@ -1225,6 +1293,74 @@
                         }
                     ]
                 },
+                "4e110000-0000-4000-8000-00f000000102": {
+                    "name": "Body",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "48"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f00002000b",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "48"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f00002000c",
+                            "time": 1.0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "4e110000-0000-4000-8000-00f000000103": {
+                    "name": "Tail",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "92"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f00002000d",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "92"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f00002000e",
+                            "time": 1.0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
                 "effects": {
                     "name": "Effects",
                     "type": "effect",
@@ -1236,7 +1372,7 @@
                                     "script": "impact"
                                 }
                             ],
-                            "uuid": "4e110000-0000-4000-8000-00f00002000b",
+                            "uuid": "4e110000-0000-4000-8000-00f00002000f",
                             "time": 0.45,
                             "color": -1,
                             "interpolation": "linear"
@@ -1376,6 +1512,74 @@
                                 }
                             ],
                             "uuid": "4e110000-0000-4000-8000-00f000030008",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "4e110000-0000-4000-8000-00f000000102": {
+                    "name": "Body",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "48"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f000030009",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "48"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f00003000a",
+                            "time": 0.4,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        }
+                    ]
+                },
+                "4e110000-0000-4000-8000-00f000000103": {
+                    "name": "Tail",
+                    "type": "bone",
+                    "keyframes": [
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "92"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f00003000b",
+                            "time": 0,
+                            "color": -1,
+                            "interpolation": "catmullrom"
+                        },
+                        {
+                            "channel": "position",
+                            "data_points": [
+                                {
+                                    "x": "0",
+                                    "y": "0",
+                                    "z": "92"
+                                }
+                            ],
+                            "uuid": "4e110000-0000-4000-8000-00f00003000c",
                             "time": 0.4,
                             "color": -1,
                             "interpolation": "catmullrom"
