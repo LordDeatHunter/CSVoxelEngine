@@ -27,15 +27,26 @@ public sealed class ColumnCacheGenerationTests
 
         foreach (var biome in Biomes)
         foreach (var dirtDepth in soilDepths)
-        foreach (var floor in floors)
-        foreach (var offset in offsets)
         {
-            var lowerBound = floor;
-            var height = lowerBound + offset;
-            var chunkX = -19 + caseIndex % 7;
-            var chunkZ = -23 - caseIndex % 5;
-            AssertEquivalent(chunkX, chunkZ, 13, 2, height, height - 11, dirtDepth, lowerBound, biome);
-            caseIndex++;
+            var effectiveSoilDepth = LegacySoilDepth(biome, dirtDepth);
+            var caseOffsets = new HashSet<int>(offsets);
+            foreach (var boundary in new[]
+                     {
+                         effectiveSoilDepth - 1, effectiveSoilDepth, effectiveSoilDepth + 1,
+                         effectiveSoilDepth + 14, effectiveSoilDepth + 15, effectiveSoilDepth + 16
+                     })
+                caseOffsets.Add(boundary);
+
+            foreach (var offset in caseOffsets)
+            foreach (var floor in floors)
+            {
+                var lowerBound = floor;
+                var height = lowerBound + offset;
+                var chunkX = -19 + caseIndex % 7;
+                var chunkZ = -23 - caseIndex % 5;
+                AssertEquivalent(chunkX, chunkZ, 13, 2, height, height - 11, dirtDepth, lowerBound, biome);
+                caseIndex++;
+            }
         }
     }
 
@@ -62,12 +73,11 @@ public sealed class ColumnCacheGenerationTests
     public void BeachWaterAndGravelCasesMatchLegacyAndAreNotVacuous()
     {
         TestContent.EnsureLoaded();
-        var originalSeed = WorldSeed.Default;
+        var originalSeed = WorldSeed.Value;
         var foundPositiveGravel = false;
         var foundPositiveSand = false;
         var foundZeroWeight = false;
         var foundWaterTop = false;
-        var testedPositions = new List<(int X, int Z)>();
 
         try
         {
@@ -84,14 +94,11 @@ public sealed class ColumnCacheGenerationTests
                     {
                         if (gravel) foundPositiveGravel = true;
                         else foundPositiveSand = true;
-                        testedPositions.Add((x, z));
-                        AssertEquivalent(x >> SizeShift, z >> SizeShift, x & SizeMask, z & SizeMask,
-                            height, height - 7, 5, height - 8, Biome.Forest);
+                        AssertBeachSlices(x, z, height);
                     }
                     else if (weight == 0f && !foundZeroWeight)
                     {
                         foundZeroWeight = true;
-                        testedPositions.Add((x, z));
                         AssertEquivalent(x >> SizeShift, z >> SizeShift, x & SizeMask, z & SizeMask,
                             height, height - 7, 5, height - 8, Biome.Forest);
                     }
@@ -117,7 +124,17 @@ public sealed class ColumnCacheGenerationTests
         Assert.True(foundPositiveSand, "The bounded scan did not find a positive-weight sand beach.");
         Assert.True(foundZeroWeight, "The bounded scan did not find a zero-weight beach.");
         Assert.True(foundWaterTop, "The bounded scan did not find a wet top outside the beach band.");
-        Assert.NotEmpty(testedPositions);
+    }
+
+    private static void AssertBeachSlices(int worldX, int worldZ, int terrainHeight)
+    {
+        var chunkX = worldX >> SizeShift;
+        var chunkZ = worldZ >> SizeShift;
+        var localX = worldX & SizeMask;
+        var localZ = worldZ & SizeMask;
+        foreach (var t in new[] { 8, 16, 21, -1 })
+            AssertEquivalent(chunkX, chunkZ, localX, localZ, terrainHeight, terrainHeight - 7,
+                5, terrainHeight - t, Biome.Forest);
     }
 
     private static void AssertEquivalent(int chunkX, int chunkZ, int x, int z,
@@ -186,4 +203,13 @@ public sealed class ColumnCacheGenerationTests
                 : TerrainGenerator.RockBlock;
         }
     }
+
+    // The legacy material switch's effective soil band, used only to choose test boundaries.
+    private static int LegacySoilDepth(Biome biome, byte dirtDepth) => biome switch
+    {
+        Biome.Desert => dirtDepth == 0 ? 0 : WorldGenerationConfig.SandstoneDepth,
+        Biome.Ocean => 2,
+        Biome.Frozen => dirtDepth == 0 ? 0 : 2,
+        _ => dirtDepth
+    };
 }
