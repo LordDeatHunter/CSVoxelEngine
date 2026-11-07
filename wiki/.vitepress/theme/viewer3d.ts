@@ -226,41 +226,8 @@ export async function buildItem(host: HTMLElement, item: any, base: string): Pro
 // ---------------------------------------------------------------- entities
 interface Clip { name: string; loop: string; length: number; tracks: { bone: string; channel: string; keys: Key[] }[] }
 
-export async function buildEntity(host: HTMLElement, modelFile: string, base: string): Promise<Built> {
-  const model = await (await fetch(`${base}/models/entity/${modelFile}`)).json()
-  let active: Clip | null = null
-  let elapsed = 0
-  let speed = 1
-  const bones = new Map<string, { node: any; rest: Vec3 }>()
-  const clips: Clip[] = (model.animations ?? []).map((a: any) => ({
-    name: a.name, loop: a.loop ?? 'once', length: a.length ?? 0,
-    tracks: Object.values<any>(a.animators ?? {}).filter((an) => an.type === 'bone' || an.keyframes).flatMap((an) =>
-      (['rotation', 'position', 'scale'] as const).map((channel) => ({
-        bone: an.name, channel,
-        keys: (an.keyframes ?? []).filter((k: any) => k.channel === channel)
-          .map((k: any) => ({ time: k.time, value: parsePoint(k.data_points[0]), interpolation: k.interpolation ?? 'linear' }))
-          .sort((p: Key, q: Key) => p.time - q.time)
-      })).filter((t) => t.keys.length)
-    )
-  }))
-
-  const stage = await createStage(host, (dt) => {
-    if (!active) return
-    elapsed += dt * speed
-    const t = clipTime(elapsed, active.length, active.loop)
-    for (const tr of active.tracks) {
-      const b = bones.get(tr.bone)
-      if (!b) continue
-      const v = sample(tr.keys, t)
-      if (tr.channel === 'rotation') b.node.rotation.set(...rotationToEuler(v), 'ZYX')
-      else if (tr.channel === 'position') {
-        const p = positionToBlocks(v)
-        b.node.position.set(b.rest[0] + p[0], b.rest[1] + p[1], b.rest[2] + p[2])
-      } else b.node.scale.set(...v)
-    }
-  })
-  const { T, scene } = stage
-
+/** The entity model as a bone hierarchy in block units (feet at the origin); bones are recorded by name in <bones>. */
+export async function entityRoot(T: THREE, model: any, modelFile: string, base: string, bones: Map<string, { node: any; rest: Vec3 }>) {
   const texInfo = model.textures?.[0]
   const tex = await loadTexture(T, `${base}/models/entity/${texInfo?.source ?? modelFile.replace('.bbmodel', '.png')}`)
   const material = lit(T, tex)
@@ -301,6 +268,45 @@ export async function buildEntity(host: HTMLElement, modelFile: string, base: st
     }
   }
   build(model.outliner ?? [], root, [0, 0, 0])
+  return root
+}
+
+export async function buildEntity(host: HTMLElement, modelFile: string, base: string): Promise<Built> {
+  const model = await (await fetch(`${base}/models/entity/${modelFile}`)).json()
+  let active: Clip | null = null
+  let elapsed = 0
+  let speed = 1
+  const bones = new Map<string, { node: any; rest: Vec3 }>()
+  const clips: Clip[] = (model.animations ?? []).map((a: any) => ({
+    name: a.name, loop: a.loop ?? 'once', length: a.length ?? 0,
+    tracks: Object.values<any>(a.animators ?? {}).filter((an) => an.type === 'bone' || an.keyframes).flatMap((an) =>
+      (['rotation', 'position', 'scale'] as const).map((channel) => ({
+        bone: an.name, channel,
+        keys: (an.keyframes ?? []).filter((k: any) => k.channel === channel)
+          .map((k: any) => ({ time: k.time, value: parsePoint(k.data_points[0]), interpolation: k.interpolation ?? 'linear' }))
+          .sort((p: Key, q: Key) => p.time - q.time)
+      })).filter((t) => t.keys.length)
+    )
+  }))
+
+  const stage = await createStage(host, (dt) => {
+    if (!active) return
+    elapsed += dt * speed
+    const t = clipTime(elapsed, active.length, active.loop)
+    for (const tr of active.tracks) {
+      const b = bones.get(tr.bone)
+      if (!b) continue
+      const v = sample(tr.keys, t)
+      if (tr.channel === 'rotation') b.node.rotation.set(...rotationToEuler(v), 'ZYX')
+      else if (tr.channel === 'position') {
+        const p = positionToBlocks(v)
+        b.node.position.set(b.rest[0] + p[0], b.rest[1] + p[1], b.rest[2] + p[2])
+      } else b.node.scale.set(...v)
+    }
+  })
+  const { T, scene } = stage
+
+  const root = await entityRoot(T, model, modelFile, base, bones)
   scene.add(root)
   stage.frame(new T.Box3().setFromObject(root))
 

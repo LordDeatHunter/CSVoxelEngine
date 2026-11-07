@@ -233,7 +233,7 @@ for (const e of Object.values(entities)) {
     `| Property | Value |\n|---|---|\n${e.hp != null ? `| Health | ${e.hp} |\n` : ''}${e.clips.length ? `| Animations | ${e.clips.join(', ')} |\n` : ''}` +
     (drops ? `\n## Drops\n\n${drops}\n` : ''))
 }
-writePage('game/mobs/index.md', `# Mobs\n\n${Object.values(entities).map((e) => `- [${esc(e.name)}](/game/mobs/${e.id})`).join('\n')}\n`)
+writePage('game/mobs/index.md', '# Mobs\n\n<MobGrid />\n')
 
 // ---- generated overview pages (game/reference/) ----
 fs.rmSync(path.join(wikiRoot, 'game/reference'), { recursive: true, force: true })

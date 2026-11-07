@@ -1,7 +1,8 @@
-// Shared data loading and block icons for the recipe cards and item grids. Block icons are rendered once
-// each, from the block's real model, by one offscreen WebGL renderer into a data URL and then cached.
+// Shared data loading and rendered icons for the recipe cards and the index grids. Block icons and mob
+// portraits are rendered once each, from the real models, by one offscreen WebGL renderer into a data URL
+// and then cached.
 import { withBase } from 'vitepress'
-import { blockGroup } from './viewer3d.ts'
+import { blockGroup, entityRoot } from './viewer3d.ts'
 
 const dataCache = new Map<string, Promise<any>>()
 
@@ -31,12 +32,8 @@ const icons = new Map<string, Promise<string | null>>()
 
 const ICON_SIZE = 128
 
-async function render(id: string): Promise<string | null> {
-  const T = await import('three')
-  const block = (await loadData('blocks'))[id]
-  const group = await blockGroup(T, block, assetBase())
-  if (!group) return null
-
+/** Renders the group in an orthographic view from <dir>, fitted to its bounds, and disposes it. */
+function snapshot(T: THREE, group: InstanceType<THREE['Object3D']>, dir: [number, number, number]): string {
   if (!renderer) {
     renderer = new T.WebGLRenderer({ alpha: true, antialias: true, preserveDrawingBuffer: true })
     renderer.setPixelRatio(1)
@@ -51,12 +48,12 @@ async function render(id: string): Promise<string | null> {
   scene.add(sun)
   scene.add(group)
 
-  // Fit any block, including multiblock structures several cells wide, in an isometric view.
+  // Fit anything, including multiblock structures several cells wide, in the square frame.
   const box = new T.Box3().setFromObject(group)
   const center = box.getCenter(new T.Vector3())
   const radius = box.getSize(new T.Vector3()).length() / 2 || 0.5
   const camera = new T.OrthographicCamera(-radius, radius, radius, -radius, 0.1, 100)
-  camera.position.copy(center).addScaledVector(new T.Vector3(1, 0.82, 1).normalize(), 20)
+  camera.position.copy(center).addScaledVector(new T.Vector3(...dir).normalize(), 20)
   camera.lookAt(center)
   renderer.render(scene, camera)
   const url = renderer.domElement.toDataURL('image/png')
@@ -71,16 +68,39 @@ async function render(id: string): Promise<string | null> {
   return url
 }
 
-/** A data URL of the block's isometric icon (rendered on first request, queued one at a time), or null. */
-export function blockIcon(id: string): Promise<string | null> {
-  let p = icons.get(id)
+async function renderBlock(id: string): Promise<string | null> {
+  const T = await import('three')
+  const group = await blockGroup(T, (await loadData('blocks'))[id], assetBase())
+  // Isometric: the south and east faces and the top, like an inventory icon.
+  return group ? snapshot(T, group, [1, 0.82, 1]) : null
+}
+
+async function renderMob(id: string): Promise<string | null> {
+  const T = await import('three')
+  const entity = (await loadData('entities'))[id]
+  const file: string | undefined = entity?.models?.[0]
+  if (!file) return null
+  const model = await (await fetch(`${assetBase()}/models/entity/${file}`)).json()
+  const root = await entityRoot(T, model, file, assetBase(), new Map())
+  // Mobs face -Z: look at the front from a little to the side and above, in the rest pose.
+  return snapshot(T, root, [0.75, 0.45, -1])
+}
+
+function cached(key: string, render: () => Promise<string | null>): Promise<string | null> {
+  let p = icons.get(key)
   if (!p) {
-    p = queue.then(() => render(id)).catch(() => null)
+    p = queue.then(render).catch(() => null)
     queue = p
-    icons.set(id, p)
+    icons.set(key, p)
   }
   return p
 }
+
+/** A data URL of the block's isometric icon (rendered on first request, queued one at a time), or null. */
+export const blockIcon = (id: string) => cached(`block/${id}`, () => renderBlock(id))
+
+/** A data URL of the mob's portrait in its rest pose, or null. */
+export const mobIcon = (id: string) => cached(`mob/${id}`, () => renderMob(id))
 
 /** Calls back once when the element is near the viewport (or at once without IntersectionObserver). */
 export function whenVisible(el: Element, run: () => void): () => void {
