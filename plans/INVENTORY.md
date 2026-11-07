@@ -2,7 +2,7 @@
 > Guide: plans/README.md
 
 ## Status
-Design settled with the user on 2026-11-07; `I-1` (gear core) and `I-2` (armor, modifiers, rarity, sets) are done. Tracks gear (armor and accessories with rarity and
+Design settled with the user on 2026-11-07; `I-1` (gear core), `I-2` (armor, modifiers, rarity, sets) and `I-4` (chests) are done. Tracks gear (armor and accessories with rarity and
 rolled modifiers), chests and ruins that hold loot. One phase per prompt: implement it, update this file, stop.
 The gear tab, equipment panel and chest panel build on the UI kit from `plans/INVENTORY_UI.md` (U-1, U-2 first).
 
@@ -17,22 +17,6 @@ Nothing.
   pass reuses them. Equipment ids ride in the `PlayerList` entry (one protocol bump); rolled modifiers stay private.
   Item debugger gets an equipment mode.
   **Hook:** `PlayerPasses`, `PlayerRig.BuildMeshes`, `RemotePlayer`, `ShadowPass`, `NetProtocol.ProtocolVersion`.
-
-### Phase 4: chests
-- [ ] **`I-4` Chest block entity, UI and container protocol** - P1, L.
-  - [ ] `ChestManager` on the `QuernManager` pattern (Capture/Restore, WriteNet/ReadNet, `NotifyBlockRemoved`,
-    stations.json, `StationNetCodec` plus protocol bump, `ClientMirror`, `World`, `WorldPersistence`)
-  - [ ] tiered sizes from block JSON: wooden, bronze and iron crafted chests, plus one ruin chest per realm tier
-    (surface, underground, hell, sky) mapped to a loot table
-  - [ ] shared and server-authoritative: anyone can open, several players at once, slot diffs; new open, move and
-    close messages
-  - [ ] chest panel beside the [E] owned list (world-opened, like the spell builder): click moves a stack,
-    shift-click moves all, search works on both sides
-  - [ ] breaking drops the contents on every edit path (mining, TNT, felling, spells, fluids); run
-    `edit-path-checklist`; a never-opened ruin chest rolls its table by the seeded roll first
-  - [ ] recipes, creative catalog, `BlockRenderer` entry and lid render if wanted
-  **Hook:** `Simulation/QuernManager.cs` (template), `BlockInteractions`, `RightClickAction`, `BlockEditor`,
-  `TntManager.Detonate`, `App/SpellBuilderInput` (UI template).
 
 ### Phase 5: ruins, loot and polish
 - [ ] **`I-5` Ruins with loot, inventory polish** - P2, L.
@@ -49,6 +33,24 @@ Nothing.
   I-1 keeps slot counts in data/config so this stays possible.
 
 ## Reference
+- **What I-4 shipped.** A chest is a model block with a `chest` object (`slots`, optional `loot` table; `ChestProfile`,
+  `BlockType.Chest`): the crafted `wooden_chest`, `bronze_chest` and `iron_chest` (the iron one is plated with crushed
+  iron, since iron cannot be smelted yet) and the worldgen-only `ruin_chest_surface`, `_underground`, `_hell` and `_sky`
+  (`hasItem: false`, picked as a wooden chest, drop nothing but their contents). `ChestManager` (`Simulation/Chests`, the
+  quern pattern) holds a `ChestState` per used cell, created on first use: a ruin chest rolls its table through
+  `ChestLoot.Materialize` from the hash of its cell and the world seed, so open-then-break and break-unopened give the same
+  contents, and a never-used chest holds no state and is never saved (`stations.json` `Chests`, `ChestSaveCodec`, the
+  inventory instance shape per slot). Breaking spills the contents (`BlockEditor`, the stale sweep in `ChestManager.Update` for
+  a blast); a tool or gear drop loses its components, since a drop carries only an id. Moves are `ChestTransfer` rules
+  (stackables merge up to `ChestConfig.MaxStack`, instances move whole through `ItemStack.CloneAs` and keep their
+  components, nothing is created or lost) behind `ChestAccess.Apply`. Wire: protocol 20, `ChestOpen`/`ChestMove`/`ChestClose`
+  from the client and a per-player `ChestContents` back (never the station broadcast); the server (`ChestSessions`) judges every
+  move against the player's open chest and reach, sends the new contents to every viewer, and closes a chest that was
+  broken or walked away from. UI: a right-click on a chest is a `RightClickOutcome.Container` claim, `ChestInput` opens the
+  `ChestView` card (`ChestCardLayout`/`ChestCardRenderer`) beside the [E] list, which then deposits on a row click (one unit,
+  all with shift); the chest card withdraws the same way and has its own search field and wheel scroll. Scenario ops
+  `setblock`, `chest` and `chestrow`; `visual-examples/chests.json`. `ChestTests`, `ChestServerTests`. Known gaps: a chest
+  is not mirrored to other viewers' panels when a *non-viewer* changes it (only viewers can); no lid animation.
 - **What I-1 shipped.** Gear instances live in the same instance list as tools (`Inventory.Tools`, `ItemStack`)
   but have their own pool category (`InventoryCategory.Gear`, `GearConfig.GearCapacity`, `UsedOf`, `CapacityOf`,
   `GearEntries`), so every tool-instance lookup, the save and the wire carry them unchanged. `Equipment`

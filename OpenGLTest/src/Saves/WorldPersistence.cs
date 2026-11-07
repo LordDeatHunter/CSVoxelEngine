@@ -456,7 +456,7 @@ internal sealed class WorldPersistence
         if (saved == null)
             return;
         var skipped = _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
-            + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts);
+            + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts) + _world.Chests.Restore(saved.Chests);
         if (skipped > 0)
             Log.Warn($"Station save: dropped {skipped} saved station entr{(skipped == 1 ? "y" : "ies")} that no longer resolve");
     }
@@ -470,6 +470,7 @@ internal sealed class WorldPersistence
             Querns = _querns.Capture(),
             Kilns = _kilns.Capture(),
             Casts = _casting.Capture(),
+            Chests = _world.Chests.Capture(),
         }));
     }
 

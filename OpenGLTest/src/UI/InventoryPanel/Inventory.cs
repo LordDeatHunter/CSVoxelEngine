@@ -42,7 +42,7 @@ public class Inventory
     /// <summary>Test stock of every placeable block the player spawns with. Every placeable block
     /// gets this much out of the one shared <see cref="BlockCapacity"/>, so it is kept small
     /// enough that the whole seed still leaves the pool room to add to as blocks are added.</summary>
-    public const int StartingStock = 24;
+    public const int StartingStock = 20;
 
     private readonly Dictionary<byte, int> _blocks = new();
     // The ids this player has obtained (the look-at label's "Unknown" rule); filled by Add and
@@ -171,6 +171,41 @@ public class Inventory
                 return true;
             }
         }
+    }
+
+    /// <summary>
+    /// Removes up to <paramref name="count"/> units of a stackable (block or misc) id from its pool and returns how many
+    /// went, clearing the hotbar slots that showed it when the last unit goes. 0 for an id with no stackable pool.
+    /// </summary>
+    public int Remove(byte id, int count)
+    {
+        var store = StoreOf(id);
+        if (store == null || count <= 0) return 0;
+        var have = store.GetValueOrDefault(id);
+        var taken = Math.Min(have, count);
+        if (taken <= 0) return 0;
+        if (taken == have)
+        {
+            store.Remove(id);
+            ClearSlotsShowing(id);
+        }
+        else store[id] = have - taken;
+        return taken;
+    }
+
+    /// <summary>
+    /// Takes in a tool or piece of gear that lives elsewhere (a chest slot) as a new instance of this inventory, keeping
+    /// every component it carries. False, changing nothing, when its pool is full or it is not an instance item.
+    /// </summary>
+    public bool AddInstance(ItemStack template)
+    {
+        var category = CategoryOf(template.DefinitionId);
+        if (category is not (InventoryCategory.Tools or InventoryCategory.Gear)
+            || UsedOf(category.Value) >= CapacityOf(category.Value))
+            return false;
+        _known.Add(template.DefinitionId);
+        _tools.Add(template.CloneAs(_nextToolInstance++));
+        return true;
     }
 
     /// <summary>

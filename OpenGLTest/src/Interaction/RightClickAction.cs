@@ -116,6 +116,13 @@ internal sealed class RightClickAction
             outcome = RightClickOutcome.Station;
             return true;
         }
+        // A chest claims the click like the spell table does: opening it is not a strike and changes nothing here
+        if (Interactions.TryOpenChest(maxDistance, player, out var chestCell))
+        {
+            LastContainerCell = chestCell;
+            outcome = RightClickOutcome.Container;
+            return true;
+        }
         // A spell table claims the click before the staff casts; opening the builder is not a strike
         if (Interactions.TryOpenSpellTable(maxDistance, player))
         {
@@ -144,6 +151,9 @@ internal sealed class RightClickAction
         outcome = RightClickOutcome.ItemUse;
         return true;
     }
+
+    /// <summary>The cell of the chest the newest <see cref="RightClickOutcome.Container"/> claim opened.</summary>
+    internal System.Numerics.Vector3 LastContainerCell { get; private set; }
 
     /// <summary>Whether a timed use is charging (see <see cref="TryBeginUseCharge"/>).</summary>
     internal bool IsUseCharging { get; private set; }

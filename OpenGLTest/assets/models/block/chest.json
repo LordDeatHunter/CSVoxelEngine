@@ -1,0 +1,34 @@
+{
+    // A chest, authored facing north (the lock on the north face): a 14 x 10 px body under a 14 x 4 px lid, 14 px
+    // tall in all. It is a facing block, so no face may cover a whole cell side, and it never does: both boxes are
+    // inset one pixel from the cell. UVs are left to the defaults, which crop each face out of its tile, so the
+    // front tile's lock plate lands across the seam between lid and body. The textures are #front (the north face
+    // of both boxes), #side (the other three sides) and #top (the lid top; the underside reuses the side tile).
+    "textures": {
+        "particle": "#side"
+    },
+    "elements": [
+        {
+            "from": [1, 0, 1],
+            "to": [15, 10, 15],
+            "faces": {
+                "north": { "texture": "#front" },
+                "south": { "texture": "#side" },
+                "west": { "texture": "#side" },
+                "east": { "texture": "#side" },
+                "down": { "texture": "#side" }
+            }
+        },
+        {
+            "from": [1, 10, 1],
+            "to": [15, 14, 15],
+            "faces": {
+                "north": { "texture": "#front" },
+                "south": { "texture": "#side" },
+                "west": { "texture": "#side" },
+                "east": { "texture": "#side" },
+                "up": { "texture": "#top" }
+            }
+        }
+    ]
+}

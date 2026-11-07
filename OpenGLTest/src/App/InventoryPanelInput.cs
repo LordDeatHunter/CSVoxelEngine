@@ -9,6 +9,7 @@ using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Platform;
 using VoxelEngine.Rendering;
+using VoxelEngine.Simulation.Chests;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
@@ -31,7 +32,11 @@ internal sealed class InventoryPanelInput
         this.inventoryView = inventoryView;
         this.pauseMenuView = pauseMenuView;
         this.session = session;
+        Chest = new ChestInput(inputManager, renderManager, inventoryView, session, this);
     }
+
+    /// <summary>The chest panel's input: it opens beside this panel and takes deposits from its list.</summary>
+    internal ChestInput Chest { get; }
 
     private World? ActiveWorld => Program.ActiveWorld;
 
@@ -164,6 +169,7 @@ internal sealed class InventoryPanelInput
         inventoryView.IsOpen = open;
         if (!open)
         {
+            Chest.Close();
             inventoryView.ClearSelection();
             inventoryView.ClearInput();
             inventoryView.Craft.Clear();
@@ -226,6 +232,11 @@ internal sealed class InventoryPanelInput
     /// <summary>Types one printable character into the focused inventory field.</summary>
     internal void HandleInventoryType(char c)
     {
+        if (inventoryView.Focus == InventoryFocus.ChestSearch)
+        {
+            Chest.Type(c);
+            return;
+        }
         if (inventoryView.Focus != InventoryFocus.Search) return;
         if (!inventoryView.Search.Text.TryAppend(c)) return;
         inventoryView.Search.Highlight = -1;
@@ -239,6 +250,11 @@ internal sealed class InventoryPanelInput
         switch (key)
         {
             case Key.Backspace:
+                if (inventoryView.Focus == InventoryFocus.ChestSearch)
+                {
+                    Chest.Backspace();
+                    break;
+                }
                 if (inventoryView.Focus != InventoryFocus.Search) break;
                 inventoryView.Search.Text.Backspace();
                 inventoryView.Search.Highlight = -1;
@@ -429,6 +445,7 @@ internal sealed class InventoryPanelInput
     // at the click, and a plain row picks its item, tool instance or recipe.
     private void ApplyRowClick(int row, ListState list, Inventory inventory, bool creative, Vector2 position)
     {
+        if (TryDepositRow(row, list, inventory, creative)) return;
         if (list.Hits != null)
         {
             if (row < list.Hits.Count)
@@ -470,6 +487,39 @@ internal sealed class InventoryPanelInput
                 if (inventoryView.Craft.Recipe != null)
                     inventoryView.Craft.FeedFromInventory(picked, inventory);
                 break;
+            }
+        }
+    }
+
+    // With a chest open, a click on the inventory list moves what the row holds into the chest instead of picking it:
+    // one unit of a stackable (all of it with shift), or the whole tool or piece of gear. Recipes and the creative
+    // catalog keep their own clicks.
+    private bool TryDepositRow(int row, ListState list, Inventory inventory, bool creative)
+    {
+        if (!Chest.IsOpen || creative) return false;
+        if (list.Hits != null)
+        {
+            if (row >= list.Hits.Count || list.Hits[row].IsRecipe) return false;
+            var hit = list.Hits[row];
+            if (hit.ToolInstance > 0) Chest.DepositInstance(hit.ToolInstance);
+            else if (inventory.CountFor(hit.Id) > 0 && !ChestTransfer.IsInstance(hit.Id)) Chest.DepositStack(hit.Id);
+            return true;
+        }
+        switch (inventoryView.Tab)
+        {
+            case InventoryCategory.Crafting:
+                return false;
+            case InventoryCategory.Tools:
+                if (row < inventory.ToolEntries().Count) Chest.DepositInstance(inventory.ToolEntries()[row].InstanceId);
+                return true;
+            case InventoryCategory.Gear:
+                if (row < inventory.GearEntries().Count) Chest.DepositInstance(inventory.GearEntries()[row].InstanceId);
+                return true;
+            default:
+            {
+                var stacks = inventory.StackEntries(inventoryView.Tab);
+                if (row < stacks.Count) Chest.DepositStack(stacks[row].Id);
+                return true;
             }
         }
     }
@@ -520,6 +570,9 @@ internal sealed class InventoryPanelInput
             return;
         }
         inventoryView.Focus = InventoryFocus.None;
+
+        // The chest card (beside the list, while a chest is open) takes its own clicks
+        if (Chest.HandleClick(position)) return;
 
         var tab = renderManager.Ui.Panel.PanelTabAt(position);
         if (tab.HasValue)

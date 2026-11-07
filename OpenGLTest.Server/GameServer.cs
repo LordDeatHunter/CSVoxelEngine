@@ -82,6 +82,7 @@ public sealed class GameServer : IDisposable
     private readonly ServerChat _chat;
     private readonly PlayerSessions _sessions;
     private readonly IntentReplay _intents;
+    private readonly ChestSessions _chests;
     private double _playerSaveTimer;
     private double _sweepTimer;
     private double _listTimer;
@@ -98,6 +99,7 @@ public sealed class GameServer : IDisposable
         _chat = new ServerChat(_state, _broadcasts);
         _sessions = new PlayerSessions(_state, _chat, worldName, seed);
         _intents = new IntentReplay(_state);
+        _chests = new ChestSessions(_state);
         _state.World.ServerPlayers = _state.PlayerList;
     }
 
@@ -187,6 +189,7 @@ public sealed class GameServer : IDisposable
         _streaming.ServeLodRequests();
         _broadcasts.DrainCellJournal();
         _sessions.SendChangedInventories();
+        _chests.Tick();
         _sessions.TickPlayers(deltaTime);
 
         _playerSaveTimer += deltaTime;
@@ -286,6 +289,18 @@ public sealed class GameServer : IDisposable
 
             case NetMessage.InventoryRequest:
                 _intents.OnInventoryRequest(client, reader);
+                break;
+
+            case NetMessage.ChestOpen:
+                _chests.OnOpen(client, reader);
+                break;
+
+            case NetMessage.ChestMove:
+                _chests.OnMove(client, reader);
+                break;
+
+            case NetMessage.ChestClose:
+                _chests.OnClose(client);
                 break;
 
             default:

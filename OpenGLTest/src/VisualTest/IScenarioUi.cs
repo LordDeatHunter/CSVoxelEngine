@@ -27,4 +27,14 @@ public interface IScenarioUi
 
     /// <summary>Opens or closes the spell builder; opening needs a staff in hand.</summary>
     void SetSpellBuilderOpen(bool open);
+
+    /// <summary>Opens the chest at a cell (the [E] list opens beside it); throws when the cell is not a chest in reach.</summary>
+    void OpenChest(int x, int y, int z);
+
+    /// <summary>Closes the chest panel.</summary>
+    void CloseChest();
+
+    /// <summary>Clicks a row of the open chest's list, 0-based: it moves one unit (the whole slot when
+    /// <paramref name="all"/>) into the inventory.</summary>
+    void PickChestRow(int row, bool all);
 }

@@ -49,6 +49,26 @@ internal sealed class ScenarioUi(InventoryPanelInput panelInput, SpellBuilderInp
         builderInput.SetOpen(open);
     }
 
+    public void OpenChest(int x, int y, int z)
+    {
+        var world = RequirePlaying("chest");
+        panelInput.Chest.Open(world, new Vector3(x, y, z));
+        if (!panelInput.Chest.IsOpen)
+            throw new InvalidOperationException($"({x}, {y}, {z}) is not a chest in reach.");
+    }
+
+    public void CloseChest() => panelInput.Chest.Close();
+
+    public void PickChestRow(int row, bool all)
+    {
+        var world = RequirePlaying("chestrow");
+        var view = world.ChestPanel;
+        var rows = view.Rows();
+        if (!view.IsOpen || row < 0 || row >= rows.Count)
+            throw new InvalidOperationException($"Chest row {row + 1} is not listed ({rows.Count} rows).");
+        panelInput.Chest.Withdraw(world, rows[row], all);
+    }
+
     private static World RequirePlaying(string what) =>
         Program.ActiveWorld is { IsPlaying: true } world
             ? world

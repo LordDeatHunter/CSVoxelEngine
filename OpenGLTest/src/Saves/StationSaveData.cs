@@ -17,6 +17,33 @@ public sealed class StationSaveData
     public List<KilnData>? Kilns { get; set; }
     public List<CastData>? Casts { get; set; }
 
+    /// <summary>The chests that have been used (a never-opened ruin chest is not here and re-rolls from its seed).</summary>
+    public List<ChestData>? Chests { get; set; }
+
+    /// <summary>One chest block's contents, keyed by its cell (see <see cref="ChestSaveCodec"/>); also the shape of the
+    /// network snapshot a player gets when it opens one.</summary>
+    public sealed class ChestData
+    {
+        public int[]? Cell { get; set; }
+
+        /// <summary>How many slots the chest has.</summary>
+        public int? SlotCount { get; set; }
+
+        /// <summary>One entry per non-empty slot.</summary>
+        public List<ChestSlotData>? Slots { get; set; }
+    }
+
+    /// <summary>One non-empty chest slot: a stackable by name and count, or a tool or gear instance with its components.</summary>
+    public sealed class ChestSlotData
+    {
+        public int? Slot { get; set; }
+        public string? Name { get; set; }
+        public int? Count { get; set; }
+
+        /// <summary>The instance with its components, for a tool or piece of gear.</summary>
+        public PlayerSaveData.ToolData? Instance { get; set; }
+    }
+
     /// <summary>One branch pile with a fire and/or food on it.</summary>
     public sealed class CampfireData
     {

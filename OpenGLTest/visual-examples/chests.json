@@ -1,0 +1,44 @@
+{
+  // Chests: run with VOXEL_SCRIPT=visual-examples/chests.json VOXEL_TIME=147 from OpenGLTest/. Shots land in
+  // visual/chests/. Sets the seven chest blocks down in a row in the forest clearing (state 1 = facing south, toward the
+  // player), opens a ruin chest (it rolls its loot from the hash of its cell), takes from it and puts into it through
+  // the [E] list, and breaks a full chest to see it spill.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "give", "block": "item/flint", "count": 7 },
+    { "op": "give", "block": "item/coal", "count": 4 },
+    { "op": "give", "block": "item/bandage", "count": 2 },
+
+    { "op": "setblock", "pos": [-48, 10, 59], "block": "wooden_chest", "state": 1 },
+    { "op": "setblock", "pos": [-46, 10, 59], "block": "bronze_chest", "state": 1 },
+    { "op": "setblock", "pos": [-44, 10, 59], "block": "iron_chest", "state": 1 },
+    { "op": "setblock", "pos": [-42, 10, 59], "block": "ruin_chest_surface", "state": 1 },
+    { "op": "setblock", "pos": [-40, 10, 59], "block": "ruin_chest_underground", "state": 1 },
+    { "op": "setblock", "pos": [-38, 10, 59], "block": "ruin_chest_hell", "state": 1 },
+    { "op": "setblock", "pos": [-36, 10, 59], "block": "ruin_chest_sky", "state": 1 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "chest-row" },
+
+    { "op": "chest", "pos": [-42, 10, 59] },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "ruin-open" },
+    { "op": "chestrow", "row": 1, "all": true },
+    { "op": "chestrow", "row": 1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "after-take" },
+
+    { "op": "tab", "tab": "misc" },
+    { "op": "row", "row": 1 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "after-deposit" },
+    { "op": "chest", "open": false },
+    { "op": "panel", "open": false },
+    { "op": "wait", "seconds": 0.3 },
+
+    { "op": "chest", "pos": [-38, 10, 59] },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "hell-open" }
+  ]
+}

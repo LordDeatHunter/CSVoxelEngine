@@ -83,6 +83,9 @@ public sealed class VisualStep
     /// <summary>The listed row a <c>row</c> step picks, 1-based from the top of the list.</summary>
     public int Row { get; init; }
 
+    /// <summary>The state byte a <c>setblock</c> step writes (a facing, for a chest); 0 by default.</summary>
+    public int State { get; init; }
+
     /// <summary>Where a <c>hover</c> step puts the pointer, in canvas units; null clears the scripted pointer.</summary>
     public Vector2? Point { get; init; }
 }
@@ -252,6 +255,25 @@ public sealed class VisualScenario
             },
             "hover" => ReadHover(element, index),
             "spellbuilder" => new VisualStep { Op = "spellbuilder", On = ReadOpen(element) },
+            "setblock" => new VisualStep
+            {
+                Op = "setblock",
+                Pos = ReadPos(element, index, "setblock"),
+                Block = ReadGiveBlock(element, index),
+                State = element.TryGetProperty("state", out var stateElement) && stateElement.TryGetInt32(out var st)
+                        && st is >= 0 and <= 255
+                    ? st
+                    : 0,
+            },
+            "chest" => ReadChest(element, index),
+            "chestrow" => new VisualStep
+            {
+                Op = "chestrow",
+                Row = element.TryGetProperty("row", out var chestRow) && chestRow.TryGetInt32(out var cr) && cr >= 1
+                    ? cr
+                    : throw new InvalidOperationException($"Step {index} (chestrow) needs 'row', a 1-based row of the chest list."),
+                On = element.TryGetProperty("all", out var all) && all.ValueKind == JsonValueKind.True,
+            },
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -259,8 +281,17 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, chest, chestrow or screenshot."),
         };
+    }
+
+    // chest opens the chest at "pos" [x, y, z] (the [E] list opens beside it), or closes it with "open": false.
+    private static VisualStep ReadChest(JsonElement element, int index)
+    {
+        var open = ReadOpen(element);
+        return open
+            ? new VisualStep { Op = "chest", On = true, Pos = ReadPos(element, index, "chest") }
+            : new VisualStep { Op = "chest", On = false };
     }
 
     // "open" defaults to true, so a bare panel or spellbuilder step opens it.

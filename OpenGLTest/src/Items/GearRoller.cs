@@ -28,7 +28,11 @@ public static class GearRoller
 
     /// <summary>The largest value a modifier of this stat can have, a roll's top range at the top rarity; what a save
     /// restore clamps to.</summary>
-    public static float MaxModifierValue(GearStat stat) => Range(stat).High * (0.6f + 0.2f * 5);
+    public static float MaxModifierValue(GearStat stat) => RoundValue(stat, Range(stat).High * (0.6f + 0.2f * 5));
+
+    // The one rounding a rolled value gets: whole points for the flat stats, hundredths for the fractions
+    private static float RoundValue(GearStat stat, float value) =>
+        GearStats.IsFlat(stat) ? MathF.Max(1f, MathF.Round(value)) : MathF.Round(value * 100f) / 100f;
 
     /// <summary>Rolls <paramref name="gear"/> at <paramref name="rarity"/> from <paramref name="seed"/>.</summary>
     public static RolledGear Roll(GearItem gear, Rarity rarity, ulong seed)
@@ -53,7 +57,7 @@ public static class GearRoller
         var tier = (int)rarity + 1;
         var value = low + (high - low) * rng.NextFloat();
         value *= 0.6f + 0.2f * tier;
-        return GearStats.IsFlat(stat) ? MathF.Max(1f, MathF.Round(value)) : MathF.Round(value * 100f) / 100f;
+        return RoundValue(stat, value);
     }
 
     private static (float Low, float High) Range(GearStat stat) => stat switch

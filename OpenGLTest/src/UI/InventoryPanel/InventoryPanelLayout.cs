@@ -26,8 +26,8 @@ public static class InventoryPanelLayout
     public const float PanelTop = 80f;
     public const float PanelGap = 16f;
     public const float PanelRightMargin = 24f;
-    public const float PanelWidthMin = 480f;
-    public const float PanelWidthMax = 660f;
+    public const float PanelWidthMin = 560f;
+    public const float PanelWidthMax = 760f;
     public const float PanelPad = 10f;
     public const float TabHeight = 60f;
     public const float RowHeight = 42f;

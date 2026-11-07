@@ -8,6 +8,9 @@ public enum InventoryFocus
 {
     None,
     Search,
+
+    /// <summary>The chest panel's search field.</summary>
+    ChestSearch,
 }
 
 /// <summary>

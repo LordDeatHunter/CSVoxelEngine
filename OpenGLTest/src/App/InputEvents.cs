@@ -172,6 +172,7 @@ internal sealed class InputEvents
             case true when !pauseMenuView.IsOpen && inputManager.Mouse != null:
             {
                 // The wheel scrolls the list only while hovering it; wheel.Y > 0 is toward the top.
+                if (panelInput.Chest.HandleScroll(inputManager.Mouse.Position, wheel.Y)) break;
                 var canvas = renderManager.Ui.ScreenSize;
                 var p = renderManager.Ui.ToCanvas(inputManager.Mouse.Position);
                 if (InventoryPanelLayout.IsOverList(p, canvas))

@@ -169,6 +169,10 @@ public sealed class ServerPlayer : IMobTarget
     /// <see cref="TickStatus"/> ticks them.</summary>
     public StatusEffectSet Effects => Status.Effects;
 
+    /// <summary>The cell of the chest this player has open, or null (the server keeps it so a move is judged against
+    /// that chest only and a change reaches every viewer).</summary>
+    public (int X, int Y, int Z)? OpenChest { get; set; }
+
     /// <summary>The player's current health, 0..<see cref="PlayerHealth.MaxHealth"/>.</summary>
     public int Health => Status.Health;
 

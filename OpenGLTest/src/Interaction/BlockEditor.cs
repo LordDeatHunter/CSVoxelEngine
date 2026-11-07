@@ -157,6 +157,9 @@ internal sealed class BlockEditor
                 _campfires.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, stationDrops);
             if (BlockType.ById[brokenId]?.Renderer == BlockRenderer.Quern)
                 _querns.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, stationDrops);
+            // A broken chest spills what it holds (a ruin chest nobody opened rolls its loot first)
+            if (BlockType.ById[brokenId]?.Chest is { } chest)
+                _world.Chests.NotifyBlockRemoved((int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, chest, stationDrops);
             // A mined mold throws out a cast that had already set, even in creative - the mold
             // block itself is what creative withholds, not the metal someone poured into it
             if (ContentRegistry.IsCastMold(brokenId))

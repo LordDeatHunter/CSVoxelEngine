@@ -253,6 +253,23 @@ internal sealed class BlockInteractions
     /// the spell builder client-side from the <see cref="RightClickOutcome.SpellTable"/> outcome,
     /// while a server replaying the click claims it and does nothing.
     /// </summary>
+    /// <summary>
+    /// A right-click on a chest: claims the click (no side effect, no swing) unless the player is sneaking, which
+    /// places a block against it instead. The local player opens the chest panel from the
+    /// <see cref="RightClickOutcome.Container"/> outcome and asks the server (or the chest manager) for the contents; a
+    /// server replaying the click claims it and does nothing. <paramref name="cell"/> is the chest's cell.
+    /// </summary>
+    internal bool TryOpenChest(float maxDistance, PlayerContext player, out Vector3 cell)
+    {
+        cell = default;
+        if (player.Camera is { IsSneaking: true }) return false;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out _)) return false;
+        if (BlockType.ById[id]?.Chest == null) return false;
+        cell = new Vector3((int)hit.X, (int)hit.Y, (int)hit.Z);
+        return true;
+    }
+
     internal bool TryOpenSpellTable(float maxDistance, PlayerContext player)
     {
         if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;

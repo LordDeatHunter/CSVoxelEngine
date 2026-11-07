@@ -247,6 +247,35 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 Advance();
                 break;
 
+            case "setblock":
+            {
+                var blockId = ContentRegistry.Require(step.Block!);
+                var cell = step.Pos!.Value;
+                var chunks = world.GetChunkManager();
+                var chunk = chunks.ChunkAt((int)cell.X, (int)cell.Y, (int)cell.Z)
+                    ?? throw new InvalidOperationException($"Step {_step + 1} sets {cell}, which is not in a loaded chunk.");
+                chunk.PlaceBlockAt(cell, blockId, chunks, (byte)step.State);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} setblock {step.Block} at {cell}");
+                Advance();
+                break;
+            }
+
+            case "chest":
+                RunUi("chest", u =>
+                {
+                    if (step.On) u.OpenChest((int)step.Pos!.Value.X, (int)step.Pos.Value.Y, (int)step.Pos.Value.Z);
+                    else u.CloseChest();
+                });
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} chest {(step.On ? "open" : "closed")}");
+                Advance();
+                break;
+
+            case "chestrow":
+                RunUi("chestrow", u => u.PickChestRow(step.Row - 1, step.On));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} chest row {step.Row}");
+                Advance();
+                break;
+
             case "spellbuilder":
                 RunUi("spellbuilder", u => u.SetSpellBuilderOpen(step.On));
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} spellbuilder {(step.On ? "open" : "closed")}");

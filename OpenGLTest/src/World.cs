@@ -28,10 +28,12 @@ using VoxelEngine.Rendering;
 using VoxelEngine.Rendering.Geometry;
 using VoxelEngine.Saves;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Chests;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.Status;
+using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Trees;
@@ -83,6 +85,7 @@ public class World
     private readonly GroundDust _dust = new();
     private readonly CampfireManager _campfires = new();
     private readonly QuernManager _querns = new();
+    private readonly ChestManager _chests = new();
     private readonly KilnManager _kilns = new();
     private readonly CastingManager _casting = new();
     private readonly FireParticleSystem _fire = new();
@@ -765,6 +768,13 @@ public class World
 
     /// <summary>Whether any station block entity (campfire, quern, kiln, cast mold) is tracked,
     /// so a server with none sends no station snapshots.</summary>
+    /// <summary>The chests that hold state (a block entity registry; authoritative worlds only, a client keeps
+    /// only what the server sends the chest it has open).</summary>
+    public ChestManager Chests => _chests;
+
+    /// <summary>The chest panel's UI state: which chest is open and what it shows (see <see cref="ChestView"/>).</summary>
+    public ChestView ChestPanel { get; } = new();
+
     public bool HasStations => StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting);
 
     /// <summary>Writes every station block entity for the server's broadcast
@@ -929,6 +939,7 @@ public class World
         _debris.Update((float)deltaTime, _chunkManager);
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
+        _chests.Update(_chunkManager, _dropManager);
         _kilns.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
         // A pour bound to a connected player (its PlayerContext) drains that player's crucible; the
         // world's own inventory and camera stand for the local player

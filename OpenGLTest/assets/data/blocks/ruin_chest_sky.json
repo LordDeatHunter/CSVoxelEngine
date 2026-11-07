@@ -1,0 +1,18 @@
+{
+  // Temple Chest: the chest of a sky temple. A chest block entity (ChestManager): right-click opens it, breaking it spills what it holds.
+  // Worldgen-only: it holds nothing until first opened or broken, then rolls the "ruin_sky" loot table from the hash of its cell
+  // and the world seed. It is picked as a wooden chest and drops nothing but its contents.
+  "name": "Temple Chest",
+  "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_sky_front", "side": "chest_ruin_sky_side", "top": "chest_ruin_sky_top" } },
+  "facing": "horizontal",
+  "facingFromLook": true,
+  "hardness": 6,
+  "sfx": "hit_rock",
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": { "min": [0.0625, 0, 0.0625], "max": [0.9375, 0.875, 0.9375] },
+  "hasItem": false,
+  "pickAs": "wooden_chest",
+  "loot": "none",
+  "chest": { "slots": 18, "loot": "ruin_sky" }
+}

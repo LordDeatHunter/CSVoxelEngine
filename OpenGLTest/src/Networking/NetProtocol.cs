@@ -54,6 +54,17 @@ public enum NetMessage : byte
     /// <summary>Server broadcast: the campfire, quern, kiln and cast-mold block entities the clients
     /// draw (<see cref="StationNetCodec"/>).</summary>
     StationState = 61,
+    /// <summary>Client to server: <c>(int x, int y, int z)</c>, a request to open the chest at a cell
+    /// (<see cref="ChestNetCodec"/>). Answered with a <see cref="ChestContents"/>.</summary>
+    ChestOpen = 62,
+    /// <summary>Client to server: one <see cref="VoxelEngine.Simulation.Chests.ChestMove"/> against the chest the
+    /// player has open. Answered with the chest's contents to everyone who has it open, and the mover's inventory.</summary>
+    ChestMove = 63,
+    /// <summary>Client to server: the player closed its chest panel.</summary>
+    ChestClose = 64,
+    /// <summary>Server to one client: the chest the player has open and what it holds, or "closed" when it is
+    /// refused, out of reach or gone (<see cref="ChestNetCodec"/>).</summary>
+    ChestContents = 65,
     /// <summary>Server to one client: the sequence id of the last intent applied, then that
     /// player's whole inventory.</summary>
     InventoryState = 70,
@@ -149,8 +160,11 @@ public static class NetFraming
     /// and an older server's 0 simply plays no attack clip.
     /// 19: the <see cref="NetInventoryAction.EquipGear"/> and <see cref="NetInventoryAction.UnequipGear"/> inventory
     /// actions, and the inventory snapshot carries the worn gear (<c>Equipped</c>) and the rolled modifiers of each
-    /// gear instance; an older peer would refuse either action as malformed.</summary>
-    public const int ProtocolVersion = 19;
+    /// gear instance; an older peer would refuse either action as malformed.
+    /// 20: the chest messages (<see cref="NetMessage.ChestOpen"/>, <see cref="NetMessage.ChestMove"/>,
+    /// <see cref="NetMessage.ChestClose"/>, <see cref="NetMessage.ChestContents"/>); chest contents are per player and never
+    /// ride the station broadcast. An older peer would ignore them, so a chest would never open.</summary>
+    public const int ProtocolVersion = 20;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

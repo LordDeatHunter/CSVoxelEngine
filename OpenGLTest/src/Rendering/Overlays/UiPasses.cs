@@ -9,6 +9,7 @@ using VoxelEngine.Juice;
 using VoxelEngine.Player;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
+using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
 using VoxelEngine.UI.SpellBuilder;
@@ -44,7 +45,8 @@ internal sealed class UiPasses
         int health = PlayerHealth.MaxHealth, float airShare = 1f, float manaShare = 1f, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
         HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
         CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null,
-        byte effectMask = 0, SpellBuilderView? builder = null, int maxHealth = PlayerHealth.MaxHealth)
+        byte effectMask = 0, SpellBuilderView? builder = null, int maxHealth = PlayerHealth.MaxHealth,
+        ChestView? chest = null)
     {
         // Either panel (the [E] inventory or the spell builder) hides the crosshair and the status row.
         var panelUp = view.IsOpen || builder?.IsOpen == true;
@@ -118,6 +120,16 @@ internal sealed class UiPasses
             _owner.Ui.SetOverlay(new Vector2(0f, view.Transition.SlideY), view.Transition.Alpha);
             _owner.Ui.Panel.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true);
             _owner.Ui.ClearOverlay();
+        }
+        if (chest != null)
+        {
+            chest.Transition.Step(chest.IsOpen, time);
+            if (chest.IsOpen || chest.Transition.Visible)
+            {
+                _owner.Ui.SetOverlay(new Vector2(0f, chest.Transition.SlideY), chest.Transition.Alpha);
+                _owner.Ui.ChestCard.Draw(chest, view.Focus == InventoryFocus.ChestSearch, view.HoverCanvas, time, heading);
+                _owner.Ui.ClearOverlay();
+            }
         }
         if (builder != null)
         {

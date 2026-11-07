@@ -332,6 +332,10 @@ public sealed record BlockType
     /// ever set on a <see cref="BlockRenderer.Multiblock"/> block.</summary>
     public KilnProfile? Kiln { get; init; }
 
+    /// <summary>The chest profile of this block (its <c>chest</c> object), or null when it is not a chest. A chest is a
+    /// block entity: it holds stacks, spills them when it breaks and, for a ruin chest, rolls its loot on first use.</summary>
+    public ChestProfile? Chest { get; init; }
+
     /// <summary>Whether this block is a spell builder station (the spell table): a right-click
     /// with a staff in hand opens the spell builder UI client-side. It has no block entity and
     /// keeps no state of its own.</summary>

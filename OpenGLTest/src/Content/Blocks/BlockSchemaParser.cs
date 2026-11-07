@@ -227,6 +227,26 @@ internal static class BlockSchemaParser
     }
 
     /// <summary>
+    /// Reads a block's <c>chest</c> object: its slot count (1..<see cref="ChestConfig.MaxSlots"/>) and the optional loot
+    /// table a never-opened one rolls, which must be a loaded loot table (loot tables load before blocks). A chest is a
+    /// plain model block; any other renderer is refused. Null for a block that is not a chest.
+    /// </summary>
+    internal static ChestProfile? ParseChest(BlockDefinition.ChestDefinition? definition, BlockRenderer renderer,
+        string path)
+    {
+        if (definition == null) return null;
+        if (renderer != BlockRenderer.Model)
+            throw new InvalidOperationException($"Block '{path}' has a chest object but is not a model block.");
+        if (definition.Slots is not { } slots || slots < 1 || slots > ChestConfig.MaxSlots)
+            throw new InvalidOperationException(
+                $"Block '{path}' has chest.slots {definition.Slots}; expected 1..{ChestConfig.MaxSlots}.");
+        var loot = string.IsNullOrWhiteSpace(definition.Loot) ? null : definition.Loot.Trim();
+        if (loot != null && !ContentRegistry.LootTables.ContainsKey(loot))
+            throw new InvalidOperationException($"Block '{path}' has chest.loot '{loot}', which is not a loot table.");
+        return new ChestProfile(slots, loot);
+    }
+
+    /// <summary>
     /// Reads a pane block's <c>pane</c> object into its <see cref="PaneProfile"/>: omitted fields
     /// take the glass pane's dimensions (post 2 px, arm as wide as the post, one full-height
     /// rail), and anything <see cref="PaneProfile.Create"/> refuses throws naming the file.

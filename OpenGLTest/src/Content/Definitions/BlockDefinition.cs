@@ -277,6 +277,21 @@ public sealed class BlockDefinition
     /// <c>"multiblock"</c> renderer.</summary>
     public KilnDefinition? Kiln { get; set; }
 
+    /// <summary>Marks the block as a chest: a right-click opens it and it holds `slots` stacks, kept by the chest
+    /// manager (a block entity). `loot` names the loot table a never-opened one rolls at first open or break (a ruin
+    /// chest); a crafted chest names none. Only legal on the `model` renderer.</summary>
+    public ChestDefinition? Chest { get; set; }
+
+    /// <summary>The <c>chest</c> object.</summary>
+    public sealed class ChestDefinition
+    {
+        /// <summary>Slots, 1..<see cref="ChestConfig.MaxSlots"/>.</summary>
+        public int? Slots { get; set; }
+
+        /// <summary>The loot table a never-opened chest rolls; omitted for an ordinary chest.</summary>
+        public string? Loot { get; set; }
+    }
+
     /// <summary>Marks the block as a spell builder station: a right-click opens the spell
     /// builder UI client-side. No block entity. Legal on any block.</summary>
     public bool? SpellBuilder { get; set; }

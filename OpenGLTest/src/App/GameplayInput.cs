@@ -295,6 +295,9 @@ internal sealed class GameplayInput
                 // A spell table opens the builder on this side only (the click itself changes nothing)
                 if (outcome == RightClickOutcome.SpellTable)
                     builderInput.OpenFromStation(w);
+                // A chest opens its panel beside the [E] list (the click itself changes nothing here)
+                if (outcome == RightClickOutcome.Container)
+                    panelInput.Chest.Open(w, w.RightClick.LastContainerCell);
                 if (!claimed)
                     w.Throws.TryBeginThrowCharge();
                 break;
@@ -313,6 +316,7 @@ internal sealed class GameplayInput
         }
         rightWasDown = rightDown;
         builderInput.Update(w);
+        panelInput.Chest.Update(w);
         if (!rightHeld && (PanelOpen || pauseMenuView.IsOpen || chatView.IsOpen || deathUp))
         {
             if (w.Throws.IsThrowCharging) w.Throws.CancelThrowCharge();

@@ -402,6 +402,9 @@ internal sealed class ClientSession
                 w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
                 break;
             }
+            case NetMessage.ChestContents:
+                ApplyChestContents(w, reader);
+                break;
             case NetMessage.InventoryState:
             {
                 // A snapshot answering an older intent than the newest one that changed the
@@ -485,6 +488,51 @@ internal sealed class ClientSession
         InventoryIntentCodec.Write(writer, intent);
         client.Send(writer.ToArray());
         return true;
+    }
+
+    /// <summary>Asks the server to open the chest at a cell; false when not connected. The answer is a
+    /// <see cref="NetMessage.ChestContents"/>.</summary>
+    internal bool SendChestOpen(int x, int y, int z)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
+        using var writer = new PacketWriter(NetMessage.ChestOpen);
+        ChestNetCodec.WriteOpen(writer, x, y, z);
+        client.Send(writer.ToArray());
+        return true;
+    }
+
+    /// <summary>Sends one move against the chest this player has open; false when not connected. Nothing is predicted:
+    /// the panel shows what the server answers.</summary>
+    internal bool SendChestMove(VoxelEngine.Simulation.Chests.ChestMove move)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
+        using var writer = new PacketWriter(NetMessage.ChestMove);
+        ChestNetCodec.WriteMove(writer, move);
+        client.Send(writer.ToArray());
+        return true;
+    }
+
+    /// <summary>Tells the server this player closed its chest panel; false when not connected.</summary>
+    internal bool SendChestClose()
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
+        using var writer = new PacketWriter(NetMessage.ChestClose);
+        client.Send(writer.ToArray());
+        return true;
+    }
+
+    // The server's answer for the open chest: the contents the panel shows, or the closed answer, which takes the
+    // chest part of the panel down (a snapshot of a chest the panel is no longer on is stale and ignored)
+    private static void ApplyChestContents(World w, PacketReader reader)
+    {
+        var answer = ChestNetCodec.ReadContents(reader);
+        if (answer is not { } open)
+        {
+            w.ChestPanel.Close();
+            return;
+        }
+        if (w.ChestPanel is { IsOpen: true } panel && panel.Cell == open.Cell)
+            panel.SetContents(open.Contents);
     }
 
     /// <summary>A cell the world just changed as part of a predicted action (World.BlockEdited).</summary>

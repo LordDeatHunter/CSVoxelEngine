@@ -163,6 +163,7 @@ internal static class BlockLoader
             MultiblockSize = multiblockSize,
             Kiln = BlockSchemaParser.ParseKiln(definition.Kiln, path, multiblockSize),
             SpellBuilder = definition.SpellBuilder ?? false,
+            Chest = BlockSchemaParser.ParseChest(definition.Chest, renderer, path),
             StackMax = (byte)stack.StackMax,
             TipHardness = tipHardness,
             WoodLootBands = woodLootBands ?? [new WoodLootBand(0, null, true)],

@@ -17,4 +17,6 @@ public enum RightClickOutcome
     Cast,
     /// <summary>A spell table took it: a local player opens the spell builder (client-side only).</summary>
     SpellTable,
+    /// <summary>A chest took it: a local player opens the chest panel on it (<see cref="RightClickAction.LastContainerCell"/>).</summary>
+    Container,
 }

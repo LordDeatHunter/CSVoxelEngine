@@ -1,0 +1,18 @@
+{
+  // Miner's Chest: the chest of an abandoned mining base. A chest block entity (ChestManager): right-click opens it, breaking it spills what it holds.
+  // Worldgen-only: it holds nothing until first opened or broken, then rolls the "ruin_underground" loot table from the hash of its cell
+  // and the world seed. It is picked as a wooden chest and drops nothing but its contents.
+  "name": "Miner's Chest",
+  "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_underground_front", "side": "chest_ruin_underground_side", "top": "chest_ruin_underground_top" } },
+  "facing": "horizontal",
+  "facingFromLook": true,
+  "hardness": 4,
+  "sfx": "hit_wood",
+  "castsAO": false,
+  "collidesByHitbox": true,
+  "hitbox": { "min": [0.0625, 0, 0.0625], "max": [0.9375, 0.875, 0.9375] },
+  "hasItem": false,
+  "pickAs": "wooden_chest",
+  "loot": "none",
+  "chest": { "slots": 18, "loot": "ruin_underground" }
+}

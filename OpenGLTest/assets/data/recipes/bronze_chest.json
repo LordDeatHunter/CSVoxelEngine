@@ -1,0 +1,14 @@
+{
+  "result": "block/bronze_chest",
+  "count": 1,
+  "ingredients": [
+    {
+      "item": "item/bronze_ingot",
+      "count": 8
+    },
+    {
+      "item": "block/oak_planks",
+      "count": 4
+    }
+  ]
+}

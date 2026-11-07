@@ -68,6 +68,22 @@ public sealed class ItemStack
         Set(new DisplayNameComponent(null));
     }
 
+    /// <summary>
+    /// A copy of this stack as instance <paramref name="instanceId"/>: the same item with every component and
+    /// enchantment, which is how a tool or piece of gear keeps its spells, metals and rolled modifiers when it moves
+    /// between an inventory and a chest. The cooldown is reset, since it is a clock of one session.
+    /// </summary>
+    public ItemStack CloneAs(int instanceId)
+    {
+        var copy = new ItemStack(instanceId, Item) { Count = Count };
+        foreach (var (type, value) in _components)
+            if (type != typeof(CooldownComponent))
+                copy._components[type] = value;
+        foreach (var (enchantment, level) in Enchantments)
+            copy.Enchantments[enchantment] = level;
+        return copy;
+    }
+
     /// <summary>Morphs the stack into another item in place, topping durability up when the new
     /// form has some and this stack had none (a poured-out bucket stays endless, a fresh
     /// firestarter starts full).</summary>
