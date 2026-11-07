@@ -5,8 +5,8 @@
 ## Status
 
 Phases 1 (foundations) and 2 (the hell slice, `L-5` to `L-10`) done; phase 3 (the sky) has begun with the
-solid cloud patches (`L-11`), the sky islands with their cloud sea (`L-12`) and the sky biomes and flora
-(`L-13`). A Nether- and Aether-like pair of realms inside the one world, as vertical
+solid cloud patches (`L-11`), the sky islands with their cloud sea (`L-12`), the sky biomes and flora
+(`L-13`) and flight in the shared mob layer (`L-14`). A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
@@ -48,9 +48,11 @@ and layer by `HellTrees`. Two hell mobs live in the pockets (`L-10`, AGENTS.md "
 `hellbrute` and the fire-casting `cinderwitch`, `HellMob`s on the shared `RiggedMob` base (the goblin's
 too), spawned only on dim hell floors (`MobSpawner.TryFindHellSpawn`) and scaled by the layer index
 (`LayerDifficulty`: health, damage, cast rate, pack size); their bolts set the player `burning`. They
-are already on the wire (protocol 17) and in `entities.json`; `L-16` adds the loopback tests and the
-flight state. Id budget: 174 of 255 ids used (108 blocks, 65 items, air; `L-13` added eight blocks), 81
-left (`L-15`'s sky mob loot needs about 3).
+are already on the wire (protocol 17) and in `entities.json`; `L-16` adds the loopback tests. Flight (`L-14`, AGENTS.md "Flying mobs") is ready for `L-15`'s flyer: a `RiggedMob` kind built
+with a `FlightTuning` flies (`RiggedMob.Fly`, `FlightSteering`: no gravity, fall damage or ledge caution, a
+hover band over its target or the floor, a wall probe that slides and climbs, a 3D wander goal and knock, the
+`fly` clip by 3D speed, pitch and bank); `Flies` comes from the kind, so it needs no wire bit. Id budget: 174 of 255 ids used (108 blocks, 65 items, air; `L-13` added eight
+blocks), 81 left (`L-15`'s sky mob loot needs about 3).
 Last updated 2026-11-07.
 
 ## In progress
@@ -61,14 +63,13 @@ Nothing.
 
 ### Phase 3: Sky slice
 
-- [ ] **`L-14` Flight in `Mob`.** P1, L. A flying movement mode plus animator support.
 - [ ] **`L-15` Sky mobs.** P1, L. Two: a flyer and a tough ground bruiser; spawn rules scaled by
   island-zone size.
 
 ### Phase 4: Netcode and polish
 
-- [ ] **`L-16` Network and saves.** P1, M. The sky mobs' kinds in `EntityList` (protocol bump), flight
-  state on the wire, `entities.json`, loopback tests of the realm mobs (the hell kinds already ride
+- [ ] **`L-16` Network and saves.** P1, M. The sky mobs' kinds in `EntityList` (protocol bump; flight follows
+  from the kind, `L-14`), `entities.json`, loopback tests of the realm mobs (the hell kinds already ride
   `EntityList` and `entities.json` since `L-10`; the sink rule in `MovementRules` came with `L-3`).
 - [ ] **`L-17` Tuning and docs.** P2, S. Visual scenarios for every phase, tuning pass, an AGENTS.md
   section, then prune this file.

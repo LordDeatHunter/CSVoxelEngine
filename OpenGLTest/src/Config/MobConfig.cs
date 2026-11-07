@@ -86,6 +86,22 @@ public static class MobConfig
     public const float MobLedgeMaxDropBlocks = 3f;
     public const float MobLedgeProbeBlocks = 0.5f;
 
+    // --- Flight (FlightSteering, RiggedMob.Fly) ---
+    // A flying mob's kind tunes its speeds and hover band (FlightTuning); these are the shared rules.
+    // The wall probe looks MobFlightProbeBlocks ahead of the body on each axis it moves along; the
+    // ground probe looks up to MobFlightGroundProbeBlocks down for the floor the hover band and the
+    // minimum clearance are measured from (none found: no floor rule, e.g. over open sky). The
+    // horizontal speed eases off within MobFlightArriveBlocks of the goal, and the vertical speed is
+    // MobFlightAltitudeGain per block of height error (capped by the kind's vertical speed). An idle
+    // flyer wanders to a point MobWanderMin..MaxRadiusBlocks away and up to MobFlightWanderRiseBlocks
+    // above or below it, rerolled up to MobFlightWanderTries times until the point is in air.
+    public const float MobFlightProbeBlocks = 0.6f;
+    public const float MobFlightGroundProbeBlocks = 24f;
+    public const float MobFlightArriveBlocks = 1.5f;
+    public const float MobFlightAltitudeGain = 2f;
+    public const float MobFlightWanderRiseBlocks = 3f;
+    public const int MobFlightWanderTries = 6;
+
     // --- Slimes (SlimeManager) ---
     // Forest mobs that hop at the player. Natural spawns appear on dry forest surface in a ring
     // around the player and are culled when they stray too far. Damage only lands while a slime

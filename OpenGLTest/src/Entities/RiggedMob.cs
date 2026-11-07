@@ -5,13 +5,14 @@ using VoxelEngine.Chunks;
 namespace VoxelEngine.Entities;
 
 /// <summary>
-/// A walking mob animated from the Blockbench clips in its model through an
+/// A walking or flying mob animated from the Blockbench clips in its model through an
 /// <see cref="EntityAnimator"/>: the goblin and the hell mobs. Owns what they share: the body
 /// physics (walking toward a move with a damped velocity, an auto-jump over a one-block step,
-/// floating and paddling in water, landings), the facing that turns toward a goal, the death,
+/// floating and paddling in water, landings; or, for a kind built with a <see cref="FlightTuning"/>,
+/// steered flight with no gravity, <see cref="Fly"/>), the facing that turns toward a goal, the death,
 /// spawn and hurt clips, a client mirror's animation, and the procedural body language the clips
 /// cannot give (<see cref="BodyEffect"/>). A subclass decides the move and its attacks each frame
-/// and hands them to <see cref="Walk"/>. Main thread only.
+/// and hands them to <see cref="Walk"/> or <see cref="Fly"/>. Main thread only.
 /// </summary>
 public abstract class RiggedMob : Mob
 {
@@ -36,24 +37,57 @@ public abstract class RiggedMob : Mob
     private const float DeathFallRadians = 1.45f;
     private const float WaterLean = 0.12f;
 
+    // A flyer pitches its nose up while it climbs (and down in a dive) and banks into a turn: in a
+    // turn its velocity lags its facing, so the sideways part of the velocity tells which way it turns.
+    private const float ClimbPitchPerSpeed = 0.06f;
+    private const float MaxFlightPitch = 0.45f;
+    private const float BankPerSpeed = 0.12f;
+    private const float MaxBank = 0.5f;
+    private const float FlightLeanRate = 6f;
+
     private Vector3 _velocity;
     private bool _inWater;
     private float _lean;
+    private float _bank;
     private bool _facingKnown;
     private bool _deathPlayed;
     private bool _hitWall;
+    private float _flightClock;
+    private readonly float _bobPhase;
 
-    /// <param name="walkReferenceSpeed">The speed the walk clip is authored at, which scales its playback.</param>
+    /// <param name="walkReferenceSpeed">The speed the walk (or fly) clip is authored at, which scales its playback.</param>
     /// <param name="spawnIn">Plays the spawn clip and the pop-in; false starts settled.</param>
-    protected RiggedMob(EntityType type, Vector3 position, float walkReferenceSpeed, bool spawnIn) : base(type, position)
+    /// <param name="flight">Makes the kind a flyer (<see cref="Fly"/>, the <see cref="EntityAnimator.FlyClip"/>
+    /// locomotion clip); null walks.</param>
+    protected RiggedMob(EntityType type, Vector3 position, float walkReferenceSpeed, bool spawnIn,
+        FlightTuning? flight = null) : base(type, position)
     {
-        Animation = new EntityAnimator(type.Model.Animations, walkReferenceSpeed);
+        flight?.Validate();
+        Flight = flight;
+        if (flight is { } tuning)
+        {
+            HoverHeight = MathUtils.Lerp(tuning.HoverMinBlocks, tuning.HoverMaxBlocks, Random.Shared.NextSingle());
+            _bobPhase = Random.Shared.NextSingle() * MathF.Tau;
+        }
+
+        Animation = new EntityAnimator(type.Model.Animations, walkReferenceSpeed,
+            flight == null ? EntityAnimator.WalkClip : EntityAnimator.FlyClip);
         if (spawnIn) Animation.Play(SpawnClip);
         else FinishSpawn();
     }
 
     /// <summary>The mob's own animation state, driven by its speed and actions.</summary>
     public EntityAnimator Animation { get; }
+
+    /// <summary>How this kind flies, or null for a walker.</summary>
+    public FlightTuning? Flight { get; }
+
+    /// <inheritdoc />
+    public override bool Flies => Flight.HasValue;
+
+    /// <summary>A flyer's own hover height inside its kind's band, rolled at spawn so a flock spreads out
+    /// (0 for a walker): over a chased target's eye (<see cref="FlightSteering.ChaseGoal"/>) or the floor.</summary>
+    public float HoverHeight { get; }
 
     /// <summary>Height of the collision body; <see cref="Mob.Position"/> is its center.</summary>
     public abstract float BodyHeight { get; }
@@ -85,6 +119,11 @@ public abstract class RiggedMob : Mob
     /// <summary>Unit horizontal direction the mob faces (the model faces -Z at yaw 0).</summary>
     protected Vector3 Forward => new(-MathF.Sin(Facing), 0f, -MathF.Cos(Facing));
 
+    // Unit horizontal direction to the mob's right
+    private Vector3 Right => new(MathF.Cos(Facing), 0f, -MathF.Sin(Facing));
+
+    private Vector3 HalfExtents => new(BodyHalfWidth, BodyHeight * 0.5f, BodyHalfWidth);
+
     /// <inheritdoc />
     public override void TakeDamage(int amount)
     {
@@ -95,18 +134,25 @@ public abstract class RiggedMob : Mob
     }
 
     /// <summary>A client's mob is driven by server snapshots, not by its update: this advances the
-    /// clips from the mirrored velocity so it still walks and idles.</summary>
+    /// clips from the mirrored velocity so it still walks (or flies, by its 3D speed) and idles, and a
+    /// flyer keeps pitching and banking with it.</summary>
     public override void AnimateMirror(float deltaTime)
     {
         base.AnimateMirror(deltaTime);
-        Animation.Update(deltaTime, MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z));
+        Animation.Update(deltaTime, LocomotionSpeed);
+        if (Flies) LeanIntoFlight(deltaTime);
         PlayDeathOnce();
     }
 
+    // What the locomotion crossfade runs on: the horizontal speed of a walker, the 3D speed of a flyer
+    private float LocomotionSpeed =>
+        Flies ? _velocity.Length() : MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z);
+
     /// <summary>
-    /// The pose the clips cannot give: about the feet, a forward lean into the walk (backward when
-    /// backpedaling), a flinch recoil while the hit spring rings, the fall backward and shrink of
-    /// the death, and the spawn pop. Multiply it after the part matrix (row-vector order).
+    /// The pose the clips cannot give: a forward lean into the walk (backward when backpedaling) or a
+    /// flyer's climb pitch and bank, a flinch recoil while the hit spring rings, the fall backward and
+    /// shrink of the death, and the spawn pop; about the feet for a walker, the body center for a flyer.
+    /// Multiply it after the part matrix (row-vector order).
     /// </summary>
     public Matrix4x4 BodyEffect(Vector3 feet)
     {
@@ -114,22 +160,29 @@ public abstract class RiggedMob : Mob
                     * (1f - MathUtils.EaseInCubic(MathUtils.InverseLerp(0.7f, 1f, DeathProgress)));
         var tilt = _lean + HitKick * HitLeanPerKick
                    + DeathFallRadians * MathUtils.EaseInCubic(MathUtils.InverseLerp(0f, 0.55f, DeathProgress));
-        var right = new Vector3(MathF.Cos(Facing), 0f, -MathF.Sin(Facing));
+        var pivot = Flies ? feet + new Vector3(0f, BodyHeight * 0.5f, 0f) : feet;
         // Positive about the right axis tips the head backward; the lean is stored as forward-positive.
-        return Matrix4x4.CreateTranslation(-feet)
-               * Matrix4x4.CreateScale(MathF.Max(scale, 0.001f))
-               * Matrix4x4.CreateFromAxisAngle(right, -tilt)
-               * Matrix4x4.CreateTranslation(feet);
+        var effect = Matrix4x4.CreateTranslation(-pivot)
+                     * Matrix4x4.CreateScale(MathF.Max(scale, 0.001f))
+                     * Matrix4x4.CreateFromAxisAngle(Right, -tilt);
+        // Positive about the forward axis dips the right side
+        if (_bank != 0f) effect *= Matrix4x4.CreateFromAxisAngle(Forward, _bank);
+        return effect * Matrix4x4.CreateTranslation(pivot);
     }
 
     /// <inheritdoc />
-    public override void Shove(Vector3 horizontalDirection, float speed)
+    public override void Shove(Vector3 direction, float speed)
     {
-        if (horizontalDirection.LengthSquared() < 1e-6f) return;
-        horizontalDirection.Y = 0f;
-        horizontalDirection = Vector3.Normalize(horizontalDirection);
-        _velocity.X = horizontalDirection.X * speed;
-        _velocity.Z = horizontalDirection.Z * speed;
+        if (!Flies) direction.Y = 0f;
+        if (direction.LengthSquared() < 1e-6f) return;
+        direction = Vector3.Normalize(direction);
+        if (Flies)
+        {
+            _velocity = direction * speed;
+            return;
+        }
+        _velocity.X = direction.X * speed;
+        _velocity.Z = direction.Z * speed;
     }
 
     /// <summary>The start of a frame of the mob's own update: the life-cycle clocks, the hit flash
@@ -217,13 +270,69 @@ public abstract class RiggedMob : Mob
 
         ApplyPhysics(deltaTime, chunks);
 
-        var planarSpeed = MathF.Sqrt(_velocity.X * _velocity.X + _velocity.Z * _velocity.Z);
-        Animation.Update(deltaTime, planarSpeed);
+        Animation.Update(deltaTime, LocomotionSpeed);
 
         // Lean into the movement along the facing; afloat it leans back a little as it paddles.
         var along = _velocity.X * Forward.X + _velocity.Z * Forward.Z;
         var leanTarget = Math.Clamp(along * LeanPerSpeed, -MaxLean, MaxLean) - (_inWater ? WaterLean : 0f);
         _lean = MathUtils.Damp(_lean, IsDying ? 0f : leanTarget, 8f, deltaTime);
+    }
+
+    /// <summary>
+    /// One frame of flight, for a kind built with a <see cref="FlightTuning"/>: no gravity, ground
+    /// friction, auto-jump, ledge caution or fall damage. The velocity is steered on all three axes
+    /// toward <paramref name="goal"/> (<see cref="FlightSteering"/>: a chased target's
+    /// <see cref="FlightSteering.ChaseGoal"/>, a wander point, or null to hover where it is at
+    /// <see cref="HoverHeight"/> over the floor), its height kept by the floor rule (the hover band
+    /// while idle, the minimum clearance while <paramref name="chasing"/>) plus a gentle bob, slid along
+    /// walls by the probe, at <paramref name="speedFactor"/> of the tuning. The body then sweeps through
+    /// <see cref="BoxSweep"/> like any mob, so it never enters a solid cell. It faces its goal, plays the
+    /// fly clip by its 3D speed and pitches and banks. A dying flyer drops out of the sky.
+    /// </summary>
+    protected void Fly(Vector3? goal, bool chasing, float speedFactor, float deltaTime, ChunkManager chunks)
+    {
+        if (Flight is not { } flight)
+            throw new InvalidOperationException($"Entity '{Type.Name}' has no flight tuning and cannot fly.");
+
+        _flightClock += deltaTime;
+        if (IsDying)
+        {
+            _velocity.Y = BodyMotion.Fall(_velocity.Y, deltaTime);
+            if (IsGrounded) BodyMotion.ScrubOnGround(ref _velocity, deltaTime);
+        }
+        else
+        {
+            var half = HalfExtents;
+            var bottom = Position.Y - half.Y;
+            float? groundTop = FlightSteering.GroundBelow(chunks, Position, bottom,
+                MobConfig.MobFlightGroundProbeBlocks) is { } depth ? bottom - depth : null;
+            var aim = goal ?? Position with { Y = groundTop is { } floor ? floor + half.Y + HoverHeight : Position.Y };
+            aim.Y = FlightSteering.GoalHeight(aim.Y + FlightSteering.BobOffset(_flightClock, _bobPhase, flight),
+                groundTop, half.Y, flight, overGround: !chasing);
+
+            var desired = FlightSteering.DesiredVelocity(Position, aim, flight, speedFactor);
+            desired = FlightSteering.AvoidSolids(Position, half, desired, flight.VerticalSpeed * speedFactor, chunks);
+            _velocity = BodyMotion.Steer(_velocity, desired, flight.Acceleration, deltaTime);
+
+            var toGoal = new Vector3(aim.X - Position.X, 0f, aim.Z - Position.Z);
+            if (toGoal.LengthSquared() > MobConfig.MobFlightArriveBlocks * MobConfig.MobFlightArriveBlocks)
+                FaceYaw(YawOf(toGoal), deltaTime);
+        }
+
+        SweepBody(deltaTime, chunks);
+        Animation.Update(deltaTime, LocomotionSpeed);
+        LeanIntoFlight(deltaTime);
+    }
+
+    // A flyer's pitch (nose up in a climb, forward into its speed) and bank (into the turn)
+    private void LeanIntoFlight(float deltaTime)
+    {
+        var along = Vector3.Dot(_velocity, Forward);
+        var side = Vector3.Dot(_velocity, Right);
+        var pitch = Math.Clamp(along * LeanPerSpeed - _velocity.Y * ClimbPitchPerSpeed, -MaxFlightPitch, MaxFlightPitch);
+        var bank = Math.Clamp(-side * BankPerSpeed, -MaxBank, MaxBank);
+        _lean = MathUtils.Damp(_lean, IsDying ? 0f : pitch, FlightLeanRate, deltaTime);
+        _bank = MathUtils.Damp(_bank, IsDying ? 0f : bank, FlightLeanRate, deltaTime);
     }
 
     private void ApplyPhysics(float deltaTime, ChunkManager chunks)
@@ -246,8 +355,14 @@ public abstract class RiggedMob : Mob
             _velocity.Y = BodyMotion.Fall(_velocity.Y, deltaTime);
         }
 
+        SweepBody(deltaTime, chunks);
+    }
+
+    // Moves the body by its velocity one axis at a time (X, Z, then Y), stopping each at a solid
+    private void SweepBody(float deltaTime, ChunkManager chunks)
+    {
         var movement = _velocity * deltaTime;
-        var half = new Vector3(BodyHalfWidth, BodyHeight * 0.5f, BodyHalfWidth);
+        var half = HalfExtents;
 
         Position = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
         Position = BoxSweep.MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ);

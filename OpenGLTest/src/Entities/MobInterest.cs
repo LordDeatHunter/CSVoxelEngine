@@ -88,4 +88,14 @@ public sealed class MobInterest
             MobConfig.MobWanderMaxRadiusBlocks, MathUtils.Clamp01(radiusRoll));
         return new Vector3(origin.X + MathF.Cos(angle) * radius, origin.Y, origin.Z + MathF.Sin(angle) * radius);
     }
+
+    /// <summary>A flyer's wander goal: <see cref="WanderPoint"/> lifted or lowered by up to
+    /// <see cref="MobConfig.MobFlightWanderRiseBlocks"/> for a <paramref name="heightRoll"/> in [0, 1).</summary>
+    public static Vector3 FlyingWanderPoint(Vector3 origin, float angleRoll, float radiusRoll, float heightRoll)
+    {
+        var point = WanderPoint(origin, angleRoll, radiusRoll);
+        point.Y += MathUtils.Lerp(-MobConfig.MobFlightWanderRiseBlocks, MobConfig.MobFlightWanderRiseBlocks,
+            MathUtils.Clamp01(heightRoll));
+        return point;
+    }
 }

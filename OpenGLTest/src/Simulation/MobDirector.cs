@@ -215,7 +215,7 @@ internal sealed class MobDirector
     /// from it (<see cref="BlastImpulse"/>): the local camera in singleplayer, every connected player
     /// on a server (through <see cref="IMobTarget.TakeHit"/>, which queues the knockback the player's
     /// status carries to its client), a creative, flying or dead player being immune; a mob is shoved
-    /// sideways (<see cref="Mob.Shove"/>). The drops, falling cubes and other TNT the blast reached
+    /// sideways, a flying mob along the whole impulse (<see cref="Mob.Shove"/>). The drops, falling cubes and other TNT the blast reached
     /// were already flung by <see cref="TntManager"/>. Gameplay: singleplayer and the server.
     /// </summary>
     internal void PushFromBlast(Vector3 center)
@@ -235,9 +235,9 @@ internal sealed class MobDirector
         {
             if (mob.IsDying) continue;
             var impulse = BlastImpulse.At(center, mob.Position, TntManager.BlastRadius);
-            var sideways = impulse with { Y = 0f };
-            if (sideways.LengthSquared() > 1e-6f)
-                mob.Shove(sideways, sideways.Length());
+            var push = mob.Flies ? impulse : impulse with { Y = 0f };
+            if (push.LengthSquared() > 1e-6f)
+                mob.Shove(push, push.Length());
         }
     }
 

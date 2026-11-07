@@ -8,8 +8,9 @@ namespace VoxelEngine.Entities;
 /// <summary>
 /// Plays an entity's Blockbench keyframe clips (<see cref="AnimationClip"/>) on its rig, one
 /// instance per entity. Two layers: a <b>locomotion</b> layer that crossfades the looping
-/// <see cref="IdleClip"/> and <see cref="WalkClip"/> by horizontal speed (walk playback rate
-/// scales with that speed), and a one-shot <b>action</b> layer (<see cref="Play"/>) that
+/// <see cref="IdleClip"/> and a moving clip (<see cref="WalkClip"/>, or <see cref="FlyClip"/> for a
+/// flyer) by the speed the owner hands it (horizontal for a walker, 3D for a flyer; the moving clip's
+/// playback rate scales with it), and a one-shot <b>action</b> layer (<see cref="Play"/>) that
 /// overrides only the bones its clip keys, blending in and out over
 /// <see cref="ActionBlendSeconds"/> so an action starts and ends exactly on the locomotion pose.
 /// Timeline events crossed by an action's playback are queued for <see cref="ConsumeEvent"/>,
@@ -23,6 +24,9 @@ public sealed class EntityAnimator
 
     /// <summary>Name of the looping clip played while moving.</summary>
     public const string WalkClip = "walk";
+
+    /// <summary>Name of the looping clip a flyer plays while moving, in place of <see cref="WalkClip"/>.</summary>
+    public const string FlyClip = "fly";
 
     /// <summary><see cref="MathUtils.Damp"/> rate of the idle/walk crossfade, per second.</summary>
     public const float WalkBlendRate = 8f;
@@ -53,21 +57,23 @@ public sealed class EntityAnimator
     private AnimationClip? _overlay;
     private float _overlayTime;
 
-    /// <param name="clips">Every clip the model authored; idle and walk are found by name.</param>
-    /// <param name="walkReferenceSpeed">Horizontal speed (blocks/s) at which the walk clip plays
-    /// at its authored rate.</param>
-    public EntityAnimator(IReadOnlyList<AnimationClip> clips, float walkReferenceSpeed = 3f)
+    /// <param name="clips">Every clip the model authored; idle and the moving clip are found by name.</param>
+    /// <param name="walkReferenceSpeed">Speed (blocks/s) at which the moving clip plays at its
+    /// authored rate.</param>
+    /// <param name="moveClip">The clip crossfaded in while moving: <see cref="WalkClip"/>, or
+    /// <see cref="FlyClip"/> for a flyer.</param>
+    public EntityAnimator(IReadOnlyList<AnimationClip> clips, float walkReferenceSpeed = 3f, string moveClip = WalkClip)
     {
         Clips = clips;
         WalkReferenceSpeed = walkReferenceSpeed > 0f ? walkReferenceSpeed : 1f;
         _idle = Find(IdleClip);
-        _walk = Find(WalkClip);
+        _walk = Find(moveClip);
     }
 
     /// <summary>Every clip this animator can play, in the model's file order.</summary>
     public IReadOnlyList<AnimationClip> Clips { get; }
 
-    /// <summary>Horizontal speed at which the walk clip plays at its authored rate.</summary>
+    /// <summary>Speed at which the moving clip (walk or fly) plays at its authored rate.</summary>
     public float WalkReferenceSpeed { get; }
 
     /// <summary>True while any one-shot action is playing.</summary>
@@ -124,15 +130,16 @@ public sealed class EntityAnimator
 
     /// <summary>
     /// Advances both layers by <paramref name="deltaTime"/>. The idle clock always runs; the walk
-    /// clock runs while the walk still shows, at a rate proportional to
-    /// <paramref name="horizontalSpeed"/> (never below half the authored rate, so a fading walk
-    /// keeps stepping). Events the action crosses this frame are queued before the action ends.
+    /// clock runs while the walk (or fly) clip still shows, at a rate proportional to
+    /// <paramref name="speed"/> (never below half the authored rate, so a fading walk keeps
+    /// stepping): a walker's horizontal speed, a flyer's 3D speed. Events the action crosses this
+    /// frame are queued before the action ends.
     /// </summary>
-    public void Update(float deltaTime, float horizontalSpeed)
+    public void Update(float deltaTime, float speed)
     {
         if (deltaTime <= 0f) return;
 
-        var moving = horizontalSpeed > MovingSpeedThreshold;
+        var moving = speed > MovingSpeedThreshold;
         _walkBlend = MathUtils.Damp(_walkBlend, moving ? 1f : 0f, WalkBlendRate, deltaTime);
         _idleTime += deltaTime;
         if (_overlay != null)
@@ -141,7 +148,7 @@ public sealed class EntityAnimator
             if (_overlayTime >= _overlay.Length) _overlay = null;
         }
         if (_walkBlend > WalkClockMinBlend)
-            _walkTime += deltaTime * MathF.Max(horizontalSpeed / WalkReferenceSpeed, MinWalkRate);
+            _walkTime += deltaTime * MathF.Max(speed / WalkReferenceSpeed, MinWalkRate);
 
         if (_action == null) return;
         var from = _lastActionTime;

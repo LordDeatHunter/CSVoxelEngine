@@ -182,8 +182,8 @@ public sealed class Slime : Mob
     /// <summary>Sets the horizontal shove a grounded player contact or a hit imparts, leaving vertical
     /// motion alone. Setting (not adding) keeps a sustained touch from accelerating the slime. A larger
     /// slime is pushed less (<see cref="SlimeSize.ShoveSpeed"/>).</summary>
-    public override void Shove(Vector3 horizontalDirection, float speed) =>
-        SetHorizontalVelocity(horizontalDirection, SlimeSize.ShoveSpeed(speed, Size));
+    public override void Shove(Vector3 direction, float speed) =>
+        SetHorizontalVelocity(direction, SlimeSize.ShoveSpeed(speed, Size));
 
     private void SetHorizontalVelocity(Vector3 horizontalDirection, float speed)
     {

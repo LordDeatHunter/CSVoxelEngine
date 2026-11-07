@@ -1070,7 +1070,7 @@ OpenGLTest/
       ManaConfig.cs            # the mana pool: start max, growth per known part and its cap, the refill time
       SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap;
                                #   the staff slot cap and the cast cooldown (CastCooldownSeconds)
-      MobConfig.cs             # mob caps and shared mob rules, layer difficulty, hell mobs, slimes, goblins (flee, dodge, pack, torches, notice
+      MobConfig.cs             # mob caps and shared mob rules (flight's probes, arrival and wander rise), layer difficulty, hell mobs, slimes, goblins (flee, dodge, pack, torches, notice
                                #   pip), healthbars, damage numbers, the realm layer difficulty step
       NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules (the attack and cast slack),
                                #   timeouts, LOD streaming, ServerAllowCreative
@@ -1295,12 +1295,15 @@ OpenGLTest/
       ContactDamage.cs         # GL-free contact damage a body takes standing against a cactus
       DamageNumber.cs          # one floating damage number in a DamageNumberPool: where it started, the damage it shows
       DamageNumberPool.cs      # the floating damage numbers over struck mobs, in one fixed array: a hit claims a free slot
-      EntityAnimator.cs        # GL-free per-entity animator: idle/walk locomotion + one-shot action
+      EntityAnimator.cs        # GL-free per-entity animator: idle/walk (or idle/fly) locomotion + one-shot action
                                #   layer, events, parent-chain part matrices, HandAnchor
       EntityModel.cs           # a runtime entity model: the cubes parsed from a Blockbench project
       EntityType.cs            # one entity kind loaded from assets/data/entities/<name>.json: its display name, health pool
       FallingBlock.cs          # a gravity-affected block (sand, gravel) in flight
       FallingBlockLanding.cs   # a falling cube written back as a block: cell, block, fall, submerged (its dust)
+      FlightSteering.cs        # GL-free flight rules: chase goal, floor probe, hover/clearance height, bob, steered
+                               #   velocity, the wall probe that slides or lifts a flyer (RiggedMob.Fly)
+      FlightTuning.cs          # one flying kind's speeds, acceleration, hover band, clearance and bob (Validate)
       MobCaps.cs, IMobPopulation.cs  # the natural and hard mob caps every kind shares, over the
                                      #   living count each registered manager reports
       IMobTarget.cs            # what a mob chases and hurts: eye, immunity, TakeHit (Camera, ServerPlayer)
@@ -1316,9 +1319,9 @@ OpenGLTest/
       MobLava.cs               # GL-free mob lava rule: body box in a burning fluid (BurningFluid), damage per tick
       MobLoot.cs               # GL-free loot toss: the up-and-out launch a killed mob's drops get
       MobTargets.cs            # GL-free target rules: body contact, nearest non-immune target, min distance
-      RiggedMob.cs             # abstract walking mob animated from its clips (Goblin, the hell mobs): the
-                               #   EntityAnimator, walk/auto-jump/float physics, facing, death/spawn/hurt clips,
-                               #   the mirror's animation and BodyEffect
+      RiggedMob.cs             # abstract walking or flying mob animated from its clips (Goblin, the hell mobs): the
+                               #   EntityAnimator, walk/auto-jump/float physics or Fly, facing, death/spawn/hurt clips,
+                               #   the mirror's animation and BodyEffect (a flyer's pitch and bank)
       PrimedTnt.cs             # a primed TNT block: a full-size cube that falls under gravity and
                                #   collides with blocks axis by axis like the player and the item drops (BoxSweep)
       ThrownProjectile.cs      # a thrown item or a goblin stone in flight: falls under Gravity,
@@ -4926,7 +4929,43 @@ torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateCon
   debugger's ENTITIES tab. Tests: `HellMobTests`, `HellMobManagerTests`, the hell round trip in
   `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload` and `NetworkEntitySyncTests`.
 - Known gaps: the bolts, like the goblin stones, are not on the wire (a client sees only their damage and
-  the burning); a client's mirror shows no attack clip; the casters walk (flight is `L-14`).
+  the burning); a client's mirror shows no attack clip; the casters walk.
+
+### Flying mobs
+
+The shared mob layer can fly (plans/LAYERS.md `L-14`), as the foundation for the sky flyer (`L-15`); no
+shipped kind flies yet, so the rules are exercised by a test-only flyer (`FlightTests`). A `RiggedMob` kind
+opts in by passing a `FlightTuning` to the base constructor (cruise and vertical speed, the
+`MathUtils.Damp` acceleration, a hover band, a minimum clearance and a bob; `Validate` refuses a misordered
+one). `Mob.Flies` follows from that, so it is a property of the kind and needs no wire bit. A flyer's update
+calls `RiggedMob.Fly(goal, chasing, speedFactor, ...)` instead of `Walk`:
+- **No ground rules.** No gravity (`BodyMotion.Steer` eases the 3D velocity toward the steered one), no
+  ground friction, auto-jump or buoyancy, no fall damage (`Mob.NoteLanding` never bills a flyer) and no ledge
+  caution (`Mob.IsLedgeAhead` is false). A dying flyer drops out of the sky under gravity.
+- **Steering** (`FlightSteering`, GL-free and state-free): a chased target's goal is
+  `ChaseGoal(eye, HoverHeight)` (each flyer rolls its own `HoverHeight` inside the band at spawn, so a flock
+  spreads out); with no goal it hovers where it is at `HoverHeight` over the floor. `GroundBelow` probes down
+  (up to `MobFlightGroundProbeBlocks`) for the first solid or fluid cell, and `GoalHeight` keeps the goal in
+  the hover band over that floor while idle or wandering and above the minimum clearance while chasing (so it
+  follows a target up a cliff); `BobOffset` adds the gentle bob first. `DesiredVelocity` flies at cruise
+  toward the goal, easing off within `MobFlightArriveBlocks`, and climbs by `MobFlightAltitudeGain` per block
+  of height error; `AvoidSolids` probes `MobFlightProbeBlocks` ahead on each axis, dropping a component into a
+  solid (so it slides along a wall) and climbing over a wall it is blocked by. The body then sweeps through
+  `BoxSweep` like every mob, so it never enters a solid cell. It faces its goal.
+- **Wander**: `Mob.WanderGoal(count, dt, chunks)` gives a flyer a 3D goal (`MobInterest.FlyingWanderPoint`,
+  up to `MobFlightWanderRiseBlocks` above or below), rerolled up to `MobFlightWanderTries` times until it is
+  an air cell, reached in 3D. Interest, idle despawn and the notice rule are unchanged (horizontal).
+- **Hazards and hits**: `Mob.UpdateHazards` still burns a flyer touching lava. `Mob.Shove` knocks a flyer
+  along the whole direction (a ground mob keeps the horizontal part): `MobStrikes.StrikeMob` passes the 3D
+  direction from the striker for a flyer, and `MobDirector.PushFromBlast` the whole blast impulse. The punch
+  and slice cones, the projectile overlap and the healthbar were already 3D.
+- **Animation**: `EntityAnimator`'s moving clip is chosen per mob (`moveClip`: `WalkClip`, or `FlyClip`,
+  `fly`, for a flyer) and crossfaded with idle by the speed the owner hands it, horizontal for a walker and 3D
+  for a flyer (`RiggedMob`, its mirror too). `BodyEffect` pitches a flyer into its speed and nose-up in a
+  climb and banks it into a turn (the velocity lagging the facing), about its body center; a walker's effect
+  is unchanged.
+- **Mirrors**: a client mirror takes the snapshot's full `Vector3` position and velocity
+  (`NetworkSetState`) and never integrates or ground-snaps it, so a flyer keeps its height between snapshots.
 
 ### Icebergs
 
@@ -5054,7 +5093,8 @@ taken from Blockbench's `BoneAnimator.displayRotation`/`displayPosition`:
 If a clip ever plays mirrored, fix the loader, never the clips.
 
 **`EntityAnimator`** (one per entity, GL-free, no per-frame allocation) has two layers:
-- **Locomotion** crossfades the `idle` and `walk` clips by horizontal speed through `MathUtils.Damp`.
+- **Locomotion** crossfades the `idle` and `walk` clips by horizontal speed through `MathUtils.Damp`
+  (a flyer's animator crossfades `idle` and `fly` by its 3D speed, see "Flying mobs").
   The walk plays back at a rate that scales with speed against the animator's reference speed.
 - **Action** runs a one-shot clip (`Play("throw")`). Replaying the clip that is already running is
   ignored, and a different one replaces it. The action overrides only the bones its clip keys, with an

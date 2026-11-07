@@ -40,7 +40,9 @@ internal sealed class MobStrikes
             striker?.NoteCombat();
         ShowLandedHit(mob, hits);
         SpawnHitSparks(mob, from);
-        var away = new Vector3(mob.Position.X - from.X, 0f, mob.Position.Z - from.Z);
+        // A flyer is knocked away in 3D (up off a blow from below), a ground mob sideways
+        var away = mob.Position - from;
+        if (!mob.Flies) away.Y = 0f;
         mob.Shove(away, shoveSpeed);
     }
 

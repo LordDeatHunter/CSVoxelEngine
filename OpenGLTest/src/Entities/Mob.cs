@@ -39,6 +39,10 @@ public abstract class Mob
 
     public EntityType Type { get; }
 
+    /// <summary>Whether this mob flies (<see cref="RiggedMob.Fly"/>): no gravity, no fall damage, no ledge
+    /// caution, a 3D wander goal and a 3D knock. Fixed by its kind, so nothing about it rides the wire.</summary>
+    public virtual bool Flies => false;
+
     /// <summary>Body center.</summary>
     public Vector3 Position { get; protected set; }
 
@@ -130,11 +134,12 @@ public abstract class Mob
     /// Two landings before a take keep the harder one; nothing but the cosmetic dust reads it. The
     /// landing also bills its fall (<see cref="MobFallDamage"/> over <see cref="SafeFallBlocks"/>)
     /// unless the feet were <paramref name="inWater"/>; only a mob's own physics lands, which runs in
-    /// the authoritative simulation alone, so a client's mirror never takes fall damage.
+    /// the authoritative simulation alone, so a client's mirror never takes fall damage. A flyer
+    /// (<see cref="Flies"/>) never falls, so it never bills one either.
     /// </summary>
     protected void NoteLanding(float impactSpeed, float gravity, bool inWater = false)
     {
-        if (!inWater)
+        if (!inWater && !Flies)
         {
             var damage = MobFallDamage.Damage(LandingDust.FallFromImpactSpeed(impactSpeed, gravity),
                 SafeFallBlocks, MaxHealth);
@@ -189,22 +194,39 @@ public abstract class Mob
     /// Where a mob that chases nobody strolls to: a goal <see cref="MobInterest.WanderPoint"/> picks
     /// around it, picked anew every <see cref="MobConfig.MobWanderRepickSeconds"/> or once
     /// reached. Null when there is nobody in play at all (<paramref name="targetCount"/> 0), so an empty
-    /// server's mobs stand still.
+    /// server's mobs stand still. A flyer's goal is 3D (<see cref="MobInterest.FlyingWanderPoint"/>, an air
+    /// cell of <paramref name="chunks"/> when given) and is reached in 3D.
     /// </summary>
-    public Vector3? WanderGoal(int targetCount, float deltaTime)
+    public Vector3? WanderGoal(int targetCount, float deltaTime, ChunkManager? chunks = null)
     {
         if (targetCount <= 0 || IsDying) return null;
         _wanderTimer -= deltaTime;
-        var dx = _wanderGoal.X - Position.X;
-        var dz = _wanderGoal.Z - Position.Z;
+        var to = _wanderGoal - Position;
+        if (!Flies) to.Y = 0f;
         var arrive = MobConfig.MobWanderArriveBlocks;
-        if (!_hasWanderGoal || _wanderTimer <= 0f || dx * dx + dz * dz < arrive * arrive)
+        if (!_hasWanderGoal || _wanderTimer <= 0f || to.LengthSquared() < arrive * arrive)
         {
-            _wanderGoal = MobInterest.WanderPoint(Position, Random.Shared.NextSingle(), Random.Shared.NextSingle());
+            _wanderGoal = Flies
+                ? FlyingWanderGoal(chunks)
+                : MobInterest.WanderPoint(Position, Random.Shared.NextSingle(), Random.Shared.NextSingle());
             _wanderTimer = MobConfig.MobWanderRepickSeconds * (0.75f + 0.5f * Random.Shared.NextSingle());
             _hasWanderGoal = true;
         }
         return _wanderGoal;
+    }
+
+    // A 3D wander point in an air cell, rerolled a few times; hovering in place when every roll hits a block
+    private Vector3 FlyingWanderGoal(ChunkManager? chunks)
+    {
+        for (var i = 0; i < MobConfig.MobFlightWanderTries; i++)
+        {
+            var point = MobInterest.FlyingWanderPoint(Position, Random.Shared.NextSingle(),
+                Random.Shared.NextSingle(), Random.Shared.NextSingle());
+            var cell = point.BlockCell();
+            if (chunks == null || chunks.GetBlockGlobal(cell.X, cell.Y, cell.Z) == 0)
+                return point;
+        }
+        return Position;
     }
 
     /// <summary>Whether this mob, idle long enough and far from every one of <paramref name="targets"/>,
@@ -217,10 +239,12 @@ public abstract class Mob
     /// Ledge caution (<see cref="LedgeProbe"/>): whether moving along the horizontal
     /// <paramref name="direction"/> to <paramref name="distance"/> blocks from the body center would step
     /// off a drop of more than <see cref="MobConfig.MobLedgeMaxDropBlocks"/>, with
-    /// <paramref name="targetEye"/> (the chased target's eye, or null) not standing below it.
+    /// <paramref name="targetEye"/> (the chased target's eye, or null) not standing below it. Never for a
+    /// flyer, which has no ledge to fall off.
     /// </summary>
     public bool IsLedgeAhead(Vector3 direction, float distance, ChunkManager chunks, Vector3? targetEye) =>
-        LedgeProbe.IsLedgeAhead(chunks, Position, Position.Y - BodyHalfHeight, direction, distance, targetEye);
+        !Flies
+        && LedgeProbe.IsLedgeAhead(chunks, Position, Position.Y - BodyHalfHeight, direction, distance, targetEye);
 
     private float _lavaTimer;
 
@@ -310,9 +334,10 @@ public abstract class Mob
         LastHitDamage = amount;
     }
 
-    /// <summary>Sets the horizontal shove a contact or hit imparts, leaving vertical motion
-    /// alone. Setting (not adding) keeps a sustained touch from accelerating the mob.</summary>
-    public abstract void Shove(Vector3 horizontalDirection, float speed);
+    /// <summary>Sets the shove a contact or hit imparts along <paramref name="direction"/>: a ground mob
+    /// takes only its horizontal part and keeps its vertical motion, a flyer (<see cref="Flies"/>) is
+    /// knocked along all three axes. Setting (not adding) keeps a sustained touch from accelerating the mob.</summary>
+    public abstract void Shove(Vector3 direction, float speed);
 
     /// <summary>Current body velocity in blocks per second (what an entity save records).</summary>
     public abstract Vector3 Velocity { get; }
