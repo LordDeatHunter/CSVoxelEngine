@@ -168,7 +168,8 @@ internal sealed class IntentReplay
             return false;
         var inventory = player.Inventory;
         player.Breaking.Start(intent.X, intent.Y, intent.Z, id, state, inventory.HeldItem,
-            inventory.SelectedBlockId, inventory.SelectedToolInstance, _state.Elapsed);
+            inventory.SelectedBlockId, inventory.SelectedToolInstance, _state.Elapsed,
+            inventory.Equipment.Stats.MiningFactor);
         return true;
     }
 
