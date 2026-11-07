@@ -83,6 +83,10 @@ public enum NetInventoryAction : byte
     CreativeClear = 6,
     PickBlock = 7,
     SelectStaffSlot = 8,
+    /// <summary>Binds spell part keys into a slot of the held staff (the spell table).</summary>
+    BindStaffSlot = 9,
+    /// <summary>Unbinds a slot of the held staff (the spell table).</summary>
+    ClearStaffSlot = 10,
 }
 
 /// <summary>
@@ -121,8 +125,11 @@ public static class NetFraming
     /// either as malformed.
     /// 13: every <see cref="NetMessage.EntityList"/> entry ends with a status-effect byte mask and
     /// <see cref="NetMessage.PlayerStatus"/> ends with the player's effect mask; an older peer would
-    /// misread the frames.</summary>
-    public const int ProtocolVersion = 13;
+    /// misread the frames.
+    /// 14: the <see cref="NetInventoryAction.BindStaffSlot"/> and
+    /// <see cref="NetInventoryAction.ClearStaffSlot"/> inventory actions (the MG-7 spell table); an
+    /// older peer would refuse them as malformed.</summary>
+    public const int ProtocolVersion = 14;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

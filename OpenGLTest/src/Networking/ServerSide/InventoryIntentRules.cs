@@ -22,6 +22,10 @@ namespace VoxelEngine.Networking.ServerSide;
 /// <item>Creative grants and clears need the player's server-owned creative flag.</item>
 /// <item>Pick-block only selects or equips what the player owns (<see cref="Inventory.PickBlock"/>).</item>
 /// <item>A staff slot selection needs a staff in hand and a slot it has (<see cref="HeldStaff.TrySelect"/>).</item>
+/// <item>A staff bind needs a staff in hand, keys that resolve, parts the player knows
+/// (<see cref="KnownSpellParts"/>; creative knows every part) and a recipe valid against the staff's
+/// tags (<see cref="HeldStaff.TryBind"/>).</item>
+/// <item>A staff clear needs a staff in hand and a bound slot (<see cref="HeldStaff.TryClear"/>).</item>
 /// </list>
 /// </summary>
 public static class InventoryIntentRules
@@ -58,6 +62,12 @@ public static class InventoryIntentRules
 
             case NetInventoryAction.SelectStaffSlot:
                 return HeldStaff.TrySelect(inventory, intent.Slot);
+
+            case NetInventoryAction.BindStaffSlot:
+                return intent.Parts is { } parts && HeldStaff.TryBind(inventory, intent.Slot, parts, creative);
+
+            case NetInventoryAction.ClearStaffSlot:
+                return HeldStaff.TryClear(inventory, intent.Slot);
 
             default:
                 return false;

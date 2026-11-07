@@ -156,6 +156,7 @@ internal static class BlockLoader
             Renderer = renderer,
             Pane = paneProfile,
             Kiln = definition.Kiln ?? false,
+            SpellBuilder = definition.SpellBuilder ?? false,
             StackMax = (byte)stack.StackMax,
             TipHardness = tipHardness,
             WoodLootBands = woodLootBands ?? [new WoodLootBand(0, null, true)],

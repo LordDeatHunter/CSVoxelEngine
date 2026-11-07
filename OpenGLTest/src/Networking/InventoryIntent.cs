@@ -19,7 +19,12 @@ namespace VoxelEngine.Networking;
 /// <item><see cref="NetInventoryAction.CreativeClear"/> / <see cref="NetInventoryAction.PickBlock"/>: <see cref="Id"/>.</item>
 /// <item><see cref="NetInventoryAction.SelectStaffSlot"/>: <see cref="Slot"/>, the held staff's spell
 /// slot to select.</item>
+/// <item><see cref="NetInventoryAction.BindStaffSlot"/>: <see cref="Slot"/> and <see cref="Parts"/>, the
+/// spell part keys (<c>&lt;kind&gt;/&lt;name&gt;</c>) to bind there.</item>
+/// <item><see cref="NetInventoryAction.ClearStaffSlot"/>: <see cref="Slot"/>, the staff slot to unbind.</item>
 /// </list>
+/// Record equality compares <see cref="Members"/> and <see cref="Parts"/> by reference, so compare
+/// those fields' contents instead.
 /// </summary>
 public readonly record struct InventoryIntent(
     NetInventoryAction Action,
@@ -28,7 +33,8 @@ public readonly record struct InventoryIntent(
     int Id = 0,
     int Count = 0,
     string? Recipe = null,
-    byte[]? Members = null)
+    byte[]? Members = null,
+    string[]? Parts = null)
 {
     public static InventoryIntent Select(int slot) => new(NetInventoryAction.SelectSlot, Slot: slot);
 
@@ -52,4 +58,9 @@ public readonly record struct InventoryIntent(
     public static InventoryIntent PickBlock(byte id) => new(NetInventoryAction.PickBlock, Id: id);
 
     public static InventoryIntent SelectStaffSlot(int slot) => new(NetInventoryAction.SelectStaffSlot, Slot: slot);
+
+    public static InventoryIntent BindStaffSlot(int slot, string[] parts) =>
+        new(NetInventoryAction.BindStaffSlot, Slot: slot, Parts: parts);
+
+    public static InventoryIntent ClearStaffSlot(int slot) => new(NetInventoryAction.ClearStaffSlot, Slot: slot);
 }

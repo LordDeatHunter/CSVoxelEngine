@@ -10,7 +10,7 @@ namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// The right-click action: the chain that hands a right-click to the first thing that claims it (a
-/// station or an openable block, then a held staff's cast, then the held item's own use, otherwise
+/// station or an openable block, then a spell table, then a held staff's cast, then the held item's own use, otherwise
 /// a placement), for the
 /// local player or a server's player, plus the local player's timed use charge. Owned by
 /// <see cref="World"/>; main thread only.
@@ -46,7 +46,8 @@ internal sealed class RightClickAction
 
     /// <summary>
     /// Right-click: runs the first thing that claims the click - a campfire, quern, kiln or cast
-    /// mold interaction, then a held staff's cast of its selected spell slot (through
+    /// mold interaction or an openable block, then a spell table (claimed with no side effect unless
+    /// a block is in hand), then a held staff's cast of its selected spell slot (through
     /// <see cref="SpellCaster"/>; a staff never places, and a client raises a
     /// <see cref="NetIntentKind.Cast"/> intent for its server to bill and run), then the selected
     /// slot's own <see cref="Item.OnUse"/> (a bucket scoops
@@ -57,9 +58,16 @@ internal sealed class RightClickAction
     /// here owned it - a mudball aimed at a lit campfire cooks instead of being thrown.
     /// False unless the world is playing: nothing may edit an unloaded world.
     /// </summary>
-    internal bool TryUseSelected(float maxDistance)
+    internal bool TryUseSelected(float maxDistance) => TryUseSelected(maxDistance, out _);
+
+    /// <summary>
+    /// <see cref="TryUseSelected(float)"/> that also hands back what claimed the click, so the
+    /// caller can open the spell builder on a <see cref="RightClickOutcome.SpellTable"/> claim (a
+    /// client raises a plain Use intent for it, like any other non-placement claim).
+    /// </summary>
+    internal bool TryUseSelected(float maxDistance, out RightClickOutcome outcome)
     {
-        var claimed = TryUseSelected(maxDistance, LocalPlayer.LocalContext(), out var outcome);
+        var claimed = TryUseSelected(maxDistance, LocalPlayer.LocalContext(), out outcome);
         // A connected client predicted the click; the server replays it for this player. A
         // placement names the face it went against (the server checks the player can see it), any
         // other claim only the cell under the crosshair, which scopes the correction sent back.
@@ -106,6 +114,12 @@ internal sealed class RightClickAction
         {
             LocalPlayer.PunchSwing();
             outcome = RightClickOutcome.Station;
+            return true;
+        }
+        // A spell table claims the click before the staff casts; opening the builder is not a strike
+        if (Interactions.TryOpenSpellTable(maxDistance, player))
+        {
+            outcome = RightClickOutcome.SpellTable;
             return true;
         }
         var item = player.Inventory.HeldItem;

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using VoxelEngine.Items;
 using VoxelEngine.UI.InventoryPanel;
@@ -6,7 +7,8 @@ namespace VoxelEngine.Magic;
 
 /// <summary>
 /// The staff in an inventory's hand and its selected spell slot: the lookup every cast, the slot cycle
-/// input, the server's slot selection and the HUD share. Main thread only, since an
+/// input, the server's slot selection and the HUD share, plus binding and clearing a slot (the spell
+/// table's prediction and the server's inventory rules). Main thread only, since an
 /// <see cref="ItemStack"/>'s components live in a plain dictionary.
 /// </summary>
 internal static class HeldStaff
@@ -37,6 +39,36 @@ internal static class HeldStaff
     {
         if (!TryGet(inventory, out var staff, out var stack) || slot < 0 || slot >= staff.Slots) return false;
         stack.Set(StaffBinding.Select(staff, stack.Get<StaffComponent>(), slot));
+        return true;
+    }
+
+    /// <summary>
+    /// Binds the recipe <paramref name="keys"/> into <paramref name="slot"/> of the held staff. False,
+    /// changing nothing, without a staff in hand, for no keys, a key this run does not know, a part the
+    /// player does not know (<see cref="KnownSpellParts"/>; creative knows every part), or a recipe
+    /// <see cref="StaffBinding.TryBind"/> refuses (slot range, the staff's tags, validity).
+    /// </summary>
+    public static bool TryBind(Inventory inventory, int slot, IReadOnlyList<string> keys, bool creative)
+    {
+        if (!TryGet(inventory, out var staff, out var stack) || keys.Count == 0) return false;
+        if (!StaffBinding.TryResolve(keys, out var parts, out _)) return false;
+        foreach (var part in parts)
+            if (!KnownSpellParts.Knows(inventory, part, creative)) return false;
+        if (!StaffBinding.TryBind(staff, stack.Get<StaffComponent>(), slot, parts, out var result, out _)) return false;
+        stack.Set(result);
+        return true;
+    }
+
+    /// <summary>
+    /// Unbinds <paramref name="slot"/> of the held staff. False, changing nothing, without a staff, for a
+    /// slot the staff does not have, or for a slot that holds no recipe.
+    /// </summary>
+    public static bool TryClear(Inventory inventory, int slot)
+    {
+        if (!TryGet(inventory, out var staff, out var stack) || slot < 0 || slot >= staff.Slots) return false;
+        var component = stack.Get<StaffComponent>();
+        if (!component.IsBound(slot)) return false;
+        stack.Set(StaffBinding.Clear(staff, component, slot));
         return true;
     }
 

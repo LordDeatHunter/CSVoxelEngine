@@ -11,13 +11,14 @@ using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.SpellBuilder;
 
 namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
 /// The UI hand-off: the HUD pass over the finished frame (the underwater wash, the damage
 /// vignette, the crosshair and look-at label, the compass or clock, the hotbar, hearts and toasts,
-/// the [E] panel and the pause menu), the chat, tooltip and player-list passes after it, and the
+/// the [E] panel, the spell builder and the pause menu), the chat, tooltip and player-list passes after it, and the
 /// world-less frames: the main menu, the opaque loading screen and the loading fade over the first
 /// playing frames. Every pass draws through the one <see cref="UIRenderer"/> its owner builds,
 /// straight into the default framebuffer in display space. Render thread only.
@@ -43,8 +44,10 @@ internal sealed class UiPasses
         int health = PlayerHealth.MaxHealth, float airShare = 1f, float manaShare = 1f, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
         HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
         CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null,
-        byte effectMask = 0)
+        byte effectMask = 0, SpellBuilderView? builder = null)
     {
+        // Either panel (the [E] inventory or the spell builder) hides the crosshair and the status row.
+        var panelUp = view.IsOpen || builder?.IsOpen == true;
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
 
@@ -74,7 +77,7 @@ internal sealed class UiPasses
         // The compass and the clock share the top-center strip; the look-at label rides below it
         var hasCompass = camera != null && HasCompassEquipped(inventory);
         var hasClock = camera != null && HasClockEquipped(inventory);
-        if (!view.IsOpen && (menu == null || !menu.IsOpen))
+        if (!panelUp && (menu == null || !menu.IsOpen))
         {
             _owner.Ui.Hud.DrawCrosshair(crosshair.ThrowCharge, crosshair.BreakProgress, crosshair.HitMarker);
             // The look-at label (its debug lines ride the profiler overlay, i.e. X)
@@ -97,7 +100,7 @@ internal sealed class UiPasses
         // The day/first-pickup/full-inventory toast rides above the item-name row
         if (toast is { Alpha: > 0f, Text.Length: > 0 })
             _owner.Ui.Hud.DrawToast(toast.Text, toast.Alpha);
-        if (!view.IsOpen && (menu == null || !menu.IsOpen))
+        if (!panelUp && (menu == null || !menu.IsOpen))
         {
             _owner.Ui.Hud.DrawHearts(health);
             _owner.Ui.Hud.DrawAir(airShare, health);
@@ -114,6 +117,16 @@ internal sealed class UiPasses
             _owner.Ui.SetOverlay(new Vector2(0f, view.Transition.SlideY), view.Transition.Alpha);
             _owner.Ui.Panel.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true);
             _owner.Ui.ClearOverlay();
+        }
+        if (builder != null)
+        {
+            builder.Transition.Step(builder.IsOpen, time);
+            if (builder.IsOpen || builder.Transition.Visible)
+            {
+                _owner.Ui.SetOverlay(new Vector2(0f, builder.Transition.SlideY), builder.Transition.Alpha);
+                _owner.Ui.SpellBuilder.DrawSpellBuilder(inventory, builder);
+                _owner.Ui.ClearOverlay();
+            }
         }
         if (menu != null && settings != null)
             _owner.Ui.Menu.DrawPauseMenu(menu, settings);

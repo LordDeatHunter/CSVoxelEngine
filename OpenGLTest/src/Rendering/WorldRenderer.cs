@@ -15,6 +15,7 @@ using VoxelEngine.Simulation;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.SpellBuilder;
 
 namespace VoxelEngine.Rendering;
 
@@ -308,15 +309,16 @@ internal sealed class WorldRenderer
 
     /// <summary>
     /// Draws the HUD. <paramref name="showProfiler"/> adds the frame-timing table under the FPS
-    /// counter (the same flag that turns the debug console logging on).
+    /// counter (the same flag that turns the debug console logging on). <paramref name="builder"/> is the
+    /// spell builder panel, drawn over the HUD while open.
     /// </summary>
     internal void RenderUI(RenderManager renderManager, InventoryView view, float time,
         int fps, bool showProfiler, bool showCoordinates = true, PauseMenuView? menu = null,
-        SettingsMenuView? settings = null)
+        SettingsMenuView? settings = null, SpellBuilderView? builder = null)
     {
         renderManager.UiPasses.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
             _health.Health, _health.Breath.Fraction, _health.Mana.Fraction, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, LeftClick.Crosshair, LeftClick.LookAt,
-            _staffSlot.Label(Inventory), _health.Effects.Mask);
+            _staffSlot.Label(Inventory), _health.Effects.Mask, builder);
     }
 
     /// <summary>

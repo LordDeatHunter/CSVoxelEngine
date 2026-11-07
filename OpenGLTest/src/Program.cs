@@ -13,6 +13,7 @@ using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.SpellBuilder;
 using VoxelEngine.VisualTest;
 
 namespace VoxelEngine;
@@ -52,12 +53,14 @@ public static class Program
     private static bool visualScriptFailed;
     private static ConnectTarget pendingConnect;
     private static readonly InventoryView inventoryView = new();
+    private static readonly SpellBuilderView spellBuilderView = new();
     private static readonly ChatView chatView = new();
     private static readonly PauseMenuView pauseMenuView = new();
     private static readonly SettingsMenuView settingsMenuView = new();
     private static DevDiagnostics diagnostics = null!;
     private static ClientSession session = null!;
     private static InventoryPanelInput panelInput = null!;
+    private static SpellBuilderInput builderInput = null!;
     private static ChatInput chatInput = null!;
     private static MenuInput menuInput = null!;
     private static GameplayInput gameplay = null!;
@@ -127,10 +130,11 @@ public static class Program
         diagnostics = new DevDiagnostics();
         session = new ClientSession(windowManager, inputManager, renderManager, sfx, loadingView, chatView, diagnostics);
         panelInput = new InventoryPanelInput(inputManager, renderManager, inventoryView, pauseMenuView, session);
+        builderInput = new SpellBuilderInput(inputManager, renderManager, spellBuilderView, session);
         chatInput = new ChatInput(chatView, session);
-        menuInput = new MenuInput(windowManager, inputManager, renderManager, menu, pauseMenuView, settingsMenuView, panelInput, inventoryView);
-        gameplay = new GameplayInput(inputManager, renderManager, inventoryView, chatView, pauseMenuView, panelInput, menuInput, session, diagnostics);
-        inputEvents = new InputEvents(inputManager, renderManager, menu, inventoryView, chatView, pauseMenuView, settingsMenuView, panelInput, menuInput, chatInput, gameplay);
+        menuInput = new MenuInput(windowManager, inputManager, renderManager, menu, pauseMenuView, settingsMenuView, panelInput, inventoryView, builderInput);
+        gameplay = new GameplayInput(inputManager, renderManager, inventoryView, chatView, pauseMenuView, panelInput, builderInput, menuInput, session, diagnostics);
+        inputEvents = new InputEvents(inputManager, renderManager, menu, inventoryView, chatView, pauseMenuView, settingsMenuView, panelInput, builderInput, menuInput, chatInput, gameplay);
 
         // A dev override (VOXEL_SCRIPT/SPAWN/LOOK) takes the old path unchanged: a storeless world
         // built right here, no seed change, no persistence and no menu, so scripted runs stay
@@ -408,6 +412,7 @@ public static class Program
         pauseMenuView.Page = PauseMenuPage.Closed;
         settingsMenuView.DragRow = null;
         inventoryView.ResetForNewWorld();
+        spellBuilderView.ResetForNewWorld();
         chatView.Reset();
         gameplay.ResetEdges();
     }
@@ -559,7 +564,7 @@ public static class Program
         if (!hideHud)
             world.Renderer.RenderUI(renderManager, inventoryView,
                 (float)world.LightingTime, shownFps, diagnostics.DebugEnabled,
-                showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView);
+                showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView, builder: spellBuilderView);
         // The chat log and input draw over the HUD; hidden with the HUD and behind the pause menu.
         if (!hideHud && !pauseMenuView.IsOpen)
             renderManager.UiPasses.RenderChat(windowManager.Window, chatView, windowManager.Window.Time);

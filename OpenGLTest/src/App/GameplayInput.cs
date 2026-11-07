@@ -1,5 +1,6 @@
 using System;
 using Silk.NET.Input;
+using VoxelEngine.Interaction;
 using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
@@ -11,7 +12,7 @@ using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.App;
 
-/// <summary>A playing world's per-frame polled input, in frame order: the chat, debug, HUD, screenshot, player-list, ESC and [E] keys, the hotbar keys and throws, the right-click use/place/charge chain, then (unless paused) the world update, the chat clock, mining and the middle-click pick. Owns the input edges and the right-click repeat timer. Owned by Program; main thread only.</summary>
+/// <summary>A playing world's per-frame polled input, in frame order: the chat, debug, HUD, screenshot, player-list, ESC and [E] keys, the hotbar keys and throws, the right-click use/place/charge chain (a spell table's claim opens the spell builder), then (unless paused) the world update, the chat clock, mining and the middle-click pick. An open [E] panel or spell builder owns the mouse (<see cref="PanelOpen"/>). Owns the input edges and the right-click repeat timer. Owned by Program; main thread only.</summary>
 internal sealed class GameplayInput
 {
     private readonly InputManager inputManager;
@@ -20,6 +21,7 @@ internal sealed class GameplayInput
     private readonly ChatView chatView;
     private readonly PauseMenuView pauseMenuView;
     private readonly InventoryPanelInput panelInput;
+    private readonly SpellBuilderInput builderInput;
     private readonly MenuInput menuInput;
     private readonly ClientSession session;
     private readonly DevDiagnostics diagnostics;
@@ -42,7 +44,7 @@ internal sealed class GameplayInput
     private const double MAX_PLACE_TIMER = 0.2;
     private static double placeTimer = MAX_PLACE_TIMER;
 
-    internal GameplayInput(InputManager inputManager, RenderManager renderManager, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, InventoryPanelInput panelInput, MenuInput menuInput, ClientSession session, DevDiagnostics diagnostics)
+    internal GameplayInput(InputManager inputManager, RenderManager renderManager, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, InventoryPanelInput panelInput, SpellBuilderInput builderInput, MenuInput menuInput, ClientSession session, DevDiagnostics diagnostics)
     {
         this.inputManager = inputManager;
         this.renderManager = renderManager;
@@ -50,12 +52,16 @@ internal sealed class GameplayInput
         this.chatView = chatView;
         this.pauseMenuView = pauseMenuView;
         this.panelInput = panelInput;
+        this.builderInput = builderInput;
         this.menuInput = menuInput;
         this.session = session;
         this.diagnostics = diagnostics;
     }
 
     private World? ActiveWorld => Program.ActiveWorld;
+
+    /// <summary>A panel owns the mouse: the [E] panel or the spell builder is open.</summary>
+    private bool PanelOpen => inventoryView.IsOpen || builderInput.IsOpen;
 
     /// <summary>Whether the HUD draws (F1).</summary>
     internal bool HudVisible => hudVisible;
@@ -91,6 +97,7 @@ internal sealed class GameplayInput
         {
             chatView.Close();
             panelInput.SetInventoryOpen(false);
+            builderInput.SetOpen(false);
             menuInput.SetPauseMenu(PauseMenuPage.Closed);
         }
         w.Camera.SuppressLook = up;
@@ -152,7 +159,7 @@ internal sealed class GameplayInput
         // the pause menu or the chat itself already owns the keyboard.
         var tPressed = inputManager.Keyboard?.IsKeyPressed(Key.T) == true;
         if (tPressed && !tWasPressed && !chatView.IsOpen && !pauseMenuView.IsOpen
-            && !inventoryView.IsOpen && !deathUp)
+            && !PanelOpen && !deathUp)
             chatView.Open();
         tWasPressed = tPressed;
 
@@ -177,7 +184,7 @@ internal sealed class GameplayInput
 
         // Tab lists who is online while it is held (a server session; the chat owns Tab otherwise)
         tabHeld = inputManager.Keyboard?.IsKeyPressed(Key.Tab) == true
-                  && !chatView.IsOpen && !pauseMenuView.IsOpen && !inventoryView.IsOpen;
+                  && !chatView.IsOpen && !pauseMenuView.IsOpen && !PanelOpen;
 
         // ESC toggles the pause menu instead of closing the game: first press opens it,
         // ESC on the settings page steps back to the main page, ESC there resumes the game.
@@ -189,6 +196,8 @@ internal sealed class GameplayInput
                 chatView.Close();
             else if (inventoryView.IsOpen)
                 panelInput.SetInventoryOpen(false);
+            else if (builderInput.IsOpen)
+                builderInput.SetOpen(false);
             else switch (pauseMenuView.Page)
             {
                 case PauseMenuPage.Closed:
@@ -221,7 +230,13 @@ internal sealed class GameplayInput
         var ePressed = inputManager.Keyboard?.IsKeyPressed(Key.E) == true;
         if (ePressed && !eWasPressed && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp
             && inventoryView.Focus == InventoryFocus.None)
-            panelInput.SetInventoryOpen(!inventoryView.IsOpen);
+        {
+            // E closes an open spell builder rather than opening the [E] panel over it
+            if (builderInput.IsOpen)
+                builderInput.SetOpen(false);
+            else
+                panelInput.SetInventoryOpen(!inventoryView.IsOpen);
+        }
         eWasPressed = ePressed;
 
         var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
@@ -230,7 +245,7 @@ internal sealed class GameplayInput
         if (inventoryView.IsOpen && inventoryView.Focus == InventoryFocus.None && !pauseMenuView.IsOpen)
             panelInput.AssignHoveredRowToHotbar();
 
-        if (!inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp)
+        if (!PanelOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp)
         {
             // 1-10 grabs the hotbar slot directly; scroll still walks it one step at a time
             for (var i = 0; i < InventoryPanelInput.NumberKeys.Length; i++)
@@ -257,7 +272,7 @@ internal sealed class GameplayInput
         // so a mudball cooks on a lit campfire instead of sailing over it. Hold to charge,
         // release to throw.
         var rightDown = inputManager.Mouse?.IsButtonPressed(MouseButton.Right) == true;
-        var rightHeld = rightDown && !inventoryView.IsOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp;
+        var rightHeld = rightDown && !PanelOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp;
         var rightPressed = rightHeld && !rightWasDown;
         switch (rightHeld)
         {
@@ -273,8 +288,13 @@ internal sealed class GameplayInput
                 FrameProfiler.Begin(ProfileSection.UsePlace);
                 // A timed use (use.seconds) charges instead of firing on the click, and runs only
                 // when the hold completes; anything else uses or places on the click
-                var claimed = w.RightClick.TryBeginUseCharge() || w.RightClick.TryUseSelected(World.InteractionReach);
+                var outcome = RightClickOutcome.None;
+                var claimed = w.RightClick.TryBeginUseCharge()
+                    || w.RightClick.TryUseSelected(World.InteractionReach, out outcome);
                 FrameProfiler.End(ProfileSection.UsePlace);
+                // A spell table opens the builder on this side only (the click itself changes nothing)
+                if (outcome == RightClickOutcome.SpellTable)
+                    builderInput.OpenFromStation(w);
                 if (!claimed)
                     w.Throws.TryBeginThrowCharge();
                 break;
@@ -292,7 +312,8 @@ internal sealed class GameplayInput
             }
         }
         rightWasDown = rightDown;
-        if (!rightHeld && (inventoryView.IsOpen || pauseMenuView.IsOpen || chatView.IsOpen || deathUp))
+        builderInput.Update(w);
+        if (!rightHeld && (PanelOpen || pauseMenuView.IsOpen || chatView.IsOpen || deathUp))
         {
             if (w.Throws.IsThrowCharging) w.Throws.CancelThrowCharge();
             if (w.RightClick.IsUseCharging) w.RightClick.CancelUseCharge();
@@ -319,11 +340,11 @@ internal sealed class GameplayInput
 
             FrameProfiler.Begin(ProfileSection.Breaking);
             w.LeftClick.UpdateBlockBreaking(deltaTime,
-                !inventoryView.IsOpen && !chatView.IsOpen && !deathUp
+                !PanelOpen && !chatView.IsOpen && !deathUp
                 && inputManager.Mouse?.IsButtonPressed(MouseButton.Left) == true);
             FrameProfiler.End(ProfileSection.Breaking);
 
-            var middlePressed = !inventoryView.IsOpen && !chatView.IsOpen && !deathUp
+            var middlePressed = !PanelOpen && !chatView.IsOpen && !deathUp
                 && inputManager.Mouse?.IsButtonPressed(MouseButton.Middle) == true;
             if (middlePressed && !middleWasPressed)
             {

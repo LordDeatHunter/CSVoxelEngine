@@ -260,6 +260,10 @@ public sealed class BlockDefinition
     /// renderer.</summary>
     public bool? Kiln { get; set; }
 
+    /// <summary>Marks the block as a spell builder station: a right-click opens the spell
+    /// builder UI client-side. No block entity. Legal on any block.</summary>
+    public bool? SpellBuilder { get; set; }
+
     /// <summary>
     /// How many units of this block stack in one cell, candle-style (pebble piles hold up to
     /// 3, branch piles up to 4). The count lives in the chunk's state byte: 0 means "untouched worldgen" (the

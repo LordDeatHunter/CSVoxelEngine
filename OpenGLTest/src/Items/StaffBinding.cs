@@ -10,8 +10,9 @@ namespace VoxelEngine.Items;
 /// The rules for binding, clearing and selecting a staff's spell slots, pure and GL-free: each takes
 /// the current <see cref="StaffComponent"/> and returns a new one, never changing the input. A slot
 /// is bound only to a recipe that compiles <see cref="SpellVerdict.Valid"/> against the staff's own
-/// tags, so a tier gates its parts by tag. The station that binds (MG-7) and the cycle input (MG-4)
-/// come later; a client never writes a binding itself, the server's inventory snapshot is the truth.
+/// tags, so a tier gates its parts by tag. <see cref="Magic.HeldStaff"/> (the spell table and the
+/// server's inventory rules) calls it; a client only predicts a binding, the server's inventory
+/// snapshot is the truth.
 /// </summary>
 public static class StaffBinding
 {

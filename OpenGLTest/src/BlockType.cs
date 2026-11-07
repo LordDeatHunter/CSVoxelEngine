@@ -312,6 +312,11 @@ public sealed record BlockType
     /// block.</summary>
     public bool Kiln { get; init; }
 
+    /// <summary>Whether this block is a spell builder station (the spell table): a right-click
+    /// with a staff in hand opens the spell builder UI client-side. It has no block entity and
+    /// keeps no state of its own.</summary>
+    public bool SpellBuilder { get; init; }
+
     /// <summary>
     /// The baked model pre-rotated to each of the four horizontal facings, indexed by facing 0..3
     /// (<c>[0]</c> is <see cref="BakedModel"/> itself, the authored north-facing bake), which the

@@ -10,7 +10,7 @@ using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.App;
 
-/// <summary>The window's mouse and keyboard events, routed to whatever owns them on the current screen: the main menu, the pause and settings menus, the [E] panel, the chat, or the right-click repeat timer. Program registers them once in OnLoad; Silk.NET raises them on the main thread.</summary>
+/// <summary>The window's mouse and keyboard events, routed to whatever owns them on the current screen: the main menu, the pause and settings menus, the [E] panel, the spell builder, the chat, or the right-click repeat timer. Program registers them once in OnLoad; Silk.NET raises them on the main thread.</summary>
 internal sealed class InputEvents
 {
     private readonly InputManager inputManager;
@@ -21,11 +21,12 @@ internal sealed class InputEvents
     private readonly PauseMenuView pauseMenuView;
     private readonly SettingsMenuView settingsMenuView;
     private readonly InventoryPanelInput panelInput;
+    private readonly SpellBuilderInput builderInput;
     private readonly MenuInput menuInput;
     private readonly ChatInput chatInput;
     private readonly GameplayInput gameplay;
 
-    internal InputEvents(InputManager inputManager, RenderManager renderManager, MainMenuController menu, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, SettingsMenuView settingsMenuView, InventoryPanelInput panelInput, MenuInput menuInput, ChatInput chatInput, GameplayInput gameplay)
+    internal InputEvents(InputManager inputManager, RenderManager renderManager, MainMenuController menu, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, SettingsMenuView settingsMenuView, InventoryPanelInput panelInput, SpellBuilderInput builderInput, MenuInput menuInput, ChatInput chatInput, GameplayInput gameplay)
     {
         this.inputManager = inputManager;
         this.renderManager = renderManager;
@@ -35,6 +36,7 @@ internal sealed class InputEvents
         this.pauseMenuView = pauseMenuView;
         this.settingsMenuView = settingsMenuView;
         this.panelInput = panelInput;
+        this.builderInput = builderInput;
         this.menuInput = menuInput;
         this.chatInput = chatInput;
         this.gameplay = gameplay;
@@ -44,7 +46,7 @@ internal sealed class InputEvents
 
     private World? ActiveWorld => Program.ActiveWorld;
 
-    /// <summary>A released button: menu and pause clicks, slider-drag saves, the right-click repeat reset and [E] panel clicks.</summary>
+    /// <summary>A released button: menu and pause clicks, slider-drag saves, the right-click repeat reset, spell builder clicks and [E] panel clicks.</summary>
     internal void OnMouseUp(MouseButton button)
     {
         if (Screen == AppScreen.Menu)
@@ -92,6 +94,9 @@ internal sealed class InputEvents
             case MouseButton.Right:
                 gameplay.ResetPlaceTimer();
                 break;
+            case MouseButton.Left when builderInput.IsOpen && inputManager.Mouse != null:
+                builderInput.HandleClick(inputManager.Mouse.Position);
+                break;
             case MouseButton.Left when inventoryView.IsOpen && inputManager.Mouse != null:
             {
                 // Releasing a thumb drag ends it here and nowhere else while the panel is
@@ -128,7 +133,7 @@ internal sealed class InputEvents
         slider.Set(SettingsLayout.SliderValue(slider, hit.Fraction));
     }
 
-    /// <summary>The wheel: the main menu lists, the hotbar (or, with Left Ctrl held, a held staff's spell slot) and the [E] panel list or craft card.</summary>
+    /// <summary>The wheel: the main menu lists, the hotbar (or, with Left Ctrl held, a held staff's spell slot) and the [E] panel list or craft card; nothing while the spell builder is open.</summary>
     internal void OnScroll(ScrollWheel wheel)
     {
         if (Screen == AppScreen.Menu)
@@ -146,6 +151,8 @@ internal sealed class InputEvents
         var w = ActiveWorld!;
 
         if (chatView.IsOpen || gameplay.DeathScreenUp(w)) return;
+        // The open spell builder owns the mouse: the wheel never steps the hotbar or the staff slot behind it
+        if (builderInput.IsOpen) return;
         switch (inventoryView.IsOpen)
         {
             case false when !pauseMenuView.IsOpen:

@@ -14,7 +14,8 @@ namespace VoxelEngine.Interaction;
 /// <summary>
 /// The block right-clicks that run before an item's own use: cooking on and collecting from a lit
 /// campfire, feeding and spinning a quern, tending a kiln (crucible, melt charge, fuel), pouring
-/// into and collecting from a cast mold, and opening or shutting a door or trapdoor. Owned by
+/// into and collecting from a cast mold, opening or shutting a door or trapdoor, and claiming a
+/// spell table's click. Owned by
 /// <see cref="World"/>; main thread only.
 /// </summary>
 internal sealed class BlockInteractions
@@ -242,6 +243,21 @@ internal sealed class BlockInteractions
             && held == partnerId)
             ToggleOpenCell(partner, toggled);
         return true;
+    }
+
+    /// <summary>
+    /// Right-click on a spell table (a block with <see cref="BlockType.SpellBuilder"/>): claims the
+    /// click unless a block is in hand, which places against the table like it does against a kiln.
+    /// No side effect and no block entity: the caller decides what to open, so a local player opens
+    /// the spell builder client-side from the <see cref="RightClickOutcome.SpellTable"/> outcome,
+    /// while a server replaying the click claims it and does nothing.
+    /// </summary>
+    internal bool TryOpenSpellTable(float maxDistance, PlayerContext player)
+    {
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out _)) return false;
+        if (BlockType.ById[id] is not { SpellBuilder: true }) return false;
+        return player.Inventory.HeldItem is not BlockItem;
     }
 
     /// <summary>Writes an openable cell's new <paramref name="state"/> and runs the hooks every

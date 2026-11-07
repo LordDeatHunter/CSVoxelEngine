@@ -48,6 +48,88 @@ public sealed class InventoryIntentTests
         Assert.Equal("some_recipe", craft.Recipe);
         Assert.Equal(3, craft.Count);
         Assert.Equal(new byte[] { 5, 6, 7 }, craft.Members);
+
+        var bind = RoundTrip(InventoryIntent.BindStaffSlot(2, ["element/fire", "shape/self"]));
+        Assert.Equal(NetInventoryAction.BindStaffSlot, bind.Action);
+        Assert.Equal(2, bind.Slot);
+        Assert.Equal(new[] { "element/fire", "shape/self" }, bind.Parts);
+
+        var clear = RoundTrip(InventoryIntent.ClearStaffSlot(1));
+        Assert.Equal(NetInventoryAction.ClearStaffSlot, clear.Action);
+        Assert.Equal(1, clear.Slot);
+
+        // A bind with no list goes out empty
+        var empty = RoundTrip(new InventoryIntent(NetInventoryAction.BindStaffSlot, Slot: 0));
+        Assert.Equal(NetInventoryAction.BindStaffSlot, empty.Action);
+        Assert.Empty(empty.Parts!);
+    }
+
+    [Fact]
+    public void ABindWithTooManyPartsOrAnOverlongKeyIsMalformed()
+    {
+        // More parts than a bind may carry
+        using (var writer = new PacketWriter(NetMessage.InventoryRequest))
+        {
+            writer.Write((byte)NetInventoryAction.BindStaffSlot);
+            writer.Write(0);
+            writer.Write((byte)(InventoryIntentCodec.MaxSpellParts + 1));
+            using var reader = new PacketReader(writer.ToArray());
+            _ = reader.Message;
+            Assert.Throws<InvalidDataException>(() => InventoryIntentCodec.Read(reader));
+        }
+
+        // A part key past the length cap
+        using (var writer = new PacketWriter(NetMessage.InventoryRequest))
+        {
+            writer.Write((byte)NetInventoryAction.BindStaffSlot);
+            writer.Write(0);
+            writer.Write((byte)1);
+            writer.Write(new string('k', InventoryIntentCodec.MaxPartKeyLength + 1));
+            using var reader = new PacketReader(writer.ToArray());
+            _ = reader.Message;
+            Assert.Throws<InvalidDataException>(() => InventoryIntentCodec.Read(reader));
+        }
+
+        // The writer refuses to send one
+        using (var writer = new PacketWriter(NetMessage.InventoryRequest))
+        {
+            var parts = Enumerable.Repeat("element/fire", InventoryIntentCodec.MaxSpellParts + 1).ToArray();
+            Assert.Throws<System.ArgumentException>(() => InventoryIntentCodec.Write(writer, InventoryIntent.BindStaffSlot(0, parts)));
+        }
+    }
+
+    [Fact]
+    public void AStaffBindNeedsAStaffInHandAndKnownParts()
+    {
+        var keys = StaffFixture.ValidRecipe(StaffFixture.Staff("wooden_staff")).Select(p => p.Key).ToArray();
+
+        // No staff in hand
+        Assert.False(InventoryIntentRules.Apply(Inventory.Empty(), InventoryIntent.BindStaffSlot(0, keys), creative: true));
+
+        var inventory = StaffFixture.Holding("wooden_staff", out _, out var stack);
+        var before = stack.Get<StaffComponent>();
+
+        // No list at all
+        Assert.False(InventoryIntentRules.Apply(inventory, new InventoryIntent(NetInventoryAction.BindStaffSlot), creative: true));
+
+        // A part the player does not know
+        inventory.RestrictKnownParts(VoxelEngine.Content.Spells.SpellPartRegistry.All.Select(p => p.Key).Where(k => k != keys[1]));
+        Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.BindStaffSlot(0, keys), creative: false));
+        Assert.Equal(before, stack.Get<StaffComponent>());
+    }
+
+    [Fact]
+    public void AValidKnownBindIsAcceptedAndAClearUnbindsIt()
+    {
+        var inventory = StaffFixture.Holding("wooden_staff", out var staff, out var stack);
+        var keys = StaffFixture.ValidRecipe(staff).Select(p => p.Key).ToArray();
+
+        Assert.True(InventoryIntentRules.Apply(inventory, InventoryIntent.BindStaffSlot(0, keys), creative: false));
+        Assert.Equal(keys, stack.Get<StaffComponent>().PartsAt(0));
+
+        Assert.True(InventoryIntentRules.Apply(inventory, InventoryIntent.ClearStaffSlot(0), creative: false));
+        Assert.False(stack.Get<StaffComponent>().IsBound(0));
+        Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.ClearStaffSlot(0), creative: false));
     }
 
     [Fact]

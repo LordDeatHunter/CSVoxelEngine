@@ -29,7 +29,7 @@ holds one whole spell recipe: the `StaffComponent` on its `ItemStack` carries th
 (`<kind>/<name>`) per slot plus the selected slot, immutable. `StaffBinding` holds the rules: `TryBind`
 binds only a recipe that `SpellRecipe.Compile` finds valid against the staff's tags (so a tier gates its
 parts by tag), plus `Clear`, `Cycle` (wraps both ways) and `Select`; `MG-4` cycles and selects in
-play, and only binding is left without a caller (`MG-7` binds). Two staffs ship: the wooden staff (tier 1, 2 slots, `basic`; two sticks
+play, and `MG-7` binds at the spell table. Two staffs ship: the wooden staff (tier 1, 2 slots, `basic`; two sticks
 and a crystal block) and the crystal staff (tier 2, 4 slots, `basic` and `advanced`; the wooden staff,
 two crystal blocks and a copper ingot); no `advanced` part ships yet. Bindings are saved as
 `ToolData.Staff` in `player.json` by part key, re-bound on load against this run's parts (what no longer
@@ -94,6 +94,23 @@ their consequences, until `MG-10`) and not saved; a self cast never primes, ligh
 does nothing); bolts never hit players; a frostburned body standing over lava crusts it to cobblestone.
 
 `MG-6` shipped: `Magic/CastRisk` holds the pure rules. A cast rolls its recipe's fizzle chance (`SpellCaster.FizzleRoll`, authoritative only) after the mana is billed; a fizzle still counts as a cast but fires no effect and backfires on the caster for `SpellConfig.BackfireShare` of max health scaled by the chance (at least 1, none in creative) as a `DamageSource.Magic` blow ("was killed by their own spell"); a server marks the status dirty. Both rules take a `resistance` (0..1) that gear will feed (`MG-14`); nothing sets it yet. Self-applied fire and frost already hurt the caster through the `self` shape (`MG-4b`). The 0.3 backfire share is a first guess.
+
+`MG-7` shipped: the `spell_table` block is JSON only (the `spellBuilder` flag, no block entity; four oak
+planks and a crystal block). Its right-click is claimed in the right-click chain after the other stations
+and before the staff cast (`BlockInteractions.TryOpenSpellTable`, outcome `RightClickOutcome.SpellTable`,
+no side effect, so the server's replay of the `Use` intent changes nothing); a block in hand places
+against it. The builder opens client-side only with a staff held, else a toast hint
+(`App/SpellBuilderInput`, GL-free state in `UI/SpellBuilder/`, drawn by `SpellBuilderRenderer`; E or
+Escape closes it, and so do the pause menu, the death screen and a change of the held staff). It lists the
+known parts by kind, keeps one element, one shape and one trigger with any modifiers, and shows the live
+cost, verdict, fizzle and damage and range factors from `SpellRecipe.Compile` against the staff's tags.
+BIND and CLEAR go through the `BindStaffSlot` / `ClearStaffSlot` inventory actions (protocol 14), which
+the server owns (`InventoryIntentRules` over `HeldStaff.TryBind` / `TryClear`): the client predicts and the
+`InventoryState` keeps or reverts it. The known-part seam is `Magic/KnownSpellParts.Knows` over
+`Inventory.KnowsPart` (creative knows all); every part is known until `MG-8`. Known gaps: no scrolling
+past `SpellBuilderLayout.MaxRowsPerColumn` rows a kind, no visual scenario (no op opens a UI), an item
+with `use.seconds` in hand starts its charge instead of opening the table, and station gating is `P-2`.
+
 ## In progress
 
 Nothing.
@@ -103,15 +120,8 @@ Nothing.
 ### Slice 1 — the builder with a few parts
 
 Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), one station
-UI, one bindable staff (two tiers). In order:
+UI (shipped, `MG-7`), one bindable staff (two tiers). In order:
 
-- [ ] **`MG-7` Builder station UI** — P1, L.
-  A crafting station (not a tab) where the player picks parts they know and binds the result to a staff
-  slot; shows cost, validity and fizzle risk live. The station is one ordinary block (e.g.
-  `spell_table`, JSON only) whose right-click opens the UI through the station click chain; it has no
-  block entity and no multiblock, since the UI only binds to the staff in hand. **Hook:** `Interaction/BlockInteractions.cs` (station
-  click chain), a new `UI/SpellBuilder/` folder, `InventoryPanelInput` for the pattern. Gating by
-  station follows `P-2`.
 - [ ] **`MG-8` Known parts and unlocks** — P1, M.
   The player's set of known parts, saved as names (the `Inventory.Knows` pattern) and riding the
   inventory net snapshot. Slice 1 source: scrolls only, items that teach a part (research is later and
@@ -120,7 +130,9 @@ UI, one bindable staff (two tiers). In order:
   the table. No signature presets and no pre-bound staffs: the player explores combinations. The known
   part count sizes the mana pool: whenever it changes call `PlayerMana.SetKnownParts` (and set
   `ServerPlayer.StatusDirty` on a server), and apply the known parts before the saved mana is restored, or a
-  saved value above the starting max is clamped down on load. **Hook:** `Inventory.cs`,
+  saved value above the starting max is clamped down on load. Replace `Inventory._knownParts` /
+  `RestrictKnownParts` behind `KnownSpellParts` (the one rule the builder, the client prediction and the
+  server share) and bump `KnownPartsVersion` on every change, so an open builder refreshes. **Hook:** `Inventory.cs`,
   `InventorySaveCodec`, `InventoryNetCodec`, loot tables.
 - [ ] **`MG-9` Mana restoration items** — P1, S.
   Items restore mana through a `use.action` (the `heal` pattern). Optional shared-reagent hook for

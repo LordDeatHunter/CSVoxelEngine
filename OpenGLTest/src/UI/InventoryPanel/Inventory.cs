@@ -44,6 +44,9 @@ public class Inventory
     // The ids this player has obtained (the look-at label's "Unknown" rule); filled by Add and
     // saved as names like every other pool
     private readonly HashSet<byte> _known = [];
+    // The spell part keys this player knows; null = every part known, until MG-8 replaces this with
+    // the saved, synced set
+    private HashSet<string>? _knownParts;
     private readonly Dictionary<byte, int> _misc = new();
 
     // One entry per tool; InstanceId is handed out increasing and never reused, so a
@@ -501,6 +504,29 @@ public class Inventory
     /// restored save's obtained names are marked on import.
     /// </summary>
     public bool Knows(byte id) => _known.Contains(id);
+
+    /// <summary>
+    /// Moves whenever the spell parts this inventory knows change, so an open spell builder rebuilds
+    /// its columns (<see cref="SpellBuilder.SpellBuilderView.Refresh"/>) only then.
+    /// </summary>
+    public int KnownPartsVersion { get; private set; }
+
+    /// <summary>
+    /// Whether this player knows the spell part with key <paramref name="key"/>
+    /// (<c>&lt;kind&gt;/&lt;name&gt;</c>). Every part is known until MG-8; read it through
+    /// <see cref="Magic.KnownSpellParts.Knows"/>, the one known-part rule.
+    /// </summary>
+    public bool KnowsPart(string key) => _knownParts == null || _knownParts.Contains(key);
+
+    /// <summary>
+    /// Limits the known spell parts to <paramref name="keys"/>. The hook MG-8 replaces with the saved,
+    /// synced set; until then only tests use it, to make a part unknown.
+    /// </summary>
+    internal void RestrictKnownParts(IEnumerable<string> keys)
+    {
+        _knownParts = new HashSet<string>(keys, StringComparer.Ordinal);
+        KnownPartsVersion++;
+    }
 
     /// <summary>
     /// Replaces everything this inventory holds — the constructor's spawn stock included —
