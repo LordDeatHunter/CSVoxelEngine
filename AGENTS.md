@@ -15,7 +15,7 @@ provides it, but **macOS (stuck at GL 4.1) is no longer supported**. The opaque 
 (the Hi-Z occlusion cull, which zeroes culled commands in the indirect buffer in place; see "Chunk
 drawing"), another 4.3+ core feature.
 
-The game is one project under `OpenGLTest/`; the item debugger (`OpenGLTest.ItemDebugger/`) and the dedicated server (`OpenGLTest.Server/`) are separate executables that reference it. Historical naming quirks to be aware of:
+The game is one project under `OpenGLTest/`; the item debugger (`OpenGLTest.ItemDebugger/`) and the dedicated server (`OpenGLTest.Server/`) are separate executables that reference it, as is the wiki data exporter (`OpenGLTest.WikiExport/`, see "Layout"). Historical naming quirks to be aware of:
 
 - The solution is `VoxelEngine.sln`, the project folder is `OpenGLTest/`, the csproj is `OpenGLTest/VoxelEngine.csproj`, and all code lives under the `VoxelEngine` root namespace with one sub-namespace per folder (see "Code organization"). Keep a new file in the namespace its folder maps to.
 - Verification is by building and running the game **and** by the xUnit tests in `OpenGLTest.Tests/` (headless, no window: `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`) plus the scripted visual scenarios under `OpenGLTest/visual-examples/` (see `VOXEL_SCRIPT` below). There is no CI.
@@ -2278,6 +2278,13 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
                                       #   pending connections, clock, join spawn, creative rights
   ServerTransport.cs                  # TCP listener, accept thread, per-connection reader threads
   StreamRequests.cs                   # chunk, column and far-LOD region requests and the LOD queue
+OpenGLTest.WikiExport/                # headless exporter for the wiki (wiki/): grows every tree species step by step
+                                      #   over flat ground (the item debugger's TREES setup) and writes per-step cell
+                                      #   diffs; CI runs it before the wiki build (`dotnet run --project
+                                      #   OpenGLTest.WikiExport -- <outDir>`)
+  Program.cs                          # content load, then TreeExporter.WriteAll to the output directory
+  TreeExporter.cs                     # GrowSteps/CellsAt (the engine calls) and the per-species JSON writer
+  TreeStepDiff.cs                     # the cells to write and remove between two steps, and Apply (the replay)
 OpenGLTest.Tests/                     # xUnit tests, headless (no window); a test sits beside the area
                                       #   of the code it tests (by the type under test), a probe beside
                                       #   the area it probes, a helper of several areas in Support/;
