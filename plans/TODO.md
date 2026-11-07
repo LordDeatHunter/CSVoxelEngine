@@ -126,7 +126,8 @@ the other while still being faster together.
 - [ ] **`P-14` · Magic system core** — P2, L. **Tracked in `MAGIC.md` (`MG-*`).**
   Mana, staffs with bound slots, a station-built spell builder (element + shape + modifiers +
   trigger), scrolls and research that unlock parts. The first slice is the builder with a few
-  parts; the fireball is one of its signature example spells, shared with `F-4`.
+  parts (fire, frost, nature) plus a data-driven status-effect system; the fireball is one of its
+  signature example spells, shared with `F-4`.
 - [ ] **`P-15` · Skill tree / character build** — P2, L.
   Spend XP (`P-9`) across branches; informs both combat and non-combat perks. Needs `U-12`.
 - [ ] **`P-16` · Dungeons & towers (structured POIs)** — P2, L.
