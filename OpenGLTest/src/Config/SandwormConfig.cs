@@ -184,7 +184,7 @@ public static class SandwormConfig
     public const float HeadRadiusBlocks = 1.5f;
 
     /// <summary>The share of a blow's damage that lands when it hits the body or tail instead of the head.</summary>
-    public const float BodyDamageShare = 0.5f;
+    public const float BodyDamageShare = 0.6f;
 
     /// <summary>The worm hunts a target only within this horizontal distance.</summary>
     public const float HuntRadiusBlocks = 96f;

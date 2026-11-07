@@ -1135,6 +1135,7 @@ OpenGLTest/
       PostProcessConfig.cs     # biome grade, damage fringe, underwater wobble, FXAA, contact AO, godrays, GPU timer
                                #   gate
       SaveConfig.cs            # autosave, save writer retries and shutdown, teardown joins and drain, entity restore
+      SandwormConfig.cs        # the sandworm boss: chain, burrow, breach, air and dash numbers, contact, the sand and quake effects
       SimulationConfig.cs      # fluid tick, tree felling, reactive growth, leaf decay, ash, saplings
       SkyIslandConfig.cs       # the sky layer's worldgen (L-12): island zones (Zone*: cells, sizes, tiers, gap),
                                #   islands (Island*: cells, radii, dome, taper, stalactites, the flora headroom),
@@ -1410,6 +1411,12 @@ OpenGLTest/
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
         Cloudgolem.cs          # the ground bruiser: walk with ledge caution, the slam clip's impact event, the shockwave
         SkyDifficulty.cs       # GL-free: the zone tier's multiplier (health, damage), pack size, the bruiser's big-zone gate
+      Sandworms/               # the desert boss (see "Sandworm"): the mob, its chain, its brain and its pose
+        Sandworm.cs            # the mob: the head is its position, the exposed segments by the sand surface, the segment hit tests and
+                               #   damage split, the jaw, the contact test; also the client mirror mode (phase, target and velocity from the server)
+        SandwormBrain.cs       # GL-free state machine: thump, dig, breach, air (dive or slide), dash, retreat; the head velocity and the signals
+        SandwormChain.cs       # GL-free follow-the-leader chain of segments: fixed link lengths, a bend limit, the taper
+        SandwormPose.cs        # GL-free world matrices of the model parts: a segment's, the lower jaw's
       Slimes/                  # the slime: the mob, its sizes and its merge
         Slime.cs               # a slime: a gel cube that hops toward the player and only hurts on contact while it is off the ground
         SlimeMerge.cs          # GL-free slime merge: who merges (same size, touching, past the cooldown),
@@ -1501,6 +1508,7 @@ OpenGLTest/
       PlantTreeItem.cs         # plants a sapling of the item's Item.UseTreeName species
                                #   on the aimed ground (an acorn on dirt or grass)
       StarterKit.cs            # the hint scroll a new survival player (and a server newcomer) starts with
+      SummonItem.cs            # the thumper: wakes the boss use.entity names at the aimed cell (the sandworm), desert sand only
       StaffBinding.cs          # GL-free staff slot rules: bind a recipe valid against the staff's tags, clear,
                                #   cycle (wrapping), select, resolve saved part keys
       StaffItem.cs             # a spell staff: slots, tier and allowed part tags; its spells ride its ItemStack
@@ -1650,6 +1658,8 @@ OpenGLTest/
       LeafParticleSystem.cs    # falling leaves: ambient fall off canopy near the camera + bursts where it was disturbed
       ParticleRing.cs          # a fixed-capacity, order-preserving particle store
       PopBoxEmitter.cs         # the mining pop's geometry: each hitbox drawn as a box sampling its crop of the block's face tiles
+      SandwormEffectRules.cs   # GL-free numbers of the worm's sand and earthquake: chips and speed by closeness, the quake by distance
+      SandwormEffects.cs       # the worm's cosmetic show: thump rumble, surfacing sand, breach boom, dive splash, dash dust, quake
       SliceTrail.cs            # GL-free ring of blade-tip samples in the swinging player's owner frame, plus a live head
       SliceTrailGlow.cs        # GL-free twin of slice-trail-fragment.glsl: the soft body, the white core, the streak lanes
       SliceTrailRenderer.cs    # the additive ribbon draw of one SliceTrail (slice-trail-*.glsl)
@@ -2007,6 +2017,8 @@ OpenGLTest/
                                #   ItemUseAction.PlantTree use), GL-free and main thread only
       SkyMobManager.cs         # the sky mobs: the galeraptor's strike at its dive impact, the golem's shockwave at its
                                #   slam impact, the sky-band ring spawn on island tops (tier-scaled packs, big-zone golems)
+      SandwormGround.cs        # what the worm reads of the ground: the surface height, sand or not, desert or not
+      SandwormManager.cs       # the sandworm boss: one at a time, summoned (the thumper), hunts, bites, loot, retreat; client mirrors
       SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning
       TntManager.cs            # owns the live primed TNT: spawns cubes where firestarter
                                #   strikes and blasts light TNT, ticks their fuses
@@ -2391,6 +2403,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     HellMobs/                  # hell mob contracts, layer difficulty, brute blow, caster cast and bolt burn
     SkyMobs/                   # sky mob contracts, zone difficulty, the flyer's hover and dive, the golem's
                                #   shockwave and ledge caution
+    Sandworms/                 # the sandworm's chain, brain and pose, its melee through the real punch path
     Icebergs/                  # iceberg shape, motion, wobble, spawn band, contact, the berg (mirrors src/Entities/Icebergs)
     Slimes/                    # slime sizes, hops, knockback, split and merge (mirrors src/Entities/Slimes)
   Graphics/                    # shader defines and the chunk-draw shader guard, cutout mips, tile materials
@@ -2936,7 +2949,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 
 | field | meaning |
 |---|---|
-| `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item), `place_fluid` (pour one into the targeted cell), `place_stack` (build a stack block up), `ignite_campfire` (strike a branch pile, or a kiln that has fuel), `convert_multiblock` (turn a volume of the anchor's size into a structure), `heal` (restore health to the user, refused at full health), `grow_tree` (grow the tree the aimed cell belongs to, `AshGrowthPulses` pulses), `restore_mana` (refill the `restoresMana` share of the mana pool, one unit spent, refused at a full pool) or `learn_parts` (a teaching scroll: learn the spell parts in `teaches`, spending one; creative spends none, and a scroll that teaches nothing new is refused and kept) |
+| `use.action` | `pickup_fluid` (scoop the targeted fluid source into the item), `place_fluid` (pour one into the targeted cell), `place_stack` (build a stack block up), `ignite_campfire` (strike a branch pile, or a kiln that has fuel), `convert_multiblock` (turn a volume of the anchor's size into a structure), `heal` (restore health to the user, refused at full health), `grow_tree` (grow the tree the aimed cell belongs to, `AshGrowthPulses` pulses), `restore_mana` (refill the `restoresMana` share of the mana pool, one unit spent, refused at a full pool) `learn_parts` (a teaching scroll: learn the spell parts in `teaches`, spending one; creative spends none, and a scroll that teaches nothing new is refused and kept) or `summon` (wake the boss `use.entity` names at the aimed cell, the thumper's sandworm; refused, and not spent, off desert sand or with one alive) |
 | `use.pose` | the pose held while a `use.seconds` charge runs: `raise` (default, the hand presenting the item) or `bow` (`UsePose`, `BowPose`): the item arm out forward, the other arm drawn to the cheek as the charge rises, the shoulders turned side-on, holding at full draw until the button is let go (the use never runs by itself; `RightClickAction.UpdateUseCharge`), then the string arm snaps back and the body settles. Needs `use.seconds`. The `bow` item has no shot yet (`F-4`), and a remote player is not shown drawing one (the draw is not on the wire) |
 | `use.seconds` | seconds holding right-click takes before the use runs: the world charges a use pose (`PlayerModel.StartUseCharge`/`ThrowPose.WithUse`) and only runs the use at completion, so letting go early cancels it and spends nothing (`RightClickAction.TryBeginUseCharge`/`UpdateUseCharge`/`CancelUseCharge`, the twin of `ThrowAction`'s throw charge). 0 (omitted) keeps the old instant use. The firestarter's `useDelay` stays the cooldown after a use |
 | `use.block` | for `place_stack`, the stack block it builds; for `ignite_campfire`, the firepit block |
@@ -4060,7 +4073,7 @@ refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's 
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
 whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell or sky mob's `Ammo` carries its
 attack count the same way (`RealmMob.AttackCount`, see "A mirror's attack clip"), with no bump either. Every
-entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 22 (current) appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 23 (current) adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
 mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
@@ -4879,7 +4892,7 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   attack clip"); all four are saved in `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 175 of the 255 content ids are used (108 blocks, 66 items, air), 80 left. Seed offsets
+- **Budgets**: 177 of the 255 content ids are used (108 blocks, 68 items, air), 78 left. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
   `plans/BIOMEGEN.md`.
@@ -5282,6 +5295,56 @@ Both models, their skins and the `cloud_shard` sprite come from `tools/generate-
   mobs").
 - Known gaps: the slam's shockwave hits players only (no mobs, no blocks); `cloud_shard` has no use yet; the overworld ring spawners still spawn on the ground far below a
   player standing on an island.
+
+### Sandworm
+
+The desert boss (plans/SANDWORM.md, tuning in `SandwormConfig`): a chain of 14 rigid segments sharing one health pool, summoned
+with the **thumper** (`use.action: "summon"`, `use.entity: "sandworm"`, `SummonItem`, crafted from copper, branches, vines and
+sandstone), never spawned naturally. Right-clicking desert sand or sandstone (`SandwormManager.CanSummonAt`: loaded sand cell,
+desert column, none alive, room under the hard cap; a client judges the same rule to predict) starts a thump and then the hunt.
+It burrows **virtually**: it never edits a block, so the edit-path hooks, saves, LOD and the journal never see it; a segment under
+the sand surface is simply not exposed.
+
+- **Content.** `assets/data/entities/sandworm.json` (hp 300, loot `sandworm`: fangs and sandstone) and its Blockbench project
+  `sandworm.bbmodel`, generated by `tools/generate-sandworm-model.py` (also the skin, the `sandworm_fang` and `thumper` sprites;
+  `--check`). It is not a humanoid rig: the groups are `Head` (with `Jaw` nested under it, hinged at the back of the mouth), `Body`
+  (one ring) and `Tail`, each authored around its own origin facing -Z, drawn once per chain segment.
+- **The chain** (`SandwormChain`, GL-free): `Follow(head)` drags every segment to its fixed link distance behind the one ahead, so
+  moving the head tugs the whole body; a link may not bend past `MaxBendDegrees`. `SandwormPose` turns a segment into its matrix
+  (scale tapered from `BodyScaleStart` to `TailScale`, facing along the chain) and the jaw into its hinge matrix.
+- **The brain** (`SandwormBrain`, GL-free, a roll source injected for the dive-or-slide pick): `Thump` (rumbles in place) ->
+  `Dig` (burrowed hunt: tunnels toward the target at `DigSpeed` under `BurrowDepthBlocks` of sand, locks the point it will surface at
+  within `LockDistanceBlocks` so a strafing target dodges the bite, then `Breach`) -> `Breach` (erupts upward, the head chomps) ->
+  `Air` (steers at the target, and at the apex either dives back under and digs again or slides) -> `Dash` (flat along the sand,
+  half in the ground, turning only `DashTurnDegreesPerSecond` so it can be dodged; ends on `DashMaxSeconds` or at the edge of the
+  sand) and `Retreat` (no target for `RetreatAfterSeconds`, or all far: sinks away and is gone). A repeat of the last dive-or-slide
+  pick is less likely. Its signals are `Telegraph` (how near the surface, 0..1), `Shake`, `Contact` (chomp, slide) and `SurfacePoint`.
+- **The mob** (`Sandworm : Mob`): `Position` is the head. `Mob` gained three virtual hooks for multi-part bodies, all defaulting to
+  the old single box: `OverlapsBox` (projectiles and spell bolts, `ThrownProjectile.FindMobHit`), `AimPointFrom` (every melee cone
+  and line of sight, null while nothing is exposed so a buried worm is untouchable) and `ScaleDamage` (`MobStrikes.StrikeMob`: the
+  head takes the blow whole, the body `BodyDamageShare` of it), plus `ShowsHealthbar` (hidden under the sand). A segment is
+  *exposed* (can be hit) when a quarter of it is above the surface and *visible* (drawn) when any of it is.
+- **The manager** (`SandwormManager`, joins `MobCaps`, not a `RealmMobManager`): picks the nearest desert target within
+  `HuntRadiusBlocks` (a non-immune one first, an immune one when it is alone, so a hovering camera can film it), runs the worm,
+  bills the contact (the chomp: `ChompDamage` and an upward `ChompLift`, from the head even while it is still under the sand
+  beneath its victim; the dash: `DashDamage` from any exposed segment) once per `ContactCooldownSeconds`, rolls the loot on a kill and
+  retires a worm nobody is near. Registered in `World`, `MobDirector` (update, billing, `RefreshMobs`, the `spawn` op: the worm's
+  head starts one burrow depth under the given feet), `WorldPersistence` (a restored worm resumes hunting, never thumps again) and
+  `ClientMirror`.
+- **Look.** `MobPasses.RenderSandworms` draws the visible segments (and `ShadowPass` casts them) with the jaw swung open while it
+  breaches, flies and slides; a dying worm shrinks and sinks. `SandwormEffects` (cosmetic, never on a server) throws sand around the
+  surfacing point with chips, speed and radius growing as it nears (`SandwormEffectRules`), a ring at the breach with a boom, a splash
+  where it dives, dust along a dash, a pulsed rumble while thumping, and the earthquake: camera trauma by distance to the head, only
+  while it digs. `visual-examples/sandworm.json` (`VOXEL_TIME=147`) films the encounter in the deep desert.
+- **Multiplayer.** Protocol 23: the head is a mob entry (`NetEntityKind.Sandworm`, phase in the ammo field, velocity for
+  dead-reckoning) and, while it digs toward a point, a `SandwormTarget` entry with the same id (the point and the nearness in
+  thousandths). The body is not on the wire: the client's mirror (`Sandworm.IsMirror`) drags its own chain after the head, so a late
+  joiner sees a straight body until the head has travelled a body length.
+- **Tests.** `SandwormChainTests`, `SandwormBrainTests`, `SandwormPoseTests`, `SandwormMeleeTests`, `SandwormManagerTests`,
+  `SummonItemTests`, the mirror in `NetworkEntitySyncTests`, the save round trip in `WorldLifecycleTests` and the loopback in
+  `GameServerTests`.
+- Known gaps: the death is only a shrink and a sink; the worm hurts players only (no mobs, no blocks); the numbers are first
+  guesses from the scenario, not a play-tested balance; the item debugger shows the three parts stacked at the origin.
 
 ### Icebergs
 

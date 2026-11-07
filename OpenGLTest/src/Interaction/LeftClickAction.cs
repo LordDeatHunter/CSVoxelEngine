@@ -640,9 +640,10 @@ internal sealed class LeftClickAction
 
         foreach (var mob in _mobs)
         {
-            if (!Combat.InPunchCone(origin, direction, mob.Position, out var distance))
+            if (mob.AimPointFrom(origin) is not { } aim) continue;
+            if (!Combat.InPunchCone(origin, direction, aim, out var distance))
                 continue;
-            if (BlockRaycaster.SegmentHitsBlock(origin, mob.Position, _chunkManager))
+            if (BlockRaycaster.SegmentHitsBlock(origin, aim, _chunkManager))
                 continue;
             if (!(distance < bestDistance)) continue;
             bestDistance = distance;
