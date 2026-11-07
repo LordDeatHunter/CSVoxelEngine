@@ -320,6 +320,15 @@ mining and attack pace and `Combat.*Damage` read the mining, attack-speed and da
 `UnequipGear` intent (protocol 19), judged by `Equipment.TryEquip`; the worn ids save as `InventoryData.Equipped`. The
 [E] panel's Gear tab lists the pieces ("worn" marked) over `EquipmentCardLayout`/`EquipmentCardRenderer`: pick a row, then
 click a lit slot (or the row again) to wear it. `GearTests`; `visual-examples/gear.json` (`VOXEL_TIME=147`).
+**Worn armor (I-3).** A body is drawn wearing its visible armor (`equip.visible`, slots head, chest, legs, feet, gloves) as flat
+tinted shells: `ArmorLook` (GL-free) is the item id per armor slot, `ArmorLook.From(Equipment)` for the local player and
+`FromWire` for a peer (a piece in the wrong slot or not visible armor is dropped). `PlayerPasses.DrawPart` draws a covered
+part's mesh and then its shell (`PlayerRig.BuildArmorMesh`: the part's cuboids grown `ArmorInflate` blocks, vertex-colored by
+`ArmorLook.ColorOf`, the mean of the item sprite, over a 1x1 white texture), built on first use per (part, piece); the
+local look is set once a frame from `Equipment.Version` (`PlayerPasses.LocalArmor`, also read by the mirror), a remote's
+rides `PlayerList` (protocol 21, one byte per armor slot at the end of each entry, `RemotePlayer.Armor`). The shadow pass
+draws no armor. `ArmorLookTests`; `visual-examples/gear-worn.json` (`VOXEL_TIME=147`).
+
 **Armor, modifiers and sets (I-2).** `PlayerHealth.TakeDamage(amount, source, ...)` runs the blow through
 `ArmorRules.Reduce` (`max(min(hit, minDamage(source)), hit - armor)`, minimums in `PlayerConfig.ArmorMinDamage*`; drowning,
 magic over time and the source-less overload, which the save restore and the client's mirror use, ignore armor). An
@@ -3967,7 +3976,7 @@ refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's 
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
 whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell or sky mob's `Ammo` carries its
 attack count the same way (`RealmMob.AttackCount`, see "A mirror's attack clip"), with no bump either. Every
-entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19 and 20 (current) add the gear equip actions and the per-player chest messages (see "Gear and equipment" and "Chests" above). Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 (current) add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
 mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the

@@ -7,9 +7,10 @@ namespace VoxelEngine.Networking.Client;
 
 /// <summary>One player position from a server <c>PlayerList</c> broadcast, with the cosmetic state
 /// that poses their model: the movement <paramref name="Flags"/> and the last swing
-/// (<paramref name="Action"/>, counted by <paramref name="ActionSeq"/> so a repeat is noticed).</summary>
+/// (<paramref name="Action"/>, counted by <paramref name="ActionSeq"/> so a repeat is noticed) and the armor they wear.</summary>
 public readonly record struct RemotePlayerSnapshot(int Id, string Name, Vector3 Eye, float Yaw, float Pitch,
-    NetPlayerFlags Flags = NetPlayerFlags.None, NetPlayerAction Action = NetPlayerAction.None, byte ActionSeq = 0);
+    NetPlayerFlags Flags = NetPlayerFlags.None, NetPlayerAction Action = NetPlayerAction.None, byte ActionSeq = 0,
+    ArmorLook? Armor = null);
 
 /// <summary>
 /// A player connected to the same server, as the client sees them: a target pose from the last
@@ -47,6 +48,9 @@ public sealed class RemotePlayer
 
     public string Name { get; set; }
 
+    /// <summary>The armor this player wears, from the newest broadcast.</summary>
+    public ArmorLook Armor { get; private set; } = ArmorLook.None;
+
     public Vector3 Eye { get; private set; }
 
     public float Yaw { get; private set; }
@@ -58,8 +62,10 @@ public sealed class RemotePlayer
 
     /// <summary>Adopts the latest broadcast pose; the first one snaps, later ones smooth.</summary>
     public void SetTarget(Vector3 eye, float yaw, float pitch,
-        NetPlayerFlags flags = NetPlayerFlags.None, NetPlayerAction action = NetPlayerAction.None, byte actionSeq = 0)
+        NetPlayerFlags flags = NetPlayerFlags.None, NetPlayerAction action = NetPlayerAction.None, byte actionSeq = 0,
+        ArmorLook? armor = null)
     {
+        Armor = armor ?? ArmorLook.None;
         if (!_hasTarget)
         {
             Eye = eye;

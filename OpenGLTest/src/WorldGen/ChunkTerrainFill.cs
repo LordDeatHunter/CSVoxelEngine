@@ -321,8 +321,7 @@ internal static class ChunkTerrainFill
         if (inHell)
             StampHellTrees(chunk, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.HellTrees);
-        if (inHell)
-            StampHellRuins(chunk, worldX0, lowerBoundY, worldZ0, stampGates, timer);
+        StampHellRuins(chunk, worldX0, lowerBoundY, worldZ0, stampGates, timer);
 
         Finish(chunk, column, lowerBoundY, hasWater, timer, genStart);
     }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
@@ -241,6 +242,13 @@ public sealed class SkyBiomeTests : IDisposable
                 }
             }
 
+            // A ruin on the island may stand where a tree does, and owns those cells
+            foreach (var key in expected.Keys.ToList())
+                if (RuinPlacement.SkyRuinOwns(key.Item1, key.Item2, key.Item3))
+                {
+                    expected.Remove(key);
+                    stamped.Remove(key);
+                }
             Assert.Equal(expected.OrderBy(e => e.Key), stamped.OrderBy(e => e.Key));
 
             // A pure function of its cell: regrown from nothing after the cache is dropped, it matches

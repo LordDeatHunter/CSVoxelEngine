@@ -58,6 +58,10 @@ internal sealed class WorldRenderer
     private Camera Camera => _world.Camera;
     private PlayerModel Player => _world.Player;
     private Inventory Inventory => _world.Inventory;
+
+    // The armor look is rebuilt only when the worn set changes
+    private int _armorVersion;
+    private bool _armorSeen;
     private HudToast Toast => _world.Toast;
     private IReadOnlyList<Slime> Slimes => _world.Slimes;
     private IReadOnlyList<Goblin> Goblins => _world.Goblins;
@@ -189,6 +193,13 @@ internal sealed class WorldRenderer
         renderManager.Objects.RenderBlockDebris(Camera, _debris.Debris);
         foreach (var tree in _toppling)
             renderManager.Objects.RenderTopplingTree(Camera, tree);
+        var armorVersion = Inventory.Equipment.Version;
+        if (armorVersion != _armorVersion || !_armorSeen)
+        {
+            renderManager.Players.LocalArmor = ArmorLook.From(Inventory.Equipment);
+            _armorVersion = armorVersion;
+            _armorSeen = true;
+        }
         renderManager.Players.RenderPlayer(Camera, Player);
         renderManager.Players.RenderHeldItem(Camera, Player, LocalPlayer.HeldId, LocalPlayer.HasHeld,
             (float)Now, Compass.HeadingFromYaw(Camera.Yaw));

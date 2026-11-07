@@ -12,11 +12,11 @@ Nothing.
 ## Open
 
 ### Phase 3: visuals and wire
-- [ ] **`I-3` Armor and visible accessories on the player model** - P1, L. Per-part armor meshes drawn right after each
-  body part (Blockbench-authored), accessories flagged `visible`; first-person head skip and back offset apply; shadow
-  pass reuses them. Equipment ids ride in the `PlayerList` entry (one protocol bump); rolled modifiers stay private.
-  Item debugger gets an equipment mode.
-  **Hook:** `PlayerPasses`, `PlayerRig.BuildMeshes`, `RemotePlayer`, `ShadowPass`, `NetProtocol.ProtocolVersion`.
+- [ ] **`I-3` Armor and visible accessories on the player model** - P1, M. Done: flat tinted armor shells over each covered
+  body part (`ArmorLook`, `PlayerPasses.DrawPart`) and the worn pieces on the wire (protocol 21), for the local player, the
+  mirror and remote players. Left: Blockbench-authored per-piece armor meshes in place of the tinted shells, accessories
+  flagged `visible` (a trinket is never drawn today), armor in the shadow pass, and an item debugger equipment mode.
+  **Hook:** `PlayerPasses.DrawPart`, `PlayerRig.BuildArmorMesh`, `ShadowPass`, `EntityPreviewState`/`PlayerPreviewState`.
 
 ### Phase 5: ruins, loot and polish
 - [ ] **`I-5` Ruins with loot, inventory polish** - P2, L.

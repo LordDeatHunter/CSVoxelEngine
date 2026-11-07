@@ -220,6 +220,25 @@ public static class RuinPlacement
         return true;
     }
 
+    /// <summary>Whether a sky ruin writes world cell (x, y, z): the footprint and a written template cell there. Lets a test (or any
+    /// reader of the island point query) set aside the cells a ruin owns.</summary>
+    internal static bool SkyRuinOwns(int x, int y, int z)
+    {
+        Span<SkyIsland> islands = stackalloc SkyIsland[16];
+        var count = SkyIslands.CollectIslands(x, z, x, z, islands);
+        for (var k = 0; k < count; k++)
+        {
+            if (!TryFindSkySite(islands[k], out var template, out var turns, out var cx, out var cz, out var top)) continue;
+            var lx = x - StructureStamper.OriginOf(cx, template);
+            var lz = z - StructureStamper.OriginOf(cz, template);
+            var ly = y - (top + 1 - template.GroundLayer);
+            if ((uint)lx < template.Size && (uint)lz < template.Size && (uint)ly < template.Height
+                && template.CellAt(turns, lx, ly, lz) >= 0)
+                return true;
+        }
+        return false;
+    }
+
     // ---- Shared ----
 
     // The hashed cells whose center column could put a footprint cell into the chunk

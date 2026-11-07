@@ -204,7 +204,14 @@ public sealed class PlayerRig
         return meshes;
     }
 
-    private static Mesh BuildPartMesh(GL gl, PlayerRig.RigPart part)
+    /// <summary>
+    /// The armor shell of one part: its cuboids grown by <paramref name="inflate"/> blocks on every side, colored
+    /// <paramref name="tint"/> through the vertex color and sampling the center of a 1x1 white texture (every UV is 0.5, 0.5).
+    /// </summary>
+    public static Mesh BuildArmorMesh(GL gl, RigPart part, float inflate, (byte R, byte G, byte B) tint) =>
+        BuildPartMesh(gl, part, inflate, tint);
+
+    private static Mesh BuildPartMesh(GL gl, PlayerRig.RigPart part, float inflate = 0f, (byte R, byte G, byte B)? tint = null)
     {
         var vertices = new List<Vertex>();
         var indices = new List<ushort>();
@@ -212,7 +219,9 @@ public sealed class PlayerRig
 
         foreach (var cube in part.Cubes)
         {
-            var size = cube.Max - cube.Min;
+            var grow = new Vector3(inflate);
+            var min = cube.Min - grow;
+            var size = cube.Max - cube.Min + grow * 2f;
             for (var face = 0; face < 6; face++)
             {
                 // A face omitted in the file leaves a hole (open reinforced edges, no cap).
@@ -226,8 +235,9 @@ public sealed class PlayerRig
                 {
                     var p = positions[corner];
                     vertices.Add(new Vertex(
-                        cube.Min + new Vector3(p.X * size.X, p.Y * size.Y, p.Z * size.Z),
-                        255, 255, 255, 255, corners[corner], 0, 1f, 0f, normal));
+                        min + new Vector3(p.X * size.X, p.Y * size.Y, p.Z * size.Z),
+                        tint?.R ?? 255, tint?.G ?? 255, tint?.B ?? 255, 255,
+                        tint == null ? corners[corner] : new Vector2(0.5f, 0.5f), 0, 1f, 0f, normal));
                 }
                 indices.AddRange([(ushort)quadBase, (ushort)(quadBase + 1), (ushort)(quadBase + 2),
                     quadBase, (ushort)(quadBase + 2), (ushort)(quadBase + 3)]);

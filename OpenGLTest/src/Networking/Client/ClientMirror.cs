@@ -440,14 +440,14 @@ internal sealed class ClientMirror
             if (index < 0)
             {
                 var remote = new RemotePlayer(entry.Id, entry.Name, Player.Rig);
-                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq);
+                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq, entry.Armor);
                 _remotePlayers.Add(remote);
             }
             else
             {
                 var remote = _remotePlayers[index];
                 remote.Name = entry.Name;
-                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq);
+                remote.SetTarget(entry.Eye, entry.Yaw, entry.Pitch, entry.Flags, entry.Action, entry.ActionSeq, entry.Armor);
             }
         }
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 using Xunit;
 
 namespace VoxelEngine.Tests.WorldGen.Sky;
@@ -284,7 +285,8 @@ public sealed class SkyIslandTests
                 var wy = cy * Chunk.Size + y;
                 var wz = (cz + dcz) * Chunk.Size + z;
                 var block = chunk.Blocks[Chunk.Idx(x, y, z)];
-                Assert.Equal(ExpectedSky(wx, wy, wz), block);
+                // A ruin on the island owns its footprint cells; the point query knows nothing of it
+                if (!RuinPlacement.SkyRuinOwns(wx, wy, wz)) Assert.Equal(ExpectedSky(wx, wy, wz), block);
                 if (block == BlockType.Air) continue;
                 solid++;
                 if (block == CloudPatchGenerator.CloudBlock) seaBlocks++;

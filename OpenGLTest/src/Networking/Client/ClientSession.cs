@@ -280,6 +280,7 @@ internal sealed class ClientSession
             {
                 var count = reader.ReadInt();
                 remoteScratch.Clear();
+                Span<byte> worn = stackalloc byte[VoxelEngine.Config.GearConfig.ArmorSlotCount];
                 for (var i = 0; i < count; i++)
                 {
                     var id = reader.ReadInt();
@@ -290,7 +291,9 @@ internal sealed class ClientSession
                     var flags = (NetPlayerFlags)reader.ReadByte();
                     var action = (NetPlayerAction)reader.ReadByte();
                     var actionSeq = reader.ReadByte();
-                    remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch, flags, action, actionSeq));
+                    for (var slot = 0; slot < worn.Length; slot++) worn[slot] = reader.ReadByte();
+                    remoteScratch.Add(new RemotePlayerSnapshot(id, name, eye, yaw, pitch, flags, action, actionSeq,
+                        VoxelEngine.Player.ArmorLook.FromWire(worn)));
                 }
                 w.ClientMirror.SyncRemotePlayers(remoteScratch, netPlayerId);
                 break;
