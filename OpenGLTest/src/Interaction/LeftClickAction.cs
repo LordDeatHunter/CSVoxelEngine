@@ -153,9 +153,8 @@ internal sealed class LeftClickAction
     // break intents carry so the server's first-person ray lands on the same cell.
     private Vector3 _selectedAimDirection = -Vector3.UnitZ;
 
-    // A connected client's creative mining pace: one block per ClientCreativeBreakSeconds while
-    // the button is held (singleplayer mines one per frame). Infinity while released, so a click
-    // breaks at once.
+    // Creative mining pace: one block per CreativeBreakRepeatSeconds while the button is held.
+    // Infinity while released, so a click breaks at once.
     private float _creativeBreakTimer = float.PositiveInfinity;
 
     /// <summary>
@@ -339,15 +338,12 @@ internal sealed class LeftClickAction
         if (Camera.IsCreative)
         {
             StopBreaking();
-            // A connected client mines at a pace the server's edit rate accepts; singleplayer
-            // keeps taking one block a frame
-            if (_clientMode)
-            {
-                _creativeBreakTimer += (float)deltaTime;
-                if (_creativeBreakTimer < NetworkConfig.ClientCreativeBreakSeconds)
-                    return;
-                _creativeBreakTimer = 0f;
-            }
+            // The press breaks at once; holding repeats only after a delay, so a tap never
+            // takes the block behind the target too (this also keeps a client under the edit rate)
+            _creativeBreakTimer += (float)deltaTime;
+            if (_creativeBreakTimer < PlayerConfig.CreativeBreakRepeatSeconds)
+                return;
+            _creativeBreakTimer = 0f;
             LocalPlayer.PunchSwing();
             PlayHitSfx(Edits.BlockIdAt(_selectedBlockPosition));
             BreakMined(_selectedBlockPosition, player);

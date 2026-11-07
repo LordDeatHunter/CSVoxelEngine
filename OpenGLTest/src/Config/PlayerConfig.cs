@@ -56,6 +56,9 @@ public static class PlayerConfig
 
     // An axe's chop (SwordSwing.AxeChop) lasts the axe's hit gap, held between these (seconds)
     public const float AxeChopMinSeconds = 0.25f;
+    // A creative player holding the mine button breaks the next block only this many seconds after
+    // the last one (the press itself breaks at once), so a tap never takes the block behind it.
+    public const float CreativeBreakRepeatSeconds = 0.2f;
     public const float AxeChopMaxSeconds = 0.8f;
 
     // Break kick (BreakKick): a landed mining hit on a block harder than the min nudges the view,

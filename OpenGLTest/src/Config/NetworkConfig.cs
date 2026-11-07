@@ -72,9 +72,6 @@ public static class NetworkConfig
     // A dead client sends a Respawn intent as soon as the server's status says it died, then again
     // this often while the status still reads dead (an earlier one refused, or lost to a race).
     public const double NetRespawnRetrySeconds = 1.0;
-    // A creative client mines one block per this many seconds while the button is held, rather than
-    // one per frame, so a held click stays inside the server's edit rate (singleplayer is unpaced).
-    public const float ClientCreativeBreakSeconds = 0.1f;
     // How long a blocking send to one client may stall the server's main thread before the
     // connection is treated as dead (NetworkStream.WriteTimeout), in milliseconds.
     public const int NetSendTimeoutMs = 5000;
