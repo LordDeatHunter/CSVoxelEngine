@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
+using VoxelEngine.WorldGen.Sky;
 
 namespace VoxelEngine.Tests.WorldGen;
 
@@ -144,7 +145,37 @@ internal static class StampGateSample
                 AddChunk(new Vector3(bcx, cy, bcz));
         }
 
+        // The cloud slab lies far above every column's ground: the chunk stacks through it of the
+        // anchor column and of the nearest chunk column holding cloud, one chunk past each edge, so
+        // its gate both admits and skips and the sky chunk's short path meets real cloud
+        if (columns.Count > 0)
+        {
+            var (ccx, ccz) = columns[0];
+            var cloudy = NearestCloudColumn(ccx, ccz);
+            for (var cy = (WorldGenerationConfig.CloudSlabBottomY >> Chunk.SizeShift) - 1;
+                 cy <= (WorldGenerationConfig.CloudSlabTopY >> Chunk.SizeShift) + 1; cy++)
+            {
+                AddChunk(new Vector3(ccx, cy, ccz));
+                AddChunk(new Vector3(cloudy.Cx, cy, cloudy.Cz));
+            }
+        }
+
         return chunks;
+    }
+
+    /// <summary>The chunk column nearest (cx, cz), by rings, with a cloud column at its center.</summary>
+    private static (int Cx, int Cz) NearestCloudColumn(int cx, int cz)
+    {
+        for (var ring = 0; ring <= MaxSiteRing * 4; ring++)
+        for (var dx = -ring; dx <= ring; dx++)
+        for (var dz = -ring; dz <= ring; dz++)
+        {
+            if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != ring) continue;
+            if (CloudPatchGenerator.TryGetColumn(((cx + dx) << Chunk.SizeShift) + 8, ((cz + dz) << Chunk.SizeShift) + 8, out _, out _))
+                return (cx + dx, cz + dz);
+        }
+
+        return (cx, cz);
     }
 
     /// <summary>

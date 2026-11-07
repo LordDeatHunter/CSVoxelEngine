@@ -6,6 +6,7 @@ using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
+using VoxelEngine.WorldGen.Sky;
 
 namespace VoxelEngine;
 
@@ -70,6 +71,7 @@ public static class WorldSeed
         BarrierGenerator.Reseed();
         HellGenerator.Reseed();
         HellBiomes.Reseed();
+        CloudPatchGenerator.Reseed();
         LavaGenerator.Reseed();
         PebbleGenerator.Reseed();
         SnowGenerator.Reseed();

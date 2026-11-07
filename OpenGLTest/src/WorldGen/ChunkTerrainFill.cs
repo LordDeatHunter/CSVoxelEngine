@@ -5,6 +5,7 @@ using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
+using VoxelEngine.WorldGen.Sky;
 using static VoxelEngine.Chunks.Chunk;
 using Stage = VoxelEngine.WorldGen.WorldgenStageTimer.Stage;
 
@@ -64,9 +65,25 @@ internal static class ChunkTerrainFill
         timer?.Mark(Stage.Columns);
         if (lowerBoundY > maxHeight + 1 && !needsWater)
         {
-            chunk.IsBlockDataReady = true;
-            WorldgenStats.AddChunk(System.Diagnostics.Stopwatch.GetTimestamp() - genStart);
-            return;
+            // A sky chunk is all air but for the solid cloud patches. With the gates on it takes
+            // just their stamp; the ungated test path runs the whole pipeline instead, which writes
+            // nothing else up here, and so proves the short path identical.
+            var inClouds = WorldGenerationConfig.CloudPatchesEnabled
+                           && CloudPatchGenerator.WriteBand().Reaches(lowerBoundY);
+            if (!inClouds)
+            {
+                chunk.IsBlockDataReady = true;
+                WorldgenStats.AddChunk(System.Diagnostics.Stopwatch.GetTimestamp() - genStart);
+                return;
+            }
+
+            if (stampGates)
+            {
+                CloudPatchGenerator.Stamp(chunk.Blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
+                timer?.Mark(Stage.Clouds);
+                Finish(chunk, column, lowerBoundY, hasWater: false, timer, genStart);
+                return;
+            }
         }
 
         for (var x = 0; x < Size; x++)
@@ -265,6 +282,12 @@ internal static class ChunkTerrainFill
         if (WorldFeatureConfig.FoliageEnabled && Admits(stampGates, FoliageGenerator.WriteBand(column), lowerBoundY))
             FoliageGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Foliage);
+
+        // The solid cloud slab, into air only: a chunk straddling it under a tall tree's reach
+        if (WorldGenerationConfig.CloudPatchesEnabled
+            && Admits(stampGates, CloudPatchGenerator.WriteBand(), lowerBoundY))
+            CloudPatchGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Clouds);
 
         // Last of every stamp, so nothing writes over it: the barrier band between the overworld
         // and hell. Its core takes every cell, carved air and fluids included, so it is gapless.

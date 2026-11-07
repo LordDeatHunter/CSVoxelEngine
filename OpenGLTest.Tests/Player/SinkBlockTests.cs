@@ -21,6 +21,9 @@ public sealed class SinkBlockTests
 
     private const float Dt = 1f / 60f;
 
+    // The shipped sink block: the solid cloud of the sky's cloud slab
+    private static byte Cloud => ContentRegistry.RequireBlock("cloud_block").Id;
+
     private static ChunkManager Floor(byte topId) => MobTestWorld.Floor(topId);
 
     private static Camera DroppedFrom(float feet)
@@ -35,7 +38,7 @@ public sealed class SinkBlockTests
     [Fact]
     public void AFallIsCaughtAtTheLayerTopAndSinksSlowlyToRestAtTheSinkShare()
     {
-        var sink = SinkTestBlock.Ensure();
+        var sink = Cloud;
         var manager = Floor(sink);
         var camera = DroppedFrom(6f);
         var keys = new ScriptedKeyboard();
@@ -71,7 +74,7 @@ public sealed class SinkBlockTests
     [Fact]
     public void ASunkBodyJumpsBackOut()
     {
-        var manager = Floor(SinkTestBlock.Ensure());
+        var manager = Floor(Cloud);
         var camera = DroppedFrom(1f);
         var keys = new ScriptedKeyboard();
         for (var i = 0; i < 300; i++)
@@ -107,8 +110,20 @@ public sealed class SinkBlockTests
     [Fact]
     public void ASoftLandingBillsNoFallDamageWhereStoneDoes()
     {
-        Assert.Equal(0, FallDamageOnto(SinkTestBlock.Ensure()));
+        Assert.Equal(0, FallDamageOnto(Cloud));
         Assert.True(FallDamageOnto(ContentRegistry.RequireBlock("stone").Id) > 0);
+    }
+
+    [Fact]
+    public void TheCloudBlockIsASeeThroughSoftLandingSinkBlockThatLetsLightThrough()
+    {
+        var cloud = Cloud;
+        Assert.True(BlockType.IsSolid(cloud));
+        Assert.True(BlockType.SoftLandingAt(cloud));
+        Assert.InRange(BlockType.SinkOf(cloud), float.Epsilon, SinkLayer.MaxSink);
+        Assert.True(BlockType.ById[cloud]!.Translucent);
+        Assert.False(BlockType.Occludes(cloud));
+        Assert.True(BlockType.PassesLightById[cloud]);
     }
 
     [Fact]

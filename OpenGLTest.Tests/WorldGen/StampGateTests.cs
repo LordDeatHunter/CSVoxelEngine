@@ -6,6 +6,7 @@ using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
+using VoxelEngine.WorldGen.Sky;
 using Xunit;
 using Stage = VoxelEngine.WorldGen.WorldgenStageTimer.Stage;
 
@@ -83,6 +84,8 @@ public sealed class StampGateTests
             (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FlowerGenerator.Stamp(b, c, x, y, z), true),
         new("Foliage", Stage.Foliage, (c, _) => FoliageGenerator.WriteBand(c),
             (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FoliageGenerator.Stamp(b, c, x, y, z), true),
+        new("Clouds", Stage.Clouds, (_, _) => CloudPatchGenerator.WriteBand(),
+            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => CloudPatchGenerator.Stamp(b, x, y, z), true),
         new("Barrier", Stage.Barrier, (_, _) => BarrierGenerator.WriteBand(),
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => BarrierGenerator.Stamp(b, x, y, z), true),
         new("Hell", Stage.Hell, (_, _) => HellGenerator.WriteBand(),
@@ -144,8 +147,9 @@ public sealed class StampGateTests
             Assert.True(gated.IsBlockDataReady == ungated.IsBlockDataReady, $"readiness differs at {pos}");
             Assert.True(SameOrBothNull(gated.FluidFrontier, ungated.FluidFrontier), $"fluid frontier differs at {pos}");
 
-            // Only a filled chunk ever reaches the stamps, so only it says anything about a gate
-            if (timer.MarksOf(Stage.Fill) == 0) continue;
+            // Only a filled chunk, or a sky chunk in the cloud slab (whose short path skips every other
+            // stamp), ever reaches the stamps, so only those say anything about a gate
+            if (timer.MarksOf(Stage.Fill) == 0 && timer.MarksOf(Stage.Clouds) == 0) continue;
 
             var column = ColumnCache.Get((int)pos.X, (int)pos.Z);
             var neighborhood = ChunkTerrainFill.NeighborhoodMaxHeight((int)pos.X, (int)pos.Z);

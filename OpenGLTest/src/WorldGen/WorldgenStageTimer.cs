@@ -11,7 +11,9 @@ namespace VoxelEngine.WorldGen;
 /// one null check per stage. Not thread-safe: use one instance per thread. The
 /// <see cref="Stage.Water"/> stage is marked only while <see cref="WorldGenerationConfig.WaterEnabled"/>;
 /// every other stage is marked once on every filled chunk, an early-out chunk (entirely above
-/// the terrain and any water) marks only <see cref="Stage.Columns"/>, and a chunk wholly in hell marks
+/// the terrain and any water) marks only <see cref="Stage.Columns"/>, one of those in the cloud slab
+/// marks <see cref="Stage.Columns"/>, <see cref="Stage.Clouds"/>, <see cref="Stage.SolidCount"/> and
+/// <see cref="Stage.FluidFrontier"/>, and a chunk wholly in hell marks
 /// only <see cref="Stage.Columns"/>, <see cref="Stage.Hell"/>, <see cref="Stage.HellTrees"/>, <see cref="Stage.SolidCount"/> and
 /// <see cref="Stage.FluidFrontier"/>.
 /// </summary>
@@ -82,6 +84,8 @@ internal sealed class WorldgenStageTimer
         Flowers,
         /// <summary>FoliageGenerator.Stamp.</summary>
         Foliage,
+        /// <summary>CloudPatchGenerator.Stamp.</summary>
+        Clouds,
         /// <summary>BarrierGenerator.Stamp.</summary>
         Barrier,
         /// <summary>HellGenerator.Stamp.</summary>

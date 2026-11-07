@@ -4,13 +4,18 @@
 
 ## Status
 
-Phases 1 (foundations) and 2 (the hell slice, `L-5` to `L-10`) done; phase 3 (the sky) is next. A Nether- and Aether-like pair of realms inside the one world, as vertical
+Phases 1 (foundations) and 2 (the hell slice, `L-5` to `L-10`) done; phase 3 (the sky) has begun with the
+solid cloud patches (`L-11`). A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
 `MobConfig.LayerDifficultyPerLayer`; `LayerBandTests` holds their order. The `iron_pickaxe` (power 3,
-creative only) is the barrier's tool. The `softLanding` and `sink` block flags (`SinkLayer`,
-`PlayerConfig.SinkBlockSpeed`) are ready for the cloud blocks of `L-11`; the server accepts the sink.
+creative only) is the barrier's tool. The solid cloud patches (`L-11`, AGENTS.md "Solid clouds") fill
+the `CloudSlab` band (198..203) with the translucent `cloud_block` (`softLanding`, `sink` 0.5: a fall is
+free, the player sinks half a block and stands; it breaks by hand) where a 2D noise (seed offsets
+166-167) outlines patches tens of blocks across, thicker in their cores (`WorldGen/Sky/CloudPatchGenerator`);
+a sky chunk in the band takes a short path that stamps only the cloud. Its tile comes from
+`tools/generate-sky-textures.py`, the spec list the sky palette of `L-12`/`L-13` extends.
 The eye's height already tints the sky and fog (`LayerClimate`, `FrameLighting`, no shader change):
 red in hell, a deeper blue over the cloud slab. The barrier band is generated (`BarrierGenerator`, the
 `barrier` block, iron pickaxe only): a gapless core from -230 to -270 that walls up caves and fluids
@@ -31,8 +36,8 @@ and layer by `HellTrees`. Two hell mobs live in the pockets (`L-10`, AGENTS.md "
 too), spawned only on dim hell floors (`MobSpawner.TryFindHellSpawn`) and scaled by the layer index
 (`LayerDifficulty`: health, damage, cast rate, pack size); their bolts set the player `burning`. They
 are already on the wire (protocol 17) and in `entities.json`; `L-16` adds the loopback tests and the
-flight state. Id budget: 165 of 255 ids used (99 blocks, 65 items with `ember_shard`, air), 90 left for
-the sky palette (`L-11`..`L-15`, ~25).
+flight state. Id budget: 166 of 255 ids used (100 blocks with `cloud_block`, 65 items, air), 89 left for
+the sky palette (`L-12`..`L-15`, ~24).
 Last updated 2026-11-07.
 
 ## In progress
@@ -43,8 +48,6 @@ Nothing.
 
 ### Phase 3: Sky slice
 
-- [ ] **`L-11` Solid cloud patches (~Y200).** P1, M. Patchy real blocks, partly transparent, using
-  the `L-3` flags. Above the relief ceiling (148) and the shader clouds (160).
 - [ ] **`L-12` Sky islands (Y ~320-420).** P1, L. Island zones from the archipelago noise approach
   plus hashed island sites (`TerrainIslands`, `TerrainSites`); wide ocean-like gaps; rare big zones
   hold the hardest mobs. A second thick cloud sea under them (visual).

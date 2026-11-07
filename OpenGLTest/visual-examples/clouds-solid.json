@@ -1,0 +1,41 @@
+{
+  // Solid cloud patches (plans/LAYERS.md L-11): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/clouds-solid.json
+  // Shots land in visual/clouds-solid/. With the default seed a patch's core (the slab's full six
+  // cells, 198..203) lies over (44, 0), with thinner rims around it and open sky between patches
+  // (found by a column scan around the origin). The camera looks down on the patch from above, up
+  // at its flat-ish underside from below and across it from the side; then, flight and creative
+  // off, the player drops nine blocks onto the core, takes no damage (soft landing, the hearts stay
+  // full), sinks half a block into the top cell and walks across it, and mines down through it.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [44.5, 226.5, 30.5], "yaw": -90, "pitch": -45 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "above", "hideHud": true },
+
+    { "op": "teleport", "pos": [44.5, 186.5, 34.5], "yaw": -90, "pitch": 30 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "below", "hideHud": true },
+
+    { "op": "teleport", "pos": [-10.5, 201.5, 40.5], "yaw": -40, "pitch": 0 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "side", "hideHud": true },
+
+    { "op": "fly", "on": false },
+    { "op": "creative", "on": false },
+    { "op": "teleport", "pos": [44.5, 214.5, 0.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "view", "mode": "shoulder" },
+    { "op": "look", "yaw": 180, "pitch": -15 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "landed_sunk" },
+    { "op": "walk", "keys": ["W"], "seconds": 1.2 },
+    { "op": "screenshot", "name": "walking" },
+    { "op": "view", "mode": "first" },
+    { "op": "look", "yaw": -90, "pitch": -89 },
+    { "op": "mine", "seconds": 3 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "look", "yaw": -90, "pitch": -10 },
+    { "op": "screenshot", "name": "dug_in" }
+  ]
+}

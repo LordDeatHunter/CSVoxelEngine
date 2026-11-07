@@ -1,0 +1,12 @@
+{
+  "name": "Cloud",
+  "model": { "parent": "block/cube_all", "textures": { "all": "cloud_block" } },
+  "hardness": 1,
+  "translucent": true,
+  "cullSelf": true,
+  "occludes": false,
+  "castsAO": false,
+  "softLanding": true,
+  "sink": 0.5,
+  "light": { "passes": true }
+}

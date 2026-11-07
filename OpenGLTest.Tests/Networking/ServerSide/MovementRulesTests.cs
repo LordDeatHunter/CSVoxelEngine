@@ -331,7 +331,7 @@ public sealed class MovementRulesTests
     [Fact]
     public void ABodySinkingIntoASinkBlockIsNeverCorrectedNorAHoverer()
     {
-        var sink = SinkTestBlock.Ensure();
+        var sink = ContentRegistry.RequireBlock("cloud_block").Id;
         var clouds = MobTestWorld.Floor(sink);
         var grace = (float)NetworkConfig.NetHoverGraceSeconds;
 

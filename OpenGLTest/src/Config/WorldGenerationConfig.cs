@@ -917,6 +917,24 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>Top of the solid cloud slab.</summary>
     public const int CloudSlabTopY = 203;
 
+    /// <summary>Master switch for the solid cloud patches (<c>CloudPatchGenerator</c>).</summary>
+    public const bool CloudPatchesEnabled = true;
+
+    /// <summary>Frequency of the 2D noise whose high values outline the cloud patches: patches tens of
+    /// blocks across with open sky between them.</summary>
+    public const float CloudPatchFrequency = 1f / 90f;
+
+    /// <summary>The patch noise value above which a column holds cloud; higher is sparser.</summary>
+    public const float CloudPatchThreshold = 0.3f;
+
+    /// <summary>The patch noise value at which a column reaches the patch's full thickness (the core);
+    /// between the threshold and this the cloud thins toward one cell at the edge.</summary>
+    public const float CloudPatchCoreValue = 0.6f;
+
+    /// <summary>Frequency of the 2D noise that roughens each patch's thickness and lifts its top, so
+    /// the top domes unevenly instead of stepping in rings.</summary>
+    public const float CloudPatchDetailFrequency = 1f / 14f;
+
     /// <summary>Lowest cell a sky island may occupy.</summary>
     public const int SkyIslandBottomY = 320;
 
