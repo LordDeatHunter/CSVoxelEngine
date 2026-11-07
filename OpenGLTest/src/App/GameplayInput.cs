@@ -37,6 +37,7 @@ internal sealed class GameplayInput
     private bool middleWasPressed;
     private bool eWasPressed;
     private bool tWasPressed;
+    private bool slashWasPressed;
     private bool escWasPressed;
     private bool deathScreenWasUp;
 
@@ -162,6 +163,16 @@ internal sealed class GameplayInput
             && !PanelOpen && !deathUp)
             chatView.Open();
         tWasPressed = tPressed;
+
+        // "/" opens the chat with the slash already typed, ready for a command
+        var slashPressed = inputManager.Keyboard?.IsKeyPressed(Key.Slash) == true;
+        if (slashPressed && !slashWasPressed && !chatView.IsOpen && !pauseMenuView.IsOpen
+            && !PanelOpen && !deathUp)
+        {
+            chatView.Open();
+            chatView.Input.Insert("/");
+        }
+        slashWasPressed = slashPressed;
 
         var xPressed = inputManager.Keyboard?.IsKeyPressed(Key.X) == true;
         if (xPressed && !xWasPressed && !chatView.IsOpen && inventoryView.Focus == InventoryFocus.None)
