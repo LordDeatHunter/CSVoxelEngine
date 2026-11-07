@@ -6,8 +6,9 @@ namespace VoxelEngine.Content.Stations;
 /// <summary>
 /// How one kind of kiln behaves, compiled from its anchor block's <c>kiln</c> object
 /// (<see cref="BlockType.Kiln"/>): how many fuel units its hearth holds, how fast it melts, and
-/// whether it may alloy two metals. The kiln manager reads it through the anchor's block id, so
-/// the plain kiln and a larger furnace share one state, save and wire shape.
+/// whether it may alloy two metals, plus where its model puts the hearth's props
+/// (<see cref="Layout"/>). The kiln manager reads it through the anchor's block id, so the plain
+/// kiln and a larger furnace share one state, save and wire shape.
 /// </summary>
 /// <param name="FuelCap">Units of fuel the hearth holds at once.</param>
 /// <param name="MeltSpeed">Multiplier on the melt pace: 2 melts a chunk in half the time.</param>
@@ -32,6 +33,11 @@ public sealed record KilnProfile(int FuelCap, float MeltSpeed, bool CanAlloy)
 
     /// <summary>The plain kiln's profile: the defaults of an empty <c>kiln</c> object.</summary>
     public static readonly KilnProfile Default = new(DefaultFuelCap, 1f, false);
+
+    /// <summary>Where this kiln's model puts its opening, crucible, fire and fuel: the layout of
+    /// its anchor's <c>multiblock.size</c> (<see cref="KilnLayout.ForSize"/>), the plain kiln's
+    /// by default.</summary>
+    public KilnLayout Layout { get; init; } = KilnLayout.Kiln;
 
     /// <summary>Seconds this kiln takes to melt one <see cref="KilnManager.MeltChunkMl"/> chunk
     /// while lit.</summary>

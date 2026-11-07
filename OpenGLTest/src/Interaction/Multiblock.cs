@@ -25,6 +25,13 @@ namespace VoxelEngine.Interaction;
 /// state read therefore resolves any cell to its anchor.
 /// </para>
 /// <para>
+/// <b>The interior.</b> A volume of 3 or more cells along each edge has cells no face touches
+/// (<see cref="IsInterior"/>; the 3x3x3 furnace's center). They may be built of the source block or
+/// left empty, so a hollow shell converts as well as a solid cube: <see cref="Convert"/> writes a
+/// part there either way, and <see cref="Revert"/> leaves them empty. The converting caller hands
+/// an interior source block back, so nothing is made or lost by a convert and a revert.
+/// </para>
+/// <para>
 /// <b>Callers remesh afterwards.</b> <see cref="Convert"/> and <see cref="Revert"/> write through
 /// <see cref="Chunk.SetBlockRaw"/> and only collect the chunk positions they touched: the caller
 /// runs <see cref="Chunk.RemeshAfterBatchEdit"/> on each (the asynchronous
@@ -68,6 +75,12 @@ public static class Multiblock
         return all;
     }
 
+    /// <summary>Whether the offset (<paramref name="dx"/>, <paramref name="dy"/>,
+    /// <paramref name="dz"/>) from the anchor lies inside a <paramref name="size"/>-cell volume,
+    /// touching none of its faces: never for a 2x2x2, the center for a 3x3x3.</summary>
+    public static bool IsInterior(int dx, int dy, int dz, int size) =>
+        dx > 0 && dy > 0 && dz > 0 && dx < size - 1 && dy < size - 1 && dz < size - 1;
+
     /// <summary>Packs a cell's facing (0..3) and its offset from the anchor (each 0..3) into the
     /// state byte: the facing in bits 0-1, the offsets' low bits in bits 2-4 and their high bits
     /// in bits 5-7. The anchor's own state is just its facing, since its offset is (0, 0, 0).</summary>
@@ -97,15 +110,9 @@ public static class Multiblock
     /// pointing at a stranger.
     /// </summary>
     public static bool TryResolveAnchor(ChunkManager chunks, int x, int y, int z,
-        out Vector3 anchor, out int facing, out BlockType? anchorType) =>
-        TryResolveAnchor(chunks, x, y, z, BlockType.ById, out anchor, out facing, out anchorType);
-
-    /// <summary><see cref="TryResolveAnchor(ChunkManager, int, int, int, out Vector3, out int, out BlockType?)"/>
-    /// over an explicit id-to-type table, so a test can resolve a structure whose anchor type
-    /// (a size no shipped block uses) is not in the registry.</summary>
-    internal static bool TryResolveAnchor(ChunkManager chunks, int x, int y, int z, BlockType?[] types,
         out Vector3 anchor, out int facing, out BlockType? anchorType)
     {
+        var types = BlockType.ById;
         anchor = Vector3.Zero;
         facing = 0;
         anchorType = null;
@@ -202,8 +209,9 @@ public static class Multiblock
     /// <summary>
     /// Turns the structure back into the block it was built from: every cell that still holds
     /// the anchor id or its part id becomes the source block with a clean state byte, except
-    /// <paramref name="clearedCell"/> (the mined one), which is cleared and unmarked instead —
-    /// its loot is the caller's business.
+    /// <paramref name="clearedCell"/> (the mined one) and the interior cells
+    /// (<see cref="IsInterior"/>), which are cleared and unmarked instead — the mined cell's loot is
+    /// the caller's business.
     ///
     /// <para>
     /// Cells holding anything else are left alone, air included, so this is safe to call when a
@@ -230,7 +238,8 @@ public static class Multiblock
             var existing = chunk.GetLocalBlock(lx, ly, lz);
             if (existing != anchorType.Id && existing != anchorType.MultiblockPartId) continue;
 
-            if (cleared is { } mined && mined.X == x && mined.Y == y && mined.Z == z)
+            if ((cleared is { } mined && mined.X == x && mined.Y == y && mined.Z == z)
+                || IsInterior(dx, dy, dz, anchorType.MultiblockSize))
             {
                 chunk.ClearBlockAt(new Vector3(x, y, z));
                 chunks.UnmarkPlayerPlaced(x, y, z);

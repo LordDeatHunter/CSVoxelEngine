@@ -13,10 +13,11 @@ using Xunit;
 namespace VoxelEngine.Tests.Content;
 
 /// <summary>
-/// The mud brick kiln is the first multiblock, and it is entirely content: two blocks, a loot
-/// table and one 2x2x2 model. These pin the structure flags the engine reads off that content,
-/// the model's opening, and the split the mesher makes between the anchor (draws the whole
-/// volume) and a part (draws nothing).
+/// The kilns are multiblocks made entirely of content: the 2x2x2 mud brick kiln and the 3x3x3
+/// alloy furnace, each two blocks, a loot table and one model. These pin the structure flags the
+/// engine reads off that content, each model's opening against its <see cref="KilnLayout"/>, and
+/// the split the mesher makes between the anchor (draws the whole volume) and a part (draws
+/// nothing).
 /// </summary>
 public sealed class KilnContentTests
 {
@@ -31,12 +32,23 @@ public sealed class KilnContentTests
         return into;
     }
 
-    [Fact]
-    public void AnchorAndPartDeclareTheStructureFlags()
+    /// <summary>Every kiln: its anchor, its part and the block it is built from.</summary>
+    public static TheoryData<string, string, string> Kilns => new()
     {
-        var anchor = ContentRegistry.RequireBlock("mud_brick_kiln");
-        var part = ContentRegistry.RequireBlock("mud_brick_kiln_part");
-        var bricks = ContentRegistry.RequireBlock("mud_bricks");
+        { "mud_brick_kiln", "mud_brick_kiln_part", "mud_bricks" },
+        { "alloy_furnace", "alloy_furnace_part", "alloy_bricks" },
+    };
+
+    /// <summary>Every kiln anchor.</summary>
+    public static TheoryData<string> KilnAnchors => new() { "mud_brick_kiln", "alloy_furnace" };
+
+    [Theory]
+    [MemberData(nameof(Kilns))]
+    public void AnchorAndPartDeclareTheStructureFlags(string anchorName, string partName, string sourceName)
+    {
+        var anchor = ContentRegistry.RequireBlock(anchorName);
+        var part = ContentRegistry.RequireBlock(partName);
+        var bricks = ContentRegistry.RequireBlock(sourceName);
 
         foreach (var cell in new[] { anchor, part })
         {
@@ -77,10 +89,12 @@ public sealed class KilnContentTests
         return (min, max);
     }
 
-    [Fact]
-    public void KilnModelSpansTheVolumeWithAnOpeningOnTheNorthFace()
+    [Theory]
+    [MemberData(nameof(KilnAnchors))]
+    public void KilnModelSpansTheVolumeWithAnOpeningOnTheNorthFace(string anchorName)
     {
-        var anchor = ContentRegistry.RequireBlock("mud_brick_kiln");
+        var anchor = ContentRegistry.RequireBlock(anchorName);
+        var layout = anchor.Kiln!.Layout;
         var north = anchor.RotatedModels![0];
 
         foreach (var quad in north.Quads)
@@ -100,15 +114,15 @@ public sealed class KilnContentTests
 
         // The hearth's back wall is the only thing you see looking into the opening
         var backWalls = north.Quads
-            .Where(q => q.Face == 0 && MathF.Abs(Range(q, p => p.Z).Min - KilnRenderer.OpeningDepthZ) <= Epsilon)
+            .Where(q => q.Face == 0 && MathF.Abs(Range(q, p => p.Z).Min - layout.OpeningDepthZ) <= Epsilon)
             .ToList();
         var backWall = Assert.Single(backWalls);
         var wallX = Range(backWall, p => p.X);
         var wallY = Range(backWall, p => p.Y);
-        Assert.Equal(KilnRenderer.OpeningMinX, wallX.Min, 3);
-        Assert.Equal(KilnRenderer.OpeningMaxX, wallX.Max, 3);
-        Assert.Equal(KilnRenderer.OpeningFloorY, wallY.Min, 3);
-        Assert.Equal(KilnRenderer.OpeningCeilingY, wallY.Max, 3);
+        Assert.Equal(layout.OpeningMinX, wallX.Min, 3);
+        Assert.Equal(layout.OpeningMaxX, wallX.Max, 3);
+        Assert.Equal(layout.OpeningFloorY, wallY.Min, 3);
+        Assert.Equal(layout.OpeningCeilingY, wallY.Max, 3);
 
         // ...because nothing covers the opening on the front plane itself
         foreach (var quad in north.Quads)
@@ -116,25 +130,26 @@ public sealed class KilnContentTests
             if (quad.Face != 0 || MathF.Abs(Range(quad, p => p.Z).Max) > Epsilon) continue;
             var x = Range(quad, p => p.X);
             var y = Range(quad, p => p.Y);
-            var blocksX = x.Max > KilnRenderer.OpeningMinX + Epsilon && x.Min < KilnRenderer.OpeningMaxX - Epsilon;
-            var blocksY = y.Max > KilnRenderer.OpeningFloorY + Epsilon && y.Min < KilnRenderer.OpeningCeilingY - Epsilon;
+            var blocksX = x.Max > layout.OpeningMinX + Epsilon && x.Min < layout.OpeningMaxX - Epsilon;
+            var blocksY = y.Max > layout.OpeningFloorY + Epsilon && y.Min < layout.OpeningCeilingY - Epsilon;
             Assert.False(blocksX && blocksY, "a front quad covers the kiln's opening");
         }
 
         // Rotating to facing 1 turns the opening onto +Z, so the back wall moves with it
         var rotatedWalls = anchor.RotatedModels[1].Quads
             .Where(q => q.Face == 1 &&
-                        MathF.Abs(Range(q, p => p.Z).Max - (anchor.MultiblockSize - KilnRenderer.OpeningDepthZ)) <= Epsilon)
+                        MathF.Abs(Range(q, p => p.Z).Max - (anchor.MultiblockSize - layout.OpeningDepthZ)) <= Epsilon)
             .ToList();
         var rotatedWall = Assert.Single(rotatedWalls);
-        Assert.Equal(anchor.MultiblockSize - KilnRenderer.OpeningDepthZ, Range(rotatedWall, p => p.Z).Min, 3);
+        Assert.Equal(anchor.MultiblockSize - layout.OpeningDepthZ, Range(rotatedWall, p => p.Z).Min, 3);
     }
 
-    [Fact]
-    public void PartEmitsNothingAndAnchorEmitsItsQuads()
+    [Theory]
+    [MemberData(nameof(KilnAnchors))]
+    public void PartEmitsNothingAndAnchorEmitsItsQuads(string anchorName)
     {
-        var anchor = ContentRegistry.RequireBlock("mud_brick_kiln");
-        var part = ContentRegistry.RequireBlock("mud_brick_kiln_part");
+        var anchor = ContentRegistry.RequireBlock(anchorName);
+        var part = BlockType.ById[anchor.MultiblockPartId]!;
         var (manager, center) = MeshTestWorld.WalledArea(MeshTestWorld.HighAbove);
 
         // A part is solid and occludes, but the anchor's model already covers its cell
@@ -142,7 +157,7 @@ public sealed class KilnContentTests
         center.SetBlockRaw(8, 8, 8, part.Id, (byte)(2 | (1 << 2)));
         Assert.Empty(center.GenerateMeshData(manager)!.Vertices);
 
-        // The anchor draws the whole 2x2x2 model, every quad of it (none is culled: a
+        // The anchor draws the whole model, every quad of it (none is culled: a
         // multiblock quad carries no cullface)
         center.SetBlockRaw(8, 8, 8, anchor.Id, 0);
         var north = center.GenerateMeshData(manager)!;

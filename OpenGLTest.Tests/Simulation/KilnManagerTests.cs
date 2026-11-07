@@ -24,13 +24,17 @@ public sealed class KilnManagerTests
     private static BlockType Bricks => ContentRegistry.RequireBlock("mud_bricks");
     private static Item Coal => ContentRegistry.RequireItem("coal");
 
+    /// <summary>Every kiln anchor: the 2x2x2 kiln and the 3x3x3 alloy furnace.</summary>
+    public static TheoryData<string> KilnAnchors => new() { "mud_brick_kiln", "alloy_furnace" };
+
     private static (ChunkManager Manager, KilnManager Kilns, DropManager Drops) ConvertedKiln(
-        Vector3 anchor, int facing = 0)
+        Vector3 anchor, int facing = 0, BlockType? kiln = null)
     {
+        kiln ??= Kiln;
         var (manager, _) = MeshTestWorld.WalledArea();
-        Multiblock.Convert(manager, anchor, facing, Kiln, new HashSet<Vector3>());
+        Multiblock.Convert(manager, anchor, facing, kiln, new HashSet<Vector3>());
         var kilns = new KilnManager();
-        kilns.Ensure(anchor, facing, Kiln.Id);
+        kilns.Ensure(anchor, facing, kiln.Id);
         return (manager, kilns, new DropManager());
     }
 
@@ -131,28 +135,33 @@ public sealed class KilnManagerTests
         Assert.Equal(Kiln.Id, Cell(manager, anchor).Id);
     }
 
-    [Fact]
-    public void BlastedPartRevertsTheRestAndDropsFuel()
+    [Theory]
+    [MemberData(nameof(KilnAnchors))]
+    public void BlastedPartRevertsTheRestAndDropsFuel(string kilnName)
     {
+        var kiln = ContentRegistry.RequireBlock(kilnName);
+        var size = kiln.MultiblockSize;
         var anchor = new Vector3(2, 2, 2);
-        var (manager, kilns, drops) = ConvertedKiln(anchor);
+        var (manager, kilns, drops) = ConvertedKiln(anchor, kiln: kiln);
         AddFuel(kilns, anchor, 2);
 
-        var blasted = anchor + new Vector3(1, 1, 1);
+        // A corner part, on the shell of every size
+        var blasted = anchor + new Vector3(size - 1, size - 1, size - 1);
         SetCell(manager, blasted, 0, 0);
 
         kilns.Update(0.1f, manager, drops);
 
-        foreach (var (dx, dy, dz) in Multiblock.Offsets(Kiln.MultiblockSize))
+        foreach (var (dx, dy, dz) in Multiblock.Offsets(size))
         {
             var cell = anchor + new Vector3(dx, dy, dz);
             var (id, state) = Cell(manager, cell);
-            if (cell == blasted)
+            // The blasted cell stays as the blast left it, and a revert leaves the interior empty
+            if (cell == blasted || Multiblock.IsInterior(dx, dy, dz, size))
             {
                 Assert.Equal(0, id);
                 continue;
             }
-            Assert.Equal(Bricks.Id, id);
+            Assert.Equal(kiln.MultiblockSourceId, id);
             Assert.Equal(0, state);
         }
 
@@ -213,32 +222,35 @@ public sealed class KilnManagerTests
         Assert.Empty(kilns.LitCells);
     }
 
-    [Fact]
-    public void FireSitsInsideTheOpeningForEveryFacing()
+    [Theory]
+    [MemberData(nameof(KilnAnchors))]
+    public void FireSitsInsideTheOpeningForEveryFacing(string kilnName)
     {
+        var kiln = ContentRegistry.RequireBlock(kilnName);
+        var layout = kiln.Kiln!.Layout;
         var anchor = new Vector3(2, 2, 2);
         for (var facing = 0; facing < 4; facing++)
         {
-            var (_, kilns, _) = ConvertedKiln(anchor, facing);
+            var (_, kilns, _) = ConvertedKiln(anchor, facing, kiln);
             AddFuel(kilns, anchor, 1);
             Assert.True(kilns.Ignite(anchor));
 
             // The list entry is the flame minus the particle offset, so the system's own
-            // "cell + SpawnOffset" lands exactly on FireLocal rotated to this facing
+            // "cell + SpawnOffset" lands exactly on the layout's FireLocal rotated to this facing
             var flame = kilns.LitCells[0] + FireParticleSystem.SpawnOffset - anchor;
-            var expected = MultiblockShape.RotatePoint(KilnRenderer.FireLocal, facing, KilnRenderer.VolumeSize);
+            var expected = MultiblockShape.RotatePoint(layout.FireLocal, facing, kiln.MultiblockSize);
             Assert.Equal(expected.X, flame.X, precision: 4);
             Assert.Equal(expected.Y, flame.Y, precision: 4);
             Assert.Equal(expected.Z, flame.Z, precision: 4);
 
             // Inside the structure's footprint, standing on the hearth floor under the lintel
-            Assert.InRange(flame.X, 0f, (float)KilnRenderer.VolumeSize);
-            Assert.InRange(flame.Z, 0f, (float)KilnRenderer.VolumeSize);
-            Assert.InRange(flame.Y, KilnRenderer.OpeningFloorY, KilnRenderer.OpeningCeilingY);
+            Assert.InRange(flame.X, 0f, (float)kiln.MultiblockSize);
+            Assert.InRange(flame.Z, 0f, (float)kiln.MultiblockSize);
+            Assert.InRange(flame.Y, layout.OpeningFloorY, layout.OpeningCeilingY);
 
             // The point light rides 0.65 higher and still clears the lintel
             var light = flame + (RenderManager.FireLightOffset - FireParticleSystem.SpawnOffset);
-            Assert.True(light.Y < KilnRenderer.OpeningCeilingY);
+            Assert.True(light.Y < layout.OpeningCeilingY);
         }
     }
 }

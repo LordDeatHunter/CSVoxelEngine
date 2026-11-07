@@ -219,16 +219,16 @@ internal sealed class StationPasses : IDisposable
         foreach (var (anchor, facing, state) in kilns.KilnView())
         {
             BindAtlas(ref atlasBound);
+            var layout = state.Profile.Layout;
 
-            // One sample per kiln, half a block outside its opening: every cell inside the
-            // structure is solid brickwork, so the light the hearth sees is the light at its mouth.
-            var light = _owner.LightAt(KilnRenderer.ToWorld(anchor, facing, new Vector3(1f, 0.5f, -0.5f)));
+            // One sample per kiln, at its mouth (KilnLayout.MouthLocal)
+            var light = _owner.LightAt(layout.ToWorld(anchor, facing, layout.MouthLocal));
 
             if (state.HasCrucible)
             {
                 // CreateBlockModel centers a cell's model on the origin, so lift by half a block
                 // to put the bowl's floor back on the hearth. The bowl is symmetric: no yaw.
-                var bowl = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.CrucibleLocal);
+                var bowl = layout.ToWorld(anchor, facing, layout.CrucibleLocal);
                 var model = Matrix4x4.CreateTranslation(bowl + new Vector3(0f, 0.5f, 0f));
                 _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
                 _crucibleMesh.Render();
@@ -253,7 +253,7 @@ internal sealed class StationPasses : IDisposable
                     // the opening; it shrinks as its last unit melts into the pool below
                     var size = KilnRenderer.PendingSize
                              * KilnRenderer.PendingScale01(pendingMl, KilnManager.PendingUnitMl(state));
-                    var foot = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.PendingLocal);
+                    var foot = layout.ToWorld(anchor, facing, layout.PendingLocal);
                     var placed = Matrix4x4.CreateScale(size)
                                 * Matrix4x4.CreateRotationY(KilnRenderer.OpeningYaw(facing))
                                 * Matrix4x4.CreateTranslation(foot + new Vector3(0f, size * 0.5f, 0f));
@@ -278,7 +278,7 @@ internal sealed class StationPasses : IDisposable
             var lift = fuelIsItem
                 ? SpritePose.RestingLift(KilnRenderer.FuelSize)
                 : KilnRenderer.FuelSize * 0.5f;
-            var basePos = KilnRenderer.ToWorld(anchor, facing, KilnRenderer.FuelLocal)
+            var basePos = layout.ToWorld(anchor, facing, layout.FuelLocal)
                         + new Vector3(0f, lift, 0f);
             for (var i = 0; i < state.Fuel; i++)
             {

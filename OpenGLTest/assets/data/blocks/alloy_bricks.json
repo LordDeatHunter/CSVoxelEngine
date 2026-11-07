@@ -1,0 +1,10 @@
+{
+  // The alloy furnace's building block: one mud brick block bound with a copper and a tin ingot
+  // (recipes/alloy_bricks.json). A 3x3x3 cube of them is what the multiblock converter presses
+  // into an alloy furnace. The tile comes from tools/generate-alloy-bricks-texture.py.
+  "name": "Alloy Bricks",
+  "model": { "parent": "block/cube_all", "textures": { "all": "alloy_bricks" } },
+  "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 }
+}

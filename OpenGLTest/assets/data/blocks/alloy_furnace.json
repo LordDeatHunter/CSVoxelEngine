@@ -1,0 +1,27 @@
+{
+  // Alloy furnace: a 3x3x3 multiblock of alloy_bricks converted in place by the multiblock
+  // converter. Only this cell - the volume's minimum corner on every axis - is the anchor, and
+  // it carries the WHOLE 3x3x3 model (authored in 0..48 model units with the opening on north).
+  // The other 26 cells hold alloy_furnace_part. The cube's center may be built of a brick or
+  // left empty: conversion hands an interior brick back, and a revert leaves the center empty.
+  // Mining any cell drops one alloy_bricks and reverts the other shell cells.
+  "name": "Alloy Furnace",
+  "model": "block/alloy_furnace",
+  "renderer": "multiblock",
+  "multiblock": { "part": "block/alloy_furnace_part", "source": "block/alloy_bricks", "size": 3 },
+  // A bigger hearth that burns twice the plain kiln's fuel, melts half again as fast and is the
+  // only kiln that takes two metals at once and alloys them.
+  "kiln": { "fuelCap": 8, "meltSpeed": 1.5, "canAlloy": true },
+  // A structure is built from its source block, never held in the inventory.
+  "hasItem": false,
+  "hardness": 5,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "sfx": "hit_rock",
+  "loot": "alloy_furnace",
+  // Like the kiln: its quads carry no cullface and are lit from the anchor cell, so light has
+  // to reach that cell.
+  "occludes": true,
+  "castsAO": true,
+  "light": { "passes": true }
+}

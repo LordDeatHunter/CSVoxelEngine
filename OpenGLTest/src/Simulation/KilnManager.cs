@@ -110,7 +110,7 @@ public sealed class KilnManager
     /// <summary>
     /// Particle/light origins of every lit kiln, one entry each. The entry is the flame's world
     /// position minus <see cref="FireParticleSystem.SpawnOffset"/>, so the particle system (which
-    /// adds that offset back) spawns exactly at <see cref="KilnRenderer.FireLocal"/> and the point
+    /// adds that offset back) spawns exactly at its layout's <see cref="KilnLayout.FireLocal"/> and the point
     /// light lands the usual 0.65 blocks above it — still under the kiln's lintel.
     /// </summary>
     public IReadOnlyList<Vector3> LitCells => _litCells;
@@ -484,7 +484,8 @@ public sealed class KilnManager
         {
             if (!state.Lit) continue;
             var anchor = new Vector3(key.X, key.Y, key.Z);
-            _litCells.Add(KilnRenderer.ToWorld(anchor, state.Facing, KilnRenderer.FireLocal)
+            var layout = state.Profile.Layout;
+            _litCells.Add(layout.ToWorld(anchor, state.Facing, layout.FireLocal)
                 - FireParticleSystem.SpawnOffset);
         }
     }

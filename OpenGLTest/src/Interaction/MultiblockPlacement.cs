@@ -16,7 +16,8 @@ namespace VoxelEngine.Interaction;
 /// among those the one reaching farthest down. For a 2x2x2 that is the order right-down,
 /// right-up, left-down, left-up over the four volumes the clicked corner belongs to. The first
 /// candidate whose cells are all the source block wins, so building a neat cube and clicking any
-/// of its front cells always converts that cube.
+/// of its front cells always converts that cube. A cell inside the volume, touching none of its
+/// faces (<see cref="Multiblock.IsInterior"/>), may be air instead, so a hollow shell qualifies.
 /// </para>
 /// <para>
 /// The structure's opening ends up facing the player: on a side face that is the hit normal
@@ -78,8 +79,8 @@ public static class MultiblockPlacement
     }
 
     /// <summary>Whether the candidate volume whose front face starts at the clicked cell moved
-    /// by <paramref name="rightOrigin"/> + <paramref name="upOrigin"/> is all source block; its
-    /// minimum corner on every axis (whatever the facing) is the anchor.</summary>
+    /// by <paramref name="rightOrigin"/> + <paramref name="upOrigin"/> is all source block (or air
+    /// inside it); its minimum corner on every axis (whatever the facing) is the anchor.</summary>
     private static bool TryCandidate(Func<int, int, int, byte> blockAt, byte sourceId, int size,
         int clickX, int clickY, int clickZ, Vector3 rightOrigin, Vector3 upOrigin,
         Vector3 right, Vector3 up, Vector3 depth, out Vector3 anchor)
@@ -98,7 +99,8 @@ public static class MultiblockPlacement
             var y = clickY + (int)MathF.Round(offset.Y);
             var z = clickZ + (int)MathF.Round(offset.Z);
 
-            if (blockAt(x, y, z) != sourceId) return false;
+            var id = blockAt(x, y, z);
+            if (id != sourceId && !(id == 0 && Multiblock.IsInterior(a, b, k, size))) return false;
 
             if (x < minX) minX = x;
             if (y < minY) minY = y;

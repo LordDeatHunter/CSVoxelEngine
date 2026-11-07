@@ -86,7 +86,7 @@ internal sealed class ShadowCasterCull
 
     /// <summary>
     /// How far a caster's drawn vertices can reach past its recorded box: a multiblock anchor's
-    /// model one block past its cell (<see cref="ReflectionCull.MeshOverhangBlocks"/>, applied on
+    /// model past its cell (<see cref="ReflectionCull.MeshOverhangBlocks"/>, applied on
     /// every side though it only reaches toward +X, +Y and +Z, which is conservative) plus the sway.
     /// </summary>
     internal const float CasterReachBlocks = ReflectionCull.MeshOverhangBlocks + SwayReachBlocks;

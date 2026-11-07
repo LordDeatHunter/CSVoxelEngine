@@ -1,0 +1,17 @@
+{
+  // One of the 26 non-anchor cells of an alloy furnace's 3x3x3 volume. Never meshed (the
+  // anchor's model covers the whole volume); a solid, occluding cell so the structure
+  // collides, raycasts and hides its neighbors, and mining it reverts the rest of the furnace.
+  "name": "Alloy Furnace",
+  "model": { "parent": "block/cube_all", "textures": { "all": "alloy_bricks" } },
+  "renderer": "multiblock_part",
+  "hasItem": false,
+  "hardness": 5,
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "sfx": "hit_rock",
+  "loot": "alloy_furnace",
+  "occludes": true,
+  "castsAO": true,
+  "light": { "passes": true }
+}

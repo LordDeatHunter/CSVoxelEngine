@@ -165,9 +165,6 @@ public sealed class MultiblockShapeTests
         Assert.Equal(0, BlockSchemaParser.ParseMultiblockSize(null, "test"));
         Assert.Equal(MultiblockShape.DefaultSize,
             BlockSchemaParser.ParseMultiblockSize(new BlockDefinition.MultiblockDefinition(), "test"));
-        // The kiln renderer's spots are authored in the kiln's own volume
-        Assert.Equal(VoxelEngine.Content.Stations.KilnRenderer.VolumeSize,
-            ContentRegistry.RequireBlock("mud_brick_kiln").MultiblockSize);
 
         for (var size = MultiblockShape.MinSize; size <= MultiblockShape.MaxSize; size++)
             Assert.Equal(size, BlockSchemaParser.ParseMultiblockSize(

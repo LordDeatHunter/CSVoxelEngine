@@ -83,6 +83,7 @@ internal static class BlockLoader
         var renderer = BlockFieldRules.ParseRenderer(definition, path);
         var paneProfile = BlockFieldRules.ParsePane(definition, renderer, path);
         BlockFieldRules.ValidateMultiblock(definition, renderer, path);
+        var multiblockSize = BlockSchemaParser.ParseMultiblockSize(definition.Multiblock, path);
         BlockFieldRules.ValidateStatusFlags(definition, path);
         var onBreak = BlockFieldRules.ParseOnBreak(definition, path);
         var (tipHardness, woodLootBands) = BlockFieldRules.ParseWood(definition, renderer, path);
@@ -155,8 +156,8 @@ internal static class BlockLoader
             FlamePoints = flamePoints,
             Renderer = renderer,
             Pane = paneProfile,
-            MultiblockSize = BlockSchemaParser.ParseMultiblockSize(definition.Multiblock, path),
-            Kiln = BlockSchemaParser.ParseKiln(definition.Kiln, path),
+            MultiblockSize = multiblockSize,
+            Kiln = BlockSchemaParser.ParseKiln(definition.Kiln, path, multiblockSize),
             SpellBuilder = definition.SpellBuilder ?? false,
             StackMax = (byte)stack.StackMax,
             TipHardness = tipHardness,

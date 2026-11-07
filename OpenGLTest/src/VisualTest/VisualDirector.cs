@@ -1,10 +1,12 @@
 using System;
 using System.IO;
+using System.Linq;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Player;
 using VoxelEngine.Status;
+using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine.VisualTest;
@@ -83,8 +85,8 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
                 break;
 
             case "prime":
-                // A firestarter strike that never misses: the scripted keyboard cannot equip a tool
-                // instance, and the strike's chance roll would make a blast scenario flaky
+                // A firestarter strike that never misses: the strike's chance roll would make a
+                // blast scenario flaky
                 if (!world.ItemUse.PrimeTnt(step.Pos!.Value))
                     throw new InvalidOperationException(
                         $"Step {_step + 1} primes {step.Pos}, which holds no primable block.");
@@ -109,7 +111,14 @@ public sealed class VisualDirector(VisualScenario scenario, World world)
             case "give":
                 var id = ContentRegistry.Require(step.Block!);
                 world.Inventory.Add(id, step.Count);
-                if (world.Inventory.IdAt(world.Inventory.SelectedIndex) != id)
+                if (Inventory.CategoryOf(id) == InventoryCategory.Tools)
+                {
+                    // A tool arrives as a new instance: put the newest one of that id in hand
+                    var newest = world.Inventory.ToolEntries().Where(t => t.ItemId == id).Select(t => t.InstanceId).DefaultIfEmpty(-1).Max();
+                    if (newest >= 0 && world.Inventory.ToolInstanceAt(world.Inventory.SelectedIndex) != newest)
+                        world.Inventory.EquipTool(world.Inventory.SelectedIndex, newest);
+                }
+                else if (world.Inventory.IdAt(world.Inventory.SelectedIndex) != id)
                     world.Inventory.EquipStackable(world.Inventory.SelectedIndex, id);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} give {step.Count} {step.Block}");
                 Advance();

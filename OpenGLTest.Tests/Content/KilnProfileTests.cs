@@ -1,6 +1,7 @@
 using System;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Shapes;
 using VoxelEngine.Content.Stations;
 using Xunit;
 
@@ -62,5 +63,32 @@ public sealed class KilnProfileTests
         var plain = new BlockDefinition { Kiln = new BlockDefinition.KilnDefinition() };
         Assert.Contains(Path, Assert.Throws<InvalidOperationException>(() =>
             BlockFieldRules.ValidateMultiblock(plain, BlockRenderer.Model, Path)).Message);
+    }
+
+    [Fact]
+    public void AKilnTakesTheLayoutOfItsSizeAndASizeWithNoKilnModelIsRefused()
+    {
+        foreach (var layout in KilnLayout.All)
+            Assert.Same(layout, BlockSchemaParser.ParseKiln(new BlockDefinition.KilnDefinition(), Path,
+                layout.VolumeSize)!.Layout);
+
+        for (var size = MultiblockShape.MinSize; size <= MultiblockShape.MaxSize; size++)
+        {
+            if (KilnLayout.ForSize(size) != null) continue;
+            Assert.Contains(Path, Assert.Throws<InvalidOperationException>(() =>
+                BlockSchemaParser.ParseKiln(new BlockDefinition.KilnDefinition(), Path, size)).Message);
+        }
+    }
+
+    [Fact]
+    public void TheAlloyFurnaceOutdoesThePlainKilnAndIsTheOneThatAlloys()
+    {
+        var kiln = ContentRegistry.RequireBlock("mud_brick_kiln").Kiln!;
+        var furnace = ContentRegistry.RequireBlock("alloy_furnace").Kiln!;
+
+        Assert.True(furnace.FuelCap > kiln.FuelCap);
+        Assert.True(furnace.MeltSeconds < kiln.MeltSeconds);
+        Assert.True(furnace.CanAlloy);
+        Assert.False(kiln.CanAlloy);
     }
 }

@@ -1,0 +1,7 @@
+{
+  // Every mined cell of an alloy furnace yields the one alloy brick block it was built from;
+  // the other shell cells revert to alloy_bricks in place.
+  "pools": [
+    { "rolls": 1, "entries": [ { "item": "block/alloy_bricks" } ] }
+  ]
+}

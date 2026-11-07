@@ -36,8 +36,8 @@ public enum ItemUseAction
     IgniteCampfire,
 
     /// <summary>
-    /// Right-clicks a <see cref="Item.UseBlockId"/> cell to turn the volume it belongs to
-    /// into the <see cref="Item.UseResultId"/> anchor block (see <see cref="Multiblock"/>).
+    /// Right-clicks a hand-built cube to turn it into the multiblock it is the source of (each
+    /// anchor's <see cref="BlockType.MultiblockSourceId"/>, see <see cref="Multiblock"/>).
     /// The tool is never consumed and never morphs — the converter is an endless misc item.
     /// </summary>
     ConvertMultiblock,

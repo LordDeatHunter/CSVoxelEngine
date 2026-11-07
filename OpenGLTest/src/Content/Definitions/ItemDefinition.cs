@@ -218,9 +218,9 @@ public sealed class ItemDefinition
         /// <c>ignite_campfire</c> or <c>convert_multiblock</c>.</summary>
         public string? Action { get; set; }
 
-        /// <summary>Item the use swaps this one for, e.g. <c>item/water_bucket</c>. For
-        /// <c>convert_multiblock</c> it is the multiblock <em>anchor block</em> the volume
-        /// becomes instead, e.g. <c>block/mud_brick_kiln</c>.</summary>
+        /// <summary>Item the use swaps this one for, e.g. <c>item/water_bucket</c>. A
+        /// <c>convert_multiblock</c> converter names none: it presses whichever multiblock the
+        /// clicked cube is the source of.</summary>
         public string? Result { get; set; }
 
         /// <summary>Fluid block the action picks up or places, e.g. <c>block/water</c>.</summary>
@@ -230,9 +230,7 @@ public sealed class ItemDefinition
         /// Stackable block a <c>place_stack</c> action builds up, e.g. <c>block/pebble</c>
         /// for flint. Right-clicking the block adds one unit, right-clicking anything else
         /// grounds a fresh pile of one. For <c>ignite_campfire</c> it names the firepit
-        /// block (a max-count branch pile) the spark can light, and for
-        /// <c>convert_multiblock</c> the <em>source block</em> the structure's volume must be
-        /// built from, e.g. <c>block/mud_bricks</c>.
+        /// block (a max-count branch pile) the spark can light.
         /// </summary>
         public string? Block { get; set; }
 

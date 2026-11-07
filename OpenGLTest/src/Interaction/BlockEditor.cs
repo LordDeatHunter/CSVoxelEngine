@@ -350,8 +350,10 @@ internal sealed class BlockEditor
     /// to into the <paramref name="anchorId"/> multiblock, opening toward the player
     /// (see <see cref="MultiblockPlacement.TryFindVolume"/>). The clicked cell's chunk remeshes
     /// synchronously so the click frame already shows the structure; the rest of the touched
-    /// chunks rebuild asynchronously, exactly as a felled tree's do. Returns whether a volume
-    /// was converted.
+    /// chunks rebuild asynchronously, exactly as a felled tree's do. A source block built into the
+    /// volume's interior (<see cref="Multiblock.IsInterior"/>) is handed back as a drop in front of
+    /// the clicked face, since a revert leaves the interior empty. Returns whether a volume was
+    /// converted.
     /// </summary>
     internal bool TryConvertMultiblock(Vector3 hitCell, Vector3 hitNormal, byte sourceId, byte anchorId,
         Vector3 viewDirection)
@@ -366,6 +368,18 @@ internal sealed class BlockEditor
         {
             if (_falling.OverlapsAny((int)anchor.X + dx, (int)anchor.Y + dy, (int)anchor.Z + dz))
                 return false;
+        }
+
+        // A client's convert is a prediction and drops nothing; the server hands the brick back
+        if (!_clientMode)
+        {
+            var size = anchorType.MultiblockSize;
+            foreach (var (dx, dy, dz) in Multiblock.Offsets(size))
+            {
+                if (Multiblock.IsInterior(dx, dy, dz, size)
+                    && _chunkManager.GetBlockGlobal((int)anchor.X + dx, (int)anchor.Y + dy, (int)anchor.Z + dz) == sourceId)
+                    _dropManager.Spawn(sourceId, hitCell + hitNormal);
+            }
         }
 
         var touchedChunks = new HashSet<Vector3>();

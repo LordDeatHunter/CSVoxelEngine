@@ -12,7 +12,9 @@ the state byte, kiln bytes unchanged) and `A-3` (the block's `kiln` object, comp
 fuel cap, melt speed, can-alloy, read per kiln through the anchor's block) and `A-4` (multi-metal
 crucible: one `CrucibleMetal` per molten material, `AlloyRules` for mixing, waiting and the 3:1 resolve,
 `recipes/alloy/bronze.json` and `data/molten/bronze.json`, crucible raised to 800 ml so one set fits,
-protocol 16) shipped. Work the items in ID order, one phase per prompt; `A-5` is next.
+protocol 16) and `A-5` (the alloy furnace: `alloy_bricks`, the 3x3x3 `alloy_furnace` multiblock, a
+`KilnLayout` per structure size for the render spots, one converter for every structure) shipped. Work
+the items in ID order, one phase per prompt; `A-6` is next.
 
 Decisions already made:
 
@@ -28,9 +30,11 @@ Decisions already made:
   melt rate, surplus stays pending, nothing is wasted.
 - **Alloy furnace**: a 3x3x3 multiblock, hollow shell of a new `alloy_bricks` block, converted by
   right-click like the kiln. Same recipes and interactions as the plain kiln, **fuel cap 8** (plain: 4)
-  and **melt speed x1.5** (data driven). Assumed, to confirm: 26 shell bricks, the center cell is air or
-  a brick at conversion and becomes a part cell; `alloy_bricks` = 1 mud brick + 1 copper ingot + 1 tin
-  ingot (26 + 26 ingots per furnace, a tuning knob).
+  and **melt speed x1.5** (data driven). 26 shell bricks: the center cell may be air or a brick at
+  conversion and becomes a part cell; a brick there is handed back as a drop and a revert leaves the
+  center empty, so nothing is made or lost. `alloy_bricks` = 1 mud brick block + 1 copper ingot + 1 tin
+  ingot (26 + 26 ingots per furnace, a tuning knob). The one `multiblock_converter` presses any
+  structure: it names none and tries every anchor with that anchor's own source block.
 - **Compat.** Old saves and crucibles may break, no migration or warning; the net protocol is bumped.
 
 ## In progress
@@ -41,12 +45,6 @@ Decisions already made:
 
 ### Alloying
 
-- [ ] **`A-5` Alloy furnace** - P1, M.
-  `alloy_bricks` (cube block + recipe), the furnace anchor and part blocks (3x3x3 model authored in
-  0..48 units, opening on north, `multiblock.size: 3`), the converter item entry, loot (the one brick that cell was built
-  from), fuel 8 and x1.5 melt as its `kiln` object (`{"fuelCap": 8, "meltSpeed": 1.5, "canAlloy": true}`). `KilnRenderer`'s spots (`VolumeSize` 2) describe the
-  2x2x2 kiln's model only, so the furnace needs its own.
-  **Hook:** `data/blocks`, `data/models/block`, `ConvertMultiblockItem`.
 - [ ] **`A-6` Bronze** - P1, S-M.
   Bronze ingot, heads and tools, melt and cast recipes (the ingot, axe,
   pickaxe and sword molds), tool tags. Needs `A-4`.
@@ -56,10 +54,12 @@ Decisions already made:
 - Copper today: pickaxe `blockDamage` 2.0, entity 5, `tool.power` 2.0, hit 250 ms; hematite needs
   pickaxe power 2, so copper and bronze both mine it. The iron sword is entity 5.5 (`attack: "sword"`,
   trail `[200, 230, 255]`); the copper sword must sit below it in the ladder.
-- Kiln today: `kiln` object `{fuelCap 4, meltSpeed 1, canAlloy false}` (`KilnProfile`, base melt
+- Kilns today: the plain kiln's `kiln` object `{fuelCap 4, meltSpeed 1, canAlloy false}`, the alloy
+  furnace's `{fuelCap 8, meltSpeed 1.5, canAlloy true}` (`KilnProfile`, with the `KilnLayout` of its size; base melt
   interval `KilnProfile.BaseMeltSeconds` 2 s), `KilnManager.MeltChunkMl` 100; a crucible holds 800 ml as one
   `CrucibleMetal(MaterialId, MoltenMl, PendingMl)` per metal (`CrucibleComponent`). In an alloy kiln a part waits
   while another part of its alloy is in the vessel; each lit tick turns full sets (molten or pending) into pending
   bronze, which melts at the melt rate (`AlloyRules`). A mold pours the molten metal it casts with the most ml.
-- Verify: `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`; a `visual-examples`
-  scenario (`VOXEL_TIME=147`) for the tin ore, the furnace and a bronze cast.
+- Verify: `dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`; `visual-examples/alloy-furnace.json`
+  (`VOXEL_TIME=147`) builds, converts, loads, lights and alloys a furnace; a scenario for a bronze cast is
+  still to come with `A-6`.

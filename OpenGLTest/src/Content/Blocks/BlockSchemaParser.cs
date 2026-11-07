@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using VoxelEngine.Content.Definitions;
@@ -196,15 +197,19 @@ internal static class BlockSchemaParser
     /// <summary>
     /// Reads a kiln anchor's <c>kiln</c> object into its <see cref="KilnProfile"/>: omitted
     /// fields take the plain kiln's (fuel cap 4, speed 1, no alloying), and a fuel cap or melt
-    /// speed <see cref="KilnProfile.Create"/> refuses throws naming the file. Null for a block
-    /// that is not a kiln.
+    /// speed <see cref="KilnProfile.Create"/> refuses throws naming the file. The layout is the
+    /// one of the anchor's <paramref name="multiblockSize"/> (<see cref="KilnLayout.ForSize"/>),
+    /// and a size no kiln model exists for throws too; a block with no multiblock (0) keeps the
+    /// default, since the renderer check refuses it anyway. Null for a block that is not a kiln.
     /// </summary>
-    internal static KilnProfile? ParseKiln(BlockDefinition.KilnDefinition? definition, string path)
+    internal static KilnProfile? ParseKiln(BlockDefinition.KilnDefinition? definition, string path,
+        int multiblockSize = MultiblockShape.DefaultSize)
     {
         if (definition == null) return null;
+        KilnProfile profile;
         try
         {
-            return KilnProfile.Create(
+            profile = KilnProfile.Create(
                 definition.FuelCap ?? KilnProfile.Default.FuelCap,
                 definition.MeltSpeed ?? KilnProfile.Default.MeltSpeed,
                 definition.CanAlloy ?? KilnProfile.Default.CanAlloy);
@@ -213,6 +218,12 @@ internal static class BlockSchemaParser
         {
             throw new InvalidOperationException($"Block '{path}' has a kiln object with {e.Message}", e);
         }
+
+        if (multiblockSize == 0) return profile;
+        var layout = KilnLayout.ForSize(multiblockSize)
+            ?? throw new InvalidOperationException(
+                $"Block '{path}' is a kiln of multiblock.size {multiblockSize}, but kiln models exist only for sizes {string.Join(", ", KilnLayout.All.Select(l => l.VolumeSize))}.");
+        return profile with { Layout = layout };
     }
 
     /// <summary>

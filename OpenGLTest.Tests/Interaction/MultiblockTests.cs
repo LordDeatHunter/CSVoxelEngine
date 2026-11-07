@@ -11,20 +11,20 @@ namespace VoxelEngine.Tests.Interaction;
 /// A multiblock lives in the chunk storage as an anchor plus its parts, with the facing and each
 /// part's offset packed into the state byte. These pin that encoding, the anchor resolve from
 /// every cell of the structure, the integrity check (including the "a cell is unloaded, so do
-/// not judge it" case) and the batch convert/revert writes, for the shipped 2x2x2 kiln and for a
-/// 3x3x3 structure.
+/// not judge it" case) and the batch convert/revert writes, for the shipped 2x2x2 kiln and the
+/// 3x3x3 alloy furnace, whose center cell is interior.
 /// </summary>
 public sealed class MultiblockTests
 {
     public MultiblockTests() => TestContent.EnsureLoaded();
 
     private static BlockType Kiln => ContentRegistry.RequireBlock("mud_brick_kiln");
-    private static BlockType Bricks => ContentRegistry.RequireBlock("mud_bricks");
+    private static BlockType Furnace => ContentRegistry.RequireBlock("alloy_furnace");
 
     /// <summary>
     /// A 3x3x3 anchor no shipped block is: the kiln's own anchor, part and source ids with a
-    /// bigger volume. Only the structure rules read it, and the resolve gets it through
-    /// <see cref="TypesWith"/> instead of the registry.
+    /// bigger volume. Only the structure rules read it; the resolve reads the registry, where
+    /// those ids are the 2x2x2 kiln's.
     /// </summary>
     private static BlockType SizeThree()
     {
@@ -42,17 +42,14 @@ public sealed class MultiblockTests
         return type;
     }
 
-    /// <summary>The registry's id table with <paramref name="anchorType"/> in its id's slot.</summary>
-    private static BlockType?[] TypesWith(BlockType anchorType)
-    {
-        var types = (BlockType?[])BlockType.ById.Clone();
-        types[anchorType.Id] = anchorType;
-        return types;
-    }
-
     public static TheoryData<int> Sizes => new() { 2, 3 };
 
-    private static BlockType AnchorOfSize(int size) => size == Kiln.MultiblockSize ? Kiln : SizeThree();
+    private static BlockType AnchorOfSize(int size) => size == Kiln.MultiblockSize ? Kiln : Furnace;
+
+    /// <summary>What a revert leaves in a cell of the volume that was not the mined one: the
+    /// source block on the shell, nothing in the interior.</summary>
+    private static byte RevertedId(BlockType anchorType, int dx, int dy, int dz) =>
+        Multiblock.IsInterior(dx, dy, dz, anchorType.MultiblockSize) ? (byte)0 : anchorType.MultiblockSourceId;
 
     private static (ChunkManager Manager, HashSet<Vector3> Touched) Converted(BlockType anchorType,
         Vector3 anchor, int facing)
@@ -125,7 +122,6 @@ public sealed class MultiblockTests
     public void ConvertWritesAnchorAndPartsAndResolveFindsTheAnchorFromEveryCell(int size)
     {
         var anchorType = AnchorOfSize(size);
-        var types = TypesWith(anchorType);
         var anchor = new Vector3(3, 3, 3);
         var (manager, touched) = Converted(anchorType, anchor, 2);
 
@@ -139,7 +135,7 @@ public sealed class MultiblockTests
             Assert.Equal(Multiblock.EncodeState(2, dx, dy, dz), state);
 
             // Every cell of the structure resolves back to the one anchor
-            Assert.True(Multiblock.TryResolveAnchor(manager, (int)cell.X, (int)cell.Y, (int)cell.Z, types,
+            Assert.True(Multiblock.TryResolveAnchor(manager, (int)cell.X, (int)cell.Y, (int)cell.Z,
                 out var resolved, out var facing, out var type));
             Assert.Equal(anchor, resolved);
             Assert.Equal(2, facing);
@@ -188,8 +184,9 @@ public sealed class MultiblockTests
         {
             var cell = anchor + new Vector3(dx, dy, dz);
             var (id, state) = Cell(manager, cell);
-            // The mined cell is the only hole; the rest are plain bricks again, state cleared
-            Assert.Equal(cell == mined ? (byte)0 : Bricks.Id, id);
+            // The mined cell and the interior are the only holes; the shell is plain bricks again,
+            // state cleared
+            Assert.Equal(cell == mined ? (byte)0 : RevertedId(anchorType, dx, dy, dz), id);
             Assert.Equal(0, state);
         }
 
@@ -201,7 +198,6 @@ public sealed class MultiblockTests
     public void IsIntactIsFalseAfterAPartIsBlasted(int size)
     {
         var anchorType = AnchorOfSize(size);
-        var types = TypesWith(anchorType);
         var anchor = new Vector3(3, 3, 3);
         var (manager, _) = Converted(anchorType, anchor, 1);
         var blasted = anchor + new Vector3(size - 1, size - 1, 0);
@@ -214,7 +210,7 @@ public sealed class MultiblockTests
 
         // The surviving parts still point at their anchor, which is what lets a sweep clean up
         var survivor = anchor + new Vector3(0, 0, size - 1);
-        Assert.True(Multiblock.TryResolveAnchor(manager, (int)survivor.X, (int)survivor.Y, (int)survivor.Z, types,
+        Assert.True(Multiblock.TryResolveAnchor(manager, (int)survivor.X, (int)survivor.Y, (int)survivor.Z,
             out var resolved, out _, out _));
         Assert.Equal(anchor, resolved);
 
@@ -225,7 +221,7 @@ public sealed class MultiblockTests
         {
             var cell = anchor + new Vector3(dx, dy, dz);
             var (id, state) = Cell(manager, cell);
-            Assert.Equal(cell == blasted ? (byte)0 : Bricks.Id, id);
+            Assert.Equal(cell == blasted ? (byte)0 : RevertedId(anchorType, dx, dy, dz), id);
             Assert.Equal(0, state);
         }
     }
@@ -235,7 +231,6 @@ public sealed class MultiblockTests
     public void RevertWithTheAnchorGoneRestoresEveryPart(int size)
     {
         var anchorType = AnchorOfSize(size);
-        var types = TypesWith(anchorType);
         var anchor = new Vector3(3, 3, 3);
         var (manager, _) = Converted(anchorType, anchor, 3);
         manager.Chunks[Vector3.Zero].SetBlockRaw((int)anchor.X, (int)anchor.Y, (int)anchor.Z, 0, 0);
@@ -243,7 +238,7 @@ public sealed class MultiblockTests
         // With the anchor gone a part has nothing to point at, so the parts alone can never
         // clean themselves up - the kiln manager's sweep is what calls Revert here
         var part = anchor + new Vector3(1, 0, 0);
-        Assert.False(Multiblock.TryResolveAnchor(manager, (int)part.X, (int)part.Y, (int)part.Z, types,
+        Assert.False(Multiblock.TryResolveAnchor(manager, (int)part.X, (int)part.Y, (int)part.Z,
             out _, out _, out _));
 
         var touched = new HashSet<Vector3>();
@@ -253,7 +248,7 @@ public sealed class MultiblockTests
         {
             var cell = anchor + new Vector3(dx, dy, dz);
             var (id, state) = Cell(manager, cell);
-            Assert.Equal(cell == anchor ? (byte)0 : Bricks.Id, id);
+            Assert.Equal(cell == anchor ? (byte)0 : RevertedId(anchorType, dx, dy, dz), id);
             Assert.Equal(0, state);
         }
     }

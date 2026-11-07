@@ -134,6 +134,28 @@ public sealed class MultiblockPlacementTests
     }
 
     [Fact]
+    public void AThreeCubeMayBeHollowButItsShellAndItsCenterTakeNothingForeign()
+    {
+        var cells = Cube();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+
+        // The center touches no face: empty or a brick, the cube converts either way
+        cells[(1, 1, 1)] = 0;
+        Assert.True(MultiblockPlacement.TryFindVolume(Reader(cells), Bricks, 3, new Vector3(1, 1, 2),
+            Vector3.UnitZ, -Vector3.UnitZ, out var anchor, out _));
+        Assert.Equal(Vector3.Zero, anchor);
+
+        // ...but nothing else there, and no hole in the shell
+        cells[(1, 1, 1)] = stone;
+        Assert.False(MultiblockPlacement.TryFindVolume(Reader(cells), Bricks, 3, new Vector3(1, 1, 2),
+            Vector3.UnitZ, -Vector3.UnitZ, out _, out _));
+        cells[(1, 1, 1)] = Bricks;
+        cells[(1, 2, 1)] = 0;
+        Assert.False(MultiblockPlacement.TryFindVolume(Reader(cells), Bricks, 3, new Vector3(1, 1, 2),
+            Vector3.UnitZ, -Vector3.UnitZ, out _, out _));
+    }
+
+    [Fact]
     public void AmongSeveralThreeCubesTheRightmostThenLowestWins()
     {
         // A 5 wide, 5 tall, 3 deep slab: from its center front cell nine 3x3x3 volumes fit, and

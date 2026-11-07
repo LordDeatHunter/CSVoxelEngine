@@ -488,25 +488,13 @@ internal static class ItemLoader
                 $"Item '{path}' has use.action 'plant_tree' with a use.fluid or use.block: the ground is read from the aimed cell.");
     }
 
+    // A converter names no structure: it presses whichever multiblock the clicked cube is the
+    // source of (each anchor's own multiblock.source), so it carries none of the use fields
     private static void ValidateConvertMultiblock(Item item, string path)
     {
-        var source = BlockType.ById[item.UseBlockId];
-        if (source == null)
+        if (item.UseBlockId != 0 || item.UseResultId != 0 || item.UseFluidId != 0)
             throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' but its use.block is not a block.");
-        var anchor = BlockType.ById[item.UseResultId];
-        if (anchor == null)
-            throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' but its use.result is not a block.");
-        if (anchor.Renderer != BlockRenderer.Multiblock)
-            throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' but block '{anchor.Name}' is not a multiblock anchor.");
-        if (anchor.MultiblockSourceId != item.UseBlockId)
-            throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' naming '{source.Name}' in use.block, but '{anchor.Name}' is built from '{BlockType.ById[anchor.MultiblockSourceId]?.Name}'.");
-        if (item.UseFluidId != 0)
-            throw new InvalidOperationException(
-                $"Item '{path}' has use.action 'convert_multiblock' with a use.fluid: that field belongs to the bucket actions.");
+                $"Item '{path}' has use.action 'convert_multiblock' with a use.block, use.result or use.fluid: a converter presses any multiblock built from the clicked cube, which each anchor's multiblock.source names.");
     }
 
     // The bucket actions: pour or scoop a fluid block, morphing into the use.result item.

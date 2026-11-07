@@ -1,15 +1,19 @@
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Items;
 
 /// <summary>
-/// Turns a hand-built cube (the anchor's <see cref="BlockType.MultiblockSize"/>) of <see cref="Item.UseBlockId"/> into the multiblock anchor
-/// named by <see cref="Item.UseResultId"/>: the aimed cell picks the volume (see
-/// <see cref="MultiblockPlacement.TryFindVolume"/>, which prefers the volume reaching farthest right,
-/// then farthest down, and points the structure's opening back at the player), and the world writes the
-/// anchor plus its parts.
+/// Presses a hand-built cube into the multiblock structure it is the source of: the item names no
+/// structure, so every multiblock anchor is tried in id order with its own source block and size
+/// (<see cref="BlockType.MultiblockSourceId"/>, <see cref="BlockType.MultiblockSize"/>), and the
+/// first whose volume the aimed cell belongs to is converted - 2x2x2 mud bricks into a kiln,
+/// 3x3x3 alloy bricks into an alloy furnace. The aimed cell picks the volume (see
+/// <see cref="MultiblockPlacement.TryFindVolume"/>, which prefers the volume reaching farthest
+/// right, then farthest down, and points the structure's opening back at the player), and the
+/// world writes the anchor plus its parts.
 ///
 /// The converter is an endless tool: it spends no durability, consumes no stack and never
 /// morphs, so one is enough forever.
@@ -20,13 +24,6 @@ public sealed class ConvertMultiblockItem : Item
     {
     }
 
-    /// <summary>
-    /// The base rule reads <c>UseResultId != 0</c> as "this is a tool", but a converter's
-    /// result is a <em>block</em> id, not the item it becomes. The converter is a plain endless
-    /// misc item, so it stacks and carries no tool instance.
-    /// </summary>
-    public override InventoryCategory StorageCategory => InventoryCategory.Misc;
-
     public override ItemUseResult OnUse(ItemUseContext ctx, ItemStack? stack)
     {
         var world = ctx.World;
@@ -34,8 +31,12 @@ public sealed class ConvertMultiblockItem : Item
             return ItemUseResult.Ignored;
 
         var cell = new Vector3((int)hit.X, (int)hit.Y, (int)hit.Z);
-        return world.TryConvertMultiblock(cell, normal, UseBlockId, UseResultId)
-            ? ItemUseResult.Succeed(null)
-            : ItemUseResult.Ignored;
+        foreach (var type in BlockType.ById)
+        {
+            if (type is not { Renderer: BlockRenderer.Multiblock }) continue;
+            if (world.TryConvertMultiblock(cell, normal, type.MultiblockSourceId, type.Id))
+                return ItemUseResult.Succeed(null);
+        }
+        return ItemUseResult.Ignored;
     }
 }
