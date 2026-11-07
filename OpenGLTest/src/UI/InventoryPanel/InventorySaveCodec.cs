@@ -27,7 +27,7 @@ internal static class InventorySaveCodec
     internal static readonly Type[] HandledComponentTypes =
     [
         typeof(DurabilityComponent), typeof(CrucibleComponent), typeof(DisplayNameComponent),
-        typeof(CooldownComponent), typeof(StaffComponent),
+        typeof(CooldownComponent), typeof(StaffComponent), typeof(ModifiersComponent),
     ];
 
     /// <inheritdoc cref="Inventory.Export"/>
@@ -72,6 +72,8 @@ internal static class InventorySaveCodec
                     slots.Add(spells.IsBound(i) ? spells.PartsAt(i).ToList() : null);
                 tool.Staff = new PlayerSaveData.StaffData { Slots = slots, Selected = spells.Selected };
             }
+            if (stack.Has<ModifiersComponent>())
+                tool.Rolled = ExportRolled(stack.Get<ModifiersComponent>());
             tool.CustomName = stack.Get<DisplayNameComponent>().CustomName;
             if (stack.Enchantments.Count > 0)
                 tool.Enchantments = new Dictionary<string, int>(stack.Enchantments, StringComparer.Ordinal);
@@ -210,6 +212,8 @@ internal static class InventorySaveCodec
                     stack.Set(CrucibleSaveCodec.Import(crucible, item.CrucibleCapacityMl, dropped));
                 if (item is StaffItem staffItem && tool.Staff is { } staffData)
                     RestoreStaff(stack, staffItem, staffData, tool.Name, dropped);
+                if (item is GearItem && tool.Rolled is { } rolled)
+                    RestoreRolled(stack, rolled, tool.Name, dropped);
                 if (tool.CustomName != null)
                     stack.Rename(tool.CustomName);
                 if (tool.Enchantments != null)
@@ -219,6 +223,37 @@ internal static class InventorySaveCodec
                 maxRestored = Math.Max(maxRestored, instanceId);
             }
         inventory.NextToolInstance = Math.Max(data.NextToolInstance ?? 1, maxRestored + 1);
+    }
+
+    private static PlayerSaveData.RolledData ExportRolled(ModifiersComponent rolled) => new()
+    {
+        Rarity = rolled.Rarity.ToString(),
+        Modifiers = rolled.Modifiers.Select(m => new PlayerSaveData.RolledModifierData
+            { Stat = m.Stat.ToString(), Value = m.Value }).ToList(),
+    };
+
+    // A saved roll is trusted no further than the rules allow: the rarity and every stat must still exist, and a
+    // value is clamped to what a roll of that stat can reach, so an edited file cannot mint an absurd piece
+    private static void RestoreRolled(ItemStack stack, PlayerSaveData.RolledData data, string? name, List<string> dropped)
+    {
+        if (!Rarities.TryParse(data.Rarity, out var rarity))
+        {
+            dropped.Add($"{name} rarity {data.Rarity}");
+            return;
+        }
+        var mods = new List<GearModifier>();
+        if (data.Modifiers != null)
+            foreach (var entry in data.Modifiers)
+            {
+                if (entry == null || !GearStats.TryParse(entry.Stat, out var stat) || !float.IsFinite(entry.Value))
+                {
+                    dropped.Add($"{name} modifier {entry?.Stat}");
+                    continue;
+                }
+                mods.Add(new GearModifier(stat, Math.Clamp(entry.Value, -GearRoller.MaxModifierValue(stat),
+                    GearRoller.MaxModifierValue(stat))));
+            }
+        stack.Set(new ModifiersComponent(rarity, mods.ToArray()));
     }
 
     // Re-binds each saved slot through the binding rules against this run's spell parts and the

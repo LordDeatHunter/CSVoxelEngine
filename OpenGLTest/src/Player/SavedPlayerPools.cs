@@ -23,7 +23,7 @@ internal static class SavedPlayerPools
             inventory.Import(data);
         KnownSpellParts.SizeMana(inventory, health.Mana);
         // Worn gear sizes the pools too, before the saved health and mana are clamped into them
-        health.ApplyGear(inventory.Equipment.Stats, simulatesMana: true);
+        health.ApplyGear(inventory.Equipment, simulatesMana: true);
         if (saved.Health is { } hp)
             health.Restore(hp);
         if (saved.Mana is { } mana)

@@ -1,8 +1,10 @@
+using System;
 using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering.Overlays;
+using VoxelEngine.Status;
 
 namespace VoxelEngine.Interaction;
 
@@ -37,7 +39,11 @@ internal sealed class MobStrikes
         var hits = mob.HitsTaken;
         mob.TakeDamage(damage);
         if (mob.HitsTaken != hits)
+        {
             striker?.NoteCombat();
+            // Worn gear's on-hit passives (a client never strikes a mob: its mobs are mirrors)
+            GearPassives.OnHit(striker, mob, Random.Shared.NextSingle);
+        }
         ShowLandedHit(mob, hits);
         SpawnHitSparks(mob, from);
         // A flyer is knocked away in 3D (up off a blow from below), a ground mob sideways

@@ -4,8 +4,10 @@ using VoxelEngine.Content;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
+using VoxelEngine.Data;
 using VoxelEngine.Rendering.Overlays;
 using VoxelEngine.UI.InventoryPanel;
+using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.UI.Hud;
 
@@ -19,9 +21,17 @@ namespace VoxelEngine.UI.Hud;
 public static class ItemTooltip
 {
     /// <summary>The lines for an id, with the stack when one is hovered (its durability left).</summary>
-    public static List<string> Lines(byte id, ItemStack? stack)
+    public static List<string> Lines(byte id, ItemStack? stack) => Lines(id, stack, null, out _);
+
+    /// <summary>
+    /// The lines for an id, and the colors of the lines that are not plain: <paramref name="colors"/> maps a line index
+    /// to its color (the title takes its rarity's, a set's active bonus is green and an inactive one dim); a line not in
+    /// it is drawn in the default. <paramref name="worn"/> is the wearer's equipment, which set progress counts.
+    /// </summary>
+    public static List<string> Lines(byte id, ItemStack? stack, Equipment? worn, out Dictionary<int, Rgba> colors)
     {
-        var lines = new List<string> { Inventory.DisplayName(id) };
+        colors = new Dictionary<int, Rgba>();
+        var lines = new List<string> { stack?.ResolvedName ?? Inventory.DisplayName(id) };
 
         if (BlockType.ById[id] is { } block)
         {
@@ -53,18 +63,46 @@ public static class ItemTooltip
         if (item is RestoreManaItem draught)
             lines.Add($"Restores {draught.Restores:P0} mana");
         if (item is GearItem gear)
-            AddGearLines(lines, gear);
+            AddGearLines(lines, colors, gear, stack, worn);
         return lines;
     }
 
-    /// <summary>The slot the piece fits (replacing the plain "Item" line), then what it changes.</summary>
-    private static void AddGearLines(List<string> lines, GearItem gear)
+    /// <summary>
+    /// The rarity and slot (replacing the plain "Item" line), what the piece changes (fixed, then rolled), the
+    /// effects it blocks, its passives and its set's progress with each bonus.
+    /// </summary>
+    private static void AddGearLines(List<string> lines, Dictionary<int, Rgba> colors, GearItem gear, ItemStack? stack,
+        Equipment? worn)
     {
-        lines[1] = GearSlots.Label(gear.Info.Slot);
+        var rarity = stack != null ? GearStatsCalculator.RarityOf(stack) : gear.Rarity;
+        colors[0] = Rarities.Color(rarity);
+        lines[1] = $"{Rarities.Label(rarity)} {GearSlots.Label(gear.Info.Slot)}";
         foreach (var modifier in gear.Info.Modifiers)
             lines.Add(GearText.Line(modifier));
+        if (stack != null && stack.Has<ModifiersComponent>())
+            foreach (var modifier in stack.Get<ModifiersComponent>().Modifiers)
+            {
+                colors[lines.Count] = Rarities.Color(rarity);
+                lines.Add(GearText.Line(modifier));
+            }
         if (gear.Info.Immune.Count > 0)
             lines.Add("Immune: " + string.Join(", ", gear.Info.Immune));
+        foreach (var passive in gear.Info.Passives)
+            lines.Add(GearText.Passive(passive));
+        if (gear.Info.SetName is { } setName && GearSetRegistry.TryGet(setName, out var set))
+            AddSetLines(lines, colors, set, worn);
+    }
+
+    private static void AddSetLines(List<string> lines, Dictionary<int, Rgba> colors, GearSet set, Equipment? worn)
+    {
+        var count = worn == null ? 0 : GearStatsCalculator.WornCount(set, worn.Worn());
+        colors[lines.Count] = Rarities.Color(Rarity.Uncommon);
+        lines.Add($"{set.DisplayName} set ({count}/{set.Members.Count})");
+        foreach (var bonus in set.Bonuses)
+        {
+            colors[lines.Count] = count >= bonus.Pieces ? Rarities.Color(Rarity.Uncommon) : TextDim;
+            lines.Add($"({bonus.Pieces}) " + string.Join(", ", bonus.Modifiers.Select(GearText.Line)));
+        }
     }
 
     /// <summary>The capacity and the vessel's fill, then one line per metal: its molten ml and

@@ -144,8 +144,9 @@ public sealed class GearTests
         foreach (var piece in pieces)
             inventory.Equipment.TryEquip((int)piece.Info.Slot, Own(inventory, piece));
 
-        var expected = pieces.Sum(p => p.Info.Modifiers.Where(m => m.Stat == GearStat.Armor).Sum(m => (int)m.Value));
-        Assert.Equal(System.Math.Min(expected, GearConfig.ArmorCap), inventory.Equipment.Stats.Armor);
+        // The pieces' own armor, plus whatever set bonuses the mix reaches, up to the cap
+        var pieceArmor = pieces.Sum(p => p.Info.Modifiers.Where(m => m.Stat == GearStat.Armor).Sum(m => (int)m.Value));
+        Assert.InRange(inventory.Equipment.Stats.Armor, System.Math.Min(pieceArmor, GearConfig.ArmorCap), GearConfig.ArmorCap);
 
         var huge = GearStats.None.With(GearStat.MaxHealth, 9999f).With(GearStat.MoveSpeed, 50f).With(GearStat.Armor, 999f);
         var clamped = huge.Clamped();

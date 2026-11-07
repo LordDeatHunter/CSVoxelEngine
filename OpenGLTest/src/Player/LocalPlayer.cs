@@ -177,9 +177,8 @@ internal sealed class LocalPlayer
     /// </summary>
     internal void ApplyGear(bool simulatesMana)
     {
-        var stats = Inventory.Equipment.Stats;
-        _health.ApplyGear(stats, simulatesMana);
-        Camera.GearMoveFactor = stats.MoveFactor;
+        _health.ApplyGear(Inventory.Equipment, simulatesMana);
+        Camera.GearMoveFactor = Inventory.Equipment.Stats.MoveFactor;
     }
 
     internal void EnsureSpawnSettled(ChunkManager chunkManager)

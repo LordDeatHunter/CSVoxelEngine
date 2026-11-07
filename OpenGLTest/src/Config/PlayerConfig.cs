@@ -121,4 +121,11 @@ public static class PlayerConfig
     public const float RegenDelaySeconds = 8f;
     public const float RegenPerSecond = 1.5f;
     public const float RegenSprintFactor = 0.25f;
+
+    // --- Armor (ArmorRules): a blow keeps at least this much through any armor, by what dealt it; a source
+    // with no entry keeps GearConfig.UniversalMinDamage. Drowning and magic (burning, frostburn) ignore armor. ---
+    public const int ArmorMinDamageMob = 2;
+    public const int ArmorMinDamageFall = 3;
+    public const int ArmorMinDamageLava = 3;
+    public const int ArmorMinDamageCactus = 1;
 }

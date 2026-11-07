@@ -2,7 +2,7 @@
 > Guide: plans/README.md
 
 ## Status
-Design settled with the user on 2026-11-07; `I-1` (gear core) is done. Tracks gear (armor and accessories with rarity and
+Design settled with the user on 2026-11-07; `I-1` (gear core) and `I-2` (armor, modifiers, rarity, sets) are done. Tracks gear (armor and accessories with rarity and
 rolled modifiers), chests and ruins that hold loot. One phase per prompt: implement it, update this file, stop.
 The gear tab, equipment panel and chest panel build on the UI kit from `plans/INVENTORY_UI.md` (U-1, U-2 first).
 
@@ -10,20 +10,6 @@ The gear tab, equipment panel and chest panel build on the UI kit from `plans/IN
 Nothing.
 
 ## Open
-
-### Phase 2: armor and modifiers
-- [ ] **`I-2` Armor math, immunity, modifiers, rarity and sets** - P1, L.
-  - [ ] armor: `damage = max(minDamage(source), hit - armor)`, `minDamage` per `DamageSource` in `PlayerConfig`, a
-    missing source uses the `universal` value (default 1); drowning and magic damage-over-time bypass it; lives in
-    `PlayerHealth.TakeDamage`; fix the source-less callers (`ServerPlayer` fall and cactus, `LocalPlayer` fall)
-  - [ ] effect immunity or resistance gated at `StatusEffectSet.Apply` (authoritative side only)
-  - [ ] passive triggers only, declared in data (on-hit, on-damaged, low-health); no ability key
-  - [ ] rarity tiers on items (common to legendary: color, tooltip, slot border, loot weight)
-  - [ ] `ModifiersComponent` (rarity plus immutable modifier id/value list) minted server-side, saved in `ToolData`;
-    crafted gear is fixed by material tier, only loot gear rolls; rolled items get a name prefix or suffix
-  - [ ] `assets/data/sets/<name>.json`: members and `[{pieces, modifiers}]`, same modifier vocabulary as gear
-  - [ ] tooltips for rarity, modifiers and set progress
-  **Hook:** `PlayerHealth.TakeDamage`, `StatusEffectSet`, `ItemStack`, `ItemTooltip`.
 
 ### Phase 3: visuals and wire
 - [ ] **`I-3` Armor and visible accessories on the player model** - P1, L. Per-part armor meshes drawn right after each
@@ -78,7 +64,20 @@ Nothing.
   `PlayerSaveData.InventoryData.Equipped`. UI: the Gear tab (rows marked "worn") and
   `EquipmentCardLayout`/`EquipmentCardRenderer`. Placeholder content: a leather and a bronze set and four
   accessories (`tools/generate-gear-textures.ps1`, `visual-examples/gear.json`); the leather set is crafted from
-  cotton for now. Passives, immunities and sets are parsed already; their rules are `I-2`.
+  cotton for now. - **What I-2 shipped.** Armor: `ArmorRules.Reduce` (`max(min(hit, minDamage(source)), hit - armor)`, per-source minimums
+  in `PlayerConfig.ArmorMinDamage*`, drowning, magic and a source-less blow bypass it) applied in
+  `PlayerHealth.TakeDamage(int, DamageSource, ...)`, with `ServerPlayer`'s fall and cactus now naming their source;
+  `PlayerHealth.Gear` is the worn `Equipment`. Immunity: `StatusEffectSet.ImmunityCheck` gates every apply (so the
+  spell, hell-bolt and passive paths all honor an item's `equip.immune`). Passives (`GearPassives`, no ability key):
+  `on_hit` through `MobStrikes.StrikeMob` onto the struck mob; `on_damaged` and `low_health` fire on the mobs
+  within `GearConfig.PassiveAuraRadiusBlocks` of the wearer from `MobDirector.FireWearerPassives` (singleplayer and
+  each server player; low health has a cooldown). Rarity: `Rarity`/`Rarities` (color, loot weight, `PickByWeight`).
+  Modifiers: `ModifiersComponent` on a gear stack (saved as `ToolData.Rolled`, clamped on restore), minted by the pure
+  `GearRoller.Roll(gear, rarity, seed)` and credited with `Inventory.AddRolledGear`; crafted gear never rolls. Sets:
+  `assets/data/sets/<name>.json` (`GearSetLoader`, `GearSetRegistry`; members are the items naming the set), summed by
+  `GearStatsCalculator`. Tooltip: rarity-colored title, rolled lines, immunities, passives and set progress
+  (`ItemTooltip.Lines(..., worn, out colors)`). Content: `ember_charm` (immune to burning, a 25% on-hit burning).
+  `GearRulesTests`.
 - **Decisions.** No durability on gear. Stats gear may change in v1: max health, max mana and mana regen, move speed,
   mining and attack speed and damage. Chest sizes come from block JSON. Gear uses a new pool because only the 8-slot
   Tools pool carries per-instance components today.

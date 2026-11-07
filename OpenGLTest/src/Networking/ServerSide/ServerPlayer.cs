@@ -281,7 +281,7 @@ public sealed class ServerPlayer : IMobTarget
             cushioned: PlayerBodyProbe.LandingCushioned(Position, chunks));
         if (fall > 0)
         {
-            Status.TakeDamage(fall);
+            Status.TakeDamage(fall, DamageSource.Fall);
             StatusDirty = true;
         }
     }
@@ -303,7 +303,7 @@ public sealed class ServerPlayer : IMobTarget
             return;
         }
         // Worn gear sizes the pools; a change marks the status dirty through the max checks below
-        Status.ApplyGear(Inventory.Equipment.Stats, simulatesMana: true);
+        Status.ApplyGear(Inventory.Equipment, simulatesMana: true);
         var before = Status.Health;
         var airBefore = Status.Breath.NetStep;
         var manaBefore = Status.Mana.NetMana;
@@ -350,7 +350,7 @@ public sealed class ServerPlayer : IMobTarget
             PlayerPhysics.PlayerRadius, PlayerPhysics.PlayerHeight, out var damage);
         var tick = ContactDamage.Tick(ref _contactTimer, dt, (int)damage, !(Creative || Flying));
         if (tick > 0)
-            Status.TakeDamage(tick);
+            Status.TakeDamage(tick, DamageSource.Cactus);
     }
 
     private float _contactTimer;

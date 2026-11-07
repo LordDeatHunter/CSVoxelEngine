@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.Input;
 using VoxelEngine.Content;
+using VoxelEngine.Data;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
@@ -63,7 +64,7 @@ internal sealed class InventoryPanelInput
     /// (or the tool instance it names) or a hotbar slot's, with the cursor as the anchor. Null
     /// when nothing hovers.
     /// </summary>
-    internal (Vector2 Anchor, List<string> Lines)? HoveredTooltip()
+    internal (Vector2 Anchor, List<string> Lines, IReadOnlyDictionary<int, Rgba> Colors)? HoveredTooltip()
     {
         if (!inventoryView.IsOpen || pauseMenuView.IsOpen || PointerWindow() is not { } position) return null;
         var inventory = ActiveWorld?.Inventory;
@@ -73,7 +74,9 @@ internal sealed class InventoryPanelInput
         if (HoveredRow(out var rowId, out var rowTool))
         {
             var stack = rowTool != 0 ? inventory.GetToolStack(rowTool) : null;
-            return (position, ItemTooltip.Lines(rowTool != 0 ? stack!.DefinitionId : rowId, stack));
+            var rowLines = ItemTooltip.Lines(rowTool != 0 ? stack!.DefinitionId : rowId, stack, inventory.Equipment,
+                out var rowColors);
+            return (position, rowLines, rowColors);
         }
 
         if (renderManager.Ui.Hud.HotbarSlotAt(position) is not { } slot || slot < 0 || inventory.IdAt(slot) == 0)
@@ -81,7 +84,8 @@ internal sealed class InventoryPanelInput
         {
             var tool = inventory.ToolInstanceAt(slot);
             var stack = tool != 0 ? inventory.GetToolStack(tool) : null;
-            return (position, ItemTooltip.Lines(inventory.IdAt(slot), stack));
+            var slotLines = ItemTooltip.Lines(inventory.IdAt(slot), stack, inventory.Equipment, out var slotColors);
+            return (position, slotLines, slotColors);
         }
     }
 

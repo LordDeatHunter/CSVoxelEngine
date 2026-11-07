@@ -174,6 +174,20 @@ public class Inventory
     }
 
     /// <summary>
+    /// Credits one piece of loot gear that rolled <paramref name="rolled"/> (see <see cref="GearRoller"/>): a new
+    /// gear instance carrying its rarity and modifiers and the name they earned. False for a non-gear id or a full
+    /// gear pool, in which case nothing is added.
+    /// </summary>
+    public bool AddRolledGear(byte id, in RolledGear rolled)
+    {
+        if (ItemRegistry.TryGet(id) is not GearItem gear || !Add(id)) return false;
+        var stack = _tools[^1];
+        stack.Set(rolled.Modifiers);
+        if (rolled.Name != gear.Name) stack.Rename(rolled.Name);
+        return true;
+    }
+
+    /// <summary>
     /// Morphs a tool instance into another item (a bucket scooped full, a water bucket
     /// poured out). Hotbar slots name the instance, so every slot holding it flips together.
     /// </summary>

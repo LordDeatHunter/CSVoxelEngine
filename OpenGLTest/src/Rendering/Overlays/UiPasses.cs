@@ -160,13 +160,14 @@ internal sealed class UiPasses
 
     /// <summary>Draws one hover tooltip (see <see cref="HudRenderer.DrawTooltip"/>), or nothing when
     /// the cursor hovers nothing.</summary>
-    internal void RenderTooltip(IWindow window, (Vector2 Anchor, IReadOnlyList<string> Lines)? tooltip)
+    internal void RenderTooltip(IWindow window,
+        (Vector2 Anchor, IReadOnlyList<string> Lines, IReadOnlyDictionary<int, Rgba> Colors)? tooltip)
     {
         if (tooltip is not { Lines.Count: > 0 } hover) return;
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
-        _owner.Ui.Hud.DrawTooltip(hover.Anchor, hover.Lines);
+        _owner.Ui.Hud.DrawTooltip(hover.Anchor, hover.Lines, hover.Colors);
         _owner.Ui.End();
         Units.InvalidateTextureUnits();
     }

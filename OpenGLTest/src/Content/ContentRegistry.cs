@@ -134,6 +134,7 @@ public static class ContentRegistry
         SpellPartLoader.LoadSpellParts(Path.Combine(assetsRoot, "data", "spell"));
         ItemLoader.ValidateItemUses(itemFiles);
         ItemLoader.ValidateGear();
+        GearSetLoader.LoadSets(Path.Combine(assetsRoot, "data", "sets"));
     }
 
     /// <summary>

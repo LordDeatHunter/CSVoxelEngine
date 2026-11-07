@@ -110,6 +110,27 @@ public sealed class PlayerSaveData
         public string? CustomName { get; set; }
 
         public Dictionary<string, int>? Enchantments { get; set; }
+
+        /// <summary>A gear instance's rarity and rolled modifiers; only written for gear that rolled any.</summary>
+        public RolledData? Rolled { get; set; }
+    }
+
+    /// <summary>What a piece of loot gear rolled: <see cref="ModifiersComponent"/> by name, never by id.</summary>
+    public sealed class RolledData
+    {
+        /// <summary>The rarity name (common to legendary).</summary>
+        public string? Rarity { get; set; }
+
+        /// <summary>The rolled modifiers.</summary>
+        public List<RolledModifierData>? Modifiers { get; set; }
+    }
+
+    /// <summary>One rolled modifier: a stat name and its value.</summary>
+    public sealed class RolledModifierData
+    {
+        public string? Stat { get; set; }
+
+        public float Value { get; set; }
     }
 
     /// <summary>What a crucible holds: <see cref="CrucibleComponent"/> by name, read and written by

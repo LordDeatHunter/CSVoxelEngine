@@ -164,7 +164,22 @@ internal sealed class MobDirector
             BillLocalPlayer(_skyMobs.DamageDealtThisFrame);
         }
 
+        FireWearerPassives((float)deltaTime);
         ApplyStatusBlockActions();
+    }
+
+    // The on-damaged and low-health passives of every worn set: the local player's in singleplayer, each connected
+    // player's on a server, firing on the mobs around them
+    private void FireWearerPassives(float deltaTime)
+    {
+        if (_serverMode)
+        {
+            var players = ServerPlayers;
+            for (var i = 0; i < players.Count; i++)
+                GearPassives.Retaliate(players[i].Status, players[i].Position, _mobs, deltaTime, Random.Shared.NextSingle);
+            return;
+        }
+        GearPassives.Retaliate(_health, Camera.Position, _mobs, deltaTime, Random.Shared.NextSingle);
     }
 
     // Singleplayer's pool takes what a manager dealt this frame (a server's players already took theirs

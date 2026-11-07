@@ -2,6 +2,7 @@ using System;
 using VoxelEngine.Config;
 using VoxelEngine.Items;
 using VoxelEngine.Status;
+using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Player;
 
@@ -30,15 +31,55 @@ public sealed class PlayerHealth
 
     private int _maxBonus;
 
+    /// <summary>What this player wears, set by <see cref="ApplyGear"/>; null until then. Armor, effect immunities and
+    /// passives read it live.</summary>
+    public Equipment? Gear { get; private set; }
+
+    /// <summary>The armor points worn right now.</summary>
+    public int Armor => Gear?.Stats.Armor ?? 0;
+
+    /// <summary>Whether worn gear makes this player immune to the named status effect.</summary>
+    public bool IsImmuneToEffect(string effectName) => Gear?.IsImmuneTo(effectName) == true;
+
+    /// <summary>Mob blows taken so far (after armor, above 0), a counter the mob director reads to know when to fire
+    /// the wearer's on-damaged passives.</summary>
+    public int MobBlows { get; private set; }
+
+    private int _blowsSeen;
+    private float _passiveCooldown;
+
+    /// <summary>Whether a mob blow landed since the last call (once per blow, then false): what fires the wearer's
+    /// on-damaged passives.</summary>
+    public bool ConsumeMobBlow()
+    {
+        if (_blowsSeen == MobBlows) return false;
+        _blowsSeen = MobBlows;
+        return true;
+    }
+
+    /// <summary>Whether a cooldown-gated passive (low health) may fire.</summary>
+    public bool PassiveReady => _passiveCooldown <= 0f;
+
+    /// <summary>Counts the passive cooldown down.</summary>
+    public void TickPassiveCooldown(float deltaTime) => _passiveCooldown = Math.Max(0f, _passiveCooldown - Math.Max(0f, deltaTime));
+
+    /// <summary>Starts the passive cooldown.</summary>
+    public void StartPassiveCooldown(float seconds) => _passiveCooldown = seconds;
+
+    public PlayerHealth() => Effects.ImmunityCheck = IsImmuneToEffect;
+
     /// <summary>
     /// Applies what worn gear changes: the health bonus, and (only where this pool is simulated, never on a
-    /// client that mirrors its server's mana) the mana bonus and regeneration.
+    /// client that mirrors its server's mana) the mana bonus and regeneration. Armor, immunities and passives follow
+    /// <paramref name="equipment"/> from here on.
     /// </summary>
-    public void ApplyGear(in GearStats gear, bool simulatesMana)
+    public void ApplyGear(Equipment equipment, bool simulatesMana)
     {
-        SetMaxBonus(gear.MaxHealth);
+        Gear = equipment;
+        var stats = equipment.Stats;
+        SetMaxBonus(stats.MaxHealth);
         if (simulatesMana)
-            Mana.SetGear(gear.MaxMana, gear.ManaRegenFactor);
+            Mana.SetGear(stats.MaxMana, stats.ManaRegenFactor);
     }
 
     /// <summary>The pool's size: <see cref="MaxHealth"/> plus what worn gear adds. The hearts scale to it.</summary>
@@ -146,11 +187,15 @@ public sealed class PlayerHealth
     public string? LastKiller { get; private set; }
 
     /// <summary>Like <see cref="TakeDamage(int)"/>, but names what dealt the blow so the death
-    /// message can say it.</summary>
+    /// message can say it, and worn armor reduces it (<see cref="ArmorRules"/>; the source-less overload is raw).</summary>
     public void TakeDamage(int amount, DamageSource source, string? killer = null)
     {
+        // Worn armor takes points off the blow, down to its source's minimum (see ArmorRules)
+        amount = ArmorRules.Reduce(amount, Armor, source);
         if (amount <= 0)
             return;
+        if (source == DamageSource.Mob)
+            MobBlows++;
         if (source != DamageSource.None)
         {
             LastSource = source;

@@ -13,6 +13,7 @@ $materials = @{
     leather = @{ Dark = (Tone 70, 44, 26);  Mid = (Tone 138, 92, 54);  Light = (Tone 182, 130, 82) }
     bronze  = @{ Dark = (Tone 92, 56, 24);  Mid = (Tone 190, 124, 52); Light = (Tone 236, 178, 96) }
     gem     = @{ Dark = (Tone 30, 70, 120); Mid = (Tone 70, 150, 220); Light = (Tone 180, 226, 255) }
+    ember   = @{ Dark = (Tone 110, 20, 10); Mid = (Tone 220, 70, 30); Light = (Tone 255, 170, 100) }
     gold    = @{ Dark = (Tone 120, 84, 12); Mid = (Tone 224, 176, 40); Light = (Tone 255, 230, 120) }
 }
 
@@ -67,6 +68,12 @@ New-Sprite 'amulet_of_vigor' {
     Rect 5 5 6 1 $g.Mid
     Block 3 6 10 9 $g
     Block 5 8 6 5 $e
+}
+New-Sprite 'ember_charm' {
+    $g = $materials.gold; $e = $materials.ember
+    Rect 5 1 1 5 $g.Dark; Rect 10 1 1 5 $g.Dark; Rect 6 5 4 1 $g.Dark
+    Block 4 6 8 8 $g
+    Block 6 8 4 4 $e
 }
 New-Sprite 'miners_belt' {
     $l = $materials.leather; $g = $materials.gold

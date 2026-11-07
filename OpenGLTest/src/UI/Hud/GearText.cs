@@ -35,6 +35,19 @@ public static class GearText
         return $"{sign}{amount} {Label(stat)}";
     }
 
+    /// <summary>A passive as a tooltip line: "On hit: burning (50%)".</summary>
+    public static string Passive(GearPassive passive)
+    {
+        var trigger = passive.Trigger switch
+        {
+            PassiveTrigger.OnHit => "On hit",
+            PassiveTrigger.OnDamaged => "When hurt",
+            _ => $"Under {passive.Below * 100f:0}% health",
+        };
+        var chance = passive.Chance < 1f ? $" ({passive.Chance * 100f:0}%)" : "";
+        return $"{trigger}: {passive.Effect}{chance}";
+    }
+
     /// <summary>The non-zero stats of a sum as lines, armor first.</summary>
     public static List<string> Lines(in GearStats stats)
     {

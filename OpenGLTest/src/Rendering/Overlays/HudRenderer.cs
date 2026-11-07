@@ -345,7 +345,7 @@ internal sealed class HudRenderer : IDisposable
     /// One hover tooltip (see <see cref="ItemTooltip"/>): a panel just below-right of the cursor
     /// with the hovered item's lines, clamped inside the canvas.
     /// </summary>
-    internal void DrawTooltip(Vector2 anchor, IReadOnlyList<string> lines)
+    internal void DrawTooltip(Vector2 anchor, IReadOnlyList<string> lines, IReadOnlyDictionary<int, Rgba>? colors = null)
     {
         if (_ui.Font == null || lines.Count == 0) return;
 
@@ -364,7 +364,7 @@ internal sealed class HudRenderer : IDisposable
         for (var i = 0; i < lines.Count; i++)
         {
             _ui.DrawText(lines[i], new Vector2(center.X - width * 0.5f + 12f, top + lineHeight * i),
-                _ui.CountScale, i == 0 ? Rgba.White : TextDim);
+                _ui.CountScale, colors != null && colors.TryGetValue(i, out var color) ? color : i == 0 ? Rgba.White : TextDim);
         }
     }
 

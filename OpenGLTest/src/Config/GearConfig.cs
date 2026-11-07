@@ -28,6 +28,18 @@ public static class GearConfig
     /// <summary>Armor points cap: a worn set can never reduce a blow by more than this.</summary>
     public const int ArmorCap = 60;
 
+    /// <summary>How many modifiers loot gear rolls at each rarity, common to legendary.</summary>
+    public static readonly int[] ModifiersPerRarity = [0, 1, 2, 3, 4];
+
+    /// <summary>Loot weight of each rarity, common to legendary: the rarer, the less likely.</summary>
+    public static readonly int[] LootWeightPerRarity = [60, 25, 10, 4, 1];
+
+    /// <summary>How far from the wearer an on-damaged or low-health passive reaches, in blocks.</summary>
+    public const float PassiveAuraRadiusBlocks = 5f;
+
+    /// <summary>Seconds a low-health passive waits after it fired.</summary>
+    public const float PassiveLowHealthCooldownSeconds = 8f;
+
     /// <summary>Minimum damage a blow keeps through armor when its source names no value of its own.</summary>
     public const int UniversalMinDamage = 1;
 }
