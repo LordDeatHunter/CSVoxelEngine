@@ -457,8 +457,9 @@ single-arc player.
   A loadable, placeable blueprint format (jigsaw or simple offsets) that `P-16`, `P-26`, `F-14`
   and `P-37` all build on. Prerequisite for all generated POIs.
 - [ ] **`M-16` · Loot table depth** — P2, M.
-  Conditions (biome, luck, tool), nested tables, guaranteed/weighted pools, and dungeon-tier
-  loot; generalizes the current pools.
+  Done: nested tables (`"table"` entries, cycles refused), a seedable `LootTable.Roll(ctx, list, Random)` and
+  `RollStacks`, gear entries with a rarity range, pools limited to a world-Y band (`minY`/`maxY`), and the four
+  `ruin_*` realm tables (`INVENTORY.md`). Left: biome, luck and held-tool conditions, and guaranteed pools.
 - [ ] **`M-17` · Spawner block / entity** — P2, M.
   A placeable spawner the dungeon and structure generators can seed; keyed by light/time and
   mob kind. Needed by `P-16`, `F-3`.

@@ -1,0 +1,28 @@
+{
+  // A ruined temple on a sky island: cloud shards, mana and scrolls, and the best gear (rare to legendary).
+  "pools": [
+    { "rolls": 1, "entries": [ { "table": "ruin_supplies" } ] },
+    {
+      "rolls": { "min": 1, "max": 3 },
+      "entries": [
+        { "item": "item/cloud_shard", "weight": 6, "count": { "min": 2, "max": 6 } },
+        { "item": "item/mana_draught", "weight": 4, "count": { "min": 1, "max": 2 } },
+        { "item": "item/scroll_frost", "weight": 2 },
+        { "item": "item/scroll_nature", "weight": 2 },
+        { "item": "item/scroll_modifiers", "weight": 2 }
+      ]
+    },
+    {
+      "chance": 0.7,
+      "rolls": 1,
+      "entries": [
+        { "item": "item/amulet_of_vigor", "weight": 3, "rarity": { "min": "rare", "max": "legendary" } },
+        { "item": "item/ember_charm", "weight": 2, "rarity": { "min": "rare", "max": "legendary" } },
+        { "item": "item/copper_ring", "weight": 2, "rarity": { "min": "rare", "max": "legendary" } },
+        { "item": "item/tin_charm", "weight": 2, "rarity": { "min": "rare", "max": "legendary" } },
+        { "item": "item/bronze_tunic", "rarity": { "min": "rare", "max": "legendary" } },
+        { "item": "item/bronze_cap", "rarity": { "min": "rare", "max": "legendary" } }
+      ]
+    }
+  ]
+}

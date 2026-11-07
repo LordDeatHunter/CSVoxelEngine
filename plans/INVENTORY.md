@@ -36,9 +36,8 @@ Nothing.
 
 ### Phase 5: ruins, loot and polish
 - [ ] **`I-5` Ruins with loot, inventory polish** - P2, L.
-  - [ ] seedable `LootTable.Roll(ctx, list, Random)` overload (the current one uses `Random.Shared`); ruin chests roll
-    lazily at first open from hash(cell, world seed), then persist; untouched chests are never saved
-  - [ ] loot tables per realm and rarity
+  - [ ] ruin chests roll lazily at first open from hash(cell, world seed) through the seedable `LootTable.RollStacks`
+    (done: the loot depth work, `ruin_*` tables), then persist; untouched chests are never saved
   - [ ] four per-cell hashed stamps, each with a `StampBand` and a `StampGateTests` row: surface (small broken
     stone/brick shells, biome-flavored), underground (small abandoned mining base in caves), hell (charred hellrock
     outposts), sky (ruined temples on island tops)
