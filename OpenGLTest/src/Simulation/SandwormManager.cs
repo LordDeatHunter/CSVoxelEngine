@@ -65,6 +65,18 @@ public sealed class SandwormManager : IMobPopulation
         return worm;
     }
 
+    /// <summary>A client mirror of the server worm first seen with its head at <paramref name="head"/> facing
+    /// <paramref name="facing"/> (radians): display-only, never judged against the one-alive rule, its chain laid
+    /// out behind it. Null for unregistered content or a full hard cap.</summary>
+    public Sandworm? SpawnMirror(Vector3 head, float facing)
+    {
+        if (_type == null || _caps.ForcedRoom <= 0) return null;
+        var worm = new Sandworm(_type, head, facing);
+        worm.MarkMirror();
+        _worms.Add(worm);
+        return worm;
+    }
+
     /// <summary>Whether a worm is alive (the summon item refuses a second).</summary>
     public bool HasLiving => LivingCount > 0;
 
@@ -94,12 +106,14 @@ public sealed class SandwormManager : IMobPopulation
         return true;
     }
 
-    /// <summary>Advances the death and spawn clocks without simulating (a client never ticks the AI).</summary>
-    public void AnimateMirrors(float deltaTime, BlockDebrisSystem? debris = null)
+    /// <summary>Advances every client mirror (a client never ticks the AI): the head dead-reckons along the
+    /// server's velocity and the chain follows, over the sand of <paramref name="chunks"/>; a mirror whose death
+    /// has played is dropped.</summary>
+    public void AnimateMirrors(float deltaTime, ChunkManager chunks)
     {
         for (var i = _worms.Count - 1; i >= 0; i--)
         {
-            _worms[i].AnimateMirror(deltaTime);
+            _worms[i].AnimateMirrorFrame(deltaTime, (x, z) => SandwormGround.At(chunks, x, z));
             if (_worms[i].IsRemovable) _worms.RemoveAt(i);
         }
     }

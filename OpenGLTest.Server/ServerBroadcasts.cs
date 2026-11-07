@@ -5,6 +5,7 @@ using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Networking;
@@ -61,7 +62,11 @@ internal sealed class ServerBroadcasts
         _entitySeen.Clear();
 
         using var writer = new PacketWriter(NetMessage.EntityList);
-        writer.Write(mobs.Count + drops.Count + primed.Count + falling.Count + icebergs.Count);
+        // A digging sandworm also sends the point it will surface at, one extra entry sharing its id
+        var wormTargets = 0;
+        for (var i = 0; i < mobs.Count; i++)
+            if (mobs[i] is Sandworm { Phase: SandwormPhase.Dig, Telegraph: > 0f }) wormTargets++;
+        writer.Write(mobs.Count + wormTargets + drops.Count + primed.Count + falling.Count + icebergs.Count);
         for (var i = 0; i < mobs.Count; i++)
         {
             var mob = mobs[i];
@@ -72,6 +77,7 @@ internal sealed class ServerBroadcasts
                 Cinderwitch => NetEntityKind.Cinderwitch,
                 Galeraptor => NetEntityKind.Galeraptor,
                 Cloudgolem => NetEntityKind.Cloudgolem,
+                Sandworm => NetEntityKind.Sandworm,
                 _ => NetEntityKind.Goblin,
             };
             // The int field is a goblin's ammo, a slime's size and a realm mob's attack count (NetEntity)
@@ -80,6 +86,7 @@ internal sealed class ServerBroadcasts
                 Goblin goblin => goblin.Ammo,
                 Slime slime => slime.Size,
                 RealmMob realm => realm.AttackCount,
+                Sandworm worm => (int)worm.Phase,
                 _ => 0,
             };
             // The byte field is a goblin's torch count (a slime carries none); every entry ends with a
@@ -87,6 +94,9 @@ internal sealed class ServerBroadcasts
             var torches = mob is Goblin torchGoblin ? (byte)torchGoblin.Torches : (byte)0;
             NetEntityCodec.Write(writer, new NetEntity(kind, IdFor(mob), mob.Position, mob.Facing, mob.Health, ammo,
                 torches, mob.Velocity, mob.Effects.Mask));
+            if (mob is Sandworm { Phase: SandwormPhase.Dig, Telegraph: > 0f } digging)
+                NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.SandwormTarget, IdFor(mob), digging.SurfacePoint, 0f,
+                    (int)MathF.Round(digging.Telegraph * 1000f), 0, 0, Vector3.Zero));
         }
 
         for (var i = 0; i < drops.Count; i++)

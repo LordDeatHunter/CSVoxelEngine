@@ -490,7 +490,7 @@ public class World
             RightClick = new RightClickAction(this, clientMode);
             Caster = new SpellCaster(this, clientMode);
             ClientMirror = new ClientMirror(this, _chunkManager, _dropManager, _tntManager, _falling, _slimes, _goblins, _hellMobs,
-                _skyMobs, _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
+                _skyMobs, _sandworms, _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
             Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _sandworms,
                 _icebergs, _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
@@ -870,6 +870,7 @@ public class World
         _goblins?.AnimateMirrors((float)deltaTime, _debris, _chunkManager, DayCycle.NightFactor(LightingTime));
         _hellMobs?.AnimateMirrors((float)deltaTime, _debris);
         _skyMobs?.AnimateMirrors((float)deltaTime, _debris);
+        _sandworms?.AnimateMirrors((float)deltaTime, _chunkManager);
         _tntManager.AnimateMirrors((float)deltaTime);
         Director.AnimateIcebergMirrors(deltaTime);
         Ambient.UpdateStatusParticles((float)deltaTime);

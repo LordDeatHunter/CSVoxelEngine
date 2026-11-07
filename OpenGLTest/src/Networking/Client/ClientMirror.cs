@@ -8,6 +8,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
+using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Interaction;
@@ -35,6 +36,7 @@ internal sealed class ClientMirror
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly SandwormManager? _sandworms;
     private readonly CampfireManager _campfires;
     private readonly QuernManager _querns;
     private readonly KilnManager _kilns;
@@ -53,7 +55,7 @@ internal sealed class ClientMirror
 
     internal ClientMirror(World world, ChunkManager chunkManager, DropManager dropManager, TntManager tntManager,
         FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, IcebergManager? icebergs,
+        SkyMobManager? skyMobs, SandwormManager? sandworms, IcebergManager? icebergs,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         BlockDebrisSystem debris, PlayerHealth health, List<RemotePlayer> remotePlayers, bool clientMode,
         bool serverMode)
@@ -67,6 +69,7 @@ internal sealed class ClientMirror
         _goblins = goblins;
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _sandworms = sandworms;
         _icebergs = icebergs;
         _campfires = campfires;
         _querns = querns;
@@ -177,6 +180,7 @@ internal sealed class ClientMirror
                 existing.Effects.SetMirrorMask(entry.Effects);
                 // A realm mob's attack count moving means the server started an attack: play its clip
                 if (existing is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
+                if (existing is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
                 if (!_serverMode && existing.Health < before)
                     Strikes.ShowDamageNumber(existing, before - existing.Health);
                 continue;
@@ -203,6 +207,8 @@ internal sealed class ClientMirror
                 Strikes.ShowDamageNumber(gone, gone.Health);
             RemoveNetMob(id);
         }
+
+        ApplySandwormTargets(entities);
 
         _dropManager.Clear();
         foreach (var netEntity in entities)
@@ -380,6 +386,24 @@ internal sealed class ClientMirror
             _health.Effects.SetMirrorMask(mask);
     }
 
+    // A worm's phase rides the ammo field; an out-of-range byte reads as the first phase
+    private static SandwormPhase PhaseOf(int ammo) =>
+        Enum.IsDefined((SandwormPhase)ammo) ? (SandwormPhase)ammo : SandwormPhase.Thump;
+
+    // The point each digging worm is about to surface at: a target entry shares its worm's id; a worm with none
+    // this snapshot has nothing to telegraph
+    private void ApplySandwormTargets(IReadOnlyList<NetEntity> entities)
+    {
+        foreach (var mob in _netMobs.Values)
+            if (mob is Sandworm worm) worm.ClearMirrorTarget();
+        foreach (var entry in entities)
+        {
+            if (entry.Kind != NetEntityKind.SandwormTarget) continue;
+            if (_netMobs.TryGetValue(entry.Id, out var mob) && mob is Sandworm worm)
+                worm.MirrorTarget(entry.Position, Math.Clamp(entry.Health / 1000f, 0f, 1f));
+        }
+    }
+
     // A slime mirror also has to be the reported size (the ammo field), since a size is fixed for life
     private static bool KindMatches(Mob mob, NetEntity entry) => entry.Kind switch
     {
@@ -389,6 +413,7 @@ internal sealed class ClientMirror
         NetEntityKind.Cinderwitch => mob is Cinderwitch,
         NetEntityKind.Galeraptor => mob is Galeraptor,
         NetEntityKind.Cloudgolem => mob is Cloudgolem,
+        NetEntityKind.Sandworm => mob is Sandworm,
         _ => false,
     };
 
@@ -405,12 +430,15 @@ internal sealed class ClientMirror
             // Likewise a sky mob's zone tier, from the column it is first seen over
             NetEntityKind.Galeraptor => _skyMobs?.Spawn(Galeraptor.EntityName, entry.Position),
             NetEntityKind.Cloudgolem => _skyMobs?.Spawn(Cloudgolem.EntityName, entry.Position),
+            // The boss mirrors with its chain laid behind its heading, then drags it after the head
+            NetEntityKind.Sandworm => _sandworms?.SpawnMirror(entry.Position, entry.Yaw),
             _ => null,
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
         mob?.Effects.SetMirrorMask(entry.Effects);
         // The first count only sets it: an attack already under way when first seen is not replayed
         if (mob is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
+        if (mob is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
         return mob;
     }
 
@@ -424,6 +452,7 @@ internal sealed class ClientMirror
             case Goblin goblin: _goblins?.Remove(goblin); break;
             case HellMob hellMob: _hellMobs?.Remove(hellMob); break;
             case SkyMob skyMob: _skyMobs?.Remove(skyMob); break;
+            case Sandworm sandworm: _sandworms?.Remove(sandworm); break;
         }
     }
 

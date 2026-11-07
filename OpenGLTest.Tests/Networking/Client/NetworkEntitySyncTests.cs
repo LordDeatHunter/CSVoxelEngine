@@ -5,6 +5,7 @@ using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Networking;
@@ -116,6 +117,56 @@ public sealed class NetworkEntitySyncTests : IDisposable
         ]);
         Assert.True(raptor.IsDying);
         Assert.True(golem.IsDying);
+    }
+
+    [Fact]
+    public void ASandwormMirrorsItsPhaseAndTargetAndDragsItsChainAfterTheHead()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+        var head = new Vector3(4f, 40f, 4f);
+        var target = new Vector3(20f, 66f, 4f);
+
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Sandworm, 5, head, 0.5f, 400, (int)SandwormPhase.Dig, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.SandwormTarget, 5, target, 0f, 750, 0, 0, Vector3.Zero),
+        ]);
+
+        var worm = Assert.Single(_world.Sandworms);
+        Assert.True(worm.IsMirror);
+        Assert.Equal(SandwormPhase.Dig, worm.Phase);
+        Assert.Equal(head, worm.Position);
+        Assert.Equal(400, worm.Health);
+        Assert.Equal(target, worm.SurfacePoint);
+        Assert.Equal(0.75f, worm.Telegraph, 3);
+        Assert.Contains(worm, _world.Mobs);
+
+        // Between snapshots the head dead-reckons along the server's velocity and the body is dragged after it
+        var velocity = new Vector3(8f, 0f, 0f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Sandworm, 5, head, 0.5f, 400, (int)SandwormPhase.Dig, 0, velocity),
+        ]);
+        var tailBefore = worm.Chain[worm.Chain.Count - 1];
+        for (var i = 0; i < 120; i++)
+            worm.AnimateMirrorFrame((float)Dt, (_, _) => (65f, true));
+        Assert.True(worm.Position.X > head.X + 10f);
+        Assert.True(worm.Chain[worm.Chain.Count - 1].X > tailBefore.X);
+        // No target entry this snapshot: nothing to telegraph
+        Assert.Equal(0f, worm.Telegraph);
+
+        // A phase change restarts the phase clock; the server dropping the worm plays its death
+        worm.MirrorPhase(SandwormPhase.Breach);
+        Assert.Equal(SandwormPhase.Breach, worm.Phase);
+        Assert.Equal(0f, worm.PhaseSeconds);
+        _world.ClientMirror.ApplyNetworkEntities([]);
+        Assert.True(worm.IsDying);
+    }
+
+    [Fact]
+    public void TheSandwormHeadIsAMobEntryAndItsTargetIsNot()
+    {
+        Assert.True(NetEntity.IsMob(NetEntityKind.Sandworm));
+        Assert.False(NetEntity.IsMob(NetEntityKind.SandwormTarget));
     }
 
     [Fact]

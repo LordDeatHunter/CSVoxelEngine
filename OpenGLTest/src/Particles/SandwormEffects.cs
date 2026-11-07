@@ -68,7 +68,7 @@ internal sealed class SandwormEffects
         switch (worm.Phase)
         {
             case SandwormPhase.Thump:
-                var rise = MathUtils.Clamp01(worm.Brain.PhaseSeconds / SandwormConfig.ThumpSeconds);
+                var rise = MathUtils.Clamp01(worm.PhaseSeconds / SandwormConfig.ThumpSeconds);
                 Churn(state, head.X, head.Z, rise, dt);
                 state.Pulse += dt;
                 if (state.Pulse >= SandwormConfig.ThumpPulseSeconds)
@@ -79,8 +79,8 @@ internal sealed class SandwormEffects
                 }
                 break;
             case SandwormPhase.Dig:
-                var point = worm.Brain.SurfacePoint;
-                if (worm.Brain.Telegraph > 0f) Churn(state, point.X, point.Z, worm.Brain.Telegraph, dt);
+                var point = worm.SurfacePoint;
+                if (worm.Telegraph > 0f) Churn(state, point.X, point.Z, worm.Telegraph, dt);
                 _camera.AddShake(SandwormEffectRules.HoldTrauma(SandwormEffectRules.QuakeTrauma(worm.Phase, distance), dt));
                 break;
             case SandwormPhase.Dash:

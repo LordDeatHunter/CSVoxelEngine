@@ -168,8 +168,11 @@ public static class NetFraming
     /// piece that player wears (0 for none), so others see it on the body; an older peer would misread every entry.
     /// 22: the iron works. <see cref="NetMessage.StationState"/> ends with the bloomeries and the anvils (after the
     /// cast molds), and <see cref="NetIntentKind.Hammer"/> works a bloom on an anvil; an older peer would misread the
-    /// station frames and refuse the intent as malformed.</summary>
-    public const int ProtocolVersion = 22;
+    /// station frames and refuse the intent as malformed.
+    /// 23: <see cref="NetEntityKind.Sandworm"/> (the boss: a mob entry for its head, its phase in the ammo field) and
+    /// <see cref="NetEntityKind.SandwormTarget"/> (the point it is about to surface at); an older client would not
+    /// draw it.</summary>
+    public const int ProtocolVersion = 23;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

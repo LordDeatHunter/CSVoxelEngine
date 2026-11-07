@@ -10,6 +10,7 @@ using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
+using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Content.Spells;
@@ -1205,6 +1206,44 @@ public sealed class GameServerTests : IDisposable
             mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
             Assert.Equal(flyer.Position.Y, Assert.Single(mirror.SkyMobs, m => m is Galeraptor).Position.Y);
             Assert.Single(mirror.SkyMobs, m => m is Cloudgolem);
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    [Fact]
+    public void ASandwormReachesTheClientsEntityListWithItsPhaseAndItsMirrorFollowsIt()
+    {
+        using var client = Connect("Watcher");
+        var spawn = client.Server!.Value.Spawn;
+        var feet = spawn - new Vector3(0f, Camera.EyeHeight, 0f);
+        Assert.True(_world.SpawnEntity(Sandworm.EntityName, feet + new Vector3(10f, 0f, 0f)));
+        var worm = Assert.Single(_world.Sandworms);
+
+        var inbox = InboxOf(client);
+        var sw = Stopwatch.StartNew();
+        while (sw.Elapsed.TotalSeconds < 5 && inbox.Entities?.Exists(e => e.Kind == NetEntityKind.Sandworm) != true)
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+            DrainAll();
+        }
+
+        var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.Sandworm);
+        Assert.Equal(worm.Position, carried.Position);
+        Assert.Equal((int)worm.Phase, carried.Ammo);
+
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            var copy = Assert.Single(mirror.Sandworms);
+            Assert.True(copy.IsMirror);
+            Assert.Equal(worm.Phase, copy.Phase);
+            Assert.Equal(worm.Position, copy.Position);
         }
         finally
         {

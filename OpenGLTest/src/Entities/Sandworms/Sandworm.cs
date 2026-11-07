@@ -21,6 +21,15 @@ public sealed class Sandworm : Mob
     private readonly bool[] _visible = new bool[SandwormConfig.SegmentCount];
     private float _contactCooldown;
 
+    // A client mirror never runs the brain: it replays what the server sends (the phase, the head velocity it
+    // dead-reckons along and the point the worm is about to surface at) and drags its own chain after the head
+    private bool _mirror;
+    private SandwormPhase _mirrorPhase = SandwormPhase.Thump;
+    private float _mirrorPhaseSeconds;
+    private Vector3 _mirrorVelocity;
+    private Vector3 _mirrorSurface;
+    private float _mirrorTelegraph;
+
     /// <param name="type">The sandworm entity type.</param>
     /// <param name="head">The head's starting center (under the sand for a fresh worm).</param>
     /// <param name="heading">Initial yaw in radians.</param>
@@ -38,8 +47,41 @@ public sealed class Sandworm : Mob
     /// <summary>The brain driving the head.</summary>
     public SandwormBrain Brain { get; }
 
-    /// <summary>The current phase.</summary>
-    public SandwormPhase Phase => Brain.Phase;
+    /// <summary>The current phase (the server's, on a client mirror).</summary>
+    public SandwormPhase Phase => _mirror ? _mirrorPhase : Brain.Phase;
+
+    /// <summary>Seconds spent in the current phase.</summary>
+    public float PhaseSeconds => _mirror ? _mirrorPhaseSeconds : Brain.PhaseSeconds;
+
+    /// <summary>How close the worm is to surfacing, 0..1: what the sand telegraph reads.</summary>
+    public float Telegraph => _mirror ? _mirrorTelegraph : Brain.Telegraph;
+
+    /// <summary>Where the worm is heading to surface, while digging.</summary>
+    public Vector3 SurfacePoint => _mirror ? _mirrorSurface : Brain.SurfacePoint;
+
+    /// <summary>Whether this worm is a client's display-only copy of the server's.</summary>
+    public bool IsMirror => _mirror;
+
+    /// <summary>Makes this worm a client mirror: its phase and target come from the server, never its brain.</summary>
+    internal void MarkMirror() => _mirror = true;
+
+    /// <summary>A mirror takes the server's phase (a change restarts the phase clock).</summary>
+    internal void MirrorPhase(SandwormPhase phase)
+    {
+        if (phase == _mirrorPhase) return;
+        _mirrorPhase = phase;
+        _mirrorPhaseSeconds = 0f;
+    }
+
+    /// <summary>A mirror takes the point the server says the worm will surface at, and how near it is (0..1).</summary>
+    internal void MirrorTarget(Vector3 point, float telegraph)
+    {
+        _mirrorSurface = point;
+        _mirrorTelegraph = telegraph;
+    }
+
+    /// <summary>A mirror forgets the surfacing point (the server sends one only while the worm digs toward it).</summary>
+    internal void ClearMirrorTarget() => _mirrorTelegraph = 0f;
 
     /// <inheritdoc />
     public override float BodyHalfExtent => SandwormConfig.HeadRadiusBlocks;
@@ -54,12 +96,14 @@ public sealed class Sandworm : Mob
     public override float DeathSeconds => SandwormConfig.DeathSeconds;
 
     /// <inheritdoc />
-    public override Vector3 Velocity => Brain.Velocity;
+    public override Vector3 Velocity => _mirror ? _mirrorVelocity : Brain.Velocity;
 
     /// <inheritdoc />
     protected override void SetVelocity(Vector3 velocity)
     {
-        // The brain owns the head's motion; a restore only puts back health and facing
+        // The brain owns the head's motion; a restore only puts back health and facing, and a mirror
+        // keeps the velocity the server sent
+        if (_mirror) _mirrorVelocity = velocity;
     }
 
     /// <summary>A boss is never knocked about by a blow.</summary>
@@ -87,7 +131,7 @@ public sealed class Sandworm : Mob
     public override void AnimateMirror(float deltaTime)
     {
         base.AnimateMirror(deltaTime);
-        var open = IsDying || Brain.Phase is SandwormPhase.Breach or SandwormPhase.Air or SandwormPhase.Dash;
+        var open = IsDying || Phase is SandwormPhase.Breach or SandwormPhase.Air or SandwormPhase.Dash;
         JawOpen = MathUtils.Damp(JawOpen, open ? SandwormConfig.JawOpenRadians : SandwormConfig.JawClosedRadians,
             SandwormConfig.JawEaseRate, deltaTime);
     }
@@ -114,6 +158,24 @@ public sealed class Sandworm : Mob
             Brain.Update(deltaTime, new SandwormSenses(Position, target, surface, onSand));
             Position += Brain.Velocity * deltaTime;
             Facing = Brain.Heading;
+            Chain.Follow(Position);
+        }
+
+        RefreshExposure(groundAt);
+    }
+
+    /// <summary>
+    /// Advances a client mirror one frame: its life clocks and jaw, the head dead-reckoned along the server's
+    /// velocity (a snapshot snaps it back), the chain dragged after it and the exposed segments refreshed
+    /// over the sand <paramref name="groundAt"/> describes. A dying mirror only plays its death.
+    /// </summary>
+    public void AnimateMirrorFrame(float deltaTime, Func<float, float, (float SurfaceY, bool OnSand)> groundAt)
+    {
+        AnimateMirror(deltaTime);
+        _mirrorPhaseSeconds += deltaTime;
+        if (!IsDying)
+        {
+            Position += _mirrorVelocity * deltaTime;
             Chain.Follow(Position);
         }
 

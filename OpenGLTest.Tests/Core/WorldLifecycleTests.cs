@@ -7,6 +7,7 @@ using System.Numerics;
 using System.Threading;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
@@ -260,6 +261,36 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(slot, second.Inventory.SlotAt(0));
         Assert.True(second.SaveAndDispose());
         Assert.False(WorldSeed.WorldIsLive);
+    }
+
+    [Fact]
+    public void ASandwormRoundTripsThroughSaveAndReloadAndResumesTheHunt()
+    {
+        WritePlayerFile(new PlayerSaveData { Position = [0f, High, 0f] });
+
+        var first = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(first, () => first.IsLoaded, LoadWallSeconds), "the first world did not finish loading");
+        Assert.True(first.SpawnEntity(Sandworm.EntityName, new Vector3(2f, High - 1f, 2f)));
+        var worm = Assert.Single(first.Sandworms);
+        Assert.Equal(SandwormPhase.Thump, worm.Phase);
+        var head = worm.Position;
+        var wounded = worm.MaxHealth - 40;
+        worm.RestoreState(wounded, 0.5f, Vector3.Zero);
+        Assert.True(first.SaveAndDispose());
+
+        var second = NewWorld(new ChunkSaveStore(_dir));
+        Assert.True(RunUntil(second, () => second.IsLoaded, LoadWallSeconds), "the second world did not finish loading");
+
+        // The worm burrows under the surface, far under the spawn bubble, so it waits for its chunk like any saved mob
+        Assert.True(RunUntil(second, () => second.Sandworms.Count > 0, LoadWallSeconds), "the worm was not restored");
+
+        // Back where it was with its wounds, and already hunting: a restore never thumps a second time
+        var restored = Assert.Single(second.Sandworms);
+        Assert.Equal(head, restored.Position);
+        Assert.Equal(wounded, restored.Health);
+        Assert.NotEqual(SandwormPhase.Thump, restored.Phase);
+        Assert.Contains(restored, second.Mobs);
+        Assert.True(second.SaveAndDispose());
     }
 
     [Fact]

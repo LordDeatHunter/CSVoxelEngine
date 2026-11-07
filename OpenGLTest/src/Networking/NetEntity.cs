@@ -18,6 +18,8 @@ public enum NetEntityKind : byte
     Cinderwitch = 8,
     Galeraptor = 9,
     Cloudgolem = 10,
+    Sandworm = 11,
+    SandwormTarget = 12,
 }
 
 /// <summary>
@@ -28,6 +30,11 @@ public enum NetEntityKind : byte
 /// attack count (<c>RealmMob.AttackCount</c>: a client's mirror plays its attack clip whenever the count moves,
 /// and an older server's 0 never moves it); a drop uses
 /// <see cref="ItemId"/>.
+/// A sandworm is a mob entry for its head (<see cref="Position"/>, <see cref="Yaw"/> its heading, <see cref="Velocity"/> the
+/// head velocity a client dead-reckons along) whose <see cref="Ammo"/> is its phase (<c>SandwormPhase</c>); its body is
+/// not on the wire, since the client drags its own chain after the head. While it digs toward a surfacing point a
+/// <see cref="NetEntityKind.SandwormTarget"/> entry with the worm's id follows its head: <see cref="Position"/> the
+/// point and <see cref="Health"/> how near it is in thousandths (the sand telegraph).
 /// A primed TNT uses <see cref="ItemId"/> (the block that primed), <see cref="Health"/> (the fuse
 /// remaining, in milliseconds) and <see cref="Ammo"/> (the whole fuse, in milliseconds); a falling
 /// block uses <see cref="ItemId"/> (the block that toppled). An iceberg uses <see cref="Position"/>
@@ -46,7 +53,7 @@ public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Posi
     /// the client's mob reconcile spawns; drops, primed TNT and falling blocks are mirrored apart.</summary>
     public static bool IsMob(NetEntityKind kind) =>
         kind is NetEntityKind.Slime or NetEntityKind.Goblin or NetEntityKind.Hellbrute or NetEntityKind.Cinderwitch
-            or NetEntityKind.Galeraptor or NetEntityKind.Cloudgolem;
+            or NetEntityKind.Galeraptor or NetEntityKind.Cloudgolem or NetEntityKind.Sandworm;
 
     // An iceberg's scale in thousandths fills the low 16 bits of Ammo, its sinking (0..255) the next 8
     private const float IcebergScaleUnits = 1000f;

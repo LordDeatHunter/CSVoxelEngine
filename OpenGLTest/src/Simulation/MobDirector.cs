@@ -359,9 +359,9 @@ internal sealed class MobDirector
         }
         if (string.Equals(name, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase) && _sandworms != null)
         {
-            // A scenario worm starts burrowed under the surface at the given spot
-            var surface = SandwormGround.At(_chunkManager, feet.X, feet.Z).SurfaceY;
-            if (_sandworms.Spawn(new Vector3(feet.X, surface - SandwormConfig.BurrowDepthBlocks, feet.Z)) == null)
+            // A scenario worm starts burrowed, its head one burrow depth under the given feet (the surface
+            // point it will rise at: the terrain top for the [x, z] form of the spawn op)
+            if (_sandworms.Spawn(new Vector3(feet.X, feet.Y - SandwormConfig.BurrowDepthBlocks, feet.Z)) == null)
                 return false;
             RefreshMobs();
             return true;
