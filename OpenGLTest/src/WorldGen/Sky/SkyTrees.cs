@@ -59,9 +59,9 @@ internal static class SkyTrees
     internal static void Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         if (!WriteBand().Reaches(worldY0)) return;
-        // A cell far from every zone pays only the island collection's cheap zone gate
+        // A chunk no island reaches holds no tree root
         if (SkyIslands.CollectIslands(worldX0, worldZ0, worldX0 + Chunk.Size - 1, worldZ0 + Chunk.Size - 1,
-                stackalloc SkyIsland[16]) == 0)
+                stackalloc SkyIsland[SkyIslands.MaxIslandsPerBox]) == 0)
             return;
 
         var yTop = worldY0 + Chunk.Size - 1;

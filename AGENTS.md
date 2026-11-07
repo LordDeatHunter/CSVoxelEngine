@@ -2208,8 +2208,9 @@ OpenGLTest/
         SkyTrees.cs            # sky trees: one per 16x16 cell rooted on an island's plain top, a pure function grown
                                #   in a SkyTreeSpace and cached (the twelfth GenerationalCache), stamped after the islands
         SkyTreeSpace.cs        # the ITreeSpace a sky tree grows in: its own cell's columns, the band's open sky only
-        SkyIslands.cs          # where the islands are: hashed zones (ZoneAt, TryGetZone, tiers) with wide gaps, hashed
-                               #   islands inside them (TryGetIsland, CollectIslands); the outline/top/stalactite noises
+        SkyIslands.cs          # where the islands are: hashed zones (ZoneAt, TryGetZone, tiers), hashed islands everywhere
+                               #   in the band, denser inside zones (TryGetIsland, CollectIslands, MaxIslandsPerBox); the
+                               #   outline/top/stalactite noises
         SkyZone.cs             # the zone at a point: weight, tier (bigger is rarer; L-15 spawns by it), radius, center
       WorldgenStats.cs         # lock-free worldgen timing from the generation workers and
                                #   the LOD builder, drained once a second by FrameProfiler
@@ -2808,18 +2809,20 @@ realms exist only in full-detail chunks), so they show within the load sphere (2
 eye). `CloudPatchTests`, `StampGateTests`; `visual-examples/clouds-solid.json` (`VOXEL_TIME=147`).
 The shape is `WorldGen/Sky/CloudLayer.cs`, which the cloud sea below shares.
 
-**Sky islands** (`WorldGen/Sky/`, plans/LAYERS.md `L-12`, tuning in `SkyIslandConfig`) float in the band
-`SkyIslandBottomY..SkyIslandTopY` (320..420) inside **zones**: one hashed candidate per `ZoneCellBlocks`
-cell (`TerrainSites.TryRoll`, salt "SKYZ"), its radius (`ZoneMinRadius..ZoneMaxRadius`) rolled with a
-size skewed small, kept `ZoneGapBlocks` clear of every lower-hash raw neighbor roll
-(`TerrainSites.YieldsToSizedNeighbor`, radius plus radius plus gap), so gaps of open
-sky still lie between zones (about 30 % of the sky is zone, and the landmasses cover more). The outline wobbles inward (noise offset
-168) and the weight is 1 in the core (`ZoneCoreShare`) easing to 0 at the outline.
-`SkyIslands.ZoneAt(x, z)` is the pure query the sky spawner of `L-15` reads: a `SkyZone` with that
-weight and a `Tier` (0 small, 1 medium, 2 big, from the rolled size by `ZoneMediumSize` /
-`ZoneLargeSize`; bigger is rarer, and the big zones hold the hardest mobs). **Islands** are one hashed
-candidate per `IslandCellBlocks` cell (salt "SKYI"), accepted when the zone weight at its center beats
-a roll (so they thin toward a zone's rim) and kept `IslandGapBlocks` clear of lower-hash neighbors, so
+**Sky islands** (`WorldGen/Sky/`, plans/LAYERS.md `L-12`, tuning in `SkyIslandConfig`) float everywhere in
+the band `SkyIslandBottomY..SkyIslandTopY` (320..420) and crowd closer together inside **zones**: one hashed
+candidate per `ZoneCellBlocks` cell (`TerrainSites.TryRoll`, salt "SKYZ"), its radius
+(`ZoneMinRadius..ZoneMaxRadius`) rolled with a size skewed small, kept `ZoneGapBlocks` clear of every
+lower-hash raw neighbor roll (`TerrainSites.YieldsToSizedNeighbor`, radius plus radius plus gap). The
+outline wobbles inward (noise offset 168) and the weight is 1 in the core (`ZoneCoreShare`) easing to 0 at
+the outline. `SkyIslands.ZoneAt(x, z)` is the pure query the sky spawner of `L-15` reads (sky mobs spawn
+only inside zones): a `SkyZone` with that weight and a `Tier` (0 small, 1 medium, 2 big, from the rolled
+size by `ZoneMediumSize` / `ZoneLargeSize`; bigger is rarer, and the big zones hold the hardest mobs).
+**Islands** are one hashed candidate per `IslandCellBlocks` cell (salt "SKYI") anywhere in the band,
+accepted when max(`IslandOpenSkyWeight`, the zone weight at its center) beats a roll (the zone is only
+asked when the roll is above the floor), so a flying player always has several within the 256-block load
+radius (about ten on average, more in a zone core; `SkyIslandTests.AFlyingPlayerAlwaysHasSeveralIslandsInView`)
+and a zone is a denser cluster on top. An island is kept `IslandGapBlocks` clear of lower-hash neighbors, so
 two islands never touch and at most one holds a column (`SkyIslands.TryGetIsland`). Each rolls a
 radius, an underside depth per radius and a base height chosen so its whole body stays in the band.
 `SkyIslandGenerator.TryGetColumn(island, x, z)` is the column rule: inside the wobbled outline
@@ -2830,10 +2833,11 @@ where offset 171 is high. The blocks come from the island's sky biome's `SkyIsla
 biomes" below), read once per island in the stamp. The meadow's grass is biome-tinted by the climate of
 the ground column below it. An island's base is rolled to leave `IslandFloraHeadroom` over its top for
 its plants and trees and `SkyVineMaxLength` under its stalactites for its vines, all inside the band. The stamp collects the
-few islands reaching the chunk once (`SkyIslands.CollectIslands`, after a cheap gate that no zone is
-near, so open sky costs a few hash rolls), then asks each column the same rule `BlockAt` asks: the point
-query equals the stamp across seams, a chunk reads no neighbor and nothing is cached. Islands write
-into air only.
+few islands reaching the chunk once (`SkyIslands.CollectIslands`: the landmasses, then the 2 x 2 island
+cells at most that reach any box up to the sky ruin box, so every caller's stack buffer is
+`SkyIslands.MaxIslandsPerBox` long; `IslandCellBlocks` must stay above 2 * (`IslandMaxRadius` + 1) plus that
+box's 34 blocks), then asks each column the same rule `BlockAt` asks: the point query equals the stamp
+across seams, a chunk reads no neighbor and nothing is cached. Islands write into air only.
 
 **Sky landmasses** (`WorldGen/Sky/SkyLandmasses.cs`, `SkyIslandConfig.Landmass*`, seed offsets 175-178) are whole
 floating continents beside the ordinary islands: one hashed candidate per `LandmassCellBlocks` (4200) cell
@@ -2846,8 +2850,14 @@ sampled so one wave spans its length), so the coast bends and cuts bays, then ro
 the top rolls over low hills (noise 177) easing down to the coast over `LandmassTopRamp`, the underside is a shallow keel
 (noise 178) that thickens over `LandmassKeelRamp` blocks with the islands' stalactites, always inside the band (the base roll
 leaves the flora headroom and vine room). Its biome changes along its length (`SkyBiomes.OfColumn`), an ordinary island stays
-whole. No ordinary island stands within a landmass's bounding disc (`OverlapsDisc`), and `ZoneAt` reports a landmass as its own
-zone (tier by radius). Around it lies a **fringe** (`LandmassFringeShare` of its radius, at most `LandmassFringeMaxBlocks`) whose zone weight eases from 1 to 0, so the ordinary island roll scatters broken-off islands there (`SkyLandmasses.TryFindInfluence`, `AnyNear`). Archipelago zones are three times the old size (cell 1200, radius 510-1320) and hold roughly ten islands (`IslandCellBlocks` 240, `IslandChance` 0.8). A ruin sits only where an island's center column is land, so most landmasses hold none.
+whole. No ordinary island touches a landmass's land (`SkyLandmasses.TouchesLand`: a conservative closed-form reject
+against the ellipse grown by the warp and the island's reach first, then the landmass column rule sampled at the island's
+center and round its perimeter every `LandmassClearanceSampleBlocks`), so islands fill its bays and the open sky of its
+bounding disc; `ZoneAt` reports a landmass as its own zone (tier by radius). Around it lies a **fringe**
+(`LandmassFringeShare` of its radius, at most `LandmassFringeMaxBlocks`) whose zone weight eases from 1 to 0, so the
+ordinary island roll scatters broken-off islands there more densely (`SkyLandmasses.TryFindInfluence`). Archipelago zones
+are three times the old size (cell 1200, radius 510-1320). A ruin sits only where an island's center column is land, so
+most landmasses hold none.
 `SkyLandmassTests`; `visual-examples/sky-landmass.json` (`VOXEL_TIME=147`).
 
 **The cloud sea** (`CloudSeaGenerator`, offsets 172-173) is a second, thick `CloudLayer` of the same
@@ -2860,9 +2870,11 @@ LOD draws none, so it pops in within the load sphere), and the ground's sun ligh
 seeds from the heightmap, so neither casts voxel shade). Mobs never spawn on either: the surface ring
 search reads the heightmap, and the cave search keeps to cells under their column's surface; the spawn
 settle and `World.TryGroundHeight` read the heightmap too. Measured with `WorldgenCostProbe`'s
-`skyIsland` and `cloudSea` classes: a sky-island chunk 0.03 ms warm (the stamp), a cloud-sea chunk 0.05
-ms warm; cold both are dominated by the column-cache neighborhood scan every chunk pays.
-`SkyIslandTests`, `StampGateTests`; `visual-examples/sky-islands.json` (`VOXEL_TIME=147`).
+`skyIsland` and `cloudSea` classes: a sky-island chunk about 0.14 ms warm with its flora, trees and ruins (the
+island stamp 0.10 ms), a cloud-sea chunk 0.05-0.1 ms warm; cold both are dominated by the column-cache
+neighborhood scan every chunk pays (plans/PERF.md). `SkyIslandTests`, `StampGateTests`;
+`visual-examples/sky-islands.json` and `sky-density.json` (both `VOXEL_TIME=147`; the second films the island
+density over the origin, open sky, a zone core and rim and a continent's coast).
 
 **Sky biomes** (`L-13`; `WorldGen/Sky/SkyBiome.cs`, `SkyBiomes.cs`, `SkyFlora.cs`, `SkyTrees.cs`,
 `SkyTreeSpace.cs`) are two, `SkyBiome.Meadow` and `SkyBiome.FrostHighland`, an enum of their own like
@@ -4897,8 +4909,8 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
   `plans/BIOMEGEN.md`.
 - **Visual checks** (each with `VOXEL_TIME=147`): `barrier.json`, `hell.json`, `hell-flora.json`,
-  `hell-mobs.json`, `layers-fog.json`, `clouds-solid.json`, `sky-islands.json`, `sky-biomes.json`,
-  `sky-mobs.json`.
+  `hell-mobs.json`, `layers-fog.json`, `clouds-solid.json`, `sky-islands.json`, `sky-density.json`,
+  `sky-biomes.json`, `sky-mobs.json`.
 
 ### Structure templates and ruins
 
@@ -5278,7 +5290,8 @@ Both models, their skins and the `cloud_shard` sprite come from `tools/generate-
   every `SkySpawnIntervalSeconds`, under the natural cap, around a target whose feet stand in the sky band
   (`MobSpawner.InSkyBand`, `SkyIslandBottomY..SkyIslandTopY`) only, `MobSpawner.TryFindSkySpawn` scans ring
   columns for an island top: solid ground under two clear dry cells, all three in the band (so never the cloud
-  sea, the overworld or hell), inside an island zone and not torch-lit. A golem stands on it; a galeraptor
+  sea, the overworld or hell), inside an island zone (islands also float in the open sky outside every zone,
+  and those hold no mobs) and not torch-lit. A golem stands on it; a galeraptor
   appears in open air `SkyFlyerSpawnLiftMin..Max` blocks over it. The overworld's surface and cave searches
   never land on an island (the surface search reads the terrain heightmap, the cave search wants a floor under
   its column's surface). Despawn and the shared hazards work as for the other mobs.
@@ -5289,8 +5302,8 @@ Both models, their skins and the `cloud_shard` sprite come from `tools/generate-
   `SkyMobManagerTests`, the realm round trip in `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`,
   `NetworkEntitySyncTests.SkyMobsMirrorByKindAndAFlyerKeepsItsHeight` and the loopback
   `GameServerTests.SkyMobsReachTheClientsEntityListByKindAndAFlyerAtItsHeight`.
-  `visual-examples/sky-mobs.json` (`VOXEL_TIME=147`) films the ring's own spawns, then both kinds on the
-  meadow island.
+  `visual-examples/sky-mobs.json` (`VOXEL_TIME=147`) films the ring's own spawns, then both kinds on a
+  frost highland island in a zone core.
 - A client's mirror plays the dive and the slam with the server (see "A mirror's attack clip" under "Hell
   mobs").
 - Known gaps: the slam's shockwave hits players only (no mobs, no blocks); `cloud_shard` has no use yet; the overworld ring spawners still spawn on the ground far below a

@@ -1,0 +1,56 @@
+{
+  // Sky island density: a flying player should always have several islands in view. Run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/sky-density.json
+  // Shots land in visual/sky-density/. With the default seed (found with SkyIslands.ZoneAt, TryGetIsland and
+  // CollectIslands): over the origin, open sky outside every zone, eleven islands lie within 256 blocks; at
+  // (-640, 640), open sky at least 600 blocks from every zone, nine; within 256 blocks of the center of the
+  // archipelago zone at (156, -441) twelve, of the point (588, -441) on its rim eight; and off the coast of the
+  // great landmass centered at (-2518, 4076), at (-1770, 2865), eight drift with the continent beyond them.
+  // Each spot is shot from just over the island band (y 430) looking out and down, two ways about 180
+  // degrees apart, each aimed at a group of islands, and the zone core also level from inside the band.
+  // The first wait lets the spawn settle (else it moves the camera back to the ground), and each spot waits
+  // 45 s: sky chunks cost a cold column scan each, and the outer shell of the 256-block load sphere, where
+  // most islands in view lie, streams in last. The whole run stays in daylight.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "wait", "seconds": 15 },
+
+    { "op": "teleport", "pos": [0.5, 430.5, 0.5], "yaw": -110, "pitch": -15 },
+    { "op": "wait", "seconds": 45 },
+    { "op": "screenshot", "name": "origin_a", "hideHud": true },
+    { "op": "look", "yaw": 70, "pitch": -15 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "origin_b", "hideHud": true },
+
+    { "op": "teleport", "pos": [-640.5, 430.5, 640.5], "yaw": -60, "pitch": -15 },
+    { "op": "wait", "seconds": 45 },
+    { "op": "screenshot", "name": "open_a", "hideHud": true },
+    { "op": "look", "yaw": 120, "pitch": -15 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "open_b", "hideHud": true },
+
+    { "op": "teleport", "pos": [156.5, 430.5, -441.5], "yaw": -80, "pitch": -15 },
+    { "op": "wait", "seconds": 45 },
+    { "op": "screenshot", "name": "zone_core_a", "hideHud": true },
+    { "op": "look", "yaw": 100, "pitch": -15 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "zone_core_b", "hideHud": true },
+    { "op": "teleport", "pos": [156.5, 370.5, -441.5], "yaw": 0, "pitch": 0 },
+    { "op": "wait", "seconds": 4 },
+    { "op": "screenshot", "name": "zone_core_level", "hideHud": true },
+
+    { "op": "teleport", "pos": [588.5, 430.5, -441.5], "yaw": -70, "pitch": -15 },
+    { "op": "wait", "seconds": 45 },
+    { "op": "screenshot", "name": "zone_rim_a", "hideHud": true },
+    { "op": "look", "yaw": 110, "pitch": -15 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "zone_rim_b", "hideHud": true },
+
+    { "op": "teleport", "pos": [-1770.5, 430.5, 2865.5], "yaw": 100, "pitch": -15 },
+    { "op": "wait", "seconds": 45 },
+    { "op": "screenshot", "name": "coast_a", "hideHud": true },
+    { "op": "look", "yaw": -80, "pitch": -15 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "coast_b", "hideHud": true }
+  ]
+}

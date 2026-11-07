@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Content.Structures;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Sky;
 using VoxelEngine.WorldGen.Structures;
@@ -10,8 +11,9 @@ namespace VoxelEngine.Tests.WorldGen.Sky;
 
 /// <summary>
 /// The sky islands and the cloud sea (plans/LAYERS.md L-12): blocks only inside their bands, islands
-/// inside zones with wide open sky between the zones, big zones rarer than small ones, islands that
-/// never touch, a domed top over a tapering underside, generated chunks that equal the point query
+/// everywhere and denser inside zones, so a flying player always has several in view, big zones rarer
+/// than small ones, islands that never touch, an island list that never overflows its shared buffer,
+/// a domed top over a tapering underside, generated chunks that equal the point query
 /// across chunk seams, two neighboring stamps that equal one union stamp, and a layout that follows
 /// the world seed.
 /// </summary>
@@ -138,29 +140,50 @@ public sealed class SkyIslandTests
     }
 
     [Fact]
-    public void TheSkyHoldsIslandZonesWithWideOpenGapsBetweenThem()
+    public void IslandsStandEverywhereAndCrowdTogetherInsideZones()
     {
         var islandColumns = 0;
         var openColumns = 0;
         for (var x = -2048; x < 2048; x += 16)
         for (var z = -2048; z < 2048; z += 16)
         {
-            if (SkyIslandGenerator.TryGetColumn(x, z, out _, out _))
-            {
-                islandColumns++;
-                continue;
-            }
-
-            if (!SkyIslands.ZoneAt(x, z).InZone) openColumns++;
+            if (SkyIslandGenerator.TryGetColumn(x, z, out _, out _)) islandColumns++;
+            else openColumns++;
         }
 
+        // Islands are small, so open sky still outnumbers them
         Assert.True(islandColumns > 0 && openColumns > islandColumns,
-            $"{islandColumns} island columns, {openColumns} columns of open sky outside every zone");
+            $"{islandColumns} island columns, {openColumns} columns of open sky");
 
-        // Every island stands in a zone, and two surviving zones keep the gap between their outlines
-        foreach (var island in IslandsNearOrigin(20))
-            Assert.True(SkyIslands.ZoneAt(island.CenterX, island.CenterZ).InZone);
+        // Islands stand outside every zone too, yet a zone core holds them more often than open sky does
+        var cells = 3000 / SkyIslandConfig.IslandCellBlocks;
+        int outside = 0, coreCells = 0, coreIslands = 0, openCells = 0, openIslands = 0;
+        for (var gx = -cells; gx <= cells; gx++)
+        for (var gz = -cells; gz <= cells; gz++)
+        {
+            var accepted = SkyIslands.TryGetIsland(gx, gz, out var island);
+            if (accepted && !SkyIslands.ZoneAt(island.CenterX, island.CenterZ).InZone) outside++;
 
+            var zone = SkyIslands.ZoneAt((gx + 0.5f) * SkyIslandConfig.IslandCellBlocks,
+                (gz + 0.5f) * SkyIslandConfig.IslandCellBlocks);
+            if (zone.Weight >= 1f)
+            {
+                coreCells++;
+                if (accepted) coreIslands++;
+            }
+            else if (!zone.InZone)
+            {
+                openCells++;
+                if (accepted) openIslands++;
+            }
+        }
+
+        Assert.True(outside > 0, "no island stands outside every zone");
+        Assert.True(coreCells > 0 && openCells > 0, $"{coreCells} zone core cells, {openCells} open cells");
+        Assert.True((float)coreIslands / coreCells > (float)openIslands / openCells,
+            $"zone cores hold {coreIslands}/{coreCells} islands, open sky {openIslands}/{openCells}");
+
+        // Two surviving zones keep the gap between their outlines
         var zones = new List<(float X, float Z, float R)>();
         for (var gx = -8; gx <= 8; gx++)
         for (var gz = -8; gz <= 8; gz++)
@@ -173,6 +196,79 @@ public sealed class SkyIslandTests
             var d = Vector2.Distance(new Vector2(zones[i].X, zones[i].Z), new Vector2(zones[j].X, zones[j].Z));
             Assert.True(d >= zones[i].R + zones[j].R + SkyIslandConfig.ZoneGapBlocks, $"zones {i} and {j} crowd");
         }
+    }
+
+    [Fact]
+    public void AFlyingPlayerAlwaysHasSeveralIslandsInView()
+    {
+        // The design requirement: anywhere in the band, a flying player sees several islands inside the
+        // full-detail load radius (the far LOD draws none), or stands over island land
+        var view = StreamingConfig.ChunkRadius * Chunk.Size;
+        const int Several = 3;
+        const float ServedShare = 0.85f;
+
+        Span<SkyIsland> into = stackalloc SkyIsland[256];
+        int points = 0, served = 0;
+        for (var x = -3000; x <= 3000; x += SkyIslandConfig.IslandCellBlocks)
+        for (var z = -3000; z <= 3000; z += SkyIslandConfig.IslandCellBlocks)
+        {
+            points++;
+            if (SkyIslandGenerator.TryGetColumn(x, z, out _, out _))
+            {
+                served++;
+                continue;
+            }
+
+            var count = SkyIslands.CollectIslands(x - view, z - view, x + view, z + view, into);
+            var inView = 0;
+            for (var k = 0; k < count; k++)
+            {
+                if (into[k].IsLandmass) continue;
+                var dx = into[k].CenterX - x;
+                var dz = into[k].CenterZ - z;
+                if (dx * dx + dz * dz <= view * view) inView++;
+            }
+            if (inView >= Several) served++;
+        }
+
+        var share = (float)served / points;
+        Assert.True(share >= ServedShare, $"only {share:P1} of {points} sky points have {Several} islands in view");
+    }
+
+    [Fact]
+    public void CollectIslandsNeverOverflowsTheSharedBuffer()
+    {
+        // A chunk box and the sky ruin's grown box, over the origin's sky and a continent's
+        var ruinMargin = StructureRegistry.MaxSize / 2 + 1;
+        var origins = new List<(int X, int Z)> { (0, 0) };
+        var nearest = float.MaxValue;
+        var landmassCenter = (X: 0, Z: 0);
+        for (var gx = -3; gx <= 3; gx++)
+        for (var gz = -3; gz <= 3; gz++)
+        {
+            if (!SkyLandmasses.TryGetLandmass(gx, gz, out var landmass)) continue;
+            var d = landmass.CenterX * landmass.CenterX + landmass.CenterZ * landmass.CenterZ;
+            if (d >= nearest) continue;
+            nearest = d;
+            landmassCenter = ((int)landmass.CenterX, (int)landmass.CenterZ);
+        }
+        Assert.True(nearest < float.MaxValue, "no landmass near the origin");
+        origins.Add(landmassCenter);
+
+        Span<SkyIsland> into = stackalloc SkyIsland[4 * SkyIslands.MaxIslandsPerBox];
+        var most = 0;
+        foreach (var (ox, oz) in origins)
+        for (var x0 = ox - 1024; x0 < ox + 1024; x0 += 2 * Chunk.Size)
+        for (var z0 = oz - 1024; z0 < oz + 1024; z0 += 2 * Chunk.Size)
+        {
+            var chunk = SkyIslands.CollectIslands(x0, z0, x0 + Chunk.Size - 1, z0 + Chunk.Size - 1, into);
+            var ruin = SkyIslands.CollectIslands(x0 - ruinMargin, z0 - ruinMargin, x0 + Chunk.Size - 1 + ruinMargin,
+                z0 + Chunk.Size - 1 + ruinMargin, into);
+            most = Math.Max(most, Math.Max(chunk, ruin));
+        }
+
+        Assert.True(most <= SkyIslands.MaxIslandsPerBox, $"{most} islands reach one box");
+        Assert.True(most > 0);
     }
 
     [Fact]
@@ -310,7 +406,7 @@ public sealed class SkyIslandTests
         var y0 = (island.BaseY >> Chunk.SizeShift) * Chunk.Size;
 
         // The union: every island reaching the 32-wide box, each column asked once over that list
-        Span<SkyIsland> union = stackalloc SkyIsland[16];
+        Span<SkyIsland> union = stackalloc SkyIsland[SkyIslands.MaxIslandsPerBox];
         var count = SkyIslands.CollectIslands(x0 - Chunk.Size, z0, x0 + Chunk.Size - 1, z0 + Chunk.Size - 1, union);
         Assert.True(count > 0);
 

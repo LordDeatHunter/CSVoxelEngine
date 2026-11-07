@@ -9,8 +9,8 @@ namespace VoxelEngine.Tests.WorldGen.Sky;
 
 /// <summary>
 /// The great sky landmasses: they exist at every seed, vary in size up to the config's reach, stay inside the
-/// island band with room for their flora, are irregular rather than round, keep ordinary islands out of their
-/// footprint, and read like any island through the shared point query and the stamp.
+/// island band with room for their flora, are irregular rather than round, keep ordinary islands off their land
+/// while letting them fill the bays, and read like any island through the shared point query and the stamp.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class SkyLandmassTests
@@ -91,22 +91,35 @@ public sealed class SkyLandmassTests
     }
 
     [Fact]
-    public void NoOrdinaryIslandStandsWithinALandmass()
+    public void NoOrdinaryIslandTouchesALandmassYetIslandsFillItsBays()
     {
         var landmass = Biggest();
         var cell = SkyIslandConfig.IslandCellBlocks;
         var cx = (int)MathF.Floor(landmass.CenterX / cell);
         var cz = (int)MathF.Floor(landmass.CenterZ / cell);
         var span = (int)(landmass.Radius / cell) + 2;
+        var insideDisc = 0;
         for (var gx = cx - span; gx <= cx + span; gx++)
         for (var gz = cz - span; gz <= cz + span; gz++)
         {
             if (!SkyIslands.TryGetIsland(gx, gz, out var island)) continue;
             var dx = island.CenterX - landmass.CenterX;
             var dz = island.CenterZ - landmass.CenterZ;
-            Assert.True(dx * dx + dz * dz >= landmass.Radius * landmass.Radius,
-                $"island {island} stands inside the landmass {landmass}");
+            if (dx * dx + dz * dz < landmass.Radius * landmass.Radius) insideDisc++;
+
+            // Not one of the island's columns is the landmass's land
+            var r = (int)MathF.Ceiling(island.Radius);
+            for (var x = (int)island.CenterX - r; x <= (int)island.CenterX + r; x++)
+            for (var z = (int)island.CenterZ - r; z <= (int)island.CenterZ + r; z++)
+            {
+                if (!SkyIslandGenerator.TryGetColumn(island, x, z, out _, out _)) continue;
+                Assert.False(SkyIslandGenerator.TryGetColumn(landmass, x, z, out _, out _),
+                    $"island {island} stands on the landmass {landmass} at ({x}, {z})");
+            }
         }
+
+        // The open sky and the bays of its bounding disc are not wasted
+        Assert.True(insideDisc > 0, "no island drifts inside the landmass's bounding disc");
     }
 
     [Fact]

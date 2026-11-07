@@ -20,9 +20,6 @@ namespace VoxelEngine.WorldGen.Sky;
 /// </summary>
 public static class SkyIslandGenerator
 {
-    // At most 3 x 3 island cells reach a 16-wide box (see CollectIslands); room to spare
-    private const int MaxIslandsPerChunk = 16;
-
     /// <summary>
     /// The cells of <paramref name="island"/> in column (x, z), inclusive world y: false outside its
     /// outline. The top is at or above the island's base and the bottom below it, so every column is at
@@ -65,7 +62,7 @@ public static class SkyIslandGenerator
     /// <summary>The island holding column (x, z) and its cells: false in open sky.</summary>
     public static bool TryGetColumn(int x, int z, out SkyIsland island, out int bottom, out int top)
     {
-        Span<SkyIsland> islands = stackalloc SkyIsland[MaxIslandsPerChunk];
+        Span<SkyIsland> islands = stackalloc SkyIsland[SkyIslands.MaxIslandsPerBox];
         var count = SkyIslands.CollectIslands(x, z, x, z, islands);
         return TryGetColumn(islands[..count], x, z, out island, out bottom, out top);
     }
@@ -86,7 +83,7 @@ public static class SkyIslandGenerator
         var yMax = Math.Min(Chunk.Size - 1, WorldGenerationConfig.SkyIslandTopY - worldY0);
         if (yMin > yMax) return;
 
-        Span<SkyIsland> islands = stackalloc SkyIsland[MaxIslandsPerChunk];
+        Span<SkyIsland> islands = stackalloc SkyIsland[SkyIslands.MaxIslandsPerBox];
         var count = SkyIslands.CollectIslands(worldX0, worldZ0, worldX0 + Chunk.Size - 1, worldZ0 + Chunk.Size - 1, islands);
         if (count == 0) return;
 

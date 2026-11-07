@@ -3,20 +3,28 @@ using System;
 namespace VoxelEngine.WorldGen.Sky;
 
 /// <summary>
-/// Where the sky islands are (plans/LAYERS.md <c>L-12</c>): the island zones and the island sites inside
-/// them. A zone is one hashed candidate per <see cref="SkyIslandConfig.ZoneCellBlocks"/> cell
-/// (<see cref="TerrainSites"/>), its size skewed small so big zones are rare, kept
-/// <see cref="SkyIslandConfig.ZoneGapBlocks"/> clear of every lower-hash neighbor, so wide, ocean-like gaps
-/// of empty sky lie between zones; its outline wobbles inward by a noise and its weight eases from 1 in the
-/// core to 0 at the rim. An island is one hashed candidate per <see cref="SkyIslandConfig.IslandCellBlocks"/>
-/// cell, accepted where its center's zone weight beats a roll (so islands thin toward a zone's rim) and kept
+/// Where the sky islands are (plans/LAYERS.md <c>L-12</c>): the island zones and the island sites. A zone is
+/// one hashed candidate per <see cref="SkyIslandConfig.ZoneCellBlocks"/> cell (<see cref="TerrainSites"/>),
+/// its size skewed small so big zones are rare, kept <see cref="SkyIslandConfig.ZoneGapBlocks"/> clear of
+/// every lower-hash neighbor; its outline wobbles inward by a noise and its weight eases from 1 in the core to
+/// 0 at the rim. An island is one hashed candidate per <see cref="SkyIslandConfig.IslandCellBlocks"/> cell
+/// anywhere in the band, accepted where max(<see cref="SkyIslandConfig.IslandOpenSkyWeight"/>, its center's
+/// zone weight) beats a roll, so islands stand everywhere and a zone is a denser cluster on top; it is kept
 /// <see cref="SkyIslandConfig.IslandGapBlocks"/> clear of its lower-hash neighbors, so two islands never
-/// touch. Everything is a pure function of position and <see cref="WorldGenerationConfig.Seed"/>, safe on
-/// any worker thread; nothing is cached, since a chunk asks for its few sites once
-/// (<see cref="CollectIslands"/>).
+/// touch, and off every landmass's land (<see cref="SkyLandmasses.TouchesLand"/>). Everything is a pure
+/// function of position and <see cref="WorldGenerationConfig.Seed"/>, safe on any worker thread; nothing is
+/// cached, since a chunk asks for its few sites once (<see cref="CollectIslands"/>).
 /// </summary>
 public static class SkyIslands
 {
+    /// <summary>
+    /// The most islands <see cref="CollectIslands"/> writes for a box no wider than the sky ruin box: at most
+    /// 2 x 2 island cells reach it (see <see cref="SkyIslandConfig.IslandCellBlocks"/>), plus the few landmass
+    /// discs whose bounds reach it (landmass discs keep <see cref="SkyIslandConfig.LandmassGapBlocks"/> apart);
+    /// every caller's stack buffer is this long.
+    /// </summary>
+    public const int MaxIslandsPerBox = 16;
+
     private const int ZoneSalt = 0x534B595A; // "SKYZ"
     private const int IslandSalt = 0x534B5949; // "SKYI"
 
@@ -106,8 +114,9 @@ public static class SkyIslands
     }
 
     /// <summary>
-    /// The island of cell (<paramref name="gx"/>, <paramref name="gz"/>): false when the cell rolls none, its
-    /// center's zone weight loses the roll or it gives way to a crowding neighbor. Its base height is rolled
+    /// The island of cell (<paramref name="gx"/>, <paramref name="gz"/>): false when the cell rolls none, the
+    /// greater of the open-sky floor and its center's zone weight loses the roll, it gives way to a crowding
+    /// neighbor or it would touch a landmass's land. Its base height is rolled
     /// so its whole body (dome, top detail, underside and stalactites) stays inside the island band.
     /// </summary>
     public static bool TryGetIsland(int gx, int gz, out SkyIsland island)
@@ -117,7 +126,9 @@ public static class SkyIslands
                 SkyIslandConfig.IslandSizeSkew, out var hash, out var centerX, out var centerZ, out var size))
             return false;
 
-        if (ZoneAt(centerX, centerZ).Weight <= SplitMix64.Unit(hash, 4)) return false;
+        // Accepted when max(open-sky floor, zone weight) beats the roll; the zone is only asked above the floor
+        var roll = SplitMix64.Unit(hash, 4);
+        if (roll >= SkyIslandConfig.IslandOpenSkyWeight && ZoneAt(centerX, centerZ).Weight <= roll) return false;
 
         var radius = MathUtils.Lerp(SkyIslandConfig.IslandMinRadius, SkyIslandConfig.IslandMaxRadius, size);
         if (TerrainSites.YieldsToSizedNeighbor(gx, gz, hash, centerX, centerZ, radius,
@@ -125,8 +136,9 @@ public static class SkyIslands
                 SkyIslandConfig.IslandCellBlocks, IslandSalt, SkyIslandConfig.IslandChance, SkyIslandConfig.IslandSizeSkew))
             return false;
 
-        // A landmass wins its footprint: no island stands within its bounding disc
-        if (SkyLandmasses.OverlapsDisc(centerX, centerZ, radius + SkyIslandConfig.IslandGapBlocks)) return false;
+        // A landmass wins its land: no island stands within the gap of it, though one may fill its bays and the
+        // open sky of its bounding disc. Last, since it is the dearest check
+        if (SkyLandmasses.TouchesLand(centerX, centerZ, radius + SkyIslandConfig.IslandGapBlocks)) return false;
 
         var dome = radius * SkyIslandConfig.IslandDomePerRadius;
         var depth = radius * MathUtils.Lerp(SkyIslandConfig.IslandMinDepthPerRadius,
@@ -144,16 +156,15 @@ public static class SkyIslands
     }
 
     /// <summary>
-    /// Writes into <paramref name="into"/>, in cell order, every island whose nominal disc can reach the box
-    /// <paramref name="minX"/>..<paramref name="maxX"/>, <paramref name="minZ"/>..<paramref name="maxZ"/>
-    /// (inclusive world columns), and returns how many. A box far from every zone pays only a few zone rolls.
-    /// The same order for any box, so a column asks a chunk's list and its own alike.
+    /// Writes into <paramref name="into"/>, landmasses first and then in cell order, every island whose nominal
+    /// disc can reach the box <paramref name="minX"/>..<paramref name="maxX"/>,
+    /// <paramref name="minZ"/>..<paramref name="maxZ"/> (inclusive world columns), and returns how many. The
+    /// same order for any box, so a column asks a chunk's list and its own alike. A box no wider than the sky
+    /// ruin box never yields more than <see cref="MaxIslandsPerBox"/>.
     /// </summary>
     public static int CollectIslands(int minX, int minZ, int maxX, int maxZ, Span<SkyIsland> into)
     {
         var count = SkyLandmasses.Collect(minX, minZ, maxX, maxZ, into, 0);
-        if (!AnyZoneNear(minX, minZ, maxX, maxZ) && !SkyLandmasses.AnyNear(minX, minZ, maxX, maxZ)) return count;
-
         var reach = SkyIslandConfig.IslandMaxRadius;
         TerrainSites.CellRange(minX, SkyIslandConfig.IslandCellBlocks, reach, out var cellMinX, out _);
         TerrainSites.CellRange(maxX, SkyIslandConfig.IslandCellBlocks, reach, out _, out var cellMaxX);
@@ -174,31 +185,5 @@ public static class SkyIslands
         }
 
         return count;
-    }
-
-    /// <summary>Whether any zone candidate, crowded out or not, lies close enough to the box that an island
-    /// centered inside it could reach the box: a conservative, cheap gate before the island cells.</summary>
-    private static bool AnyZoneNear(int minX, int minZ, int maxX, int maxZ)
-    {
-        var reach = SkyIslandConfig.ZoneMaxRadius + SkyIslandConfig.IslandMaxRadius + 1f;
-        TerrainSites.CellRange(minX, SkyIslandConfig.ZoneCellBlocks, reach, out var cellMinX, out _);
-        TerrainSites.CellRange(maxX, SkyIslandConfig.ZoneCellBlocks, reach, out _, out var cellMaxX);
-        TerrainSites.CellRange(minZ, SkyIslandConfig.ZoneCellBlocks, reach, out var cellMinZ, out _);
-        TerrainSites.CellRange(maxZ, SkyIslandConfig.ZoneCellBlocks, reach, out _, out var cellMaxZ);
-        for (var gx = cellMinX; gx <= cellMaxX; gx++)
-        for (var gz = cellMinZ; gz <= cellMaxZ; gz++)
-        {
-            if (!TerrainSites.TryRoll(gx, gz, SkyIslandConfig.ZoneCellBlocks, ZoneSalt, SkyIslandConfig.ZoneChance,
-                    SkyIslandConfig.ZoneSizeSkew, out _, out var centerX, out var centerZ, out var size))
-                continue;
-
-            var radius = MathUtils.Lerp(SkyIslandConfig.ZoneMinRadius, SkyIslandConfig.ZoneMaxRadius, size)
-                         + SkyIslandConfig.IslandMaxRadius + 1f;
-            var dx = centerX - Math.Clamp(centerX, minX, maxX + 1);
-            var dz = centerZ - Math.Clamp(centerZ, minZ, maxZ + 1);
-            if (dx * dx + dz * dz < radius * radius) return true;
-        }
-
-        return false;
     }
 }

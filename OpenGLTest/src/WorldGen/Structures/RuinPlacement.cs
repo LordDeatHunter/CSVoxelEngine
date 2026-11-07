@@ -181,7 +181,7 @@ public static class RuinPlacement
     public static void StampSky(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
     {
         if (StructureRegistry.Of(StructureKind.Sky).Count == 0) return;
-        Span<SkyIsland> islands = stackalloc SkyIsland[16];
+        Span<SkyIsland> islands = stackalloc SkyIsland[SkyIslands.MaxIslandsPerBox];
         var count = SkyIslands.CollectIslands(worldX0 - Reach, worldZ0 - Reach, worldX0 + Chunk.Size - 1 + Reach,
             worldZ0 + Chunk.Size - 1 + Reach, islands);
         for (var k = 0; k < count; k++)
@@ -232,7 +232,7 @@ public static class RuinPlacement
     /// reader of the island point query) set aside the cells a ruin owns.</summary>
     internal static bool SkyRuinOwns(int x, int y, int z)
     {
-        Span<SkyIsland> islands = stackalloc SkyIsland[16];
+        Span<SkyIsland> islands = stackalloc SkyIsland[SkyIslands.MaxIslandsPerBox];
         var count = SkyIslands.CollectIslands(x, z, x, z, islands);
         for (var k = 0; k < count; k++)
         {

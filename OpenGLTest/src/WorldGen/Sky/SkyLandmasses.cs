@@ -15,7 +15,8 @@ namespace VoxelEngine.WorldGen.Sky;
 /// inward at the rim. The top rolls over low hills and eases down to the rim; the underside is a broad, shallow
 /// keel under the middle that thins out toward the coast, with the islands' stalactites. Pure functions of
 /// position and the seed, like the islands: the point query equals the stamp bit for bit across seams, and an
-/// ordinary island never stands within a landmass (<see cref="OverlapsDisc"/>).
+/// ordinary island never stands on a landmass's land (<see cref="TouchesLand"/>); it may drift in the bays and the
+/// open sky of its bounding disc.
 /// </summary>
 internal static class SkyLandmasses
 {
@@ -123,30 +124,13 @@ internal static class SkyLandmasses
         return false;
     }
 
-    /// <summary>Whether any landmass's bounding disc plus fringe reaches the box (inclusive world columns): the cheap
-    /// gate that lets the island scan run beside a continent where no archipelago zone stands.</summary>
-    internal static bool AnyNear(int minX, int minZ, int maxX, int maxZ)
-    {
-        var reach = SkyIslandConfig.LandmassMaxRadius + SkyIslandConfig.LandmassFringeMaxBlocks;
-        TerrainSites.CellRange(minX, SkyIslandConfig.LandmassCellBlocks, reach, out var cellMinX, out _);
-        TerrainSites.CellRange(maxX, SkyIslandConfig.LandmassCellBlocks, reach, out _, out var cellMaxX);
-        TerrainSites.CellRange(minZ, SkyIslandConfig.LandmassCellBlocks, reach, out var cellMinZ, out _);
-        TerrainSites.CellRange(maxZ, SkyIslandConfig.LandmassCellBlocks, reach, out _, out var cellMaxZ);
-        for (var gx = cellMinX; gx <= cellMaxX; gx++)
-        for (var gz = cellMinZ; gz <= cellMaxZ; gz++)
-        {
-            if (!TryGetLandmass(gx, gz, out var landmass)) continue;
-            var dx = landmass.CenterX - Math.Clamp(landmass.CenterX, minX, maxX + 1);
-            var dz = landmass.CenterZ - Math.Clamp(landmass.CenterZ, minZ, maxZ + 1);
-            var range = landmass.Radius + FringeOf(landmass);
-            if (dx * dx + dz * dz < range * range) return true;
-        }
-
-        return false;
-    }
-    /// <summary>Whether a disc of <paramref name="radius"/> at (x, z) reaches any landmass's bounding disc, which
-    /// is how an ordinary island gives way to a landmass.</summary>
-    internal static bool OverlapsDisc(float x, float z, float radius)
+    /// <summary>
+    /// Whether a disc of <paramref name="radius"/> at (x, z) reaches any landmass's land, which is how an
+    /// ordinary island gives way to a landmass while still drifting in its bays and the open sky of its bounding
+    /// disc. A conservative closed-form reject (<see cref="MayReach"/>) first, then the land itself sampled at the
+    /// disc's center and round its perimeter (<see cref="LandWithin"/>).
+    /// </summary>
+    internal static bool TouchesLand(float x, float z, float radius)
     {
         var reach = SkyIslandConfig.LandmassMaxRadius + radius;
         TerrainSites.CellRange(x, SkyIslandConfig.LandmassCellBlocks, reach, out var minX, out var maxX);
@@ -155,10 +139,54 @@ internal static class SkyLandmasses
         for (var gz = minZ; gz <= maxZ; gz++)
         {
             if (!TryGetLandmass(gx, gz, out var landmass)) continue;
+            // Every land column lies inside the bounding disc (TryGetColumn culls at it)
             var dx = x - landmass.CenterX;
             var dz = z - landmass.CenterZ;
             var spacing = landmass.Radius + radius;
-            if (dx * dx + dz * dz < spacing * spacing) return true;
+            if (dx * dx + dz * dz >= spacing * spacing) continue;
+            if (MayReach(landmass, dx, dz, radius) && LandWithin(landmass, x, z, radius)) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// False only when no land of <paramref name="landmass"/> lies within <paramref name="radius"/> of the point at
+    /// (<paramref name="dx"/>, <paramref name="dz"/>) from its center. The land lies inside its ellipse grown by the
+    /// warp (each warp channel moves a point at most the warp amplitude on its axis; 1.5 covers the diagonal and a
+    /// slight noise overshoot); a disc of D lies inside the homothetic ellipse of semi-axes (D / aspect, D), and the
+    /// Minkowski sum of two homothetic ellipses is the ellipse of the summed axes, so a point outside that grown
+    /// ellipse has no land within the radius.
+    /// </summary>
+    private static bool MayReach(in SkyIsland landmass, float dx, float dz, float radius)
+    {
+        var semi = landmass.Radius / SkyIslandConfig.LandmassBoundShare;
+        var b = semi * landmass.Aspect;
+        var d = semi * SkyIslandConfig.LandmassWarp * 1.5f + radius;
+        var cos = MathF.Cos(landmass.Angle);
+        var sin = MathF.Sin(landmass.Angle);
+        var u = dx * cos + dz * sin;
+        var v = -dx * sin + dz * cos;
+        var a = semi + d / landmass.Aspect;
+        var c = b + d;
+        return u * u / (a * a) + v * v / (c * c) < 1f;
+    }
+
+    /// <summary>Whether land of <paramref name="landmass"/> stands at (x, z) or on the circle of
+    /// <paramref name="radius"/> round it, sampled every <see cref="SkyIslandConfig.LandmassClearanceSampleBlocks"/>
+    /// of arc. A landmass is one body far larger than an island disc, so land reaching the disc covers its center
+    /// or crosses its perimeter; only a sliver narrower than the spacing could slip between two samples.</summary>
+    private static bool LandWithin(in SkyIsland landmass, float x, float z, float radius)
+    {
+        if (TryGetColumn(landmass, (int)MathF.Floor(x), (int)MathF.Floor(z), out _, out _)) return true;
+
+        var points = Math.Max(8, (int)MathF.Ceiling(MathF.Tau * radius / SkyIslandConfig.LandmassClearanceSampleBlocks));
+        for (var k = 0; k < points; k++)
+        {
+            var angle = k * (MathF.Tau / points);
+            var px = (int)MathF.Floor(x + MathF.Cos(angle) * radius);
+            var pz = (int)MathF.Floor(z + MathF.Sin(angle) * radius);
+            if (TryGetColumn(landmass, px, pz, out _, out _)) return true;
         }
 
         return false;

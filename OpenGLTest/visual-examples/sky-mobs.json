@@ -2,8 +2,8 @@
   // Sky mobs check (plans/LAYERS.md L-15): run from OpenGLTest/ with
   //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/sky-mobs.json
   // Shots land in visual/sky-mobs/. `natural` looks up at whatever the ring spawner put over the island while
-  // the camera loaded (galeraptors, in this zone); the scenario then kills those. The camera loads the meadow island of sky-biomes.json (radius 25 at
-  // (232, 763), its top near 383) from above, then drops onto it in creative mode without flight (immune,
+  // the camera loaded (galeraptors, in this zone); the scenario then kills those. The camera loads the frost highland island of radius 27
+  // at (228, -598), its top near 396, in an island zone's core (the sky spawner only spawns in zones), from above at a treeless spot, then drops onto it in creative mode without flight (immune,
   // so the mobs still chase it), and spawns a cloud golem a few blocks in front, then a galeraptor in the air,
   // with the exact-feet form of `spawn` (the [x, z] form snaps onto the overworld surface far below).
   // `idle` is taken just after they pop in, the four `slam` shots once the golem has walked up and swings (one
@@ -12,7 +12,7 @@
   "steps": [
     { "op": "creative", "on": true },
     { "op": "fly", "on": true },
-    { "op": "teleport", "pos": [236.5, 392.5, 763.5], "yaw": 180, "pitch": -10 },
+    { "op": "teleport", "pos": [225.5, 405.5, -594.5], "yaw": 180, "pitch": -10 },
     { "op": "wait", "seconds": 20 },
     { "op": "fly", "on": false },
     { "op": "wait", "seconds": 2 },
@@ -23,7 +23,7 @@
     { "op": "damage", "amount": 1000 },
     { "op": "wait", "seconds": 1 },
     { "op": "look", "yaw": 180, "pitch": -10 },
-    { "op": "spawn", "entity": "cloudgolem", "pos": [230.5, 388, 763.5] },
+    { "op": "spawn", "entity": "cloudgolem", "pos": [219.5, 401, -594.5] },
     { "op": "wait", "seconds": 0.6 },
     { "op": "screenshot", "name": "idle", "hideHud": true },
     { "op": "look", "yaw": 180, "pitch": 12 },
@@ -36,7 +36,7 @@
     { "op": "wait", "seconds": 0.35 },
     { "op": "screenshot", "name": "slam_d", "hideHud": true },
 
-    { "op": "spawn", "entity": "galeraptor", "pos": [233.5, 392, 765.5] },
+    { "op": "spawn", "entity": "galeraptor", "pos": [222.5, 405, -592.5] },
     { "op": "look", "yaw": 180, "pitch": 50 },
     { "op": "wait", "seconds": 0.8 },
     { "op": "screenshot", "name": "hover", "hideHud": true },

@@ -50,13 +50,20 @@ public static class SkyIslandConfig
     /// <summary>The zone size (0..1) from which a zone is tier 2 (big, the hardest mobs, <c>L-15</c>).</summary>
     public const float ZoneLargeSize = 0.75f;
 
-    // --- Islands: one hashed candidate per island cell, accepted inside a zone ---
+    // --- Islands: one hashed candidate per island cell, accepted anywhere, denser inside zones ---
 
-    /// <summary>Side of the square cell that rolls at most one island.</summary>
-    public const int IslandCellBlocks = 240;
+    /// <summary>Side of the square cell that rolls at most one island: small enough that a flying player's
+    /// 256-block view always holds several. It must stay above 2 * (<see cref="IslandMaxRadius"/> + 1) plus the
+    /// widest box <c>SkyIslands.CollectIslands</c> is asked for (the sky ruin box, 34 blocks), so at most 2 x 2
+    /// island cells reach any box and <c>SkyIslands.MaxIslandsPerBox</c> holds.</summary>
+    public const int IslandCellBlocks = 112;
 
-    /// <summary>Chance an island cell rolls a candidate (a zone's weight thins it further toward its rim).</summary>
-    public const float IslandChance = 0.8f;
+    /// <summary>Chance an island cell rolls a candidate (the acceptance weight thins it further).</summary>
+    public const float IslandChance = 0.9f;
+
+    /// <summary>The island acceptance weight anywhere in the band outside every zone, so islands are never
+    /// rarer than this; a zone, or a landmass's disc and fringe, raises it toward 1.</summary>
+    public const float IslandOpenSkyWeight = 0.7f;
 
     /// <summary>Skew of the island size roll toward small.</summary>
     public const float IslandSizeSkew = 1.8f;
@@ -147,6 +154,10 @@ public static class SkyIslandConfig
 
     /// <summary>Wavelength of the warp noise as a share of the long semi-axis, so a landmass bends about once across its length.</summary>
     public const float LandmassWarpWavelengthShare = 0.9f;
+
+    /// <summary>The arc spacing at which an ordinary island's perimeter is sampled against a landmass's land
+    /// (<c>SkyLandmasses.TouchesLand</c>).</summary>
+    public const float LandmassClearanceSampleBlocks = 4f;
 
     /// <summary>Blocks the rim is roughened inward by the island outline noise.</summary>
     public const float LandmassRimWobble = 9f;
