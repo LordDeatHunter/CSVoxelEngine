@@ -2274,7 +2274,7 @@ tools/                                # asset generators: tiles, sprites, models
   generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
                                       #   the geometry rules (waterline, shelf, 8 px inset steps) and the UV layout
   generate-lantern-texture.py         # deterministic lantern tile; its header pins the uv of every model part
-  generate-metal-textures.py          # deterministic tin/copper-sword/bronze item art and the tin ore tiles, recolored from the copper tools, the iron sword and malachite
+  generate-metal-textures.py          # deterministic tin/copper-sword/bronze/iron-pickaxe item art and the tin ore tiles, recolored from the copper tools, the iron sword and malachite
   generate-leaf-textureless.ps1       # deterministic gray leaf tiles for the biome tint (scaled to BiomeTintTextureGray)
   generate-permafrost-texture.py      # deterministic generator of the permafrost tile (permafrost.png)
   generate-plank-texture.py           # deterministic oak_planks tile (stdlib PNG writer)
@@ -3025,7 +3025,11 @@ pickaxe (`tools: {"pickaxe": 2}`, so the primitive and tin pickaxes whiff and co
 `hematite_ore` item), which the quern crushes into `crushed_iron` (`recipes/crush/hematite_ore.json`).
 There is no melt recipe and no molten iron, so a kiln refuses
 every iron form (`MetalworksRecipeTests.IronCrushesInTheQuernButNeverMelts`). `iron_sword` (a
-`slice` weapon) and `iron_sword_head` exist as items with no recipe until an iron kiln change.
+`slice` weapon) and `iron_sword_head` exist as items with no recipe until an iron kiln change. The
+`iron_pickaxe` is the top pickaxe tier (power 3, above bronze's 2.5; in the `pickaxe` tag), the tool
+the hell barrier will need (plans/LAYERS.md). It has no recipe either: for now it only comes from the
+creative catalog (`MiningTests.IronOutranksBronzeAndMinesEverythingBronzeMines`; sprite from
+`tools/generate-metal-textures.py iron`).
 
 **The kiln** (`Simulation/KilnManager.cs`, keyed by the structure's anchor cell) is the furnace half.
 How a kiln behaves is its anchor block's `KilnProfile` (the `kiln` object, `BlockType.Kiln`), which

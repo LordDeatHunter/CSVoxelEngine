@@ -158,6 +158,21 @@ public sealed class MiningTests
     }
 
     [Fact]
+    public void IronOutranksBronzeAndMinesEverythingBronzeMines()
+    {
+        var bronze = ItemOf("bronze_pickaxe");
+        var iron = ItemOf("iron_pickaxe");
+
+        Assert.True(iron.ToolPower > bronze.ToolPower);
+        Assert.True(Mining.BlockDamage(iron) > Mining.BlockDamage(bronze));
+        Assert.True(iron.EntityDamage > bronze.EntityDamage);
+
+        // The top tier only widens the gate, over every block, not just the ores
+        foreach (var block in BlockType.Types.Values.Where(block => Mining.CanMine(block.Id, bronze)))
+            Assert.True(Mining.CanMine(block.Id, iron), block.Name);
+    }
+
+    [Fact]
     public void FluidCellsRefuseEveryTool()
     {
         var water = BlockOf("water");

@@ -8,7 +8,8 @@ Phase 1 under way. A Nether- and Aether-like pair of realms inside the one world
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
-`MobConfig.LayerDifficultyPerLayer`; `LayerBandTests` holds their order. Last updated 2026-11-07.
+`MobConfig.LayerDifficultyPerLayer`; `LayerBandTests` holds their order. The `iron_pickaxe` (power 3,
+creative only) is the barrier's tool. Last updated 2026-11-07.
 
 ## In progress
 
@@ -18,8 +19,6 @@ Nothing.
 
 ### Phase 1: Foundations
 
-- [ ] **`L-2` Iron pickaxe item.** P0, S. Item + `pickaxe` tag entry + tier above the copper one;
-  creative catalog grants it. **No recipe, no smelting** (see Future ideas). **Hook:** `add-content`.
 - [ ] **`L-3` Soft-landing and sink block flags.** P0, M. Block JSON flags (fall damage negated on
   landing; the body sinks slowly up to 50 % into the block), flat `BlockType` mirrors.
   **Hook:** `BlockDefinition`, `BlockLoader`, `PlayerPhysics`, `FallTracker`, server `MovementRules`

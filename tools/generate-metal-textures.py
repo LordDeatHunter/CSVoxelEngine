@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Deterministic placeholder art for the tin and bronze metals and the copper sword.
+"""Deterministic placeholder art for the tin and bronze metals, the copper sword and the iron pickaxe.
 
 Recolors the existing copper tool sprites and the iron sword (only the metal pixels: the wooden
 handles and outlines are kept) onto a per-metal luminance ramp, and the malachite ore tile and
-chunk onto tin. Also writes the 32x32 mold_sword.png silhouette the mold model generator reads
+chunk onto tin. Iron only gets the pickaxe, recolored from the copper one (its sword is the
+source). Also writes the 32x32 mold_sword.png silhouette the mold model generator reads
 (tools/generate-mold-models.ps1). Re-runs are byte-identical.
 
-Usage: python tools/generate-metal-textures.py [tin|copper|bronze ...]   (default: all)
+Usage: python tools/generate-metal-textures.py [tin|copper|bronze|iron ...]   (default: all)
 """
 import os
 import sys
@@ -20,6 +21,7 @@ RAMPS = {  # dark -> light, sRGB
     'tin': ((62, 72, 88), (150, 164, 180), (232, 238, 244)),
     'bronze': ((84, 52, 18), (176, 120, 44), (240, 196, 104)),
     'copper': ((115, 25, 0), (209, 101, 11), (255, 168, 72)),
+    'iron': ((48, 52, 62), (128, 136, 150), (214, 222, 232)),
 }
 
 
@@ -59,8 +61,12 @@ def green_ore(p):
 
 
 def main():
-    metals = sys.argv[1:] or ['tin', 'copper', 'bronze']
+    metals = sys.argv[1:] or ['tin', 'copper', 'bronze', 'iron']
     for m in metals:
+        if m == 'iron':
+            recolor(os.path.join(ITEMS, 'copper_pickaxe.png'), os.path.join(ITEMS, 'iron_pickaxe.png'),
+                    m, copper_metal, 40, 200)
+            continue
         if m != 'copper':
             for part in ('axe', 'axe_head', 'pickaxe', 'pickaxe_head', 'ingot'):
                 recolor(os.path.join(ITEMS, 'copper_%s.png' % part), os.path.join(ITEMS, '%s_%s.png' % (m, part)),
