@@ -628,7 +628,8 @@ GreatLakeIslandChance 0.5     GreatLakeIslandMinRadius 18   GreatLakeIslandMaxRa
 GreatLakeSpawnClearRadius = ReliefSpawnClearStart           GreatLakeSiteCacheCapacity 512  GreatLakeSiteCacheGenerations 4
 Noise seed offsets: ReliefNoise 153, MountainSpineNoise 154, MountainRangeCellWarp 155,
   MassifShapeNoise 156, MassifSpurNoise 157 (2 octaves), PeakShapeNoise 158,
-  IslandNoise 159, IslandSmallNoise 160 (2 octaves each), GreatLakeShapeNoise 161 (2 octaves)
+  IslandNoise 159, IslandSmallNoise 160 (2 octaves each), GreatLakeShapeNoise 161 (2 octaves),
+  BarrierGenerator.PatchNoise 162 (3D, the barrier band's ramps; plans/LAYERS.md)
 WorldFeatureConfig: CottonMaxDesertWeight = 0.5 - BiomeBorderDither
 PostProcessConfig: BiomeGradeStrength 0.04, ColdStart 0.45, ColdFull 0.85, EaseRate 0.5
 SurfaceShadingConfig: Grass/Foliage Color corners (ColdDry/WarmDry, ColdMid/WarmMid, ColdWet/WarmWet),

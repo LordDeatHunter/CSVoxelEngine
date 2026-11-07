@@ -21,7 +21,7 @@ description: Rules and checklist for changing CSVoxelEngine biome, climate, terr
 
 ## Traps
 
-- **Next free noise seed offset is 162** (153-161 are relief, mountains, peaks, islands, great lakes). A new `TerrainNoise` instance needs a new unused offset. `SnowGenerator.DriftNoise` shares offset 89 with `BiomeDitherNoise`; do not "fix" it, it re-lays snow drift.
+- **Next free noise seed offset is 163** (153-161 are relief, mountains, peaks, islands, great lakes; 162 the barrier band's patches). A new `TerrainNoise` instance needs a new unused offset. `SnowGenerator.DriftNoise` shares offset 89 with `BiomeDitherNoise`; do not "fix" it, it re-lays snow drift.
 - Changing any frequency, octave count, warp amplitude or seed offset re-lays the whole world for existing seeds; existing saves show seams at the edge of edited chunks. Say so in BIOMEGEN §11.
 - The origin's raw temperature and humidity are exactly 0 (OpenSimplex at the lattice origin); the semi-dry ramp midpoint sits just below 0 to keep spawn Forest. A change moving the origin's climate sample breaks `OriginColumnIsForest`; relax the test to its real rule, never tune toward one seed.
 - Widen the temperate band by raising both `TemperatureWarm*` constants together; never move the cold ramp. The climate warp is bounded by stretch <= 2 and by the desert/snow load-radius separation (the tighter limit); if the separation test fails lower the warp or `TemperatureFrequency`, never the rule.

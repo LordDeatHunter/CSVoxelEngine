@@ -131,6 +131,16 @@ internal static class StampGateSample
         foreach (var pos in extraChunks)
             AddChunk(pos);
 
+        // The barrier band lies far below every column's ground: one anchor column's chunk stack
+        // through it, one chunk past each edge, so its gate both admits and skips a filled chunk
+        if (columns.Count > 0)
+        {
+            var (bcx, bcz) = columns[0];
+            for (var cy = (WorldGenerationConfig.BarrierBottomY >> Chunk.SizeShift) - 1;
+                 cy <= (WorldGenerationConfig.BarrierTopY >> Chunk.SizeShift) + 1; cy++)
+                AddChunk(new Vector3(bcx, cy, bcz));
+        }
+
         return chunks;
     }
 

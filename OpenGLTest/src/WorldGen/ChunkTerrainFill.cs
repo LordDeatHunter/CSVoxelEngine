@@ -250,6 +250,12 @@ internal static class ChunkTerrainFill
             FoliageGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Foliage);
 
+        // Last of every stamp, so nothing writes over it: the barrier band between the overworld
+        // and hell. Its core takes every cell, carved air and fluids included, so it is gapless.
+        if (WorldGenerationConfig.BarrierEnabled && Admits(stampGates, BarrierGenerator.WriteBand(), lowerBoundY))
+            BarrierGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Barrier);
+
         // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping.
         // Counting AIR and subtracting beats counting non-air: BlockType.Air is
         // `public const byte Air = 0`, so this binds to the vectorized

@@ -4,7 +4,7 @@
 
 ## Status
 
-Phase 1 (foundations) done; phase 2 next. A Nether- and Aether-like pair of realms inside the one world, as vertical
+Phase 1 (foundations) done; phase 2 under way (`L-5` done). A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
@@ -12,7 +12,10 @@ day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, 
 creative only) is the barrier's tool. The `softLanding` and `sink` block flags (`SinkLayer`,
 `PlayerConfig.SinkBlockSpeed`) are ready for the cloud blocks of `L-11`; the server accepts the sink.
 The eye's height already tints the sky and fog (`LayerClimate`, `FrameLighting`, no shader change):
-red in hell, a deeper blue over the cloud slab. Last updated 2026-11-07.
+red in hell, a deeper blue over the cloud slab. The barrier band is generated (`BarrierGenerator`, the
+`barrier` block, iron pickaxe only): a gapless core from -230 to -270 that walls up caves and fluids
+too, patchy noise ramps above and below it, stamped last; below it the ground stays stone until `L-6`.
+Last updated 2026-11-07.
 
 ## In progress
 
@@ -22,10 +25,6 @@ Nothing.
 
 ### Phase 2: Hell slice
 
-- [ ] **`L-5` Barrier band.** P1, M. Y -200..-300, iron pickaxe to mine. Chance ramps 0 to 100 %
-  over -200..-230 and back over -270..-300, modulated by coherent noise; 100 % from -230 to -270.
-  A pure function of position and seed. **Hook:** `ChunkTerrainFill` stamp with a `StampBand`
-  (and its row in `StampGateTests`), new noise seed offset (`biome-worldgen` skill).
 - [ ] **`L-6` Hell pockets, endless.** P1, L. Below the barrier: big open cavern pockets stacked
   downward, separated by hellrock slabs (iron-pickaxe breakable, high hardness), repeating forever.
   Layer index scales lava, density and mob difficulty. 3D noise on a strided lattice like

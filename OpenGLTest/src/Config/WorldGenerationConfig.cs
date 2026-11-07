@@ -756,6 +756,14 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>Bottom of the barrier band, where its lower ramp ends at 0 %.</summary>
     public const int BarrierBottomY = -300;
 
+    /// <summary>Whether worldgen stamps the barrier band (BarrierGenerator).</summary>
+    public const bool BarrierEnabled = true;
+
+    /// <summary>Frequency of the barrier's 3D patch noise (seed offset 162): a cell in either ramp
+    /// is barrier where the noise, mapped to 0..1, is under the ramp's share at its y, so the
+    /// band's edges break into coherent patches about this wavelength across.</summary>
+    public const float BarrierPatchFrequency = 1f / 20f;
+
     /// <summary>Where hell starts: the first cell under the barrier band. Hell has no bottom.</summary>
     public const int HellTopY = BarrierBottomY - 1;
 

@@ -80,6 +80,8 @@ internal sealed class WorldgenStageTimer
         Flowers,
         /// <summary>FoliageGenerator.Stamp.</summary>
         Foliage,
+        /// <summary>BarrierGenerator.Stamp.</summary>
+        Barrier,
         /// <summary>The SolidCount recount.</summary>
         SolidCount,
         /// <summary>ScanFluidFrontier.</summary>
