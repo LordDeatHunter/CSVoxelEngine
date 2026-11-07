@@ -2,7 +2,7 @@
 > Guide: plans/README.md
 
 ## Status
-Design settled with the user on 2026-11-07; nothing implemented. Tracks gear (armor and accessories with rarity and
+Design settled with the user on 2026-11-07; `I-1` (gear core) is done. Tracks gear (armor and accessories with rarity and
 rolled modifiers), chests and ruins that hold loot. One phase per prompt: implement it, update this file, stop.
 The gear tab, equipment panel and chest panel build on the UI kit from `plans/INVENTORY_UI.md` (U-1, U-2 first).
 
@@ -10,19 +10,6 @@ The gear tab, equipment panel and chest panel build on the UI kit from `plans/IN
 Nothing.
 
 ## Open
-
-### Phase 1: gear core
-- [ ] **`I-1` Gear pool, equipment slots and item schema** - P1, L. New Gear pool (own cap, about 64, own [E] tab) for
-  instances that carry components, plus an equipment array outside the pool: 5 armor slots (head, chest, legs, feet,
-  gloves) and 4 accessory slots (rings, charms, amulets and belts share them); slot counts are data/config.
-  - [ ] item JSON `equip` object (slot, armor, stat modifiers, set name, `visible`) and `rarity`; `ItemLoader` rules
-    refusing `equip` beside `use`/`staff`/`crucible`; `GearItem` in `ItemFactory`
-  - [ ] save and net: `PlayerSaveData` equipment, `HandledComponentTypes`, equip/unequip `NetInventoryAction`s and
-    `InventoryIntentRules` arms (an owned instance and a matching slot type)
-  - [ ] stat plumbing: `PlayerHealth.MaxHealth` const -> instance (HUD hearts), mana max and regen, move speed (server
-    allowance in `NetValidation` scales with it), mining and attack speed and damage
-  - [ ] [E] gear tab and equipment panel; a few placeholder gear items
-  **Hook:** `Inventory`, `InventorySaveCodec`, `ItemLoader`, `PlayerHealth`, `PlayerMana`, `PlayerPhysics`.
 
 ### Phase 2: armor and modifiers
 - [ ] **`I-2` Armor math, immunity, modifiers, rarity and sets** - P1, L.
@@ -77,6 +64,21 @@ Nothing.
   I-1 keeps slot counts in data/config so this stays possible.
 
 ## Reference
+- **What I-1 shipped.** Gear instances live in the same instance list as tools (`Inventory.Tools`, `ItemStack`)
+  but have their own pool category (`InventoryCategory.Gear`, `GearConfig.GearCapacity`, `UsedOf`, `CapacityOf`,
+  `GearEntries`), so every tool-instance lookup, the save and the wire carry them unchanged. `Equipment`
+  (`inventory.Equipment`) holds one instance id per slot (5 armor in head, chest, legs, feet, gloves order, then 4
+  accessories). A worn piece stays in the pool (a deviation from "outside the pool": the pool cap counts it),
+  `RemoveTool` takes it off, and gear never goes on the hotbar. Item JSON gained `equip` (`slot`, `armor`,
+  `modifiers`, `set`, `visible`, `immune`, `passives`) and `rarity`, parsed by `ItemLoader.ParseEquip` into a
+  `GearInfo` on a `GearItem`. `GearStats` sums the worn modifiers (`GearStatsCalculator`, clamped) and is applied by
+  `PlayerHealth.ApplyGear` (max health; mana max and regen where the pool is simulated), `Camera.GearMoveFactor`,
+  the mining and attack pace (`LeftClickAction`, `BreakProgress`, `AttackPacing`) and the factor on
+  `Combat.*Damage`. Wire: protocol 19, `NetInventoryAction.EquipGear` and `UnequipGear`, and
+  `PlayerSaveData.InventoryData.Equipped`. UI: the Gear tab (rows marked "worn") and
+  `EquipmentCardLayout`/`EquipmentCardRenderer`. Placeholder content: a leather and a bronze set and four
+  accessories (`tools/generate-gear-textures.ps1`, `visual-examples/gear.json`); the leather set is crafted from
+  cotton for now. Passives, immunities and sets are parsed already; their rules are `I-2`.
 - **Decisions.** No durability on gear. Stats gear may change in v1: max health, max mana and mana regen, move speed,
   mining and attack speed and damage. Chest sizes come from block JSON. Gear uses a new pool because only the 8-slot
   Tools pool carries per-instance components today.

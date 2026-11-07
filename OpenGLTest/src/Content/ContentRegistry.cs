@@ -133,6 +133,7 @@ public static class ContentRegistry
         StatusEffectLoader.LoadEffects(Path.Combine(assetsRoot, "data", "effects"));
         SpellPartLoader.LoadSpellParts(Path.Combine(assetsRoot, "data", "spell"));
         ItemLoader.ValidateItemUses(itemFiles);
+        ItemLoader.ValidateGear();
     }
 
     /// <summary>

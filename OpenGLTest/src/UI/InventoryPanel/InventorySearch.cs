@@ -76,6 +76,7 @@ public static class InventorySearch
     {
         AddStacks(query, inventory, InventoryCategory.Blocks, hits, owned);
         AddStacks(query, inventory, InventoryCategory.Misc, hits, owned);
+        AddGearHits(query, inventory, hits, owned);
 
         // One row per tool kind, pointing at its first live instance: tools are instances, but
         // a search should offer "Bucket", not one row per duplicate.
@@ -87,6 +88,20 @@ public static class InventorySearch
             if (!Matches(tool.Name, query)) continue;
             hits.Add(new SearchHit(SearchHitKind.Inventory, tool.ItemId, tool.Name,
                 InventoryCategory.Tools, tool.InstanceId, inventory.CountFor(tool.ItemId), null));
+        }
+    }
+
+    private static void AddGearHits(string query, Inventory inventory, List<SearchHit> hits, HashSet<byte> owned)
+    {
+        // Like tools: one row per gear kind, pointing at its first live instance
+        var seen = new HashSet<byte>();
+        foreach (var gear in inventory.GearEntries())
+        {
+            if (!seen.Add(gear.ItemId)) continue;
+            owned.Add(gear.ItemId);
+            if (!Matches(gear.Name, query)) continue;
+            hits.Add(new SearchHit(SearchHitKind.Inventory, gear.ItemId, gear.Name,
+                InventoryCategory.Gear, gear.InstanceId, inventory.CountFor(gear.ItemId), null));
         }
     }
 

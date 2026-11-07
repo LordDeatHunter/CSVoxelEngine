@@ -222,7 +222,7 @@ internal sealed class PlayerPhysics
         // A slowing status effect (frostburn) scales the same way; flight ignores both.
         camera.SetMovementFactor(BlockMoveFactor(camera, chunkManager));
         var statusFactor = camera.Effects?.MoveFactor ?? 1f;
-        if (!camera.IsFlying) moveSpeed *= camera.MovementFactor * statusFactor;
+        if (!camera.IsFlying) moveSpeed *= camera.MovementFactor * statusFactor * camera.GearMoveFactor;
         var wish = new Vector2(moveInput.X * moveSpeed, moveInput.Z * moveSpeed);
         float accelRate;
         if (camera.IsFlying)
@@ -241,7 +241,7 @@ internal sealed class PlayerPhysics
                 SwimStrokeCount++;
                 if (moving)
                 {
-                    var burst = SwimBurstSpeed * (backing ? 0.6f : 1f) * camera.MovementFactor * statusFactor;
+                    var burst = SwimBurstSpeed * (backing ? 0.6f : 1f) * camera.MovementFactor * statusFactor * camera.GearMoveFactor;
                     _horizontalVelocity = new Vector2(moveInput.X, moveInput.Z) * burst;
                 }
                 _pendingSwimVertical = strokeUp ? SwimBurstUp : strokeDown ? SwimBurstDown : 0f;

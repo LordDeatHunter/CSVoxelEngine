@@ -783,6 +783,7 @@ public class World
         UpdateFocus();
         _chunkManager.Update(Focus.Chunks);
         _lodManager.Update(_chunkManager);
+        LocalPlayer.ApplyGear(simulatesMana: false);
 
         var feet = Camera.Position - new Vector3(0f, Camera.EyeHeight, 0f);
         if (_chunkManager.ChunkAt(MathUtils.FloorToInt(feet.X), MathUtils.FloorToInt(feet.Y),

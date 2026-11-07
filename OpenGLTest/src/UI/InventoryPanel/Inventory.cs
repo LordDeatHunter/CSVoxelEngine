@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Config;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Items;
 using VoxelEngine.Saves;
@@ -35,6 +36,9 @@ public class Inventory
     public const int ToolCapacity = 8;
     public const int MiscCapacity = 2048;
 
+    /// <summary>Gear instances a player carries (see <see cref="GearConfig.GearCapacity"/>); worn pieces count.</summary>
+    public const int GearCapacity = GearConfig.GearCapacity;
+
     /// <summary>Test stock of every placeable block the player spawns with. Every placeable block
     /// gets this much out of the one shared <see cref="BlockCapacity"/>, so it is kept small
     /// enough that the whole seed still leaves the pool room to add to as blocks are added.</summary>
@@ -55,6 +59,9 @@ public class Inventory
     private int _nextToolInstance = 1;
 
     private readonly HotbarSlot[] _hotbar = new HotbarSlot[SlotCount];
+
+    /// <summary>What the player wears; the worn pieces are instances in the Gear pool.</summary>
+    public Equipment Equipment { get; }
 
     // The same instances, handed to the static helpers that work on this inventory
     // (InventoryCrafting, InventorySaveCodec); state lives only here
@@ -103,14 +110,16 @@ public class Inventory
         InventoryCategory.Blocks => BlockCapacity,
         InventoryCategory.Tools => ToolCapacity,
         InventoryCategory.Misc => MiscCapacity,
+        InventoryCategory.Gear => GearCapacity,
         _ => 0,
     };
 
     public int UsedOf(InventoryCategory category) => category switch
     {
         InventoryCategory.Blocks => _blocks.Values.Sum(),
-        InventoryCategory.Tools => _tools.Count,
+        InventoryCategory.Tools => _tools.Count(t => t.Item is not GearItem),
         InventoryCategory.Misc => _misc.Values.Sum(),
+        InventoryCategory.Gear => _tools.Count(t => t.Item is GearItem),
         _ => 0,
     };
 
@@ -138,13 +147,14 @@ public class Inventory
         switch (category.Value)
         {
             case InventoryCategory.Tools:
-                var room = ToolCapacity - _tools.Count;
+            case InventoryCategory.Gear:
+                var room = CapacityOf(category.Value) - UsedOf(category.Value);
                 if (room <= 0) return false;
                 var newTool = CountFor(id) == 0;
                 var firstNewIndex = _tools.Count;
                 for (var i = 0; i < Math.Min(room, amount); i++)
                     _tools.Add(new ItemStack(_nextToolInstance++, id));
-                if (newTool)
+                if (newTool && category.Value == InventoryCategory.Tools)
                     EquipNewTool(_tools[firstNewIndex].InstanceId);
                 return true;
             default:
@@ -195,6 +205,7 @@ public class Inventory
         var index = _tools.FindIndex(t => t.InstanceId == instanceId);
         if (index < 0) return false;
         _tools.RemoveAt(index);
+        Equipment.Forget(instanceId);
         for (var i = 0; i < _hotbar.Length; i++)
             if (_hotbar[i] is { IsTool: true } slot && slot.ToolInstance == instanceId)
                 _hotbar[i] = HotbarSlot.Empty;
@@ -207,7 +218,7 @@ public class Inventory
     /// </summary>
     public bool RemoveAll(byte id)
     {
-        if (CategoryOf(id) == InventoryCategory.Tools)
+        if (CategoryOf(id) is InventoryCategory.Tools or InventoryCategory.Gear)
         {
             var instances = _tools.Where(t => t.DefinitionId == id)
                 .Select(t => t.InstanceId)
@@ -282,7 +293,8 @@ public class Inventory
             _hotbar[i] = HotbarSlot.Empty;
             return true;
         }
-        var alive = _tools.Any(t => t.InstanceId == instanceId);
+        // Worn gear is not held in hand: only tools and items go on the hotbar
+        var alive = _tools.Any(t => t.InstanceId == instanceId && t.Item is not GearItem);
         _hotbar[i] = alive ? new HotbarSlot(true, 0, instanceId) : HotbarSlot.Empty;
         return alive;
     }
@@ -350,7 +362,7 @@ public class Inventory
             return true;
         }
         if (CountFor(id) <= 0) return false;
-        if (CategoryOf(id) == InventoryCategory.Tools)
+        if (CategoryOf(id) is InventoryCategory.Tools or InventoryCategory.Gear)
         {
             var instance = _tools.FirstOrDefault(t => t.DefinitionId == id);
             if (instance == null) return false;
@@ -371,7 +383,7 @@ public class Inventory
         {
             InventoryCategory.Blocks => _blocks.GetValueOrDefault(id),
             InventoryCategory.Misc => _misc.GetValueOrDefault(id),
-            InventoryCategory.Tools => _tools.Count(t => t.DefinitionId == id),
+            InventoryCategory.Tools or InventoryCategory.Gear => _tools.Count(t => t.DefinitionId == id),
             _ => 0,
         };
     }
@@ -416,7 +428,7 @@ public class Inventory
     /// <summary>Stackable rows for a tab, holding something only (name-sorted).</summary>
     public IReadOnlyList<StackRow> StackEntries(InventoryCategory category)
     {
-        if (category == InventoryCategory.Crafting || category == InventoryCategory.Tools)
+        if (category is InventoryCategory.Crafting or InventoryCategory.Tools or InventoryCategory.Gear)
             return [];
         var store = category == InventoryCategory.Blocks ? _blocks : _misc;
         // The panel's order: by display name, then the fuller stack first. Rows are always built
@@ -430,8 +442,14 @@ public class Inventory
     }
 
     /// <summary>One row per tool instance (name-sorted, oldest first within a name).</summary>
-    public IReadOnlyList<ToolRow> ToolEntries() =>
+    public IReadOnlyList<ToolRow> ToolEntries() => InstanceEntries(gear: false);
+
+    /// <summary>One row per gear instance (name-sorted, oldest first within a name).</summary>
+    public IReadOnlyList<ToolRow> GearEntries() => InstanceEntries(gear: true);
+
+    private ToolRow[] InstanceEntries(bool gear) =>
         _tools
+            .Where(t => (t.Item is GearItem) == gear)
             .OrderBy(t => DisplayName(t.DefinitionId), StringComparer.OrdinalIgnoreCase)
             .ThenBy(t => t.InstanceId)
             .Select(t => new ToolRow(t.InstanceId, t.DefinitionId, DisplayName(t.DefinitionId)))
@@ -624,6 +642,7 @@ public class Inventory
 
     private Inventory(bool seedTestStock)
     {
+        Equipment = new Equipment(this);
         if (!seedTestStock) return;
         foreach (var type in BlockType.Types.Values)
             if (type.HasItem && !type.Fluid)

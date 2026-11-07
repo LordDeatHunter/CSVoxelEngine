@@ -1,4 +1,6 @@
 using System;
+using VoxelEngine.Config;
+using VoxelEngine.Items;
 using VoxelEngine.Status;
 
 namespace VoxelEngine.Player;
@@ -25,6 +27,33 @@ public sealed class PlayerHealth
     public const float DamageFlashSeconds = 1.5f;
 
     public int Health { get; private set; } = MaxHealth;
+
+    private int _maxBonus;
+
+    /// <summary>
+    /// Applies what worn gear changes: the health bonus, and (only where this pool is simulated, never on a
+    /// client that mirrors its server's mana) the mana bonus and regeneration.
+    /// </summary>
+    public void ApplyGear(in GearStats gear, bool simulatesMana)
+    {
+        SetMaxBonus(gear.MaxHealth);
+        if (simulatesMana)
+            Mana.SetGear(gear.MaxMana, gear.ManaRegenFactor);
+    }
+
+    /// <summary>The pool's size: <see cref="MaxHealth"/> plus what worn gear adds. The hearts scale to it.</summary>
+    public int Max => MaxHealth + _maxBonus;
+
+    /// <summary>
+    /// Sets what worn gear adds to the pool (clamped to 0..<see cref="GearConfig.MaxHealthBonusCap"/>). A smaller
+    /// pool pulls the health down with it; a larger one leaves it where it is, so putting gear on never heals.
+    /// </summary>
+    public void SetMaxBonus(int bonus)
+    {
+        _maxBonus = Math.Clamp(bonus, 0, GearConfig.MaxHealthBonusCap);
+        if (Health > Max)
+            Health = Max;
+    }
 
     /// <summary>
     /// Damage feedback strength, 1 on a hit decaying to 0. Drives the screen-corner
@@ -58,7 +87,7 @@ public sealed class PlayerHealth
     /// </summary>
     public void Restore(int health)
     {
-        Health = Math.Clamp(health, 0, MaxHealth);
+        Health = Math.Clamp(health, 0, Max);
         DamageFlash = 0f;
         _lavaTimer = 0f;
         Breath.Refill();
@@ -93,7 +122,7 @@ public sealed class PlayerHealth
         if (IsDead)
             return;
         _secondsSinceCombat += Math.Max(0f, deltaTime);
-        if (immune || Health >= MaxHealth || _secondsSinceCombat < PlayerConfig.RegenDelaySeconds)
+        if (immune || Health >= Max || _secondsSinceCombat < PlayerConfig.RegenDelaySeconds)
         {
             _regenCarry = 0f;
             return;
@@ -136,9 +165,9 @@ public sealed class PlayerHealth
     /// </summary>
     public bool Heal(int amount)
     {
-        if (amount <= 0 || Health <= 0 || Health >= MaxHealth)
+        if (amount <= 0 || Health <= 0 || Health >= Max)
             return false;
-        Health = Math.Min(MaxHealth, Health + amount);
+        Health = Math.Min(Max, Health + amount);
         return true;
     }
 
@@ -200,7 +229,7 @@ public sealed class PlayerHealth
             Effects.Clear();
             return;
         }
-        var damage = Effects.Tick(deltaTime, MaxHealth);
+        var damage = Effects.Tick(deltaTime, Max);
         if (damage > 0)
             TakeDamage(damage, DamageSource.Magic, Effects.LastDamageEffect?.DeathMessage);
     }
@@ -213,7 +242,7 @@ public sealed class PlayerHealth
     /// caller owns the teleport.</summary>
     public void Respawn()
     {
-        Health = MaxHealth;
+        Health = Max;
         _lavaTimer = 0f;
         Breath.Refill();
         Mana.Refill();

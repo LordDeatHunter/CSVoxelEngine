@@ -12,7 +12,7 @@ public interface IScenarioUi
     /// <summary>Opens or closes the [E] panel.</summary>
     void SetPanelOpen(bool open);
 
-    /// <summary>Switches the [E] panel to a tab by name (<c>blocks</c>, <c>tools</c>, <c>misc</c>, <c>crafting</c>).</summary>
+    /// <summary>Switches the [E] panel to a tab by name (<c>blocks</c>, <c>tools</c>, <c>misc</c>, <c>gear</c>, <c>crafting</c>).</summary>
     void SelectTab(string tab);
 
     /// <summary>Types into the [E] panel's search field.</summary>

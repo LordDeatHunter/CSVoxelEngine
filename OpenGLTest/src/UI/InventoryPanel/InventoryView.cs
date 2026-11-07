@@ -42,9 +42,9 @@ public sealed class InventoryView
     /// </summary>
     public CraftingSession Craft { get; } = new();
 
-    // One scroll offset per tab, indexed by (int)InventoryCategory, which is 0..3 contiguous
-    // (Inventory.cs). If a tab is added, size this from Enum.GetValues instead.
-    private readonly float[] _scroll = new float[4];
+    // One scroll offset per tab, indexed by (int)InventoryCategory, which is contiguous from 0
+    // (InventoryCategory.cs), so it is sized from the enum.
+    private readonly float[] _scroll = new float[Enum.GetValues<InventoryCategory>().Length];
 
     /// <summary>
     /// Canvas pixels the active tab's list is scrolled by. The input handlers clamp on write,

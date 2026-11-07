@@ -111,7 +111,14 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
             case "give":
                 var id = ContentRegistry.Require(step.Block!);
                 world.Inventory.Add(id, step.Count);
-                if (Inventory.CategoryOf(id) == InventoryCategory.Tools)
+                if (Inventory.CategoryOf(id) == InventoryCategory.Gear)
+                {
+                    // A piece of gear is put on, in its first fitting slot, so a shot shows it worn
+                    var worn = world.Inventory.GearEntries().Where(t => t.ItemId == id).Select(t => t.InstanceId)
+                        .DefaultIfEmpty(-1).Max();
+                    if (worn >= 0) world.Inventory.Equipment.TryEquipAuto(worn);
+                }
+                else if (Inventory.CategoryOf(id) == InventoryCategory.Tools)
                 {
                     // A tool arrives as a new instance: put the newest one of that id in hand
                     var newest = world.Inventory.ToolEntries().Where(t => t.ItemId == id).Select(t => t.InstanceId).DefaultIfEmpty(-1).Max();

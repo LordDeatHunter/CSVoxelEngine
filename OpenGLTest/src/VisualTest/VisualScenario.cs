@@ -234,7 +234,7 @@ public sealed class VisualScenario
             "tab" => new VisualStep
             {
                 Op = "tab",
-                Tab = ReadChoice(element, index, "tab", "tab", ["blocks", "tools", "misc", "crafting"]),
+                Tab = ReadChoice(element, index, "tab", "tab", ["blocks", "tools", "misc", "gear", "crafting"]),
             },
             "search" => new VisualStep
             {

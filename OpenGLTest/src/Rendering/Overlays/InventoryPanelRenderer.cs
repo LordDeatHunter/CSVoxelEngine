@@ -106,8 +106,8 @@ internal sealed class InventoryPanelRenderer
             rowCount = hits.Count;
         else if (creative && view.Tab != InventoryCategory.Crafting)
             rowCount = (catalog = CreativeCatalog.Entries(view.Tab, inventory)).Count;
-        else if (view.Tab == InventoryCategory.Tools)
-            rowCount = (tools = inventory.ToolEntries()).Count;
+        else if (view.Tab is InventoryCategory.Tools or InventoryCategory.Gear)
+            rowCount = (tools = view.Tab == InventoryCategory.Gear ? inventory.GearEntries() : inventory.ToolEntries()).Count;
         else if (view.Tab == InventoryCategory.Crafting)
             rowCount = (recipes = ContentRegistry.CraftingRecipes).Count;
         else
@@ -153,8 +153,11 @@ internal sealed class InventoryPanelRenderer
                 for (var i = first; i < end; i++)
                 {
                     var selected = view.SelectedToolInstance == tools[i].InstanceId;
-                    DrawEntryRow(i, offset, tools[i].ItemId, tools[i].Name, "1", selected, false, headingDegrees,
-                        time, null, inventory.ToolDurabilityFraction(tools[i].InstanceId));
+                    // A worn piece reads "worn" in green, so the list shows what is on at a glance
+                    var worn = view.Tab == InventoryCategory.Gear && inventory.Equipment.IsEquipped(tools[i].InstanceId);
+                    DrawEntryRow(i, offset, tools[i].ItemId, tools[i].Name, worn ? "worn" : "1", selected, false,
+                        headingDegrees, time, worn ? ReadyGreen : null,
+                        inventory.ToolDurabilityFraction(tools[i].InstanceId));
                 }
             }
             else if (recipes != null)
@@ -222,6 +225,7 @@ internal sealed class InventoryPanelRenderer
     {
         InventoryCategory.Blocks => "Blocks",
         InventoryCategory.Tools => "Tools",
+        InventoryCategory.Gear => "Gear",
         InventoryCategory.Crafting => "Craft",
         _ => "Misc",
     };
@@ -325,6 +329,12 @@ internal sealed class InventoryPanelRenderer
         if (view.Tab == InventoryCategory.Crafting)
         {
             _ui.CraftCard.DrawCraftDetail(inventory, view, time, headingDegrees);
+            return;
+        }
+
+        if (view.Tab == InventoryCategory.Gear)
+        {
+            _ui.EquipmentCard.Draw(inventory, view.SelectedToolInstance, view.HoverCanvas, time, headingDegrees);
             return;
         }
 

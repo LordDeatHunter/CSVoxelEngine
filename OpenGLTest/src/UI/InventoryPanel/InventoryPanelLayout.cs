@@ -55,7 +55,8 @@ public static class InventoryPanelLayout
 
     public static readonly InventoryCategory[] Tabs =
     [
-        InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc, InventoryCategory.Crafting,
+        InventoryCategory.Blocks, InventoryCategory.Tools, InventoryCategory.Misc, InventoryCategory.Gear,
+        InventoryCategory.Crafting,
     ];
 
     public static float PanelWidth(Vector2 screen) =>

@@ -212,9 +212,11 @@ internal sealed class HudRenderer : IDisposable
     /// Every heart draws its empty shell first and the red heart over it — full, left
     /// half (5 HP steps), or nothing — so damage reads heart by heart like Minecraft.
     /// </summary>
-    internal void DrawHearts(int health)
+    internal void DrawHearts(int health, int maxHealth = PlayerHealth.MaxHealth)
     {
-        var hp = Math.Clamp(health, 0, PlayerHealth.MaxHealth);
+        var hp = Math.Clamp(health, 0, maxHealth);
+        // Ten hearts always: each stands for a tenth of the pool, so gear that grows the pool grows every heart
+        var perHeart = maxHealth / (float)PlayerHealth.HeartCount;
         var rowWidth = HeartDrawWidth + (PlayerHealth.HeartCount - 1) * HeartStride;
         var firstX = (_ui.ScreenSize.X - rowWidth) * 0.5f + HeartDrawWidth * 0.5f;
         var hotbarTop = _ui.ScreenSize.Y - BottomMargin - SlotSize;
@@ -227,10 +229,10 @@ internal sealed class HudRenderer : IDisposable
             var center = new Vector2(firstX + i * HeartStride, centerY);
             _ui.DrawMesh(_heartEmptyMesh, RectTransform(center, fullSize), Rgba.White, _heartEmptyTexture);
 
-            var fill = Math.Clamp(hp - i * PlayerHealth.HpPerHeart, 0, PlayerHealth.HpPerHeart);
-            if (fill >= PlayerHealth.HpPerHeart)
+            var fill = Math.Clamp(hp - i * perHeart, 0f, perHeart);
+            if (fill >= perHeart - 1e-3f)
                 _ui.DrawMesh(_heartFullMesh, RectTransform(center, fullSize), Rgba.White, _heartTexture);
-            else if (fill >= PlayerHealth.HpPerHeart / 2)
+            else if (fill >= perHeart * 0.5f - 1e-3f)
                 _ui.DrawMesh(_heartHalfMesh,
                     RectTransform(center with { X = center.X - HeartDrawWidth * 0.25f }, halfSize),
                     Rgba.White, _heartTexture);

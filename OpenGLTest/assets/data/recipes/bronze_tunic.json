@@ -1,0 +1,7 @@
+{
+  "result": "item/bronze_tunic",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/bronze_ingot", "count": 8 }
+  ]
+}

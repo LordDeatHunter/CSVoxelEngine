@@ -87,6 +87,10 @@ public enum NetInventoryAction : byte
     BindStaffSlot = 9,
     /// <summary>Unbinds a slot of the held staff (the spell table).</summary>
     ClearStaffSlot = 10,
+    /// <summary>Wears an owned gear instance in an equipment slot: <c>Slot</c> and <c>Id</c> (the instance id).</summary>
+    EquipGear = 11,
+    /// <summary>Takes off the gear worn in an equipment slot: <c>Slot</c>.</summary>
+    UnequipGear = 12,
 }
 
 /// <summary>
@@ -142,8 +146,11 @@ public static class NetFraming
     /// <see cref="NetEntityKind.Cloudgolem"/>); a flyer's whole position rides the entry as for every mob, and its
     /// flight follows from its kind; an older client would not draw them. A hell or sky mob's attack count was put
     /// in its entry's ammo field later without a bump: the layout is unchanged, an older client ignores the field
-    /// and an older server's 0 simply plays no attack clip.</summary>
-    public const int ProtocolVersion = 18;
+    /// and an older server's 0 simply plays no attack clip.
+    /// 19: the <see cref="NetInventoryAction.EquipGear"/> and <see cref="NetInventoryAction.UnequipGear"/> inventory
+    /// actions, and the inventory snapshot carries the worn gear (<c>Equipped</c>) and the rolled modifiers of each
+    /// gear instance; an older peer would refuse either action as malformed.</summary>
+    public const int ProtocolVersion = 19;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

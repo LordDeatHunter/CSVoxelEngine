@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Items;
 using VoxelEngine.UI.InventoryPanel;
@@ -120,6 +121,60 @@ public sealed class ItemDefinition
 
         /// <summary>The spell part tags it allows; a part passes when any of its tags is listed.</summary>
         public string[]? Tags { get; set; }
+    }
+
+    /// <summary>Rarity name (<c>common</c> to <c>legendary</c>); omitted means common.</summary>
+    public string? Rarity { get; set; }
+
+    /// <summary>
+    /// Marks the item as wearable gear: which slot it fits and what it changes. A piece of gear stores in the Gear
+    /// pool one instance at a time (its rolled modifiers ride on its stack). Omitted for everything else.
+    /// </summary>
+    public EquipDefinition? Equip { get; set; }
+
+    /// <summary>The <c>equip</c> object.</summary>
+    public sealed class EquipDefinition
+    {
+        /// <summary>The slot kind: head, chest, legs, feet, gloves or accessory.</summary>
+        public string? Slot { get; set; }
+
+        /// <summary>Armor points, a shorthand for a flat <c>armor</c> modifier; 0 or more.</summary>
+        public int? Armor { get; set; }
+
+        /// <summary>Fixed stat changes by stat name (maxHealth, maxMana, manaRegen, moveSpeed, miningSpeed,
+        /// attackSpeed, attackDamage, armor).</summary>
+        public Dictionary<string, float>? Modifiers { get; set; }
+
+        /// <summary>The armor set this piece belongs to (the file name of an <c>assets/data/sets</c> entry).</summary>
+        public string? Set { get; set; }
+
+        /// <summary>Whether the piece is drawn on the player's body.</summary>
+        public bool? Visible { get; set; }
+
+        /// <summary>Status effect names this piece makes the wearer immune to.</summary>
+        public string[]? Immune { get; set; }
+
+        /// <summary>Passive triggers this piece carries.</summary>
+        public PassiveDefinition[]? Passives { get; set; }
+    }
+
+    /// <summary>One passive trigger of a piece of gear: when it fires and what it does.</summary>
+    public sealed class PassiveDefinition
+    {
+        /// <summary>When it fires: <c>on_hit</c>, <c>on_damaged</c> or <c>low_health</c>.</summary>
+        public string? Trigger { get; set; }
+
+        /// <summary>The status effect it applies (to the struck mob on a hit, to the wearer otherwise).</summary>
+        public string? Effect { get; set; }
+
+        /// <summary>The chance per trigger, 0..1 (default 1).</summary>
+        public float? Chance { get; set; }
+
+        /// <summary>The effect duration scale (default 1).</summary>
+        public float? Scale { get; set; }
+
+        /// <summary>For <c>low_health</c>: the health share under which it applies (default 0.3).</summary>
+        public float? Below { get; set; }
     }
 
     /// <summary>

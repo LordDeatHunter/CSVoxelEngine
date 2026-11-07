@@ -44,7 +44,7 @@ internal sealed class UiPasses
         int health = PlayerHealth.MaxHealth, float airShare = 1f, float manaShare = 1f, float damageFlash = 0f, HotbarNameFade? hotbarName = null,
         HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
         CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null,
-        byte effectMask = 0, SpellBuilderView? builder = null)
+        byte effectMask = 0, SpellBuilderView? builder = null, int maxHealth = PlayerHealth.MaxHealth)
     {
         // Either panel (the [E] inventory or the spell builder) hides the crosshair and the status row.
         var panelUp = view.IsOpen || builder?.IsOpen == true;
@@ -63,7 +63,7 @@ internal sealed class UiPasses
         }
 
         // The hit flash and the low-health pulse share the vignette's one full-screen pass
-        var lowHealth = LowHealthVignette.Intensity((float)health / PlayerHealth.MaxHealth, time,
+        var lowHealth = LowHealthVignette.Intensity((float)health / maxHealth, time,
             dead: health <= 0, creative: camera?.IsCreative == true);
         // ...and so do the damage direction arc toward the last blow (DamageDirection) and the
         // droplets streaking down after the eye surfaced (SurfacingDroplets)
@@ -102,7 +102,7 @@ internal sealed class UiPasses
             _owner.Ui.Hud.DrawToast(toast.Text, toast.Alpha);
         if (!panelUp && (menu == null || !menu.IsOpen))
         {
-            _owner.Ui.Hud.DrawHearts(health);
+            _owner.Ui.Hud.DrawHearts(health, maxHealth);
             _owner.Ui.Hud.DrawAir(airShare, health);
             _owner.Ui.Hud.DrawMana(manaShare, health, camera?.IsCreative == true);
             _owner.Ui.Hud.DrawEffects(effectMask, health);

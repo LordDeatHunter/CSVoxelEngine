@@ -1,4 +1,5 @@
 using System;
+using VoxelEngine.Config;
 
 namespace VoxelEngine.Player;
 
@@ -11,7 +12,13 @@ namespace VoxelEngine.Player;
 /// </summary>
 public sealed class PlayerMana
 {
+    private int _baseMax = ManaConfig.StartMax;
+    private int _bonus;
+    private float _regenFactor = 1f;
     private int _max = ManaConfig.StartMax;
+
+    /// <summary>The largest pool the wire carries: the progression cap plus the most gear can add.</summary>
+    public const int WireMaxCap = ManaConfig.MaxCap + GearConfig.MaxManaBonusCap;
 
     /// <summary>The size of the pool, at least 1.</summary>
     public int Max => _max;
@@ -34,14 +41,33 @@ public sealed class PlayerMana
     /// </summary>
     public void SetKnownParts(int knownParts)
     {
-        _max = MaxFor(knownParts);
+        _baseMax = MaxFor(knownParts);
+        Resize();
+    }
+
+    /// <summary>
+    /// What worn gear adds: <paramref name="maxBonus"/> to the pool (0..<see cref="GearConfig.MaxManaBonusCap"/>)
+    /// and a <paramref name="regenFactor"/> on its regeneration. Only the authoritative simulation calls it; a
+    /// client mirrors the finished max (<see cref="SetNet"/>). A smaller pool clamps the mana down, a larger
+    /// one never refills it.
+    /// </summary>
+    public void SetGear(int maxBonus, float regenFactor)
+    {
+        _bonus = Math.Clamp(maxBonus, 0, GearConfig.MaxManaBonusCap);
+        _regenFactor = float.IsFinite(regenFactor) ? Math.Max(0.1f, regenFactor) : 1f;
+        Resize();
+    }
+
+    private void Resize()
+    {
+        _max = _baseMax + _bonus;
         Current = Math.Min(Current, _max);
     }
 
     /// <summary>Passive regeneration: <see cref="Max"/> / <see cref="ManaConfig.RegenFullSeconds"/> per
-    /// second, never past the pool.</summary>
+    /// second (scaled by worn gear), never past the pool.</summary>
     public void Regen(float deltaTime) =>
-        Current = Math.Min(_max, Current + Math.Max(0f, deltaTime) * _max / ManaConfig.RegenFullSeconds);
+        Current = Math.Min(_max, Current + Math.Max(0f, deltaTime) * _max * _regenFactor / ManaConfig.RegenFullSeconds);
 
     /// <summary>
     /// Restores <paramref name="share"/> (0..1) of the pool, never past it (a mana item, MG-9). Refused,
@@ -78,10 +104,10 @@ public sealed class PlayerMana
     public int NetMana => Math.Clamp((int)MathF.Floor(Current + 1e-4f), 0, _max);
 
     /// <summary>Sets the pool from the wire (a client mirroring its server): the max clamped to
-    /// 1..<see cref="ManaConfig.MaxCap"/>, the mana into it.</summary>
+    /// 1..<see cref="WireMaxCap"/>, the mana into it.</summary>
     public void SetNet(int mana, int max)
     {
-        _max = Math.Clamp(max, 1, ManaConfig.MaxCap);
+        _max = Math.Clamp(max, 1, WireMaxCap);
         Current = Math.Clamp(mana, 0, _max);
     }
 

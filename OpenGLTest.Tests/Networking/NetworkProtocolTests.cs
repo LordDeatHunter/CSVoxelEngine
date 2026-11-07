@@ -227,11 +227,11 @@ public sealed class NetworkProtocolTests
         var dead = new PlayerStatusData(NetPlayerFlags.None, 0, Dead: true, Vector3.Zero, 0f);
         Assert.Equal(dead, RoundTrip(dead));
 
-        // A health outside the pool is clamped into it, and mode bits the protocol does not define
+        // A health past the biggest pool gear can make is clamped into it, and mode bits the protocol does not define
         // are dropped rather than handed to the camera
-        var overfull = RoundTrip(new PlayerStatusData((NetPlayerFlags)0xFF, PlayerHealth.MaxHealth + 50, false,
+        var overfull = RoundTrip(new PlayerStatusData((NetPlayerFlags)0xFF, PlayerHealth.MaxHealth + GearConfig.MaxHealthBonusCap + 50, false,
             Vector3.Zero, 0f));
-        Assert.Equal(PlayerHealth.MaxHealth, overfull.Health);
+        Assert.Equal(PlayerHealth.MaxHealth + GearConfig.MaxHealthBonusCap, overfull.Health);
         Assert.Equal(NetPlayerFlags.Creative | NetPlayerFlags.Flying, overfull.Modes);
         Assert.Equal(0, RoundTrip(dead with { Health = -10 }).Health);
 
@@ -239,13 +239,13 @@ public sealed class NetworkProtocolTests
         Assert.Equal(7, RoundTrip(hurt with { Air = 7 }).Air);
         Assert.Equal(VoxelEngine.Player.Breath.NetSteps, RoundTrip(hurt with { Air = 250 }).Air);
 
-        // The mana and its max ride along; the max is clamped to 1..MaxCap and the mana into it
+        // The mana and its max ride along; the max is clamped to 1..WireMaxCap and the mana into it
         var casting = hurt with { Mana = 12, MaxMana = ManaConfig.StartMax + ManaConfig.MaxPerKnownPart };
         Assert.Equal(casting, RoundTrip(casting));
         var overflowing = RoundTrip(hurt with { Mana = 5000, MaxMana = 50 });
         Assert.Equal(50, overflowing.Mana);
         Assert.Equal(50, overflowing.MaxMana);
-        Assert.Equal(ManaConfig.MaxCap, RoundTrip(hurt with { MaxMana = int.MaxValue }).MaxMana);
+        Assert.Equal(PlayerMana.WireMaxCap, RoundTrip(hurt with { MaxMana = int.MaxValue }).MaxMana);
         var negative = RoundTrip(hurt with { Mana = -3, MaxMana = 0 });
         Assert.Equal(0, negative.Mana);
         Assert.Equal(1, negative.MaxMana);

@@ -122,8 +122,8 @@ public sealed class ManaTests
 
         mirror.SetNet(mirror.Max + 50, mirror.Max);
         Assert.Equal(mirror.Max, mirror.Current);
-        mirror.SetNet(10, ManaConfig.MaxCap + 1000);
-        Assert.Equal(ManaConfig.MaxCap, mirror.Max);
+        mirror.SetNet(10, PlayerMana.WireMaxCap + 1000);
+        Assert.Equal(PlayerMana.WireMaxCap, mirror.Max);
         mirror.SetNet(10, 0);
         Assert.Equal(1, mirror.Max);
         Assert.Equal(1f, mirror.Current);

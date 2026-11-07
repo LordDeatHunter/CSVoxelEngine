@@ -52,7 +52,19 @@ public static class ItemTooltip
                 scroll.Teaches.Select(k => SpellPartRegistry.TryGetByKey(k)?.DisplayName ?? k)));
         if (item is RestoreManaItem draught)
             lines.Add($"Restores {draught.Restores:P0} mana");
+        if (item is GearItem gear)
+            AddGearLines(lines, gear);
         return lines;
+    }
+
+    /// <summary>The slot the piece fits (replacing the plain "Item" line), then what it changes.</summary>
+    private static void AddGearLines(List<string> lines, GearItem gear)
+    {
+        lines[1] = GearSlots.Label(gear.Info.Slot);
+        foreach (var modifier in gear.Info.Modifiers)
+            lines.Add(GearText.Line(modifier));
+        if (gear.Info.Immune.Count > 0)
+            lines.Add("Immune: " + string.Join(", ", gear.Info.Immune));
     }
 
     /// <summary>The capacity and the vessel's fill, then one line per metal: its molten ml and

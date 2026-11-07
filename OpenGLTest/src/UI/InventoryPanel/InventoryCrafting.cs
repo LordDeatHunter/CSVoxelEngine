@@ -95,7 +95,7 @@ internal static class InventoryCrafting
 
     private static void RemoveUnits(Inventory inventory, byte id, int count)
     {
-        if (Inventory.CategoryOf(id) == InventoryCategory.Tools)
+        if (Inventory.CategoryOf(id) is InventoryCategory.Tools or InventoryCategory.Gear)
         {
             // The least-bound instance goes first (a stable order, so otherwise the pool's own), so
             // upgrading a staff never eats one carrying spells while an empty one is at hand

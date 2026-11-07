@@ -36,7 +36,12 @@ public static class InventoryIntentCodec
             case NetInventoryAction.SelectSlot:
             case NetInventoryAction.SelectStaffSlot:
             case NetInventoryAction.ClearStaffSlot:
+            case NetInventoryAction.UnequipGear:
                 writer.Write(intent.Slot);
+                break;
+            case NetInventoryAction.EquipGear:
+                writer.Write(intent.Slot);
+                writer.Write(intent.Id);
                 break;
             case NetInventoryAction.BindStaffSlot:
             {
@@ -128,6 +133,13 @@ public static class InventoryIntentCodec
                 return InventoryIntent.SelectStaffSlot(reader.ReadInt());
             case NetInventoryAction.ClearStaffSlot:
                 return InventoryIntent.ClearStaffSlot(reader.ReadInt());
+            case NetInventoryAction.UnequipGear:
+                return InventoryIntent.UnequipGear(reader.ReadInt());
+            case NetInventoryAction.EquipGear:
+            {
+                var slot = reader.ReadInt();
+                return InventoryIntent.EquipGear(slot, reader.ReadInt());
+            }
             case NetInventoryAction.BindStaffSlot:
             {
                 var slot = reader.ReadInt();

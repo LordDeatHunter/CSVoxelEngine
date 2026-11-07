@@ -58,7 +58,7 @@ public sealed class BreakProgress
     /// its <paramref name="heldInstance"/>), at server time <paramref name="now"/>.
     /// </summary>
     public void Start(int x, int y, int z, byte blockId, byte state, Item? held, byte heldId, int heldInstance,
-        double now)
+        double now, float speedFactor = 1f)
     {
         _active = true;
         (_x, _y, _z) = (x, y, z);
@@ -68,7 +68,7 @@ public sealed class BreakProgress
         _allowed = Mining.CanMine(blockId, held);
         _startedAt = now;
         _requiredSeconds = RequiredSeconds(Mining.HardnessOf(blockId, state), Mining.BlockDamage(held),
-            Mining.HitGapSeconds(held));
+            Mining.HitGapSeconds(held, speedFactor));
     }
 
     /// <summary>

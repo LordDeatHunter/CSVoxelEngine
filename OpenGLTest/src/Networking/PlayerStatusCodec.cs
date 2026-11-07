@@ -20,8 +20,8 @@ public readonly record struct PlayerStatusData(NetPlayerFlags Modes, int Health,
 /// <summary>
 /// The wire form of a <see cref="PlayerStatusData"/>: <c>(byte flags, int health, bool dead,
 /// Vector3 knockbackImpulse, float lift, byte air, int mana, int maxMana, byte effectMask)</c>. The reader is bounds-checked: mode bits other than
-/// creative and flight are dropped, the health is clamped to 0..<see cref="PlayerHealth.MaxHealth"/>, the air to 0..<see cref="Breath.NetSteps"/>,
-/// the mana max to 1..<see cref="ManaConfig.MaxCap"/> and the mana into that max,
+/// creative and flight are dropped, the health is clamped to 0..<see cref="PlayerHealth.MaxHealth"/> plus the most gear can add, the air to 0..<see cref="Breath.NetSteps"/>,
+/// the mana max to 1..<see cref="PlayerMana.WireMaxCap"/> and the mana into that max,
 /// the effect mask is taken raw (the client drops the bits no loaded effect owns when it mirrors it),
 /// and a non-finite knockback or lift is a malformed frame (<see cref="InvalidDataException"/>), which
 /// the client answers by leaving the server; a short frame throws <see cref="EndOfStreamException"/>
@@ -46,7 +46,7 @@ public static class PlayerStatusCodec
     public static PlayerStatusData Read(PacketReader reader)
     {
         var modes = (NetPlayerFlags)reader.ReadByte() & (NetPlayerFlags.Creative | NetPlayerFlags.Flying);
-        var health = Math.Clamp(reader.ReadInt(), 0, PlayerHealth.MaxHealth);
+        var health = Math.Clamp(reader.ReadInt(), 0, PlayerHealth.MaxHealth + GearConfig.MaxHealthBonusCap);
         var dead = reader.ReadBool();
         var knockback = reader.ReadVector3();
         if (!float.IsFinite(knockback.X) || !float.IsFinite(knockback.Y) || !float.IsFinite(knockback.Z))
@@ -56,7 +56,7 @@ public static class PlayerStatusCodec
             throw new InvalidDataException("player status lift is not finite");
         var air = Math.Min(reader.ReadByte(), (byte)Breath.NetSteps);
         var mana = reader.ReadInt();
-        var maxMana = Math.Clamp(reader.ReadInt(), 1, ManaConfig.MaxCap);
+        var maxMana = Math.Clamp(reader.ReadInt(), 1, PlayerMana.WireMaxCap);
         mana = Math.Clamp(mana, 0, maxMana);
         var effectMask = reader.ReadByte();
         return new PlayerStatusData(modes, health, dead, knockback, lift, air, mana, maxMana, effectMask);

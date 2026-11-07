@@ -1,0 +1,7 @@
+{
+  "result": "item/leather_cap",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/cotton", "count": 3 }
+  ]
+}

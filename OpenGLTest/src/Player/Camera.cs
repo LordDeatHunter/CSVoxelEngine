@@ -132,6 +132,10 @@ public class Camera : IMobTarget
     /// a walker standing in a block with no movement speed.
     /// </summary>
     public float MovementFactor { get; private set; } = 1f;
+
+    /// <summary>The walk and swim speed multiplier from worn gear (1 = none); set once a frame by the local
+    /// player. Flight ignores it like every other speed modifier.</summary>
+    public float GearMoveFactor { get; internal set; } = 1f;
     public float GroundFriction { get; private set; } = BlockType.DefaultFriction;
     public Vector2 HorizontalVelocity => _physics.HorizontalVelocity;
 

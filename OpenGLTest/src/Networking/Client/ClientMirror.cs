@@ -336,6 +336,8 @@ internal sealed class ClientMirror
     {
         if (!_clientMode)
             return;
+        // The pool's size follows the mirrored gear, so the server's health is not clamped below it
+        LocalPlayer.ApplyGear(simulatesMana: false);
         var current = _health.Health;
         if (health < current)
         {

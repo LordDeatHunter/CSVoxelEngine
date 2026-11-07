@@ -1,0 +1,7 @@
+{
+  "result": "item/bronze_gloves",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/bronze_ingot", "count": 4 }
+  ]
+}

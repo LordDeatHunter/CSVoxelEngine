@@ -98,7 +98,8 @@ public sealed class ServerPlayer : IMobTarget
     /// </summary>
     public bool TryAttack(NetAttackKind kind, Item? held, double now, double slackSeconds)
     {
-        if (now - _lastAttackAt + slackSeconds < AttackPacing.MinGapSeconds(_lastAttackKind, kind, held))
+        if (now - _lastAttackAt + slackSeconds < AttackPacing.MinGapSeconds(_lastAttackKind, kind, held,
+                Inventory.Equipment.Stats.AttackSpeedFactor))
             return false;
         _lastAttackAt = now;
         _lastAttackKind = kind;
@@ -301,6 +302,8 @@ public sealed class ServerPlayer : IMobTarget
             NoteEffectMask();
             return;
         }
+        // Worn gear sizes the pools; a change marks the status dirty through the max checks below
+        Status.ApplyGear(Inventory.Equipment.Stats, simulatesMana: true);
         var before = Status.Health;
         var airBefore = Status.Breath.NetStep;
         var manaBefore = Status.Mana.NetMana;

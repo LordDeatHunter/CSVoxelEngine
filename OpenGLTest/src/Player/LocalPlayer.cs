@@ -170,6 +170,18 @@ internal sealed class LocalPlayer
             _health.TakeDamage(tick, DamageSource.Cactus);
     }
 
+    /// <summary>
+    /// Applies what the worn gear changes to this player: the health pool (every mode, so a client's hearts
+    /// scale), the mana pool where it is simulated (<paramref name="simulatesMana"/>; a client mirrors its server's)
+    /// and the walk speed. Called every frame, cheap: the stats are cached until the worn set changes.
+    /// </summary>
+    internal void ApplyGear(bool simulatesMana)
+    {
+        var stats = Inventory.Equipment.Stats;
+        _health.ApplyGear(stats, simulatesMana);
+        Camera.GearMoveFactor = stats.MoveFactor;
+    }
+
     internal void EnsureSpawnSettled(ChunkManager chunkManager)
     {
         if (_spawnSettled)
@@ -372,7 +384,8 @@ internal sealed class LocalPlayer
         // weight, which stays the tool's own.
         var held = ItemRegistry.TryGet(Inventory.SelectedBlockId);
         var toolGap = Mining.HitGapSeconds(held);
-        var gap = Mining.HitGapSeconds(held, Camera.Effects?.AttackFactor ?? 1f);
+        var gap = Mining.HitGapSeconds(held,
+            (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
         var weight = MathUtils.InverseLerp(Mining.HitGapSeconds(null), Mining.HitGapSeconds(null) + 0.5f, toolGap);
         // An axe chops: one swing paced to its hits (the click loop starts it early, so the blow comes
         // down as the hit lands, and says so with chopStarted)
@@ -457,6 +470,7 @@ internal sealed class LocalPlayer
     /// </summary>
     internal void UpdateHealth(float deltaTime, ChunkManager chunkManager)
     {
+        ApplyGear(simulatesMana: true);
         if (_spawnSettled && !_hasRespawnEye)
         {
             _respawnEye = Camera.Position;

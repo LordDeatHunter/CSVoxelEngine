@@ -209,7 +209,7 @@ internal sealed class LeftClickAction
     {
         if (!IsPlaying) return false;
         if (!TryFindPunchTarget(player.Eye, player.ViewDirection, out var target)) return false;
-        Strikes.StrikeMob(target, Combat.PunchDamage(HeldItem(player.Inventory)), player.Eye, player.Health);
+        Strikes.StrikeMob(target, Combat.PunchDamage(HeldItem(player.Inventory), GearDamage(player.Inventory)), player.Eye, player.Health);
         return true;
     }
 
@@ -221,7 +221,7 @@ internal sealed class LeftClickAction
     internal int SliceFor(PlayerContext player, bool returnSwing)
     {
         if (!IsPlaying) return 0;
-        return ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), returnSwing, player.Health);
+        return ApplySliceDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), returnSwing, player.Health, GearDamage(player.Inventory));
     }
 
     /// <summary>
@@ -232,7 +232,7 @@ internal sealed class LeftClickAction
     internal int SwordFor(PlayerContext player, SwordSwing swing)
     {
         if (!IsPlaying) return 0;
-        return ApplySwordDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), swing, player.Health);
+        return ApplySwordDamage(player.Eye, player.ViewDirection, HeldItem(player.Inventory), swing, player.Health, GearDamage(player.Inventory));
     }
 
     /// <summary>
@@ -349,7 +349,8 @@ internal sealed class LeftClickAction
             _breakHardness = Mining.HardnessOf(_breakingBlockId, _breakState);
             _breakAllowed = Mining.CanMine(_breakingBlockId, held);
             _breakPower = Mining.BlockDamage(held);
-            _breakHitSeconds = Mining.HitGapSeconds(held, Camera.Effects?.AttackFactor ?? 1f);
+            _breakHitSeconds = Mining.HitGapSeconds(held,
+                (Camera.Effects?.AttackFactor ?? 1f) * Inventory.Equipment.Stats.MiningFactor);
             // A natural tree's wood keeps the damage it took (only here: a connected client's server counts
             // its own break from zero, and a placed log never keeps any)
             _breakNatural = !_clientMode && BlockType.IsTreeWood(_breakingBlockId) && !WoodState.IsDetached(_breakState);
@@ -505,6 +506,9 @@ internal sealed class LeftClickAction
     /// <summary>The item in hand, or null when the selected slot holds nothing.</summary>
     private Item? HeldItem() => HeldItem(Inventory);
 
+    // The damage multiplier of the gear a player wears (1 when nothing changes it)
+    private static float GearDamage(Inventory inventory) => inventory.Equipment.Stats.DamageFactor;
+
     /// <summary>The item in <paramref name="inventory"/>'s selected slot, or null when it holds nothing.</summary>
     private static Item? HeldItem(Inventory inventory) => inventory.HeldItem;
 
@@ -520,7 +524,8 @@ internal sealed class LeftClickAction
     private bool UpdatePunch(double deltaTime, PlayerContext player)
     {
         var held = HeldItem();
-        _punchGap = Mining.HitGapSeconds(held, Camera.Effects?.AttackFactor ?? 1f);
+        _punchGap = Mining.HitGapSeconds(held,
+            (Camera.Effects?.AttackFactor ?? 1f) * player.Inventory.Equipment.Stats.AttackSpeedFactor);
         _punchTimer += (float)deltaTime;
 
         if (TryFindPunchTarget(player.Eye, player.ViewDirection, out var target))
@@ -537,7 +542,7 @@ internal sealed class LeftClickAction
                 Strikes.SpawnHitSparks(target, player.Eye);
             }
             else
-                Strikes.StrikeMob(target, Combat.PunchDamage(held), player.Eye, player.Health);
+                Strikes.StrikeMob(target, Combat.PunchDamage(held, GearDamage(player.Inventory)), player.Eye, player.Health);
             // The punch connected, so the swing holds at full extension for a beat (cosmetic: the
             // punch timer above keeps the pace). A client only predicts the connect - a mob was in
             // the cone with a clear line when the swing landed - since the server's verdict comes
@@ -611,7 +616,7 @@ internal sealed class LeftClickAction
             _sliceImpactDone = true;
             var returnSwing = _sliceCombo.ReturnSwing;
             LandSwing(player, returnSwing ? NetAttackKind.SliceReturn : NetAttackKind.Slice,
-                Combat.SliceDamage(HeldItem(), returnSwing), Combat.SliceTargets, cone: false,
+                Combat.SliceDamage(HeldItem(), returnSwing, GearDamage(player.Inventory)), Combat.SliceTargets, cone: false,
                 MobConfig.SlimePunchShoveSpeed, hitStopWeight: 0f);
         }
 
@@ -647,7 +652,7 @@ internal sealed class LeftClickAction
         if (!_swordImpactDone && Player.SwordProgress >= PlayerModel.SwordImpactProgress(swing))
         {
             _swordImpactDone = true;
-            LandSwing(player, NetAttacks.OfSword(swing), Combat.SwordDamage(HeldItem(), swing),
+            LandSwing(player, NetAttacks.OfSword(swing), Combat.SwordDamage(HeldItem(), swing, GearDamage(player.Inventory)),
                 SwordSwings.MaxTargets(swing), SwordSwings.IsCone(swing),
                 MobConfig.SlimePunchShoveSpeed * SwordSwings.ShoveFactor(swing), SwordSwings.HitStopWeight(swing));
         }
@@ -702,8 +707,9 @@ internal sealed class LeftClickAction
     /// unobstructed line of sight each take the swing's damage and a knockback shove. The return
     /// swing is at half power (<paramref name="returnSwing"/>). Returns how many were struck.
     /// </summary>
-    private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing, PlayerHealth? striker) =>
-        StrikeNearest(origin, direction, Combat.SliceDamage(held, returnSwing), Combat.SliceTargets, cone: false,
+    private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing, PlayerHealth? striker,
+        float damageFactor = 1f) =>
+        StrikeNearest(origin, direction, Combat.SliceDamage(held, returnSwing, damageFactor), Combat.SliceTargets, cone: false,
             MobConfig.SlimePunchShoveSpeed, striker);
 
     /// <summary>
@@ -711,8 +717,9 @@ internal sealed class LeftClickAction
     /// <paramref name="held"/>: the nearest mobs the swing reaches (<see cref="SwordSwings"/>) with an
     /// unobstructed line of sight each take its damage and its shove. Returns how many were struck.
     /// </summary>
-    private int ApplySwordDamage(Vector3 origin, Vector3 direction, Item? held, SwordSwing swing, PlayerHealth? striker) =>
-        StrikeNearest(origin, direction, Combat.SwordDamage(held, swing), SwordSwings.MaxTargets(swing),
+    private int ApplySwordDamage(Vector3 origin, Vector3 direction, Item? held, SwordSwing swing, PlayerHealth? striker,
+        float damageFactor = 1f) =>
+        StrikeNearest(origin, direction, Combat.SwordDamage(held, swing, damageFactor), SwordSwings.MaxTargets(swing),
             SwordSwings.IsCone(swing), MobConfig.SlimePunchShoveSpeed * SwordSwings.ShoveFactor(swing), striker);
 
     /// <summary>

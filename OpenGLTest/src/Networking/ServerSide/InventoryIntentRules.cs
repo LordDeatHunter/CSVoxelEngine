@@ -26,6 +26,8 @@ namespace VoxelEngine.Networking.ServerSide;
 /// (<see cref="KnownSpellParts"/>; creative knows every part) and a recipe valid against the staff's
 /// tags (<see cref="HeldStaff.TryBind"/>).</item>
 /// <item>A staff clear needs a staff in hand and a bound slot (<see cref="HeldStaff.TryClear"/>).</item>
+/// <item>Wearing gear needs an owned gear instance and an equipment slot of its kind
+/// (<see cref="Equipment.TryEquip"/>); taking it off needs a worn slot.</item>
 /// </list>
 /// </summary>
 public static class InventoryIntentRules
@@ -68,6 +70,13 @@ public static class InventoryIntentRules
 
             case NetInventoryAction.ClearStaffSlot:
                 return HeldStaff.TryClear(inventory, intent.Slot);
+
+            // Only an owned gear instance, in an equipment slot of its own kind (Equipment.TryEquip)
+            case NetInventoryAction.EquipGear:
+                return inventory.Equipment.TryEquip(intent.Slot, intent.Id);
+
+            case NetInventoryAction.UnequipGear:
+                return inventory.Equipment.Unequip(intent.Slot);
 
             default:
                 return false;

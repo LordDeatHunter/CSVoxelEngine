@@ -95,6 +95,7 @@ internal static class InventorySaveCodec
             Known = ExportKnown(inventory),
             // Always a list, empty or not: null is reserved for a save from before known parts
             KnownParts = inventory.KnownParts.OrderBy(k => k, StringComparer.Ordinal).ToList(),
+            Equipped = inventory.Equipment.Slots.Any(s => s != 0) ? inventory.Equipment.Slots.ToList() : null,
         };
         if (unnamed.Count > 0)
             Log.Warn($"Player save: left out content with no save name: {string.Join(", ", unnamed)}");
@@ -139,6 +140,7 @@ internal static class InventorySaveCodec
         ImportStore(inventory, data.Blocks, InventoryCategory.Blocks, inventory.Blocks, dropped);
         ImportStore(inventory, data.Misc, InventoryCategory.Misc, inventory.Misc, dropped);
         ImportTools(inventory, data, dropped);
+        inventory.Equipment.Restore(data.Equipped);
         ImportHotbar(inventory, data);
         inventory.Select(data.SelectedIndex ?? 0);
 
@@ -173,7 +175,6 @@ internal static class InventorySaveCodec
         if (data.Tools != null)
             foreach (var tool in data.Tools)
             {
-                if (inventory.Tools.Count >= Inventory.ToolCapacity) break;
                 if (tool == null) continue;
                 // Any pure item may be a tool instance, not just a Tools-category one: the spawn
                 // stock puts the copper pickaxe and axe (no durability, no use action, so their
@@ -181,9 +182,17 @@ internal static class InventorySaveCodec
                 // them back. Blocks never are.
                 if (!SaveNames.TryResolve(tool.Name, out var id)
                     || ItemRegistry.TryGet(id) is not { } item
-                    || Inventory.CategoryOf(id) is not (InventoryCategory.Tools or InventoryCategory.Misc))
+                    || Inventory.CategoryOf(id) is not (InventoryCategory.Tools or InventoryCategory.Misc
+                        or InventoryCategory.Gear))
                 {
                     dropped.Add(tool.Name ?? "(no name)");
+                    continue;
+                }
+                // Each pool keeps its own cap: a full tools pool never crowds out gear, nor the reverse
+                var pool = item is GearItem ? InventoryCategory.Gear : InventoryCategory.Tools;
+                if (inventory.UsedOf(pool) >= Inventory.CapacityOf(pool))
+                {
+                    dropped.Add($"{tool.Name} (pool full)");
                     continue;
                 }
                 if (tool.InstanceId is not { } instanceId || instanceId <= 0
@@ -250,7 +259,8 @@ internal static class InventorySaveCodec
             if (slot == null) continue;
             if (slot.IsTool == true)
             {
-                if (slot.ToolInstance is { } instance && inventory.Tools.Any(t => t.InstanceId == instance))
+                if (slot.ToolInstance is { } instance
+                    && inventory.Tools.Any(t => t.InstanceId == instance && t.Item is not GearItem))
                     inventory.Hotbar[i] = new HotbarSlot(true, 0, instance);
             }
             else if (SaveNames.TryResolve(slot.Name, out var id) && inventory.StoreOf(id) != null

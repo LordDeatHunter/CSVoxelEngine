@@ -1,0 +1,34 @@
+{
+  // Gear: run with VOXEL_SCRIPT=visual-examples/gear.json VOXEL_TIME=147 from OpenGLTest/. Shots land in
+  // visual/gear/. Gives a few pieces (a `give` of gear puts it on), then films the [E] panel's Gear tab: the
+  // list with worn pieces marked, the equipment card with its summed stats, a picked piece's fitting slots, and
+  // the hearts and hotbar with the bigger health pool.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "give", "block": "item/bronze_cap", "count": 1 },
+    { "op": "give", "block": "item/bronze_tunic", "count": 1 },
+    { "op": "give", "block": "item/leather_boots", "count": 1 },
+    { "op": "give", "block": "item/amulet_of_vigor", "count": 1 },
+    { "op": "give", "block": "item/miners_belt", "count": 1 },
+    { "op": "give", "block": "item/tin_charm", "count": 1 },
+    { "op": "give", "block": "item/leather_cap", "count": 1 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "worn-hud" },
+
+    { "op": "panel", "open": true },
+    { "op": "tab", "tab": "gear" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "gear-tab" },
+
+    // Pick the unworn cap: the head slot lights up as the place a click puts it
+    { "op": "row", "row": 6 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "picked-piece" },
+
+    { "op": "hover", "pos": [200, 330] },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "hover-tooltip" }
+  ]
+}

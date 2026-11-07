@@ -265,5 +265,9 @@ public abstract class Item
         EntityDamage = spec.EntityDamage;
         ThrowDamage = spec.ThrowDamage;
         ThrowAligned = spec.ThrowAligned;
+        Rarity = spec.Rarity;
     }
+
+    /// <summary>The item's base rarity (a rolled instance may carry its own, see <c>ModifiersComponent</c>).</summary>
+    public Rarity Rarity { get; internal init; }
 }

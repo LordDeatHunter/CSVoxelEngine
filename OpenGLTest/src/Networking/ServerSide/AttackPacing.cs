@@ -17,9 +17,9 @@ public static class AttackPacing
 {
     /// <summary>The shortest time between an attack of <paramref name="previous"/> and one of
     /// <paramref name="next"/> with <paramref name="held"/> in hand.</summary>
-    public static float MinGapSeconds(NetAttackKind previous, NetAttackKind next, Item? held)
+    public static float MinGapSeconds(NetAttackKind previous, NetAttackKind next, Item? held, float speedFactor = 1f)
     {
-        if (next == NetAttackKind.Punch) return Mining.HitGapSeconds(held);
+        if (next == NetAttackKind.Punch) return Mining.HitGapSeconds(held, speedFactor);
         if (!NetAttacks.IsSword(next)) return PlayerModel.SliceDuration;
         // A sword swing starts when the swing before it in the chain has finished: the previous attack's own
         // length when that was a sword swing, and the shortest swing's when the last attack was something else

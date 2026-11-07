@@ -5,6 +5,7 @@ using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Spells;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Data;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
@@ -90,6 +91,8 @@ internal static class ItemLoader
             }
 
             var staff = ParseStaff(definition, path);
+            var equip = ParseEquip(definition, staff != null, path);
+            var rarity = ParseRarity(definition.Rarity, path);
 
             var id = ContentRegistry.ItemIds[name];
 
@@ -170,7 +173,9 @@ internal static class ItemLoader
                 StaffTier: staff?.Tier ?? 0,
                 StaffTags: staff?.Tags,
                 Teaches: teaches,
-                RestoresMana: restoresMana));
+                RestoresMana: restoresMana,
+                Rarity: rarity,
+                Equip: equip));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ContentRegistry.ItemIds, StringComparer.Ordinal));
@@ -223,6 +228,122 @@ internal static class ItemLoader
                 throw new InvalidOperationException($"Item '{path}' lists staff tag '{tag}' twice.");
         }
         return (slots, tier, set);
+    }
+
+    /// <summary>The item's rarity, common when it names none; an unknown name is refused naming the file.</summary>
+    internal static Rarity ParseRarity(string? text, string path)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return Rarity.Common;
+        if (Rarities.TryParse(text, out var rarity)) return rarity;
+        throw new InvalidOperationException(
+            $"Item '{path}' has unknown rarity '{text}'; expected common, uncommon, rare, epic or legendary.");
+    }
+
+    /// <summary>
+    /// The <c>equip</c> object compiled, or null when the item is not wearable. Gear is neither a staff, a
+    /// crucible nor a <c>use</c> item; its slot is required, its modifiers must name known stats with finite
+    /// values and its passives known triggers. Status effect names are matched in <see cref="ValidateGear"/>,
+    /// once the effects have loaded.
+    /// </summary>
+    internal static GearInfo? ParseEquip(ItemDefinition definition, bool isStaff, string path)
+    {
+        if (definition.Equip is not { } equip) return null;
+        if (isStaff || definition.Crucible != null || definition.Use != null)
+            throw new InvalidOperationException(
+                $"Item '{path}' is wearable gear but also declares a use, staff or crucible.");
+        if (!GearSlots.TryParse(equip.Slot, out var slot))
+            throw new InvalidOperationException(
+                $"Item '{path}' has equip.slot '{equip.Slot}'; expected head, chest, legs, feet, gloves or accessory.");
+
+        var modifiers = new List<GearModifier>();
+        if (equip.Armor is { } armor)
+        {
+            if (armor < 0 || armor > GearConfig.ArmorCap)
+                throw new InvalidOperationException(
+                    $"Item '{path}' has equip.armor {armor}; expected 0..{GearConfig.ArmorCap}.");
+            if (armor > 0) modifiers.Add(new GearModifier(GearStat.Armor, armor));
+        }
+        if (equip.Modifiers != null)
+            foreach (var (statName, value) in equip.Modifiers)
+            {
+                if (!GearStats.TryParse(statName, out var stat))
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has equip.modifiers stat '{statName}'; expected armor, maxHealth, maxMana, "
+                        + "manaRegen, moveSpeed, miningSpeed, attackSpeed or attackDamage.");
+                if (!float.IsFinite(value) || MathF.Abs(value) > 1000f)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' has equip.modifiers.{statName} {value}; expected a finite number up to 1000.");
+                if (equip.Armor != null && stat == GearStat.Armor)
+                    throw new InvalidOperationException(
+                        $"Item '{path}' sets armor both as equip.armor and in equip.modifiers.");
+                modifiers.Add(new GearModifier(stat, value));
+            }
+
+        var immune = new HashSet<string>(StringComparer.Ordinal);
+        if (equip.Immune != null)
+            foreach (var effect in equip.Immune)
+            {
+                if (string.IsNullOrWhiteSpace(effect))
+                    throw new InvalidOperationException($"Item '{path}' has a blank equip.immune entry.");
+                immune.Add(effect.Trim());
+            }
+
+        var passives = new List<GearPassive>();
+        if (equip.Passives != null)
+            foreach (var passive in equip.Passives)
+                passives.Add(ParsePassive(passive, path));
+
+        if (string.IsNullOrWhiteSpace(equip.Set) && equip.Set != null)
+            throw new InvalidOperationException($"Item '{path}' has a blank equip.set.");
+        return new GearInfo(slot, modifiers, equip.Set?.Trim(), equip.Visible ?? false, immune, passives);
+    }
+
+    private static GearPassive ParsePassive(ItemDefinition.PassiveDefinition? passive, string path)
+    {
+        if (passive == null)
+            throw new InvalidOperationException($"Item '{path}' has an empty equip.passives entry.");
+        var trigger = passive.Trigger?.Trim().ToLowerInvariant() switch
+        {
+            "on_hit" => PassiveTrigger.OnHit,
+            "on_damaged" => PassiveTrigger.OnDamaged,
+            "low_health" => PassiveTrigger.LowHealth,
+            _ => throw new InvalidOperationException(
+                $"Item '{path}' has passive trigger '{passive.Trigger}'; expected on_hit, on_damaged or low_health."),
+        };
+        if (string.IsNullOrWhiteSpace(passive.Effect))
+            throw new InvalidOperationException($"Item '{path}' has a passive with no effect.");
+        var chance = passive.Chance ?? 1f;
+        if (!float.IsFinite(chance) || chance <= 0f || chance > 1f)
+            throw new InvalidOperationException(
+                $"Item '{path}' has passive chance {passive.Chance}; expected 0..1 exclusive of 0.");
+        var scale = passive.Scale ?? 1f;
+        if (!float.IsFinite(scale) || scale <= 0f)
+            throw new InvalidOperationException($"Item '{path}' has passive scale {passive.Scale}; expected above 0.");
+        var below = passive.Below ?? 0.3f;
+        if (!float.IsFinite(below) || below <= 0f || below > 1f)
+            throw new InvalidOperationException(
+                $"Item '{path}' has passive below {passive.Below}; expected 0..1 exclusive of 0.");
+        return new GearPassive(trigger, passive.Effect.Trim(), chance, scale, below);
+    }
+
+    /// <summary>
+    /// Matches every gear item's immunities and passive effects against the loaded status effects, so a typo
+    /// fails content load naming the item.
+    /// </summary>
+    internal static void ValidateGear()
+    {
+        foreach (var item in ItemRegistry.All)
+        {
+            if (item is not GearItem gear) continue;
+            foreach (var effect in gear.Info.Immune)
+                if (!StatusEffectRegistry.TryGet(effect, out _))
+                    throw new InvalidOperationException(
+                        $"Item '{item.SourceName}' is immune to unknown status effect '{effect}'.");
+            foreach (var passive in gear.Info.Passives)
+                if (!StatusEffectRegistry.TryGet(passive.Effect, out _))
+                    throw new InvalidOperationException(
+                        $"Item '{item.SourceName}' has a passive applying unknown status effect '{passive.Effect}'.");
+        }
     }
 
     /// <summary>

@@ -145,6 +145,7 @@ public class UIRenderer : IDisposable
     internal LoadingScreenRenderer LoadingScreen { get; }
     internal MenuRenderer Menu { get; }
     internal CraftCardRenderer CraftCard { get; }
+    internal EquipmentCardRenderer EquipmentCard { get; }
     internal InventoryPanelRenderer Panel { get; }
     internal SpellBuilderRenderer SpellBuilder { get; }
     internal TopStripRenderer TopStrip { get; }
@@ -204,6 +205,7 @@ public class UIRenderer : IDisposable
         }
 
         CraftCard = new CraftCardRenderer(gl, this);
+        EquipmentCard = new EquipmentCardRenderer(this);
 
         // Text batch buffers: a dynamic VBO refilled per run (DrawTextBatch) and a static EBO
         // whose indices never change — quad q always draws vertices [4q, 4q+4) — exactly the

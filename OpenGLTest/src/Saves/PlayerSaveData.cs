@@ -72,6 +72,11 @@ public sealed class PlayerSaveData
         /// an inventory saved before known parts existed (MG-8), which is how such a player is told apart
         /// from one who simply knows none.</summary>
         public List<string>? KnownParts { get; set; }
+
+        /// <summary>The worn gear: one instance id per equipment slot (armor slots first, then accessories),
+        /// 0 for an empty slot. The gear instances themselves are in <see cref="Tools"/>. Null in a save from
+        /// before equipment existed.</summary>
+        public List<int>? Equipped { get; set; }
     }
 
     /// <summary>One stackable pool entry: a block or item name and its pool total.</summary>

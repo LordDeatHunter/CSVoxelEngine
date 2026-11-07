@@ -55,7 +55,9 @@ public static class ItemFactory
         int StaffTier = 0,
         IReadOnlySet<string>? StaffTags = null,
         IReadOnlyList<string>? Teaches = null,
-        float RestoresMana = 0f);
+        float RestoresMana = 0f,
+        Rarity Rarity = Rarity.Common,
+        GearInfo? Equip = null);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,
@@ -83,6 +85,9 @@ public static class ItemFactory
         // A staff's bound spells live on its stack, so like a vessel it needs the Tools pool
         if (spec.StaffSlots > 0)
             return new StaffItem(spec);
+        // Wearable gear has a pool of its own: its rolled modifiers ride on each instance's stack
+        if (spec.Equip != null)
+            return new GearItem(spec);
         return spec.Action switch
         {
             ItemUseAction.PickupFluid => new BucketPickupItem(spec),

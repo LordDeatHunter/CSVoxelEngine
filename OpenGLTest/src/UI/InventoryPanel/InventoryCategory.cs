@@ -7,4 +7,7 @@ public enum InventoryCategory
     Tools,
     Misc,
     Crafting,
+
+    /// <summary>Wearable gear: instances like tools, but a pool and a cap of their own.</summary>
+    Gear,
 }

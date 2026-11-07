@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.Input;
 using VoxelEngine.Content;
+using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Platform;
@@ -105,9 +106,9 @@ internal sealed class InventoryPanelInput
         var row = renderManager.Ui.Panel.PanelRowAt(pointer, offset, rowCount);
         if (row == null) return false;
 
-        if (inventoryView.Tab == InventoryCategory.Tools)
+        if (inventoryView.Tab is InventoryCategory.Tools or InventoryCategory.Gear)
         {
-            var entries = inventory.ToolEntries();
+            var entries = inventoryView.Tab == InventoryCategory.Gear ? inventory.GearEntries() : inventory.ToolEntries();
             if (row.Value >= entries.Count) return false;
             toolInstance = entries[row.Value].InstanceId;
             return true;
@@ -130,6 +131,8 @@ internal sealed class InventoryPanelInput
         if (inventory == null) return;
         if (!HoveredRow(out var id, out var tool)) return;
         if (id == 0 && tool == 0) return;
+        // Worn gear is not held in hand, so a number key never puts it on the hotbar
+        if (tool != 0 && inventory.GetToolStack(tool)?.Item is GearItem) return;
 
         for (var i = 0; i < NumberKeys.Length; i++)
         {
@@ -174,9 +177,12 @@ internal sealed class InventoryPanelInput
             return ContentRegistry.CraftingRecipes.Count;
         if (ActiveWorld?.Camera.IsCreative == true)
             return CreativeCatalog.Entries(tab, ActiveWorld.Inventory).Count;
-        return tab == InventoryCategory.Tools
-            ? ActiveWorld!.Inventory.ToolEntries().Count
-            : ActiveWorld!.Inventory.StackEntries(tab).Count;
+        return tab switch
+        {
+            InventoryCategory.Tools => ActiveWorld!.Inventory.ToolEntries().Count,
+            InventoryCategory.Gear => ActiveWorld!.Inventory.GearEntries().Count,
+            _ => ActiveWorld!.Inventory.StackEntries(tab).Count,
+        };
     }
 
     /// <summary>
@@ -436,6 +442,17 @@ internal sealed class InventoryPanelInput
                 inventoryView.SelectedToolInstance = inventory.ToolEntries()[row].InstanceId;
                 inventoryView.SelectedId = 0;
                 break;
+            case InventoryCategory.Gear:
+            {
+                // The first click picks the piece (its fitting slots light up); picking it again wears it, or
+                // takes it off when it is already on
+                var instance = inventory.GearEntries()[row].InstanceId;
+                var already = inventoryView.SelectedToolInstance == instance;
+                inventoryView.SelectedToolInstance = instance;
+                inventoryView.SelectedId = 0;
+                if (already) ToggleWorn(inventory, instance);
+                break;
+            }
             case InventoryCategory.Crafting:
                 inventoryView.Craft.Select(ContentRegistry.CraftingRecipes[row]);
                 // A newly opened recipe starts at the top of its card.
@@ -451,6 +468,35 @@ internal sealed class InventoryPanelInput
                 break;
             }
         }
+    }
+
+    // Wears an owned gear instance in its first fitting slot, or takes it off when it is worn. Applied here at
+    // once and, while connected, sent as an intent the server replays against its own copy.
+    private void ToggleWorn(Inventory inventory, int instance)
+    {
+        var worn = inventory.Equipment.SlotOf(instance);
+        if (worn >= 0)
+        {
+            if (inventory.Equipment.Unequip(worn))
+                session.SendInventoryIntent(InventoryIntent.UnequipGear(worn));
+            return;
+        }
+        if (!inventory.Equipment.TryEquipAuto(instance)) return;
+        session.SendInventoryIntent(InventoryIntent.EquipGear(inventory.Equipment.SlotOf(instance), instance));
+    }
+
+    // A click on the equipment card: the picked gear goes into the slot when it fits there, otherwise a worn
+    // piece comes off.
+    private void ClickEquipmentSlot(Inventory inventory, int slot)
+    {
+        var picked = inventoryView.SelectedToolInstance;
+        if (picked != 0 && inventory.Equipment.TryEquip(slot, picked))
+        {
+            session.SendInventoryIntent(InventoryIntent.EquipGear(slot, picked));
+            return;
+        }
+        if (inventory.Equipment.Unequip(slot))
+            session.SendInventoryIntent(InventoryIntent.UnequipGear(slot));
     }
 
     /// <summary>
@@ -488,6 +534,13 @@ internal sealed class InventoryPanelInput
         if (row.HasValue)
         {
             ApplyRowClick(row.Value, list, inventory, creative, position);
+            return;
+        }
+
+        if (inventoryView.Tab == InventoryCategory.Gear
+            && EquipmentCardLayout.SlotAt(renderManager.Ui.ToCanvas(position), renderManager.Ui.ScreenSize) is { } slot)
+        {
+            ClickEquipmentSlot(inventory, slot);
             return;
         }
 
