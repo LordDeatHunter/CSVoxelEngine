@@ -43,6 +43,16 @@ public static class SandwormGround
         return source.GetColumn(chunkX, chunkZ).Biomes[i] == Biome.Desert;
     }
 
+    /// <summary>The sand block id, for the chips a surfacing worm throws.</summary>
+    public static byte SandId
+    {
+        get
+        {
+            IsSand(0);
+            return _sandId;
+        }
+    }
+
     /// <summary>Whether the block id is sand or sandstone.</summary>
     public static bool IsSand(byte id)
     {

@@ -7,6 +7,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Graphics;
@@ -36,6 +37,14 @@ internal sealed class MobPasses : IDisposable
     private RigMeshes? _goblin;
     // The realm (hell and sky) mobs' rigs by kind; a kind whose content is not registered has none and is not drawn.
     private readonly Dictionary<EntityType, RigMeshes> _realmRigs = [];
+    // The sandworm rig (one mesh per part: Body, Head, Jaw, Tail) drawn once per chain segment; null when the
+    // entity is not registered. The part indices are looked up once from its sorted names.
+    private RigMeshes? _sandworm;
+    private int _wormBody;
+    private int _wormHead;
+    private int _wormJaw;
+    private int _wormTail;
+    private readonly List<(Matrix4x4 Model, int Mesh, Vector3 LightAt)> _wormParts = [];
     // The flint item: the stone a goblin holds while it still has ammo.
     private byte _flintId;
     private byte _torchId;
@@ -68,6 +77,17 @@ internal sealed class MobPasses : IDisposable
         foreach (var name in RealmRigNames)
             if (EntityRegistry.TryGet(name) is { } realmType)
                 _realmRigs[realmType] = RigMeshes.Build(gl, realmType);
+        if (EntityRegistry.TryGet(Sandworm.EntityName) is { } wormType)
+        {
+            _sandworm = RigMeshes.Build(gl, wormType);
+            _wormBody = Array.IndexOf(_sandworm.PartNames, "Body");
+            _wormHead = Array.IndexOf(_sandworm.PartNames, "Head");
+            _wormJaw = Array.IndexOf(_sandworm.PartNames, "Jaw");
+            _wormTail = Array.IndexOf(_sandworm.PartNames, "Tail");
+            if (_wormBody < 0 || _wormHead < 0 || _wormJaw < 0 || _wormTail < 0)
+                throw new InvalidOperationException(
+                    $"Entity model '{wormType.ModelPath}' needs the groups Body, Head, Jaw and Tail (tools/generate-sandworm-model.py).");
+        }
         _flintId = ContentRegistry.RequireItem("flint").Id;
         _torchId = ContentRegistry.RequireBlock("torch").Id;
     }
@@ -204,6 +224,64 @@ internal sealed class MobPasses : IDisposable
         _owner.BindEntityTextures(mirror: false);
     }
 
+    /// <summary>
+    /// Draws the sandworm: every visible chain segment with its part of the model (the head with its jaw, a body
+    /// ring, the tail), each lit where it stands, with the hit flash and status tint. Restores the world textures on
+    /// the way out like <see cref="RenderSlimes"/>.
+    /// </summary>
+    internal void RenderSandworms(Camera camera, IReadOnlyList<Sandworm> worms)
+    {
+        if (camera == null || worms.Count == 0 || _sandworm == null) return;
+
+        var viewProj = camera.GetViewProjection();
+        _owner.WorldShader.Use();
+        _owner.BindEntityTextures(mirror: false);
+        Units.BindUnit(0, TextureTarget.Texture2DArray, _sandworm.Texture);
+        foreach (var worm in worms)
+        {
+            _owner.WorldShader.SetUniform(_owner.LocHitFlash, worm.HitFlash);
+            _owner.WorldShader.SetUniform(_owner.LocStatusTint, StatusTintOf(worm));
+            GatherSandwormParts(worm);
+            foreach (var (model, mesh, lightAt) in _wormParts)
+            {
+                _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(lightAt));
+                _sandworm.Meshes[mesh].Render();
+            }
+        }
+
+        _owner.WorldShader.SetUniform(_owner.LocHitFlash, 0f);
+        _owner.WorldShader.SetUniform(_owner.LocStatusTint, Vector4.Zero);
+        _owner.BindEntityTextures(mirror: false);
+    }
+
+    /// <summary>The sandworm rig (the shadow pass's lookup), or null when its content is not registered.</summary>
+    internal RigMeshes? SandwormRig => _sandworm;
+
+    /// <summary>The parts of <paramref name="worm"/> to draw this frame: the model matrix, the mesh index into
+    /// <see cref="SandwormRig"/> and where to sample its light. The list is reused by the next call.</summary>
+    internal List<(Matrix4x4 Model, int Mesh, Vector3 LightAt)> GatherSandwormParts(Sandworm worm)
+    {
+        _wormParts.Clear();
+        // A dying worm shrinks a little and sinks into the sand
+        var shrink = 1f - 0.4f * worm.DeathProgress;
+        var sink = worm.DeathProgress * worm.DeathProgress * 4f;
+        for (var i = 0; i < worm.Chain.Count; i++)
+        {
+            if (!worm.IsVisible(i)) continue;
+            var model = SandwormPose.Segment(worm.Chain, i, shrink, sink);
+            var lightAt = worm.Chain[i] + new Vector3(0f, Sandworm.SegmentHalfExtent(i) + 0.5f, 0f);
+            var mesh = SandwormChain.KindOf(i) switch
+            {
+                SandwormSegmentKind.Head => _wormHead,
+                SandwormSegmentKind.Tail => _wormTail,
+                _ => _wormBody,
+            };
+            _wormParts.Add((model, mesh, lightAt));
+            if (i == 0) _wormParts.Add((SandwormPose.Jaw(model, worm.JawOpen), _wormJaw, lightAt));
+        }
+        return _wormParts;
+    }
+
     /// <summary>The rig of a realm mob kind, or null when its content is not registered (the shadow
     /// pass's lookup).</summary>
     internal RigMeshes? RealmRigOf(EntityType type) => _realmRigs.GetValueOrDefault(type);
@@ -238,6 +316,8 @@ internal sealed class MobPasses : IDisposable
             _gl.DeleteTexture(_slimeTexture);
         _goblin?.Dispose();
         _goblin = null;
+        _sandworm?.Dispose();
+        _sandworm = null;
         foreach (var rig in _realmRigs.Values)
             rig.Dispose();
         _realmRigs.Clear();

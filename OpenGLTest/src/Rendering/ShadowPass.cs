@@ -6,6 +6,7 @@ using VoxelEngine.Data;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.Icebergs;
+using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Lod;
 using VoxelEngine.Player;
@@ -95,7 +96,7 @@ internal sealed class ShadowPass
         PlayerModel? player = null, IReadOnlyList<Slime>? slimes = null,
         IReadOnlyList<LodRegion>? lodRegions = null, IReadOnlyList<Goblin>? goblins = null,
         IReadOnlyList<Iceberg>? icebergs = null, IReadOnlyList<RiggedMob>? hellMobs = null,
-        IReadOnlyList<RiggedMob>? skyMobs = null)
+        IReadOnlyList<RiggedMob>? skyMobs = null, IReadOnlyList<Sandworm>? sandworms = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -201,6 +202,7 @@ internal sealed class ShadowPass
 
         DrawRealmCasters(hellMobs);
         DrawRealmCasters(skyMobs);
+        DrawSandwormCasters(sandworms);
 
         if (icebergs != null)
             DrawIcebergCasters(icebergs, frustum);
@@ -311,6 +313,23 @@ internal sealed class ShadowPass
             if (Mobs.RealmRigOf(mob.Type) is not { } rig) continue;
             Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
             DrawRigCaster(mob, rig);
+        }
+        Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
+    }
+
+    // The sandworm segments into the near cascade, on the worm own skin; the atlas goes back on unit 0 after them
+    private void DrawSandwormCasters(IReadOnlyList<Sandworm>? worms)
+    {
+        if (worms == null || worms.Count == 0 || Mobs.SandwormRig is not { } rig) return;
+        Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
+        foreach (var worm in worms)
+        {
+            foreach (var (model, mesh, _) in Mobs.GatherSandwormParts(worm))
+            {
+                _owner.ShadowShader.SetUniform("uModel", model);
+                _owner.ShadowShader.SetUniform("uLightMVP", model * _owner.NearShadow.ViewProj);
+                rig.Meshes[mesh].Render();
+            }
         }
         Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
     }

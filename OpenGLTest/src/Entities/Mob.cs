@@ -347,6 +347,10 @@ public abstract class Mob
     /// default; a multi-part body scales it by the part the blow lands on.</summary>
     public virtual int ScaleDamage(int amount, Vector3 from) => amount;
 
+    /// <summary>Whether the floating healthbar is drawn over this mob: always, except a boss hidden under the
+    /// ground (the sandworm), whose bar would hang in the sand.</summary>
+    public virtual bool ShowsHealthbar => true;
+
     /// <summary>Applies a hit; the owner drops the loot and removes the mob once dead.</summary>
     public virtual void TakeDamage(int amount)
     {

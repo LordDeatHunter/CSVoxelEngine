@@ -119,6 +119,65 @@ public static class SandwormConfig
     /// <summary>Seconds between two contact hits on the same target.</summary>
     public const float ContactCooldownSeconds = 0.8f;
 
+    // --- Look: the jaw, the sand it throws and the quake it makes ---
+
+    /// <summary>How far the lower jaw hangs open at rest (radians).</summary>
+    public const float JawClosedRadians = 0.12f;
+
+    /// <summary>How far the lower jaw hangs open while it breaches, flies and slides (radians).</summary>
+    public const float JawOpenRadians = 0.85f;
+
+    /// <summary>How fast the jaw eases to its target.</summary>
+    public const float JawEaseRate = 7f;
+
+    /// <summary>Sand chips a second thrown around the surfacing point when the worm is far from it...</summary>
+    public const float TelegraphChipsMin = 6f;
+
+    /// <summary>...rising to this many a second as it reaches the surface.</summary>
+    public const float TelegraphChipsMax = 110f;
+
+    /// <summary>Chip speed far from the surface...</summary>
+    public const float TelegraphSpeedMin = 1.2f;
+
+    /// <summary>...and at the breach.</summary>
+    public const float TelegraphSpeedMax = 5.5f;
+
+    /// <summary>Radius of the churned sand around the surfacing point when far...</summary>
+    public const float TelegraphRadiusMin = 1.2f;
+
+    /// <summary>...and at the breach.</summary>
+    public const float TelegraphRadiusMax = 3.6f;
+
+    /// <summary>Size of one sand chip.</summary>
+    public const float SandChipSize = 0.24f;
+
+    /// <summary>Chips thrown in the ring where the head breaks through.</summary>
+    public const int BreachChips = 70;
+
+    /// <summary>Chips thrown where a diving worm goes back under.</summary>
+    public const int DiveChips = 36;
+
+    /// <summary>Chips a second kicked up along the surface by each exposed part of a dash.</summary>
+    public const float DashChipsPerSecond = 26f;
+
+    /// <summary>The camera trauma at full strength of the earthquake of a worm tunneling near it.</summary>
+    public const float QuakeStrength = 0.6f;
+
+    /// <summary>The earthquake is full inside this distance of the head...</summary>
+    public const float QuakeNearBlocks = 6f;
+
+    /// <summary>...and gone beyond this one.</summary>
+    public const float QuakeRangeBlocks = 56f;
+
+    /// <summary>Camera trauma of the breach boom at full strength.</summary>
+    public const float BreachShake = 1f;
+
+    /// <summary>Camera trauma of one thump pulse at full strength.</summary>
+    public const float ThumpShake = 0.35f;
+
+    /// <summary>Seconds between two thump pulses while the summon rumbles.</summary>
+    public const float ThumpPulseSeconds = 0.7f;
+
     // --- Body, damage and reach ---
 
     /// <summary>Half extent of the head's hit box in blocks; a body segment's is this times its draw scale.</summary>

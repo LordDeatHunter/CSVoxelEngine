@@ -93,6 +93,10 @@ public sealed class SandwormBrain
     /// <summary>The earthquake strength, 0..1, while digging; 0 in every other phase.</summary>
     public float Shake { get; private set; }
 
+    /// <summary>Where the worm is heading to surface: the locked point once locked, else the target spot on the
+    /// sand; the sand puffs gather there. Meaningful while digging.</summary>
+    public Vector3 SurfacePoint { get; private set; }
+
     /// <summary>True once the worm has sunk away after retreating and should be removed.</summary>
     public bool IsFinished { get; private set; }
 
@@ -188,6 +192,7 @@ public sealed class SandwormBrain
         var goal = HasLockedPoint ? LockedPoint : target;
         var toGoal = Horizontal(goal - senses.Head);
         var goalDistance = toGoal.Length();
+        SurfacePoint = new Vector3(goal.X, senses.GroundY, goal.Z);
         Telegraph = 1f - MathUtils.Clamp01(goalDistance / SandwormConfig.TelegraphRangeBlocks);
         Shake = 1f - MathUtils.Clamp01(targetDistance / SandwormConfig.ShakeRangeBlocks);
 

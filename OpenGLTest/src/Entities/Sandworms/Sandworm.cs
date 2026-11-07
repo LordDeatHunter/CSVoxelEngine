@@ -18,6 +18,7 @@ public sealed class Sandworm : Mob
 
     private readonly bool[] _exposed = new bool[SandwormConfig.SegmentCount];
     private readonly float[] _ground = new float[SandwormConfig.SegmentCount];
+    private readonly bool[] _visible = new bool[SandwormConfig.SegmentCount];
     private float _contactCooldown;
 
     /// <param name="type">The sandworm entity type.</param>
@@ -71,6 +72,25 @@ public sealed class Sandworm : Mob
 
     /// <summary>Whether segment <paramref name="index"/> stood above the sand last update, and so can be hit and drawn.</summary>
     public bool IsExposed(int index) => _exposed[index];
+
+    /// <summary>Whether any part of segment <paramref name="index"/> stood above the sand last update, so it is drawn
+    /// (looser than <see cref="IsExposed"/>, which needs a quarter of it clear to be hit).</summary>
+    public bool IsVisible(int index) => _visible[index];
+
+    /// <summary>How far the lower jaw hangs open, radians: wide while it breaches, flies and slides, nearly shut under the sand.</summary>
+    public float JawOpen { get; private set; } = SandwormConfig.JawClosedRadians;
+
+    /// <inheritdoc />
+    public override bool ShowsHealthbar => IsVisible(0);
+
+    /// <inheritdoc />
+    public override void AnimateMirror(float deltaTime)
+    {
+        base.AnimateMirror(deltaTime);
+        var open = IsDying || Brain.Phase is SandwormPhase.Breach or SandwormPhase.Air or SandwormPhase.Dash;
+        JawOpen = MathUtils.Damp(JawOpen, open ? SandwormConfig.JawOpenRadians : SandwormConfig.JawClosedRadians,
+            SandwormConfig.JawEaseRate, deltaTime);
+    }
 
     /// <summary>True when the contact cooldown has run out, so the next touch may land.</summary>
     public bool CanHit => _contactCooldown <= 0f;
@@ -180,6 +200,7 @@ public sealed class Sandworm : Mob
             _ground[i] = surface;
             // At least a quarter of the segment above the sand
             _exposed[i] = center.Y >= surface - SegmentHalfExtent(i) * 0.5f;
+            _visible[i] = center.Y + SegmentHalfExtent(i) > surface;
         }
     }
 }

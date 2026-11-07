@@ -158,6 +158,10 @@ public class World
     /// <summary>The ambient cosmetic effects: steam, lava embers, torch flames, bubbles, splashes, blast shake.</summary>
     internal AmbientEffects Ambient { get; }
 
+    /// <summary>The sandworm's cosmetic show: thump rumble, surfacing sand, breach boom, dash dust and the
+    /// earthquake (never built on a headless server).</summary>
+    internal SandwormEffects? WormEffects { get; }
+
     /// <summary>The block edit paths: breaking, felling, multiblocks, tall blocks, toppling trees, edit reports.</summary>
     internal BlockEditor Edits { get; }
 
@@ -470,6 +474,8 @@ public class World
             Strikes = new MobStrikes(this, _debris, serverMode);
             Ambient = new AmbientEffects(this, _chunkManager, _fire, _torchFire, _bubbles, _debris, _dropManager,
                 _falling, _tntManager, _mobs, _projectiles, serverMode, _campfires, _kilns, _goblins);
+            if (!serverMode)
+                WormEffects = new SandwormEffects(Camera, _debris, _chunkManager);
             Edits = new BlockEditor(this, _chunkManager, _debris, _dropManager, _campfires, _querns, _kilns, _casting,
                 _fluidManager, _leafDecay, _lodManager, _leaves, _falling, _toppling, clientMode, serverMode);
             LeftClick = new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
@@ -867,6 +873,7 @@ public class World
         _tntManager.AnimateMirrors((float)deltaTime);
         Director.AnimateIcebergMirrors(deltaTime);
         Ambient.UpdateStatusParticles((float)deltaTime);
+        WormEffects?.Update((float)deltaTime, Sandworms);
         Ambient.GatherStationFires();
         Ambient.AddGoblinTorches();
         _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
@@ -1024,6 +1031,7 @@ public class World
         {
             _dust.TakeMobLandings(_mobs, _chunkManager, _debris);
             Ambient.UpdateStatusParticles((float)deltaTime);
+            WormEffects?.Update((float)deltaTime, Sandworms);
         }
 
         Edits.UpdateToppling((float)deltaTime);
