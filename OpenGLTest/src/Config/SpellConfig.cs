@@ -18,6 +18,12 @@ public static class SpellConfig
     /// <summary>The highest fizzle chance any recipe reaches, however complex.</summary>
     public const float FizzleMaxChance = 0.75f;
 
+    /// <summary>The share of the caster's max health a fizzle backfires for before it is scaled by the recipe's fizzle chance (a first guess).</summary>
+    public const float BackfireShare = 0.3f;
+
+    /// <summary>The phrase after the caster's name in the death line of a backfire.</summary>
+    public const string BackfireDeathMessage = "was killed by their own spell";
+
     /// <summary>The most spell slots a staff's JSON may declare (a first guess).</summary>
     public const int StaffMaxSlots = 8;
 

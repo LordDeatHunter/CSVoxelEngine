@@ -1,4 +1,5 @@
 using System;
+using VoxelEngine.Config;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.Magic;
@@ -39,7 +40,26 @@ internal sealed class SpellCaster
     {
         if (!_world.IsPlaying) return CastVerdict.NotPlaying;
         var verdict = CastRules.TryCast(player, slot, pacing, now, slackSeconds, spend: !_clientMode, out var cast);
-        if (verdict == CastVerdict.Cast && !_clientMode) Effect?.Invoke(cast);
+        if (verdict != CastVerdict.Cast || _clientMode) return verdict;
+        // A fizzle still counts as a cast (the mana is gone, the swing plays) but fires no effect
+        if (CastRisk.Fizzles(cast.Stats, FizzleRoll())) Backfire(cast);
+        else Effect?.Invoke(cast);
         return verdict;
+    }
+
+    /// <summary>The fizzle roll in 0..1 (a test seam).</summary>
+    internal Func<float> FizzleRoll { get; set; } = static () => Random.Shared.NextSingle();
+
+    // A fizzle hurts the caster as a magic blow; a server tells the client
+    private void Backfire(SpellCast cast)
+    {
+        var health = cast.Caster.Health;
+        if (health == null) return;
+        var damage = CastRisk.BackfireDamage(cast.Stats, PlayerHealth.MaxHealth, cast.Caster.IsCreative);
+        if (damage <= 0) return;
+        health.TakeDamage(damage, DamageSource.Magic, SpellConfig.BackfireDeathMessage);
+        var players = _world.ServerPlayers;
+        for (var i = 0; i < players.Count; i++)
+            if (ReferenceEquals(players[i].Context, cast.Caster)) players[i].StatusDirty = true;
     }
 }

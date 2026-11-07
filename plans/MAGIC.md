@@ -49,7 +49,7 @@ mana; it bills exactly the compiled cost, free in creative, and a cast also draw
 spam cap. The effect is the `World.SpellEffect` hook, which `MG-5`'s `SpellEffects` fills. A client
 predicts only: it checks and paces, never spends and never fires the effect. The HUD shows
 `StaffSlotIndicator` (the selected slot and its parts, or empty) beside the hotbar. The gesture is a
-punch swing until `MG-10`, and nothing rolls the fizzle chance yet (`MG-6`). The 0.5 s cooldown and
+punch swing until `MG-10`, (the fizzle is `MG-6`). The 0.5 s cooldown and
 0.1 s slack are first guesses.
 
 `MG-4b` shipped: status effects are data, `assets/data/effects/<name>.json`, compiled by
@@ -93,6 +93,7 @@ speed 24, range 24 blocks, base damage 4, impact reach 1. Known gaps: bolts are 
 their consequences, until `MG-10`) and not saved; a self cast never primes, lights or grows (nature + self
 does nothing); bolts never hit players; a frostburned body standing over lava crusts it to cobblestone.
 
+`MG-6` shipped: `Magic/CastRisk` holds the pure rules. A cast rolls its recipe's fizzle chance (`SpellCaster.FizzleRoll`, authoritative only) after the mana is billed; a fizzle still counts as a cast but fires no effect and backfires on the caster for `SpellConfig.BackfireShare` of max health scaled by the chance (at least 1, none in creative) as a `DamageSource.Magic` blow ("was killed by their own spell"); a server marks the status dirty. Both rules take a `resistance` (0..1) that gear will feed (`MG-14`); nothing sets it yet. Self-applied fire and frost already hurt the caster through the `self` shape (`MG-4b`). The 0.3 backfire share is a first guess.
 ## In progress
 
 Nothing.
@@ -104,11 +105,6 @@ Nothing.
 Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), one station
 UI, one bindable staff (two tiers). In order:
 
-- [ ] **`MG-6` Risk: self-damage and fizzle** — P1, S–M.
-  Your own fire and blasts can hurt you; an over-complex or conflicting recipe fizzles and wastes mana
-  instead. The rules are pure functions with a gear bypass hook for later. Self-damage uses
-  `DamageSource.Magic`. **Hook:**
-  `IMobTarget.TakeHit`, `PlayerHealth`, `DeathMessages`.
 - [ ] **`MG-7` Builder station UI** — P1, L.
   A crafting station (not a tab) where the player picks parts they know and binds the result to a staff
   slot; shows cost, validity and fizzle risk live. The station is one ordinary block (e.g.

@@ -1429,6 +1429,7 @@ OpenGLTest/
       LodSurface.cs            # per-column far-LOD surface overrides (edited top height + tile), beside LodColumnCaps
       LodWorkerPool.cs         # the LodGen threads: Start (refused while a straggler lives), the worker loop, the joining Stop
     Magic/                     # the cast pipeline: the one SpellCaster seam and its GL-free rules (see the Cast intent)
+      CastRisk.cs              # the pure fizzle roll and backfire damage, with the gear resistance hook
       CastPacing.cs            # one caster's cooldown (SpellConfig.CastCooldownSeconds, network slack passed in)
       CastRules.cs             # the pure cast judgement: held staff, selected bound slot, valid recipe, pacing,
                                #   then mana spent (or, for a client's prediction, only checked)
@@ -2989,7 +2990,7 @@ staff's), every part allowed by it — a part passes when **any** of its tags is
 `ManaConfig.StartMax` times the summed `costShare` (the unit `PlayerMana.TrySpend` takes), so every
 added part raises it; `FizzleChance` is `SpellRecipe.FizzleChanceFor` of the summed complexity: 0 up to
 `SpellConfig.FizzleFreeComplexity`, then `FizzleChancePerComplexity` a unit, capped at
-`FizzleMaxChance` — a chance only, the roll belongs to the cast (MG-6). `DamageFactor` and
+`FizzleMaxChance` — a chance only, the roll belongs to the cast (`SpellCaster`, rules in `Magic/CastRisk`: a fizzle fires no effect and backfires on the caster). `DamageFactor` and
 `RangeFactor` are the products of the parts' factors. Every number is computed even for an invalid
 recipe, so the builder (MG-7) can show it live; a cast must check `IsValid` before spending. A new part
 is a JSON file, never a `switch` on its name. Slice 1 ships the elements `fire`, `frost` and `nature`,
