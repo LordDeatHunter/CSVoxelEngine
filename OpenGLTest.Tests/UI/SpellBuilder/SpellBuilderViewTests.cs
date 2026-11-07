@@ -140,6 +140,7 @@ public sealed class SpellBuilderViewTests
     public void ForgettingAPartDropsItFromTheColumnAndTheSelection()
     {
         var inventory = Inventory.Empty();
+        StaffFixture.KnowAll(inventory);
         var view = new SpellBuilderView();
         view.Refresh(inventory, creative: false);
 
@@ -148,7 +149,7 @@ public sealed class SpellBuilderViewTests
         view.Toggle(element);
         view.Toggle(shape);
 
-        inventory.RestrictKnownParts(SpellPartRegistry.All.Where(p => p != element).Select(p => p.Key));
+        inventory.ReplaceKnownParts(SpellPartRegistry.All.Where(p => p != element).Select(p => p.Key));
         var before = view.Version;
         view.Refresh(inventory, creative: false);
 
@@ -162,7 +163,6 @@ public sealed class SpellBuilderViewTests
     public void CreativeListsEveryPart()
     {
         var inventory = Inventory.Empty();
-        inventory.RestrictKnownParts([]);
         var view = new SpellBuilderView();
 
         view.Refresh(inventory, creative: false);
@@ -178,6 +178,7 @@ public sealed class SpellBuilderViewTests
     public void ASteadyRefreshChangesNothing()
     {
         var inventory = Inventory.Empty();
+        StaffFixture.KnowAll(inventory);
         var view = new SpellBuilderView();
         view.Refresh(inventory, creative: false);
         view.Toggle(view.Column(SpellPartKind.Element)[0]);

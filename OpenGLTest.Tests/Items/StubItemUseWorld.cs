@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
+using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Tests.Items;
 
@@ -30,7 +31,12 @@ internal sealed class StubItemUseWorld : IItemUseWorld
     public int Consumed { get; set; }
 
     public double NowSeconds => 0.0;
-    public bool IsCreative => false;
+    public bool IsCreative { get; set; }
+
+    /// <summary>The inventory whose known spell parts <see cref="LearnParts"/> teaches.</summary>
+    public Inventory Inventory { get; set; } = Inventory.Empty();
+
+    public bool LearnParts(IReadOnlyList<string> keys) => Inventory.LearnParts(keys);
 
     /// <summary>A fixed chance roll, or null for a real random one.</summary>
     public float? FixedRoll { get; set; }

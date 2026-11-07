@@ -113,7 +113,7 @@ public sealed class InventoryIntentTests
         Assert.False(InventoryIntentRules.Apply(inventory, new InventoryIntent(NetInventoryAction.BindStaffSlot), creative: true));
 
         // A part the player does not know
-        inventory.RestrictKnownParts(VoxelEngine.Content.Spells.SpellPartRegistry.All.Select(p => p.Key).Where(k => k != keys[1]));
+        inventory.ReplaceKnownParts(VoxelEngine.Content.Spells.SpellPartRegistry.All.Select(p => p.Key).Where(k => k != keys[1]));
         Assert.False(InventoryIntentRules.Apply(inventory, InventoryIntent.BindStaffSlot(0, keys), creative: false));
         Assert.Equal(before, stack.Get<StaffComponent>());
     }
@@ -122,6 +122,7 @@ public sealed class InventoryIntentTests
     public void AValidKnownBindIsAcceptedAndAClearUnbindsIt()
     {
         var inventory = StaffFixture.Holding("wooden_staff", out var staff, out var stack);
+        StaffFixture.KnowAll(inventory);
         var keys = StaffFixture.ValidRecipe(staff).Select(p => p.Key).ToArray();
 
         Assert.True(InventoryIntentRules.Apply(inventory, InventoryIntent.BindStaffSlot(0, keys), creative: false));

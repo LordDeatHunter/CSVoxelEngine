@@ -53,7 +53,8 @@ public static class ItemFactory
         UsePose UsePose = UsePose.Raise,
         int StaffSlots = 0,
         int StaffTier = 0,
-        IReadOnlySet<string>? StaffTags = null);
+        IReadOnlySet<string>? StaffTags = null,
+        IReadOnlyList<string>? Teaches = null);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,
@@ -91,6 +92,7 @@ public static class ItemFactory
             ItemUseAction.Heal => new HealItem(spec),
             ItemUseAction.GrowTree => new GrowTreeItem(spec),
             ItemUseAction.PlantTree => new PlantTreeItem(spec),
+            ItemUseAction.LearnParts => new LearnPartsItem(spec),
             _ => new PlainItem(spec),
         };
     }

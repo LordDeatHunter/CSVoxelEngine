@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Linq;
+using VoxelEngine.Content.Spells;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
 using VoxelEngine.Rendering.Overlays;
@@ -9,7 +11,8 @@ namespace VoxelEngine.UI.Hud;
 /// <summary>
 /// The hover tooltip's lines, GL-free: the display name, what the thing is (a block, a tool, a
 /// plain pickup) and whichever of the item's own numbers it actually has — tool power and hit
-/// pace, block and entity damage, durability left, fuel seconds, a crucible's capacity, a staff's tier and bound spells. A slice of
+/// pace, block and entity damage, durability left, fuel seconds, a crucible's capacity, a staff's tier and bound spells, the spell parts a scroll teaches (which is
+/// how the hint scroll shows its example combo). A slice of
 /// the UI work (U-1); the panel that draws these lives in <see cref="HudRenderer.DrawTooltip"/>.
 /// </summary>
 public static class ItemTooltip
@@ -42,6 +45,9 @@ public static class ItemTooltip
         if (item.CrucibleCapacityMl > 0) lines.Add($"Holds {item.CrucibleCapacityMl} ml");
         if (item is StaffItem staff)
             lines.Add($"Staff tier {staff.Tier}   {stack?.Get<StaffComponent>().BoundCount ?? 0}/{staff.Slots} spells");
+        if (item is LearnPartsItem scroll && scroll.Teaches.Count > 0)
+            lines.Add("Teaches: " + string.Join(" + ",
+                scroll.Teaches.Select(k => SpellPartRegistry.TryGetByKey(k)?.DisplayName ?? k)));
         return lines;
     }
 }

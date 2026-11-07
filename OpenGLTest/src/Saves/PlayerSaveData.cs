@@ -67,6 +67,11 @@ public sealed class PlayerSaveData
         /// <summary>Names of the ids this player has obtained (the look-at label's "Unknown"
         /// rule). Absent, as in a save written before it existed, reads as empty.</summary>
         public List<string>? Known { get; set; }
+
+        /// <summary>The spell part keys (<c>&lt;kind&gt;/&lt;name&gt;</c>) this player has learned. Null in
+        /// an inventory saved before known parts existed (MG-8), which is how such a player is told apart
+        /// from one who simply knows none.</summary>
+        public List<string>? KnownParts { get; set; }
     }
 
     /// <summary>One stackable pool entry: a block or item name and its pool total.</summary>

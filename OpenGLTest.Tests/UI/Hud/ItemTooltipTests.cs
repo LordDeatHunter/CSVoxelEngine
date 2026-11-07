@@ -1,4 +1,6 @@
 using System.Linq;
+using VoxelEngine.Content.Spells;
+using VoxelEngine.Items;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using Xunit;
@@ -8,7 +10,7 @@ namespace VoxelEngine.Tests.UI.Hud;
 /// <summary>
 /// The hover tooltip's lines (<see cref="ItemTooltip"/>): the name comes first, a block shows its
 /// hardness and light, and an item shows only the numbers it actually declares (a plain pickup
-/// stays two lines).
+/// stays two lines), and a teaching scroll names every part it teaches (how the hint scroll shows its combo).
 /// </summary>
 public sealed class ItemTooltipTests
 {
@@ -68,5 +70,17 @@ public sealed class ItemTooltipTests
         var lines = ItemTooltip.Lines(firestarter.Id, stack);
         var durability = lines.Single(l => l.StartsWith("Durability"));
         Assert.Contains($" {firestarter.MaxDurability - 3}/", durability);
+    }
+
+    [Fact]
+    public void AScrollNamesEveryPartItTeaches()
+    {
+        var scrolls = ItemRegistry.All.OfType<LearnPartsItem>().ToList();
+        Assert.NotEmpty(scrolls);
+        foreach (var scroll in scrolls)
+        {
+            var lines = ItemTooltip.Lines(scroll.Id, null);
+            Assert.Contains(lines, l => scroll.Teaches.All(k => l.Contains(SpellPartRegistry.TryGetByKey(k)!.DisplayName)));
+        }
     }
 }

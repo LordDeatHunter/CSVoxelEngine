@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Numerics;
 using System.Threading;
+using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Player;
@@ -71,6 +72,10 @@ public sealed class ClientIntentFlowTests : IDisposable
             Thread.Sleep(5);
         }
         Assert.Equal(NetworkStatus.Handshaken, _connection.Status);
+        // A newcomer holds the starter kit's hint scroll; this flow starts from an empty hand
+        Assert.True(_host.TryGetPlayer(_connection.Server!.Value.PlayerId, out var joined));
+        joined.Inventory.RemoveAll(ItemRegistry.RequireItem(StarterKit.HintScrollName).Id);
+        joined.InventoryChanged = true;
 
         _client = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
         _client.GetChunkManager().Headless = true;

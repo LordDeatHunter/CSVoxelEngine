@@ -128,8 +128,9 @@ internal sealed class LocalPlayer
     /// <summary>
     /// Applies a parsed <see cref="PlayerSaveCodec.FileName"/> field by field: a saved position
     /// restores the pose and marks the spawn settled (a restored player is never relocated to the
-    /// surface), and without one the modes still apply at the current pose. The respawn eye,
-    /// health, mana and inventory are restored when present. The lighting clock waits for the
+    /// surface), and without one the modes still apply at the current pose. The respawn eye is
+    /// restored when present, and the inventory, health and mana through
+    /// <see cref="SavedPlayerPools.Apply"/> (known parts before mana). The lighting clock waits for the
     /// Loading -> Playing flip (<see cref="World.FinishLoading"/>).
     /// </summary>
     internal void ApplySavedPlayer(PlayerSaveData saved)
@@ -151,12 +152,7 @@ internal sealed class LocalPlayer
             _hasRespawnEye = true;
         }
 
-        if (saved.Health is { } hp)
-            _health.Restore(hp);
-        if (saved.Mana is { } mana)
-            _health.Mana.Restore(mana);
-        if (saved.Inventory is { } inventory)
-            Inventory.Import(inventory);
+        SavedPlayerPools.Apply(saved, Inventory, _health);
     }
 
     // Standing against a cactus pricks: one tick per ContactDamage.TickSeconds while the body box

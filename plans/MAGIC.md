@@ -12,7 +12,8 @@ in ID order.
 
 `MG-1` shipped: the mana pool (`Player/PlayerMana.cs`, owned by `PlayerHealth`; tuning in
 `Config/ManaConfig.cs`) regenerates slowly, refills on respawn, is spent through `TrySpend` (free in
-creative, refused when short), grows through `SetKnownParts` (no caller yet, see `MG-8`), is saved as
+creative, refused when short), grows through `SetKnownParts` (called by `KnownSpellParts.SizeMana`
+whenever the known spell parts change or are restored, `MG-8`), is saved as
 `Mana` in `player.json` (the max is not saved), rides the end of `PlayerStatus` (protocol 11) and draws
 as a bar under the hotbar (`HudRenderer.DrawMana`). The 100 start, +10 per known part, 300 cap and
 150 s refill are first guesses.
@@ -107,9 +108,29 @@ cost, verdict, fizzle and damage and range factors from `SpellRecipe.Compile` ag
 BIND and CLEAR go through the `BindStaffSlot` / `ClearStaffSlot` inventory actions (protocol 14), which
 the server owns (`InventoryIntentRules` over `HeldStaff.TryBind` / `TryClear`): the client predicts and the
 `InventoryState` keeps or reverts it. The known-part seam is `Magic/KnownSpellParts.Knows` over
-`Inventory.KnowsPart` (creative knows all); every part is known until `MG-8`. Known gaps: no scrolling
+`Inventory.KnowsPart` (creative knows all). Known gaps: no scrolling
 past `SpellBuilderLayout.MaxRowsPerColumn` rows a kind, no visual scenario (no op opens a UI), an item
 with `use.seconds` in hand starts its charge instead of opening the table, and station gating is `P-2`.
+
+`MG-8` shipped: an `Inventory` holds the set of known spell part keys (`<kind>/<name>`; a fresh one knows
+none), changed only through `LearnParts` and the codec's `ReplaceKnownParts` (an equal set is a no-op), and
+`KnownPartsVersion` moves on a real change. `Magic/KnownSpellParts.Learn` teaches and resizes the owner's
+pool through `SizeMana` (`PlayerMana.SetKnownParts` of the owned count, never creative's; a client passes
+no pool, since its max is mirrored from `PlayerStatus`). The set is saved by key as `KnownParts` in
+`player.json`'s inventory and rides the `InventoryState` snapshot in the same shape (protocol 15); a key
+that no longer resolves is dropped into the codec's one warning. `Player/SavedPlayerPools.Apply` (singleplayer
+and a server's players) imports the inventory and sizes the pool before the saved mana is restored, so a
+grown pool is not clamped down. Scrolls are items with `use.action: "learn_parts"` and a `teaches` list
+(`ItemLoader.ParseTeaches` checks the shape, `ValidateLearnParts` the keys once the parts load;
+`Items/LearnPartsItem`): right-click teaches and spends one, creative learns without spending, and a scroll
+that teaches nothing new is refused and kept. On a server the `Use` intent teaches the sending player, sets
+its status dirty and is answered with the inventory snapshot. Five ship, creative-catalog only
+(`tools/generate-scroll-textures.py` placeholder sprites): `scroll_fire_projectile` (the hint),
+`scroll_frost`, `scroll_nature`, `scroll_self` and `scroll_modifiers` (power and range).
+`Items/StarterKit` gives the hint scroll to a new store-backed survival player, a server newcomer and a
+player saved before `MG-8` (an inventory with no known-part list), never twice. The hint is shown by the
+tooltip line listing the parts a scroll teaches ("Teaches: Fire + Projectile"). Known gaps: scrolls have no
+loot or research source yet, and the builder shows no hint line of its own.
 
 ## In progress
 
@@ -122,18 +143,6 @@ Nothing.
 Three elements (fire, frost, nature), two shapes (projectile, self), two modifiers (power and range), one station
 UI (shipped, `MG-7`), one bindable staff (two tiers). In order:
 
-- [ ] **`MG-8` Known parts and unlocks** — P1, M.
-  The player's set of known parts, saved as names (the `Inventory.Knows` pattern) and riding the
-  inventory net snapshot. Slice 1 source: scrolls only, items that teach a part (research is later and
-  gets its own station decision). Creative knows every part. A survival world starts with **one
-  scroll**: a hint scroll that teaches the parts of one handpicked example combo and shows its recipe at
-  the table. No signature presets and no pre-bound staffs: the player explores combinations. The known
-  part count sizes the mana pool: whenever it changes call `PlayerMana.SetKnownParts` (and set
-  `ServerPlayer.StatusDirty` on a server), and apply the known parts before the saved mana is restored, or a
-  saved value above the starting max is clamped down on load. Replace `Inventory._knownParts` /
-  `RestrictKnownParts` behind `KnownSpellParts` (the one rule the builder, the client prediction and the
-  server share) and bump `KnownPartsVersion` on every change, so an open builder refreshes. **Hook:** `Inventory.cs`,
-  `InventorySaveCodec`, `InventoryNetCodec`, loot tables.
 - [ ] **`MG-9` Mana restoration items** — P1, S.
   Items restore mana through a `use.action` (the `heal` pattern). Optional shared-reagent hook for
   `P-47`, never required. **Hook:** `Items/HealItem.cs`, item schema.
@@ -172,8 +181,10 @@ UI (shipped, `MG-7`), one bindable staff (two tiers). In order:
   sprint and stays free). The mana pool is small with slow regen. The staff is crafted, in two tiers.
   Survival starts with one hint scroll; creative knows everything. The user runs a task-by-task
   workflow that picks its own tier, so each `MG-*` is a self-contained sitting.
+- **Decided in `MG-8`.** The hint scroll teaches fire + projectile (`scroll_fire_projectile`), a combo
+  every staff tier can bind and cast.
 - **Not wanted for now.** Element-vs-element rules, per-mob weaknesses, a live Magicka-style combo
   queue.
-- **Open questions.** Which example combo the hint scroll teaches; chain depth and mana scaling
+- **Open questions.** Chain depth and mana scaling
   (`MG-12`); which blocks a utility spell may touch (`MG-11`); what the mana item and the `P-47` reagent are; whether research is its own
   station.

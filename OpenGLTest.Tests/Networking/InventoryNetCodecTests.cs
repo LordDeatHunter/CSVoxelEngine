@@ -57,4 +57,17 @@ public sealed class InventoryNetCodecTests
 
         Assert.Equal(spells, mirror.GetToolStack(instance)!.Get<StaffComponent>());
     }
+
+    [Fact]
+    public void KnownSpellPartsSurviveTheServerSnapshot()
+    {
+        var keys = SpellPartRegistry.All.Take(3).Select(p => p.Key).ToArray();
+        var source = Inventory.Empty();
+        source.LearnParts(keys);
+
+        var mirror = Inventory.Empty();
+        mirror.Import(InventoryNetCodec.Decode(InventoryNetCodec.Encode(source.Export())));
+
+        Assert.Equal(keys.Order(System.StringComparer.Ordinal), mirror.KnownParts.Order(System.StringComparer.Ordinal));
+    }
 }

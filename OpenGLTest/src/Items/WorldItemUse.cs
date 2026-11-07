@@ -7,6 +7,7 @@ using VoxelEngine.Content.Shapes;
 using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Lod;
+using VoxelEngine.Magic;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
@@ -316,6 +317,25 @@ internal sealed class WorldItemUse : IItemUseWorld
         {
             if (!ReferenceEquals(serverPlayer.Context, context)) continue;
             if (!serverPlayer.Status.Heal(amount)) return false;
+            serverPlayer.StatusDirty = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool IItemUseWorld.LearnParts(IReadOnlyList<string> keys)
+    {
+        // Singleplayer learns and resizes its own pool; a client only predicts the inventory (the
+        // server's InventoryState confirms it and its PlayerStatus carries the new max); a server
+        // teaches the sending ServerPlayer, found through the dispatching context, never World.Inventory
+        if (!_serverMode)
+            return KnownSpellParts.Learn(ActiveInventory, keys, _clientMode ? null : _health.Mana);
+        var context = _activeContext;
+        if (context == null) return false;
+        foreach (var serverPlayer in ServerPlayers)
+        {
+            if (!ReferenceEquals(serverPlayer.Context, context)) continue;
+            if (!KnownSpellParts.Learn(serverPlayer.Inventory, keys, serverPlayer.Status.Mana)) return false;
             serverPlayer.StatusDirty = true;
             return true;
         }

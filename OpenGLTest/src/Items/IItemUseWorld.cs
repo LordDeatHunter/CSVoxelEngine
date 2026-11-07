@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Interaction;
 
@@ -122,6 +123,10 @@ public interface IItemUseWorld
     /// <summary>Restores up to <paramref name="amount"/> HP to the player the use runs for (a
     /// bandage); false when they are at full health, so the use is never spent for nothing.</summary>
     bool Heal(int amount);
+
+    /// <summary>Teaches the spell part <paramref name="keys"/> to the player the use runs for (a scroll);
+    /// false when every one is already known, so the scroll is never spent for nothing.</summary>
+    bool LearnParts(IReadOnlyList<string> keys);
 
     /// <summary>
     /// Grows the tree the targeted cell belongs to (ash on a trunk or a canopy) by a few pulses

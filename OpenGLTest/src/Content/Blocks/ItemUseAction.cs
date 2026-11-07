@@ -61,4 +61,11 @@ public enum ItemUseAction
     /// (<see cref="SaplingManager"/>). Refused where the species cannot root.
     /// </summary>
     PlantTree,
+
+    /// <summary>
+    /// Teaches the spell parts in the item's <c>teaches</c> list to the player the use runs for (a
+    /// scroll, <see cref="LearnPartsItem"/>), spending one unit. Refused, and not spent, when every
+    /// part is already known.
+    /// </summary>
+    LearnParts,
 }

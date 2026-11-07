@@ -1,0 +1,11 @@
+{
+  // A teaching scroll: right-click to learn the fire element and the projectile shape,
+  // spending one scroll (refused and kept when every part is already known). This is the hint
+  // scroll a new survival player starts with (StarterKit): its two parts make a castable spell.
+  //
+  // TODO: placeholder art - scroll_fire_projectile.png comes from tools/generate-scroll-textures.py.
+  "name": "Scroll of Fire Bolts",
+  "texture": "assets/textures/items/scroll_fire_projectile.png",
+  "use": { "action": "learn_parts" },
+  "teaches": ["element/fire", "shape/projectile"]
+}

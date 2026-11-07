@@ -414,20 +414,20 @@ public sealed class ServerPlayer : IMobTarget
     public Vector3 Forward => Vector3Utils.FromYawPitch(Yaw, Pitch);
 
     /// <summary>
-    /// Applies a saved player file: the pose when it has one, the inventory, the health, the respawn
-    /// eye, and the modes only as far as <paramref name="allowCreative"/> lets this server grant them.
-    /// Returns whether a position was restored, so the caller can spawn the player where they left.
+    /// Applies a saved player file: the pose when it has one, the inventory, health and mana (through
+    /// <see cref="SavedPlayerPools.Apply"/>, known parts before mana), the respawn eye, and the modes only as far as <paramref name="allowCreative"/> lets this server grant them.
+    /// A newcomer (no file, or one saved before spell parts could be learned) gets the
+    /// <see cref="StarterKit"/>. Returns whether a position was restored, so the caller can spawn the
+    /// player where they left.
     /// </summary>
     public bool Restore(PlayerSaveData? saved, bool allowCreative)
     {
+        if (saved != null)
+            SavedPlayerPools.Apply(saved, Inventory, Status);
+        if (StarterKit.NeededBy(saved))
+            StarterKit.GiveTo(Inventory);
         if (saved == null)
             return false;
-        if (saved.Inventory is { } inventory)
-            Inventory.Import(inventory);
-        if (saved.Health is { } health)
-            Status.Restore(health);
-        if (saved.Mana is { } mana)
-            Status.Mana.Restore(mana);
         if (saved.RespawnEye is { Length: 3 } r)
             RespawnEye = new Vector3(r[0], r[1], r[2]);
         Creative = allowCreative && saved.Creative == true;

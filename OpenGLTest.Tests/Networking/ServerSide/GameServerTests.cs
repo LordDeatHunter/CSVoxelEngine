@@ -225,6 +225,10 @@ public sealed class GameServerTests : IDisposable
 
         Assert.Equal(NetworkStatus.Handshaken, client.Status);
         InboxOf(client);
+        // A newcomer holds the starter kit's hint scroll; these flows start from an empty hand
+        var joined = PlayerOf(client);
+        joined.Inventory.RemoveAll(ItemRegistry.RequireItem(StarterKit.HintScrollName).Id);
+        joined.InventoryChanged = true;
         return client;
     }
 

@@ -28,8 +28,9 @@ public sealed class PlayerMana
         Math.Min(ManaConfig.MaxCap, ManaConfig.StartMax + Math.Max(0, knownParts) * ManaConfig.MaxPerKnownPart);
 
     /// <summary>
-    /// The progression hook: sizes the pool for <paramref name="knownParts"/> known spell parts (fed by the
-    /// known parts of MG-8). A smaller pool clamps the mana down to it; a larger one never refills it.
+    /// The progression hook: sizes the pool for <paramref name="knownParts"/> known spell parts (fed by
+    /// <see cref="Magic.KnownSpellParts.SizeMana"/>). A smaller pool clamps the mana down to it; a larger one
+    /// never refills it.
     /// </summary>
     public void SetKnownParts(int knownParts)
     {

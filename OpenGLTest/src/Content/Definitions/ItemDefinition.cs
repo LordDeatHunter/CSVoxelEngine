@@ -123,6 +123,13 @@ public sealed class ItemDefinition
     }
 
     /// <summary>
+    /// The spell part keys (<c>&lt;kind&gt;/&lt;name&gt;</c>) a scroll teaches; required with, and only legal
+    /// with, <c>use.action: "learn_parts"</c>. Its shape is checked at parse time and every key against the
+    /// loaded spell parts once they exist.
+    /// </summary>
+    public string[]? Teaches { get; set; }
+
+    /// <summary>
     /// Optional <c>block/&lt;name&gt;</c> model under <c>assets/models</c>, baked into
     /// <see cref="Item.BakedModel"/> so the item can be drawn as real 3D geometry while it
     /// sits inside a station (a crucible standing in a kiln's hearth). The sprite stays the

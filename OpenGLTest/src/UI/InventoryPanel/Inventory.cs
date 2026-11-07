@@ -44,9 +44,9 @@ public class Inventory
     // The ids this player has obtained (the look-at label's "Unknown" rule); filled by Add and
     // saved as names like every other pool
     private readonly HashSet<byte> _known = [];
-    // The spell part keys this player knows; null = every part known, until MG-8 replaces this with
-    // the saved, synced set
-    private HashSet<string>? _knownParts;
+    // The spell part keys (<kind>/<name>) this player knows; saved by key in player.json and synced in
+    // the inventory snapshot
+    private readonly HashSet<string> _knownParts = new(StringComparer.Ordinal);
     private readonly Dictionary<byte, int> _misc = new();
 
     // One entry per tool; InstanceId is handed out increasing and never reused, so a
@@ -506,25 +506,50 @@ public class Inventory
     public bool Knows(byte id) => _known.Contains(id);
 
     /// <summary>
-    /// Moves whenever the spell parts this inventory knows change, so an open spell builder rebuilds
-    /// its columns (<see cref="SpellBuilder.SpellBuilderView.Refresh"/>) only then.
+    /// Moves whenever the spell parts this inventory knows really change (never for an equal set), so
+    /// an open spell builder rebuilds its columns (<see cref="SpellBuilder.SpellBuilderView.Refresh"/>)
+    /// only then.
     /// </summary>
     public int KnownPartsVersion { get; private set; }
 
     /// <summary>
-    /// Whether this player knows the spell part with key <paramref name="key"/>
-    /// (<c>&lt;kind&gt;/&lt;name&gt;</c>). Every part is known until MG-8; read it through
-    /// <see cref="Magic.KnownSpellParts.Knows"/>, the one known-part rule.
+    /// Whether this player has learned the spell part with key <paramref name="key"/>
+    /// (<c>&lt;kind&gt;/&lt;name&gt;</c>). Read it through <see cref="Magic.KnownSpellParts.Knows"/>,
+    /// the one known-part rule, which also lets creative know every part.
     /// </summary>
-    public bool KnowsPart(string key) => _knownParts == null || _knownParts.Contains(key);
+    public bool KnowsPart(string key) => _knownParts.Contains(key);
+
+    /// <summary>How many spell parts this player has learned (what sizes the mana pool).</summary>
+    public int KnownPartCount => _knownParts.Count;
+
+    /// <summary>The spell part keys this player has learned.</summary>
+    public IReadOnlyCollection<string> KnownParts => _knownParts;
 
     /// <summary>
-    /// Limits the known spell parts to <paramref name="keys"/>. The hook MG-8 replaces with the saved,
-    /// synced set; until then only tests use it, to make a part unknown.
+    /// Learns every key in <paramref name="keys"/> and returns whether any was new;
+    /// <see cref="KnownPartsVersion"/> moves once when one was. The keys are trusted: content load
+    /// validates the ones an item teaches. Go through <see cref="Magic.KnownSpellParts.Learn"/> so the
+    /// mana pool follows.
     /// </summary>
-    internal void RestrictKnownParts(IEnumerable<string> keys)
+    public bool LearnParts(IEnumerable<string> keys)
     {
-        _knownParts = new HashSet<string>(keys, StringComparer.Ordinal);
+        var learned = false;
+        foreach (var key in keys)
+            learned |= _knownParts.Add(key);
+        if (learned) KnownPartsVersion++;
+        return learned;
+    }
+
+    /// <summary>
+    /// Replaces the known spell parts with <paramref name="keys"/> (a save or a server snapshot). An
+    /// equal set changes nothing, so a client importing every snapshot never rebuilds an open builder.
+    /// </summary>
+    internal void ReplaceKnownParts(IEnumerable<string> keys)
+    {
+        var next = new HashSet<string>(keys, StringComparer.Ordinal);
+        if (next.SetEquals(_knownParts)) return;
+        _knownParts.Clear();
+        _knownParts.UnionWith(next);
         KnownPartsVersion++;
     }
 
@@ -534,7 +559,9 @@ public class Inventory
     /// repeated id is restored once) and later pickups get ids above every restored one; a
     /// durability or crucible value is clamped to this run's maximum. Names this run does not
     /// know, or that belong to the wrong pool, are dropped with one warning, and a hotbar slot
-    /// pointing at dropped content comes back empty.
+    /// pointing at dropped content comes back empty. The known spell parts are replaced by the saved
+    /// keys this run still has (an unknown key is named in the same warning; a save from before known
+    /// parts knows none).
     /// </summary>
     public void Import(PlayerSaveData.InventoryData data) => InventorySaveCodec.Import(this, data);
 
@@ -584,13 +611,15 @@ public class Inventory
     /// The debug/test inventory: 50 of every placeable block plus the handful of starting tools
     /// and materials below. A new survival player owns none of it — <see cref="World"/> builds
     /// an <see cref="Empty"/> pool — so this stock is only what tests and the item debugger open
-    /// with, and the pools it fills are the ones the category-cap tests measure against.
+    /// with, and the pools it fills are the ones the category-cap tests measure against. It knows no
+    /// spell part.
     /// </summary>
     public Inventory() : this(seedTestStock: true)
     {
     }
 
-    /// <summary>A stockless pool, which is what a new survival player owns.</summary>
+    /// <summary>A stockless pool that knows no spell part; a new survival player starts from it plus
+    /// the starter kit.</summary>
     public static Inventory Empty() => new(seedTestStock: false);
 
     private Inventory(bool seedTestStock)

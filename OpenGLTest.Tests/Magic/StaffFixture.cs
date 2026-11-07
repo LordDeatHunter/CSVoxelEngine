@@ -65,6 +65,9 @@ internal static class StaffFixture
         return new SpellRecipe(parts).Compile(staff.AllowedTags);
     }
 
+    /// <summary>Teaches <paramref name="inventory"/> every registered spell part.</summary>
+    public static void KnowAll(Inventory inventory) => inventory.LearnParts(SpellPartRegistry.All.Select(p => p.Key));
+
     /// <summary>A context for <paramref name="inventory"/> with a full mana pool.</summary>
     public static PlayerContext Player(Inventory inventory, bool creative = false) =>
         new(inventory) { Health = new PlayerHealth(), IsCreative = creative };

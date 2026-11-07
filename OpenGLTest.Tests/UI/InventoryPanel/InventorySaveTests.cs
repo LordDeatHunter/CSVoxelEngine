@@ -30,6 +30,54 @@ public sealed class InventorySaveTests
     private static int InstanceOf(Inventory inventory, byte itemId) =>
         inventory.ToolEntries().Last(t => t.ItemId == itemId).InstanceId;
 
+    private static string[] SortedKnownParts(Inventory inventory) =>
+        inventory.KnownParts.Order(System.StringComparer.Ordinal).ToArray();
+
+    [Fact]
+    public void KnownSpellPartsRoundTripByKey()
+    {
+        var a = Inventory.Empty();
+        a.LearnParts(SpellPartRegistry.All.Take(3).Select(p => p.Key));
+        var b = Inventory.Empty();
+        b.LearnParts(SpellPartRegistry.All.Skip(3).Select(p => p.Key));
+
+        b.Import(a.Export());
+
+        Assert.NotEmpty(a.KnownParts);
+        Assert.Equal(SortedKnownParts(a), SortedKnownParts(b));
+    }
+
+    [Fact]
+    public void AnUnknownSpellPartKeyIsDroppedAndTheRestKept()
+    {
+        var a = Inventory.Empty();
+        a.LearnParts(SpellPartRegistry.All.Take(2).Select(p => p.Key));
+        var data = a.Export();
+        data.KnownParts!.Add("element/no_such_part");
+        data.KnownParts.Add(null!);
+
+        var b = Inventory.Empty();
+        b.Import(data);
+
+        Assert.Equal(SortedKnownParts(a), SortedKnownParts(b));
+        Assert.False(b.KnowsPart("element/no_such_part"));
+    }
+
+    [Fact]
+    public void ReimportingTheSameKnownPartsDoesNotMoveTheVersion()
+    {
+        var a = Inventory.Empty();
+        a.LearnParts(SpellPartRegistry.All.Take(2).Select(p => p.Key));
+        var data = a.Export();
+        var b = Inventory.Empty();
+        b.Import(data);
+        var version = b.KnownPartsVersion;
+
+        b.Import(data);
+
+        Assert.Equal(version, b.KnownPartsVersion);
+    }
+
     [Fact]
     public void ExportImportRoundTripsEveryPoolToolAndSlot()
     {

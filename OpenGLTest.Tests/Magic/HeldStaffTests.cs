@@ -88,6 +88,7 @@ public sealed class HeldStaffTests
     public void AKnownValidRecipeBindsIntoItsSlotOnly()
     {
         var inventory = StaffFixture.Holding("crystal_staff", out var staff, out var stack);
+        StaffFixture.KnowAll(inventory);
         StaffFixture.Bind(staff, stack, 0, out _);
         var before = stack.Get<StaffComponent>();
         var keys = Keys(StaffFixture.ValidRecipe(staff));
@@ -107,7 +108,7 @@ public sealed class HeldStaffTests
     {
         var inventory = StaffFixture.Holding("wooden_staff", out var staff, out var stack);
         var keys = Keys(StaffFixture.ValidRecipe(staff));
-        inventory.RestrictKnownParts(SpellPartRegistry.All.Select(p => p.Key).Where(k => k != keys[0]));
+        inventory.ReplaceKnownParts(SpellPartRegistry.All.Select(p => p.Key).Where(k => k != keys[0]));
         var before = stack.Get<StaffComponent>();
 
         Assert.False(HeldStaff.TryBind(inventory, 0, keys, creative: false));
@@ -166,14 +167,12 @@ public sealed class HeldStaffTests
     }
 
     [Fact]
-    public void AFreshInventoryKnowsEveryPartAndARestrictedOneOnlyItsList()
+    public void AReplacedSetIsKnownExactly()
     {
         var inventory = Inventory.Empty();
-        Assert.All(SpellPartRegistry.All, p => Assert.True(KnownSpellParts.Knows(inventory, p, creative: false)));
-
         var kept = SpellPartRegistry.All.First();
         var version = inventory.KnownPartsVersion;
-        inventory.RestrictKnownParts([kept.Key]);
+        inventory.ReplaceKnownParts([kept.Key]);
         Assert.NotEqual(version, inventory.KnownPartsVersion);
 
         foreach (var part in SpellPartRegistry.All)
@@ -181,5 +180,20 @@ public sealed class HeldStaffTests
             Assert.Equal(part == kept, KnownSpellParts.Knows(inventory, part, creative: false));
             Assert.True(KnownSpellParts.Knows(inventory, part, creative: true));
         }
+    }
+
+    [Fact]
+    public void ReplacingWithTheSameSetDoesNotMoveTheVersion()
+    {
+        var inventory = Inventory.Empty();
+        var keys = SpellPartRegistry.All.Take(2).Select(p => p.Key).ToArray();
+        inventory.ReplaceKnownParts(keys);
+        var version = inventory.KnownPartsVersion;
+
+        inventory.ReplaceKnownParts([keys[1], keys[0]]);
+        Assert.Equal(version, inventory.KnownPartsVersion);
+
+        inventory.ReplaceKnownParts(keys.Take(1));
+        Assert.NotEqual(version, inventory.KnownPartsVersion);
     }
 }

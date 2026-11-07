@@ -376,6 +376,10 @@ public class World
             var savedPlayer = PlayerSaveCodec.TryParse(saveStore?.ReadFile(PlayerSaveCodec.FileName));
             if (savedPlayer != null)
                 LocalPlayer.ApplySavedPlayer(savedPlayer);
+            // A new store-backed survival player starts with the hint scroll; storeless scenario and
+            // test worlds, the server camera and clients never do
+            if (saveStore != null && !serverMode && !clientMode && StarterKit.NeededBy(savedPlayer))
+                StarterKit.GiveTo(Inventory);
             EntitySaveData? savedEntities = null;
             StationSaveData? savedStations = null;
             if (saveStore != null)

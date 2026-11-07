@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using VoxelEngine.Content.Spells;
 using VoxelEngine.Items;
 using VoxelEngine.Saves;
 
@@ -101,6 +102,8 @@ internal static class InventorySaveCodec
             SelectedIndex = inventory.SelectedIndex,
             NextToolInstance = inventory.NextToolInstance,
             Known = ExportKnown(inventory),
+            // Always a list, empty or not: null is reserved for a save from before known parts
+            KnownParts = inventory.KnownParts.OrderBy(k => k, StringComparer.Ordinal).ToList(),
         };
         if (unnamed.Count > 0)
             Log.Warn($"Player save: left out content with no save name: {string.Join(", ", unnamed)}");
@@ -130,6 +133,17 @@ internal static class InventorySaveCodec
         if (data.Known != null)
             foreach (var name in data.Known)
                 if (name != null && SaveNames.TryResolve(name, out var known)) inventory.Known.Add(known);
+
+        // The known spell parts: the saved keys this run still has
+        var knownParts = new List<string>();
+        if (data.KnownParts != null)
+            foreach (var key in data.KnownParts)
+            {
+                if (key == null) continue;
+                if (SpellPartRegistry.TryGetByKey(key) != null) knownParts.Add(key);
+                else dropped.Add($"spell part {key}");
+            }
+        inventory.ReplaceKnownParts(knownParts);
 
         ImportStore(inventory, data.Blocks, InventoryCategory.Blocks, inventory.Blocks, dropped);
         ImportStore(inventory, data.Misc, InventoryCategory.Misc, inventory.Misc, dropped);

@@ -1,0 +1,10 @@
+{
+  // A teaching scroll: right-click to learn the nature element, spending one scroll (refused and
+  // kept when every part is already known). No recipe or loot yet: creative catalog only.
+  //
+  // TODO: placeholder art - scroll_nature.png comes from tools/generate-scroll-textures.py.
+  "name": "Scroll of Nature",
+  "texture": "assets/textures/items/scroll_nature.png",
+  "use": { "action": "learn_parts" },
+  "teaches": ["element/nature"]
+}

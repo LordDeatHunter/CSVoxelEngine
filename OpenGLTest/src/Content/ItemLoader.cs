@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Definitions;
+using VoxelEngine.Content.Spells;
 using VoxelEngine.Data;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
@@ -34,9 +35,11 @@ internal static class ItemLoader
                 "heal" => ItemUseAction.Heal,
                 "grow_tree" => ItemUseAction.GrowTree,
                 "plant_tree" => ItemUseAction.PlantTree,
+                "learn_parts" => ItemUseAction.LearnParts,
                 _ => throw new InvalidOperationException(
-                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal, grow_tree or plant_tree."),
+                    $"Item '{path}' has unknown use.action '{use.Action}'; expected pickup_fluid, place_fluid, place_stack, ignite_campfire, convert_multiblock, heal, grow_tree, plant_tree or learn_parts."),
             };
+            var teaches = ParseTeaches(definition, action, path);
 
             var durability = definition.Durability ?? 0;
             if (durability < 0 || durability > 1000)
@@ -163,7 +166,8 @@ internal static class ItemLoader
                 UsePose: usePose,
                 StaffSlots: staff?.Slots ?? 0,
                 StaffTier: staff?.Tier ?? 0,
-                StaffTags: staff?.Tags));
+                StaffTags: staff?.Tags,
+                Teaches: teaches));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ContentRegistry.ItemIds, StringComparer.Ordinal));
@@ -216,6 +220,37 @@ internal static class ItemLoader
                 throw new InvalidOperationException($"Item '{path}' lists staff tag '{tag}' twice.");
         }
         return (slots, tier, set);
+    }
+
+    /// <summary>
+    /// The <c>teaches</c> list, trimmed, or null when the item has none. Checks the shape only: spell
+    /// parts load after items, so each key is matched against them in <see cref="ValidateLearnParts"/>.
+    /// The list belongs to, and is required by, <c>use.action: "learn_parts"</c>.
+    /// </summary>
+    internal static string[]? ParseTeaches(ItemDefinition definition, ItemUseAction action, string path)
+    {
+        var teaches = definition.Teaches;
+        if (action != ItemUseAction.LearnParts)
+        {
+            if (teaches != null)
+                throw new InvalidOperationException($"Item '{path}' has teaches but its use.action is not learn_parts.");
+            return null;
+        }
+        if (teaches is not { Length: > 0 })
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'learn_parts' without teaches: list the spell part keys (<kind>/<name>) it teaches.");
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var keys = new string[teaches.Length];
+        for (var i = 0; i < teaches.Length; i++)
+        {
+            if (string.IsNullOrWhiteSpace(teaches[i]))
+                throw new InvalidOperationException($"Item '{path}' has a blank entry in teaches.");
+            keys[i] = teaches[i].Trim();
+            if (!seen.Add(keys[i]))
+                throw new InvalidOperationException($"Item '{path}' teaches '{keys[i]}' twice.");
+        }
+        return keys;
     }
 
     private readonly record struct ParsedSheet(int Cols, int Rows, int Frames, ItemAnimationMode Mode, float Fps);
@@ -323,6 +358,9 @@ internal static class ItemLoader
                 case ItemUseAction.ConvertMultiblock:
                     ValidateConvertMultiblock(item, path);
                     break;
+                case ItemUseAction.LearnParts:
+                    ValidateLearnParts(item, path);
+                    break;
                 default:
                     ValidateFluidAction(item, path);
                     break;
@@ -378,6 +416,27 @@ internal static class ItemLoader
         if (item.UseFluidId != 0 || item.UseBlockId != 0)
             throw new InvalidOperationException(
                 $"Item '{path}' has use.action 'heal' with a use.fluid or use.block: a heal targets nobody.");
+    }
+
+    /// <summary>
+    /// A scroll spends from its stack and targets nobody, and every key it teaches must name a loaded
+    /// spell part (they load after items and blocks, before this check).
+    /// </summary>
+    internal static void ValidateLearnParts(Item item, string path)
+    {
+        if (item.UseResultId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'learn_parts' with a use.result: a scroll spends from its stack, it never morphs.");
+        if (item.UseFluidId != 0 || item.UseBlockId != 0)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'learn_parts' with a use.fluid or use.block: a scroll targets nobody.");
+        if (item is not LearnPartsItem scroll)
+            throw new InvalidOperationException(
+                $"Item '{path}' has use.action 'learn_parts' but is not built as a scroll (a staff or a crucible cannot teach).");
+        foreach (var key in scroll.Teaches)
+            if (SpellPartRegistry.TryGetByKey(key) == null)
+                throw new InvalidOperationException(
+                    $"Item '{path}' teaches '{key}', which is not a spell part key (<kind>/<name>).");
     }
 
     private static void ValidateGrowTree(Item item, string path)
