@@ -13,7 +13,7 @@ namespace VoxelEngine.Tests.WorldGen;
 /// <see cref="TerrainGenerator.Compute"/> per chunk column over fixed, SplitMix64-drawn column
 /// categories (land, ocean, lake/river, highland, massif, great lake), and the per-stage cost of
 /// <c>ChunkTerrainFill.GenerateBlockData</c> through <see cref="WorldgenStageTimer"/> on fixed
-/// surface, above-surface, sky, deep-stone, cave-heavy and sea-floor chunks, each timed cold and
+/// surface, above-surface, sky, deep-stone, cave-heavy, sea-floor and hell chunks, each timed cold and
 /// warm, so a worldgen change can report its before/after cost on the same workload.
 ///
 /// Nothing here asserts a TIMING: this is a shared dev machine with no CI, so a timing assertion
@@ -65,9 +65,13 @@ public sealed class WorldgenCostProbe
     private const int DeepStone = 3;
     private const int CaveHeavy = 4;
     private const int SeaFloor = 5;
+    private const int Hell = 6;
+
+    // Hell chunks are drawn from this many chunk layers under the one straddling hell's top
+    private const int HellChunkLayers = 36;
 
     private static readonly string[] ChunkClassNames =
-        ["surface", "above", "sky", "deepStone", "caveHeavy", "seaFloor"];
+        ["surface", "above", "sky", "deepStone", "caveHeavy", "seaFloor", "hell"];
 
     [Fact]
     public void ComputeCostPerColumnCategory()
@@ -271,7 +275,7 @@ public sealed class WorldgenCostProbe
     }
 
     /// <summary>
-    /// Draws chunk columns and picks the surface, above, sky, sea-floor and underground candidate
+    /// Draws chunk columns and picks the surface, above, sky, sea-floor, hell and underground candidate
     /// chunks from them, then splits the underground candidates by their carved-cell count into
     /// cave-heavy (most carved) and deep-stone (least carved). Untimed.
     /// </summary>
@@ -317,6 +321,10 @@ public sealed class WorldgenCostProbe
                     classes[Sky].Add(sky);
             }
 
+            var hellCy = (WorldGenerationConfig.HellTopY >> Chunk.SizeShift) - 1
+                         - (int)(NextRandom(ref state) % HellChunkLayers);
+            TryAdd(classes[Hell], PositionsPerClass, new Vector3(cx, hellCy, cz));
+
             if (underground.Count < UndergroundCandidates)
             {
                 var k = 2 + (int)(NextRandom(ref state) % 4);
@@ -354,6 +362,7 @@ public sealed class WorldgenCostProbe
         && classes[Above].Count >= PositionsPerClass
         && classes[Sky].Count >= SkyPositions
         && classes[SeaFloor].Count >= PositionsPerClass
+        && classes[Hell].Count >= PositionsPerClass
         && underground.Count >= UndergroundCandidates;
 
     private static void TryAdd(List<Vector3> list, int target, Vector3 pos)

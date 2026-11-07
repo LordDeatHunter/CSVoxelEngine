@@ -132,11 +132,14 @@ internal static class StampGateSample
             AddChunk(pos);
 
         // The barrier band lies far below every column's ground: one anchor column's chunk stack
-        // through it, one chunk past each edge, so its gate both admits and skips a filled chunk
+        // through it, one chunk past each edge, so its gate both admits and skips a filled chunk,
+        // and on down through hell's first two layers, whose wholly-hell chunks take the fill's
+        // hell path (gated) against the whole pipeline (ungated)
         if (columns.Count > 0)
         {
             var (bcx, bcz) = columns[0];
-            for (var cy = (WorldGenerationConfig.BarrierBottomY >> Chunk.SizeShift) - 1;
+            var hellBottom = WorldGenerationConfig.HellTopY - 2 * WorldGenerationConfig.HellLayerPeriodBlocks;
+            for (var cy = hellBottom >> Chunk.SizeShift;
                  cy <= (WorldGenerationConfig.BarrierTopY >> Chunk.SizeShift) + 1; cy++)
                 AddChunk(new Vector3(bcx, cy, bcz));
         }

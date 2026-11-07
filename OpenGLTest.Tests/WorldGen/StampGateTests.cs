@@ -5,6 +5,7 @@ using System.Numerics;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
+using VoxelEngine.WorldGen.Hell;
 using Xunit;
 using Stage = VoxelEngine.WorldGen.WorldgenStageTimer.Stage;
 
@@ -84,6 +85,8 @@ public sealed class StampGateTests
             (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FoliageGenerator.Stamp(b, c, x, y, z), true),
         new("Barrier", Stage.Barrier, (_, _) => BarrierGenerator.WriteBand(),
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => BarrierGenerator.Stamp(b, x, y, z), true),
+        new("Hell", Stage.Hell, (_, _) => HellGenerator.WriteBand(),
+            (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => HellGenerator.Stamp(b, x, y, z), true),
     ];
 
     private static Chunk Generate(Vector3 pos, WorldgenStageTimer? timer, bool stampGates)

@@ -163,10 +163,10 @@ internal static class OreNoiseLattice
 
     /// <summary>
     /// Trilinear blend of the corners cXYZ at fraction (fx, fy, fz): lerped in z, then y, then x,
-    /// the order <see cref="NoiseCaves"/> uses.
+    /// the order <see cref="NoiseCaves"/> uses. The hell caverns blend their lattice with it too.
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static float Trilinear(float c000, float c001, float c010, float c011,
+    internal static float Trilinear(float c000, float c001, float c010, float c011,
         float c100, float c101, float c110, float c111, float fx, float fy, float fz)
     {
         var x0y0 = c000 + (c001 - c000) * fz;

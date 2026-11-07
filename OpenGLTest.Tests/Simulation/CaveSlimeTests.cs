@@ -9,8 +9,8 @@ namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// Cave slimes (<see cref="MobSpawner.TryFindCaveSpawn"/>): slimes spawn on dark, dry cave floors well
-/// under the surface around a player in the cave, never where sunlight or a torch reaches, and the
-/// size roll treats them as underground.
+/// under the surface around a player in the cave, never where sunlight or a torch reaches nor in hell,
+/// and the size roll treats them as underground.
 /// </summary>
 public sealed class CaveSlimeTests
 {
@@ -18,11 +18,16 @@ public sealed class CaveSlimeTests
 
     private const int Floor = -25;
 
-    // Solid stone chunks over x and z -48..47 and y -32..-17, with a cave three cells tall
-    // (y = Floor + 1 .. Floor + 3) carved across all of it, far under the generated terrain.
+    // A floor deep in hell, its cave inside one chunk like the overworld one's
+    private const int HellFloor = WorldGenerationConfig.HellTopY - 40;
+
+    // Solid stone chunks over x and z -48..47 and the chunk layer holding the floor, with a cave three
+    // cells tall (y = floor + 1 .. floor + 3) carved across all of it, far under the generated terrain.
     // Every chunk publishes the given sun and block light (0..15) for every cell.
-    private static ChunkManager Cave(int sun, int block)
+    private static ChunkManager Cave(int sun, int block, int floor = Floor)
     {
+        var cy = floor >> Chunk.SizeShift;
+        Assert.Equal(cy, (floor + 3) >> Chunk.SizeShift);
         var chunks = new ChunkManager(null!);
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var light = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
@@ -30,14 +35,14 @@ public sealed class CaveSlimeTests
         for (var cx = -3; cx <= 2; cx++)
         for (var cz = -3; cz <= 2; cz++)
         {
-            var pos = new Vector3(cx, -2, cz);
+            var pos = new Vector3(cx, cy, cz);
             var chunk = new Chunk(null!, pos, generateBlockData: false) { IsBlockDataReady = true };
             for (var x = 0; x < Chunk.Size; x++)
             for (var y = 0; y < Chunk.Size; y++)
             for (var z = 0; z < Chunk.Size; z++)
             {
-                var worldY = -2 * Chunk.Size + y;
-                var open = worldY > Floor && worldY <= Floor + 3;
+                var worldY = cy * Chunk.Size + y;
+                var open = worldY > floor && worldY <= floor + 3;
                 chunk.SetBlockRaw(x, y, z, open ? (byte)0 : stone, 0);
             }
             chunk.PublishLight(light);
@@ -50,7 +55,10 @@ public sealed class CaveSlimeTests
     private static readonly Vector3 PlayerInCave = new(0.5f, Floor + 1 + Camera.EyeHeight, 0.5f);
 
     private static bool Search(ChunkManager chunks, out int x, out int groundY, out int z) =>
-        MobSpawner.TryFindCaveSpawn(chunks, PlayerInCave,
+        Search(chunks, PlayerInCave, out x, out groundY, out z);
+
+    private static bool Search(ChunkManager chunks, Vector3 player, out int x, out int groundY, out int z) =>
+        MobSpawner.TryFindCaveSpawn(chunks, player,
             MobConfig.SlimeSpawnMinRadiusBlocks, MobConfig.SlimeSpawnMaxRadiusBlocks,
             MobConfig.SlimeCaveSpawnTries, MobConfig.SlimeCaveSearchHalfHeight,
             MobConfig.SlimeCaveScanDepth, MobConfig.SlimeCaveMaxSkyLight,
@@ -82,6 +90,15 @@ public sealed class CaveSlimeTests
         var chunks = Cave(sun, block);
         for (var attempt = 0; attempt < 30; attempt++)
             Assert.False(Search(chunks, out _, out _, out _));
+    }
+
+    [Fact]
+    public void ADarkCaveInHellTakesNone()
+    {
+        var chunks = Cave(sun: 0, block: 0, floor: HellFloor);
+        var player = PlayerInCave with { Y = HellFloor + 1 + Camera.EyeHeight };
+        for (var attempt = 0; attempt < 30; attempt++)
+            Assert.False(Search(chunks, player, out _, out _, out _));
     }
 
     [Fact]

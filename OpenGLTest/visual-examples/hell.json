@@ -1,0 +1,36 @@
+{
+  // Hell caverns check (plans/LAYERS.md L-6): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/hell.json
+  // Shots land in visual/hell/. Under the barrier band hell repeats a 96-block layer downward
+  // forever: an open cavern pocket over a 16-block hellrock slab. The default seed leaves open
+  // cavern at each spot below (found by a point-query scan around the origin): layer 0 at -330, its
+  // floor dipping into small lava pools; layer 1 at -430; layer 4 at -706, which is more open and
+  // whose floor holds wider lava pools. Lava and the eye adaptation are the only light (no
+  // skylight reaches this deep); the red fog is LayerClimate's hell tint.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+
+    { "op": "teleport", "pos": [-15.5, -330, -7.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 24 },
+    { "op": "screenshot", "name": "layer0_ahead", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": -40 },
+    { "op": "screenshot", "name": "layer0_floor", "hideHud": true },
+    { "op": "look", "yaw": 0, "pitch": 10 },
+    { "op": "screenshot", "name": "layer0_ceiling", "hideHud": true },
+
+    { "op": "teleport", "pos": [0.5, -430, 0.5], "yaw": -90, "pitch": -15 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "layer1_ahead", "hideHud": true },
+    { "op": "look", "yaw": 45, "pitch": -50 },
+    { "op": "screenshot", "name": "layer1_floor", "hideHud": true },
+
+    { "op": "teleport", "pos": [4.5, -706, 8.5], "yaw": -90, "pitch": -30 },
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "layer4_lava", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": -10 },
+    { "op": "screenshot", "name": "layer4_cavern", "hideHud": true },
+    { "op": "look", "yaw": 180, "pitch": -89 },
+    { "op": "screenshot", "name": "layer4_down", "hideHud": true }
+  ]
+}

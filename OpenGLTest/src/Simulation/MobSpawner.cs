@@ -4,6 +4,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Hell;
 
 namespace VoxelEngine.Simulation;
 
@@ -81,7 +82,8 @@ public static class MobSpawner
     /// height (<see cref="SlimeSize.IsUnderground"/>), the cell above it must be dark (sky light at most
     /// <paramref name="maxSkyLight"/>, read like <see cref="IsLitByBlocks"/>; a cell without a published
     /// light snapshot reads as full sun, so it is refused) and not torch-lit, and every cell read must
-    /// be loaded. Any biome. On success <paramref name="groundY"/> is the floor cell's Y.
+    /// be loaded. Any biome, but never in hell (<see cref="HellGenerator.InHell"/>), which is the hell
+    /// mobs' own ground. On success <paramref name="groundY"/> is the floor cell's Y.
     /// </summary>
     public static bool TryFindCaveSpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
         float maxRadius, int tries, int searchHalfHeight, int scanDepth, int maxSkyLight,
@@ -119,7 +121,7 @@ public static class MobSpawner
                 }
 
                 // The first floor under two clear cells decides this try
-                if (SlimeSize.IsUnderground(y, surface) && !IsLitByBlocks(chunks, x, y + 1, z)
+                if (!HellGenerator.InHell(y) && SlimeSize.IsUnderground(y, surface) && !IsLitByBlocks(chunks, x, y + 1, z)
                     && (int)MathF.Round(EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 1.5f, z + 0.5f)).Sun * 15f) <= maxSkyLight)
                 {
                     groundY = y;

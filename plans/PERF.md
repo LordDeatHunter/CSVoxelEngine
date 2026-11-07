@@ -228,6 +228,8 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
 - LOD build medians 17.7 / 17.6 / 65.3 ms at levels 0/1/2, tracking the 36/100/324 prefetched
   columns; cold sweep of 203 coarsest regions ~41 s; first finest region cold 1.1-1.5 s, warm ~7 ms;
   full 17,077-chunk ring ~5.0 s with 4 generation threads (headless).
+- Hell chunks (`L-6`, 2026-11-07, `WorldgenCostProbe` `hell` class): a wholly-hell chunk skips the
+  overworld pipeline, warm 0.024 ms (the stamp 0.019 ms) against deepStone's 0.92 ms; cold 0.33 ms.
 - Identity recipe: dump `LandHeight`, `WaterLevelAt` and `SurfaceWaterWeight` bits before and after
   on a +-20000 grid at stride 37, plus `Compute` on 1000 random chunk columns; zero changes allowed
   outside the intended footprint.

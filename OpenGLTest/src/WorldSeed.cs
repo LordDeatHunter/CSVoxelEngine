@@ -5,6 +5,7 @@ using VoxelEngine.Lod;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
+using VoxelEngine.WorldGen.Hell;
 
 namespace VoxelEngine;
 
@@ -67,6 +68,7 @@ public static class WorldSeed
         HematiteGenerator.Reseed();
         TinGenerator.Reseed();
         BarrierGenerator.Reseed();
+        HellGenerator.Reseed();
         LavaGenerator.Reseed();
         PebbleGenerator.Reseed();
         SnowGenerator.Reseed();

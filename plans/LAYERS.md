@@ -4,7 +4,7 @@
 
 ## Status
 
-Phase 1 (foundations) done; phase 2 under way (`L-5` done). A Nether- and Aether-like pair of realms inside the one world, as vertical
+Phase 1 (foundations) done; phase 2 under way (`L-5`, `L-6` done). A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty step in
@@ -14,7 +14,12 @@ creative only) is the barrier's tool. The `softLanding` and `sink` block flags (
 The eye's height already tints the sky and fog (`LayerClimate`, `FrameLighting`, no shader change):
 red in hell, a deeper blue over the cloud slab. The barrier band is generated (`BarrierGenerator`, the
 `barrier` block, iron pickaxe only): a gapless core from -230 to -270 that walls up caves and fluids
-too, patchy noise ramps above and below it, stamped last; below it the ground stays stone until `L-6`.
+too, patchy noise ramps above and below it, stamped last. Under it hell is generated
+(`HellGenerator`, `WorldGen/Hell/`): 96-block layers repeating downward forever, a cavern pocket on a
+3D lattice noise over a 16-block slab of `hellrock` (iron pickaxe only), deeper layers more open with
+more lava ponding their floors' dips; a wholly-hell chunk skips the overworld pipeline. Hellrock is
+the only hell block so far: `L-8` completes the palette (`tools/generate-hell-textures.py` takes a
+tile spec per block). The layer index is ready for the hell mobs' difficulty (`L-10`).
 Last updated 2026-11-07.
 
 ## In progress
@@ -25,10 +30,6 @@ Nothing.
 
 ### Phase 2: Hell slice
 
-- [ ] **`L-6` Hell pockets, endless.** P1, L. Below the barrier: big open cavern pockets stacked
-  downward, separated by hellrock slabs (iron-pickaxe breakable, high hardness), repeating forever.
-  Layer index scales lava, density and mob difficulty. 3D noise on a strided lattice like
-  `NoiseCaves`. **Hook:** `ChunkTerrainFill`, new generator under `WorldGen/`.
 - [ ] **`L-7` Hell biomes.** P1, M. 2-3 biomes chosen by **3D** noise (they vary by layer and xz).
 - [ ] **`L-8` Hell palette.** P1, M. Full block palette in JSON: hellrock, surface and soil per
   biome, emissive blocks (new `BlockLightPalette` slots, 8-color cap), lava reuse. Mind the 255 id

@@ -775,6 +775,53 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// pocket from the next.</summary>
     public const int HellSlabThicknessBlocks = 16;
 
+    /// <summary>Whether worldgen fills hell (HellGenerator): below <see cref="HellTopY"/> every cell
+    /// is the hell generator's, cavern pockets in hellrock separated by slabs.</summary>
+    public const bool HellEnabled = true;
+
+    /// <summary>Lattice spacing of the hell cavern noise in blocks: a power of two dividing the
+    /// chunk size, so neighboring chunks sample the same lattice points.</summary>
+    public const int HellNoiseStride = 4;
+
+    /// <summary>Frequency of the hell cavern noise (seed offset 163, two octaves): about the width
+    /// of one cavern chamber.</summary>
+    public const float HellCavernFrequency = 1f / 64f;
+
+    /// <summary>The cavern noise's y is scaled by this, so chambers are a little flatter than wide.</summary>
+    public const float HellCavernYScale = 1.5f;
+
+    /// <summary>How far in from a pocket's ceiling and floor the edge bias reaches: within this many
+    /// cells of either the cells close up, more the nearer the edge, so ceilings and floors follow
+    /// the noise instead of a flat plane.</summary>
+    public const int HellEdgeBlocks = 32;
+
+    /// <summary>The edge bias right at a pocket's ceiling and floor, in noise units (falling
+    /// quadratically to 0 at <see cref="HellEdgeBlocks"/>): above the noise's range, so the
+    /// outermost cells are always hellrock.</summary>
+    public const float HellEdgeStrength = 1.6f;
+
+    /// <summary>The cavern noise must exceed this (plus the edge bias) for a pocket cell of the top
+    /// layer to open; each layer down lowers it by <see cref="HellOpenThresholdPerLayer"/>, so
+    /// deeper pockets are more open, down to <see cref="HellOpenThresholdMin"/>.</summary>
+    public const float HellOpenThresholdTop = -0.1f;
+
+    /// <summary>How much more open each hell layer is than the one above it.</summary>
+    public const float HellOpenThresholdPerLayer = 0.02f;
+
+    /// <summary>The most open a hell layer gets.</summary>
+    public const float HellOpenThresholdMin = -0.3f;
+
+    /// <summary>The lava level of the top hell layer: every open cell fewer than this many cells
+    /// above its pocket's floor holds a lava source, so the dips of a cavern floor pond lava.
+    /// Rises by <see cref="HellLavaDepthPerLayer"/> each layer down, up to <see cref="HellLavaMaxDepth"/>.</summary>
+    public const int HellLavaBaseDepth = 14;
+
+    /// <summary>How many cells the lava level rises each hell layer down.</summary>
+    public const int HellLavaDepthPerLayer = 1;
+
+    /// <summary>The highest lava level of any hell layer, in cells above its pocket's floor.</summary>
+    public const int HellLavaMaxDepth = 22;
+
     /// <summary>Bottom of the solid cloud slab: the patchy real cloud blocks around y 200, above the
     /// relief ceiling (<see cref="ReliefCeilingHeight"/>) and the drawn cloud layer
     /// (<see cref="SkyConfig.CloudHeight"/>).</summary>

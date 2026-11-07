@@ -4,6 +4,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
+using VoxelEngine.WorldGen.Hell;
 using static VoxelEngine.Chunks.Chunk;
 using Stage = VoxelEngine.WorldGen.WorldgenStageTimer.Stage;
 
@@ -29,6 +30,19 @@ internal static class ChunkTerrainFill
         var column = ColumnCache.Get((int)chunk.Position.X, (int)chunk.Position.Z);
         var lowerBoundY = chunk.LowerBoundY;
         chunk.SurfaceMinY = column.MinHeight;
+
+        // Wholly in hell: every cell is the hell generator's, which writes all of them, so nothing
+        // the overworld pipeline would put here first survives. Skipping it is bit-identical (the
+        // ungated test path, stampGates false, runs it all and proves that) and spares a hell chunk
+        // the neighborhood scan, the carvers and every stamp.
+        if (stampGates && WorldGenerationConfig.HellEnabled && HellGenerator.Covers(lowerBoundY))
+        {
+            timer?.Mark(Stage.Columns);
+            HellGenerator.Stamp(chunk.Blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
+            timer?.Mark(Stage.Hell);
+            Finish(chunk, column, lowerBoundY, hasWater: false, timer, genStart);
+            return;
+        }
 
         // Entirely above the terrain: nothing to fill, nothing to carve, nothing to stamp.
         // With trees enabled the band above the surface still needs generation (a tree reaches
@@ -256,6 +270,20 @@ internal static class ChunkTerrainFill
             BarrierGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Barrier);
 
+        // Hell under the barrier band: it overwrites every cell at or below HellTopY, so only the
+        // chunk straddling hell's top gets here with any (wholly hell chunks took the path above)
+        if (WorldGenerationConfig.HellEnabled && Admits(stampGates, HellGenerator.WriteBand(), lowerBoundY))
+            HellGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.Hell);
+
+        Finish(chunk, column, lowerBoundY, hasWater, timer, genStart);
+    }
+
+    /// <summary>The tail every filled chunk shares: the solid recount, the fluid frontier and the
+    /// ready flag.</summary>
+    private static void Finish(Chunk chunk, ColumnData column, int lowerBoundY, bool hasWater,
+        WorldgenStageTimer? timer, long genStart)
+    {
         // Carving removed an unknown number of blocks; a recount is cheaper than bookkeeping.
         // Counting AIR and subtracting beats counting non-air: BlockType.Air is
         // `public const byte Air = 0`, so this binds to the vectorized
@@ -265,8 +293,9 @@ internal static class ChunkTerrainFill
         timer?.Mark(Stage.SolidCount);
 
         // Only a chunk that actually got flooded can have a frontier to report, plus any
-        // chunk low enough to hold lava pockets (the scan itself is fluid-generic)
-        if (hasWater || (WorldGenerationConfig.LavaEnabled && lowerBoundY <= WorldGenerationConfig.LavaMaxY))
+        // chunk low enough to hold lava pockets or hell's lava (the scan itself is fluid-generic)
+        if (hasWater || (WorldGenerationConfig.LavaEnabled && lowerBoundY <= WorldGenerationConfig.LavaMaxY)
+                     || (WorldGenerationConfig.HellEnabled && HellGenerator.WriteBand().Reaches(lowerBoundY)))
             ScanFluidFrontier(chunk, column, lowerBoundY);
         timer?.Mark(Stage.FluidFrontier);
 
