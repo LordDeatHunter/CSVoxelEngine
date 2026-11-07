@@ -4822,7 +4822,7 @@ path and the straddle path through `StampHellRuins`) stand on the first solid po
 per layer, with the whole footprint level and clear above, and their cells stay inside their layer. **Sky** ruins (`RuinsSky`,
 inside `StampSky` after the sky trees) take at most one per island, on its center top when the top is within
 `RuinSkyMaxStep` of level across the footprint. Every placement has a band (`SurfaceBand`, `UndergroundBand`, `SkyBand`, hell
-`HellGenerator.WriteBand`) and a `StampGateTests` row; `StructureTests` holds the template, seam and site rules. The far LOD
+`HellGenerator.WriteBand`) and a `StampGateTests` row; `StructureTests` holds the template, seam and site rules, and `visual-examples/ruins.json` (`VOXEL_TIME=147`) frames a surface ruin. The far LOD
 draws none. A new ruin is a JSON file.
 
 ## Entities
