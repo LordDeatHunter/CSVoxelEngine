@@ -42,6 +42,9 @@ export async function loadTexture(T: THREE, url: string) {
   tex.minFilter = T.NearestFilter
   tex.colorSpace = T.SRGBColorSpace
   tex.generateMipmaps = false
+  // Quads merged over several cells (multiblock models) carry uvs past 0..1 and rely on tiling.
+  tex.wrapS = T.RepeatWrapping
+  tex.wrapT = T.RepeatWrapping
   return tex
 }
 
@@ -180,6 +183,33 @@ export async function buildBlock(host: HTMLElement, block: any, base: string): P
   stage.frame(new T.Box3(new T.Vector3(-h, -h, -h), new T.Vector3(h, h, h)))
   const note = block.renderer !== 'model' ? 'Representative shape; the in-game form depends on placement.' : ''
   return { dispose: stage.dispose, note }
+}
+
+/** A size^3 volume of one block, one cell per brick; `setLayers(n)` shows only the lowest n layers. */
+export async function buildStructure(host: HTMLElement, source: any, layers: string[][][], base: string): Promise<Built & { setLayers(n: number): void }> {
+  const stage = await createStage(host)
+  const { T, scene } = stage
+  const cell = await blockGroup(T, source, base)
+  if (!cell) {
+    stage.dispose()
+    throw new Error('the building block has no static model')
+  }
+  const size = layers.length
+  const byLayer: InstanceType<THREE['Group']>[][] = []
+  layers.forEach((rows, y) => {
+    byLayer[y] = []
+    rows.forEach((row, z) => row.forEach((c, x) => {
+      if (c !== 'source') return
+      const g = cell.clone()
+      g.position.set(x - size / 2, y - size / 2, z - size / 2)
+      scene.add(g)
+      byLayer[y].push(g)
+    }))
+  })
+  const h = size / 2
+  stage.frame(new T.Box3(new T.Vector3(-h, -h, -h), new T.Vector3(h, h, h)))
+  const setLayers = (n: number) => byLayer.forEach((gs, y) => gs.forEach((g) => { g.visible = y < n }))
+  return { dispose: stage.dispose, setLayers }
 }
 
 // ---------------------------------------------------------------- items

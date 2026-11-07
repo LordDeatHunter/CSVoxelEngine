@@ -5,12 +5,15 @@ export function normalizeTexture(ref) {
   return ref.replace(/^minecraft:/, '').replace(/^blocks?\//, '')
 }
 
-/** Minecraft's default per-face UV: the crop of the tile the box face covers. */
+/** Minecraft's default per-face UV: the crop of the tile the box face covers (the game's ModelBaker.DefaultUv). */
 export function defaultUv(face, from, to) {
   switch (face) {
-    case 'up': case 'down': return [from[0], from[2], to[0], to[2]]
-    case 'north': case 'south': return [from[0], 16 - to[1], to[0], 16 - from[1]]
-    default: return [from[2], 16 - to[1], to[2], 16 - from[1]]
+    case 'up': return [from[0], from[2], to[0], to[2]]
+    case 'down': return [from[0], 16 - to[2], to[0], 16 - from[2]]
+    case 'north': return [16 - to[0], 16 - to[1], 16 - from[0], 16 - from[1]]
+    case 'south': return [from[0], 16 - to[1], to[0], 16 - from[1]]
+    case 'west': return [from[2], 16 - to[1], to[2], 16 - from[1]]
+    default: return [16 - to[2], 16 - to[1], 16 - from[2], 16 - from[1]]
   }
 }
 

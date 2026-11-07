@@ -47,7 +47,7 @@ for (const { id, file } of listJson(path.join(assets, 'data/blocks'))) {
     id, name: d.name ?? id, renderer: d.renderer ?? 'model', hasItem: d.hasItem !== false && !d.fluid,
     hardness: d.hardness ?? 5, requiresTool: !!d.requiresTool, tools: d.tools ?? null, solid: d.solid !== false,
     fluid: !!d.fluid, emission: d.light?.emission ?? 0, facing: d.facing ?? null, loot: d.loot ?? id,
-    size: d.multiblock?.size ?? 1,
+    size: d.multiblock ? d.multiblock.size ?? 2 : 1,
     biomeTint: d.biomeTint ? Object.values(d.biomeTint.faces ?? {}).map((f) => f.tile ?? f.overlay).filter(Boolean) : null,
     model
   }
@@ -265,7 +265,7 @@ ${table(['Property', 'Value'], rows)}
 ## How to build
 
 ` +
-    `Craft the bricks (see Materials above), stack them into a ${st.size}×${st.size}×${st.size} cube and right-click a front face with the multiblock converter. The opening ends up facing you.
+    `Craft the bricks, stack them into a ${st.size}×${st.size}×${st.size} cube and right-click a front face with the multiblock converter. The opening ends up facing you.
 `)
 }
 writePage('game/structures/index.md', `# Structures

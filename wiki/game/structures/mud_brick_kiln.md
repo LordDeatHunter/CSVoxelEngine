@@ -17,4 +17,4 @@ title: "Mud Brick Kiln"
 
 ## How to build
 
-Craft the bricks (see Materials above), stack them into a 2×2×2 cube and right-click a front face with the multiblock converter. The opening ends up facing you.
+Craft the bricks, stack them into a 2×2×2 cube and right-click a front face with the multiblock converter. The opening ends up facing you.
