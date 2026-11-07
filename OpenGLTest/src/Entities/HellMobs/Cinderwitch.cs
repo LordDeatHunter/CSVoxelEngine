@@ -22,6 +22,9 @@ public sealed class Cinderwitch : HellMob
     /// <summary>The cast clip, named like the goblin's so the shared clip tooling reads both.</summary>
     public const string CastClip = "throw";
 
+    /// <inheritdoc />
+    public override string AttackClip => CastClip;
+
     /// <summary>Timeline event on the cast clip at which the bolt leaves the hand.</summary>
     public const string ReleaseEvent = "release";
 
@@ -72,7 +75,7 @@ public sealed class Cinderwitch : HellMob
         if (!IsGrounded || _castCooldown > 0f) return Vector3.Zero;
 
         _aimTarget = ChestOf(target.Eye);
-        Animation.Play(CastClip);
+        StartAttack();
         var jitter = (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.HellCasterCooldownJitter;
         _castCooldown = LayerDifficulty.Cooldown(MobConfig.HellCasterCooldownSeconds + jitter, Layer);
         return Vector3.Zero;

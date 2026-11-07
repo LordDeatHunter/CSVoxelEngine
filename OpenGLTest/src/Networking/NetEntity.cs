@@ -24,7 +24,9 @@ public enum NetEntityKind : byte
 /// One server-authoritative entity in a broadcast snapshot: its kind and stable id, and the state
 /// the client renders from. A mob uses <see cref="Health"/>, <see cref="Yaw"/> and
 /// <see cref="Velocity"/>, and <see cref="Ammo"/> carries a goblin's ammo or a slime's size
-/// (<see cref="Slime.Size"/>; a 0 from an older server reads as the smallest size); a drop uses
+/// (<see cref="Slime.Size"/>; a 0 from an older server reads as the smallest size) or a hell or sky mob's
+/// attack count (<c>RealmMob.AttackCount</c>: a client's mirror plays its attack clip whenever the count moves,
+/// and an older server's 0 never moves it); a drop uses
 /// <see cref="ItemId"/>.
 /// A primed TNT uses <see cref="ItemId"/> (the block that primed), <see cref="Health"/> (the fuse
 /// remaining, in milliseconds) and <see cref="Ammo"/> (the whole fuse, in milliseconds); a falling

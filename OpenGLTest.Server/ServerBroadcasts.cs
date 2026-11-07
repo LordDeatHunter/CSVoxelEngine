@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.SkyMobs;
@@ -73,38 +74,26 @@ internal sealed class ServerBroadcasts
                 Cloudgolem => NetEntityKind.Cloudgolem,
                 _ => NetEntityKind.Goblin,
             };
-            // The int field is a goblin's ammo and a slime's size (NetEntity)
+            // The int field is a goblin's ammo, a slime's size and a realm mob's attack count (NetEntity)
             var ammo = mob switch
             {
                 Goblin goblin => goblin.Ammo,
                 Slime slime => slime.Size,
+                RealmMob realm => realm.AttackCount,
                 _ => 0,
             };
-            writer.Write((byte)kind);
-            writer.Write(IdFor(mob));
-            writer.Write(mob.Position);
-            writer.Write(mob.Facing);
-            writer.Write(mob.Health);
-            writer.Write(ammo);
-            // The byte field is a goblin's torch count (a slime carries none)
-            writer.Write(mob is Goblin torchGoblin ? (byte)torchGoblin.Torches : (byte)0);
-            writer.Write(mob.Velocity);
-            // Every entry ends with a status-effect mask (NetEntity.Effects), a mob's own
-            writer.Write(mob.Effects.Mask);
+            // The byte field is a goblin's torch count (a slime carries none); every entry ends with a
+            // status-effect mask (NetEntity.Effects), a mob's own
+            var torches = mob is Goblin torchGoblin ? (byte)torchGoblin.Torches : (byte)0;
+            NetEntityCodec.Write(writer, new NetEntity(kind, IdFor(mob), mob.Position, mob.Facing, mob.Health, ammo,
+                torches, mob.Velocity, mob.Effects.Mask));
         }
 
         for (var i = 0; i < drops.Count; i++)
         {
             var drop = drops[i];
-            writer.Write((byte)NetEntityKind.Drop);
-            writer.Write(IdFor(drop));
-            writer.Write(drop.Position);
-            writer.Write(0f);
-            writer.Write(0);
-            writer.Write(0);
-            writer.Write(drop.BlockId);
-            writer.Write(drop.Velocity);
-            writer.Write((byte)0);
+            NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.Drop, IdFor(drop), drop.Position, 0f, 0, 0,
+                drop.BlockId, drop.Velocity));
         }
 
         // The fuse travels in milliseconds in the two int fields, so the client's flash and swell
@@ -112,29 +101,16 @@ internal sealed class ServerBroadcasts
         for (var i = 0; i < primed.Count; i++)
         {
             var tnt = primed[i];
-            writer.Write((byte)NetEntityKind.PrimedTnt);
-            writer.Write(IdFor(tnt));
-            writer.Write(tnt.Position);
-            writer.Write(0f);
-            writer.Write((int)MathF.Round(tnt.FuseRemaining * 1000f));
-            writer.Write((int)MathF.Round(tnt.FuseDuration * 1000f));
-            writer.Write(tnt.BlockId);
-            writer.Write(Vector3.Zero);
-            writer.Write((byte)0);
+            NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.PrimedTnt, IdFor(tnt), tnt.Position, 0f,
+                (int)MathF.Round(tnt.FuseRemaining * 1000f), (int)MathF.Round(tnt.FuseDuration * 1000f), tnt.BlockId,
+                Vector3.Zero));
         }
 
         for (var i = 0; i < falling.Count; i++)
         {
             var block = falling[i];
-            writer.Write((byte)NetEntityKind.FallingBlock);
-            writer.Write(IdFor(block));
-            writer.Write(block.Position);
-            writer.Write(0f);
-            writer.Write(0);
-            writer.Write(0);
-            writer.Write(block.BlockId);
-            writer.Write(Vector3.Zero);
-            writer.Write((byte)0);
+            NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.FallingBlock, IdFor(block), block.Position, 0f, 0,
+                0, block.BlockId, Vector3.Zero));
         }
 
         // An iceberg's fields are packed as NetEntity documents: turns in the yaw, the seed in the
@@ -142,15 +118,9 @@ internal sealed class ServerBroadcasts
         for (var i = 0; i < icebergs.Count; i++)
         {
             var berg = icebergs[i];
-            writer.Write((byte)NetEntityKind.Iceberg);
-            writer.Write(IdFor(berg));
-            writer.Write(berg.Center);
-            writer.Write(NetEntity.YawFromTurns(berg.Turns));
-            writer.Write(berg.Seed);
-            writer.Write(NetEntity.PackIcebergAmmo(berg.Scale, berg.Sink01));
-            writer.Write((byte)berg.Variant);
-            writer.Write(berg.Velocity);
-            writer.Write((byte)0);
+            NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.Iceberg, IdFor(berg), berg.Center,
+                NetEntity.YawFromTurns(berg.Turns), berg.Seed, NetEntity.PackIcebergAmmo(berg.Scale, berg.Sink01),
+                (byte)berg.Variant, berg.Velocity));
         }
 
         _state.Broadcast(writer.ToArray());

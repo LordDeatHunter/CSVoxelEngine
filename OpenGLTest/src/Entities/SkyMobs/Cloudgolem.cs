@@ -19,6 +19,9 @@ public sealed class Cloudgolem : SkyMob
 
     public const string SlamClip = "slam";
 
+    /// <inheritdoc />
+    public override string AttackClip => SlamClip;
+
     /// <summary>Timeline event on the slam clip at which the fists hit the ground and the shockwave goes out.</summary>
     public const string ImpactEvent = "impact";
 
@@ -78,7 +81,7 @@ public sealed class Cloudgolem : SkyMob
         if (InSlamReach(Position, target.Eye))
         {
             if (_slamCooldown > 0f) return Vector3.Zero;
-            Animation.Play(SlamClip);
+            StartAttack();
             _slamCooldown = MobConfig.CloudgolemSlamCooldownSeconds;
             return Vector3.Zero;
         }

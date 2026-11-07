@@ -7,6 +7,8 @@ using System.Numerics;
 using System.Threading;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.StatusEffects;
+using VoxelEngine.Entities;
+using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
@@ -141,22 +143,11 @@ public sealed class GameServerTests : IDisposable
                     }
                     case NetMessage.EntityList:
                     {
-                        // The record shape the client's own reader decodes (ClientSession's EntityList case)
+                        // The client's own reader (ClientSession's EntityList case)
                         var count = reader.ReadInt();
                         var entities = new List<NetEntity>(count);
                         for (var i = 0; i < count; i++)
-                        {
-                            var kind = (NetEntityKind)reader.ReadByte();
-                            var id = reader.ReadInt();
-                            var position = reader.ReadVector3();
-                            var yaw = reader.ReadFloat();
-                            var health = reader.ReadInt();
-                            var ammo = reader.ReadInt();
-                            var itemId = reader.ReadByte();
-                            var velocity = reader.ReadVector3();
-                            var effects = reader.ReadByte();
-                            entities.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity, effects));
-                        }
+                            entities.Add(NetEntityCodec.Read(reader));
                         Entities = entities;
                         break;
                     }
@@ -1154,6 +1145,76 @@ public sealed class GameServerTests : IDisposable
         {
             mirror.SaveAndDispose();
         }
+    }
+
+    [Fact]
+    public void HellMobsReachTheClientsEntityListAndItsMirrorKeepsTheirLayerAndAttacks()
+    {
+        using var client = Connect("Watcher");
+        var spawn = client.Server!.Value.Spawn;
+        // Straight under the player (the despawn rule is horizontal), deep enough to be a scaled layer
+        var deep = new Vector3(spawn.X, WorldGenerationConfig.HellTopY - 3 * WorldGenerationConfig.HellLayerPeriodBlocks - 20,
+            spawn.Z);
+        Assert.True(_world.SpawnEntity(Hellbrute.EntityName, deep + new Vector3(3f, 0f, 0f)));
+        Assert.True(_world.SpawnEntity(Cinderwitch.EntityName, deep + new Vector3(-3f, 0f, 0f)));
+        var brute = Assert.IsType<Hellbrute>(Assert.Single(_world.HellMobs, m => m is Hellbrute));
+        var caster = Assert.IsType<Cinderwitch>(Assert.Single(_world.HellMobs, m => m is Cinderwitch));
+        Assert.True(brute.MaxHealth > EntityRegistry.Require(Hellbrute.EntityName).MaxHealth);
+        brute.RestoreState(brute.MaxHealth - 5, 1.25f, Vector3.Zero);
+        caster.RestoreState(caster.MaxHealth - 1, -0.5f, Vector3.Zero);
+        // Stands in for three swings the server simulated: the counter its entry carries
+        brute.MirrorAttackCount(3);
+
+        var inbox = InboxOf(client);
+        WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Hellbrute && e.Ammo == 3)
+                                           && entities.Exists(e => e.Kind == NetEntityKind.Cinderwitch));
+        foreach (var mob in new RealmMob[] { brute, caster })
+        {
+            var kind = mob is Hellbrute ? NetEntityKind.Hellbrute : NetEntityKind.Cinderwitch;
+            var carried = Assert.Single(inbox.Entities!, e => e.Kind == kind);
+            Assert.Equal(mob.Position, carried.Position);
+            Assert.Equal(mob.Health, carried.Health);
+            Assert.Equal(mob.Facing, carried.Yaw);
+        }
+
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            var mirroredBrute = Assert.IsType<Hellbrute>(Assert.Single(mirror.HellMobs, m => m is Hellbrute));
+            var mirroredCaster = Assert.IsType<Cinderwitch>(Assert.Single(mirror.HellMobs, m => m is Cinderwitch));
+            // The layer follows from where the mirror stands, so the scaled pool and the wound match the server's
+            Assert.Equal(brute.MaxHealth, mirroredBrute.MaxHealth);
+            Assert.Equal(caster.MaxHealth, mirroredCaster.MaxHealth);
+            Assert.Equal(brute.Health, mirroredBrute.Health);
+            Assert.Equal(brute.Facing, mirroredBrute.Facing);
+            Assert.False(mirroredBrute.Animation.IsPlaying(Hellbrute.MeleeClip));
+
+            // The server starts another swing: the next snapshot makes the mirror play the brute's melee clip
+            brute.MirrorAttackCount(4);
+            WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Hellbrute && e.Ammo == 4));
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            Assert.True(mirroredBrute.Animation.IsPlaying(Hellbrute.MeleeClip));
+            Assert.False(mirroredCaster.Animation.IsPlaying(Cinderwitch.CastClip));
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    // Pumps the server until the newest EntityList the inbox holds satisfies the condition, or five seconds pass
+    private void WaitForEntities(Inbox inbox, Predicate<List<NetEntity>> ready)
+    {
+        var sw = Stopwatch.StartNew();
+        while (sw.Elapsed.TotalSeconds < 5 && (inbox.Entities == null || !ready(inbox.Entities)))
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+            DrainAll();
+        }
+        Assert.True(inbox.Entities != null && ready(inbox.Entities), "the expected EntityList never arrived");
     }
 
     [Fact]

@@ -19,6 +19,7 @@ public abstract class RealmMob : RiggedMob
 
     private float _losRetry;
     private bool _losClear;
+    private bool _attackCountMirrored;
 
     /// <param name="type">The kind, with its model and clips.</param>
     /// <param name="position">The body center it spawns at.</param>
@@ -42,6 +43,37 @@ public abstract class RealmMob : RiggedMob
 
     /// <summary>A multiplier on the ground walk this frame (a brute's charge); 1 by default.</summary>
     protected virtual float GroundSpeedFactor => 1f;
+
+    /// <summary>The kind's one attack clip (a swing, a cast, a dive, a slam), started through
+    /// <see cref="StartAttack"/>.</summary>
+    public abstract string AttackClip { get; }
+
+    /// <summary>
+    /// How many attacks the mob has started (<see cref="StartAttack"/>), the counter a server broadcasts in
+    /// the mob's <see cref="Networking.NetEntity.Ammo"/> so a client's mirror can play each one
+    /// (<see cref="MirrorAttackCount"/>); a mirror holds the server's count.
+    /// </summary>
+    public int AttackCount { get; private set; }
+
+    /// <summary>Plays the attack clip and counts the attack (<see cref="AttackCount"/>).</summary>
+    protected void StartAttack()
+    {
+        Animation.Play(AttackClip);
+        AttackCount++;
+    }
+
+    /// <summary>
+    /// A client's mirror takes the server's <see cref="AttackCount"/> from a snapshot: a count that moved since
+    /// the last snapshot means the server started an attack, so the mirror plays its attack clip (once; the
+    /// locomotion pose returns when the clip ends). The first count a mirror sees only sets it, and a dying
+    /// mirror keeps its death.
+    /// </summary>
+    public void MirrorAttackCount(int count)
+    {
+        if (_attackCountMirrored && count != AttackCount && !IsDying) Animation.Play(AttackClip);
+        AttackCount = count;
+        _attackCountMirrored = true;
+    }
 
     /// <summary>Where the mob looks from at its target's chest: its eye, a little under the head top.</summary>
     public Vector3 EyePoint => Position + new Vector3(0f, BodyHeight * 0.35f, 0f);

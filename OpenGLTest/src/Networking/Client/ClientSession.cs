@@ -387,18 +387,7 @@ internal sealed class ClientSession
                 var count = reader.ReadInt();
                 netEntitiesScratch.Clear();
                 for (var i = 0; i < count; i++)
-                {
-                    var kind = (NetEntityKind)reader.ReadByte();
-                    var id = reader.ReadInt();
-                    var position = reader.ReadVector3();
-                    var yaw = reader.ReadFloat();
-                    var health = reader.ReadInt();
-                    var ammo = reader.ReadInt();
-                    var itemId = reader.ReadByte();
-                    var velocity = reader.ReadVector3();
-                    var effects = reader.ReadByte();
-                    netEntitiesScratch.Add(new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity, effects));
-                }
+                    netEntitiesScratch.Add(NetEntityCodec.Read(reader));
                 w.ClientMirror.ApplyNetworkEntities(netEntitiesScratch);
                 break;
             }

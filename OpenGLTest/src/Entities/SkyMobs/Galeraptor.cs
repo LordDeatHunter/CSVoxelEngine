@@ -20,6 +20,9 @@ public sealed class Galeraptor : SkyMob
 
     public const string DiveClip = "dive";
 
+    /// <inheritdoc />
+    public override string AttackClip => DiveClip;
+
     /// <summary>Timeline event on the dive clip at which the talons strike.</summary>
     public const string ImpactEvent = "impact";
 
@@ -75,7 +78,7 @@ public sealed class Galeraptor : SkyMob
         if (_diveCooldown > 0f || dist > MobConfig.GaleraptorDiveRangeBlocks || !SeesTarget(Position, target, chunks))
             return Vector3.Zero;
 
-        Animation.Play(DiveClip);
+        StartAttack();
         _diveCooldown = MobConfig.GaleraptorDiveCooldownSeconds;
         return Vector3.Zero;
     }

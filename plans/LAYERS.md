@@ -6,7 +6,7 @@
 
 Phases 1 (foundations), 2 (the hell slice, `L-5` to `L-10`) and 3 (the sky slice: the solid cloud
 patches `L-11`, the sky islands with their cloud sea `L-12`, the sky biomes and flora `L-13`, flight in the
-shared mob layer `L-14` and the sky mobs `L-15`) done; phase 4 (netcode and polish) remains. A Nether- and Aether-like pair of realms inside the one world, as vertical
+shared mob layer `L-14` and the sky mobs `L-15`) done; phase 4 (netcode `L-16` done; polish `L-17`) remains. A Nether- and Aether-like pair of realms inside the one world, as vertical
 layers (not dimensions). Dig or build to reach them; no portals. Old saves do not matter (build as
 day 0). The layer Y bands live in `WorldGenerationConfig` (`Barrier*`, `Hell*`, `CloudSlab*`,
 `SkyIsland*`), the cloud sea in `SkyConfig.SkyCloudSea*` and the difficulty steps in
@@ -48,7 +48,8 @@ and layer by `HellTrees`. Two hell mobs live in the pockets (`L-10`, AGENTS.md "
 `hellbrute` and the fire-casting `cinderwitch`, `HellMob`s on the shared `RiggedMob` base (the goblin's
 too), spawned only on dim hell floors (`MobSpawner.TryFindHellSpawn`) and scaled by the layer index
 (`LayerDifficulty`: health, damage, cast rate, pack size); their bolts set the player `burning`. They
-are already on the wire (protocol 17) and in `entities.json`; `L-16` adds the loopback tests. Flight (`L-14`, AGENTS.md "Flying mobs") carries the sky's flyer: a `RiggedMob` kind built
+are on the wire (protocol 17, with a loopback test since `L-16`) and in `entities.json`; a client's mirror plays
+every realm mob's attack clip from a replicated attack count (`L-16`, AGENTS.md "Hell mobs"). Flight (`L-14`, AGENTS.md "Flying mobs") carries the sky's flyer: a `RiggedMob` kind built
 with a `FlightTuning` flies (`RiggedMob.Fly`, `FlightSteering`: no gravity, fall damage or ledge caution, a
 hover band over its target or the floor, a wall probe that slides and climbs, a 3D wander goal and knock, the
 `fly` clip by 3D speed, pitch and bank); `Flies` comes from the kind, so it needs no wire bit. Two sky mobs
@@ -68,9 +69,6 @@ Nothing.
 
 ### Phase 4: Netcode and polish
 
-- [ ] **`L-16` Network and saves.** P1, S. Loopback tests of the hell mobs (every realm kind already rides
-  `EntityList` and `entities.json`, the sky kinds since `L-15` with a loopback test of their own; the sink
-  rule in `MovementRules` came with `L-3`), and showing a mirrored mob's attack clip on a client.
 - [ ] **`L-17` Tuning and docs.** P2, S. Visual scenarios for every phase, tuning pass, an AGENTS.md
   section, then prune this file.
 

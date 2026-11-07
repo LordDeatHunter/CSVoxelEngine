@@ -175,6 +175,8 @@ internal sealed class ClientMirror
                 var before = existing.Health;
                 existing.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
                 existing.Effects.SetMirrorMask(entry.Effects);
+                // A realm mob's attack count moving means the server started an attack: play its clip
+                if (existing is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
                 if (!_serverMode && existing.Health < before)
                     Strikes.ShowDamageNumber(existing, before - existing.Health);
                 continue;
@@ -402,6 +404,8 @@ internal sealed class ClientMirror
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
         mob?.Effects.SetMirrorMask(entry.Effects);
+        // The first count only sets it: an attack already under way when first seen is not replayed
+        if (mob is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
         return mob;
     }
 

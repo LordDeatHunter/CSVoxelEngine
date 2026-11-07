@@ -140,7 +140,9 @@ public static class NetFraming
     /// <see cref="NetEntityKind.Cinderwitch"/>); an older client would not draw them.
     /// 18: <see cref="NetMessage.EntityList"/> also carries the sky mobs (<see cref="NetEntityKind.Galeraptor"/>,
     /// <see cref="NetEntityKind.Cloudgolem"/>); a flyer's whole position rides the entry as for every mob, and its
-    /// flight follows from its kind; an older client would not draw them.</summary>
+    /// flight follows from its kind; an older client would not draw them. A hell or sky mob's attack count was put
+    /// in its entry's ammo field later without a bump: the layout is unchanged, an older client ignores the field
+    /// and an older server's 0 simply plays no attack clip.</summary>
     public const int ProtocolVersion = 18;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>

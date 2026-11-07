@@ -20,6 +20,9 @@ public sealed class Hellbrute : HellMob
 
     public const string MeleeClip = "melee";
 
+    /// <inheritdoc />
+    public override string AttackClip => MeleeClip;
+
     /// <summary>Timeline event on the melee clip at which the blow connects.</summary>
     public const string ImpactEvent = "impact";
 
@@ -76,7 +79,7 @@ public sealed class Hellbrute : HellMob
         if (InMeleeReach(Position, target.Eye))
         {
             if (_meleeCooldown > 0f) return Vector3.Zero;
-            Animation.Play(MeleeClip);
+            StartAttack();
             _meleeCooldown = MobConfig.HellbruteMeleeCooldownSeconds;
             return Vector3.Zero;
         }

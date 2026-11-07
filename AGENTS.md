@@ -1320,7 +1320,8 @@ OpenGLTest/
       MobLoot.cs               # GL-free loot toss: the up-and-out launch a killed mob's drops get
       MobTargets.cs            # GL-free target rules: body contact, nearest non-immune target, min distance
       RealmMob.cs              # abstract realm mob (the hell and sky mobs): the chase frame (face, Decide, Locomote: a
-                               #   walk by default, a flyer steers), the throttled line of sight (SeesTarget), ChestOf
+                               #   walk by default, a flyer steers), the throttled line of sight (SeesTarget), ChestOf,
+                               #   the attack clip and its replicated count (StartAttack, AttackCount, MirrorAttackCount)
       RiggedMob.cs             # abstract walking or flying mob animated from its clips (Goblin, the realm mobs): the
                                #   EntityAnimator, walk/auto-jump/float physics or Fly, facing, death/spawn/hurt clips,
                                #   the mirror's animation and BodyEffect (a flyer's pitch and bank)
@@ -1533,6 +1534,7 @@ OpenGLTest/
       NetAttacks.cs            # what each NetAttackKind stands for: the attack pattern it needs in hand, the
                                #   sword swing it names, the NetPlayerAction it is rebroadcast as
       NetEntity.cs             # NetEntityKind/NetEntity and NetCellChange
+      NetEntityCodec.cs        # one EntityList entry on the wire (the server writes, the client reads)
       NetPlayerAction.cs       # the swing a player just made, as the server rebroadcasts it in each
                                #   player list entry (with a counter that moves on every new one)
       NetPlayerFlags.cs        # the PlayerState flags byte (creative, flying), a request to the server
@@ -3905,7 +3907,9 @@ climate) instead of the heights alone, so a client derives nothing from worldgen
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`ClientMirror.KindMatches`). Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Version 18 (current) lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell or sky mob's `Ammo` carries its
+attack count the same way (`RealmMob.AttackCount`, see "A mirror's attack clip"), with no bump either. Every
+entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Version 18 (current) lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
 mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
@@ -4948,9 +4952,20 @@ torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateCon
   `MobPasses.RenderRealmMobs` and the near shadow cascade (no mirror: hell lies far under the water plane),
   `entities.json` by kind name, the `EntityList` kinds above and `ClientMirror`'s reconcile, and the item
   debugger's ENTITIES tab. Tests: `HellMobTests`, `HellMobManagerTests`, the hell round trip in
-  `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload` and `NetworkEntitySyncTests`.
+  `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `NetworkEntitySyncTests` and the loopback
+  `GameServerTests.HellMobsReachTheClientsEntityListAndItsMirrorKeepsTheirLayerAndAttacks` (a deep, scaled
+  mob keeps its scaled pool on the client, since the mirror reads its layer from where it stands).
+- **A mirror's attack clip** (every realm mob, hell and sky alike): a kind starts its one attack clip
+  (`RealmMob.AttackClip`: the brute's melee, the witch's cast, the raptor's dive, the golem's slam) through
+  `RealmMob.StartAttack`, which counts it (`AttackCount`); the server sends that count in the mob's
+  `EntityList` `Ammo` field (no protocol bump: the layout is unchanged), and `ClientMirror` hands it to
+  `RealmMob.MirrorAttackCount`, which plays the clip whenever the count moves (the first count it sees only
+  sets it, a dying mirror keeps its death), so the mirror swings, casts, dives and slams with the server and
+  falls back to its locomotion when the clip ends. Its events are never consumed there: the blows, bolts and
+  shockwaves stay the server's. `RealmMobMirrorTests`, `NetEntityCodecTests` (the entry codec,
+  `NetEntityCodec`, the server's writer and the client's reader).
 - Known gaps: the bolts, like the goblin stones, are not on the wire (a client sees only their damage and
-  the burning); a client's mirror shows no attack clip; the casters walk.
+  the burning); a goblin's mirror still shows no throw or melee clip; the casters walk.
 
 ### Flying mobs
 
@@ -5034,8 +5049,9 @@ Both models, their skins and the `cloud_shard` sprite come from `tools/generate-
   `GameServerTests.SkyMobsReachTheClientsEntityListByKindAndAFlyerAtItsHeight`.
   `visual-examples/sky-mobs.json` (`VOXEL_TIME=147`) films the ring's own spawns, then both kinds on the
   meadow island.
-- Known gaps: a client's mirror shows no attack clip; the slam's shockwave hits players only (no mobs, no
-  blocks); `cloud_shard` has no use yet; the overworld ring spawners still spawn on the ground far below a
+- A client's mirror plays the dive and the slam with the server (see "A mirror's attack clip" under "Hell
+  mobs").
+- Known gaps: the slam's shockwave hits players only (no mobs, no blocks); `cloud_shard` has no use yet; the overworld ring spawners still spawn on the ground far below a
   player standing on an island.
 
 ### Icebergs
