@@ -141,8 +141,8 @@ the other while still being faster together.
 - [ ] **`P-43` · Forge & anvil (metal shaping)** — P1, M. **Milestone 1.**
   After casting: hammer ingots into shaped parts, the gate to iron/steel tiers (`P-7`).
 - [ ] **`P-44` · Alloys** — P2, M.
-  Bronze from copper + tin, and later steel; the alloy step that makes mixed mining worthwhile.
-  Combines with `P-25`.
+  Bronze from copper + tin (the 3x3x3 alloy furnace, tin ore and tools) is planned in
+  `ALLOYS.md` (`A-1`..`A-6`); later steel stays here. Combines with `P-25`.
 
 #### Arc B — expert automation
 
