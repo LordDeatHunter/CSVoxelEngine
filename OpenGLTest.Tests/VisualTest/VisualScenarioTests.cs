@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Silk.NET.Input;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.VisualTest;
@@ -301,17 +302,20 @@ public sealed class VisualScenarioTests
     }
 
     [Fact]
-    public void TheIcebergScenarioParses()
+    public void EveryShippedScenarioLoadsAndShootsSomething()
     {
         // visual-examples/ is not copied to the build output: it sits in the game project
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "icebergs.json")))
+        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples")))
             dir = dir.Parent;
         Assert.NotNull(dir);
-        var scenario = VisualScenario.Load(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "icebergs.json"));
-
-        Assert.Contains(scenario.Steps, step => step.Op == "spawn" && step.Entity == "iceberg");
-        Assert.Contains(scenario.Steps, step => step.Op == "screenshot");
+        var files = Directory.GetFiles(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples"), "*.json");
+        Assert.NotEmpty(files);
+        foreach (var file in files)
+        {
+            var scenario = VisualScenario.Load(file);
+            Assert.True(scenario.Steps.Any(step => step.Op == "screenshot"), $"{file} takes no screenshot");
+        }
     }
 
     [Fact]
@@ -337,19 +341,5 @@ public sealed class VisualScenarioTests
         var ex = Assert.Throws<InvalidOperationException>(() =>
             VisualScenario.Parse($$"""{ "steps": [{{step}}] }""", "bad"));
         Assert.Contains("(cast) needs 'parts'", ex.Message);
-    }
-
-    [Fact]
-    public void TheSpellsScenarioLoads()
-    {
-        // visual-examples/ is not copied to the build output: it sits in the game project
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "spells.json")))
-            dir = dir.Parent;
-        Assert.NotNull(dir);
-        var scenario = VisualScenario.Load(Path.Combine(dir.FullName, "OpenGLTest", "visual-examples", "spells.json"));
-
-        Assert.Contains(scenario.Steps, step => step.Op == "cast" && step.Parts.Length > 0);
-        Assert.Contains(scenario.Steps, step => step.Op == "screenshot");
     }
 }

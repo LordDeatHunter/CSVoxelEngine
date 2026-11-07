@@ -12,7 +12,7 @@ The one guide for every file in this folder. Agents: the `plan-docs` skill
 | [BIOMEGEN.md](BIOMEGEN.md) | Biome, climate and terrain-shape generation: handoff map and remaining work |
 | [CLEANUP.md](CLEANUP.md) | The code cleanup campaign the `cleanup-campaign` workflow runs |
 | [MAGIC.md](MAGIC.md) | The magic system (Arc A): mana, staffs, the station-built spell builder |
-| [LAYERS.md](LAYERS.md) | Hell (below) and Sky (above) layers in the one world |
+| [LAYERS.md](LAYERS.md) | Hell (below) and Sky (above) layers: all shipped, the decisions and future ideas |
 | [TREES.md](TREES.md) | Residue of the tree rework |
 | [QUICK_WINS.md](QUICK_WINS.md) | One-sitting features |
 | [VISUAL.md](VISUAL.md) | Particles, animations and other visual polish |

@@ -4,7 +4,7 @@ Guidance for AI coding agents working in this repository.
 
 ## Project overview
 
-A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, binary greedy chunk meshing with ambient occlusion (plain cubes are culled by bitmask and merged into larger quads wherever the result is pixel-identical; procedural blocks and fluids keep per-quad emitters — see "Chunk meshing"), frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`SpawnOverrides.SpawnPosition`), or where they left a saved world; worlds are created, listed and opened from a main menu and saved to disk (see "Launch flow" and "Saves").
+A Minecraft-style voxel engine written in C# on .NET 9, using **Silk.NET** (windowing, input, OpenGL bindings) and StbImageSharp for texture loading. It renders an infinite, procedurally generated world (FastNoiseLite OpenSimplex2 noise) with chunk streaming, an underground of 3D-noise caves, worm-carved tunnels and heightmap ravines, a hell of endless cavern layers below a barrier band and floating sky islands above the clouds (see "Layers: hell below, sky above"), binary greedy chunk meshing with ambient occlusion (plain cubes are culled by bitmask and merged into larger quads wherever the result is pixel-identical; procedural blocks and fluids keep per-quad emitters — see "Chunk meshing"), frustum culling, block breaking/placement via raycast, and simple player physics (gravity, jumping, collision). The player spawns standing on the terrain at the origin (`SpawnOverrides.SpawnPosition`), or where they left a saved world; worlds are created, listed and opened from a main menu and saved to disk (see "Launch flow" and "Saves").
 
 The renderer requires an **OpenGL 4.6 core** context: `WindowManager` requests `APIVersion(4, 6)`
 with `ContextProfile.Core`, and every shader under `assets/shaders/` declares `#version 460 core`.
@@ -3323,7 +3323,7 @@ eight `BlockLightPalette` slots then used (the sky's `crystal_leaves` take a six
 `fungal_glow`) are plain JSON cubes whose tiles come from `tools/generate-hell-textures.py`; the soils and
 ash mine by hand, the rocks need any pickaxe, hellrock the iron one. Costs about 0.26 ms a warm hell
 chunk with the flora below (0.15 before it), plus the hell trees grown on a cache miss, about 0.6 ms a
-chunk on the probe's cold samples, which regrow every tree (`WorldgenCostProbe`, plans/PERF.md). Layer index will also scale the hell mobs (`L-10`).
+chunk on the probe's cold samples, which regrow every tree (`WorldgenCostProbe`, plans/PERF.md). The layer index also scales the hell mobs (see "Hell mobs").
 `HellTests`, `HellBiomeTests`; `visual-examples/hell.json` (`VOXEL_TIME=147`) frames layers 0, 1 and 4
 and a spot in each biome.
 
@@ -4682,6 +4682,56 @@ the gated `StampGround`) is never gated, since its leaves may come from neighbor
 The tuft density of the `tall_grass`/`dead_shrub` plants runs with the climate's wetness
 (`FoliageGenerator.GrassDensityAt`, `GrassDensityDry`..`GrassDensityWet`) and every flower stands in
 an open-forest clump (`FlowerGenerator`, the `PlantClumps` rule) (`MeadowTests`).
+
+## Layers: hell below, sky above
+
+Two realms share the one world with the overworld as vertical layers, a Nether-like hell under it and an
+Aether-like sky over it: no dimensions, no portals. This is the map; each part has its own section, named
+in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for later.
+
+- **Bands** (`WorldGenerationConfig`, their order held by `LayerBandTests`): the overworld down to the
+  barrier band `BarrierTopY..BarrierBottomY` (-200..-300, a gapless core `BarrierFullTopY..BarrierFullBottomY`,
+  -230..-270, between patchy ramps); hell from `HellTopY` (-301) down forever in `HellLayerPeriodBlocks` (96)
+  layers, each a cavern pocket over a 16-block hellrock slab; above every peak (`ReliefCeilingHeight` 148) and
+  the drawn cloud layer (160), the solid cloud slab `CloudSlabBottomY..CloudSlabTopY` (198..203); the cloud sea
+  (`SkyConfig.SkyCloudSeaHeight`, `SkyCloudSeaThickness`: 290..301); the sky islands
+  `SkyIslandBottomY..SkyIslandTopY` (320..420), tuned in `SkyIslandConfig`.
+- **Getting there**: dig down or build up. The barrier and hell's slabs (`barrier`, `hellrock`) need the
+  `iron_pickaxe` (power 3; creative only for now, no recipe), see "The barrier". The sky has no gate: the
+  solid clouds and the cloud sea catch a fall (`softLanding`, and `sink` holds the player half a block deep,
+  "Sink and soft-landing flags"); hell has no bottom and its falls hurt as usual.
+- **Worldgen**, a pure function of position like the rest (each chunk alone, the point query equal to the
+  stamp; the write rules are in the worldgen invariants under "Architecture"): "The barrier"
+  (`WorldGen/Features/Underground/BarrierGenerator.cs`, stamped last); "Hell", "Hell biomes" (Ashlands,
+  Magma Caverns, Fungal Grove) and "Hell flora" (vines, plants, the `fungal_tree` and `charred_tree` through
+  `HellTrees`) under `WorldGen/Hell/`, where a chunk wholly in hell skips the overworld pipeline; "Solid
+  clouds", "Sky islands" (with the cloud sea) and "Sky biomes" (meadow and frost highland, their flora and the
+  `sky_oak` and `crystal_tree` through `SkyTrees`) under `WorldGen/Sky/`, where a chunk in the sky takes a
+  short path that stamps only the sky. Both realms' trees are `GenerationalCache` sites cleared by
+  `WorldSeed.Apply`.
+- **Look**: "Realm layer fog" (`Effects/Sky/LayerClimate.cs`: red fog and no sky in hell, a deeper blue
+  aloft, read by `FrameLighting` with no shader change). Hell is lit only by lava and its glowing blocks, in
+  the ember and fungal teal block-light colors; the sky's `crystal_leaves` add pale cyan (six of the eight
+  `BlockLightPalette` slots used).
+- **Mobs**: "Hell mobs" (the hellbrute and the fire-casting cinderwitch) and "Sky mobs" (the diving
+  galeraptor and the slamming cloud golem), all `RealmMob`s run by a `RealmMobManager` (`HellMobManager`,
+  `SkyMobManager`) under the world's shared mob caps, each spawning only in its own realm
+  (`MobSpawner.TryFindHellSpawn`, `TryFindSkySpawn`); "Flying mobs" is the flight every mob kind can opt
+  into. **Difficulty** grows with depth and zone: `LayerDifficulty` (`1 + layer *
+  MobConfig.LayerDifficultyPerLayer`, capped at `LayerDifficultyMaxMultiplier`) by the hell layer and
+  `SkyDifficulty` (`1 + tier * MobConfig.SkyDifficultyPerTier`) by the island zone's tier scale health,
+  damage, a caster's rate and the pack, read from where the mob spawned, so a save restore and a client mirror
+  agree. On a server every realm mob rides `EntityList` and is mirrored with its attack clips ("A mirror's
+  attack clip"); all four are saved in `entities.json`.
+- **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
+  and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
+- **Budgets**: 175 of the 255 content ids are used (108 blocks, 66 items, air), 80 left. Seed offsets
+  162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
+  168 to 171 (sky zones and islands), 172 and 173 (cloud sea) and 174 (sky biomes); the whole table is in
+  `plans/BIOMEGEN.md`.
+- **Visual checks** (each with `VOXEL_TIME=147`): `barrier.json`, `hell.json`, `hell-flora.json`,
+  `hell-mobs.json`, `layers-fog.json`, `clouds-solid.json`, `sky-islands.json`, `sky-biomes.json`,
+  `sky-mobs.json`.
 
 ## Entities
 

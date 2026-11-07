@@ -52,7 +52,8 @@
     { "op": "look", "yaw": 180, "pitch": 35 },
     { "op": "screenshot", "name": "magma_ceiling", "hideHud": true },
 
-    { "op": "teleport", "pos": [-135.5, -426.4, -103.5], "yaw": 0, "pitch": -15 },
+    // Two blocks over the floor: the grove's glow ferns (L-9) grow at eye height there now
+    { "op": "teleport", "pos": [-135.5, -424.4, -103.5], "yaw": 0, "pitch": -15 },
     { "op": "wait", "seconds": 20 },
     { "op": "screenshot", "name": "fungal_ahead", "hideHud": true },
     { "op": "look", "yaw": 0, "pitch": -60 },
