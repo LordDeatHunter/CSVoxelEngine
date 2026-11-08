@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { parseJsonc } from './jsonc.mjs'
 import { resolveModel } from './models.mjs'
 import { buildRecipeIndex, refKey } from './recipes.mjs'
+import { lootRows } from './loot.mjs'
 import { structureFrom } from './structures.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -71,9 +72,7 @@ const hasItem = (n) => n in items
 const loot = {}
 for (const { id, file } of listJson(path.join(assets, 'data/loot'))) {
   const d = readJson(file)
-  loot[id] = (d.pools ?? []).flatMap((p) => (p.entries ?? []).filter((e) => e.item).map((e) => ({
-    item: refKey(e.item, hasBlock, hasItem) ?? e.item, chance: p.chance ?? 1, count: e.count ?? 1
-  })))
+  loot[id] = lootRows(d.pools, (n) => refKey(n, hasBlock, hasItem))
 }
 
 const entities = {}
@@ -186,16 +185,14 @@ const ref = (key) => {
   return l.link ? `[${esc(l.text)}](${l.link})` : esc(l.text)
 }
 /** Recipe cards drawn by the RecipeCard component, which looks each recipe up by kind and id. */
-const recipeCards = (list) =>
-  `<div class="recipe-list">\n${list.map((r) => `<RecipeCard kind="${r.kind}" id="${r.id}" />`).join('\n')}\n</div>\n`
+const recipeCards = (list) => `<RecipeList recipes='${JSON.stringify(list.map((r) => ({ kind: r.kind, id: r.id })))}' />\n`
 const recipeSection = (key) => {
   const made = recipeIndex.madeFrom[key] ?? []
   const used = recipeIndex.usedIn[key] ?? []
   let s = ''
   if (made.length) s += `\n## How to get it\n\n${recipeCards(made)}\n`
   if (used.length) s += `\n## Used in\n\n${recipeCards(used)}\n`
-  const drops = Object.entries(loot).filter(([, es]) => es.some((e) => e.item === key)).map(([n]) => n)
-  if (drops.length) s += `\n## Dropped by\n\nLoot tables: ${drops.map((n) => '`' + n + '`').join(', ')}\n`
+  if (Object.values(loot).some((es) => es.some((e) => e.item === key))) s += `\n## Dropped by\n\n<DropList item="${key}" />\n`
   return s
 }
 const writePage = (rel, body) => {
@@ -204,6 +201,17 @@ const writePage = (rel, body) => {
   fs.writeFileSync(f, body)
 }
 for (const d of ['blocks', 'items', 'mobs', 'trees', 'structures']) fs.rmSync(path.join(wikiRoot, 'game', d), { recursive: true, force: true })
+
+// What breaking a block yields, unless it is only the block itself (no table is the same thing)
+const blockDrops = (b) => {
+  const rows = loot[b.loot] ?? []
+  const onlySelf = rows.length === 1 && rows[0].item === 'block/' + b.id && rows[0].chance >= 1
+  return rows.length && !onlySelf ? `
+## Drops
+
+<DropList table="${b.loot}" />
+` : ''
+}
 
 const shownBlocks = Object.values(blocks).filter((b) => b.hasItem)
 for (const b of shownBlocks) {
@@ -214,7 +222,7 @@ for (const b of shownBlocks) {
   writePage(`game/blocks/${b.id}.md`,
     `---\ntitle: ${JSON.stringify(b.name)}\n---\n\n# ${esc(b.name)}\n\n<ModelViewer kind="block" id="${b.id}" />\n\n` +
     `| Property | Value |\n|---|---|\n| Hardness | ${b.hardness} |\n| Needs tool | ${b.requiresTool ? tool ?? 'yes' : 'no'} |\n| Light | ${b.emission || 'none'} |\n` +
-    note + recipeSection('block/' + b.id))
+    note + blockDrops(b) + recipeSection('block/' + b.id))
 }
 writePage('game/blocks/index.md', '# Blocks\n\n<ItemGrid kind="blocks" />\n')
 
@@ -233,7 +241,7 @@ for (const i of Object.values(items)) {
 writePage('game/items/index.md', '# Items\n\n<ItemGrid kind="items" />\n')
 
 for (const e of Object.values(entities)) {
-  const drops = e.loot && loot[e.loot] ? loot[e.loot].map((d) => ref(d.item)).join(', ') : null
+  const drops = e.loot && loot[e.loot]?.length ? `<DropList table="${e.loot}" />` : null
   // A boss is summoned, never found: name the item that wakes it, whose page carries the recipe
   const summoners = Object.values(items).filter((i) => i.summons === e.id).map((i) => ref('item/' + i.id))
   writePage(`game/mobs/${e.id}.md`,
