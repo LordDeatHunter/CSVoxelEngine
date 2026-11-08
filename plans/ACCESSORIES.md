@@ -2,7 +2,7 @@
 > Guide: plans/README.md
 
 ## Status
-Designed, nothing built yet. Tracks accessory abilities (cloud boots, charms), the metal ring ladder and the set-bonus rule
+AC-2 done (sets count head, chest and legs only); the rest is designed, nothing built yet. Tracks accessory abilities (cloud boots, charms), the metal ring ladder and the set-bonus rule
 change, on top of the gear core in `INVENTORY.md` (`I-1`, `I-2`). First of three efforts, in order: accessories (`AC-*`), the
 battle tower (`BATTLE_TOWER.md`), cave biomes (`CAVE_BIOMES.md`). One phase per prompt; each leaves the game building and the
 tests green. Last updated 2026-11-08.
@@ -16,10 +16,6 @@ Nothing.
   `GearInfo`, resolved to flags in `Equipment`/`GearStatsCalculator` and cached with the worn set like stats. Also the extra stat or
   passive the tower's accessory needs (`BT-7`: slight mana regen, +10% damage against undead). **Hook:** `src/Items/GearStat.cs`,
   `GearInfo`, `Equipment`.
-- [ ] **`AC-2` Sets count head, chest and legs only** - P1, S.
-  Boots and gloves become free-standing armor (they keep their own `armor`). Bonus numbers stay, thresholds shift: the 3-piece
-  bonus becomes 2-piece, the 5-piece becomes 3-piece, in `sets/iron.json`, `bronze.json`, `leather.json`. **Hook:**
-  `GearStatsCalculator`, `GearText` set-progress text.
 - [ ] **`AC-3` Cloud boots and the air jump** - P1, M.
   A `feet` item, crafted from `cloud_shard` plus iron boots, visible armor (`ArmorLook`). One free air jump, resets on landing; the
   same height as a normal jump, off while swimming or flying, sprint momentum kept like a regular jump. **The air jump never pumps

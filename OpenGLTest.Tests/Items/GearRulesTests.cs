@@ -234,6 +234,18 @@ public sealed class GearRulesTests
     }
 
     [Fact]
+    public void BootsAndGlovesNeverCountTowardASet()
+    {
+        Assert.True(GearSetRegistry.TryGet("bronze", out var set));
+        var all = ItemRegistry.All.OfType<GearItem>().Where(g => g.Info.SetName == "bronze").ToList();
+        Assert.All(set.Members, id => Assert.True(GearSlots.CountsForSets(((GearItem)ItemRegistry.TryGet(id)!).Info.Slot)));
+        var free = all.Where(g => !GearSlots.CountsForSets(g.Info.Slot)).ToList();
+        var inventory = Inventory.Empty();
+        foreach (var piece in free) Wear(inventory, piece);
+        Assert.Equal(0, GearStatsCalculator.WornCount(set, inventory.Equipment.Worn()));
+    }
+
+    [Fact]
     public void ASetBonusThatAsksForMorePiecesThanTheSetHasIsRefusedNamingTheFile()
     {
         var definition = new GearSetDefinition

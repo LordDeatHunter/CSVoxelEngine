@@ -1,8 +1,8 @@
 {
-  // The bronze set: wear more of it for more. Members are the items whose equip.set is "bronze".
+  // The bronze set: wear more of it for more. Counts head, chest and legs pieces only. Members are the items whose equip.set is "bronze".
   "name": "Bronze",
   "bonuses": [
-    { "pieces": 3, "modifiers": { "armor": 2 } },
-    { "pieces": 5, "modifiers": { "maxHealth": 20, "attackDamage": 0.1 } }
+    { "pieces": 2, "modifiers": { "armor": 2 } },
+    { "pieces": 3, "modifiers": { "maxHealth": 20, "attackDamage": 0.1 } }
   ]
 }

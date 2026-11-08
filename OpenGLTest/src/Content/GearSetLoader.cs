@@ -9,7 +9,7 @@ namespace VoxelEngine.Content;
 
 /// <summary>
 /// Loads <c>data/sets/&lt;name&gt;.json</c> into <see cref="GearSetRegistry"/>, after the items: a set's members are
-/// the gear items whose <c>equip.set</c> names its file. A missing folder is no sets; an item naming a set that does
+/// the head, chest and legs items whose <c>equip.set</c> names its file (boots and gloves never count). A missing folder is no sets; an item naming a set that does
 /// not exist, a bonus that asks for more pieces than the set has, or an unknown stat all throw naming the file.
 /// <see cref="Compile"/> touches no static state, so tests call it directly.
 /// </summary>
@@ -31,7 +31,7 @@ internal static class GearSetLoader
     }
 
     private static List<byte> MembersOf(string setName) =>
-        ItemRegistry.All.OfType<GearItem>().Where(g => g.Info.SetName == setName).Select(g => g.Id).ToList();
+        ItemRegistry.All.OfType<GearItem>().Where(g => g.Info.SetName == setName && GearSlots.CountsForSets(g.Info.Slot)).Select(g => g.Id).ToList();
 
     /// <summary>Compiles one set, throwing an error that names <paramref name="path"/> on any bad field.</summary>
     internal static GearSet Compile(string name, GearSetDefinition definition, string path, IReadOnlyList<byte> members)

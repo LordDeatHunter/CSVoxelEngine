@@ -22,6 +22,9 @@ public static class GearSlots
         ? index >= GearConfig.ArmorSlotCount && index < GearConfig.EquipmentSlotCount
         : index == (int)slot;
 
+    /// <summary>Whether a piece in this slot counts toward a set's bonuses: head, chest and legs only. Boots and gloves are free-standing armor.</summary>
+    public static bool CountsForSets(GearSlot slot) => slot is GearSlot.Head or GearSlot.Chest or GearSlot.Legs;
+
     /// <summary>The slot kind an equipment index holds.</summary>
     public static GearSlot KindOf(int index) => index < GearConfig.ArmorSlotCount ? (GearSlot)index : GearSlot.Accessory;
 

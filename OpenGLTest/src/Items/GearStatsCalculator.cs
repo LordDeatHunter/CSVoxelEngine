@@ -23,7 +23,7 @@ public static class GearStatsCalculator
             if (stack.Has<ModifiersComponent>())
                 foreach (var modifier in stack.Get<ModifiersComponent>().Modifiers)
                     total = total.With(modifier.Stat, modifier.Value);
-            if (gear.Info.SetName is { } setName)
+            if (gear.Info.SetName is { } setName && GearSlots.CountsForSets(gear.Info.Slot))
             {
                 sets ??= new Dictionary<string, int>(StringComparer.Ordinal);
                 sets[setName] = sets.GetValueOrDefault(setName) + 1;
@@ -51,7 +51,7 @@ public static class GearStatsCalculator
     {
         var count = 0;
         foreach (var stack in worn)
-            if (stack.Item is GearItem { Info.SetName: { } name } && name == set.Name)
+            if (stack.Item is GearItem { Info.SetName: { } name } g && name == set.Name && GearSlots.CountsForSets(g.Info.Slot))
                 count++;
         return count;
     }
