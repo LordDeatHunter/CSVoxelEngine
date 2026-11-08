@@ -13,7 +13,8 @@ public readonly record struct GearStats(
     float MoveSpeed = 0f,
     float MiningSpeed = 0f,
     float AttackSpeed = 0f,
-    float AttackDamage = 0f)
+    float AttackDamage = 0f,
+    float UndeadDamage = 0f)
 {
     /// <summary>No gear worn.</summary>
     public static readonly GearStats None = default;
@@ -28,7 +29,9 @@ public readonly record struct GearStats(
         GearStat.MoveSpeed => this with { MoveSpeed = MoveSpeed + value },
         GearStat.MiningSpeed => this with { MiningSpeed = MiningSpeed + value },
         GearStat.AttackSpeed => this with { AttackSpeed = AttackSpeed + value },
-        _ => this with { AttackDamage = AttackDamage + value },
+        GearStat.AttackDamage => this with { AttackDamage = AttackDamage + value },
+        GearStat.UndeadDamage => this with { UndeadDamage = UndeadDamage + value },
+        _ => this,
     };
 
     /// <summary>The sums clamped to what the game allows, so a stack of rolled gear can never break the rules.</summary>
@@ -40,7 +43,8 @@ public readonly record struct GearStats(
         Math.Clamp(MoveSpeed, -0.5f, GearConfig.FactorBonusCap),
         Math.Clamp(MiningSpeed, -0.5f, GearConfig.FactorBonusCap),
         Math.Clamp(AttackSpeed, -0.5f, GearConfig.FactorBonusCap),
-        Math.Clamp(AttackDamage, -0.9f, GearConfig.FactorBonusCap));
+        Math.Clamp(AttackDamage, -0.9f, GearConfig.FactorBonusCap),
+        Math.Clamp(UndeadDamage, 0f, GearConfig.FactorBonusCap));
 
     /// <summary>Multiplier of the move speed.</summary>
     public float MoveFactor => 1f + MoveSpeed;

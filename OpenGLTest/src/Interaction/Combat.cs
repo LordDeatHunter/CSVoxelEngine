@@ -68,4 +68,11 @@ public static class Combat
     /// scaled by the swing's <see cref="SwordSwings.Power"/>. Rounded to whole hit points.</summary>
     public static int SwordDamage(Item? held, SwordSwing swing, float damageFactor = 1f) =>
         (int)MathF.Round(Mining.EntityDamage(held) * damageFactor * SwordSwings.Power(swing), MidpointRounding.AwayFromZero);
+
+    /// <summary>A blow of <paramref name="damage"/> raised by the striker's undead bonus when the target is undead
+    /// (rounded, never below the blow); unchanged otherwise.</summary>
+    public static int VersusUndead(int damage, bool targetIsUndead, float undeadBonus) =>
+        !targetIsUndead || undeadBonus <= 0f || damage <= 0
+            ? damage
+            : Math.Max(damage, (int)MathF.Round(damage * (1f + undeadBonus), MidpointRounding.AwayFromZero));
 }

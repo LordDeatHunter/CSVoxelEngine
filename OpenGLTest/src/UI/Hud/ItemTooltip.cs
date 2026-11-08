@@ -89,6 +89,9 @@ public static class ItemTooltip
             lines.Add("Immune: " + string.Join(", ", gear.Info.Immune));
         foreach (var passive in gear.Info.Passives)
             lines.Add(GearText.Passive(passive));
+        foreach (var ability in GearAbilities.All)
+            if ((gear.Info.Abilities & ability) != 0)
+                lines.Add(GearAbilities.Label(ability));
         if (gear.Info.SetName is { } setName && GearSetRegistry.TryGet(setName, out var set))
             AddSetLines(lines, colors, set, worn);
     }

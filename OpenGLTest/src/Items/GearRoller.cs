@@ -69,6 +69,7 @@ public static class GearRoller
         GearStat.MoveSpeed => (0.02f, 0.06f),
         GearStat.MiningSpeed => (0.05f, 0.15f),
         GearStat.AttackSpeed => (0.03f, 0.1f),
+        GearStat.UndeadDamage => (0.05f, 0.15f),
         _ => (0.03f, 0.1f),
     };
 
@@ -88,6 +89,7 @@ public static class GearRoller
         GearStat.MoveSpeed => "Swift",
         GearStat.MiningSpeed => "Delving",
         GearStat.AttackSpeed => "Quick",
+        GearStat.UndeadDamage => "Hallowed",
         _ => "Fierce",
     };
 
@@ -100,6 +102,7 @@ public static class GearRoller
         GearStat.MoveSpeed => "of the Hare",
         GearStat.MiningSpeed => "of the Miner",
         GearStat.AttackSpeed => "of the Viper",
+        GearStat.UndeadDamage => "of the Dawn",
         _ => "of the Wolf",
     };
 }

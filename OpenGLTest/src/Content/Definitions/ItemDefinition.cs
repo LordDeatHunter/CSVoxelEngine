@@ -142,7 +142,7 @@ public sealed class ItemDefinition
         public int? Armor { get; set; }
 
         /// <summary>Fixed stat changes by stat name (maxHealth, maxMana, manaRegen, moveSpeed, miningSpeed,
-        /// attackSpeed, attackDamage, armor).</summary>
+        /// attackSpeed, attackDamage, undeadDamage, armor).</summary>
         public Dictionary<string, float>? Modifiers { get; set; }
 
         /// <summary>The armor set this piece belongs to (the file name of an <c>assets/data/sets</c> entry).</summary>
@@ -156,6 +156,9 @@ public sealed class ItemDefinition
 
         /// <summary>Passive triggers this piece carries.</summary>
         public PassiveDefinition[]? Passives { get; set; }
+
+        /// <summary>Ability names this piece grants its wearer: air_jump, no_fall_damage, extra_air or magnet.</summary>
+        public string[]? Abilities { get; set; }
     }
 
     /// <summary>One passive trigger of a piece of gear: when it fires and what it does.</summary>

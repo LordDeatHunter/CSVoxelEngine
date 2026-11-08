@@ -284,6 +284,58 @@ public sealed class GearRulesTests
         Assert.Null(ItemLoader.ParseEquip(new ItemDefinition(), false, "items/x.json"));
     }
 
+    private static GearInfo Accessory(params string[]? abilities) =>
+        ItemLoader.ParseEquip(new ItemDefinition { Equip = new() { Slot = "accessory", Abilities = abilities } },
+            false, "items/x.json")!;
+
+    [Fact]
+    public void AbilitiesParseIntoFlagsWhateverTheirCaseOrRepeats()
+    {
+        var info = Accessory("air_jump", "MAGNET", " air_jump ");
+        Assert.True(info.Abilities.HasFlag(GearAbility.AirJump));
+        Assert.True(info.Abilities.HasFlag(GearAbility.Magnet));
+        Assert.False(info.Abilities.HasFlag(GearAbility.NoFallDamage));
+        Assert.False(info.Abilities.HasFlag(GearAbility.ExtraAir));
+
+        Assert.Equal(GearAbility.None, Accessory(null).Abilities);
+
+        // The name table and the parser agree on every ability
+        foreach (var ability in GearAbilities.All)
+            Assert.Equal(ability, Accessory(GearAbilities.Name(ability)).Abilities);
+    }
+
+    [Fact]
+    public void AnUnknownOrBlankAbilityIsRefusedNamingTheItem()
+    {
+        var unknown = Assert.Throws<System.InvalidOperationException>(() => Accessory("bogus"));
+        Assert.Contains("items/x.json", unknown.Message);
+        var blank = Assert.Throws<System.InvalidOperationException>(() => Accessory(" "));
+        Assert.Contains("items/x.json", blank.Message);
+    }
+
+    [Fact]
+    public void UndeadDamageNeverFoldsIntoAttackDamageAndClampsAtZero()
+    {
+        var boosted = GearStats.None.With(GearStat.UndeadDamage, 0.1f);
+        Assert.Equal(0f, boosted.AttackDamage);
+        Assert.True(boosted.UndeadDamage > 0f);
+
+        Assert.Equal(0f, GearStats.None.With(GearStat.UndeadDamage, -1f).Clamped().UndeadDamage);
+        Assert.True(GearStats.None.With(GearStat.UndeadDamage, 1000f).Clamped().UndeadDamage <= GearConfig.FactorBonusCap);
+
+        Assert.True(GearStats.TryParse("undeadDamage", out var stat));
+        Assert.Equal(GearStat.UndeadDamage, stat);
+    }
+
+    [Fact]
+    public void LootRollsNeverGiveUndeadDamage()
+    {
+        foreach (var gear in ItemRegistry.All.OfType<GearItem>())
+            for (ulong seed = 0; seed < 200; seed++)
+                Assert.DoesNotContain(GearRoller.Roll(gear, Rarity.Legendary, seed).Modifiers.Modifiers,
+                    m => m.Stat == GearStat.UndeadDamage);
+    }
+
     [Fact]
     public void ATooltipShowsRarityRolledModifiersAndSetProgress()
     {

@@ -17,6 +17,7 @@ public static class GearText
         GearStat.MoveSpeed => "Move speed",
         GearStat.MiningSpeed => "Mining speed",
         GearStat.AttackSpeed => "Attack speed",
+        GearStat.UndeadDamage => "Damage vs undead",
         _ => "Damage",
     };
 
@@ -60,6 +61,7 @@ public static class GearText
         if (stats.MiningSpeed != 0f) lines.Add(Line(GearStat.MiningSpeed, stats.MiningSpeed));
         if (stats.AttackSpeed != 0f) lines.Add(Line(GearStat.AttackSpeed, stats.AttackSpeed));
         if (stats.AttackDamage != 0f) lines.Add(Line(GearStat.AttackDamage, stats.AttackDamage));
+        if (stats.UndeadDamage != 0f) lines.Add(Line(GearStat.UndeadDamage, stats.UndeadDamage));
         return lines;
     }
 }

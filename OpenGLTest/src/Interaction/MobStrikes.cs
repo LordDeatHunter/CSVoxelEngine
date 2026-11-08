@@ -32,11 +32,13 @@ internal sealed class MobStrikes
     /// <summary>Deals <paramref name="damage"/> to <paramref name="mob"/> and shoves it away from
     /// <paramref name="from"/> (the striker's eye, or where a thrown item left it) at
     /// <paramref name="shoveSpeed"/> (a punch's by default; a sword's chop throws harder). A landed blow
-    /// from a player (<paramref name="striker"/>) puts that player in combat, which pauses their regeneration.</summary>
+    /// from a player (<paramref name="striker"/>) puts that player in combat, which pauses their regeneration, and
+    /// that player's worn undead bonus raises a blow against an undead mob.</summary>
     internal void StrikeMob(Mob mob, int damage, Vector3 from, PlayerHealth? striker = null,
         float shoveSpeed = MobConfig.SlimePunchShoveSpeed)
     {
         var hits = mob.HitsTaken;
+        damage = Combat.VersusUndead(damage, mob.IsUndead, striker?.Gear?.Stats.UndeadDamage ?? 0f);
         mob.TakeDamage(mob.ScaleDamage(damage, from));
         if (mob.HitsTaken != hits)
         {

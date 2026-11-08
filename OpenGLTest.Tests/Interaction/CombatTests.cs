@@ -10,6 +10,20 @@ public sealed class CombatTests
     public CombatTests() => TestContent.EnsureLoaded();
 
     [Fact]
+    public void UndeadBonusRaisesOnlyBlowsAgainstTheUndead()
+    {
+        Assert.True(Combat.VersusUndead(10, true, 0.1f) > 10);
+        Assert.Equal(10, Combat.VersusUndead(10, false, 0.1f));
+        Assert.Equal(10, Combat.VersusUndead(10, true, 0f));
+        Assert.Equal(0, Combat.VersusUndead(0, true, 0.1f));
+        for (var d = 1; d <= 50; d++)
+        {
+            Assert.True(Combat.VersusUndead(d, true, 0.1f) >= d);
+            Assert.True(Combat.VersusUndead(d, true, 0.2f) >= Combat.VersusUndead(d, true, 0.1f));
+        }
+    }
+
+    [Fact]
     public void PunchConeAcceptsAheadWithinReachAndRejectsBehindAndBeyond()
     {
         var origin = Vector3.Zero;

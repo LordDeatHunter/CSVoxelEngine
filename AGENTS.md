@@ -309,8 +309,10 @@ ending just left of the hearts, hidden while dead. `StatusEffectSetTests`, `Stat
 **Gear and equipment (I-1).** A player wears up to `GearConfig.EquipmentSlotCount` pieces (`Inventory.Equipment`, an
 `Equipment`: one instance id per slot, 5 armor slots in head/chest/legs/feet/gloves order, then 4 accessory slots; a
 slot takes a `GearItem` of its own `GearSlot`, `GearSlots.Fits`). Gear is an item with an `equip` object in its JSON
-(`slot`, `armor`, `modifiers` by `GearStat` name, `set`, `visible`, `immune`, `passives`; `rarity` beside it),
-compiled by `ItemLoader.ParseEquip` into a `GearInfo`. Its instances live in the same `Inventory.Tools` list as tool
+(`slot`, `armor`, `modifiers` by `GearStat` name, `set`, `visible`, `immune`, `passives`, `abilities`; `rarity` beside it),
+compiled by `ItemLoader.ParseEquip` into a `GearInfo`. `equip.abilities` (`air_jump`, `no_fall_damage`, `extra_air`,
+`magnet`; an unknown name refuses the item) compiles into `GearInfo.Abilities` (`GearAbility` flags), and
+`Equipment.Abilities`/`Has` caches their union with the stats on `Version`; nothing consumes them until AC-3/AC-4. Its instances live in the same `Inventory.Tools` list as tool
 instances (so every instance lookup, the save and the wire carry them) but count against their own pool
 (`InventoryCategory.Gear`, `GearConfig.GearCapacity`), never take a hotbar slot and come off when removed from the
 pool. `Equipment.Stats` (`GearStatsCalculator`, clamped by `GearStats.Clamped`) is cached until the worn set changes;
@@ -338,8 +340,10 @@ item's `equip.immune` blocks effects at `StatusEffectSet.ImmunityCheck`, and `eq
 near the wearer from `MobDirector.FireWearerPassives`, authoritative side only. Loot gear rolls `ModifiersComponent`
 (rarity plus modifiers, saved as `ToolData.Rolled`) from the pure `GearRoller.Roll(gear, rarity, seed)`
 (`Inventory.AddRolledGear`), crafted gear never; a piece's rarity is its roll's or its item's. Sets are
-`assets/data/sets/<name>.json` (`GearSetLoader`), bonuses by piece count summed in `GearStatsCalculator`. The tooltip
-colors its title by rarity and shows rolled lines and set progress. `GearRulesTests`.
+`assets/data/sets/<name>.json` (`GearSetLoader`), bonuses by piece count summed in `GearStatsCalculator`. The
+`undeadDamage` stat is a fraction applied in `MobStrikes.StrikeMob` through `Combat.VersusUndead` to a mob whose
+`IsUndead` is true (none yet), never rolled by `GearRoller`. The tooltip colors its title by rarity and shows rolled
+lines, set progress and abilities. `GearRulesTests`.
 
 **Chests (I-4).** A block with a `chest` object (`slots`, optional `loot`; `BlockType.Chest`) is a chest block entity kept by
 `ChestManager` (`Simulation/Chests/`, owned by `World`, saved in `stations.json` as `Chests`). Its `ChestState` is created on

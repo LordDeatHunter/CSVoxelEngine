@@ -245,7 +245,7 @@ internal static class ItemLoader
     /// <summary>
     /// The <c>equip</c> object compiled, or null when the item is not wearable. Gear is neither a staff, a
     /// crucible nor a <c>use</c> item; its slot is required, its modifiers must name known stats with finite
-    /// values and its passives known triggers. Status effect names are matched in <see cref="ValidateGear"/>,
+    /// values, its passives known triggers and its abilities known names. Status effect names are matched in <see cref="ValidateGear"/>,
     /// once the effects have loaded.
     /// </summary>
     internal static GearInfo? ParseEquip(ItemDefinition definition, bool isStaff, string path)
@@ -272,7 +272,7 @@ internal static class ItemLoader
                 if (!GearStats.TryParse(statName, out var stat))
                     throw new InvalidOperationException(
                         $"Item '{path}' has equip.modifiers stat '{statName}'; expected armor, maxHealth, maxMana, "
-                        + "manaRegen, moveSpeed, miningSpeed, attackSpeed or attackDamage.");
+                        + "manaRegen, moveSpeed, miningSpeed, attackSpeed, attackDamage or undeadDamage.");
                 if (!float.IsFinite(value) || MathF.Abs(value) > 1000f)
                     throw new InvalidOperationException(
                         $"Item '{path}' has equip.modifiers.{statName} {value}; expected a finite number up to 1000.");
@@ -298,7 +298,17 @@ internal static class ItemLoader
 
         if (string.IsNullOrWhiteSpace(equip.Set) && equip.Set != null)
             throw new InvalidOperationException($"Item '{path}' has a blank equip.set.");
-        return new GearInfo(slot, modifiers, equip.Set?.Trim(), equip.Visible ?? false, immune, passives);
+        var abilities = GearAbility.None;
+        foreach (var name in equip.Abilities ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new InvalidOperationException($"Item '{path}' has a blank equip.abilities entry.");
+            if (!GearAbilities.TryParse(name, out var ability))
+                throw new InvalidOperationException(
+                    $"Item '{path}' has equip.abilities '{name}'; expected air_jump, no_fall_damage, extra_air or magnet.");
+            abilities |= ability;
+        }
+        return new GearInfo(slot, modifiers, equip.Set?.Trim(), equip.Visible ?? false, immune, passives, abilities);
     }
 
     private static GearPassive ParsePassive(ItemDefinition.PassiveDefinition? passive, string path)

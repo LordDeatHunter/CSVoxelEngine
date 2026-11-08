@@ -42,6 +42,17 @@ public static class GearStatsCalculator
         return total.Clamped();
     }
 
+    /// <summary>The abilities the given worn stacks grant together: the union of each worn piece's own (rolled
+    /// modifiers and sets grant none).</summary>
+    public static GearAbility Abilities(IEnumerable<ItemStack> worn)
+    {
+        var abilities = GearAbility.None;
+        foreach (var stack in worn)
+            if (stack.Item is GearItem gear)
+                abilities |= gear.Info.Abilities;
+        return abilities;
+    }
+
     /// <summary>The rarity of one gear instance: what it rolled, else its item's own.</summary>
     public static Rarity RarityOf(ItemStack stack) =>
         stack.Has<ModifiersComponent>() ? stack.Get<ModifiersComponent>().Rarity : stack.Item.Rarity;

@@ -354,6 +354,9 @@ public abstract class Mob
     /// <summary>Whether this mob is a boss: while one lives (and is not dying) the HUD shows its boss bar.</summary>
     public virtual bool IsBoss => false;
 
+    /// <summary>Whether this mob is undead: gear with undead damage hits it harder. No mob is yet.</summary>
+    public virtual bool IsUndead => false;
+
     /// <summary>Applies a hit; the owner drops the loot and removes the mob once dead.</summary>
     public virtual void TakeDamage(int amount)
     {

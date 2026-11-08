@@ -8,7 +8,7 @@ namespace VoxelEngine.UI.InventoryPanel;
 /// <summary>
 /// What a player wears: one gear instance (or none) per equipment slot, armor slots first, then accessories.
 /// A worn piece stays in the Gear pool, so the slots only name instance ids, the way a hotbar slot names a tool.
-/// GL-free. <see cref="Version"/> moves on every real change, and <see cref="Stats"/> is rebuilt only then.
+/// GL-free. <see cref="Version"/> moves on every real change, and <see cref="Stats"/> and <see cref="Abilities"/> are rebuilt only then.
 /// </summary>
 public sealed class Equipment
 {
@@ -16,6 +16,7 @@ public sealed class Equipment
     private readonly int[] _slots = new int[GearConfig.EquipmentSlotCount];
     private int _statsVersion = -1;
     private GearStats _stats;
+    private GearAbility _abilities;
 
     internal Equipment(Inventory inventory) => _inventory = inventory;
 
@@ -98,13 +99,30 @@ public sealed class Equipment
     {
         get
         {
-            if (_statsVersion != Version)
-            {
-                _stats = GearStatsCalculator.Compute(Worn());
-                _statsVersion = Version;
-            }
+            Refresh();
             return _stats;
         }
+    }
+
+    /// <summary>The abilities everything worn grants, rebuilt only when what is worn changes.</summary>
+    public GearAbility Abilities
+    {
+        get
+        {
+            Refresh();
+            return _abilities;
+        }
+    }
+
+    /// <summary>Whether what is worn grants <paramref name="ability"/>.</summary>
+    public bool Has(GearAbility ability) => ability != GearAbility.None && (Abilities & ability) == ability;
+
+    private void Refresh()
+    {
+        if (_statsVersion == Version) return;
+        _stats = GearStatsCalculator.Compute(Worn());
+        _abilities = GearStatsCalculator.Abilities(Worn());
+        _statsVersion = Version;
     }
 
     /// <summary>Whether any worn piece makes its wearer immune to the named status effect.</summary>

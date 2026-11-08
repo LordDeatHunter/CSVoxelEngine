@@ -1,5 +1,8 @@
 using System.Linq;
+using System.Numerics;
 using VoxelEngine.Config;
+using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Definitions;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.ServerSide;
@@ -24,6 +27,66 @@ public sealed class GearTests
     {
         Assert.True(inventory.Add(gear.Id));
         return inventory.GearEntries().Last(e => e.ItemId == gear.Id).InstanceId;
+    }
+
+    // A gear item with abilities that no content file declares; it borrows a real piece's id of the same slot, so
+    // the inventory files it in the Gear pool, while every stack of it keeps this item
+    private static GearItem SyntheticGear(GearSlot slot, params string[] abilities)
+    {
+        var info = ItemLoader.ParseEquip(new ItemDefinition
+        {
+            Equip = new() { Slot = slot.ToString().ToLowerInvariant(), Abilities = abilities },
+        }, false, "items/synthetic.json")!;
+        var spec = new ItemFactory.ItemSpec(GearFor(slot).Id, "Synthetic", "t", ItemUseAction.None,
+            0, 0, 0, 1f, 0, 0f, 1, 1, 1, ItemAnimationMode.None, 8f,
+            Vector3.Zero, Vector3.Zero, 1f, false, 0.5f, 300f, AttackPattern.Punch, 0.5f, 1f, null, "synthetic",
+            Equip: info);
+        return Assert.IsType<GearItem>(ItemFactory.Create("synthetic", spec));
+    }
+
+    private static int OwnSynthetic(Inventory inventory, GearItem gear)
+    {
+        Assert.True(inventory.AddInstance(new ItemStack(1, gear)));
+        return inventory.GearEntries().Last().InstanceId;
+    }
+
+    [Fact]
+    public void AbilityFlagsFollowWhatIsWornAndRebuildOnEveryChange()
+    {
+        var inventory = Inventory.Empty();
+        var equipment = inventory.Equipment;
+        Assert.Equal(GearAbility.None, equipment.Abilities);
+
+        var jumper = OwnSynthetic(inventory, SyntheticGear(GearSlot.Accessory, "air_jump"));
+        var magnet = OwnSynthetic(inventory, SyntheticGear(GearSlot.Accessory, "magnet"));
+
+        Assert.True(equipment.TryEquipAuto(jumper));
+        Assert.True(equipment.Has(GearAbility.AirJump));
+        Assert.False(equipment.Has(GearAbility.Magnet));
+
+        _ = equipment.Stats;
+        Assert.True(equipment.TryEquipAuto(magnet));
+        Assert.True(equipment.Has(GearAbility.AirJump));
+        Assert.True(equipment.Has(GearAbility.Magnet));
+
+        _ = equipment.Stats;
+        Assert.True(equipment.Unequip(equipment.SlotOf(jumper)));
+        Assert.False(equipment.Has(GearAbility.AirJump));
+        Assert.True(equipment.Has(GearAbility.Magnet));
+
+        equipment.Restore(new int[GearConfig.EquipmentSlotCount]);
+        Assert.Equal(GearAbility.None, equipment.Abilities);
+    }
+
+    [Fact]
+    public void WornAbilitiesDoNotChangeTheStats()
+    {
+        var inventory = Inventory.Empty();
+        var id = OwnSynthetic(inventory, SyntheticGear(GearSlot.Accessory, "no_fall_damage", "extra_air"));
+        Assert.True(inventory.Equipment.TryEquipAuto(id));
+
+        Assert.True(inventory.Equipment.Has(GearAbility.NoFallDamage | GearAbility.ExtraAir));
+        Assert.Equal(GearStats.None, inventory.Equipment.Stats);
     }
 
     [Fact]
