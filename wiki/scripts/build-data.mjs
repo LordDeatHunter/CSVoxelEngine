@@ -57,13 +57,19 @@ for (const { id, file } of listJson(path.join(assets, 'data/blocks'))) {
 }
 
 const items = {}
+// An animated item's spritesheet: the grid of frames, how it picks one and how fast a loop plays
+const sheetOf = (sh) => sh ? {
+  cols: sh.cols, rows: sh.rows, frames: sh.frames ?? sh.cols * sh.rows,
+  mode: String(sh.mode ?? 'loop').toLowerCase(), fps: sh.fps ?? 8
+} : null
+
 for (const { id, file } of listJson(path.join(assets, 'data/items'))) {
   const d = readJson(file)
   items[id] = {
     id, name: d.name ?? id, texture: d.texture ? path.basename(d.texture) : null,
     entityDamage: d.entityDamage ?? null, blockDamage: d.blockDamage ?? null, tool: d.tool ?? null,
     fuelSeconds: d.fuel?.burnSeconds ?? null, attack: d.attack ?? null, staff: d.staff ?? null, use: d.use?.action ?? null,
-    teaches: d.teaches ?? null, summons: d.use?.action === 'summon' ? d.use.entity ?? null : null
+    sheet: sheetOf(d.spritesheet), teaches: d.teaches ?? null, summons: d.use?.action === 'summon' ? d.use.entity ?? null : null
   }
 }
 const hasBlock = (n) => n in blocks

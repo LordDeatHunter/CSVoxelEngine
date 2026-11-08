@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sample, rotationToEuler, positionToBlocks, clipTime, parsePoint } from '../.vitepress/theme/animation.ts'
+import { sample, rotationToEuler, positionToBlocks, clipTime, parsePoint, sheetFrame, sheetStyle } from '../.vitepress/theme/animation.ts'
 
 test('rotation follows the engine sign convention: x and y negate, z keeps its sign', () => {
   const [x, y, z] = rotationToEuler([90, 90, 90])
@@ -44,4 +44,26 @@ test('loop wraps, once and hold clamp', () => {
 
 test('string data points parse, anything non-numeric becomes 0', () => {
   assert.deepEqual(parsePoint({ x: '1.5', y: 2, z: 'abc' }), [1.5, 2, 0])
+})
+
+const compass = { cols: 4, rows: 4, frames: 16, mode: 'heading', fps: 8 }
+
+test('a sheet frame stays inside the sheet and advances with time', () => {
+  for (const s of [compass, { ...compass, mode: 'loop', frames: 6 }]) {
+    const seen = new Set()
+    for (let t = 0; t < 30; t += 0.05) {
+      const f = sheetFrame(s, t)
+      assert.ok(f >= 0 && f < s.frames)
+      seen.add(f)
+    }
+    assert.equal(seen.size, s.frames)
+  }
+})
+
+test('a frame crop puts frame 0 at the top left and the last frame at the bottom right, row-major', () => {
+  assert.equal(sheetStyle('x.png', compass, 0).backgroundPosition, '0% 0%')
+  assert.equal(sheetStyle('x.png', compass, 15).backgroundPosition, '100% 100%')
+  assert.equal(sheetStyle('x.png', compass, 1).backgroundPosition.split(' ')[1], '0%')
+  assert.equal(sheetStyle('x.png', compass, 4).backgroundPosition.split(' ')[0], '0%')
+  assert.equal(sheetStyle('x.png', compass, 0).backgroundSize, '400% 400%')
 })

@@ -1,6 +1,6 @@
 // three.js scene builders for the wiki's ModelViewer: blocks (resolved model elements), items (extruded
 // sprite) and entities (.bbmodel with animation clips). three is imported lazily so SSR never loads it.
-import { clipTime, parsePoint, positionToBlocks, rotationToEuler, sample, type Key, type Vec3 } from './animation.ts'
+import { clipTime, parsePoint, positionToBlocks, rotationToEuler, sample, sheetFrame, type Key, type Sheet, type Vec3 } from './animation.ts'
 
 type THREE = typeof import('three')
 
@@ -226,7 +226,15 @@ export async function buildStructure(host: HTMLElement, source: any, layers: str
 // ---------------------------------------------------------------- items
 export async function buildItem(host: HTMLElement, item: any, base: string): Promise<Built> {
   if (!item?.texture) throw new Error('no sprite')
-  const stage = await createStage(host)
+  // An animated item is a grid of equally sized frames in one image; a plain sprite is a 1x1 grid.
+  const sheet: Sheet = item.sheet ?? { cols: 1, rows: 1, frames: 1, mode: 'loop', fps: 8 }
+  let meshes: any[] = []
+  let started = 0
+  const stage = await createStage(host, () => {
+    if (meshes.length < 2) return
+    const shown = sheetFrame(sheet, (performance.now() - started) / 1000)
+    meshes.forEach((m, i) => { m.visible = i === shown })
+  })
   const { T, scene } = stage
   const url = `${base}/textures/items/${item.texture}`
   const img = await new Promise<HTMLImageElement>((res, rej) => {
@@ -243,26 +251,36 @@ export async function buildItem(host: HTMLElement, item: any, base: string): Pro
   const ctx = cv.getContext('2d')!
   ctx.drawImage(img, 0, 0)
   const data = ctx.getImageData(0, 0, w, h).data
-  let count = 0
-  for (let i = 3; i < data.length; i += 4) if (data[i] > 127) count++
-  const px = 1 / Math.max(w, h)
+  const cw = Math.floor(w / sheet.cols)
+  const ch = Math.floor(h / sheet.rows)
+  const px = 1 / Math.max(cw, ch)
   const depth = 1 / 16
-  const mesh = new T.InstancedMesh(new T.BoxGeometry(px, px, depth), new T.MeshLambertMaterial(), count)
+  const geometry = new T.BoxGeometry(px, px, depth)
   const m = new T.Matrix4()
   const col = new T.Color()
-  let n = 0
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const o = (y * w + x) * 4
-      if (data[o + 3] <= 127) continue
-      m.makeTranslation((x - w / 2 + 0.5) * px, (h / 2 - y - 0.5) * px, 0)
+  for (let f = 0; f < sheet.frames; f++) {
+    const ox = (f % sheet.cols) * cw
+    const oy = Math.floor(f / sheet.cols) * ch
+    const solid: number[] = []
+    for (let y = 0; y < ch; y++) {
+      for (let x = 0; x < cw; x++) if (data[((oy + y) * w + ox + x) * 4 + 3] > 127) solid.push(x, y)
+    }
+    const mesh = new T.InstancedMesh(geometry, new T.MeshLambertMaterial(), solid.length / 2)
+    for (let n = 0; n < solid.length / 2; n++) {
+      const x = solid[n * 2]
+      const y = solid[n * 2 + 1]
+      const o = ((oy + y) * w + ox + x) * 4
+      m.makeTranslation((x - cw / 2 + 0.5) * px, (ch / 2 - y - 0.5) * px, 0)
       mesh.setMatrixAt(n, m)
       mesh.setColorAt(n, col.setRGB(data[o] / 255, data[o + 1] / 255, data[o + 2] / 255, T.SRGBColorSpace))
-      n++
     }
+    mesh.visible = f === 0
+    scene.add(mesh)
+    meshes.push(mesh)
   }
-  scene.add(mesh)
-  stage.frame(new T.Box3().setFromObject(mesh))
+  started = performance.now()
+  // Frame the first frame: every frame shares the cell size, so the view never shifts as it animates.
+  stage.frame(new T.Box3().setFromObject(meshes[0]))
   return { dispose: stage.dispose }
 }
 

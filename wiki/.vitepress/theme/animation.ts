@@ -64,3 +64,28 @@ export function clipTime(elapsed: number, length: number, loop: string): number 
   if (length <= 0) return 0
   return loop === 'loop' ? elapsed % length : Math.min(elapsed, length)
 }
+
+// ---- item spritesheets (the compass): which frame shows when, and how to crop it with CSS ----
+
+export interface Sheet { cols: number; rows: number; frames: number; mode: string; fps: number }
+
+/** Seconds a heading-driven sheet (the compass) takes to turn once through its frames when shown on its own. */
+export const HEADING_DEMO_SECONDS = 4
+
+/** The frame a sheet shows `seconds` in: a loop plays at its fps, a heading sheet sweeps its frames as a demo. */
+export function sheetFrame(sheet: Sheet, seconds: number): number {
+  const rate = sheet.mode === 'heading' ? sheet.frames / HEADING_DEMO_SECONDS : sheet.fps
+  return Math.floor(seconds * rate) % sheet.frames
+}
+
+/** CSS that shows one frame of a sheet image, filling its box; frame f sits at (f % cols, f / cols) row-major. */
+export function sheetStyle(url: string, sheet: Sheet, frame: number): Record<string, string> {
+  const col = frame % sheet.cols
+  const row = Math.floor(frame / sheet.cols)
+  const at = (i: number, n: number) => (n > 1 ? (i / (n - 1)) * 100 : 0)
+  return {
+    backgroundImage: `url(${url})`, backgroundRepeat: 'no-repeat',
+    backgroundSize: `${sheet.cols * 100}% ${sheet.rows * 100}%`,
+    backgroundPosition: `${at(col, sheet.cols)}% ${at(row, sheet.rows)}%`
+  }
+}
