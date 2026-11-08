@@ -95,10 +95,10 @@ internal sealed class HudRenderer : IDisposable
     private readonly Mesh[] _crosshairArmMeshes;
 
     // The boss bar: a name line over a bar cut from the 48x32 boss_health sheet (16 px segments, 16 px rows),
-    // drawn at one canvas unit per texture pixel
-    private const float BossBarWidth = 320f;
-    private const float BossBarHeight = 16f;
-    private const float BossBarNameGap = 6f;
+    // drawn at two canvas units per texture pixel
+    private const float BossBarWidth = 640f;
+    private const float BossBarHeight = 32f;
+    private const float BossBarNameGap = 12f;
     private readonly SegmentedBarRenderer _bossBar;
 
     /// <summary>How much vertical room the boss bar block (name and bar) takes under <c>top</c>, in canvas units.</summary>
