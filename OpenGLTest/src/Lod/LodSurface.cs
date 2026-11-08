@@ -211,6 +211,12 @@ public static class LodSurface
     /// </summary>
     public static bool RecordEdit(ChunkManager chunks, int x, int y, int z)
     {
+        // The far LOD is a heightmap shell of the overworld. Hell lies under the barrier band and
+        // never shows in it, so an edit there must not cap the column: the cap would drop the shell
+        // to the edit's Y and draw a pit wall from the surface down to it.
+        if (y <= WorldGenerationConfig.BarrierTopY)
+            return false;
+
         if (!chunks.TryGetCell(x, y, z, out var id, out _))
             return false;
 
