@@ -94,10 +94,21 @@ internal sealed class HudRenderer : IDisposable
     private readonly Mesh _crosshairCenterMesh;
     private readonly Mesh[] _crosshairArmMeshes;
 
+    // The boss bar: a name line over a bar cut from the 48x32 boss_health sheet (16 px segments, 16 px rows),
+    // drawn at one canvas unit per texture pixel
+    private const float BossBarWidth = 320f;
+    private const float BossBarHeight = 16f;
+    private const float BossBarNameGap = 6f;
+    private readonly SegmentedBarRenderer _bossBar;
+
+    /// <summary>How much vertical room the boss bar block (name and bar) takes under <c>top</c>, in canvas units.</summary>
+    internal static float BossBarBlockHeight => TextSize.Body + BossBarNameGap + BossBarHeight;
+
     internal HudRenderer(GL gl, UIRenderer ui)
     {
         _gl = gl;
         _ui = ui;
+        _bossBar = new SegmentedBarRenderer(gl, ui, "assets/textures/ui/boss_health.png", 16, 16);
 
         _crosshairTexture = TextureLoader.LoadFromFile(gl, "assets/textures/crosshair.png");
         _heartTexture = TextureLoader.LoadFromFile(gl, "assets/textures/ui/heart.png");
@@ -282,6 +293,18 @@ internal sealed class HudRenderer : IDisposable
         var fill = MathUtils.Clamp01(manaShare) * width;
         if (fill > 0.5f)
             _ui.DrawRect(new Vector2(left + fill * 0.5f, centerY), new Vector2(fill, ManaBarHeight), ManaFill);
+    }
+
+    /// <summary>
+    /// The boss bar: the boss's name centered over a bar centered on the screen, its top at <paramref name="top"/>
+    /// and filled left to right by <paramref name="share"/>. The name is drawn whole, never cut or wrapped.
+    /// </summary>
+    internal void DrawBossBar(string name, float share, float top)
+    {
+        var centerX = _ui.ScreenSize.X * 0.5f;
+        _ui.DrawTextCentered(name, centerX, top, _ui.CountScale, Rgba.White);
+        _bossBar.Draw(new Vector2(centerX - BossBarWidth * 0.5f, top + TextSize.Body + BossBarNameGap),
+            BossBarWidth, BossBarHeight, share);
     }
 
     /// <summary>
@@ -581,6 +604,7 @@ internal sealed class HudRenderer : IDisposable
         foreach (var icon in _effectIcons)
             if (icon != 0)
                 _gl.DeleteTexture(icon);
+        _bossBar.Dispose();
         _bubbleMesh.Dispose();
         _heartEmptyMesh.Dispose();
         _heartFullMesh.Dispose();

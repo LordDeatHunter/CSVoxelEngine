@@ -33,6 +33,9 @@ internal sealed class UiPasses
     private TextureUnits Units => _owner.Units;
     private RenderTargets Targets => _owner.Targets;
 
+    // Space between the boss bar block and the look-at label pushed below it
+    private const float BossBarLabelGap = 8f;
+
     internal UiPasses(GL gl, RenderManager owner)
     {
         _gl = gl;
@@ -46,7 +49,7 @@ internal sealed class UiPasses
         HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
         CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null,
         byte effectMask = 0, SpellBuilderView? builder = null, int maxHealth = PlayerHealth.MaxHealth,
-        ChestView? chest = null)
+        ChestView? chest = null, BossBarState? boss = null)
     {
         // Either panel (the [E] inventory or the spell builder) hides the crosshair and the status row.
         var panelUp = view.IsOpen || builder?.IsOpen == true;
@@ -82,10 +85,16 @@ internal sealed class UiPasses
         if (!panelUp && (menu == null || !menu.IsOpen))
         {
             _owner.Ui.Hud.DrawCrosshair(crosshair.ThrowCharge, crosshair.BreakProgress, crosshair.HitMarker);
+            // The boss bar takes the spot under the strip, pushing the look-at label below it
+            var labelTop = TopStripRenderer.LookLabelTop(hasCompass, hasClock, showCoordinates);
+            if (boss is { } bar)
+            {
+                _owner.Ui.Hud.DrawBossBar(bar.Name, bar.Share, labelTop);
+                labelTop += HudRenderer.BossBarBlockHeight + BossBarLabelGap;
+            }
             // The look-at label (its debug lines ride the profiler overlay, i.e. X)
             if (lookAt is { } label)
-                _owner.Ui.TopStrip.DrawLookLabel(label, time, showProfiler,
-                    TopStripRenderer.LookLabelTop(hasCompass, hasClock, showCoordinates));
+                _owner.Ui.TopStrip.DrawLookLabel(label, time, showProfiler, labelTop);
         }
         if (hasCompass)
             _owner.Ui.TopStrip.DrawCompass(camera!.Yaw, camera.Position, showCoordinates);

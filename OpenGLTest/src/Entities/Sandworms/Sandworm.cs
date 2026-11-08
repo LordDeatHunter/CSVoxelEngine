@@ -128,6 +128,9 @@ public sealed class Sandworm : Mob
     public override bool ShowsHealthbar => IsVisible(0);
 
     /// <inheritdoc />
+    public override bool IsBoss => true;
+
+    /// <inheritdoc />
     public override void AnimateMirror(float deltaTime)
     {
         base.AnimateMirror(deltaTime);

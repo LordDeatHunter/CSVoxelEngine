@@ -351,6 +351,9 @@ public abstract class Mob
     /// ground (the sandworm), whose bar would hang in the sand.</summary>
     public virtual bool ShowsHealthbar => true;
 
+    /// <summary>Whether this mob is a boss: while one lives (and is not dying) the HUD shows its boss bar.</summary>
+    public virtual bool IsBoss => false;
+
     /// <summary>Applies a hit; the owner drops the loot and removes the mob once dead.</summary>
     public virtual void TakeDamage(int amount)
     {
