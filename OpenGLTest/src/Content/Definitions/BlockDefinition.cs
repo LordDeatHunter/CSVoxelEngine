@@ -135,8 +135,8 @@ public sealed class BlockDefinition
     /// <see cref="BiomeTint"/>: a cross-shaped plant has no cube faces to map per face, so it
     /// names the one palette and the mesher multiplies each of its model quads by the
     /// <see cref="VoxelEngine.Effects.Climate.BiomeTint"/> field. Only legal on a non-full-cube
-    /// <c>model</c>-renderer block, and the model must wear a gray textureless tile (see
-    /// <c>tools/generate-leaf-textureless.ps1</c>), since the tint multiplies the texel.
+    /// <c>model</c>-renderer block, and the model must wear a gray textureless tile, since the tint
+    /// multiplies the texel.
     /// </summary>
     public string? ModelTint { get; set; }
 

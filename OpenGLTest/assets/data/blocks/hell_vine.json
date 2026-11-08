@@ -3,7 +3,7 @@
   // in the Ashlands: each cell hangs from the cell above it (support "above"), a solid ceiling or the
   // vine cell over it, so mining any cell drops the rest of the vine below it. Cutout, no sway (a
   // rooted sway would swing its lower end from the floor), dropping nothing. Tile from
-  // tools/generate-hell-textures.py.
+  // committed art.
   "name": "Hell Vine",
   "model": { "parent": "block/cross", "textures": { "cross": "hell_vine" } },
   "hardness": 0,

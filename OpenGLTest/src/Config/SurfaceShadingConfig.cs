@@ -141,7 +141,7 @@ public static class SurfaceShadingConfig
     public static readonly Vector3 FoliageColorWarmMid = new Vector3(110f, 127f, 56f) / 255f;
     public static readonly Vector3 FoliageColorWarmWet = new Vector3(52f, 120f, 52f) / 255f;
     // The sRGB gray every textureless tile averages to (the two supplied grass tiles measure 98.4
-    // and 97.4, and tools/generate-leaf-textureless.ps1 normalizes the leaf tiles to it), so the
+    // and 97.4, and every leaf tile is normalized to it), so the
     // one BiomeTint.Gain fits them all.
     public const float BiomeTintTextureGray = 98f / 255f;
 

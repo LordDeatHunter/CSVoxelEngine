@@ -1,6 +1,6 @@
 {
   // The glassy trunk of a crystal tree (trees/crystal_tree.json) on the frost highland's islands: tree
-  // wood, its thickness in the state byte. Tiles from tools/generate-sky-textures.py.
+  // wood, its thickness in the state byte. Tiles are committed art.
   "name": "Crystal Log",
   "model": {
     "parent": "block/cube_column",

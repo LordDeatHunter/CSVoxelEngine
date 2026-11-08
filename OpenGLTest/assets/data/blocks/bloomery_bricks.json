@@ -1,6 +1,6 @@
 {
   // The bloomery's building block: mud bricks fired hard with cobblestone (recipes/bloomery_bricks.json). A cube
-  // of them is what the bloomery multiblock is built from. The tile comes from tools/generate-bloomery-textures.py.
+  // of them is what the bloomery multiblock is built from. The tile is committed art.
   "name": "Bloomery Bricks",
   "model": { "parent": "block/cube_all", "textures": { "all": "bloomery_bricks" } },
   "sfx": "hit_rock",

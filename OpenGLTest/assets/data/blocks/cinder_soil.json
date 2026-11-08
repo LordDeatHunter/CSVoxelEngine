@@ -1,5 +1,5 @@
 {
-  // The Ashlands soil under its ash. Tile from tools/generate-hell-textures.py.
+  // The Ashlands soil under its ash. Tile is committed art.
   "name": "Cinder Soil",
   "model": { "parent": "block/cube_all", "textures": { "all": "cinder_soil" } },
   "hardness": 4,

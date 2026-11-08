@@ -76,8 +76,8 @@ Nothing.
   (`Mining`, `LeftClickAction`'s creative branch, `BreakProgress`, `BlockEditor`, `TntManager.Detonate`,
   `FluidManager.SetCellImmediate`, `StatusEffectBlockRule`, `LookLabel`). `Chunk.SetBlockRaw` stays raw;
   `Chunk.CollapseWriteAt` is the only bypass, and BT-8's writer must call every edit-path hook.
-- Tower brick tiles come from `tools/generate-tower-brick-textures.py` (stone_bricks.png with its five colors swapped
-  one-to-one onto a palette per variant); a new biome variant is one more palette there and one more block JSON.
+- Tower brick tiles are stone_bricks.png with its five colors swapped
+  one-to-one onto a palette per variant; a new biome variant is one more palette and one more block JSON.
 - **Tower generator (BT-2)**, 0 content ids used (the tower is the three BT-1 bricks plus existing blocks).
   - **Files** (`OpenGLTest/src/WorldGen/Structures/`): `TowerPlacement` (cells, rolls, the cached site verdict, the band,
     the stamp, the finders), `TowerSite` (one accepted tower and the hooks below), `TowerShell` (pure shell geometry),

@@ -1,6 +1,6 @@
 {
   // The burnt trunk of a charred tree (trees/charred_tree.json) in the hell's Ashlands: leafless tree
-  // wood, its thickness in the state byte. Tiles from tools/generate-hell-textures.py.
+  // wood, its thickness in the state byte. Tiles are committed art.
   "name": "Charred Log",
   "model": {
     "parent": "block/cube_column",

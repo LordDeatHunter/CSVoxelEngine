@@ -509,8 +509,7 @@ water, ramp rivers included. Over ±23000 there are 14 accepted sites, 13 of the
 
 Taiga uses the **default** (grass) branch: its "snowiness" comes entirely from `SnowGenerator`, not the
 biome. Steppe and Savanna differ from Forest only in tint, trees and flora. `permafrost` is a JSON
-block (`assets/data/blocks/permafrost.json`, `hit_rock`, hand-diggable, drops itself) whose tile comes
-from `tools/generate-permafrost-texture.py`.
+block (`assets/data/blocks/permafrost.json`, `hit_rock`, hand-diggable, drops itself) whose tile is committed art.
 
 #### Water (`WaterBodies`)
 * Ocean: level = `SeaLevel`. Lakes/rivers: every land biome but the desert (`CanHoldSurfaceWater`:

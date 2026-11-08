@@ -3,7 +3,7 @@
   // (refused and kept when every part is already known). No recipe or loot yet: creative
   // catalog only.
   //
-  // TODO: placeholder art - scroll_modifiers.png comes from tools/generate-scroll-textures.py.
+  // TODO: placeholder art.
   "name": "Scroll of Modifiers",
   "texture": "assets/textures/items/scroll_modifiers.png",
   "use": { "action": "learn_parts" },

@@ -314,7 +314,10 @@ slot takes a `GearItem` of its own `GearSlot`, `GearSlots.Fits`). Gear is an ite
 compiled by `ItemLoader.ParseEquip` into a `GearInfo`. `equip.abilities` (`air_jump`, `no_fall_damage`, `extra_air`,
 `magnet`, `bone_shrapnel`; an unknown name refuses the item) compiles into `GearInfo.Abilities` (`GearAbility` flags), and
 `Equipment.Abilities`/`Has` caches their union with the stats on `Version` (the `no_fall_damage`, `extra_air` and `magnet`
-consumers are under "Armor, modifiers and sets", `bone_shrapnel` under "Bone shrapnel"). **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
+consumers are under "Armor, modifiers and sets", `bone_shrapnel` under "Bone shrapnel"). Every gear sprite is 32x32 committed pixel art
+(the same width every item sprite is authored at; the large swords are the 42x42 exception): the five-piece silhouette
+of each set is drawn once, shaded by a shared bevel and recolored per material, then dressed per material (stitching on
+leather, rivets on metal), and the rings, charms and belt are drawn the same way. **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
 (`PlayerPhysics`), on a fresh Space press while airborne, never in water or flight nor on the frame a creative double tap toggles
 flight; it rises as high as a ground jump, keeps the horizontal speed (sprint momentum), refills on the ground, in water and in
 flight, and has its own `AirJumpCount`, never moving `JumpCount`, so it never works a bloomery's bellows. `LocalPlayer.ApplyGear`
@@ -399,8 +402,7 @@ whose rows then deposit (one unit, all with shift) while the card's rows withdra
 `visual-examples/chests.json` (`VOXEL_TIME=147`, with the `setblock`, `chest` and `chestrow` ops).
 
 **Waystones (W-1..W-3, plans/WAYSTONES.md).** A block with `"waystone": true` (`BlockType.Waystone`; the four
-`waystone_<realm>` blocks: surface, underground, hell, sky, on the shared `block/waystone` model, tiles from
-`tools/generate-waystone-textures.py`) is a teleport point. A waystone stands two cells tall: the `waystone_<realm>` block is
+`waystone_<realm>` blocks: surface, underground, hell, sky, on the shared `block/waystone` model) is a teleport point. A waystone stands two cells tall: the `waystone_<realm>` block is
 its lower half (plinth and the foot of the rune shaft) and names `waystone_<realm>_upper` (the shaft's top, cap and point, on
 `block/waystone_upper`, no `waystone` flag) as its `upperHalf`, so it is a `TallBlock` like the door: worldgen writes both,
 mining either half takes both down and rolls the lower half's loot once. Each half's `hitbox` is its model's own boxes with
@@ -830,7 +832,10 @@ Assets are opened by **relative** path (`FileUtils.ReadFile("assets/shaders/..."
 `TEXTURE_2D_ARRAY` (`TextureLoader.Upload`/`UploadArray`): the block atlas has one slice per
 `assets/textures/blocks/*.png` in sorted file-name order (`TextureAtlas.TileOf(name)` returns the
 slice as a `ushort`, `BlockType.FaceTiles/Top/Bottom/Side` hold it), and item sprites, the font,
-the crosshair and the sun are single-slice arrays on layer 0. All eight world/shadow/UI/sun
+the crosshair and the sun are single-slice arrays on layer 0. **Item sprites are authored at 32x32** (and so are the block
+tiles); the only exception is the eight large sword sprites at 42x42, whose blade is longer than a 32px frame. The
+extruded sprite is built from the file's own pixel size (its thickness is `size / width * 2`, `SpritePose.HalfThickness`),
+so one sprite's size never depends on another's. All eight world/shadow/UI/sun
 shaders therefore declare `sampler2DArray` and read `vec3(fTexCoord, float(fLayer))`; there is
 no 2D-texture path for meshes. `Vertex` is 32 bytes: position (3 floats), packed rgba, **UV as
 two floats in tile units** (0..1 across one tile, 0..W across a quad merged over W cells — the
@@ -880,9 +885,7 @@ material, which `TileMaterials.Build` warns about instead of silently resolving.
 is the switch for the whole path and stays 0 wherever the buffer is not bound (the ItemDebugger
 loads the same shaders), so an unbound buffer is never read. `test-vertex.glsl` emits the `fTangent`
 / `fBitangent` frame the normal map is read in, and it has to agree with `ChunkFaceTables.TiledUv`'s per-face
-UV orientation or the relief comes out rotated or mirrored per face. Regenerate the art with
-`tools/generate-ore-materials.ps1` (deterministic, byte-identical re-runs);
-`visual-examples/ores.json` is the screenshot check, and wants a `VOXEL_TIME` since the highlight
+UV orientation or the relief comes out rotated or mirrored per face. `visual-examples/ores.json` is the screenshot check, and wants a `VOXEL_TIME` since the highlight
 tracks the sun. The ore body darkens by `metallic * 0.6` and the sun highlight, added in linear light,
 is scaled by `SurfaceShadingConfig.OreSpecLinearScale` (`uOreSpecScale`), because the sRGB encode
 lifts an add on the near-black body far more than it did in display space and smeared coal's
@@ -1033,12 +1036,9 @@ and it is accepted). The tint rides the vertex rgb as `shade * tint` (`BiomeTint
 `BiomeTint.Gain` (4, mirrored by the literal `4.0` behind `fTintGain` in `test-vertex.glsl` — keep
 the two together): the textureless tiles are gray around `SurfaceShadingConfig.BiomeTintTextureGray`
 (sRGB 98), so a byte rgb capped at 1 needs that headroom to reach grass green. The two grass tiles
-are supplied art; `tools/generate-leaf-textureless.ps1` writes each leaf one,
-`<name>_leaves_textureless.png`, from its `<name>_leaves.png` (Rec. 601 luminance, alpha copied,
-scaled to the same mean gray, byte-identical re-runs). Its `-Sources` list defaults to all four leaf
-tiles; `tools/generate-tree-textures.ps1`, which tints the placeholder baobab and stone pine log and
-leaf tiles from the oak art, calls it with `-Sources baobab_leaves, stone_pine_leaves` so a run of it
-never rewrites the oak and spruce tiles. Both chunk mesh paths go through the one `ChunkMesher.EmitTintedCubeFace`, which draws the
+are supplied art, and every leaf block has its own gray `<name>_leaves_textureless.png` beside it
+(Rec. 601 luminance of `<name>_leaves.png`, alpha copied, scaled to the same mean gray), so the tint
+multiplies the same art at any species' color. Both chunk mesh paths go through the one `ChunkMesher.EmitTintedCubeFace`, which draws the
 base quad first and then the coplanar tinted quad, the overlay winning by draw order under
 `Lequal`; the reflection and shadow passes reuse the same lists and inherit the order, and the
 shadow pass's alpha test punches the overlay's holes over the opaque base. The far LOD reads the
@@ -2656,58 +2656,22 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   stair, landings, the door seal flood fill; TowerPlacementTests: rarity, point query
                                #   equals stamp, generated chunks) (mirrors src/WorldGen/Structures)
     Trees/                     # the tree growth engine, flat over src's Trees/Shape, Logics and Features
-tools/                                # asset generators: tiles, sprites, models and clips, each re-run byte-identical
-  generate-acorn-texture.py           # deterministic generator of the acorn sprite (acorn.png)
-  generate-bandage-texture.py         # deterministic generator of the bandage sprite (bandage.png)
-  generate-bone-items.py              # deterministic generator of the bone-breaker blade and bone charm sprites, --check-free byte-identical re-runs
-  generate-cave-plants.py             # deterministic generator of the glow mushroom tile (glow_mushroom.png)
-  generate-clock-texture.py           # deterministic generator of the clock sprite (clock.png)
-  generate-cotton-textures.py         # deterministic cotton_plant tile and cotton item sprite (stdlib PNG writer)
-  generate-crystal-texture.py         # deterministic generator of the crystal tile (crystal_block.png)
-  generate-crushed-iron-texture.py    # deterministic generator of the crushed iron sprite (crushed_iron.png)
-  generate-door-textures.py           # deterministic oak trapdoor (and door) tiles (stdlib PNG writer)
-  generate-effect-icons.py            # deterministic 16x16 HUD icons of the status effects (effect_*.png), --check
+tools/                                # asset generators: models, animation clips, sounds and the wiki scenarios, each
+                                      #   re-run byte-identical; the pixel art (block tiles, item sprites, icons, normal
+                                      #   maps, skins) is committed art now, so its generators were removed
   generate-goblin-clips.py            # deterministic generator of the goblin's animation clips (goblin.bbmodel)
-  generate-goblin-skin.ps1            # deterministic generator of goblin.png; its header pins the UV layout
   generate-hell-mob-models.py         # deterministic hellbrute/cinderwitch .bbmodel (rig + clips) and skins, and the
                                       #   ember_shard sprite; its header pins the rig and clip contract, --check
-  generate-hollow-log-textures.py     # deterministic placeholder inner/end tiles of the hollow logs
   generate-sky-mob-models.py          # deterministic galeraptor/cloudgolem .bbmodel (rig + clips) and skins, and the
                                       #   cloud_shard sprite, on the hell script's machinery; --check
   generate-skeleton-model.py          # deterministic skeleton .bbmodel (rig with its bow, clips) and palette skin, and the
                                       #   arrow and bone sprites, on the hell script's machinery; --check
   generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
                                       #   the geometry rules (waterline, shelf, 8 px inset steps) and the UV layout
-  generate-lantern-texture.py         # deterministic lantern tile; its header pins the uv of every model part
-  generate-metal-textures.py          # deterministic tin/copper-sword/bronze/iron-pickaxe item art and the tin ore tiles, recolored from the copper tools, the iron sword and malachite
-  generate-leaf-textureless.ps1       # deterministic gray leaf tiles for the biome tint (scaled to BiomeTintTextureGray)
-  generate-permafrost-texture.py      # deterministic generator of the permafrost tile (permafrost.png)
-  generate-plank-texture.py           # deterministic oak_planks tile (stdlib PNG writer)
-  generate-pond-plants.py             # deterministic generator of the pond plants' art
-  remove-copper-head-handles.py       # strips the wooden handle from copper_pickaxe_head.png / copper_axe_head.png (re-runs are no-ops)
-  generate-slime-block-texture.py     # deterministic generator of the slime block tile (slime_block.png)
-  generate-staff-textures.py          # deterministic placeholder sprites of the wooden and crystal staffs
+  generate-mold-models.ps1            # the eight cast molds' block models under assets/models/block/, from their sprites' alpha silhouettes
+  generate-sandworm-model.py          # deterministic sandworm .bbmodel, skin and fang sprite (placeholder art); --check
   generate-spell-sfx.py               # deterministic placeholder spell sounds (spell_cast/impact/fizzle.wav), --check
-  generate-waystone-textures.py       # deterministic waystone_<realm>_stone/_runes/_runes_upper tiles (four realm palettes, one
-                                      #   rune panel up the two-cell obelisk shaft, split where its halves meet), --check
   generate-wiki-shots.mjs             # the wiki's screenshot scenarios (visual-examples/wiki-*.json) and wiki/data/screenshots.json from one spec of poses and captions
-  generate-mana-draught-texture.py    # deterministic placeholder sprite of the mana draught (mana_draught.png), --check
-  generate-stone-brick-texture.py     # deterministic generator of the stone brick tile (stone_bricks.png); the
-                                      #   committed tile is hand art now, so a re-run no longer reproduces it
-  generate-tower-brick-textures.py    # deterministic tower_bricks / _sandstone / _frost tiles: stone_bricks.png with its
-                                      #   palette swapped one-to-one (pure Python, no Pillow), --check
-  generate-hell-textures.py           # deterministic hell block tiles from a list of tile specs (hellrock, ash,
-                                      #   cinder_soil, scorched_hellrock, basalt, magma_block, ember_crystal, fungal_*,
-                                      #   the hell logs, the fungal cap and the cutout plants and vine;
-                                      #   Pillow, plain `python`), --check
-  generate-sky-textures.py            # deterministic sky block tiles from a list of tile specs (cloud_block: a soft
-                                      #   white mottle with mottled alpha; the L-13 palette: cutout leaves, a turf
-                                      #   side, and stone, bark, rings, fern and vine through the hell script's
-                                      #   painters; Pillow, plain `python`), --check
-  generate-frost-textures.py         # deterministic frost_grass_top/_side and frost_stone: grass_top, grass_side and stone with each
-                                      #   color swapped one-to-one for an icy one (same pixels, same palette size), --check
-  generate-alloy-bricks-texture.py    # deterministic alloy brick tile (alloy_bricks.png), mud_bricks.png recolored bronze and gray
-  generate-tree-textures.ps1          # placeholder baobab / stone pine log and leaf tiles tinted from the oak art
 ```
 
 ## Content: blocks, items, models and loot are data
@@ -2897,8 +2861,7 @@ generic one.
 
 Plain construction pieces built from the schema above. `oak_planks` is the first building wood:
 four from one `oak_log` (`recipes/oak_planks.json`), a plain `cube_all` block with `sfx: hit_wood`
-that is mined by hand. Its tile comes from `tools/generate-plank-texture.py` (stdlib PNG writer,
-byte-identical re-runs) and is what the wooden pieces below crop their faces from.
+that is mined by hand. Its tile is hand-authored and is what the wooden pieces below crop their faces from.
 `visual-examples/planks.json` (`VOXEL_TIME=147`) builds and shoots them.
 
 **Slabs** (`cobblestone_slab`, `oak_planks_slab`, six from three of their block) are bottom half
@@ -2925,8 +2888,7 @@ in where a solid block stands over the target cell (a placement against a block'
 every pop path that asks `BlockSupport` (mining's `BlockEditor.PopUnsupportedAround`, the blast scan, leaf
 decay) takes it down with that block. It lights like the torch (emission 15, the default warm
 color), is non-solid, and crafts from a torch and a copper ingot. Its model crops a cage, a lid
-and a chain out of one opaque tile from `tools/generate-lantern-texture.py`, whose header notes
-the trap: `ModelBaker` mirrors an explicit Minecraft uv on the way in (a side face samples column
+and a chain out of one opaque tile. Note the trap: `ModelBaker` mirrors an explicit Minecraft uv on the way in (a side face samples column
 `32 - 2u`, an up/down face row `32 - 2v`), so an off-center uv must be written mirrored and the
 art kept symmetric. `HangingBlockTests` covers the rule; `visual-examples/lanterns.json`
 (`VOXEL_TIME=700`) hangs one and pops it.
@@ -2957,7 +2919,7 @@ into a panel standing against the side of its cell nearest whoever placed it. Th
 clients, remeshed at once) with the fluid and leaf-decay schedules and `World.BlockEdited`; a
 client predicts it and the server replays the `Use` intent through the same chain. Both models
 (`block/trapdoor_bottom`, `block/trapdoor_open`) are split in half-width boxes so no face spans a
-cell side; the tile comes from `tools/generate-door-textures.py`. `OpenableTests` covers the
+cell side. `OpenableTests` covers the
 rules; `visual-examples/doors.json` (`VOXEL_TIME=147`) shoots trapdoors shut and open.
 
 The **door** (`oak_door`, three from six planks) is two blocks, `oak_door` (the lower half, the
@@ -2972,8 +2934,7 @@ lower half once and clears the partner through the hooks mining runs (fluid, lea
 `PopUnsupportedAround`, a falls block above it, `BlockEdited`), the multiblock revert in
 miniature; `BlockInteractions.TryToggleOpenable` writes the clicked half's new state to its partner too. A blast
 clears cells without these hooks, so it can leave one half standing (like a multiblock without
-a sweep); breaking that orphan drops the door as usual. The door tiles are from
-`tools/generate-door-textures.py`, the pull on the center line because of the mirrored uv.
+a sweep); breaking that orphan drops the door as usual. The door's pull sits on the center line because of the mirrored uv.
 `DoorTests` covers placement, the two-cell refusal, breaking either half and the shared toggle;
 `doors.json` shoots two doors, one clicked open.
 
@@ -2982,7 +2943,7 @@ a sweep); breaking that orphan drops the door as usual. The door tiles are from
 
 **Slime block** (nine slimeballs) carries the `bounce` flag: a body that lands on it is sprung back
 up at `SlimeBlockBounceRestitution` of its impact and bills no fall damage (`FallTracker`'s cushioned
-landing); the tile comes from `tools/generate-slime-block-texture.py` (`SlimeBlockTests`).
+landing) (`SlimeBlockTests`).
 
 **Sink and soft-landing flags** (the solid `cloud_block` of the sky's cloud slab uses both, see "Solid clouds").
 `softLanding` makes a landing on the block free, like the bounce but with no spring. `sink` (0..0.5)
@@ -3003,8 +2964,7 @@ in the sky band `CloudSlabBottomY..CloudSlabTopY` (198..203), above every peak (
 148) and the drawn cloud layer (160). The block is a `translucent`, `cullSelf` glass-like cube (drawn in
 the sorted translucent pass, no shadow, no AO, light passes) with `softLanding` and `sink: 0.5`, so a
 fall onto it is free and the player sinks half a block into its top cell and stands there; hardness 1,
-it breaks by hand and drops itself, so mining through a patch drops the player out of it. Its tile
-comes from `tools/generate-sky-textures.py` (alpha about 0.7). Worldgen lays patches where a 2D
+it breaks by hand and drops itself, so mining through a patch drops the player out of it. Its tile is a soft white mottle whose alpha is about 0.7. Worldgen lays patches where a 2D
 OpenSimplex noise (seed offset 166, two octaves, `CloudPatchFrequency`) is above `CloudPatchThreshold`
 (about a quarter of the sky, patches tens of blocks across): the further above, the thicker the column
 (one cell at a rim, the whole band from `CloudPatchCoreValue`), roughened by a detail noise (offset 167)
@@ -3110,15 +3070,13 @@ columns, inside the band and outside every island's cells, memoized per column),
 never enter an island and never leave the band. The shape is cached per cell (`SkyTrees`'
 `GenerationalCache`, `SkyTreeCacheCapacity`, cleared by `WorldSeed.Apply`) and `SkyTrees.Stamp`
 (`Stage.SkyTrees`, right after the islands in `ChunkTerrainFill.StampSky`) writes each tree's cells with
-their state bytes over air and flora only, never over a solid cell. The tiles come from
-`tools/generate-sky-textures.py` (the frost turf and stone from `tools/generate-frost-textures.py`: **pixel art uses a small hand-picked palette, never noise or smooth gradients, so a new tile is a palette swap of the regular tile it mirrors**). Cost (`WorldgenCostProbe` `skyIsland` class): a warm sky-island chunk
+their state bytes over air and flora only, never over a solid cell. **Pixel art uses a small hand-picked palette, never noise or smooth gradients, so a new tile is a palette swap of the regular tile it mirrors** (the frost turf and stone are the regular grass and stone in an icy palette). Cost (`WorldgenCostProbe` `skyIsland` class): a warm sky-island chunk
 0.065 ms (0.034 before the flora), cold dominated by the column scan as before plus about 0.3 ms of
 trees grown on a cache miss (plans/PERF.md). `SkyBiomeTests`, `SkyIslandTests`; `visual-examples/sky-biomes.json` (`VOXEL_TIME=147`) frames a
 meadow and a frost island from the side, from above, on top and from below.
 
 **Bandage** is the first `use.action: "heal"` item (`HealItem` -> `PlayerHealth.Heal`, refused at
-full health, `BandageHealAmount`), its sprite from `tools/generate-bandage-texture.py`
-(`HealItemTests`).
+full health, `BandageHealAmount`), its sprite is committed art (`HealItemTests`).
 
 **Ash fertilizer** (`use.action: "grow_tree"`) grows the tree of the column it is used on, resolving
 the species from the targeted block (`TreeSpeciesRegistry.ForBlock`, which resolves a wood two
@@ -3128,8 +3086,7 @@ species share to the leafy owner) and refusing, spending nothing, where the cell
 
 **Spell staffs** (`staff` in the item schema): the **wooden staff** (branches and a crystal block) and
 the **crystal staff** it is upgraded into (the wooden staff, crystal blocks and a copper ingot), a
-higher tier with more slots and the `advanced` part tag beside `basic`. Their sprites come from
-`tools/generate-staff-textures.py` (`StaffContentTests`, `StaffBindingTests`).
+higher tier with more slots and the `advanced` part tag beside `basic`. Their sprites are committed placeholder art (`StaffContentTests`, `StaffBindingTests`).
 
 **Spell table** (`spell_table`, four oak planks and a crystal block) is a plain `cube_bottom_top` block
 wearing the crystal block's tile on top and planks elsewhere, made a station by the `spellBuilder`
@@ -3177,7 +3134,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 | `use.fluid` | the fluid block the action works on; must be a block with `fluid: true` || `use.result` | the item this one becomes on success; must be an item, and the two normally point at each other |
 | `display` | how the item sits in the right hand: `rotation` as `[pitch, yaw, roll]` degrees (composed yaw, then pitch, then roll), `translation` in blocks of hand space, `scale` as a multiplier; omitted means `{"rotation": [-30, 10, 0]}`, i.e. upright over the hand with a slight sideways cant — the pickaxe yaws to 60 so a tip faces forward, the compass uses rotation `[-60, 0, 0]`, scale `0.67` and a lift to face back up at the holder |
 | `blockDamage` | damage one left-click hit removes from a block's `hardness`; default 0.5 (the bare-hand baseline). Independent of `tool`, which only gates *whether* the block may be mined |
-| `throwDamage` / `throwAligned` | `throwDamage` makes the item throwable (a charged right-click throw, damage at full charge, 0 for a harmless snowball); `throwAligned: true` (needs `throwDamage`) makes the thrown copy fly point first along its velocity (`ThrownProjectile.AlignedRotation`, the sprite's tip on its (1, 1) diagonal along the heading) instead of tumbling about the vertical, which is how the `spear` flies. Its sprite comes from `tools/generate-spear-texture.py`; `visual-examples/spear.json` films it (the `throw` player action launches the selected throwable at full charge). Gameplay beyond the throw (pickup, durability, a recipe) is `F-4` |
+| `throwDamage` / `throwAligned` | `throwDamage` makes the item throwable (a charged right-click throw, damage at full charge, 0 for a harmless snowball); `throwAligned: true` (needs `throwDamage`) makes the thrown copy fly point first along its velocity (`ThrownProjectile.AlignedRotation`, the sprite's tip on its (1, 1) diagonal along the heading) instead of tumbling about the vertical, which is how the `spear` flies. `visual-examples/spear.json` films it (the `throw` player action launches the selected throwable at full charge). Gameplay beyond the throw (pickup, durability, a recipe) is `F-4` |
 | `entityDamage` | damage one punch or slice deals to an enemy (any `Mob`: a slime or a goblin); default 1 (the bare-hand baseline). A weapon raises it without needing a `tool` block (the obsidian blade is `6`) |
 | `attack` | left-click attack behavior, an `AttackPattern`: `punch` (default; forward cone, hits the nearest one), `slice` (forward hemisphere, hits the nearest two, two-phase swing — the obsidian blade) or `sword` (a three-swing chain: a diagonal cut and a rising back cut over the hemisphere, hitting the nearest three, then an overhead chop on the one target in the cone at the highest power with a heavier shove — the iron sword). See `Combat`/`SliceCombo`/`SwordCombo`/`SwordSwings` |
 | `trail` | optional `{"color": [r, g, b]}`, sRGB 0..255: the color of the glowing slice trail the item's swings leave (`Item.TrailColor`; omitted, `TrailColorOrDefault` falls back to `ParticleConfig.SliceTrailDefaultColor`). Legal only on a `slice` or `sword` item; a trail on a punch item, or a color that is not three ints in 0..255, throws naming the file (`ItemLoader.ParseTrail`). The obsidian blade is violet, the iron sword pale blue-white |
@@ -3529,8 +3486,7 @@ file, and re-running is byte-identical until the real sprites arrive. The blocks
 pins that tie, and the quad budget at 300); raw molds wear the `mud` tile, fired ones `fired_mud` —
 a `stone.png` placeholder that lives in `assets/textures/blocks/`, never `blocks_material/`.
 There are **eight** of them now — pickaxe, axe, ingot and sword, raw and fired — all generated by the same
-script from the same constants (`mold_sword.png` comes from `tools/generate-metal-textures.py`, which also
-recolors the tin and copper-sword art).
+script from the same constants.
 
 **Tin** (`tin_ore`, `TinGenerator`) is the second, weaker metal: commoner than malachite, in the
 `TinMinY..TinMaxY` band, mined with any pickaxe; it crushes in the quern into `crushed_tin`, melts as `tin`
@@ -3541,8 +3497,7 @@ copper each have an axe, pickaxe and sword (`attack: "sword"`), the tool ladder 
 **Bronze** is the alloy (3 copper + 1 tin by ml, made only in the alloy furnace, see the recipe kind
 below) and the top of that ladder: an ingot, axe, pickaxe and sword heads (each 200 ml, melting back
 to `bronze`, cast in the same four molds) and the three tools crafted like the others (head + branch + 2
-vines), in the `axe` and `pickaxe` tags. It has no ore, no blocks and no armor. Its art is
-`tools/generate-metal-textures.py bronze`; `MiningTests.BronzeOutranksCopperAndMinesWhatCopperMines`
+vines), in the `axe` and `pickaxe` tags. It has no ore, no blocks and no armor. Its art is recolored from the copper tools; `MiningTests.BronzeOutranksCopperAndMinesWhatCopperMines`
 holds the ladder as relations and `visual-examples/bronze.json` (`VOXEL_TIME=147`) shows the tin,
 copper and bronze tools side by side.
 
@@ -3593,8 +3548,7 @@ anvil hammers that into `wrought_iron`, which every iron recipe consumes: the he
 the five-piece iron armor set (`iron_cap`, `iron_tunic`, `iron_pants`, `iron_boots`, `iron_gloves`, `sets/iron.json`; bronze's
 counts and one more armor point each). The `iron_pickaxe` is the top pickaxe tier (power 3, above bronze's 2.5; in the
 `pickaxe` tag), the tool the hell barrier needs (plans/LAYERS.md), so hell is now reachable in survival
-(`MiningTests.IronOutranksBronzeAndMinesEverythingBronzeMines`; sprites from `tools/generate-metal-textures.py iron` and
-`tools/generate-gear-textures.ps1`).
+(`MiningTests.IronOutranksBronzeAndMinesEverythingBronzeMines`).
 
 **The barrier** (the `basalt` block, `BarrierGenerator`) seals the overworld from hell: `requiresTool` with
 `tools: {"pickaxe": 3}`, so only the iron pickaxe mines it, hardness 40, and it drops itself (no loot
@@ -3652,7 +3606,7 @@ seams. Every palette block is solid and steady, so lava stays put. The lights gl
 of their own: ember (`ember_crystal` 15, `magma_block` 9) and fungal teal (`fungal_glow` 14), five of the
 eight `BlockLightPalette` slots then used (the sky's `crystal_leaves` take a sixth, pale cyan). The hell blocks (`hellrock`, `ash`, `cinder_soil`,
 `scorched_hellrock`, `basalt`, `magma_block`, `ember_crystal`, `fungal_moss`, `fungal_soil`,
-`fungal_glow`) are plain JSON cubes whose tiles come from `tools/generate-hell-textures.py`; the soils and
+`fungal_glow`) are plain JSON cubes; the soils and
 ash mine by hand, the rocks need any pickaxe, hellrock the iron one. Costs about 0.26 ms a warm hell
 chunk with the flora below (0.15 before it), plus the hell trees grown on a cache miss, about 0.6 ms a
 chunk on the probe's cold samples, which regrow every tree (`WorldgenCostProbe`, plans/PERF.md). The layer index also scales the hell mobs (see "Hell mobs").
@@ -3691,8 +3645,7 @@ in the fungal glow's palette slot, and decays like leaves) on
 `support: "above"`: each cell is held by the one over it, a solid ceiling or a vine, so a vine cut
 anywhere drops what hangs below, through mining's recursive pop and, with this change, the blast scan
 (`TntManager.PopIfUnsupported` follows a popped block's dependents past the blast box) and leaf decay
-(`LeafDecayManager.PopUnsupportedAround` recurses), with no new block flag. Every tile comes from
-`tools/generate-hell-textures.py` (the `bark`, `rings`, `fern`, `bloom` and `vine` painters).
+(`LeafDecayManager.PopUnsupportedAround` recurses), with no new block flag. Every tile is committed art.
 `HellFloraTests`; `visual-examples/hell-flora.json` (`VOXEL_TIME=147`) frames the Fungal Grove and the
 Ashlands.
 
@@ -3787,7 +3740,7 @@ beside it to keep its bellows going) -> `bloom` -> **anvil** + smithing hammer -
 
 **The alloy furnace** (`alloy_furnace` / `alloy_furnace_part`, `multiblock.size` 3) is the second
 kiln: a 3x3x3 hollow shell of `alloy_bricks` (one mud brick block, a copper and a tin ingot each,
-`recipes/alloy_bricks.json`; the tile from `tools/generate-alloy-bricks-texture.py`) pressed by the
+`recipes/alloy_bricks.json`) pressed by the
 same converter, with `{"fuelCap": 8, "meltSpeed": 1.5, "canAlloy": true}`. It is the same
 `KilnManager` state, save and wire shape; only its profile and its model differ. Where the render
 pass (`StationPasses.RenderKilns`) draws the crucible, the pending lump and the fuel row, where the
@@ -3951,8 +3904,7 @@ the albedo before the hit flash at `StatusEffectConfig.MobTintStrength`, zero by
 frame on the plain program, so everything else is byte-identical; `MobPasses` sets it from
 `StatusEffectSet.TryGetTint`, the lowest-id tinted effect) and sheds its effects' particles through the
 campfire `FireParticleSystem.Puff` (`AmbientEffects.UpdateStatusParticles`, nearest first, at most
-`MaxParticleEmitters` mobs, `ParticlesPerSecond` each, never on a server). The HUD icons come from
-`tools/generate-effect-icons.py`. Tests: `StatusEffectLoaderTests`, `StatusBlockFlagTests`,
+`MaxParticleEmitters` mobs, `ParticlesPerSecond` each, never on a server). The HUD icons are committed 16x16 art. Tests: `StatusEffectLoaderTests`, `StatusBlockFlagTests`,
 `StatusEffectSetTests`, `StatusEffectApplyTests`, `StatusEffectFactorTests`, `StatusEffectBlockTests`.
 
 Known gaps: effects are not saved (`player.json`, `entities.json`); other players' effects are not shown
@@ -5010,8 +4962,8 @@ cell-center column's `DirtDepth` is zero: `LodMeshBuilder`'s stripped-soil grid,
 prefetched `ColumnData` on the generated path too), while its top stays snow.
 Vegetation is biome-gated. Trees come from the species files (`assets/data/trees`), each planted
 only in its `worldgen.biomes`: `oak` in the forest, `spruce` in the taiga, the leafless `cactus`
-(a thick stem whose few arms bend upward, wearing the generated `cactus_side`/`cactus_top` tiles;
-see `tools/generate-biome-textures.ps1`) in the desert (where it wins over the dead tree, since
+(a thick stem whose few arms bend upward, wearing its own `cactus_side`/`cactus_top` tiles)
+in the desert (where it wins over the dead tree, since
 `TreeGenerator.SpeciesByBiome` takes the first species in name order), the leafless `dead_tree` in
 the desert, the frozen tundra and the steppe, and `stone_pine` in the savanna, whose umbrella crown
 stands in for an acacia (its reach equals the palm's, so `ReachChunkRadius` did not grow), while
@@ -5059,8 +5011,7 @@ the gated `StampGround`) is never gated, since its leaves may come from neighbor
   it never welds, fells or decays: the shared `block/hollow_log` model is a square tube authored
   along Z (3 px walls round a 10 px hole, open at both ends, each wall split at the cell's middle so
   no quad covers a whole side), its outside the species log's own side tile and its inside and end
-  rings the placeholder `hollow_<species>_log_inner`/`_end` tiles of
-  `tools/generate-hollow-log-textures.py`. The state byte holds a facing (`FacingAlongZ` = north
+  rings the placeholder `hollow_<species>_log_inner`/`_end` tiles. The state byte holds a facing (`FacingAlongZ` = north
   or `FacingAlongX` = west, picking the pre-turned model and boxes), never a `WoodState`. Its four
   wall `hitbox`es with `collidesByHitbox` leave the hole open to the raycast and the player body
   (only the player: mobs, drops and projectiles see a full cell). Its `hardness` is half the
@@ -5826,8 +5777,7 @@ The goblin's **content contract** is enforced at startup by `Goblin.ValidateCont
 - a `release` event on `throw` and an `impact` event on `melee`.
 A missing piece throws, naming the model file. The clips' keyframes may be retuned freely in
 Blockbench; the clip and event names may not change. Hurt is not a clip: it is the hit-flash tint.
-`goblin.png` is generated by `tools/generate-goblin-skin.ps1`, whose UV layout must match the
-`.bbmodel`'s face UVs.
+`goblin.png` is committed art whose UV layout must match the `.bbmodel`'s face UVs.
 
 ### Animation juice (springs, mob life-cycle, player secondary motion)
 

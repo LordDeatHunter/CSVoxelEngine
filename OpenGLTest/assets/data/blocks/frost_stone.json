@@ -1,6 +1,6 @@
 {
   // The frost highland's island core and underside (SkyBiomes): pale, rime-veined stone. Tile from
-  // tools/generate-sky-textures.py.
+  // committed art.
   "name": "Frost Stone",
   "model": { "parent": "block/cube_all", "textures": { "all": "frost_stone" } },
   "sfx": "hit_rock",

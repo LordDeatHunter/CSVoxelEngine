@@ -1,7 +1,6 @@
 # Generates the block models for the eight cast molds into assets/models/block/:
 # mold_pickaxe.json, mold_axe.json, mold_ingot.json, fired_mold_pickaxe.json, fired_mold_axe.json
-# fired_mold_ingot.json, mold_sword.json and fired_mold_sword.json (mold_sword.png comes from
-# tools/generate-metal-textures.py). Each one is a
+# fired_mold_ingot.json, mold_sword.json and fired_mold_sword.json (mold_sword.png is committed art). Each one is a
 # flat slab whose top is carved out into a pocket shaped like the tool the mold casts, so the
 # geometry is derived from the tool sprite rather than modelled by hand - never hand-edit the
 # output, re-run this instead.
@@ -23,7 +22,7 @@
 #   * The block JSON's hitbox max Y must equal $SlabHeight/16; MoldTests pins that tie.
 #
 # The output is a pure function of the input pixels - no noise, no randomness - so re-running
-# reproduces each model byte for byte, like tools/generate-ore-materials.ps1.
+# reproduces each model byte for byte.
 #
 # Run from the repo root: powershell -File tools/generate-mold-models.ps1
 Add-Type -AssemblyName System.Drawing

@@ -1,5 +1,5 @@
 {
-  // Glassy bricks pressed from slag (recipes/slag_bricks.json). The tile comes from tools/generate-bloomery-textures.py.
+  // Glassy bricks pressed from slag (recipes/slag_bricks.json). The tile is committed art.
   "name": "Slag Bricks",
   "model": { "parent": "block/cube_all", "textures": { "all": "slag_bricks" } },
   "sfx": "hit_rock",

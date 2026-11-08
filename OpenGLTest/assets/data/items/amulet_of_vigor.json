@@ -1,5 +1,5 @@
 {
-  // Amulet of Vigor: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite). Wearable in the accessory slot; its
+  // Amulet of Vigor: placeholder gear. Wearable in the accessory slot; its
   // fixed stats are the equip object, and a piece found in loot may also roll modifiers on its stack.
   "name": "Amulet of Vigor",
   "texture": "assets/textures/items/amulet_of_vigor.png",

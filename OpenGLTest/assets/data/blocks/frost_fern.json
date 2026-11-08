@@ -1,6 +1,6 @@
 {
   // A rimed fern on the frost highland's turf (SkyFlora): cutout, swaying, unsupported without its
-  // ground and dropping nothing. Tile from tools/generate-sky-textures.py.
+  // ground and dropping nothing. Tile is committed art.
   "name": "Frost Fern",
   "model": { "parent": "block/cross", "textures": { "cross": "frost_fern" } },
   "hardness": 0,

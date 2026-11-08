@@ -66,7 +66,7 @@ effect through `Status/StatusEffects.Apply(target, name, durationScale)`. Block 
 `StatusEffectBlockWriter` (drained by `MobDirector`) writes cells with every edit-path hook, capped per
 pulse and per frame. Protocol 13 ends each `EntityList` entry with an effect mask and `PlayerStatus` with
 the player's; a client mirrors them. Visuals: the `uStatusTint` mob tint, embers or steam through the
-campfire particles, HUD icons left of the hearts (`tools/generate-effect-icons.py`), and the scenario op
+campfire particles, HUD icons left of the hearts (committed 16x16 icons), and the scenario op
 `effect` (`visual-examples/status-effects.json`). First guesses: burning 6 s, 5% a second, ignites and
 thaws; frostburn 8 s, 2% every 2 s, half speed, 0.6 attack, freezes. Known gaps: effects are not saved,
 other players' effects are not shown, the player slowdown is client-trusted, blade swing durations are
@@ -124,7 +124,7 @@ grown pool is not clamped down. Scrolls are items with `use.action: "learn_parts
 `Items/LearnPartsItem`): right-click teaches and spends one, creative learns without spending, and a scroll
 that teaches nothing new is refused and kept. On a server the `Use` intent teaches the sending player, sets
 its status dirty and is answered with the inventory snapshot. Five ship, creative-catalog only
-(`tools/generate-scroll-textures.py` placeholder sprites): `scroll_fire_projectile` (the hint),
+(committed placeholder sprites): `scroll_fire_projectile` (the hint),
 `scroll_frost`, `scroll_nature`, `scroll_self` and `scroll_modifiers` (power and range).
 `Items/StarterKit` gives the hint scroll to a new store-backed survival player, a server newcomer and a
 player saved before `MG-8` (an inventory with no known-part list), never twice. The hint is shown by the

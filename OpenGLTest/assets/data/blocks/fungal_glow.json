@@ -1,6 +1,6 @@
 {
-  // A soft fungal light hanging in the Fungal Grove ceilings, in its own teal light color. Tile
-  // from tools/generate-hell-textures.py.
+  // A soft fungal light hanging in the Fungal Grove ceilings, in its own teal light color. Tile is
+  // committed art.
   "name": "Fungal Glow",
   "model": { "parent": "block/cube_all", "textures": { "all": "fungal_glow" } },
   "hardness": 2,

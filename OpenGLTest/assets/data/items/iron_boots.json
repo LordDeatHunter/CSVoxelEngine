@@ -1,5 +1,5 @@
 {
-  // Iron Boots: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite).
+  // Iron Boots: placeholder gear.
   "name": "Iron Boots",
   "texture": "assets/textures/items/iron_boots.png",
   "rarity": "uncommon",

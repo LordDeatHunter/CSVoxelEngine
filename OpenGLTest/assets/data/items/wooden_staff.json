@@ -3,7 +3,7 @@
   // ItemStack (StaffComponent), so every staff is its own instance in the Tools pool. Its tags
   // decide which spell parts it accepts (a part passes when any of its tags is listed here).
   //
-  // TODO: placeholder art - wooden_staff.png comes from tools/generate-staff-textures.py.
+  // TODO: placeholder art.
   "name": "Wooden Staff",
   "texture": "assets/textures/items/wooden_staff.png",
   "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.6 },

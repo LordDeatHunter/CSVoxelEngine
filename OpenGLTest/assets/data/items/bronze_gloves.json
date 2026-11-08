@@ -1,5 +1,5 @@
 {
-  // Bronze Gloves: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite). Wearable in the gloves slot; its
+  // Bronze Gloves: placeholder gear. Wearable in the gloves slot; its
   // fixed stats are the equip object, and a piece found in loot may also roll modifiers on its stack.
   "name": "Bronze Gloves",
   "texture": "assets/textures/items/bronze_gloves.png",

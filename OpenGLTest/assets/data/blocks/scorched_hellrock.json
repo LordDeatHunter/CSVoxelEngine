@@ -1,6 +1,6 @@
 {
   // Burnt hellrock: the Ashlands walls, ceilings and pool beds, the Magma Caverns soil. Softer than
-  // hellrock, so any pickaxe mines it. Tile from tools/generate-hell-textures.py.
+  // hellrock, so any pickaxe mines it. Tile is committed art.
   "name": "Scorched Hellrock",
   "model": { "parent": "block/cube_all", "textures": { "all": "scorched_hellrock" } },
   "sfx": "hit_rock",

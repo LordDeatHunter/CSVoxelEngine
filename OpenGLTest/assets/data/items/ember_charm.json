@@ -1,6 +1,6 @@
 {
   // Ember Charm: a loot-only accessory that makes its wearer immune to burning and sets what they hit alight
-  // now and then (equip.passives, on_hit). Placeholder sprite from tools/generate-gear-textures.ps1.
+  // now and then (equip.passives, on_hit). Committed placeholder sprite.
   "name": "Ember Charm",
   "texture": "assets/textures/items/ember_charm.png",
   "rarity": "rare",

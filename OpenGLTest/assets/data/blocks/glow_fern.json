@@ -1,7 +1,7 @@
 {
   // A teal fern on the Fungal Grove's moss (HellFlora): a dim light in the grove's color, cutout,
   // swaying, unsupported without its floor and dropping nothing. Tile from
-  // tools/generate-hell-textures.py.
+  // committed art.
   "name": "Glow Fern",
   "model": { "parent": "block/cross", "textures": { "cross": "glow_fern" } },
   "hardness": 0,

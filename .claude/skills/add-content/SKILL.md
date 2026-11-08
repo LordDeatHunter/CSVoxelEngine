@@ -19,7 +19,7 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 | molten / melt / cast / craft / cook / crush | `assets/data/molten/`, `recipes/melt/`, `recipes/cast/`, `recipes/`, `recipes/cook/`, `recipes/crush/` |
 | tags | `assets/data/tags/<tag>.json` |
 | spell part | `assets/data/spell/<kind>/<name>.json` (kind = `element`, `shape`, `modifier`, `trigger`) |
-| status effect | `assets/data/effects/<name>.json` (HUD icon in `assets/textures/ui/`, see `tools/generate-effect-icons.py`) |
+| status effect | `assets/data/effects/<name>.json` (HUD icon in `assets/textures/ui/`) |
 | block tile | `assets/textures/blocks/<name>.png` |
 | normal map / material tile | `assets/textures/blocks_material/<name>.png` (**never** in `blocks/`) |
 
@@ -36,7 +36,7 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 - A non-full-cube model needs `light.passes: true` (default) or its cell and interior quads render black.
 - A `cutout` block must not occlude. `translucent` forces occludes off.
 - Partial-block textures are cropped, never stretched (`FaceTiles` crops); a new partial block needs no mining-pop work if its `FaceTiles` are sensible.
-- `biomeTint` only on blocks that bake to a plain full cube, not translucent; overlay not on cutout. Textureless tint tiles must be gray (see the biome tint section; generator scripts in `tools/`).
+- `biomeTint` only on blocks that bake to a plain full cube, not translucent; overlay not on cutout. Textureless tint tiles must be gray (see the biome tint section).
 - `multiblock` anchors/parts: `hasItem: false`, model authored in 0..32 units, no `cullface`, opening on north.
 - Two blocks sharing a texture share its material (warned at startup).
 - Fluids force `solid/castsAO/hasItem/needsSupport` off; `hardensTo` pairs live under `flow`.
@@ -47,8 +47,8 @@ AGENTS.md ("Content: blocks, items, models and loot are data") holds the full sc
 - Status effects: at most 8 files (`StatusEffect.MaxKinds`, every wire form is a byte mask; the id is the file-name order). `durationSeconds` is required; `tickSeconds` is required exactly when the effect has a `damageShare` or a `blocks` flag and refused otherwise; factors only slow, in (0,1]; the effect must do something; `particle` is a `FireParticleKind` name; `icon` a `.png` path. An element part's `effect` must name a loaded effect, and only an element may carry one.
 - Status block flags: `flammable` never on a fluid or a multiblock cell; `freezesTo` only on a fluid and names a non-fluid; `meltsTo` only on a non-fluid and names another fluid. Flag only what a burn may safely remove (leaves, plants), never builds or stations.
 - Staffs: an item with a `staff` object (`slots` 1..`SpellConfig.StaffMaxSlots`, `tier` >= 1, non-blank distinct `tags`) stores in the Tools pool and may not declare `use` or `crucible`. It must be craftable (never loot only), and a higher tier needs more slots and a superset of the lower tier's tags (`StaffContentTests`).
-- Teaching scrolls: `use.action: "learn_parts"` and a `teaches` list of spell part keys (`<kind>/<name>`) always come together, each key once; the keys are checked against the loaded spell parts after they load (`ItemLoader.ValidateLearnParts`), so a misspelled key fails content load naming the file. A scroll declares no `use.result`, `use.fluid` or `use.block`. Each scroll is an item id, so mind the 255-id budget before shipping one per part: group parts on one scroll instead. Placeholder sprites come from `tools/generate-scroll-textures.py` (add the new name and seal color there). The starter grant is `Items/StarterKit`, never a JSON flag (`ScrollSchemaTests`, `StarterKitTests`).
-- Mana items: `use.action: "restore_mana"` needs a `restoresMana` share in (0, 1] (`ItemLoader.ParseRestoresMana`), and no `use.result`, `use.fluid` or `use.block`. The one item is `mana_draught`, its sprite from `tools/generate-mana-draught-texture.py` (`RestoreManaItemTests`).
+- Teaching scrolls: `use.action: "learn_parts"` and a `teaches` list of spell part keys (`<kind>/<name>`) always come together, each key once; the keys are checked against the loaded spell parts after they load (`ItemLoader.ValidateLearnParts`), so a misspelled key fails content load naming the file. A scroll declares no `use.result`, `use.fluid` or `use.block`. Each scroll is an item id, so mind the 255-id budget before shipping one per part: group parts on one scroll instead. Placeholder sprites are committed art (`assets/textures/items/scroll_<name>.png`). The starter grant is `Items/StarterKit`, never a JSON flag (`ScrollSchemaTests`, `StarterKitTests`).
+- Mana items: `use.action: "restore_mana"` needs a `restoresMana` share in (0, 1] (`ItemLoader.ParseRestoresMana`), and no `use.result`, `use.fluid` or `use.block`. The one item is `mana_draught`, its sprite committed art (`RestoreManaItemTests`).
 - Spell stations: any block with `spellBuilder: true` opens the spell builder on right-click (a JSON flag, no code, no block entity). It must have an item and be craftable (`SpellTableTests`). Do not give it a `material`: its tile is shared with the crystal block, and two blocks sharing a texture with a material warn.
 
 ## Tests to extend

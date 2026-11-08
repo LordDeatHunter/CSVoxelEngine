@@ -5,7 +5,7 @@
   // waystone two cells tall: its upper half (waystone_sky_upper) stands above it, written with it, and the
   // registry keys the waystone by this cell. Worldgen-only (no item); mining either half takes both down, marks the
   // waystone lost for everyone who found it and breaks it into stone bricks (loot/waystone.json). The runes glow in
-  // the crystal leaves' pale cyan, an existing block-light palette slot. Tiles from tools/generate-waystone-textures.py.
+  // the crystal leaves' pale cyan, an existing block-light palette slot. Tiles are committed art.
   "name": "Sky Waystone",
   "model": { "parent": "block/waystone", "textures": { "stone": "waystone_sky_stone", "runes": "waystone_sky_runes" } },
   "upperHalf": "block/waystone_sky_upper",

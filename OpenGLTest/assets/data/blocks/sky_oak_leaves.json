@@ -1,7 +1,7 @@
 {
   // The broad, bright canopy of a sky oak (trees/sky_oak.json), dotted with pale blossom: the species'
   // leaves, so a crown cut off its trunk decays. Untinted (the sky has no climate of its own). Tile from
-  // tools/generate-sky-textures.py.
+  // committed art.
   "name": "Sky Oak Leaves",
   "model": { "parent": "block/cube_all", "textures": { "all": "sky_oak_leaves" } },
   "hardness": 1,

@@ -1,5 +1,5 @@
 {
-  // Iron Gloves: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite).
+  // Iron Gloves: placeholder gear.
   "name": "Iron Gloves",
   "texture": "assets/textures/items/iron_gloves.png",
   "rarity": "uncommon",

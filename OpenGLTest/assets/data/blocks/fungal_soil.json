@@ -1,5 +1,5 @@
 {
-  // The Fungal Grove soil and ceilings. Tile from tools/generate-hell-textures.py.
+  // The Fungal Grove soil and ceilings. Tile is committed art.
   "name": "Fungal Soil",
   "model": { "parent": "block/cube_all", "textures": { "all": "fungal_soil" } },
   "hardness": 4,

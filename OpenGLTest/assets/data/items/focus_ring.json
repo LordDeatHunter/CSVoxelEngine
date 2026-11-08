@@ -1,5 +1,5 @@
 {
-  // Ring of Focus: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite). Wearable in the accessory slot; its
+  // Ring of Focus: placeholder gear. Wearable in the accessory slot; its
   // fixed stats are the equip object, and a piece found in loot may also roll modifiers on its stack.
   "name": "Ring of Focus",
   "texture": "assets/textures/items/focus_ring.png",

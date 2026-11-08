@@ -1,5 +1,5 @@
 {
-  // Cloud Boots: iron boots lined with cloud shards (see tools/generate-gear-textures.ps1 for the sprite). Lighter armor
+  // Cloud Boots: iron boots lined with cloud shards. Lighter armor
   // than the iron boots, but worn they give one free air jump per airtime (the air_jump ability). Not part of a set:
   // sets count only head, chest and legs.
   "name": "Cloud Boots",

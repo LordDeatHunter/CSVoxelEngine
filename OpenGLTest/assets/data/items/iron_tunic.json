@@ -1,5 +1,5 @@
 {
-  // Iron Tunic: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite).
+  // Iron Tunic: placeholder gear.
   "name": "Iron Tunic",
   "texture": "assets/textures/items/iron_tunic.png",
   "rarity": "uncommon",

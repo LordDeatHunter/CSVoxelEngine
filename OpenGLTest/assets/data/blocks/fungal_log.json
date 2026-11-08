@@ -1,6 +1,6 @@
 {
   // The pale stem of a fungal tree (trees/fungal_tree.json) in the hell's Fungal Grove: tree wood,
-  // its thickness in the state byte like the oak log's. Tiles from tools/generate-hell-textures.py.
+  // its thickness in the state byte like the oak log's. Tiles are committed art.
   "name": "Fungal Log",
   "model": {
     "parent": "block/cube_column",

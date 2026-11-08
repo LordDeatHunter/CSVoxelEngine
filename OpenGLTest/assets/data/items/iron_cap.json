@@ -1,5 +1,5 @@
 {
-  // Iron Cap: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite).
+  // Iron Cap: placeholder gear.
   "name": "Iron Cap",
   "texture": "assets/textures/items/iron_cap.png",
   "rarity": "uncommon",

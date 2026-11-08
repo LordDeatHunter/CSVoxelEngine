@@ -61,7 +61,7 @@ Accessory abilities, the ring ladder and the set rule change are done (AGENTS.md
   `Combat.*Damage`. Wire: protocol 19, `NetInventoryAction.EquipGear` and `UnequipGear`, and
   `PlayerSaveData.InventoryData.Equipped`. UI: the Gear tab (rows marked "worn") and
   `EquipmentCardLayout`/`EquipmentCardRenderer`. Placeholder content: a leather and a bronze set and four
-  accessories (`tools/generate-gear-textures.ps1`, `visual-examples/gear.json`); the leather set is crafted from
+  accessories (`visual-examples/gear.json`); the leather set is crafted from
   cotton for now. - **What I-2 shipped.** Armor: `ArmorRules.Reduce` (`max(min(hit, minDamage(source)), hit - armor)`, per-source minimums
   in `PlayerConfig.ArmorMinDamage*`, drowning, magic and a source-less blow bypass it) applied in
   `PlayerHealth.TakeDamage(int, DamageSource, ...)`, with `ServerPlayer`'s fall and cactus now naming their source;

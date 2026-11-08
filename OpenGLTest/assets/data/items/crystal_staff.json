@@ -3,7 +3,7 @@
   // of "basic". No advanced spell part ships yet. Its bound spells ride on its ItemStack
   // (StaffComponent), like the wooden staff's.
   //
-  // TODO: placeholder art - crystal_staff.png comes from tools/generate-staff-textures.py.
+  // TODO: placeholder art.
   "name": "Crystal Staff",
   "texture": "assets/textures/items/crystal_staff.png",
   "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.6 },

@@ -2,7 +2,7 @@
   // A waystone's lower half (the upper half, block/waystone_upper, stands in the cell above): a two-step plinth and the
   // foot of the rune-carved obelisk shaft, which runs on through the top of the cell into the upper half. Symmetric
   // about the cell's center, so it reads the same from every side; the shaft's default uv crops the lower part of the
-  // rune panel tools/generate-waystone-textures.py draws (#runes: tile columns 10..21, rows 0..21). Every box is
+  // rune panel (#runes: tile columns 10..21, rows 0..21). Every box is
   // narrower than the cell, so only the plinth's underside culls against the block below. The realm blocks fill
   // #stone and #runes, and their hitboxes are these boxes.
   "textures": { "particle": "#stone" },
