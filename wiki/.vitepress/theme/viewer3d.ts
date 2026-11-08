@@ -8,6 +8,17 @@ export interface EntityRig {
   clipNames: string[]
   play(name: string, speed: number): void
   setSpeed(speed: number): void
+  setPaused(paused: boolean): void
+  /** true wraps the clip, false plays it once and holds the last frame; the clip's own mode until first set. */
+  setLoop(loop: boolean): void
+  /** The active clip's length in seconds (0 without one). */
+  length(): number
+  /** Seconds into the active clip, after the loop rule. */
+  time(): number
+  /** Jumps to a time in the active clip (the pose follows even while paused). */
+  seek(seconds: number): void
+  /** Whether the active clip loops by its own authoring, for the switch's starting state. */
+  clipLoops(): boolean
 }
 export interface Built { dispose: () => void; note?: string; rig?: EntityRig }
 
@@ -308,6 +319,8 @@ export async function buildEntity(host: HTMLElement, modelFile: string, base: st
   let active: Clip | null = null
   let elapsed = 0
   let speed = 1
+  let paused = false
+  let loopOverride: boolean | null = null
   const bones = new Map<string, { node: any; rest: Vec3 }>()
   const clips: Clip[] = (model.animations ?? []).map((a: any) => ({
     name: a.name, loop: a.loop ?? 'once', length: a.length ?? 0,
@@ -321,11 +334,10 @@ export async function buildEntity(host: HTMLElement, modelFile: string, base: st
     )
   }))
 
-  const stage = await createStage(host, (dt) => {
-    if (!active) return
-    elapsed += dt * speed
-    const t = clipTime(elapsed, active.length, active.loop)
-    for (const tr of active.tracks) {
+  const modeOf = (c: Clip) => (loopOverride == null ? c.loop : loopOverride ? 'loop' : 'once')
+  const pose = (c: Clip) => {
+    const t = clipTime(elapsed, c.length, modeOf(c))
+    for (const tr of c.tracks) {
       const b = bones.get(tr.bone)
       if (!b) continue
       const v = sample(tr.keys, t)
@@ -335,6 +347,11 @@ export async function buildEntity(host: HTMLElement, modelFile: string, base: st
         b.node.position.set(b.rest[0] + p[0], b.rest[1] + p[1], b.rest[2] + p[2])
       } else b.node.scale.set(...v)
     }
+  }
+  const stage = await createStage(host, (dt) => {
+    if (!active) return
+    if (!paused) elapsed += dt * speed
+    pose(active)
   })
   const { T, scene } = stage
 
@@ -350,7 +367,17 @@ export async function buildEntity(host: HTMLElement, modelFile: string, base: st
       active = clips.find((c) => c.name === name) ?? null
       if (!active) for (const b of bones.values()) { b.node.rotation.set(0, 0, 0); b.node.position.set(...b.rest); b.node.scale.set(1, 1, 1) }
     },
-    setSpeed(s) { speed = s }
+    setSpeed(s) { speed = s },
+    setPaused(p) { paused = p },
+    setLoop(l) {
+      // Switching a finished play back to looping must not jump: wrap the clock into the clip first.
+      if (active && l && !(loopOverride ?? active.loop === 'loop')) elapsed = clipTime(elapsed, active.length, 'once')
+      loopOverride = l
+    },
+    length() { return active?.length ?? 0 },
+    time() { return active ? clipTime(elapsed, active.length, modeOf(active)) : 0 },
+    seek(sec) { if (active) { elapsed = Math.max(0, sec); pose(active) } },
+    clipLoops() { return active ? modeOf(active) === 'loop' : false }
   }
   return { dispose: stage.dispose, rig }
 }
