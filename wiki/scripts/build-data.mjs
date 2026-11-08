@@ -243,13 +243,13 @@ writePage('game/items/index.md', '# Items\n\n<ItemGrid kind="items" />\n')
 for (const e of Object.values(entities)) {
   const drops = e.loot && loot[e.loot]?.length ? `<DropList table="${e.loot}" />` : null
   // A boss is summoned, never found: name the item that wakes it, whose page carries the recipe
-  const summoners = Object.values(items).filter((i) => i.summons === e.id).map((i) => ref('item/' + i.id))
+  const summoners = Object.values(items).filter((i) => i.summons === e.id).map((i) => 'item/' + i.id)
   writePage(`game/mobs/${e.id}.md`,
     `---\ntitle: ${JSON.stringify(e.name)}\n---\n\n# ${esc(e.name)}\n\n` +
     (e.boss ? '::: warning Boss\nA boss is never found wandering: it has to be summoned.\n:::\n\n' : '') +
     `<ModelViewer kind="entity" id="${e.id}" />\n\n` +
     `| Property | Value |\n|---|---|\n${e.hp != null ? `| Health | ${e.hp} |\n` : ''}${e.clips.length ? `| Animations | ${e.clips.join(', ')} |\n` : ''}` +
-    (summoners.length ? `\n## Summoned with\n\n${summoners.join(', ')}\n` : '') +
+    (summoners.length ? `\n## Summoned with\n\n<SlotList targets='${JSON.stringify(summoners)}' />\n` : '') +
     (drops ? `\n## Drops\n\n${drops}\n` : ''))
 }
 writePage('game/mobs/index.md', '# Mobs\n\n<MobGrid />\n')

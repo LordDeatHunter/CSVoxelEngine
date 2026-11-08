@@ -6,6 +6,7 @@ import StructureViewer from './StructureViewer.vue'
 import RecipeCard from './RecipeCard.vue'
 import RecipeList from './RecipeList.vue'
 import DropList from './DropList.vue'
+import SlotList from './SlotList.vue'
 import ItemGrid from './ItemGrid.vue'
 import MobGrid from './MobGrid.vue'
 import ShotGallery from './ShotGallery.vue'
@@ -19,6 +20,7 @@ export default {
     app.component('RecipeCard', RecipeCard)
     app.component('RecipeList', RecipeList)
     app.component('DropList', DropList)
+    app.component('SlotList', SlotList)
     app.component('ItemGrid', ItemGrid)
     app.component('MobGrid', MobGrid)
     app.component('ShotGallery', ShotGallery)
