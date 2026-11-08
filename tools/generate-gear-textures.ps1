@@ -1,6 +1,7 @@
 # Deterministic placeholder sprites of the first gear (assets/textures/items/<name>.png, 16x16): a leather, a bronze
 # and an iron armor set (cap, tunic, pants, boots, gloves), the cloud boots (the iron boots in a pale cloud palette
-# with two wing puffs) and the accessories (ring, charms, amulet, belt). Plain
+# with two wing puffs) and the accessories (ring, charms, amulet, belt), including the loot-only ability charms
+# (feather, gill, frost, fire, magnet: one gold pendant with a glyph each). Plain
 # filled rectangles in a material's three tones, so a re-run is byte-identical; replace with real art any time,
 # the item JSON only names the files. Run: pwsh tools/generate-gear-textures.ps1
 Add-Type -AssemblyName System.Drawing
@@ -18,6 +19,9 @@ $materials = @{
     ember   = @{ Dark = (Tone 110, 20, 10); Mid = (Tone 220, 70, 30); Light = (Tone 255, 170, 100) }
     gold    = @{ Dark = (Tone 120, 84, 12); Mid = (Tone 224, 176, 40); Light = (Tone 255, 230, 120) }
     cloud   = @{ Dark = (Tone 96, 120, 150); Mid = (Tone 214, 226, 240); Light = (Tone 250, 252, 255) }
+    aqua    = @{ Dark = (Tone 16, 78, 70);  Mid = (Tone 40, 160, 140); Light = (Tone 140, 230, 200) }
+    frost   = @{ Dark = (Tone 90, 140, 170); Mid = (Tone 170, 214, 236); Light = (Tone 236, 250, 255) }
+    magnet  = @{ Dark = (Tone 100, 16, 20); Mid = (Tone 200, 40, 44); Light = (Tone 250, 120, 110) }
 }
 
 function New-Sprite([string]$name, [scriptblock]$draw) {
@@ -85,6 +89,45 @@ New-Sprite 'ember_charm' {
     Block 4 6 8 8 $g
     Block 6 8 4 4 $e
 }
+
+# The AC-4 ability charms: the same cord and gold pendant, each with its own glyph inset
+function Pendant {
+    $g = $materials.gold
+    Rect 5 1 1 5 $g.Dark; Rect 10 1 1 5 $g.Dark; Rect 6 5 4 1 $g.Dark
+    Block 4 6 8 8 $g
+}
+New-Sprite 'feather_charm' {
+    $c = $materials.cloud
+    Pendant
+    Px 9 8 $c.Light; Px 8 9 $c.Light; Px 7 10 $c.Light; Px 6 11 $c.Dark; Px 5 12 $c.Dark
+    Px 8 8 $c.Mid; Px 9 9 $c.Mid; Px 7 9 $c.Mid; Px 8 10 $c.Mid; Px 6 10 $c.Mid; Px 7 11 $c.Mid
+}
+New-Sprite 'gill_charm' {
+    $a = $materials.aqua
+    Pendant
+    Block 5 7 6 6 $a
+    Rect 6 9 4 1 $a.Dark; Rect 6 11 4 1 $a.Dark
+}
+New-Sprite 'frost_charm' {
+    $f = $materials.frost
+    Pendant
+    Rect 7 7 2 6 $f.Mid; Rect 5 9 6 2 $f.Mid
+    Rect 7 9 2 2 $f.Light
+    Px 5 7 $f.Dark; Px 10 7 $f.Dark; Px 5 12 $f.Dark; Px 10 12 $f.Dark
+}
+New-Sprite 'fire_charm' {
+    $e = $materials.ember
+    Pendant
+    Px 7 7 $e.Mid; Rect 7 8 2 1 $e.Mid; Rect 6 9 4 2 $e.Mid; Rect 5 11 6 2 $e.Dark
+    Px 7 9 $e.Light; Rect 7 10 2 2 $e.Light
+}
+New-Sprite 'magnet_charm' {
+    $r = $materials.magnet; $i = $materials.iron
+    Pendant
+    Rect 5 8 2 4 $r.Mid; Rect 9 8 2 4 $r.Mid; Rect 5 11 6 2 $r.Dark; Rect 7 11 2 1 $r.Mid
+    Rect 5 7 2 1 $i.Light; Rect 9 7 2 1 $i.Light
+}
+
 New-Sprite 'miners_belt' {
     $l = $materials.leather; $g = $materials.gold
     Block 1 5 14 6 $l

@@ -18,6 +18,8 @@
       "entries": [
         { "item": "item/amulet_of_vigor", "weight": 3, "rarity": { "min": "rare", "max": "legendary" } },
         { "item": "item/ember_charm", "weight": 2, "rarity": { "min": "rare", "max": "legendary" } },
+        { "item": "item/feather_charm", "weight": 2, "rarity": { "min": "rare", "max": "legendary" } },
+        { "item": "item/frost_charm", "weight": 2, "rarity": { "min": "rare", "max": "legendary" } },
         { "item": "item/copper_ring", "weight": 2, "rarity": { "min": "rare", "max": "legendary" } },
         { "item": "item/tin_charm", "weight": 2, "rarity": { "min": "rare", "max": "legendary" } },
         { "item": "item/bronze_tunic", "rarity": { "min": "rare", "max": "legendary" } },

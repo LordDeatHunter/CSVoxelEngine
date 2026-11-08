@@ -5,6 +5,13 @@
       "entries": [
         { "item": "item/ember_shard", "weight": 1, "count": { "min": 1, "max": 3 } }
       ]
+    },
+    {
+      "rolls": 1,
+      "chance": 0.04,
+      "entries": [
+        { "item": "item/fire_charm", "weight": 1, "count": 1 }
+      ]
     }
   ]
 }

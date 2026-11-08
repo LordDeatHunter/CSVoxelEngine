@@ -12,6 +12,13 @@
       "entries": [
         { "item": "item/coal", "weight": 1, "count": { "min": 1, "max": 2 } }
       ]
+    },
+    {
+      "rolls": 1,
+      "chance": 0.03,
+      "entries": [
+        { "item": "item/fire_charm", "weight": 1, "count": 1 }
+      ]
     }
   ]
 }

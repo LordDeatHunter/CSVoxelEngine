@@ -117,6 +117,42 @@ public sealed class GearRulesTests
     }
 
     [Fact]
+    public void TheFireAndFrostCharmsEachBlockOnlyTheirOwnEffect()
+    {
+        var bare = new PlayerHealth();
+        Assert.True(StatusEffects.Apply(bare, false, "burning"));
+        Assert.True(StatusEffects.Apply(bare, false, "frostburn"));
+
+        var fireward = Wearing("fire_charm");
+        Assert.False(StatusEffects.Apply(fireward, false, "burning"));
+        Assert.True(StatusEffects.Apply(fireward, false, "frostburn"));
+
+        var frostward = Wearing("frost_charm");
+        Assert.False(StatusEffects.Apply(frostward, false, "frostburn"));
+        Assert.True(StatusEffects.Apply(frostward, false, "burning"));
+    }
+
+    [Fact]
+    public void TheFeatherCharmNegatesFallDamageButNoOtherBlow()
+    {
+        var drop = 1f;
+        while (PlayerHealth.FallDamage(drop) <= 0) drop += 1f;
+        var damage = PlayerHealth.FallDamage(drop);
+
+        var bare = new PlayerHealth();
+        bare.TakeDamage(damage, DamageSource.Fall);
+        Assert.True(bare.Health < bare.Max);
+
+        var feathered = Wearing("feather_charm");
+        Assert.True(feathered.NegatesFallDamage);
+        feathered.TakeDamage(damage, DamageSource.Fall);
+        Assert.Equal(feathered.Max, feathered.Health);
+
+        feathered.TakeDamage(damage, DamageSource.Lava);
+        Assert.True(feathered.Health < feathered.Max);
+    }
+
+    [Fact]
     public void AnOnHitPassiveFiresByItsChanceOnTheStruckMob()
     {
         var wearer = Wearing("ember_charm");

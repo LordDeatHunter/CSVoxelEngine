@@ -2,9 +2,10 @@
 > Guide: plans/README.md
 
 ## Status
-AC-1, AC-2 and AC-3 done (ability flags `equip.abilities` cached on `Equipment.Abilities`, the `undeadDamage` stat and
+AC-1..AC-4 done (ability flags `equip.abilities` cached on `Equipment.Abilities`, the `undeadDamage` stat and
 `Mob.IsUndead`; sets count head, chest and legs only; the cloud boots' air jump, with the server's airtime rise budget in
-`MovementRules.AirRiseBudget`); the rest is designed, nothing else built yet. Tracks accessory abilities (cloud boots, charms), the metal ring ladder and the set-bonus rule
+`MovementRules.AirRiseBudget`; five loot-only ability charms, with the no-fall, extra-air and magnet consumers wired); the rest
+is designed, nothing else built yet. Tracks accessory abilities (cloud boots, charms), the metal ring ladder and the set-bonus rule
 change, on top of the gear core in `INVENTORY.md` (`I-1`, `I-2`). First of three efforts, in order: accessories (`AC-*`), the
 battle tower (`BATTLE_TOWER.md`), cave biomes (`CAVE_BIOMES.md`). One phase per prompt; each leaves the game building and the
 tests green. Last updated 2026-11-08.
@@ -13,12 +14,6 @@ tests green. Last updated 2026-11-08.
 Nothing.
 
 ## Open
-- [ ] **`AC-4` Ability charms** - P1, M.
-  Loot-only, never crafted: feather (fall damage fully negated; `FallTracker` consumers `LocalPlayer.UpdateHealth`,
-  `ServerPlayer.TickStatus`), gill (about double `PlayerConfig.AirSeconds`; `PlayerHealth.UpdateBreath`), frost and fire charms
-  (`equip.immune` frostburn and burning; the ember charm stays the on-hit variant), magnet (about 3x pickup radius through
-  `DropCollector` in `DropPickup`/`DropManager`). Drops mix ruin chest tables by realm with rare mob and boss drops (sandworm fang,
-  hell and sky mobs); the exact table per charm is open. Sprites via `tools/generate-gear-textures.ps1` (small palettes).
 - [ ] **`AC-5` Metal ring ladder** - P2, S.
   Full-metal rings are armor only, crafted from ingots: tin +1, copper +1, bronze +2, iron +2. **Hook:** `assets/data/items`,
   `assets/data/recipes`.
@@ -46,5 +41,23 @@ Nothing.
   Accepted gaps: a non-wearer may hop once after walking off a ledge (height-based budget); a hop within one sample step of the
   ground counts as a landing; a client that double jumps before the server applied its equip intent is corrected once; iceberg
   mirror lag can still mis-judge a rider's bunny hop.
-- Still open: which realm or mob drops which charm, whether the wiki lists them.
+- AC-4 decisions (2026-11-08): all five are rare accessories with no armor or stats, loot-only (no recipe):
+  - Feather Charm (`feather_charm`, `no_fall_damage`): `ruin_sky` gear pool (weight 2, rare..legendary), `galeraptor` (own
+    pool, chance 0.04).
+  - Gill Charm (`gill_charm`, `extra_air`, the lung `GearConfig.ExtraAirFactor` = 2x): `ruin_surface` gear pool (weight 1,
+    common..uncommon), `ruin_underground` gear pool (weight 2, uncommon..rare).
+  - Frostward Charm (`frost_charm`, immune to frostburn): `ruin_sky` gear pool (weight 2, rare..legendary), `cloudgolem` (own
+    pool, chance 0.06).
+  - Fireward Charm (`fire_charm`, immune to burning; the ember charm stays the on-hit variant): `ruin_hell` gear pool (weight 2,
+    rare..epic), `cinderwitch` (own pool, chance 0.04), `hellbrute` (own pool, chance 0.03).
+  - Lodestone Charm (`magnet_charm`, `magnet`, `GearConfig.MagnetRangeFactor` = 3x `DropManager.PickupRange`):
+    `ruin_underground` gear pool (weight 2, uncommon..rare), `sandworm` (own pool, chance 0.25).
+  - Consumers: `PlayerHealth.TakeDamage` skips a `Fall` blow while `NegatesFallDamage`, and the server's
+    `ObserveAcceptedState` reads `Inventory.Equipment.Has` before billing; `Breath.MaxAir` follows `ApplyGear` (a full lung stays
+    full, otherwise the seconds left are kept, so swapping the charm under water adds no air; the 0..40 wire step stays a share of
+    the receiver's lung, protocol 24); `DropCollector.Range` per collector, and the nearest collector whose own range holds a drop
+    wins over a nearer one out of its range.
+  - Accepted gaps: a magnet-latched drop is pulled through walls like any attracted drop; a charm from a mob table is an unrolled
+    instance (no rarity roll); a client's bubble row can lag an equip by one status.
+- Still open: whether the wiki lists the charms.
 - `I-3` (visible accessories on the model) and `I-6` (slots that grow) stay in `INVENTORY.md`.

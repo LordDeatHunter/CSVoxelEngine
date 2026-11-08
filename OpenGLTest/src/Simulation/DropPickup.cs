@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
+using VoxelEngine.Items;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
@@ -67,6 +68,11 @@ internal sealed class DropPickup
         return Inventory.SelectedIndex;
     }
 
+    /// <summary>How far a player wearing <paramref name="equipment"/> attracts drops from: wider with the magnet ability.</summary>
+    private static float RangeFor(Equipment equipment) => equipment.Has(GearAbility.Magnet)
+        ? DropManager.PickupRange * GearConfig.MagnetRangeFactor
+        : DropManager.PickupRange;
+
     /// <summary>Runs this tick's drop pickup: gathers the collectors, updates the drops and credits what they collected.</summary>
     internal void Update(double deltaTime)
     {
@@ -80,11 +86,12 @@ internal sealed class DropPickup
         {
             var players = ServerPlayers;
             foreach (var serverPlayer in players)
-                _dropCollectors.Add(new DropCollector(serverPlayer.Position, serverPlayer.CanAcceptDrop));
+                _dropCollectors.Add(new DropCollector(serverPlayer.Position, serverPlayer.CanAcceptDrop,
+                    RangeFor(serverPlayer.Inventory.Equipment)));
         }
         else
         {
-            _dropCollectors.Add(new DropCollector(Camera.Position, _canAcceptDrop));
+            _dropCollectors.Add(new DropCollector(Camera.Position, _canAcceptDrop, RangeFor(Inventory.Equipment)));
         }
 
         // A client's goblins are mirrors whose ammo is the server's (EntityList): never scavenge

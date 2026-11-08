@@ -41,6 +41,10 @@ public sealed class PlayerHealth
     /// <summary>Whether worn gear makes this player immune to the named status effect.</summary>
     public bool IsImmuneToEffect(string effectName) => Gear?.IsImmuneTo(effectName) == true;
 
+    /// <summary>Whether worn gear (the feather charm's no_fall_damage ability) negates fall damage: a
+    /// <see cref="DamageSource.Fall"/> blow then does nothing.</summary>
+    public bool NegatesFallDamage => Gear?.Has(GearAbility.NoFallDamage) == true;
+
     /// <summary>Mob blows taken so far (after armor, above 0), a counter the mob director reads to know when to fire
     /// the wearer's on-damaged passives.</summary>
     public int MobBlows { get; private set; }
@@ -70,12 +74,16 @@ public sealed class PlayerHealth
 
     /// <summary>
     /// Applies what worn gear changes: the health bonus, and (only where this pool is simulated, never on a
-    /// client that mirrors its server's mana) the mana bonus and regeneration. Armor, immunities and passives follow
+    /// client that mirrors its server's mana) the mana bonus and regeneration, and the lung's capacity (the extra_air
+    /// ability, <see cref="GearConfig.ExtraAirFactor"/>). Armor, immunities, passives and the fall negation follow
     /// <paramref name="equipment"/> from here on.
     /// </summary>
     public void ApplyGear(Equipment equipment, bool simulatesMana)
     {
         Gear = equipment;
+        Breath.SetMaxAir(equipment.Has(GearAbility.ExtraAir)
+            ? PlayerConfig.AirSeconds * GearConfig.ExtraAirFactor
+            : PlayerConfig.AirSeconds);
         var stats = equipment.Stats;
         SetMaxBonus(stats.MaxHealth);
         if (simulatesMana)
@@ -190,6 +198,8 @@ public sealed class PlayerHealth
     /// message can say it, and worn armor reduces it (<see cref="ArmorRules"/>; the source-less overload is raw).</summary>
     public void TakeDamage(int amount, DamageSource source, string? killer = null)
     {
+        if (source == DamageSource.Fall && NegatesFallDamage)
+            return;
         // Worn armor takes points off the blow, down to its source's minimum (see ArmorRules)
         amount = ArmorRules.Reduce(amount, Armor, source);
         if (amount <= 0)

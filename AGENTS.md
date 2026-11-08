@@ -348,7 +348,10 @@ near the wearer from `MobDirector.FireWearerPassives`, authoritative side only. 
 (`Inventory.AddRolledGear`), crafted gear never; a piece's rarity is its roll's or its item's. Sets are
 `assets/data/sets/<name>.json` (`GearSetLoader`), bonuses by piece count summed in `GearStatsCalculator`. The
 `undeadDamage` stat is a fraction applied in `MobStrikes.StrikeMob` through `Combat.VersusUndead` to a mob whose
-`IsUndead` is true (none yet), never rolled by `GearRoller`. The tooltip colors its title by rarity and shows rolled
+`IsUndead` is true (none yet), never rolled by `GearRoller`. The `equip.abilities` consumers read the cached
+`Equipment.Has`: `no_fall_damage` skips fall billing in `PlayerHealth.TakeDamage` and the server's `ObserveAcceptedState`,
+`extra_air` widens `Breath.MaxAir` through `ApplyGear`, `magnet` widens `DropCollector.Range` in `DropPickup` (the AC-4
+charms, loot-only: ruin chests and rare mob drops, plans/ACCESSORIES.md). The tooltip colors its title by rarity and shows rolled
 lines, set progress and abilities. `GearRulesTests`.
 
 **Chests (I-4).** A block with a `chest` object (`slots`, optional `loot`; `BlockType.Chest`) is a chest block entity kept by

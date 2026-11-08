@@ -16,6 +16,7 @@
       "rolls": 1,
       "entries": [
         { "item": "item/ember_charm", "weight": 3, "rarity": { "min": "rare", "max": "epic" } },
+        { "item": "item/fire_charm", "weight": 2, "rarity": { "min": "rare", "max": "epic" } },
         { "item": "item/amulet_of_vigor", "weight": 2, "rarity": { "min": "rare", "max": "epic" } },
         { "item": "item/bronze_cap", "rarity": { "min": "rare", "max": "epic" } },
         { "item": "item/bronze_tunic", "rarity": { "min": "rare", "max": "epic" } },

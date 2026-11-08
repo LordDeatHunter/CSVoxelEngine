@@ -1,0 +1,8 @@
+{
+  // Fireward Charm: a loot-only accessory (never crafted; ruin chests and mob drops, see plans/ACCESSORIES.md) that makes its wearer immune to burning (equip.immune; the ember charm is the on-hit variant).
+  // Placeholder sprite from tools/generate-gear-textures.ps1.
+  "name": "Fireward Charm",
+  "texture": "assets/textures/items/fire_charm.png",
+  "rarity": "rare",
+  "equip": { "slot": "accessory", "immune": ["burning"] }
+}

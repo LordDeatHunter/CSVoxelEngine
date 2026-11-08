@@ -1,0 +1,8 @@
+{
+  // Gill Charm: a loot-only accessory (never crafted; ruin chests and mob drops, see plans/ACCESSORIES.md) that widens the lung to hold more air under water (the extra_air ability).
+  // Placeholder sprite from tools/generate-gear-textures.ps1.
+  "name": "Gill Charm",
+  "texture": "assets/textures/items/gill_charm.png",
+  "rarity": "rare",
+  "equip": { "slot": "accessory", "abilities": ["extra_air"] }
+}

@@ -309,7 +309,9 @@ public sealed class ServerPlayer : IMobTarget
         var fall = _fall.Observe(feet, grounded, Flying, inWater, Creative,
             NetValidation.AllowedDistance(stateGapSeconds, NetworkConfig.NetMaxMoveBlocksPerSecond),
             cushioned: PlayerBodyProbe.LandingCushioned(Position, chunks));
-        if (fall > 0)
+        // Worn no_fall_damage gear (the feather charm) negates the blow; read from the inventory itself, so it holds
+        // even before the first status tick applied the gear, and a negated fall never dirties the status
+        if (fall > 0 && !Inventory.Equipment.Has(GearAbility.NoFallDamage))
         {
             Status.TakeDamage(fall, DamageSource.Fall);
             StatusDirty = true;

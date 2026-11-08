@@ -487,6 +487,7 @@ internal sealed class LocalPlayer
         // feet cushioned the landing: it still counts as a landing, but bills no damage
         var damage = _fall.Observe(feet, Camera.IsGrounded, Camera.IsFlying, Camera.IsInWater, Camera.IsCreative,
             FallTracker.DefaultMaxStepBlocks, cushioned: PlayerBodyProbe.LandingCushioned(Camera.Position, chunkManager));
+        // Worn no_fall_damage gear negates the blow inside PlayerHealth.TakeDamage; the landing still counts
         if (damage > 0)
             _health.TakeDamage(damage, DamageSource.Fall);
 

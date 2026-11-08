@@ -42,4 +42,10 @@ public static class GearConfig
 
     /// <summary>Minimum damage a blow keeps through armor when its source names no value of its own.</summary>
     public const int UniversalMinDamage = 1;
+
+    /// <summary>How many times a full lung the extra_air ability holds (the gill charm).</summary>
+    public const float ExtraAirFactor = 2f;
+
+    /// <summary>How many times <c>DropManager.PickupRange</c> the magnet ability attracts drops from (the lodestone charm).</summary>
+    public const float MagnetRangeFactor = 3f;
 }

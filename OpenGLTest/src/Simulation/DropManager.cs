@@ -193,10 +193,11 @@ public class DropManager
     /// <summary>
     /// Advances the drops, collecting what reaches the player. A drop whose id
     /// <paramref name="canCollect"/> refuses is never attracted and stays on the ground,
-    /// so a full inventory pool ignores pickups instead of sucking them up.
+    /// so a full inventory pool ignores pickups instead of sucking them up. A drop is attracted once within
+    /// <paramref name="range"/> (<see cref="PickupRange"/> by default).
     /// </summary>
     public void Update(float deltaTime, Vector3 playerPosition, ChunkManager chunks,
-        Func<byte, bool>? canCollect = null)
+        Func<byte, bool>? canCollect = null, float range = PickupRange)
     {
         _collected.Clear();
         _collectedBy.Clear();
@@ -205,7 +206,7 @@ public class DropManager
         if (_drops.Count == 0) return;
 
         var target = playerPosition - Vector3.UnitY * CollectHeightOffset;
-        var rangeSquared = PickupRange * PickupRange;
+        var rangeSquared = range * range;
 
         // Back to front so removing a collected drop doesn't skip the next one
         for (var i = _drops.Count - 1; i >= 0; i--)
@@ -230,7 +231,9 @@ public class DropManager
 
     /// <summary>
     /// The multiplayer server's pickup: every drop flies to the nearest collector whose pool has
-    /// room for it (attracted once within <see cref="PickupRange"/>, as in single player), and a
+    /// room for it (attracted once within that collector's <see cref="DropCollector.Range"/>, by default
+    /// <see cref="PickupRange"/>; a nearer collector whose own range does not hold the drop never keeps it from one
+    /// whose range does), and a
     /// collected drop is reported in <see cref="Collected"/> with its collector's index in
     /// <see cref="CollectedBy"/>, so each player's own inventory is credited. A drop whose chunk is
     /// not loaded is left untouched (neither collected nor simulated, so it cannot fall through the
@@ -245,7 +248,6 @@ public class DropManager
         _blockedCollectors.Clear();
         if (_drops.Count == 0) return;
 
-        var rangeSquared = PickupRange * PickupRange;
         var lift = Vector3.UnitY * CollectHeightOffset;
 
         // Back to front so removing a collected drop doesn't skip the next one
@@ -255,14 +257,20 @@ public class DropManager
             var (cx, cy, cz) = drop.Position.BlockCell();
             if (chunks.ChunkAt(cx, cy, cz) == null) continue;
 
+            // The nearest wanting collector whose own range holds the drop wins; failing that, the nearest wanting
+            // one overall, toward which the drop only simulates (or keeps flying, once latched)
             var nearest = -1;
             var nearestSquared = float.MaxValue;
             var target = Vector3.Zero;
+            var inRangeIndex = -1;
+            var inRangeSquared = float.MaxValue;
+            var inRangeTarget = Vector3.Zero;
             for (var c = 0; c < collectors.Count; c++)
             {
                 var collector = collectors[c];
                 var aim = collector.Eye - lift;
                 var distanceSquared = Vector3.DistanceSquared(drop.Position, aim);
+                var rangeSquared = collector.Range * collector.Range;
                 // A collector within reach that refuses the drop is a blocked pool (see
                 // BlockedCollectors), and is not a candidate to fly it in
                 if (!(collector.CanCollect?.Invoke(drop.BlockId) ?? true))
@@ -270,6 +278,12 @@ public class DropManager
                     if (distanceSquared <= rangeSquared && !_blockedCollectors.Contains(c))
                         _blockedCollectors.Add(c);
                     continue;
+                }
+                if (distanceSquared <= rangeSquared && distanceSquared < inRangeSquared)
+                {
+                    inRangeIndex = c;
+                    inRangeSquared = distanceSquared;
+                    inRangeTarget = aim;
                 }
                 if (distanceSquared >= nearestSquared) continue;
                 nearest = c;
@@ -284,7 +298,13 @@ public class DropManager
                 continue;
             }
 
-            if (!drop.Update(deltaTime, target, nearestSquared <= rangeSquared, chunks)) continue;
+            var inRange = inRangeIndex >= 0;
+            if (inRange)
+            {
+                nearest = inRangeIndex;
+                target = inRangeTarget;
+            }
+            if (!drop.Update(deltaTime, target, inRange, chunks)) continue;
 
             _collected.Add(drop.BlockId);
             _collectedAt.Add(drop.Position);
