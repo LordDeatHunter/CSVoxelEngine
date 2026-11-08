@@ -37,10 +37,12 @@ Nothing.
   **The altar sits on an open roof** (a player can pillar up the outside), so the ritual must be refused until
   `TowerManager` (BT-4) reports every floor of that tower cleared. The altar cell is `TowerSite.AltarCell`.
 - [ ] **`BT-7` · Boss loot and unique items** — P2, L.
-  Exactly one guaranteed unique per boss, rolled from a pool, plus ingots and goodies from a boss table. The pool:
-  a **weapon** whose kills of non-undead enemies burst into bone fragments dealing small damage to nearby enemies; an
-  **accessory** with a very slight mana regen boost and +10% damage against undead (gear modifiers plus a new
-  stat or passive, see `INVENTORY.md`); a **staff or spell scroll** teaching a new part. No armor for now.
+  Exactly one guaranteed unique per boss, rolled from a pool, plus ingots and goodies from a boss table. Two of the
+  pool's uniques are shipped (crafted for now; the boss table is what is left): the **Bone-Breaker Blade**, a sword that
+  sprays bone fragments on every landed hit (`shrapnel`, stronger than the plan's old "kills burst" idea, which the user
+  changed to on-hit), and the **Bone Charm**, the accessory the plan asked for — very slight mana regen, +10 % against
+  undead and the same burst on any weapon, which also sharpens the blade's (`bone_shrapnel`). Still open: a **staff or
+  spell scroll** teaching a new part. No armor for now.
 - [ ] **`BT-8` · Collapse into a ruin** — P2, L.
   After the boss dies, a staged collapse (top floors first) replaces the tower with rubble and ruin blocks placed
   around where it stood, through a capped-per-frame writer like `StatusEffectBlockWriter` that calls every edit-path
@@ -60,11 +62,12 @@ Nothing.
 
 ## Reference
 
-- **Content id budget (budget constraint, after BT-3, which used 2: the `arrow` and `bone` items): 238 of 255 used
-  (130 blocks, 107 items, air), 17 free.** Rough needs of the later phases: BT-4 skeleton pile and barrier door blocks (2, 3 if
+- **Content id budget (budget constraint, after BT-3, which used 2: the `arrow` and `bone` items, and BT-7's bone pair,
+  which used 2: `bone_breaker_blade`, `bone_charm`): 240 of 255 used (130 blocks, 109 items, air), 15 free.** Rough needs
+  of the later phases: BT-4 skeleton pile and barrier door blocks (2, 3 if
   the door is two cells); BT-5 tower chest block(s) (1 if the loot keys on the floor through the cell or state, up to
-  4 with one per tier); BT-6 altar block (1); BT-7 three uniques plus a boss material (~3-4 items; the bone fragment
-  should reuse `bone`); BT-8 rubble or ruin block(s) (1-2). About 10-14 in total: the tower fits, but leaves little for `CAVE_BIOMES.md`.
+  4 with one per tier); BT-6 altar block (1); BT-7 one more unique plus a boss material (~2-3 items; the bone fragments
+  reuse `bone`); BT-8 rubble or ruin block(s) (1-2). About 10-14 in total: the tower fits, but leaves little for `CAVE_BIOMES.md`.
   Prefer one chest block and reuse existing ruin blocks for the rubble.
 - **How `unbreakable` is enforced** (BT-1): load rules (`BlockFieldRules.ValidateUnbreakable` refuses fluid, falls,
   needsSupport, replaceableByPlacement, flammable, meltsTo, the tree-wood and multiblock renderers, upperHalf and
@@ -129,6 +132,14 @@ Nothing.
     `TowerDifficulty.Clamp`; the attack count's parity names the clip (melee even, shot odd).
   - **Known gaps**: arrows are not on the wire, skeletons are not drawn in the water mirror.
 
+- **Bone shrapnel (BT-7's first two uniques)**, 2 content ids (`bone_breaker_blade`, `bone_charm`); see AGENTS.md
+  "Bone shrapnel". The blade carries `shrapnel: { count: 6, damage: 3 }`; the charm grants `bone_shrapnel`
+  (`ShrapnelConfig.Charm*`, weaker) and sharpens the blade's by `ShrapnelConfig.TogetherFactor` (~20 %). Fragments reuse
+  the `bone` item and fly as ordinary `ThrownProjectile`s, so the draw and the water mirror needed nothing new. The
+  effect runs on the authoritative side only, so another player's client sees the damage but not the fragments (the
+  existing projectile gap, `M-12`); both items are crafted until the boss table exists (an `iron_sword` and bones; bones
+  and vines).
+
 Decisions made while planning (2026-11-08):
 
 - **Hybrid generation**, because templates cap at 17x17x24 and the shell is far bigger; the shell stays a pure
@@ -142,7 +153,7 @@ Decisions made while planning (2026-11-08):
 - **Palette swap only** per biome; the same skeleton, boss and layout everywhere.
 - **Full scope from the start**: server-authoritative, saved, networked.
 - **Order of the three efforts** (2026-11-08): accessories (done) first, this plan second, cave biomes
-  (`CAVE_BIOMES.md`) third. `BT-7`'s accessory (slight mana regen, +10% damage against undead) needs the `undeadDamage` gear stat, which the
-  accessories added.
+  (`CAVE_BIOMES.md`) third. `BT-7`'s accessory (slight mana regen, +10% damage against undead) needed the `undeadDamage` gear stat, which the
+  accessories added; it is now the shipped `bone_charm`.
 - Tuning left open: the stair and door layout at radius 20+, the floor height rhythm, bone-burst and accessory
   numbers, skeleton variants per tier and pile wave sizes. These are first guesses to retune after a play-test.

@@ -58,7 +58,8 @@ public static class ItemFactory
         IReadOnlyList<string>? Teaches = null,
         float RestoresMana = 0f,
         Rarity Rarity = Rarity.Common,
-        GearInfo? Equip = null);
+        GearInfo? Equip = null,
+        ShrapnelProfile? Shrapnel = null);
 
     /// <summary>
     /// Per-item code classes by file name. The factory consults these before the action mapping,

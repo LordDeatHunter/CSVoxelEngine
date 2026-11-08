@@ -160,6 +160,9 @@ public class World
     /// <summary>What a landed hit does to a mob: damage, shove, sparks and the floating number.</summary>
     internal MobStrikes Strikes { get; }
 
+    /// <summary>The bone fragments a landed hit sprays (the bone-breaker blade's own and the bone charm's).</summary>
+    internal BoneShrapnel Shrapnel { get; }
+
     /// <summary>The ambient cosmetic effects: steam, lava embers, torch flames, bubbles, splashes, blast shake.</summary>
     internal AmbientEffects Ambient { get; }
 
@@ -485,6 +488,7 @@ public class World
             Camera.BodySolids = _icebergs;
             // The per-job components: each only stores its references here and reads this world lazily
             Strikes = new MobStrikes(this, _debris, serverMode);
+            Shrapnel = new BoneShrapnel(this, _chunkManager, _debris, serverMode);
             Ambient = new AmbientEffects(this, _chunkManager, _fire, _torchFire, _bubbles, _debris, _dropManager,
                 _falling, _tntManager, _mobs, _projectiles, serverMode, _campfires, _kilns, _goblins);
             if (!serverMode)
@@ -1120,7 +1124,10 @@ public class World
 
         Edits.UpdateToppling((float)deltaTime);
         Throws.UpdateThrown((float)deltaTime);
+        // The hit's fragments fly and bill what they touch before the draw list is rebuilt below
+        Shrapnel.Update((float)deltaTime);
         Throws.RefreshProjectiles();
+        Shrapnel.AppendTo(_projectiles);
         Spells?.Update((float)deltaTime);
         Ambient.UpdateSplashes((float)deltaTime);
         // Remote player poses ease toward the last broadcast and drive their own walk cycles.

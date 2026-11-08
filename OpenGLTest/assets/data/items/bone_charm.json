@@ -1,0 +1,14 @@
+{
+  // Bone Charm: the battle tower's bone accessory (plans/BATTLE_TOWER.md BT-7). Its bone_shrapnel
+  // ability sprays a weaker burst than the Bone-Breaker Blade's on any landed hit, and wearing it with
+  // that blade raises the blade's burst. Also its slight mana regen and undead bonus. Sprite from
+  // tools/generate-bone-items.py.
+  "name": "Bone Charm",
+  "texture": "assets/textures/items/bone_charm.png",
+  "rarity": "rare",
+  "equip": {
+    "slot": "accessory",
+    "modifiers": { "manaRegen": 0.1, "undeadDamage": 0.1 },
+    "abilities": ["bone_shrapnel"]
+  }
+}

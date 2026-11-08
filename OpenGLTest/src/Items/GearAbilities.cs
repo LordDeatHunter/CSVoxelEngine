@@ -7,7 +7,8 @@ public static class GearAbilities
 {
     /// <summary>Every single ability flag, in display order.</summary>
     public static readonly GearAbility[] All =
-        [GearAbility.AirJump, GearAbility.NoFallDamage, GearAbility.ExtraAir, GearAbility.Magnet];
+        [GearAbility.AirJump, GearAbility.NoFallDamage, GearAbility.ExtraAir, GearAbility.Magnet,
+            GearAbility.BoneShrapnel];
 
     /// <summary>Parses a JSON ability name (snake_case, case-insensitive, trimmed); false with None when unknown.</summary>
     public static bool TryParse(string? text, out GearAbility ability)
@@ -18,6 +19,7 @@ public static class GearAbilities
             "no_fall_damage" => GearAbility.NoFallDamage,
             "extra_air" => GearAbility.ExtraAir,
             "magnet" => GearAbility.Magnet,
+            "bone_shrapnel" => GearAbility.BoneShrapnel,
             _ => GearAbility.None,
         };
         return ability != GearAbility.None;
@@ -30,6 +32,7 @@ public static class GearAbilities
         GearAbility.NoFallDamage => "no_fall_damage",
         GearAbility.ExtraAir => "extra_air",
         GearAbility.Magnet => "magnet",
+        GearAbility.BoneShrapnel => "bone_shrapnel",
         _ => throw new ArgumentOutOfRangeException(nameof(ability), ability, "Not a single ability flag."),
     };
 
@@ -40,6 +43,7 @@ public static class GearAbilities
         GearAbility.NoFallDamage => "No fall damage",
         GearAbility.ExtraAir => "Longer breath",
         GearAbility.Magnet => "Item magnet",
+        GearAbility.BoneShrapnel => "Bone shrapnel",
         _ => throw new ArgumentOutOfRangeException(nameof(ability), ability, "Not a single ability flag."),
     };
 }

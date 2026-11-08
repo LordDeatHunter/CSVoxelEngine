@@ -221,7 +221,9 @@ internal sealed class LeftClickAction
     {
         if (!IsPlaying) return false;
         if (!TryFindPunchTarget(player.Eye, player.ViewDirection, out var target)) return false;
-        Strikes.StrikeMob(target, Combat.PunchDamage(HeldItem(player.Inventory), GearDamage(player.Inventory)), player.Eye, player.Health);
+        var held = HeldItem(player.Inventory);
+        Strikes.StrikeMob(target, Combat.PunchDamage(held, GearDamage(player.Inventory)), player.Eye, player.Health,
+            shrapnel: ShrapnelFor(held, player.Health));
         return true;
     }
 
@@ -573,6 +575,10 @@ internal sealed class LeftClickAction
     // The damage multiplier of the gear a player wears (1 when nothing changes it)
     private static float GearDamage(Inventory inventory) => inventory.Equipment.Stats.DamageFactor;
 
+    // The bone shrapnel a landed strike with this item sprays for the striker's worn gear
+    private static ShrapnelProfile ShrapnelFor(Item? held, PlayerHealth? striker) =>
+        ShrapnelProfile.Resolve(held, striker?.Gear?.Has(GearAbility.BoneShrapnel) == true);
+
     /// <summary>The item in <paramref name="inventory"/>'s selected slot, or null when it holds nothing.</summary>
     private static Item? HeldItem(Inventory inventory) => inventory.HeldItem;
 
@@ -606,7 +612,8 @@ internal sealed class LeftClickAction
                 Strikes.SpawnHitSparks(target, player.Eye);
             }
             else
-                Strikes.StrikeMob(target, Combat.PunchDamage(held, GearDamage(player.Inventory)), player.Eye, player.Health);
+                Strikes.StrikeMob(target, Combat.PunchDamage(held, GearDamage(player.Inventory)), player.Eye, player.Health,
+                    shrapnel: ShrapnelFor(held, player.Health));
             // The punch connected, so the swing holds at full extension for a beat (cosmetic: the
             // punch timer above keeps the pace). A client only predicts the connect - a mob was in
             // the cone with a clear line when the swing landed - since the server's verdict comes
@@ -758,7 +765,8 @@ internal sealed class LeftClickAction
         }
         else
         {
-            connected = StrikeNearest(player.Eye, player.ViewDirection, damage, maxTargets, cone, shoveSpeed, player.Health) > 0;
+            connected = StrikeNearest(player.Eye, player.ViewDirection, damage, maxTargets, cone, shoveSpeed, player.Health,
+                ShrapnelFor(HeldItem(), player.Health)) > 0;
         }
 
         if (!connected) return;
@@ -775,7 +783,7 @@ internal sealed class LeftClickAction
     private int ApplySliceDamage(Vector3 origin, Vector3 direction, Item? held, bool returnSwing, PlayerHealth? striker,
         float damageFactor = 1f) =>
         StrikeNearest(origin, direction, Combat.SliceDamage(held, returnSwing, damageFactor), Combat.SliceTargets, cone: false,
-            MobConfig.SlimePunchShoveSpeed, striker);
+            MobConfig.SlimePunchShoveSpeed, striker, ShrapnelFor(held, striker));
 
     /// <summary>
     /// Lands one sword swing from <paramref name="origin"/> along <paramref name="direction"/> with
@@ -785,21 +793,23 @@ internal sealed class LeftClickAction
     private int ApplySwordDamage(Vector3 origin, Vector3 direction, Item? held, SwordSwing swing, PlayerHealth? striker,
         float damageFactor = 1f) =>
         StrikeNearest(origin, direction, Combat.SwordDamage(held, swing, damageFactor), SwordSwings.MaxTargets(swing),
-            SwordSwings.IsCone(swing), MobConfig.SlimePunchShoveSpeed * SwordSwings.ShoveFactor(swing), striker);
+            SwordSwings.IsCone(swing), MobConfig.SlimePunchShoveSpeed * SwordSwings.ShoveFactor(swing), striker,
+            ShrapnelFor(held, striker));
 
     /// <summary>
     /// Strikes the nearest <paramref name="maxTargets"/> mobs a swing from <paramref name="origin"/> along
     /// <paramref name="direction"/> reaches (the punch cone when <paramref name="cone"/>, else the forward
     /// hemisphere; see <see cref="Combat"/>) with an unobstructed line of sight: each takes
-    /// <paramref name="damage"/> and a shove at <paramref name="shoveSpeed"/>. Returns how many were struck.
+    /// <paramref name="damage"/> and a shove at <paramref name="shoveSpeed"/>, and a landed one sprays
+    /// <paramref name="shrapnel"/>. Returns how many were struck.
     /// </summary>
     private int StrikeNearest(Vector3 origin, Vector3 direction, int damage, int maxTargets, bool cone,
-        float shoveSpeed, PlayerHealth? striker)
+        float shoveSpeed, PlayerHealth? striker, ShrapnelProfile shrapnel)
     {
         GatherReached(origin, direction, cone);
         var struck = Math.Min(maxTargets, _strikeScratch.Count);
         for (var i = 0; i < struck; i++)
-            Strikes.StrikeMob(_strikeScratch[i].Mob, damage, origin, striker, shoveSpeed);
+            Strikes.StrikeMob(_strikeScratch[i].Mob, damage, origin, striker, shoveSpeed, shrapnel);
         return struck;
     }
 

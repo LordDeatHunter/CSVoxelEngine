@@ -133,6 +133,7 @@ internal static class ItemLoader
                     $"Item '{path}' has unknown attack '{definition.Attack}'; expected punch, slice or sword."),
             };
             var trailColor = ParseTrail(definition.Trail, attack, path);
+            var shrapnel = ParseShrapnel(definition.Shrapnel, attack, path);
 
             var blockDamage = definition.BlockDamage ?? Mining.DefaultBlockDamage;
             if (!float.IsFinite(blockDamage) || blockDamage <= 0f || blockDamage > 1000f)
@@ -178,7 +179,8 @@ internal static class ItemLoader
                 Teaches: teaches,
                 RestoresMana: restoresMana,
                 Rarity: rarity,
-                Equip: equip));
+                Equip: equip,
+                Shrapnel: shrapnel));
         }
 
         ItemRegistry.Publish(types, new Dictionary<string, byte>(ContentRegistry.ItemIds, StringComparer.Ordinal));
@@ -198,6 +200,26 @@ internal static class ItemLoader
             throw new InvalidOperationException(
                 $"Item '{path}' has a trail.color that is not three integers in 0..255.");
         return new Rgba((byte)color[0], (byte)color[1], (byte)color[2]);
+    }
+
+    /// <summary>
+    /// The <c>shrapnel</c> object's profile, or null when the item names none. Only a blade (a slice or
+    /// sword attack) sprays bone fragments, so a shrapnel object on a punch item is refused.
+    /// </summary>
+    internal static ShrapnelProfile? ParseShrapnel(ItemDefinition.ShrapnelDefinition? shrapnel,
+        AttackPattern attack, string path)
+    {
+        if (shrapnel == null) return null;
+        if (attack == AttackPattern.Punch)
+            throw new InvalidOperationException(
+                $"Item '{path}' has a shrapnel object, but only slice and sword items spray bone fragments.");
+        if (shrapnel.Count is not { } count || count is < 1 or > 32)
+            throw new InvalidOperationException(
+                $"Item '{path}' has shrapnel.count {shrapnel.Count}; expected 1..32 fragments.");
+        if (shrapnel.Damage is not { } damage || damage is < 1 or > 100)
+            throw new InvalidOperationException(
+                $"Item '{path}' has shrapnel.damage {shrapnel.Damage}; expected 1..100.");
+        return new ShrapnelProfile(count, damage);
     }
 
     /// <summary>
@@ -303,9 +325,9 @@ internal static class ItemLoader
         {
             if (string.IsNullOrWhiteSpace(name))
                 throw new InvalidOperationException($"Item '{path}' has a blank equip.abilities entry.");
-            if (!GearAbilities.TryParse(name, out var ability))
-                throw new InvalidOperationException(
-                    $"Item '{path}' has equip.abilities '{name}'; expected air_jump, no_fall_damage, extra_air or magnet.");
+        if (!GearAbilities.TryParse(name, out var ability))
+            throw new InvalidOperationException(
+                $"Item '{path}' has equip.abilities '{name}'; expected air_jump, no_fall_damage, extra_air, magnet or bone_shrapnel.");
             abilities |= ability;
         }
         return new GearInfo(slot, modifiers, equip.Set?.Trim(), equip.Visible ?? false, immune, passives, abilities);

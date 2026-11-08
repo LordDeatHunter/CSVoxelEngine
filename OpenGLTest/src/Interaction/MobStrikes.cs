@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Entities;
+using VoxelEngine.Items;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering.Overlays;
@@ -33,18 +34,23 @@ internal sealed class MobStrikes
     /// <paramref name="from"/> (the striker's eye, or where a thrown item left it) at
     /// <paramref name="shoveSpeed"/> (a punch's by default; a sword's chop throws harder). A landed blow
     /// from a player (<paramref name="striker"/>) puts that player in combat, which pauses their regeneration, and
-    /// that player's worn undead bonus raises a blow against an undead mob.</summary>
-    internal void StrikeMob(Mob mob, int damage, Vector3 from, PlayerHealth? striker = null,
-        float shoveSpeed = MobConfig.SlimePunchShoveSpeed)
+    /// that player's worn undead bonus raises a blow against an undead mob. A landed blow also sprays
+    /// <paramref name="shrapnel"/>, the payload the weapon path resolved from the held item and the striker's
+    /// gear; it stays empty for a thrown item, a spell and a fragment's own hit, so shrapnel never cascades.
+    /// Returns whether the mob's pool accepted the blow.</summary>
+    internal bool StrikeMob(Mob mob, int damage, Vector3 from, PlayerHealth? striker = null,
+        float shoveSpeed = MobConfig.SlimePunchShoveSpeed, in ShrapnelProfile shrapnel = default)
     {
         var hits = mob.HitsTaken;
         damage = Combat.VersusUndead(damage, mob.IsUndead, striker?.Gear?.Stats.UndeadDamage ?? 0f);
         mob.TakeDamage(mob.ScaleDamage(damage, from));
-        if (mob.HitsTaken != hits)
+        var landed = mob.HitsTaken != hits;
+        if (landed)
         {
             striker?.NoteCombat();
             // Worn gear's on-hit passives (a client never strikes a mob: its mobs are mirrors)
             GearPassives.OnHit(striker, mob, Random.Shared.NextSingle);
+            if (!shrapnel.IsEmpty) _world.Shrapnel.Burst(mob, shrapnel, striker);
         }
         ShowLandedHit(mob, hits);
         SpawnHitSparks(mob, from);
@@ -52,6 +58,7 @@ internal sealed class MobStrikes
         var away = mob.Position - from;
         if (!mob.Flies) away.Y = 0f;
         mob.Shove(away, shoveSpeed);
+        return landed;
     }
 
     // A connecting hit throws a few pale chips off the mob's body where the striker faces it

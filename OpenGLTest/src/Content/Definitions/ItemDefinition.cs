@@ -65,6 +65,22 @@ public sealed class ItemDefinition
     }
 
     /// <summary>
+    /// Optional bone shrapnel: a landed hit with this blade sprays <c>count</c> fragments that each deal
+    /// <c>damage</c> to any other enemy they touch. Only legal on a <c>slice</c> or <c>sword</c> item.
+    /// </summary>
+    public ShrapnelDefinition? Shrapnel { get; set; }
+
+    /// <summary>The <c>shrapnel</c> object: how many bone fragments a hit sprays and how hard each hits.</summary>
+    public sealed class ShrapnelDefinition
+    {
+        /// <summary>Fragments per landed hit, 1..32.</summary>
+        public int? Count { get; set; }
+
+        /// <summary>Damage each fragment deals, 1..100.</summary>
+        public int? Damage { get; set; }
+    }
+
+    /// <summary>
     /// Optional tool block: writing it marks the item as a mining tool and carries the numbers
     /// the mining gate reads. <c>power</c> is the item's <em>tier</em> — the number a block's
     /// <c>tools</c> requirement compares against — not its damage, which is

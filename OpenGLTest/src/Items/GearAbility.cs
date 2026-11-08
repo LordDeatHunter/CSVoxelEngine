@@ -8,7 +8,8 @@ namespace VoxelEngine.Items;
 /// <c>Camera.GearAirJump</c> and <c>ServerPlayer.AirJumps</c>; <see cref="NoFallDamage"/> in
 /// <c>PlayerHealth.NegatesFallDamage</c> (inside its <c>TakeDamage</c>) and <c>ServerPlayer.ObserveAcceptedState</c>;
 /// <see cref="ExtraAir"/> in <c>Breath.SetMaxAir</c> from <c>PlayerHealth.ApplyGear</c> (<c>GearConfig.ExtraAirFactor</c>);
-/// <see cref="Magnet"/> in <c>DropCollector.Range</c> from <c>DropPickup</c> (<c>GearConfig.MagnetRangeFactor</c>).
+/// <see cref="Magnet"/> in <c>DropCollector.Range</c> from <c>DropPickup</c> (<c>GearConfig.MagnetRangeFactor</c>);
+/// <see cref="BoneShrapnel"/> in <c>ShrapnelProfile.Resolve</c>, read by <c>LeftClickAction</c>'s strike sites.
 /// </summary>
 [Flags]
 public enum GearAbility : byte
@@ -27,4 +28,7 @@ public enum GearAbility : byte
 
     /// <summary>A wider pickup radius for item drops.</summary>
     Magnet = 8,
+
+    /// <summary>A landed hit also sprays bone fragments (<see cref="ShrapnelProfile"/>).</summary>
+    BoneShrapnel = 16,
 }

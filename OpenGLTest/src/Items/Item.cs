@@ -111,6 +111,11 @@ public abstract class Item
     /// <see cref="TrailColor"/>, else <see cref="ParticleConfig.SliceTrailDefaultColor"/>.</summary>
     public Rgba TrailColorOrDefault => TrailColor ?? ParticleConfig.SliceTrailDefaultColor;
 
+    /// <summary>The bone fragments a landed hit with this blade sprays (see
+    /// <see cref="ShrapnelProfile"/>), or null when it sprays none. Only a slice or sword item may
+    /// name one.</summary>
+    public ShrapnelProfile? Shrapnel { get; internal init; }
+
     /// <summary>Damage one left-click hit removes from a block's hardness; the bare-hand
     /// baseline by default.</summary>
     public float BlockDamage { get; internal init; } = Mining.DefaultBlockDamage;
@@ -265,6 +270,7 @@ public abstract class Item
         HitDelayMs = spec.HitDelayMs;
         Attack = spec.Attack;
         TrailColor = spec.TrailColor;
+        Shrapnel = spec.Shrapnel;
         BlockDamage = spec.BlockDamage;
         EntityDamage = spec.EntityDamage;
         ThrowDamage = spec.ThrowDamage;

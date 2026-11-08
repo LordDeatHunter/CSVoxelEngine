@@ -21,6 +21,7 @@ public sealed class ThrownProjectile
     public float BaseDamage { get; }
     public float Charge01 { get; }
     private Vector3 _velocity;
+    private readonly float _gravityScale;
     private float _age;
 
     /// <summary>The projectile's velocity in blocks per second.</summary>
@@ -64,7 +65,8 @@ public sealed class ThrownProjectile
     public float Scale => ItemDrop.Size * (ItemRegistry.IsItem(ItemId) ? 1.5f : 1f);
     public bool IsExpired => _age >= PlayerConfig.ThrowLifetimeSeconds;
 
-    public ThrownProjectile(byte itemId, Vector3 position, Vector3 velocity, float baseDamage, float charge01)
+    public ThrownProjectile(byte itemId, Vector3 position, Vector3 velocity, float baseDamage, float charge01,
+        float gravityScale = 1f)
     {
         ItemId = itemId;
         Position = position;
@@ -72,6 +74,7 @@ public sealed class ThrownProjectile
         _velocity = velocity;
         BaseDamage = baseDamage;
         Charge01 = MathUtils.Clamp01(charge01);
+        _gravityScale = MathF.Max(0f, gravityScale);
     }
 
     public static float ChargeFactor(float charge01) =>
@@ -96,7 +99,7 @@ public sealed class ThrownProjectile
         _age += Math.Max(0f, deltaTime);
         if (IsExpired) return false;
 
-        _velocity.Y = BodyMotion.Fall(_velocity.Y, deltaTime);
+        _velocity.Y = BodyMotion.Fall(_velocity.Y, deltaTime * _gravityScale);
         var movement = _velocity * deltaTime;
         var half = new Vector3(HalfExtent);
         var next = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);

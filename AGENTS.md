@@ -312,9 +312,9 @@ ending just left of the hearts, hidden while dead. `StatusEffectSetTests`, `Stat
 slot takes a `GearItem` of its own `GearSlot`, `GearSlots.Fits`). Gear is an item with an `equip` object in its JSON
 (`slot`, `armor`, `modifiers` by `GearStat` name, `set`, `visible`, `immune`, `passives`, `abilities`; `rarity` beside it),
 compiled by `ItemLoader.ParseEquip` into a `GearInfo`. `equip.abilities` (`air_jump`, `no_fall_damage`, `extra_air`,
-`magnet`; an unknown name refuses the item) compiles into `GearInfo.Abilities` (`GearAbility` flags), and
+`magnet`, `bone_shrapnel`; an unknown name refuses the item) compiles into `GearInfo.Abilities` (`GearAbility` flags), and
 `Equipment.Abilities`/`Has` caches their union with the stats on `Version` (the `no_fall_damage`, `extra_air` and `magnet`
-consumers are under "Armor, modifiers and sets"). **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
+consumers are under "Armor, modifiers and sets", `bone_shrapnel` under "Bone shrapnel"). **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
 (`PlayerPhysics`), on a fresh Space press while airborne, never in water or flight nor on the frame a creative double tap toggles
 flight; it rises as high as a ground jump, keeps the horizontal speed (sprint momentum), refills on the ground, in water and in
 flight, and has its own `AirJumpCount`, never moving `JumpCount`, so it never works a bloomery's bellows. `LocalPlayer.ApplyGear`
@@ -366,6 +366,23 @@ Frostward and Fireward (`frost_charm`, `fire_charm`: immune to frostburn / burni
 `GearConfig.MagnetRangeFactor`), all rare and loot-only (ruin chests, rare mob drops; a mob-table charm is an unrolled instance,
 `CharmLootTests`). Accepted gaps: a magnet-latched drop is pulled through walls, and a client's bubble row can lag an equip by
 one status. The tooltip colors its title by rarity and shows rolled lines, set progress and abilities. `GearRulesTests`.
+
+**Bone shrapnel (the battle tower's bone pair).** A blade's own `shrapnel` object and the Bone Charm's `bone_shrapnel`
+ability feed one effect: a landed melee hit sprays bone fragments (`Simulation/BoneShrapnel`, authoritative worlds only,
+main thread) out of the struck body, and each fragment wounds the first *other* enemy it touches through the ordinary
+`MobStrikes.StrikeMob` path (so its shove, sparks, damage number and undead bonus are the weapon path's own, and a
+fragment's own hit never sprays again). `LeftClickAction` resolves the payload at its strike sites
+(`ShrapnelProfile.Resolve`) and hands it to `MobStrikes.StrikeMob` as a `ShrapnelProfile`: the blade's profile alone, the
+charm's weaker default one (`ShrapnelConfig.Charm*`) when only the charm is worn, or the blade's count and damage raised
+by `ShrapnelConfig.TogetherFactor` (about 20 %) when both are present, so the blade's own effect always stays the
+stronger. A thrown item, a spell bolt and a fragment's own hit pass no payload, so shrapnel never cascades. The struck
+mob is passed as the fragment's `ignore`, so a
+burst never doubles a blow on its source. Fragments are ordinary `ThrownProjectile`s of the `bone` item with
+`ShrapnelConfig.GravityScale` of gravity and a short `LifeSeconds`, so the existing thrown-object draw and the water mirror
+render them; `World.Shrapnel.AppendTo` adds them to the frame's projectile list after `Throws.RefreshProjectiles`. The
+`bone_breaker_blade` (a `sword` with `shrapnel: { count: 6, damage: 3 }`) and the `bone_charm` (accessory: `bone_shrapnel`,
+slight `manaRegen`, +10 % `undeadDamage`) are crafted; `BoneShrapnelTests`, and `visual-examples/bone-shrapnel.json`
+(`VOXEL_TIME=147`) films the sharpened burst.
 
 **Chests (I-4).** A block with a `chest` object (`slots`, optional `loot`; `BlockType.Chest`) is a chest block entity kept by
 `ChestManager` (`Simulation/Chests/`, owned by `World`, saved in `stations.json` as `Chests`). Its `ChestState` is created on
@@ -1239,6 +1256,8 @@ OpenGLTest/
                                #   gate
       SaveConfig.cs            # autosave, save writer retries and shutdown, teardown joins and drain, entity restore
       SandwormConfig.cs        # the sandworm boss: chain, burrow, breach, air and dash numbers, contact, the sand and quake effects
+      ShrapnelConfig.cs        # the bone shrapnel: the charm's weaker default burst, the factor a worn charm raises a
+                               #   blade's own by, the fragments' life, speed, gravity and launch spread, the live cap
       SimulationConfig.cs      # fluid tick, tree felling, reactive growth, leaf decay, ash, saplings
       SkyIslandConfig.cs       # the sky layer's worldgen (L-12): island zones (Zone*: cells, sizes, tiers, gap),
                                #   islands (Island*: cells, radii, dome, taper, stalactites, the flora headroom),
@@ -1611,6 +1630,8 @@ OpenGLTest/
       Item.cs, ItemFactory.cs  # the abstract item; the per-use.action factory building the singletons
       ItemRegistry.cs          # every item by shared byte id: pure items (vine, branch, flint, ...) plus
                                #   one BlockItem per placeable block
+      ShrapnelProfile.cs       # GL-free one hit's bone-shrapnel payload and the rule that resolves it from the
+                               #   held weapon and the worn bone_shrapnel ability
       LearnPartsItem.cs        # a teaching scroll (learn_parts): teaches its parts, spent once, refused when nothing is new
       RestoreManaItem.cs       # a mana draught (restore_mana): refills a share of the pool, spent once, refused at a full pool
       ItemUseResult.cs         # outcome of Item.OnUse: did the use take effect, what
@@ -2080,6 +2101,8 @@ OpenGLTest/
     Simulation/                # the main-thread simulations World owns: gravity, TNT, tree growth,
                                #   saplings, the stations (campfire, quern, kiln, casting), drops, the mob managers
                                #   and spawner; the fluids are in Fluids/ and leaf decay in LeafDecay/ below
+      BoneShrapnel.cs          # the bone fragments a landed hit sprays: spawn spread, flight against the mobs,
+                               #   bills each hit through MobStrikes, and appends them to the frame's projectile draw
       AlloyRules.cs            # GL-free crucible rules: which metals may share a vessel (CanMix), which melts next
                                #   (NextToMelt; alloy parts wait for their set), full sets -> the alloy (Resolve)
       CampfireManager.cs       # block-entity registry for campfires: lit branch piles with a per-branch burn timer
@@ -2636,6 +2659,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
 tools/                                # asset generators: tiles, sprites, models and clips, each re-run byte-identical
   generate-acorn-texture.py           # deterministic generator of the acorn sprite (acorn.png)
   generate-bandage-texture.py         # deterministic generator of the bandage sprite (bandage.png)
+  generate-bone-items.py              # deterministic generator of the bone-breaker blade and bone charm sprites, --check-free byte-identical re-runs
   generate-cave-plants.py             # deterministic generator of the glow mushroom tile (glow_mushroom.png)
   generate-clock-texture.py           # deterministic generator of the clock sprite (clock.png)
   generate-cotton-textures.py         # deterministic cotton_plant tile and cotton item sprite (stdlib PNG writer)
@@ -3157,6 +3181,7 @@ right-click behavior (`RightClickAction.TryUseSelected` -> `WorldItemUse.Dispatc
 | `entityDamage` | damage one punch or slice deals to an enemy (any `Mob`: a slime or a goblin); default 1 (the bare-hand baseline). A weapon raises it without needing a `tool` block (the obsidian blade is `6`) |
 | `attack` | left-click attack behavior, an `AttackPattern`: `punch` (default; forward cone, hits the nearest one), `slice` (forward hemisphere, hits the nearest two, two-phase swing — the obsidian blade) or `sword` (a three-swing chain: a diagonal cut and a rising back cut over the hemisphere, hitting the nearest three, then an overhead chop on the one target in the cone at the highest power with a heavier shove — the iron sword). See `Combat`/`SliceCombo`/`SwordCombo`/`SwordSwings` |
 | `trail` | optional `{"color": [r, g, b]}`, sRGB 0..255: the color of the glowing slice trail the item's swings leave (`Item.TrailColor`; omitted, `TrailColorOrDefault` falls back to `ParticleConfig.SliceTrailDefaultColor`). Legal only on a `slice` or `sword` item; a trail on a punch item, or a color that is not three ints in 0..255, throws naming the file (`ItemLoader.ParseTrail`). The obsidian blade is violet, the iron sword pale blue-white |
+| `shrapnel` | optional `{"count": n, "damage": d}`: a landed hit with this blade sprays `n` bone fragments (1..32) that each deal `d` damage (1..100) to the first other enemy they touch (`Item.Shrapnel`, a `ShrapnelProfile`). Legal only on a `slice` or `sword` item (`ItemLoader.ParseShrapnel` refuses it on a punch item and refuses a missing or out-of-range field, naming the file). A worn `bone_shrapnel` gear ability adds its own weaker burst to any weapon and raises this blade's by `ShrapnelConfig.TogetherFactor`; see "Bone shrapnel". The bone-breaker blade is `{"count": 6, "damage": 3}` |
 | `fuel.burnSeconds` | seconds one unit of this item keeps a kiln lit (coal 60; 1..3600). Writing the object is what makes an item kiln fuel — a kiln takes up to its `kiln.fuelCap` units of **one** kind at a time |
 | `crucible.capacityMl` | marks the item a **crucible**: a vessel holding this many milliliters of metal, melted and pending together (100..10000). A crucible stores in the **Tools** pool, one instance at a time, because its contents ride on that instance's `ItemStack` as a `CrucibleComponent`: one `CrucibleMetal(MaterialId, MoltenMl, PendingMl)` per molten material it holds (copper and tin side by side in an alloy kiln, see "The kiln"), the capacity counted over all of them, plus `PendingInputId`, display-only, the last melt input charged in, so the kiln can draw what is waiting to melt; while the vessel stands in a kiln the same struct lives in `KilnState` instead, and taking it out writes it back onto a fresh instance (`CrucibleInventory.Add`). The stack carries no melt timer, so putting a crucible back into a kiln restarts the partial chunk it was melting |
 | `staff` | marks the item a **spell staff**: `{"slots": n, "tier": t, "tags": [..]}`, slots 1..`SpellConfig.StaffMaxSlots`, tier >= 1, non-blank distinct spell part tags (`ItemLoader.ParseStaff`, shape only: spell parts load after items). Builds a `StaffItem`, stored in the **Tools** pool one instance at a time, because each slot's bound spell recipe rides that instance's `ItemStack` as a `StaffComponent` (the part keys `<kind>/<name>` per slot plus the selected slot, immutable). `StaffBinding.TryBind` binds a recipe only when MG-2's `SpellRecipe.Compile` finds it valid against the staff's tags (a part passes when any of its tags is allowed), so a tier gates its parts by tag; `Clear`, `Cycle` (wrapping) and `Select` exist; Left Ctrl + wheel cycles the held staff's slot through `HeldStaff` and the server-owned `SelectStaffSlot` inventory action, and the spell table binds and clears a slot (`HeldStaff.TryBind`/`TryClear`, through the server-owned `BindStaffSlot`/`ClearStaffSlot` inventory actions, see "Spell table"). Right-click casts the selected slot (see the **Cast** intent). Saved in `player.json` and carried in the inventory snapshot as `ToolData.Staff` by part key, never id, and re-bound on load against this run's parts (what no longer binds is dropped with a warning). Crafting consumes the least-bound instance first. A Q-dropped staff loses its spells like a crucible loses its metal (an `ItemDrop` carries only an id). May not declare `use` or `crucible`; the tier is shown in the tooltip |
