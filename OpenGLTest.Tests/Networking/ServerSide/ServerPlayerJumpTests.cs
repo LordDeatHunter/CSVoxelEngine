@@ -72,6 +72,22 @@ public sealed class ServerPlayerJumpTests
     }
 
     [Fact]
+    public void AnAirHopIsNeverABellowsJump()
+    {
+        var chunks = StoneFloor();
+        var player = new ServerPlayer(1, "Hopper", EyeAtFeet(1f));
+        var rise = NetworkConfig.NetJumpRiseBlocks + 0.3f;
+
+        Assert.False(Observe(player, chunks, 1f));
+        Assert.True(Observe(player, chunks, 1f + rise));
+        // Up to the apex, a little way down, then the cloud boots' air jump climbs again from no ground
+        Assert.False(Observe(player, chunks, 1f + 2f * rise));
+        Assert.False(Observe(player, chunks, 1f + 1.5f * rise));
+        Assert.False(Observe(player, chunks, 1f + 2.5f * rise));
+        Assert.False(Observe(player, chunks, 1f + 3.5f * rise));
+    }
+
+    [Fact]
     public void AFlyingPlayerNeverJumps()
     {
         var chunks = StoneFloor();

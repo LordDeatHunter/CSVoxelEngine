@@ -75,6 +75,16 @@ internal sealed class PlayerPhysics
     /// <summary>Counts jumps taken (a land jump, or one off the bottom of a shallow puddle): the bellows of a
     /// bloomery beside the player reads it (<see cref="Camera.JumpCount"/>).</summary>
     public int JumpCount { get; private set; }
+
+    /// <summary>Counts air jumps taken (the cloud boots' one free jump per airtime). Kept apart from
+    /// <see cref="JumpCount"/> on purpose: an air jump starts from no ground, so it never works a bellows.</summary>
+    public int AirJumpCount { get; private set; }
+
+    // Space as it was last frame: the air jump needs a fresh press, so a Space held through a ground
+    // jump (or across a closed menu) never fires it.
+    private bool _spaceWasDown;
+    // The one air jump this airtime still has: spent in the air, back on landing (and in water or flight).
+    private bool _airJumpReady;
     internal const float SinkSpeed = -2f;
     // Pushing into a bank while holding Space lifts the player over it, so getting out of
     // water never needs a ramp
@@ -143,9 +153,18 @@ internal sealed class PlayerPhysics
     public void Update(Camera camera, float deltaTime, IKeyboard? keyboard, ChunkManager chunkManager)
     {
         if (keyboard == null)
+        {
             camera.MarkTogglesHeld();
+            _spaceWasDown = true;
+        }
         if (keyboard == null || chunkManager == null)
             return;
+
+        var spaceDown = keyboard.IsKeyPressed(Key.Space);
+        var spaceEdge = spaceDown && !_spaceWasDown;
+        _spaceWasDown = spaceDown;
+        // A creative double tap may turn flight on or off this frame; that tap is never an air jump
+        var flyingAtStart = camera.IsFlying;
 
         camera.UpdateCreativeToggle(keyboard);
         camera.UpdateFlightToggle(deltaTime, keyboard);
@@ -215,6 +234,9 @@ internal sealed class PlayerPhysics
         if (!swimming && !_swimLatched || _lastPhase == WaterPhase.Swim && phase != WaterPhase.Swim)
             _diving = false;
         _lastPhase = phase;
+        // The air jump's charge is spent in the air and comes back on landing; water and flight refill it too
+        if (camera.IsGrounded || camera.IsInWater || camera.IsFlying)
+            _airJumpReady = true;
         // Ctrl on foot crouches: slower, never sprinting. While flying Ctrl is "down" instead.
         var sneaking = keyboard.IsKeyPressed(Key.ControlLeft) && !camera.IsFlying && !swimming;
         camera.SetSneaking(sneaking);
@@ -331,11 +353,21 @@ internal sealed class PlayerPhysics
         }
         else
         {
-            if (camera.IsGrounded && keyboard.IsKeyPressed(Key.Space))
+            if (camera.IsGrounded && spaceDown)
             {
                 _verticalVelocity = JumpSpeed;
                 JumpCount++;
                 camera.SetGrounded(false);
+            }
+            else if (spaceEdge && _airJumpReady && camera.GearAirJump && !flyingAtStart && !camera.IsFlying
+                     && !camera.IsInWater)
+            {
+                // The cloud boots' air jump, a fresh Space press while airborne: as high as a ground jump,
+                // the horizontal speed (sprint momentum) kept, and JumpCount, which works a bloomery's
+                // bellows, never moved
+                _verticalVelocity = JumpSpeed;
+                _airJumpReady = false;
+                AirJumpCount++;
             }
 
             _verticalVelocity -= Gravity * deltaTime;

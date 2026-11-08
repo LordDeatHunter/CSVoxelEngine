@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Threading;
@@ -1491,6 +1492,94 @@ public sealed class GameServerTests : IDisposable
             Tick(0.05);
         Assert.Equal(step, PlayerOf(client).Position);
         Assert.Single(inbox.PlayerCorrections);
+    }
+
+    [Fact]
+    public void AWearersDoubleJumpIsNeverCorrectedButASecondAirHopIs()
+    {
+        using var client = Connect("Hopper");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var manager = _world.GetChunkManager();
+        var inbox = InboxOf(client);
+        var player = PlayerOf(client);
+
+        // Headroom for two jumps' climb over the arena's cleared rows
+        var top = arena.Y + 7;
+        bool Loaded()
+        {
+            for (var y = arena.Y + 5; y <= top; y++)
+                if (!manager.TryGetCell(arena.X, y, arena.Z, out _, out _))
+                    return false;
+            return true;
+        }
+        var sw = Stopwatch.StartNew();
+        while (!Loaded() && sw.Elapsed.TotalSeconds < 60)
+            Tick(0.05);
+        Assert.True(Loaded(), "the headroom's chunks never loaded");
+        for (var x = arena.X - 3; x <= arena.X + 3; x++)
+        for (var y = arena.Y + 5; y <= top; y++)
+        for (var z = arena.Z - 3; z <= arena.Z + 3; z++)
+            SetCell(new Vector3(x, y, z), 0);
+
+        // Settle on the arena floor where the client's physics rests a body
+        var resting = arena.Y + 0.01f;
+        var start = new Vector3(arena.Eye.X, resting + Camera.EyeHeight, arena.Eye.Z);
+        SendState(client, start, NetPlayerFlags.None);
+        sw.Restart();
+        while (player.Position != start && sw.Elapsed.TotalSeconds < 15)
+            Tick(0.05);
+        Assert.Equal(start, player.Position);
+
+        // Wear the cloud boots (equipment is the server's own)
+        var boots = ContentRegistry.RequireItem("cloud_boots").Id;
+        Assert.True(player.Inventory.Add(boots));
+        Assert.True(player.Inventory.Equipment.TryEquipAuto(
+            player.Inventory.GearEntries().Last(e => e.ItemId == boots).InstanceId));
+        Assert.Equal(1, player.AirJumps);
+
+        const float up = PlayerPhysics.JumpSpeed / PlayerPhysics.Gravity;
+        var dt = (float)NetworkConfig.NetPlayerStateSeconds;
+
+        // The feet of a body jumping at each launch moment (from wherever it is then), resting on the floor
+        float FeetAt(float t, float[] launches)
+        {
+            var feet = resting;
+            var since = 0f;
+            var speed = 0f;
+            foreach (var at in launches)
+            {
+                if (at > t) break;
+                feet = MathF.Max(resting, feet + speed * (at - since) - 0.5f * PlayerPhysics.Gravity * (at - since) * (at - since));
+                since = at;
+                speed = PlayerPhysics.JumpSpeed;
+            }
+            return MathF.Max(resting, feet + speed * (t - since) - 0.5f * PlayerPhysics.Gravity * (t - since) * (t - since));
+        }
+
+        // One state at a time, each pumped until the server has judged it
+        void Send(float feet)
+        {
+            var before = player.LastStateAt;
+            var eye = new Vector3(start.X, feet + Camera.EyeHeight, start.Z);
+            SendState(client, eye, feet > resting ? NetPlayerFlags.Airborne : NetPlayerFlags.None);
+            var wait = Stopwatch.StartNew();
+            while (player.LastStateAt == before && wait.Elapsed.TotalSeconds < 5)
+                Tick(dt);
+        }
+
+        // A ground jump and one air hop at its apex, down to the floor again: never corrected
+        for (var t = 0f; t <= 4f * up + 0.2f; t += dt)
+            Send(FeetAt(t, [0f, up]));
+        Assert.Empty(inbox.PlayerCorrections);
+        Assert.Equal(resting, player.Position.Y - Camera.EyeHeight, 3);
+
+        // A second air hop at the next apex: corrected
+        for (var t = 0f; t <= 4f * up && inbox.PlayerCorrections.Count == 0; t += dt)
+            Send(FeetAt(t, [0f, up, 2f * up]));
+        sw.Restart();
+        while (inbox.PlayerCorrections.Count == 0 && sw.Elapsed.TotalSeconds < 15)
+            Tick(dt);
+        Assert.NotEmpty(inbox.PlayerCorrections);
     }
 
     [Fact]

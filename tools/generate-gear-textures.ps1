@@ -1,5 +1,6 @@
-# Deterministic placeholder sprites of the first gear (assets/textures/items/<name>.png, 16x16): a leather and a
-# bronze armor set (cap, tunic, pants, boots, gloves) and four accessories (ring, charm, amulet, belt). Plain
+# Deterministic placeholder sprites of the first gear (assets/textures/items/<name>.png, 16x16): a leather, a bronze
+# and an iron armor set (cap, tunic, pants, boots, gloves), the cloud boots (the iron boots in a pale cloud palette
+# with two wing puffs) and the accessories (ring, charms, amulet, belt). Plain
 # filled rectangles in a material's three tones, so a re-run is byte-identical; replace with real art any time,
 # the item JSON only names the files. Run: pwsh tools/generate-gear-textures.ps1
 Add-Type -AssemblyName System.Drawing
@@ -16,6 +17,7 @@ $materials = @{
     gem     = @{ Dark = (Tone 30, 70, 120); Mid = (Tone 70, 150, 220); Light = (Tone 180, 226, 255) }
     ember   = @{ Dark = (Tone 110, 20, 10); Mid = (Tone 220, 70, 30); Light = (Tone 255, 170, 100) }
     gold    = @{ Dark = (Tone 120, 84, 12); Mid = (Tone 224, 176, 40); Light = (Tone 255, 230, 120) }
+    cloud   = @{ Dark = (Tone 96, 120, 150); Mid = (Tone 214, 226, 240); Light = (Tone 250, 252, 255) }
 }
 
 function New-Sprite([string]$name, [scriptblock]$draw) {
@@ -49,6 +51,13 @@ foreach ($name in 'leather', 'bronze', 'iron') {
     New-Sprite "${name}_pants" { Block 3 2 10 4 $m; Block 3 6 4 8 $m; Block 9 6 4 8 $m }
     New-Sprite "${name}_boots" { Block 2 5 5 8 $m; Block 9 5 5 8 $m; Block 1 11 6 3 $m; Block 9 11 6 3 $m }
     New-Sprite "${name}_gloves" { Block 2 3 5 10 $m; Block 9 3 5 10 $m; Block 1 8 3 3 $m; Block 12 8 3 3 $m }
+}
+
+# The iron boots' shape in the cloud palette, plus a small wing puff on each side
+New-Sprite 'cloud_boots' {
+    $c = $materials.cloud
+    Block 2 5 5 8 $c; Block 9 5 5 8 $c; Block 1 11 6 3 $c; Block 9 11 6 3 $c
+    Rect 0 6 2 2 $c.Light; Rect 14 6 2 2 $c.Light
 }
 
 New-Sprite 'copper_ring' {

@@ -37,6 +37,12 @@ public static class NetworkConfig
     // server rubberbands it: longer than a full jump's climb and apex (about a third of a second
     // rising), so only a hover trips it.
     public const double NetHoverGraceSeconds = 1.0;
+    // Jitter allowed on top of the jump apexes one airtime may rise (MovementRules.AirRiseBudget):
+    // the states around a landing and the client's frame-sized physics steps overshoot a little.
+    public const float NetAirRiseSlackBlocks = 0.5f;
+    // How long a queued knockback lift widens a player's airtime rise budget: long enough for the
+    // status to reach the client and the lift to play out.
+    public const double NetLiftCreditSeconds = 1.5;
     // A state arriving more than this long after the previous one (a lag spike) is judged only by
     // the speed clamp and the collision test: the rise and hover rules need a short, honest gap.
     public const double NetMaxJudgedStateGapSeconds = 0.5;

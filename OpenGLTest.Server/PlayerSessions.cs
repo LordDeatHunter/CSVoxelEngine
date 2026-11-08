@@ -94,7 +94,7 @@ internal sealed class PlayerSessions
                 var solids = _state.World.BodySolids;
                 var gap = _state.Elapsed - current.LastStateAt;
                 var verdict = MovementRules.Judge(current.Position, position, gap, current.Flying, chunks,
-                    current.Movement, out var accepted, solids);
+                    current.Movement, out var accepted, solids, airJumps: current.AirJumps);
                 current.Position = accepted;
                 switch (verdict)
                 {

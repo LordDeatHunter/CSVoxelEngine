@@ -8,6 +8,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Data;
 using VoxelEngine.Entities;
+using VoxelEngine.Items;
 using VoxelEngine.Juice;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Status;
@@ -53,6 +54,9 @@ public class Camera : IMobTarget
     public int SwimStrokeCount => _physics.SwimStrokeCount;
     /// <summary>Jumps the body has taken so far; moves on each one (<c>PlayerPhysics.JumpCount</c>).</summary>
     public int JumpCount => _physics.JumpCount;
+    /// <summary>Air jumps the body has taken so far (<c>PlayerPhysics.AirJumpCount</c>); never counted in
+    /// <see cref="JumpCount"/>, so a bloomery's bellows never sees them.</summary>
+    public int AirJumpCount => _physics.AirJumpCount;
     /// <summary>Current vertical FOV in degrees: the base FOV plus the eased sprint widening plus the punch
     /// pinch plus the throw charge zoom.</summary>
     public float CurrentFov => _head.CurrentFov;
@@ -138,6 +142,9 @@ public class Camera : IMobTarget
     /// <summary>The walk and swim speed multiplier from worn gear (1 = none); set once a frame by the local
     /// player. Flight ignores it like every other speed modifier.</summary>
     public float GearMoveFactor { get; internal set; } = 1f;
+    /// <summary>Whether worn gear grants the one free air jump per airtime (<see cref="GearAbility.AirJump"/>,
+    /// the cloud boots); set once a frame by the local player, like <see cref="GearMoveFactor"/>.</summary>
+    public bool GearAirJump { get; internal set; }
     public float GroundFriction { get; private set; } = BlockType.DefaultFriction;
     public Vector2 HorizontalVelocity => _physics.HorizontalVelocity;
 

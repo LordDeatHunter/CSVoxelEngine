@@ -1,3 +1,4 @@
+using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
 
@@ -40,6 +41,36 @@ public static class PlayerBodyProbe
     public static bool Grounded(Vector3 eye, ChunkManager chunks, IBodySolids? solids = null) =>
         BodyCollision.BodyCollides(eye - new Vector3(0f, NetworkConfig.NetGroundProbeBlocks, 0f), chunks, solids)
         || SinkLayerTop(eye, chunks) != null;
+
+    /// <summary>
+    /// Whether the body could have touched down within <paramref name="reach"/> blocks below this
+    /// eye: the body box lowered by that much (plus <see cref="NetworkConfig.NetGroundProbeBlocks"/>)
+    /// collides, so it straddles any ground top within that distance. The server reads it at the
+    /// low point of a descent-then-rise, whose landing fell between two states.
+    /// </summary>
+    public static bool GroundedWithin(Vector3 eye, float reach, ChunkManager chunks, IBodySolids? solids = null) =>
+        BodyCollision.BodyCollides(eye - new Vector3(0f, reach + NetworkConfig.NetGroundProbeBlocks, 0f), chunks, solids);
+
+    /// <summary>
+    /// Whether a bounce block (a slime block) lies under the body's footprint within
+    /// <paramref name="depth"/> blocks below the feet (at least the cell just under them). An
+    /// unloaded cell reads as air, so it bounces nothing.
+    /// </summary>
+    public static bool BounceWithin(Vector3 eye, float depth, ChunkManager chunks)
+    {
+        var feet = eye.Y - Camera.EyeHeight;
+        var top = MathUtils.FloorToInt(feet - SinkLayer.FeetTolerance);
+        var bottom = Math.Min(top, MathUtils.FloorToInt(feet - depth));
+        FootprintCells(eye, out var minX, out var minZ, out var maxX, out var maxZ);
+        for (var y = top; y >= bottom; y--)
+        for (var x = minX; x <= maxX; x++)
+        for (var z = minZ; z <= maxZ; z++)
+        {
+            if (BlockType.BouncesAt(chunks.GetBlockGlobal(x, y, z)))
+                return true;
+        }
+        return false;
+    }
 
     /// <summary>
     /// The top of the sink block's soft layer the feet stand in (<see cref="SinkLayer.FeetIn"/>), read

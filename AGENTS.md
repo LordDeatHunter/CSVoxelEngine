@@ -312,7 +312,13 @@ slot takes a `GearItem` of its own `GearSlot`, `GearSlots.Fits`). Gear is an ite
 (`slot`, `armor`, `modifiers` by `GearStat` name, `set`, `visible`, `immune`, `passives`, `abilities`; `rarity` beside it),
 compiled by `ItemLoader.ParseEquip` into a `GearInfo`. `equip.abilities` (`air_jump`, `no_fall_damage`, `extra_air`,
 `magnet`; an unknown name refuses the item) compiles into `GearInfo.Abilities` (`GearAbility` flags), and
-`Equipment.Abilities`/`Has` caches their union with the stats on `Version`; nothing consumes them until AC-3/AC-4. Its instances live in the same `Inventory.Tools` list as tool
+`Equipment.Abilities`/`Has` caches their union with the stats on `Version`; `no_fall_damage`, `extra_air` and `magnet` wait for
+AC-4. **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
+(`PlayerPhysics`), on a fresh Space press while airborne, never in water or flight nor on the frame a creative double tap toggles
+flight; it rises as high as a ground jump, keeps the horizontal speed (sprint momentum), refills on the ground, in water and in
+flight, and has its own `AirJumpCount`, never moving `JumpCount`, so it never works a bloomery's bellows. `LocalPlayer.ApplyGear`
+feeds the flag into `Camera.GearAirJump` every frame (singleplayer and a client's mirrored equipment), and the server judges the
+hop by `ServerPlayer.AirJumps` (see "The movement rubberband"); no wire change, protocol 24. `AirJumpTests`. Its instances live in the same `Inventory.Tools` list as tool
 instances (so every instance lookup, the save and the wire carry them) but count against their own pool
 (`InventoryCategory.Gear`, `GearConfig.GearCapacity`), never take a hotbar slot and come off when removed from the
 pool. `Equipment.Stats` (`GearStatsCalculator`, clamped by `GearStats.Clamped`) is cached until the worn set changes;
@@ -1716,7 +1722,8 @@ OpenGLTest/
         BreakProgress.cs       # GL-free: a player's mining on the server, judged against the held item's hits
         InventoryIntentRules.cs # GL-free: what the server accepts of an intent, against that player's inventory
         MovementRules.cs       # GL-free movement rubberband: speed clamp, then collision, rise and hover checks
-        MovementState.cs       # a player's per-connection movement memory (airborne-still time)
+        MovementState.cs       # a player's per-connection movement memory (airborne-still time, the airtime rise budget's
+                               #   climb, takeoff and bounce, the lift credit)
         MoveVerdict.cs         # Accepted / Clamped / Rejected
         NetValidation.cs       # server movement, edit-reach, intent-eye and visible-face sanity rules
         OperatorList.cs        # who may be creative: ops.json in the world folder plus --op, matched by save slug
@@ -1790,7 +1797,8 @@ OpenGLTest/
       ModeToggles.cs           # the creative (C) and double-tap flight toggles and the sprint latch
       PlayerBodyProbe.cs       # GL-free body probes over the live chunk map: known (loaded), grounded (a sink
                                #   layer counts), in water, in lava (BurningFluid), the sink layer top, a cushioned
-                               #   landing (bounce or softLanding); what the server judges a remote player's body by
+                               #   landing (bounce or softLanding), ground within a reach, a bounce block below; what the
+                               #   server judges a remote player's body by
       PlayerContext.cs         # who an interaction runs for: eye, aim, inventory, creative (local camera or a
                                #   server's connected player), threaded through every World interaction path
       PlayerHealth.cs          # the player's survival pool, 0-100 HP drawn as 10 hearts (1 heart = 10 HP)
@@ -4473,10 +4481,20 @@ a body that would collide with a solid cell while the previous position did not 
 player already inside a solid may move, so it can leave), and, when the state gap is at most
 `NetMaxJudgedStateGapSeconds`, a climb faster than `NetMaxRiseBlocksPerSecond * gap +
 NetRiseSlackBlocks` is rejected, and so is a hover: airborne, not in water and not sinking for
-longer than `NetHoverGraceSeconds` in total. The numbers are generous on purpose — a jump, a sprint
+longer than `NetHoverGraceSeconds` in total, and so is a climb past one airtime's rise budget
+(`MovementRules.AirRiseBudget`: one jump's apex per jump the player has, the ground jump plus `ServerPlayer.AirJumps` from the
+cloud boots, plus `NetAirRiseSlackBlocks`), summed in `MovementState` over the upward steps since the body was last grounded or
+in water; the sum is kept on a rejection, so every further rise of that airtime is refused until a landing. Three exemptions:
+a descent turning into a rise with ground within reach below the low state (`PlayerBodyProbe.GroundedWithin`, a bunny hop
+whose landing fell between two states) starts a fresh airtime; an airtime begun off a bounce block
+(`PlayerBodyProbe.BounceWithin`) may climb a bounce's apex more; and a mob hit or blast lift (`ServerPlayer.TakeHit` ->
+`MovementState.GrantLift`) widens the budget by its own climb for `NetLiftCreditSeconds`. A correction keeps the sum (being
+corrected never refills it), a teleport resets it (`MovementState.Reset`). The numbers are generous on purpose — a jump, a sprint
 jump, a sprint auto-step of a whole block inside one state, swimming up and out of water, a mob's
 knockback lift, a fall and standing idle never trip them (`MovementRulesTests` asserts the
-relations against `PlayerPhysics`' own constants). A rejection keeps the player where it stood,
+relations against `PlayerPhysics`' own constants, and that a wearer's one air hop is taken and a second rejected, a bunny hop,
+a queued lift and a slime-block bounce are legal; `ServerPlayerJumpTests` that an air hop is never a bellows jump;
+`GameServerTests.AWearersDoubleJumpIsNeverCorrectedButASecondAirHopIs` over loopback). A rejection keeps the player where it stood,
 resets its fall tracking and sends a numbered `PlayerCorrection(seq, eye)`
 (`ServerPlayer.IssueCorrection`); the client snaps there (`Camera.TestTeleport`, motion reset),
 echoes the number in every following `PlayerState`, and the server ignores state positions until
@@ -4649,7 +4667,10 @@ camera exactly like a focused inventory field, and the log sits bottom-left abov
 SendChat` echoes locally; in multiplayer it sends `ChatSend` and the server's broadcast is the
 only copy, so a line never appears twice.
 
-**Known gaps** (open): players are keyed by name with no authentication, so whoever joins first
+**Known gaps** (open): the airtime rise budget is height-based, so a player without the cloud boots may hop once after
+walking off a ledge, a hop within one state step of the ground counts as a landing, a client that double jumps before the
+server applied its equip intent is corrected once, and iceberg mirror lag can still mis-judge a rider's bunny hop; players are
+keyed by name with no authentication, so whoever joins first
 under a name gets that name's inventory, status and operator rights (`ops.json` is read once at
 start, and there is no in-game op command); a slice's return-swing flag and a throw's charge are
 taken from the client (both are paced, neither verified); a timed use (`use.seconds`) is held
@@ -5046,7 +5067,7 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   attack clip"); all four are saved in `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 223 of the 255 content ids are used (127 blocks, 95 items, air), 32 left. Seed offsets
+- **Budgets**: 224 of the 255 content ids are used (127 blocks, 96 items, air), 31 left. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
   `plans/BIOMEGEN.md`.

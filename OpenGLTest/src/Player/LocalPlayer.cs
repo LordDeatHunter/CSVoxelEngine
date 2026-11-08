@@ -175,13 +175,15 @@ internal sealed class LocalPlayer
 
     /// <summary>
     /// Applies what the worn gear changes to this player: the health pool (every mode, so a client's hearts
-    /// scale), the mana pool where it is simulated (<paramref name="simulatesMana"/>; a client mirrors its server's)
-    /// and the walk speed. Called every frame, cheap: the stats are cached until the worn set changes.
+    /// scale), the mana pool where it is simulated (<paramref name="simulatesMana"/>; a client mirrors its server's),
+    /// the walk speed and the air jump. Called every frame, cheap: the stats and abilities are cached until the
+    /// worn set changes.
     /// </summary>
     internal void ApplyGear(bool simulatesMana)
     {
         _health.ApplyGear(Inventory.Equipment, simulatesMana);
         Camera.GearMoveFactor = Inventory.Equipment.Stats.MoveFactor;
+        Camera.GearAirJump = Inventory.Equipment.Has(GearAbility.AirJump);
     }
 
     internal void EnsureSpawnSettled(ChunkManager chunkManager)

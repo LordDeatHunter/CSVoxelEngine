@@ -230,8 +230,14 @@ public sealed class ServerPlayer : IMobTarget
     /// </summary>
     public bool AcceptsStatePosition(int ack) => ack >= _awaitedCorrection;
 
-    /// <summary>What the movement rules remember between this player's states (its hover time).</summary>
+    /// <summary>What the movement rules remember between this player's states (its hover time and airtime climb).</summary>
     public MovementState Movement { get; } = new();
+
+    /// <summary>
+    /// Air jumps this player's worn gear grants per airtime (the cloud boots' <see cref="GearAbility.AirJump"/>),
+    /// judged by <see cref="MovementRules"/>.
+    /// </summary>
+    public int AirJumps => Inventory.Equipment.Has(GearAbility.AirJump) ? 1 : 0;
 
     /// <summary>The accepted camera eye position.</summary>
     public Vector3 Position { get; set; }
@@ -259,6 +265,8 @@ public sealed class ServerPlayer : IMobTarget
         if (awayHorizontal.LengthSquared() > 1e-6f)
             _pendingKnockback = Vector3.Normalize(awayHorizontal) * knockbackSpeed;
         _pendingLift = MathF.Max(_pendingLift, lift);
+        // The client plays the lift once the status arrives, so its rise must not be judged an air hop
+        if (lift > 0f) Movement.GrantLift(lift);
         StatusDirty = true;
     }
 
@@ -308,7 +316,8 @@ public sealed class ServerPlayer : IMobTarget
         }
 
         // A jump is the step off the ground that rises: grounded last state, airborne and higher now (an
-        // auto-step stays grounded, a drop off a ledge does not rise). It is what works a bloomery's bellows.
+        // auto-step stays grounded, a drop off a ledge does not rise, and an airborne rise such as the cloud
+        // boots' air jump starts from no ground). It is what works a bloomery's bellows.
         var jumped = _jumpTracked && _wasGrounded && !grounded && !Flying && !inWater
                      && feet - _lastFeet > NetworkConfig.NetJumpRiseBlocks;
         _jumpTracked = true;
@@ -392,18 +401,23 @@ public sealed class ServerPlayer : IMobTarget
 
     /// <summary>
     /// The server moves the player: the accepted eye jumps to <paramref name="eye"/> and the fall
-    /// and the hover time are forgotten, since a teleport is never a fall or a hover.
+    /// and the movement memory (hover time, airtime climb, lift credit) are forgotten, since a
+    /// teleport is never a fall, a hover or a climb.
     /// </summary>
     public void Teleport(Vector3 eye)
     {
         Position = eye;
         Aim(eye, Forward);
         _fall.Reset(eye.Y - Camera.EyeHeight, grounded: false);
-        Movement.AirborneStillSeconds = 0;
+        Movement.Reset();
         _jumpTracked = false;
     }
 
-    /// <summary>Forgets the fall built up so far, at the current position (after a correction).</summary>
+    /// <summary>
+    /// Forgets the fall built up so far, at the current position (after a correction). The movement
+    /// memory is kept on purpose: a correction never refills the airtime rise budget, so being
+    /// corrected again and again cannot climb.
+    /// </summary>
     public void ResetFall()
     {
         _fall.Reset(Position.Y - Camera.EyeHeight, grounded: false);
