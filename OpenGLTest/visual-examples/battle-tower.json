@@ -1,0 +1,44 @@
+{
+  // The battle tower (plans/BATTLE_TOWER.md BT-2): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/battle-tower.json
+  // Shots land in visual/battle-tower/. The tower is the one nearest the origin on the default seed, found
+  // with TowerPlacement.TryFindNearest(0, 0, 4) (TowerPlacementTests.ATowerStandsWithinAFewCellsOfTheOrigin
+  // prints it): cell (1, -1), center (2920, -1411), ground y 10, radius 21, 5 floors, turns 2, plain
+  // tower_bricks; floor slabs at y 10/17/24/31/38, roof at y 45, altar cell (2920, 46, -1411), top y 51.
+  // With turns 2 the entrance faces -X, a little toward +Z (about 171 degrees around from +X), and the
+  // stair starts just south of it, climbing toward -Z. Shots: the exterior from 2.5 radii out, the
+  // entrance, floor 0 and floor 2 inside (eye at the slab + 2.6), the stair corridor at half-step 10
+  // (y 16), the roof and its altar dressing, and a steep view from above (not straight down: at pitch -89 the
+  // first-person body fills the frame).
+  "steps": [
+    { "op": "fly", "on": true },
+
+    { "op": "teleport", "pos": [2868.5, 30.5, -1402.5], "yaw": -9, "pitch": 2 },
+    { "op": "wait", "seconds": 15 },
+    { "op": "screenshot", "name": "exterior", "hideHud": true },
+
+    { "op": "teleport", "pos": [2887.5, 13.5, -1405.5], "yaw": -9, "pitch": -2 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "entrance", "hideHud": true },
+
+    { "op": "teleport", "pos": [2910.5, 12.6, -1410.5], "yaw": 0, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "floor0", "hideHud": true },
+
+    { "op": "teleport", "pos": [2910.5, 26.6, -1410.5], "yaw": 0, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "floor2", "hideHud": true },
+
+    { "op": "teleport", "pos": [2912.5, 17.6, -1426.5], "yaw": -27, "pitch": 10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "stair", "hideHud": true },
+
+    { "op": "teleport", "pos": [2909.5, 48.5, -1410.5], "yaw": 0, "pitch": -15 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "roof_altar", "hideHud": true },
+
+    { "op": "teleport", "pos": [2885.5, 90.5, -1410.5], "yaw": 0, "pitch": -55 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "overhead", "hideHud": true }
+  ]
+}

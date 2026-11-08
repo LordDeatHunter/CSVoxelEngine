@@ -146,6 +146,65 @@ public sealed class StructureTests
         Assert.Contains("bad/test.json", error.Message);
     }
 
+    // A 3x3 tower dressing of the kind, `height` layers of open floor with a stone corner: legal as written
+    private static StructureDefinition TowerDefinition(string kind, int height = 1)
+    {
+        var def = WaystoneDefinition(Enumerable.Range(0, height).Select(_ => new[] { "s..", "...", "..." }).ToArray());
+        def.Kind = kind;
+        return def;
+    }
+
+    [Theory]
+    [InlineData("towerFloor")]
+    [InlineData("towerAltar")]
+    public void ALegalTowerDressingCompilesAtItsTallest(string kind)
+    {
+        var tallest = kind == "towerFloor" ? WorldGenerationConfig.TowerFloorHeight - 1 : WorldGenerationConfig.TowerAltarHeight;
+        var template = StructureLoader.Compile("test", TowerDefinition(kind, tallest), "test.json");
+        Assert.Equal(tallest, template.Height);
+        Assert.False(template.Satellite);
+    }
+
+    [Theory]
+    [InlineData("towerFloor", "groundLayer")]
+    [InlineData("towerAltar", "groundLayer")]
+    [InlineData("towerFloor", "evenSize")]
+    [InlineData("towerAltar", "evenSize")]
+    [InlineData("towerFloor", "tooTall")]
+    [InlineData("towerAltar", "tooTall")]
+    [InlineData("towerAltar", "filledAltarCell")]
+    [InlineData("towerFloor", "satellite")]
+    [InlineData("towerAltar", "satellite")]
+    [InlineData("towerFloor", "waystone")]
+    public void ABadTowerDressingIsRefusedAndNamed(string kind, string what)
+    {
+        var def = TowerDefinition(kind);
+        switch (what)
+        {
+            case "groundLayer": def.Layers = [["s..", "...", "..."], ["...", "...", "..."]]; def.GroundLayer = 1; break;
+            case "evenSize": def.Layers = [["s.", ".."]]; break;
+            case "tooTall":
+                var tallest = kind == "towerFloor" ? WorldGenerationConfig.TowerFloorHeight - 1 : WorldGenerationConfig.TowerAltarHeight;
+                def = TowerDefinition(kind, tallest + 1);
+                break;
+            case "filledAltarCell": def.Layers = [["...", ".s.", "..."]]; break;
+            case "satellite": def.Satellite = true; break;
+            case "waystone": def.Layers = [["w..", "...", "..."], ["u..", "...", "..."]]; break;
+        }
+        var error = Assert.Throws<InvalidOperationException>(() => StructureLoader.Compile("test", def, "bad/tower.json"));
+        Assert.Contains("bad/tower.json", error.Message);
+    }
+
+    [Fact]
+    public void AFloorDressingMayFillItsCenterWhereTheAltarMayNot()
+    {
+        var def = TowerDefinition("towerFloor");
+        def.Layers = [["...", ".s.", "..."]];
+        StructureLoader.Compile("test", def, "test.json");
+        def.Kind = "towerAltar";
+        Assert.Throws<InvalidOperationException>(() => StructureLoader.Compile("test", def, "test.json"));
+    }
+
     [Fact]
     public void EveryRuinKindHasTemplatesThatHoldTheirOwnLootChest()
     {

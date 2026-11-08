@@ -58,6 +58,13 @@ internal static class ChunkTerrainFill
         var maxHeight = column.MaxHeight;
         if (WorldGenerationConfig.TreesEnabled)
             maxHeight = neighborhoodMaxHeight + TreeGenerator.ReachUp + 1;
+        // A battle tower rises up to TowerPlacement.MaxHeightAboveGround over its ground, far past a
+        // tree's reach. Only a chunk column a tower's footprint reaches pays it (the rest pay a few
+        // hash and box rejects), and it keeps a tower chunk out of both the empty early-out and the
+        // sky short path, so the full pipeline below stamps it.
+        if (WorldGenerationConfig.TowersEnabled)
+            maxHeight = Math.Max(maxHeight,
+                TowerPlacement.TopReaching((int)chunk.Position.X * Size, (int)chunk.Position.Z * Size));
 
         // A chunk above the terrain still has water to fill when a body's surface reaches into it:
         // the sea reaches sea level, a lake its own level. A column that holds no water reports
@@ -322,6 +329,19 @@ internal static class ChunkTerrainFill
             FoliageGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Foliage);
 
+        // The battle towers: after the heightmap-reading scatter (snow, pebbles, cotton, flowers,
+        // foliage), which would otherwise float inside a tower's cleared interior, and before the
+        // sky layers. A tower writes every cell of its disc from its foundation to its top, air
+        // included, so it clears the terrain and trees inside. Never reaches hell or the sky bands.
+        if (WorldGenerationConfig.TowersEnabled
+            && Admits(stampGates, TowerPlacement.Band(neighborhoodMaxHeight), lowerBoundY))
+        {
+            var state = chunk.StateArray;
+            TowerPlacement.Stamp(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            chunk.StateArray = state;
+        }
+        timer?.Mark(Stage.Towers);
+
         // The sky layers, into air only: a chunk straddling the cloud slab under a tall tree's reach
         StampSky(chunk, worldX0, lowerBoundY, worldZ0, stampGates, timer);
 
@@ -463,8 +483,13 @@ internal static class ChunkTerrainFill
     // How many chunk columns away the site of a boulder, a desert well or a fallen log can lie
     // and still write into a chunk: its farthest horizontal reach in blocks, rounded up to chunks
     private static readonly int FeatureReachChunks =
-        (Math.Max(Math.Max(BoulderGenerator.HorizontalReach, DesertWellGenerator.FootprintRadius),
-             WorldFeatureConfig.FallenLogMaxLength) + Chunk.Size - 1) / Chunk.Size;
+        Math.Max(
+            (Math.Max(Math.Max(BoulderGenerator.HorizontalReach, DesertWellGenerator.FootprintRadius),
+                 WorldFeatureConfig.FallenLogMaxLength) + Chunk.Size - 1) / Chunk.Size,
+            // A tower's band reads NeighborhoodMaxHeight as an upper bound on its ground, so the scan
+            // must reach the tower's center column from every chunk its footprint covers. Free while
+            // TreeGenerator.ReachChunkRadius >= 2 (it is 2 today); kept so the band never under-covers.
+            (TowerPlacement.Reach + Chunk.Size - 1) / Chunk.Size);
 
     /// <summary>
     /// The tallest <see cref="ColumnData.MaxHeight"/> over the chunk columns within

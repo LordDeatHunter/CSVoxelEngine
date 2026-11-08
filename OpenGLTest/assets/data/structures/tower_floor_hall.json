@@ -1,0 +1,119 @@
+{
+  // A battle tower floor (plans/BATTLE_TOWER.md BT-2): a pillared hall. Four tower-brick pillars (remapped to the tower's
+  // biome brick) with cobblestone plinths rise to the next slab, a cobblestone-slab ring with four gaps marks the middle
+  // of the room, and lanterns hang under the slab above (layer 5, right under it). Spaces write nothing, so the shell's
+  // air shows through.
+  "kind": "towerFloor",
+  "weight": 1,
+  "groundLayer": 0,
+  "palette": {
+    "P": "tower_bricks",
+    "c": "cobblestone",
+    "h": "cobblestone_slab",
+    "L": "lantern"
+  },
+  "layers": [
+    [
+      "               ",
+      "  c         c  ",
+      " cPc       cPc ",
+      "  c  hh hh  c  ",
+      "    h     h    ",
+      "   h       h   ",
+      "   h       h   ",
+      "               ",
+      "   h       h   ",
+      "   h       h   ",
+      "    h     h    ",
+      "  c  hh hh  c  ",
+      " cPc       cPc ",
+      "  c         c  ",
+      "               "
+    ],
+    [
+      "               ",
+      "               ",
+      "  P         P  ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "  P         P  ",
+      "               ",
+      "               "
+    ],
+    [
+      "               ",
+      "               ",
+      "  P         P  ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "  P         P  ",
+      "               ",
+      "               "
+    ],
+    [
+      "               ",
+      "               ",
+      "  P         P  ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "  P         P  ",
+      "               ",
+      "               "
+    ],
+    [
+      "               ",
+      "               ",
+      "  P         P  ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "               ",
+      "  P         P  ",
+      "               ",
+      "               "
+    ],
+    [
+      "               ",
+      "               ",
+      "  P         P  ",
+      "       L       ",
+      "               ",
+      "               ",
+      "               ",
+      "   L   L   L   ",
+      "               ",
+      "               ",
+      "               ",
+      "       L       ",
+      "  P         P  ",
+      "               ",
+      "               "
+    ]
+  ]
+}

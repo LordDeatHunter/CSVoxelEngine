@@ -58,13 +58,18 @@ public static class RuinPlacement
                && TrySurfaceGround(template, x, z, out ground);
     }
 
-    /// <summary>The ground height under <paramref name="template"/> centered on (x, z) of a land column: false on water or where
-    /// the footprint steps more than <see cref="WorldFeatureConfig.RuinSurfaceMaxStep"/>.</summary>
+    /// <summary>The ground height under <paramref name="template"/> centered on (x, z) of a land column: false on water, where
+    /// the footprint (grown by a column) meets a battle tower's footprint (<see cref="TowerPlacement.Meets"/>), or where the
+    /// footprint steps more than <see cref="WorldFeatureConfig.RuinSurfaceMaxStep"/>. Surface ruins and their waystone
+    /// satellites both pass through here, so neither ever stands inside a tower; towers never read ruins, so the dependency
+    /// is one-way.</summary>
     internal static bool TrySurfaceGround(StructureTemplate template, int x, int z, out int ground)
     {
         ground = HeightAt(x, z);
         if (TerrainGenerator.IsWaterColumn(x, z, ground)) return false;
         var half = template.Half;
+        if (WorldGenerationConfig.TowersEnabled && TowerPlacement.Meets(x - half - 1, z - half - 1, x + half + 1, z + half + 1))
+            return false;
         for (var dx = -half; dx <= half; dx++)
         for (var dz = -half; dz <= half; dz++)
         {

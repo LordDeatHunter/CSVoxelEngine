@@ -9,7 +9,13 @@ public enum StructureKind
     Surface,
     Underground,
     Hell,
-    Sky
+    Sky,
+
+    /// <summary>Dresses one floor room of a battle tower (BT-2); never a ruin.</summary>
+    TowerFloor,
+
+    /// <summary>Dresses a battle tower's roof around the altar cell (BT-2); never a ruin.</summary>
+    TowerAltar
 }
 
 /// <summary>

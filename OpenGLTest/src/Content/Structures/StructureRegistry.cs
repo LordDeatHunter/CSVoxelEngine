@@ -16,8 +16,8 @@ public static class StructureRegistry
     public const int MaxHeight = 24;
 
     private static StructureTemplate[] _all = [];
-    private static StructureTemplate[][] _ruins = [[], [], [], []];
-    private static StructureTemplate[][] _satellites = [[], [], [], []];
+    private static StructureTemplate[][] _ruins = EmptyByKind();
+    private static StructureTemplate[][] _satellites = EmptyByKind();
 
     /// <summary>Every template, ruins and satellites, in file-name order.</summary>
     public static IReadOnlyList<StructureTemplate> All => _all;
@@ -59,6 +59,9 @@ public static class StructureRegistry
         _ruins = ByKind(satellite: false);
         _satellites = ByKind(satellite: true);
     }
+
+    private static StructureTemplate[][] EmptyByKind() =>
+        Enum.GetValues<StructureKind>().Select(_ => Array.Empty<StructureTemplate>()).ToArray();
 
     private static StructureTemplate[][] ByKind(bool satellite) =>
         Enum.GetValues<StructureKind>().Select(k => _all.Where(t => t.Kind == k && t.Satellite == satellite).ToArray()).ToArray();

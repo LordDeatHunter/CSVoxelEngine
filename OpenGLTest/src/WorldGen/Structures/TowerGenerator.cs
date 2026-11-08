@@ -1,0 +1,96 @@
+using System;
+using VoxelEngine.Chunks;
+using VoxelEngine.Content.Structures;
+
+namespace VoxelEngine.WorldGen.Structures;
+
+/// <summary>
+/// The battle tower's cells: the procedural shell (<see cref="TowerShell"/>) dressed by each floor's and the roof's template.
+/// One cell function (<see cref="Merge"/>) feeds both the chunk stamp (<see cref="StampSite"/>) and the point query
+/// (<see cref="CellAt(int, int, int)"/>), so the two agree across every chunk seam by construction. A template cell naming the
+/// plain tower brick is swapped for the site's palette brick. GL-free and pure.
+/// </summary>
+public static class TowerGenerator
+{
+    /// <summary>The tower cell at world (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>): -1 when no tower
+    /// writes it, else <c>block | state &lt;&lt; 8</c>, air included.</summary>
+    public static int CellAt(int x, int y, int z) => TowerPlacement.TryFindAt(x, z, out var site) ? CellAt(site, x, y, z) : -1;
+
+    /// <summary>The cell <paramref name="site"/> writes at world (<paramref name="x"/>, <paramref name="y"/>,
+    /// <paramref name="z"/>): -1 or <c>block | state &lt;&lt; 8</c>.</summary>
+    public static int CellAt(TowerSite site, int x, int y, int z)
+    {
+        var dx = x - site.CenterX;
+        var dz = z - site.CenterZ;
+        var step = TowerShell.StepOf(site, dx, dz);
+        return Merge(site, TowerShell.RingOf(site, dx, dz, step), step, x, y, z);
+    }
+
+    // The shell cell, unless a floor's or the roof's dressing template writes there
+    private static int Merge(TowerSite s, TowerRing ring, int step, int x, int y, int z)
+    {
+        if (ring == TowerRing.Outside) return -1;
+        var shell = TowerShell.CellAt(s, ring, step, y);
+        if (shell < 0) return shell;
+
+        // A room cell between two slabs (a slab itself is always shell)
+        if (ring == TowerRing.Room && y > s.GroundY && y < s.RoofY && (y - s.GroundY) % WorldGenerationConfig.TowerFloorHeight != 0)
+        {
+            var k = (y - s.GroundY) / WorldGenerationConfig.TowerFloorHeight;
+            var dressed = TemplateCell(s, s.FloorTemplates[k], s.FloorTurns[k], x, y - s.FloorY(k) - 1, z);
+            if (dressed >= 0) return dressed;
+        }
+        else if (ring != TowerRing.Apron && y > s.RoofY && y <= s.RoofY + s.Altar.Height)
+        {
+            var dressed = TemplateCell(s, s.Altar, s.AltarTurns, x, y - s.RoofY - 1, z);
+            if (dressed >= 0) return dressed;
+        }
+        return shell;
+    }
+
+    // A template centered on the tower's center column at template layer ly, remapped to the site's palette; -1 outside it
+    // or where it writes nothing
+    private static int TemplateCell(TowerSite s, StructureTemplate template, int turns, int x, int ly, int z)
+    {
+        var lx = x - StructureStamper.OriginOf(s.CenterX, template);
+        var lz = z - StructureStamper.OriginOf(s.CenterZ, template);
+        if ((uint)lx >= template.Size || (uint)lz >= template.Size || (uint)ly >= template.Height) return -1;
+        var cell = template.CellAt(turns, lx, ly, lz);
+        if (cell < 0 || (cell & 0xFF) != TowerPalette.DefaultBrick) return cell;
+        return (cell & ~0xFF) | s.Palette.Brick;
+    }
+
+    /// <summary>Writes <paramref name="site"/>'s cells inside the chunk whose minimum corner is (<paramref name="worldX0"/>,
+    /// <paramref name="worldY0"/>, <paramref name="worldZ0"/>). Every written cell's state byte is assigned, never OR'd, so a
+    /// stale tree, leaf or snow state never survives under a tower block.</summary>
+    internal static void StampSite(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0, TowerSite site)
+    {
+        var xLo = Math.Max(site.MinX, worldX0);
+        var xHi = Math.Min(site.MaxX, worldX0 + Chunk.Size - 1);
+        var zLo = Math.Max(site.MinZ, worldZ0);
+        var zHi = Math.Min(site.MaxZ, worldZ0 + Chunk.Size - 1);
+        var yLo = Math.Max(site.BottomY, worldY0);
+        var yHi = Math.Min(site.TopY, worldY0 + Chunk.Size - 1);
+        if (xLo > xHi || zLo > zHi || yLo > yHi) return;
+
+        for (var z = zLo; z <= zHi; z++)
+        for (var x = xLo; x <= xHi; x++)
+        {
+            var dx = x - site.CenterX;
+            var dz = z - site.CenterZ;
+            var step = TowerShell.StepOf(site, dx, dz);
+            var ring = TowerShell.RingOf(site, dx, dz, step);
+            if (ring == TowerRing.Outside) continue;
+            for (var y = yLo; y <= yHi; y++)
+            {
+                var cell = Merge(site, ring, step, x, y, z);
+                if (cell < 0) continue;
+                var index = Chunk.Idx(x - worldX0, y - worldY0, z - worldZ0);
+                blocks[index] = (byte)(cell & 0xFF);
+                var cellState = (byte)(cell >> 8);
+                if (cellState != 0 || state != null)
+                    (state ??= new byte[Chunk.Size * Chunk.Size * Chunk.Size])[index] = cellState;
+            }
+        }
+    }
+}

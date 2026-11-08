@@ -28,7 +28,8 @@ internal static class StructureLoader
         string Fail(string why) => $"Structure '{path}' {why}";
 
         if (!Enum.TryParse<StructureKind>(d.Kind, true, out var kind))
-            throw new InvalidOperationException(Fail($"has kind '{d.Kind}'; expected surface, underground, hell or sky."));
+            throw new InvalidOperationException(Fail($"has kind '{d.Kind}'; expected surface, underground, hell, sky, towerFloor or towerAltar."));
+        var tower = kind is StructureKind.TowerFloor or StructureKind.TowerAltar;
         var weight = d.Weight ?? 1f;
         if (!float.IsFinite(weight) || weight <= 0f) throw new InvalidOperationException(Fail("needs a weight above 0."));
         if (d.Layers is not { Length: > 0 } layers) throw new InvalidOperationException(Fail("has no layers."));
@@ -51,6 +52,7 @@ internal static class StructureLoader
         var size = firstRows.Length;
         if (size > StructureRegistry.MaxSize)
             throw new InvalidOperationException(Fail($"is {size} rows deep; expected 1..{StructureRegistry.MaxSize}."));
+        if (tower) ValidateTowerShape(kind, d, layers.Length, groundLayer, size, Fail);
         var cells = new int[layers.Length * size * size];
         var facing = new bool[cells.Length];
         var waystones = 0;
@@ -91,6 +93,16 @@ internal static class StructureLoader
                 throw new InvalidOperationException(Fail($"has the upper half '{type.Name}' in layer {y} without its lower half right below it."));
         }
 
+        // A tower dressing holds no waystone, and the altar dressing leaves its center floor cell (BT-6's altar) free
+        if (tower && waystones != 0)
+            throw new InvalidOperationException(Fail("is a tower template holding a waystone block; tower templates hold none."));
+        if (kind == StructureKind.TowerAltar)
+        {
+            var center = size / 2 * size + size / 2;
+            if (BlockAt(cells, center) > 0)
+                throw new InvalidOperationException(Fail("fills its center column's bottom layer, which is the altar cell; leave it ' ' or '.'."));
+        }
+
         // A satellite is a waystone site: exactly one waystone (its lower half), the one the registry names; a ruin
         // holds none
         var satellite = d.Satellite ?? false;
@@ -110,6 +122,22 @@ internal static class StructureLoader
         }
 
         return new StructureTemplate(name, kind, satellite, weight, size, layers.Length, groundLayer, biomes, cells, facing);
+    }
+
+    // A tower dressing (towerFloor, towerAltar) is centered on the tower's axis and stands on a slab: no satellite flag,
+    // no ground layer, an odd size, and no taller than the room under the next slab (a floor) or the altar cap (the roof)
+    private static void ValidateTowerShape(StructureKind kind, StructureDefinition d, int height, int groundLayer, int size,
+        Func<string, string> fail)
+    {
+        if (d.Satellite == true)
+            throw new InvalidOperationException(fail("is a tower template marked as a satellite; tower templates never are."));
+        if (groundLayer != 0)
+            throw new InvalidOperationException(fail($"is a tower template with groundLayer {groundLayer}; expected 0 (it stands on the slab)."));
+        if (size % 2 == 0)
+            throw new InvalidOperationException(fail($"is a tower template {size} wide; expected an odd size (it centers on the tower's axis)."));
+        var maxHeight = kind == StructureKind.TowerFloor ? WorldGenerationConfig.TowerFloorHeight - 1 : WorldGenerationConfig.TowerAltarHeight;
+        if (height > maxHeight)
+            throw new InvalidOperationException(fail($"is a {kind} template {height} layers tall; the most is {maxHeight}."));
     }
 
     // The block a template cell writes, or -1 for a cell that writes nothing

@@ -93,6 +93,8 @@ public sealed class StampGateTests
             (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FlowerGenerator.Stamp(b, c, x, y, z), true),
         new("Foliage", Stage.Foliage, (c, _) => FoliageGenerator.WriteBand(c),
             (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => FoliageGenerator.Stamp(b, c, x, y, z), true),
+        new("Towers", Stage.Towers, (_, nb) => TowerPlacement.Band(nb),
+            (byte[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => TowerPlacement.Stamp(b, ref s, x, y, z), true),
         new("Clouds", Stage.Clouds, (_, _) => CloudPatchGenerator.WriteBand(),
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => CloudPatchGenerator.Stamp(b, x, y, z), true),
         new("CloudSea", Stage.CloudSea, (_, _) => CloudSeaGenerator.WriteBand(),

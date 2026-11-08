@@ -917,6 +917,90 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>Generations of the sky tree cache.</summary>
     public const int SkyTreeCacheGenerations = 4;
 
+    /// <summary>Capacity of the battle tower site cache (one entry per tower cell, a site or none), read by the
+    /// generation workers; see <see cref="TreeShapeCacheCapacity"/>.</summary>
+    public const int TowerSiteCacheCapacity = 256;
+
+    /// <summary>Generations of the battle tower site cache.</summary>
+    public const int TowerSiteCacheGenerations = 4;
+
+    // Battle tower (plans/BATTLE_TOWER.md BT-2): a procedural shell of unbreakable tower brick, one hashed site per
+    // tower cell, dressed by hand-authored towerFloor / towerAltar templates. First guesses, tuned against the
+    // default seed's rarity
+
+    /// <summary>Master switch for the battle towers (<c>TowerPlacement</c>).</summary>
+    public const bool TowersEnabled = true;
+
+    /// <summary>The side of a tower cell: each cell rolls at most one tower, wholly inside it.</summary>
+    public const int TowerCellBlocks = 1536;
+
+    /// <summary>The chance a tower cell rolls a tower, before the site rules (level, dry land) refuse it.</summary>
+    public const float TowerChance = 0.6f;
+
+    /// <summary>No tower footprint reaches this close to the origin.</summary>
+    public const float TowerSpawnClearRadius = ReliefSpawnClearStart;
+
+    /// <summary>The smallest radius a tower rolls, to the outside of its outer wall.</summary>
+    public const int TowerMinRadius = 20;
+
+    /// <summary>The largest radius a tower rolls.</summary>
+    public const int TowerMaxRadius = 24;
+
+    /// <summary>The fewest floors a tower rolls.</summary>
+    public const int TowerMinFloors = 4;
+
+    /// <summary>The most floors a tower rolls.</summary>
+    public const int TowerMaxFloors = 8;
+
+    /// <summary>Blocks from one floor slab to the next.</summary>
+    public const int TowerFloorHeight = 7;
+
+    /// <summary>Thickness of the outer wall, in cells.</summary>
+    public const int TowerWallThickness = 2;
+
+    /// <summary>Width of the stair corridor between the outer and the inner wall, in cells.</summary>
+    public const int TowerStairWidth = 3;
+
+    /// <summary>Thickness of the inner wall around the floor rooms, in cells.</summary>
+    public const int TowerInnerWallThickness = 1;
+
+    /// <summary>Half-steps of the spiral stair per full turn around the tower.</summary>
+    public const int TowerStairStepsPerTurn = 60;
+
+    /// <summary>Air cells kept clear above every stair step (and the entrance and doorways).</summary>
+    public const int TowerStairHeadroom = 3;
+
+    /// <summary>Stair half-steps the ground entrance spans before the climb starts.</summary>
+    public const int TowerEntranceSteps = 3;
+
+    /// <summary>How many half-steps either side of a landing its inner-wall doorway spans.</summary>
+    public const int TowerDoorwayHalfSteps = 2;
+
+    /// <summary>Half-steps past a landing at which a floor's barrier door (BT-4) closes the stair; even, and above
+    /// <see cref="TowerDoorwayHalfSteps"/> + 2 so the door stands clear of the doorway.</summary>
+    public const int TowerDoorStepOffset = 6;
+
+    /// <summary>How far the entrance apron reaches outside the outer wall.</summary>
+    public const int TowerApronDepth = 3;
+
+    /// <summary>Height of the crenellated parapet above the roof slab.</summary>
+    public const int TowerParapetHeight = 2;
+
+    /// <summary>The tallest the altar dressing on the roof may be (the towerAltar template's layer cap).</summary>
+    public const int TowerAltarHeight = 8;
+
+    /// <summary>How deep the brick foundation reaches under the ground slab.</summary>
+    public const int TowerFoundationDepth = 6;
+
+    /// <summary>The largest ground height step from the center a tower site accepts across its disc.</summary>
+    public const int TowerMaxStep = 4;
+
+    /// <summary>Spacing of the ground samples a tower site checks across its disc.</summary>
+    public const int TowerSiteSampleStep = 4;
+
+    /// <summary>How far past the apron the site check keeps sampling for water and level ground.</summary>
+    public const int TowerSiteWaterRing = 3;
+
     /// <summary>Bottom of the solid cloud slab: the patchy real cloud blocks around y 200, above the
     /// relief ceiling (<see cref="ReliefCeilingHeight"/>) and the drawn cloud layer
     /// (<see cref="SkyConfig.CloudHeight"/>).</summary>

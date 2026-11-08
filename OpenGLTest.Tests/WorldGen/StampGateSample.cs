@@ -5,6 +5,7 @@ using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 
 namespace VoxelEngine.Tests.WorldGen;
 
@@ -26,7 +27,10 @@ namespace VoxelEngine.Tests.WorldGen;
 /// on the frozen plains and oases. Every chunk column a site's footprint touches is added;</item>
 /// <item>for every column, every chunk from two below its lowest ground to one above its tallest
 /// ground plus the tree reach, plus the chunk holding its highest water level and the one above
-/// it. The sky chunks in that range simply take the fill's early-out.</item>
+/// it. The sky chunks in that range simply take the fill's early-out;</item>
+/// <item>the nearest battle tower (<see cref="TowerPlacement.TryFindNearest"/>): a seam-crossing 2x2
+/// block of chunk columns holding its center, every chunk from one below its foundation to one above
+/// its top.</item>
 /// </list>
 /// The default set is sized for the default test suite; setting the environment variable
 /// <see cref="ExhaustiveVariable"/> to <c>1</c> scales every count up (thousands of chunks) for
@@ -170,6 +174,20 @@ internal static class StampGateSample
             for (var cy = (WorldGenerationConfig.SkyIslandBottomY >> Chunk.SizeShift) - 1;
                  cy <= (WorldGenerationConfig.SkyIslandTopY >> Chunk.SizeShift) + 1; cy++)
                 AddChunk(new Vector3(island.Cx, cy, island.Cz));
+        }
+
+        // The nearest battle tower: the 2x2 block of chunk columns whose shared corner lies nearest
+        // its center (so it crosses a seam and holds the center column), every chunk from one below
+        // its foundation to one above its top, so the tower gate meets real tower cells, including
+        // the upper chunks only the raised early-out keeps filled
+        if (TowerPlacement.TryFindNearest(0, 0, 6, out var tower))
+        {
+            var tcx0 = (tower.CenterX - Chunk.Size / 2) >> Chunk.SizeShift;
+            var tcz0 = (tower.CenterZ - Chunk.Size / 2) >> Chunk.SizeShift;
+            for (var tcx = tcx0; tcx <= tcx0 + 1; tcx++)
+            for (var tcz = tcz0; tcz <= tcz0 + 1; tcz++)
+            for (var cy = tower.MinChunkY - 1; cy <= tower.MaxChunkY + 1; cy++)
+                AddChunk(new Vector3(tcx, cy, tcz));
         }
 
         return chunks;

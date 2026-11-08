@@ -7,6 +7,7 @@ using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
 using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 
 namespace VoxelEngine;
 
@@ -88,6 +89,7 @@ public static class WorldSeed
         TreeGenerator.ResetCaches();
         HellTrees.ResetCache();
         SkyTrees.ResetCache();
+        TowerPlacement.ResetCache();
         TerrainPeaks.ResetCaches();
         GreatLakes.ResetCaches();
         WaterBodies.ResetCaches();

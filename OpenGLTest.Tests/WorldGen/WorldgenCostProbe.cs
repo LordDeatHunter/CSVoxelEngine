@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Numerics;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -14,7 +15,8 @@ namespace VoxelEngine.Tests.WorldGen;
 /// <see cref="TerrainGenerator.Compute"/> per chunk column over fixed, SplitMix64-drawn column
 /// categories (land, ocean, lake/river, highland, massif, great lake), and the per-stage cost of
 /// <c>ChunkTerrainFill.GenerateBlockData</c> through <see cref="WorldgenStageTimer"/> on fixed
-/// surface, above-surface, sky, deep-stone, cave-heavy, sea-floor, hell, sky-island and cloud-sea chunks,
+/// surface, above-surface, sky, deep-stone, cave-heavy, sea-floor, hell, sky-island, cloud-sea and
+/// battle-tower chunks,
 /// each timed cold and
 /// warm, so a worldgen change can report its before/after cost on the same workload.
 ///
@@ -70,12 +72,13 @@ public sealed class WorldgenCostProbe
     private const int Hell = 6;
     private const int SkyIsland = 7;
     private const int CloudSea = 8;
+    private const int Tower = 9;
 
     // Hell chunks are drawn from this many chunk layers under the one straddling hell's top
     private const int HellChunkLayers = 36;
 
     private static readonly string[] ChunkClassNames =
-        ["surface", "above", "sky", "deepStone", "caveHeavy", "seaFloor", "hell", "skyIsland", "cloudSea"];
+        ["surface", "above", "sky", "deepStone", "caveHeavy", "seaFloor", "hell", "skyIsland", "cloudSea", "tower"];
 
     [Fact]
     public void ComputeCostPerColumnCategory()
@@ -339,6 +342,7 @@ public sealed class WorldgenCostProbe
         }
 
         AddSkyIslandChunks(classes[SkyIsland]);
+        AddTowerChunks(classes[Tower]);
 
         var ranked = new List<(int Carved, Vector3 Pos)>(underground.Count);
         foreach (var pos in underground)
@@ -387,6 +391,29 @@ public sealed class WorldgenCostProbe
             into.Add(new Vector3((int)MathF.Floor(island.CenterX) >> Chunk.SizeShift, island.BaseY >> Chunk.SizeShift,
                 (int)MathF.Floor(island.CenterZ) >> Chunk.SizeShift));
         }
+    }
+
+    /// <summary>Chunks of the battle tower nearest the origin: the center chunk at its ground, the
+    /// center chunk of a middle floor, the center chunk at its roof, and the chunk the outer wall
+    /// crosses on the +X side at ground level. A tower the ring scan cannot find leaves the class empty.</summary>
+    private static void AddTowerChunks(List<Vector3> into)
+    {
+        if (!TowerPlacement.TryFindNearest(0, 0, 6, out var tower))
+            return;
+
+        var cx = tower.CenterX >> Chunk.SizeShift;
+        var cz = tower.CenterZ >> Chunk.SizeShift;
+        AddDistinct(into, new Vector3(cx, tower.GroundY >> Chunk.SizeShift, cz));
+        AddDistinct(into, new Vector3(cx, tower.FloorY(tower.Floors / 2) >> Chunk.SizeShift, cz));
+        AddDistinct(into, new Vector3(cx, tower.RoofY >> Chunk.SizeShift, cz));
+        AddDistinct(into, new Vector3((tower.CenterX + tower.Radius) >> Chunk.SizeShift,
+            tower.GroundY >> Chunk.SizeShift, cz));
+    }
+
+    private static void AddDistinct(List<Vector3> list, Vector3 pos)
+    {
+        if (list.Count < PositionsPerClass && !list.Contains(pos))
+            list.Add(pos);
     }
 
     private static void TryAdd(List<Vector3> list, int target, Vector3 pos)

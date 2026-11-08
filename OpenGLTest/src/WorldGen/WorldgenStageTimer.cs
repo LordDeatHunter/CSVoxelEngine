@@ -93,6 +93,8 @@ internal sealed class WorldgenStageTimer
         Flowers,
         /// <summary>FoliageGenerator.Stamp.</summary>
         Foliage,
+        /// <summary>TowerPlacement.Stamp, the battle towers.</summary>
+        Towers,
         /// <summary>CloudPatchGenerator.Stamp.</summary>
         Clouds,
         /// <summary>CloudSeaGenerator.Stamp.</summary>
