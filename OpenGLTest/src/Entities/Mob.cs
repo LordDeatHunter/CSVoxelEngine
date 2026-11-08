@@ -337,6 +337,18 @@ public abstract class Mob
     }
 
     /// <summary>
+    /// Slides the body horizontally by <paramref name="delta"/> through the shared block sweep, so a
+    /// nudge can never push it into a solid cell: how <see cref="MobSeparation"/> resolves two
+    /// bodies standing in the same space.
+    /// </summary>
+    internal void Nudge(Vector3 delta, ChunkManager chunks)
+    {
+        var half = new Vector3(BodyHalfExtent, BodyHalfHeight, BodyHalfExtent);
+        if (delta.X != 0f) Position = BoxSweep.MoveOnAxis(Position, delta.X, 0, half, chunks, out _);
+        if (delta.Z != 0f) Position = BoxSweep.MoveOnAxis(Position, delta.Z, 2, half, chunks, out _);
+    }
+
+    /// <summary>
     /// The point melee swings aim at and test their line of sight to, seen from <paramref name="from"/>: the body
     /// center by default; a multi-part body gives its nearest exposed part, or null while none can be hit (a worm
     /// fully under the sand), which keeps the mob out of every swing.

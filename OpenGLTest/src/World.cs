@@ -1113,6 +1113,7 @@ public class World
         // After every mob manager and before the thrown items, so a mob killed or despawned
         // this frame is never hit by a projectile or drawn a healthbar.
         Director.RefreshMobs();
+        MobSeparation.Separate(_mobs, _chunkManager);
         // A mob that landed this frame kicks up its dust and an affected mob sheds its effects'
         // particles; a server spawns no particles
         if (!_serverMode)

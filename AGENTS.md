@@ -2588,7 +2588,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Surfaces/                  # glass, grass, ice, lava, leaf and ore twins, the snow sparkle shader term
     Water/                     # deep-water fog, the waterline fresnel, sun glitter, the shore foam shader term
   Entities/                    # the Mob base and the shared mob rules (caps, targets, notice, interest, fall,
-                               #   lava, ledge, loot), clips and the animator, drops, projectiles, damage numbers
+                               #   lava, ledge, loot, body separation), clips and the animator, drops, projectiles,
+                               #   damage numbers
     Goblins/                   # goblin AI, aim and stones, flee, dodge, pack alert,
                                #   torches, the content contract (mirrors src/Entities/Goblins)
     HellMobs/                  # hell mob contracts, layer difficulty, brute blow, caster cast and bolt burn
@@ -5209,7 +5210,12 @@ update; a body box touching a burning fluid (`MobLava.BodyInLava`, sharing the c
 `BurningFluid.AnyInBox` with `PlayerBodyProbe.InLava`) takes `MobLava.DamagePerTick` (`MobLavaDamageShare` of its full health, at
 least 1) every `MobLavaTickSeconds` with the hit flash, leaving it clears the partial tick, and a
 death it causes rolls the loot as usual (`MobLavaTests`). `visual-examples/mob-hazards.json`
-(`VOXEL_TIME=147`) films the falls and the lava bath. **Despawn fade**: a mob past every target's
+(`VOXEL_TIME=147`) films the falls and the lava bath. **Body collision**: after the managers run,
+`MobSeparation.Separate` (called by `World.Update` over the rebuilt `World.Mobs`) pushes every two
+living mobs whose body boxes overlap apart along the shallower horizontal axis, each taking half unless
+a wall blocks it; a pushed body slides through `BoxSweep` (`Mob.Nudge`), so no pack can stack in one
+silhouette and no push enters a solid cell. A dying mob and a boss are left alone, and a pair that only
+meets at different heights is not pushed (`MobSeparationTests`). **Despawn fade**: a mob past every target's
 despawn radius is not removed outright; the manager calls `Mob.BeginDying` without rolling any loot,
 so it plays its death pose and is dropped once that has run, and like any dying mob it leaves
 `LivingCount`, the saves and the server's broadcast at once (`SlimeTests`, `GoblinManagerTests`,
