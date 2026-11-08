@@ -145,10 +145,10 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                             $"Step {_step + 1} spawns on column ({feet.X}, {feet.Z}), whose ground height is unavailable.");
                     feet.Y = ground + 1;
                 }
-                if (!world.SpawnEntity(step.Entity!, feet, step.Size))
+                if (!world.SpawnEntity(step.Entity!, feet, step.Size, step.Tier))
                     throw new InvalidOperationException(
                         $"Step {_step + 1} cannot spawn '{step.Entity}': an unknown entity, or the mob hard cap is full.");
-                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} spawn {step.Entity} (size {step.Size}) at {feet}");
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} spawn {step.Entity} (size {step.Size}, tier {step.Tier}) at {feet}");
                 Advance();
                 break;
 

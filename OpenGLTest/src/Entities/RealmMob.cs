@@ -44,35 +44,61 @@ public abstract class RealmMob : RiggedMob
     /// <summary>A multiplier on the ground walk this frame (a brute's charge); 1 by default.</summary>
     protected virtual float GroundSpeedFactor => 1f;
 
-    /// <summary>The kind's one attack clip (a swing, a cast, a dive, a slam), started through
-    /// <see cref="StartAttack"/>.</summary>
+    /// <summary>The kind's first attack clip, variant 0 (a swing, a cast, a dive, a slam), started through
+    /// <see cref="StartAttack()"/>; a kind with one attack has only this one.</summary>
     public abstract string AttackClip { get; }
 
+    /// <summary>How many attack clips the kind has (<see cref="AttackClipOf"/>); 1 by default.</summary>
+    protected virtual int AttackVariants => 1;
+
+    /// <summary>The attack clip of <paramref name="variant"/> (0..<see cref="AttackVariants"/> - 1);
+    /// <see cref="AttackClip"/> by default.</summary>
+    protected virtual string AttackClipOf(int variant) => AttackClip;
+
+    /// <summary>The attack clip an attack count names: its remainder modulo <see cref="AttackVariants"/>
+    /// is the variant.</summary>
+    public string AttackClipFor(int count) => AttackClipOf(VariantOf(count));
+
     /// <summary>
-    /// How many attacks the mob has started (<see cref="StartAttack"/>), the counter a server broadcasts in
+    /// How many attacks the mob has started (<see cref="StartAttack(int)"/>), the counter a server broadcasts in
     /// the mob's <see cref="Networking.NetEntity.Ammo"/> so a client's mirror can play each one
-    /// (<see cref="MirrorAttackCount"/>); a mirror holds the server's count.
+    /// (<see cref="MirrorAttackCount"/>); a mirror holds the server's count. Its remainder modulo
+    /// <see cref="AttackVariants"/> names the clip a mirror plays (<see cref="AttackClipFor"/>).
     /// </summary>
     public int AttackCount { get; private set; }
 
-    /// <summary>Plays the attack clip and counts the attack (<see cref="AttackCount"/>).</summary>
-    protected void StartAttack()
+    /// <summary>Plays the first attack clip and counts the attack (<see cref="AttackCount"/>).</summary>
+    protected void StartAttack() => StartAttack(0);
+
+    /// <summary>
+    /// Plays the attack clip of <paramref name="variant"/> and advances <see cref="AttackCount"/> to the next
+    /// count whose remainder names that variant, so the count always moves (by 1 for a one-attack kind).
+    /// </summary>
+    protected void StartAttack(int variant)
     {
-        Animation.Play(AttackClip);
-        AttackCount++;
+        var n = AttackVariants;
+        var step = ((variant - AttackCount) % n + n) % n;
+        AttackCount += step == 0 ? n : step;
+        Animation.Play(AttackClipOf(variant));
     }
 
     /// <summary>
     /// A client's mirror takes the server's <see cref="AttackCount"/> from a snapshot: a count that moved since
-    /// the last snapshot means the server started an attack, so the mirror plays its attack clip (once; the
-    /// locomotion pose returns when the clip ends). The first count a mirror sees only sets it, and a dying
-    /// mirror keeps its death.
+    /// the last snapshot means the server started an attack, so the mirror plays the clip that count names
+    /// (once; the locomotion pose returns when the clip ends). The first count a mirror sees only sets it, and a
+    /// dying mirror keeps its death.
     /// </summary>
     public void MirrorAttackCount(int count)
     {
-        if (_attackCountMirrored && count != AttackCount && !IsDying) Animation.Play(AttackClip);
+        if (_attackCountMirrored && count != AttackCount && !IsDying) Animation.Play(AttackClipFor(count));
         AttackCount = count;
         _attackCountMirrored = true;
+    }
+
+    private int VariantOf(int count)
+    {
+        var n = AttackVariants;
+        return ((count % n) + n) % n;
     }
 
     /// <summary>Where the mob looks from at its target's chest: its eye, a little under the head top.</summary>

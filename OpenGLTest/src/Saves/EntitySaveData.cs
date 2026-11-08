@@ -3,6 +3,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 
 namespace VoxelEngine.Saves;
 
@@ -49,6 +50,11 @@ public sealed class EntitySaveData
         /// <summary>Torches still carried (<see cref="Goblin.Torches"/>); only meaningful for a
         /// goblin. Absent, as in a file saved before goblins carried torches, restores none.</summary>
         public int? Torches { get; set; }
+
+        /// <summary>The tower floor tier (<see cref="Skeleton.Tier"/>); only meaningful for a skeleton.
+        /// Absent restores tier 0. Saved explicitly because, unlike a hell mob's layer, it cannot be
+        /// read back from the position.</summary>
+        public int? Tier { get; set; }
     }
 
     /// <summary>One item drop lying (or falling) in the world.</summary>

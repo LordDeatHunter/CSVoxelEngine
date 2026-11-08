@@ -8,6 +8,7 @@ using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Networking;
 using VoxelEngine.WorldGen;
 using Xunit;
@@ -78,6 +79,51 @@ public sealed class NetworkEntitySyncTests : IDisposable
         for (var i = 0; i < 120 && _world.HellMobs.Count > 0; i++)
             _world.Update(Dt, null);
         Assert.Empty(_world.HellMobs);
+    }
+
+    [Fact]
+    public void ASkeletonMirrorTakesItsTierFromTheSnapshotAndIsReplacedWhenTheTierDiffers()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        var pos = new Vector3(4f, 60f, 4f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Skeleton, 7, pos, 1f, 25, 0, 4, Vector3.Zero),
+        ]);
+        var skeleton = Assert.IsType<Skeleton>(Assert.Single(_world.Skeletons));
+        // Nothing about where it stands names its floor: the tier is the snapshot's, and so is its scaled pool
+        Assert.Equal(4, skeleton.Tier);
+        Assert.True(skeleton.MaxHealth > EntityRegistry.Require(Skeleton.EntityName).MaxHealth);
+        Assert.Equal(25, skeleton.Health);
+
+        // The same tier updates in place, and its attack count plays the clip the count names
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Skeleton, 7, pos + Vector3.UnitX, 1f, 20, 1, 4, Vector3.Zero),
+        ]);
+        Assert.Same(skeleton, Assert.Single(_world.Skeletons, s => !s.IsDying));
+        Assert.Equal(20, skeleton.Health);
+        Assert.True(skeleton.Animation.IsPlaying(Skeleton.ShootClip));
+
+        // A different tier under the same id is a different mob: the old one dies, a new one takes the tier
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Skeleton, 7, pos, 1f, 20, 1, 6, Vector3.Zero),
+        ]);
+        Assert.True(skeleton.IsDying);
+        var replaced = Assert.Single(_world.Skeletons, s => !s.IsDying);
+        Assert.NotSame(skeleton, replaced);
+        Assert.Equal(6, replaced.Tier);
+
+        // A tier past the tower's top floor clamps, and then matches the clamped mirror instead of churning
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Skeleton, 8, pos, 1f, 20, 0, 255, Vector3.Zero),
+        ]);
+        var clamped = Assert.Single(_world.Skeletons, s => !s.IsDying && s != replaced);
+        Assert.Equal(MobConfig.TowerMaxTier, clamped.Tier);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Skeleton, 8, pos, 1f, 20, 0, 255, Vector3.Zero),
+        ]);
+        Assert.False(clamped.IsDying);
     }
 
     [Fact]

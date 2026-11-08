@@ -14,6 +14,7 @@ using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation.Icebergs;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;
 
 namespace VoxelEngine.Simulation;
@@ -34,6 +35,7 @@ internal sealed class MobDirector
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly SkeletonManager? _skeletons;
     private readonly SandwormManager? _sandworms;
     private readonly IcebergManager? _icebergs;
     private readonly BlockDebrisSystem _debris;
@@ -55,13 +57,14 @@ internal sealed class MobDirector
     private MobStrikes Strikes => _world.Strikes;
 
     internal MobDirector(World world, ChunkManager chunkManager, DropManager dropManager, SlimeManager? slimes,
-        GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, SandwormManager? sandworms, IcebergManager? icebergs,
-        BlockDebrisSystem debris,
+        GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, SkeletonManager? skeletons, SandwormManager? sandworms,
+        IcebergManager? icebergs, BlockDebrisSystem debris,
         FireParticleSystem? embers, PlayerHealth health, List<Mob> mobs, bool serverMode, bool clientMode,
         StatusEffectBlockWriter? statusBlocks)
     {
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _skeletons = skeletons;
         _sandworms = sandworms;
         _embers = embers;
         _statusBlocks = statusBlocks;
@@ -123,7 +126,7 @@ internal sealed class MobDirector
         _icebergs.CarryAndPushOut(Camera, _chunkManager);
     }
 
-    /// <summary>The mob part of the world's entity update: rebuilds the targets, runs the slime, goblin, hell and sky mob managers and bills the damage they dealt, then converts the cells the bodies' status effects pulsed (<see cref="ApplyStatusBlockActions"/>).</summary>
+    /// <summary>The mob part of the world's entity update: rebuilds the targets, runs the slime, goblin, hell, sky, skeleton and sandworm managers and bills the damage they dealt, then converts the cells the bodies' status effects pulsed (<see cref="ApplyStatusBlockActions"/>).</summary>
     internal void Update(double deltaTime)
     {
         RefreshTargets();
@@ -165,6 +168,13 @@ internal sealed class MobDirector
         {
             _skyMobs.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris);
             BillLocalPlayer(_skyMobs.DamageDealtThisFrame);
+        }
+
+        // The tower's skeletons rake up close and shoot arrows at range; they never spawn on their own
+        if (_skeletons != null)
+        {
+            _skeletons.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris);
+            BillLocalPlayer(_skeletons.DamageDealtThisFrame);
         }
 
         // The sandworm boss hunts under the sand, erupts under its target and slides at it
@@ -222,6 +232,8 @@ internal sealed class MobDirector
             ApplyMobBlockActions(_hellMobs.Mobs);
         if (_skyMobs != null)
             ApplyMobBlockActions(_skyMobs.Mobs);
+        if (_skeletons != null)
+            ApplyMobBlockActions(_skeletons.Mobs);
         if (_sandworms != null)
             ApplyMobBlockActions(_sandworms.Worms);
         for (var i = 0; i < _mobTargets.Count; i++)
@@ -309,6 +321,9 @@ internal sealed class MobDirector
         if (_skyMobs != null)
             AddLiving(_skyMobs.Mobs);
 
+        if (_skeletons != null)
+            AddLiving(_skeletons.Mobs);
+
         if (_sandworms != null)
             AddLiving(_sandworms.Worms);
     }
@@ -325,10 +340,10 @@ internal sealed class MobDirector
     /// Spawns one mob of the named entity kind standing with its feet at <paramref name="feet"/>
     /// (the scripted visual tests' <c>spawn</c> op), a forced spawn under the hard mob cap. False
     /// for an unknown name, a kind whose manager does not exist because its content is not
-    /// registered, or a full hard cap. <paramref name="size"/> is a slime's size (other kinds
-    /// have none and ignore it).
+    /// registered, or a full hard cap. <paramref name="size"/> is a slime's size and
+    /// <paramref name="tier"/> a skeleton's tower floor tier (other kinds have neither and ignore them).
     /// </summary>
-    internal bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min)
+    internal bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min, int tier = 0)
     {
         if (string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
         {
@@ -353,6 +368,13 @@ internal sealed class MobDirector
         if (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f)
         {
             if (_skyMobs.Spawn(name, feet + new Vector3(0f, SkyMobManager.HeightOf(name) * 0.5f, 0f)) == null)
+                return false;
+            RefreshMobs();
+            return true;
+        }
+        if (_skeletons != null && SkeletonManager.HeightOf(name) > 0f)
+        {
+            if (_skeletons.Spawn(feet + new Vector3(0f, SkeletonManager.HeightOf(name) * 0.5f, 0f), tier) == null)
                 return false;
             RefreshMobs();
             return true;

@@ -9,6 +9,7 @@ using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 
 namespace VoxelEngine.ItemDebugger;
 
@@ -23,8 +24,9 @@ namespace VoxelEngine.ItemDebugger;
 /// named by its file (<see cref="SelectedVariant"/>), and an entity with no health pool is never offered
 /// <see cref="HurtMode"/>.
 /// <para>
-/// A goblin, a hell mob or a slime is previewed as the real <see cref="RiggedMob"/> (<see cref="Goblin"/>,
-/// <see cref="Hellbrute"/>, <see cref="Cinderwitch"/>, <see cref="Galeraptor"/>, <see cref="Cloudgolem"/>) or
+/// A goblin, a hell, sky or tower mob or a slime is previewed as the real <see cref="RiggedMob"/> (<see cref="Goblin"/>,
+/// <see cref="Hellbrute"/>, <see cref="Cinderwitch"/>, <see cref="Galeraptor"/>, <see cref="Cloudgolem"/>,
+/// <see cref="Skeleton"/> at tier 0) or
 /// <see cref="Slime"/> object, driven
 /// the way a client drives a mob it does not simulate (<see cref="Mob.AnimateMirror"/>), so everything the
 /// game layers on top of the clips shows up here too: the spawn pop, the hit recoil and flash (and the
@@ -486,6 +488,8 @@ public sealed class EntityPreviewState : IPreviewDriver
             return new Galeraptor(type, Vector3.Zero, spawnIn);
         if (string.Equals(type.Name, Cloudgolem.EntityName, StringComparison.OrdinalIgnoreCase))
             return new Cloudgolem(type, Vector3.Zero, spawnIn);
+        if (string.Equals(type.Name, Skeleton.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new Skeleton(type, Vector3.Zero, tier: 0, spawnIn);
         return null;
     }
 

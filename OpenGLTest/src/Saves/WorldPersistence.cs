@@ -9,9 +9,11 @@ using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Icebergs;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Saves;
@@ -31,6 +33,7 @@ internal sealed class WorldPersistence
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly SkeletonManager? _skeletons;
     private readonly SandwormManager? _sandworms;
     private readonly IcebergManager? _icebergs;
     private readonly PlayerHealth _health;
@@ -48,12 +51,13 @@ internal sealed class WorldPersistence
     private IReadOnlyList<Goblin> Goblins => _world.Goblins;
     private IReadOnlyList<HellMob> HellMobs => _world.HellMobs;
     private IReadOnlyList<SkyMob> SkyMobs => _world.SkyMobs;
+    private IReadOnlyList<Skeleton> Skeletons => _world.Skeletons;
     private IReadOnlyList<Sandworm> Sandworms => _world.Sandworms;
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
 
     internal WorldPersistence(World world, ChunkSaveStore? saveStore, ChunkManager chunkManager,
         DropManager dropManager, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, SandwormManager? sandworms, IcebergManager? icebergs, PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
+        SkyMobManager? skyMobs, SkeletonManager? skeletons, SandwormManager? sandworms, IcebergManager? icebergs, PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         StationSaveData? savedStations)
     {
@@ -70,6 +74,7 @@ internal sealed class WorldPersistence
         _goblins = goblins;
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _skeletons = skeletons;
         _sandworms = sandworms;
         _icebergs = icebergs;
         _health = health;
@@ -351,10 +356,11 @@ internal sealed class WorldPersistence
         || (_goblins != null && string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
         || (_hellMobs != null && HellMobManager.HeightOf(name) > 0f)
         || (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f)
+        || (_skeletons != null && SkeletonManager.HeightOf(name) > 0f)
         || (_sandworms != null && string.Equals(name, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase));
 
     // A forced spawn of a saved mob of a known kind (null at a full hard cap); a hell mob's layer and a sky
-    // mob's zone tier, and so its pool, follow from its saved position
+    // mob's zone tier, and so its pool, follow from its saved position, while a skeleton's tower tier is saved
     private Mob? SpawnSaved(string name, Vector3 center, EntitySaveData.MobData mob)
     {
         // A file saved before slimes had sizes carries none: those were all the smallest size
@@ -364,6 +370,9 @@ internal sealed class WorldPersistence
             return _goblins!.Spawn(center, mob.Ammo ?? 0, mob.Torches ?? 0);
         if (SkyMobManager.HeightOf(name) > 0f)
             return _skyMobs!.Spawn(name, center);
+        // Before the hell fall-through, which would otherwise take the skeleton
+        if (SkeletonManager.HeightOf(name) > 0f)
+            return _skeletons!.Spawn(center, mob.Tier ?? 0);
         if (string.Equals(name, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase))
         {
             // A restored worm resumes the hunt under the sand at once, without a second thump
@@ -376,8 +385,8 @@ internal sealed class WorldPersistence
 
     /// <summary>
     /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime,
-    /// goblin, hell and sky mob (kind by <see cref="EntityType.Name"/>, body center, health, facing, velocity, a
-    /// goblin's ammo, a slime's size) and the item drops nearest the player first, capped at
+    /// goblin, hell and sky mob, skeleton and sandworm (kind by <see cref="EntityType.Name"/>, body center, health,
+    /// facing, velocity, a goblin's ammo and torches, a slime's size, a skeleton's tower tier) and the item drops nearest the player first, capped at
     /// <see cref="SaveConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
     /// with no name is skipped with one warning). Entries still pending a restore are appended, so a
     /// flush during loading, or before a far entity's chunk arrived, never loses them.
@@ -390,6 +399,7 @@ internal sealed class WorldPersistence
         mobs.AddRange(from t in goblins where !t.IsDead select MobSaveCodec.Capture(t, t.Ammo, torches: t.Torches));
         mobs.AddRange(from t in HellMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in SkyMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
+        mobs.AddRange(from t in Skeletons where !t.IsDead select MobSaveCodec.Capture(t, null, tier: t.Tier));
         mobs.AddRange(from t in Sandworms where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(_pendingMobs);
 

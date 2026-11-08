@@ -10,6 +10,7 @@ using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Graphics;
 using VoxelEngine.Player;
 
@@ -17,8 +18,8 @@ namespace VoxelEngine.Rendering.Actors;
 
 /// <summary>
 /// The mob draws: the live slimes from the shared entity mesh, the goblins part by part with the
-/// flint and the torch they hold, and the realm (hell and sky) mobs part by part, for the entity pass and the water
-/// mirror. Owns the slime mesh and skin and one <see cref="RigMeshes"/> per clip-animated kind,
+/// flint and the torch they hold, and the realm (hell, sky and tower) mobs part by part, for the entity pass and the
+/// water mirror. Owns the slime mesh and skin and one <see cref="RigMeshes"/> per clip-animated kind,
 /// built from their Blockbench projects at load; the world program and the item and block caches stay owned by
 /// <see cref="RenderManager"/>. Render thread only.
 /// </summary>
@@ -35,7 +36,7 @@ internal sealed class MobPasses : IDisposable
     // The goblin rig, posed per frame by each goblin's EntityAnimator. Null only when no 'goblin'
     // entity kind is registered, in which case the passes are no-ops.
     private RigMeshes? _goblin;
-    // The realm (hell and sky) mobs' rigs by kind; a kind whose content is not registered has none and is not drawn.
+    // The realm (hell, sky and tower) mobs' rigs by kind; a kind whose content is not registered has none and is not drawn.
     private readonly Dictionary<EntityType, RigMeshes> _realmRigs = [];
     // The sandworm rig (one mesh per part: Body, Head, Jaw, Tail) drawn once per chain segment; null when the
     // entity is not registered. The part indices are looked up once from its sorted names.
@@ -58,7 +59,7 @@ internal sealed class MobPasses : IDisposable
 
     // The realm mob kinds a rig is built for, when their content is registered
     private static readonly string[] RealmRigNames =
-        [Hellbrute.EntityName, Cinderwitch.EntityName, Galeraptor.EntityName, Cloudgolem.EntityName];
+        [Hellbrute.EntityName, Cinderwitch.EntityName, Galeraptor.EntityName, Cloudgolem.EntityName, Skeleton.EntityName];
 
     internal MobPasses(GL gl, RenderManager owner)
     {

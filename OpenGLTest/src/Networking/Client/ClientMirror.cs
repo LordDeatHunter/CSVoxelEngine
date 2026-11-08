@@ -11,11 +11,13 @@ using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Icebergs;
+using VoxelEngine.Simulation.Tower;
 
 namespace VoxelEngine.Networking.Client;
 
@@ -36,6 +38,7 @@ internal sealed class ClientMirror
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly SkeletonManager? _skeletons;
     private readonly SandwormManager? _sandworms;
     private readonly CampfireManager _campfires;
     private readonly QuernManager _querns;
@@ -55,7 +58,7 @@ internal sealed class ClientMirror
 
     internal ClientMirror(World world, ChunkManager chunkManager, DropManager dropManager, TntManager tntManager,
         FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, SandwormManager? sandworms, IcebergManager? icebergs,
+        SkyMobManager? skyMobs, SkeletonManager? skeletons, SandwormManager? sandworms, IcebergManager? icebergs,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         BlockDebrisSystem debris, PlayerHealth health, List<RemotePlayer> remotePlayers, bool clientMode,
         bool serverMode)
@@ -69,6 +72,7 @@ internal sealed class ClientMirror
         _goblins = goblins;
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _skeletons = skeletons;
         _sandworms = sandworms;
         _icebergs = icebergs;
         _campfires = campfires;
@@ -404,7 +408,8 @@ internal sealed class ClientMirror
         }
     }
 
-    // A slime mirror also has to be the reported size (the ammo field), since a size is fixed for life
+    // A slime mirror also has to be the reported size (the ammo field) and a skeleton the reported tier (the item
+    // byte), since both are fixed for life
     private static bool KindMatches(Mob mob, NetEntity entry) => entry.Kind switch
     {
         NetEntityKind.Slime => mob is Slime slime && slime.Size == SlimeSize.Clamp(entry.Ammo),
@@ -414,6 +419,7 @@ internal sealed class ClientMirror
         NetEntityKind.Galeraptor => mob is Galeraptor,
         NetEntityKind.Cloudgolem => mob is Cloudgolem,
         NetEntityKind.Sandworm => mob is Sandworm,
+        NetEntityKind.Skeleton => mob is Skeleton skeleton && skeleton.Tier == TowerDifficulty.Clamp(entry.ItemId),
         _ => false,
     };
 
@@ -432,6 +438,8 @@ internal sealed class ClientMirror
             NetEntityKind.Cloudgolem => _skyMobs?.Spawn(Cloudgolem.EntityName, entry.Position),
             // The boss mirrors with its chain laid behind its heading, then drags it after the head
             NetEntityKind.Sandworm => _sandworms?.SpawnMirror(entry.Position, entry.Yaw),
+            // A skeleton's tower tier rides the item byte, since a mirror cannot derive it from where it stands
+            NetEntityKind.Skeleton => _skeletons?.Spawn(entry.Position, entry.ItemId),
             _ => null,
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
@@ -452,6 +460,7 @@ internal sealed class ClientMirror
             case Goblin goblin: _goblins?.Remove(goblin); break;
             case HellMob hellMob: _hellMobs?.Remove(hellMob); break;
             case SkyMob skyMob: _skyMobs?.Remove(skyMob); break;
+            case Skeleton skeleton: _skeletons?.Remove(skeleton); break;
             case Sandworm sandworm: _sandworms?.Remove(sandworm); break;
         }
     }

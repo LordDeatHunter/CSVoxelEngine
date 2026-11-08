@@ -18,6 +18,8 @@ public sealed class NetEntityCodecTests
         new(NetEntityKind.Hellbrute, 3, new Vector3(1.5f, -400.25f, 7f), 1.25f, 87, 41, 0, new Vector3(0.5f, -2f, 0f), 0b101),
         new(NetEntityKind.Galeraptor, int.MaxValue, new Vector3(-9f, 355.5f, 2f), -3f, 1, int.MaxValue, 0,
             new Vector3(0f, 4f, -1f)),
+        new(NetEntityKind.Skeleton, 11, new Vector3(2920.5f, 11.95f, -1410.5f), 0.75f, 35, 7, 5,
+            new Vector3(-1f, 0f, 2f)),
         new(NetEntityKind.Goblin, 12, new Vector3(0f, 64f, 0f), 0f, 10, 3, 2, Vector3.Zero),
         new(NetEntityKind.Drop, 13, new Vector3(4f, 70f, 4f), 0f, 0, 0, 200, new Vector3(1f, 2f, 3f)),
         new(NetEntityKind.Iceberg, 14, new Vector3(100f, 62f, -50f), NetEntity.YawFromTurns(3), -77,

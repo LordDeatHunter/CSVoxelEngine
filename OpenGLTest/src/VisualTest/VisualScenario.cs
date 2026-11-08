@@ -33,6 +33,10 @@ public sealed class VisualStep
     /// kinds ignore it).</summary>
     public int Size { get; init; } = 1;
 
+    /// <summary>The tower floor tier a <c>spawn</c> step gives a skeleton (0 when the step names none;
+    /// other kinds ignore it).</summary>
+    public int Tier { get; init; }
+
     /// <summary>True when a <c>spawn</c> step gave only <c>[x, z]</c>, and always for a <c>grow</c>
     /// step: the feet (or the tree's root search) go on top of the terrain column there, and
     /// <see cref="Pos"/>'s Y is ignored.</summary>
@@ -408,7 +412,8 @@ public sealed class VisualScenario
     /// <summary>A <c>spawn</c> step: <c>entity</c> names what to create (validated against the
     /// registry only when the step runs, so parsing stays content-free), <c>pos</c> is either
     /// <c>[x, z]</c> (feet snapped onto the terrain) or <c>[x, y, z]</c> (an exact feet position),
-    /// and the optional <c>size</c> (an integer from 1, default 1) is a slime's size.</summary>
+    /// the optional <c>size</c> (an integer from 1, default 1) is a slime's size and the optional
+    /// <c>tier</c> (an integer from 0, default 0) a skeleton's tower floor tier.</summary>
     private static VisualStep ReadSpawn(JsonElement element, int index)
     {
         if (!element.TryGetProperty("entity", out var entity)
@@ -421,17 +426,22 @@ public sealed class VisualScenario
             && (sizeElement.ValueKind != JsonValueKind.Number || !sizeElement.TryGetInt32(out size) || size < 1))
             throw new InvalidOperationException($"Step {index} (spawn) needs 'size' to be an integer from 1.");
 
+        var tier = 0;
+        if (element.TryGetProperty("tier", out var tierElement)
+            && (tierElement.ValueKind != JsonValueKind.Number || !tierElement.TryGetInt32(out tier) || tier < 0))
+            throw new InvalidOperationException($"Step {index} (spawn) needs 'tier' to be an integer from 0.");
+
         var values = ReadPosValues(element, index, "spawn", "[x, z] or [x, y, z]");
         return values.Count switch
         {
             2 => new VisualStep
             {
-                Op = "spawn", Entity = entity.GetString()!.Trim(), Size = size,
+                Op = "spawn", Entity = entity.GetString()!.Trim(), Size = size, Tier = tier,
                 Pos = new Vector3(values[0], 0f, values[1]), SnapToGround = true,
             },
             3 => new VisualStep
             {
-                Op = "spawn", Entity = entity.GetString()!.Trim(), Size = size,
+                Op = "spawn", Entity = entity.GetString()!.Trim(), Size = size, Tier = tier,
                 Pos = new Vector3(values[0], values[1], values[2]),
             },
             _ => throw new InvalidOperationException(

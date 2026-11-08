@@ -27,9 +27,8 @@ public sealed class HellMobManager : RealmMobManager<HellMob>
 
     private readonly EntityType? _bruteType;
     private readonly EntityType? _casterType;
-    private readonly List<ThrownProjectile> _bolts = [];
-    // Parallel to _bolts: the damage each bolt carries (its caster's, scaled by the caster's layer)
-    private readonly List<int> _boltDamage = [];
+    // Each bolt carries its caster's damage, scaled by the caster's layer
+    private readonly MobMissiles _bolts = new();
     private readonly byte _boltItemId;
 
     /// <summary>
@@ -47,7 +46,7 @@ public sealed class HellMobManager : RealmMobManager<HellMob>
     }
 
     /// <summary>Fire bolts in flight; drawn and mirrored like the player's own throws.</summary>
-    public IReadOnlyList<ThrownProjectile> Bolts => _bolts;
+    public IReadOnlyList<ThrownProjectile> Bolts => _bolts.Flying;
 
     /// <summary>The body height of the named kind (where a scenario or a ring spawn puts its center above
     /// the feet), or 0 for an unknown kind.</summary>
@@ -67,13 +66,8 @@ public sealed class HellMobManager : RealmMobManager<HellMob>
     }
 
     /// <summary>Test seam: launches a bolt as if a caster had thrown it, carrying <paramref name="damage"/>.</summary>
-    internal ThrownProjectile TestLaunchBolt(Vector3 origin, Vector3 velocity, int damage)
-    {
-        var bolt = new ThrownProjectile(_boltItemId, origin, velocity, 0f, 1f);
-        _bolts.Add(bolt);
-        _boltDamage.Add(damage);
-        return bolt;
-    }
+    internal ThrownProjectile TestLaunchBolt(Vector3 origin, Vector3 velocity, int damage) =>
+        _bolts.Launch(_boltItemId, origin, velocity, damage);
 
     /// <summary>
     /// Ticks every hell mob and bolt against <paramref name="targets"/> (each mob chasing its noticed
@@ -97,8 +91,7 @@ public sealed class HellMobManager : RealmMobManager<HellMob>
     {
         if (mob is Cinderwitch caster && caster.TryTakeCastRelease(out var origin, out var velocity))
         {
-            _bolts.Add(new ThrownProjectile(_boltItemId, origin, velocity, 0f, 1f));
-            _boltDamage.Add(caster.BoltDamage);
+            _bolts.Launch(_boltItemId, origin, velocity, caster.BoltDamage);
             return;
         }
 
@@ -122,33 +115,22 @@ public sealed class HellMobManager : RealmMobManager<HellMob>
     private void UpdateBolts(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets,
         FireParticleSystem? embers)
     {
-        for (var i = _bolts.Count - 1; i >= 0; i--)
+        _bolts.Update(deltaTime, chunks, targets);
+
+        if (embers != null)
         {
-            var bolt = _bolts[i];
-            var alive = bolt.Update(deltaTime, chunks, null, out _);
-            if (embers != null && Random.Shared.NextSingle() < MobConfig.HellBoltEmbersPerSecond * deltaTime)
-                embers.Puff(bolt.Position, 1, ThrownProjectile.HalfExtent * 2f, FireParticleKind.Ember);
+            var flying = _bolts.Flying;
+            for (var i = 0; i < flying.Count; i++)
+                if (Random.Shared.NextSingle() < MobConfig.HellBoltEmbersPerSecond * deltaTime)
+                    embers.Puff(flying[i].Position, 1, ThrownProjectile.HalfExtent * 2f, FireParticleKind.Ember);
+        }
 
-            var touched = false;
-            IMobTarget? hurt = null;
-            for (var t = 0; t < targets.Count; t++)
-            {
-                var target = targets[t];
-                if (!MobTargets.BodyTouches(target.Eye, bolt.Position, ThrownProjectile.HalfExtent)) continue;
-                touched = true;
-                if (target.IsImmune) continue;
-                hurt = target;
-                break;
-            }
-
-            if (hurt != null)
-            {
-                Hit(hurt, _boltDamage[i], bolt.Position, MobConfig.HellBoltKnockbackSpeed, 0f, _casterType?.DisplayName);
-                StatusEffects.Apply(hurt, BurningEffect, MobConfig.HellBoltBurnScale);
-            }
-            if (!touched && alive) continue;
-            _bolts.RemoveAt(i);
-            _boltDamage.RemoveAt(i);
+        var hits = _bolts.Hits;
+        for (var i = 0; i < hits.Count; i++)
+        {
+            var hit = hits[i];
+            Hit(hit.Target, hit.Damage, hit.Position, MobConfig.HellBoltKnockbackSpeed, 0f, _casterType?.DisplayName);
+            StatusEffects.Apply(hit.Target, BurningEffect, MobConfig.HellBoltBurnScale);
         }
     }
 

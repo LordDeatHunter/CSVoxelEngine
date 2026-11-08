@@ -82,8 +82,8 @@ block-name-paletted snapshot per **modified** chunk, `ChunkSaveCodec`; an untouc
 never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column caps,
 felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: the permanent chop damage of natural trunk cells, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
 creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar (a staff's bound spells by part key), the known spell parts by key and the discovered waystones; no position
-while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live slimes and
-goblins with health, facing, velocity, ammo and a slime's size plus still-pending entries, up to
+while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live mobs
+with health, facing, velocity, ammo, a slime's size and a skeleton's tower tier plus still-pending entries, up to
 `MaxSavedDrops` item drops, nearest first, and the drifting icebergs) and `stations.json` (`StationSaveCodec`:
 the campfires, querns, kilns and cast molds with their fuel, fire, crucible, cooking and cast progress, the used chests and
 the waystone registry). See "Saves" below for the rules.
@@ -92,7 +92,7 @@ Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated
 **without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
 player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
 any scenario that teleports a walking player above the ground, and turn it off again before a
-`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, and an optional `"size"` (an integer from 1, default 1) is a slime's size; the entity name (`slime`, `goblin`, `hellbrute` or `cinderwitch`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, an optional `"size"` (an integer from 1, default 1) is a slime's size and an optional `"tier"` (an integer from 0, default 0) is a skeleton's tower tier; the entity name (`slime`, `goblin`, `hellbrute`, `cinderwitch`, `galeraptor`, `cloudgolem`, `sandworm`, `iceberg` or `skeleton`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/skeletons.json` (`VOXEL_TIME=147`) spawns a tier-0 and a tier-5 skeleton in goblins.json's open forest clearing (a tower floor's dressing walls block a shot's line of sight) and films them idle, drawing and loosing an arrow, an arrow in flight and raking. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
@@ -122,8 +122,9 @@ through its `EntityAnimator` (`DebugSceneRenderer.RenderEntity`). The mode butto
 per clip in the selected model's `.bbmodel`, in file order, plus HURT (hurts the mob: the hit flash,
 its recoil and the `hurt` clip as an overlay, listed once when the model has that clip). For the goblin
 they read IDLE WALK THROW MELEE HURT DEATH SPAWN, for the hellbrute IDLE WALK MELEE HURT DEATH SPAWN and for
-the cinderwitch IDLE WALK THROW HURT DEATH SPAWN (its cast is named `throw`). A goblin, a hell mob or a
-slime is previewed as the real `Goblin` / `Hellbrute` / `Cinderwitch` / `Slime` object driven like a client drives a mob it does not simulate (`Mob.AnimateMirror`, and
+the cinderwitch IDLE WALK THROW HURT DEATH SPAWN (its cast is named `throw`), for the skeleton IDLE WALK MELEE SHOOT
+HURT DEATH SPAWN. A goblin, a hell mob, a skeleton or a
+slime is previewed as the real `Goblin` / `Hellbrute` / `Cinderwitch` / `Skeleton` (at tier 0) / `Slime` object driven like a client drives a mob it does not simulate (`Mob.AnimateMirror`, and
 `NetworkSetState` for the walk velocity), so what the game layers on the clips shows too: the spawn pop,
 the hit recoil, the death, the rigged mob's body pose (`RiggedMob.BodyEffect`, applied to every part and the
 held flint) and the slime's spring squash. The clipless slime offers IDLE HOP HURT SPAWN DEATH (it hops on
@@ -357,7 +358,7 @@ near the wearer from `MobDirector.FireWearerPassives`, authoritative side only. 
 `assets/data/sets/<name>.json` (`GearSetLoader`), bonuses by piece count summed in `GearStatsCalculator`; only head, chest and
 legs count toward a set (`GearSlots.CountsForSets`; boots and gloves are free-standing armor). The
 `undeadDamage` stat is a fraction applied in `MobStrikes.StrikeMob` through `Combat.VersusUndead` to a mob whose
-`IsUndead` is true (none yet), never rolled by `GearRoller`. The `equip.abilities` consumers read the cached
+`IsUndead` is true (the battle tower's skeleton, see "Skeleton"), never rolled by `GearRoller`. The `equip.abilities` consumers read the cached
 `Equipment.Has`: `no_fall_damage` skips fall billing in `PlayerHealth.TakeDamage` and the server's `ObserveAcceptedState`,
 `extra_air` widens `Breath.MaxAir` through `ApplyGear`, `magnet` widens `DropCollector.Range` in `DropPickup`. The ability
 charms wear them: Feather (`feather_charm`, `no_fall_damage`), Gill (`gill_charm`, `extra_air`, `GearConfig.ExtraAirFactor`),
@@ -1518,6 +1519,10 @@ OpenGLTest/
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
         Cloudgolem.cs          # the ground bruiser: walk with ledge caution, the slam clip's impact event, the shockwave
         SkyDifficulty.cs       # GL-free: the zone tier's multiplier (health, damage), pack size, the bruiser's big-zone gate
+      TowerMobs/               # the battle tower's mobs (see "Skeleton"): the skeleton and the floor-tier difficulty
+        Skeleton.cs            # the undead archer (a RealmMob): melee rake at its impact event, a bow shot at its release
+                               #   event inside its band with a clear line, two attack clips over one count, its tier
+        TowerDifficulty.cs     # GL-free: the floor tier's multiplier (health, damage), clamp and pack size (BT-4's hook)
       Sandworms/               # the desert boss (see "Sandworm"): the mob, its chain, its brain and its pose
         Sandworm.cs            # the mob: the head is its position, the exposed segments by the sand surface, the segment hit tests and
                                #   damage split, the jaw, the contact test; also the client mirror mode (phase, target and velocity from the server)
@@ -1703,7 +1708,7 @@ OpenGLTest/
       LodNetCodec.cs           # a far-LOD region's mesh on the wire
       NetAttacks.cs            # what each NetAttackKind stands for: the attack pattern it needs in hand, the
                                #   sword swing it names, the NetPlayerAction it is rebroadcast as
-      NetEntity.cs             # NetEntityKind/NetEntity and NetCellChange
+      NetEntity.cs             # NetEntityKind/NetEntity (ItemId: a goblin's torches or a skeleton's tower tier) and NetCellChange
       NetEntityCodec.cs        # one EntityList entry on the wire (the server writes, the client reads)
       NetPlayerAction.cs       # the swing a player just made, as the server rebroadcasts it in each
                                #   player list entry (with a counter that moves on every new one)
@@ -2103,7 +2108,7 @@ OpenGLTest/
       GoblinManager.cs         # goblins: AI tick, their thrown stones, melee damage at the impact
                                #   event, loot + carried flint on death, ring spawning
       HellMobManager.cs        # the hell mobs: AI tick, the brute's blow at its impact, the casters' fire bolts
-                               #   (damage + burning), loot, despawn, the hell-only ring spawn (packs by layer)
+                               #   (MobMissiles; damage + burning), loot, despawn, the hell-only ring spawn (packs by layer)
       Icebergs/                # the iceberg simulation, namespace VoxelEngine.Simulation.Icebergs
         IcebergManager.cs      # the live bergs: forced and ring spawns, drift and push, the terrain/berg/body
                                #   collision, the life cycle, IBodySolids, the rider carry and push-out, client mirrors
@@ -2125,6 +2130,8 @@ OpenGLTest/
       MobDirector.cs           # World component: the per-frame mob job (the targets, the slime and goblin updates and
                                #   their damage, the blast shove, the mob list and its scenario spawn/damage seams,
                                #   the drain of status-effect block actions into the StatusEffectBlockWriter)
+      MobMissiles.cs           # GL-free: the shared mob missile flight (hell bolts, skeleton arrows): launch, fly, the touch
+                               #   test, an immune target spared, the hits of the frame for the owning manager to bill
       MobSpawner.cs            # the ring spawn searches: dry forest surface, dark caves, hell floors, sky island tops
       RealmMobManager.cs       # the realm mob managers' shared frame: the capped list, forced spawn, mirrors, the update
                                #   loop (target, hazards, loot, attack, shove, despawn), Hit and the spawn turn
@@ -2138,6 +2145,9 @@ OpenGLTest/
       SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning
       TntManager.cs            # owns the live primed TNT: spawns cubes where firestarter
                                #   strikes and blasts light TNT, ticks their fuses
+      Tower/                   # the battle tower's simulation, namespace VoxelEngine.Simulation.Tower
+        SkeletonManager.cs     # the skeletons: forced spawn only (Spawn(position, tier), under the hard cap), the rake at
+                               #   its impact, the arrows (MobMissiles), loot, despawn, client mirrors; no ring spawn
       TopplingTree.cs          # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once by
                                #   CellBatchMesher (one mesh per chunk it spans), swung flat around the cut, then popped out as drops
       TreeGrowthResult.cs      # the outcome of one TreeGrowthWriter call: its status,
@@ -2533,7 +2543,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Support/                     # cross-area fixtures: TestContent (the headless content load),
                                #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
                                #   WideTreeSpecies, TreeWorldgenFixture, IcebergTestWorld (a hand-built sea with a
-                               #   pack-ice strip), StubTarget, BoxSolids, SkyZoneFinder (sky zones under the seed)
+                               #   pack-ice strip), StubTarget, BoxSolids, SkyZoneFinder (sky zones under the seed),
+                               #   SyntheticGear (gear items with made-up abilities and modifiers)
                                #   and the three [CollectionDefinition]s
   Audio/                       # the sfx library and the ambience bed
   Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
@@ -2560,6 +2571,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     HellMobs/                  # hell mob contracts, layer difficulty, brute blow, caster cast and bolt burn
     SkyMobs/                   # sky mob contracts, zone difficulty, the flyer's hover and dive, the golem's
                                #   shockwave and ledge caution
+    TowerMobs/                 # the skeleton's contract, tier scaling, bow band and line of sight, melee, undead
     Sandworms/                 # the sandworm's chain, brain and pose, its melee through the real punch path
     Icebergs/                  # iceberg shape, motion, wobble, spawn band, contact, the berg (mirrors src/Entities/Icebergs)
     Slimes/                    # slime sizes, hops, knockback, split and merge (mirrors src/Entities/Slimes)
@@ -2597,6 +2609,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
     Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World
+    Tower/                     # the skeleton manager: forced spawn and the hard cap, tier, no natural spawn, rake, arrows
     Waystones/                 # waystone names, the registry's discovery, rename, lost and save rules; the teleport rule,
                                #   the arrival search, the realm tag and a trip in a headless world
   Status/                      # the status effect set, the Apply API, the speed factors and the block rule and writer
@@ -2637,6 +2650,8 @@ tools/                                # asset generators: tiles, sprites, models
   generate-hollow-log-textures.py     # deterministic placeholder inner/end tiles of the hollow logs
   generate-sky-mob-models.py          # deterministic galeraptor/cloudgolem .bbmodel (rig + clips) and skins, and the
                                       #   cloud_shard sprite, on the hell script's machinery; --check
+  generate-skeleton-model.py          # deterministic skeleton .bbmodel (rig with its bow, clips) and palette skin, and the
+                                      #   arrow and bone sprites, on the hell script's machinery; --check
   generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
                                       #   the geometry rules (waterline, shelf, 8 px inset steps) and the UV layout
   generate-lantern-texture.py         # deterministic lantern tile; its header pins the uv of every model part
@@ -4260,9 +4275,9 @@ climate) instead of the heights alone, so a client derives nothing from worldgen
 milliseconds) and `NetEntityKind.FallingBlock` (5; `ItemId` the block), and an older client is
 refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's size; the layout
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
-whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell or sky mob's `Ammo` carries its
+whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell, sky or tower mob's `Ammo` carries its
 attack count the same way (`RealmMob.AttackCount`, see "A mirror's attack clip"), with no bump either. Every
-entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 24 (current) adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 25 (current) lets `EntityList` carry the battle tower's skeleton (`NetEntityKind.Skeleton` 13): its tower tier rides `ItemId` (a goblin's torch byte, 0 for other mobs; clamped to 0..`MobConfig.TowerMaxTier` on read, since a mirror cannot derive it from where it stands, and a mirror whose tier differs is replaced, `ClientMirror.KindMatches`) and its attack count rides `Ammo` (melee even, shot odd, see "A mirror's attack clip"); an older client would not draw it. Version 24 adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
 mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
@@ -5101,8 +5116,8 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   attack clip"); all four are saved in `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 236 of the 255 content ids are used (130 blocks, 105 items, air), 19 left; the battle tower
-  (plans/BATTLE_TOWER.md) needs about 12-16 more. Seed offsets
+- **Budgets**: 238 of the 255 content ids are used (130 blocks, 107 items, air), 17 left; the battle tower
+  (plans/BATTLE_TOWER.md) needs about 10-14 more. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
   `plans/BIOMEGEN.md`.
@@ -5415,7 +5430,8 @@ torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateCon
   `HellCasterMinRange..HellCasterMaxRange` and, grounded off its cooldown with a clear line, plays its cast
   (the `throw` clip); at its `release` event the manager launches a **fire bolt**: a `ThrownProjectile`
   of the `ember_shard` item on `GoblinAim`'s low arc (the band stays inside `v^2/g`), merged into the
-  projectile list like the goblin stones (`HellMobManager.Bolts`), shedding embers in flight. A bolt that
+  projectile list like the goblin stones (`HellMobManager.Bolts`, flown and touch-tested by the shared
+  `MobMissiles`, which the skeleton's arrows use too), shedding embers in flight. A bolt that
   touches a non-immune target deals the caster's `BoltDamage` and applies `burning` through
   `StatusEffects.Apply(IMobTarget, "burning", HellBoltBurnScale)`; any touched target or block stops it.
 - **Layer difficulty** (`LayerDifficulty`, GL-free): `1 + layer * MobConfig.LayerDifficultyPerLayer`,
@@ -5437,11 +5453,14 @@ torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateCon
   `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `NetworkEntitySyncTests` and the loopback
   `GameServerTests.HellMobsReachTheClientsEntityListAndItsMirrorKeepsTheirLayerAndAttacks` (a deep, scaled
   mob keeps its scaled pool on the client, since the mirror reads its layer from where it stands).
-- **A mirror's attack clip** (every realm mob, hell and sky alike): a kind starts its one attack clip
+- **A mirror's attack clip** (every realm mob, hell, sky and the tower's skeleton alike): a kind starts its attack clip
   (`RealmMob.AttackClip`: the brute's melee, the witch's cast, the raptor's dive, the golem's slam) through
-  `RealmMob.StartAttack`, which counts it (`AttackCount`); the server sends that count in the mob's
+  `RealmMob.StartAttack`, which counts it (`AttackCount`). A kind with several attack clips declares
+  `AttackVariants` and `AttackClipOf(variant)` (the skeleton: 0 its melee, 1 its shot): `StartAttack(variant)` moves
+  the count to the next value whose remainder modulo the variant count is that variant (so by 1 up to n; with one
+  variant it is the plain +1), and the count's remainder names the clip (`AttackClipFor(count)`); the server sends that count in the mob's
   `EntityList` `Ammo` field (no protocol bump: the layout is unchanged), and `ClientMirror` hands it to
-  `RealmMob.MirrorAttackCount`, which plays the clip whenever the count moves (the first count it sees only
+  `RealmMob.MirrorAttackCount`, which plays `AttackClipFor(count)` whenever the count moves (the first count it sees only
   sets it, a dying mirror keeps its death), so the mirror swings, casts, dives and slams with the server and
   falls back to its locomotion when the clip ends. Its events are never consumed there: the blows, bolts and
   shockwaves stay the server's. `RealmMobMirrorTests`, `NetEntityCodecTests` (the entry codec,
@@ -5536,6 +5555,54 @@ Both models, their skins and the `cloud_shard` sprite come from `tools/generate-
   mobs").
 - Known gaps: the slam's shockwave hits players only (no mobs, no blocks); `cloud_shard` has no use yet; the overworld ring spawners still spawn on the ground far below a
   player standing on an island.
+
+### Skeleton
+
+The battle tower's undead archer (plans/BATTLE_TOWER.md `BT-3`): one `Skeleton` (`src/Entities/TowerMobs/`), a
+`RealmMob` like the hell and sky mobs but with no realm base, run by `SkeletonManager` (`src/Simulation/Tower/`) on the
+shared `RealmMobManager<TMob>` frame, joined to the world's `MobCaps`. Its model, palette skin and the `arrow` and `bone`
+sprites come from `tools/generate-skeleton-model.py` (deterministic, `--check`; it loads the hell script's rig, UV, PNG
+and clip machinery like the sky script): a thin humanoid rig (head and arms under the torso, checked by
+`Skeleton.ValidateContent` over `EntityContract.RequireHumanoid`) holding a bow modeled as cubes under `ArmL`, so the
+renderer needs no held-item code; clips idle, walk, `melee` (an `impact` event), `shoot` (a `release` event) and the
+common hurt, death and spawn.
+- **Behavior** (`skeleton.json`, hp 20 on the first floor, loot bones and sometimes arrows): in
+  `MobConfig.SkeletonMeleeReach` and off its cooldown it rakes (the `melee` clip), and at its `impact` the manager bills
+  `MeleeDamage` with a knockback to every non-immune target still in reach (`Skeleton.InMeleeReach`). Inside
+  `SkeletonBowMinRange..SkeletonBowMaxRange`, grounded, off its jittered cooldown (a fresh one waits
+  `SkeletonFirstShotDelaySeconds`) and with a clear line from `ShotOrigin` to the chest (`RealmMob.SeesTarget`), it draws
+  (`shoot`); at its `release` (`TryTakeShotRelease`) an **arrow** leaves on `GoblinAim`'s low arc at
+  `SkeletonArrowSpeed` (the band stays inside `v^2/g`). Out of the band, or without a line, it walks in, so close up it
+  closes to melee.
+- **Arrows** are `ThrownProjectile`s of the `arrow` item (`throwAligned`, so they fly point first like the spear, which
+  a player may also hand-throw; `recipes/arrow.json` makes four from a branch, a flint and a bone), flown by the shared
+  `MobMissiles` (`SkeletonManager.Arrows`, merged into `ThrowAction.RefreshProjectiles`): a non-immune target touched
+  takes the skeleton's `ArrowDamage` and a small shove, an immune one stops the arrow unhurt.
+- **Tower difficulty** (`TowerDifficulty`, GL-free): the tier is the tower floor index (0..`MobConfig.TowerMaxTier`,
+  `TowerSite.Tier(k)`), and `1 + tier * TowerDifficultyPerTier`, capped at `TowerDifficultyMaxMultiplier`, scales its
+  pool and both damages through `LayerDifficulty.ScaleBy`; `PackSize(tier)` is the pile's wave hook for `BT-4`. The tier
+  is a constructor argument fixed for life: a mirror cannot derive it from where it stands, so it is saved
+  (`EntitySaveData.MobData.Tier`, absent reads as 0) and sent (the entry's `ItemId`, see protocol 25), clamped on both.
+- **Forced spawn only**: `SkeletonManager.Spawn(position, tier)` is the one way a skeleton appears (the `spawn`
+  scenario op's `tier`, a save restore, a client mirror, the `BT-4` piles) and returns null at the hard cap
+  (`MobCaps.ForcedRoom`); there is no ring spawn. It keeps the shared distance and idle despawn, past a generous
+  `SkeletonDespawnRadiusBlocks`.
+- **Undead**: `IsUndead` is true, so `MobStrikes.StrikeMob` adds the striker's `undeadDamage` gear stat
+  (`Combat.VersusUndead`) to every blow on it (`UndeadStrikeTests`).
+- **Two attack clips over one count**: `AttackVariants` 2 (0 the rake, 1 the shot), so a mirror plays the right clip
+  from the replicated count (see "A mirror's attack clip").
+- **Plumbing**: `World.Skeletons`, `MobDirector` (update, damage billing, status block actions, `RefreshMobs`, the
+  `spawn` op name `skeleton` with its optional `tier`), `ThrowAction` (the arrows), `MobPasses.RenderRealmMobs` and the
+  near shadow cascade (`ShadowPass.RenderShadows`' `skeletons`), `entities.json` by kind name with the tier, the
+  `EntityList` kind (protocol 25) and `ClientMirror`'s reconcile, and the item debugger's ENTITIES tab (tier 0). Tests:
+  `SkeletonTests`, `SkeletonManagerTests`, `UndeadStrikeTests`, the realm round trip in
+  `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `RealmMobMirrorTests`,
+  `NetworkEntitySyncTests.ASkeletonMirrorTakesItsTierFromTheSnapshotAndIsReplacedWhenTheTierDiffers` and the loopback
+  `GameServerTests.SkeletonsReachTheClientsEntityListByKindWithTheirTier`. `visual-examples/skeletons.json`
+  (`VOXEL_TIME=147`) films them idle, shooting and raking in an open forest clearing.
+- Known gaps: the arrows, like the goblin stones and hell bolts, are not on the wire (a client sees only the damage);
+  skeletons are not drawn in the water mirror; they share the realm mobs' despawn rules, which `BT-4`'s piles may want
+  to revisit; the tower interiors are sunlit (`BT-10`).
 
 ### Sandworm
 

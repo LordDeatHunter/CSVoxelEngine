@@ -1,0 +1,17 @@
+{
+  "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/bone", "weight": 1, "count": { "min": 0, "max": 2 } }
+      ]
+    },
+    {
+      "rolls": 1,
+      "chance": 0.5,
+      "entries": [
+        { "item": "item/arrow", "weight": 1, "count": { "min": 0, "max": 2 } }
+      ]
+    }
+  ]
+}

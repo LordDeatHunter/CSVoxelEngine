@@ -2,6 +2,7 @@ using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.SkyMobs;
+using VoxelEngine.Entities.TowerMobs;
 using Xunit;
 
 namespace VoxelEngine.Tests.Entities;
@@ -25,6 +26,7 @@ public sealed class RealmMobMirrorTests
             Hellbrute.EntityName => new Hellbrute(type, position, spawnIn: false),
             Cinderwitch.EntityName => new Cinderwitch(type, position, spawnIn: false),
             Galeraptor.EntityName => new Galeraptor(type, position, spawnIn: false),
+            Skeleton.EntityName => new Skeleton(type, position, tier: 0, spawnIn: false),
             _ => new Cloudgolem(type, position, spawnIn: false),
         };
     }
@@ -40,6 +42,7 @@ public sealed class RealmMobMirrorTests
     [InlineData(Cinderwitch.EntityName)]
     [InlineData(Galeraptor.EntityName)]
     [InlineData(Cloudgolem.EntityName)]
+    [InlineData(Skeleton.EntityName)]
     public void AMirrorPlaysItsAttackClipWhenTheServersCountMovesThenReturnsToLocomotion(string kind)
     {
         var mirror = Create(kind, new Vector3(0f, 80f, 0f));
@@ -65,6 +68,28 @@ public sealed class RealmMobMirrorTests
         Animate(mirror, 0.1f);
         mirror.MirrorAttackCount(7);
         Assert.False(mirror.Animation.IsPlaying(mirror.AttackClip));
+    }
+
+    [Fact]
+    public void ASkeletonMirrorPlaysTheClipItsCountsRemainderNames()
+    {
+        var mirror = (Skeleton)Create(Skeleton.EntityName, new Vector3(0f, 80f, 0f));
+        mirror.MirrorAttackCount(1);
+
+        // An even count is a melee swing, an odd one a bow shot, whichever came before
+        mirror.MirrorAttackCount(2);
+        Assert.True(mirror.Animation.IsPlaying(Skeleton.MeleeClip));
+        Assert.False(mirror.Animation.IsPlaying(Skeleton.ShootClip));
+        Animate(mirror, 5f);
+
+        mirror.MirrorAttackCount(3);
+        Assert.True(mirror.Animation.IsPlaying(Skeleton.ShootClip));
+        Assert.Equal(Skeleton.ShootClip, mirror.AttackClipFor(mirror.AttackCount));
+        Animate(mirror, 5f);
+
+        // Two shots in a row skip a count: the clip still follows the remainder
+        mirror.MirrorAttackCount(5);
+        Assert.True(mirror.Animation.IsPlaying(Skeleton.ShootClip));
     }
 
     [Fact]

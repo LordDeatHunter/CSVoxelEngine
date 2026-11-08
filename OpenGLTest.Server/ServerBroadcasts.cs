@@ -8,6 +8,7 @@ using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Networking;
 
 namespace VoxelEngine.Server;
@@ -78,6 +79,7 @@ internal sealed class ServerBroadcasts
                 Galeraptor => NetEntityKind.Galeraptor,
                 Cloudgolem => NetEntityKind.Cloudgolem,
                 Sandworm => NetEntityKind.Sandworm,
+                Skeleton => NetEntityKind.Skeleton,
                 _ => NetEntityKind.Goblin,
             };
             // The int field is a goblin's ammo, a slime's size and a realm mob's attack count (NetEntity)
@@ -89,11 +91,16 @@ internal sealed class ServerBroadcasts
                 Sandworm worm => (int)worm.Phase,
                 _ => 0,
             };
-            // The byte field is a goblin's torch count (a slime carries none); every entry ends with a
-            // status-effect mask (NetEntity.Effects), a mob's own
-            var torches = mob is Goblin torchGoblin ? (byte)torchGoblin.Torches : (byte)0;
+            // The byte field is a goblin's torch count or a skeleton's tower tier (0 for the rest); every entry
+            // ends with a status-effect mask (NetEntity.Effects), a mob's own
+            var itemByte = mob switch
+            {
+                Goblin goblin => (byte)goblin.Torches,
+                Skeleton skeleton => (byte)skeleton.Tier,
+                _ => (byte)0,
+            };
             NetEntityCodec.Write(writer, new NetEntity(kind, IdFor(mob), mob.Position, mob.Facing, mob.Health, ammo,
-                torches, mob.Velocity, mob.Effects.Mask));
+                itemByte, mob.Velocity, mob.Effects.Mask));
             if (mob is Sandworm { Phase: SandwormPhase.Dig, Telegraph: > 0f } digging)
                 NetEntityCodec.Write(writer, new NetEntity(NetEntityKind.SandwormTarget, IdFor(mob), digging.SurfacePoint, 0f,
                     (int)MathF.Round(digging.Telegraph * 1000f), 0, 0, Vector3.Zero));

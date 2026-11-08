@@ -117,7 +117,7 @@ internal sealed class WorldRenderer
         renderManager.IcebergPasses.Time = _world.LightingTime;
         renderManager.Shadows.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
             _lodManager.RegionList, goblins: Goblins, icebergs: _world.Icebergs, hellMobs: _world.HellMobs,
-            skyMobs: _world.SkyMobs, sandworms: _world.Sandworms);
+            skyMobs: _world.SkyMobs, sandworms: _world.Sandworms, skeletons: _world.Skeletons);
 
         FrameProfiler.Begin(ProfileSection.Reflection);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.Reflection);
@@ -175,6 +175,7 @@ internal sealed class WorldRenderer
         renderManager.Mobs.RenderGoblins(Camera, Goblins);
         renderManager.Mobs.RenderRealmMobs(Camera, _world.HellMobs);
         renderManager.Mobs.RenderRealmMobs(Camera, _world.SkyMobs);
+        renderManager.Mobs.RenderRealmMobs(Camera, _world.Skeletons);
         renderManager.Mobs.RenderSandworms(Camera, _world.Sandworms);
         renderManager.IcebergPasses.RenderIcebergs(Camera.GetViewProjection(), _world.Icebergs);
         renderManager.Players.RenderRemotePlayers(Camera, _remotePlayers);

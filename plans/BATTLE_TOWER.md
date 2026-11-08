@@ -4,11 +4,12 @@
 
 ## Status
 
-BT-1 and BT-2 done; BT-3 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
-the tower generator (see "Tower generator (BT-2)" under Reference). Tracks the battle
-tower: a rare, huge (radius ~20+) cylindrical landmark of 4-8 floors with skeleton piles, chests, floor locks, a roof
+BT-1 to BT-3 done; BT-4 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
+the tower generator (see "Tower generator (BT-2)" under Reference), BT-3 the undead skeleton with its melee rake, bow
+and arrows, floor-tier difficulty and forced-spawn-only manager (see "Skeleton (BT-3)" and AGENTS.md "Skeleton").
+Tracks the battle tower: a rare, huge (radius ~20+) cylindrical landmark of 4-8 floors with skeleton piles, chests, floor locks, a roof
 altar that summons the Skeleton King, unique boss loot and a collapse into a ruin. One phase per prompt; each phase
-leaves the game building and the tests green. **Content ids are tight: 19 left, see Reference.**
+leaves the game building and the tests green. **Content ids are tight: 17 left, see Reference.**
 Last updated 2026-11-08.
 
 ## In progress
@@ -17,12 +18,6 @@ Nothing.
 
 ## Open
 
-- [ ] **`BT-3` · Skeleton mob** — P1, L.
-  One `RealmMob`-style kind: melee up close, bow at range (arrow is a `ThrownProjectile` like goblin stones). Rig, clips
-  and skin from a deterministic `tools/generate-skeleton-model.py` (`--check`) into a Blockbench `.bbmodel`; humanoid
-  contract through `EntityContract.RequireHumanoid`. Floor-tier difficulty scales health, damage and pack size like
-  `LayerDifficulty`. An undead tag the weapon and accessory read. Manager on `MobCaps`, saves in `entities.json`,
-  `NetEntityKind` and protocol bump, item debugger ENTITIES modes, mirror attack clips.
 - [ ] **`BT-4` · Skeleton piles, floor locks and `TowerManager`** — P1, L.
   A worldgen-only pile block with a `SkeletonPileManager` (main thread, like the kiln registries): a player within ~8
   blocks makes it raise skeletons in waves, then it depletes. A worldgen-only barrier door block across each floor's
@@ -65,11 +60,11 @@ Nothing.
 
 ## Reference
 
-- **Content id budget (budget constraint, after BT-2, which used none): 236 of 255 used (130 blocks, 105 items, air), 19 free.**
-  Rough needs of the later phases: BT-3 bone and arrow items (~2); BT-4 skeleton pile and barrier door blocks (2, 3 if
+- **Content id budget (budget constraint, after BT-3, which used 2: the `arrow` and `bone` items): 238 of 255 used
+  (130 blocks, 107 items, air), 17 free.** Rough needs of the later phases: BT-4 skeleton pile and barrier door blocks (2, 3 if
   the door is two cells); BT-5 tower chest block(s) (1 if the loot keys on the floor through the cell or state, up to
-  4 with one per tier); BT-6 altar block (1); BT-7 three uniques plus a bone fragment or boss material (~3-5 items);
-  BT-8 rubble or ruin block(s) (1-2). About 12-16 in total: the tower fits, but leaves little for `CAVE_BIOMES.md`.
+  4 with one per tier); BT-6 altar block (1); BT-7 three uniques plus a boss material (~3-4 items; the bone fragment
+  should reuse `bone`); BT-8 rubble or ruin block(s) (1-2). About 10-14 in total: the tower fits, but leaves little for `CAVE_BIOMES.md`.
   Prefer one chest block and reuse existing ruin blocks for the rubble.
 - **How `unbreakable` is enforced** (BT-1): load rules (`BlockFieldRules.ValidateUnbreakable` refuses fluid, falls,
   needsSupport, replaceableByPlacement, flammable, meltsTo, the tree-wood and multiblock renderers, upperHalf and
@@ -123,6 +118,16 @@ Nothing.
     footprint; tree crowns and limbs cut at the disc edge leave floating leaves and orphan wood until a nearby edit schedules
     decay; the stair's `cobblestone_slab` half-steps are breakable (a mined one leaves a pit over brick, never a bypass, as
     the flood-fill test proves).
+
+- **Skeleton (BT-3)**, 2 content ids (`arrow`, `bone`). See AGENTS.md "Skeleton" for the whole design.
+  - **Hooks for BT-4**: `SkeletonManager.Spawn(position, tier)` (a body center; null at the hard cap, the only way a
+    skeleton appears, since it has no ring spawn), `TowerDifficulty.PackSize(tier)` (the wave size, no caller yet),
+    `TowerSite.Tier(k)` as the tier, `World.Skeletons` for the floor's living count.
+  - **Despawn**: skeletons keep the shared realm-mob distance and idle despawn past `MobConfig.SkeletonDespawnRadiusBlocks`
+    (96); a pile's skeletons may need to stay while their floor is locked, so BT-4 should revisit it.
+  - **Tier on the wire and in saves**: `NetEntity.ItemId` (protocol 25) and `EntitySaveData.MobData.Tier`, clamped by
+    `TowerDifficulty.Clamp`; the attack count's parity names the clip (melee even, shot odd).
+  - **Known gaps**: arrows are not on the wire, skeletons are not drawn in the water mirror.
 
 Decisions made while planning (2026-11-08):
 

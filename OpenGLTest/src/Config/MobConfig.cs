@@ -362,6 +362,62 @@ public static class MobConfig
     public const float CloudgolemKnockbackLift = 7f;
     public const float CloudgolemShoveSpeed = 0.6f;
 
+    // --- Skeletons (SkeletonManager, Skeleton; the battle tower) ---
+    // Raised only by the tower's bone piles (a forced spawn with the floor's tier), never by a ring. A
+    // skeleton swings a bony rake in melee reach and, inside SkeletonBowMinRange..SkeletonBowMaxRange with a
+    // clear line, draws its bow; the arrow leaves at the shoot clip's "release" event on GoblinAim's low arc
+    // under ThrownProjectile.Gravity, so the band must stay inside the arrow's level range v^2/g.
+    /// <summary>Height of a skeleton's body box, in blocks.</summary>
+    public const float SkeletonHeight = 1.9f;
+    /// <summary>Half the width of a skeleton's body box, in blocks.</summary>
+    public const float SkeletonHalfExtent = 0.3f;
+    /// <summary>A skeleton's walk speed, in blocks per second.</summary>
+    public const float SkeletonWalkSpeed = 2.5f;
+    /// <summary>A skeleton's auto-jump launch speed.</summary>
+    public const float SkeletonJumpSpeed = 8.5f;
+    /// <summary>How hard a player walking into a grounded skeleton shoves it.</summary>
+    public const float SkeletonShoveSpeed = 3f;
+    /// <summary>How far a skeleton's rake reaches (MobTargets.InMeleeReach).</summary>
+    public const float SkeletonMeleeReach = 2f;
+    /// <summary>The damage one rake deals on the first floor (TowerDifficulty scales it).</summary>
+    public const int SkeletonMeleeDamage = 6;
+    /// <summary>Seconds between two rakes.</summary>
+    public const float SkeletonMeleeCooldownSeconds = 1.4f;
+    /// <summary>The knockback speed of a landed rake.</summary>
+    public const float SkeletonMeleeKnockbackSpeed = 5f;
+    /// <summary>The upward lift of a landed rake.</summary>
+    public const float SkeletonMeleeKnockbackLift = 2.5f;
+    /// <summary>Inside this horizontal distance a skeleton stops shooting and closes in to melee.</summary>
+    public const float SkeletonBowMinRange = 5f;
+    /// <summary>Beyond this horizontal distance a skeleton walks in before it shoots.</summary>
+    public const float SkeletonBowMaxRange = 14f;
+    /// <summary>Seconds a fresh skeleton waits before its first shot.</summary>
+    public const float SkeletonFirstShotDelaySeconds = 1.2f;
+    /// <summary>Seconds between two shots, before the jitter.</summary>
+    public const float SkeletonShotCooldownSeconds = 2.4f;
+    /// <summary>The most a shot cooldown is lengthened or shortened at random.</summary>
+    public const float SkeletonShotCooldownJitter = 0.4f;
+    /// <summary>An arrow's launch speed (its level range v^2/g must clear SkeletonBowMaxRange).</summary>
+    public const float SkeletonArrowSpeed = 24f;
+    /// <summary>The damage one arrow deals on the first floor (TowerDifficulty scales it).</summary>
+    public const int SkeletonArrowDamage = 5;
+    /// <summary>The knockback speed of an arrow hit.</summary>
+    public const float SkeletonArrowKnockbackSpeed = 2f;
+    /// <summary>A skeleton farther than this from every target despawns.</summary>
+    public const float SkeletonDespawnRadiusBlocks = 96f;
+
+    // --- Tower difficulty (TowerDifficulty) ---
+    /// <summary>The highest tower floor tier (floors 0..TowerMaxTier).</summary>
+    public const int TowerMaxTier = 7;
+    /// <summary>How much harder a tower mob gets per floor tier.</summary>
+    public const float TowerDifficultyPerTier = 0.25f;
+    /// <summary>The most a tower mob's difficulty multiplier ever reaches.</summary>
+    public const float TowerDifficultyMaxMultiplier = 2.5f;
+    /// <summary>One more mob in a pile's wave every this many tiers.</summary>
+    public const int TowerPackTiersPerExtra = 2;
+    /// <summary>The most mobs one pile wave raises.</summary>
+    public const int TowerPackMaxSize = 4;
+
     // --- Entity healthbars (EntityHealthbarRenderer) ---
     // Five hearts float above every live mob, billboarded to face the camera, using the same
     // heart sprites as the player HUD. The pool is drawn proportionally across the row (each

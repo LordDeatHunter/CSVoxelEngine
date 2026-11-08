@@ -7,6 +7,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Interaction;
@@ -24,6 +25,7 @@ internal sealed class ThrowAction
     private readonly DropManager _dropManager;
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
+    private readonly SkeletonManager? _skeletons;
     private readonly List<Mob> _mobs;
     private readonly List<ThrownProjectile> _projectiles;
     private readonly bool _clientMode;
@@ -35,9 +37,11 @@ internal sealed class ThrowAction
     private MobStrikes Strikes => _world.Strikes;
 
     internal ThrowAction(World world, ChunkManager chunkManager, DropManager dropManager, GoblinManager? goblins,
-        HellMobManager? hellMobs, List<Mob> mobs, List<ThrownProjectile> projectiles, bool clientMode)
+        HellMobManager? hellMobs, SkeletonManager? skeletons, List<Mob> mobs, List<ThrownProjectile> projectiles,
+        bool clientMode)
     {
         _hellMobs = hellMobs;
+        _skeletons = skeletons;
         _world = world;
         _chunkManager = chunkManager;
         _dropManager = dropManager;
@@ -58,8 +62,8 @@ internal sealed class ThrowAction
     internal float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / PlayerConfig.ThrowChargeSeconds);
 
     /// <summary>Rebuilds the projectile list (<c>_projectiles</c>) from the player's throws, the
-    /// goblins' stones and the hell casters' fire bolts, with indexed loops so a frame allocates no
-    /// enumerator.</summary>
+    /// goblins' stones, the hell casters' fire bolts and the skeletons' arrows, with indexed loops so a
+    /// frame allocates no enumerator.</summary>
     internal void RefreshProjectiles()
     {
         _projectiles.Clear();
@@ -76,6 +80,12 @@ internal sealed class ThrowAction
             var bolts = _hellMobs.Bolts;
             for (var i = 0; i < bolts.Count; i++)
                 _projectiles.Add(bolts[i]);
+        }
+        if (_skeletons != null)
+        {
+            var arrows = _skeletons.Arrows;
+            for (var i = 0; i < arrows.Count; i++)
+                _projectiles.Add(arrows[i]);
         }
     }
 

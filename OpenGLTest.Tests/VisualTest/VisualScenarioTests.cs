@@ -137,6 +137,26 @@ public sealed class VisualScenarioTests
         Assert.Contains("(spawn)", ex.Message);
     }
 
+    [Theory]
+    [InlineData("""{ "op": "spawn", "entity": "skeleton", "pos": [1, 2], "tier": 5 }""", 5)]
+    [InlineData("""{ "op": "spawn", "entity": "skeleton", "pos": [1, 2, 3], "tier": 4 }""", 4)]
+    [InlineData("""{ "op": "spawn", "entity": "skeleton", "pos": [1, 2, 3] }""", 0)]
+    [InlineData("""{ "op": "spawn", "entity": "skeleton", "pos": [1, 2] }""", 0)]
+    public void ASpawnStepReadsAnOptionalTierAndRefusesANegativeOne(string step, int tier)
+    {
+        var scenario = VisualScenario.Parse($$"""{ "steps": [{{step}}] }""", "tiers");
+        Assert.Equal(tier, scenario.Steps[0].Tier);
+
+        // The same step with a negative, fractional or non-numeric tier is refused, naming the field
+        foreach (var bad in new[] { "-1", "1.5", "\"high\"" })
+        {
+            var json = $$"""{ "steps": [{ "op": "spawn", "entity": "skeleton", "pos": [1, 2], "tier": {{bad}} }] }""";
+            var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
+            Assert.Contains("'tier'", ex.Message);
+            Assert.Contains("(spawn)", ex.Message);
+        }
+    }
+
     [Fact]
     public void UnknownOpNamesEveryOp()
     {

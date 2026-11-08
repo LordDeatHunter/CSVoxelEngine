@@ -188,8 +188,10 @@ public static class NetFraming
     /// waystone the player stands at; the server discovers a waystone on a replayed <see cref="NetIntentKind.Use"/> and
     /// answers with <see cref="NetMessage.WaystoneOpened"/>, keeps each player's <see cref="NetMessage.WaystoneRows"/> (the
     /// registry rows of its discovered waystones) current, and takes a <see cref="NetMessage.WaystoneRename"/> from a
-    /// waystone's first discoverer. An older peer would refuse the intent as malformed and never open a waystone.</summary>
-    public const int ProtocolVersion = 24;
+    /// waystone's first discoverer. An older peer would refuse the intent as malformed and never open a waystone.
+    /// 25: <see cref="NetEntityKind.Skeleton"/> (the battle tower's skeleton): its tower tier in the item byte, its attack
+    /// count (melee even, shot odd) in the ammo field; an older client would not draw it.</summary>
+    public const int ProtocolVersion = 25;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

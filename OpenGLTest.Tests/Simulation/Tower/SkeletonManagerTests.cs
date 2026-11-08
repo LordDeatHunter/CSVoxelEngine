@@ -1,0 +1,146 @@
+using System.Numerics;
+using VoxelEngine.Entities;
+using VoxelEngine.Entities.TowerMobs;
+using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Tower;
+using Xunit;
+
+namespace VoxelEngine.Tests.Simulation.Tower;
+
+/// <summary>
+/// The skeleton manager (<see cref="SkeletonManager"/>): a forced spawn passes the natural cap but never the hard
+/// cap and keeps its (clamped) tier, skeletons never appear on their own, a rake lands on a target in reach and an
+/// arrow on the target it touches, and an immune target is spared both.
+/// </summary>
+public sealed class SkeletonManagerTests
+{
+    public SkeletonManagerTests() => TestContent.EnsureLoaded();
+
+    private const float Dt = 1f / 60f;
+
+    private static EntityType Type => EntityRegistry.Require(Skeleton.EntityName);
+
+    private static ChunkManager StoneFloor() => MobTestWorld.Floor(ContentRegistry.RequireBlock("stone").Id);
+
+    // Body center of a skeleton standing on the y = 0 floor
+    private static Vector3 OnFloor(float x, float z) => new(x, 1f + MobConfig.SkeletonHeight * 0.5f, z);
+
+    private static StubTarget PlayerAt(float x, float z) => new(StubTarget.EyeAt(new Vector3(x, 1f, z)));
+
+    [Fact]
+    public void AForcedSpawnPassesTheNaturalCapButNotTheHardCap()
+    {
+        var caps = new MobCaps();
+        var manager = new SkeletonManager(Type, caps);
+        var at = OnFloor(8.5f, 8.5f);
+        for (var i = 0; i < MobConfig.MobNaturalCap; i++)
+            Assert.NotNull(manager.Spawn(at, tier: 0));
+        Assert.False(caps.AllowsNaturalSpawn);
+
+        while (caps.ForcedRoom > 0)
+            Assert.NotNull(manager.Spawn(at, tier: 3));
+        Assert.Null(manager.Spawn(at, tier: 0));
+        Assert.Equal(MobConfig.MobHardCap, caps.Living);
+    }
+
+    [Fact]
+    public void ASpawnKeepsItsTierAndClampsOneOutOfRange()
+    {
+        var manager = new SkeletonManager(Type);
+        var at = OnFloor(8.5f, 8.5f);
+        var middle = MobConfig.TowerMaxTier / 2;
+
+        Assert.Equal(middle, manager.Spawn(at, middle)!.Tier);
+        Assert.Equal(MobConfig.TowerMaxTier, manager.Spawn(at, MobConfig.TowerMaxTier + 5)!.Tier);
+        Assert.Equal(0, manager.Spawn(at, -3)!.Tier);
+
+        // Without registered content nothing spawns
+        Assert.Null(new SkeletonManager(null).Spawn(at, 0));
+    }
+
+    [Fact]
+    public void SkeletonsNeverSpawnOnTheirOwn()
+    {
+        var chunks = StoneFloor();
+        var manager = new SkeletonManager(Type);
+        var drops = new DropManager();
+        IMobTarget[] targets = [PlayerAt(8.5f, 8.5f)];
+
+        for (var i = 0; i < 600; i++)
+            manager.Update(0.5f, chunks, drops, targets);
+        Assert.Empty(manager.Mobs);
+    }
+
+    [Fact]
+    public void AMeleeImpactBillsATargetInReachButSparesAnImmuneOne()
+    {
+        var chunks = StoneFloor();
+        var drops = new DropManager();
+
+        var manager = new SkeletonManager(Type);
+        manager.Spawn(OnFloor(8.5f, 8.5f), tier: 0, spawnIn: false);
+        var close = PlayerAt(8.5f + MobConfig.SkeletonMeleeReach * 0.5f, 8.5f);
+        var billed = false;
+        for (var i = 0; i < (int)(4f / Dt) && close.DamageTaken == 0; i++)
+        {
+            manager.Update(Dt, chunks, drops, [close]);
+            billed |= manager.DamageDealtThisFrame > 0;
+        }
+        Assert.True(close.DamageTaken > 0, "the skeleton never raked a target in reach");
+        Assert.True(billed, "the rake was not counted into the frame's damage");
+
+        var spared = new SkeletonManager(Type);
+        spared.Spawn(OnFloor(8.5f, 8.5f), tier: 0, spawnIn: false);
+        var immune = new StubTarget(close.Eye) { IsFlying = true };
+        for (var i = 0; i < (int)(4f / Dt); i++)
+        {
+            spared.Update(Dt, chunks, drops, [immune]);
+            Assert.Equal(0, spared.DamageDealtThisFrame);
+        }
+        Assert.Equal(0, immune.DamageTaken);
+    }
+
+    [Fact]
+    public void AnArrowThatTouchesATargetHurtsItButSparesAnImmuneOne()
+    {
+        var chunks = StoneFloor();
+        var manager = new SkeletonManager(Type);
+        var drops = new DropManager();
+
+        var target = PlayerAt(10.5f, 8.5f);
+        var chest = RealmMob.ChestOf(target.Eye);
+        manager.TestLaunchArrow(chest - new Vector3(4f, 0f, 0f), new Vector3(20f, 3f, 0f), damage: 5);
+        for (var i = 0; i < 60 && manager.Arrows.Count > 0; i++)
+            manager.Update(Dt, chunks, drops, [target]);
+
+        Assert.Empty(manager.Arrows);
+        Assert.Equal(5, target.DamageTaken);
+
+        var flier = new StubTarget(target.Eye) { IsFlying = true };
+        manager.TestLaunchArrow(chest - new Vector3(4f, 0f, 0f), new Vector3(20f, 3f, 0f), damage: 5);
+        for (var i = 0; i < 60 && manager.Arrows.Count > 0; i++)
+            manager.Update(Dt, chunks, drops, [flier]);
+        Assert.Empty(manager.Arrows);
+        Assert.Equal(0, flier.DamageTaken);
+    }
+
+    [Fact]
+    public void ASkeletonInItsBandShootsAnArrowThatReachesItsTarget()
+    {
+        var chunks = StoneFloor();
+        var manager = new SkeletonManager(Type);
+        var drops = new DropManager();
+        var band = (MobConfig.SkeletonBowMinRange + MobConfig.SkeletonBowMaxRange) * 0.5f;
+        manager.Spawn(OnFloor(1.5f, 8.5f), tier: 0, spawnIn: false);
+        var target = PlayerAt(1.5f + band, 8.5f);
+
+        var launched = false;
+        for (var i = 0; i < (int)(8f / Dt) && target.DamageTaken == 0; i++)
+        {
+            manager.Update(Dt, chunks, drops, [target]);
+            launched |= manager.Arrows.Count > 0;
+        }
+        Assert.True(launched, "no arrow left the bow");
+        Assert.True(target.DamageTaken > 0, "no arrow reached the target");
+    }
+}

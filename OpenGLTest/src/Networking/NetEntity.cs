@@ -20,6 +20,7 @@ public enum NetEntityKind : byte
     Cloudgolem = 10,
     Sandworm = 11,
     SandwormTarget = 12,
+    Skeleton = 13,
 }
 
 /// <summary>
@@ -28,7 +29,9 @@ public enum NetEntityKind : byte
 /// <see cref="Velocity"/>, and <see cref="Ammo"/> carries a goblin's ammo or a slime's size
 /// (<see cref="Slime.Size"/>; a 0 from an older server reads as the smallest size) or a hell or sky mob's
 /// attack count (<c>RealmMob.AttackCount</c>: a client's mirror plays its attack clip whenever the count moves,
-/// and an older server's 0 never moves it); a drop uses
+/// the count's remainder modulo the kind's attack variants naming the clip, and an older server's 0 never moves it);
+/// <see cref="ItemId"/> is a goblin's torches or a skeleton's tower tier (0..<c>MobConfig.TowerMaxTier</c>, clamped on
+/// read, since a mirror cannot derive it from where it stands); a drop uses
 /// <see cref="ItemId"/>.
 /// A sandworm is a mob entry for its head (<see cref="Position"/>, <see cref="Yaw"/> its heading, <see cref="Velocity"/> the
 /// head velocity a client dead-reckons along) whose <see cref="Ammo"/> is its phase (<c>SandwormPhase</c>); its body is
@@ -49,11 +52,11 @@ public enum NetEntityKind : byte
 public readonly record struct NetEntity(NetEntityKind Kind, int Id, Vector3 Position, float Yaw,
     int Health, int Ammo, byte ItemId, Vector3 Velocity, byte Effects = 0)
 {
-    /// <summary>Whether <paramref name="kind"/> is a mob (a slime, a goblin, a hell or a sky mob), the only kinds
+    /// <summary>Whether <paramref name="kind"/> is a mob (a slime, a goblin, a hell, sky or tower mob), the only kinds
     /// the client's mob reconcile spawns; drops, primed TNT and falling blocks are mirrored apart.</summary>
     public static bool IsMob(NetEntityKind kind) =>
         kind is NetEntityKind.Slime or NetEntityKind.Goblin or NetEntityKind.Hellbrute or NetEntityKind.Cinderwitch
-            or NetEntityKind.Galeraptor or NetEntityKind.Cloudgolem or NetEntityKind.Sandworm;
+            or NetEntityKind.Galeraptor or NetEntityKind.Cloudgolem or NetEntityKind.Sandworm or NetEntityKind.Skeleton;
 
     // An iceberg's scale in thousandths fills the low 16 bits of Ammo, its sinking (0..255) the next 8
     private const float IcebergScaleUnits = 1000f;

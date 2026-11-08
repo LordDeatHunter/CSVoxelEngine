@@ -13,7 +13,8 @@ namespace VoxelEngine.Simulation;
 /// and the per-frame loop over the mobs (each chasing its noticed target, <see cref="Mob.PickTarget"/>, or
 /// wandering; hazards; loot on death; the kind's attack; the shove off a player walking into it; the despawn by
 /// distance or idleness), plus the one round-robin spawn timer. A subclass builds its kinds, lands their attacks
-/// and runs its own ring search. Main thread only.
+/// and runs its own ring search, or skips ring spawning altogether (a kind raised only by forced spawns).
+/// Main thread only.
 /// </summary>
 public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmMob
 {
@@ -60,7 +61,14 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
     {
         if (Caps.ForcedRoom <= 0) return null;
         var mob = Create(kind, position, spawnIn);
-        if (mob != null) _mobs.Add(mob);
+        return mob == null ? null : Track(mob);
+    }
+
+    /// <summary>Adds an already built <paramref name="mob"/> to the list (a subclass's own spawn, which has
+    /// checked the caps itself) and returns it.</summary>
+    protected TMob Track(TMob mob)
+    {
+        _mobs.Add(mob);
         return mob;
     }
 

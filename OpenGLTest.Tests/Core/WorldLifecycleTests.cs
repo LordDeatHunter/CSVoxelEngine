@@ -10,6 +10,7 @@ using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.InventoryPanel;
@@ -309,6 +310,8 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(first.SpawnEntity(Cinderwitch.EntityName, new Vector3(-3f, High - 1f, -3f)));
         Assert.True(first.SpawnEntity(Galeraptor.EntityName, new Vector3(4f, High - 1f, 4f)));
         Assert.True(first.SpawnEntity(Cloudgolem.EntityName, new Vector3(-4f, High - 1f, 4f)));
+        // A tower skeleton above the first floor: its tier cannot be read back from the position
+        Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(5f, High - 1f, -5f), tier: 4));
         var slime = Assert.Single(first.Slimes);
         var goblin = Assert.Single(first.Goblins);
         Assert.True(slime.Size > SlimeSize.Min);
@@ -322,14 +325,16 @@ public sealed class WorldLifecycleTests : IDisposable
         var goblinCenter = goblin.Position;
         var goblinAmmo = goblin.Ammo;
         var goblinHealth = goblin.Health;
-        // Every hell and sky kind wounded and turned, so the restore keeps each kind and its own state
+        // Every hell, sky and tower kind wounded and turned, so the restore keeps each kind and its own state
         var realmSaved = new List<(Type Kind, Vector3 Center, int Health, float Facing)>();
-        foreach (var realmMob in first.HellMobs.Concat<RealmMob>(first.SkyMobs))
+        foreach (var realmMob in first.HellMobs.Concat<RealmMob>(first.SkyMobs).Concat(first.Skeletons))
         {
             realmMob.RestoreState(realmMob.MaxHealth - 2, 0.75f, Vector3.Zero);
             realmSaved.Add((realmMob.GetType(), realmMob.Position, realmMob.Health, realmMob.Facing));
         }
-        Assert.Equal(4, realmSaved.Count);
+        Assert.Equal(5, realmSaved.Count);
+        var skeletonTier = Assert.Single(first.Skeletons).Tier;
+        Assert.True(skeletonTier > 0);
 
         var rock = EquipRock(first);
         first.Throws.ThrowSelected();
@@ -356,7 +361,7 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(goblinCenter, restoredGoblin.Position);
         Assert.Equal(goblinAmmo, restoredGoblin.Ammo);
         Assert.Equal(goblinHealth, restoredGoblin.Health);
-        var restoredRealm = second.HellMobs.Concat<RealmMob>(second.SkyMobs).ToList();
+        var restoredRealm = second.HellMobs.Concat<RealmMob>(second.SkyMobs).Concat(second.Skeletons).ToList();
         Assert.Equal(realmSaved.Count, restoredRealm.Count);
         foreach (var (kind, center, health, facing) in realmSaved)
         {
@@ -365,6 +370,10 @@ public sealed class WorldLifecycleTests : IDisposable
             Assert.Equal(health, restored.Health);
             Assert.Equal(facing, restored.Facing);
         }
+        // The skeleton came back at its saved tier, so its wounded health fits a pool above the first floor's
+        var restoredSkeleton = Assert.Single(second.Skeletons);
+        Assert.Equal(skeletonTier, restoredSkeleton.Tier);
+        Assert.True(restoredSkeleton.MaxHealth > restoredSkeleton.Type.MaxHealth);
         Assert.Equal(2 + realmSaved.Count, second.Mobs.Count); // RefreshMobs ran at the flip
 
         var restoredDrop = Assert.Single(second.Drops);

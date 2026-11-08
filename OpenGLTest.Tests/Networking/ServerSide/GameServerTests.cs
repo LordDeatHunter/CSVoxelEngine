@@ -14,6 +14,7 @@ using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Interaction;
 using VoxelEngine.Items;
@@ -1302,6 +1303,52 @@ public sealed class GameServerTests : IDisposable
             mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
             Assert.True(mirroredBrute.Animation.IsPlaying(Hellbrute.MeleeClip));
             Assert.False(mirroredCaster.Animation.IsPlaying(Cinderwitch.CastClip));
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    [Fact]
+    public void SkeletonsReachTheClientsEntityListByKindWithTheirTier()
+    {
+        using var client = Connect("Archer");
+        var spawn = client.Server!.Value.Spawn;
+        // Straight under the player (the despawn rule is horizontal) and far below it, so it never reaches the player
+        var deep = new Vector3(spawn.X, spawn.Y - 200f, spawn.Z + 3f);
+        Assert.True(_world.SpawnEntity(Skeleton.EntityName, deep, tier: 5));
+        var skeleton = Assert.Single(_world.Skeletons);
+        Assert.Equal(5, skeleton.Tier);
+        skeleton.RestoreState(skeleton.MaxHealth - 3, 0.5f, Vector3.Zero);
+        // Stands in for the attacks the server simulated: the counter its entry carries
+        skeleton.MirrorAttackCount(3);
+
+        var inbox = InboxOf(client);
+        WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Skeleton && e.Ammo == 3));
+        // Sent as a skeleton (never under the switch's goblin default), its tier in the item byte
+        var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.Skeleton);
+        Assert.Equal(skeleton.Tier, carried.ItemId);
+        Assert.Equal(skeleton.Health, carried.Health);
+
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            var mirrored = Assert.Single(mirror.Skeletons);
+            Assert.Equal(skeleton.Tier, mirrored.Tier);
+            Assert.Equal(skeleton.MaxHealth, mirrored.MaxHealth);
+            Assert.Equal(skeleton.Health, mirrored.Health);
+            // The first count only sets: an attack already under way when first seen is not replayed
+            Assert.False(mirrored.Animation.IsPlaying(Skeleton.ShootClip));
+
+            // The server shoots twice in a row: the count skips a melee and the mirror draws its bow
+            skeleton.MirrorAttackCount(5);
+            WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Skeleton && e.Ammo == 5));
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            Assert.True(mirrored.Animation.IsPlaying(Skeleton.ShootClip));
+            Assert.False(mirrored.Animation.IsPlaying(Skeleton.MeleeClip));
         }
         finally
         {
