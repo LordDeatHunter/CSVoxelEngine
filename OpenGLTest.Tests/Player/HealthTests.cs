@@ -1,4 +1,5 @@
 using System.Numerics;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Player;
 using VoxelEngine.UI;
 using VoxelEngine.VisualTest;
@@ -53,11 +54,12 @@ public sealed class HealthTests
     }
 
     [Fact]
-    public void LavaBurnsFiveHpPerHalfSecond()
+    public void LavaBurnsTenHpPerHalfSecondAndSetsTheBodyAlight()
     {
         var health = new PlayerHealth();
         health.UpdateLava(1.1f, inLava: true, immune: false);
-        Assert.Equal(90, health.Health);
+        Assert.Equal(80, health.Health);
+        Assert.True(health.Effects.IsActive(StatusEffectRegistry.Require("burning")));
     }
 
     [Fact]
@@ -68,12 +70,12 @@ public sealed class HealthTests
         Assert.Equal(100, health.Health);
 
         health.UpdateLava(0.01f, inLava: true, immune: false);
-        Assert.Equal(95, health.Health);
+        Assert.Equal(90, health.Health);
 
         // Leaving clears the partial tick, so coming back never eats an instant hit.
         health.UpdateLava(0.4f, inLava: false, immune: false);
         health.UpdateLava(0.4f, inLava: true, immune: false);
-        Assert.Equal(95, health.Health);
+        Assert.Equal(90, health.Health);
     }
 
     [Fact]

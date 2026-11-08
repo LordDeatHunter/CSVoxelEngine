@@ -20,9 +20,9 @@ public sealed class PlayerHealth
     /// <summary>Minimum fall height in blocks that hurts; anything shorter lands free.</summary>
     public const float FallMinBlocks = 5f;
 
-    /// <summary>Lava burns 5 HP every half second, i.e. 10 HP/s.</summary>
+    /// <summary>Lava burns 10 HP every half second, i.e. 20 HP/s.</summary>
     public const float LavaTickSeconds = 0.5f;
-    public const int LavaDamagePerTick = 5;
+    public const int LavaDamagePerTick = 10;
 
     /// <summary>How long the damage vignette takes to fade after a hit.</summary>
     public const float DamageFlashSeconds = 1.5f;
@@ -227,8 +227,9 @@ public sealed class PlayerHealth
     }
 
     /// <summary>Burns while <paramref name="inLava"/> and not <paramref name="immune"/>
-    /// (creative/flight). Leaving the lava (or going immune) clears the partial tick, so
-    /// re-entry never eats an instant hit.</summary>
+    /// (creative/flight), and catches the <c>burning</c> status effect so the fire rides out of the
+    /// pool. Leaving the lava (or going immune) clears the partial tick, so re-entry never eats an
+    /// instant hit; the effect stays for its own duration.</summary>
     public void UpdateLava(float deltaTime, bool inLava, bool immune)
     {
         if (immune || !inLava)
@@ -237,6 +238,7 @@ public sealed class PlayerHealth
             return;
         }
 
+        StatusEffects.Apply(this, immune: false, "burning");
         _lavaTimer += Math.Max(0f, deltaTime);
         while (_lavaTimer >= LavaTickSeconds)
         {

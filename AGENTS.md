@@ -273,6 +273,12 @@ changes), which a client mirrors (`ClientMirror.ApplyNetworkAir`). `HudRenderer.
 (`assets/textures/ui/bubble.png`) over the hearts, right-aligned, emptying from the left,
 shown only below a full lung. `BreathTests`, `visual-examples/drowning.json` (`VOXEL_TIME=147`).
 
+**Lava.** A body touching lava burns for `PlayerHealth.LavaDamagePerTick` (10 HP) every
+`LavaTickSeconds` (0.5 s), i.e. 20 HP/s, and catches the `burning` status effect while it is in the
+pool, so the fire rides out with it for the effect's own duration; creative and flight are immune.
+Singleplayer ticks it in `LocalPlayer.UpdateHealth`, a server in `ServerPlayer.TickStatus` (an unloaded
+body is not judged); `HealthTests`.
+
 **Regeneration.** Out of combat the player heals (`PlayerHealth.UpdateRegen`): once
 `PlayerConfig.RegenDelaySeconds` have passed with no damage taken (`TakeDamage` restarts the clock)
 and no blow dealt (`NoteCombat`, called by `MobStrikes.StrikeMob` through `PlayerContext.Health` for
