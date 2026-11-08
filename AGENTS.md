@@ -5632,11 +5632,12 @@ the sand surface is simply not exposed.
   and line of sight, null while nothing is exposed so a buried worm is untouchable) and `ScaleDamage` (`MobStrikes.StrikeMob`: the
   head takes the blow whole, the body `BodyDamageShare` of it), plus `ShowsHealthbar` (hidden under the sand). A segment is
   *exposed* (can be hit) when a quarter of it is above the surface and *visible* (drawn) when any of it is.
-- **The manager** (`SandwormManager`, joins `MobCaps`, not a `RealmMobManager`): picks the nearest desert target within
-  `HuntRadiusBlocks` (a non-immune one first, an immune one when it is alone, so a hovering camera can film it), runs the worm,
+- **The manager** (`SandwormManager`, joins `MobCaps`, not a `RealmMobManager`): picks the nearest target within
+  `HuntRadiusBlocks` in any biome (a non-immune one first, an immune one when it is alone, so a hovering camera can film
+  it), keeps digging toward where it last saw a target for `TargetMemorySeconds` after losing it, runs the worm,
   bills the contact (the chomp: `ChompDamage` and an upward `ChompLift`, from the head even while it is still under the sand
   beneath its victim; the dash: `DashDamage` from any exposed segment) once per `ContactCooldownSeconds`, rolls the loot on a kill and
-  retires a worm nobody is near. Registered in `World`, `MobDirector` (update, billing, `RefreshMobs`, the `spawn` op: the worm's
+  retires a worm nobody is near or whose head strays `DesertLeaveBlocks` from the desert. Registered in `World`, `MobDirector` (update, billing, `RefreshMobs`, the `spawn` op: the worm's
   head starts one burrow depth under the given feet), `WorldPersistence` (a restored worm resumes hunting, never thumps again) and
   `ClientMirror`.
 - **Look.** `MobPasses.RenderSandworms` draws the visible segments (and `ShadowPass` casts them) with the jaw swung open while it
