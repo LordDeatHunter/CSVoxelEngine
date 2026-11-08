@@ -184,6 +184,33 @@ public sealed class HellMobTests
     }
 
     [Fact]
+    public void TheCasterStillCastsWhileATargetHugsItInsideItsMinRange()
+    {
+        var chunks = StoneFloor();
+        var caster = new Cinderwitch(Caster, OnFloor(4.5f, 8.5f, MobConfig.HellCasterHeight), spawnIn: false);
+        var target = PlayerAt(4.5f - MobConfig.HellCasterMinRange * 0.4f, 8.5f);
+
+        var starts = 0;
+        var releases = 0;
+        var wasCasting = false;
+        for (var i = 0; i < (int)(4f / Dt) && releases < 1; i++)
+        {
+            // The player keeps hugging it from behind as it backs away, so it never reaches its band
+            target.Eye = StubTarget.EyeAt(new Vector3(caster.Position.X - MobConfig.HellCasterMinRange * 0.4f, 1f, 8.5f));
+            caster.Update(Dt, chunks, target);
+            var casting = caster.Animation.IsPlaying(Cinderwitch.CastClip);
+            if (casting && !wasCasting) starts++;
+            wasCasting = casting;
+            if (!caster.TryTakeCastRelease(out _, out var velocity)) continue;
+            releases++;
+            Assert.True(velocity.X < 0f, "the bolt flew away from its target");
+        }
+
+        Assert.True(starts >= 1, "the caster never cast at a target inside its minimum range");
+        Assert.True(releases >= 1, "the caster never released a bolt at a close target");
+    }
+
+    [Fact]
     public void ABoltThatTouchesATargetBurnsItButSparesAnImmuneOne()
     {
         var chunks = StoneFloor();

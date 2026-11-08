@@ -5404,7 +5404,8 @@ torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateCon
   still in reach (`HellMobManager`). A player walking into it barely moves it (`HellbruteShoveSpeed`).
 - **The cinderwitch** (`cinderwitch.json`, hp 24, loot ember shards) keeps
   `HellCasterMinRange..HellCasterMaxRange` and, grounded off its cooldown with a clear line, plays its cast
-  (the `throw` clip); at its `release` event the manager launches a **fire bolt**: a `ThrownProjectile`
+  (the `throw` clip) **even inside the band**: a target that hugs it still gets burned instead of the caster
+  only backing away; at its `release` event the manager launches a **fire bolt**: a `ThrownProjectile`
   of the `ember_shard` item on `GoblinAim`'s low arc (the band stays inside `v^2/g`), merged into the
   projectile list like the goblin stones (`HellMobManager.Bolts`, flown and touch-tested by the shared
   `MobMissiles`, which the skeleton's arrows use too), shedding embers in flight. A bolt that

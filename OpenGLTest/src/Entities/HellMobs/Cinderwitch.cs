@@ -8,8 +8,9 @@ namespace VoxelEngine.Entities.HellMobs;
 /// <summary>
 /// The cinderwitch: a ranged fire caster of hell's pockets. It keeps
 /// <see cref="MobConfig.HellCasterMinRange"/>..<see cref="MobConfig.HellCasterMaxRange"/> from its
-/// target (walking in from beyond, backing off from inside) and, standing on the ground off its
-/// cooldown with a clear line to the chest, plays its cast clip aimed at that chest; the fire bolt
+/// target (walking in from beyond, backing off from inside) but still casts at a target inside the
+/// band, and, standing on the ground off its cooldown with a clear line to the chest, plays its cast
+/// clip aimed at that chest; the fire bolt
 /// leaves the hand at the clip's <see cref="ReleaseEvent"/> (<see cref="TryTakeCastRelease"/>), which
 /// the manager launches as a burning projectile. Its cooldown shortens with the layer
 /// (<see cref="LayerDifficulty.Cooldown"/>). Main thread only.
@@ -66,19 +67,23 @@ public sealed class Cinderwitch : HellMob
     /// <inheritdoc />
     protected override Vector3 Decide(float dist, Vector3 toward, ChunkManager chunks, IMobTarget target)
     {
+        // Cast at any in-reach target, including inside the band: hugging a caster must never
+        // leave it harmless by only backing away.
+        if (dist <= MobConfig.HellCasterMaxRange && IsGrounded && _castCooldown <= 0f
+            && SeesTarget(CastOrigin, target, chunks))
+        {
+            _aimTarget = ChestOf(target.Eye);
+            StartAttack();
+            var jitter = (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.HellCasterCooldownJitter;
+            _castCooldown = LayerDifficulty.Cooldown(MobConfig.HellCasterCooldownSeconds + jitter, Layer);
+            return Vector3.Zero;
+        }
+
         if (dist > MobConfig.HellCasterMaxRange) return toward;
         if (dist < MobConfig.HellCasterMinRange) return -toward;
 
-        // Inside the band: cast when grounded (so a jump never lifts the hand over a wall), off the
-        // cooldown and with a clear line; otherwise keep walking at the target until the line clears.
-        if (!SeesTarget(CastOrigin, target, chunks)) return toward;
-        if (!IsGrounded || _castCooldown > 0f) return Vector3.Zero;
-
-        _aimTarget = ChestOf(target.Eye);
-        StartAttack();
-        var jitter = (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.HellCasterCooldownJitter;
-        _castCooldown = LayerDifficulty.Cooldown(MobConfig.HellCasterCooldownSeconds + jitter, Layer);
-        return Vector3.Zero;
+        // Inside the band, off the cooldown: keep walking at the target until the line clears.
+        return SeesTarget(CastOrigin, target, chunks) ? Vector3.Zero : toward;
     }
 
     /// <summary>
