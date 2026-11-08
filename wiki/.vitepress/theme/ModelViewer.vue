@@ -109,7 +109,12 @@ onBeforeUnmount(() => { cancelled = true; dispose?.(); if (ticker) clearInterval
       </label>
     </div>
     <div v-if="kind === 'entity' && clips.length && clip" class="mv-controls mv-timeline">
-      <button type="button" class="mv-btn" :aria-pressed="paused" @click="togglePause">{{ paused ? 'Play' : 'Pause' }}</button>
+      <button type="button" class="mv-btn mv-icon" :aria-label="paused ? 'Play' : 'Pause'" :title="paused ? 'Play' : 'Pause'" @click="togglePause">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="currentColor">
+          <path v-if="paused" d="M7 4.5v15l12-7.5z" />
+          <path v-else d="M6 4.5h4v15H6zM14 4.5h4v15h-4z" />
+        </svg>
+      </button>
       <label class="mv-slider mv-grow">Progress
         <input v-model.number="time" type="range" min="0" :max="length" step="0.01"
           @pointerdown="onScrubStart" @pointerup="onScrubEnd" @input="onScrub" />
@@ -138,6 +143,7 @@ onBeforeUnmount(() => { cancelled = true; dispose?.(); if (ticker) clearInterval
   display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px; line-height: 1.4;
   border: 1px solid var(--vp-c-divider); border-radius: 6px; background: var(--vp-c-bg-soft); cursor: pointer;
 }
+.mv-icon { padding: 6px 10px; }
 .mv-btn:hover { border-color: var(--vp-c-brand-1); }
 .mv-knob { position: relative; width: 28px; height: 16px; border-radius: 8px; background: var(--vp-c-divider); transition: background .15s; }
 .mv-knob::after { content: ''; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #fff; transition: transform .15s; }
