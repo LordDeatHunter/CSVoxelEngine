@@ -59,8 +59,11 @@ public static class SandwormConfig
     /// <summary>Horizontal range inside which the earthquake ramps from 0 to full.</summary>
     public const float ShakeRangeBlocks = 48f;
 
+    /// <summary>How long the worm keeps digging toward where it last saw a target after losing it.</summary>
+    public const float TargetMemorySeconds = 4f;
+
     /// <summary>Seconds with no target before the worm gives up and burrows away.</summary>
-    public const float RetreatAfterSeconds = 20f;
+    public const float RetreatAfterSeconds = 6f;
 
     // --- Brain: breach and air ---
 

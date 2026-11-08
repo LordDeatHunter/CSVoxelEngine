@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Simulation;
@@ -10,9 +11,10 @@ using Xunit;
 namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
-/// The sandworm manager over a flat desert: one worm at a time, hunting a desert target from under the sand and
-/// biting it when it breaches, resting between bites, never hurting an immune target, ignoring a target out of
-/// the desert, giving up when nobody is near, rolling loot on a kill; the body's hit tests (exposed segments
+/// The sandworm manager over a flat desert: one worm at a time, hunting a target from under the sand and
+/// biting it when it breaches, resting between bites, never hurting an immune target, still hunting a target
+/// across the desert border, keeping the hunt going for a moment after the target is lost, giving up when the
+/// head strays from the desert or nobody is near, rolling loot on a kill; the body's hit tests (exposed segments
 /// only) and the head-versus-body damage split.
 /// </summary>
 public sealed class SandwormManagerTests
@@ -23,17 +25,34 @@ public sealed class SandwormManagerTests
     public SandwormManagerTests() => TestContent.EnsureLoaded();
 
     // Built once per biome: the worm never edits a block, and filling chunks cell by cell is the slow part
-    private static readonly Lazy<ChunkManager> SharedDesert = new(() => Build(Biome.Desert));
-    private static readonly Lazy<ChunkManager> SharedForest = new(() => Build(Biome.Forest));
+    private static readonly Lazy<ChunkManager> SharedDesert = new(() => Build(FlatSource(Biome.Desert, -5, 5)));
+    private static readonly Lazy<ChunkManager> SharedForest = new(() => Build(FlatSource(Biome.Forest, -5, 5)));
+    private static readonly Lazy<ChunkManager> SharedBorder = new(BuildBorder);
 
     private static ChunkManager Desert(Biome biome = Biome.Desert) =>
         biome == Biome.Desert ? SharedDesert.Value : SharedForest.Value;
 
-    // A flat sand plateau whose top cell is Top, over 5x5 chunk columns around the origin, biome as given
-    private static ChunkManager Build(Biome biome)
+    // Desert up to chunk column x = 0 and forest from x = 1, so a target can stand across the border
+    private static ChunkManager Border() => SharedBorder.Value;
+
+    private static ChunkManager BuildBorder()
     {
-        var sand = ContentRegistry.RequireBlock("sand").Id;
-        var source = new FlatWorldSource(-5, 5, -5, 5, Top, sand, biome, 0.8f, 0.1f);
+        var desert = FlatSource(Biome.Desert, -5, 0);
+        var forest = FlatSource(Biome.Forest, 1, 5);
+        return Build(new SplitBiomeSource(desert, forest, 0));
+    }
+
+    private static FlatWorldSource FlatSource(Biome biome, int cxMin, int cxMax)
+    {
+        var desert = biome == Biome.Desert;
+        return new FlatWorldSource(cxMin, cxMax, -5, 5, Top, Sand, biome, desert ? 0.8f : 0.1f, desert ? 0.1f : 0.8f);
+    }
+
+    private static byte Sand => ContentRegistry.RequireBlock("sand").Id;
+
+    // A flat sand plateau whose top cell is Top, over 5x5 chunk columns around the origin
+    private static ChunkManager Build(IWorldSource source)
+    {
         var chunks = new ChunkManager(null!) { WorldSource = source };
         for (var cx = -2; cx <= 2; cx++)
         for (var cz = -2; cz <= 2; cz++)
@@ -44,7 +63,7 @@ public sealed class SandwormManagerTests
             for (var x = 0; x < Chunk.Size; x++)
             for (var y = 0; y < Chunk.Size; y++)
             for (var z = 0; z < Chunk.Size; z++)
-                chunk.SetBlockRaw(x, y, z, cy * Chunk.Size + y <= Top ? sand : (byte)0, 0);
+                chunk.SetBlockRaw(x, y, z, cy * Chunk.Size + y <= Top ? Sand : (byte)0, 0);
             chunks.Chunks[pos] = chunk;
         }
         return chunks;
@@ -126,18 +145,48 @@ public sealed class SandwormManagerTests
     }
 
     [Fact]
-    public void ATargetOutsideTheDesertIsNotHunted()
+    public void ATargetAcrossTheDesertBorderIsStillHunted()
     {
-        var chunks = Desert(Biome.Forest);
+        var chunks = Border();
         var manager = NewManager();
         var worm = manager.Spawn(Burrowed(0, 0))!;
         worm.Brain.SkipThump();
-        var start = worm.Position;
+        var target = new StubTarget(StubTarget.EyeAt(FeetOn(40, 0)));
+        List<IMobTarget> targets = [target];
 
-        Run(manager, chunks, [new StubTarget(StubTarget.EyeAt(FeetOn(30, 0)))], 5f);
+        Run(manager, chunks, targets, 30f, () => target.DamageTaken > 0);
 
-        Assert.Equal(start.X, worm.Position.X, 3);
-        Assert.Equal(start.Z, worm.Position.Z, 3);
+        Assert.True(target.DamageTaken > 0);
+    }
+
+    [Fact]
+    public void AWormThatLosesItsTargetKeepsDiggingTowardWhereItWas()
+    {
+        var chunks = Desert();
+        var manager = NewManager();
+        var worm = manager.Spawn(Burrowed(0, 0))!;
+        worm.Brain.SkipThump();
+        List<IMobTarget> targets = [new StubTarget(StubTarget.EyeAt(FeetOn(40, 0)))];
+
+        Run(manager, chunks, targets, 1f);
+        var before = worm.Position;
+        targets.Clear();
+        Run(manager, chunks, targets, 1f);
+
+        Assert.True(Vector3.Distance(before, worm.Position) > 1f);
+        Assert.NotEqual(SandwormPhase.Retreat, worm.Phase);
+    }
+
+    [Fact]
+    public void AWormWhoseHeadStraysFromTheDesertGivesUpAndIsGone()
+    {
+        var chunks = Desert(Biome.Forest);
+        var manager = NewManager();
+        manager.Spawn(Burrowed(0, 0))!.Brain.SkipThump();
+
+        Run(manager, chunks, [new StubTarget(StubTarget.EyeAt(FeetOn(30, 0)))], 5f, () => manager.Worms.Count == 0);
+
+        Assert.Empty(manager.Worms);
     }
 
     [Fact]
@@ -230,6 +279,29 @@ public sealed class SandwormManagerTests
     private sealed class FakePopulation(int living) : IMobPopulation
     {
         public int LivingCount { get; } = living;
+    }
+
+    // One map split at a chunk column: both halves are supplied, because SandwormGround.IsDesert reads worldgen
+    // for any column the source does not supply
+    private sealed class SplitBiomeSource(IWorldSource desert, IWorldSource forest, int borderChunkX) : IWorldSource
+    {
+        public bool Supplies(int chunkX, int chunkZ) =>
+            chunkX <= borderChunkX ? desert.Supplies(chunkX, chunkZ) : forest.Supplies(chunkX, chunkZ);
+
+        public ColumnData GetColumn(int chunkX, int chunkZ) =>
+            chunkX <= borderChunkX ? desert.GetColumn(chunkX, chunkZ) : forest.GetColumn(chunkX, chunkZ);
+
+        public void Fill(Chunk chunk)
+        {
+            if (chunk.Position.X <= borderChunkX) desert.Fill(chunk);
+            else forest.Fill(chunk);
+        }
+
+        public bool IsReady(int chunkX, int chunkZ) =>
+            chunkX <= borderChunkX ? desert.IsReady(chunkX, chunkZ) : forest.IsReady(chunkX, chunkZ);
+
+        public bool TryGet(int chunkX, int chunkZ, out ColumnTerrain terrain) =>
+            chunkX <= borderChunkX ? desert.TryGet(chunkX, chunkZ, out terrain) : forest.TryGet(chunkX, chunkZ, out terrain);
     }
 
     // A worm standing on the surface for the hit tests: the whole chain laid flat above the sand

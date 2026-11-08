@@ -12,10 +12,11 @@ namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Owns the sandworm boss (plans/SANDWORM.md): at most one living at a time, never spawned by a ring (it is
-/// summoned, or placed by a scenario or a save restore). Each frame it picks the nearest desert target within
-/// reach (a non-immune one first), lets the worm hunt it over the sand under the chain, bills the head's chomp
-/// and the dash's contact to every target they touch, rolls the loot on a kill and retires a worm no target
-/// is near. Joins the world's <see cref="MobCaps"/>. Main thread only.
+/// summoned, or placed by a scenario or a save restore). Each frame it picks the nearest target within reach (a
+/// non-immune one first) and keeps digging toward where it last saw one for a moment after losing it, lets the
+/// worm hunt it over the sand under the chain, bills the head's chomp and the dash's contact to every target they
+/// touch, rolls the loot on a kill and retires a worm whose head has strayed from the desert or whose targets are
+/// all far. Joins the world's <see cref="MobCaps"/>. Main thread only.
 /// </summary>
 public sealed class SandwormManager : IMobPopulation
 {
@@ -23,6 +24,7 @@ public sealed class SandwormManager : IMobPopulation
     private readonly MobCaps _caps;
     private readonly List<Sandworm> _worms = [];
     private readonly List<byte> _loot = [];
+    private readonly Dictionary<Sandworm, (Vector3 Point, float Age)> _lastTargets = [];
 
     /// <summary>Joins <paramref name="caps"/> (the world's), or caps itself alone when none is given (tests).
     /// <paramref name="type"/> may be null (unregistered content), which leaves the boss out.</summary>
@@ -114,7 +116,9 @@ public sealed class SandwormManager : IMobPopulation
         for (var i = _worms.Count - 1; i >= 0; i--)
         {
             _worms[i].AnimateMirrorFrame(deltaTime, (x, z) => SandwormGround.At(chunks, x, z));
-            if (_worms[i].IsRemovable) _worms.RemoveAt(i);
+            if (!_worms[i].IsRemovable) continue;
+            _lastTargets.Remove(_worms[i]);
+            _worms.RemoveAt(i);
         }
     }
 
@@ -132,7 +136,12 @@ public sealed class SandwormManager : IMobPopulation
 
             if (worm.IsDying)
             {
-                if (worm.IsRemovable) _worms.RemoveAt(i);
+                if (worm.IsRemovable)
+                {
+                    _lastTargets.Remove(worm);
+                    _worms.RemoveAt(i);
+                }
+
                 continue;
             }
 
@@ -147,6 +156,7 @@ public sealed class SandwormManager : IMobPopulation
             {
                 // It sank away for good: gone without loot
                 worm.BeginDying();
+                _lastTargets.Remove(worm);
                 _worms.RemoveAt(i);
                 continue;
             }
@@ -157,17 +167,37 @@ public sealed class SandwormManager : IMobPopulation
 
     private void UpdateWorm(Sandworm worm, float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
-        var target = PickTarget(worm, chunks, targets);
+        var seen = PickTarget(worm, targets);
+        if (seen is { } point)
+            _lastTargets[worm] = (point, 0f);
+        var target = seen ?? RememberTarget(worm, deltaTime);
         if (worm.Phase != SandwormPhase.Thump && worm.Phase != SandwormPhase.Retreat
-            && ((target == null && TargetsAllFar(worm, targets))
+            && ((seen == null && TargetsAllFar(worm, targets))
                 || !SandwormGround.IsNearDesert(chunks, worm.Position.X, worm.Position.Z, SandwormConfig.DesertLeaveBlocks)))
             worm.Brain.BeginRetreat();
         worm.Update(deltaTime, target, (x, z) => SandwormGround.At(chunks, x, z));
     }
 
-    // The nearest desert target within hunt range, preferring one a hit can hurt over an immune one (which a
-    // hovering camera still gets chased by when it is alone)
-    private static Vector3? PickTarget(Sandworm worm, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
+    // Keeps the worm digging toward where it last saw a target for TargetMemorySeconds after it loses it, so a
+    // dropped target never parks it mid-fight; null once that memory has run out
+    private Vector3? RememberTarget(Sandworm worm, float deltaTime)
+    {
+        if (!_lastTargets.TryGetValue(worm, out var memory)) return null;
+        var age = memory.Age + deltaTime;
+        if (age > SandwormConfig.TargetMemorySeconds)
+        {
+            _lastTargets.Remove(worm);
+            return null;
+        }
+
+        _lastTargets[worm] = (memory.Point, age);
+        return memory.Point;
+    }
+
+    // The nearest target within hunt range, preferring one a hit can hurt over an immune one (which a hovering
+    // camera still gets chased by when it is alone). Any biome counts: the worm burrows through any ground and
+    // UpdateWorm's desert leash is what keeps the fight home
+    private static Vector3? PickTarget(Sandworm worm, IReadOnlyList<IMobTarget> targets)
     {
         IMobTarget? best = null;
         var bestImmune = true;
@@ -181,7 +211,7 @@ public sealed class SandwormManager : IMobPopulation
             var dx = eye.X - worm.Position.X;
             var dz = eye.Z - worm.Position.Z;
             var distance = dx * dx + dz * dz;
-            if (distance > range || !SandwormGround.IsDesert(chunks, eye.X, eye.Z)) continue;
+            if (distance > range) continue;
             if (best != null && (bestImmune == target.IsImmune ? distance >= bestDistance : !bestImmune)) continue;
             best = target;
             bestImmune = target.IsImmune;
