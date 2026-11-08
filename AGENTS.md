@@ -5222,8 +5222,10 @@ death it causes rolls the loot as usual (`MobLavaTests`). `visual-examples/mob-h
 `MobSeparation.Separate` (called by `World.Update` over the rebuilt `World.Mobs`) pushes every two
 living mobs whose body boxes overlap apart along the shallower horizontal axis, each taking half unless
 a wall blocks it; a pushed body slides through `BoxSweep` (`Mob.Nudge`), so no pack can stack in one
-silhouette and no push enters a solid cell. A dying mob and a boss are left alone, and a pair that only
-meets at different heights is not pushed (`MobSeparationTests`). **Despawn fade**: a mob past every target's
+silhouette and no push enters a solid cell. A pair is left with only a hair of overlap
+(`MobSeparation.TouchOverlap`), so `SlimeMerge` still sees two slimes as touching. A dying mob and a
+boss are left alone, and a pair that only meets at different heights is not pushed
+(`MobSeparationTests`). **Despawn fade**: a mob past every target's
 despawn radius is not removed outright; the manager calls `Mob.BeginDying` without rolling any loot,
 so it plays its death pose and is dropped once that has run, and like any dying mob it leaves
 `LivingCount`, the saves and the server's broadcast at once (`SlimeTests`, `GoblinManagerTests`,

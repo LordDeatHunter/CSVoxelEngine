@@ -14,10 +14,12 @@ namespace VoxelEngine.Entities;
 /// </summary>
 internal static class MobSeparation
 {
-    // A hair past the touching position, so a resolved pair reads as clear on the next frame too.
-    private const float Slack = 0.001f;
+    /// <summary>How much overlap a resolved pair keeps: invisible on screen, but enough that
+    /// <see cref="Slimes.SlimeMerge"/> still reads the bodies as touching.</summary>
+    internal const float TouchOverlap = 0.001f;
 
-    /// <summary>Resolves every overlapping pair of <paramref name="mobs"/> in place.</summary>
+    /// <summary>Resolves every overlapping pair of <paramref name="mobs"/> in place, leaving at most
+    /// <see cref="TouchOverlap"/> between two bodies.</summary>
     public static void Separate(IReadOnlyList<Mob> mobs, ChunkManager chunks)
     {
         for (var i = 0; i < mobs.Count; i++)
@@ -48,20 +50,21 @@ internal static class MobSeparation
         if (overlapZ <= 0f) return;
 
         var alongX = overlapX <= overlapZ;
-        var overlap = MathF.Min(overlapX, overlapZ) + Slack;
+        var pushOut = MathF.Min(overlapX, overlapZ) - TouchOverlap;
+        if (pushOut <= 0f) return;
         var sign = (alongX ? delta.X : delta.Z) < 0f ? -1f : 1f;
         var push = alongX ? new Vector3(sign, 0f, 0f) : new Vector3(0f, 0f, sign);
-        a.Nudge(push * (overlap * 0.5f), chunks);
-        b.Nudge(-push * (overlap * 0.5f), chunks);
+        a.Nudge(push * (pushOut * 0.5f), chunks);
+        b.Nudge(-push * (pushOut * 0.5f), chunks);
 
         // One body may have been against a wall and taken less than its half, so the other takes
         // the remainder: one pass clears the overlap unless both are wedged.
         var after = a.Position - b.Position;
-        var remaining = reach - MathF.Abs(alongX ? after.X : after.Z);
+        var remaining = reach - MathF.Abs(alongX ? after.X : after.Z) - TouchOverlap;
         if (remaining <= 0f) return;
         b.Nudge(-push * remaining, chunks);
         after = a.Position - b.Position;
-        remaining = reach - MathF.Abs(alongX ? after.X : after.Z);
+        remaining = reach - MathF.Abs(alongX ? after.X : after.Z) - TouchOverlap;
         if (remaining > 0f) a.Nudge(push * remaining, chunks);
     }
 }

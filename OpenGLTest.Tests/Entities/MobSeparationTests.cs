@@ -21,10 +21,14 @@ public sealed class MobSeparationTests
     private static Slime SlimeAt(float x, float z, float feetY = 1f) =>
         new(EntityRegistry.Require("slime"), new Vector3(x, feetY + Slime.HalfExtent, z));
 
-    private static bool Overlapping(Mob a, Mob b) =>
-        MathF.Abs(a.Position.X - b.Position.X) < a.BodyHalfExtent + b.BodyHalfExtent
-        && MathF.Abs(a.Position.Z - b.Position.Z) < a.BodyHalfExtent + b.BodyHalfExtent
-        && MathF.Abs(a.Position.Y - b.Position.Y) < a.BodyHalfHeight + b.BodyHalfHeight;
+    // Overlap beyond the hair MobSeparation deliberately leaves for slime merging
+    private static bool Overlapping(Mob a, Mob b)
+    {
+        var allowed = MobSeparation.TouchOverlap + 0.0001f;
+        return MathF.Abs(a.Position.X - b.Position.X) < a.BodyHalfExtent + b.BodyHalfExtent - allowed
+               && MathF.Abs(a.Position.Z - b.Position.Z) < a.BodyHalfExtent + b.BodyHalfExtent - allowed
+               && MathF.Abs(a.Position.Y - b.Position.Y) < a.BodyHalfHeight + b.BodyHalfHeight - allowed;
+    }
 
     [Fact]
     public void TwoBodiesInTheSameSpotArePushedApartWithoutLeavingTheFloor()
@@ -38,6 +42,21 @@ public sealed class MobSeparationTests
         Assert.False(Overlapping(a, b));
         Assert.Equal(1f, a.Position.Y - a.BodyHalfHeight, 3);
         Assert.Equal(1f, b.Position.Y - b.BodyHalfHeight, 3);
+    }
+
+    [Fact]
+    public void SeparatedSlimesStillCountAsTouchingForTheirMerge()
+    {
+        var chunks = Floor();
+        var a = SlimeAt(8.5f, 8.5f);
+        var b = SlimeAt(8.5f, 8.5f);
+        a.AnimateMirror(MobConfig.SlimeMergeCooldownSeconds);
+        b.AnimateMirror(MobConfig.SlimeMergeCooldownSeconds);
+
+        MobSeparation.Separate([a, b], chunks);
+
+        Assert.False(Overlapping(a, b));
+        Assert.True(SlimeMerge.CanMerge(a, b), "separation left the pair too far apart to merge");
     }
 
     [Fact]
