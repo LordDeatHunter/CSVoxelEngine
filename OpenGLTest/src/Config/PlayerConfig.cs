@@ -83,6 +83,9 @@ public static class PlayerConfig
     // Wading (under WaterFloatShare) walks, at this share of the walk speed: a lighter slowdown than
     // swimming's, with the normal jump.
     public const float WadeSpeedFactor = 0.75f;
+    // Lava drags far harder than water: any part of the body in it scales the walk and the swim
+    // stroke to this share of their already slowed speed, so sprinting through a dip cannot carry a run.
+    public const float LavaSpeedFactor = 0.3f;
     // Floating: a body in deep water with its eye above the surface (and one that has not dived,
     // even with the eye under) settles where this share of it is under. Its vertical speed eases at
     // FloatSettleRate (per second) toward FloatBuoyancy (per second) times its height error, capped

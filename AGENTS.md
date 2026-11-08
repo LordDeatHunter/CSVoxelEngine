@@ -277,7 +277,9 @@ shown only below a full lung. `BreathTests`, `visual-examples/drowning.json` (`V
 `LavaTickSeconds` (0.5 s), i.e. 20 HP/s, and catches the `burning` status effect while it is in the
 pool, so the fire rides out with it for the effect's own duration; creative and flight are immune.
 Singleplayer ticks it in `LocalPlayer.UpdateHealth`, a server in `ServerPlayer.TickStatus` (an unloaded
-body is not judged); `HealthTests`.
+body is not judged); `HealthTests`. Lava also drags movement: `PlayerConfig.LavaSpeedFactor` scales the
+walk and the swim stroke while any part of the body is in it (flight ignores it), so a sprint cannot
+carry through a shallow dip (`LavaMovementTests`).
 
 **Regeneration.** Out of combat the player heals (`PlayerHealth.UpdateRegen`): once
 `PlayerConfig.RegenDelaySeconds` have passed with no damage taken (`TakeDamage` restarts the clock)
@@ -1257,7 +1259,7 @@ OpenGLTest/
       ParticleConfig.cs        # falling leaves, mining debris, campfire, lava and torch embers and smoke, bubbles,
                                #   spring steam
       PlayerConfig.cs          # break overlay, camera and swing feel (sprint FOV, strafe tilt, hit-stop, throw
-                               #   zoom), water depth states, throws, slime block, sink blocks, bandage
+                               #   zoom), water depth states, lava speed, throws, slime block, sink blocks, bandage
       PostProcessConfig.cs     # biome grade, damage fringe, underwater wobble, FXAA, contact AO, godrays, GPU timer
                                #   gate
       SaveConfig.cs            # autosave, save writer retries and shutdown, teardown joins and drain, entity restore

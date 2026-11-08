@@ -249,6 +249,9 @@ internal sealed class PlayerPhysics
         camera.SetMovementFactor(BlockMoveFactor(camera, chunkManager));
         var statusFactor = camera.Effects?.MoveFactor ?? 1f;
         if (!camera.IsFlying) moveSpeed *= camera.MovementFactor * statusFactor * camera.GearMoveFactor;
+        // Lava is denser than water: body contact drags the walk (and the stroke below) to a crawl,
+        // so a sprint cannot carry through a shallow dip.
+        if (camera.IsInLava && !camera.IsFlying) moveSpeed *= PlayerConfig.LavaSpeedFactor;
         var wish = new Vector2(moveInput.X * moveSpeed, moveInput.Z * moveSpeed);
         float accelRate;
         if (camera.IsFlying)
@@ -268,6 +271,7 @@ internal sealed class PlayerPhysics
                 if (moving)
                 {
                     var burst = SwimBurstSpeed * (backing ? 0.6f : 1f) * camera.MovementFactor * statusFactor * camera.GearMoveFactor;
+                    if (camera.IsInLava) burst *= PlayerConfig.LavaSpeedFactor;
                     _horizontalVelocity = new Vector2(moveInput.X, moveInput.Z) * burst;
                 }
                 _pendingSwimVertical = strokeUp ? SwimBurstUp : strokeDown ? SwimBurstDown : 0f;
