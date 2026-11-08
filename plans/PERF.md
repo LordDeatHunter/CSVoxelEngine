@@ -251,6 +251,13 @@ processes. Absolute cost drifts between sessions (0.18-0.40 ms per chunk column)
   rule per cell, and the `SkyTrees` stage 0.006 ms); cold 4.1-4.3 ms against 3.9, of which `SkyTrees`
   0.33 ms mean (a cold sample regrows every tree it crosses; in game a tree is grown once per cell and
   cached). Untried: the stamp asking the flora rule only at the top, the plant cell and the vine run.
+- Sky islands everywhere (2026-11-07, `IslandOpenSkyWeight` 0.7, 112-block island cells, `TouchesLand`, the
+  zone gate gone; `WorldgenCostProbe` `skyIsland` class, one run each, different island samples since the
+  layout moved): a sky-island chunk warm 0.14 ms against 0.34 ms at the previous commit (island stamp 0.10
+  against 0.22, `RuinsSky` 0.018 against 0.077), cold 5.0 against 12.1 ms (the column scan). Over a grid of
+  6400 band chunks at y 352 around the origin the island stamp averages 17 us a chunk (three passes) against
+  10-25 us at the previous commit, though the band now holds about 30x as many islands: the old zone and
+  landmass gate cost about what the 2 x 2 island rolls cost now.
 - Identity recipe: dump `LandHeight`, `WaterLevelAt` and `SurfaceWaterWeight` bits before and after
   on a +-20000 grid at stride 37, plus `Compute` on 1000 random chunk columns; zero changes allowed
   outside the intended footprint.

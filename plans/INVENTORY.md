@@ -18,6 +18,8 @@ Nothing.
   flagged `visible` (a trinket is never drawn today), armor in the shadow pass, and an item debugger equipment mode.
   **Hook:** `PlayerPasses.DrawPart`, `PlayerRig.BuildArmorMesh`, `ShadowPass`, `EntityPreviewState`/`PlayerPreviewState`.
 
+Accessory abilities, the ring ladder and the set rule change are tracked in `ACCESSORIES.md`; `I-3` and `I-6` stay here.
+
 ### Future
 - [ ] **`I-6` Equipment slots that grow with milestones** - P3, M. Needs its own brainstorm; not in scope for I-1..I-5.
   I-1 keeps slot counts in data/config so this stays possible.

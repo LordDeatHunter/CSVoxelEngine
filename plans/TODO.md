@@ -37,6 +37,7 @@ Mostly content JSON plus small systems; high feel, low engine risk. In order:
 4. **Armor (in `P-7`)** — flat damage reduction from summed armor points (capped), equipped from
    the inventory panel, shown in HUD/tooltip, with worn armor drawn on `PlayerModel` and remote
    players (this pulls `V-14` in). *Hook:* the damage pipeline (`PlayerHealth`, `IMobTarget.TakeHit`).
+   Accessory abilities, the ring ladder and the set rule change are in `ACCESSORIES.md` (`AC-1`..`AC-7`).
 
 #### Milestone 2 — Arc A vertical slice: the first dungeon
 
@@ -45,6 +46,8 @@ Prove the fantasy half. Infrastructure first, in order: `M-15` (structure templa
 (`P-17`), then the first magic slice, the spell builder with a few parts (`P-14`, `MAGIC.md`). A single hand-authored crypt with loot, a spawner
 room and a boss is enough to make health, combat and loot matter and to give survival a
 destination. Placing it needs a world-site hook, the one worldgen touch this milestone allows.
+The **battle tower** (`BT-1`..`BT-9`, tracked in `BATTLE_TOWER.md`) is the large-scale form of this dungeon: a multi-floor
+landmark with skeleton piles, chests, a boss altar and a collapse.
 
 #### Milestone 3 — Arc B vertical slice: first power
 
@@ -226,7 +229,7 @@ single-arc player.
   Grass, leaves and spruce leaves are already climate-tinted through the `biomeTint` block field.
   Open: falling-leaf particles should sample the foliage field; flowers and water can opt into
   `biomeTint`'s `tile` form; and the biome roster itself can grow (swamp, jungle, volcanic,
-  underground biomes).
+  underground biomes; the cave biomes are tracked in `CAVE_BIOMES.md`).
   Terrain relief (highlands, ranges, massifs, lone peaks) is in `BIOMEGEN.md` §6.
 - [ ] **`P-25` · More ores + deeper strata** — P1, M.
   Tin/iron/gold/… veins placed deterministically like trees/pebbles/malachite; tiers gate tools
@@ -237,7 +240,7 @@ single-arc player.
   Separate seed/noise sets on the same chunk pipeline; new LOD palette. Base for `P-36`.
 - [ ] **`P-28` · Caves as destinations** — P2, M.
   Larger caverns, underground biomes, rare crystals and hazard zones; builds on the existing
-  cave/worm/lava generation. A natural home for `P-47`'s crystal.
+  cave/worm/lava generation. A natural home for `P-47`'s crystal. Tracked in `CAVE_BIOMES.md` (`CB-0`..`CB-5`).
 - [ ] **`P-56` · Ocean & island content** — P3, M.
   Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.
   Ties `F-19`.
