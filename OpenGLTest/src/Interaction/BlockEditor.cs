@@ -313,6 +313,14 @@ internal sealed class BlockEditor
                 touched.RemeshAfterBatchEdit(_chunkManager);
         }
 
+        // The falling copy shows at once, so the chunks that lost cells rebuild now too (nearest
+        // first, capped against a hitch): left to the dirty queue behind every light-radius
+        // neighbor, the standing tree stayed drawn beside its falling copy for seconds.
+        foreach (var chunkPos in touchedChunks
+                     .OrderBy(c => Vector3.DistanceSquared((c + new Vector3(0.5f)) * Chunk.Size, feller))
+                     .Take(SimulationConfig.TreeFellSyncRemeshChunks))
+            _chunkManager.ImmediateRemesh(chunkPos);
+
         // Sand stacked on the felled wood loses its support with it
         foreach (var block in collected)
             _falling.TryTopple(_chunkManager, _lodManager, _fluidManager,
