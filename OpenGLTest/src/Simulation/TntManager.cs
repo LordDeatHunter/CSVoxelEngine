@@ -162,6 +162,7 @@ public class TntManager
     /// touched chunk once, then moves the far LOD of every blasted column onto the crater. Fluid cells
     /// are left standing — clearing them would only be undone by the hundreds of sources around
     /// the crater — and the water around the blast is scheduled so it floods the hole instead.
+    /// Unbreakable blocks are left standing too.
     /// </summary>
     private void Detonate(Vector3 center, ChunkManager chunks, LodManager lod, DropManager drops,
         FluidManager fluids, FallingBlockManager falling, LeafParticleSystem? leaves = null,
@@ -189,8 +190,9 @@ public class TntManager
             if (existing == 0) continue;
 
             // A blast cannot clear water: it would refill within a tick or two anyway, and a
-            // dry crater under the sea would flood from every side at once
-            if (BlockType.IsFluid(existing)) continue;
+            // dry crater under the sea would flood from every side at once. An unbreakable block
+            // survives the blast (ClearBlockAt would refuse it anyway)
+            if (BlockType.IsFluid(existing) || BlockType.IsUnbreakable(existing)) continue;
 
             var chunkPos = VoxelCoords.ChunkPosOf(x, y, z);
             if (!chunks.Chunks.TryGetValue(chunkPos, out var chunk)) continue;

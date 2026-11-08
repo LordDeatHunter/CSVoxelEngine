@@ -30,11 +30,12 @@ public static class Mining
     /// deals to an enemy.</summary>
     public const float DefaultEntityDamage = 1f;
 
-    /// <summary>Whether the held item may damage this block under its requiresTool gate.</summary>
+    /// <summary>Whether the held item may damage this block under its requiresTool gate. Never
+    /// for a fluid or an unbreakable block, which nothing mines.</summary>
     public static bool CanMine(byte blockId, Item? held)
     {
         var block = BlockType.ById[blockId];
-        return block is { Fluid: false } && !Refused(block, held);
+        return block is { Fluid: false, Unbreakable: false } && !Refused(block, held);
     }
 
     /// <summary>Whether <paramref name="held"/> is an axe: a member of the <c>axe</c> tag, which swings an
@@ -45,11 +46,12 @@ public static class Mining
     /// a bloom on an anvil (<see cref="Simulation.Smithing.AnvilManager"/>) instead of mining it.</summary>
     public static bool IsHammer(Item? held) => held != null && ContentRegistry.IsInTag("hammer", held.Id);
 
-    /// <summary>Damage one hit deals, or 0 when the block's gate refuses the held item.</summary>
+    /// <summary>Damage one hit deals, or 0 when the block's gate refuses the held item. An
+    /// unbreakable block takes no damage from anything.</summary>
     public static float HitDamage(byte blockId, Item? held)
     {
         var block = BlockType.ById[blockId];
-        if (block == null || block.Fluid) return 0f;
+        if (block == null || block.Fluid || block.Unbreakable) return 0f;
         return Refused(block, held) ? 0f : BlockDamage(held);
     }
 

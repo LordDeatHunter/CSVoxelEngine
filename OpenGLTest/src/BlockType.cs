@@ -143,6 +143,9 @@ public sealed record BlockType
     internal static readonly byte[] FreezesToById = new byte[256];
     internal static readonly byte[] MeltsToById = new byte[256];
 
+    // Blocks no gameplay path may remove (IsUnbreakable); only Chunk.CollapseWriteAt replaces one
+    internal static readonly bool[] UnbreakableById = new bool[256];
+
     // Gravity checks run per block edit (not per voxel), but the flat shape keeps the
     // support test a single array read like the other per-id questions
     internal static readonly bool[] FallsById = new bool[256];
@@ -488,6 +491,9 @@ public sealed record BlockType
     /// <summary>Whether an igniting status effect burns this block away to air, dropping nothing.</summary>
     public bool Flammable { get; init; }
 
+    /// <summary>Whether no gameplay path may remove this block (see <see cref="IsUnbreakable"/>).</summary>
+    public bool Unbreakable { get; init; }
+
     /// <summary>Solid block a source of this fluid becomes under a freezing status effect;
     /// 0 when it never freezes.</summary>
     public byte FreezesToId { get; internal set; }
@@ -657,6 +663,12 @@ public sealed record BlockType
     /// <summary>Whether a block id is a flowing fluid; see <see cref="IsFluid"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsFluid(byte blockId) => FluidById[blockId];
+
+    /// <summary>Whether no gameplay path may remove or overwrite the block (its <c>unbreakable</c>
+    /// JSON flag): mining, creative, blasts, buckets, placement and status or spell block actions
+    /// all leave it. The one sanctioned write over it is <c>Chunk.CollapseWriteAt</c>.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsUnbreakable(byte blockId) => UnbreakableById[blockId];
 
     /// <summary>Whether a fluid or a placement may overwrite the cell without destroying
     /// anything worth keeping: air, plus the fragile <see cref="NeedsSupport"/> blocks, which

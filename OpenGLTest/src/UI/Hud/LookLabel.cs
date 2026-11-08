@@ -27,6 +27,8 @@ public static class LookLabel
     {
         if (BlockType.ById[blockId] is not { } block) return new State("", false, false);
         var known = creative || !block.HasItem || knows(blockId);
-        return new State(known ? block.DisplayName : "Unknown", known, creative || Mining.CanMine(blockId, held));
+        // An unbreakable block reads red even in creative, where nothing else is gated
+        var mineable = !block.Unbreakable && (creative || Mining.CanMine(blockId, held));
+        return new State(known ? block.DisplayName : "Unknown", known, mineable);
     }
 }

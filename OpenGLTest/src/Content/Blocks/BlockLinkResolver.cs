@@ -137,7 +137,7 @@ internal sealed class BlockLinkResolver
 
     /// <summary>
     /// Resolves a multiblock anchor's <c>multiblock.source</c>: the plain block the structure is
-    /// built from and reverts to, which must not itself be part of a multiblock.
+    /// built from and reverts to, which must not itself be part of a multiblock nor unbreakable.
     /// </summary>
     private static byte ResolveMultiblockSource(string? name, string path, byte ownerId)
     {
@@ -149,6 +149,9 @@ internal sealed class BlockLinkResolver
         if (id == ownerId || BlockType.ById[id]!.Renderer is BlockRenderer.Multiblock or BlockRenderer.MultiblockPart)
             throw new InvalidOperationException(
                 $"Block '{path}' names '{name}' in multiblock.source, which is itself a multiblock cell; a structure is built from a plain block.");
+        if (BlockType.ById[id]!.Unbreakable)
+            throw new InvalidOperationException(
+                $"Block '{path}' names '{name}' in multiblock.source, which is unbreakable; converting would overwrite it.");
         return id;
     }
 

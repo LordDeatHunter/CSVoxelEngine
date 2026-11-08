@@ -20,14 +20,16 @@ public static class StatusEffectBlockRule
     /// What the cell holding <paramref name="id"/> with state <paramref name="state"/> becomes under
     /// <paramref name="actions"/>: true with the new id and state when one of the actions converts it,
     /// false when none does. <paramref name="belowFeet"/> says the cell lies wholly under the body's
-    /// feet, the only place a freeze may set solid, so an effect never entombs its own body.
+    /// feet, the only place a freeze may set solid, so an effect never entombs its own body. An
+    /// unbreakable block is never converted (the load rules already refuse it every status flag;
+    /// the check keeps the writer and the spell impacts safe in this one place).
     /// </summary>
     public static bool TryConvert(byte id, byte state, StatusEffectBlockAction actions, bool belowFeet,
         out byte newId, out byte newState)
     {
         newId = 0;
         newState = 0;
-        if (id == 0 || actions == StatusEffectBlockAction.None)
+        if (id == 0 || actions == StatusEffectBlockAction.None || BlockType.IsUnbreakable(id))
             return false;
 
         if ((actions & StatusEffectBlockAction.Ignite) != 0 && BlockType.FlammableById[id])

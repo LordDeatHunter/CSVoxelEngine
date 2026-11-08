@@ -78,14 +78,15 @@ internal sealed class BlockEditor
     /// cell of a multiblock reverts the structure, loot drops unless the player is creative, a
     /// station hands back what it held, fragile blocks above pop and sand above topples, and the
     /// fluid, leaf-decay, far-LOD and canopy hooks all run. A server calls it once a player's mining
-    /// was judged complete. Returns whether the cell was cleared; false for an unloaded chunk, air
-    /// or a fluid (never mined), or while the world is not playing.
+    /// was judged complete. Returns whether the cell was cleared; false for an unloaded chunk, air,
+    /// a fluid or an unbreakable block (never mined), or while the world is not playing.
     /// </summary>
     internal bool BreakBlockFor(PlayerContext player, Vector3 cell)
     {
         if (!IsPlaying) return false;
         int x = (int)cell.X, y = (int)cell.Y, z = (int)cell.Z;
-        if (!_chunkManager.TryGetCell(x, y, z, out var id, out _) || id == 0 || BlockType.IsFluid(id))
+        if (!_chunkManager.TryGetCell(x, y, z, out var id, out _) || id == 0 || BlockType.IsFluid(id)
+            || BlockType.IsUnbreakable(id))
             return false;
         RemoveBlock(cell, player);
         return _chunkManager.TryGetCell(x, y, z, out var after, out _) && after == 0;
@@ -121,6 +122,10 @@ internal sealed class BlockEditor
         // Water is not mineable: only a bucket takes it out (and its hardness of 0 would
         // otherwise pop it on first contact)
         if (BlockType.IsFluid(brokenId)) return;
+
+        // Nothing removes an unbreakable block, creative and a client's prediction included: no
+        // debris, no hooks, no BlockEdited
+        if (BlockType.IsUnbreakable(brokenId)) return;
 
         _debris.Burst(blockPos, brokenId, ParticleConfig.BlockDebrisOnBreak,
             columns: _chunkManager.ColumnSource);

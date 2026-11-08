@@ -231,6 +231,11 @@ public sealed class BlockDefinition
     /// no loot. Default false; never on a fluid or a multiblock cell.</summary>
     public bool? Flammable { get; set; }
 
+    /// <summary>Whether the block is never removed by any gameplay path (mining, creative,
+    /// blasts, fluids, buckets, status effects, spells); only the collapse writer
+    /// (<c>Chunk.CollapseWriteAt</c>) may replace it. Default false; never on a fluid.</summary>
+    public bool? Unbreakable { get; set; }
+
     /// <summary>The solid block a source of this fluid becomes under a freezing status effect
     /// (water's <c>"ice"</c>). Only on a fluid; omitted means it never freezes.</summary>
     public string? FreezesTo { get; set; }

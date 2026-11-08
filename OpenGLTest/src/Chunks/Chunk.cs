@@ -308,7 +308,8 @@ public class Chunk : IDisposable
     /// scheduling, returning the previous id. The fluid simulation edits hundreds of cells per
     /// tick and batches the remeshes itself (<see cref="ChunkManager.MarkDirty"/>), so the
     /// per-edit work of <see cref="PlaceBlockAt"/> would hitch. Main thread only, like every
-    /// other block edit. Allocates the state array on the first non-zero state.
+    /// other block edit. Allocates the state array on the first non-zero state. It is raw and does
+    /// not honor <see cref="BlockType.IsUnbreakable"/>; semantic callers guard themselves.
     /// </summary>
     public byte SetBlockRaw(int x, int y, int z, byte id, byte state)
     {
@@ -408,7 +409,8 @@ public class Chunk : IDisposable
     /// </summary>
     internal void RestoreFrom(ChunkSnapshot snapshot, ColumnData column) => ChunkRestore.RestoreFrom(this, snapshot, column);
 
-    /// <summary>Clears a block. Returns false if the cell is outside this chunk or already air.</summary>
+    /// <summary>Clears a block. Returns false if the cell is outside this chunk, already air or
+    /// holds an unbreakable block (<see cref="BlockType.IsUnbreakable"/>).</summary>
     public bool RemoveBlockAt(Vector3 worldPos, ChunkManager chunkManager)
     {
         var localX = (int)(worldPos.X - Position.X * Size);
@@ -416,10 +418,12 @@ public class Chunk : IDisposable
         var localZ = (int)(worldPos.Z - Position.Z * Size);
 
         if (!InBounds(localX, localY, localZ)) return false;
-        if (_blocks[Idx(localX, localY, localZ)] == 0) return false;
-        _blocks[Idx(localX, localY, localZ)] = 0;
+        var i = Idx(localX, localY, localZ);
+        var existing = _blocks[i];
+        if (existing == 0 || BlockType.IsUnbreakable(existing)) return false;
+        _blocks[i] = 0;
         _solidCount--;
-        ClearState(Idx(localX, localY, localZ));
+        ClearState(i);
         MarkModified();
 
         chunkManager.UnmarkPlayerPlaced((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z);
@@ -484,9 +488,9 @@ public class Chunk : IDisposable
 
     /// <summary>
     /// Clears a block without remeshing and returns the removed id (0 if the cell was outside
-    /// this chunk or already air). The caller must remesh every touched chunk afterwards —
-    /// explosions clear hundreds of blocks, where per-block remeshing would hitch.
-    /// Main thread only, like the other block edits.
+    /// this chunk, already air or unbreakable, which is left standing). The caller must remesh
+    /// every touched chunk afterwards — explosions clear hundreds of blocks, where per-block
+    /// remeshing would hitch. Main thread only, like the other block edits.
     /// </summary>
     public byte ClearBlockAt(Vector3 worldPos)
     {
@@ -495,14 +499,34 @@ public class Chunk : IDisposable
         var localZ = (int)(worldPos.Z - Position.Z * Size);
 
         if (!InBounds(localX, localY, localZ)) return 0;
-        var removed = _blocks[Idx(localX, localY, localZ)];
-        if (removed == 0) return 0;
-        _blocks[Idx(localX, localY, localZ)] = 0;
+        var i = Idx(localX, localY, localZ);
+        var removed = _blocks[i];
+        if (removed == 0 || BlockType.IsUnbreakable(removed)) return 0;
+        _blocks[i] = 0;
         _solidCount--;
-        ClearState(Idx(localX, localY, localZ));
+        ClearState(i);
         MarkModified();
         CellWritten?.Invoke((int)worldPos.X, (int)worldPos.Y, (int)worldPos.Z, 0, 0);
         return removed;
+    }
+
+    /// <summary>
+    /// The one sanctioned write over an unbreakable block (the battle tower's collapse, BT-8):
+    /// writes <paramref name="id"/> and <paramref name="state"/> into the cell whatever holds it
+    /// and returns the previous id (0 outside this chunk). Like <see cref="ClearBlockAt"/> it
+    /// neither remeshes nor runs any hook, so its caller must remesh every touched chunk and call
+    /// every edit-path hook itself (the fluid and leaf-decay schedules, the falling-block topple
+    /// above, the far-LOD and canopy hooks, <c>UnmarkPlayerPlaced</c>; see the edit-path
+    /// checklist). Main thread only.
+    /// </summary>
+    public byte CollapseWriteAt(Vector3 worldPos, byte id, byte state)
+    {
+        var localX = (int)(worldPos.X - Position.X * Size);
+        var localY = (int)(worldPos.Y - Position.Y * Size);
+        var localZ = (int)(worldPos.Z - Position.Z * Size);
+
+        if (!InBounds(localX, localY, localZ)) return 0;
+        return SetBlockRaw(localX, localY, localZ, id, state);
     }
 
     /// <summary>Zeroes one cell's state byte. Every write that is not a fluid write goes

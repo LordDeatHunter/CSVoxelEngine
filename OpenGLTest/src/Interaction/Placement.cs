@@ -21,11 +21,13 @@ public static class Placement
 
     /// <summary>Whether a placement may write into a cell that already holds a block: air, a
     /// fluid it displaces, or a stack it takes over. Anything else occupies the cell and the
-    /// caller keeps its item.</summary>
+    /// caller keeps its item. An unbreakable cell is never written over (the load rules already
+    /// refuse a fluid or replaceable unbreakable block; the check keeps the rule in this one place
+    /// for placement and falling-block landing alike).</summary>
     public static bool CanOccupy(byte existingId, byte existingState) =>
         existingId == 0
-        || BlockType.IsFluid(existingId)
-        || BlockType.IsReplaceableByPlacement(existingId, existingState);
+        || (!BlockType.IsUnbreakable(existingId)
+            && (BlockType.IsFluid(existingId) || BlockType.IsReplaceableByPlacement(existingId, existingState)));
 
     /// <summary>
     /// The block and state a placement of <paramref name="blockId"/> against a face with outward

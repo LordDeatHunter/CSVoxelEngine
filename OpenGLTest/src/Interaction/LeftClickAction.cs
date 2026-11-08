@@ -259,7 +259,8 @@ internal sealed class LeftClickAction
     /// (wrong kind, or below its required tier) takes 0 damage and shows no progress, though the
     /// swing still plays. A block of hardness 0 breaks on first contact. Damage is discarded when
     /// the target, the held tool or the button changes. A click with no block under the
-    /// crosshair still swings the fist. Creative instamines and ignores the gate.
+    /// crosshair still swings the fist. Creative instamines and ignores the gate, but an
+    /// unbreakable block never breaks (survival hits on it whiff with no progress).
     /// Call after Update so the selection is current. Does nothing unless the world is playing:
     /// nothing may edit an unloaded world.
     /// </summary>
@@ -344,9 +345,12 @@ internal sealed class LeftClickAction
             if (_creativeBreakTimer < PlayerConfig.CreativeBreakRepeatSeconds)
                 return;
             _creativeBreakTimer = 0f;
+            var creativeTarget = Edits.BlockIdAt(_selectedBlockPosition);
             LocalPlayer.PunchSwing();
-            PlayHitSfx(Edits.BlockIdAt(_selectedBlockPosition));
-            BreakMined(_selectedBlockPosition, player);
+            PlayHitSfx(creativeTarget);
+            // Creative swings at an unbreakable block like at any other, but it never breaks
+            if (!BlockType.IsUnbreakable(creativeTarget))
+                BreakMined(_selectedBlockPosition, player);
             return;
         }
 

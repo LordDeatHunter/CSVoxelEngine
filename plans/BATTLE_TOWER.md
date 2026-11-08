@@ -4,9 +4,10 @@
 
 ## Status
 
-Designed, nothing built yet. Tracks the battle tower: a rare, huge (radius ~20+) cylindrical landmark of 4-8 floors
-with skeleton piles, chests, floor locks, a roof altar that summons the Skeleton King, unique boss loot and a collapse
-into a ruin. One phase per prompt; each phase leaves the game building and the tests green.
+BT-1 done (the `unbreakable` block flag and the three worldgen-only tower bricks); BT-2 next. Tracks the battle
+tower: a rare, huge (radius ~20+) cylindrical landmark of 4-8 floors with skeleton piles, chests, floor locks, a roof
+altar that summons the Skeleton King, unique boss loot and a collapse into a ruin. One phase per prompt; each phase
+leaves the game building and the tests green. **Content ids are tight: 19 left, see Reference.**
 Last updated 2026-11-08.
 
 ## In progress
@@ -15,12 +16,6 @@ Nothing.
 
 ## Open
 
-- [ ] **`BT-1` · Unbreakable flag and tower bricks** — P1, S.
-  A block data flag `unbreakable: true` that no path can remove: `Mining.CanMine`, the server's `BreakProgress` and
-  `BreakComplete`, blasts (`TntManager.Detonate`), felling/pops, fluid washing, creative breaking, buckets. Only the
-  collapse writer (`BT-8`) may replace such a block. Tower brick variants (stone bricks, sandstone, frosted stone), JSON
-  only. **Hook:** `BlockType`, `BlockDefinition`, `BlockFieldRules`; run the `add-content` and `edit-path-checklist`
-  skills. Tests: each removal path refuses the block.
 - [ ] **`BT-2` · Tower generator** — P1, L.
   Pure function of (cell, seed), stamped per chunk and clipped, like ruins and sky islands. Hashed cells of ~1500
   blocks, land biomes, near-level ground, outside the spawn clear; hash rolls radius (20-24), floor count (4-8) and
@@ -58,13 +53,30 @@ Nothing.
   around where it stood, through a capped-per-frame writer like `StatusEffectBlockWriter` that calls every edit-path
   hook (journal, LOD, fluids, leaf decay, gravity). Written chunks become `ModifiedSinceSave`, so the ruin persists;
   hold the collapse until every footprint chunk is loaded, and record the tower as conquered in the world save so a
-  chunk that loads late still gets the ruin. The writer is the one thing allowed past `unbreakable`.
+  chunk that loads late still gets the ruin. The writer is the one thing allowed past `unbreakable`: it writes through
+  `Chunk.CollapseWriteAt` (already in place, hook-free) and must run every edit-path hook itself.
 - [ ] **`BT-9` · Verify and document** — P2, S.
   `visual-examples/battle-tower.json` (`VOXEL_TIME=147`), loopback `GameServerTests` for skeletons, boss, piles and
   locks on a client, a perf pass, then fold the design into AGENTS.md (Layout and a "Battle tower" section) and the
   wiki, and delete this file's finished entries.
 
 ## Reference
+
+- **Content id budget (budget constraint, after BT-1): 236 of 255 used (130 blocks, 105 items, air), 19 free.**
+  Rough needs of the later phases: BT-3 bone and arrow items (~2); BT-4 skeleton pile and barrier door blocks (2, 3 if
+  the door is two cells); BT-5 tower chest block(s) (1 if the loot keys on the floor through the cell or state, up to
+  4 with one per tier); BT-6 altar block (1); BT-7 three uniques plus a bone fragment or boss material (~3-5 items);
+  BT-8 rubble or ruin block(s) (1-2). About 12-16 in total: the tower fits, but leaves little for `CAVE_BIOMES.md`.
+  Prefer one chest block and reuse existing ruin blocks for the rubble.
+- **How `unbreakable` is enforced** (BT-1): load rules (`BlockFieldRules.ValidateUnbreakable` refuses fluid, falls,
+  needsSupport, replaceableByPlacement, flammable, meltsTo, the tree-wood and multiblock renderers, upperHalf and
+  prime_tnt, and `BlockLinkResolver` refuses an unbreakable multiblock source) keep the block away from every raw-write
+  path, plus guards in `Chunk.RemoveBlockAt`/`ClearBlockAt`, `Placement.CanOccupy` and the gameplay entry points
+  (`Mining`, `LeftClickAction`'s creative branch, `BreakProgress`, `BlockEditor`, `TntManager.Detonate`,
+  `FluidManager.SetCellImmediate`, `StatusEffectBlockRule`, `LookLabel`). `Chunk.SetBlockRaw` stays raw;
+  `Chunk.CollapseWriteAt` is the only bypass, and BT-8's writer must call every edit-path hook.
+- Tower brick tiles come from `tools/generate-tower-brick-textures.py` (stone_bricks.png with its five colors swapped
+  one-to-one onto a palette per variant); a new biome variant is one more palette there and one more block JSON.
 
 Decisions made while planning (2026-11-08):
 

@@ -508,6 +508,7 @@ public static class ContentRegistry
         Array.Clear(BlockType.HardensToById);
         Array.Clear(BlockType.HardensTouchingById);
         Array.Clear(BlockType.FlammableById);
+        Array.Clear(BlockType.UnbreakableById);
         Array.Clear(BlockType.FreezesToById);
         Array.Clear(BlockType.MeltsToById);
         Array.Clear(BlockType.ReplaceableById);

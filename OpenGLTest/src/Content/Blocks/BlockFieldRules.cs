@@ -119,6 +119,33 @@ internal static class BlockFieldRules
                 $"Block '{path}' sets meltsTo on a fluid; only a solid block melts into a fluid.");
     }
 
+    /// <summary>
+    /// The <c>unbreakable</c> flag. Every field refused here would hand the cell to a raw-write
+    /// path the unbreakable guards do not cover: the fluid tick (fluid), toppling (falls), support
+    /// and flow pops (needsSupport), placement takeover (replaceableByPlacement), burning and
+    /// thawing (flammable, meltsTo), felling, decay and growth (tree wood), multiblock convert and
+    /// revert (multiblock renderers), tall-block removal (upperHalf) and priming (prime_tnt).
+    /// </summary>
+    internal static void ValidateUnbreakable(BlockDefinition definition, BlockRenderer renderer, string path)
+    {
+        if (!(definition.Unbreakable ?? false)) return;
+
+        string? field = null;
+        if (definition.Fluid ?? false) field = "fluid (a fluid cannot be unbreakable)";
+        else if (definition.Falls ?? false) field = "falls";
+        else if (definition.NeedsSupport ?? false) field = "needsSupport";
+        else if (definition.ReplaceableByPlacement ?? false) field = "replaceableByPlacement";
+        else if (definition.Flammable ?? false) field = "flammable";
+        else if (definition.MeltsTo != null) field = "meltsTo";
+        else if (renderer is BlockRenderer.TreeWood or BlockRenderer.Multiblock or BlockRenderer.MultiblockPart)
+            field = $"renderer \"{definition.Renderer}\"";
+        else if (definition.UpperHalf != null) field = "upperHalf";
+        else if (definition.OnBreak == "prime_tnt") field = "onBreak \"prime_tnt\"";
+        if (field != null)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets unbreakable with {field}; that path would remove the block anyway.");
+    }
+
     /// <summary>What mining the block does: roll its loot, or prime TNT.</summary>
     internal static BlockBreakAction ParseOnBreak(BlockDefinition definition, string path) =>
         definition.OnBreak switch

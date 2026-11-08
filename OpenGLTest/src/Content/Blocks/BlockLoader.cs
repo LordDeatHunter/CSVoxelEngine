@@ -85,6 +85,7 @@ internal static class BlockLoader
         BlockFieldRules.ValidateMultiblock(definition, renderer, path);
         var multiblockSize = BlockSchemaParser.ParseMultiblockSize(definition.Multiblock, path);
         BlockFieldRules.ValidateStatusFlags(definition, path);
+        BlockFieldRules.ValidateUnbreakable(definition, renderer, path);
         var onBreak = BlockFieldRules.ParseOnBreak(definition, path);
         var (tipHardness, woodLootBands) = BlockFieldRules.ParseWood(definition, renderer, path);
 
@@ -190,7 +191,8 @@ internal static class BlockLoader
             CollidesByHitbox = collidesByHitbox,
             HardensToId = 0,
             HardensTouchingId = 0,
-            Flammable = definition.Flammable ?? false
+            Flammable = definition.Flammable ?? false,
+            Unbreakable = definition.Unbreakable ?? false
         };
         // A facing block's selection boxes turn with it, exactly like its model will in BakeModels
         if (horizontalFacing)
@@ -234,6 +236,7 @@ internal static class BlockLoader
         BlockType.HardensToById[id] = type.HardensToId;
         BlockType.HardensTouchingById[id] = type.HardensTouchingId;
         BlockType.FlammableById[id] = type.Flammable;
+        BlockType.UnbreakableById[id] = type.Unbreakable;
         BlockType.FreezesToById[id] = type.FreezesToId;
         BlockType.MeltsToById[id] = type.MeltsToId;
         BlockType.FallsById[id] = type.Falls;
