@@ -165,6 +165,7 @@ internal static class BlockLoader
             Bloomery = BlockSchemaParser.ParseBloomery(definition.Bloomery, path),
             Anvil = BlockSchemaParser.ParseAnvil(definition.Anvil, renderer, path),
             SpellBuilder = definition.SpellBuilder ?? false,
+            Waystone = definition.Waystone ?? false,
             Chest = BlockSchemaParser.ParseChest(definition.Chest, renderer, path),
             StackMax = (byte)stack.StackMax,
             TipHardness = tipHardness,

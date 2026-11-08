@@ -1,0 +1,6 @@
+{
+  // A broken waystone (every realm's) crumbles into dressed stone: it has no item of its own to drop
+  "pools": [
+    { "rolls": 1, "entries": [ { "item": "block/stone_bricks", "count": { "min": 2, "max": 3 } } ] }
+  ]
+}

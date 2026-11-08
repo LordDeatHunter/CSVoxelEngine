@@ -209,6 +209,26 @@
     "caption": "Looking down on a frost highland island.",
     "group": "sky"
   },
+  "waystone_surface": {
+    "title": "A surface waystone",
+    "caption": "An open pavilion with a lantern over the waystone, a short walk from a ruined hall.",
+    "group": "waystone"
+  },
+  "waystone_underground": {
+    "title": "An underground waystone",
+    "caption": "A sealed, lamp-lit crypt with the waystone on a dais. You dig in to reach it.",
+    "group": "waystone"
+  },
+  "waystone_sky": {
+    "title": "A sky waystone",
+    "caption": "A frost-stone plaza under a crystal-keyed arch, on the island of a sky ruin.",
+    "group": "waystone"
+  },
+  "waystone_hell": {
+    "title": "A hell waystone",
+    "caption": "A basalt ring crowned with ember crystal, in the same hell layer as its ruin.",
+    "group": "waystone"
+  },
   "aurora": {
     "title": "The aurora",
     "caption": "Slow green and violet curtains in the night sky of cold lands.",

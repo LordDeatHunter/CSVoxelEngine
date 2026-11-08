@@ -348,6 +348,11 @@ public sealed record BlockType
     /// keeps no state of its own.</summary>
     public bool SpellBuilder { get; init; }
 
+    /// <summary>Whether this block is a waystone: discovered by a right-click, a teleport destination once
+    /// discovered. Its name, first discoverer and lost flag live in <see cref="World.Waystones"/>, created on first
+    /// use; the block keeps no state of its own.</summary>
+    public bool Waystone { get; init; }
+
     /// <summary>
     /// The baked model pre-rotated to each of the four horizontal facings, indexed by facing 0..3
     /// (<c>[0]</c> is <see cref="BakedModel"/> itself, the authored north-facing bake), which the

@@ -12,6 +12,7 @@ using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
+using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Trees;
 
@@ -165,6 +166,12 @@ internal sealed class BlockEditor
             if (ContentRegistry.IsCastMold(brokenId))
                 _casting.NotifyBlockRemoved(blockPos, stationDrops);
         }
+
+        // A mined waystone (either half: the pair came down together above) stays in its discoverers' lists, marked
+        // lost once under its lower half's cell. A client keeps no registry; the server's answer to the break decides.
+        if (!_clientMode && BlockIdAt(blockPos) == 0
+            && WaystoneManager.TryGetWaystoneCell(brokenId, (int)blockPos.X, (int)blockPos.Y, (int)blockPos.Z, out var waystone))
+            _world.Waystones.NotifyBlockRemoved(waystone.X, waystone.Y, waystone.Z);
 
         // Water beside or above the hole pours into it on the next fluid tick
         _fluidManager.ScheduleAround(blockPos);

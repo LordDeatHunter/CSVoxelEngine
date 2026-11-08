@@ -10,7 +10,7 @@ The site is VitePress, in the `wiki/` folder, deployed to GitHub Pages by `.gith
 - `public/assets/`: the block and item textures and the entity `.bbmodel` files with their skins.
 - One page per block, item and mob under `game/blocks`, `game/items` and `game/mobs`, plus the generated overview pages in `game/reference/`.
 
-All of that is gitignored and rebuilt in CI. The hand-written pages (controls, biomes, layers and everything under `dev/`) are committed.
+All of that is gitignored and rebuilt in CI. The hand-written pages (controls, biomes, layers, waystones and everything under `dev/`) are committed.
 
 ## Tree growth data
 
@@ -36,7 +36,7 @@ Recipes are drawn by `<RecipeCard kind="craft" id="..."/>`: framed inventory-sty
 
 ## Screenshots
 
-The in-game screenshots on the Biomes, Terrain and Layers pages are captured from the real game, which needs a GPU and a window, so they are made locally and the converted images are committed (`public/screenshots/*.webp`, about 100 KB each). `tools/generate-wiki-shots.mjs` holds one spec for every shot (camera pose, title, caption, group) and writes the scenarios (`OpenGLTest/visual-examples/wiki-*.json`) and `data/screenshots.json`. The lighting clock follows the wall clock, so each scenario is short and names its own `VOXEL_TIME`.
+The in-game screenshots on the Biomes, Terrain, Layers and Waystones pages are captured from the real game, which needs a GPU and a window, so they are made locally and the converted images are committed (`public/screenshots/*.webp`, about 100 KB each). `tools/generate-wiki-shots.mjs` holds one spec for every shot (camera pose, title, caption, group) and writes the scenarios (`OpenGLTest/visual-examples/wiki-*.json`) and `data/screenshots.json`. The lighting clock follows the wall clock, so each scenario is short and names its own `VOXEL_TIME`.
 
 To refresh them, from `OpenGLTest/` run each scenario in a Release build (`VOXEL_TIME=<its header time> VOXEL_SCRIPT=visual-examples/wiki-<name>.json`, which writes `visual/wiki-<name>/`), then run `npm run shots` in `wiki/` to convert them. `<ShotGallery>` shows shots by group or slug and opens them in a lightbox; a test checks that every manifest entry has its image and every gallery names real shots. Poses found by probing `TerrainGenerator.BiomeAt` go stale when worldgen changes, so re-check a shot that no longer shows its biome.
 

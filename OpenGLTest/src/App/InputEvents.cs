@@ -10,7 +10,7 @@ using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.App;
 
-/// <summary>The window's mouse and keyboard events, routed to whatever owns them on the current screen: the main menu, the pause and settings menus, the [E] panel, the spell builder, the chat, or the right-click repeat timer. Program registers them once in OnLoad; Silk.NET raises them on the main thread.</summary>
+/// <summary>The window's mouse and keyboard events, routed to whatever owns them on the current screen: the main menu, the pause and settings menus, the [E] panel, the spell builder, the waystone screen, the chat, or the right-click repeat timer. Program registers them once in OnLoad; Silk.NET raises them on the main thread.</summary>
 internal sealed class InputEvents
 {
     private readonly InputManager inputManager;
@@ -22,11 +22,12 @@ internal sealed class InputEvents
     private readonly SettingsMenuView settingsMenuView;
     private readonly InventoryPanelInput panelInput;
     private readonly SpellBuilderInput builderInput;
+    private readonly WaystoneInput waystoneInput;
     private readonly MenuInput menuInput;
     private readonly ChatInput chatInput;
     private readonly GameplayInput gameplay;
 
-    internal InputEvents(InputManager inputManager, RenderManager renderManager, MainMenuController menu, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, SettingsMenuView settingsMenuView, InventoryPanelInput panelInput, SpellBuilderInput builderInput, MenuInput menuInput, ChatInput chatInput, GameplayInput gameplay, FieldPointer fieldPointer)
+    internal InputEvents(InputManager inputManager, RenderManager renderManager, MainMenuController menu, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, SettingsMenuView settingsMenuView, InventoryPanelInput panelInput, SpellBuilderInput builderInput, WaystoneInput waystoneInput, MenuInput menuInput, ChatInput chatInput, GameplayInput gameplay, FieldPointer fieldPointer)
     {
         this.fieldPointer = fieldPointer;
         this.inputManager = inputManager;
@@ -38,6 +39,7 @@ internal sealed class InputEvents
         this.settingsMenuView = settingsMenuView;
         this.panelInput = panelInput;
         this.builderInput = builderInput;
+        this.waystoneInput = waystoneInput;
         this.menuInput = menuInput;
         this.chatInput = chatInput;
         this.gameplay = gameplay;
@@ -98,6 +100,9 @@ internal sealed class InputEvents
         {
             case MouseButton.Right:
                 gameplay.ResetPlaceTimer();
+                break;
+            case MouseButton.Left when waystoneInput.IsOpen && inputManager.Mouse != null:
+                waystoneInput.HandleClick(inputManager.Mouse.Position);
                 break;
             case MouseButton.Left when builderInput.IsOpen && inputManager.Mouse != null:
                 builderInput.HandleClick(inputManager.Mouse.Position);
@@ -162,6 +167,8 @@ internal sealed class InputEvents
         if (chatView.IsOpen || gameplay.DeathScreenUp(w)) return;
         // The open spell builder owns the mouse: the wheel never steps the hotbar or the staff slot behind it
         if (builderInput.IsOpen) return;
+        // ...and so does the waystone screen, whose list takes the wheel over its panel
+        if (inputManager.Mouse != null && waystoneInput.HandleScroll(inputManager.Mouse.Position, wheel.Y)) return;
         switch (inventoryView.IsOpen)
         {
             case false when !pauseMenuView.IsOpen:
@@ -218,6 +225,9 @@ internal sealed class InputEvents
             case AppScreen.Playing when chatView.IsOpen && !pauseMenuView.IsOpen:
                 chatView.Type(c);
                 break;
+            case AppScreen.Playing when waystoneInput.IsOpen && !pauseMenuView.IsOpen:
+                waystoneInput.Type(c);
+                break;
             case AppScreen.Playing when inventoryView.IsOpen && !pauseMenuView.IsOpen:
                 panelInput.HandleInventoryType(c);
                 break;
@@ -231,6 +241,8 @@ internal sealed class InputEvents
         {
             if (chatView.IsOpen && !pauseMenuView.IsOpen)
                 chatInput.HandleChatKey(key);
+            else if (waystoneInput.IsOpen && !pauseMenuView.IsOpen)
+                waystoneInput.HandleKey(key);
             else if (inventoryView.IsOpen && !pauseMenuView.IsOpen)
                 panelInput.HandleInventoryKey(key);
             else if (key is Key.Enter or Key.KeypadEnter && ActiveWorld is { } world)

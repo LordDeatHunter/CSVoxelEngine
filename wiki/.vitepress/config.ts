@@ -24,7 +24,8 @@ export default defineConfig({
         { text: 'Systems', items: [
           { text: 'Recipes', link: '/game/reference/crafting' },
           { text: 'Structures', link: '/game/structures/' },
-          { text: 'Magic', link: '/game/reference/magic' }
+          { text: 'Magic', link: '/game/reference/magic' },
+          { text: 'Waystones', link: '/game/waystones' }
         ] },
         { text: 'Reference', items: [
           { text: 'Blocks', link: '/game/blocks/' },

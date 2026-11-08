@@ -6,6 +6,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Magic;
 using VoxelEngine.Player;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.Status;
 using VoxelEngine.UI.InventoryPanel;
 
@@ -173,6 +174,18 @@ public sealed class ServerPlayer : IMobTarget
     /// that chest only and a change reaches every viewer).</summary>
     public (int X, int Y, int Z)? OpenChest { get; set; }
 
+    /// <summary>The cell of the waystone this player last activated (its screen's waystone, which a trip leaves from), or
+    /// null; a trip is still judged on the player standing at it.</summary>
+    public (int X, int Y, int Z)? AtWaystone { get; set; }
+
+    /// <summary>The waystone trip waiting for its destination to load, or null. While it waits the player is held over
+    /// the destination, immune, and its states move nothing (a correction is awaited); it ends with the landing.</summary>
+    public WaystoneArrivalHold? WaystoneTrip { get; set; }
+
+    /// <summary>The registry and discovered-list versions the client's waystone rows were last built from, so the
+    /// server sends fresh rows only when either moved.</summary>
+    public (int Registry, int Discovered) WaystoneRowsSent { get; set; } = (-1, -1);
+
     /// <summary>The player's current health, 0..<see cref="PlayerHealth.MaxHealth"/>.</summary>
     public int Health => Status.Health;
 
@@ -226,8 +239,9 @@ public sealed class ServerPlayer : IMobTarget
     /// <summary>The mobs chase and hit this player at its accepted eye.</summary>
     Vector3 IMobTarget.Eye => Position;
 
-    /// <summary>No mob hurts a creative, flying or dead player.</summary>
-    public bool IsImmune => Creative || Flying || IsDead;
+    /// <summary>No mob hurts a creative, flying or dead player, nor one held on a waystone trip (it is not really there
+    /// yet).</summary>
+    public bool IsImmune => Creative || Flying || IsDead || WaystoneTrip != null;
 
     /// <summary>The client's cosmetic sneaking flag: mobs notice a sneaking player from half as far.</summary>
     public bool IsSneaking => ((NetPlayerFlags)Flags & NetPlayerFlags.Sneaking) != 0;

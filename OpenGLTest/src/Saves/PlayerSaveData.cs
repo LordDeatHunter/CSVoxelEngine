@@ -77,6 +77,18 @@ public sealed class PlayerSaveData
         /// 0 for an empty slot. The gear instances themselves are in <see cref="Tools"/>. Null in a save from
         /// before equipment existed.</summary>
         public List<int>? Equipped { get; set; }
+
+        /// <summary>The waystones this player has discovered, each with the name it had then. Null in an inventory
+        /// saved before waystones existed; written as a list, empty or not.</summary>
+        public List<DiscoveredWaystoneData>? Waystones { get; set; }
+    }
+
+    /// <summary>One discovered waystone: its cell and the name the player knows it by.</summary>
+    public sealed class DiscoveredWaystoneData
+    {
+        public int[]? Cell { get; set; }
+
+        public string? Name { get; set; }
     }
 
     /// <summary>One stackable pool entry: a block or item name and its pool total.</summary>

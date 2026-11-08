@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace VoxelEngine.Content.Definitions;
 
-/// <summary>JSON shape of <c>assets/data/structures/&lt;name&gt;.json</c>: a hand-authored template the ruin placements stamp.
+/// <summary>JSON shape of <c>assets/data/structures/&lt;name&gt;.json</c>: a hand-authored template the ruin (or waystone) placements stamp.
 /// Layers run bottom to top, each an array of rows (north to south), each row a string of palette keys (west to east):
 /// a space writes nothing, <c>.</c> writes air.</summary>
 public sealed class StructureDefinition
@@ -13,6 +13,10 @@ public sealed class StructureDefinition
 
     /// <summary>Relative pick weight among the templates of its kind (default 1).</summary>
     public float? Weight { get; set; }
+
+    /// <summary>True for a waystone satellite (stamped a short walk from a ruin of its kind, never picked as a ruin); it must
+    /// hold exactly one waystone block, and a ruin template none.</summary>
+    public bool? Satellite { get; set; }
 
     /// <summary>Surface only: the biome names it may stand in; omitted means every land biome.</summary>
     public string[]? Biomes { get; set; }

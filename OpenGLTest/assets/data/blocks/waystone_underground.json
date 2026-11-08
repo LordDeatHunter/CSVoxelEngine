@@ -1,0 +1,28 @@
+{
+  // Deep Waystone: the waystone that stands beside an underground ruin (plans/WAYSTONES.md). A right-click discovers it and
+  // a discovered one teleports to the others; its name, first discoverer and lost flag live in the world's waystone
+  // registry (WaystoneManager), created on first use, so the block keeps no state. This is the lower half of a
+  // waystone two cells tall: its upper half (waystone_underground_upper) stands above it, written with it, and the
+  // registry keys the waystone by this cell. Worldgen-only (no item); mining either half takes both down, marks the
+  // waystone lost for everyone who found it and breaks it into stone bricks (loot/waystone.json). The runes glow in
+  // the default warm torch color, an existing block-light palette slot. Tiles from tools/generate-waystone-textures.py.
+  "name": "Deep Waystone",
+  "model": { "parent": "block/waystone", "textures": { "stone": "waystone_underground_stone", "runes": "waystone_underground_runes" } },
+  "upperHalf": "block/waystone_underground_upper",
+  "hardness": 30,
+  "sfx": "hit_rock",
+  "requiresTool": true,
+  "tools": { "pickaxe": 1 },
+  "light": { "emission": 6 },
+  "castsAO": false,
+  "hasItem": false,
+  "loot": "waystone",
+  "waystone": true,
+  "collidesByHitbox": true,
+  // The model's own boxes (block/waystone): the plinth and its step, which the body steps up onto, and the shaft
+  "hitbox": [
+    { "min": [0.0625, 0, 0.0625], "max": [0.9375, 0.1875, 0.9375] },
+    { "min": [0.1875, 0.1875, 0.1875], "max": [0.8125, 0.3125, 0.8125] },
+    { "min": [0.3125, 0.3125, 0.3125], "max": [0.6875, 1, 0.6875] }
+  ]
+}

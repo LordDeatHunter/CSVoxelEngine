@@ -13,10 +13,10 @@ namespace VoxelEngine.WorldGen;
 /// every other stage is marked once on every filled chunk, an early-out chunk (entirely above
 /// the terrain and any water) marks only <see cref="Stage.Columns"/>, one of those in a sky layer's band
 /// marks <see cref="Stage.Columns"/>, <see cref="Stage.Clouds"/>, <see cref="Stage.CloudSea"/>,
-/// <see cref="Stage.SkyIslands"/>, <see cref="Stage.SkyTrees"/>, <see cref="Stage.SolidCount"/> and
-/// <see cref="Stage.FluidFrontier"/>, and a chunk wholly in hell marks
-/// only <see cref="Stage.Columns"/>, <see cref="Stage.Hell"/>, <see cref="Stage.HellTrees"/>, <see cref="Stage.SolidCount"/> and
-/// <see cref="Stage.FluidFrontier"/>.
+/// <see cref="Stage.SkyIslands"/>, <see cref="Stage.SkyTrees"/>, <see cref="Stage.RuinsSky"/>, <see cref="Stage.WaystonesSky"/>,
+/// <see cref="Stage.SolidCount"/> and <see cref="Stage.FluidFrontier"/>, and a chunk wholly in hell marks
+/// only <see cref="Stage.Columns"/>, <see cref="Stage.Hell"/>, <see cref="Stage.HellTrees"/>, <see cref="Stage.RuinsHell"/>,
+/// <see cref="Stage.WaystonesHell"/>, <see cref="Stage.SolidCount"/> and <see cref="Stage.FluidFrontier"/>.
 /// </summary>
 internal sealed class WorldgenStageTimer
 {
@@ -59,8 +59,8 @@ internal sealed class WorldgenStageTimer
         DesertWells,
         /// <summary>RuinPlacement.StampSurface.</summary>
         RuinsSurface,
-        /// <summary>RuinPlacement.StampUnderground.</summary>
-        RuinsUnderground,
+        /// <summary>WaystonePlacement.StampSurface.</summary>
+        WaystonesSurface,
         /// <summary>GeodeGenerator.Stamp.</summary>
         Geodes,
         /// <summary>MeteorGenerator.Stamp.</summary>
@@ -77,6 +77,10 @@ internal sealed class WorldgenStageTimer
         GravelPockets,
         /// <summary>UndergroundPoolGenerator.Stamp.</summary>
         UndergroundPools,
+        /// <summary>RuinPlacement.StampUnderground.</summary>
+        RuinsUnderground,
+        /// <summary>WaystonePlacement.StampUnderground.</summary>
+        WaystonesUnderground,
         /// <summary>IceSpikeGenerator.Stamp.</summary>
         IceSpikes,
         /// <summary>SnowGenerator.StampGround and StampCanopy.</summary>
@@ -99,6 +103,8 @@ internal sealed class WorldgenStageTimer
         SkyTrees,
         /// <summary>RuinPlacement.StampSky.</summary>
         RuinsSky,
+        /// <summary>WaystonePlacement.StampSky.</summary>
+        WaystonesSky,
         /// <summary>BarrierGenerator.Stamp.</summary>
         Barrier,
         /// <summary>HellGenerator.Stamp.</summary>
@@ -107,6 +113,8 @@ internal sealed class WorldgenStageTimer
         HellTrees,
         /// <summary>RuinPlacement.StampHell.</summary>
         RuinsHell,
+        /// <summary>WaystonePlacement.StampHell.</summary>
+        WaystonesHell,
         /// <summary>The SolidCount recount.</summary>
         SolidCount,
         /// <summary>ScanFluidFrontier.</summary>

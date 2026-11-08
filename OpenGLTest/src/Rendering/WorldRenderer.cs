@@ -16,6 +16,7 @@ using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
 using VoxelEngine.UI.SpellBuilder;
+using VoxelEngine.UI.Waystone;
 
 namespace VoxelEngine.Rendering;
 
@@ -326,15 +327,15 @@ internal sealed class WorldRenderer
     /// <summary>
     /// Draws the HUD. <paramref name="showProfiler"/> adds the frame-timing table under the FPS
     /// counter (the same flag that turns the debug console logging on). <paramref name="builder"/> is the
-    /// spell builder panel, drawn over the HUD while open.
+    /// spell builder panel and <paramref name="waystone"/> the waystone screen, each drawn over the HUD while open.
     /// </summary>
     internal void RenderUI(RenderManager renderManager, InventoryView view, float time,
         int fps, bool showProfiler, bool showCoordinates = true, PauseMenuView? menu = null,
-        SettingsMenuView? settings = null, SpellBuilderView? builder = null)
+        SettingsMenuView? settings = null, SpellBuilderView? builder = null, WaystoneView? waystone = null)
     {
         renderManager.UiPasses.RenderUI(_window!, Inventory, view, time, fps, showProfiler, Camera, showCoordinates, menu, settings,
             _health.Health, _health.Breath.Fraction, _health.Mana.Fraction, _health.DamageFlash, _hotbarName, _hotbarPops, LightingTime, Toast, LeftClick.Crosshair, LeftClick.LookAt,
-            _staffSlot.Label(Inventory), _health.Effects.Mask, builder, _health.Max, _world.ChestPanel, boss: BossSelection.Nearest(Mobs, Camera.Position));
+            _staffSlot.Label(Inventory), _health.Effects.Mask, builder, _health.Max, _world.ChestPanel, waystone, BossSelection.Nearest(Mobs, Camera.Position));
     }
 
     /// <summary>

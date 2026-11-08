@@ -4,6 +4,7 @@ using System.Linq;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Items;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation.Waystones;
 
 namespace VoxelEngine.UI.InventoryPanel;
 
@@ -71,6 +72,9 @@ internal static class InventorySaveCodec
             // Always a list, empty or not: null is reserved for a save from before known parts
             KnownParts = inventory.KnownParts.OrderBy(k => k, StringComparer.Ordinal).ToList(),
             Equipped = inventory.Equipment.Slots.Any(s => s != 0) ? inventory.Equipment.Slots.ToList() : null,
+            Waystones = inventory.Waystones.Entries
+                .Select(e => new PlayerSaveData.DiscoveredWaystoneData { Cell = [e.X, e.Y, e.Z], Name = e.Name })
+                .ToList(),
         };
         if (unnamed.Count > 0)
             Log.Warn($"Player save: left out content with no save name: {string.Join(", ", unnamed)}");
@@ -183,6 +187,7 @@ internal static class InventorySaveCodec
                 else dropped.Add($"spell part {key}");
             }
         inventory.ReplaceKnownParts(knownParts);
+        inventory.Waystones.Replace(ImportWaystones(data.Waystones, dropped));
 
         ImportStore(inventory, data.Blocks, InventoryCategory.Blocks, inventory.Blocks, dropped);
         ImportStore(inventory, data.Misc, InventoryCategory.Misc, inventory.Misc, dropped);
@@ -193,6 +198,25 @@ internal static class InventorySaveCodec
 
         if (dropped.Count > 0)
             Log.Warn($"Player save: dropped inventory content this run cannot restore: {string.Join(", ", dropped)}");
+    }
+
+    // The discovered waystones: every entry with a cell and a name left after the rename rules (an edited file cannot
+    // smuggle in a name a rename would refuse)
+    private static List<DiscoveredWaystones.Entry> ImportWaystones(List<PlayerSaveData.DiscoveredWaystoneData>? saved,
+        List<string> dropped)
+    {
+        var entries = new List<DiscoveredWaystones.Entry>();
+        if (saved == null) return entries;
+        foreach (var data in saved)
+        {
+            if (data?.Cell is not { Length: 3 } cell || !WaystoneNames.TrySanitize(data.Name, out var name))
+            {
+                dropped.Add($"waystone {data?.Name ?? "(no name)"}");
+                continue;
+            }
+            entries.Add(new DiscoveredWaystones.Entry(cell[0], cell[1], cell[2], name));
+        }
+        return entries;
     }
 
     private static void ImportStore(Inventory inventory, List<PlayerSaveData.StackData>? entries,

@@ -209,8 +209,9 @@ internal sealed class BlockLinkResolver
     /// <summary>
     /// Resolves a block's <c>upperHalf</c>: the block filling the cell above it (a door's top). The
     /// two halves share one state byte, so they must agree on <c>facing</c> and <c>open</c>; the
-    /// lower half is the item and the drop, so only it may be held; each half belongs to one pair;
-    /// and neither may topple, pop or flow away from the other.
+    /// lower half is the item (when the pair has one, a door; a waystone has none) and the drop, so
+    /// the upper half may never be held; each half belongs to one pair; and neither may topple, pop
+    /// or flow away from the other.
     /// </summary>
     private static byte ResolveUpperHalf(string name, string path, byte ownerId)
     {
@@ -221,9 +222,9 @@ internal sealed class BlockLinkResolver
             throw new InvalidOperationException($"Block '{path}' names itself in upperHalf.");
         var lower = BlockType.ById[ownerId]!;
         var upper = BlockType.ById[id]!;
-        if (!lower.HasItem || upper.HasItem)
+        if (upper.HasItem)
             throw new InvalidOperationException(
-                $"Block '{path}' names '{name}' in upperHalf; the lower half must be held and the upper half must set hasItem: false.");
+                $"Block '{path}' names '{name}' in upperHalf; the upper half must set hasItem: false (only the lower half may be held).");
         if (upper.UpperHalfId != 0 || upper.LowerHalfId != 0 || upper.ItemBlockId != 0 || lower.LowerHalfId != 0)
             throw new InvalidOperationException(
                 $"Block '{path}' names '{name}' in upperHalf, but one of the two already belongs to another block; a half belongs to one pair.");

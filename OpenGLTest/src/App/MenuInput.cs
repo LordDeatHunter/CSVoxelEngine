@@ -22,11 +22,12 @@ internal sealed class MenuInput
     private readonly InventoryPanelInput panelInput;
     private readonly InventoryView inventoryView;
     private readonly SpellBuilderInput builderInput;
+    private readonly WaystoneInput waystoneInput;
     private bool appliedVSync;
     private int appliedResolution = -1;
     private int appliedMaxFps = -1;
 
-    internal MenuInput(WindowManager windowManager, InputManager inputManager, RenderManager renderManager, MainMenuController menu, PauseMenuView pauseMenuView, SettingsMenuView settingsMenuView, InventoryPanelInput panelInput, InventoryView inventoryView, SpellBuilderInput builderInput)
+    internal MenuInput(WindowManager windowManager, InputManager inputManager, RenderManager renderManager, MainMenuController menu, PauseMenuView pauseMenuView, SettingsMenuView settingsMenuView, InventoryPanelInput panelInput, InventoryView inventoryView, SpellBuilderInput builderInput, WaystoneInput waystoneInput)
     {
         this.windowManager = windowManager;
         this.inputManager = inputManager;
@@ -37,6 +38,7 @@ internal sealed class MenuInput
         this.panelInput = panelInput;
         this.inventoryView = inventoryView;
         this.builderInput = builderInput;
+        this.waystoneInput = waystoneInput;
     }
 
     private AppScreen Screen => Program.Screen;
@@ -59,6 +61,8 @@ internal sealed class MenuInput
             panelInput.SetInventoryOpen(false);
         if (page != PauseMenuPage.Closed && builderInput.IsOpen)
             builderInput.SetOpen(false);
+        if (page != PauseMenuPage.Closed)
+            waystoneInput.Close();
         pauseMenuView.Page = page;
         if (page == PauseMenuPage.Settings)
         {

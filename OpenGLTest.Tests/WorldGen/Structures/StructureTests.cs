@@ -42,6 +42,31 @@ public sealed class StructureTests
     private static StructureTemplate Compile(string[][] layers, string kind = "surface") =>
         StructureLoader.Compile("test", Definition(layers, kind), "test.json");
 
+    // A definition whose palette also holds a waystone (w) and its upper half (u)
+    private static StructureDefinition WaystoneDefinition(string[][] layers)
+    {
+        var def = Definition(layers);
+        def.Palette!["w"] = Json("\"waystone_surface\"");
+        def.Palette!["u"] = Json("\"waystone_surface_upper\"");
+        return def;
+    }
+
+    [Fact]
+    public void ASatelliteHoldsOneWholeWaystoneEveryTurn()
+    {
+        var def = WaystoneDefinition([["sw", "ss"], ["su", "ss"]]);
+        def.Satellite = true;
+        var template = StructureLoader.Compile("test", def, "test.json");
+        var lower = ContentRegistry.RequireBlock("waystone_surface").Id;
+        for (var turns = 0; turns < 4; turns++)
+        {
+            var cells = Enumerable.Range(0, 4).Where(i => (template.CellAt(turns, i % 2, 0, i / 2) & 0xFF) == lower).ToArray();
+            Assert.Single(cells);
+            var (x, z) = (cells[0] % 2, cells[0] / 2);
+            Assert.Equal(BlockType.ById[lower]!.UpperHalfId, template.CellAt(turns, x, 1, z) & 0xFF);
+        }
+    }
+
     [Fact]
     public void ATurnMovesEachCellClockwiseAndTurnsItsFacingWithIt()
     {
@@ -96,11 +121,21 @@ public sealed class StructureTests
     [InlineData("ragged")]
     [InlineData("facing")]
     [InlineData("missingBlock")]
+    [InlineData("satelliteWithoutWaystone")]
+    [InlineData("satelliteWithTwoWaystones")]
+    [InlineData("ruinWithWaystone")]
+    [InlineData("waystoneWithoutItsUpperHalf")]
+    [InlineData("upperHalfWithoutItsWaystone")]
     public void ABadFileIsRefusedAndNamed(string what)
     {
-        var def = Definition([["ss", "ss"]]);
+        var def = WaystoneDefinition([["ss", "ss"]]);
         switch (what)
         {
+            case "satelliteWithoutWaystone": def.Satellite = true; break;
+            case "satelliteWithTwoWaystones": def.Satellite = true; def.Layers = [["sw", "ws"], ["su", "us"]]; break;
+            case "ruinWithWaystone": def.Layers = [["sw", "ss"], ["su", "ss"]]; break;
+            case "waystoneWithoutItsUpperHalf": def.Satellite = true; def.Layers = [["sw", "ss"], ["ss", "ss"]]; break;
+            case "upperHalfWithoutItsWaystone": def.Satellite = true; def.Layers = [["sw", "ss"], ["su", "su"]]; break;
             case "kind": def.Kind = "castle"; break;
             case "palette": def.Layers = [["sx", "ss"]]; break;
             case "ragged": def.Layers = [["ss", "s"]]; break;

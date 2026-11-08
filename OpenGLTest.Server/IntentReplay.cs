@@ -9,17 +9,19 @@ using VoxelEngine.Simulation.Smithing;
 
 namespace VoxelEngine.Server;
 
-/// <summary>Replays a player's intents (breaks, placements, uses, throws, attacks, casts, respawns and inventory actions) through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
+/// <summary>Replays a player's intents (breaks, placements, uses, throws, attacks, casts, hammer hits, waystone trips, respawns and inventory actions) through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
 internal sealed class IntentReplay
 {
     private readonly ServerState _state;
+    private readonly WaystoneSessions _waystones;
 
     // Scratch for one correction's cells
     private readonly List<NetCellChange> _correctionScratch = [];
 
-    internal IntentReplay(ServerState state)
+    internal IntentReplay(ServerState state, WaystoneSessions waystones)
     {
         _state = state;
+        _waystones = waystones;
     }
 
     internal void OnBlockEdit(ClientConnection client, PacketReader reader)
@@ -87,7 +89,7 @@ internal sealed class IntentReplay
         var accepted = player.AcceptSeq(seq)
                        && (player.IsDead
                            ? intent.Kind == NetIntentKind.Respawn && RespawnFor(client, player)
-                           : ApplyWorldIntent(player, intent));
+                           : ApplyWorldIntent(client, player, intent));
         if (intent.EditsCells && intent.HasCell
             && NetValidation.InEditReach(player.Position, intent.X, intent.Y, intent.Z, NetworkConfig.NetMaxEditReachBlocks))
             SendCellCorrection(client, seq, intent.X, intent.Y, intent.Z, radius: 1);
@@ -103,7 +105,7 @@ internal sealed class IntentReplay
     /// <see cref="ServerPlayer.Casting"/>). A living player has nothing to respawn from, so its
     /// respawn is refused.
     /// </summary>
-    private bool ApplyWorldIntent(ServerPlayer player, in WorldIntent intent)
+    private bool ApplyWorldIntent(ClientConnection client, ServerPlayer player, in WorldIntent intent)
     {
         if (intent.Kind == NetIntentKind.Respawn)
             return false;
@@ -140,9 +142,18 @@ internal sealed class IntentReplay
             case NetIntentKind.Place:
                 return PlaceFor(player, intent);
             case NetIntentKind.Use:
+            {
                 // The right-click chain short of its placement fallback: a click the client did
-                // not place with never places here either
-                return _state.World.TryUseSelected(World.InteractionReach, context, out _, allowPlace: false);
+                // not place with never places here either. A waystone it claimed is discovered
+                // here, for this player, and its client told what to show.
+                var used = _state.World.TryUseSelected(World.InteractionReach, context, out var outcome, allowPlace: false);
+                if (outcome == RightClickOutcome.Waystone)
+                {
+                    var cell = _state.World.LastWaystoneCell;
+                    _waystones.OnActivated(client, player, ((int)cell.X, (int)cell.Y, (int)cell.Z));
+                }
+                return used;
+            }
             case NetIntentKind.Throw:
                 return _state.World.ThrowFor(context, intent.Charge);
             case NetIntentKind.Attack:
@@ -151,6 +162,8 @@ internal sealed class IntentReplay
                 return CastFor(player, intent);
             case NetIntentKind.Hammer:
                 return HammerFor(player, intent);
+            case NetIntentKind.Waystone:
+                return _waystones.TripFor(player, intent);
             default:
                 return false;
         }

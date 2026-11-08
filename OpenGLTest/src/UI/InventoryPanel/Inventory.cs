@@ -7,6 +7,7 @@ using VoxelEngine.Config;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Items;
 using VoxelEngine.Saves;
+using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.UI.Hud;
 
 namespace VoxelEngine.UI.InventoryPanel;
@@ -62,6 +63,10 @@ public class Inventory
 
     /// <summary>What the player wears; the worn pieces are instances in the Gear pool.</summary>
     public Equipment Equipment { get; }
+
+    /// <summary>The waystones this player has discovered; saved in <c>player.json</c> and synced in the inventory
+    /// snapshot like the known spell parts.</summary>
+    public DiscoveredWaystones Waystones { get; } = new();
 
     // The same instances, handed to the static helpers that work on this inventory
     // (InventoryCrafting, InventorySaveCodec); state lives only here
@@ -632,7 +637,7 @@ public class Inventory
     /// know, or that belong to the wrong pool, are dropped with one warning, and a hotbar slot
     /// pointing at dropped content comes back empty. The known spell parts are replaced by the saved
     /// keys this run still has (an unknown key is named in the same warning; a save from before known
-    /// parts knows none).
+    /// parts knows none). The discovered waystones are replaced by the saved ones (none for a save from before them).
     /// </summary>
     public void Import(PlayerSaveData.InventoryData data) => InventorySaveCodec.Import(this, data);
 

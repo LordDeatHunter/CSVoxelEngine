@@ -26,6 +26,24 @@ public sealed class StationSaveData
     /// <summary>The chests that have been used (a never-opened ruin chest is not here and re-rolls from its seed).</summary>
     public List<ChestData>? Chests { get; set; }
 
+    /// <summary>The waystone registry's records (a waystone nobody activated has none).</summary>
+    public List<WaystoneData>? Waystones { get; set; }
+
+    /// <summary>One waystone's registry row, keyed by its cell (see <see cref="Simulation.Waystones.WaystoneManager"/>).</summary>
+    public sealed class WaystoneData
+    {
+        public int[]? Cell { get; set; }
+
+        /// <summary>Its name (generated or the first discoverer's rename).</summary>
+        public string? Name { get; set; }
+
+        /// <summary>The discoverer id of the first player to activate it: a player name slug, or the local player's marker.</summary>
+        public string? Discoverer { get; set; }
+
+        /// <summary>Whether its block has been broken.</summary>
+        public bool Lost { get; set; }
+    }
+
     /// <summary>One chest block's contents, keyed by its cell (see <see cref="ChestSaveCodec"/>); also the shape of the
     /// network snapshot a player gets when it opens one.</summary>
     public sealed class ChestData

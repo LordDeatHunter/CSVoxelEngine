@@ -11,6 +11,7 @@ using VoxelEngine.Rendering;
 using VoxelEngine.Saves;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.Waystone;
 
 namespace VoxelEngine.Networking.Client;
 
@@ -44,6 +45,7 @@ internal sealed class ClientSession
     private readonly List<NetCellChange> netCellsScratch = new();
     // The server values a message lets through to the world (the rest wait behind a prediction)
     private readonly List<NetCellChange> netApplyScratch = new();
+    private readonly List<WaystoneNetRow> waystoneRowsScratch = new();
     // What this client predicted and the server has not answered yet; one per connection
     private ClientPrediction prediction = new();
     private double netStateTimer;
@@ -75,6 +77,10 @@ internal sealed class ClientSession
 
     /// <summary>The connection, null in singleplayer, on the menu and after a disconnect.</summary>
     internal NetworkClient? Client => netClient;
+
+    /// <summary>The waystone rows, the activation answer and the trip the server is handling for this player (empty
+    /// while not connected).</summary>
+    internal WaystoneMirror Waystones { get; } = new();
 
     /// <summary>The death screen's state for the running session: this connection's while connected, else the world's own (singleplayer).</summary>
     internal RespawnPrompt RespawnPromptOf(World world) =>
@@ -319,6 +325,8 @@ internal sealed class ClientSession
                 netApplyScratch.Clear();
                 prediction.Resolve(seq, netApplyScratch);
                 w.ClientMirror.ApplyNetworkBlockChanges(netApplyScratch);
+                if (Waystones.NoteResult(seq, accepted) && !accepted)
+                    w.Toast.Show(WaystoneText.TripRefused);
                 if (!accepted && diagnostics.DebugEnabled)
                     Log.WriteLine($"Multiplayer: the server refused intent #{seq}");
                 break;
@@ -360,6 +368,9 @@ internal sealed class ClientSession
                 w.Camera.TestTeleport(eye, w.Camera.Yaw, w.Camera.Pitch);
                 netCorrectionAck = seq;
                 netStateTimer = NetworkConfig.NetPlayerStateSeconds;
+                // A waystone trip's landing: held there, facing away from the waystone, until this side's chunks are in
+                if (Waystones.TryTakeLanding(out var destination))
+                    w.WaystoneTravel.BeginLanding(eye, destination);
                 break;
             }
             case NetMessage.ChunkData:
@@ -407,6 +418,14 @@ internal sealed class ClientSession
             }
             case NetMessage.ChestContents:
                 ApplyChestContents(w, reader);
+                break;
+            case NetMessage.WaystoneRows:
+                WaystoneNetCodec.ReadRows(reader, waystoneRowsScratch);
+                Waystones.Replace(waystoneRowsScratch);
+                break;
+            case NetMessage.WaystoneOpened:
+                // The server discovered the waystone this player right-clicked: the waystone screen opens on it
+                Waystones.Offer(WaystoneNetCodec.ReadOpened(reader));
                 break;
             case NetMessage.InventoryState:
             {
@@ -538,6 +557,17 @@ internal sealed class ClientSession
             panel.SetContents(open.Contents);
     }
 
+    /// <summary>Asks the server to rename the waystone at a cell (only its first discoverer may); false when not
+    /// connected. The answer is fresh <see cref="NetMessage.WaystoneRows"/>.</summary>
+    internal bool SendWaystoneRename((int X, int Y, int Z) cell, string name)
+    {
+        if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
+        using var writer = new PacketWriter(NetMessage.WaystoneRename);
+        WaystoneNetCodec.WriteRename(writer, cell, name);
+        client.Send(writer.ToArray());
+        return true;
+    }
+
     /// <summary>A cell the world just changed as part of a predicted action (World.BlockEdited).</summary>
     private void StagePredictedCell(int x, int y, int z, byte blockId, byte state) =>
         prediction.Stage(x, y, z);
@@ -552,8 +582,12 @@ internal sealed class ClientSession
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
         using var writer = new PacketWriter(NetMessage.WorldIntent);
-        WorldIntentCodec.Write(writer, prediction.Commit(intent.PredictsInventory), intent);
+        var seq = prediction.Commit(intent.PredictsInventory);
+        WorldIntentCodec.Write(writer, seq, intent);
         client.Send(writer.ToArray());
+        // A waystone trip lands with a correction later; the session watches for it
+        if (intent.Kind == NetIntentKind.Waystone)
+            Waystones.NoteTripSent(seq, (intent.X, intent.Y, intent.Z));
     }
 
     /// <summary>
@@ -595,6 +629,7 @@ internal sealed class ClientSession
         netRespawnTimer = 0f;
         respawnPrompt.Reset();
         prediction = new ClientPrediction();
+        Waystones.Clear();
         if (ActiveWorld == null) return;
         ActiveWorld.ClientMirror.ClearRemotePlayers();
         ActiveWorld.BlockEdited = null;

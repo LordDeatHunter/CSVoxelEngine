@@ -130,6 +130,13 @@ internal sealed class RightClickAction
             outcome = RightClickOutcome.SpellTable;
             return true;
         }
+        // A waystone claims it the same way: discovering it and opening its screen is the local player's own business
+        if (Interactions.TryOpenWaystone(maxDistance, player, out var waystoneCell))
+        {
+            LastWaystoneCell = waystoneCell;
+            outcome = RightClickOutcome.Waystone;
+            return true;
+        }
         var item = player.Inventory.HeldItem;
         if (item is StaffItem)
         {
@@ -155,6 +162,9 @@ internal sealed class RightClickAction
 
     /// <summary>The cell of the chest the newest <see cref="RightClickOutcome.Container"/> claim opened.</summary>
     internal System.Numerics.Vector3 LastContainerCell { get; private set; }
+
+    /// <summary>The cell of the waystone the newest <see cref="RightClickOutcome.Waystone"/> claim named.</summary>
+    internal System.Numerics.Vector3 LastWaystoneCell { get; private set; }
 
     /// <summary>Whether a timed use is charging (see <see cref="TryBeginUseCharge"/>).</summary>
     internal bool IsUseCharging { get; private set; }

@@ -161,6 +161,18 @@ public static class WorldFeatureConfig
     // Rock an underground room keeps between its roof and the ground over its center
     public const int RuinUndergroundCover = 16;
 
+    // --- Waystones (WaystonePlacement): a waystone structure a short walk from a placed ruin, never on its own ---
+    public const bool WaystonesEnabled = true;
+    // The share of placed ruins that get a waystone satellite
+    public const float WaystoneSatelliteChance = 0.25f;
+    // The rolled distance between the ruin's center and the waystone's (pushed farther when their footprints would meet)
+    public const float WaystoneMinDistance = 12f;
+    public const float WaystoneMaxDistance = 30f;
+    // Empty columns kept at least between a ruin's footprint and its waystone's
+    public const int WaystoneRuinGap = 2;
+    // Distances and directions tried in order for a waystone's site, the first that passes its realm's rule winning
+    public const int WaystoneSiteTries = 3;
+
     // --- Geodes (GeodeGenerator): a crystal-lined hollow sphere deep in rock ---
     public const bool GeodesEnabled = true;
     public const int GeodeCellShift = 7;

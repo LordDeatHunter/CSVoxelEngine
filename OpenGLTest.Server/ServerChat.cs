@@ -74,6 +74,8 @@ internal sealed class ServerChat
                     SendSystem(client, "Usage: /tp x y z");
                     return;
                 }
+                // A /tp ends a waystone trip still waiting for its destination
+                player.WaystoneTrip = null;
                 player.Teleport(target);
                 PlayerSessions.SendPlayerCorrection(client, player.IssueCorrection(), player.Position);
                 SendSystem(client, $"Teleported to {target.X:0.#} {target.Y:0.#} {target.Z:0.#}");

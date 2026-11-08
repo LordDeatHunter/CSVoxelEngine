@@ -40,16 +40,16 @@ public sealed class DoorTests : IDisposable
     private static BlockType Door() => Lowers().First(t => t.Openable);
 
     [Fact]
-    public void ATwoCellBlockPairsAHeldLowerHalfWithAnUpperHalfPickedAsIt()
+    public void ATwoCellBlockPairsALowerHalfWithAnUpperHalfPickedAsIt()
     {
         var lowers = Lowers();
         Assert.NotEmpty(lowers);
         var cell = new Vector3(2, 5, -3);
         foreach (var lower in lowers)
         {
+            // Only the lower half is ever held (a door; a waystone pair has no item at all)
             var upper = BlockType.ById[lower.UpperHalfId]!;
             Assert.Equal(lower.Id, upper.LowerHalfId);
-            Assert.True(lower.HasItem);
             Assert.False(upper.HasItem);
             Assert.Equal((lower.HasHorizontalFacing, lower.Openable), (upper.HasHorizontalFacing, upper.Openable));
             Assert.Equal(lower.Id, BlockType.PickId(upper.Id));

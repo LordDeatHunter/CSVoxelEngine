@@ -63,7 +63,8 @@ public sealed class VisualStep
 
     /// <summary>What a <c>player</c> step makes the player's model do (<c>hurt</c>, <c>punch</c>,
     /// <c>slice</c>, <c>slicereturn</c> (the buffered return slice), <c>cut</c>, <c>backcut</c>,
-    /// <c>chop</c>, <c>equip</c>, <c>charge</c>, <c>release</c>, <c>die</c> or <c>revive</c>).</summary>
+    /// <c>chop</c>, <c>equip</c>, <c>charge</c>, <c>release</c>, <c>die</c> or <c>revive</c>), or what a
+    /// <c>waystone</c> step does to the waystone screen (see <see cref="IScenarioUi.Waystone"/>).</summary>
     public string? Action { get; init; }
 
     /// <summary>The hotbar slot a <c>select</c> step picks, 1-based like the number keys.</summary>
@@ -304,6 +305,7 @@ public sealed class VisualScenario
                     : throw new InvalidOperationException($"Step {index} (chestrow) needs 'row', a 1-based row of the chest list."),
                 On = element.TryGetProperty("all", out var all) && all.ValueKind == JsonValueKind.True,
             },
+            "waystone" => ReadWaystone(element, index),
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -311,7 +313,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, chest, chestrow or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, chest, chestrow, waystone or screenshot."),
         };
     }
 
@@ -325,6 +327,36 @@ public sealed class VisualScenario
         return open
             ? new VisualStep { Op = "chest", On = true, Pos = ReadPos(element, index, "chest") }
             : new VisualStep { Op = "chest", On = false };
+    }
+
+    // waystone drives the waystone screen like a player's clicks: "action" open (with "pos" [x, y, z], the waystone's
+    // cell: a right-click there), confirm, rename, type (with "text", into the rename field or the list's search),
+    // submit, back (Escape), close or teleport (with "row", 1-based).
+    private static VisualStep ReadWaystone(JsonElement element, int index)
+    {
+        var action = ReadChoice(element, index, "waystone", "action",
+            ["open", "confirm", "rename", "type", "submit", "back", "close", "teleport"]);
+        return action switch
+        {
+            "open" => new VisualStep { Op = "waystone", Action = action, Pos = ReadPos(element, index, "waystone") },
+            "type" => new VisualStep
+            {
+                Op = "waystone",
+                Action = action,
+                Text = element.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.String
+                    ? text.GetString()!
+                    : throw new InvalidOperationException($"Step {index} (waystone type) needs a 'text' string."),
+            },
+            "teleport" => new VisualStep
+            {
+                Op = "waystone",
+                Action = action,
+                Row = element.TryGetProperty("row", out var rowElement) && rowElement.TryGetInt32(out var row) && row >= 1
+                    ? row
+                    : throw new InvalidOperationException($"Step {index} (waystone teleport) needs 'row', a 1-based row of the list."),
+            },
+            _ => new VisualStep { Op = "waystone", Action = action },
+        };
     }
 
     // "open" defaults to true, so a bare panel or spellbuilder step opens it.

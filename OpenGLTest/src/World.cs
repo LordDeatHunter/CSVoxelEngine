@@ -34,6 +34,7 @@ using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.Status;
 using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.Hud;
@@ -89,6 +90,7 @@ public class World
     private readonly CampfireManager _campfires = new();
     private readonly QuernManager _querns = new();
     private readonly ChestManager _chests = new();
+    private readonly WaystoneManager _waystones = new();
     private readonly KilnManager _kilns = new();
     private readonly SmithingStations _smithing = new();
     private int _lastJumpCount;
@@ -262,6 +264,9 @@ public class World
 
     /// <summary>The air under water as a share of a full lung, 0..1; the HUD's bubbles.</summary>
     public float AirShare => _health.Breath.Fraction;
+
+    /// <summary>The local player's mana pool (what a waystone trip needs over half of).</summary>
+    public PlayerMana Mana => _health.Mana;
 
     /// <summary>The HUD toast line (the day change, a first pickup, a full inventory), drawn while
     /// its alpha is above zero.</summary>
@@ -494,6 +499,7 @@ public class World
             Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _sandworms,
                 _icebergs, _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
+            WaystoneTravel = new WaystoneTravel(Camera, LocalPlayer, _chunkManager);
             // Status effects convert cells only where the world is authoritative: a client's effects
             // are mirrors, and the server's writes reach it through the journal
             var statusBlocks = clientMode
@@ -800,6 +806,69 @@ public class World
     /// <summary>The chest panel's UI state: which chest is open and what it shows (see <see cref="ChestView"/>).</summary>
     public ChestView ChestPanel { get; } = new();
 
+    /// <summary>The waystone registry (names, first discoverers, lost flags); authoritative worlds only.</summary>
+    public WaystoneManager Waystones => _waystones;
+
+    /// <summary>
+    /// <paramref name="player"/> activates the waystone at <paramref name="cell"/> (see
+    /// <see cref="WaystoneManager.DiscoverFor"/>); on a server a waystone new to that player flags its inventory
+    /// snapshot for resending. Null on a client, for an unloaded cell or a cell holding no waystone.
+    /// </summary>
+    public WaystoneDiscovery? DiscoverWaystoneFor(PlayerContext player, Vector3 cell)
+    {
+        if (_clientMode) return null;
+        var found = _waystones.DiscoverFor(_chunkManager, player, (int)cell.X, (int)cell.Y, (int)cell.Z);
+        if (found is { NewToPlayer: true }) FlagInventoryChanged(player);
+        return found;
+    }
+
+    /// <summary><paramref name="player"/> renames the waystone at <paramref name="cell"/>, which only its first
+    /// discoverer may (see <see cref="WaystoneManager.TryRenameFor"/>); on a server the renamer's snapshot is resent.</summary>
+    public bool RenameWaystoneFor(PlayerContext player, Vector3 cell, string? name)
+    {
+        if (_clientMode || !_waystones.TryRenameFor(player, (int)cell.X, (int)cell.Y, (int)cell.Z, name)) return false;
+        FlagInventoryChanged(player);
+        return true;
+    }
+
+    /// <summary>The cell of the waystone the newest right-click claim named (<see cref="RightClickOutcome.Waystone"/>);
+    /// the dedicated server discovers it for the player whose Use it replayed.</summary>
+    public Vector3 LastWaystoneCell => RightClick.LastWaystoneCell;
+
+    /// <summary>The local player's waystone trip, held until its destination loads (see <see cref="WaystoneTravel"/>);
+    /// on a client, the hold on the spot the server landed it on.</summary>
+    internal WaystoneTravel WaystoneTravel { get; }
+
+    /// <summary>
+    /// The local player, standing at the waystone at <paramref name="from"/>, travels to the one at <paramref name="to"/>
+    /// (<see cref="WaystoneTeleport"/>: discovered, not lost, mana strictly over half unless creative or flying, which the
+    /// trip drains). On <see cref="WaystoneTeleportVerdict.Teleport"/> the trip starts (<see cref="WaystoneTravel"/>); a
+    /// refusal changes nothing. Singleplayer only: a client or a server refuses (<see cref="WaystoneTeleportVerdict.NotAtWaystone"/>),
+    /// a server's players travel through their own intent.
+    /// </summary>
+    public WaystoneTeleportVerdict TeleportViaWaystone(Vector3 from, Vector3 to)
+    {
+        var fromCell = ((int)from.X, (int)from.Y, (int)from.Z);
+        var toCell = ((int)to.X, (int)to.Y, (int)to.Z);
+        if (_clientMode || _serverMode || !IsPlaying
+            || !WaystoneTeleport.IsAtWaystone(_chunkManager, Camera.Position, fromCell, InteractionReach))
+            return WaystoneTeleportVerdict.NotAtWaystone;
+        var verdict = WaystoneTeleport.TryPay(Inventory.Waystones, _waystones.Peek(toCell.Item1, toCell.Item2, toCell.Item3),
+            fromCell, toCell, WaystoneTeleport.IsFree(Camera.IsCreative, Camera.IsFlying), _health.Mana);
+        if (verdict == WaystoneTeleportVerdict.Teleport)
+            WaystoneTravel.Begin(toCell);
+        return verdict;
+    }
+
+    // A server resends a player's inventory snapshot once its discovered list changed
+    private void FlagInventoryChanged(PlayerContext player)
+    {
+        if (!_serverMode) return;
+        foreach (var connected in ServerPlayers)
+            if (connected.Context == player)
+                connected.InventoryChanged = true;
+    }
+
     /// <summary>The bloomeries and anvils (iron works); authoritative worlds tick them, a client's are mirrors.</summary>
     public SmithingStations Smithing => _smithing;
 
@@ -839,6 +908,8 @@ public class World
         _chunkManager.Update(Focus.Chunks);
         _lodManager.Update(_chunkManager);
         LocalPlayer.ApplyGear(simulatesMana: false);
+        // A waystone trip the server landed stays put until this side's chunks there are in
+        WaystoneTravel.Update(deltaTime);
 
         var feet = Camera.Position - new Vector3(0f, Camera.EyeHeight, 0f);
         if (_chunkManager.ChunkAt(MathUtils.FloorToInt(feet.X), MathUtils.FloorToInt(feet.Y),
@@ -932,6 +1003,8 @@ public class World
 
         FrameProfiler.Begin(ProfileSection.Player);
         LocalPlayer.EnsureSpawnSettled(_chunkManager);
+        // A waystone traveler stays over its destination until it has loaded
+        WaystoneTravel.Update(deltaTime);
         FrameProfiler.End(ProfileSection.Player);
 
         FrameProfiler.Begin(ProfileSection.Camera);
@@ -987,6 +1060,7 @@ public class World
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
         _chests.Update(_chunkManager, _dropManager);
+        _waystones.Update(_chunkManager);
         _kilns.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
         _smithing.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
         // Every jump of the local body works a bellows (a server pumps per player instead, see PumpBellows)

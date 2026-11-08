@@ -12,7 +12,7 @@ using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.App;
 
-/// <summary>A playing world's per-frame polled input, in frame order: the chat, debug, HUD, screenshot, player-list, ESC and [E] keys, the hotbar keys and throws, the right-click use/place/charge chain (a spell table's claim opens the spell builder), then (unless paused) the world update, the chat clock, mining and the middle-click pick. An open [E] panel or spell builder owns the mouse (<see cref="PanelOpen"/>). Owns the input edges and the right-click repeat timer. Owned by Program; main thread only.</summary>
+/// <summary>A playing world's per-frame polled input, in frame order: the chat, debug, HUD, screenshot, player-list, ESC and [E] keys, the hotbar keys and throws, the right-click use/place/charge chain (a spell table's claim opens the spell builder, a waystone's the waystone screen), then (unless paused) the world update, the chat clock, mining and the middle-click pick. An open [E] panel, spell builder or waystone screen owns the mouse (<see cref="PanelOpen"/>). Owns the input edges and the right-click repeat timer. Owned by Program; main thread only.</summary>
 internal sealed class GameplayInput
 {
     private readonly InputManager inputManager;
@@ -22,6 +22,7 @@ internal sealed class GameplayInput
     private readonly PauseMenuView pauseMenuView;
     private readonly InventoryPanelInput panelInput;
     private readonly SpellBuilderInput builderInput;
+    private readonly WaystoneInput waystoneInput;
     private readonly MenuInput menuInput;
     private readonly ClientSession session;
     private readonly DevDiagnostics diagnostics;
@@ -45,7 +46,7 @@ internal sealed class GameplayInput
     private const double MAX_PLACE_TIMER = 0.2;
     private static double placeTimer = MAX_PLACE_TIMER;
 
-    internal GameplayInput(InputManager inputManager, RenderManager renderManager, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, InventoryPanelInput panelInput, SpellBuilderInput builderInput, MenuInput menuInput, ClientSession session, DevDiagnostics diagnostics)
+    internal GameplayInput(InputManager inputManager, RenderManager renderManager, InventoryView inventoryView, ChatView chatView, PauseMenuView pauseMenuView, InventoryPanelInput panelInput, SpellBuilderInput builderInput, WaystoneInput waystoneInput, MenuInput menuInput, ClientSession session, DevDiagnostics diagnostics)
     {
         this.inputManager = inputManager;
         this.renderManager = renderManager;
@@ -54,6 +55,7 @@ internal sealed class GameplayInput
         this.pauseMenuView = pauseMenuView;
         this.panelInput = panelInput;
         this.builderInput = builderInput;
+        this.waystoneInput = waystoneInput;
         this.menuInput = menuInput;
         this.session = session;
         this.diagnostics = diagnostics;
@@ -61,8 +63,8 @@ internal sealed class GameplayInput
 
     private World? ActiveWorld => Program.ActiveWorld;
 
-    /// <summary>A panel owns the mouse: the [E] panel or the spell builder is open.</summary>
-    private bool PanelOpen => inventoryView.IsOpen || builderInput.IsOpen;
+    /// <summary>A panel owns the mouse: the [E] panel, the spell builder or the waystone screen is open.</summary>
+    private bool PanelOpen => inventoryView.IsOpen || builderInput.IsOpen || waystoneInput.IsOpen;
 
     /// <summary>Whether the HUD draws (F1).</summary>
     internal bool HudVisible => hudVisible;
@@ -99,6 +101,7 @@ internal sealed class GameplayInput
             chatView.Close();
             panelInput.SetInventoryOpen(false);
             builderInput.SetOpen(false);
+            waystoneInput.Close();
             menuInput.SetPauseMenu(PauseMenuPage.Closed);
         }
         w.Camera.SuppressLook = up;
@@ -175,7 +178,8 @@ internal sealed class GameplayInput
         slashWasPressed = slashPressed;
 
         var xPressed = inputManager.Keyboard?.IsKeyPressed(Key.X) == true;
-        if (xPressed && !xWasPressed && !chatView.IsOpen && inventoryView.Focus == InventoryFocus.None)
+        if (xPressed && !xWasPressed && !chatView.IsOpen && inventoryView.Focus == InventoryFocus.None
+            && !waystoneInput.HasFocusedField)
         {
             diagnostics.DebugEnabled = !diagnostics.DebugEnabled;
             Log.WriteLine($"Debug {(diagnostics.DebugEnabled ? "ON" : "OFF")}");
@@ -209,6 +213,8 @@ internal sealed class GameplayInput
                 panelInput.SetInventoryOpen(false);
             else if (builderInput.IsOpen)
                 builderInput.SetOpen(false);
+            else if (waystoneInput.IsOpen)
+                waystoneInput.Back();
             else switch (pauseMenuView.Page)
             {
                 case PauseMenuPage.Closed:
@@ -240,11 +246,13 @@ internal sealed class GameplayInput
         // While a text field has focus, E is typing, not a close.
         var ePressed = inputManager.Keyboard?.IsKeyPressed(Key.E) == true;
         if (ePressed && !eWasPressed && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp
-            && inventoryView.Focus == InventoryFocus.None)
+            && inventoryView.Focus == InventoryFocus.None && !waystoneInput.HasFocusedField)
         {
-            // E closes an open spell builder rather than opening the [E] panel over it
+            // E closes an open spell builder or waystone screen rather than opening the [E] panel over it
             if (builderInput.IsOpen)
                 builderInput.SetOpen(false);
+            else if (waystoneInput.IsOpen)
+                waystoneInput.Close();
             else
                 panelInput.SetInventoryOpen(!inventoryView.IsOpen);
         }
@@ -309,6 +317,9 @@ internal sealed class GameplayInput
                 // A chest opens its panel beside the [E] list (the click itself changes nothing here)
                 if (outcome == RightClickOutcome.Container)
                     panelInput.Chest.Open(w, w.RightClick.LastContainerCell);
+                // A waystone is discovered and its screen opened here (the click itself changes nothing)
+                if (outcome == RightClickOutcome.Waystone)
+                    waystoneInput.OpenFromStation(w, w.RightClick.LastWaystoneCell);
                 if (!claimed)
                     w.Throws.TryBeginThrowCharge();
                 break;
@@ -327,6 +338,7 @@ internal sealed class GameplayInput
         }
         rightWasDown = rightDown;
         builderInput.Update(w);
+        waystoneInput.Update(w);
         panelInput.Chest.Update(w);
         if (!rightHeld && (PanelOpen || pauseMenuView.IsOpen || chatView.IsOpen || deathUp))
         {
@@ -342,7 +354,7 @@ internal sealed class GameplayInput
             // A focused text field owns the keyboard: pass no board so the camera cannot act on
             // the very keys being typed (E, C, Space, WASD) while the panel or chat is up.
             var board = (inventoryView.IsOpen && inventoryView.Focus != InventoryFocus.None)
-                || chatView.IsOpen || deathUp
+                || waystoneInput.HasFocusedField || chatView.IsOpen || deathUp
                 ? null
                 : inputManager.Keyboard;
             w.Update((float)deltaTime, board);

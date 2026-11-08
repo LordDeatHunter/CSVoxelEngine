@@ -37,4 +37,12 @@ public interface IScenarioUi
     /// <summary>Clicks a row of the open chest's list, 0-based: it moves one unit (the whole slot when
     /// <paramref name="all"/>) into the inventory.</summary>
     void PickChestRow(int row, bool all);
+
+    /// <summary>
+    /// Drives the waystone screen: <c>open</c> right-clicks the waystone at <paramref name="cell"/> (discovering it),
+    /// <c>confirm</c> and <c>rename</c> press the popup's buttons, <c>type</c> types <paramref name="text"/> into the
+    /// focused field, <c>submit</c> saves the rename, <c>back</c> is Escape, <c>close</c> closes, and <c>teleport</c>
+    /// clicks list row <paramref name="row"/> (0-based).
+    /// </summary>
+    void Waystone(string action, Vector3? cell, string? text, int row);
 }

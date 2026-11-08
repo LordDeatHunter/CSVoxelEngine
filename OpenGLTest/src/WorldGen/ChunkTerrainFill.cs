@@ -214,14 +214,14 @@ internal static class ChunkTerrainFill
         }
         timer?.Mark(Stage.RuinsSurface);
 
-        if (WorldFeatureConfig.RuinsEnabled
-            && Admits(stampGates, RuinPlacement.UndergroundBand(neighborhoodMaxHeight), lowerBoundY))
+        // A ruin's waystone a short walk off, right after the ruins so it never hides under one's footprint
+        if (WaystonesEnabled && Admits(stampGates, WaystonePlacement.SurfaceBand(neighborhoodMaxHeight), lowerBoundY))
         {
             var state = chunk.StateArray;
-            RuinPlacement.StampUnderground(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            WaystonePlacement.StampSurface(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
             chunk.StateArray = state;
         }
-        timer?.Mark(Stage.RuinsUnderground);
+        timer?.Mark(Stage.WaystonesSurface);
 
         // Deep rock features, after the carvers so a geode's heart is not carved again
         if (WorldFeatureConfig.GeodesEnabled && Admits(stampGates, GeodeGenerator.WriteBand(), lowerBoundY))
@@ -263,6 +263,25 @@ internal static class ChunkTerrainFill
             && Admits(stampGates, UndergroundPoolGenerator.WriteBand(column), lowerBoundY))
             UndergroundPoolGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.UndergroundPools);
+
+        // Sealed underground rooms and their waystone chambers, after the deep features and the cave life, so no
+        // geode, mushroom, formation, gravel pocket or pool is left inside a room
+        if (WorldFeatureConfig.RuinsEnabled
+            && Admits(stampGates, RuinPlacement.UndergroundBand(neighborhoodMaxHeight), lowerBoundY))
+        {
+            var state = chunk.StateArray;
+            RuinPlacement.StampUnderground(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            chunk.StateArray = state;
+        }
+        timer?.Mark(Stage.RuinsUnderground);
+
+        if (WaystonesEnabled && Admits(stampGates, WaystonePlacement.UndergroundBand(neighborhoodMaxHeight), lowerBoundY))
+        {
+            var state = chunk.StateArray;
+            WaystonePlacement.StampUnderground(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            chunk.StateArray = state;
+        }
+        timer?.Mark(Stage.WaystonesUnderground);
 
         // Frozen-only ice spikes go down before the snow, so a spike keeps its base cell
         if (WorldGenerationConfig.SnowAndIceEnabled
@@ -368,7 +387,18 @@ internal static class ChunkTerrainFill
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.RuinsSky);
+
+        if (WaystonesEnabled && SkyIslandConfig.SkyIslandsEnabled && Admits(stampGates, WaystonePlacement.SkyBand(), worldY0))
+        {
+            var state = chunk.StateArray;
+            WaystonePlacement.StampSky(blocks, ref state, worldX0, worldY0, worldZ0);
+            chunk.StateArray = state;
+        }
+        timer?.Mark(Stage.WaystonesSky);
     }
+
+    // The waystone satellites stand only beside ruins, so they need both switches
+    private const bool WaystonesEnabled = WorldFeatureConfig.RuinsEnabled && WorldFeatureConfig.WaystonesEnabled;
 
     /// <summary>The hell trees crossing the chunk (<see cref="HellTrees.Stamp"/>), after the hell stamp,
     /// through a local like the overworld trees: a ref to the volatile state field is refused.</summary>
@@ -379,8 +409,9 @@ internal static class ChunkTerrainFill
         chunk.StateArray = state;
     }
 
-    /// <summary>The hell ruins crossing the chunk (<see cref="RuinPlacement.StampHell"/>), after the hell stamp and its trees,
-    /// through a local like the trees: a ref to the volatile state field is refused.</summary>
+    /// <summary>The hell ruins crossing the chunk (<see cref="RuinPlacement.StampHell"/>) and their waystones
+    /// (<see cref="WaystonePlacement.StampHell"/>), after the hell stamp and its trees, through a local like the trees: a ref to
+    /// the volatile state field is refused.</summary>
     private static void StampHellRuins(Chunk chunk, int worldX0, int worldY0, int worldZ0, bool stampGates,
         WorldgenStageTimer? timer)
     {
@@ -391,6 +422,14 @@ internal static class ChunkTerrainFill
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.RuinsHell);
+
+        if (WaystonesEnabled && Admits(stampGates, HellGenerator.WriteBand(), worldY0))
+        {
+            var state = chunk.StateArray;
+            WaystonePlacement.StampHell(chunk.Blocks, ref state, worldX0, worldY0, worldZ0);
+            chunk.StateArray = state;
+        }
+        timer?.Mark(Stage.WaystonesHell);
     }
 
     /// <summary>The tail every filled chunk shares: the solid recount, the fluid frontier and the

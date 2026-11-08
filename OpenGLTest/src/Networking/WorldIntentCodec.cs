@@ -30,6 +30,7 @@ public static class WorldIntentCodec
             case NetIntentKind.BreakStart:
             case NetIntentKind.BreakComplete:
             case NetIntentKind.Hammer:
+            case NetIntentKind.Waystone:
                 WriteCell(writer, intent);
                 break;
             case NetIntentKind.Place:
@@ -64,7 +65,7 @@ public static class WorldIntentCodec
     {
         seq = reader.ReadInt();
         var kind = (NetIntentKind)reader.ReadByte();
-        if (kind is < NetIntentKind.BreakStart or > NetIntentKind.Hammer)
+        if (kind is < NetIntentKind.BreakStart or > NetIntentKind.Waystone)
             throw new InvalidDataException($"unknown world intent {(byte)kind}");
 
         var eye = reader.ReadVector3();
@@ -83,6 +84,7 @@ public static class WorldIntentCodec
             case NetIntentKind.BreakStart:
             case NetIntentKind.BreakComplete:
             case NetIntentKind.Hammer:
+            case NetIntentKind.Waystone:
             {
                 var (x, y, z) = ReadCell(reader);
                 return new WorldIntent(kind, eye, direction, x, y, z, HasCell: true);

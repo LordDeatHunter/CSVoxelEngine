@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Interaction;
@@ -49,6 +50,7 @@ public sealed class WorldIntentRuleTests
             WorldIntent.AttackWith(Eye, direction, NetAttackKind.SliceReturn),
             WorldIntent.AttackWith(Eye, direction, NetAttackKind.SwordChop),
             WorldIntent.Hammer(Eye, direction, cell),
+            WorldIntent.Waystone(Eye, direction, (-300, -420, 77)),
         };
 
         var seq = 40;
@@ -111,12 +113,25 @@ public sealed class WorldIntentRuleTests
         // The kind past the last one is unknown
         using var writer = new PacketWriter(NetMessage.WorldIntent);
         writer.Write(1);
-        writer.Write((byte)(NetIntentKind.Hammer + 1));
+        writer.Write((byte)(Enum.GetValues<NetIntentKind>().Max() + 1));
         writer.Write(Eye);
         writer.Write(Vector3.UnitX);
         using var reader = new PacketReader(writer.ToArray());
         _ = reader.Message;
         Assert.Throws<InvalidDataException>(() => WorldIntentCodec.Read(reader, out _));
+    }
+
+    [Fact]
+    public void AWaystoneTripNamesItsDestinationEditsNoCellAndDrawsFromTheEditRate()
+    {
+        var direction = Vector3.Normalize(new Vector3(0.5f, -0.25f, -1f));
+        var back = RoundTrip(5, WorldIntent.Waystone(Eye, direction, (1200, -350, -64)), out _);
+        Assert.Equal(NetIntentKind.Waystone, back.Kind);
+        Assert.Equal((1200, -350, -64), (back.X, back.Y, back.Z));
+        // A trip changes no cell and spends nothing the client predicted, but a flood of them is still capped
+        Assert.False(back.EditsCells);
+        Assert.False(back.PredictsInventory);
+        Assert.True(back.IsRateLimited);
     }
 
     [Fact]

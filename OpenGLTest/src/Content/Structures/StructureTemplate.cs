@@ -23,11 +23,12 @@ public sealed class StructureTemplate
 
     private readonly int[][] _turns;
 
-    internal StructureTemplate(string name, StructureKind kind, float weight, int size, int height, int groundLayer,
-        Biome[]? biomes, int[] cells, bool[] facingCells)
+    internal StructureTemplate(string name, StructureKind kind, bool satellite, float weight, int size, int height,
+        int groundLayer, Biome[]? biomes, int[] cells, bool[] facingCells)
     {
         Name = name;
         Kind = kind;
+        Satellite = satellite;
         Weight = weight;
         Size = size;
         Height = height;
@@ -51,7 +52,13 @@ public sealed class StructureTemplate
     /// <summary>Which placement stamps it.</summary>
     public StructureKind Kind { get; }
 
-    /// <summary>Relative pick weight among its kind.</summary>
+    /// <summary>Whether it is a waystone satellite, stamped beside a ruin of its kind and never picked as a ruin.</summary>
+    public bool Satellite { get; }
+
+    /// <summary>Half the footprint edge: the farthest a cell lies from the center column.</summary>
+    public int Half => Size / 2;
+
+    /// <summary>Relative pick weight among the templates of its kind and role (ruin or satellite).</summary>
     public float Weight { get; }
 
     /// <summary>Edge length of the square footprint in cells.</summary>

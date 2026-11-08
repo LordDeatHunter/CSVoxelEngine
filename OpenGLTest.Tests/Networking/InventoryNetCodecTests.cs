@@ -59,6 +59,19 @@ public sealed class InventoryNetCodecTests
     }
 
     [Fact]
+    public void DiscoveredWaystonesSurviveTheServerSnapshot()
+    {
+        var source = Inventory.Empty();
+        source.Waystones.Add(10, 64, -3, "Kafuziro");
+        source.Waystones.Add(-200, -400, 7, "Home");
+
+        var mirror = Inventory.Empty();
+        mirror.Import(InventoryNetCodec.Decode(InventoryNetCodec.Encode(source.Export())));
+
+        Assert.Equal(source.Waystones.Entries, mirror.Waystones.Entries);
+    }
+
+    [Fact]
     public void KnownSpellPartsSurviveTheServerSnapshot()
     {
         var keys = SpellPartRegistry.All.Take(3).Select(p => p.Key).ToArray();

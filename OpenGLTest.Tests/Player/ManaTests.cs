@@ -145,6 +145,33 @@ public sealed class ManaTests
     }
 
     [Fact]
+    public void ADrainEmptiesThePoolWhichThenRefillsAsUsual()
+    {
+        var mana = new PlayerMana();
+        mana.Drain();
+        Assert.Equal(0f, mana.Current);
+        Assert.False(mana.MoreThanHalf);
+
+        mana.Regen(1f);
+        Assert.True(mana.Current > 0f);
+    }
+
+    [Fact]
+    public void MoreThanHalfIsStrictlyAboveHalfInWholeUnits()
+    {
+        var mana = new PlayerMana();
+        Assert.True(mana.MoreThanHalf);
+
+        // Exactly half is not enough, and neither is a fraction of a unit past it
+        mana.Restore(mana.Max / 2);
+        Assert.False(mana.MoreThanHalf);
+        mana.Restore(mana.Max / 2 + 0.9f);
+        Assert.False(mana.MoreThanHalf);
+        mana.Restore(mana.Max / 2 + 1);
+        Assert.True(mana.MoreThanHalf);
+    }
+
+    [Fact]
     public void AServerRegeneratesManaAndReportsOnlyWhenTheWireValueMoves()
     {
         var chunks = MobTestWorld.Pool(waterCells: 6);

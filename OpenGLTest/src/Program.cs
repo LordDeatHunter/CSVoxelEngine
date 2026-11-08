@@ -14,6 +14,7 @@ using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
 using VoxelEngine.UI.SpellBuilder;
+using VoxelEngine.UI.Waystone;
 using VoxelEngine.VisualTest;
 
 namespace VoxelEngine;
@@ -54,6 +55,7 @@ public static class Program
     private static ConnectTarget pendingConnect;
     private static readonly InventoryView inventoryView = new();
     private static readonly SpellBuilderView spellBuilderView = new();
+    private static readonly WaystoneView waystoneView = new();
     private static readonly ChatView chatView = new();
     private static readonly PauseMenuView pauseMenuView = new();
     private static readonly SettingsMenuView settingsMenuView = new();
@@ -61,6 +63,7 @@ public static class Program
     private static ClientSession session = null!;
     private static InventoryPanelInput panelInput = null!;
     private static SpellBuilderInput builderInput = null!;
+    private static WaystoneInput waystoneInput = null!;
     private static ChatInput chatInput = null!;
     private static MenuInput menuInput = null!;
     private static GameplayInput gameplay = null!;
@@ -132,11 +135,12 @@ public static class Program
         session = new ClientSession(windowManager, inputManager, renderManager, sfx, loadingView, chatView, diagnostics);
         panelInput = new InventoryPanelInput(inputManager, renderManager, inventoryView, pauseMenuView, session);
         builderInput = new SpellBuilderInput(inputManager, renderManager, spellBuilderView, session);
+        waystoneInput = new WaystoneInput(inputManager, renderManager, waystoneView, session);
         chatInput = new ChatInput(chatView, session, inputManager);
-        menuInput = new MenuInput(windowManager, inputManager, renderManager, menu, pauseMenuView, settingsMenuView, panelInput, inventoryView, builderInput);
-        gameplay = new GameplayInput(inputManager, renderManager, inventoryView, chatView, pauseMenuView, panelInput, builderInput, menuInput, session, diagnostics);
-        fieldPointer = new FieldPointer(inputManager, renderManager, menu, inventoryView, pauseMenuView, new TextFieldKeys(inputManager));
-        inputEvents = new InputEvents(inputManager, renderManager, menu, inventoryView, chatView, pauseMenuView, settingsMenuView, panelInput, builderInput, menuInput, chatInput, gameplay, fieldPointer);
+        menuInput = new MenuInput(windowManager, inputManager, renderManager, menu, pauseMenuView, settingsMenuView, panelInput, inventoryView, builderInput, waystoneInput);
+        gameplay = new GameplayInput(inputManager, renderManager, inventoryView, chatView, pauseMenuView, panelInput, builderInput, waystoneInput, menuInput, session, diagnostics);
+        fieldPointer = new FieldPointer(inputManager, renderManager, menu, inventoryView, pauseMenuView, waystoneView, new TextFieldKeys(inputManager));
+        inputEvents = new InputEvents(inputManager, renderManager, menu, inventoryView, chatView, pauseMenuView, settingsMenuView, panelInput, builderInput, waystoneInput, menuInput, chatInput, gameplay, fieldPointer);
 
         // A dev override (VOXEL_SCRIPT/SPAWN/LOOK) takes the old path unchanged: a storeless world
         // built right here, no seed change, no persistence and no menu, so scripted runs stay
@@ -186,7 +190,7 @@ public static class Program
 
         try
         {
-            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!, new ScenarioUi(panelInput, builderInput));
+            visualDirector = new VisualDirector(VisualScenario.Load(script.Trim()), world!, new ScenarioUi(panelInput, builderInput, waystoneInput));
         }
         catch (Exception e)
         {
@@ -415,6 +419,7 @@ public static class Program
         settingsMenuView.DragRow = null;
         inventoryView.ResetForNewWorld();
         spellBuilderView.ResetForNewWorld();
+        waystoneView.ResetForNewWorld();
         chatView.Reset();
         gameplay.ResetEdges();
     }
@@ -569,7 +574,7 @@ public static class Program
         if (!hideHud)
             world.Renderer.RenderUI(renderManager, inventoryView,
                 (float)world.LightingTime, shownFps, diagnostics.DebugEnabled,
-                showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView, builder: spellBuilderView);
+                showCoordinates: true, menu: pauseMenuView, settings: settingsMenuView, builder: spellBuilderView, waystone: waystoneView);
         // The chat log and input draw over the HUD; hidden with the HUD and behind the pause menu.
         if (!hideHud && !pauseMenuView.IsOpen)
             renderManager.UiPasses.RenderChat(windowManager.Window, chatView, windowManager.Window.Time);

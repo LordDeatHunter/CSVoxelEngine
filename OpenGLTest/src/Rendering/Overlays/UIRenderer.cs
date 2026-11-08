@@ -34,7 +34,7 @@ namespace VoxelEngine.Rendering.Overlays;
 /// their original points) and the shared draw primitives every page and the item debugger use.
 /// The pages are the components it builds and exposes as internal properties -
 /// <see cref="HudRenderer"/>, <see cref="TopStripRenderer"/>, <see cref="InventoryPanelRenderer"/>,
-/// <see cref="CraftCardRenderer"/>, <see cref="SpellBuilderRenderer"/>, <see cref="MenuRenderer"/>,
+/// <see cref="CraftCardRenderer"/>, <see cref="SpellBuilderRenderer"/>, <see cref="WaystoneRenderer"/>, <see cref="MenuRenderer"/>,
 /// <see cref="LoadingScreenRenderer"/> and <see cref="ChatRenderer"/> - each drawing through these primitives and reading the per-pass
 /// state live. Render thread only.</para>
 /// </summary>
@@ -149,6 +149,7 @@ public class UIRenderer : IDisposable
     internal ChestCardRenderer ChestCard { get; }
     internal InventoryPanelRenderer Panel { get; }
     internal SpellBuilderRenderer SpellBuilder { get; }
+    internal WaystoneRenderer Waystone { get; }
     internal TopStripRenderer TopStrip { get; }
     internal HudRenderer Hud { get; }
 
@@ -236,6 +237,7 @@ public class UIRenderer : IDisposable
         Menu = new MenuRenderer(gl, this);
         Panel = new InventoryPanelRenderer(gl, this);
         SpellBuilder = new SpellBuilderRenderer(this);
+        Waystone = new WaystoneRenderer(gl, this);
         TopStrip = new TopStripRenderer(gl, this);
     }
 

@@ -81,13 +81,14 @@ sources"), `chunks/<cx>_<cy>_<cz>.bin` (one Deflate-compressed,
 block-name-paletted snapshot per **modified** chunk, `ChunkSaveCodec`; an untouched chunk is
 never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column caps,
 felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: the permanent chop damage of natural trunk cells, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
-creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar (a staff's bound spells by part key) and the known spell parts by key; no position
+creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar (a staff's bound spells by part key), the known spell parts by key and the discovered waystones; no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live slimes and
 goblins with health, facing, velocity, ammo and a slime's size plus still-pending entries, up to
 `MaxSavedDrops` item drops, nearest first, and the drifting icebergs) and `stations.json` (`StationSaveCodec`:
-the campfires, querns, kilns and cast molds with their fuel, fire, crucible, cooking and cast progress). See "Saves" below for the rules.
+the campfires, querns, kilns and cast molds with their fuel, fire, crucible, cooking and cast progress, the used chests and
+the waystone registry). See "Saves" below for the rules.
 
-Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `SkyConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`creative`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; the UI ops film the list-based UIs through `IScenarioUi` (`ScenarioUi`, the same input components a player reaches): `panel` and `spellbuilder` (`{ "open": true|false }`, default open; the spell builder needs a staff in hand) open or close the [E] panel and the builder, `tab` (`blocks`, `tools`, `misc`, `crafting`) and `row` (1-based, plain lists and search results only, so a survival player) pick like clicks, `search` types into the search field, and `hover` (`{ "pos": [x, y] }` in canvas units, or `"clear": true`) holds a scripted pointer that the hovered row and the tooltip read instead of the mouse; give each a short `wait` after `panel` (its fade takes about 0.2 s), and `visual-examples/inventory-ui.json` (`VOXEL_TIME=147`) is the baseline that films the panel on every tab, a search, a picked row, the craft card, a hover tooltip and the spell builder; `damage` hurts every live mob, or the player's own pool with `"target": "player"`; `effect` (`{ "op": "effect", "effect": "burning", "target": "mobs"|"player", "scale": 1 }`, target `mobs` by default) applies a status effect through `StatusEffects.Apply`, the name checked only when the step runs (an unknown one is warned and skipped); `cast` (`{ "op": "cast", "parts": ["element/fire", "shape/projectile"] }`) fires a spell of those part keys from the camera's eye and aim with no staff or mana (`SpellEffects.TestCast`; an unknown key or an invalid recipe stops the run), and `visual-examples/spells.json` (`VOXEL_TIME=147`) films a fire, a frost and a nature bolt; then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `creative` turns creative mode on
+Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `SkyConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`creative`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; the UI ops film the list-based UIs through `IScenarioUi` (`ScenarioUi`, the same input components a player reaches): `panel` and `spellbuilder` (`{ "open": true|false }`, default open; the spell builder needs a staff in hand) open or close the [E] panel and the builder, `tab` (`blocks`, `tools`, `misc`, `crafting`) and `row` (1-based, plain lists and search results only, so a survival player) pick like clicks, `search` types into the search field, and `hover` (`{ "pos": [x, y] }` in canvas units, or `"clear": true`) holds a scripted pointer that the hovered row and the tooltip read instead of the mouse; give each a short `wait` after `panel` (its fade takes about 0.2 s), and `visual-examples/inventory-ui.json` (`VOXEL_TIME=147`) is the baseline that films the panel on every tab, a search, a picked row, the craft card, a hover tooltip and the spell builder; `damage` hurts every live mob, or the player's own pool with `"target": "player"`; `effect` (`{ "op": "effect", "effect": "burning", "target": "mobs"|"player", "scale": 1 }`, target `mobs` by default) applies a status effect through `StatusEffects.Apply`, the name checked only when the step runs (an unknown one is warned and skipped); `cast` (`{ "op": "cast", "parts": ["element/fire", "shape/projectile"] }`) fires a spell of those part keys from the camera's eye and aim with no staff or mana (`SpellEffects.TestCast`; an unknown key or an invalid recipe stops the run), and `visual-examples/spells.json` (`VOXEL_TIME=147`) films a fire, a frost and a nature bolt; `waystone` (`{ "op": "waystone", "action": "open", "pos": [x, y, z] }` right-clicks the waystone at that cell, discovering it; then `confirm`, `rename`, `type` with a `"text"`, `submit`, `back` (Escape), `close` or `teleport` with a 1-based `"row"`) drives the waystone screen through `WaystoneInput` like a player's clicks, and `visual-examples/waystones-ui.json` (`VOXEL_TIME=147`) films the discovery popup, the rename dialog, the list with a lost row, its search, a short trip and the list with the mana spent, while `visual-examples/waystones.json` (`VOXEL_TIME=147`) flies to a natural satellite of each realm on the default seed (the surface pavilion, the sealed underground crypt from inside, the sky arch and the hell ember ring), films each from outside and beside its waystone, discovers all four and films the four-realm list and a trip home; then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `creative` turns creative mode on
 **without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
 player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
 any scenario that teleports a walking player above the ground, and turn it off again before a
@@ -353,6 +354,78 @@ broken or out of reach. Right-clicking a chest is a `RightClickOutcome.Container
 `ChestInput` (owned by `InventoryPanelInput`) opens the `ChestView` card (`UI/Chest/`, `ChestCardRenderer`) beside the [E] list,
 whose rows then deposit (one unit, all with shift) while the card's rows withdraw. `ChestTests`, `ChestServerTests`;
 `visual-examples/chests.json` (`VOXEL_TIME=147`, with the `setblock`, `chest` and `chestrow` ops).
+
+**Waystones (W-1..W-3, plans/WAYSTONES.md).** A block with `"waystone": true` (`BlockType.Waystone`; the four
+`waystone_<realm>` blocks: surface, underground, hell, sky, on the shared `block/waystone` model, tiles from
+`tools/generate-waystone-textures.py`) is a teleport point. A waystone stands two cells tall: the `waystone_<realm>` block is
+its lower half (plinth and the foot of the rune shaft) and names `waystone_<realm>_upper` (the shaft's top, cap and point, on
+`block/waystone_upper`, no `waystone` flag) as its `upperHalf`, so it is a `TallBlock` like the door: worldgen writes both,
+mining either half takes both down and rolls the lower half's loot once. Each half's `hitbox` is its model's own boxes with
+`collidesByHitbox`, so the outline and the raycast hug the obelisk, the body steps onto the plinth and stops at the shaft
+(`BuildingBlockTests.EveryShapeCollidingModelsBoxesHugItsParts`). The registry, the screens, the trip and the wire all key a
+waystone by its lower cell: `WaystoneManager.TryGetWaystoneCell` maps either half to it (a right-click on either half opens it,
+a break of either marks it lost once), and `WaystoneManager.IsWaystoneAt` holds only while both halves stand, so a lone half (a
+blast's leftover, or a waystone saved before they were two cells tall: it reads as a remnant, lost to its discoverers, and
+breaks like a door's orphan) is no waystone; `WaystoneArrival.StoneHeight` is where a traveler held on top stands. Worldgen-only
+(`hasItem: false`), only a pickaxe breaks it and it crumbles into stone bricks (`loot/waystone.json`). `WaystoneManager` (`Simulation/Waystones/`, owned by `World` as
+`World.Waystones`, authoritative worlds only, saved in `stations.json` as `Waystones`) keeps one `WaystoneRecord` per cell,
+created on the first activation (`Discover`/`DiscoverFor`, `World.DiscoverWaystoneFor`): a random `WaystoneNames.Generate`
+name and the activator as first discoverer (`WaystoneManager.DiscovererOf`: the name slug, or `@local` for the local
+player), the only one who may rename it (`TryRename`/`TryRenameFor`, `World.RenameWaystoneFor`, sanitized to printable
+ASCII within `WaystoneNames.MaxLength`). A break of either half (`BlockEditor.RemoveBlock`) or the sweep in `Update` (a blast
+took either half) marks the record lost instead of forgetting it. Each player's discovered list is `Inventory.Waystones` (`DiscoveredWaystones`: cell plus
+the name at discovery, with a `Version`), saved as `InventoryData.Waystones` (null in an older save) and carried by the
+`InventoryState` snapshot; a server flags `InventoryChanged` when a discovery or rename changed it. `PlayerMana.Drain` and
+`MoreThanHalf` are the teleport cost's halves. `WaystoneManagerTests`, `WaystoneNamesTests`, `WaystoneContentTests`.
+Worldgen stands them only beside ruins, one realm template each (W-4, `WaystonePlacement`, see "Waystone satellites" under
+"Structure templates and ruins").
+**The waystone screen and the trip (W-5, singleplayer).** A right-click on a waystone (`BlockInteractions.TryOpenWaystone`,
+`RightClickOutcome.Waystone`) reaches `App/WaystoneInput`, which discovers it (`World.DiscoverWaystoneFor`) and opens the
+GL-free `WaystoneView` (`UI/Waystone/`, drawn by `WaystoneRenderer` in `UiPasses.RenderUI`, geometry and hit-tests in
+`WaystoneLayout`): a waystone new to the player shows the **discovery popup** ("{name} has been discovered", CONFIRM, and
+RENAME only for its first discoverer), RENAME opens the **rename dialog** (a `TextFieldState` capped at
+`WaystoneNames.MaxLength`, Enter or RENAME saves through `World.RenameWaystoneFor`, Escape or CANCEL steps back to the popup),
+and CONFIRM, or any later visit, shows the **teleport list**: the player's discovered waystones (`WaystoneRows.Build`: the
+current one first and not selectable, then the standing ones nearest first, the lost ones last and greyed), each with its
+realm tag (`WaystoneRealms.Classify`: hell under `HellTopY`, sky from `SkyIslandBottomY`, between them underground when it lies
+`UndergroundDepthBlocks` under its column's surface from `ChunkManager.ColumnSource`) and its distance, a search field filtering
+by name, a scroll list and a footer with the mana requirement (`WaystoneText.ManaLine`, red when unmet). The cursor is free and
+the look frozen while it is up; E (when no field has focus) or Escape close it, and so do the pause menu, the death screen, a
+world switch and leaving the waystone's reach or its block (`WaystoneTeleport.IsAtWaystone`, checked every frame). A row click
+runs `World.TeleportViaWaystone`: `WaystoneTeleport.TryPay` (the pure rule: not the current waystone, discovered, a registry row
+that is not lost, mana strictly over half unless creative or flying, then `PlayerMana.Drain`), and on success
+`WaystoneTravel.Begin` moves the camera over the destination at once (so the streaming focus follows) and holds it there each
+frame, like the spawn settle, until the destination is loaded and meshed, then lands it on `WaystoneArrival.Find`'s spot (pure
+over an `IArrivalCells` seam, `ChunkArrivalCells` on the live chunks: the nearest free two-cell standing spot within
+`SearchRadius` columns and `SearchHeight` cells, a level spot beating a climb, facing away; on top of the waystone when nothing is
+free or after `StreamingConfig.WaystoneArrivalTimeoutSeconds`); a landing never bills a fall (`LocalPlayer.ResetFall`).
+`WaystoneTeleportTests`, `WaystoneArrivalTests`, `WaystoneRealmsTests`, `WaystoneTravelTests`, `WaystoneViewTests`,
+`WaystoneLayoutTests`; `visual-examples/waystones-ui.json` (`VOXEL_TIME=147`).
+
+**Waystones on a server (W-6, protocol 24).** The server is authoritative and the screens stay the client's. A connected
+client's right-click on a waystone only raises its usual `Use` intent (`WaystoneInput.OpenFromStation` does nothing then): the
+server's replay claims `RightClickOutcome.Waystone` and `WaystoneSessions.OnActivated` (`OpenGLTest.Server`) discovers it for
+that player (`World.DiscoverWaystoneFor` at `World.LastWaystoneCell`), remembers it as the waystone the player stands at
+(`ServerPlayer.AtWaystone`), and answers with the player's `WaystoneRows` and a `WaystoneOpened` (cell, name, may rename, new
+to the player), which the client's `WaystoneMirror` (`ClientSession.Waystones`) hands to `WaystoneInput.Update` to open the
+popup or the list. Each player's rows (`WaystoneNetRow`: the registry row of every waystone it discovered, with whether it may
+rename it) are resent by `WaystoneSessions.Tick` whenever `WaystoneManager.Version` or its `DiscoveredWaystones.Version` moved
+(`ServerPlayer.WaystoneRowsSent`), so they go out at join and a rename or a loss reaches everyone who knows the waystone; the
+list reads the mirror instead of the client's empty registry. RENAME sends a `WaystoneRename(cell, name)`, which
+`World.RenameWaystoneFor` takes from the first discoverer only (sanitized), answered with the rows either way. A row click is
+judged on the mirrored rows and pool first (`WaystoneTeleport.Judge`, so a refusal toasts its reason at once), then sent as a
+`Waystone(cell)` world intent and the screen closes. The server (`WaystoneSessions.TripFor`; not operator gated, rate-limited,
+editing no cell) refuses unless the player stands at the waystone it last activated (`IsAtWaystone` with its eye and
+`World.InteractionReach`) and no trip is already waiting, then runs `WaystoneTeleport.TryPay` with the player's discovered list,
+the registry row, `IsFree(creative, flying)` and its `PlayerHealth.Mana` (a spend marks `StatusDirty`, so the drained pool
+reaches the client). An accepted trip moves the `ServerPlayer` over the destination (`WaystoneArrivalHold.HoldEye`, so its
+streaming focus loads it) and issues a correction it never sends, so the client's states move nothing and are never judged
+meanwhile; the held player is immune (`IsImmune`). Each pump `WaystoneArrivalHold.Step` retries `WaystoneArrival.Find` until no
+cell it reads is unloaded (on top of the waystone past the timeout), then lands it: `ServerPlayer.Teleport` (the fall
+forgotten), a fresh `PlayerCorrection` and the status. The client's `WaystoneMirror` remembers the trip's intent and, on the
+correction that follows its accepted result, holds the camera there (`WaystoneTravel.BeginLanding`, facing away from the
+waystone, ticked in `World.UpdateClient`) until its own streamed chunk there is meshed. `/tp` ends a waiting trip.
+`WaystoneServerTests` (loopback), `WaystoneNetCodecTests`, `WaystoneArrivalHoldTests`.
 
 **Water rendering** lives in the shared world shader plus two extra passes, the planar mirror (`ReflectionPass.RenderReflection`) and the scene copy. Just before `TerrainPasses.RenderWorldTranslucent` draws, `RenderTargets.CopyScene` snapshots the HDR scene target's color and depth (see "Linear lighting" below; the color copy is `Rgba16f`, like the reflection mirror) into two textures on units 3 and 4 (`CopyTexSubImage2D` from the bound HDR FBO — the water pass depth-tests while sampling, so it cannot read the target directly); the water fragment then composes its own look out of them: a refracted lookup offset along the analytic wave normal, Beer-Lambert absorption over the water's measured thickness (`WaterAbsorb`) plus in-scattered `WaterScatter`, and a Schlick fresnel mix into the planar reflection. Where that view-ray depth thins below `WaterFoamWidthBlocks` (a wall, a bank, a thin trickle) a pale **shore foam** band is mixed over the composed surface in linear light, lit by the shared opaque `light` term and fogged with it, broken up by a value-noise field the ripple phases jiggle and `FlowFoam` (the same two-phase flow map) carries downstream; top faces only, never from below or with the eye submerged, faded out by 160 blocks. The width must stay under a full cell's surface less the swell (`WaterFoamTests`), so open water over a block floor never foams; being screen-space, only contacts the depth copy sees foam (the camera-facing side of a block; a wall seen straight down shows none). `visual-examples/water-foam.json` frames liquid shores at `VOXEL_TIME` 360 and 147. Flowing water carries its baked flow into that normal (`FlowWaveNormal`: a bounded two-phase flow map that scrolls the ripples downstream and stretches them along the flow, identical to `WaveNormal` when the flow is zero), and falling side faces add fast vertical streaks; generated rivers and lakes are all source cells, so they bake no flow and stay still until the simulation makes them flow (`visual-examples/flow-water.json`, `VOXEL_TIME=147`, pours some). The mirror plane itself is the single `RenderManager.WaterPlaneY` at sea level, so a lake whose surface stands above it reflects against that plane rather than its own - an accepted approximation, since only one plane can be mirrored per frame. Seen from below — decided per fragment from the face normal (`fromBehind` in `test-fragment.glsl`), never from the sea plane, since a pond stands above it — the surface is a Snell window: the same scene copy shows through it distorted by the wave normal, the inside fresnel goes to total internal reflection past the critical angle and that band fades to the underwater fog color, and the mirror is never sampled from that side; `ReflectionReuse.MirrorApplies` also skips rendering it whenever `Camera.IsEyeInWater`, and the sky dome (`SkyRenderer`) and the sun disc stay dry in water (lava still fades the dome via `FrameLighting.SkyTintAmount`, eased through its `_lavaT`) so the window shows real sky. World, cloud and sky fog share `SkySample`, duplicated verbatim in `sky-fragment.glsl`, `test-fragment.glsl` and `cloud-fragment.glsl`, with `SkyPalette.Sample` as the tested C# reference, so change all four together. The dome currently samples the flat 28198cc sky color: `SkyPalette.Compute` returns the old night/day mix, pulled toward the dusk orange by `SkyDuskMix`, as both zenith and horizon with zero glow, and `SkyHazeStrength` is 0, so every direction (and every fully fogged fragment) is that one color. The reflection pass now also draws the sun disc and the cloud layer into the mirror, and both it and the scene copies are skipped whenever `TerrainPasses.CullWater` (one frustum pass a frame, feeding the water pass its draw lists) found no water on screen — glass shares the translucent mesh, so `Chunk.HasWaterMesh` is the flag that decides, not `HasTranslucentMesh`. The mirror's opaque chunk and LOD lists skip anything whose top (`Chunk.WorldMax.Y`, `LodRegion.YMax`) plus `ReflectionCull.TopMarginBlocks` (a multiblock's overhang, two blocks for the 3x3x3 furnace, plus the shader's sway and wave lift) lies below the plane, since its clip would discard every fragment. Opaque faces that look into water are flagged by the mesher in bit 3 of `Vertex.Normal` (bits 0-2 stay the face index, bit 5 is the leaf-sway flag, bits 6-7 the low bits of the block-light tint code) and get the animated Voronoi caustic net; bit 4 is the biome-tint flag (see "Biome-tinted grass and leaves" below). The world fragment darkens a submerged face's albedo by `WetDarken` once, before the light multiply, and only at or below that face's own baked surface (`step(fWorldPos.y, fWaterSurfaceY)`; the caustics stop at the same line), so a dry face beside water — a beach top, a bank wall over the waterline — is never darkened or tinted; ore tiles (a non-zero `material.metallic`) are excluded. `SurfaceFresnel` is the GL-free twin (`Schlick`, `WetWeight`). While the eye is submerged, `UnderwaterRaysRenderer` adds one full-screen ray-march for sun shafts, composited in display space (the upsample reads the HDR target it draws into, adds the shafts to the encoded scene with the pre-SH-10 sRGB sun color and strength, clips at 1 and decodes), since the same add in linear light lost the glare toward the sun. Both measure depth from the **local** water surface, never the sea plane: the caustics from the surface baked into each submerged face's vertex (`Vertex.WaterSurface`, read as `fWaterSurfaceY`), the rays from `Camera.EyeWaterSurfaceY` (`ChunkManager.GetFluidColumnTopGlobal` over the eye's column), so a pond above sea level gets both — only the planar mirror still uses the sea plane. The rays are why the shadow map keeps rendering underwater (`FrameLighting.ShadowStrengthDry`, the strength before the underwater fade) even though the world diffuse no longer uses it. **Depth convention**: `Camera.GetProjectionMatrix` comes from `System.Numerics`, which is Direct3D-style (clip depth 0..1), so window depth is *not* the GL -1..1 mapping — never write a near/far linearization. Reconstruct a world position by inverting the very matrix that wrote the depth (`uInvViewProj`), and compare raw depth values directly for "which is nearer". `visual-examples/water.json` (run it with `VOXEL_TIME=360`) frames the shallows, the grazing surface, deep water from height and the underwater shots, including the surface seen from below in the sea and in a pond above sea level (a liquid one — a frozen pond has an ice lid, not a water top face).
 
@@ -1027,14 +1100,18 @@ OpenGLTest/
       DevDiagnostics.cs        # the startup build line, the VOXEL_TIME read, the live debug flag (X, VOXEL_DEBUG) and the X debug line
       GameplayInput.cs         # a playing world's per-frame polled input: key edges, hotbar, right-click chain, pause-gated world update, mining, middle pick
       InputEvents.cs           # the window's mouse and keyboard events, routed to whatever owns them on the current screen
-      FieldPointer.cs          # the mouse's side of text fields: a press places the caret, Shift extends, holding drags a selection (menu fields, [E] and chest search)
+      FieldPointer.cs          # the mouse's side of text fields: a press places the caret, Shift extends, holding drags a selection (menu fields, [E] and chest search,
+                               #   the waystone screen's rename and search fields)
       TextFieldKeys.cs         # maps key events (and the Ctrl/Shift state and clipboard) onto TextFieldEditing for the focused field
       InventoryPanelInput.cs   # the [E] panel's input: clicks, scrollbar, search keys, creative buttons, hovered row, tooltip
       MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings
       ScenarioUi.cs            # the app's IScenarioUi: lets a VOXEL_SCRIPT run open the [E] panel and the spell builder, pick a tab or row,
-                               #   type a search and hold the pointer through the real input components
+                               #   type a search, hold the pointer and drive the waystone screen through the real input components
       SpellBuilderInput.cs     # the spell builder's input: open from the table (or the hold-a-staff toast), close on
                                #   E/Escape or a changed held staff, cursor and look capture, clicks, bind/clear requests
+      WaystoneInput.cs         # the waystone screen's input: discover on a right-click, the popup, rename dialog and teleport list,
+                               #   cursor and look capture, clicks, keys, wheel, the close rules, the trip request; connected,
+                               #   opens on the server's answer and sends the rename and the trip intent
     Audio/                     # sound: the sfx library, mixer and manager, the ambience bed
       AmbienceManager.cs       # looping day/night ambience with a slow crossfade
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups (and names the
@@ -1249,6 +1326,11 @@ OpenGLTest/
         StatusEffectBlockAction.cs # [Flags] Ignite / Freeze / Thaw, what an effect's tick does to the cells around
         StatusEffectLoader.cs  # data/effects/*.json -> effects (id = file-name order, at most MaxKinds); Compile is pure
         StatusEffectRegistry.cs # every effect by name and id, KnownMask, published once by ContentRegistry.Load
+      Structures/              # structure templates (see "Structure templates and ruins")
+        StructureLoader.cs     # data/structures/*.json -> templates; a two-cell block stands whole, a satellite holds
+                               #   exactly one waystone, a ruin none
+        StructureRegistry.cs   # templates by kind and role: Of (ruins), SatellitesOf (waystones), TryPick(..., satellite)
+        StructureTemplate.cs   # one compiled template: kind, Satellite, weight, size, height, ground layer, four turns
       Stations/                # GL-free render constants of the kiln, quern and casting passes, molten materials
         KilnRenderer.cs, QuernRenderer.cs,
           CastingRenderer.cs   # GL-free placement/animation
@@ -1470,7 +1552,7 @@ OpenGLTest/
       RightClickAction.cs      # World component: the right-click chain (TryUseSelected: stations, the spell table,
                                #   a staff's cast, the item's use, placement; one overload hands back the outcome)
                                #   and the timed use charge
-      RightClickOutcome.cs     # what claimed a right-click: a station, the spell table, the item's use, a placement or a cast
+      RightClickOutcome.cs     # what claimed a right-click: a station, a chest, the spell table, a waystone, the item's use, a placement or a cast
       SelectionOutlineMesh.cs  # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
       SelectionPulse.cs        # GL-free twin of the outline's breathing opacity (steady while mining)
       SliceCombo.cs            # the blade's two-phase slice combo: press/queue/advance state
@@ -1479,7 +1561,7 @@ OpenGLTest/
       SwordSwing.cs            # the three sword swings, in chain order
       SwordSwings.cs           # GL-free per-swing rules: the chain's successor, power, targets, cone vs
                                #   hemisphere, shove and hit-stop weight
-      TallBlock.cs             # GL-free two-cell block rules (a door): each half's partner cell
+      TallBlock.cs             # GL-free two-cell block rules (a door, a waystone): each half's partner cell
                                #   and block, and the lower half every half drops and picks as
       ThrowAction.cs           # World component: Q drops, the throw charge and release, the projectiles in flight
     Items/                     # the Item class hierarchy ItemFactory hands out per use action, and the registry
@@ -1605,7 +1687,10 @@ OpenGLTest/
       PlayerStatusCodec.cs     # PlayerStatusData (modes, health, dead, knockback) and its bounds-checked wire form
       ServerAddress.cs         # host[:port] parsing and formatting (the default port)
       StationNetCodec.cs       # the StationState snapshot: campfires, querns, kilns, cast molds
-      WorldIntent.cs           # one client world intent (break start/complete, place, use, throw, attack)
+      WaystoneNetCodec.cs      # the waystone messages: the rename request, a player's rows (WaystoneNetRow) and the
+                               #   activation answer (WaystoneOpened), bounds-checked
+      WorldIntent.cs           # one client world intent (break start/complete, place, use, throw, attack, cast, hammer,
+                               #   waystone trip)
       WorldIntentCodec.cs      # its bounds-checked wire form, with the sequence id
       Client/                  # the client: connection, streamed chunks and far LOD, the World mirror, predictions, remote players
         ClientChunkStreamer.cs # requests streamed chunks/columns and applies them, no worldgen; the
@@ -1618,6 +1703,8 @@ OpenGLTest/
         ClientPrediction.cs    # GL-free: a client's pending predictions vs the server's answers (sequence ids)
         NetworkClient.cs       # the client: connect + handshake, reader thread, inbound queue, sends
         RemotePlayer.cs        # another player as the client sees them: pose smoothing + a PlayerModel
+        WaystoneMirror.cs      # GL-free: the waystone rows the server sent, its activation answer and the trip awaiting
+                               #   its landing correction
       ServerSide/              # the server's side of a session: the connected player and the rules its intents and
                                #   moves are judged by (the dedicated server itself is OpenGLTest.Server, VoxelEngine.Server)
         AttackPacing.cs        # GL-free: the shortest gap from one attack to the next (a punch's pace, a
@@ -1633,7 +1720,7 @@ OpenGLTest/
         ServerPlayer.cs        # a connected player on the server: own Inventory, creative/flight flags, pose,
                                #   its PlayerContext, newest sequence id, mining progress, edit rate, attack pace,
                                #   cast pacing (Casting), its PlayerHealth/fall tracking/respawn eye, mob-hit sink,
-                               #   correction numbers
+                               #   correction numbers, its open chest, the waystone it stands at, a waiting trip
     Particles/                 # every particle system (debris, bubbles, fire, leaves,
                                #   splashes, dust) and its renderer; the ParticleRing buffer
       AmbientEffects.cs        # World component: the fire cells (campfires, lit kilns, goblin torches), cosmetic
@@ -1900,6 +1987,8 @@ OpenGLTest/
                                #   highlight (RenderBlockSelection) and the crack overlay (RenderBlockBreaking)
         SpellBuilderRenderer.cs # the spell table's builder page: staff slots, the known parts by kind, the live
                                 #   cost/verdict/fizzle/factors, BIND and CLEAR (or the hold-a-staff hint)
+        WaystoneRenderer.cs    # the waystone screen: the discovery popup, the rename dialog and the teleport list (rows with realm
+                               #   tag and distance, lost rows dimmed, search field, the mana footer)
         TopStripRenderer.cs    # the top-center HUD strip (compass or clock) and the look-at label below it
                                #   (LookLabelTop)
         UiPasses.cs            # the UI hand-off: RenderUI, RenderChat, RenderTooltip, RenderPlayerList;
@@ -2030,6 +2119,24 @@ OpenGLTest/
       TreeGrowthWriter.cs      # reactive growth on the live world: rebuild a column's tree from its wood
                                #   state bytes (or plant a sapling), GrowFurther in a WorldTreeSpace, write
                                #   the difference back; TreeGrowthResult.cs / TreeGrowthStatus.cs are its result
+      Waystones/               # the waystone registry and discovery, namespace VoxelEngine.Simulation.Waystones (see "Waystones")
+        DiscoveredWaystones.cs # GL-free: one player's discovered waystones (cell + name at discovery) and their version
+        WaystoneDiscovery.cs   # what one player's activation came to: the record, may rename, new to the player
+        WaystoneManager.cs     # the world's registry keyed by the lower half's cell: lazy records, first discoverer, rename,
+                               #   lost marking (break hook + sweep), either half -> its cell, stations.json Capture/Restore
+        WaystoneNames.cs       # GL-free: the mod's random name (4 consonant-vowel pairs) and the rename sanitizer
+        WaystoneRecord.cs      # one registry row: name, first discoverer id, lost flag
+        WaystoneRealm.cs, WaystoneRealms.cs  # surface / underground / hell / sky; GL-free Classify by the bands and the
+                                              #   column's surface, and the list's tag
+        WaystoneTeleport.cs    # GL-free teleport rule: IsAtWaystone, Judge (current, discovered, registry row, lost, mana over
+                               #   half unless free) and TryPay (drains); WaystoneTeleportVerdict.cs its answer
+        WaystoneArrival.cs     # GL-free arrival search over IArrivalCells: the nearest free two-cell spot facing away, on top
+                               #   of the stone, or Unloaded; ArrivalCell.cs, IArrivalCells.cs, ChunkArrivalCells.cs (the live
+                               #   chunks), WaystoneArrivalSpot.cs and WaystoneArrivalStatus.cs are its seam and answer
+        WaystoneTravel.cs      # World component: the local trip, holding the camera over an unloaded destination, then landing;
+                               #   a client's hold on the spot the server landed it on (BeginLanding)
+        WaystoneArrivalHold.cs # GL-free: a server player's trip waiting for its destination (HoldEye; Step: the spot once
+                               #   loaded, on top after the timeout)
     Status/                    # status effects at run time (MG-4b), see "Status effect schema"
       StatusEffectSet.cs       # GL-free per-target set: apply (refresh, never stack), tick (DoT, block actions), the
                                #   lowest move/attack factor, the client mirror mask, the tint
@@ -2104,10 +2211,17 @@ OpenGLTest/
         SpellBuilderText.cs    # the title, the hold-a-staff hint and a phrase per SpellVerdict
         SpellBuilderView.cs    # open flag, transition, chosen slot, the selection (one element/shape/trigger, any
                                #   modifiers), live stats cached per Version; Refresh rebuilds only on a knowledge change
+      Waystone/                # the waystone screen, GL-free (WaystoneRenderer draws it, WaystoneInput drives it)
+        WaystonePage.cs        # Closed / Discovered (the popup) / Rename (the dialog) / List
+        WaystoneView.cs        # the page, the waystone, its name and rename right, the rename field, search, scroll, the cached
+                               #   rows and the mana footer state; Confirm, BeginRename, FinishRename, Back (Escape)
+        WaystoneRow.cs, WaystoneRows.cs  # one list row (name, realm, distance, lost, current); Build: filter, order
+        WaystoneLayout.cs      # canvas geometry of the popup, dialog and list panel, and HitAt; WaystoneHit.cs, WaystoneHitKind.cs
+        WaystoneText.cs        # the labels, the mana footer rule and a toast per refused trip
     VisualTest/                # the VOXEL_SCRIPT scenario runner: parsed scenario, director, scripted keyboard, PNG capture
       ScriptedKeyboard.cs      # an IKeyboard whose pressed keys are set by code instead of the OS
       VisualCapture.cs         # reads the finished frame back from the GPU and writes it as a PNG
-      IScenarioUi.cs           # what a scenario may do to the live UI (panel, tab, search, row, hover, spell builder)
+      IScenarioUi.cs           # what a scenario may do to the live UI (panel, tab, search, row, hover, spell builder, waystone)
       VisualDirector.cs        # runs a VisualScenario inside the live game
       VisualScenario.cs        # a scripted in-game run:
                                #   teleport/look/wait/walk/mine/place/fly/give/spawn/grow/damage/effect/screenshot
@@ -2215,6 +2329,11 @@ OpenGLTest/
       WorldgenStats.cs         # lock-free worldgen timing from the generation workers and
                                #   the LOD builder, drained once a second by FrameProfiler
       WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere
+      Structures/              # template placement (see "Structure templates and ruins")
+        PlacedStructure.cs     # a template placed in the world: center column, origin y, turns, footprint box
+        RuinPlacement.cs       # the ruins of the four realms on hashed cells, and the realm site rules satellites share
+        StructureStamper.cs    # writes a template part inside one chunk, clipped at its border and to a y window
+        WaystonePlacement.cs   # a waystone satellite a short walk from a placed ruin, by the ruin's realm rule
       Features/                # every surface feature generator (see "Biomes"); the underground ones below
         BoulderGenerator.cs    # a rare 2-4 cell stone or cobblestone blob on the forest/taiga floor
         BranchPileGenerator.cs # crossed-stick branch piles: up to 4 long thin logs sharing one air cell above the ground
@@ -2361,6 +2480,8 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
                                       #   pending connections, clock, join spawn, creative rights
   ServerTransport.cs                  # TCP listener, accept thread, per-connection reader threads
   StreamRequests.cs                   # chunk, column and far-LOD region requests and the LOD queue
+  WaystoneSessions.cs                 # waystones for each player: discovery on a replayed Use (WaystoneOpened),
+                                      #   the rows kept current, the rename, the trip judged, held and landed
 OpenGLTest.WikiExport/                # headless exporter for the wiki (wiki/): grows every tree species step by step
                                       #   over flat ground (the item debugger's TREES setup) and writes per-step cell
                                       #   diffs; CI runs it before the wiki build (`dotnet run --project
@@ -2441,6 +2562,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
     Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World
+    Waystones/                 # waystone names, the registry's discovery, rename, lost and save rules; the teleport rule,
+                               #   the arrival search, the realm tag and a trip in a headless world
   Status/                      # the status effect set, the Apply API, the speed factors and the block rule and writer
   UI/                          # the canvas, settings, scroll lists, text wrap
     Hud/                       # chat, clock, compass, hit marker, hotbar feedback,
@@ -2448,6 +2571,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     InventoryPanel/            # the inventory and its save shape, the [E] panel layout, crafting cards, the creative catalog, search
     Menus/                     # main and pause menus, the loading screen, text fields
     SpellBuilder/              # the builder's selection rules, live stats and layout hit-tests
+    Waystone/                  # the waystone screen's page rules, rows and layout hit-tests
   VisualTest/                  # scenario parsing and ops, PNG capture
   WorldGen/                    # terrain, biomes, lakes, ravines, clouds, the generational
                                #   cache, the tree front end and batches, worldgen stats,
@@ -2457,6 +2581,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Hell/                      # the hell caverns, biomes, palette and flora (mirrors src/WorldGen/Hell)
     Sky/                       # the solid cloud patches, the cloud sea, the sky islands, the sky biomes and their
                                #   flora (mirrors src/WorldGen/Sky)
+    Structures/                # templates, the ruins and their waystone satellites (mirrors src/WorldGen/Structures)
     Trees/                     # the tree growth engine, flat over src's Trees/Shape, Logics and Features
 tools/                                # asset generators: tiles, sprites, models and clips, each re-run byte-identical
   generate-acorn-texture.py           # deterministic generator of the acorn sprite (acorn.png)
@@ -2487,6 +2612,8 @@ tools/                                # asset generators: tiles, sprites, models
   generate-slime-block-texture.py     # deterministic generator of the slime block tile (slime_block.png)
   generate-staff-textures.py          # deterministic placeholder sprites of the wooden and crystal staffs
   generate-spell-sfx.py               # deterministic placeholder spell sounds (spell_cast/impact/fizzle.wav), --check
+  generate-waystone-textures.py       # deterministic waystone_<realm>_stone/_runes/_runes_upper tiles (four realm palettes, one
+                                      #   rune panel up the two-cell obelisk shaft, split where its halves meet), --check
   generate-wiki-shots.mjs             # the wiki's screenshot scenarios (visual-examples/wiki-*.json) and wiki/data/screenshots.json from one spec of poses and captions
   generate-mana-draught-texture.py    # deterministic placeholder sprite of the mana draught (mana_draught.png), --check
   generate-stone-brick-texture.py     # deterministic generator of the stone brick tile (stone_bricks.png)
@@ -2573,6 +2700,7 @@ trailing commas.
 | `bloomery` | none | marks a multiblock anchor as a bloomery (see "The bloomery and the anvil"): `{"oreCap", "fuelCap", "ore", "bloom", "slag"}`, caps 1..64 (default 4), the three names required and resolved at load (`BloomeryProfile`, `BlockType.Bloomery`). Only on the `multiblock` renderer, never with `kiln` |
 | `anvil` | none | marks a plain model block as an anvil: `{"hits", "input", "result", "slag"}`, hits 1..32 (default 3), the three names required (`AnvilProfile`, `BlockType.Anvil`). Not on a multiblock |
 | `spellBuilder` | false | the block is a spell table: a right-click with a staff in hand opens the spell builder (`BlockType.SpellBuilder`, `BlockInteractions.TryOpenSpellTable`, after the other stations and before the staff cast; a block in hand places against it instead). No block entity, no state; legal on any block. `spell_table` |
+| `waystone` | false | the block is a waystone (`BlockType.Waystone`): a right-click discovers it and a discovered one teleports to the others. Its name, first discoverer and lost flag live in `WaystoneManager` (see "Waystones"), so the block keeps no state; legal on any block. With an `upperHalf` (the shipped ones) the upper half carries no flag: a click on it opens the waystone below, and the waystone stands only while both halves do. `waystone_surface`, `_underground`, `_hell`, `_sky` |
 | `pane` | glass pane | only legal with `renderer: "pane"`: the post and arm dimensions in pixels, `{"post": p, "arm": a, "rails": [[bottom, top], ...]}` (`PaneProfile`): a full-height post `p` (1..16) wide, arms `a` (1..`p`, default `p`) wide filling each `rails` height band (ascending, apart, inside 0..16, default `[[0, 16]]`). Omitted is the glass pane's 2 px post and arms over the full height, drawn byte-identically to before. Panes join only panes of the same dimensions (interned, so equal dimensions are one `PaneProfile`) and solid full cubes, so a fence never reaches into a glass pane. `oak_fence` is `{"post": 4, "arm": 2, "rails": [[6, 9], [12, 15]]}` |
 | `wood` | none | required on, and only legal with, `renderer: "tree_wood"`: how hardness and loot follow the thickness stored in each cell's `WoodState` (code 0 = 1 px across .. 15 = full cube) |
 | `wood.tipHardness` | 0.25 | the share of `hardness` the thinnest (1 px) wood keeps, 0..1, rising linearly to the full `hardness` at a full cube (`BlockType.TipHardness`, read by `Mining.HardnessOf`). Player-placed tree wood is a full detached cube and therefore as hard as a trunk |
@@ -2586,7 +2714,7 @@ trailing commas.
 | `facing` | none | `"horizontal"`: the state byte's low two bits are a facing (north -Z 0, south +Z 1, west -X 2, east +X 3); the model (no full-face quads) and `hitbox` are authored facing north and pre-turned to all four (`BlockType.RotatedModels`/`RotatedHitboxes`, `HorizontalFacing`). Only on the `model` renderer, never with `fluid`, `falls` or `stackMax` |
 | `facingFromLook` | false | a placement faces the block along the placing player's horizontal look (`Placement.LookFacing`: the dominant horizontal axis of `PlayerContext.ViewDirection`, so a server replays a `Place` intent by that player's own aim), whatever face was hit: stairs placed looking north climb north. Only with `facing`, never with `support: "attached"` |
 | `open` | none | makes the block openable: `{"model": m, "hitbox": h}`, both required, authored facing north like the closed model and hitbox. Right-click (`BlockInteractions.TryToggleOpenable`, in the right-click chain after the stations) flips `DoorState.OpenBit` in the state byte whatever is in hand, and the block is then drawn with `m` and hit (and, with `collidesByHitbox`, collided) with `h`; `RotatedModels`/`RotatedHitboxes` hold the four closed facings then the four open ones. Only with `facing`. `oak_trapdoor` |
-| `upperHalf` | none | makes this block the lower half of a block two cells tall (`TallBlock`): the named block fills the cell above it. Placement writes both halves with one state byte and is refused, spending nothing, unless the upper cell is free too; breaking either half takes the other down through the hooks mining runs and drops this block once; an openable pair opens and shuts together. The upper half needs `hasItem: false` (it is picked as this block, `BlockType.PickId`), the same `facing` and `open` as this block, and neither half may be a fluid, fall, need support or stack. `oak_door` -> `oak_door_upper` |
+| `upperHalf` | none | makes this block the lower half of a block two cells tall (`TallBlock`): the named block fills the cell above it. Placement writes both halves with one state byte and is refused, spending nothing, unless the upper cell is free too; breaking either half takes the other down through the hooks mining runs and drops this block once; an openable pair opens and shuts together. The upper half needs `hasItem: false` (it is picked as this block, `BlockType.PickId`; the lower half may have no item either, a worldgen-only pair such as a waystone), the same `facing` and `open` as this block, and neither half may be a fluid, fall, need support or stack. A structure template must stand a pair whole (`StructureLoader`). `oak_door` -> `oak_door_upper`, `waystone_<realm>` -> `waystone_<realm>_upper` |
 | `wallBlock` | none | the block a placement against a block's side becomes, facing the hit normal (leaning away from the wall); on top the block places as itself, under a ceiling it is refused (`Placement.TryMount`). The wall block needs `facing` and `support: "attached"`, and is picked as this block (`BlockType.PickId`). `torch` -> `wall_torch` |
 | `pickAs` | none | the block a middle-click picks instead of this one (`BlockType.PickId`, through the same `ItemBlockId` a `wallBlock` and an `upperHalf` set): a worldgen-only block picked as its plain counterpart. Requires `hasItem: false` on this block and names another registered block that has an item; a block that is already some block's `wallBlock` or an `upperHalf` may not set it (`BlockLoader.ResolvePickAs` refuses each case naming the file). A misspelled field name is ignored silently, like every unknown field. `hollow_oak_log` -> `oak_log` |
 | `replaceableByPlacement` | false | a block placement aimed at this block fills the block's own cell and discards it, instead of filling the cell across the hit face, so a block placed against a partial snow drift rests on the ground instead of hovering a layer above it. Only fires while the cell is not solid, so a full snow stack stays an ordinary block, and the displaced block drops nothing. Independent of `needsSupport`, which is what a flow or a bucket may overwrite. Illegal on an always-solid block, which could never honor it |
@@ -3609,7 +3737,7 @@ progress is saved with the world (`stations.json`, see "Saves"; a pour comes bac
 rather than being forgotten.
 
 The right-click chain in `RightClickAction.TryUseSelected` runs `TryCookOrCollect` -> `TryQuernInteract` ->
-`TryKilnInteract` -> `TryCastInteract` -> `TryToggleOpenable` -> `TryOpenSpellTable` (all on `BlockInteractions`) -> a held spell staff's cast (which never places) -> the item's own `use` action or block placement, and the
+`TryKilnInteract` -> `TryCastInteract` -> `TryToggleOpenable` -> `TryOpenChest` -> `TryOpenSpellTable` -> `TryOpenWaystone` (all on `BlockInteractions`) -> a held spell staff's cast (which never places) -> the item's own `use` action or block placement, and the
 first one that claims the click wins (`TryUseSelected(maxDistance, out RightClickOutcome)` hands back which). On a kiln: an empty hand lifts the crucible out (and puts it
 straight back when the tools pool is full), a crucible stands one in, a melt input charges it, fuel
 goes into the hearth, a **firestarter falls through** to its own `Item.OnUse` so it can strike and
@@ -3621,7 +3749,11 @@ trapdoor, either half of a door, which swings both) flips its open bit whatever 
 nothing places against it. Then `TryOpenSpellTable`: a click on a `spellBuilder` block with anything
 but a block in hand is claimed as `RightClickOutcome.SpellTable` with no side effect and no swing (the
 local player's `GameplayInput` opens the builder from that outcome; a server's replay changes nothing),
-so a staff in hand never casts at the table.
+so a staff in hand never casts at the table. Then `TryOpenWaystone`: a click on either half of a whole waystone, unless sneaking or
+holding a block (which place against it), is claimed as `RightClickOutcome.Waystone` the same way, its cell kept in
+`RightClickAction.LastWaystoneCell`; the local player's `GameplayInput` hands it to `WaystoneInput.OpenFromStation`,
+which discovers it and opens the waystone screen (see "Waystones"); a server replaying a client's `Use` discovers it for that
+player instead (`World.LastWaystoneCell`, see "Waystones on a server").
 
 ### Spell part schema (`assets/data/spell/<kind>/<name>.json`)
 
@@ -4071,7 +4203,9 @@ accepted), `BlockCorrection` (sequence id, then the authoritative cells around t
 `EntityList` (the live mobs, drops, primed TNT and falling blocks, `NetEntity`), `StationState` (the campfires, querns, kilns and
 cast molds, `StationNetCodec`), `BlockChanges` (a batch of server cell changes, `NetCellChange`)
 and `InventoryState`/`InventoryRequest` (a player's server-owned inventory, `InventoryNetCodec`,
-and its intents, `InventoryIntentCodec`). The intent protocol came with version 3: a client
+and its intents, `InventoryIntentCodec`), and the waystone messages `WaystoneRename` (a client's rename request),
+`WaystoneRows` (a player's registry rows) and `WaystoneOpened` (what a waystone activation came to; `WaystoneNetCodec`,
+see "Waystones on a server"). The intent protocol came with version 3: a client
 never writes a cell (the old raw `BlockEdit` is retired and refused), every intent carries a
 per-player sequence id, and `InventoryState` carries the id of the newest intent it reflects.
 Version 4 added the status payload of `PlayerStatus`, the
@@ -4085,7 +4219,7 @@ refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's 
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
 whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell or sky mob's `Ammo` carries its
 attack count the same way (`RealmMob.AttackCount`, see "A mirror's attack clip"), with no bump either. Every
-entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 23 (current) adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 24 (current) adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
 mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
@@ -4101,7 +4235,8 @@ them. A
 made from, then that kind's fields (`WorldIntent`): `BreakStart`/`BreakComplete(cell)`,
 `Place(hit cell, face normal)`, `Use(cell under the crosshair, optional)`, `Throw(charge 0..1)`,
 `Attack(punch | slice | slice return)`, `Respawn` (nothing more; never rate-limited, edits no
-cell), `Cast(slot)` (a held staff's spell slot as one byte; never edits a cell, rate-limited) and `Hammer(cell)` (one hammer hit on an anvil; never edits a cell, rate-limited). Its
+cell), `Cast(slot)` (a held staff's spell slot as one byte; never edits a cell, rate-limited) , `Hammer(cell)` (one hammer hit on an anvil; never edits a cell, rate-limited) and `Waystone(cell)` (a trip to the
+discovered waystone at that cell from the one the player last activated; never edits a cell, rate-limited). Its
 reader refuses an unknown kind or attack, a cast slot at or past `SpellConfig.StaffMaxSlots`, a
 non-finite or far-out eye, an aim that is not close to a unit vector and a normal component
 outside -1..1 as an `InvalidDataException`, renormalizes the aim and clamps the charge. An
@@ -4241,6 +4376,9 @@ empty. Then, by kind:
 - **Hammer** — `IntentReplay.HammerFor` -> `World.HammerFor`: a smithing hammer (the `hammer` tag) in hand, the player's own
   ray landing on the anvil's cell, and the anvil's own hit gap run down (the hammer's pace less
   `BloomeryConfig.HammerSlackSeconds`); the anvil manager counts the hit and, on the last, drops the result and slag.
+- **Waystone** — `WaystoneSessions.TripFor`: standing at the waystone the player last activated, no trip already waiting,
+  then `WaystoneTeleport.TryPay` (discovered, not lost, mana over half unless creative or flying, drained); the player is
+  held over the destination until it loads and then landed with a `PlayerCorrection` (see "Waystones on a server").
 
 Every intent is answered, in order: an intent that can edit cells gets a `BlockCorrection` with
 the authoritative state of the 3x3x3 cells around its named cell (within edit reach), so whatever
@@ -4904,13 +5042,13 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   attack clip"); all four are saved in `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 177 of the 255 content ids are used (108 blocks, 68 items, air), 78 left. Seed offsets
+- **Budgets**: 223 of the 255 content ids are used (127 blocks, 95 items, air), 32 left. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
   `plans/BIOMEGEN.md`.
 - **Visual checks** (each with `VOXEL_TIME=147`): `barrier.json`, `hell.json`, `hell-flora.json`,
   `hell-mobs.json`, `layers-fog.json`, `clouds-solid.json`, `sky-islands.json`, `sky-density.json`,
-  `sky-biomes.json`, `sky-mobs.json`.
+  `sky-biomes.json`, `sky-mobs.json`, and `waystones.json` (a waystone structure in each realm).
 
 ### Structure templates and ruins
 
@@ -4929,13 +5067,40 @@ world-y window, so every chunk a footprint crosses agrees with no cross-chunk wr
 site (jittered), its template and its turn from the hash, a pure function of (cell, seed). **Surface** ruins (stage
 `RuinsSurface`, after the wells) need a land biome, dry ground and a footprint within `RuinSurfaceMaxStep` of level.
 **Underground** rooms (`RuinsUnderground`) sit at a hashed depth between the barrier and `RuinUndergroundCover` under the
-ground at their center and are sealed by their own walls. **Hell** ruins (`RuinsHell`, hooked into both the wholly-hell early
+ground at their center and are sealed by their own walls; they (and their waystone chambers) are stamped after the geodes, the
+cave life, the gravel pockets and the pools, so none of those is left inside a room. **Hell** ruins (`RuinsHell`, hooked into both the wholly-hell early
 path and the straddle path through `StampHellRuins`) stand on the first solid pocket floor scanning down from a hashed row,
 per layer, with the whole footprint level and clear above, and their cells stay inside their layer. **Sky** ruins (`RuinsSky`,
 inside `StampSky` after the sky trees) take at most one per island, on its center top when the top is within
 `RuinSkyMaxStep` of level across the footprint. Every placement has a band (`SurfaceBand`, `UndergroundBand`, `SkyBand`, hell
 `HellGenerator.WriteBand`) and a `StampGateTests` row; `StructureTests` holds the template, seam and site rules, and `visual-examples/ruins.json` (`VOXEL_TIME=147`) frames a surface ruin. The far LOD
 draws none. A new ruin is a JSON file.
+
+**Waystone satellites (W-4).** A template with `"satellite": true` is a waystone site, never a ruin: `StructureLoader` refuses
+a satellite that does not hold exactly one waystone block (a lower half; every two-cell block in a template must stand whole, its
+upper half right above it) and a ruin that holds any, and `StructureRegistry.Of(kind)` lists ruins
+only while `SatellitesOf(kind)` lists satellites (`TryPick(..., satellite: true)`). Four ship, one per realm, each its own layout:
+`waystone_pavilion` (surface, 5x5 and 10 layers: four wall-post pillars on a stone-brick platform under a stepped cobblestone
+roof, a lantern over the waystone), `waystone_crypt` (underground: a sealed stone-brick chamber with wall lamps, the waystone on a slab dais),
+`waystone_ember_ring` (hell: a basalt disc ringed by basalt pillars crowned with ember crystal, on a two-layer hellrock foundation)
+and `waystone_sky_arch` (sky: a frost-stone plaza under a crystal-keyed arch). `WaystonePlacement` (`WorldGen/Structures/`) places
+them only beside ruins: every placed ruin's hash, mixed with salt `0x5E7E` (`SatelliteHash`), rolls `WaystoneSatelliteChance`, the
+template and its turn, and up to `WaystoneSiteTries` distances (`WaystoneMinDistance..MaxDistance` between centers) and directions,
+each pushed out until the two footprints keep `WaystoneRuinGap` empty columns apart; the first try whose site passes the realm's
+rule wins. The rules are the ruins' own, shared through `RuinPlacement`: surface `TrySurfaceGround` (a land biome, dry, within
+`RuinSurfaceMaxStep`; the template is picked by the ruin's biome), underground `TryUndergroundOrigin` (its own sealed chamber at
+a hashed depth), hell `TryHellFloor` in the ruin's layer, scanned from the pocket top and level within the template's
+`groundLayer` (its foundation fills dips that deep and the next layers write over or carve bulges; the ruins keep step 0, strictly
+level), sky `TrySkyTop` on the ruin's own island, the distance rolled across the room the island's disc leaves. A chunk checks the
+ruin cells within `MaxCenterDistance` plus `RuinPlacement.Reach` of it and rolls the cheap hashes (and whether any try's ray can
+reach it) before searching a site, so a chunk off every satellite pays only hashes; the sky reuses the ruins' island collection,
+since a sky waystone stays inside its island's disc. Stages `WaystonesSurface`, `WaystonesUnderground`, `WaystonesSky` and
+`WaystonesHell` follow their ruins' stages, with the ruins' bands. `WaystonePlacement.TryFindSurface`/`TryFindUnderground`/
+`TryFindHell`/`TryFindSky` return the ruin and its waystone as `PlacedStructure`s; `RuinPlacement.SkyRuinOwns` counts a sky
+waystone's cells too. Measured over the default seed (3600 ruin cells a kind): a satellite beside 24% of surface ruins, 27% of
+underground rooms, about 35% of the (rare) hell ruins and 11% of sky ruins (islands are often too small or uneven), at a mean
+center distance of 20-22 blocks (10 on islands). `WaystonePlacementTests`; `visual-examples/waystones.json` (`VOXEL_TIME=147`)
+films the nearest satellite of each realm on the default seed.
 
 ## Entities
 

@@ -10,6 +10,7 @@ using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.Simulation.Smithing;
+using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Interaction;
@@ -368,13 +369,6 @@ internal sealed class BlockInteractions
     }
 
     /// <summary>
-    /// Right-click on a spell table (a block with <see cref="BlockType.SpellBuilder"/>): claims the
-    /// click unless a block is in hand, which places against the table like it does against a kiln.
-    /// No side effect and no block entity: the caller decides what to open, so a local player opens
-    /// the spell builder client-side from the <see cref="RightClickOutcome.SpellTable"/> outcome,
-    /// while a server replaying the click claims it and does nothing.
-    /// </summary>
-    /// <summary>
     /// A right-click on a chest: claims the click (no side effect, no swing) unless the player is sneaking, which
     /// places a block against it instead. The local player opens the chest panel from the
     /// <see cref="RightClickOutcome.Container"/> outcome and asks the server (or the chest manager) for the contents; a
@@ -391,12 +385,39 @@ internal sealed class BlockInteractions
         return true;
     }
 
+    /// <summary>
+    /// Right-click on a spell table (a block with <see cref="BlockType.SpellBuilder"/>): claims the
+    /// click unless a block is in hand, which places against the table like it does against a kiln.
+    /// No side effect and no block entity: the caller decides what to open, so a local player opens
+    /// the spell builder client-side from the <see cref="RightClickOutcome.SpellTable"/> outcome,
+    /// while a server replaying the click claims it and does nothing.
+    /// </summary>
     internal bool TryOpenSpellTable(float maxDistance, PlayerContext player)
     {
         if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
         if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out _)) return false;
         if (BlockType.ById[id] is not { SpellBuilder: true }) return false;
         return player.Inventory.HeldItem is not BlockItem;
+    }
+
+    /// <summary>
+    /// A right-click on a waystone (a block with <see cref="BlockType.Waystone"/>): claims the click (no side effect, no
+    /// swing) unless the player is sneaking or holds a block, which places against it instead. The local player
+    /// discovers it and opens the waystone screen from the <see cref="RightClickOutcome.Waystone"/> outcome; a server
+    /// replaying the click claims it and does nothing. A click on either half of a waystone counts, and only while the
+    /// whole waystone stands (<see cref="WaystoneManager.IsWaystoneAt"/>). <paramref name="cell"/> is the waystone's
+    /// cell, its lower half's, which the registry keys it by.
+    /// </summary>
+    internal bool TryOpenWaystone(float maxDistance, PlayerContext player, out Vector3 cell)
+    {
+        cell = default;
+        if (player.Camera is { IsSneaking: true } || player.Inventory.HeldItem is BlockItem) return false;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out _)) return false;
+        if (!WaystoneManager.TryGetWaystoneCell(id, (int)hit.X, (int)hit.Y, (int)hit.Z, out var waystone)
+            || !WaystoneManager.IsWaystoneAt(_chunkManager, waystone.X, waystone.Y, waystone.Z)) return false;
+        cell = new Vector3(waystone.X, waystone.Y, waystone.Z);
+        return true;
     }
 
     /// <summary>Writes an openable cell's new <paramref name="state"/> and runs the hooks every

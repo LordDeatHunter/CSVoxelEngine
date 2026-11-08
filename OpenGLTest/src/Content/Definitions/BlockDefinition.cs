@@ -305,6 +305,11 @@ public sealed class BlockDefinition
     /// builder UI client-side. No block entity. Legal on any block.</summary>
     public bool? SpellBuilder { get; set; }
 
+    /// <summary>Marks the block as a waystone: a right-click discovers it, and from a discovered one a player
+    /// teleports to the others. Its name and first discoverer live in the world's waystone registry, created on
+    /// first use, so the block itself keeps no state. Legal on any block.</summary>
+    public bool? Waystone { get; set; }
+
     /// <summary>
     /// How many units of this block stack in one cell, candle-style (pebble piles hold up to
     /// 3, branch piles up to 4). The count lives in the chunk's state byte: 0 means "untouched worldgen" (the

@@ -81,6 +81,9 @@ internal sealed class LocalPlayer
     /// <summary>Marks the spawn settled (a client starts at its server's spawn).</summary>
     internal void MarkSpawnSettled() => _spawnSettled = true;
 
+    /// <summary>Forgets the fall in progress, so a teleport (a waystone arrival) lands as a teleport, never a drop.</summary>
+    internal void ResetFall(float feet) => _fall.Reset(feet, grounded: false);
+
     /// <summary>Forgets the walk cycle's previous position, so a whole load never reads as one step.</summary>
     internal void ForgetPreloadPosition() => _hasPrevCamPos = false;
 

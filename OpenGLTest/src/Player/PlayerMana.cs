@@ -117,4 +117,11 @@ public sealed class PlayerMana
 
     /// <summary>A full pool again (a respawn).</summary>
     public void Refill() => Current = _max;
+
+    /// <summary>An empty pool (a waystone teleport spends all of it); it regenerates from there as usual.</summary>
+    public void Drain() => Current = 0f;
+
+    /// <summary>Whether the pool is strictly more than half full, judged on the whole-unit <see cref="NetMana"/> a
+    /// server and its client agree on (what a waystone teleport needs).</summary>
+    public bool MoreThanHalf => NetMana * 2 > _max;
 }

@@ -56,12 +56,13 @@ public sealed class ServerPlayerTests : IDisposable
     }
 
     [Fact]
-    public void APlayerComesBackWithItsInventoryAndPose()
+    public void APlayerComesBackWithItsInventoryPoseAndDiscoveredWaystones()
     {
         var store = new ChunkSaveStore(_dir);
         var player = new ServerPlayer(1, "Alice", new Vector3(10.5f, 70f, -3.25f)) { Yaw = 30f, Pitch = -12f };
         player.Inventory.Add(Stone, 7);
         player.Inventory.Select(4);
+        player.Inventory.Waystones.Add(400, 11, -2, "Kafuziro");
         ServerPlayerSaves.Save(store, player);
         Assert.True(store.Shutdown(TimeSpan.FromSeconds(10)));
 
@@ -76,11 +77,13 @@ public sealed class ServerPlayerTests : IDisposable
             Assert.Equal(player.Pitch, back.Pitch);
             Assert.Equal(player.Inventory.CountFor(Stone), back.Inventory.CountFor(Stone));
             Assert.Equal(player.Inventory.SelectedIndex, back.Inventory.SelectedIndex);
+            Assert.Equal(player.Inventory.Waystones.Entries, back.Inventory.Waystones.Entries);
 
             // Somebody else's name loads nothing of Alice's
             var stranger = new ServerPlayer(10, "Bob", Vector3.Zero);
             Assert.False(stranger.Restore(ServerPlayerSaves.Load(reopened, "Bob"), allowCreative: false));
             Assert.Equal(0, stranger.Inventory.CountFor(Stone));
+            Assert.Equal(0, stranger.Inventory.Waystones.Count);
         }
         finally
         {

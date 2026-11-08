@@ -1,0 +1,64 @@
+{
+  // Waystone screens (W-5): run with VOXEL_SCRIPT=visual-examples/waystones-ui.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/waystones-ui/. Sets three waystones (both halves) down in the forest clearing, discovers them (the popup, the
+  // rename dialog), mines one (a lost row), then films the teleport list, its search, a short trip and the list again
+  // with the mana spent.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 63.5], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 2 },
+
+    { "op": "setblock", "pos": [-44, 10, 59], "block": "waystone_surface" },
+    { "op": "setblock", "pos": [-44, 11, 59], "block": "waystone_surface_upper" },
+    { "op": "setblock", "pos": [-38, 10, 59], "block": "waystone_sky" },
+    { "op": "setblock", "pos": [-38, 11, 59], "block": "waystone_sky_upper" },
+    { "op": "setblock", "pos": [-42, 10, 61], "block": "waystone_hell" },
+    { "op": "setblock", "pos": [-42, 11, 61], "block": "waystone_hell_upper" },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "waystones", "hideHud": true },
+
+    { "op": "waystone", "action": "open", "pos": [-44, 10, 59] },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "discovered" },
+    { "op": "waystone", "action": "rename" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "rename" },
+    { "op": "waystone", "action": "type", "text": "Clearing Stone" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "rename-typed" },
+    { "op": "waystone", "action": "submit" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "renamed" },
+    { "op": "waystone", "action": "confirm" },
+    { "op": "waystone", "action": "close" },
+
+    { "op": "waystone", "action": "open", "pos": [-38, 10, 59] },
+    { "op": "waystone", "action": "confirm" },
+    { "op": "waystone", "action": "close" },
+    { "op": "waystone", "action": "open", "pos": [-42, 10, 61] },
+    { "op": "waystone", "action": "close" },
+    { "op": "fly" },
+    { "op": "teleport", "pos": [-41.5, 12.4, 61.5], "yaw": -90, "pitch": -89 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "mine", "seconds": 0.3 },
+    { "op": "creative", "on": false },
+    { "op": "teleport", "pos": [-43.5, 12.5, 63.5], "yaw": -90, "pitch": -12 },
+    { "op": "wait", "seconds": 1 },
+
+    { "op": "waystone", "action": "open", "pos": [-44, 10, 59] },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "list" },
+    { "op": "waystone", "action": "type", "text": "clear" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "search" },
+    { "op": "waystone", "action": "close" },
+
+    { "op": "waystone", "action": "open", "pos": [-44, 10, 59] },
+    { "op": "waystone", "action": "teleport", "row": 2 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "arrived" },
+    { "op": "waystone", "action": "open", "pos": [-38, 10, 59] },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "list-no-mana" }
+  ]
+}

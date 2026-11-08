@@ -53,6 +53,7 @@ internal static class StructureLoader
             throw new InvalidOperationException(Fail($"is {size} rows deep; expected 1..{StructureRegistry.MaxSize}."));
         var cells = new int[layers.Length * size * size];
         var facing = new bool[cells.Length];
+        var waystones = 0;
         for (var y = 0; y < layers.Length; y++)
         {
             if (layers[y] is not { } rows || rows.Length != size)
@@ -71,11 +72,32 @@ internal static class StructureLoader
                     {
                         cells[index] = entry.Block | (entry.State << 8);
                         facing[index] = entry.Facing;
+                        if (BlockType.ById[entry.Block]!.Waystone) waystones++;
                     }
                     else throw new InvalidOperationException(Fail($"uses '{ch}' in layer {y} row {z}, which is not in the palette."));
                 }
             }
         }
+
+        // A two-cell block (a waystone) stands whole: every lower half has its upper half right above it, every upper
+        // half its lower half right below
+        for (var index = 0; index < cells.Length; index++)
+        {
+            if (BlockAt(cells, index) <= 0 || BlockType.ById[(byte)cells[index]] is not { } type) continue;
+            var y = index / (size * size);
+            if (type.UpperHalfId != 0 && (y + 1 >= layers.Length || BlockAt(cells, index + size * size) != type.UpperHalfId))
+                throw new InvalidOperationException(Fail($"has '{type.Name}' in layer {y} without its upper half right above it."));
+            if (type.LowerHalfId != 0 && (y == 0 || BlockAt(cells, index - size * size) != type.LowerHalfId))
+                throw new InvalidOperationException(Fail($"has the upper half '{type.Name}' in layer {y} without its lower half right below it."));
+        }
+
+        // A satellite is a waystone site: exactly one waystone (its lower half), the one the registry names; a ruin
+        // holds none
+        var satellite = d.Satellite ?? false;
+        if (satellite && waystones != 1)
+            throw new InvalidOperationException(Fail($"is a satellite holding {waystones} waystone blocks; expected exactly one."));
+        if (!satellite && waystones != 0)
+            throw new InvalidOperationException(Fail("holds a waystone block but is not a satellite (\"satellite\": true)."));
 
         Biome[]? biomes = null;
         if (d.Biomes is { Length: > 0 } names)
@@ -87,8 +109,11 @@ internal static class StructureLoader
                     throw new InvalidOperationException(Fail($"names unknown biome '{names[i]}'."));
         }
 
-        return new StructureTemplate(name, kind, weight, size, layers.Length, groundLayer, biomes, cells, facing);
+        return new StructureTemplate(name, kind, satellite, weight, size, layers.Length, groundLayer, biomes, cells, facing);
     }
+
+    // The block a template cell writes, or -1 for a cell that writes nothing
+    private static int BlockAt(int[] cells, int index) => cells[index] < 0 ? -1 : cells[index] & 0xFF;
 
     private static (byte Block, byte State, bool Facing) ParseEntry(string key, JsonElement value, Func<string, string> fail)
     {

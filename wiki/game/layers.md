@@ -15,6 +15,7 @@ The overworld shares the world with two realms: a Nether-like hell under it and 
 
 - **Down**: the barrier and hell's rock slabs can only be dug with an **iron pickaxe**, the top pickaxe tier. Hell itself has no bottom, and falls hurt as usual.
 - **Up**: the sky has no gate. Solid cloud blocks catch a fall without damage, and the player sinks half a block into them, so you can build up and stand on them.
+- **Back again**: once you have found a [waystone](/game/waystones) in a realm, you can travel to it from any other waystone.
 
 ## Hell
 

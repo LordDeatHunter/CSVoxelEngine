@@ -79,6 +79,58 @@ public sealed class InventorySaveTests
     }
 
     [Fact]
+    public void DiscoveredWaystonesRoundTripWithTheirNames()
+    {
+        var a = Inventory.Empty();
+        a.Waystones.Add(1, 2, 3, "Kafuziro");
+        a.Waystones.Add(-5, 300, 9, "Sky Gate");
+        var b = Inventory.Empty();
+        b.Waystones.Add(7, 7, 7, "Stale");
+
+        b.Import(a.Export());
+
+        Assert.Equal(a.Waystones.Entries, b.Waystones.Entries);
+        Assert.False(b.Waystones.Contains(7, 7, 7));
+    }
+
+    [Fact]
+    public void ASaveFromBeforeWaystonesKnowsNoneAndABrokenEntryIsDropped()
+    {
+        var a = Inventory.Empty();
+        a.Waystones.Add(1, 2, 3, "Kafuziro");
+        var data = a.Export();
+        data.Waystones!.Add(new PlayerSaveData.DiscoveredWaystoneData { Cell = [4, 5], Name = "Bad" });
+        data.Waystones.Add(new PlayerSaveData.DiscoveredWaystoneData { Cell = [4, 5, 6], Name = " \t " });
+        data.Waystones.Add(null!);
+
+        var b = Inventory.Empty();
+        b.Import(data);
+        Assert.Equal(a.Waystones.Entries, b.Waystones.Entries);
+
+        data.Waystones = null;
+        b.Import(data);
+        Assert.Equal(0, b.Waystones.Count);
+    }
+
+    [Fact]
+    public void ReimportingTheSameWaystonesDoesNotMoveTheVersion()
+    {
+        var a = Inventory.Empty();
+        a.Waystones.Add(1, 2, 3, "Kafuziro");
+        var data = a.Export();
+        var b = Inventory.Empty();
+        b.Import(data);
+        var version = b.Waystones.Version;
+
+        b.Import(data);
+        Assert.Equal(version, b.Waystones.Version);
+
+        data.Waystones![0].Name = "Renamed";
+        b.Import(data);
+        Assert.NotEqual(version, b.Waystones.Version);
+    }
+
+    [Fact]
     public void ExportImportRoundTripsEveryPoolToolAndSlot()
     {
         var a = new Inventory();

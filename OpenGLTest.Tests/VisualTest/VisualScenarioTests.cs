@@ -342,4 +342,34 @@ public sealed class VisualScenarioTests
             VisualScenario.Parse($$"""{ "steps": [{{step}}] }""", "bad"));
         Assert.Contains("(cast) needs 'parts'", ex.Message);
     }
+
+    [Fact]
+    public void AWaystoneStepParsesItsActionAndWhatThatActionNeeds()
+    {
+        var scenario = VisualScenario.Parse("""
+            { "steps": [
+              { "op": "waystone", "action": "open", "pos": [4, 11, -2] },
+              { "op": "waystone", "action": "type", "text": "Home" },
+              { "op": "waystone", "action": "teleport", "row": 2 },
+              { "op": "waystone", "action": "confirm" },
+            ] }
+            """, "tour");
+        Assert.Equal(["open", "type", "teleport", "confirm"], scenario.Steps.Select(s => s.Action));
+        Assert.Equal(new System.Numerics.Vector3(4, 11, -2), scenario.Steps[0].Pos);
+        Assert.Equal("Home", scenario.Steps[1].Text);
+        Assert.Equal(2, scenario.Steps[2].Row);
+    }
+
+    [Theory]
+    [InlineData("""{ "op": "waystone" }""")]
+    [InlineData("""{ "op": "waystone", "action": "fly" }""")]
+    [InlineData("""{ "op": "waystone", "action": "open" }""")]
+    [InlineData("""{ "op": "waystone", "action": "type" }""")]
+    [InlineData("""{ "op": "waystone", "action": "teleport", "row": 0 }""")]
+    public void AWaystoneStepMissingWhatItsActionNeedsIsRefused(string step)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            VisualScenario.Parse($$"""{ "steps": [{{step}}] }""", "bad"));
+        Assert.Contains("waystone", ex.Message);
+    }
 }

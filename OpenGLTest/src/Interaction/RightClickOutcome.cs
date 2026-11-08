@@ -19,4 +19,6 @@ public enum RightClickOutcome
     SpellTable,
     /// <summary>A chest took it: a local player opens the chest panel on it (<see cref="RightClickAction.LastContainerCell"/>).</summary>
     Container,
+    /// <summary>A waystone took it: a local player discovers it and opens the waystone screen (<see cref="RightClickAction.LastWaystoneCell"/>).</summary>
+    Waystone,
 }

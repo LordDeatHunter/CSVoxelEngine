@@ -65,13 +65,25 @@ public enum NetMessage : byte
     /// <summary>Server to one client: the chest the player has open and what it holds, or "closed" when it is
     /// refused, out of reach or gone (<see cref="ChestNetCodec"/>).</summary>
     ChestContents = 65,
+    /// <summary>Client to server: <c>(int x, int y, int z, string name)</c>, a request to rename the waystone at a cell
+    /// (<see cref="WaystoneNetCodec"/>), accepted only from its first discoverer, the name sanitized. Answered with fresh
+    /// <see cref="WaystoneRows"/> either way.</summary>
+    WaystoneRename = 66,
+    /// <summary>Server to one client: the registry rows of the waystones that player discovered (name, lost flag, whether
+    /// it may rename it; <see cref="WaystoneNetCodec"/>). Sent at join and whenever the registry or the player's discovered
+    /// list changed.</summary>
+    WaystoneRows = 67,
+    /// <summary>Server to one client: what the player's activation of a waystone (a replayed <see cref="NetIntentKind.Use"/>)
+    /// came to: the cell, its name, whether the player may rename it and whether it was new to the player, so the client
+    /// opens the discovery popup or the teleport list (<see cref="WaystoneNetCodec"/>).</summary>
+    WaystoneOpened = 68,
     /// <summary>Server to one client: the sequence id of the last intent applied, then that
     /// player's whole inventory.</summary>
     InventoryState = 70,
     /// <summary>Client to server: a sequence id and an <see cref="InventoryIntent"/>.</summary>
     InventoryRequest = 71,
     /// <summary>Client to server: a <see cref="VoxelEngine.Networking.WorldIntent"/> (break, place, use,
-    /// throw, attack, cast) with its sequence id (<see cref="WorldIntentCodec"/>).</summary>
+    /// throw, attack, cast, hammer, waystone trip) with its sequence id (<see cref="WorldIntentCodec"/>).</summary>
     WorldIntent = 80,
     /// <summary>Server to one client: the sequence id of an intent and whether it was accepted.
     /// Every intent gets exactly one, in order, after its correction and inventory snapshot.</summary>
@@ -171,8 +183,13 @@ public static class NetFraming
     /// station frames and refuse the intent as malformed.
     /// 23: <see cref="NetEntityKind.Sandworm"/> (the boss: a mob entry for its head, its phase in the ammo field) and
     /// <see cref="NetEntityKind.SandwormTarget"/> (the point it is about to surface at); an older client would not
-    /// draw it.</summary>
-    public const int ProtocolVersion = 23;
+    /// draw it.
+    /// 24: waystones. A <see cref="NetIntentKind.Waystone"/> world intent (the destination's cell) asks for a trip from the
+    /// waystone the player stands at; the server discovers a waystone on a replayed <see cref="NetIntentKind.Use"/> and
+    /// answers with <see cref="NetMessage.WaystoneOpened"/>, keeps each player's <see cref="NetMessage.WaystoneRows"/> (the
+    /// registry rows of its discovered waystones) current, and takes a <see cref="NetMessage.WaystoneRename"/> from a
+    /// waystone's first discoverer. An older peer would refuse the intent as malformed and never open a waystone.</summary>
+    public const int ProtocolVersion = 24;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

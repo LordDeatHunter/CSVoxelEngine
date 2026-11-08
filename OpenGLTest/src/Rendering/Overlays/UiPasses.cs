@@ -13,13 +13,14 @@ using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
 using VoxelEngine.UI.SpellBuilder;
+using VoxelEngine.UI.Waystone;
 
 namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
 /// The UI hand-off: the HUD pass over the finished frame (the underwater wash, the damage
 /// vignette, the crosshair and look-at label, the compass or clock, the hotbar, hearts and toasts,
-/// the [E] panel, the spell builder and the pause menu), the chat, tooltip and player-list passes after it, and the
+/// the [E] panel, the spell builder, the waystone screen and the pause menu), the chat, tooltip and player-list passes after it, and the
 /// world-less frames: the main menu, the opaque loading screen and the loading fade over the first
 /// playing frames. Every pass draws through the one <see cref="UIRenderer"/> its owner builds,
 /// straight into the default framebuffer in display space. Render thread only.
@@ -49,10 +50,10 @@ internal sealed class UiPasses
         HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
         CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null,
         byte effectMask = 0, SpellBuilderView? builder = null, int maxHealth = PlayerHealth.MaxHealth,
-        ChestView? chest = null, BossBarState? boss = null)
+        ChestView? chest = null, WaystoneView? waystone = null, BossBarState? boss = null)
     {
-        // Either panel (the [E] inventory or the spell builder) hides the crosshair and the status row.
-        var panelUp = view.IsOpen || builder?.IsOpen == true;
+        // Any panel (the [E] inventory, the spell builder or the waystone screen) hides the crosshair and the status row.
+        var panelUp = view.IsOpen || builder?.IsOpen == true || waystone?.IsOpen == true;
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
 
@@ -147,6 +148,16 @@ internal sealed class UiPasses
             {
                 _owner.Ui.SetOverlay(new Vector2(0f, builder.Transition.SlideY), builder.Transition.Alpha);
                 _owner.Ui.SpellBuilder.DrawSpellBuilder(inventory, builder);
+                _owner.Ui.ClearOverlay();
+            }
+        }
+        if (waystone != null)
+        {
+            waystone.Transition.Step(waystone.IsOpen, time);
+            if (waystone.IsOpen)
+            {
+                _owner.Ui.SetOverlay(new Vector2(0f, waystone.Transition.SlideY), waystone.Transition.Alpha);
+                _owner.Ui.Waystone.Draw(waystone, time);
                 _owner.Ui.ClearOverlay();
             }
         }

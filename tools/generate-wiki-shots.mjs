@@ -73,6 +73,12 @@ const SCENARIOS = [
     ['sky_frost', 'Frost highland island', 'Frosted turf over permafrost, with crystal outcrops and glowing crystal trees.', 'sky', [-170.5, 372.5, 180.5], 0, -5, 20],
     ['sky_frost_above', 'A frost island from above', 'Looking down on a frost highland island.', 'sky', [-110.5, 410.5, 230.5], -90, -45, 12]
   ]),
+  day('waystones', 147, 'A natural waystone structure in each realm (poses from waystones.json).', [
+    ['waystone_surface', 'A surface waystone', 'An open pavilion with a lantern over the waystone, a short walk from a ruined hall.', 'waystone', [37.2, 15.5, 72.0], -120, -6, 12],
+    ['waystone_underground', 'An underground waystone', 'A sealed, lamp-lit crypt with the waystone on a dais. You dig in to reach it.', 'waystone', [-205.6, -160.6, 124.6], -45, -15, 12],
+    ['waystone_sky', 'A sky waystone', 'A frost-stone plaza under a crystal-keyed arch, on the island of a sky ruin.', 'waystone', [-145.1, 386.0, -50.1], 45, -12, 20],
+    ['waystone_hell', 'A hell waystone', 'A basalt ring crowned with ember crystal, in the same hell layer as its ruin.', 'waystone', [-2601.5, -339.5, -422.5], 112, -23, 20]
+  ]),
   day('night', 700, 'The night sky.', [
     ['aurora', 'The aurora', 'Slow green and violet curtains in the night sky of cold lands.', 'night', [-1112.5, 40.5, 584.5], 270, 14, 24],
     ['aurora_up', 'The aurora overhead', 'Looking up into the curtains.', 'night', [-1112.5, 40.5, 584.5], 270, 40, 4],

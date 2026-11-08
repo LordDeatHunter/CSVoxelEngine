@@ -5,18 +5,19 @@ using VoxelEngine.Rendering;
 using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
+using VoxelEngine.UI.Waystone;
 
 namespace VoxelEngine.App;
 
 /// <summary>
 /// The mouse's side of text fields: a left press on a field focuses it and puts the caret under
 /// the pointer (Shift extends the selection), and holding the button drags the selection. Covers
-/// the main-menu fields, the [E] search field and the chest search; the chat line has no pointer
+/// the main-menu fields, the [E] search field, the chest search and the waystone screen's rename and search fields; the chat line has no pointer
 /// (the cursor stays captured while it is open). The click-up focus rules stay where they were.
 /// Owned by Program; main thread only.
 /// </summary>
 internal sealed class FieldPointer(InputManager inputManager, RenderManager renderManager, MainMenuController menu,
-    InventoryView inventoryView, PauseMenuView pauseMenuView, TextFieldKeys textKeys)
+    InventoryView inventoryView, PauseMenuView pauseMenuView, WaystoneView waystoneView, TextFieldKeys textKeys)
 {
     private TextFieldState? _field;
     private Vector2 _center;
@@ -41,6 +42,9 @@ internal sealed class FieldPointer(InputManager inputManager, RenderManager rend
                     MainMenuLayout.FieldSize, position);
                 return;
             }
+            case AppScreen.Playing when waystoneView.IsOpen && !pauseMenuView.IsOpen:
+                PressWaystone(ui.ToCanvas(position), ui.ScreenSize, position);
+                return;
             case AppScreen.Playing when inventoryView.IsOpen && !pauseMenuView.IsOpen && ActiveWorld is { } world:
             {
                 var screen = ui.ScreenSize;
@@ -59,6 +63,21 @@ internal sealed class FieldPointer(InputManager inputManager, RenderManager rend
                 return;
             }
         }
+    }
+
+    // The waystone screen's two fields: the rename dialog's name and the list's search
+    private void PressWaystone(Vector2 point, Vector2 screen, Vector2 position)
+    {
+        var field = WaystoneLayout.RenameField(screen);
+        if (waystoneView.Page == WaystonePage.Rename && field.Contains(point))
+        {
+            Begin(waystoneView.RenameField, field.Center, field.Size, position);
+            return;
+        }
+        var box = WaystoneLayout.SearchBox(screen);
+        if (waystoneView.Page != WaystonePage.List || !box.Contains(point)) return;
+        waystoneView.SearchFocused = true;
+        Begin(waystoneView.Search.Text, box.Center, box.Size, position);
     }
 
     /// <summary>Every frame: while the button stays down after a press on a field, the selection follows the pointer.</summary>
