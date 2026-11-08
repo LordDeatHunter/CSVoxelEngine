@@ -1,0 +1,7 @@
+{
+  "result": "item/iron_ring",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/wrought_iron", "count": 2 }
+  ]
+}

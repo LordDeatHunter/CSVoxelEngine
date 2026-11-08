@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using VoxelEngine.Config;
@@ -216,6 +217,46 @@ public sealed class GearTests
         Assert.Equal(GearConfig.MaxHealthBonusCap, clamped.MaxHealth);
         Assert.Equal(GearConfig.ArmorCap, clamped.Armor);
         Assert.True(clamped.MoveSpeed <= GearConfig.FactorBonusCap);
+    }
+
+    private static int ArmorOf(GearItem gear) =>
+        gear.Info.Modifiers.Where(m => m.Stat == GearStat.Armor).Sum(m => (int)m.Value);
+
+    [Fact]
+    public void MetalRingsAddOnlyTheirArmorAndSumWithTheRest()
+    {
+        // The armor-only accessories: armor and nothing else, no set, no passive, no immunity, no ability
+        var rings = ItemRegistry.All.OfType<GearItem>()
+            .Where(g => g.Info.Slot == GearSlot.Accessory && g.Info.Modifiers.All(m => m.Stat == GearStat.Armor)
+                        && ArmorOf(g) > 0 && g.Info.Abilities == GearAbility.None && g.Info.SetName is null
+                        && g.Info.Passives.Count == 0 && g.Info.Immune.Count == 0)
+            .Take(GearConfig.AccessorySlotCount).ToList();
+        Assert.NotEmpty(rings);
+
+        var inventory = Inventory.Empty();
+        var equipment = inventory.Equipment;
+        var ids = new List<int>();
+        var sum = 0;
+        foreach (var ring in rings)
+        {
+            var id = Own(inventory, ring);
+            ids.Add(id);
+            Assert.True(equipment.TryEquipAuto(id));
+            sum += ArmorOf(ring);
+
+            // Only the armor moves, by exactly the ring's armor
+            Assert.Equal(GearStats.None with { Armor = System.Math.Min(sum, GearConfig.ArmorCap) }, equipment.Stats);
+        }
+
+        // A body piece outside any set's slots adds its own armor on top
+        var boots = GearFor(GearSlot.Feet);
+        Assert.True(equipment.TryEquip((int)GearSlot.Feet, Own(inventory, boots)));
+        Assert.Equal(System.Math.Min(sum + ArmorOf(boots), GearConfig.ArmorCap), equipment.Stats.Armor);
+
+        // Taking a ring off takes exactly its armor away again
+        var before = equipment.Stats.Armor;
+        Assert.True(equipment.Unequip(equipment.SlotOf(ids[0])));
+        Assert.Equal(before - ArmorOf(rings[0]), equipment.Stats.Armor);
     }
 
     [Fact]

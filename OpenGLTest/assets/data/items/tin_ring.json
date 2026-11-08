@@ -1,0 +1,8 @@
+{
+  // Tin Ring: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite). A full-metal ring, armor only:
+  // worn in an accessory slot, crafted from ingots, never looted.
+  "name": "Tin Ring",
+  "texture": "assets/textures/items/tin_ring.png",
+  "rarity": "common",
+  "equip": { "slot": "accessory", "armor": 1, "visible": false }
+}

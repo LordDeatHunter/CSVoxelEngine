@@ -78,8 +78,8 @@ Decisions made while planning (2026-11-08):
 - **Locked until cleared** per floor, with a barrier door that opens by manager state (not mineable).
 - **Palette swap only** per biome; the same skeleton, boss and layout everywhere.
 - **Full scope from the start**: server-authoritative, saved, networked.
-- **Order of the three efforts** (2026-11-08): accessories (`ACCESSORIES.md`) first, this plan second, cave biomes
-  (`CAVE_BIOMES.md`) third. `BT-7`'s accessory (slight mana regen, +10% damage against undead) needs the new stat or passive from
-  `AC-1`.
+- **Order of the three efforts** (2026-11-08): accessories (done) first, this plan second, cave biomes
+  (`CAVE_BIOMES.md`) third. `BT-7`'s accessory (slight mana regen, +10% damage against undead) needs the `undeadDamage` gear stat, which the
+  accessories added.
 - Tuning left open: the stair and door layout at radius 20+, the floor height rhythm, bone-burst and accessory
   numbers, skeleton variants per tier and pile wave sizes. These are first guesses to retune after a play-test.

@@ -188,7 +188,7 @@ public sealed class GearRulesTests
     [Fact]
     public void RolledValuesStayWithinTheClampTheSaveRestoreUses()
     {
-        var ring = Named("copper_ring");
+        var ring = Named("focus_ring");
         for (ulong seed = 0; seed < 60; seed++)
             foreach (var modifier in GearRoller.Roll(ring, Rarity.Legendary, seed).Modifiers.Modifiers)
                 Assert.InRange(modifier.Value, -GearRoller.MaxModifierValue(modifier.Stat), GearRoller.MaxModifierValue(modifier.Stat));

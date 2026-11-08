@@ -1,5 +1,5 @@
 {
-  // Frostward Charm: a loot-only accessory (never crafted; ruin chests and mob drops, see plans/ACCESSORIES.md) that makes its wearer immune to frostburn (equip.immune).
+  // Frostward Charm: a loot-only accessory (never crafted; ruin chests and mob drops, see AGENTS.md "Gear and equipment") that makes its wearer immune to frostburn (equip.immune).
   // Placeholder sprite from tools/generate-gear-textures.ps1.
   "name": "Frostward Charm",
   "texture": "assets/textures/items/frost_charm.png",

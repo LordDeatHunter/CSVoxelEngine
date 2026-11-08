@@ -20,7 +20,7 @@ public sealed class ArmorLookTests
     {
         var inventory = Inventory.Empty();
         Assert.True(inventory.Add(Id("bronze_cap")));
-        Assert.True(inventory.Add(Id("tin_charm")));
+        Assert.True(inventory.Add(Id("reserve_charm")));
         foreach (var entry in inventory.GearEntries().ToList())
             Assert.True(inventory.Equipment.TryEquipAuto(entry.InstanceId));
 

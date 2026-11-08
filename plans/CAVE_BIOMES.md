@@ -3,7 +3,7 @@
 
 ## Status
 Designed, nothing built yet. Tracks 3D cave biomes: caves that stop being biome-blind, plus the barrier shift that makes room for
-them. Third of three efforts, in order: accessories (`ACCESSORIES.md`), the battle tower (`BATTLE_TOWER.md`), cave biomes. One phase
+them. Third of three efforts, in order: accessories (done), the battle tower (`BATTLE_TOWER.md`), cave biomes. One phase
 per prompt; each leaves the game building and the tests green. Last updated 2026-11-08.
 
 ## In progress

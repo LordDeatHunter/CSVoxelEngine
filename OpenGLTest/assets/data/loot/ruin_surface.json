@@ -12,7 +12,7 @@
         { "item": "item/leather_pants", "rarity": { "min": "common", "max": "uncommon" } },
         { "item": "item/leather_boots", "rarity": { "min": "common", "max": "uncommon" } },
         { "item": "item/leather_gloves", "rarity": { "min": "common", "max": "uncommon" } },
-        { "item": "item/tin_charm", "rarity": { "min": "common", "max": "uncommon" } },
+        { "item": "item/reserve_charm", "rarity": { "min": "common", "max": "uncommon" } },
         { "item": "item/gill_charm", "weight": 1, "rarity": { "min": "common", "max": "uncommon" } }
       ]
     },

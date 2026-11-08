@@ -1,7 +1,8 @@
 # Deterministic placeholder sprites of the first gear (assets/textures/items/<name>.png, 16x16): a leather, a bronze
 # and an iron armor set (cap, tunic, pants, boots, gloves), the cloud boots (the iron boots in a pale cloud palette
-# with two wing puffs) and the accessories (ring, charms, amulet, belt), including the loot-only ability charms
-# (feather, gill, frost, fire, magnet: one gold pendant with a glyph each). Plain
+# with two wing puffs) and the accessories (the ring of focus, the charm of reserves, the ember charm, amulet, belt),
+# including the loot-only ability charms (feather, gill, frost, fire, magnet: one gold pendant with a glyph each), and
+# the metal ring ladder (tin, copper, bronze, iron: a plain band of the metal, thin for +1 armor, thick for +2). Plain
 # filled rectangles in a material's three tones, so a re-run is byte-identical; replace with real art any time,
 # the item JSON only names the files. Run: pwsh tools/generate-gear-textures.ps1
 Add-Type -AssemblyName System.Drawing
@@ -15,6 +16,8 @@ $materials = @{
     leather = @{ Dark = (Tone 70, 44, 26);  Mid = (Tone 138, 92, 54);  Light = (Tone 182, 130, 82) }
     bronze  = @{ Dark = (Tone 92, 56, 24);  Mid = (Tone 190, 124, 52); Light = (Tone 236, 178, 96) }
     iron    = @{ Dark = (Tone 40, 44, 54);  Mid = (Tone 128, 136, 150); Light = (Tone 206, 214, 226) }
+    tin     = @{ Dark = (Tone 66, 74, 84);  Mid = (Tone 160, 170, 180); Light = (Tone 224, 230, 236) }
+    copper  = @{ Dark = (Tone 98, 40, 22);  Mid = (Tone 196, 102, 58); Light = (Tone 242, 164, 120) }
     gem     = @{ Dark = (Tone 30, 70, 120); Mid = (Tone 70, 150, 220); Light = (Tone 180, 226, 255) }
     ember   = @{ Dark = (Tone 110, 20, 10); Mid = (Tone 220, 70, 30); Light = (Tone 255, 170, 100) }
     gold    = @{ Dark = (Tone 120, 84, 12); Mid = (Tone 224, 176, 40); Light = (Tone 255, 230, 120) }
@@ -64,13 +67,13 @@ New-Sprite 'cloud_boots' {
     Rect 0 6 2 2 $c.Light; Rect 14 6 2 2 $c.Light
 }
 
-New-Sprite 'copper_ring' {
+New-Sprite 'focus_ring' {
     $g = $materials.gold; $e = $materials.gem
     Block 4 6 8 8 $g
     Rect 6 8 4 4 ([System.Drawing.Color]::Transparent)
     Block 6 3 4 4 $e
 }
-New-Sprite 'tin_charm' {
+New-Sprite 'reserve_charm' {
     $g = $materials.gold; $e = $materials.gem
     Rect 5 1 1 5 $g.Dark; Rect 10 1 1 5 $g.Dark; Rect 6 5 4 1 $g.Dark
     Block 4 6 8 8 $g
@@ -90,7 +93,7 @@ New-Sprite 'ember_charm' {
     Block 6 8 4 4 $e
 }
 
-# The AC-4 ability charms: the same cord and gold pendant, each with its own glyph inset
+# The ability charms: the same cord and gold pendant, each with its own glyph inset
 function Pendant {
     $g = $materials.gold
     Rect 5 1 1 5 $g.Dark; Rect 10 1 1 5 $g.Dark; Rect 6 5 4 1 $g.Dark
@@ -133,4 +136,15 @@ New-Sprite 'miners_belt' {
     Block 1 5 14 6 $l
     Block 6 4 4 8 $g
     Rect 7 6 2 4 $l.Dark
+}
+
+# The metal ring ladder: a plain band of the metal, no gem; the +2 rings (bronze, iron) wear a thicker band
+foreach ($name in 'tin', 'copper', 'bronze', 'iron') {
+    $m = $materials[$name]
+    $thick = $name -eq 'bronze' -or $name -eq 'iron'
+    New-Sprite "${name}_ring" {
+        if ($thick) { Block 3 4 10 10 $m } else { Block 4 5 8 8 $m }
+        Rect 6 7 4 4 ([System.Drawing.Color]::Transparent)
+        Px 5 6 $m.Light
+    }
 }

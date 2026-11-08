@@ -1,5 +1,5 @@
 {
-  // Feather Charm: a loot-only accessory (never crafted; ruin chests and mob drops, see plans/ACCESSORIES.md) that negates all fall damage (the no_fall_damage ability).
+  // Feather Charm: a loot-only accessory (never crafted; ruin chests and mob drops, see AGENTS.md "Gear and equipment") that negates all fall damage (the no_fall_damage ability).
   // Placeholder sprite from tools/generate-gear-textures.ps1.
   "name": "Feather Charm",
   "texture": "assets/textures/items/feather_charm.png",

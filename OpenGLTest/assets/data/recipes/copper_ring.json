@@ -2,7 +2,6 @@
   "result": "item/copper_ring",
   "count": 1,
   "ingredients": [
-    { "item": "item/copper_ingot", "count": 2 },
-    { "item": "item/vine", "count": 1 }
+    { "item": "item/copper_ingot", "count": 2 }
   ]
 }

@@ -1,0 +1,8 @@
+{
+  // Iron Ring: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite). A full-metal ring, armor only:
+  // worn in an accessory slot, crafted from ingots, never looted.
+  "name": "Iron Ring",
+  "texture": "assets/textures/items/iron_ring.png",
+  "rarity": "uncommon",
+  "equip": { "slot": "accessory", "armor": 2, "visible": false }
+}

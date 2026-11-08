@@ -1,5 +1,5 @@
 {
-  "result": "item/tin_charm",
+  "result": "item/reserve_charm",
   "count": 1,
   "ingredients": [
     { "item": "item/tin_ingot", "count": 2 },

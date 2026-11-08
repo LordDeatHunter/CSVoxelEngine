@@ -312,13 +312,20 @@ slot takes a `GearItem` of its own `GearSlot`, `GearSlots.Fits`). Gear is an ite
 (`slot`, `armor`, `modifiers` by `GearStat` name, `set`, `visible`, `immune`, `passives`, `abilities`; `rarity` beside it),
 compiled by `ItemLoader.ParseEquip` into a `GearInfo`. `equip.abilities` (`air_jump`, `no_fall_damage`, `extra_air`,
 `magnet`; an unknown name refuses the item) compiles into `GearInfo.Abilities` (`GearAbility` flags), and
-`Equipment.Abilities`/`Has` caches their union with the stats on `Version`; `no_fall_damage`, `extra_air` and `magnet` wait for
-AC-4. **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
+`Equipment.Abilities`/`Has` caches their union with the stats on `Version` (the `no_fall_damage`, `extra_air` and `magnet`
+consumers are under "Armor, modifiers and sets"). **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
 (`PlayerPhysics`), on a fresh Space press while airborne, never in water or flight nor on the frame a creative double tap toggles
 flight; it rises as high as a ground jump, keeps the horizontal speed (sprint momentum), refills on the ground, in water and in
 flight, and has its own `AirJumpCount`, never moving `JumpCount`, so it never works a bloomery's bellows. `LocalPlayer.ApplyGear`
 feeds the flag into `Camera.GearAirJump` every frame (singleplayer and a client's mirrored equipment), and the server judges the
-hop by `ServerPlayer.AirJumps` (see "The movement rubberband"); no wire change, protocol 24. `AirJumpTests`. Its instances live in the same `Inventory.Tools` list as tool
+hop by `ServerPlayer.AirJumps`: the server's airtime rise budget (`MovementRules.AirRiseBudget`: one jump apex per jump the
+player has plus `NetAirRiseSlackBlocks`, reset by support or a descent-then-rise near ground, widened by a bounce block and a
+queued knockback lift) is what accepts the legal hop and corrects a second (see "The movement rubberband"); no wire change,
+protocol 24. `AirJumpTests`. **Accessories**: the stat accessories are the Ring of Focus (`focus_ring`, mana regen) and the
+Charm of Reserves (`reserve_charm`, max mana), both crafted and looted, plus `amulet_of_vigor`, `miners_belt` and
+`ember_charm`; the **metal ring ladder** is `tin_ring` and `copper_ring` (+1 armor) and `bronze_ring` and `iron_ring` (+2),
+armor only (no mana, no set), crafted from two ingots (iron from `wrought_iron`) and never looted, their armor adding to the
+body armor's in `GearStatsCalculator`; the ability charms are under "Armor, modifiers and sets". Its instances live in the same `Inventory.Tools` list as tool
 instances (so every instance lookup, the save and the wire carry them) but count against their own pool
 (`InventoryCategory.Gear`, `GearConfig.GearCapacity`), never take a hotbar slot and come off when removed from the
 pool. `Equipment.Stats` (`GearStatsCalculator`, clamped by `GearStats.Clamped`) is cached until the worn set changes;
@@ -328,7 +335,8 @@ mining and attack pace and `Combat.*Damage` read the mining, attack-speed and da
 (`LeftClickAction`) and the server (`BreakProgress.Start`, `AttackPacing`). Wearing is a `NetInventoryAction.EquipGear` /
 `UnequipGear` intent (protocol 19), judged by `Equipment.TryEquip`; the worn ids save as `InventoryData.Equipped`. The
 [E] panel's Gear tab lists the pieces ("worn" marked) over `EquipmentCardLayout`/`EquipmentCardRenderer`: pick a row, then
-click a lit slot (or the row again) to wear it. `GearTests`; `visual-examples/gear.json` (`VOXEL_TIME=147`).
+click a lit slot (or the row again) to wear it. `GearTests`; `visual-examples/gear.json` and `accessories.json` (the double jump
+and a feather-charm fall; both `VOXEL_TIME=147`).
 **Worn armor (I-3).** A body is drawn wearing its visible armor (`equip.visible`, slots head, chest, legs, feet, gloves) as flat
 tinted shells: `ArmorLook` (GL-free) is the item id per armor slot, `ArmorLook.From(Equipment)` for the local player and
 `FromWire` for a peer (a piece in the wrong slot or not visible armor is dropped). `PlayerPasses.DrawPart` draws a covered
@@ -346,13 +354,17 @@ item's `equip.immune` blocks effects at `StatusEffectSet.ImmunityCheck`, and `eq
 near the wearer from `MobDirector.FireWearerPassives`, authoritative side only. Loot gear rolls `ModifiersComponent`
 (rarity plus modifiers, saved as `ToolData.Rolled`) from the pure `GearRoller.Roll(gear, rarity, seed)`
 (`Inventory.AddRolledGear`), crafted gear never; a piece's rarity is its roll's or its item's. Sets are
-`assets/data/sets/<name>.json` (`GearSetLoader`), bonuses by piece count summed in `GearStatsCalculator`. The
+`assets/data/sets/<name>.json` (`GearSetLoader`), bonuses by piece count summed in `GearStatsCalculator`; only head, chest and
+legs count toward a set (`GearSlots.CountsForSets`; boots and gloves are free-standing armor). The
 `undeadDamage` stat is a fraction applied in `MobStrikes.StrikeMob` through `Combat.VersusUndead` to a mob whose
 `IsUndead` is true (none yet), never rolled by `GearRoller`. The `equip.abilities` consumers read the cached
 `Equipment.Has`: `no_fall_damage` skips fall billing in `PlayerHealth.TakeDamage` and the server's `ObserveAcceptedState`,
-`extra_air` widens `Breath.MaxAir` through `ApplyGear`, `magnet` widens `DropCollector.Range` in `DropPickup` (the AC-4
-charms, loot-only: ruin chests and rare mob drops, plans/ACCESSORIES.md). The tooltip colors its title by rarity and shows rolled
-lines, set progress and abilities. `GearRulesTests`.
+`extra_air` widens `Breath.MaxAir` through `ApplyGear`, `magnet` widens `DropCollector.Range` in `DropPickup`. The ability
+charms wear them: Feather (`feather_charm`, `no_fall_damage`), Gill (`gill_charm`, `extra_air`, `GearConfig.ExtraAirFactor`),
+Frostward and Fireward (`frost_charm`, `fire_charm`: immune to frostburn / burning) and Lodestone (`magnet_charm`, `magnet`,
+`GearConfig.MagnetRangeFactor`), all rare and loot-only (ruin chests, rare mob drops; a mob-table charm is an unrolled instance,
+`CharmLootTests`). Accepted gaps: a magnet-latched drop is pulled through walls, and a client's bubble row can lag an equip by
+one status. The tooltip colors its title by rarity and shows rolled lines, set progress and abilities. `GearRulesTests`.
 
 **Chests (I-4).** A block with a `chest` object (`slots`, optional `loot`; `BlockType.Chest`) is a chest block entity kept by
 `ChestManager` (`Simulation/Chests/`, owned by `World`, saved in `stations.json` as `Chests`). Its `ChestState` is created on
@@ -4497,7 +4509,10 @@ jump, a sprint auto-step of a whole block inside one state, swimming up and out 
 knockback lift, a fall and standing idle never trip them (`MovementRulesTests` asserts the
 relations against `PlayerPhysics`' own constants, and that a wearer's one air hop is taken and a second rejected, a bunny hop,
 a queued lift and a slime-block bounce are legal; `ServerPlayerJumpTests` that an air hop is never a bellows jump;
-`GameServerTests.AWearersDoubleJumpIsNeverCorrectedButASecondAirHopIs` over loopback). A rejection keeps the player where it stood,
+`GameServerTests.AWearersDoubleJumpIsNeverCorrectedButASecondAirHopIs` over loopback). Accepted gaps of the air budget: a
+non-wearer may hop once after walking off a ledge (the budget is height-based), a hop within one sample step of the ground counts
+as a landing, an air jump sent before the server applied the equip intent is corrected once, and iceberg mirror lag can still
+mis-judge a rider's bunny hop. A rejection keeps the player where it stood,
 resets its fall tracking and sends a numbered `PlayerCorrection(seq, eye)`
 (`ServerPlayer.IssueCorrection`); the client snaps there (`Camera.TestTeleport`, motion reset),
 echoes the number in every following `PlayerState`, and the server ignores state positions until
@@ -5070,7 +5085,7 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   attack clip"); all four are saved in `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 224 of the 255 content ids are used (127 blocks, 96 items, air), 31 left. Seed offsets
+- **Budgets**: 233 of the 255 content ids are used (127 blocks, 105 items, air), 22 left. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
   `plans/BIOMEGEN.md`.

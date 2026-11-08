@@ -8,7 +8,7 @@ using Xunit;
 namespace VoxelEngine.Tests.Content;
 
 /// <summary>
-/// The ability charms (plans/ACCESSORIES.md AC-4) are loot-only: no recipe makes one, every one drops from a chest
+/// The ability charms are loot-only: no recipe makes one, every one drops from a chest
 /// or a mob table the game really rolls, and each shows in the creative catalog.
 /// </summary>
 public sealed class CharmLootTests

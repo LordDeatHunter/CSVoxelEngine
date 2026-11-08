@@ -1,0 +1,8 @@
+{
+  // Charm of Reserves: placeholder gear (see tools/generate-gear-textures.ps1 for the sprite). Wearable in the accessory slot; its
+  // fixed stats are the equip object, and a piece found in loot may also roll modifiers on its stack.
+  "name": "Charm of Reserves",
+  "texture": "assets/textures/items/reserve_charm.png",
+  "rarity": "common",
+  "equip": { "slot": "accessory", "modifiers": { "maxMana": 20 },  "visible": false }
+}

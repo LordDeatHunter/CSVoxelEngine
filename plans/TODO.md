@@ -5,7 +5,7 @@
 ## Status
 
 Gameplay and content only: performance is in `PERF.md`, tree residue in `TREES.md`, and
-architecture, content schema and threading rules in `AGENTS.md`. Last updated 2026-11-05.
+architecture, content schema and threading rules in `AGENTS.md`. Last updated 2026-11-08.
 **Current priority:** playable loop first. Finish the Act I survival floor (Milestone 1:
 persistence, furnace, metal tiers, forge, armor), then the first dungeon slice (Milestone 2), then
 one slice per remaining arc to prove the dual identity. No food/hunger system is planned.
@@ -37,7 +37,7 @@ Mostly content JSON plus small systems; high feel, low engine risk. In order:
 4. **Armor (in `P-7`)** — flat damage reduction from summed armor points (capped), equipped from
    the inventory panel, shown in HUD/tooltip, with worn armor drawn on `PlayerModel` and remote
    players (this pulls `V-14` in). *Hook:* the damage pipeline (`PlayerHealth`, `IMobTarget.TakeHit`).
-   Accessory abilities, the ring ladder and the set rule change are in `ACCESSORIES.md` (`AC-1`..`AC-7`).
+   Accessory abilities, the ring ladder and the set rule change are done (`AGENTS.md` "Gear and equipment").
 
 #### Milestone 2 — Arc A vertical slice: the first dungeon
 

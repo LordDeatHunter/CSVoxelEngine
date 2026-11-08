@@ -12,7 +12,7 @@
     { "op": "give", "block": "item/leather_boots", "count": 1 },
     { "op": "give", "block": "item/amulet_of_vigor", "count": 1 },
     { "op": "give", "block": "item/miners_belt", "count": 1 },
-    { "op": "give", "block": "item/tin_charm", "count": 1 },
+    { "op": "give", "block": "item/reserve_charm", "count": 1 },
     { "op": "give", "block": "item/leather_cap", "count": 1 },
     { "op": "wait", "seconds": 0.5 },
     { "op": "screenshot", "name": "worn-hud" },
