@@ -79,8 +79,8 @@ internal sealed class ChatInput
 
     /// <summary>
     /// Runs one chat command locally, on the same table a server uses (<see cref="ChatCommands"/>):
-    /// <c>/tp</c> and <c>/give</c> need creative mode, <c>/time</c> and <c>/help</c> do not, and
-    /// every answer is a system chat line.
+    /// <c>/tp</c> and <c>/give</c> need creative mode, <c>/time</c>, <c>/locate</c> and <c>/help</c>
+    /// do not, and every answer is a system chat line (<c>/locate</c>'s with a link).
     /// </summary>
     private void RunCommand(string line)
     {
@@ -132,6 +132,19 @@ internal sealed class ChatInput
                 w.CreditItem(id, request.Count);
                 chatView.AddSystem($"Gave {request.Count} x {request.Item}");
                 return;
+
+            case ChatCommands.CommandKind.Locate:
+            {
+                // A client holds no seed to search worldgen with; its '/' lines go to the server, which answers
+                if (w.IsClientMode)
+                {
+                    chatView.AddSystem("/locate needs a connection to the server");
+                    return;
+                }
+                var (text, link) = ChatCommands.Locate(parsed.Args, w.Camera.Position);
+                chatView.AddSystem(text, link);
+                return;
+            }
 
             default:
                 chatView.AddSystem(ChatCommands.HelpText);

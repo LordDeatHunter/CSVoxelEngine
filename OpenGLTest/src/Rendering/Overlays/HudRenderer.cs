@@ -464,7 +464,7 @@ internal sealed class HudRenderer : IDisposable
 
     /// <summary>
     /// Draws the frame-timing table under the FPS text: a translucent panel sized to the block
-    /// so it reads over bright terrain, then one <see cref="UIRenderer.DrawText"/> line per row. The lines
+    /// so it reads over bright terrain, then one <see cref="UIRenderer.DrawText(string, Vector2, float, Rgba)"/> line per row. The lines
     /// are already formatted by <see cref="FrameProfiler"/> (rebuilt once a second), so this
     /// allocates nothing per frame.
     /// </summary>

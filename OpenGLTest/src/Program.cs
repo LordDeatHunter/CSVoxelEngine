@@ -139,7 +139,7 @@ public static class Program
         chatInput = new ChatInput(chatView, session, inputManager);
         menuInput = new MenuInput(windowManager, inputManager, renderManager, menu, pauseMenuView, settingsMenuView, panelInput, inventoryView, builderInput, waystoneInput);
         gameplay = new GameplayInput(inputManager, renderManager, inventoryView, chatView, pauseMenuView, panelInput, builderInput, waystoneInput, menuInput, session, diagnostics);
-        fieldPointer = new FieldPointer(inputManager, renderManager, menu, inventoryView, pauseMenuView, waystoneView, new TextFieldKeys(inputManager));
+        fieldPointer = new FieldPointer(inputManager, renderManager, menu, chatView, inventoryView, pauseMenuView, waystoneView, new TextFieldKeys(inputManager));
         inputEvents = new InputEvents(inputManager, renderManager, menu, inventoryView, chatView, pauseMenuView, settingsMenuView, panelInput, builderInput, waystoneInput, menuInput, chatInput, gameplay, fieldPointer);
 
         // A dev override (VOXEL_SCRIPT/SPAWN/LOOK) takes the old path unchanged: a storeless world

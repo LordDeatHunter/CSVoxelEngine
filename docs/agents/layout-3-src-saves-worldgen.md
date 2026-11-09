@@ -181,7 +181,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Primitives.cs            # Vertex-layout mesh factories for simple shapes
       ScrollList.cs            # scrolled equal-height row math: clamp, visible range, row at a point
       TextFit.cs               # GL-free single-line fit: shrink to a floor, then an ellipsis, reporting whether it cut
-      TextWrap.cs              # GL-free word wrap against a measure delegate
+      TextWrap.cs              # GL-free word wrap against a measure delegate (+ WrapRanges: the same lines as slices of the source)
       UiTheme.cs               # the spacing scale, border widths, text sizes and palette every list-based UI draws with
       UiCanvas.cs              # the virtual UI canvas: reference size, uniform scale, scissor rects
       Widgets/                 # GL-free widget layouts the renderers only draw: UiRect, PanelFrameLayout, ButtonLayout (+ WidgetState),
@@ -190,7 +190,12 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Hud/                     # HUD widgets: chat, clock, compass, crosshair state,
                                #   toasts, hotbar feedback, look label, tooltips, screenshots
         BossBarState.cs        # what one frame's boss bar draws: the boss's name and health share (BossSelection)
-        Chat.cs                # ChatKind/ChatMessage, ChatView (log/input/history) and ChatLayout
+        Chat.cs                # ChatKind/ChatMessage (with its optional ChatLink), ChatView (log/input/history, Suggest) and
+                               #   ChatLayout
+        ChatLink.cs            # a clickable span of a chat line and the command a click suggests (FitsIn)
+        ChatLogLayout.cs       # GL-free chat log layout shared by the draw and the click hit-test: the shown messages, their
+                               #   wrapped lines and where a link lies on every line it spans (LinkAt)
+        ChatLogLine.cs         # one laid-out log line: its message, text, top, alpha and its part of the link
         Clock.cs               # pure clock math behind the HUD's held-clock readout (see TopStripRenderer.DrawClock)
         Compass.cs             # HUD compass heading math
         CrosshairState.cs      # throw charge, break progress and hit marker, handed to the UI pass
@@ -382,6 +387,10 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Structures/              # template placement (see "Structure templates and ruins")
         PlacedStructure.cs     # a template placed in the world: center column, origin y, turns, footprint box
         RuinPlacement.cs       # the ruins of the four realms on hashed cells, and the realm site rules satellites share
+        StructureLocation.cs   # where StructureLocator found a structure: its center and ground floor, the landing beside it,
+                               #   the distance
+        StructureLocator.cs    # /locate: the nearest tower from worldgen within TowerLocateRings, exact by roll distance,
+                               #   and the landing beside it; main thread, never on a client
         StructureStamper.cs    # writes a template part inside one chunk, clipped at its border and to a y window
         WaystonePlacement.cs   # a waystone satellite a short walk from a placed ruin, by the ruin's realm rule
         TowerPlacement.cs      # the battle towers (plans/BATTLE_TOWER.md): 1536-block hashed cells (salt 0x5E7F), the cached

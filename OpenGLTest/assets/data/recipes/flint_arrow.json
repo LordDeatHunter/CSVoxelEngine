@@ -1,6 +1,6 @@
 {
   // A flint head on a branch shaft, with a bone nock
-  "result": "item/arrow",
+  "result": "item/flint_arrow",
   "count": 4,
   "ingredients": [
     { "item": "item/branch", "count": 1 },

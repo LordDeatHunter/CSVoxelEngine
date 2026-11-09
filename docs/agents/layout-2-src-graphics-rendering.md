@@ -28,7 +28,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       BlockRaycaster.cs        # the DDA block raycast + line-of-sight segment test, split out of Camera.cs
       BlockSupport.cs          # GL-free needsSupport rule: the cell holding a block up (below, or
                                #   behind the front of a support "attached" block)
-      ChatCommands.cs          # the chat command table: /help, /tp, /give, /time and their rights
+      ChatCommands.cs          # the chat command table: /help, /tp, /give, /time, /locate and their rights, the shared
+                               #   /locate reply (its coordinates linked) and the /tp suggestion (TeleportCommand)
       Combat.cs                # GL-free punch rules: the forward cone (3 blocks, 30° half-angle)
                                #   and entity damage, shared by the punch loop and the tests
       DoorState.cs             # GL-free state byte of an openable block: facing in bits 0-1, the
@@ -170,6 +171,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       SpellSparks.cs           # GL-free: the shared spell sparks (the element's color, the trail, the impact, the cast burst)
     Networking/                # the GL-free multiplayer protocol and codecs both sides share
                                #   (see "Multiple players and chat"); the client and the server side below
+      ChatMessageCodec.cs      # one ChatMessage frame (kind, sender, text, optional link), its one writer and reader;
+                               #   a link that does not fit its text is a malformed frame
       ChunkNetCodec.cs         # chunk blocks/state and column terrain (heights, water levels, corner climate),
                                #   Deflate-compressed
       InventoryIntent.cs       # one client inventory intent (select, drop, equip, craft, creative grant/clear, pick)
@@ -469,7 +472,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   selection outline and mining pop, and the world-space healthbars, damage numbers, notice pips and particles
         BillboardPasses.cs     # the world-space billboard draws: healthbars, damage numbers, notice pips and the
                                #   leaf, fire and bubble particles and the slice trails (RenderSliceTrails)
-        ChatRenderer.cs        # the chat HUD: the word-wrapped log and the input line
+        ChatRenderer.cs        # the chat HUD: draws the log from ChatLogLayout (link runs colored and underlined) and the
+                               #   input line; LinkCommandAt, the click hit-test over the same layout
         CraftCardRenderer.cs   # the [E] panel's crafting card and its hit-tests over the last drawn
                                #   CraftCardLayout
         DamageNumberRenderer.cs # draws the floating damage numbers (DamageNumberPool)

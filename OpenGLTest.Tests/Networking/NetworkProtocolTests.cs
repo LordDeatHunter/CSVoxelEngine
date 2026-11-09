@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
-using VoxelEngine.Config;
 using VoxelEngine.Player;
 using VoxelEngine.Server;
 using VoxelEngine.UI.Hud;
@@ -392,11 +391,13 @@ public sealed class NetworkLoopbackTests : IDisposable
                 using var reader = new PacketReader(payload);
                 if (reader.Message != NetMessage.ChatMessage)
                     continue;
-                var kind = (ChatKind)reader.ReadByte();
-                var sender = reader.ReadString();
-                var text = reader.ReadString();
-                if (kind == ChatKind.Player && sender == "Tester" && text == "hello")
+                var message = ChatMessageCodec.Read(reader);
+                if (message is { Kind: ChatKind.Player, Sender: "Tester", Text: "hello" })
+                {
+                    // A plain line carries no link
+                    Assert.Null(message.Link);
                     seen = true;
+                }
             }
             Thread.Sleep(5);
         }

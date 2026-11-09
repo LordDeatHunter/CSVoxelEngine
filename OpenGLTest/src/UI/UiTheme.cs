@@ -53,6 +53,8 @@ public static class UiTheme
     public static readonly Rgba AccentGold = new(232, 184, 72);
     public static readonly Rgba ReadyGreen = new(126, 217, 87);
     public static readonly Rgba DangerRed = new(230, 110, 110);
+    /// <summary>A clickable chat link (the <c>/locate</c> coordinates), drawn underlined.</summary>
+    public static readonly Rgba LinkBlue = new(110, 180, 255);
     public static readonly Rgba TextDim = Rgba.Gray(0.55f, 1f);
     public static readonly Rgba TextShadow = new(0, 0, 0, 180);
 

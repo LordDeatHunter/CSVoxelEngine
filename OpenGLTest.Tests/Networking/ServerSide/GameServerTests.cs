@@ -30,6 +30,7 @@ using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;
 using VoxelEngine.Tests.Magic;
+using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Structures;
 using VoxelEngine.WorldGen.Trees;
@@ -107,6 +108,9 @@ public sealed class GameServerTests : IDisposable
         /// <summary>The newest <see cref="NetMessage.StationState"/> payload received, raw (message byte included).</summary>
         public byte[]? Stations;
 
+        /// <summary>Every chat line received, decoded by the client's own reader.</summary>
+        public readonly List<ChatMessage> Chat = [];
+
         public void Drain(NetworkClient client)
         {
             while (client.Inbound.TryDequeue(out var payload))
@@ -179,6 +183,9 @@ public sealed class GameServerTests : IDisposable
                     }
                     case NetMessage.StationState:
                         Stations = payload;
+                        break;
+                    case NetMessage.ChatMessage:
+                        Chat.Add(ChatMessageCodec.Read(reader));
                         break;
                 }
             }
@@ -551,6 +558,41 @@ public sealed class GameServerTests : IDisposable
         Assert.False(guestAccepted);
         Assert.Equal(0, PlayerOf(guest).Inventory.CountFor(Stone));
         Assert.Equal(0, InboxOf(guest).Mirror().CountFor(Stone));
+    }
+
+    [Fact]
+    public void ALocateCommandAnswersItsSenderWithATeleportLink()
+    {
+        // Not an operator: the default server allows creative to nobody, and /locate needs no rights
+        using var client = Connect("Seeker");
+        using (var chat = new PacketWriter(NetMessage.ChatSend))
+        {
+            chat.Write("/locate tower");
+            client.Send(chat.ToArray());
+        }
+
+        var inbox = InboxOf(client);
+        var sw = Stopwatch.StartNew();
+        while (!inbox.Chat.Any(m => m is { Kind: ChatKind.System, Link: not null }) && sw.Elapsed.TotalSeconds < 15)
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+            inbox.Drain(client);
+        }
+
+        var answer = inbox.Chat.FirstOrDefault(m => m is { Kind: ChatKind.System, Link: not null });
+        Assert.True(answer.Link.HasValue, "the /locate answer never arrived with a link");
+        var parsed = ChatCommands.Parse(answer.Link!.Value.Command);
+        Assert.Equal(ChatCommands.CommandKind.Teleport, parsed.Kind);
+        var target = ChatCommands.TeleportTarget(parsed.Args);
+        Assert.NotNull(target);
+
+        // Searched from the sender's own eye, so it lands beside the tower nearest that player
+        var eye = PlayerOf(client).Position;
+        Assert.True(StructureLocator.TryFindTower((int)MathF.Floor(eye.X), (int)MathF.Floor(eye.Z),
+            WorldGenerationConfig.TowerLocateRings, out var location));
+        Assert.Equal((location.LandX, location.LandZ),
+            ((int)MathF.Floor(target!.Value.X), (int)MathF.Floor(target.Value.Z)));
     }
 
     [Fact]

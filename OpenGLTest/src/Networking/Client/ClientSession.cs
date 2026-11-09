@@ -273,10 +273,8 @@ internal sealed class ClientSession
         {
             case NetMessage.ChatMessage:
             {
-                var kind = (ChatKind)reader.ReadByte();
-                var sender = reader.ReadString();
-                var text = reader.ReadString();
-                chatView.AddMessage(kind, sender, text);
+                var message = ChatMessageCodec.Read(reader);
+                chatView.AddMessage(message.Kind, message.Sender, message.Text, message.Link);
                 break;
             }
             case NetMessage.TimeSync:

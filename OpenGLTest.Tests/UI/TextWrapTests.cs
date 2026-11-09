@@ -132,6 +132,17 @@ public sealed class TextWrapTests
     }
 
     [Fact]
+    public void RangesSliceToTheLinesWrapReturns()
+    {
+        foreach (var (text, width, measure) in Sweep())
+        {
+            var ranges = new List<(int Start, int Length)>();
+            TextWrap.WrapRanges(text, width, measure, ranges);
+            Assert.Equal(Wrap(text, width, measure), ranges.Select(r => text.Substring(r.Start, r.Length)));
+        }
+    }
+
+    [Fact]
     public void EmptyTextAppendsNothing()
     {
         foreach (var text in new[] { null, "", "   " })

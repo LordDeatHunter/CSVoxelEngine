@@ -13,7 +13,7 @@ namespace VoxelEngine.UI;
 /// One screen-space draw of a single glyph: its atlas UV rect and where to place it. Produced by
 /// <see cref="BitmapFont.Layout"/>; the caller batches every glyph of a run into one dynamic
 /// vertex buffer and draws it through the UI shader in a single call (see
-/// <see cref="UIRenderer.DrawText"/>).
+/// <see cref="UIRenderer.DrawText(string, Vector2, float, Rgba)"/>).
 /// </summary>
 public readonly record struct GlyphInstance(Vector2 Center, Vector2 Size, UvRect Uv);
 

@@ -24,10 +24,12 @@ OpenGLTest/
       AppScreen.cs             # what the window is showing: Menu / Loading / Playing / Saving
       ChatInput.cs             # the chat's keys, submitting a line, the local chat commands and the Tab player list's names
       DevDiagnostics.cs        # the startup build line, the VOXEL_TIME read, the live debug flag (X, VOXEL_DEBUG) and the X debug line
-      GameplayInput.cs         # a playing world's per-frame polled input: key edges, hotbar, right-click chain, pause-gated world update, mining, middle pick
-      InputEvents.cs           # the window's mouse and keyboard events, routed to whatever owns them on the current screen
-      FieldPointer.cs          # the mouse's side of text fields: a press places the caret, Shift extends, holding drags a selection (menu fields, [E] and chest search,
-                               #   the waystone screen's rename and search fields)
+      GameplayInput.cs         # a playing world's per-frame polled input: key edges, hotbar, right-click chain, pause-gated world update, mining, middle pick;
+                               #   frees the cursor while the chat is open (SyncChatCursor)
+      InputEvents.cs           # the window's mouse and keyboard events, routed to whatever owns them on the current screen (a click on a chat link
+                               #   suggests its command)
+      FieldPointer.cs          # the mouse's side of text fields: a press places the caret, Shift extends, holding drags a selection (menu fields, the chat line,
+                               #   [E] and chest search, the waystone screen's rename and search fields)
       TextFieldKeys.cs         # maps key events (and the Ctrl/Shift state and clipboard) onto TextFieldEditing for the focused field
       InventoryPanelInput.cs   # the [E] panel's input: clicks, scrollbar, search keys, creative buttons, hovered row, tooltip
       MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings

@@ -13,7 +13,11 @@ public enum NetMessage : byte
     ClientHello = 1,
     ServerHello = 2,
     KeepAlive = 3,
+    /// <summary>Client to server: <c>(string line)</c>, one line the player typed (a <c>/</c> command runs on the server
+    /// for that player).</summary>
     ChatSend = 10,
+    /// <summary>Server to clients: one chat line, its kind, sender, text and optional link
+    /// (<see cref="ChatMessageCodec"/>).</summary>
     ChatMessage = 11,
     /// <summary>Client to server: <c>(Vector3 eye, float yaw, float pitch, byte flags, int
     /// correctionAck)</c>. The flags are a creative/flight request (<see cref="NetPlayerFlags"/>);
@@ -202,8 +206,11 @@ public static class NetFraming
     /// an older peer would misread the status.
     /// 29: the cave mobs (<see cref="NetEntityKind.Shardling"/>, <see cref="NetEntityKind.Sporeling"/>,
     /// <see cref="NetEntityKind.Magmaborn"/>) in <see cref="NetMessage.EntityList"/>, their depth tier in the item byte and
-    /// attack count in the ammo field; an older client would not draw them.</summary>
-    public const int ProtocolVersion = 29;
+    /// attack count in the ammo field; an older client would not draw them.
+    /// 30: every <see cref="NetMessage.ChatMessage"/> ends with an optional link (<see cref="ChatMessageCodec"/>): its
+    /// suggested command, empty for none, then its start and length in the text; the server's <c>/locate</c> answers with
+    /// one. An older peer would misread the frame.</summary>
+    public const int ProtocolVersion = 30;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

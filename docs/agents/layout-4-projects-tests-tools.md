@@ -34,7 +34,8 @@ OpenGLTest.Server/                    # the dedicated CLI server (see "Multiple 
                                       #   names, the player list, leave and the idle sweep
   ServerBroadcasts.cs                 # the cell journal (BlockChanges), entities under stable ids,
                                       #   stations and the day clock
-  ServerChat.cs                       # chat relay and the server's chat commands (over ChatCommands)
+  ServerChat.cs                       # chat relay and the server's chat commands (over ChatCommands), /locate
+                                      #   answered from the player's eye with its teleport link
   ServerProgram.cs                    # content load, world/port prompts, headless World + tick loop
   ServerState.cs                      # what the components share: world, client and player tables,
                                       #   pending connections, clock, join spawn, creative rights
@@ -99,7 +100,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Graphics/                    # shader defines and the chunk-draw shader guard, cutout mips, tile materials
   Interaction/                 # raycast and targeting, mining, combat and the slice combo,
                                #   placement, support, doors and stairs, multiblocks, the selection
-                               #   outline, chat commands; its own helper SupportTestWorld
+                               #   outline, chat commands and the /locate reply (ChatLocateTests); its own helper
+                               #   SupportTestWorld
   ItemDebugger/                # the OpenGLTest.ItemDebugger project: the timeline, the
                                #   preview states, the display editor and its JSON writer
   Items/                       # item uses (acorn, converter, firestarter, heal, grow-tree,
@@ -111,7 +113,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Magic/                       # the cast rules, pacing and held-staff lookup, the spell effects (bolt flight,
                                #   impact rules, the element impacts on a server world), the sparks, the cast
                                #   feedback and a client's preview bolt; its own helper StaffFixture
-  Networking/                  # protocol and codecs, end-to-end chunk and imported-world streaming
+  Networking/                  # protocol and codecs (the chat line's link: ChatMessageCodecTests), end-to-end chunk and
+                               #   imported-world streaming
     Client/                    # client streaming, the mesh gate, predictions and intent flow, the entity
                                #   mirror, remote players, worldgen isolation
     ServerSide/                # the server player and its status (the eye's cave biome: ServerPlayerCaveBiomeTests),
@@ -141,8 +144,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   the arrival search, the realm tag and a trip in a headless world
   Status/                      # the status effect set, the Apply API, the speed factors and the block rule and writer
   UI/                          # the canvas, settings, scroll lists, text wrap
-    Hud/                       # chat, clock, compass, hit marker, hotbar feedback,
-                               #   toasts, tooltips, the look label, screenshot paths
+    Hud/                       # chat (its log layout and link hit-test: ChatLogLayoutTests), clock, compass, hit marker,
+                               #   hotbar feedback, toasts, tooltips, the look label, screenshot paths
     InventoryPanel/            # the inventory and its save shape, the [E] panel layout, crafting cards, the creative catalog, search
     Menus/                     # main and pause menus, the loading screen, text fields
     SpellBuilder/              # the builder's selection rules, live stats and layout hit-tests
@@ -162,7 +165,9 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   flora (mirrors src/WorldGen/Sky)
     Structures/                # templates, the ruins and their waystone satellites, the battle towers (TowerShellTests:
                                #   stair, landings, the door seal flood fill, the closed doors; TowerPlacementTests: rarity,
-                               #   point query equals stamp, generated chunks, every floor's piles) (mirrors src/WorldGen/Structures)
+                               #   point query equals stamp, generated chunks, every floor's piles), the /locate search
+                               #   (StructureLocatorTests: exactly the nearest, the ring cap, the landing) (mirrors
+                               #   src/WorldGen/Structures)
     Trees/                     # the tree growth engine, flat over src's Trees/Shape, Logics and Features
 USER_TODO.md                          # placeholder art list: every stand-in asset an agent added, its generator and
                                       #   what a replacement must keep (see "Placeholder art" under "Content")

@@ -1163,6 +1163,15 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>How far past the apron the site check keeps sampling for water and level ground.</summary>
     public const int TowerSiteWaterRing = 3;
 
+    /// <summary>How many Chebyshev rings of tower cells around the player's own cell a <c>/locate tower</c> scans, so it
+    /// covers at least <see cref="TowerLocateRings"/> * <see cref="TowerCellBlocks"/> blocks. Rolling a cell is only a
+    /// hash; a candidate pays its cached site verdict only when it is nearer than the answer.</summary>
+    public const int TowerLocateRings = 8;
+
+    /// <summary>How far west of a tower's footprint box the <c>/locate</c> teleport lands. Keep it at most
+    /// <see cref="TowerSiteWaterRing"/>, so the landing lies inside the ring the site rules judged dry and level.</summary>
+    public const int TowerLocateLandingGapBlocks = 2;
+
     /// <summary>Bottom of the solid cloud slab: the patchy real cloud blocks around y 200, above the
     /// relief ceiling (<see cref="ReliefCeilingHeight"/>) and the drawn cloud layer
     /// (<see cref="SkyConfig.CloudHeight"/>).</summary>

@@ -53,7 +53,7 @@ internal sealed class InputEvents
 
     private World? ActiveWorld => Program.ActiveWorld;
 
-    /// <summary>A released button: menu and pause clicks, slider-drag saves, the right-click repeat reset, spell builder clicks and [E] panel clicks.</summary>
+    /// <summary>A released button: menu and pause clicks, slider-drag saves, the right-click repeat reset, a click on a link in the open chat's log (it suggests the link's command), spell builder clicks and [E] panel clicks.</summary>
     internal void OnMouseUp(MouseButton button)
     {
         if (Screen == AppScreen.Menu)
@@ -100,6 +100,12 @@ internal sealed class InputEvents
         {
             case MouseButton.Right:
                 gameplay.ResetPlaceTimer();
+                break;
+            // Only a drawn link is clickable, and the click never reaches the world: mining, use and the middle
+            // pick already stand aside while the chat is open
+            case MouseButton.Left when chatView.IsOpen && gameplay.HudVisible && inputManager.Mouse != null:
+                if (renderManager.Ui.Chat.LinkCommandAt(inputManager.Mouse.Position, chatView) is { } command)
+                    chatView.Suggest(command);
                 break;
             case MouseButton.Left when waystoneInput.IsOpen && inputManager.Mouse != null:
                 waystoneInput.HandleClick(inputManager.Mouse.Position);

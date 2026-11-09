@@ -337,7 +337,7 @@ single-arc player.
   Decide whether a shaped grid is ever wanted; the current system is deliberately shapeless.
   Parked, not planned — revisit only if content demands it.
 - [ ] **`U-22` · Chat command autocomplete** — P2, S–M. Pairs `U-7`; for the quick-win `/time`,
-  `/tp`, `/give` and `/help`.
+  `/tp`, `/give`, `/locate` and `/help` (`/locate` offers `tower`).
   Tab completes in the chat input. *Hook:* the command table those commands share (each entry gains
   an argument spec). Tab on `/` completes the command name (a unique prefix completes at once,
   several cycle through the matches with Tab and Shift+Tab, shown as a suggestion row above the
@@ -348,6 +348,12 @@ single-arc player.
   completion of a prefix, the cycle order and wrap, no completion for an unknown command);
   `ChatRenderer.DrawChat` draws the row. Multiplayer: complete against the client's own content, and
   against the player list for names; the server still judges every command.
+- [ ] **`U-23` · `/locate` ruins and waystones** — P3, S–M.
+  The first cut locates battle towers only (`StructureLocator.TryFindTower`). *Hook:* a nearest-site
+  search per kind over `RuinPlacement.TryRollRuin` plus each realm's site rule and
+  `WaystonePlacement.TryFind*`. Their site verdicts are not cached and ruin cells are 128 blocks, so
+  the ring scan needs a wider cap and the tower's sorted-by-roll-distance order. Hell needs a layer
+  and the sky is island-based, and the landing must avoid the paired ruin and waystone footprints.
 
 ### 4. Visual & particles
 

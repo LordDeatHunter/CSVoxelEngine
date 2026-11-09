@@ -452,11 +452,16 @@ public class UIRenderer : IDisposable
     /// order, so a glyph's face still draws over every shadow, exactly as separate draw
     /// calls in that order would.
     /// </summary>
-    public void DrawText(string text, Vector2 topLeft, float scale, Rgba color)
+    public void DrawText(string text, Vector2 topLeft, float scale, Rgba color) =>
+        DrawText(text.AsSpan(), topLeft, scale, color);
+
+    /// <summary>The same text draw over a slice of a string, so a run of a line (a chat link) draws without a
+    /// substring.</summary>
+    public void DrawText(ReadOnlySpan<char> text, Vector2 topLeft, float scale, Rgba color)
     {
-        if (_font == null || string.IsNullOrEmpty(text))
+        if (_font == null || text.IsEmpty)
             return;
-        DrawGlyphs(_font.Layout(text.AsSpan(), topLeft, scale, _glyphScratch), color);
+        DrawGlyphs(_font.Layout(text, topLeft, scale, _glyphScratch), color);
     }
 
     /// <summary>

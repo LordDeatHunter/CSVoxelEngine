@@ -13,7 +13,7 @@ using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.App;
 
-/// <summary>A playing world's per-frame polled input, in frame order: the chat, debug, HUD, screenshot, player-list, ESC and [E] keys, the hotbar keys and throws, the right-click use/place/charge chain (a spell table's claim opens the spell builder, a waystone's the waystone screen), then (unless paused) the world update, the chat clock, mining and the middle-click pick. An open [E] panel, spell builder or waystone screen owns the mouse (<see cref="PanelOpen"/>). Owns the input edges and the right-click repeat timer. Owned by Program; main thread only.</summary>
+/// <summary>A playing world's per-frame polled input, in frame order: the chat, debug, HUD, screenshot, player-list, ESC and [E] keys, the hotbar keys and throws, the right-click use/place/charge chain (a spell table's claim opens the spell builder, a waystone's the waystone screen), then (unless paused) the world update, the chat clock, mining and the middle-click pick. An open [E] panel, spell builder or waystone screen owns the mouse (<see cref="PanelOpen"/>), and an open chat frees the cursor so its links and input can be clicked (<see cref="SyncChatCursor"/>). Owns the input edges and the right-click repeat timer. Owned by Program; main thread only.</summary>
 internal sealed class GameplayInput
 {
     private readonly InputManager inputManager;
@@ -42,6 +42,8 @@ internal sealed class GameplayInput
     private bool slashWasPressed;
     private bool escWasPressed;
     private bool deathScreenWasUp;
+    // Whether the chat freed the cursor: SyncChatCursor acts only when the chat's open state moves off it
+    private bool chatCursorFree;
 
     // TODO: move this to player class
     private const double MAX_PLACE_TIMER = 0.2;
@@ -80,7 +82,7 @@ internal sealed class GameplayInput
     internal void ResetEdges()
     {
         escWasPressed = eWasPressed = qWasPressed = rightWasDown = middleWasPressed = false;
-        deathScreenWasUp = false;
+        deathScreenWasUp = chatCursorFree = false;
         placeTimer = MAX_PLACE_TIMER;
     }
 
@@ -107,6 +109,21 @@ internal sealed class GameplayInput
         }
         w.Camera.SuppressLook = up;
         inputManager.Mouse?.Cursor.CursorMode = up ? CursorMode.Normal : CursorMode.Disabled;
+    }
+
+    /// <summary>
+    /// On the frame the chat opens or closes: the chat frees the cursor and holds the look, so its links and its input
+    /// can be clicked. A close hands the cursor back only when nothing else owns it: the death screen, a panel and the
+    /// pause menu set their own.
+    /// </summary>
+    private void SyncChatCursor(World w)
+    {
+        var open = chatView.IsOpen;
+        if (open == chatCursorFree) return;
+        chatCursorFree = open;
+        if (!open && (DeathScreenUp(w) || PanelOpen || pauseMenuView.IsOpen)) return;
+        w.Camera.SuppressLook = open;
+        inputManager.Mouse?.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
     }
 
     /// <summary>A right-button release: the next press uses or places at once.</summary>
@@ -228,6 +245,10 @@ internal sealed class GameplayInput
             }
         }
         escWasPressed = escPressed;
+
+        // Every chat open (T, '/') and close (Enter in the event pump, ESC, the death sync) of the frame has happened by
+        // now, and a panel that opens later in the frame sets its own cursor
+        SyncChatCursor(w);
 
         menuInput.SyncWindowSettings();
         menuInput.TrackSettingsDrag();
