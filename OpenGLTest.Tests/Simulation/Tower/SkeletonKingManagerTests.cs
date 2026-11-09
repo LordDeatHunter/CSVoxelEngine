@@ -13,7 +13,8 @@ namespace VoxelEngine.Tests.Simulation.Tower;
 /// The Skeleton King's manager (<see cref="SkeletonKingManager"/>): one king per tower and none past the hard cap, a
 /// kill reads as killed before the next update while a king that is left alone (everyone far off, or nobody in play)
 /// fades out without loot and never reads as killed, a summon raises skeletons of the king's tier and never more
-/// living than its minion cap, a volley fans several bones, and the slam's shockwave reaches only nearby targets.
+/// living than its minion cap, a volley fans several bones, the slam's shockwave reaches only nearby targets, and the
+/// slam throws bone shrapnel that flies through the king and its skeletons and hurts only the target it touches.
 /// </summary>
 public sealed class SkeletonKingManagerTests
 {
@@ -254,5 +255,53 @@ public sealed class SkeletonKingManagerTests
         Assert.True(close.DamageTaken > 0, "the slam never landed on the target in reach");
         Assert.Equal(0, outside.DamageTaken);
         Assert.Equal(0, above.DamageTaken);
+    }
+
+    [Fact]
+    public void ASlamThrowsBoneShrapnel()
+    {
+        var chunks = StoneFloor();
+        var manager = new SkeletonKingManager(KingType);
+        var drops = new DropManager();
+        SpawnBound(manager, FeetAt(8.5f, 8.5f), TowerA);
+        // In slam reach and inside the volley's minimum range, so every bone in flight is the slam's
+        var close = PlayerAt(8.5f + MobConfig.SkeletonKingSlamTriggerReach * 0.5f, 8.5f);
+
+        for (var i = 0; i < (int)(4f / Dt) && close.DamageTaken == 0; i++)
+            manager.Update(Dt, chunks, drops, [close]);
+
+        Assert.True(close.DamageTaken > 0, "the slam never landed");
+        Assert.NotEmpty(manager.Bones);
+    }
+
+    [Fact]
+    public void ASlamShardFliesThroughTheKingAndASkeletonAndHurtsOnlyTheTarget()
+    {
+        var chunks = StoneFloor();
+        var caps = new MobCaps();
+        var manager = new SkeletonKingManager(KingType, caps);
+        var minions = new SkeletonManager(SkeletonType, caps);
+        var drops = new DropManager();
+        // The king, a skeleton and the target in a line, out of slam reach and before the king's first volley
+        var king = SpawnBound(manager, FeetAt(2.5f, 8.5f), TowerA);
+        var skeleton = minions.Spawn(new Vector3(6.5f, 1f + MobConfig.SkeletonHeight * 0.5f, 8.5f), tier: 0,
+            spawnIn: false)!;
+        var target = PlayerAt(10.5f, 8.5f);
+
+        // Launched from inside the king, level at the target's chest, so it crosses the skeleton's body on the way
+        var chest = RealmMob.ChestOf(target.Eye);
+        manager.TestLaunchShard(new Vector3(king.Position.X, chest.Y, 8.5f), new Vector3(20f, 0f, 0f));
+        var crossed = false;
+        for (var i = 0; i < 120 && manager.Bones.Count > 0; i++)
+        {
+            manager.Update(Dt, chunks, drops, [target], minions: minions);
+            foreach (var bone in manager.Bones)
+                crossed |= skeleton.OverlapsBox(bone.Position, ThrownProjectile.HalfExtent);
+        }
+
+        Assert.True(crossed, "the shard never crossed the skeleton");
+        Assert.Equal(king.MaxHealth, king.Health);
+        Assert.Equal(skeleton.MaxHealth, skeleton.Health);
+        Assert.Equal(MobConfig.SkeletonKingSlamShrapnelDamage, target.DamageTaken);
     }
 }

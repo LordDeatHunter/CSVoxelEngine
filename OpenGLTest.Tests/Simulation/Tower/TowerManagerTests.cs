@@ -15,8 +15,8 @@ namespace VoxelEngine.Tests.Simulation.Tower;
 /// <summary>
 /// The battle tower's floor locks (<see cref="TowerManager"/>): a door opens only once its floor's piles are depleted
 /// and nothing of it lives, is owed or waits to be restored, and only after the floor below opened; an unloaded door
-/// cell never holds back the loaded ones; a floor's piles sleep until the floor below is open; a stray or despawned
-/// bound skeleton is owed back; the scenario clear and the look-at line. Every record is synthetic, built inside one
+/// cell never holds back the loaded ones; a floor's piles sleep until the floor below is open; a stray, despawned or
+/// idle bound skeleton is owed back (an idle one rising again at full health); the scenario clear and the look-at line. Every record is synthetic, built inside one
 /// loaded chunk, so nothing depends on the world seed.
 /// </summary>
 [Collection("LOD column caps")]
@@ -216,6 +216,31 @@ public sealed class TowerManagerTests
         rig.Update([OnFloor0()], MobConfig.SkeletonPileWaveSeconds);
         Assert.Equal(0, rig.Floor0.Owed);
         Assert.Contains(rig.Skeletons.Mobs, s => !s.IsDying && !s.IsDead && s.Floor == rig.Floor0.Ref);
+        Assert.False(rig.Floor0.DoorOpen);
+    }
+
+    [Fact]
+    public void AnIdleBoundSkeletonCrumblesBackToItsPileAndRisesAgainAtFullHealth()
+    {
+        var rig = Setup();
+        Deplete(rig.Floor0);
+        var skeleton = Bound(rig, rig.Floor0, new Vector3(CenterX + 0.5f, 2f, CenterZ + 0.5f));
+        skeleton.TakeDamage(skeleton.MaxHealth / 2);
+
+        // Nobody in sight for its idle time: it crumbles, and its floor owes it, so the door stays shut
+        for (var t = 0f; t < MobConfig.SkeletonPileReturnIdleSeconds + 1f && !skeleton.IsDying; t += Dt)
+            rig.Skeletons.Update(Dt, rig.Chunks, rig.Drops, []);
+        Assert.True(skeleton.IsDying);
+        rig.Update([]);
+        Assert.Equal(1, rig.Floor0.Owed);
+        Assert.Equal(1, rig.Floor0.Alive);
+        Assert.False(rig.Floor0.DoorOpen);
+
+        // The next target on the floor raises it again from the pile, its wounds gone
+        rig.Update([OnFloor0()], MobConfig.SkeletonPileWaveSeconds);
+        Assert.Equal(0, rig.Floor0.Owed);
+        var risen = Assert.Single(rig.Skeletons.Mobs, s => !s.IsDying && !s.IsDead && s.Floor == rig.Floor0.Ref);
+        Assert.Equal(risen.MaxHealth, risen.Health);
         Assert.False(rig.Floor0.DoorOpen);
     }
 

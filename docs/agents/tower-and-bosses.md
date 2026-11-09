@@ -12,7 +12,7 @@ and clip machinery like the sky script): a thin humanoid rig (head and arms unde
 `Skeleton.ValidateContent` over `EntityContract.RequireHumanoid`) holding a bow modeled as cubes under `ArmL`, so the
 renderer needs no held-item code; clips idle, walk, `melee` (an `impact` event), `shoot` (a `release` event) and the
 common hurt, death and spawn.
-- **Behavior** (`skeleton.json`, hp 20 on the first floor, loot bones and sometimes arrows): in
+- **Behavior** (`skeleton.json`, hp 40 on the first floor, loot bones and sometimes arrows): in
   `MobConfig.SkeletonMeleeReach` and off its cooldown it rakes (the `melee` clip), and at its `impact` the manager bills
   `MeleeDamage` with a knockback to every non-immune target still in reach (`Skeleton.InMeleeReach`). Inside
   `SkeletonBowMinRange..SkeletonBowMaxRange`, grounded, off its jittered cooldown (a fresh one waits
@@ -33,7 +33,10 @@ common hurt, death and spawn.
   scenario op's `tier`, a save restore, a client mirror, a tower's skeleton piles) and returns null at the hard cap
   (`MobCaps.ForcedRoom`); there is no ring spawn. It keeps the shared distance and idle despawn, past a generous
   `SkeletonDespawnRadiusBlocks`; a pile's skeleton is **bound** to its floor (`Skeleton.Floor`, a `TowerFloorRef`, saved,
-  never sent), and its despawn is reported so the floor owes it (see "Battle tower").
+  never sent), and its despawn is reported so the floor owes it; one idle too long crumbles back into its floor's piles
+  (see "Battle tower"). `visual-examples/tower-idle-shrapnel.json` (`VOXEL_TIME=147`) films a hurt wave from a spent
+  pile, the floor empty after it idled away, one of it risen again at full health (a spent pile raises only owed
+  skeletons), then the king's slam and its bone shrapnel from the shoulder and from above.
 - **Undead**: `IsUndead` is true, so `MobStrikes.StrikeMob` adds the striker's `undeadDamage` gear stat
   (`Combat.VersusUndead`) to every blow on it (`UndeadStrikeTests`).
 - **Two attack clips over one count**: `AttackVariants` 2 (0 the rake, 1 the shot), so a mirror plays the right clip
@@ -91,6 +94,14 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   either way `SkeletonManager.TakeReleased` reports it once and the floor's **owed** count grows. Owed skeletons are raised
   again at any of the floor's piles (depleted ones too) the next time a target triggers one. So a half-cleared tower far
   away holds no cap room, and a skeleton that wandered off can never soft-lock a door. A killed one is never owed.
+- **Idle skeletons crumble back into their piles.** A bound skeleton that has chased nobody (no target noticed, or its
+  sight of one lost: `MobInterest.IdleSeconds`) for `MobConfig.SkeletonPileReturnIdleSeconds` reads
+  `Skeleton.ReturnsToPile`, and `SkeletonManager` releases it right after the shared frame: its death clip, no loot,
+  reported through `TakeReleased`, so its floor owes it like a leashed one and the piles raise it again, a fresh
+  skeleton at full health, for the next target. The door count never drops (it moves from living to owed in one
+  frame). An unbound skeleton (a scenario's, a king's summon) has no pile and keeps only the shared despawns. Authoritative
+  only: a client's mirror just sees it die. `SkeletonManagerTests` and
+  `TowerManagerTests.AnIdleBoundSkeletonCrumblesBackToItsPileAndRisesAgainAtFullHealth`.
 - **The door rule** (`TowerRules.DoorMayOpen`): door `k` opens once door `k - 1` is open (always for `k = 0`), every pile of
   floor `k` is depleted and **alive = living + owed + pending** is 0, where living counts the tagged skeletons in the
   manager, and pending the floor's tagged entries still waiting in the save restore
@@ -188,7 +199,12 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   line, grounded, off cooldown; phase 3 enrages (shorter cooldowns, faster walk). `SkeletonKingManager`
   (`Simulation/Tower/`, on the shared `RealmMobManager` frame and `MobCaps`, forced spawn only, one king per tower: a tower
   that reads Alive or Killed refuses another) lands the slam as a shockwave (`MobTargets.InShockwave`, the cloud golem's
-  rule), the volley as a fan of `bone` projectiles through `MobMissiles` (merged into `ThrowAction`'s projectile list), and
+  rule) plus a burst of `SkeletonKingSlamShrapnelCount` bone shards all round from `SkeletonKingSlamShrapnelLiftBlocks`
+  over its feet, flying like the bone blade's shrapnel (`BoneShrapnel.RollFragment`; `ShrapnelConfig`'s speeds, gravity
+  share and life, which `ThrownProjectile` and `MobMissiles.Launch` take per missile) and dealing
+  `SkeletonKingSlamShrapnelDamage` to a target they touch; like every mob missile they never touch a mob, so the king and
+  the skeletons are never hurt by them. It lands the volley as a fan of `bone` projectiles through the same `MobMissiles`
+  (merged into `ThrowAction`'s projectile list; a hit by either knocks back `SkeletonKingBoneKnockbackSpeed`), and
   the summon as a ring of skeletons at the home's summon tier (`SkeletonManager.Spawn`, standing spots at the feet level,
   a cell below or a cell above, so a king on the altar raises them on the roof), never more living than
   `SkeletonKingMaxMinions`; summoned skeletons have no floor, so the lock recount ignores them. The king is leashed to its
@@ -208,12 +224,14 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
 - **Scenario and tests (BT-6)**: the `altar` op (`World.UseAltar` plus its toast); `visual-examples/skeleton-king.json`
   (`VOXEL_TIME=147`) clears the default tower's floors with `towerclear`, then films the altar, the ritual, the rise, the
   boss bar, the slam, the volley and a summon. Tests: `TowerAltarTests`, `TowerAltarWorldTests`, `SkeletonKingBrainTests`,
-  `SkeletonKingTests`, `SkeletonKingManagerTests`, the altar cases of `TowerPlacementTests`, `TowerLockBlockTests`,
+  `SkeletonKingTests`, `SkeletonKingManagerTests` (the slam's shrapnel: `ASlamThrowsBoneShrapnel`,
+  `ASlamShardFliesThroughTheKingAndASkeletonAndHurtsOnlyTheTarget`), the altar cases of `TowerPlacementTests`, `TowerLockBlockTests`,
   `TowerManagerSaveTests` and `StationNetCodecTests`, `BossSelectionTests.ABossBarRespectsItsRange`, the king in
   `WorldLifecycleTests`, `NetworkEntitySyncTests` and `UndeadStrikeTests`, `VisualScenarioTests.AnAltarStepParsesItsCell`
   and the loopback `GameServerTests.AClientRaisesTheSkeletonKingFromAClearedTowersAltar` and
   `ASealedAltarRaisesNothingForAClient`.
-- **Known gaps (BT-6)**: the king's bones, like every mob missile, are not on the wire (a client sees only the damage); the
+- **Known gaps (BT-6)**: the king's bones and slam shards, like every mob missile, are not on the wire (a client sees only
+  the damage); the
   king is not drawn in the water mirror; a ritual's remaining time is not saved (it restarts); tower chunks saved before
   BT-6 keep an air altar cell, so that tower's altar cannot be clicked; the king's numbers are first guesses.
 - **Collapse (BT-8)**: once the king is killed the tower falls into a ruin. `TowerManager.Update` polls

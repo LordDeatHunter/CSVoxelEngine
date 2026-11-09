@@ -91,8 +91,9 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       MobDirector.cs           # World component: the per-frame mob job (the targets, the slime and goblin updates and
                                #   their damage, the blast shove, the mob list and its scenario spawn/damage seams,
                                #   the drain of status-effect block actions into the StatusEffectBlockWriter)
-      MobMissiles.cs           # GL-free: the shared mob missile flight (hell bolts, skeleton arrows): launch, fly, the touch
-                               #   test, an immune target spared, the hits of the frame for the owning manager to bill
+      MobMissiles.cs           # GL-free: the shared mob missile flight (hell bolts, skeleton arrows, the king's bones and
+                               #   shards): launch (gravity share and life per missile), fly, the touch test (targets only,
+                               #   never a mob), an immune target spared, the hits of the frame for the owning manager to bill
       MobSpawner.cs            # the ring spawn searches: dry forest surface (never in a tower footprint), dark caves,
                                #   hell floors, sky island tops
       RealmMobManager.cs       # the realm mob managers' shared frame: the capped list, forced spawn, mirrors, the update
@@ -117,15 +118,17 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Tower/                   # the battle tower's simulation, namespace VoxelEngine.Simulation.Tower
         SkeletonManager.cs     # the skeletons: forced spawn only (Spawn(position, tier), under the hard cap), the rake at
                                #   its impact, the arrows (MobMissiles), loot, despawn, client mirrors; no ring spawn; reports a
-                               #   bound skeleton's despawn or leash release (TakeReleased) so its floor owes it
+                               #   bound skeleton's despawn, leash release or idle crumble back to its piles (TakeReleased)
+                               #   so its floor owes it
         TowerManager.cs        # the floor locks (see "Battle tower"): records materialized near a player, the recount, owed
                                #   and leash, the door judgement, the capped sweep, ClearFloor, Detail, stations.json and the wire;
                                #   the roof altar: JudgeAltar, BeginRitual, UpdateAltars/SettleAltars, the BossDefeated event;
                                #   a defeated tower's collapse (TowerRules.CollapseDue, saved with the tower)
         TowerCollapse.cs       # the staged, capped, resumable collapse of a defeated tower into its TowerRuin: a top-down
                                #   layer cursor under a scan budget, unloaded chunks waiting, the saved NextY/Waiting/Done
-        SkeletonKingManager.cs # the Skeleton King: forced spawn only, one per tower (StatusFor), the slam shockwave, the bone
-                               #   volley (MobMissiles), the summoned minions (capped), the empty-server fade, client mirrors
+        SkeletonKingManager.cs # the Skeleton King: forced spawn only, one per tower (StatusFor), the slam shockwave and its
+                               #   bone shrapnel, the bone volley (both MobMissiles), the summoned minions (capped), the
+                               #   empty-server fade, client mirrors
         KingStatus.cs          # None / Alive / Killed (health 0) / Fading (a despawn with health left): what a tower's king is
         TowerAltarState.cs     # Dormant / Ritual / Awake / Defeated: a tower's altar
         AltarVerdict.cs        # Begin / Sealed / Stirring / Awake / Defeated / NoTower: what an altar click comes to

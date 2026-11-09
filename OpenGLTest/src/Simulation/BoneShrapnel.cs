@@ -54,20 +54,33 @@ internal sealed class BoneShrapnel
         var center = source.Position;
         for (var i = 0; i < profile.Count; i++)
         {
-            var azimuth = Random.Shared.NextSingle() * MathF.Tau;
-            var elevation = ShrapnelConfig.MinElevationRadians
-                            + Random.Shared.NextSingle() * (ShrapnelConfig.MaxElevationRadians - ShrapnelConfig.MinElevationRadians);
-            var cosElevation = MathF.Cos(elevation);
-            var direction = new Vector3(cosElevation * MathF.Cos(azimuth), MathF.Sin(elevation),
-                cosElevation * MathF.Sin(azimuth));
-            var speed = ShrapnelConfig.SpeedMin
-                        + Random.Shared.NextSingle() * (ShrapnelConfig.SpeedMax - ShrapnelConfig.SpeedMin);
-            Launch(center + direction * ShrapnelConfig.SpawnOffsetBlocks, direction * speed, profile.Damage, source, striker);
+            var (origin, velocity) = RollFragment(center);
+            Launch(origin, velocity, profile.Damage, source, striker);
         }
 
         if (!_serverMode)
             _debris.Spark(center, ShrapnelConfig.BurstSparkColor, source.BodyHalfExtent,
                 ShrapnelConfig.BurstSparkCount, ShrapnelConfig.BurstSparkSpeed, ShrapnelConfig.BurstSparkSize);
+    }
+
+    /// <summary>
+    /// One fragment of a burst centered at <paramref name="center"/>: a random heading all round, an elevation in
+    /// <see cref="ShrapnelConfig.MinElevationRadians"/>..<see cref="ShrapnelConfig.MaxElevationRadians"/> and a speed
+    /// in <see cref="ShrapnelConfig.SpeedMin"/>..<see cref="ShrapnelConfig.SpeedMax"/>, starting
+    /// <see cref="ShrapnelConfig.SpawnOffsetBlocks"/> out along its heading. Shared by a struck body's burst and the
+    /// Skeleton King's slam, so both sprays fly alike.
+    /// </summary>
+    internal static (Vector3 Origin, Vector3 Velocity) RollFragment(Vector3 center)
+    {
+        var azimuth = Random.Shared.NextSingle() * MathF.Tau;
+        var elevation = ShrapnelConfig.MinElevationRadians
+                        + Random.Shared.NextSingle() * (ShrapnelConfig.MaxElevationRadians - ShrapnelConfig.MinElevationRadians);
+        var cosElevation = MathF.Cos(elevation);
+        var direction = new Vector3(cosElevation * MathF.Cos(azimuth), MathF.Sin(elevation),
+            cosElevation * MathF.Sin(azimuth));
+        var speed = ShrapnelConfig.SpeedMin
+                    + Random.Shared.NextSingle() * (ShrapnelConfig.SpeedMax - ShrapnelConfig.SpeedMin);
+        return (center + direction * ShrapnelConfig.SpawnOffsetBlocks, direction * speed);
     }
 
     /// <summary>
@@ -77,7 +90,8 @@ internal sealed class BoneShrapnel
     internal void Launch(Vector3 origin, Vector3 velocity, int damage, Mob source, PlayerHealth? striker)
     {
         if (_live.Count >= ShrapnelConfig.MaxLiveFragments) _live.RemoveAt(0);
-        var projectile = new ThrownProjectile(_boneId, origin, velocity, damage, 1f, ShrapnelConfig.GravityScale);
+        var projectile = new ThrownProjectile(_boneId, origin, velocity, damage, 1f, ShrapnelConfig.GravityScale,
+            ShrapnelConfig.LifeSeconds);
         _live.Add(new Fragment(projectile, source, striker));
     }
 
@@ -88,14 +102,8 @@ internal sealed class BoneShrapnel
         var mobs = _world.Mobs;
         for (var i = _live.Count - 1; i >= 0; i--)
         {
+            // A spent fragment (past ShrapnelConfig.LifeSeconds) flies no more and hits nothing
             var fragment = _live[i];
-            fragment.Age += deltaTime;
-            if (fragment.Age >= ShrapnelConfig.LifeSeconds)
-            {
-                _live.RemoveAt(i);
-                continue;
-            }
-
             var flying = fragment.Projectile.Update(deltaTime, _chunks, mobs, out var hit, fragment.Source);
             if (hit != null)
             {
@@ -121,6 +129,5 @@ internal sealed class BoneShrapnel
         internal ThrownProjectile Projectile { get; } = projectile;
         internal Mob Source { get; } = source;
         internal PlayerHealth? Striker { get; } = striker;
-        internal float Age { get; set; }
     }
 }

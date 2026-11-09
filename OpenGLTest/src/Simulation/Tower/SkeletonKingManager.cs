@@ -12,8 +12,9 @@ namespace VoxelEngine.Simulation.Tower;
 
 /// <summary>
 /// Owns the battle tower's <see cref="SkeletonKing"/>s and the bones they throw, on the shared realm frame
-/// (<see cref="RealmMobManager{TMob}"/>): at the slam's impact it bills the shockwave to every target it reaches, at
-/// the volley's release it throws a fan of bones (<see cref="MobMissiles"/>), and at the summon it raises a ring of
+/// (<see cref="RealmMobManager{TMob}"/>): at the slam's impact it bills the shockwave to every target it reaches and
+/// throws bone shrapnel all round, at the volley's release it throws a fan of bones (both <see cref="MobMissiles"/>,
+/// which hurt only targets, never the king or a skeleton), and at the summon it raises a ring of
 /// skeletons of the king's tier through the <see cref="SkeletonManager"/>, never more living than
 /// <see cref="MobConfig.SkeletonKingMaxMinions"/>. A king never spawns on its own: only through
 /// <see cref="Spawn(Vector3, SkeletonKingHome, bool)"/> (the altar's ritual, a scenario, a save restore, a client's
@@ -25,7 +26,7 @@ namespace VoxelEngine.Simulation.Tower;
 public sealed class SkeletonKingManager : RealmMobManager<SkeletonKing>
 {
     private readonly EntityType? _type;
-    // Each bone carries the king's volley damage
+    // The volley bones and the slam shards in flight, each carrying its own damage
     private readonly MobMissiles _bones = new();
     private readonly byte _boneItemId;
     // The skeletons the kings summoned and still track (pruned once they are dying or dead)
@@ -46,7 +47,7 @@ public sealed class SkeletonKingManager : RealmMobManager<SkeletonKing>
         _boneItemId = ContentRegistry.RequireItem("bone").Id;
     }
 
-    /// <summary>Bones in flight; drawn and mirrored like the player's own throws.</summary>
+    /// <summary>Bones in flight (volley bones and slam shards); drawn and mirrored like the player's own throws.</summary>
     public IReadOnlyList<ThrownProjectile> Bones => _bones.Flying;
 
     /// <summary>The summoned skeletons still alive (not dying, not dead), what <see cref="MobConfig.SkeletonKingMaxMinions"/>
@@ -132,13 +133,14 @@ public sealed class SkeletonKingManager : RealmMobManager<SkeletonKing>
 
         _minions.RemoveAll(static m => m.IsDying || m.IsDead);
 
-        // A bone flies under gravity; any target it touches stops it, and the first non-immune one takes its damage
+        // A bone or shard flies under gravity; any target it touches stops it, and the first non-immune one takes its
+        // damage (mobs never stop it, so the king and the skeletons are never hit)
         _bones.Update(deltaTime, chunks, targets);
         var hits = _bones.Hits;
         for (var i = 0; i < hits.Count; i++)
         {
             var hit = hits[i];
-            Hit(hit.Target, hit.Damage, hit.Position, MobConfig.SkeletonKingVolleyKnockbackSpeed, 0f, _type?.DisplayName);
+            Hit(hit.Target, hit.Damage, hit.Position, MobConfig.SkeletonKingBoneKnockbackSpeed, 0f, _type?.DisplayName);
         }
 
         _minionManager = null;
@@ -149,7 +151,12 @@ public sealed class SkeletonKingManager : RealmMobManager<SkeletonKing>
     internal void TestSummon(SkeletonKing king, SkeletonManager minions, ChunkManager chunks) =>
         Summon(king, minions, chunks);
 
-    // A slam's shockwave lands at its impact, a volley's bones at its release, a summon's skeletons at its event
+    /// <summary>Test seam: launches one slam shard from <paramref name="origin"/> along <paramref name="velocity"/>,
+    /// exactly as a slam's burst does.</summary>
+    internal ThrownProjectile TestLaunchShard(Vector3 origin, Vector3 velocity) => LaunchShard(origin, velocity);
+
+    // A slam's shockwave and shards land at its impact, a volley's bones at its release, a summon's skeletons at its
+    // event
     /// <inheritdoc />
     protected override void Attack(SkeletonKing mob, IReadOnlyList<IMobTarget> targets)
     {
@@ -174,7 +181,24 @@ public sealed class SkeletonKingManager : RealmMobManager<SkeletonKing>
             Hit(target, MobConfig.SkeletonKingSlamDamage, mob.Position, MobConfig.SkeletonKingSlamKnockbackSpeed,
                 MobConfig.SkeletonKingSlamKnockbackLift, mob.Type.DisplayName);
         }
+        SlamShrapnel(feet);
     }
+
+    // The slam's bone shrapnel: a burst all round, flying like the bone blade's (BoneShrapnel.RollFragment). The
+    // shards are mob missiles, which only ever touch targets, so they never hurt the king or a skeleton
+    private void SlamShrapnel(Vector3 feet)
+    {
+        var center = feet + new Vector3(0f, MobConfig.SkeletonKingSlamShrapnelLiftBlocks, 0f);
+        for (var i = 0; i < MobConfig.SkeletonKingSlamShrapnelCount; i++)
+        {
+            var (origin, velocity) = BoneShrapnel.RollFragment(center);
+            LaunchShard(origin, velocity);
+        }
+    }
+
+    private ThrownProjectile LaunchShard(Vector3 origin, Vector3 velocity) =>
+        _bones.Launch(_boneItemId, origin, velocity, MobConfig.SkeletonKingSlamShrapnelDamage,
+            ShrapnelConfig.GravityScale, ShrapnelConfig.LifeSeconds);
 
     /// <inheritdoc />
     protected override float ShoveSpeedOf(SkeletonKing mob) => MobConfig.SkeletonKingShoveSpeed;

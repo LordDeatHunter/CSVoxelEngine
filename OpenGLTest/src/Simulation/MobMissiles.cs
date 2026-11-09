@@ -6,11 +6,12 @@ using VoxelEngine.Entities;
 namespace VoxelEngine.Simulation;
 
 /// <summary>
-/// The missiles a mob manager's kinds launch at players (a hell caster's fire bolts, a skeleton's arrows):
-/// plain <see cref="ThrownProjectile"/>s flying under gravity, each carrying its launcher's damage. Each update
-/// flies them, stops one on any target it touches (an immune target is spared), records the first non-immune
-/// target it touched as a hit (<see cref="Hits"/>), and drops a missile that touched someone or struck a block
-/// or outlived its flight. The owning manager bills the hits and adds its own extras (a burn, a trail).
+/// The missiles a mob manager's kinds launch at players (a hell caster's fire bolts, a skeleton's arrows, the
+/// Skeleton King's bones and slam shards): plain <see cref="ThrownProjectile"/>s flying under gravity, each carrying
+/// its launcher's damage. Each update flies them, stops one on any target it touches (an immune target is spared),
+/// records the first non-immune target it touched as a hit (<see cref="Hits"/>), and drops a missile that touched
+/// someone or struck a block or outlived its flight. A missile never touches a mob, so a launcher's own kind is
+/// never hurt by it. The owning manager bills the hits and adds its own extras (a burn, a trail).
 /// GL-free, main thread only, allocation-free per frame.
 /// </summary>
 internal sealed class MobMissiles
@@ -26,10 +27,13 @@ internal sealed class MobMissiles
     /// <summary>The non-immune targets the missiles touched during the most recent <see cref="Update"/>.</summary>
     public IReadOnlyList<MissileHit> Hits => _hits;
 
-    /// <summary>Launches a missile of item <paramref name="itemId"/> carrying <paramref name="damage"/>.</summary>
-    public ThrownProjectile Launch(byte itemId, Vector3 origin, Vector3 velocity, int damage)
+    /// <summary>Launches a missile of item <paramref name="itemId"/> carrying <paramref name="damage"/>, falling under
+    /// <paramref name="gravityScale"/> of the throw gravity and spent after <paramref name="lifeSeconds"/> (a bone
+    /// shard's are shorter than an arrow's).</summary>
+    public ThrownProjectile Launch(byte itemId, Vector3 origin, Vector3 velocity, int damage, float gravityScale = 1f,
+        float lifeSeconds = PlayerConfig.ThrowLifetimeSeconds)
     {
-        var missile = new ThrownProjectile(itemId, origin, velocity, 0f, 1f);
+        var missile = new ThrownProjectile(itemId, origin, velocity, 0f, 1f, gravityScale, lifeSeconds);
         _flying.Add(missile);
         _damage.Add(damage);
         return missile;

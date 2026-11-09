@@ -17,8 +17,10 @@ namespace VoxelEngine.Simulation.Tower;
 /// appear only through <see cref="Spawn(Vector3, int, bool)"/>, judged by the global <see cref="MobCaps"/> it
 /// shares with the other mob kinds. A skeleton bound to a tower floor (<see cref="Skeleton.Floor"/>) despawns like
 /// any mob, and so does one the tower leashes back (<see cref="Release"/>): each is reported once through
-/// <see cref="TakeReleased"/>, so its floor owes it back and raises it again later. Leaving a tower therefore never
-/// clears a floor and never leaves skeletons holding cap room far away. Main thread only.
+/// <see cref="TakeReleased"/>, so its floor owes it back and raises it again later; so does one that chased nobody
+/// for <see cref="MobConfig.SkeletonPileReturnIdleSeconds"/>, which crumbles back into its piles and rises again at
+/// full health. Leaving a tower therefore never clears a floor and never leaves skeletons holding cap room far away.
+/// Main thread, authoritative worlds only (a client's mirrors never tick).
 /// </summary>
 public sealed class SkeletonManager : RealmMobManager<Skeleton>
 {
@@ -68,9 +70,10 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
             : null;
 
     /// <summary>
-    /// Fades out <paramref name="skeleton"/> without loot (a tower leash: it strayed too far from its floor) and,
-    /// when it is bound to a floor, reports that floor through <see cref="TakeReleased"/>. A dying or dead skeleton
-    /// is left alone, so a skeleton is never reported twice.
+    /// Fades out <paramref name="skeleton"/> without loot (a tower leash: it strayed too far from its floor; or it
+    /// idled long enough to crumble back into its piles, <see cref="Skeleton.ReturnsToPile"/>) and, when it is bound
+    /// to a floor, reports that floor through <see cref="TakeReleased"/>. A dying or dead skeleton is left alone, so a
+    /// skeleton is never reported twice.
     /// </summary>
     internal void Release(Skeleton skeleton)
     {
@@ -107,6 +110,7 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
         if (chunks == null || targets == null) return;
 
         UpdateMobs(deltaTime, chunks, drops, targets, debris, MobConfig.SkeletonDespawnRadiusBlocks);
+        ReturnIdleToPiles();
 
         // An arrow flies under gravity; any target it touches stops it, and the first non-immune one takes its damage
         _arrows.Update(deltaTime, chunks, targets);
@@ -141,4 +145,16 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
 
     /// <inheritdoc />
     protected override float ShoveSpeedOf(Skeleton mob) => MobConfig.SkeletonShoveSpeed;
+
+    // A bound skeleton that has chased nobody for too long crumbles back into its floor's piles: released like a
+    // leashed one, so the floor owes it and its piles raise it again, at full health, for the next target
+    private void ReturnIdleToPiles()
+    {
+        var mobs = Mobs;
+        for (var i = 0; i < mobs.Count; i++)
+        {
+            var skeleton = mobs[i];
+            if (skeleton.ReturnsToPile) Release(skeleton);
+        }
+    }
 }

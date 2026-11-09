@@ -11,7 +11,8 @@ namespace VoxelEngine.Tests.Simulation.Tower;
 /// <summary>
 /// The skeleton manager (<see cref="SkeletonManager"/>): a forced spawn passes the natural cap but never the hard
 /// cap and keeps its (clamped) tier, skeletons never appear on their own, a rake lands on a target in reach and an
-/// arrow on the target it touches, and an immune target is spared both.
+/// arrow on the target it touches, an immune target is spared both, and a bound skeleton that chased nobody for its
+/// idle time crumbles back to its floor (reported once) while one in sight of a target never does.
 /// </summary>
 public sealed class SkeletonManagerTests
 {
@@ -196,6 +197,48 @@ public sealed class SkeletonManagerTests
         manager.Release(unbound);
         released.Clear();
         manager.TakeReleased(released);
+        Assert.Empty(released);
+    }
+
+    [Fact]
+    public void ABoundSkeletonIdleLongEnoughCrumblesBackToItsPileButNeverWhileItSeesATarget()
+    {
+        var chunks = StoneFloor();
+        var drops = new DropManager();
+        var floor = new TowerFloorRef(3, -2, 1);
+
+        // Nobody in sight: the bound one crumbles once its idle time is up, without loot; an unbound one has no pile
+        var idle = new SkeletonManager(Type);
+        var bound = idle.Spawn(OnFloor(4.5f, 8.5f), tier: 1, spawnIn: false)!;
+        bound.Floor = floor;
+        var unbound = idle.Spawn(OnFloor(12.5f, 8.5f), tier: 0, spawnIn: false)!;
+        var elapsed = 0f;
+        while (!bound.IsDying && elapsed < MobConfig.SkeletonPileReturnIdleSeconds * 2f)
+        {
+            idle.Update(Dt, chunks, drops, []);
+            elapsed += Dt;
+        }
+        Assert.True(bound.IsDying, "an idle bound skeleton never crumbled");
+        Assert.True(elapsed >= MobConfig.SkeletonPileReturnIdleSeconds - 0.1f, "it crumbled before its idle time was up");
+        Assert.False(unbound.IsDying);
+        Assert.Empty(drops.Drops);
+
+        // Reported once, so its floor owes exactly one skeleton back
+        for (var i = 0; i < 60; i++) idle.Update(Dt, chunks, drops, []);
+        var released = new List<TowerFloorRef>();
+        idle.TakeReleased(released);
+        Assert.Equal([floor], released);
+
+        // A target in sight keeps a bound skeleton standing however long the fight lasts
+        var watched = new SkeletonManager(Type);
+        var engaged = watched.Spawn(OnFloor(4.5f, 8.5f), tier: 0, spawnIn: false)!;
+        engaged.Floor = floor;
+        IMobTarget[] near = [PlayerAt(8.5f, 8.5f)];
+        for (var t = 0f; t < MobConfig.SkeletonPileReturnIdleSeconds * 1.5f; t += Dt)
+            watched.Update(Dt, chunks, drops, near);
+        Assert.False(engaged.IsDying);
+        released.Clear();
+        watched.TakeReleased(released);
         Assert.Empty(released);
     }
 }

@@ -500,6 +500,10 @@ public static class MobConfig
     public const float SkeletonArrowKnockbackSpeed = 2f;
     /// <summary>A skeleton farther than this from every target despawns.</summary>
     public const float SkeletonDespawnRadiusBlocks = 96f;
+    /// <summary>Seconds a skeleton bound to a tower floor may chase nobody (no target noticed, or its sight of one lost,
+    /// see MobInterest) before it crumbles back into its floor's bone piles, owed and raised again at full health
+    /// (a first guess).</summary>
+    public const float SkeletonPileReturnIdleSeconds = 20f;
 
     // --- Tower difficulty (TowerDifficulty) ---
     /// <summary>The highest tower floor tier (floors 0..TowerMaxTier).</summary>
@@ -565,6 +569,13 @@ public static class MobConfig
     public const float SkeletonKingSlamKnockbackLift = 7f;
     /// <summary>Seconds between two slams (shortened by the enrage).</summary>
     public const float SkeletonKingSlamCooldownSeconds = 3.5f;
+    /// <summary>How many bone shards the slam throws out all round at its impact (flying like the bone blade's
+    /// shrapnel, ShrapnelConfig).</summary>
+    public const int SkeletonKingSlamShrapnelCount = 10;
+    /// <summary>The damage one slam shard deals to the target it touches (never to the king or a skeleton).</summary>
+    public const int SkeletonKingSlamShrapnelDamage = 6;
+    /// <summary>How far above the king's feet the slam's shards burst out, so they fly at a standing player's body.</summary>
+    public const float SkeletonKingSlamShrapnelLiftBlocks = 0.8f;
     /// <summary>Inside this horizontal distance the king does not volley.</summary>
     public const float SkeletonKingVolleyMinRange = 4f;
     /// <summary>Beyond this horizontal distance the king does not volley (must stay inside v^2/g at the volley speed).</summary>
@@ -579,8 +590,8 @@ public static class MobConfig
     public const float SkeletonKingVolleySpreadDegrees = 30f;
     /// <summary>The damage one volley bone deals.</summary>
     public const int SkeletonKingVolleyDamage = 18;
-    /// <summary>The knockback speed of a volley bone hit.</summary>
-    public const float SkeletonKingVolleyKnockbackSpeed = 4f;
+    /// <summary>The knockback speed of a king's bone hit (a volley bone or a slam shard).</summary>
+    public const float SkeletonKingBoneKnockbackSpeed = 4f;
     /// <summary>Seconds between two volleys (shortened by the enrage).</summary>
     public const float SkeletonKingVolleyCooldownSeconds = 4f;
     /// <summary>Seconds a freshly risen king waits before its first volley.</summary>

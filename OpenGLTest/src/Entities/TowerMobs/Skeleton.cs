@@ -63,6 +63,14 @@ public sealed class Skeleton : RealmMob
     /// </summary>
     public TowerFloorRef? Floor { get; set; }
 
+    /// <summary>
+    /// Whether this skeleton crumbles back into its floor's bone piles: it is alive, bound to a floor
+    /// (<see cref="Floor"/>) and has chased nobody (no target noticed, or its sight of one lost, <see cref="MobInterest"/>)
+    /// for <see cref="MobConfig.SkeletonPileReturnIdleSeconds"/>. An unbound skeleton has no pile and never does.
+    /// </summary>
+    public bool ReturnsToPile =>
+        Floor != null && !IsDying && !IsDead && Interest.IdleSeconds >= MobConfig.SkeletonPileReturnIdleSeconds;
+
     /// <inheritdoc />
     public override int MaxHealth => TowerDifficulty.Scale(Type.MaxHealth, Tier);
 

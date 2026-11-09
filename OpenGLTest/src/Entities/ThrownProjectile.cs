@@ -22,6 +22,7 @@ public sealed class ThrownProjectile
     public float Charge01 { get; }
     private Vector3 _velocity;
     private readonly float _gravityScale;
+    private readonly float _lifeSeconds;
     private float _age;
 
     /// <summary>The projectile's velocity in blocks per second.</summary>
@@ -63,10 +64,12 @@ public sealed class ThrownProjectile
 
     public float Spin => _age * 9f;
     public float Scale => ItemDrop.Size * (ItemRegistry.IsItem(ItemId) ? 1.5f : 1f);
-    public bool IsExpired => _age >= PlayerConfig.ThrowLifetimeSeconds;
+    public bool IsExpired => _age >= _lifeSeconds;
 
+    /// <summary>A projectile that falls under <paramref name="gravityScale"/> of <see cref="Gravity"/> (bone shrapnel
+    /// spreads sideways) and is spent after <paramref name="lifeSeconds"/>, a throw's by default.</summary>
     public ThrownProjectile(byte itemId, Vector3 position, Vector3 velocity, float baseDamage, float charge01,
-        float gravityScale = 1f)
+        float gravityScale = 1f, float lifeSeconds = PlayerConfig.ThrowLifetimeSeconds)
     {
         ItemId = itemId;
         Position = position;
@@ -75,6 +78,7 @@ public sealed class ThrownProjectile
         BaseDamage = baseDamage;
         Charge01 = MathUtils.Clamp01(charge01);
         _gravityScale = MathF.Max(0f, gravityScale);
+        _lifeSeconds = lifeSeconds;
     }
 
     public static float ChargeFactor(float charge01) =>
