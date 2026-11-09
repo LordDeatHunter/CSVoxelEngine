@@ -347,9 +347,15 @@ public sealed class Slime : Mob
         var movement = _velocity * deltaTime;
         var half = new Vector3(BodyHalfExtent);
 
+        // A rising slime clears the block in front of it before it moves sideways. Sweeping X and Z
+        // first would hit that block at the feet and zero the forward speed of every hop from a wall.
+        var rising = movement.Y > 0f;
+        var hitY = false;
+        if (rising) Position = BoxSweep.MoveOnAxis(Position, movement.Y, 1, half, chunks, out hitY);
+
         Position = BoxSweep.MoveOnAxis(Position, movement.X, 0, half, chunks, out var hitX);
         Position = BoxSweep.MoveOnAxis(Position, movement.Z, 2, half, chunks, out var hitZ);
-        Position = BoxSweep.MoveOnAxis(Position, movement.Y, 1, half, chunks, out var hitY);
+        if (!rising) Position = BoxSweep.MoveOnAxis(Position, movement.Y, 1, half, chunks, out hitY);
 
         if (hitX) _velocity.X = 0f;
         if (hitZ) _velocity.Z = 0f;
