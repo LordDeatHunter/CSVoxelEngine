@@ -26,6 +26,8 @@ public static class HudConfig
 
     // Per-second rate the loading screen's shown bar eases toward the real load progress (MathUtils.Damp).
     public const float LoadingProgressDampRate = 6f;
+    // Per-second rate the hearts, the boss bar and the mana bar ease toward their real values (MathUtils.Damp).
+    public const float BarDampRate = 9f;
     // Seconds of wall time for one revolution of the loading screen's spinner.
     public const double LoadingSpinnerPeriodSeconds = 1.2;
     // The loading overlay fades out over this many seconds once the world plays.

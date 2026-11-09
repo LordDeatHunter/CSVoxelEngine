@@ -101,6 +101,15 @@ internal sealed class HudRenderer : IDisposable
     private const float BossBarNameGap = 12f;
     private readonly SegmentedBarRenderer _bossBar;
 
+    // The shown values of the hearts, the boss bar and the mana bar, which ease toward the real ones
+    // (-1 until the first draw, so a bar starts at its true value instead of sliding in)
+    private float _shownHealth = -1f;
+    private float _shownBoss = -1f;
+    private float _shownMana = -1f;
+    private float _barDt;
+    private bool _bossDrawn;
+    private float _barTime = -1f;
+
     /// <summary>How much vertical room the boss bar block (name and bar) takes under <c>top</c>, in canvas units.</summary>
     internal static float BossBarBlockHeight => TextSize.Body + BossBarNameGap + BossBarHeight;
 
@@ -134,6 +143,25 @@ internal sealed class HudRenderer : IDisposable
             Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(0f, 6f, 5f, 10f)),
             Primitives.CreateRectangle(gl, 1f, 1f, uv: CrosshairUv(11f, 6f, 16f, 10f)),
         ];
+    }
+
+    /// <summary>
+    /// Starts a HUD frame at <paramref name="time"/> (seconds): the step the hearts, boss bar and mana
+    /// bar ease by this frame. Call once before their draws.
+    /// </summary>
+    internal void BeginBars(float time)
+    {
+        _barDt = _barTime < 0f ? 0f : time - _barTime;
+        if (!_bossDrawn)
+            _shownBoss = -1f;
+        _bossDrawn = false;
+        _barTime = time;
+    }
+
+    private float Ease(ref float shown, float target)
+    {
+        shown = shown < 0f ? target : MathUtils.Damp(shown, target, HudConfig.BarDampRate, _barDt);
+        return shown;
     }
 
     // One crosshair piece's pixel rect (y measured from the texture's top) as a UV rect
@@ -226,7 +254,7 @@ internal sealed class HudRenderer : IDisposable
     /// </summary>
     internal void DrawHearts(int health, int maxHealth = PlayerHealth.MaxHealth)
     {
-        var hp = Math.Clamp(health, 0, maxHealth);
+        var hp = Math.Clamp(Ease(ref _shownHealth, health), 0f, maxHealth);
         // Ten hearts always: each stands for a tenth of the pool, so gear that grows the pool grows every heart
         var perHeart = maxHealth / (float)PlayerHealth.HeartCount;
         var rowWidth = HeartDrawWidth + (PlayerHealth.HeartCount - 1) * HeartStride;
@@ -290,7 +318,7 @@ internal sealed class HudRenderer : IDisposable
         var centerY = _ui.ScreenSize.Y - BottomMargin * 0.5f;
         var left = (_ui.ScreenSize.X - width) * 0.5f;
         _ui.DrawRect(new Vector2(_ui.ScreenSize.X * 0.5f, centerY), new Vector2(width, ManaBarHeight), ManaTrack);
-        var fill = MathUtils.Clamp01(manaShare) * width;
+        var fill = MathUtils.Clamp01(Ease(ref _shownMana, manaShare)) * width;
         if (fill > 0.5f)
             _ui.DrawRect(new Vector2(left + fill * 0.5f, centerY), new Vector2(fill, ManaBarHeight), ManaFill);
     }
@@ -301,10 +329,11 @@ internal sealed class HudRenderer : IDisposable
     /// </summary>
     internal void DrawBossBar(string name, float share, float top)
     {
+        _bossDrawn = true;
         var centerX = _ui.ScreenSize.X * 0.5f;
         _ui.DrawTextCentered(name, centerX, top, _ui.CountScale, Rgba.White);
         _bossBar.Draw(new Vector2(centerX - BossBarWidth * 0.5f, top + TextSize.Body + BossBarNameGap),
-            BossBarWidth, BossBarHeight, share);
+            BossBarWidth, BossBarHeight, Ease(ref _shownBoss, share));
     }
 
     /// <summary>

@@ -101,6 +101,7 @@ internal sealed class UiPasses
             _owner.Ui.TopStrip.DrawCompass(camera!.Yaw, camera.Position, showCoordinates);
         else if (hasClock)
             _owner.Ui.TopStrip.DrawClock(Clock.DayNumber(lightingTime), Clock.Readout(lightingTime));
+        _owner.Ui.Hud.BeginBars(time);
         _owner.Ui.Hud.DrawFps(fps);
         if (showProfiler)
             _owner.Ui.Hud.DrawProfiler(FrameProfiler.Lines);
