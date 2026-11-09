@@ -160,8 +160,8 @@ public static class JuiceConfig
     public const float TowerCollapseRumblePulseSeconds = 0.3f;
     public const float TowerCollapseRumbleHoldSeconds = 0.6f;
     public const float TowerDebrisMinRadiusShare = 0.75f;
-    public const float TowerDebrisLaunchesPerSecond = 20f;
-    public const int TowerDebrisMax = 96;
+    public const float TowerDebrisLaunchesPerSecond = 60f;
+    public const int TowerDebrisMax = 288;
     // Blocks per second a thrown block leaves the tower at: away from its center, upward and sideways
     public const float TowerDebrisOutwardSpeedMin = 2.5f;
     public const float TowerDebrisOutwardSpeedMax = 6f;
