@@ -56,6 +56,13 @@ public sealed class Skeleton : RealmMob
     /// <summary>The tower floor tier this skeleton was raised on, fixed for life.</summary>
     public int Tier { get; }
 
+    /// <summary>
+    /// The tower floor whose lock this skeleton counts toward, set by the bone pile that raised it or by a save
+    /// restore; null for a scenario's or a client mirror's skeleton. Saved in <c>entities.json</c>, never sent on
+    /// the wire.
+    /// </summary>
+    public TowerFloorRef? Floor { get; set; }
+
     /// <inheritdoc />
     public override int MaxHealth => TowerDifficulty.Scale(Type.MaxHealth, Tier);
 

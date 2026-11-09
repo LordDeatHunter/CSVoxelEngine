@@ -9,7 +9,10 @@
   // stair starts just south of it, climbing toward -Z. Shots: the exterior from 2.5 radii out, the
   // entrance, floor 0 and floor 2 inside (eye at the slab + 2.6), the stair corridor at half-step 10
   // (y 16), the roof and its altar dressing, and a steep view from above (not straight down: at pitch -89 the
-  // first-person body fills the frame).
+  // first-person body fills the frame). The BT-4 locks: floor 0's piles (at feet y 11: (2920, -1417), (2916, -1411),
+  // (2924, -1411), (2920, -1405)) beside a creative player, then the skeletons one raised once the player turns
+  // survival, door 0's portcullis (cells x 2906..2909, y 15..18, z -1426..-1423) seen down the stair, and the open
+  // stairwell after a towerclear of floor 0.
   "steps": [
     { "op": "fly", "on": true },
 
@@ -39,6 +42,24 @@
 
     { "op": "teleport", "pos": [2885.5, 90.5, -1410.5], "yaw": 0, "pitch": -55 },
     { "op": "wait", "seconds": 2 },
-    { "op": "screenshot", "name": "overhead", "hideHud": true }
+    { "op": "screenshot", "name": "overhead", "hideHud": true },
+
+    { "op": "creative", "on": true },
+    { "op": "teleport", "pos": [2912.5, 12.6, -1410.5], "yaw": 0, "pitch": -22 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "piles", "hideHud": true },
+
+    { "op": "creative", "on": false },
+    { "op": "wait", "seconds": 2 },
+    { "op": "screenshot", "name": "piles_raised", "hideHud": true },
+
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [2912.5, 17.6, -1426.5], "yaw": 160, "pitch": -12 },
+    { "op": "wait", "seconds": 1 },
+    { "op": "screenshot", "name": "door_sealed", "hideHud": true },
+
+    { "op": "towerclear", "floor": 0 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "door_open", "hideHud": true }
   ]
 }

@@ -21,6 +21,8 @@ public sealed record TowerPalette(byte Brick, byte Step)
         var step = ContentRegistry.RequireBlock("cobblestone_slab").Id;
         DefaultBrick = ContentRegistry.RequireBlock("tower_bricks").Id;
         StoopBlock = ContentRegistry.RequireBlock("cobblestone").Id;
+        DoorBlock = ContentRegistry.RequireBlock("tower_door").Id;
+        PileBlock = ContentRegistry.RequireBlock("skeleton_pile").Id;
         Plain = new TowerPalette(DefaultBrick, step);
         Sandstone = new TowerPalette(ContentRegistry.RequireBlock("tower_bricks_sandstone").Id, step);
         Frost = new TowerPalette(ContentRegistry.RequireBlock("tower_bricks_frost").Id, step);
@@ -32,6 +34,18 @@ public sealed record TowerPalette(byte Brick, byte Step)
 
     /// <summary>The block under the entrance apron's walkway.</summary>
     internal static byte StoopBlock { get; }
+
+    /// <summary>
+    /// The unbreakable gate worldgen stamps across each floor's stairwell, the same in every palette; the tower's lock
+    /// clears it once the floor below is cleared.
+    /// </summary>
+    internal static byte DoorBlock { get; }
+
+    /// <summary>
+    /// The unbreakable bone heap a floor template places, the same in every palette; its skeletons rise from it, and the
+    /// tower's lock clears it once it is spent.
+    /// </summary>
+    internal static byte PileBlock { get; }
 
     /// <summary>Every palette, once each.</summary>
     internal static IReadOnlyList<TowerPalette> All { get; }

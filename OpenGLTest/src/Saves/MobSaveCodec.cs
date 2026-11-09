@@ -1,15 +1,17 @@
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.TowerMobs;
 
 namespace VoxelEngine.Saves;
 
 /// <summary>
 /// Serializes a live <see cref="Mob"/> into its <see cref="EntitySaveData"/> form. Extracted
-/// from <see cref="World"/> so the per-kind fields (a goblin's ammo, a slime's size, a skeleton's tier) are a pure
-/// function of the mob, not a detail of the world's save loop.
+/// from <see cref="World"/> so the per-kind fields (a goblin's ammo, a slime's size, a skeleton's tier and tower
+/// floor) are a pure function of the mob, not a detail of the world's save loop.
 /// </summary>
 internal static class MobSaveCodec
 {
-    public static EntitySaveData.MobData Capture(Mob mob, int? ammo, int? size = null, int? torches = null, int? tier = null) => new()
+    public static EntitySaveData.MobData Capture(Mob mob, int? ammo, int? size = null, int? torches = null, int? tier = null,
+        TowerFloorRef? floor = null) => new()
     {
         Type = mob.Type.Name,
         Position = [mob.Position.X, mob.Position.Y, mob.Position.Z],
@@ -19,6 +21,8 @@ internal static class MobSaveCodec
         Ammo = ammo,
         Size = size,
         Torches = torches,
-        Tier = tier
+        Tier = tier,
+        TowerCell = floor is { } f ? [f.CellX, f.CellZ] : null,
+        TowerFloor = floor?.Floor
     };
 }

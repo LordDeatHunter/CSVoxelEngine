@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Structures;
 
@@ -58,6 +59,32 @@ public static class TowerGenerator
         var cell = template.CellAt(turns, lx, ly, lz);
         if (cell < 0 || (cell & 0xFF) != TowerPalette.DefaultBrick) return cell;
         return (cell & ~0xFF) | s.Palette.Brick;
+    }
+
+    /// <summary>The skeleton pile cells floor <paramref name="floor"/>'s dressing template stands, in template order (layer,
+    /// then row, then column, after the template's turn): the cells where both the turned template and the merged cell are the
+    /// pile block. Scans the template, so a consumer keeps the result.</summary>
+    internal static IReadOnlyList<(int X, int Y, int Z)> PileCells(TowerSite s, int floor)
+    {
+        if (floor < 0 || floor >= s.Floors)
+            throw new ArgumentOutOfRangeException(nameof(floor), floor, "A tower's floors run from 0 to its floor count - 1.");
+        var template = s.FloorTemplates[floor];
+        var turns = s.FloorTurns[floor];
+        var x0 = StructureStamper.OriginOf(s.CenterX, template);
+        var z0 = StructureStamper.OriginOf(s.CenterZ, template);
+        var y0 = s.FloorY(floor) + 1;
+        var cells = new List<(int X, int Y, int Z)>();
+        for (var ly = 0; ly < template.Height; ly++)
+        for (var lz = 0; lz < template.Size; lz++)
+        for (var lx = 0; lx < template.Size; lx++)
+        {
+            var cell = template.CellAt(turns, lx, ly, lz);
+            if (cell < 0 || (cell & 0xFF) != TowerPalette.PileBlock) continue;
+            int x = x0 + lx, y = y0 + ly, z = z0 + lz;
+            var merged = CellAt(s, x, y, z);
+            if (merged >= 0 && (merged & 0xFF) == TowerPalette.PileBlock) cells.Add((x, y, z));
+        }
+        return cells;
     }
 
     /// <summary>Writes <paramref name="site"/>'s cells inside the chunk whose minimum corner is (<paramref name="worldX0"/>,

@@ -83,16 +83,16 @@ never written and simply regenerates), `lod-edits.bin` (`LodEditState`: column c
 felled-canopy markers, grown crowns, surface overrides), `wood-damage.bin` (`WoodDamageCodec`: the permanent chop damage of natural trunk cells, singleplayer only), `player.json` (`PlayerSaveCodec`: position and look,
 creative/flight, health, mana, respawn eye, lighting clock, the full inventory and hotbar (a staff's bound spells by part key), the known spell parts by key and the discovered waystones; no position
 while the spawn has not settled) and `entities.json` (`EntitySaveCodec`: the live mobs
-with health, facing, velocity, ammo, a slime's size and a skeleton's tower tier plus still-pending entries, up to
+with health, facing, velocity, ammo, a slime's size and a skeleton's tower tier and tower floor plus still-pending entries, up to
 `MaxSavedDrops` item drops, nearest first, and the drifting icebergs) and `stations.json` (`StationSaveCodec`:
-the campfires, querns, kilns and cast molds with their fuel, fire, crucible, cooking and cast progress, the used chests and
-the waystone registry). See "Saves" below for the rules.
+the campfires, querns, kilns and cast molds with their fuel, fire, crucible, cooking and cast progress, the used chests,
+the waystone registry and the battle towers' floor locks). See "Saves" below for the rules.
 
 Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `SkyConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`creative`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; the UI ops film the list-based UIs through `IScenarioUi` (`ScenarioUi`, the same input components a player reaches): `panel` and `spellbuilder` (`{ "open": true|false }`, default open; the spell builder needs a staff in hand) open or close the [E] panel and the builder, `tab` (`blocks`, `tools`, `misc`, `crafting`) and `row` (1-based, plain lists and search results only, so a survival player) pick like clicks, `search` types into the search field, and `hover` (`{ "pos": [x, y] }` in canvas units, or `"clear": true`) holds a scripted pointer that the hovered row and the tooltip read instead of the mouse; give each a short `wait` after `panel` (its fade takes about 0.2 s), and `visual-examples/inventory-ui.json` (`VOXEL_TIME=147`) is the baseline that films the panel on every tab, a search, a picked row, the craft card, a hover tooltip and the spell builder; `damage` hurts every live mob, or the player's own pool with `"target": "player"`; `effect` (`{ "op": "effect", "effect": "burning", "target": "mobs"|"player", "scale": 1 }`, target `mobs` by default) applies a status effect through `StatusEffects.Apply`, the name checked only when the step runs (an unknown one is warned and skipped); `cast` (`{ "op": "cast", "parts": ["element/fire", "shape/projectile"] }`) fires a spell of those part keys from the camera's eye and aim with no staff or mana (`SpellEffects.TestCast`; an unknown key or an invalid recipe stops the run), and `visual-examples/spells.json` (`VOXEL_TIME=147`) films a fire, a frost and a nature bolt; `waystone` (`{ "op": "waystone", "action": "open", "pos": [x, y, z] }` right-clicks the waystone at that cell, discovering it; then `confirm`, `rename`, `type` with a `"text"`, `submit`, `back` (Escape), `close` or `teleport` with a 1-based `"row"`) drives the waystone screen through `WaystoneInput` like a player's clicks, and `visual-examples/waystones-ui.json` (`VOXEL_TIME=147`) films the discovery popup, the rename dialog, the list with a lost row, its search, a short trip and the list with the mana spent, while `visual-examples/waystones.json` (`VOXEL_TIME=147`) flies to a natural satellite of each realm on the default seed (the surface pavilion, the sealed underground crypt from inside, the sky arch and the hell ember ring), films each from outside and beside its waystone, discovers all four and films the four-realm list and a trip home; then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `creative` turns creative mode on
 **without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
 player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
 any scenario that teleports a walking player above the ground, and turn it off again before a
-`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, an optional `"size"` (an integer from 1, default 1) is a slime's size and an optional `"tier"` (an integer from 0, default 0) is a skeleton's tower tier; the entity name (`slime`, `goblin`, `hellbrute`, `cinderwitch`, `galeraptor`, `cloudgolem`, `sandworm`, `iceberg` or `skeleton`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/skeletons.json` (`VOXEL_TIME=147`) spawns a tier-0 and a tier-5 skeleton in goblins.json's open forest clearing (a tower floor's dressing walls block a shot's line of sight) and films them idle, drawing and loosing an arrow, an arrow in flight and raking. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, an optional `"size"` (an integer from 1, default 1) is a slime's size and an optional `"tier"` (an integer from 0, default 0) is a skeleton's tower tier; the entity name (`slime`, `goblin`, `hellbrute`, `cinderwitch`, `galeraptor`, `cloudgolem`, `sandworm`, `iceberg` or `skeleton`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/skeletons.json` (`VOXEL_TIME=147`) spawns a tier-0 and a tier-5 skeleton in goblins.json's open forest clearing (a tower floor's dressing walls block a shot's line of sight) and films them idle, drawing and loosing an arrow, an arrow in flight and raking. `towerclear` (`{ "op": "towerclear", "floor": k }`, floor 0 by default) clears floor `k` of the battle tower around the camera through `World.ClearTowerFloor` (its piles depleted, its bound skeletons killed, nothing owed), so its door opens on the next update; `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) uses it to film a floor's piles, the skeletons they raise, the sealed gate and the opened stairwell. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
@@ -1550,7 +1550,8 @@ OpenGLTest/
       TowerMobs/               # the battle tower's mobs (see "Skeleton"): the skeleton and the floor-tier difficulty
         Skeleton.cs            # the undead archer (a RealmMob): melee rake at its impact event, a bow shot at its release
                                #   event inside its band with a clear line, two attack clips over one count, its tier
-        TowerDifficulty.cs     # GL-free: the floor tier's multiplier (health, damage), clamp and pack size (BT-4's hook)
+        TowerDifficulty.cs     # GL-free: the floor tier's multiplier (health, damage), clamp and pack size (a pile's wave)
+        TowerFloorRef.cs       # the tower (by placement cell) and floor whose lock a bound skeleton counts toward
       Sandworms/               # the desert boss (see "Sandworm"): the mob, its chain, its brain and its pose
         Sandworm.cs            # the mob: the head is its position, the exposed segments by the sand surface, the segment hit tests and
                                #   damage split, the jaw, the contact test; also the client mirror mode (phase, target and velocity from the server)
@@ -2092,7 +2093,7 @@ OpenGLTest/
       PlayerSaveData.cs        # the player.json shape: pose, modes, health, clock, inventory + hotbar
       SaveNames.cs             # block/ and item/ namespaced content names, so saves never store raw ids
       StationSaveCodec.cs      # reads/writes stations.json
-      StationSaveData.cs       # the stations.json shape: campfires, querns, kilns, cast molds (content by name)
+      StationSaveData.cs       # the stations.json shape: campfires, querns, kilns, cast molds (content by name), tower locks
       ServerInfo.cs            # one saved server: display name, host, port, last connected (servers.json)
       ServerPlayerSaves.cs     # a hosted world's per-player files: players/<name slug>.json via the store
       ServerStore.cs           # servers.json: list, add, delete, touch (unique names, most recent first)
@@ -2179,7 +2180,21 @@ OpenGLTest/
                                #   strikes and blasts light TNT, ticks their fuses
       Tower/                   # the battle tower's simulation, namespace VoxelEngine.Simulation.Tower
         SkeletonManager.cs     # the skeletons: forced spawn only (Spawn(position, tier), under the hard cap), the rake at
-                               #   its impact, the arrows (MobMissiles), loot, despawn, client mirrors; no ring spawn
+                               #   its impact, the arrows (MobMissiles), loot, despawn, client mirrors; no ring spawn; reports a
+                               #   bound skeleton's despawn or leash release (TakeReleased) so its floor owes it
+        TowerManager.cs        # the floor locks (see "Battle tower"): records materialized near a player, the recount, owed
+                               #   and leash, the door judgement, the capped sweep, ClearFloor, Detail, stations.json and the wire
+        TowerRecord.cs         # one tower: key, center, radius and a TowerFloorState per floor; Build (explicit data, the
+                               #   test seam), FromSite (the one PileCells/DoorCells scan) and Mirror (the client's copy)
+        TowerFloorState.cs     # one floor: band, piles, door cells and the ones still to sweep, living, owed, piles left,
+                               #   alive and the door bit
+        PileState.cs           # one skeleton pile: cell, waves left, cooldown, removed
+        SkeletonPileManager.cs # a floor's piles: waves of TowerDifficulty.PackSize skeletons for a non-immune target in
+                               #   range, then depleted; owed skeletons re-raised at any pile; never writes blocks
+        TowerRules.cs          # GL-free: the pile trigger, floor awake, the door rule, spawn points round a pile, the leash
+        TowerBlockWriter.cs    # the capped writer past `unbreakable` (Chunk.CollapseWriteAt plus every edit-path hook): the
+                               #   BT-4 doors and depleted piles, BT-8's collapse; TowerWriteResult.cs is its answer
+        TowerReadout.cs        # the look-at status line of a pile or a sealed door
       TopplingTree.cs          # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once by
                                #   CellBatchMesher (one mesh per chunk it spans), swung flat around the cut, then popped out as drops
       TreeGrowthResult.cs      # the outcome of one TreeGrowthWriter call: its status,
@@ -2406,10 +2421,13 @@ OpenGLTest/
         TowerPlacement.cs      # the battle towers (plans/BATTLE_TOWER.md): 1536-block hashed cells (salt 0x5E7F), the cached
                                #   site verdict, the band, the per-chunk stamp, TryGetSite/TryFindAt/Meets/TopReaching
         TowerSite.cs           # one accepted tower: center, ground, radius, floors, palette, dressing picks, and the BT-4/6/8
-                               #   hooks (FloorY, RoofY, Tier, DoorCells, AltarCell, BottomY/TopY, chunk range)
-        TowerShell.cs          # GL-free pure shell geometry: the rings, the helical half-step stair, doorways, slabs, parapet
-        TowerGenerator.cs      # merges the shell with the floor and altar templates; the point query CellAt and StampSite
-        TowerPalette.cs        # the biome palette swap: tower_bricks / _sandstone (desert) / _frost (frozen, taiga), the step slab
+                               #   hooks (FloorY, RoofY, Tier, DoorCells, PileCells, AltarCell, BottomY/TopY, chunk range)
+        TowerShell.cs          # GL-free pure shell geometry: the rings, the helical half-step stair, doorways, slabs, parapet,
+                               #   the closed tower_door cells (IsDoorStep, closed-form)
+        TowerGenerator.cs      # merges the shell with the floor and altar templates; the point query CellAt, StampSite and
+                               #   PileCells (a floor template's skeleton piles)
+        TowerPalette.cs        # the biome palette swap: tower_bricks / _sandstone (desert) / _frost (frozen, taiga), the step
+                               #   slab, the door and pile blocks
         TowerRing.cs           # Outside / Apron / OuterWall / Corridor / InnerWall / Room
       Features/                # every surface feature generator (see "Biomes"); the underground ones below
         BoulderGenerator.cs    # a rare 2-4 cell stone or cobblestone blob on the forest/taiga floor
@@ -2576,7 +2594,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   MeshTestWorld, MobTestWorld, FlatWorldSource, StampedTree,
                                #   WideTreeSpecies, TreeWorldgenFixture, IcebergTestWorld (a hand-built sea with a
                                #   pack-ice strip), StubTarget, BoxSolids, SkyZoneFinder (sky zones under the seed),
-                               #   SyntheticGear (gear items with made-up abilities and modifiers)
+                               #   SyntheticGear (gear items with made-up abilities and modifiers), TowerSiteFixture
+                               #   (synthetic tower sites of any radius, floor count and turn)
                                #   and the three [CollectionDefinition]s
   Audio/                       # the sfx library and the ambience bed
   Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
@@ -2587,7 +2606,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Streaming/                 # the generation workers, the scan frontier, the streaming foci
   Content/                     # the registry and its baked tables: blocks, models, shapes (panes,
                                #   tree wood, multiblocks), loot, recipes, kiln and molds, spell parts and
-                               #   recipes, status effects and the status block flags (flat)
+                               #   recipes, status effects and the status block flags, the tower lock blocks (flat)
   Core/                        # the Core utilities and the src-root types (World lifecycle, WorldSeed, WorldLoadGate)
   Effects/                     # mirrors src/Effects: one folder per sub-domain of shader twins
     Climate/                   # the biome tint field and its chunk, LOD, pop and texture consumers
@@ -2642,7 +2661,9 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
     Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World
-    Tower/                     # the skeleton manager: forced spawn and the hard cap, tier, no natural spawn, rake, arrows
+    Tower/                     # the skeleton manager: forced spawn and the hard cap, tier, no natural spawn, rake, arrows,
+                               #   despawn reports; the floor locks (TowerRulesTests, SkeletonPileManagerTests,
+                               #   TowerBlockWriterTests, TowerManagerTests, TowerManagerSaveTests: stations.json)
     Waystones/                 # waystone names, the registry's discovery, rename, lost and save rules; the teleport rule,
                                #   the arrival search, the realm tag and a trip in a headless world
   Status/                      # the status effect set, the Apply API, the speed factors and the block rule and writer
@@ -2663,8 +2684,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Sky/                       # the solid cloud patches, the cloud sea, the sky islands, the sky biomes and their
                                #   flora (mirrors src/WorldGen/Sky)
     Structures/                # templates, the ruins and their waystone satellites, the battle towers (TowerShellTests:
-                               #   stair, landings, the door seal flood fill; TowerPlacementTests: rarity, point query
-                               #   equals stamp, generated chunks) (mirrors src/WorldGen/Structures)
+                               #   stair, landings, the door seal flood fill, the closed doors; TowerPlacementTests: rarity,
+                               #   point query equals stamp, generated chunks, every floor's piles) (mirrors src/WorldGen/Structures)
     Trees/                     # the tree growth engine, flat over src's Trees/Shape, Logics and Features
 USER_TODO.md                          # placeholder art list: every stand-in asset an agent added, its generator and
                                       #   what a replacement must keep (see "Placeholder art" under "Content")
@@ -2679,6 +2700,8 @@ tools/                                # asset generators: models, animation clip
                                       #   cloud_shard sprite, on the hell script's machinery; --check
   generate-skeleton-model.py          # deterministic skeleton .bbmodel (rig with its bow, clips) and palette skin, and the
                                       #   arrow and bone sprites, on the hell script's machinery; --check
+  generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout) and skeleton_pile tiles,
+                                      #   stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
   generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
                                       #   the geometry rules (waterline, shelf, 8 px inset steps) and the UV layout
   generate-mold-models.ps1            # the eight cast molds' block models under assets/models/block/, from their sprites' alpha silhouettes
@@ -2786,7 +2809,7 @@ trailing commas.
 | `fluid` | false | the block is a flowing fluid (water, lava): forces `solid`, `castsAO`, `hasItem`, `needsSupport` off, `occludes` off and `light.passes` on, and drops nothing whatever the file says |
 | `flow` | water behavior | per-fluid tuning, only legal with `fluid: true`: `tickDivisor` (ticks between updates, lava `2` = half water speed), `range` (sideways spread 1..7, lava `3`), `infinite` (adjacent sources birth new ones, lava `false`), and the `hardensTo` + `hardensTouching` pair (lava hardens to `cobblestone` on touching `block/water`) |
 | `flammable` | false | a status effect with `blocks.ignite` burns the block away to air (no loot, no fire block) when it ticks beside it (`BlockType.FlammableById`). Illegal on a fluid and on a multiblock anchor or part. The leaves and the ground plants set it; planks, logs, TNT and stations do not |
-| `unbreakable` | false | no gameplay path removes the block (`BlockType.IsUnbreakable`): mining whiffs with no crack progress (`Mining.CanMine`/`HitDamage`), creative swings but never breaks it, the server refuses its break (`BreakVerdict.Unbreakable`, before the creative shortcut), `BlockEditor.BreakBlockFor`/`RemoveBlock` return early, blasts skip it, `Chunk.RemoveBlockAt`/`ClearBlockAt` and placement (`Placement.CanOccupy`, so a falling cube's landing too) refuse it, and buckets (`FluidManager.SetCellImmediate`) and status or spell block actions (`StatusEffectBlockRule`) leave it. Only `Chunk.CollapseWriteAt` (the battle tower's collapse, BT-8) writes over it; `Chunk.SetBlockRaw` stays raw. Refused with `fluid`, `falls`, `needsSupport`, `replaceableByPlacement`, `flammable`, `meltsTo`, the `tree_wood`/`multiblock`/`multiblock_part` renderers, `upperHalf` and `onBreak: "prime_tnt"` (`BlockFieldRules.ValidateUnbreakable`), and as a `multiblock.source`, since each would hand the cell to a raw-write path. The look-at label and outline still target it (the name in red, never mineable). `tower_bricks`, `tower_bricks_sandstone`, `tower_bricks_frost` |
+| `unbreakable` | false | no gameplay path removes the block (`BlockType.IsUnbreakable`): mining whiffs with no crack progress (`Mining.CanMine`/`HitDamage`), creative swings but never breaks it, the server refuses its break (`BreakVerdict.Unbreakable`, before the creative shortcut), `BlockEditor.BreakBlockFor`/`RemoveBlock` return early, blasts skip it, `Chunk.RemoveBlockAt`/`ClearBlockAt` and placement (`Placement.CanOccupy`, so a falling cube's landing too) refuse it, and buckets (`FluidManager.SetCellImmediate`) and status or spell block actions (`StatusEffectBlockRule`) leave it. Only `Chunk.CollapseWriteAt`, through `TowerBlockWriter` (the battle tower's opened doors and depleted piles, and BT-8's collapse), writes over it; `Chunk.SetBlockRaw` stays raw. Refused with `fluid`, `falls`, `needsSupport`, `replaceableByPlacement`, `flammable`, `meltsTo`, the `tree_wood`/`multiblock`/`multiblock_part` renderers, `upperHalf` and `onBreak: "prime_tnt"` (`BlockFieldRules.ValidateUnbreakable`), and as a `multiblock.source`, since each would hand the cell to a raw-write path. The look-at label and outline still target it (the name in red, never mineable). `tower_bricks`, `tower_bricks_sandstone`, `tower_bricks_frost`, `tower_door`, `skeleton_pile` |
 | `freezesTo` | none | the solid block a fluid **source** freezes into under `blocks.freeze` and a spell's `freeze` impact (`BlockType.FreezesToById`; water -> `ice`, lava -> `cobblestone`). Only legal on a fluid, and the target must be a registered non-fluid block |
 | `meltsTo` | none | the fluid a block thaws into, as a source, under `blocks.thaw` (`BlockType.MeltsToById`; ice -> `water`). Only legal on a non-fluid, and the target must be a fluid other than the block itself |
 | `onBreak` | `"drop"` | `drop` (roll loot) or `prime_tnt` (no drop, spawns a `PrimedTnt`) |
@@ -4275,7 +4298,7 @@ refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's 
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
 whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell, sky or tower mob's `Ammo` carries its
 attack count the same way (`RealmMob.AttackCount`, see "A mirror's attack clip"), with no bump either. Every
-entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 25 (current) lets `EntityList` carry the battle tower's skeleton (`NetEntityKind.Skeleton` 13): its tower tier rides `ItemId` (a goblin's torch byte, 0 for other mobs; clamped to 0..`MobConfig.TowerMaxTier` on read, since a mirror cannot derive it from where it stands, and a mirror whose tier differs is replaced, `ClientMirror.KindMatches`) and its attack count rides `Ammo` (melee even, shot odd, see "A mirror's attack clip"); an older client would not draw it. Version 24 adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 26 (current) appends the battle tower locks at the end of `StationState` (`TowerManager.WriteNet`/`ReadNet`: each tower's cell, center and radius, and per floor its band, piles left, skeletons left and door bit, bounds-checked; see "Battle tower"); an older peer would misread the station frames. Version 25 lets `EntityList` carry the battle tower's skeleton (`NetEntityKind.Skeleton` 13): its tower tier rides `ItemId` (a goblin's torch byte, 0 for other mobs; clamped to 0..`MobConfig.TowerMaxTier` on read, since a mirror cannot derive it from where it stands, and a mirror whose tier differs is replaced, `ClientMirror.KindMatches`) and its attack count rides `Ammo` (melee even, shot odd, see "A mirror's attack clip"); an older client would not draw it. Version 24 adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
 mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
@@ -5113,8 +5136,8 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   attack clip"); all four are saved in `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 238 of the 255 content ids are used (130 blocks, 107 items, air), 17 left; the battle tower
-  (plans/BATTLE_TOWER.md) needs about 10-14 more. Seed offsets
+- **Budgets**: 242 of the 255 content ids are used (132 blocks, 109 items, air), 13 left; the rest of the battle
+  tower (plans/BATTLE_TOWER.md) needs about 5-8 more. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
   `plans/BIOMEGEN.md`.
@@ -5589,9 +5612,10 @@ common hurt, death and spawn.
   is a constructor argument fixed for life: a mirror cannot derive it from where it stands, so it is saved
   (`EntitySaveData.MobData.Tier`, absent reads as 0) and sent (the entry's `ItemId`, see protocol 25), clamped on both.
 - **Forced spawn only**: `SkeletonManager.Spawn(position, tier)` is the one way a skeleton appears (the `spawn`
-  scenario op's `tier`, a save restore, a client mirror, the `BT-4` piles) and returns null at the hard cap
+  scenario op's `tier`, a save restore, a client mirror, a tower's skeleton piles) and returns null at the hard cap
   (`MobCaps.ForcedRoom`); there is no ring spawn. It keeps the shared distance and idle despawn, past a generous
-  `SkeletonDespawnRadiusBlocks`.
+  `SkeletonDespawnRadiusBlocks`; a pile's skeleton is **bound** to its floor (`Skeleton.Floor`, a `TowerFloorRef`, saved,
+  never sent), and its despawn is reported so the floor owes it (see "Battle tower").
 - **Undead**: `IsUndead` is true, so `MobStrikes.StrikeMob` adds the striker's `undeadDamage` gear stat
   (`Combat.VersusUndead`) to every blow on it (`UndeadStrikeTests`).
 - **Two attack clips over one count**: `AttackVariants` 2 (0 the rake, 1 the shot), so a mirror plays the right clip
@@ -5606,8 +5630,64 @@ common hurt, death and spawn.
   `GameServerTests.SkeletonsReachTheClientsEntityListByKindWithTheirTier`. `visual-examples/skeletons.json`
   (`VOXEL_TIME=147`) films them idle, shooting and raking in an open forest clearing.
 - Known gaps: the arrows, like the goblin stones and hell bolts, are not on the wire (a client sees only the damage);
-  skeletons are not drawn in the water mirror; they share the realm mobs' despawn rules, which `BT-4`'s piles may want
-  to revisit; the tower interiors are sunlit (`BT-10`).
+  skeletons are not drawn in the water mirror; the tower interiors are sunlit (`BT-10`).
+
+### Battle tower
+
+The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are above ("Structure templates and ruins",
+"Skeleton"); plans/BATTLE_TOWER.md holds the phases still to come. This section is the **floor locks** (`BT-4`).
+- **Two worldgen-only, unbreakable blocks** (`hasItem: false`, `loot: "none"`), both from the single tower cell function,
+  so the point query still equals the stamp. `tower_door` (a solid, cutout, `cullSelf` portcullis `cube_all` that passes
+  light) fills the headroom over the two door half-steps of every floor (`TowerSite.DoorCells(k)`, stamped by
+  `TowerShell.CorridorAt` through the closed-form `TowerShell.IsDoorStep`): door `k` seals floor `k` from floor `k + 1`, the
+  last one the roof, and the ground entrance stays open. `skeleton_pile` (non-solid, a low hitbox, never replaceable) is
+  the `S` palette key of the three `tower_floor_*.json` templates, found per floor by `TowerSite.PileCells(k)` (a template
+  scan, kept by its consumer). Both tiles are placeholders from `tools/generate-tower-lock-textures.py` (USER_TODO.md).
+- **`TowerManager`** (`Simulation/Tower/`, owned by `World` as `World.Towers`, main thread, ticked by `MobDirector.Update`
+  right after the skeletons on authoritative worlds only) keeps one `TowerRecord` per tower keyed by its placement cell,
+  with a `TowerFloorState` per floor. A record is materialized lazily: every `MobConfig.TowerScanSeconds`, a target whose
+  eye chunk is loaded and who stands in no record asks `TowerPlacement.TryFindAt` (the generation workers have usually
+  cached the verdict already). `TowerRecord.Build` takes explicit floor data, which is the test and loopback seam.
+- **Piles** (`SkeletonPileManager`): on an awake floor (floor 0, or the floor below's door open), a pile whose cell holds
+  the pile block raises a wave of `TowerDifficulty.PackSize(k)` skeletons at tier `k` (`SkeletonManager.Spawn`, around the
+  pile by `TowerRules.SpawnPoints`) when a **non-immune** target stands within `SkeletonPileTriggerBlocks` on that floor's
+  band, every `SkeletonPileWaveSeconds`, for `SkeletonPileWaves` waves, then it is depleted. A wave counts only if one
+  skeleton rose (the hard cap keeps it for later). A pile in an unloaded chunk freezes; a loaded cell without the pile
+  block counts as depleted.
+- **Bound skeletons are never immortal.** Each raised skeleton is tagged with its `TowerFloorRef`. It despawns like any
+  mob, and past `TowerSkeletonLeashBlocks` from the tower's center the manager releases it (`SkeletonManager.Release`);
+  either way `SkeletonManager.TakeReleased` reports it once and the floor's **owed** count grows. Owed skeletons are raised
+  again at any of the floor's piles (depleted ones too) the next time a target triggers one. So a half-cleared tower far
+  away holds no cap room, and a skeleton that wandered off can never soft-lock a door. A killed one is never owed.
+- **The door rule** (`TowerRules.DoorMayOpen`): door `k` opens once door `k - 1` is open (always for `k = 0`), every pile of
+  floor `k` is depleted and **alive = living + owed + pending** is 0, where living counts the tagged skeletons in the
+  manager, and pending the floor's tagged entries still waiting in the save restore
+  (`WorldPersistence.PendingTowerSkeletons`); a restore that times out credits its tagged entries to owed
+  (`TakeDiscardedTowerSkeletons`), so a reload never opens a door early. Opening is permanent.
+- **The writer** (`TowerBlockWriter`) is the one sanctioned path past `unbreakable`: `Chunk.CollapseWriteAt` to air, then
+  every edit-path hook (player-placed unmark, `MarkAreaDirty` over the light radius, fluid and leaf-decay schedules, a falls
+  block toppling above, the LOD notify, the support pop, the canopy branch), capped at `TowerMaxBlockWritesPerFrame`; the
+  raw write journals the cell to clients as `BlockChanges`. Each frame a sweep writes the depleted piles and the open
+  doors' remaining cells: a written or gone cell leaves the set, an unloaded one stays for later and never blocks the rest,
+  and the cap ends the sweep. BT-8's collapse reuses it.
+- **Saves and the wire**: `stations.json`'s `Towers` (`StationSaveData.TowerData`: the cell, and per floor the waves left
+  per pile in `PileCells` order, the door bit and owed), restored before the entities through `TowerPlacement.TryGetSite`
+  (an entry whose site, floor count or pile count no longer matches is dropped and counted). Only site-built records are
+  saved. Every record rides the end of `StationState` (protocol 26). The client's manager has no writer: it never ticks,
+  never raises a skeleton or opens a door, and each snapshot replaces its `TowerRecord.Mirror`s; door and pile cells reach
+  it through `BlockChanges`.
+- **Look-at line** (`TowerManager.Detail`, `TowerReadout`, on both sides): a pile reads "Floor 2: 3 piles, 4 skeletons", a
+  sealed door "Floor 2 sealed: clear floor 1 first", "... 2 piles left" or "... 5 skeletons left" (floors counted from 1).
+- **Scenario**: the `towerclear` op (`World.ClearTowerFloor`) clears a floor at once; `visual-examples/battle-tower.json`
+  films it. Tests: `TowerLockBlockTests`, `TowerShellTests`, `TowerPlacementTests`, `TowerRulesTests`,
+  `SkeletonPileManagerTests`, `TowerBlockWriterTests`, `TowerManagerTests`, `TowerManagerSaveTests`,
+  `StationNetCodecTests`, the skeleton despawn cases of `SkeletonManagerTests`, the bound skeleton in
+  `WorldLifecycleTests` and the loopback `GameServerTests.AClientSeesATowerDoorOpenOnceItsFloorIsCleared`.
+- **Known gaps**: only a non-immune target raises piles, so a creative player who is not flying cannot clear a floor (a
+  flying one noclips past the doors); a door's support pop on a server runs with the creative server camera's context and
+  may drop nothing; a tower whose chunks were saved before BT-4 keeps air in its door cells and has no piles, so the
+  manager still tracks it but its doors read gone and open at once; the far LOD shows none of this; a pile whose nine
+  spawn columns are all walled in retries forever.
 
 ### Sandworm
 

@@ -301,33 +301,10 @@ public sealed class TowerPlacementTests
     private static bool Overlaps(TowerSite s, PlacedStructure p) =>
         p.MinX <= s.MaxX && p.MaxX >= s.MinX && p.MinZ <= s.MaxZ && p.MaxZ >= s.MinZ;
 
-    /// <summary>A tower of the smallest radius at a fixed spot, every floor wearing <paramref name="floor"/> and the roof
-    /// <paramref name="altar"/>, both at <paramref name="turns"/>.</summary>
-    private static TowerSite SyntheticSite(StructureTemplate floor, StructureTemplate altar, int turns)
-    {
-        var floors = WorldGenerationConfig.TowerMinFloors;
-        return new TowerSite(5, 7, 5 * 1536 + 700, 7 * 1536 + 600, 70, WorldGenerationConfig.TowerMinRadius, floors, 0,
-            TowerPalette.For(Biome.Forest), altar, turns, Enumerable.Repeat(floor, floors).ToArray(),
-            Enumerable.Repeat(turns, floors).ToArray());
-    }
-
-    /// <summary>One synthetic site per (floor template, altar template, turn) pairing, so every template is seen at every turn.</summary>
-    private static IEnumerable<TowerSite> SyntheticSites()
-    {
-        var floors = StructureRegistry.Of(StructureKind.TowerFloor);
-        var altars = StructureRegistry.Of(StructureKind.TowerAltar);
-        Assert.NotEmpty(floors);
-        Assert.NotEmpty(altars);
-        var pairs = Math.Max(floors.Count, altars.Count);
-        for (var i = 0; i < pairs; i++)
-        for (var turns = 0; turns < 4; turns++)
-            yield return SyntheticSite(floors[i % floors.Count], altars[i % altars.Count], turns);
-    }
-
     [Fact]
     public void DressingTemplatesFitTheSmallestRoomAtEveryTurn()
     {
-        var site = SyntheticSite(StructureRegistry.Of(StructureKind.TowerFloor)[0], StructureRegistry.Of(StructureKind.TowerAltar)[0], 0);
+        var site = TowerSiteFixture.SyntheticSite(StructureRegistry.Of(StructureKind.TowerFloor)[0], StructureRegistry.Of(StructureKind.TowerAltar)[0], 0);
         foreach (var template in StructureRegistry.Of(StructureKind.TowerFloor).Concat(StructureRegistry.Of(StructureKind.TowerAltar)))
         {
             if (template.Kind == StructureKind.TowerFloor)
@@ -350,7 +327,7 @@ public sealed class TowerPlacementTests
     public void EverySupportedDressingBlockHasItsHolder()
     {
         var checkedBlocks = 0;
-        foreach (var s in SyntheticSites())
+        foreach (var s in TowerSiteFixture.SyntheticSites())
         {
             var r = s.RoomRadius;
             for (var x = s.CenterX - r; x <= s.CenterX + r; x++)
@@ -373,12 +350,29 @@ public sealed class TowerPlacementTests
     [Fact]
     public void TheAltarCellIsFreeOnAnUnbreakableRoof()
     {
-        foreach (var s in SyntheticSites().Append(Nearest()))
+        foreach (var s in TowerSiteFixture.SyntheticSites().Append(Nearest()))
         {
             var (x, y, z) = s.AltarCell;
             Assert.Equal(BlockType.Air, (byte)TowerGenerator.CellAt(s, x, y, z));
             var roof = TowerGenerator.CellAt(s, x, y - 1, z);
             Assert.True(roof >= 0 && BlockType.IsUnbreakable((byte)BlockOf(roof)));
+        }
+    }
+
+    [Fact]
+    public void EveryFloorHasPilesStandingOnItsSlabWhereThePointQuerySaysSo()
+    {
+        foreach (var s in TowerSiteFixture.SyntheticSites())
+        for (var k = 0; k < s.Floors; k++)
+        {
+            var piles = s.PileCells(k);
+            Assert.NotEmpty(piles);
+            Assert.Equal(piles.Count, piles.Distinct().Count());
+            foreach (var (x, y, z) in piles)
+            {
+                Assert.Equal(TowerPalette.PileBlock, (byte)BlockOf(TowerGenerator.CellAt(s, x, y, z)));
+                Assert.Equal(s.FloorY(k) + 1, y);
+            }
         }
     }
 

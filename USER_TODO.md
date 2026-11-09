@@ -160,3 +160,16 @@ plinth and cap; both models are symmetric.
 - [ ] **Battle tower bricks** — `tower_bricks.png`, `tower_bricks_sandstone.png`,
   `tower_bricks_frost.png`. Opaque and tileable; palette swaps of `stone_bricks`, so the three must
   read as one structure in their biomes.
+
+### Battle tower locks
+
+Both made by `tools/generate-tower-lock-textures.py`: re-running puts the placeholders back
+(`--check` compares), so remove or repoint that generator with the replacement.
+
+- [ ] **Tower gate** — `tower_door.png`. 32x32 RGBA, a cutout with binary alpha (fully clear gaps,
+  fully opaque iron): a `cube_all` portcullis seen through from both sides, with two cells stacked in
+  each stairwell, so its frame should still read where the cells meet.
+- [ ] **Skeleton pile** — `skeleton_pile.png`. 32x32 RGBA, fully opaque. The `skeleton_pile` model
+  crops it with default UVs: the base's sides take rows 26..31 across columns 4..27, its top the
+  square rows/columns 4..27; the skull's sides take rows 18..25 across columns 10..21 (the sockets
+  sit there) and its top the square rows/columns 10..21.

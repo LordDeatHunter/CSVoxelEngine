@@ -29,6 +29,33 @@ public sealed class StationSaveData
     /// <summary>The waystone registry's records (a waystone nobody activated has none).</summary>
     public List<WaystoneData>? Waystones { get; set; }
 
+    /// <summary>The battle towers' floor locks (a tower nobody entered has none and starts sealed).</summary>
+    public List<TowerData>? Towers { get; set; }
+
+    /// <summary>One battle tower's lock state, keyed by its placement cell (see
+    /// <see cref="Simulation.Tower.TowerManager"/>).</summary>
+    public sealed class TowerData
+    {
+        /// <summary>The tower's placement cell as <c>int[2]</c> (cellX, cellZ).</summary>
+        public int[]? Cell { get; set; }
+
+        /// <summary>One entry per floor, ground floor first.</summary>
+        public List<TowerFloorData>? Floors { get; set; }
+    }
+
+    /// <summary>One tower floor's lock state.</summary>
+    public sealed class TowerFloorData
+    {
+        /// <summary>The waves each pile still raises, in the site's pile order.</summary>
+        public int[]? Waves { get; set; }
+
+        /// <summary>Whether the door sealing this floor from the next has opened (it stays open).</summary>
+        public bool DoorOpen { get; set; }
+
+        /// <summary>Bound skeletons that despawned or strayed and must be raised again.</summary>
+        public int Owed { get; set; }
+    }
+
     /// <summary>One waystone's registry row, keyed by its cell (see <see cref="Simulation.Waystones.WaystoneManager"/>).</summary>
     public sealed class WaystoneData
     {

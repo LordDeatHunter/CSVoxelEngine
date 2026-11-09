@@ -26,9 +26,11 @@ using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Server;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;
 using VoxelEngine.Tests.Magic;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Structures;
 using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
@@ -101,6 +103,9 @@ public sealed class GameServerTests : IDisposable
         /// <summary>Each listed player's movement flags from the newest <see cref="NetMessage.PlayerList"/>, by name.</summary>
         public readonly Dictionary<string, NetPlayerFlags> ListedFlags = new();
 
+        /// <summary>The newest <see cref="NetMessage.StationState"/> payload received, raw (message byte included).</summary>
+        public byte[]? Stations;
+
         public void Drain(NetworkClient client)
         {
             while (client.Inbound.TryDequeue(out var payload))
@@ -171,6 +176,9 @@ public sealed class GameServerTests : IDisposable
                         }
                         break;
                     }
+                    case NetMessage.StationState:
+                        Stations = payload;
+                        break;
                 }
             }
         }
@@ -1246,6 +1254,71 @@ public sealed class GameServerTests : IDisposable
             Assert.True(copy.IsMirror);
             Assert.Equal(worm.Phase, copy.Phase);
             Assert.Equal(worm.Position, copy.Position);
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    [Fact]
+    public void AClientSeesATowerDoorOpenOnceItsFloorIsCleared()
+    {
+        using var client = Connect("Climber");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var inbox = InboxOf(client);
+
+        // A one-floor tower around the arena: its band holds the arena's rows, a pile beside the player and a
+        // two-cell door in front of it
+        var door = new[] { (arena.X + 2, arena.Y, arena.Z), (arena.X + 2, arena.Y + 1, arena.Z) };
+        var pile = (arena.X - 2, arena.Y, arena.Z);
+        var record = TowerRecord.Build((900, 900), arena.X, arena.Z, 8,
+            [(arena.Y - 1, arena.Y + 4, (IReadOnlyList<(int X, int Y, int Z)>)[pile], door)], hasSite: false);
+        _world.Towers.Track(record);
+        foreach (var (x, y, z) in door)
+            SetCell(new Vector3(x, y, z), TowerPalette.DoorBlock);
+        SetCell(new Vector3(pile.Item1, pile.Item2, pile.Item3), TowerPalette.PileBlock);
+
+        bool Broadcasts(int from, (int X, int Y, int Z) cell, byte id) =>
+            inbox.Broadcast.Skip(from).Any(c => c.X == cell.X && c.Y == cell.Y && c.Z == cell.Z && c.Id == id);
+
+        // The closed door reaches the client (pumping the server only, so the pile never wakes)
+        var sw = Stopwatch.StartNew();
+        while (!door.All(d => Broadcasts(0, d, TowerPalette.DoorBlock)) && sw.Elapsed.TotalSeconds < 10)
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+            DrainAll();
+        }
+        Assert.True(door.All(d => Broadcasts(0, d, TowerPalette.DoorBlock)), "the door never reached the client");
+
+        // Clearing the floor opens its door: the world writes the door cells to air and the client is told
+        var seen = inbox.Broadcast.Count;
+        Assert.True(_world.ClearTowerFloor(new Vector3(arena.X + 0.5f, arena.Y + 1f, arena.Z + 0.5f), 0));
+        sw.Restart();
+        while (!door.All(d => Broadcasts(seen, d, 0)) && sw.Elapsed.TotalSeconds < 10)
+            Tick(0.05);
+        Assert.True(door.All(d => Broadcasts(seen, d, 0)), "the opened door never reached the client");
+        Assert.True(record.Floors[0].DoorOpen);
+
+        // A station frame sent after the door opened carries it to the client's mirror
+        inbox.Stations = null;
+        sw.Restart();
+        while (inbox.Stations == null && sw.Elapsed.TotalSeconds < 10)
+            Tick(0.05);
+        Assert.NotNull(inbox.Stations);
+
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            // ClientSession hands ApplyNetworkStations a reader already past the message byte
+            using var reader = new PacketReader(inbox.Stations!);
+            Assert.Equal(NetMessage.StationState, reader.Message);
+            mirror.ClientMirror.ApplyNetworkStations(reader);
+            var copy = mirror.Towers.RecordAt(arena.X, arena.Z);
+            Assert.NotNull(copy);
+            Assert.True(copy!.Floors[0].DoorOpen);
         }
         finally
         {

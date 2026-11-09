@@ -177,6 +177,12 @@ internal sealed class MobDirector
             BillLocalPlayer(_skeletons.DamageDealtThisFrame);
         }
 
+        // The tower's piles raise skeletons, and its floor locks open once their floor is cleared
+        // (a client's tower mirror has no writer and never ticks)
+        if (!_clientMode)
+            _world.Towers.Update((float)deltaTime, _chunkManager, _skeletons, _mobTargets,
+                _world.Persistence.PendingTowerSkeletons, _world.Persistence.TakeDiscardedTowerSkeletons);
+
         // The sandworm boss hunts under the sand, erupts under its target and slides at it
         if (_sandworms != null)
         {

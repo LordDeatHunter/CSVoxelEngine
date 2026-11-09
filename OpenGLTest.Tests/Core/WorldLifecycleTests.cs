@@ -312,6 +312,11 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(first.SpawnEntity(Cloudgolem.EntityName, new Vector3(-4f, High - 1f, 4f)));
         // A tower skeleton above the first floor: its tier cannot be read back from the position
         Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(5f, High - 1f, -5f), tier: 4));
+        // A second, first-floor skeleton left unbound, beside the first one bound to a tower floor
+        Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(-5f, High - 1f, -5f), tier: 0));
+        var boundFloor = new TowerFloorRef(7, -3, 4);
+        var bound = Assert.Single(first.Skeletons, s => s.Tier > 0);
+        bound.Floor = boundFloor;
         var slime = Assert.Single(first.Slimes);
         var goblin = Assert.Single(first.Goblins);
         Assert.True(slime.Size > SlimeSize.Min);
@@ -332,9 +337,10 @@ public sealed class WorldLifecycleTests : IDisposable
             realmMob.RestoreState(realmMob.MaxHealth - 2, 0.75f, Vector3.Zero);
             realmSaved.Add((realmMob.GetType(), realmMob.Position, realmMob.Health, realmMob.Facing));
         }
-        Assert.Equal(5, realmSaved.Count);
-        var skeletonTier = Assert.Single(first.Skeletons).Tier;
-        Assert.True(skeletonTier > 0);
+        Assert.Equal(6, realmSaved.Count);
+        var skeletonTier = bound.Tier;
+        var boundCenter = bound.Position;
+        var unboundCenter = Assert.Single(first.Skeletons, s => s != bound).Position;
 
         var rock = EquipRock(first);
         first.Throws.ThrowSelected();
@@ -365,15 +371,18 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(realmSaved.Count, restoredRealm.Count);
         foreach (var (kind, center, health, facing) in realmSaved)
         {
-            var restored = Assert.Single(restoredRealm, m => m.GetType() == kind);
+            var restored = Assert.Single(restoredRealm, m => m.GetType() == kind && m.Position == center);
             Assert.Equal(center, restored.Position);
             Assert.Equal(health, restored.Health);
             Assert.Equal(facing, restored.Facing);
         }
-        // The skeleton came back at its saved tier, so its wounded health fits a pool above the first floor's
-        var restoredSkeleton = Assert.Single(second.Skeletons);
+        // The bound skeleton came back at its saved tier, so its wounded health fits a pool above the first floor's,
+        // and bound to the same tower floor; the unbound one came back bound to none
+        var restoredSkeleton = Assert.Single(second.Skeletons, s => s.Position == boundCenter);
         Assert.Equal(skeletonTier, restoredSkeleton.Tier);
         Assert.True(restoredSkeleton.MaxHealth > restoredSkeleton.Type.MaxHealth);
+        Assert.Equal(boundFloor, restoredSkeleton.Floor);
+        Assert.Null(Assert.Single(second.Skeletons, s => s.Position == unboundCenter).Floor);
         Assert.Equal(2 + realmSaved.Count, second.Mobs.Count); // RefreshMobs ran at the flip
 
         var restoredDrop = Assert.Single(second.Drops);

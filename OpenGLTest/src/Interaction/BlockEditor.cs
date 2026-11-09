@@ -612,6 +612,15 @@ internal sealed class BlockEditor
             _lodManager.MarkEditedColumn(x, z);
     }
 
+    /// <summary>
+    /// Pops every support-fragile block the emptied cell (x, y, z) was holding up, for a writer that
+    /// cleared the cell itself (the battle tower's <c>TowerBlockWriter</c>). The pops run for the local
+    /// player's context, so they roll loot only while it is not creative. Known gap: a dedicated server's
+    /// camera hovers in creative, so a pop beside a cell it clears there drops nothing. Main thread only.
+    /// </summary>
+    internal void PopUnsupportedAt(int x, int y, int z) =>
+        PopUnsupportedAround(new Vector3(x, y, z), _world.LocalPlayer.LocalContext());
+
     /// <summary>Runs <see cref="NotifyLodEdit"/> over every cell of the structure at
     /// <paramref name="anchor"/>, after a convert or a revert rewrote them.</summary>
     private void NotifyLodEditMultiblock(Vector3 anchor, BlockType anchorType)

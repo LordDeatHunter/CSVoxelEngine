@@ -190,8 +190,11 @@ public static class NetFraming
     /// registry rows of its discovered waystones) current, and takes a <see cref="NetMessage.WaystoneRename"/> from a
     /// waystone's first discoverer. An older peer would refuse the intent as malformed and never open a waystone.
     /// 25: <see cref="NetEntityKind.Skeleton"/> (the battle tower's skeleton): its tower tier in the item byte, its attack
-    /// count (melee even, shot odd) in the ammo field; an older client would not draw it.</summary>
-    public const int ProtocolVersion = 25;
+    /// count (melee even, shot odd) in the ammo field; an older client would not draw it.
+    /// 26: the battle tower locks appended at the end of <see cref="NetMessage.StationState"/> (each tower's cell, center,
+    /// radius and per floor its band, piles left, skeletons left and door bit); an older peer would misread the station
+    /// frames.</summary>
+    public const int ProtocolVersion = 26;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

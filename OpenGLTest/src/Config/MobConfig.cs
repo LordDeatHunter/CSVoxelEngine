@@ -418,6 +418,20 @@ public static class MobConfig
     /// <summary>The most mobs one pile wave raises.</summary>
     public const int TowerPackMaxSize = 4;
 
+    // --- Battle tower locks (TowerBlockWriter, SkeletonPileManager, TowerManager) ---
+    /// <summary>The most cells the tower block writer clears in one frame (opened doors, spent piles).</summary>
+    public const int TowerMaxBlockWritesPerFrame = 32;
+    /// <summary>How close, horizontally, a target on a pile's floor must come before the pile raises skeletons.</summary>
+    public const float SkeletonPileTriggerBlocks = 8f;
+    /// <summary>How many waves of skeletons one pile raises before it is spent.</summary>
+    public const int SkeletonPileWaves = 2;
+    /// <summary>Seconds a pile waits after a wave before it raises the next one.</summary>
+    public const float SkeletonPileWaveSeconds = 6f;
+    /// <summary>Seconds between the tower manager's looks for a tower under each target.</summary>
+    public const float TowerScanSeconds = 0.5f;
+    /// <summary>A bound skeleton farther than this from its tower's center is released and owed back to its floor.</summary>
+    public const float TowerSkeletonLeashBlocks = 48f;
+
     // --- Entity healthbars (EntityHealthbarRenderer) ---
     // Five hearts float above every live mob, billboarded to face the camera, using the same
     // heart sprites as the player HUD. The pool is drawn proportionally across the row (each

@@ -129,6 +129,10 @@ internal sealed class WorldPersistence
     private readonly List<EntitySaveData.IcebergData> _pendingIcebergs = [];
     private double _entityRestoreTimer;
 
+    // The tower floors of saved skeletons a restore timeout discarded, owed back to their floors
+    // (TakeDiscardedTowerSkeletons), so a reload never opens a door early
+    private readonly List<TowerFloorRef> _discardedTowerSkeletons = [];
+
     // Scratch for CaptureEntities' nearest-first drop order, reused across saves
     private readonly List<(float dist2, ItemDrop drop)> _dropSort = [];
 
@@ -219,10 +223,39 @@ internal sealed class WorldPersistence
             || (_pendingMobs.Count <= 0 && _pendingDrops.Count <= 0 && _pendingIcebergs.Count <= 0)) return;
 
         Log.Warn($"Entity save: discarded {_pendingMobs.Count} mob(s), {_pendingDrops.Count} drop(s) and {_pendingIcebergs.Count} iceberg(s) whose chunks never loaded or that a full cap kept out");
+        foreach (var mob in _pendingMobs)
+            if (TowerFloorOf(mob) is { } floor)
+                _discardedTowerSkeletons.Add(floor);
         _pendingMobs.Clear();
         _pendingDrops.Clear();
         _pendingIcebergs.Clear();
     }
+
+    /// <summary>How many saved skeletons bound to <paramref name="floor"/> still wait for a restore; they count
+    /// as alive toward the floor's lock.</summary>
+    internal int PendingTowerSkeletons(TowerFloorRef floor)
+    {
+        var count = 0;
+        foreach (var mob in _pendingMobs)
+            if (TowerFloorOf(mob) == floor)
+                count++;
+        return count;
+    }
+
+    /// <summary>Appends the tower floors of the saved skeletons a restore timeout discarded to
+    /// <paramref name="into"/>, then forgets them: each is owed back to its floor.</summary>
+    internal void TakeDiscardedTowerSkeletons(List<TowerFloorRef> into)
+    {
+        into.AddRange(_discardedTowerSkeletons);
+        _discardedTowerSkeletons.Clear();
+    }
+
+    // The tower floor a saved skeleton counts toward, or null for an untagged or other entry
+    private static TowerFloorRef? TowerFloorOf(EntitySaveData.MobData mob) =>
+        mob.TowerCell is { Length: 2 } cell && mob.TowerFloor is >= 0 and var floor
+        && mob.Type != null && SkeletonManager.HeightOf(mob.Type) > 0f
+            ? new TowerFloorRef(cell[0], cell[1], floor)
+            : null;
 
     // Spawns every pending saved iceberg once every chunk under its placed bounds is loaded (a berg
     // collides with its whole footprint, so a part over an unloaded chunk would refuse it). A spawn
@@ -372,7 +405,11 @@ internal sealed class WorldPersistence
             return _skyMobs!.Spawn(name, center);
         // Before the hell fall-through, which would otherwise take the skeleton
         if (SkeletonManager.HeightOf(name) > 0f)
-            return _skeletons!.Spawn(center, mob.Tier ?? 0);
+        {
+            var skeleton = _skeletons!.Spawn(center, mob.Tier ?? 0);
+            if (skeleton != null) skeleton.Floor = TowerFloorOf(mob);
+            return skeleton;
+        }
         if (string.Equals(name, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase))
         {
             // A restored worm resumes the hunt under the sand at once, without a second thump
@@ -399,7 +436,7 @@ internal sealed class WorldPersistence
         mobs.AddRange(from t in goblins where !t.IsDead select MobSaveCodec.Capture(t, t.Ammo, torches: t.Torches));
         mobs.AddRange(from t in HellMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in SkyMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
-        mobs.AddRange(from t in Skeletons where !t.IsDead select MobSaveCodec.Capture(t, null, tier: t.Tier));
+        mobs.AddRange(from t in Skeletons where !t.IsDead select MobSaveCodec.Capture(t, null, tier: t.Tier, floor: t.Floor));
         mobs.AddRange(from t in Sandworms where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(_pendingMobs);
 
@@ -480,7 +517,8 @@ internal sealed class WorldPersistence
             return;
         var skipped = _campfires.Restore(saved.Campfires) + _querns.Restore(saved.Querns)
             + _kilns.Restore(saved.Kilns) + _casting.Restore(saved.Casts) + _world.Chests.Restore(saved.Chests)
-            + _world.Waystones.Restore(saved.Waystones) + _world.Smithing.Restore(saved);
+            + _world.Waystones.Restore(saved.Waystones) + _world.Smithing.Restore(saved)
+            + _world.Towers.Restore(saved.Towers);
         if (skipped > 0)
             Log.Warn($"Station save: dropped {skipped} saved station entr{(skipped == 1 ? "y" : "ies")} that no longer resolve");
     }
@@ -497,6 +535,7 @@ internal sealed class WorldPersistence
             Casts = _casting.Capture(),
             Chests = _world.Chests.Capture(),
             Waystones = _world.Waystones.Capture(),
+            Towers = _world.Towers.Capture(),
         };
         _world.Smithing.Capture(data);
         _saveStore.EnqueueFile(StationSaveCodec.FileName, StationSaveCodec.ToBytes(data));

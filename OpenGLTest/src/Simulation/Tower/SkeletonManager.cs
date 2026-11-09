@@ -15,11 +15,16 @@ namespace VoxelEngine.Simulation.Tower;
 /// launches an arrow (a <see cref="ThrownProjectile"/> of the <c>arrow</c> item, which flies point first) at each
 /// bow release and hurts the first non-immune target an arrow touches. Skeletons never spawn on their own: they
 /// appear only through <see cref="Spawn(Vector3, int, bool)"/>, judged by the global <see cref="MobCaps"/> it
-/// shares with the other mob kinds. Main thread only.
+/// shares with the other mob kinds. A skeleton bound to a tower floor (<see cref="Skeleton.Floor"/>) despawns like
+/// any mob, and so does one the tower leashes back (<see cref="Release"/>): each is reported once through
+/// <see cref="TakeReleased"/>, so its floor owes it back and raises it again later. Leaving a tower therefore never
+/// clears a floor and never leaves skeletons holding cap room far away. Main thread only.
 /// </summary>
 public sealed class SkeletonManager : RealmMobManager<Skeleton>
 {
     private readonly EntityType? _type;
+    // The floors of bound skeletons that despawned or were released since the last TakeReleased
+    private readonly List<TowerFloorRef> _released = [];
     // Each arrow carries its archer's damage, scaled by the archer's tier
     private readonly MobMissiles _arrows = new();
     private readonly byte _arrowItemId;
@@ -61,6 +66,32 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
         _type != null && string.Equals(kind, Skeleton.EntityName, StringComparison.OrdinalIgnoreCase)
             ? new Skeleton(_type, position, 0, spawnIn)
             : null;
+
+    /// <summary>
+    /// Fades out <paramref name="skeleton"/> without loot (a tower leash: it strayed too far from its floor) and,
+    /// when it is bound to a floor, reports that floor through <see cref="TakeReleased"/>. A dying or dead skeleton
+    /// is left alone, so a skeleton is never reported twice.
+    /// </summary>
+    internal void Release(Skeleton skeleton)
+    {
+        if (skeleton.IsDying || skeleton.IsDead) return;
+        if (skeleton.Floor is { } floor) _released.Add(floor);
+        skeleton.BeginDying();
+    }
+
+    /// <summary>Appends the floors of the bound skeletons that despawned or were released since the last call to
+    /// <paramref name="into"/>, then forgets them.</summary>
+    internal void TakeReleased(List<TowerFloorRef> into)
+    {
+        into.AddRange(_released);
+        _released.Clear();
+    }
+
+    /// <inheritdoc />
+    protected override void OnDespawn(Skeleton mob)
+    {
+        if (mob.Floor is { } floor) _released.Add(floor);
+    }
 
     /// <summary>Test seam: launches an arrow as if a skeleton had shot it, carrying <paramref name="damage"/>.</summary>
     internal ThrownProjectile TestLaunchArrow(Vector3 origin, Vector3 velocity, int damage) =>

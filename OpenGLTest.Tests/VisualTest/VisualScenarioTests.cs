@@ -117,6 +117,18 @@ public sealed class VisualScenarioTests
     }
 
     [Fact]
+    public void ATowerClearStepParsesItsFloor()
+    {
+        var scenario = VisualScenario.Parse(
+            """{ "steps": [{ "op": "towerclear", "floor": 2 }, { "op": "TowerClear" }] }""", "tower");
+        Assert.Equal("towerclear", scenario.Steps[0].Op);
+        Assert.Equal(2, scenario.Steps[0].Floor);
+        // An absent floor is the ground floor
+        Assert.Equal("towerclear", scenario.Steps[1].Op);
+        Assert.Equal(0, scenario.Steps[1].Floor);
+    }
+
+    [Fact]
     public void SpawnCarriesAnOptionalSizeThatDefaultsToTheSmallest()
     {
         var scenario = VisualScenario.Parse(

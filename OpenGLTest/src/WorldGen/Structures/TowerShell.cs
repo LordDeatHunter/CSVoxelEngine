@@ -13,8 +13,10 @@ namespace VoxelEngine.WorldGen.Structures;
 /// (even) and brick (odd); an inner wall with one doorway per floor where the stair is level with that floor's slab; and the
 /// rooms, a slab every <see cref="WorldGenerationConfig.TowerFloorHeight"/> blocks up to the roof. A short apron cuts a walkway
 /// in front of the entrance. Every disc cell from the foundation to the top is written, as air or block. The barrier door of
-/// floor k (BT-4) fills the tube over two steps just past its doorway (<see cref="DoorCells"/>); with those cells solid, the
-/// unbreakable bricks seal every floor from the next one and the top floor from the roof.
+/// floor k (BT-4) fills the tube over two steps just past its doorway (<see cref="DoorCells"/>, <see cref="IsDoorStep"/>):
+/// worldgen stamps the closed door there as the unbreakable door block, which the BT-4 <c>TowerManager</c> opens to air once the
+/// floor is cleared. With those cells shut, the unbreakable bricks seal every floor from the next one and the top floor from the
+/// roof.
 /// </para>
 /// </summary>
 internal static class TowerShell
@@ -117,9 +119,23 @@ internal static class TowerShell
             if (t < 0 && !(m == -1 && InEntrance(step))) continue;
             var stepY = StepY(s, t);
             if (y == stepY) return IsSlabStep(t) ? s.Palette.Step : s.Palette.Brick;
-            if (y > stepY && y <= stepY + Headroom) return BlockType.Air;
+            if (y > stepY && y <= stepY + Headroom) return IsDoorStep(s, t) ? TowerPalette.DoorBlock : BlockType.Air;
         }
         return y <= s.RoofY ? s.Palette.Brick : BlockType.Air;
+    }
+
+    /// <summary>Whether half-step <paramref name="t"/> is one of the two steps a floor's closed barrier door fills the tube
+    /// over: <see cref="TowerSite.DoorStep"/> of some floor k (0..<see cref="TowerSite.Floors"/> - 1) or the step after it.
+    /// Closed-form (it mirrors <c>DoorStep(k) = (k == 0 ? 1 : 2kH - 1) + offset</c>), so the stamp's hot path runs no loop.</summary>
+    internal static bool IsDoorStep(TowerSite s, int t)
+    {
+        var u = t - WorldGenerationConfig.TowerDoorStepOffset;
+        if (u < 0) return false;
+        if (u == 1 || u == 2) return true;
+        const int period = 2 * WorldGenerationConfig.TowerFloorHeight;
+        var k = (u + 1) / period;
+        var r = (u + 1) % period;
+        return (r == 0 || r == 1) && k >= 1 && k < s.Floors;
     }
 
     private static int InnerWallAt(TowerSite s, int step, int y)
@@ -144,7 +160,8 @@ internal static class TowerShell
     private static int Mod(int v, int m) => (v % m + m) % m;
 
     /// <summary>The stair tube cells floor <paramref name="k"/>'s barrier door fills: in every corridor column of the door's two
-    /// strips, the headroom over that column's step. Air in the shell.</summary>
+    /// strips, the headroom over that column's step. Worldgen stamps the closed door there as the door block, and the BT-4
+    /// <c>TowerManager</c> opens it to air.</summary>
     internal static IReadOnlyList<(int X, int Y, int Z)> DoorCells(TowerSite s, int k)
     {
         if (k < 0 || k >= s.Floors) throw new ArgumentOutOfRangeException(nameof(k), k, "A tower has a door per floor below the roof.");

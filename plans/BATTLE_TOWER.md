@@ -4,13 +4,14 @@
 
 ## Status
 
-BT-1 to BT-3 done; BT-4 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
+BT-1 to BT-4 done; BT-5 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
 the tower generator (see "Tower generator (BT-2)" under Reference), BT-3 the undead skeleton with its melee rake, bow
-and arrows, floor-tier difficulty and forced-spawn-only manager (see "Skeleton (BT-3)" and AGENTS.md "Skeleton").
+and arrows, floor-tier difficulty and forced-spawn-only manager (see "Skeleton (BT-3)" and AGENTS.md "Skeleton"), BT-4
+the skeleton piles, the floor doors and `TowerManager` (see "Locks (BT-4)" and AGENTS.md "Battle tower").
 Tracks the battle tower: a rare, huge (radius ~20+) cylindrical landmark of 4-8 floors with skeleton piles, chests, floor locks, a roof
 altar that summons the Skeleton King, unique boss loot and a collapse into a ruin. One phase per prompt; each phase
-leaves the game building and the tests green. **Content ids are tight: 17 left, see Reference.**
-Last updated 2026-11-08.
+leaves the game building and the tests green. **Content ids are tight: 13 left, see Reference.**
+Last updated 2026-11-09.
 
 ## In progress
 
@@ -18,14 +19,6 @@ Nothing.
 
 ## Open
 
-- [ ] **`BT-4` · Skeleton piles, floor locks and `TowerManager`** — P1, L.
-  A worldgen-only pile block with a `SkeletonPileManager` (main thread, like the kiln registries): a player within ~8
-  blocks makes it raise skeletons in waves, then it depletes. A worldgen-only barrier door block across each floor's
-  stairwell; the `TowerManager` opens it when the floor's piles are depleted and its skeletons dead. State in
-  `stations.json` (Capture/Restore) and the `StationState` frame (protocol bump); the client only mirrors it.
-  The barrier door of floor k fills `TowerSite.DoorCells(k)`: the headroom cells of the stair tube over the two
-  half-steps `DoorStep(k)` and `DoorStep(k) + 1`, past each landing's doorway (BT-2's flood-fill test proves that
-  with those cells solid no floor reaches the next or the roof, even with every breakable cell mined).
 - [ ] **`BT-5` · Chests and floor loot** — P1, S.
   Worldgen-only tower chests like `ruin_chest_*` in the floor templates; loot tables per floor tier
   (`loot/tower_floor_N`) rolled by `ChestLoot.Materialize`, richer going up. **Hook:** `Simulation/Chests/`.
@@ -35,7 +28,8 @@ Nothing.
   boss health bar HUD. Server-authoritative, saved, on the wire (`NetEntityKind`, protocol bump). **Hook:** the
   sandworm (`SandwormManager`) is the boss template; `RealmMob` is the frame.
   **The altar sits on an open roof** (a player can pillar up the outside), so the ritual must be refused until
-  `TowerManager` (BT-4) reports every floor of that tower cleared. The altar cell is `TowerSite.AltarCell`.
+  `TowerManager` reports every floor of that tower cleared (every `TowerFloorState.DoorOpen` of its record, see "Locks
+  (BT-4)"). The altar cell is `TowerSite.AltarCell`.
 - [ ] **`BT-7` · Boss loot and unique items** — P2, L.
   Exactly one guaranteed unique per boss, rolled from a pool, plus ingots and goodies from a boss table. Two of the
   pool's uniques are shipped (crafted for now; the boss table is what is left): the **Bone-Breaker Blade**, a sword that
@@ -48,12 +42,14 @@ Nothing.
   around where it stood, through a capped-per-frame writer like `StatusEffectBlockWriter` that calls every edit-path
   hook (journal, LOD, fluids, leaf decay, gravity). Written chunks become `ModifiedSinceSave`, so the ruin persists;
   hold the collapse until every footprint chunk is loaded, and record the tower as conquered in the world save so a
-  chunk that loads late still gets the ruin. The writer is the one thing allowed past `unbreakable`: it writes through
-  `Chunk.CollapseWriteAt` (already in place, hook-free) and must run every edit-path hook itself.
+  chunk that loads late still gets the ruin. The writer is the one thing allowed past `unbreakable`: reuse BT-4's
+  `TowerBlockWriter`, which writes through `Chunk.CollapseWriteAt` and already runs every edit-path hook (it only clears
+  to air today; a ruin needs a target block too).
 - [ ] **`BT-9` · Verify and document** — P2, S.
-  Extend `visual-examples/battle-tower.json` (`VOXEL_TIME=147`, from BT-2) with skeletons, locks and the boss, loopback `GameServerTests` for skeletons, boss, piles and
-  locks on a client, a perf pass, then fold the design into AGENTS.md (Layout and a "Battle tower" section) and the
-  wiki, and delete this file's finished entries.
+  Extend `visual-examples/battle-tower.json` (`VOXEL_TIME=147`, from BT-2; BT-4 added piles, a gate and a cleared floor)
+  with the boss, loopback `GameServerTests` for the boss on a client (skeletons and locks have theirs), a perf pass, then
+  fold the rest of the design into AGENTS.md's "Battle tower" section (BT-4 started it) and the wiki, and delete this
+  file's finished entries.
 - [ ] **`BT-10` · Dark tower interiors** — P2, M.
   Tower interiors are sunlit: `ChunkLighting` seeds sun from the column heightmap, which stays the terrain's (the
   tower must not raise `ColumnData.Heights`, which the LOD, water and spawns read). Seed sun in a tower footprint from
@@ -62,12 +58,11 @@ Nothing.
 
 ## Reference
 
-- **Content id budget (budget constraint, after BT-3, which used 2: the `arrow` and `bone` items, and BT-7's bone pair,
-  which used 2: `bone_breaker_blade`, `bone_charm`): 240 of 255 used (130 blocks, 109 items, air), 15 free.** Rough needs
-  of the later phases: BT-4 skeleton pile and barrier door blocks (2, 3 if
-  the door is two cells); BT-5 tower chest block(s) (1 if the loot keys on the floor through the cell or state, up to
+- **Content id budget (budget constraint, after BT-3, which used 2: the `arrow` and `bone` items, BT-7's bone pair,
+  which used 2: `bone_breaker_blade`, `bone_charm`, and BT-4, which used 2: `skeleton_pile`, `tower_door`): 242 of 255
+  used (132 blocks, 109 items, air), 13 free.** Rough needs of the later phases: BT-5 tower chest block(s) (1 if the loot keys on the floor through the cell or state, up to
   4 with one per tier); BT-6 altar block (1); BT-7 one more unique plus a boss material (~2-3 items; the bone fragments
-  reuse `bone`); BT-8 rubble or ruin block(s) (1-2). About 10-14 in total: the tower fits, but leaves little for `CAVE_BIOMES.md`.
+  reuse `bone`); BT-8 rubble or ruin block(s) (1-2). About 5-8 left to spend: the tower fits, but leaves little for `CAVE_BIOMES.md`.
   Prefer one chest block and reuse existing ruin blocks for the rubble.
 - **How `unbreakable` is enforced** (BT-1): load rules (`BlockFieldRules.ValidateUnbreakable` refuses fluid, falls,
   needsSupport, replaceableByPlacement, flammable, meltsTo, the tree-wood and multiblock renderers, upperHalf and
@@ -75,7 +70,7 @@ Nothing.
   path, plus guards in `Chunk.RemoveBlockAt`/`ClearBlockAt`, `Placement.CanOccupy` and the gameplay entry points
   (`Mining`, `LeftClickAction`'s creative branch, `BreakProgress`, `BlockEditor`, `TntManager.Detonate`,
   `FluidManager.SetCellImmediate`, `StatusEffectBlockRule`, `LookLabel`). `Chunk.SetBlockRaw` stays raw;
-  `Chunk.CollapseWriteAt` is the only bypass, and BT-8's writer must call every edit-path hook.
+  `Chunk.CollapseWriteAt` is the only bypass, reached only through BT-4's `TowerBlockWriter`, which calls every edit-path hook.
 - Tower brick tiles are stone_bricks.png with its five colors swapped
   one-to-one onto a palette per variant; a new biome variant is one more palette and one more block JSON.
 - **Tower generator (BT-2)**, 0 content ids used (the tower is the three BT-1 bricks plus existing blocks).
@@ -126,11 +121,39 @@ Nothing.
   - **Hooks for BT-4**: `SkeletonManager.Spawn(position, tier)` (a body center; null at the hard cap, the only way a
     skeleton appears, since it has no ring spawn), `TowerDifficulty.PackSize(tier)` (the wave size, no caller yet),
     `TowerSite.Tier(k)` as the tier, `World.Skeletons` for the floor's living count.
-  - **Despawn**: skeletons keep the shared realm-mob distance and idle despawn past `MobConfig.SkeletonDespawnRadiusBlocks`
-    (96); a pile's skeletons may need to stay while their floor is locked, so BT-4 should revisit it.
+  - **Despawn** (resolved by BT-4): skeletons keep the shared realm-mob distance and idle despawn past
+    `MobConfig.SkeletonDespawnRadiusBlocks` (96); a pile's bound skeleton that despawns or strays past the leash is owed
+    back to its floor and re-raised there, so it never needs to stay (see "Locks (BT-4)").
   - **Tier on the wire and in saves**: `NetEntity.ItemId` (protocol 25) and `EntitySaveData.MobData.Tier`, clamped by
     `TowerDifficulty.Clamp`; the attack count's parity names the clip (melee even, shot odd).
   - **Known gaps**: arrows are not on the wire, skeletons are not drawn in the water mirror.
+
+- **Locks (BT-4)**, 2 content ids (`skeleton_pile`, `tower_door`). See AGENTS.md "Battle tower" for the whole design.
+  - **Files**: `src/Simulation/Tower/` `TowerManager`, `TowerRecord`, `TowerFloorState`, `PileState`,
+    `SkeletonPileManager`, `TowerRules`, `TowerBlockWriter` (+ `TowerWriteResult`), `TowerReadout`;
+    `src/Entities/TowerMobs/TowerFloorRef.cs`; `TowerShell.IsDoorStep`, `TowerGenerator.PileCells`/`TowerSite.PileCells`,
+    `TowerPalette.DoorBlock`/`PileBlock`; the `S` piles in the three floor templates; placeholder tiles from
+    `tools/generate-tower-lock-textures.py` (USER_TODO.md). Tests `TowerLockBlockTests`, `TowerRulesTests`,
+    `SkeletonPileManagerTests`, `TowerBlockWriterTests`, `TowerManagerTests`, `TowerManagerSaveTests`, the tower cases
+    of `StationNetCodecTests`, `SkeletonManagerTests` and `WorldLifecycleTests`, the loopback
+    `GameServerTests.AClientSeesATowerDoorOpenOnceItsFloorIsCleared`, `VisualScenarioTests.ATowerClearStepParsesItsFloor`;
+    shared fixture `Support/TowerSiteFixture`.
+  - **Rule**: door k (seals floor k from k + 1, the last the roof) opens when door k - 1 is open, every pile of floor k
+    is depleted and alive = living + owed + pending is 0; floor k's piles sleep until door k - 1 opens. Opening is
+    permanent and saved (`stations.json` `Towers`, protocol 26 on the wire).
+  - **Hooks**: BT-6 refuses the altar until every `TowerFloorState.DoorOpen` of the tower's record is set
+    (`World.Towers.RecordAt(x, z)`, authoritative side; the client mirror carries the door bits too). BT-8 reuses
+    `TowerBlockWriter` (capped, every edit-path hook; extend it to write a target block, not only air) and can read
+    `TowerSite.PileCells(k)`/`DoorCells(k)`; a conquered tower should drop its `TowerRecord` (or stop judging it).
+  - **Default seed**: tower (2920, -1411) has floor-0 piles at feet y 11 at (2920, -1417), (2916, -1411), (2924, -1411),
+    (2920, -1405) and door 0 at x 2906..2909, y 15..18, z -1426..-1423 (`visual-examples/battle-tower.json`).
+  - **Tuning** (first guesses, `MobConfig` "Battle tower locks"): 4 piles a floor, 2 waves a pile of
+    `TowerDifficulty.PackSize(k)`, trigger 8 blocks, a wave every 6 s, 32 writes a frame, a tower scan every 0.5 s, leash
+    48 blocks.
+  - **Known gaps**: a creative player who is not flying cannot clear a floor (only non-immune targets raise piles); a
+    server door pop runs with the creative server camera's context and may drop nothing; towers saved before BT-4 have
+    air in their door cells and no piles, so they open at once; the far LOD shows none of it; a pile with all nine spawn
+    columns walled in retries forever.
 
 - **Bone shrapnel (BT-7's first two uniques)**, 2 content ids (`bone_breaker_blade`, `bone_charm`); see AGENTS.md
   "Bone shrapnel". The blade carries `shrapnel: { count: 6, damage: 3 }`; the charm grants `bone_shrapnel`

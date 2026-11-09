@@ -96,6 +96,7 @@ public class World
     private readonly WaystoneManager _waystones = new();
     private readonly KilnManager _kilns = new();
     private readonly SmithingStations _smithing = new();
+    private readonly TowerManager _towers;
     private int _lastJumpCount;
     private readonly CastingManager _casting = new();
     private readonly FireParticleSystem _fire = new();
@@ -495,7 +496,10 @@ public class World
                 WormEffects = new SandwormEffects(Camera, _debris, _chunkManager);
             Edits = new BlockEditor(this, _chunkManager, _debris, _dropManager, _campfires, _querns, _kilns, _casting,
                 _fluidManager, _leafDecay, _lodManager, _leaves, _falling, _toppling, clientMode, serverMode);
-            LeftClick = new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
+            // Built before the persistence, whose constructor restores the stations (towers included)
+            _towers = new TowerManager(clientMode ? null : new TowerBlockWriter(_chunkManager, _fluidManager, _leafDecay,
+                _falling, _lodManager, Edits.NotifyLodEdit, Edits.PopUnsupportedAt));
+            LeftClick =new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
             Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
                 _lodManager, _debris, clientMode, serverMode);
             Throws = new ThrowAction(this, _chunkManager, _dropManager, _goblins, _hellMobs, _skeletons, _mobs,
@@ -898,7 +902,16 @@ public class World
     public AnvilHit HammerFor(Vector3 cell, float gapSeconds, float slackSeconds) =>
         Interactions.HammerAnvil(cell, gapSeconds, slackSeconds);
 
-    public bool HasStations => StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting) || _smithing.HasAny;
+    /// <summary>The battle towers' floor locks (piles and doors); authoritative worlds tick them, a client's are
+    /// display-only mirrors.</summary>
+    public TowerManager Towers => _towers;
+
+    /// <summary>Clears floor <paramref name="floor"/> of the tower around <paramref name="near"/> at once (the
+    /// scenario op): its piles deplete and its tagged skeletons die. Never on a client.</summary>
+    public bool ClearTowerFloor(Vector3 near, int floor) => !_clientMode && _towers.ClearFloor(near, floor, Skeletons);
+
+    public bool HasStations =>
+        StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting) || _smithing.HasAny || _towers.HasAny;
 
     /// <summary>Writes every station block entity for the server's broadcast
     /// (<see cref="NetMessage.StationState"/>).</summary>
@@ -906,6 +919,7 @@ public class World
     {
         StationNetCodec.Write(writer, _campfires, _querns, _kilns, _casting);
         _smithing.WriteNet(writer);
+        _towers.WriteNet(writer);
     }
 
     /// <summary>

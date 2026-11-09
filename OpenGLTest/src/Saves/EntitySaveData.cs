@@ -55,6 +55,14 @@ public sealed class EntitySaveData
         /// Absent restores tier 0. Saved explicitly because, unlike a hell mob's layer, it cannot be
         /// read back from the position.</summary>
         public int? Tier { get; set; }
+
+        /// <summary>The placement cell (cellX, cellZ) of the tower whose floor lock this skeleton counts toward
+        /// (<see cref="Skeleton.Floor"/>); absent for an unbound mob.</summary>
+        public int[]? TowerCell { get; set; }
+
+        /// <summary>The tower floor whose lock this skeleton counts toward, with <see cref="TowerCell"/>; absent
+        /// for an unbound mob.</summary>
+        public int? TowerFloor { get; set; }
     }
 
     /// <summary>One item drop lying (or falling) in the world.</summary>

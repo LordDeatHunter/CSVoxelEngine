@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using VoxelEngine.Content.Structures;
-using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Structures;
 using Xunit;
 
@@ -33,21 +31,8 @@ public sealed class TowerShellTests
             yield return [radius, floor, turns];
     }
 
-    private static TowerSite SiteOf(int radius, int floors, int turns)
-    {
-        var floorTemplates = StructureRegistry.Of(StructureKind.TowerFloor);
-        var altar = StructureRegistry.Of(StructureKind.TowerAltar)[0];
-        Assert.NotEmpty(floorTemplates);
-        var picks = new StructureTemplate[floors];
-        var floorTurns = new int[floors];
-        for (var k = 0; k < floors; k++)
-        {
-            picks[k] = floorTemplates[k % floorTemplates.Count];
-            floorTurns[k] = k & 3;
-        }
-        // An off-origin center with a negative coordinate, so floor division and the world offsets are exercised
-        return new TowerSite(3, -2, 4611, -2987, 72, radius, floors, turns, TowerPalette.For(Biome.Forest), altar, 1, picks, floorTurns);
-    }
+    /// <summary>The headroom cell expected over half-step <paramref name="t"/>: the closed door on a door step, else air.</summary>
+    private static int HeadroomOf(TowerSite s, int t) => TowerShell.IsDoorStep(s, t) ? TowerPalette.DoorBlock : BlockType.Air;
 
     /// <summary>Every column of the site's footprint box with its strip and ring.</summary>
     private static IEnumerable<(int Dx, int Dz, int Step, TowerRing Ring)> Columns(TowerSite s)
@@ -67,7 +52,7 @@ public sealed class TowerShellTests
     [MemberData(nameof(Shapes))]
     public void TheStairClimbsHalfABlockAtATimeFromTheGroundToTheRoof(int radius, int floors, int turns)
     {
-        var s = SiteOf(radius, floors, turns);
+        var s = TowerSiteFixture.SiteOf(radius, floors, turns);
         var corridor = Columns(s).Where(c => c.Ring == TowerRing.Corridor).ToList();
         for (var t = 0; t < s.StairSteps; t++)
         {
@@ -77,7 +62,7 @@ public sealed class TowerShellTests
             var walkable = corridor.Any(c => c.Step == strip
                                              && BlockOf(TowerShell.CellAt(s, c.Ring, c.Step, stepY)) == block
                                              && Enumerable.Range(stepY + 1, Headroom)
-                                                 .All(y => TowerShell.CellAt(s, c.Ring, c.Step, y) == BlockType.Air));
+                                                 .All(y => TowerShell.CellAt(s, c.Ring, c.Step, y) == HeadroomOf(s, t)));
             Assert.True(walkable, $"half-step {t} has no corridor column with its step and headroom (r {radius}, {floors} floors, turn {turns})");
             if (t + 1 < s.StairSteps) Assert.InRange(TowerShell.StepY(s, t + 1) - stepY, 0, 1);
         }
@@ -89,7 +74,7 @@ public sealed class TowerShellTests
     [MemberData(nameof(Shapes))]
     public void EveryLandingIsLevelWithItsFloorAndOpensOntoTheRoom(int radius, int floors, int turns)
     {
-        var s = SiteOf(radius, floors, turns);
+        var s = TowerSiteFixture.SiteOf(radius, floors, turns);
         var columns = Columns(s).ToList();
         for (var k = 1; k <= floors; k++) Assert.Equal(s.FloorY(k), TowerShell.StepY(s, s.LandingStep(k)));
         for (var k = 0; k < floors; k++)
@@ -107,7 +92,7 @@ public sealed class TowerShellTests
     [MemberData(nameof(Shapes))]
     public void DoorCellsSpanTwoStepsPastTheirLanding(int radius, int floors, int turns)
     {
-        var s = SiteOf(radius, floors, turns);
+        var s = TowerSiteFixture.SiteOf(radius, floors, turns);
         for (var k = 0; k < floors; k++)
         {
             var cells = s.DoorCells(k);
@@ -129,17 +114,62 @@ public sealed class TowerShellTests
                 var t = step == first % StepsPerTurn ? first : first + 1;
                 Assert.InRange(y, TowerShell.StepY(s, t) + 1, TowerShell.StepY(s, t) + Headroom);
                 Assert.InRange(y, s.FloorY(k), s.FloorY(k + 1) + Headroom);
-                Assert.Equal(BlockType.Air, TowerShell.CellAt(s, TowerRing.Corridor, step, y));
+                Assert.Equal(TowerPalette.DoorBlock, TowerShell.CellAt(s, TowerRing.Corridor, step, y));
             }
             Assert.Equal(2, strips.Count);
         }
+    }
+
+    [Fact]
+    public void IsDoorStepMatchesEveryFloorsDoorStepAndTheStepAfterIt()
+    {
+        for (var floors = WorldGenerationConfig.TowerMinFloors; floors <= WorldGenerationConfig.TowerMaxFloors; floors++)
+        {
+            var s = TowerSiteFixture.SiteOf(WorldGenerationConfig.TowerMinRadius, floors, 0);
+            var doorSteps = new HashSet<int>();
+            for (var k = 0; k < floors; k++)
+            {
+                doorSteps.Add(s.DoorStep(k));
+                doorSteps.Add(s.DoorStep(k) + 1);
+            }
+            for (var t = -StepsPerTurn; t <= s.StairSteps; t++)
+                Assert.True(doorSteps.Contains(t) == TowerShell.IsDoorStep(s, t), $"half-step {t} of a {floors}-floor tower");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Shapes))]
+    public void EveryClosedDoorIsAnUnbreakableGateAndTheRestOfTheTubeIsAir(int radius, int floors, int turns)
+    {
+        var s = TowerSiteFixture.SiteOf(radius, floors, turns);
+        Assert.True(BlockType.IsUnbreakable(TowerPalette.DoorBlock));
+        var doorCells = new HashSet<(int, int, int)>();
+        for (var k = 0; k < floors; k++) doorCells.UnionWith(s.DoorCells(k));
+
+        // Over every corridor column, the headroom over each of its steps is the closed door exactly at the door cells
+        var tube = 0;
+        foreach (var (dx, dz, step, ring) in Columns(s))
+        {
+            if (ring != TowerRing.Corridor) continue;
+            for (var t = step; t < s.StairSteps; t += StepsPerTurn)
+            {
+                var stepY = TowerShell.StepY(s, t);
+                for (var y = stepY + 1; y <= stepY + Headroom; y++)
+                {
+                    tube++;
+                    var expected = doorCells.Contains((s.CenterX + dx, y, s.CenterZ + dz)) ? TowerPalette.DoorBlock : BlockType.Air;
+                    Assert.Equal(expected, TowerShell.CellAt(s, ring, step, y));
+                }
+            }
+        }
+        Assert.True(tube > doorCells.Count, "the tube should hold more than its doors");
     }
 
     [Theory]
     [MemberData(nameof(Shapes))]
     public void ClosedDoorsSealEveryFloorEvenWithBreakableCellsRemoved(int radius, int floors, int turns)
     {
-        var s = SiteOf(radius, floors, turns);
+        var s = TowerSiteFixture.SiteOf(radius, floors, turns);
         var x0 = s.MinX - 1;
         var z0 = s.MinZ - 1;
         var y0 = s.BottomY - 1;
@@ -227,7 +257,7 @@ public sealed class TowerShellTests
     [MemberData(nameof(Shapes))]
     public void TheWallsSlabsAndCorridorAreUnbreakableBricks(int radius, int floors, int turns)
     {
-        var s = SiteOf(radius, floors, turns);
+        var s = TowerSiteFixture.SiteOf(radius, floors, turns);
         foreach (var palette in TowerPalette.All) Assert.True(BlockType.IsUnbreakable(palette.Brick));
         Assert.False(BlockType.IsUnbreakable(s.Palette.Step));
         foreach (var (_, _, step, ring) in Columns(s))
@@ -267,7 +297,7 @@ public sealed class TowerShellTests
     [MemberData(nameof(Shapes))]
     public void TheRingsNestOutwardByDistance(int radius, int floors, int turns)
     {
-        var s = SiteOf(radius, floors, turns);
+        var s = TowerSiteFixture.SiteOf(radius, floors, turns);
         var depth = new Dictionary<TowerRing, int>
         {
             [TowerRing.Room] = 0, [TowerRing.InnerWall] = 1, [TowerRing.Corridor] = 2,

@@ -282,6 +282,15 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 Advance();
                 break;
 
+            case "towerclear":
+                // Clears the floor of the tower around the camera (its piles spent, its skeletons dead), so its
+                // door opens on the next frames as if the floor had been fought
+                var cleared = world.ClearTowerFloor(world.Camera.Position, step.Floor);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} towerclear floor {step.Floor}: "
+                              + (cleared ? "cleared" : "no tower here"));
+                Advance();
+                break;
+
             case "chest":
                 RunUi("chest", u =>
                 {

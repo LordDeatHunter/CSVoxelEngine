@@ -1,7 +1,8 @@
 {
   // A battle tower floor (plans/BATTLE_TOWER.md BT-2): a library. Three-high oak-plank shelves stand in two long rows
   // (an aisle through the middle of each) and four short ones, an oak-slab reading table fills the middle, torches stand
-  // on the shelf tops and lanterns hang under the slab above (layer 5, right under it). Spaces write nothing.
+  // on the shelf tops, lanterns hang under the slab above (layer 5, right under it) and four skeleton piles (BT-4)
+  // lie in the aisles around the table; they raise the floor's skeletons. Spaces write nothing.
   "kind": "towerFloor",
   "weight": 1,
   "groundLayer": 0,
@@ -9,7 +10,8 @@
     "p": "oak_planks",
     "t": "oak_planks_slab",
     "T": "torch",
-    "L": "lantern"
+    "L": "lantern",
+    "S": "skeleton_pile"
   },
   "layers": [
     [
@@ -17,15 +19,15 @@
       "                 ",
       "                 ",
       "   ppppp ppppp   ",
-      "                 ",
+      "        S        ",
       "                 ",
       " ppp         ppp ",
       "      ttttt      ",
-      "      ttttt      ",
+      "  S   ttttt   S  ",
       "      ttttt      ",
       " ppp         ppp ",
       "                 ",
-      "                 ",
+      "        S        ",
       "   ppppp ppppp   ",
       "                 ",
       "                 ",
