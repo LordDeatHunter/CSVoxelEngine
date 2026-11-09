@@ -9,6 +9,7 @@
         { "item": "item/flint_arrow", "weight": 4, "count": { "min": 2, "max": 8 } },
         { "item": "item/coal", "weight": 4, "count": { "min": 2, "max": 5 } },
         { "item": "item/bandage", "weight": 3 },
+        { "item": "block/torch", "weight": 3, "count": { "min": 2, "max": 6 } },
         { "item": "item/flint", "weight": 3, "count": { "min": 1, "max": 3 } },
         { "empty": true, "weight": 3 }
       ]

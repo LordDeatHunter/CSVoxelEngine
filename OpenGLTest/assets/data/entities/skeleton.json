@@ -1,7 +1,7 @@
 {
   "name": "Skeleton",
   // The base pool on the tower's first floor; TowerDifficulty scales it with the floor tier
-  "hp": 20,
+  "hp": 40,
   "loot": "skeleton",
   "model": "assets/models/entity/skeleton.bbmodel"
 }

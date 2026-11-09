@@ -467,7 +467,7 @@ public static class MobConfig
     /// <summary>Half the width of a skeleton's body box, in blocks.</summary>
     public const float SkeletonHalfExtent = 0.3f;
     /// <summary>A skeleton's walk speed, in blocks per second.</summary>
-    public const float SkeletonWalkSpeed = 2.5f;
+    public const float SkeletonWalkSpeed = 3.75f;
     /// <summary>A skeleton's auto-jump launch speed.</summary>
     public const float SkeletonJumpSpeed = 8.5f;
     /// <summary>How hard a player walking into a grounded skeleton shoves it.</summary>
@@ -475,9 +475,9 @@ public static class MobConfig
     /// <summary>How far a skeleton's rake reaches (MobTargets.InMeleeReach).</summary>
     public const float SkeletonMeleeReach = 2f;
     /// <summary>The damage one rake deals on the first floor (TowerDifficulty scales it).</summary>
-    public const int SkeletonMeleeDamage = 6;
+    public const int SkeletonMeleeDamage = 12;
     /// <summary>Seconds between two rakes.</summary>
-    public const float SkeletonMeleeCooldownSeconds = 1.4f;
+    public const float SkeletonMeleeCooldownSeconds = 0.93f;
     /// <summary>The knockback speed of a landed rake.</summary>
     public const float SkeletonMeleeKnockbackSpeed = 5f;
     /// <summary>The upward lift of a landed rake.</summary>
@@ -487,15 +487,15 @@ public static class MobConfig
     /// <summary>Beyond this horizontal distance a skeleton walks in before it shoots.</summary>
     public const float SkeletonBowMaxRange = 14f;
     /// <summary>Seconds a fresh skeleton waits before its first shot.</summary>
-    public const float SkeletonFirstShotDelaySeconds = 1.2f;
+    public const float SkeletonFirstShotDelaySeconds = 0.8f;
     /// <summary>Seconds between two shots, before the jitter.</summary>
-    public const float SkeletonShotCooldownSeconds = 2.4f;
+    public const float SkeletonShotCooldownSeconds = 1.6f;
     /// <summary>The most a shot cooldown is lengthened or shortened at random.</summary>
-    public const float SkeletonShotCooldownJitter = 0.4f;
+    public const float SkeletonShotCooldownJitter = 0.27f;
     /// <summary>An arrow's launch speed (its level range v^2/g must clear SkeletonBowMaxRange).</summary>
     public const float SkeletonArrowSpeed = 24f;
     /// <summary>The damage one arrow deals on the first floor (TowerDifficulty scales it).</summary>
-    public const int SkeletonArrowDamage = 5;
+    public const int SkeletonArrowDamage = 10;
     /// <summary>The knockback speed of an arrow hit.</summary>
     public const float SkeletonArrowKnockbackSpeed = 2f;
     /// <summary>A skeleton farther than this from every target despawns.</summary>
@@ -558,7 +558,7 @@ public static class MobConfig
     /// <summary>...whose feet stand within this many blocks of the king's (MobTargets.InShockwave).</summary>
     public const float SkeletonKingSlamHeight = 2.5f;
     /// <summary>The damage the slam's shockwave deals.</summary>
-    public const int SkeletonKingSlamDamage = 14;
+    public const int SkeletonKingSlamDamage = 42;
     /// <summary>The knockback speed of the slam's shockwave.</summary>
     public const float SkeletonKingSlamKnockbackSpeed = 12f;
     /// <summary>The upward lift of the slam's shockwave.</summary>
@@ -578,7 +578,7 @@ public static class MobConfig
     /// <summary>The whole width of a volley's fan in degrees, outermost bone to outermost bone.</summary>
     public const float SkeletonKingVolleySpreadDegrees = 30f;
     /// <summary>The damage one volley bone deals.</summary>
-    public const int SkeletonKingVolleyDamage = 6;
+    public const int SkeletonKingVolleyDamage = 18;
     /// <summary>The knockback speed of a volley bone hit.</summary>
     public const float SkeletonKingVolleyKnockbackSpeed = 4f;
     /// <summary>Seconds between two volleys (shortened by the enrage).</summary>
