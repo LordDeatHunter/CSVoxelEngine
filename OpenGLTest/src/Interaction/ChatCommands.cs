@@ -5,6 +5,7 @@ using System.Numerics;
 using VoxelEngine.Content;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.WorldGen.Structures;
 
@@ -120,14 +121,15 @@ public static class ChatCommands
     /// the nearest battle tower within <see cref="WorldGenerationConfig.TowerLocateRings"/> tower cells
     /// (<see cref="StructureLocator.TryFindTower"/>), its coordinates a link whose click suggests a <c>/tp</c> to the ground
     /// beside it, or a line with no link (the usage, or none found). Reads worldgen, so only a world holding the seed may
-    /// ask.
+    /// ask. A tower <paramref name="towers"/> records as defeated is conquered and is not offered.
     /// </summary>
-    public static (string Text, ChatLink? Link) Locate(IReadOnlyList<string> args, Vector3 eye)
+    public static (string Text, ChatLink? Link) Locate(IReadOnlyList<string> args, Vector3 eye, TowerManager? towers = null)
     {
         if (args.Count == 0 || !string.Equals(args[0], "tower", StringComparison.OrdinalIgnoreCase))
             return ("Usage: /locate tower", null);
         if (!StructureLocator.TryFindTower((int)MathF.Floor(eye.X), (int)MathF.Floor(eye.Z),
-                WorldGenerationConfig.TowerLocateRings, out var found))
+                WorldGenerationConfig.TowerLocateRings, out var found,
+                (x, z) => towers?.RecordAt(x, z)?.BossDefeated == true))
             return (string.Create(CultureInfo.InvariantCulture,
                 $"No battle tower within {WorldGenerationConfig.TowerLocateRings * WorldGenerationConfig.TowerCellBlocks} blocks"), null);
 

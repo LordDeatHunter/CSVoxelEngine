@@ -100,7 +100,7 @@ internal sealed class ServerChat
 
             case ChatCommands.CommandKind.Locate:
             {
-                var (text, link) = ChatCommands.Locate(parsed.Args, player.Position);
+                var (text, link) = ChatCommands.Locate(parsed.Args, player.Position, _state.World.Towers);
                 SendSystem(client, text, link);
                 return;
             }

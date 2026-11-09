@@ -15,9 +15,11 @@ public static class StructureLocator
     /// The battle tower nearest column (<paramref name="x"/>, <paramref name="z"/>) among the tower cells within
     /// <paramref name="maxRings"/> Chebyshev rings of that column's own cell, or false when none of them holds one. Rolling
     /// every cell of the window is only a hash; the rolled candidates are then judged nearest first, so only those nearer
-    /// than the answer pay their cached site verdict.
+    /// than the answer pay their cached site verdict. A site <paramref name="isConquered"/> reports true for (its center
+    /// column) is skipped: a tower whose king fell is a ruin, no longer a tower to find.
     /// </summary>
-    public static bool TryFindTower(int x, int z, int maxRings, out StructureLocation location)
+    public static bool TryFindTower(int x, int z, int maxRings, out StructureLocation location,
+        Func<int, int, bool>? isConquered = null)
     {
         location = default;
         if (!WorldGenerationConfig.TowersEnabled || maxRings < 0) return false;
@@ -41,6 +43,7 @@ public static class StructureLocator
         foreach (var (_, cellX, cellZ) in candidates)
         {
             if (!TowerPlacement.TryGetSite(cellX, cellZ, out var site)) continue;
+            if (isConquered != null && isConquered(site.CenterX, site.CenterZ)) continue;
             location = LocationOf(site, x, z);
             return true;
         }

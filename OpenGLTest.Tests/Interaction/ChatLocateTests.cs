@@ -4,6 +4,7 @@ using System.Numerics;
 using System.Text.RegularExpressions;
 using VoxelEngine.Interaction;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.WorldGen.Structures;
 using Xunit;
 
@@ -51,5 +52,20 @@ public sealed class ChatLocateTests
     {
         Assert.Null(ChatCommands.Locate([], Vector3.Zero).Link);
         Assert.Null(ChatCommands.Locate(["village"], Vector3.Zero).Link);
+    }
+
+    [Fact]
+    public void ALocateSkipsATowerWhoseKingHasFallen()
+    {
+        Assert.True(StructureLocator.TryFindTower(0, 0, WorldGenerationConfig.TowerLocateRings, out var nearest));
+        var towers = new TowerManager(null, (_, _) => null);
+        var record = towers.Track(TowerRecord.Build((0, 0), nearest.X, nearest.Z, 9,
+            [(nearest.Y, nearest.Y + 8, new[] { (nearest.X, nearest.Y, nearest.Z) }, new[] { (nearest.X, nearest.Y + 2, nearest.Z) })],
+            hasSite: false));
+        record.AltarState = TowerAltarState.Defeated;
+
+        var (text, _) = ChatCommands.Locate(["tower"], new Vector3(0.5f, 80f, 0.5f), towers);
+
+        Assert.DoesNotContain($"[{nearest.X}, {nearest.Y}, {nearest.Z}]", text);
     }
 }

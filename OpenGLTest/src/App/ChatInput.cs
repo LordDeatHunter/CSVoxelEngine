@@ -141,7 +141,7 @@ internal sealed class ChatInput
                     chatView.AddSystem("/locate needs a connection to the server");
                     return;
                 }
-                var (text, link) = ChatCommands.Locate(parsed.Args, w.Camera.Position);
+                var (text, link) = ChatCommands.Locate(parsed.Args, w.Camera.Position, w.Towers);
                 chatView.AddSystem(text, link);
                 return;
             }
