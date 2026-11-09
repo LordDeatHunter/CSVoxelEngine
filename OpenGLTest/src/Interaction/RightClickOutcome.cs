@@ -24,4 +24,6 @@ public enum RightClickOutcome
     /// <summary>A battle tower's roof altar took it: the authoritative side begins the ritual, a client only judges it;
     /// the verdict is in <see cref="RightClickAction.LastAltarVerdict"/>.</summary>
     Altar,
+    /// <summary>The held item's timed use began charging (<see cref="RightClickAction.TryBeginUseCharge"/>); nothing else claimed the click.</summary>
+    UseCharge,
 }

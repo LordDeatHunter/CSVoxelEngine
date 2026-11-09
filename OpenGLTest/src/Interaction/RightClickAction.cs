@@ -66,9 +66,22 @@ internal sealed class RightClickAction
     /// caller can open the spell builder on a <see cref="RightClickOutcome.SpellTable"/> claim (a
     /// client raises a plain Use intent for it, like any other non-placement claim).
     /// </summary>
-    internal bool TryUseSelected(float maxDistance, out RightClickOutcome outcome)
+    internal bool TryUseSelected(float maxDistance, out RightClickOutcome outcome) =>
+        UseLocal(maxDistance, beginTimedUse: false, out outcome);
+
+    /// <summary>
+    /// The input's right-click: <see cref="TryUseSelected(float, out RightClickOutcome)"/>, except that a held item with
+    /// a timed use (<see cref="Item.UseSeconds"/>) starts charging once no block, station or staff has claimed the click
+    /// (<see cref="RightClickOutcome.UseCharge"/>), so a chest, door or altar under the crosshair always wins over a bandage.
+    /// </summary>
+    internal bool TryUseOrBeginCharge(float maxDistance, out RightClickOutcome outcome) =>
+        UseLocal(maxDistance, beginTimedUse: true, out outcome);
+
+    private bool UseLocal(float maxDistance, bool beginTimedUse, out RightClickOutcome outcome)
     {
-        var claimed = TryUseSelected(maxDistance, LocalPlayer.LocalContext(), out outcome);
+        var claimed = TryUseSelected(maxDistance, LocalPlayer.LocalContext(), out outcome, beginTimedUse: beginTimedUse);
+        // A charge that just began is no use yet: its completion runs the click again, and that one raises the intent
+        if (outcome == RightClickOutcome.UseCharge) return true;
         // A connected client predicted the click; the server replays it for this player. A
         // placement names the face it went against (the server checks the player can see it), any
         // other claim only the cell under the crosshair, which scopes the correction sent back.
@@ -95,7 +108,7 @@ internal sealed class RightClickAction
     /// placement fallback (a server replaying a click the client said was not a placement).
     /// </summary>
     internal bool TryUseSelected(float maxDistance, PlayerContext player, out RightClickOutcome outcome,
-        bool allowPlace = true)
+        bool allowPlace = true, bool beginTimedUse = false)
     {
         outcome = RightClickOutcome.None;
         if (!IsPlaying) return false;
@@ -159,6 +172,12 @@ internal sealed class RightClickAction
             outcome = RightClickOutcome.Cast;
             return true;
         }
+        // A timed use charges only once nothing above claimed the click
+        if (beginTimedUse && TryBeginUseCharge(player.Inventory))
+        {
+            outcome = RightClickOutcome.UseCharge;
+            return true;
+        }
         if (item == null || item is BlockItem || item.UseAction == ItemUseAction.None)
         {
             if (!allowPlace || !Placer.TryPlaceSelectedBlock(maxDistance, player)) return false;
@@ -192,12 +211,14 @@ internal sealed class RightClickAction
     /// early (<see cref="CancelUseCharge"/>) spends nothing. False for anything else, which uses
     /// on the click or charges a throw. False unless the world is playing.
     /// </summary>
-    internal bool TryBeginUseCharge()
+    internal bool TryBeginUseCharge() => TryBeginUseCharge(Inventory);
+
+    private bool TryBeginUseCharge(Inventory holder)
     {
         if (!IsPlaying) return false;
         if (IsUseCharging) return true;
-        var id = Inventory.SelectedBlockId;
-        if (id == 0 || Inventory.SelectedCount <= 0) return false;
+        var id = holder.SelectedBlockId;
+        if (id == 0 || holder.SelectedCount <= 0) return false;
         if (ItemRegistry.TryGet(id) is not { } item || item.UseSeconds <= 0f) return false;
         IsUseCharging = true;
         _useChargeSeconds = 0f;

@@ -328,10 +328,10 @@ internal sealed class GameplayInput
                 placeTimer = 0;
                 FrameProfiler.Begin(ProfileSection.UsePlace);
                 // A timed use (use.seconds) charges instead of firing on the click, and runs only
-                // when the hold completes; anything else uses or places on the click
+                // when the hold completes, but only once no block under the crosshair claimed the click
+                // (a chest opens, not a bandage); anything else uses or places on the click
                 var outcome = RightClickOutcome.None;
-                var claimed = w.RightClick.TryBeginUseCharge()
-                    || w.RightClick.TryUseSelected(World.InteractionReach, out outcome);
+                var claimed = w.RightClick.TryUseOrBeginCharge(World.InteractionReach, out outcome);
                 FrameProfiler.End(ProfileSection.UsePlace);
                 // A spell table opens the builder on this side only (the click itself changes nothing)
                 if (outcome == RightClickOutcome.SpellTable)
