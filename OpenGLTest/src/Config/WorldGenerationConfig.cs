@@ -910,6 +910,69 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>Generations of the hell tree cache.</summary>
     public const int HellTreeCacheGenerations = 4;
 
+    // Cave biomes (plans/CAVE_BIOMES.md CB-1): the overworld's carved caves stop being biome-blind. A frozen
+    // or desert column's caves echo its surface down to a wavy line near CaveEchoBottomY; under it the cave
+    // sub-biomes (crystal, fungal, the magma-touched deep) fill the rock down to the barrier. CaveBiomes
+    // classifies, its palette pass rewrites only stone. LayerBandTests holds the band order. First guesses.
+
+    /// <summary>Whether worldgen dresses the overworld caves in their cave biome's palette (CaveBiomes).</summary>
+    public const bool CaveBiomesEnabled = true;
+
+    /// <summary>Lattice spacing of the three cave-biome noises in blocks: a power of two dividing the chunk
+    /// size, so neighboring chunks sample the same lattice points and the point query equals the stamp.</summary>
+    public const int CaveBiomeLatticeStride = 8;
+
+    /// <summary>The echo band's mean bottom: an echo cell lies strictly above
+    /// <c>CaveEchoBottomY + CaveEchoDriftBlocks * drift</c>, drift being the echo drift noise in -1..1.</summary>
+    public const int CaveEchoBottomY = -200;
+
+    /// <summary>How far the echo band's bottom wanders up and down with the echo drift noise (seed offset 179),
+    /// so the hand-over to the sub-biomes is never a flat line.</summary>
+    public const int CaveEchoDriftBlocks = 24;
+
+    /// <summary>Frequency of the echo drift noise (seed offset 179).</summary>
+    public const float CaveEchoDriftFrequency = 1f / 160f;
+
+    /// <summary>The rock an echo leaves untouched under its column's surface: an echo cell needs a depth of at
+    /// least <c>CaveEchoCoverBlocks + CaveEchoCoverJitterBlocks * (drift + 1) / 2</c> under the column top, so
+    /// the surface, its soil and shallow cliffs keep their own blocks.</summary>
+    public const int CaveEchoCoverBlocks = 8;
+
+    /// <summary>How much deeper the echo cover reaches where the echo drift noise is high, so the echo's top
+    /// edge is ragged rather than a copy of the surface.</summary>
+    public const int CaveEchoCoverJitterBlocks = 6;
+
+    /// <summary>The magma-touched deep's mean top: a cell under the echo band is MagmaDeep at or below
+    /// <c>CaveDeepTopY + CaveDeepDriftBlocks * deepDrift</c>, deepDrift being the deep drift noise in -1..1.
+    /// Nothing is written at or below <see cref="BarrierTopY"/>.</summary>
+    public const int CaveDeepTopY = -264;
+
+    /// <summary>How far the deep's top wanders with the deep drift noise (seed offset 180).</summary>
+    public const int CaveDeepDriftBlocks = 16;
+
+    /// <summary>Frequency of the deep drift noise (seed offset 180).</summary>
+    public const float CaveDeepDriftFrequency = 1f / 120f;
+
+    /// <summary>Frequency of the sub-biome selector noise (seed offset 181, two octaves): about the size of
+    /// one crystal or fungal region between the echo band and the deep.</summary>
+    public const float CaveSubBiomeFrequency = 1f / 96f;
+
+    /// <summary>A sub-band cell above the deep is Crystal where the selector noise is above this.</summary>
+    public const float CaveCrystalMinValue = 0.12f;
+
+    /// <summary>A sub-band cell above the deep is Fungal where the selector noise is below this; between
+    /// this and <see cref="CaveCrystalMinValue"/> it stays plain stone.</summary>
+    public const float CaveFungalMaxValue = -0.12f;
+
+    /// <summary>One crystal cave face cell in this many is a crystal block.</summary>
+    public const int CaveCrystalAccentRate = 10;
+
+    /// <summary>One fungal cave face cell in this many is a fungal glow.</summary>
+    public const int CaveFungalAccentRate = 60;
+
+    /// <summary>One magma-touched cave face cell in this many is a magma block.</summary>
+    public const int CaveMagmaAccentRate = 24;
+
     /// <summary>Capacity of the sky tree cache (one entry per sky tree cell, a tree or none), read by the
     /// generation workers; see <see cref="TreeShapeCacheCapacity"/>.</summary>
     public const int SkyTreeCacheCapacity = 4096;

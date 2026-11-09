@@ -1,0 +1,91 @@
+{
+  // Cave biome check (plans/CAVE_BIOMES.md CB-1): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/cave-biomes.json
+  // Shots land in visual/cave-biomes/. Every spot is an eye CaveBiomeSpotTests prints under the default
+  // seed (the first open cave whose floor lies in that biome, scanning out from the origin; an echo spot
+  // only in a chunk column wholly of its surface biome, so its views stay inside the echo):
+  //   Fungal      (3.5, -219.38, 3.5)       fungal moss floors, fungal soil ceilings, teal fungal glow
+  //   Crystal     (-12.5, -262.38, -10.5)   plain stone walls studded with crystal blocks
+  //   MagmaDeep   (-12.5, -263.38, -12.5)   scorched hellrock walls and floors with glowing magma blocks
+  //   DesertEcho  (195.5, -59.38, 138.5)    a desert column's cave in sandstone
+  //   FrozenEcho  (-572.5, -19.38, -572.5)  a frozen column's cave in frost stone over permafrost floors
+  // The crystal and magma spots share one cave on the wavy deep line, so both views show the edge
+  // between the two. Lamps light each cave (no skylight reaches it); the glowing accents add their own,
+  // and the warm lamp light makes plain stone read brown. The first wait lets the spawn settle, which
+  // would otherwise move a camera teleported before it back onto the surface.
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "wait", "seconds": 12 },
+
+    { "op": "teleport", "pos": [3.5, -219.38, 3.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 24 },
+    { "op": "give", "block": "lamp", "count": 32 },
+    { "op": "look", "yaw": -90, "pitch": -89 },
+    { "op": "place" },
+    { "op": "look", "yaw": 0, "pitch": 0 },
+    { "op": "place" },
+    { "op": "look", "yaw": 180, "pitch": 0 },
+    { "op": "place" },
+    { "op": "select", "slot": 9 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "look", "yaw": -90, "pitch": -25 },
+    { "op": "screenshot", "name": "fungal_down", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": 15 },
+    { "op": "screenshot", "name": "fungal_up", "hideHud": true },
+
+    { "op": "teleport", "pos": [-12.5, -262.38, -10.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 16 },
+    { "op": "select", "slot": 1 },
+    { "op": "look", "yaw": -90, "pitch": -89 },
+    { "op": "place" },
+    { "op": "look", "yaw": 0, "pitch": 0 },
+    { "op": "place" },
+    { "op": "look", "yaw": 180, "pitch": 0 },
+    { "op": "place" },
+    { "op": "select", "slot": 9 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "look", "yaw": 90, "pitch": -20 },
+    { "op": "screenshot", "name": "crystal", "hideHud": true },
+    { "op": "look", "yaw": -90, "pitch": -20 },
+    { "op": "screenshot", "name": "crystal_to_magma", "hideHud": true },
+
+    { "op": "teleport", "pos": [-12.5, -263.38, -12.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "look", "yaw": 0, "pitch": -25 },
+    { "op": "screenshot", "name": "magma_deep", "hideHud": true },
+    { "op": "look", "yaw": 180, "pitch": 10 },
+    { "op": "screenshot", "name": "magma_deep_up", "hideHud": true },
+
+    { "op": "teleport", "pos": [195.5, -59.38, 138.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "select", "slot": 1 },
+    { "op": "look", "yaw": -90, "pitch": -89 },
+    { "op": "place" },
+    { "op": "look", "yaw": 0, "pitch": 0 },
+    { "op": "place" },
+    { "op": "look", "yaw": 180, "pitch": 0 },
+    { "op": "place" },
+    { "op": "select", "slot": 9 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "look", "yaw": -90, "pitch": -25 },
+    { "op": "screenshot", "name": "desert_echo", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": 10 },
+    { "op": "screenshot", "name": "desert_echo_side", "hideHud": true },
+
+    { "op": "teleport", "pos": [-572.5, -19.38, -572.5], "yaw": -90, "pitch": -20 },
+    { "op": "wait", "seconds": 30 },
+    { "op": "select", "slot": 1 },
+    { "op": "look", "yaw": -90, "pitch": -89 },
+    { "op": "place" },
+    { "op": "look", "yaw": 0, "pitch": 0 },
+    { "op": "place" },
+    { "op": "look", "yaw": 180, "pitch": 0 },
+    { "op": "place" },
+    { "op": "select", "slot": 9 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "look", "yaw": -90, "pitch": -25 },
+    { "op": "screenshot", "name": "frozen_echo", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": 10 },
+    { "op": "screenshot", "name": "frozen_echo_side", "hideHud": true }
+  ]
+}

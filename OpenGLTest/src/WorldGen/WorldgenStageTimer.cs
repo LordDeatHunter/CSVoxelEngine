@@ -77,6 +77,8 @@ internal sealed class WorldgenStageTimer
         GravelPockets,
         /// <summary>UndergroundPoolGenerator.Stamp.</summary>
         UndergroundPools,
+        /// <summary>CaveBiomes.Stamp.</summary>
+        CaveBiomes,
         /// <summary>RuinPlacement.StampUnderground.</summary>
         RuinsUnderground,
         /// <summary>WaystonePlacement.StampUnderground.</summary>

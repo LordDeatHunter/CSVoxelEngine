@@ -15,8 +15,9 @@ namespace VoxelEngine.Tests.WorldGen;
 /// <see cref="TerrainGenerator.Compute"/> per chunk column over fixed, SplitMix64-drawn column
 /// categories (land, ocean, lake/river, highland, massif, great lake), and the per-stage cost of
 /// <c>ChunkTerrainFill.GenerateBlockData</c> through <see cref="WorldgenStageTimer"/> on fixed
-/// surface, above-surface, sky, deep-stone, cave-heavy, sea-floor, hell, sky-island, cloud-sea and
-/// battle-tower chunks,
+/// surface, above-surface, sky, deep-stone, cave-heavy, sea-floor, hell, sky-island, cloud-sea,
+/// battle-tower, echo-cave (underground under a frozen or desert column) and deep-band (the cave
+/// sub-biome band above the barrier) chunks,
 /// each timed cold and
 /// warm, so a worldgen change can report its before/after cost on the same workload.
 ///
@@ -73,12 +74,26 @@ public sealed class WorldgenCostProbe
     private const int SkyIsland = 7;
     private const int CloudSea = 8;
     private const int Tower = 9;
+    private const int EchoCave = 10;
+    private const int DeepBand = 11;
+
+    // Echo-cave and deep-band depths come from their own stream, so adding them left every other
+    // class's drawn workload unchanged
+    private const ulong CaveBandSeed = 0x6E1D_C0DE_0003UL;
+
+    // Deep-band chunks are drawn from this many chunk layers starting at DeepBandTopCy, inside the
+    // cave sub-biome band between the echo band and the barrier
+    private const int DeepBandTopCy = -13;
+    private const int DeepBandLayers = 6;
 
     // Hell chunks are drawn from this many chunk layers under the one straddling hell's top
     private const int HellChunkLayers = 36;
 
     private static readonly string[] ChunkClassNames =
-        ["surface", "above", "sky", "deepStone", "caveHeavy", "seaFloor", "hell", "skyIsland", "cloudSea", "tower"];
+        [
+            "surface", "above", "sky", "deepStone", "caveHeavy", "seaFloor", "hell", "skyIsland", "cloudSea", "tower",
+            "echoCave", "deepBand"
+        ];
 
     [Fact]
     public void ComputeCostPerColumnCategory()
@@ -282,8 +297,8 @@ public sealed class WorldgenCostProbe
     }
 
     /// <summary>
-    /// Draws chunk columns and picks the surface, above, sky, sea-floor, hell and underground candidate
-    /// chunks from them, then splits the underground candidates by their carved-cell count into
+    /// Draws chunk columns and picks the surface, above, sky, sea-floor, hell, echo-cave, deep-band and
+    /// underground candidate chunks from them, then splits the underground candidates by their carved-cell count into
     /// cave-heavy (most carved) and deep-stone (least carved). Untimed.
     /// </summary>
     private static List<Vector3>[] SelectChunks()
@@ -295,6 +310,7 @@ public sealed class WorldgenCostProbe
         var scratch = new WorldgenStageTimer();
 
         var state = ChunkSeed;
+        var caveState = CaveBandSeed;
         for (var draw = 0; draw < MaxChunkDraws; draw++)
         {
             if (ChunkClassesFull(classes, underground))
@@ -304,6 +320,12 @@ public sealed class WorldgenCostProbe
             var column = ColumnCache.Get(cx, cz);
             var center = column.Biomes[(8 << Chunk.SizeShift) | 8];
             var top = column.MaxHeight >> Chunk.SizeShift;
+
+            if ((center == Biome.Frozen || center == Biome.Desert) && classes[EchoCave].Count < PositionsPerClass)
+            {
+                var k = 2 + (int)(NextRandom(ref caveState) % 4);
+                classes[EchoCave].Add(new Vector3(cx, (column.MinHeight >> Chunk.SizeShift) - k, cz));
+            }
 
             if (center == Biome.Ocean)
             {
@@ -333,6 +355,9 @@ public sealed class WorldgenCostProbe
             TryAdd(classes[Hell], PositionsPerClass, new Vector3(cx, hellCy, cz));
             TryAdd(classes[CloudSea], PositionsPerClass,
                 new Vector3(cx, SkyIslandConfig.CloudSeaBottomY >> Chunk.SizeShift, cz));
+            if (classes[DeepBand].Count < PositionsPerClass)
+                classes[DeepBand].Add(new Vector3(cx,
+                    DeepBandTopCy - (int)(NextRandom(ref caveState) % DeepBandLayers), cz));
 
             if (underground.Count < UndergroundCandidates)
             {
@@ -376,6 +401,8 @@ public sealed class WorldgenCostProbe
         && classes[SeaFloor].Count >= PositionsPerClass
         && classes[Hell].Count >= PositionsPerClass
         && classes[CloudSea].Count >= PositionsPerClass
+        && classes[EchoCave].Count >= PositionsPerClass
+        && classes[DeepBand].Count >= PositionsPerClass
         && underground.Count >= UndergroundCandidates;
 
     /// <summary>The chunk at the base of each of the first sky islands a ring scan of island cells finds

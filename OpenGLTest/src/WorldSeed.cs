@@ -3,6 +3,7 @@ using System.Threading;
 using VoxelEngine.Chunks;
 using VoxelEngine.Lod;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
@@ -72,6 +73,7 @@ public static class WorldSeed
         BarrierGenerator.Reseed();
         HellGenerator.Reseed();
         HellBiomes.Reseed();
+        CaveBiomes.Reseed();
         CloudPatchGenerator.Reseed();
         CloudSeaGenerator.Reseed();
         SkyIslands.Reseed();

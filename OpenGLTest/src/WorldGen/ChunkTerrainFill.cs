@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using VoxelEngine.Chunks;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
@@ -270,6 +271,13 @@ internal static class ChunkTerrainFill
             && Admits(stampGates, UndergroundPoolGenerator.WriteBand(column), lowerBoundY))
             UndergroundPoolGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.UndergroundPools);
+
+        // The cave biomes' palette, after every carver, ore and underground stamp, so it rewrites only the plain
+        // stone they left (ore counts, pockets, pools and cave life unchanged), and before the underground ruins,
+        // which own their rooms
+        if (WorldGenerationConfig.CaveBiomesEnabled && Admits(stampGates, CaveBiomes.WriteBand(column), lowerBoundY))
+            CaveBiomes.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.CaveBiomes);
 
         // Sealed underground rooms and their waystone chambers, after the deep features and the cave life, so no
         // geode, mushroom, formation, gravel pocket or pool is left inside a room

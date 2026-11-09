@@ -635,11 +635,13 @@ Noise seed offsets: ReliefNoise 153, MountainSpineNoise 154, MountainRangeCellWa
   SkyIslands.ZoneNoise 168, OutlineNoise 169, TopNoise 170, StalactiteNoise 171 (the sky islands),
   CloudSeaGenerator cover 172 (2 octaves) and detail 173 (the cloud sea; plans/LAYERS.md),
   SkyBiomes.BiomeNoise 174 (2 octaves, the sky biomes; plans/LAYERS.md L-13)
-  SkyLandmasses warp 175 and 176, hills 177 (3 octaves), keel 178 (the sky landmasses);
-  the next free noise offset is 179
+  SkyLandmasses warp 175 and 176, hills 177 (3 octaves), keel 178 (the sky landmasses),
+  CaveBiomes echo drift 179, deep drift 180, selector 181 (2 octaves; 3D, the cave biomes; plans/CAVE_BIOMES.md);
+  the next free noise offset is 182
 Hash salts (no noise, SplitMix64.Hash(cell, Seed ^ salt), so a new one re-lays nothing else):
   ruins 0x5E7A-0x5E7D (RuinPlacement, one per kind), waystone satellites 0x5E7E (WaystonePlacement),
-  battle towers 0x5E7F (TowerPlacement, cell 1536; plans/BATTLE_TOWER.md BT-2), tower ruin 0x5E80 (TowerRuin, BT-8)
+  battle towers 0x5E7F (TowerPlacement, cell 1536; plans/BATTLE_TOWER.md BT-2), tower ruin 0x5E80 (TowerRuin, BT-8),
+  cave biome accents 0x43415645 (CaveBiomes.BlockFor, through HellBiomes.Hash)
 WorldFeatureConfig: CottonMaxDesertWeight = 0.5 - BiomeBorderDither
 PostProcessConfig: BiomeGradeStrength 0.04, ColdStart 0.45, ColdFull 0.85, EaseRate 0.5
 SurfaceShadingConfig: Grass/Foliage Color corners (ColdDry/WarmDry, ColdMid/WarmMid, ColdWet/WarmWet),

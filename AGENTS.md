@@ -1316,7 +1316,8 @@ OpenGLTest/
                                #   Hell*SkinBlocks, HellEmberCrystalRate, HellMagmaFloorRate) and flora (HellVine*,
                                #   Hell*VineRate, HellGlowFernRate, HellEmberBloomRate, HellTree*), and the solid
                                #   cloud patches (CloudPatchesEnabled, CloudPatchFrequency, CloudPatchThreshold,
-                               #   CloudPatchCoreValue, CloudPatchDetailFrequency)
+                               #   CloudPatchCoreValue, CloudPatchDetailFrequency), and the cave biomes
+                               #   (CaveBiome*, CaveEcho*, CaveDeep*, CaveSubBiomeFrequency, Cave*AccentRate)
     Content/                   # the data-driven content pipeline (ContentRegistry) — see "Content" below
       ContentRegistry.cs       # the static facade: owns the content tables, assigns byte ids, runs Load / BakeModels /
                                #   Reset in order and serves the public lookups (RequireBlock, recipes, tags, ...)
@@ -2415,6 +2416,12 @@ OpenGLTest/
                                #   miss and in TerrainGenerator.Climate (off in production)
       WorldgenStageTimer.cs    # test/probe seam: per-stage wall time of ChunkTerrainFill.GenerateBlockData,
                                #   passed explicitly (null in production)
+      Caves/                   # the overworld cave biomes (plans/CAVE_BIOMES.md), namespace VoxelEngine.WorldGen.Caves
+        CaveBiome.cs           # Plain / FrozenEcho / DesertEcho / Crystal / Fungal / MagmaDeep, apart from the surface Biome
+        CaveCellRole.cs        # Interior / Wall / Floor / Ceiling: where a rock cell sits against the open cave
+        CaveBiomePalette.cs    # one cave biome's blocks: base stone, floor, ceiling, an accent and its rate
+        CaveBiomes.cs          # the field (three 3D noises, seed offsets 179-181, on a stride-8 lattice), the one
+                               #   Classify rule, the point query At, the palette pass Stamp (stone hosts only) and its band
       Hell/                    # the realm under the barrier band (plans/LAYERS.md), namespace VoxelEngine.WorldGen.Hell
         HellGenerator.cs       # hell's endless layers: cavern pockets over hellrock slabs on a 3D lattice noise (seed
                                #   offset 163), pools ponding the floors' dips, the biome skins (Classify over the
@@ -2732,6 +2739,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   the worldgen cost probe and the stage-timer tests
     Features/                  # every feature generator (mirrors src/WorldGen/Features)
       Underground/             # coal, malachite, hematite, gravel pockets, cave life (mirrors src/WorldGen/Features/Underground)
+    Caves/                     # the cave biomes: point query equals stamp, bands, determinism, safe palettes, and the
+                               #   spot finder behind cave-biomes.json (mirrors src/WorldGen/Caves)
     Hell/                      # the hell caverns, biomes, palette and flora (mirrors src/WorldGen/Hell)
     Sky/                       # the solid cloud patches, the cloud sea, the sky islands, the sky biomes and their
                                #   flora (mirrors src/WorldGen/Sky)
@@ -5151,13 +5160,39 @@ The tuft density of the `tall_grass`/`dead_shrub` plants runs with the climate's
 (`FoliageGenerator.GrassDensityAt`, `GrassDensityDry`..`GrassDensityWet`) and every flower stands in
 an open-forest clump (`FlowerGenerator`, the `PlantClumps` rule) (`MeadowTests`).
 
+**Cave biomes** (`WorldGen/Caves/`, plans/CAVE_BIOMES.md CB-1, tuning `CaveBiome*`/`CaveEcho*`/`CaveDeep*` in
+`WorldGenerationConfig`) dress the overworld's carved caves. `CaveBiome` is its own enum, never the surface `Biome`.
+Three 3D noises (seed offsets 179 echo drift, 180 deep drift, 181 selector) are sampled on a world-aligned stride-8
+lattice and blended with `OreNoiseLattice.Trilinear`, and the one rule `CaveBiomes.Classify` turns them, the cell's y,
+its depth under its column's top and the column's stored, dithered surface biome into a cave biome:
+- **Echo**: from a jittered cover (`CaveEchoCoverBlocks` plus up to `CaveEchoCoverJitterBlocks`) under the column top
+  down to `CaveEchoBottomY + CaveEchoDriftBlocks * drift`, a frozen column's caves are FrozenEcho (frost_stone,
+  permafrost floors), a desert column's DesertEcho (sandstone), every other column's plain.
+- **Sub-biomes**: under the echo, MagmaDeep (scorched_hellrock, magma_block accents) at or below
+  `CaveDeepTopY + CaveDeepDriftBlocks * deepDrift`; above it the selector picks Crystal (stone with crystal_block
+  accents), plain or Fungal (fungal_moss floors, fungal_soil ceilings, fungal_glow accents).
+- Nothing at or below `BarrierTopY`, so the barrier and hell are untouched. Every palette block is reused (no new
+  content id) and is solid, opaque and occluding; ice, sand, gravel and basalt are deliberately not used.
+
+`CaveBiomes.At(x, y, z, surfaceBiome, surfaceHeight)` (the column's `ColumnData.Biomes[i]` and `Heights[i]`) equals
+what `CaveBiomes.Stamp` writes, bit for bit across seams. The pass (`Stage.CaveBiomes`) runs after `UndergroundPools`
+and before `RuinsUnderground`, gated by `CaveBiomes.WriteBand` and a `StampGateTests` row, and rewrites only cells that
+are exactly `stone`, so ores, pockets, geodes, pools, lava and plants are untouched. It swaps a non-plain biome's whole
+stone volume to its base stone and takes the floor, ceiling and accent from in-chunk openness (`CaveBiomes.RoleAt`),
+so a cave face on a chunk plane still wears the biome stone. A per-lattice-cell `CellRule` decides most cells from the
+corner ranges, exactly; only cells near a line pay their own blend. `CaveBiomeTests`, `CaveBiomeSpotTests` (prints a
+spot per biome), `LayerBandTests.CaveBiomeBandsLieAboveTheBarrierInOrder`; `visual-examples/cave-biomes.json`
+(`VOXEL_TIME=147`).
+
 ## Layers: hell below, sky above
 
 Two realms share the one world with the overworld as vertical layers, a Nether-like hell under it and an
 Aether-like sky over it: no dimensions, no portals. This is the map; each part has its own section, named
 in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for later.
 
-- **Bands** (`WorldGenerationConfig`, their order held by `LayerBandTests`): the overworld down to the
+- **Bands** (`WorldGenerationConfig`, their order held by `LayerBandTests`): the overworld, whose caves wear
+  their "Cave biomes" (a frozen or desert echo down to a wavy line near `CaveEchoBottomY` -200, then crystal,
+  fungal or the magma-touched deep under a wavy line near `CaveDeepTopY` -264), down to the
   barrier band `BarrierTopY..BarrierBottomY` (-300..-400, a gapless core `BarrierFullTopY..BarrierFullBottomY`,
   -330..-370, between patchy ramps); hell from `HellTopY` (-401) down forever in `HellLayerPeriodBlocks` (96)
   layers, each a cavern pocket over a 16-block hellrock slab; above every peak (`ReliefCeilingHeight` 148) and
@@ -5196,9 +5231,10 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
 - **Budgets**: 244 of the 255 content ids are used (134 blocks, 109 items, air), 11 left; the battle tower
   (plans/BATTLE_TOWER.md) is done, and the rest is left for `CAVE_BIOMES.md`. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
-  168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
+  168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes), 175 to 178 (sky landmasses) and 179 to 181
+  (cave biomes); the whole table is in
   `plans/BIOMEGEN.md`.
-- **Visual checks** (each with `VOXEL_TIME=147`): `barrier.json`, `hell.json`, `hell-flora.json`,
+- **Visual checks** (each with `VOXEL_TIME=147`): `barrier.json`, `cave-biomes.json`, `hell.json`, `hell-flora.json`,
   `hell-mobs.json`, `layers-fog.json`, `clouds-solid.json`, `sky-islands.json`, `sky-density.json`,
   `sky-biomes.json`, `sky-mobs.json`, and `waystones.json` (a waystone structure in each realm).
 

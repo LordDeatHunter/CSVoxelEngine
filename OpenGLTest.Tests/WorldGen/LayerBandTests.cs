@@ -6,8 +6,9 @@ namespace VoxelEngine.Tests.WorldGen;
 /// The realm layer bands (plans/LAYERS.md) keep their order whatever they are tuned to: hell lies
 /// under the barrier, which lies under the sea; the barrier's solid core sits inside its ramps; the
 /// solid cloud slab clears the terrain's relief ceiling and the drawn cloud layer; the sky-island
-/// cloud sea lies between the slab and the islands above it; and every hell layer is more than its
-/// slab, so it holds a pocket.
+/// cloud sea lies between the slab and the islands above it; every hell layer is more than its
+/// slab, so it holds a pocket; and the cave biome bands (plans/CAVE_BIOMES.md) stack in order above
+/// the barrier and under the sea, their wavy edges never crossing.
 /// </summary>
 public sealed class LayerBandTests
 {
@@ -47,5 +48,19 @@ public sealed class LayerBandTests
         Assert.True(V(SkyConfig.SkyCloudSeaHeight) + V(SkyConfig.SkyCloudSeaThickness)
                     < V(WorldGenerationConfig.SkyIslandBottomY));
         Assert.True(V(WorldGenerationConfig.SkyIslandBottomY) < V(WorldGenerationConfig.SkyIslandTopY));
+    }
+
+    [Fact]
+    public void CaveBiomeBandsLieAboveTheBarrierInOrder()
+    {
+        Assert.True(V(WorldGenerationConfig.BarrierTopY)
+                    < V(WorldGenerationConfig.CaveDeepTopY) - V(WorldGenerationConfig.CaveDeepDriftBlocks));
+        Assert.True(V(WorldGenerationConfig.CaveDeepTopY) + V(WorldGenerationConfig.CaveDeepDriftBlocks)
+                    < V(WorldGenerationConfig.CaveEchoBottomY) - V(WorldGenerationConfig.CaveEchoDriftBlocks));
+        Assert.True(V(WorldGenerationConfig.CaveEchoBottomY) + V(WorldGenerationConfig.CaveEchoDriftBlocks)
+                    < V(WorldGenerationConfig.SeaLevel));
+        Assert.True(V(WorldGenerationConfig.CaveEchoCoverBlocks) >= 0f);
+        Assert.True(V(WorldGenerationConfig.CaveEchoCoverJitterBlocks) >= 0f);
+        Assert.True(V(WorldGenerationConfig.CaveFungalMaxValue) <= V(WorldGenerationConfig.CaveCrystalMinValue));
     }
 }
