@@ -716,7 +716,8 @@ hell and in the sky, so the atmosphere is zero there. Each biome also drifts mot
 magma deep, sparks in crystal and fungal caves, steam in a frozen echo, smoke dust in a desert echo; paced by a
 debt and capped at `ParticleConfig.CaveMoteMaxPerFrame`, singleplayer and a client, never a server).
 `CaveClimateTests`, `EyeCaveBiomeProbeTests`, `ServerPlayerCaveBiomeTests`, the cave byte in
-`NetworkProtocolTests`; `visual-examples/cave-biomes.json` (`VOXEL_TIME=147`).
+`NetworkProtocolTests`; `visual-examples/cave-biomes.json` (`VOXEL_TIME=147`, each biome's fog and motes, with its
+mob idle in the three sub-biomes).
 
 **Biome color grade.** The post pass multiplies the finished, anti-aliased display image by
 `uGrade` (`PostEffects.Grade`, (1, 1, 1) by default): `BiomeGrade.Tint` of the eye's climate (the same
@@ -5259,9 +5260,11 @@ and before `RuinsUnderground`, gated by `CaveBiomes.WriteBand` and a `StampGateT
 are exactly `stone`, so ores, pockets, geodes, pools, lava and plants are untouched. It swaps a non-plain biome's whole
 stone volume to its base stone and takes the floor, ceiling and accent from in-chunk openness (`CaveBiomes.RoleAt`),
 so a cave face on a chunk plane still wears the biome stone. A per-lattice-cell `CellRule` decides most cells from the
-corner ranges, exactly; only cells near a line pay their own blend. `CaveBiomeTests`, `CaveBiomeSpotTests` (prints a
+corner ranges, exactly; only cells near a line pay their own blend, and a lattice cell wholly under every echo line is
+classified a row at a time (`FillSubBandCell`). The cumulative worldgen cost against the build before the cave biomes is in
+plans/CAVE_BIOMES.md (Reference, "Cumulative cost (CB-5)"). `CaveBiomeTests`, `CaveBiomeSpotTests` (prints a
 spot per biome), `LayerBandTests.CaveBiomeBandsLieAboveTheBarrierInOrder`; `visual-examples/cave-biomes.json`
-(`VOXEL_TIME=147`).
+(`VOXEL_TIME=147`), which also films each sub-biome's mob idle in its own atmosphere.
 
 **Cave shape and ores (CB-2)**, read from the same map: crystal cells open bigger cheese rooms, fungal cells wider spaghetti
 tunnels and magma-touched cells both cheese and caverns (`CaveShape`, scaled per region by `NoiseCaves`' ninth channel), and a
@@ -5315,7 +5318,8 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   `SkyDifficulty` (`1 + tier * MobConfig.SkyDifficultyPerTier`) by the island zone's tier scale health,
   damage, a caster's rate and the pack, read from where the mob spawned, so a save restore and a client mirror
   agree. On a server every realm mob rides `EntityList` and is mirrored with its attack clips ("A mirror's
-  attack clip"); all four are saved in `entities.json`.
+  attack clip"); all four realm kinds and the three cave mobs (shardling, sporeling, magmaborn) are saved in
+  `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
 - **Budgets**: 247 of the 255 content ids are used (137 blocks, 109 items, air), 8 left; the battle tower
@@ -5325,7 +5329,7 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes), 175 to 178 (sky landmasses), 179 to 181
   (cave biomes), 182 (cave shape scale) and 183 to 185 (cave ores); the whole table is in
   `plans/BIOMEGEN.md`.
-- **Visual checks** (each with `VOXEL_TIME=147`): `barrier.json`, `cave-biomes.json`, `hell.json`, `hell-flora.json`,
+- **Visual checks** (each with `VOXEL_TIME=147`): `barrier.json`, `cave-biomes.json`, `cave-mobs.json`, `hell.json`, `hell-flora.json`,
   `hell-mobs.json`, `layers-fog.json`, `clouds-solid.json`, `sky-islands.json`, `sky-density.json`,
   `sky-biomes.json`, `sky-mobs.json`, and `waystones.json` (a waystone structure in each realm).
 
@@ -5883,8 +5887,8 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
 reference and the measured costs ("Costs (BT-9)": the sky-cover mesh build, the tower worldgen and the collapse's
 per-frame step, with their ceilings). This section is the **floor locks** (`BT-4`), the **chests** (`BT-5`), the **roof
 altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collapse** (`BT-8`) and the **dark interiors**
-(`BT-10`). The tower's last protocol was 27 (the altar byte and the king; the collapse needs no wire change); 28,
-the current one, came after it with the cave biome byte (CB-3). The tower's
+(`BT-10`). The tower's last protocol was 27 (the altar byte and the king; the collapse needs no wire change); 28
+(the cave biome byte, CB-3) and 29 (the cave mobs, CB-4, the current one) came after it. The tower's
 content ids left 244 of the 255 used, before the cave ores took 3 more (see "Budgets" under "Layers").
 - **Dark interiors (BT-10)**: the floors get no sun. The three palette bricks carry `coversSky`, so a mesh build over a
   tower chunk starts every sun seed above the slab over it ("Sky cover (BT-10)" under "Chunk meshing"); a floor is lit only

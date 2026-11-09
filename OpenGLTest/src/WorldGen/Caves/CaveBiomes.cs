@@ -148,9 +148,7 @@ public static class CaveBiomes
         if (y > EchoLine(drift))
             return depth < CoverDepth(drift) ? CaveBiome.Plain : EchoOf(surface);
 
-        if (y <= DeepLine(deepDrift)) return CaveBiome.MagmaDeep;
-        if (selector > WorldGenerationConfig.CaveCrystalMinValue) return CaveBiome.Crystal;
-        return selector < WorldGenerationConfig.CaveFungalMaxValue ? CaveBiome.Fungal : CaveBiome.Plain;
+        return y <= DeepLine(deepDrift) ? CaveBiome.MagmaDeep : SelectorBiome(selector);
     }
 
     /// <summary>
@@ -346,7 +344,8 @@ public static class CaveBiomes
     /// have not run yet). Returns whether some cell is not plain; when it returns false the map's cells
     /// may be stale and must not be read. Most cells are classified by their lattice cell's
     /// <see cref="CellRule"/> alone, which is exact, and only a cell near a band line or a selector
-    /// threshold pays its own blend.
+    /// threshold pays its own blend. A lattice cell wholly in the sub band (under every echo line) is
+    /// classified a row at a time by <see cref="FillSubBandCell"/> (CB-5), which cut the deep band's cost.
     /// </summary>
     internal static bool Fill(CaveBiomeMap map, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
@@ -369,42 +368,142 @@ public static class CaveBiomes
         Span<bool> ruled = stackalloc bool[CellCount];
         Span<float> corners = stackalloc float[CellCount * CornersPerCell];
 
-        for (var x = 0; x < Chunk.Size; x++)
-        for (var z = 0; z < Chunk.Size; z++)
+        for (var cx = 0; cx < Cells; cx++)
+        for (var cy = 0; cy < Cells; cy++)
+        for (var cz = 0; cz < Cells; cz++)
         {
-            var i = (x << Chunk.SizeShift) | z;
-            var surface = column.Biomes[i];
-            var surfaceEcho = EchoOf(surface);
-            var height = column.Heights[i];
-            for (var y = 0; y < Chunk.Size; y++)
-            {
-                var idx = Chunk.Idx(x, y, z);
-                var wy = worldY0 + y;
-                var depth = height - wy;
+            int x0 = cx * Stride, y0 = cy * Stride, z0 = cz * Stride;
+            var wyMin = worldY0 + y0;
+            var wyMax = wyMin + Mask;
 
-                // Exact fast paths to plain, no lattice read: at or below the barrier top Classify gives
-                // plain; above SubBandTopY a cell is above every echo line (the line at its highest clamped
-                // drift is SubBandTopY), so Classify gives plain when the column has no echo or the cell is
-                // shallower than the bare cover (CoverDepth is never below CaveEchoCoverBlocks)
-                if (wy <= WorldGenerationConfig.BarrierTopY
-                    || (wy > SubBandTopY
-                        && (surfaceEcho == CaveBiome.Plain || depth < WorldGenerationConfig.CaveEchoCoverBlocks)))
+            // A whole lattice cell under the barrier top is plain, with no lattice read (the per-cell fast path)
+            if (wyMax <= WorldGenerationConfig.BarrierTopY)
+            {
+                FillLatticeCell(map, x0, y0, z0, CaveBiome.Plain);
+                continue;
+            }
+
+            // A lattice cell above the barrier and at or below the lowest echo line is under the echo band in
+            // every column whatever its depth and echo, so a whole row of it (one x and y, its z run) is
+            // decided by its y alone (FillSubBandCell)
+            var cell = (cx * Cells + cy) * Cells + cz;
+            if (wyMin > WorldGenerationConfig.BarrierTopY && wyMax <= SubBandTopY)
+            {
+                ref readonly var sub = ref RuleOf(rules, ruled, corners, echo, deep, selector,
+                    worldX0, worldY0, worldZ0, cell, x0, y0, z0);
+                if (wyMax <= sub.EchoLo)
                 {
-                    map.Set(idx, CaveBiome.Plain);
+                    FillSubBandCell(map, sub, corners.Slice(cell * CornersPerCell, CornersPerCell), x0, y0, z0,
+                        worldY0, column);
                     continue;
                 }
+            }
 
-                var cell = (x / Stride * Cells + y / Stride) * Cells + z / Stride;
-                ref readonly var rule = ref RuleOf(rules, ruled, corners, echo, deep, selector,
-                    worldX0, worldY0, worldZ0, cell, x, y, z);
-                if (!rule.TryDecide(wy, depth, surfaceEcho, out var biome))
-                    biome = ClassifyCell(corners.Slice(cell * CornersPerCell, CornersPerCell), x, y, z, wy, depth,
-                        surface);
-                map.Set(idx, biome);
+            for (var x = x0; x < x0 + Stride; x++)
+            for (var z = z0; z < z0 + Stride; z++)
+            {
+                var i = (x << Chunk.SizeShift) | z;
+                var surface = column.Biomes[i];
+                var surfaceEcho = EchoOf(surface);
+                var height = column.Heights[i];
+                for (var y = y0; y < y0 + Stride; y++)
+                {
+                    var idx = Chunk.Idx(x, y, z);
+                    var wy = worldY0 + y;
+                    var depth = height - wy;
+
+                    // Exact fast paths to plain, no lattice read: at or below the barrier top Classify gives
+                    // plain; above SubBandTopY a cell is above every echo line (the line at its highest clamped
+                    // drift is SubBandTopY), so Classify gives plain when the column has no echo or the cell is
+                    // shallower than the bare cover (CoverDepth is never below CaveEchoCoverBlocks)
+                    if (wy <= WorldGenerationConfig.BarrierTopY
+                        || (wy > SubBandTopY
+                            && (surfaceEcho == CaveBiome.Plain || depth < WorldGenerationConfig.CaveEchoCoverBlocks)))
+                    {
+                        map.Set(idx, CaveBiome.Plain);
+                        continue;
+                    }
+
+                    ref readonly var rule = ref RuleOf(rules, ruled, corners, echo, deep, selector,
+                        worldX0, worldY0, worldZ0, cell, x, y, z);
+                    if (!rule.TryDecide(wy, depth, surfaceEcho, out var biome))
+                        biome = ClassifyCell(corners.Slice(cell * CornersPerCell, CornersPerCell), x, y, z, wy, depth,
+                            surface);
+                    map.Set(idx, biome);
+                }
             }
         }
 
         return map.Present != 1 << (int)CaveBiome.Plain;
+    }
+
+    /// <summary>
+    /// Classifies the lattice cell whose lowest chunk-local cell is (x0, y0, z0), lying above the barrier
+    /// and wholly at or below its rule's lowest echo line, row by row (one x and y, the z run): exactly
+    /// what <see cref="Classify"/> gives each cell. No cell is in the echo band (the exact echo line lies
+    /// at or above the lowest one), so a row at or below the lowest deep line is magma deep, a row above
+    /// the highest deep line is the selector's (decided for the whole cell, or from each cell's own
+    /// selector blend, clamped and compared as <see cref="Classify"/> does), and only a row between the
+    /// two deep lines pays the full <see cref="ClassifyCell"/>.
+    /// </summary>
+    private static void FillSubBandCell(CaveBiomeMap map, in CellRule rule, ReadOnlySpan<float> cellCorners,
+        int x0, int y0, int z0, int worldY0, ColumnData column)
+    {
+        var selectorCorners = cellCorners.Slice(16, 8);
+        for (var x = x0; x < x0 + Stride; x++)
+        for (var y = y0; y < y0 + Stride; y++)
+        {
+            var wy = worldY0 + y;
+            var row = Chunk.Idx(x, y, z0);
+            if (wy <= rule.DeepLo)
+            {
+                map.SetRun(row, Stride, CaveBiome.MagmaDeep);
+                continue;
+            }
+
+            if (wy > rule.DeepHi && rule.SelectorDecided)
+            {
+                map.SetRun(row, Stride, rule.Selected);
+                continue;
+            }
+
+            var fx = ((x & Mask) + 0.5f) * InvStride;
+            var fy = ((y & Mask) + 0.5f) * InvStride;
+            for (var z = z0; z < z0 + Stride; z++)
+            {
+                CaveBiome biome;
+                if (wy > rule.DeepHi)
+                {
+                    var fz = ((z & Mask) + 0.5f) * InvStride;
+                    biome = SelectorBiome(Math.Clamp(Blend(selectorCorners, fx, fy, fz), -1f, 1f));
+                }
+                else
+                {
+                    var i = (x << Chunk.SizeShift) | z;
+                    biome = ClassifyCell(cellCorners, x, y, z, wy, column.Heights[i] - wy, column.Biomes[i]);
+                }
+
+                map.Set(Chunk.Idx(x, y, z), biome);
+            }
+        }
+    }
+
+    /// <summary>The sub-biome a clamped selector picks under the echo band and above the deep line (<see cref="Classify"/>'s tail).</summary>
+    private static CaveBiome SelectorBiome(float selector)
+    {
+        if (selector > WorldGenerationConfig.CaveCrystalMinValue) return CaveBiome.Crystal;
+        return selector < WorldGenerationConfig.CaveFungalMaxValue ? CaveBiome.Fungal : CaveBiome.Plain;
+    }
+
+    /// <summary>
+    /// Writes <paramref name="biome"/> into every cell of the lattice cell whose lowest chunk-local cell is
+    /// (x0, y0, z0): what the per-cell loop writes when every cell of it takes the same decided path.
+    /// </summary>
+    private static void FillLatticeCell(CaveBiomeMap map, int x0, int y0, int z0, CaveBiome biome)
+    {
+        for (var x = x0; x < x0 + Stride; x++)
+        for (var y = y0; y < y0 + Stride; y++)
+            map.SetRun(Chunk.Idx(x, y, z0), Stride, biome);
     }
 
     /// <summary>

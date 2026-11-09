@@ -128,6 +128,10 @@ public sealed class CaveBiomeTests
             (-2, -4, -17),
             (-2, -4, 2),
             (5, 7, (WorldGenerationConfig.BarrierTopY >> Chunk.SizeShift) + 1),
+            // More of the sub band and the deep line, where Fill decides whole lattice cells at once
+            (12, -9, -13),
+            (-21, 17, -15),
+            (30, 30, -16),
         };
 
         var map = new CaveBiomeMap();

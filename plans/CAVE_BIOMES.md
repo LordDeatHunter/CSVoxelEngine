@@ -2,26 +2,19 @@
 > Guide: plans/README.md
 
 ## Status
-CB-0 (barrier shift) and CB-1 (the cave biome field, its palette pass and the debug scenario) done: barrier -300..-400, core
--330..-370, hell top -401 (a chunk edge, so no chunk straddles hell); the overworld caves wear a frozen or desert echo down to
-about -200 and crystal, fungal or magma-touched sub-biomes from there to the barrier. CB-2 (shape and ores) done: the
-sub-biomes carve bigger rooms and wider tunnels, the Y-band ores' richness follows the cave biome and each sub-biome has an
-exclusive ore (amethyst, jade, cinnabar). CB-3 (atmosphere and transport) done: each cave biome eases in its own fog,
-ambient tint and drifting motes, and the server sends the eye's cave biome in `PlayerStatus` (protocol 28). CB-4 (mobs and loot)
-done: the cave spawn search filters by cave biome (no slimes in the magma deep, goblins favor crystal and fungal caves and now
-spawn underground), one mob per sub-biome (shardling, sporeling, magmaborn; protocol 29) and underground ruin chests that roll a
-table of their own cave biome. Only CB-5 (documentation) is left. Tracks 3D cave biomes: caves that stop
-being biome-blind, plus the barrier shift that makes room for them. Third of three efforts, in order: accessories (done), the
-battle tower (`BATTLE_TOWER.md`), cave biomes. One phase per prompt; each leaves the game building and the tests green. Last
-updated 2026-11-09 (CB-4).
+Done. Tracked 3D cave biomes: caves that stop being biome-blind, plus the barrier shift that makes room for them. Third of
+three efforts, in order: accessories (done), the battle tower (`BATTLE_TOWER.md`, done), cave biomes. Every phase landed: the
+barrier shift (CB-0: barrier -300..-400, hell top -401), the cave biome field and palettes (CB-1), the cave shape and ores
+(CB-2), the atmosphere and its transport (CB-3, protocol 28), the cave mobs and biome loot (CB-4, protocol 29), and the docs
+and the cumulative cost against CB-0 (CB-5, below). The subject summary is `BIOMEGEN.md` §12; the mobs and chests are in
+AGENTS.md ("Cave biomes", "Cave mobs"). The as-built notes and costs of each phase stay below as reference. Last updated
+2026-11-09 (CB-5).
 
 ## In progress
 Nothing.
 
 ## Open
-- [ ] **`CB-5` Document** - P2, S.
-  A `BIOMEGEN.md` section on the cave biomes (the seed table already lists 179-181), a final AGENTS.md pass now that CB-2..CB-4
-  have landed; then delete this file's finished entries.
+Nothing.
 
 ## Reference
 - Decisions (2026-11-08): hybrid model, a surface echo biome that drifts into 3D-noise cave biomes with depth; per-biome palette,
@@ -158,7 +151,7 @@ Nothing.
     deep, sparks in crystal and fungal caves, steam in a frozen echo, smoke dust in a desert echo) at open cells around the eye,
     paced by a debt and capped per frame; singleplayer and a client, never a server. No new content ids, no new GL resource.
   - Known gaps: the particle colors are fixed per kind (no per-biome tint); a client lags one status after crossing a biome line;
-    the tuning is a first guess, not yet checked against the scenario shots.
+    the tuning is a first guess; the CB-5 run of `cave-biomes.json` shows each sub-biome's tint around its mob, untuned.
 - **CB-4 as built** (`Simulation/Caves/`: `CaveSpawnSearch`, `CaveBiomeResolver`, `CaveSpawnRules`, `CaveMobManager`;
   `Entities/CaveMobs/`: `CaveMob`, `CaveDifficulty`, `Shardling`, `Sporeling`, `Magmaborn`; knobs `GoblinCave*` and `Cave*` in
   `MobConfig`, all first guesses):
@@ -202,5 +195,47 @@ Nothing.
     with the real mask), the crystal and magma spots 164 and 169 turns; raising the limit to 15 only lifts fungal to 63. So
     `CaveMobSpawnBlockLightLimit` stays at `MobSpawnBlockLightLimit` (fungal glow does not starve the sporeling).
   - Scenario: `visual-examples/cave-mobs.json` (`VOXEL_TIME=147`) spawns each mob at its biome's spot and films idle and attack.
+    CB-5 moved its crystal and magma spots to the ones `CaveBiomeSpotTests` prints since CB-2's shape change (and in
+    `cave-biomes.json`), and the sporeling out of the fungal spot's wall onto open moss; its shoulder-camera attack shots
+    are filled by the player's own head in these tight caves.
   - Known gaps: the shards, like goblin stones and hell bolts, are not on the wire (a client sees only their damage); cave mobs
     are not drawn in the water mirror; chests in chunks saved before CB-4 keep tier 0 (plain); the numbers are first guesses.
+- **Cumulative cost (CB-5)** (2026-11-09, dev machine, `WorldgenCostProbe.ChunkFillCostPerStage`, interleaved against a build
+  of the CB-0 commit 69fd8666 in a git worktree with HEAD's probe copied in, which compiled there unchanged; median of the
+  per-run means in ms per chunk). Flag: more than +50% warm on underground chunks. First the default probe, six interleaved
+  pairs against the CB-4 commit f8ea475d:
+
+  | class | warm CB-0 | warm CB-4 | delta | cold CB-0 | cold CB-4 |
+  |---|---|---|---|---|---|
+  | deepStone | 0.760 | 0.919 | +21% | 171.3 | 171.8 |
+  | caveHeavy | 0.684 | 0.667 | -3% | 117.8 | 120.4 |
+  | echoCave | 0.599 | 0.735 | +23% | 85.7 | 88.0 |
+  | deepBand | 0.650 | 1.002 | +54% | 144.9 | 147.7 |
+
+  The cave stage sums say the same: deep band 0.396 ms at CB-0 (NoiseCaves 0.225, WormCaves 0.002, the four ores 0.171) against
+  0.738 at CB-4 (CaveBiomeMap 0.124, NoiseCaves 0.297, the ores 0.182, CaveOres 0.085, CaveBiomes 0.052), +53% of the CB-0 mean;
+  echo cave 0.394 against 0.525, +22%. deepStone's +21% whole-chunk figure is not cave work (its cave stages moved +2%). So the
+  deep band crossed the flag on the default probe. But the probe calls each cave stage only a few dozen times a process, so much
+  of that is unoptimized tier-0 code: `CaveBiomeMap` read 0.125 ms there, and 0.105 ms with tiered compilation off
+  (`DOTNET_TieredCompilation=0`, the optimized code a long-running game settles on). Measured that way, six interleaved triples
+  of CB-0, CB-4 and the fix below:
+
+  | class | warm CB-0 | warm CB-4 | delta | warm CB-5 | delta | cold CB-0 | cold CB-5 |
+  |---|---|---|---|---|---|---|---|
+  | deepStone | 0.711 | 0.749 | +5% | 0.727 | +2% | 204.3 | 202.3 |
+  | caveHeavy | 0.631 | 0.666 | +6% | 0.658 | +4% | 146.5 | 145.0 |
+  | echoCave | 0.759 | 0.790 | +4% | 0.796 | +5% | 107.9 | 103.5 |
+  | deepBand | 0.662 | 0.934 | +41% | 0.841 | +27% | 179.5 | 178.0 |
+
+  The fix: `CaveBiomes.Fill` now classifies a lattice cell lying wholly in the sub band (above the barrier, under its lowest echo
+  line) a row at a time (`FillSubBandCell`): a row at or below the lowest deep line is filled as magma deep, a row above the
+  highest one with the cell's decided sub-biome, or from each cell's selector blend alone, and only a row between the two deep
+  lines pays the full classification. Bit-exact (`CaveBiomeTests.TheMapMatchesThePointQueryAcrossEverySeam`, now with more
+  sub-band samples). On the deep band `CaveBiomeMap` went from 0.105 to 0.040 ms with optimized code and the stage sum from
+  +41% to +27% of the CB-0 mean (0.397, 0.665, 0.576 ms); the default probe does not see it (`CaveBiomeMap` stayed at 0.126 ms
+  there, six more pairs), which is the tier-0 inflation again. Verdict: under the flag in optimized code; over it on the
+  default probe only through tier-0 code. The largest remaining cave cost is NoiseCaves' shape channel and boosts (+0.04 ms
+  optimized) and `CaveOres` (0.062 ms), both sampled noise. Machine speed drifts between sessions, so only interleaved runs
+  compare, and the default and tiering-off figures are separate sets. Not probed: the cave-mob spawn search runs once per
+  spawn interval and resolves the cave biome last, only for a floor that passed every other check; the CB-3 atmosphere is one
+  eased lookup per frame.

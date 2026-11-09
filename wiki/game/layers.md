@@ -7,9 +7,10 @@ The overworld shares the world with two realms: a Nether-like hell under it and 
 | Sky islands | 320 to 420 | Floating islands everywhere, crowding into zones, with their own biomes, flora and mobs |
 | Cloud sea | 290 to 301 | A thick, nearly continuous sea of solid cloud |
 | Cloud patches | 198 to 203 | Solid cloud slabs above every mountain |
-| Overworld | down to −200 | Everything the biomes page describes |
-| Barrier | −200 to −300 | A sealed band separating the overworld from hell |
-| Hell | −301 and down | Endless cavern layers, with no bottom |
+| Overworld | down to −300 | Everything the biomes page describes |
+| Cave biomes | about −20 to −300 | The overworld's caves, echoing frozen and desert land near the top and turning into crystal, fungal and magma-touched caves below about −200 (see the [biomes page](/game/biomes)) |
+| Barrier | −300 to −400 | A sealed band separating the overworld from hell |
+| Hell | −401 and down | Endless cavern layers, with no bottom |
 
 ## Getting there
 

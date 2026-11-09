@@ -6,6 +6,7 @@ Worldgen is a **pure function of world position and the seed**: each chunk gener
 
 - Nothing generated is ever solid above `height(x, z)`. Heights come from the column cache and already include ravines.
 - Carvers (noise caves, worm tunnels) only remove blocks.
+- A per-chunk cave biome map is classified once, right after the column fill and before the carvers, and dresses them: the cave shape, the ore richness, the exclusive cave ores and the palette pass all read it, and its point query equals it across every seam (`plans/BIOMEGEN.md` §12).
 - Water fills air up to the column's own level in a wet column. There is no single water plane: oceans sit at sea level, rivers at their own level and ponds at their own surface.
 - Generated water and lava are always sources. Cold columns freeze their top water cell into ice.
 - Noise seeds derive from the world seed plus fixed per-channel offsets. A new noise takes the next free offset (the table is kept in the biome plan).

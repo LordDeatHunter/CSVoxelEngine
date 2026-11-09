@@ -16,8 +16,9 @@ dead shrubs; a ragged pack-ice edge; drifting icebergs (§11); the terrain-shape
 (relief highlands and ranges, massifs and lone peaks, islands and archipelagos, great lakes) and
 phase E's great-lake river ramps and outflows. Each is documented where it lives: §4 (the island
 fold), §6 (each mechanism), §7 (constants), §9 (invariants 11-17), §10 (tests), §11 (limits). Their
-perf numbers are in `PERF.md`, their shots in `visual-examples/terrain-shape.json`.
-Last updated 2026-11-05.
+perf numbers are in `PERF.md`, their shots in `visual-examples/terrain-shape.json`. Also done: the
+cave biomes, a 3D cave biome field under the surface biomes (§12; tracked in `CAVE_BIOMES.md`).
+Last updated 2026-11-09.
 
 ## In progress
 
@@ -85,6 +86,7 @@ climate borders bend and wander instead of tracing the smooth contours of the ra
 | `Lod/LodMeshBuilder.cs`, `Lod/LodFaceEmitter.cs` | Far-terrain LOD wears biome-specific tiles. |
 | `OpenGLTest.Tests/WorldGen/BiomeTests.cs` | The rule tests (see §10). |
 | `OpenGLTest.Tests/WorldGen/BiomeClimateTests.cs` | The climate-sample rules: one warped sample behind every reader, the warp's stretch bound (§10). |
+| `WorldGen/Caves/*` | The cave biomes (§12): the field and its point query (`CaveBiomes`, `CaveBiome`, `CaveCellRole`), the per-chunk map (`CaveBiomeMap`), the palettes (`CaveBiomePalette`), the cave shape (`CaveShape`), the ore richness (`CaveRichness`), the exclusive ores (`CaveOres`) and the eye's biome probe (`EyeCaveBiomeProbe`). |
 
 ---------------------------------------------------------------------------------------------------
 
@@ -770,6 +772,9 @@ Grep `Biome\.` to confirm; at time of writing:
   Savanna 6; `TreeGenerator.SpeciesByBiome` sizes itself from the enum).
 * **Climate-only (not biome):** tint, grade, aurora, snow, ice, grass tuft density. Cold-related visuals
   follow `ColdWeight`.
+* **Cave biomes:** `WorldGen/Caves/CaveBiomes.Classify` reads the column's stored, dithered surface biome:
+  a Frozen column's caves echo as FrozenEcho, a Desert one's as DesertEcho (§12). Changing how Frozen or
+  Desert classify, or the dither, re-lays the echo caves.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -1049,7 +1054,7 @@ Grep `Biome\.` to confirm; at time of writing:
 * **Hashed peaks (phase B):**
   * A massif or lone peak rejects every candidate whose center or nominal rim touches any ocean or
     desert weight, so none stand at a coast or at the desert border (and there are no sand
-    mountains). The desert mesa variant is not implemented; it is listed in §12.
+    mountains). The desert mesa variant is not implemented; it is listed under Open.
   * Massif summits are absolute (96..128), lower than the design's "120-200 above the local base":
     the trade for staying under the cloud slab without flat caps. Taller massifs need the cloud layer
     raised first.
@@ -1090,7 +1095,7 @@ Grep `Biome\.` to confirm; at time of writing:
     all-continental columns of a 1000-column sample changed in `TerrainGenerator.Compute` (`PERF.md`).
   * Many island-land components join a continental coast as peninsulas rather than standing alone:
     about 275 of the 556 components within ±8000 hold no continental dry land within 100 blocks.
-  * There is no archipelago shelf (listed in §12).
+  * There is no archipelago shelf (listed under Open).
   * Existing saves regenerate their unmodified ocean chunks wherever an island now rises, so seams
     appear at the edge of edited ocean chunks.
   * The far LOD's summit exposure over an island is asserted only on summit corners clear of canopy:
@@ -1194,5 +1199,57 @@ Grep `Biome\.` to confirm; at time of writing:
   stone hosts, no longer reach the top 2 soil cells of a Frozen column.
 * Existing saves: unmodified Frozen chunks regenerate with permafrost, edited ones keep their old rock
   tops, so seams appear at the edge of edited tundra.
+
+---------------------------------------------------------------------------------------------------
+
+### 12. Cave biomes
+
+The overworld's carved caves are dressed by a 3D cave biome field that sits under the surface
+biomes rather than beside them: the upper caves echo the frozen or desert land above them, and the
+deep caves drift into three sub-biomes of their own. The as-built detail, the knobs and the measured
+costs of each phase are in `CAVE_BIOMES.md` (Reference); the mobs and chests are in `AGENTS.md`
+("Cave biomes", "Cave mobs").
+
+* **Model.** `CaveBiome` is its own enum, never `Biome` (whose ordinals ride the column codecs). One
+  rule, `CaveBiomes.Classify`, reads three 3D noises blended on a stride-8 lattice (seed offsets
+  179-181, §7), the cell's y, its depth under the column top and the column's **stored, dithered
+  surface biome**. That last read is the one link to the surface biomes: changing how Frozen or Desert
+  classify, or the desert dither, re-lays the echo caves.
+* **Bands.** Echo: a Frozen column's caves are FrozenEcho and a Desert column's DesertEcho, from a
+  jittered cover under the column top down to the wavy `CaveEchoBottomY` line (-200 plus a drift);
+  every other column's are plain. Under the echo, the selector picks Crystal, plain or Fungal, and
+  MagmaDeep takes over under the wavy `CaveDeepTopY` line (-264 plus a drift). Nothing at or below
+  `BarrierTopY`, so the barrier and hell are untouched; `LayerBandTests` holds the order.
+* **One map.** `CaveBiomes.Fill` writes `CaveBiomeMap` once per chunk, right after the column fill;
+  every consumer (cave shape, ore richness, exclusive ores, palette pass, underground ruin chests)
+  reads it, and the point query `CaveBiomes.At` equals it bit for bit across every seam.
+* **Palettes.** The palette pass rewrites only cells that are exactly `stone`, so ores, pockets, pools
+  and plants survive. Every palette block is reused (no new content id) and is solid, opaque and
+  occluding; ice, sand, gravel and basalt are excluded on purpose.
+* **Shape.** `CaveShape` gives crystal bigger cheese rooms, fungal wider spaghetti tunnels and the
+  magma deep both, each boost scaled per region by NoiseCaves' ninth channel (seed offset 182), plus a
+  worm radius factor at the node center. Plain and echo cells carve bit for bit as before.
+* **Ores.** `CaveRichness` shifts the Y-band ores' thresholds per cave biome (negative richer), keeping
+  the stamp equal to the point query; `CaveOres` adds amethyst (crystal), jade (fungal) and cinnabar
+  (magma deep), seed offsets 183-185, in plain stone of their own biome only.
+* **Atmosphere.** `CaveClimate` and `CaveAtmosphere` ease in each biome's fog, ambient tint and drifting
+  motes from the eye's cave biome, which an authoritative world computes (`EyeCaveBiomeProbe`) and the
+  server sends in `PlayerStatus` (protocol 28), since a client has no seed.
+* **Mobs and loot.** One mob per sub-biome (shardling, sporeling, magmaborn; protocol 29), a cave spawn
+  search filtered by cave biome, and underground ruin chests that roll a table of their own cave biome;
+  see `AGENTS.md`.
+* **Cost.** Cumulative against the pre-cave-biome build, on the deep band (the chunks between the echo
+  line and the barrier, the most affected class): +27% warm with optimized code after CB-5's row fast
+  path in `CaveBiomes.Fill` (+41% before it), +54% on the default probe, whose few calls run mostly
+  tier-0 code; echo caves +5%, other underground chunks within noise. The tables are in
+  `CAVE_BIOMES.md` (Reference, "Cumulative cost (CB-5)").
+* **Tests.** `CaveBiomeTests`, `CaveShapeTests`, `CaveOreRichnessTests`, `CaveOreTests`,
+  `CaveBiomeSpotTests` (prints a spot per biome for `visual-examples/cave-biomes.json`), `LayerBandTests`
+  and `StampGateTests`.
+* **Known gaps.** Hard vertical edges in rock where the stored column biome flips between Frozen or
+  Desert and anything else; frozen and desert cliffs deeper than the cover wear the echo stone while the
+  far LOD still draws stone; cave size and ore richness step hard at biome borders, like the palette;
+  the exclusive ores have no use yet; existing saves regenerate their unmodified cave chunks, so seams
+  show at the edge of edited chunks.
 
 ---------------------------------------------------------------------------------------------------

@@ -239,12 +239,14 @@ single-arc player.
 - [ ] **`P-27` · Second dimension + portals** — P3, XL.
   Separate seed/noise sets on the same chunk pipeline; new LOD palette. Base for `P-36`.
 - [ ] **`P-28` · Caves as destinations** — P2, M.
-  Larger caverns, underground biomes, rare crystals and hazard zones; builds on the existing
-  cave/worm/lava generation. A natural home for `P-47`'s crystal. Tracked in `CAVE_BIOMES.md` (`CB-0`..`CB-5`).
+  The cave biomes landed (`CAVE_BIOMES.md`, all phases done): larger caverns, frozen and desert echo
+  caves, crystal, fungal and magma-touched sub-biomes with their own atmosphere, exclusive ores
+  (amethyst, jade, cinnabar), cave mobs and biome loot. Still open: **hazard zones** (gas pockets,
+  unstable ceilings, flooding passages), and a use for the exclusive ores and `P-47`'s crystal.
 - [ ] **`P-56` · Ocean & island content** — P3, M.
   Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.
   Ties `F-19`.
-  Island, archipelago and great lake *shape* is in `BIOMEGEN.md` §6; the remaining ideas are its §12.
+  Island, archipelago and great lake *shape* is in `BIOMEGEN.md` §6; the remaining ideas are its Open section.
 - [ ] **`P-57` · World events** — P2, M.
   Blood moons, raids, meteors, wandering bosses, seasonal changes; drives `F-5` and gives the
   base a reason to be defended (`P-54`).

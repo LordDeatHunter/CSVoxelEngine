@@ -2,13 +2,17 @@
   // Cave biome check (plans/CAVE_BIOMES.md CB-1): run from OpenGLTest/ with
   //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/cave-biomes.json
   // The shots also show the CB-3 atmosphere (each biome's tinted, closer fog and its drifting motes): every
-  // wait after a teleport outlasts the atmosphere's ease.
+  // wait after a teleport outlasts the atmosphere's ease. Each sub-biome section also spawns its mob (CB-4: a
+  // sporeling, a shardling, a magmaborn) a few blocks in front of the camera with the exact-feet form of `spawn`
+  // and films it idle in its own fog and motes, then kills it; cave-mobs.json is the detailed attack scenario.
+  // The mob shots sit inside their sections, before the camera flies off to the echo spots, because a storeless
+  // world forgets the lamps once their chunks unload. Creative keeps the hovering camera immune.
   // Shots land in visual/cave-biomes/. Every spot is an eye CaveBiomeSpotTests prints under the default
   // seed (the first open cave whose floor lies in that biome, scanning out from the origin; an echo spot
   // only in a chunk column wholly of its surface biome, so its views stay inside the echo):
   //   Fungal      (3.5, -219.38, 3.5)       fungal moss floors, fungal soil ceilings, teal fungal glow
-  //   Crystal     (-12.5, -262.38, -10.5)   plain stone walls studded with crystal blocks
-  //   MagmaDeep   (-12.5, -263.38, -12.5)   scorched hellrock walls and floors with glowing magma blocks
+  //   Crystal     (-12.5, -263.38, -8.5)    plain stone walls studded with crystal blocks
+  //   MagmaDeep   (-12.5, -264.38, -12.5)   scorched hellrock walls and floors with glowing magma blocks
   //   DesertEcho  (195.5, -59.38, 138.5)    a desert column's cave in sandstone
   //   FrozenEcho  (-572.5, -19.38, -572.5)  a frozen column's cave in frost stone over permafrost floors
   // The crystal and magma spots share one cave on the wavy deep line, so both views show the edge
@@ -16,6 +20,7 @@
   // and the warm lamp light makes plain stone read brown. The first wait lets the spawn settle, which
   // would otherwise move a camera teleported before it back onto the surface.
   "steps": [
+    { "op": "creative", "on": true },
     { "op": "fly", "on": true },
     { "op": "wait", "seconds": 12 },
 
@@ -34,8 +39,13 @@
     { "op": "screenshot", "name": "fungal_down", "hideHud": true },
     { "op": "look", "yaw": 90, "pitch": 15 },
     { "op": "screenshot", "name": "fungal_up", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": -20 },
+    { "op": "spawn", "entity": "sporeling", "pos": [1.5, -220.5, 6.5] },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "fungal_sporeling", "hideHud": true },
+    { "op": "damage", "amount": 999 },
 
-    { "op": "teleport", "pos": [-12.5, -262.38, -10.5], "yaw": -90, "pitch": -20 },
+    { "op": "teleport", "pos": [-12.5, -263.38, -8.5], "yaw": -90, "pitch": -20 },
     { "op": "wait", "seconds": 16 },
     { "op": "select", "slot": 1 },
     { "op": "look", "yaw": -90, "pitch": -89 },
@@ -50,13 +60,23 @@
     { "op": "screenshot", "name": "crystal", "hideHud": true },
     { "op": "look", "yaw": -90, "pitch": -20 },
     { "op": "screenshot", "name": "crystal_to_magma", "hideHud": true },
+    { "op": "look", "yaw": 90, "pitch": -20 },
+    { "op": "spawn", "entity": "shardling", "pos": [-12.5, -265, -5.5] },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "crystal_shardling", "hideHud": true },
+    { "op": "damage", "amount": 999 },
 
-    { "op": "teleport", "pos": [-12.5, -263.38, -12.5], "yaw": -90, "pitch": -20 },
+    { "op": "teleport", "pos": [-12.5, -264.38, -12.5], "yaw": -90, "pitch": -20 },
     { "op": "wait", "seconds": 3 },
     { "op": "look", "yaw": 0, "pitch": -25 },
     { "op": "screenshot", "name": "magma_deep", "hideHud": true },
     { "op": "look", "yaw": 180, "pitch": 10 },
     { "op": "screenshot", "name": "magma_deep_up", "hideHud": true },
+    { "op": "look", "yaw": 0, "pitch": -20 },
+    { "op": "spawn", "entity": "magmaborn", "pos": [-9.5, -266, -12.5] },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "magma_magmaborn", "hideHud": true },
+    { "op": "damage", "amount": 999 },
 
     { "op": "teleport", "pos": [195.5, -59.38, 138.5], "yaw": -90, "pitch": -20 },
     { "op": "wait", "seconds": 30 },

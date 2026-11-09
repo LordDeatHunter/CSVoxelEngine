@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.CompilerServices;
 using VoxelEngine.Chunks;
 
@@ -41,6 +42,13 @@ public sealed class CaveBiomeMap
     internal void Set(int idx, CaveBiome biome)
     {
         Cells[idx] = (byte)biome;
+        Present |= 1 << (int)biome;
+    }
+
+    /// <summary>Writes <paramref name="count"/> cells from <paramref name="idx"/> on with one biome and marks it present.</summary>
+    internal void SetRun(int idx, int count, CaveBiome biome)
+    {
+        Cells.AsSpan(idx, count).Fill((byte)biome);
         Present |= 1 << (int)biome;
     }
 }

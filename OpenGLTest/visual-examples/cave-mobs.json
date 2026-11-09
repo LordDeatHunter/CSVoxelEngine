@@ -4,11 +4,12 @@
   // Shots land in visual/cave-mobs/. The camera hovers (creative flight, so it is immune and the mobs still
   // chase it) at the cave-biomes.json spots CaveBiomeSpotTests prints under the default seed, lays three lamps
   // for light like that scenario, and spawns each sub-biome's mob a few blocks in front of it with the
-  // exact-feet form of `spawn` (feet = the spot's eye less 1.62; the [x, z] form snaps onto the surface):
+  // exact-feet form of `spawn` (feet at the spot's eye less 1.62; the sporeling half a block above the moss
+  // floor beside a lava pool to the +Z side of its tight spot; the [x, z] form snaps onto the surface):
   //   Fungal     (3.5, -219.38, 3.5)      a sporeling: idle, then its spore burst once it closes in
-  //   Crystal    (-12.5, -262.38, -10.5)  a shardling: idle, then casting crystal shards (first cast after
+  //   Crystal    (-12.5, -263.38, -8.5)   a shardling: idle, then casting crystal shards (first cast after
   //                                       CaveShardlingFirstCastDelaySeconds), then killed by a `damage` step
-  //   MagmaDeep  (-12.5, -263.38, -12.5)  a magmaborn: idle, then its blow from the shoulder camera
+  //   MagmaDeep  (-12.5, -264.38, -12.5)  a magmaborn: idle, then its blow from the shoulder camera
   // No tier is given, so each takes the depth tier of its feet (CaveDifficulty.TierAt). The first wait lets
   // the spawn settle, which would otherwise move a camera teleported before it back onto the surface.
   "steps": [
@@ -27,8 +28,8 @@
     { "op": "look", "yaw": 180, "pitch": 0 },
     { "op": "place" },
     { "op": "select", "slot": 9 },
-    { "op": "look", "yaw": -90, "pitch": -20 },
-    { "op": "spawn", "entity": "sporeling", "pos": [3.5, -221, 0.5] },
+    { "op": "look", "yaw": 90, "pitch": -20 },
+    { "op": "spawn", "entity": "sporeling", "pos": [1.5, -220.5, 6.5] },
     { "op": "wait", "seconds": 0.6 },
     { "op": "screenshot", "name": "sporeling_idle", "hideHud": true },
     { "op": "wait", "seconds": 1.5 },
@@ -39,7 +40,7 @@
     { "op": "damage", "amount": 999 },
     { "op": "view", "mode": "first" },
 
-    { "op": "teleport", "pos": [-12.5, -262.38, -10.5], "yaw": 90, "pitch": -20 },
+    { "op": "teleport", "pos": [-12.5, -263.38, -8.5], "yaw": 90, "pitch": -20 },
     { "op": "wait", "seconds": 16 },
     { "op": "select", "slot": 1 },
     { "op": "look", "yaw": -90, "pitch": -89 },
@@ -50,7 +51,7 @@
     { "op": "place" },
     { "op": "select", "slot": 9 },
     { "op": "look", "yaw": 90, "pitch": -20 },
-    { "op": "spawn", "entity": "shardling", "pos": [-12.5, -264, -7.5] },
+    { "op": "spawn", "entity": "shardling", "pos": [-12.5, -265, -5.5] },
     { "op": "wait", "seconds": 0.6 },
     { "op": "screenshot", "name": "shardling_idle", "hideHud": true },
     { "op": "wait", "seconds": 1.0 },
@@ -61,9 +62,9 @@
     { "op": "wait", "seconds": 0.3 },
     { "op": "screenshot", "name": "shardling_death", "hideHud": true },
 
-    { "op": "teleport", "pos": [-12.5, -263.38, -12.5], "yaw": 0, "pitch": -20 },
+    { "op": "teleport", "pos": [-12.5, -264.38, -12.5], "yaw": 0, "pitch": -20 },
     { "op": "wait", "seconds": 3 },
-    { "op": "spawn", "entity": "magmaborn", "pos": [-9.5, -265, -12.5] },
+    { "op": "spawn", "entity": "magmaborn", "pos": [-9.5, -266, -12.5] },
     { "op": "wait", "seconds": 0.6 },
     { "op": "screenshot", "name": "magmaborn_idle", "hideHud": true },
     { "op": "wait", "seconds": 1.5 },
