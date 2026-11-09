@@ -283,6 +283,17 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 Advance();
                 break;
 
+            case "goblincamp":
+            {
+                // A night's goblin camp pitched now on that column: its lit fire and its goblins round it
+                var at = step.Pos!.Value;
+                var risen = world.Director.PitchGoblinCamp((int)MathF.Floor(at.X), (int)MathF.Floor(at.Z));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} goblincamp at ({at.X}, {at.Z}): "
+                              + (risen >= 0 ? $"{risen} goblins" : "no camp here"));
+                Advance();
+                break;
+            }
+
             case "towerclear":
                 // Clears the floor of the tower around the camera (its piles spent, its skeletons dead), so its
                 // door opens on the next frames as if the floor had been fought

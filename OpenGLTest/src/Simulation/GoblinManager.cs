@@ -593,7 +593,7 @@ public sealed class GoblinManager : IMobPopulation
         return true;
     }
 
-    // The center of a goblin body standing on the ground cell (x, groundY, z)
-    private static Vector3 BodyCenter(int x, int groundY, int z) =>
+    /// <summary>The center of a goblin body standing on the ground cell (x, groundY, z).</summary>
+    internal static Vector3 BodyCenter(int x, int groundY, int z) =>
         new(x + 0.5f, groundY + 1 + Goblin.Height * 0.5f, z + 0.5f);
 }

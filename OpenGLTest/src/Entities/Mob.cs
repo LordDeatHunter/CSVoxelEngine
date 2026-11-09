@@ -169,6 +169,10 @@ public abstract class Mob
     private float _wanderTimer;
     private bool _hasWanderGoal;
 
+    /// <summary>Where a walker's wander goals are picked round instead of its own position (a camp goblin's fire,
+    /// <c>GoblinCamps</c>), so it mills about there; null wanders from wherever it stands. Not saved.</summary>
+    public Vector3? WanderAnchor { get; set; }
+
     /// <summary>Where the mob looks from for its line of sight: a little above the body center.</summary>
     public Vector3 SightOrigin => Position + new Vector3(0f, BodyHalfHeight * 0.6f, 0f);
 
@@ -208,7 +212,7 @@ public abstract class Mob
         {
             _wanderGoal = Flies
                 ? FlyingWanderGoal(chunks)
-                : MobInterest.WanderPoint(Position, Random.Shared.NextSingle(), Random.Shared.NextSingle());
+                : MobInterest.WanderPoint(WanderAnchor ?? Position, Random.Shared.NextSingle(), Random.Shared.NextSingle());
             _wanderTimer = MobConfig.MobWanderRepickSeconds * (0.75f + 0.5f * Random.Shared.NextSingle());
             _hasWanderGoal = true;
         }

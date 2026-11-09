@@ -136,6 +136,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
     Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World
+    Camps/                     # goblin camps: the fire first, torch-bearing goblins round it, one a dark night
     Caves/                     # the cave spawn filter and rules, the cave mob manager (spawns by biome, tier, caps, attacks)
     Chests/                    # chests, tower chests and the underground ruin chests' cave biome tables (CaveChestTests)
     Tower/                     # the skeleton manager: forced spawn and the hard cap, tier, no natural spawn, rake, arrows,

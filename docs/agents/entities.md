@@ -231,6 +231,21 @@ torches on death with the flint; the count is saved (`MobData.Torches`) and sent
 `NetEntity.ItemId` byte) (`GoblinTorches`, `GoblinTorchTests`). **A notice pip**: a "!" billboard
 pops over a goblin's head the moment it first spots a player (`GoblinNoticePipTests`).
 
+**Goblin camps** (`Simulation/Camps/GoblinCamps.cs`, owned by `MobDirector`, ticked after the goblins on authoritative
+worlds only; tuning `MobConfig.GoblinCamp*`): once the night is dark enough (`GoblinCampNightFactor` of
+`DayCycle.NightFactor`), every `GoblinCampCheckSeconds` a roll of `GoblinCampChancePerCheck` may pitch the night's one camp
+(the day clears it), far from a random player (`GoblinCampMinDistanceBlocks..MaxDistanceBlocks`, inside the despawn
+radius) on the dry surface the ring spawns take and with bare air over its ground, so a player exploring at night
+stumbles on it. A camp is its fire first: a full `branch_pile` placed through `BlockPlacer.PlaceBlockAtFace` (every
+placement hook runs, the cell journals to clients) and lit with a first branch that burns `GoblinCampFireSeconds`
+(`CampfireManager.Ignite(x, y, z, firstBranchSeconds)`, then it burns down like any campfire); no fire, no goblins. Then
+`GoblinCampMinGoblins..MaxGoblins` goblins rise on dry spots `GoblinCampRingMinBlocks..RingMaxBlocks` round it (forced
+spawns, never past the hard cap), each carrying a torch, lit at night, and wandering about the fire (`Mob.WanderAnchor`:
+its wander goals are picked round the fire instead of where it stands) until one notices a player and the pack joins in.
+The anchor is not saved and the camp keeps no record: after a reload, or once the goblins despawn, the fire is just a
+campfire. The `goblincamp` scenario op pitches one at once (`MobDirector.PitchGoblinCamp`); `GoblinCampTests`;
+`visual-examples/goblin-camp.json` (`VOXEL_TIME=700`).
+
 Every mob shares three more hazards. **Fall damage**: `Mob.NoteLanding` bills `MobFallDamage.Damage`
 over the drop its impact speed implies — free up to `Mob.SafeFallBlocks` (plus a slime's own hop
 peak), then `MobFallDamagePerBlockShare` of the pool per whole block, nothing when the feet were in

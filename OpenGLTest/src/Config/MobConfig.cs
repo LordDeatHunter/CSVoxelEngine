@@ -192,6 +192,30 @@ public static class MobConfig
     public const float GoblinSpawnMaxRadiusBlocks = 64f;
     public const int GoblinSpawnTries = 8;
     public const float GoblinDespawnRadiusBlocks = 100f;
+
+    // --- Goblin camps (GoblinCamps): met by chance at night, far from the player ---
+    /// <summary>How dark the night must be (DayCycle.NightFactor) before a camp may be pitched.</summary>
+    public const float GoblinCampNightFactor = 0.6f;
+    /// <summary>Seconds between two rolls for tonight's camp.</summary>
+    public const float GoblinCampCheckSeconds = 15f;
+    /// <summary>The chance one roll pitches tonight's camp (about half the nights get one).</summary>
+    public const float GoblinCampChancePerCheck = 0.03f;
+    /// <summary>The nearest a camp is pitched to the player, in blocks: out of sight, to be stumbled on.</summary>
+    public const float GoblinCampMinDistanceBlocks = 56f;
+    /// <summary>The farthest a camp is pitched to the player; inside the goblins' despawn radius.</summary>
+    public const float GoblinCampMaxDistanceBlocks = 88f;
+    /// <summary>Columns tried for a camp's site per roll.</summary>
+    public const int GoblinCampSiteTries = 16;
+    /// <summary>The fewest and most goblins round a camp's fire.</summary>
+    public const int GoblinCampMinGoblins = 4;
+    public const int GoblinCampMaxGoblins = 8;
+    /// <summary>The ring round the fire a camp's goblins rise on, in blocks.</summary>
+    public const float GoblinCampRingMinBlocks = 2f;
+    public const float GoblinCampRingMaxBlocks = 4.5f;
+    /// <summary>Columns tried per goblin for its standing spot.</summary>
+    public const int GoblinCampSpotTries = 6;
+    /// <summary>Seconds the camp's first branch burns before the fire burns down like any campfire: the rest of the night.</summary>
+    public const float GoblinCampFireSeconds = 480f;
     public const float GoblinWalkSpeed = 3.2f;
     public const float GoblinJumpSpeed = 8.5f;
     // Stones (flint) a goblin carries, rolled inclusive at spawn; the rest drop on death.

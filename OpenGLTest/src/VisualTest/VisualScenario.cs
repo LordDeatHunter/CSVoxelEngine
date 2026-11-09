@@ -316,6 +316,7 @@ public sealed class VisualScenario
             "towerclear" => new VisualStep { Op = "towerclear", Floor = ReadInt(element, "floor") },
             "altar" => new VisualStep { Op = "altar", Pos = ReadPos(element, index, "altar") },
             "towerdefeat" => new VisualStep { Op = "towerdefeat" },
+            "goblincamp" => ReadGoblinCamp(element, index),
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -323,7 +324,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, chest, chestrow, waystone, towerclear, altar, towerdefeat or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, chest, chestrow, waystone, towerclear, altar, towerdefeat, goblincamp or screenshot."),
         };
     }
 
@@ -453,6 +454,17 @@ public sealed class VisualScenario
             _ => throw new InvalidOperationException(
                 $"Step {index} (spawn) needs 'pos' with 2 or 3 numbers, got {values.Count}."),
         };
+    }
+
+    /// <summary>A <c>goblincamp</c> step: pitches a goblin camp at once on the ground of the <c>pos</c> column
+    /// <c>[x, z]</c> (the fire on top of it, its goblins round it), night or not.</summary>
+    private static VisualStep ReadGoblinCamp(JsonElement element, int index)
+    {
+        var values = ReadPosValues(element, index, "goblincamp", "[x, z]");
+        if (values.Count != 2)
+            throw new InvalidOperationException(
+                $"Step {index} (goblincamp) needs 'pos' with exactly 2 numbers ([x, z]), got {values.Count}.");
+        return new VisualStep { Op = "goblincamp", Pos = new Vector3(values[0], 0f, values[1]) };
     }
 
     /// <summary>A <c>grow</c> step: <c>species</c> names the tree (validated against the registry

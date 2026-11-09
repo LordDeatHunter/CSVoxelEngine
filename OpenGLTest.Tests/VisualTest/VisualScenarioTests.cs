@@ -141,6 +141,16 @@ public sealed class VisualScenarioTests
     }
 
     [Fact]
+    public void AGoblinCampStepParsesItsColumnAndRefusesAnyOtherShape()
+    {
+        var scenario = VisualScenario.Parse("""{ "steps": [{ "op": "goblincamp", "pos": [-44, 50] }] }""", "camp");
+        Assert.Equal("goblincamp", scenario.Steps[0].Op);
+        Assert.Equal(new Vector3(-44, 0, 50), scenario.Steps[0].Pos);
+        Assert.Throws<InvalidOperationException>(() =>
+            VisualScenario.Parse("""{ "steps": [{ "op": "goblincamp", "pos": [1, 2, 3] }] }""", "camp"));
+    }
+
+    [Fact]
     public void ATowerDefeatStepParses()
     {
         var scenario = VisualScenario.Parse(

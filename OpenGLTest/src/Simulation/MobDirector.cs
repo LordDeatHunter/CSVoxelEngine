@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
@@ -15,6 +16,7 @@ using VoxelEngine.Juice;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Camps;
 using VoxelEngine.Simulation.Caves;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.Tower;
@@ -55,6 +57,9 @@ internal sealed class MobDirector
     private readonly StatusEffectBlockWriter? _statusBlocks;
     // The players the mob managers chase this frame, rebuilt right before they run.
     private readonly List<IMobTarget> _mobTargets = [];
+    // The night's goblin camp; null without goblins and on a client, which never pitches one
+    private readonly GoblinCamps? _camps;
+    private readonly CampfireManager _campfires;
 
     private Camera Camera => _world.Camera;
     private IReadOnlyList<ServerPlayer> ServerPlayers => _world.ServerPlayers;
@@ -66,8 +71,10 @@ internal sealed class MobDirector
         GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, CaveMobManager? caveMobs,
         SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs, BlockDebrisSystem debris,
         FireParticleSystem? embers, PlayerHealth health, List<Mob> mobs, bool serverMode, bool clientMode,
-        StatusEffectBlockWriter? statusBlocks)
+        StatusEffectBlockWriter? statusBlocks, CampfireManager campfires)
     {
+        _campfires = campfires;
+        if (goblins != null && !clientMode) _camps = new GoblinCamps(goblins, PitchCampfire);
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
         _caveMobs = caveMobs;
@@ -87,6 +94,29 @@ internal sealed class MobDirector
         _mobs = mobs;
         _serverMode = serverMode;
         _clientMode = clientMode;
+    }
+
+    /// <summary>
+    /// A goblin camp's lit fire on ground cell (<paramref name="x"/>, <paramref name="groundY"/>, <paramref name="z"/>):
+    /// a full branch pile placed on top through the world's placement path (every placement hook runs) and lit to burn
+    /// the night (<see cref="MobConfig.GoblinCampFireSeconds"/>). False when the cell above will not take it.
+    /// </summary>
+    private bool PitchCampfire(int x, int groundY, int z)
+    {
+        var pile = ContentRegistry.RequireBlock("branch_pile");
+        if (!_world.Placer.PlaceBlockAtFace(new Vector3(x, groundY, z), Vector3.UnitY, pile.Id, pile.StackMax, Vector3.UnitZ,
+                out var cell))
+            return false;
+        _campfires.Ignite((int)cell.X, (int)cell.Y, (int)cell.Z, MobConfig.GoblinCampFireSeconds);
+        return true;
+    }
+
+    /// <summary>The scenario's <c>goblincamp</c> step: pitches a camp at once on the ground of column
+    /// (<paramref name="x"/>, <paramref name="z"/>), night or not; how many goblins rose, -1 when none could be pitched.</summary>
+    internal int PitchGoblinCamp(int x, int z)
+    {
+        if (_camps == null || !_world.TryGroundHeight(x, z, out var groundY)) return -1;
+        return _camps.Pitch(_chunkManager, x, groundY, z);
     }
 
     /// <summary>
@@ -163,6 +193,7 @@ internal sealed class MobDirector
                 aimCharge: _serverMode || _clientMode ? 0f : Camera.ThrowCharge ?? 0f,
                 night: DayCycle.NightFactor(LightingTime));
             BillLocalPlayer(_goblins.DamageDealtThisFrame);
+            _camps?.Update((float)deltaTime, _chunkManager, _mobTargets, DayCycle.NightFactor(LightingTime));
         }
 
         // Hell's brutes slam and its casters throw fire bolts (which also set the target burning)

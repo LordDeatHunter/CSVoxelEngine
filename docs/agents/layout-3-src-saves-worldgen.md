@@ -68,6 +68,9 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         FluidWakeScanner.cs    # waking loaded chunks' water: the worker-found frontier and the border scan
       GoblinManager.cs         # goblins: AI tick, their thrown stones, melee damage at the impact
                                #   event, loot + carried flint on death, ring spawning (night surface; caves by biome weight)
+      Camps/                   # goblin camps, namespace VoxelEngine.Simulation.Camps (see "Goblin camps")
+        GoblinCamps.cs         # one camp a dark night by chance, far from a player: a lit fire and torch-bearing goblins
+                               #   milling round it (MobDirector owns it, pitching the fire through BlockPlacer)
       HellMobManager.cs        # the hell mobs: AI tick, the brute's blow at its impact, the casters' fire bolts
                                #   (MobMissiles; damage + burning), loot, despawn, the hell-only ring spawn (packs by layer)
       Icebergs/                # the iceberg simulation, namespace VoxelEngine.Simulation.Icebergs

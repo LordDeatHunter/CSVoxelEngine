@@ -61,11 +61,15 @@ public sealed class CampfireManager
 
     public bool IsLit(int x, int y, int z) => _lit.ContainsKey((x, y, z));
 
-    public bool Ignite(int x, int y, int z)
+    public bool Ignite(int x, int y, int z) => Ignite(x, y, z, BurnSeconds);
+
+    /// <summary>Lights the pile with its first branch burning <paramref name="firstBranchSeconds"/> (a goblin camp's
+    /// fire lasts the night); the rest burn <see cref="BurnSeconds"/> each. False when it already burns.</summary>
+    public bool Ignite(int x, int y, int z, float firstBranchSeconds)
     {
         var key = (x, y, z);
         if (_lit.ContainsKey(key)) return false;
-        _lit[key] = BurnSeconds;
+        _lit[key] = firstBranchSeconds;
         RefreshCells();
         return true;
     }
