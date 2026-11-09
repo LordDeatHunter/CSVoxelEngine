@@ -131,9 +131,9 @@ internal sealed class LeftClickAction
     private int _breakFace;
     private float _popElapsed = BlockPopSeconds;
 
-    // Punch cadence: the left-click attack runs on the held item's mining pace. Seeded to
-    // infinity while the button is up, so the first frame of a press punches at once, exactly
-    // like the break timer's seeded first hit.
+    // Swing cadence: seconds since the last swing or block hit, the left-click attack running on the held item's
+    // pace. It keeps counting while the button is up, so releasing and pressing again never skips the wait (no
+    // spam-clicking past the pace); infinity until the first swing, so that one lands at once.
     private float _punchTimer = float.PositiveInfinity;
     private float _punchGap = Mining.DefaultHitGapMs / 1000f;
 
@@ -297,10 +297,10 @@ internal sealed class LeftClickAction
         // it just no longer lands a hit.
         ResetCombos();
 
+        _punchTimer += (float)deltaTime;
         if (!isHolding)
         {
             StopBreaking();
-            _punchTimer = float.PositiveInfinity;
             _creativeBreakTimer = float.PositiveInfinity;
             return;
         }
@@ -310,7 +310,7 @@ internal sealed class LeftClickAction
 
         // Attack-first: while a mob is in the punch cone it owns the swing, so no block is
         // mined through it (including while the punch itself is on cooldown).
-        if (UpdatePunch(deltaTime, player))
+        if (UpdatePunch(player))
         {
             StopBreaking();
             return;
@@ -380,10 +380,10 @@ internal sealed class LeftClickAction
             _breakNatural = !_clientMode && BlockType.IsTreeWood(_breakingBlockId) && !WoodState.IsDetached(_breakState);
             _breakDamage = _breakNatural && _chunkManager.ChopDamage.TryGet((int)_selectedBlockPosition.X,
                 (int)_selectedBlockPosition.Y, (int)_selectedBlockPosition.Z, out var kept) ? kept.Damage : 0f;
-            // Seed the timer a whole interval in so the loop below lands the first hit this
-            // frame: a tap then counts as one hit instead of being released before the gap
-            // it would have to survive.
-            _hitTimer = _breakHitSeconds;
+            // Seed the timer with the time since the last swing, up to a whole interval: after a pause the
+            // loop below lands the first hit this frame (a tap counts as one hit), but a press right after
+            // a swing waits out what is left of the pace instead of restarting it.
+            _hitTimer = MathF.Min(_breakHitSeconds, _punchTimer);
             _popElapsed = BlockPopSeconds;
             // A connected client: the server starts its own count of this break here, and judges
             // the completion against it (BreakProgress)
@@ -427,6 +427,7 @@ internal sealed class LeftClickAction
         while (_hitTimer >= _breakHitSeconds)
         {
             _hitTimer -= _breakHitSeconds;
+            _punchTimer = _hitTimer;
             LocalPlayer.PunchSwing(_chopStarted);
             _chopStarted = false;
             PlayHitSfx(_breakingBlockId);
@@ -591,12 +592,11 @@ internal sealed class LeftClickAction
     /// swings on the same pace, so left-clicking the sky plays the animation. A connected client
     /// never damages a mob itself: it sends the punch, and the server lands it on its own mobs.
     /// </summary>
-    private bool UpdatePunch(double deltaTime, PlayerContext player)
+    private bool UpdatePunch(PlayerContext player)
     {
         var held = HeldItem();
         _punchGap = Mining.HitGapSeconds(held,
             (Camera.Effects?.AttackFactor ?? 1f) * player.Inventory.Equipment.Stats.AttackSpeedFactor);
-        _punchTimer += (float)deltaTime;
 
         if (TryFindPunchTarget(player.Eye, player.ViewDirection, out var target))
         {
