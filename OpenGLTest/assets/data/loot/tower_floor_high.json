@@ -1,0 +1,41 @@
+{
+  // A battle tower chest on floors 4-5: bronze and wrought iron, iron gear and the casters' trinkets (rare to epic),
+  // often a scroll or a mana draught.
+  "pools": [
+    { "rolls": 1, "entries": [ { "table": "tower_supplies" } ] },
+    {
+      "chance": 0.8,
+      "rolls": { "min": 1, "max": 2 },
+      "entries": [
+        { "item": "item/bronze_ingot", "weight": 3, "count": { "min": 1, "max": 3 } },
+        { "item": "item/wrought_iron", "weight": 2, "count": { "min": 1, "max": 2 } }
+      ]
+    },
+    {
+      "chance": 0.7,
+      "rolls": 1,
+      "entries": [
+        { "item": "item/iron_cap", "rarity": { "min": "rare", "max": "epic" } },
+        { "item": "item/iron_tunic", "rarity": { "min": "rare", "max": "epic" } },
+        { "item": "item/iron_pants", "rarity": { "min": "rare", "max": "epic" } },
+        { "item": "item/iron_boots", "rarity": { "min": "rare", "max": "epic" } },
+        { "item": "item/iron_gloves", "rarity": { "min": "rare", "max": "epic" } },
+        { "item": "item/iron_ring", "weight": 2, "rarity": { "min": "rare", "max": "epic" } },
+        { "item": "item/focus_ring", "rarity": { "min": "rare", "max": "epic" } },
+        { "item": "item/frost_charm", "rarity": { "min": "rare", "max": "epic" } },
+        { "item": "item/fire_charm", "rarity": { "min": "rare", "max": "epic" } },
+        { "item": "item/amulet_of_vigor", "rarity": { "min": "rare", "max": "epic" } }
+      ]
+    },
+    {
+      "chance": 0.3,
+      "rolls": 1,
+      "entries": [
+        { "item": "item/scroll_modifiers" },
+        { "item": "item/scroll_self" },
+        { "item": "item/scroll_frost" },
+        { "item": "item/mana_draught", "weight": 2 }
+      ]
+    }
+  ]
+}

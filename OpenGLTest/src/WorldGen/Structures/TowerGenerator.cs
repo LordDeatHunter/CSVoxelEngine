@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Structures;
 
 namespace VoxelEngine.WorldGen.Structures;
@@ -9,7 +10,9 @@ namespace VoxelEngine.WorldGen.Structures;
 /// The battle tower's cells: the procedural shell (<see cref="TowerShell"/>) dressed by each floor's and the roof's template.
 /// One cell function (<see cref="Merge"/>) feeds both the chunk stamp (<see cref="StampSite"/>) and the point query
 /// (<see cref="CellAt(int, int, int)"/>), so the two agree across every chunk seam by construction. A template cell naming the
-/// plain tower brick is swapped for the site's palette brick. GL-free and pure.
+/// plain tower brick is swapped for the site's palette brick, and a tower chest cell carries its floor's tier in its state
+/// (<see cref="ChestProfile.TierState"/> OR'd onto its facing; the roof's chest <see cref="TowerSite.TreasureTier"/>). GL-free
+/// and pure.
 /// </summary>
 public static class TowerGenerator
 {
@@ -38,27 +41,31 @@ public static class TowerGenerator
         if (ring == TowerRing.Room && y > s.GroundY && y < s.RoofY && (y - s.GroundY) % WorldGenerationConfig.TowerFloorHeight != 0)
         {
             var k = (y - s.GroundY) / WorldGenerationConfig.TowerFloorHeight;
-            var dressed = TemplateCell(s, s.FloorTemplates[k], s.FloorTurns[k], x, y - s.FloorY(k) - 1, z);
+            var dressed = TemplateCell(s, s.FloorTemplates[k], s.FloorTurns[k], x, y - s.FloorY(k) - 1, z, s.Tier(k));
             if (dressed >= 0) return dressed;
         }
         else if (ring != TowerRing.Apron && y > s.RoofY && y <= s.RoofY + s.Altar.Height)
         {
-            var dressed = TemplateCell(s, s.Altar, s.AltarTurns, x, y - s.RoofY - 1, z);
+            var dressed = TemplateCell(s, s.Altar, s.AltarTurns, x, y - s.RoofY - 1, z, TowerSite.TreasureTier);
             if (dressed >= 0) return dressed;
         }
         return shell;
     }
 
-    // A template centered on the tower's center column at template layer ly, remapped to the site's palette; -1 outside it
-    // or where it writes nothing
-    private static int TemplateCell(TowerSite s, StructureTemplate template, int turns, int x, int ly, int z)
+    // A template centered on the tower's center column at template layer ly, remapped to the site's palette, a chest given
+    // the tier of the floor (or roof) it stands on; -1 outside it or where it writes nothing
+    private static int TemplateCell(TowerSite s, StructureTemplate template, int turns, int x, int ly, int z, int tier)
     {
         var lx = x - StructureStamper.OriginOf(s.CenterX, template);
         var lz = z - StructureStamper.OriginOf(s.CenterZ, template);
         if ((uint)lx >= template.Size || (uint)lz >= template.Size || (uint)ly >= template.Height) return -1;
         var cell = template.CellAt(turns, lx, ly, lz);
-        if (cell < 0 || (cell & 0xFF) != TowerPalette.DefaultBrick) return cell;
-        return (cell & ~0xFF) | s.Palette.Brick;
+        if (cell < 0) return cell;
+        var block = cell & 0xFF;
+        if (block == TowerPalette.DefaultBrick) return (cell & ~0xFF) | s.Palette.Brick;
+        // The template's state for a chest is its facing alone (bits 0-1), so the tier bits OR on cleanly
+        if (block == TowerPalette.ChestBlock) return cell | (ChestProfile.TierState(tier) << 8);
+        return cell;
     }
 
     /// <summary>The skeleton pile cells floor <paramref name="floor"/>'s dressing template stands, in template order (layer,
@@ -66,23 +73,45 @@ public static class TowerGenerator
     /// pile block. Scans the template, so a consumer keeps the result.</summary>
     internal static IReadOnlyList<(int X, int Y, int Z)> PileCells(TowerSite s, int floor)
     {
+        RequireFloor(s, floor);
+        return TemplateBlockCells(s, s.FloorTemplates[floor], s.FloorTurns[floor], s.FloorY(floor) + 1, TowerPalette.PileBlock);
+    }
+
+    /// <summary>The tower chest cells floor <paramref name="floor"/>'s dressing template stands, in template order, each
+    /// carrying the floor's tier in its state. Scans the template, so a consumer keeps the result.</summary>
+    internal static IReadOnlyList<(int X, int Y, int Z)> ChestCells(TowerSite s, int floor)
+    {
+        RequireFloor(s, floor);
+        return TemplateBlockCells(s, s.FloorTemplates[floor], s.FloorTurns[floor], s.FloorY(floor) + 1, TowerPalette.ChestBlock);
+    }
+
+    /// <summary>The tower chest cells the roof's altar template stands, each carrying <see cref="TowerSite.TreasureTier"/>
+    /// in its state. Scans the template, so a consumer keeps the result.</summary>
+    internal static IReadOnlyList<(int X, int Y, int Z)> AltarChestCells(TowerSite s) =>
+        TemplateBlockCells(s, s.Altar, s.AltarTurns, s.RoofY + 1, TowerPalette.ChestBlock);
+
+    private static void RequireFloor(TowerSite s, int floor)
+    {
         if (floor < 0 || floor >= s.Floors)
             throw new ArgumentOutOfRangeException(nameof(floor), floor, "A tower's floors run from 0 to its floor count - 1.");
-        var template = s.FloorTemplates[floor];
-        var turns = s.FloorTurns[floor];
+    }
+
+    // The cells where both the turned template (its layer 0 at world y0) and the merged cell are the block
+    private static IReadOnlyList<(int X, int Y, int Z)> TemplateBlockCells(TowerSite s, StructureTemplate template, int turns,
+        int y0, byte block)
+    {
         var x0 = StructureStamper.OriginOf(s.CenterX, template);
         var z0 = StructureStamper.OriginOf(s.CenterZ, template);
-        var y0 = s.FloorY(floor) + 1;
         var cells = new List<(int X, int Y, int Z)>();
         for (var ly = 0; ly < template.Height; ly++)
         for (var lz = 0; lz < template.Size; lz++)
         for (var lx = 0; lx < template.Size; lx++)
         {
             var cell = template.CellAt(turns, lx, ly, lz);
-            if (cell < 0 || (cell & 0xFF) != TowerPalette.PileBlock) continue;
+            if (cell < 0 || (cell & 0xFF) != block) continue;
             int x = x0 + lx, y = y0 + ly, z = z0 + lz;
             var merged = CellAt(s, x, y, z);
-            if (merged >= 0 && (merged & 0xFF) == TowerPalette.PileBlock) cells.Add((x, y, z));
+            if (merged >= 0 && (merged & 0xFF) == block) cells.Add((x, y, z));
         }
         return cells;
     }

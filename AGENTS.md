@@ -400,14 +400,19 @@ slight `manaRegen`, +10 % `undeadDamage`) are crafted; `BoneShrapnelTests`, and 
 `ChestManager` (`Simulation/Chests/`, owned by `World`, saved in `stations.json` as `Chests`). Its `ChestState` is created on
 first use (`ChestManager.Open`, a break): a ruin chest (`ruin_chest_*`, worldgen-only) then rolls its loot table with
 `ChestLoot.Materialize` from the hash of its cell and the world seed, so a chest nobody touched holds no state and is never
-saved. A slot is a stackable or one tool/gear instance with every component (`ChestSlot`, `ItemStack.CloneAs`); moves are
+saved. An optional `chest.tiers` list of loot tables instead of `loot` (validated at load; the two are exclusive) makes a
+**tiered chest** (the battle tower's `tower_chest`): its tier is state bits 2-7 (`ChestProfile.TierShift`/`TierState`/`TierOf`,
+bits 0-1 being the facing) and `ChestProfile.TableFor(state)` picks the table, clamped to the last entry.
+`ChestLoot.Materialize(profile, state, cell, seed)` and `ChestManager.NotifyBlockRemoved(..., removedState, ...)` take the
+cell's state (`BlockEditor` passes `brokenState`, `Open` reads it), so opening and breaking unopened agree. A slot is a
+stackable or one tool/gear instance with every component (`ChestSlot`, `ItemStack.CloneAs`); moves are
 `ChestTransfer` (conserving, merging up to `ChestConfig.MaxStack`) behind `ChestAccess.Apply`, the same in singleplayer and on
 the server. A break and the stale sweep spill the contents as drops (instances lose their components there). Over the wire
 (protocol 20) the client sends `ChestOpen`/`ChestMove`/`ChestClose` and gets a per-player `ChestContents`; `ChestSessions`
 (server) judges each move against that player's open chest and reach, tells every viewer, and closes the chest when it is
 broken or out of reach. Right-clicking a chest is a `RightClickOutcome.Container` claim (sneak places against it instead);
 `ChestInput` (owned by `InventoryPanelInput`) opens the `ChestView` card (`UI/Chest/`, `ChestCardRenderer`) beside the [E] list,
-whose rows then deposit (one unit, all with shift) while the card's rows withdraw. `ChestTests`, `ChestServerTests`;
+whose rows then deposit (one unit, all with shift) while the card's rows withdraw. `ChestTests`, `TowerChestTests`, `ChestServerTests`;
 `visual-examples/chests.json` (`VOXEL_TIME=147`, with the `setblock`, `chest` and `chestrow` ops).
 
 **Waystones (W-1..W-3, plans/WAYSTONES.md).** A block with `"waystone": true` (`BlockType.Waystone`; the four
@@ -2421,13 +2426,15 @@ OpenGLTest/
         TowerPlacement.cs      # the battle towers (plans/BATTLE_TOWER.md): 1536-block hashed cells (salt 0x5E7F), the cached
                                #   site verdict, the band, the per-chunk stamp, TryGetSite/TryFindAt/Meets/TopReaching
         TowerSite.cs           # one accepted tower: center, ground, radius, floors, palette, dressing picks, and the BT-4/6/8
-                               #   hooks (FloorY, RoofY, Tier, DoorCells, PileCells, AltarCell, BottomY/TopY, chunk range)
+                               #   hooks (FloorY, RoofY, Tier, TreasureTier, DoorCells, PileCells, AltarCell, BottomY/TopY,
+                               #   chunk range)
         TowerShell.cs          # GL-free pure shell geometry: the rings, the helical half-step stair, doorways, slabs, parapet,
                                #   the closed tower_door cells (IsDoorStep, closed-form)
         TowerGenerator.cs      # merges the shell with the floor and altar templates; the point query CellAt, StampSite and
-                               #   PileCells (a floor template's skeleton piles)
+                               #   PileCells (a floor template's skeleton piles), ChestCells/AltarChestCells (the tower chests,
+                               #   each carrying its floor's tier in its state)
         TowerPalette.cs        # the biome palette swap: tower_bricks / _sandstone (desert) / _frost (frozen, taiga), the step
-                               #   slab, the door and pile blocks
+                               #   slab, the door, pile and chest blocks
         TowerRing.cs           # Outside / Apron / OuterWall / Corridor / InnerWall / Room
       Features/                # every surface feature generator (see "Biomes"); the underground ones below
         BoulderGenerator.cs    # a rare 2-4 cell stone or cobblestone blob on the forest/taiga floor
@@ -5635,7 +5642,8 @@ common hurt, death and spawn.
 ### Battle tower
 
 The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are above ("Structure templates and ruins",
-"Skeleton"); plans/BATTLE_TOWER.md holds the phases still to come. This section is the **floor locks** (`BT-4`).
+"Skeleton"); plans/BATTLE_TOWER.md holds the phases still to come. This section is the **floor locks** (`BT-4`) and the
+**chests** (`BT-5`).
 - **Two worldgen-only, unbreakable blocks** (`hasItem: false`, `loot: "none"`), both from the single tower cell function,
   so the point query still equals the stamp. `tower_door` (a solid, cutout, `cullSelf` portcullis `cube_all` that passes
   light) fills the headroom over the two door half-steps of every floor (`TowerSite.DoorCells(k)`, stamped by
@@ -5688,6 +5696,15 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
   may drop nothing; a tower whose chunks were saved before BT-4 keeps air in its door cells and has no piles, so the
   manager still tracks it but its doors read gone and open at once; the far LOD shows none of this; a pile whose nine
   spawn columns are all walled in retries forever.
+- **Chests (BT-5)**: `tower_chest` (worldgen-only, breakable, spills like a ruin chest; placeholder tiles reused from the
+  underground ruin chest, USER_TODO.md) stands 2 per floor in each `tower_floor_*` template and 1 on the roof in
+  `tower_altar`, the tower's treasure. `TowerGenerator.TemplateCell` ORs the floor tier `TowerSite.Tier(k)` (the roof's:
+  `TowerSite.TreasureTier`, one above any floor) into its state as `ChestProfile.TierState`, so the point query equals the
+  stamp. Its `chest.tiers` maps the tiers onto `tower_floor_low`/`_mid`/`_high`/`_top` (two floors each) and
+  `tower_treasure`, all nesting `tower_supplies`, richer going up (a gear rarity band one step rarer a table, more gear,
+  the ingot ladder tin..wrought iron, scrolls and mana draughts). Like any ruin chest it holds no state until first opened
+  or broken. Hooks: `TowerGenerator.ChestCells(s, k)`/`AltarChestCells(s)`. Tests: `TowerChestTests` and the chest cases
+  of `TowerPlacementTests`. Known gap: towers in chunks saved before BT-5 have no chests.
 
 ### Sandworm
 

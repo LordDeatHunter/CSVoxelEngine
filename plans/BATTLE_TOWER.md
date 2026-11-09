@@ -4,13 +4,14 @@
 
 ## Status
 
-BT-1 to BT-4 done; BT-5 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
+BT-1 to BT-5 done; BT-6 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
 the tower generator (see "Tower generator (BT-2)" under Reference), BT-3 the undead skeleton with its melee rake, bow
 and arrows, floor-tier difficulty and forced-spawn-only manager (see "Skeleton (BT-3)" and AGENTS.md "Skeleton"), BT-4
-the skeleton piles, the floor doors and `TowerManager` (see "Locks (BT-4)" and AGENTS.md "Battle tower").
+the skeleton piles, the floor doors and `TowerManager` (see "Locks (BT-4)" and AGENTS.md "Battle tower"), BT-5 the
+tower chest and per-floor loot (see "Chests (BT-5)").
 Tracks the battle tower: a rare, huge (radius ~20+) cylindrical landmark of 4-8 floors with skeleton piles, chests, floor locks, a roof
 altar that summons the Skeleton King, unique boss loot and a collapse into a ruin. One phase per prompt; each phase
-leaves the game building and the tests green. **Content ids are tight: 13 left, see Reference.**
+leaves the game building and the tests green. **Content ids are tight: 12 left, see Reference.**
 Last updated 2026-11-09.
 
 ## In progress
@@ -19,9 +20,6 @@ Nothing.
 
 ## Open
 
-- [ ] **`BT-5` · Chests and floor loot** — P1, S.
-  Worldgen-only tower chests like `ruin_chest_*` in the floor templates; loot tables per floor tier
-  (`loot/tower_floor_N`) rolled by `ChestLoot.Materialize`, richer going up. **Hook:** `Simulation/Chests/`.
 - [ ] **`BT-6` · Skeleton King and the altar** — P1, XL.
   Big humanoid rig and brain: melee slam, skeleton wave summon, bone volley, phases by health. Right-clicking the altar
   (a claimed `RightClickOutcome`, like the waystone) starts a short ritual and the boss rises, once per tower. Uses the
@@ -59,11 +57,11 @@ Nothing.
 ## Reference
 
 - **Content id budget (budget constraint, after BT-3, which used 2: the `arrow` and `bone` items, BT-7's bone pair,
-  which used 2: `bone_breaker_blade`, `bone_charm`, and BT-4, which used 2: `skeleton_pile`, `tower_door`): 242 of 255
-  used (132 blocks, 109 items, air), 13 free.** Rough needs of the later phases: BT-5 tower chest block(s) (1 if the loot keys on the floor through the cell or state, up to
-  4 with one per tier); BT-6 altar block (1); BT-7 one more unique plus a boss material (~2-3 items; the bone fragments
-  reuse `bone`); BT-8 rubble or ruin block(s) (1-2). About 5-8 left to spend: the tower fits, but leaves little for `CAVE_BIOMES.md`.
-  Prefer one chest block and reuse existing ruin blocks for the rubble.
+  which used 2: `bone_breaker_blade`, `bone_charm`, BT-4, which used 2: `skeleton_pile`, `tower_door`, and BT-5, which
+  used 1: `tower_chest`): 243 of 255 used (133 blocks, 109 items, air), 12 free.** Rough needs of the later phases:
+  BT-6 altar block (1); BT-7 one more unique plus a boss material (~2-3 items; the bone fragments
+  reuse `bone`); BT-8 rubble or ruin block(s) (1-2). About 6-8 left to spend: the tower fits, but leaves little for `CAVE_BIOMES.md`.
+  Reuse existing ruin blocks for the rubble.
 - **How `unbreakable` is enforced** (BT-1): load rules (`BlockFieldRules.ValidateUnbreakable` refuses fluid, falls,
   needsSupport, replaceableByPlacement, flammable, meltsTo, the tree-wood and multiblock renderers, upperHalf and
   prime_tnt, and `BlockLinkResolver` refuses an unbreakable multiblock source) keep the block away from every raw-write
@@ -100,7 +98,7 @@ Nothing.
   - **Templates**: kinds `towerFloor` (at most `TowerFloorHeight - 1` = 6 layers) and `towerAltar` (at most 8), odd size,
     `groundLayer` 0, no satellite or waystone, an empty altar template center at layer 0; a `tower_bricks` cell becomes the
     site's palette brick; lanterns hang only under a solid cell (a floor's top layer sits under the next slab); dressing
-    blocks are breakable decoratives and no chests (BT-5 adds them).
+    blocks are breakable decoratives; each floor template and the altar also stand tower chests (see "Chests (BT-5)").
   - **Default seed**: the tower nearest the origin is cell (1, -1), center (2920, -1411), ground 10, radius 21, 5 floors,
     turns 2, plain bricks, slabs y 10/17/24/31/38, roof 45, altar (2920, 46, -1411), top 51
     (`visual-examples/battle-tower.json`, `VOXEL_TIME=147`).
@@ -154,6 +152,27 @@ Nothing.
     server door pop runs with the creative server camera's context and may drop nothing; towers saved before BT-4 have
     air in their door cells and no piles, so they open at once; the far LOD shows none of it; a pile with all nine spawn
     columns walled in retries forever.
+
+- **Chests (BT-5)**, 1 content id (`tower_chest`). See AGENTS.md "Battle tower" and "Chests (I-4)".
+  - **Files**: `ChestProfile` (the tier helpers `TierShift`/`TierState`/`TierOf`, `TierTables`, `TableFor`, `Tables`),
+    `BlockDefinition.ChestDefinition.Tiers`, `BlockSchemaParser.ParseChest`, `ChestLoot.Materialize` (takes the cell's
+    state), `ChestManager` (`Open` and `NotifyBlockRemoved` read or take the state), `BlockEditor.RemoveBlock` (passes
+    `brokenState`); `TowerPalette.ChestBlock`, `TowerSite.TreasureTier`, `TowerGenerator.TemplateCell`/`ChestCells`/
+    `AltarChestCells`; `blocks/tower_chest.json`; `loot/tower_supplies`, `tower_floor_low/mid/high/top`,
+    `tower_treasure`; two chests in each `tower_floor_*` template and one on the roof in `tower_altar`.
+  - **Tier encoding**: a chest is a facing block, so bits 0-1 of its state are the facing and bits 2-7 the tier
+    (`ChestProfile.TierState(tier)`, up to 64). `TowerGenerator.TemplateCell` ORs `TierState(TowerSite.Tier(k))` onto
+    the template's facing for a floor's chest and `TierState(TowerSite.TreasureTier)` (= `TowerMaxFloors`, 8) for the
+    roof's, so the point query equals the stamp. `chest.tiers` maps tier to table, the last entry for any higher tier:
+    floors 0-1 `tower_floor_low`, 2-3 `_mid`, 4-5 `_high`, 6-7 `_top`, the roof `tower_treasure`; all nest
+    `tower_supplies`. Gear rarity bands climb one step a table (common..uncommon up to legendary only) and the gear per
+    chest never falls; the ingots climb tin..wrought iron.
+  - **Tests**: `TowerChestTests` (every stamped tier has a table, the map never steps back and each table is richer by
+    least rarity and gear count, a chest rolls its tier's table whatever its facing, determinism, open equals break,
+    no state until used, the `tiers` load rules) and the chest cases of `TowerPlacementTests` (chests per floor at their
+    tier, the treasure tier on the roof, chest states in the point-query-equals-stamp check).
+  - **Known gaps**: towers in chunks saved before BT-5 have no chests; an unopened chest destroyed by a blast or by BT-8's
+    collapse rolls nothing, like a ruin chest; the chest reuses the underground ruin chest's tiles (USER_TODO.md).
 
 - **Bone shrapnel (BT-7's first two uniques)**, 2 content ids (`bone_breaker_blade`, `bone_charm`); see AGENTS.md
   "Bone shrapnel". The blade carries `shrapnel: { count: 6, damage: 3 }`; the charm grants `bone_shrapnel`

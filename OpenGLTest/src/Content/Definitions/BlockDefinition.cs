@@ -304,6 +304,10 @@ public sealed class BlockDefinition
 
         /// <summary>The loot table a never-opened chest rolls; omitted for an ordinary chest.</summary>
         public string? Loot { get; set; }
+
+        /// <summary>The loot tables of a tiered chest, by tier: worldgen carries the tier in the cell's state bits
+        /// 2-7, and the last entry is used for any higher tier. Exclusive with <see cref="Loot"/>.</summary>
+        public string[]? Tiers { get; set; }
     }
 
     /// <summary>Marks the block as a spell builder station: a right-click opens the spell

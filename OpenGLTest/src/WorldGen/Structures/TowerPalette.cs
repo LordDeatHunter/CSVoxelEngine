@@ -23,6 +23,7 @@ public sealed record TowerPalette(byte Brick, byte Step)
         StoopBlock = ContentRegistry.RequireBlock("cobblestone").Id;
         DoorBlock = ContentRegistry.RequireBlock("tower_door").Id;
         PileBlock = ContentRegistry.RequireBlock("skeleton_pile").Id;
+        ChestBlock = ContentRegistry.RequireBlock("tower_chest").Id;
         Plain = new TowerPalette(DefaultBrick, step);
         Sandstone = new TowerPalette(ContentRegistry.RequireBlock("tower_bricks_sandstone").Id, step);
         Frost = new TowerPalette(ContentRegistry.RequireBlock("tower_bricks_frost").Id, step);
@@ -46,6 +47,12 @@ public sealed record TowerPalette(byte Brick, byte Step)
     /// tower's lock clears it once it is spent.
     /// </summary>
     internal static byte PileBlock { get; }
+
+    /// <summary>
+    /// The worldgen-only loot chest a floor template (and the roof's) places, the same in every palette; the stamp writes
+    /// the floor's tier into its state, which picks the loot table it rolls.
+    /// </summary>
+    internal static byte ChestBlock { get; }
 
     /// <summary>Every palette, once each.</summary>
     internal static IReadOnlyList<TowerPalette> All { get; }

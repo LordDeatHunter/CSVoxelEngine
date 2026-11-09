@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Structures;
 using VoxelEngine.Interaction;
 using VoxelEngine.WorldGen;
@@ -16,7 +17,8 @@ namespace VoxelEngine.Tests.WorldGen.Structures;
 /// within a few cells of the origin on the default seed, sites are a pure function of (cell, seed), the rolled radius and floor
 /// count stay in their ranges, every tower keeps the spawn clear on dry, level land, the point query equals the stamp in every
 /// footprint chunk, the dressing fits the smallest room and every support-fragile dressing block has its holder, the altar cell
-/// is free on an unbreakable roof, and every palette brick is unbreakable.
+/// is free on an unbreakable roof, every floor holds chests of its own tier and the roof one of the treasure tier, and
+/// every palette brick is unbreakable.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class TowerPlacementTests
@@ -136,6 +138,7 @@ public sealed class TowerPlacementTests
         var s = Nearest();
         const int volume = Chunk.Size * Chunk.Size * Chunk.Size;
         var wrote = 0;
+        var chests = 0;
         (int X, int Y, int Z)? seam = null;
         for (var cx = s.MinChunkX; cx <= s.MaxChunkX; cx++)
         for (var cy = s.MinChunkY; cy <= s.MaxChunkY; cy++)
@@ -165,11 +168,18 @@ public sealed class TowerPlacementTests
                 chunkWrote++;
                 Assert.Equal(BlockOf(cell), stamped);
                 Assert.Equal(StateOf(cell), stampedState);
+                if (stamped != TowerPalette.ChestBlock) continue;
+                // A chest carries the tier of the floor it stands on, or the roof's treasure tier
+                chests++;
+                var wy = y0 + y;
+                var tier = wy < s.RoofY ? (wy - s.GroundY) / WorldGenerationConfig.TowerFloorHeight : TowerSite.TreasureTier;
+                Assert.Equal(tier, ChestProfile.TierOf(stampedState));
             }
             wrote += chunkWrote;
             if (seam == null && chunkWrote > 0 && chunkSkipped > 0) seam = (x0, y0, z0);
         }
         Assert.True(wrote > 0);
+        Assert.True(chests > 0, "the stamp wrote no chest, so no chest state was compared");
         Assert.NotNull(seam);
 
         // A seam chunk over junk: unwritten cells keep it, written cells get their exact state, zero included
@@ -372,6 +382,40 @@ public sealed class TowerPlacementTests
             {
                 Assert.Equal(TowerPalette.PileBlock, (byte)BlockOf(TowerGenerator.CellAt(s, x, y, z)));
                 Assert.Equal(s.FloorY(k) + 1, y);
+            }
+        }
+    }
+
+    [Fact]
+    public void EveryFloorHoldsAChestOfItsOwnTierWhereThePointQuerySaysSo()
+    {
+        foreach (var s in TowerSiteFixture.SyntheticSites())
+        {
+            for (var k = 0; k < s.Floors; k++)
+            {
+                var chests = TowerGenerator.ChestCells(s, k);
+                Assert.NotEmpty(chests);
+                Assert.Equal(chests.Count, chests.Distinct().Count());
+                var piles = s.PileCells(k);
+                foreach (var (x, y, z) in chests)
+                {
+                    var cell = TowerGenerator.CellAt(s, x, y, z);
+                    Assert.Equal(TowerPalette.ChestBlock, (byte)BlockOf(cell));
+                    Assert.Equal(s.Tier(k), ChestProfile.TierOf(StateOf(cell)));
+                    Assert.Equal(s.FloorY(k) + 1, y);
+                    Assert.DoesNotContain((x, y, z), piles);
+                }
+            }
+
+            var treasure = TowerGenerator.AltarChestCells(s);
+            Assert.NotEmpty(treasure);
+            foreach (var (x, y, z) in treasure)
+            {
+                var cell = TowerGenerator.CellAt(s, x, y, z);
+                Assert.Equal(TowerPalette.ChestBlock, (byte)BlockOf(cell));
+                Assert.Equal(TowerSite.TreasureTier, ChestProfile.TierOf(StateOf(cell)));
+                Assert.Equal(s.RoofY + 1, y);
+                Assert.NotEqual(s.AltarCell, (x, y, z));
             }
         }
     }

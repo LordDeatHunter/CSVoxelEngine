@@ -25,8 +25,9 @@ public sealed class CharmLootTests
         var tables = new List<LootTable>();
         foreach (var block in BlockType.ById)
         {
-            var name = block?.Chest?.LootTable;
-            if (name != null && ContentRegistry.LootTableFor(name) is { } table) tables.Add(table);
+            if (block?.Chest is not { } chest) continue;
+            foreach (var name in chest.Tables)
+                if (ContentRegistry.LootTableFor(name) is { } table) tables.Add(table);
         }
         foreach (var entity in EntityRegistry.ByName.Values)
             if (entity.LootTable != null) tables.Add(entity.LootTable);

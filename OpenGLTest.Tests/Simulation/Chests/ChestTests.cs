@@ -170,7 +170,7 @@ public sealed class ChestTests
         Assert.NotEmpty(shown);
 
         var broken = World(RuinSurface);
-        broken.Chests.NotifyBlockRemoved(4, 4, 4, Profile(RuinSurface), broken.Drops);
+        broken.Chests.NotifyBlockRemoved(4, 4, 4, Profile(RuinSurface), 0, broken.Drops);
         var spilled = broken.Drops.Drops.Select(d => d.BlockId).OrderBy(i => i).ToList();
 
         Assert.Equal(shown, spilled);
@@ -183,9 +183,9 @@ public sealed class ChestTests
         string Describe(ChestState c) => string.Join(",", Enumerable.Range(0, c.SlotCount)
             .Select(i => c[i]).Where(s => !s.IsEmpty).Select(s => $"{s.Id}x{s.Count}:{s.Instance?.ResolvedName}"));
 
-        Assert.Equal(Describe(ChestLoot.Materialize(profile, 10, 20, 30, 1)), Describe(ChestLoot.Materialize(profile, 10, 20, 30, 1)));
+        Assert.Equal(Describe(ChestLoot.Materialize(profile, 0, 10, 20, 30, 1)), Describe(ChestLoot.Materialize(profile, 0, 10, 20, 30, 1)));
         var contents = new HashSet<string>();
-        for (var x = 0; x < 40; x++) contents.Add(Describe(ChestLoot.Materialize(profile, x, 20, 30, 1)));
+        for (var x = 0; x < 40; x++) contents.Add(Describe(ChestLoot.Materialize(profile, 0, x, 20, 30, 1)));
         Assert.True(contents.Count > 10, "different cells hold different loot");
         Assert.NotEqual(ChestLoot.SeedFor(1, 2, 3, 100), ChestLoot.SeedFor(1, 2, 3, 101));
     }
@@ -207,7 +207,7 @@ public sealed class ChestTests
         var chest = world.Chests.Open(world.Manager, 4, 4, 4)!;
         ChestTransfer.Place(chest, Flint, 5);
 
-        world.Chests.NotifyBlockRemoved(4, 4, 4, Profile(Wooden), world.Drops);
+        world.Chests.NotifyBlockRemoved(4, 4, 4, Profile(Wooden), 0, world.Drops);
 
         Assert.Equal(5, world.Drops.Drops.Count(d => d.BlockId == Flint));
         Assert.Null(world.Chests.Peek(4, 4, 4));

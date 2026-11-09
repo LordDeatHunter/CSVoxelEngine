@@ -2,7 +2,8 @@
   // A battle tower floor (plans/BATTLE_TOWER.md BT-2): barracks. Four bunks, each a lower and an upper cobblestone-slab
   // bed between oak-fence posts, sit either side of a cobblestone-wall partition with a gap through its middle, and
   // lanterns hang under the slab above (layer 5, right under it). Four skeleton piles (BT-4) lie in the open
-  // aisle between the bunks; they raise the floor's skeletons. Spaces write nothing.
+  // aisle between the bunks; they raise the floor's skeletons. Two tower chests (BT-5), footlockers beside two of the
+  // bunks, get the floor's loot tier from the stamp. Spaces write nothing.
   "kind": "towerFloor",
   "weight": 1,
   "groundLayer": 0,
@@ -11,20 +12,22 @@
     "h": "cobblestone_slab",
     "w": "cobblestone_wall",
     "L": "lantern",
-    "S": "skeleton_pile"
+    "S": "skeleton_pile",
+    "E": { "block": "tower_chest", "facing": "east" },
+    "W": { "block": "tower_chest", "facing": "west" }
   },
   "layers": [
     [
       "             ",
       "      w      ",
       " fhhf w fhhf ",
-      "      w      ",
+      " E    w      ",
       "      w      ",
       "   S     S   ",
       "             ",
       "   S     S   ",
       "      w      ",
-      "      w      ",
+      "      w    W ",
       " fhhf w fhhf ",
       "      w      ",
       "             "

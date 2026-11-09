@@ -2,8 +2,9 @@
   // A battle tower floor (plans/BATTLE_TOWER.md BT-2): a pillared hall. Four tower-brick pillars (remapped to the tower's
   // biome brick) with cobblestone plinths rise to the next slab, a cobblestone-slab ring with four gaps marks the middle
   // of the room, lanterns hang under the slab above (layer 5, right under it) and four skeleton piles (BT-4) lie
-  // between the pillars, one on each side; they raise the floor's skeletons. Spaces write nothing, so the shell's
-  // air shows through.
+  // between the pillars, one on each side; they raise the floor's skeletons. Two tower chests (BT-5) stand inside the
+  // slab ring, north and south of the middle, facing it; the stamp gives them the floor's loot tier. Spaces write
+  // nothing, so the shell's air shows through.
   "kind": "towerFloor",
   "weight": 1,
   "groundLayer": 0,
@@ -12,7 +13,9 @@
     "c": "cobblestone",
     "h": "cobblestone_slab",
     "L": "lantern",
-    "S": "skeleton_pile"
+    "S": "skeleton_pile",
+    "C": { "block": "tower_chest", "facing": "south" },
+    "D": { "block": "tower_chest", "facing": "north" }
   },
   "layers": [
     [
@@ -21,11 +24,11 @@
       " cPc       cPc ",
       "  c  hh hh  c  ",
       "    h     h    ",
-      "   h       h   ",
+      "   h   C   h   ",
       "   h       h   ",
       " S           S ",
       "   h       h   ",
-      "   h       h   ",
+      "   h   D   h   ",
       "    h     h    ",
       "  c  hh hh  c  ",
       " cPc       cPc ",

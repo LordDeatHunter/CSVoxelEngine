@@ -173,3 +173,10 @@ Both made by `tools/generate-tower-lock-textures.py`: re-running puts the placeh
   crops it with default UVs: the base's sides take rows 26..31 across columns 4..27, its top the
   square rows/columns 4..27; the skull's sides take rows 18..25 across columns 10..21 (the sockets
   sit there) and its top the square rows/columns 10..21.
+
+### Battle tower chest
+
+- [ ] **Tower chest** — `chest_tower_front.png`, `chest_tower_side.png`, `chest_tower_top.png`. The
+  worldgen-only `tower_chest` (BT-5) currently reuses the underground ruin chest's
+  `chest_ruin_underground_*` tiles; same layout as the ruin chests (the shared `block/chest` model).
+  Repoint `tower_chest.json`'s textures when they land.
