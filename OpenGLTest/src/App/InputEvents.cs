@@ -53,7 +53,7 @@ internal sealed class InputEvents
 
     private World? ActiveWorld => Program.ActiveWorld;
 
-    /// <summary>A released button: menu and pause clicks, slider-drag saves, the right-click repeat reset, a click on a link in the open chat's log (it suggests the link's command), spell builder clicks and [E] panel clicks.</summary>
+    /// <summary>A released button: menu and pause clicks, slider-drag saves, the right-click repeat reset and [E] panel row equip, a click on a link in the open chat's log (it suggests the link's command), spell builder clicks and [E] panel clicks.</summary>
     internal void OnMouseUp(MouseButton button)
     {
         if (Screen == AppScreen.Menu)
@@ -100,6 +100,10 @@ internal sealed class InputEvents
         {
             case MouseButton.Right:
                 gameplay.ResetPlaceTimer();
+                // A right-click on an [E] panel row equips it; the world's use and place stand aside while it is open
+                if (inventoryView.IsOpen && !chatView.IsOpen && !waystoneInput.IsOpen && !builderInput.IsOpen
+                    && inputManager.Mouse != null)
+                    panelInput.HandleInventoryRightClick(inputManager.Mouse.Position);
                 break;
             // Only a drawn link is clickable, and the click never reaches the world: mining, use and the middle
             // pick already stand aside while the chat is open
@@ -201,7 +205,7 @@ internal sealed class InputEvents
                 {
                     var searching = !inventoryView.Search.IsEmpty;
                     var rowCount = searching
-                        ? InventorySearch.Search(inventoryView.Search.Query, w.Inventory, w.Camera.IsCreative).Count
+                        ? inventoryView.SearchHits(w.Inventory, w.Camera.IsCreative).Count
                         : panelInput.RowCountFor(inventoryView.Tab);
                     var delta = -wheel.Y * InventoryPanelLayout.WheelStepRows * InventoryPanelLayout.RowHeight;
                     panelInput.SetListScroll(InventoryPanelLayout.ClampedOffset(

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
-using VoxelEngine.Content;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Data;
 using VoxelEngine.Items;
@@ -15,8 +14,8 @@ using static VoxelEngine.UI.UiTheme;
 namespace VoxelEngine.Rendering.Overlays;
 
 /// <summary>
-/// The [E] inventory panel: its tabs, search field, list rows, creative catalog buttons and
-/// preview card, and the hit-tests that read the same <see cref="InventoryPanelLayout"/>, so a
+/// The [E] inventory panel: its tabs, search field and scope button, list rows, creative catalog
+/// buttons and preview card, and the hit-tests that read the same <see cref="InventoryPanelLayout"/>, so a
 /// click lands on exactly what was drawn. The Craft tab's card is <see cref="CraftCardRenderer"/>.
 /// Draws through the <see cref="UIRenderer"/> primitives. Render thread only.
 /// </summary>
@@ -72,9 +71,9 @@ internal sealed class InventoryPanelRenderer
             var active = view.Tab == tabs[t];
             var hovered = !active && _hover is { } p && new UiRect(center, size).Contains(p);
             _ui.DrawRect(center, size, active ? SelectedBackground : hovered ? HoverBackground : SlotBackground);
-            _ui.DrawTextCenteredFitted(TabTitle(tabs[t]),
+            _ui.DrawTextCenteredFitted(PanelTabLabels.Title(tabs[t]),
                 center.X, top + PanelPad + 6f, _ui.CountScale, Rgba.White, tabWidth - 8f);
-            _ui.DrawTextCenteredFitted(TabSubtitle(inventory, tabs[t]),
+            _ui.DrawTextCenteredFitted(PanelTabLabels.Subtitle(inventory, tabs[t], creative),
                 center.X, top + PanelPad + 30f, _ui.CountScale, Rgba.White, tabWidth - 8f);
         }
 
@@ -85,14 +84,15 @@ internal sealed class InventoryPanelRenderer
 
         var (searchCenter, searchSize) = InventoryPanelLayout.SearchBoxRect(_ui.ScreenSize);
         _ui.DrawInputField(searchCenter, searchSize, view.Search.Text,
-            view.Focus == InventoryFocus.Search, "Search items and recipes", time);
+            view.Focus == InventoryFocus.Search, SearchPlaceholder(view.SearchScope), time);
+        DrawScopeButton(view.SearchScope);
 
         // A query replaces the tab's list with search results; the list region below doubles as
-        // the field's dropdown, and InventoryPanelInput.HandleInventoryClick reads the same InventorySearch
-        // call, so the drawn rows and the click always agree.
+        // the field's dropdown, and InventoryPanelInput.HandleInventoryClick reads the same
+        // InventoryView.SearchHits call, so the drawn rows and the click always agree.
         IReadOnlyList<SearchHit>? hits = view.Search.IsEmpty
             ? null
-            : InventorySearch.Search(view.Search.Query, inventory, creative);
+            : view.SearchHits(inventory, creative);
 
         // One list per frame for the active tab (never re-query StackEntries/ToolEntries for
         // the visible range: that would double the LINQ sort). In creative the Blocks/Tools/Misc
@@ -140,13 +140,22 @@ internal sealed class InventoryPanelRenderer
         {
             if (hits != null)
             {
+                // In creative an item hit is a catalog row, with the same grant buttons as the tab's list
                 for (var i = first; i < end; i++)
-                    DrawSearchRow(i, offset, hits[i], i == view.Search.Highlight, headingDegrees, time);
+                {
+                    var highlighted = i == view.Search.Highlight;
+                    if (creative && !hits[i].IsRecipe)
+                        DrawCatalogRow(i, offset, rowCount, hits[i].Id, hits[i].Name, hits[i].Count, highlighted,
+                            headingDegrees, time);
+                    else
+                        DrawSearchRow(i, offset, hits[i], highlighted, headingDegrees, time);
+                }
             }
             else if (catalog != null)
             {
                 for (var i = first; i < end; i++)
-                    DrawCatalogRow(i, offset, rowCount, catalog[i], headingDegrees, time);
+                    DrawCatalogRow(i, offset, rowCount, catalog[i].Id, catalog[i].Name, catalog[i].Count, false,
+                        headingDegrees, time);
             }
             else if (tools != null)
             {
@@ -221,19 +230,33 @@ internal sealed class InventoryPanelRenderer
     internal bool SearchBoxAt(Vector2 windowPoint) =>
         InventoryPanelLayout.SearchBoxAt(_ui.ToCanvas(windowPoint), _ui.ScreenSize);
 
-    private static string TabTitle(InventoryCategory tab) => tab switch
+    /// <summary>Whether a window-pixel point is over the search scope's cycle button.</summary>
+    internal bool ScopeButtonAt(Vector2 windowPoint) =>
+        InventoryPanelLayout.ScopeButtonAt(_ui.ToCanvas(windowPoint), _ui.ScreenSize);
+
+    private static string SearchPlaceholder(SearchScope scope) => scope switch
     {
-        InventoryCategory.Blocks => "Blocks",
-        InventoryCategory.Tools => "Tools",
-        InventoryCategory.Gear => "Gear",
-        InventoryCategory.Crafting => "Craft",
-        _ => "Misc",
+        SearchScope.Items => "Search items",
+        SearchScope.Recipes => "Search recipes",
+        _ => "Search items and recipes",
     };
 
-    private static string TabSubtitle(Inventory inventory, InventoryCategory tab) =>
-        tab == InventoryCategory.Crafting
-            ? $"{inventory.Craftable().Count}/{ContentRegistry.CraftingRecipes.Count}"
-            : $"{inventory.UsedOf(tab)}/{Inventory.CapacityOf(tab)}";
+    // The search scope's cycle button beside the field: its label names what the search lists, and a narrowed
+    // scope wears the accent border so it is never mistaken for the default.
+    private void DrawScopeButton(SearchScope scope)
+    {
+        var (center, size) = InventoryPanelLayout.ScopeButtonRect(_ui.ScreenSize);
+        var hovered = _hover is { } p && new UiRect(center, size).Contains(p);
+        _ui.DrawRect(center, size, hovered ? HoverBackground : ChipBackground);
+        _ui.DrawBorder(center, size, Border.Standard, scope == SearchScope.All ? SlotBorderColor : AccentGold);
+        var label = scope switch
+        {
+            SearchScope.Items => "Items",
+            SearchScope.Recipes => "Recipes",
+            _ => "All",
+        };
+        _ui.DrawTextMiddle(_ui.FitText(label, _ui.CountScale, size.X - 8f), center, _ui.CountScale, Rgba.White);
+    }
 
     private void DrawEntryRow(int row, float offset, byte id, string name, string count, bool selected,
         bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null, float? durability = null,
@@ -284,10 +307,10 @@ internal sealed class InventoryPanelRenderer
             headingDegrees, timeSeconds, hit.IsRecipe ? AccentGold : null);
     }
 
-    private void DrawCatalogRow(int row, float offset, int rowCount, CreativeCatalog.CatalogEntry entry,
+    private void DrawCatalogRow(int row, float offset, int rowCount, byte id, string name, int count, bool selected,
         float headingDegrees, float timeSeconds)
     {
-        DrawEntryRow(row, offset, entry.Id, entry.Name, entry.Count.ToString(), false, false,
+        DrawEntryRow(row, offset, id, name, count.ToString(), selected, false,
             headingDegrees, timeSeconds, null, null, InventoryPanelLayout.CatalogButtonGroupWidth + 12f);
         for (var which = 0; which < InventoryPanelLayout.CatalogButtonCount; which++)
         {

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.Input;
-using VoxelEngine.Content;
+using VoxelEngine.Content.Recipes;
 using VoxelEngine.Data;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
@@ -16,7 +16,7 @@ using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.App;
 
-/// <summary>The [E] panel's input: opening and closing it, clicks, the scrollbar, the search field's keys, the creative catalog buttons, the hovered row (number-key equips) and the hover tooltip. Every change the server owns is sent through the client session as well. Owned by Program; main thread only.</summary>
+/// <summary>The [E] panel's input: opening and closing it, clicks and the right-click equip, the scrollbar, the search field's keys and scope button, the creative catalog buttons, the hovered row (number-key equips) and the hover tooltip. Every change the server owns is sent through the client session as well. Owned by Program; main thread only.</summary>
 internal sealed class InventoryPanelInput
 {
     private readonly InputManager inputManager;
@@ -67,22 +67,22 @@ internal sealed class InventoryPanelInput
             Key.Number6, Key.Number7, Key.Number8, Key.Number9, Key.Number0];
 
     /// <summary>
-    /// The tooltip for whatever the cursor hovers while the [E] panel is open: a panel row's item
-    /// (or the tool instance it names) or a hotbar slot's, with the cursor as the anchor. Null
-    /// when nothing hovers.
+    /// The tooltip for whatever the cursor hovers while the [E] panel is open: a listed row's item
+    /// (a search hit's, a recipe's result, a creative catalog row's, or the tool instance a row
+    /// names) or a hotbar slot's, with the cursor as the anchor. Null when nothing hovers.
     /// </summary>
     internal (Vector2 Anchor, List<string> Lines, IReadOnlyDictionary<int, Rgba> Colors)? HoveredTooltip()
     {
         if (!inventoryView.IsOpen || pauseMenuView.IsOpen || PointerWindow() is not { } position) return null;
-        var inventory = ActiveWorld?.Inventory;
-        if (inventory == null || renderManager == null) return null;
+        var world = ActiveWorld;
+        if (world == null || renderManager == null) return null;
+        var inventory = world.Inventory;
 
-        // A panel row first (the rows sit over the list), then a hotbar slot
-        if (HoveredRow(out var rowId, out var rowTool))
+        // A listed row first (the rows sit over the list), then a hotbar slot
+        if (EntryAt(position, inventory, world.Camera.IsCreative) is { } entry)
         {
-            var stack = rowTool != 0 ? inventory.GetToolStack(rowTool) : null;
-            var rowLines = ItemTooltip.Lines(rowTool != 0 ? stack!.DefinitionId : rowId, stack, inventory.Equipment,
-                out var rowColors);
+            var stack = entry.ToolInstance != 0 ? inventory.GetToolStack(entry.ToolInstance) : null;
+            var rowLines = ItemTooltip.Lines(entry.Id, stack, inventory.Equipment, out var rowColors);
             return (position, rowLines, rowColors);
         }
 
@@ -96,39 +96,42 @@ internal sealed class InventoryPanelInput
         }
     }
 
+    /// <summary>What a listed row names: its item id, the tool or gear instance it stands for (else 0), and the
+    /// recipe it opens (a recipe row or hit, else null).</summary>
+    private readonly record struct RowEntry(byte Id, int ToolInstance, CraftingRecipe? Recipe);
+
     /// <summary>
-    /// The panel row under the cursor, if any: its item id, or the tool instance it names (then
-    /// the id is 0). The one reading of "which row is hovered" the number keys and the tooltip
-    /// share, so they never disagree.
+    /// The listed row under a window-pixel point and what it names, read from the list the panel shows this frame
+    /// (a search hit, a recipe, a creative catalog row or one of the player's own rows); null off the rows. The one
+    /// reading of "which row is that" the tooltip, the number keys and the right-click share, so they never disagree.
     /// </summary>
-    private bool HoveredRow(out byte id, out int toolInstance)
+    private RowEntry? EntryAt(Vector2 window, Inventory inventory, bool creative)
     {
-        id = 0;
-        toolInstance = 0;
-        var inventory = ActiveWorld?.Inventory;
-        if (inventory == null || PointerWindow() is not { } pointer || renderManager == null) return false;
-        if (!inventoryView.Search.IsEmpty) return false;
-        if (inventoryView.Tab == InventoryCategory.Crafting) return false;
-        if (ActiveWorld!.Camera.IsCreative) return false;
-
-        var rowCount = RowCountFor(inventoryView.Tab);
-        var offset = InventoryPanelLayout.ClampedOffset(inventoryView.ScrollOffset, rowCount,
-            renderManager.Ui.ScreenSize);
-        var row = renderManager.Ui.Panel.PanelRowAt(pointer, offset, rowCount);
-        if (row == null) return false;
-
+        var list = CurrentList(inventory, creative);
+        if (renderManager.Ui.Panel.PanelRowAt(window, list.Offset, list.RowCount) is not { } row) return null;
+        if (list.Hits != null)
+        {
+            if (row >= list.Hits.Count) return null;
+            var hit = list.Hits[row];
+            return new RowEntry(hit.Id, hit.ToolInstance, hit.Recipe);
+        }
+        if (inventoryView.Tab == InventoryCategory.Crafting)
+        {
+            var recipes = inventory.ListedRecipes(creative);
+            return row < recipes.Count ? new RowEntry(recipes[row].ResultId, 0, recipes[row]) : null;
+        }
+        if (creative)
+        {
+            var entries = CreativeCatalog.Entries(inventoryView.Tab, inventory);
+            return row < entries.Count ? new RowEntry(entries[row].Id, 0, null) : null;
+        }
         if (inventoryView.Tab is InventoryCategory.Tools or InventoryCategory.Gear)
         {
-            var entries = inventoryView.Tab == InventoryCategory.Gear ? inventory.GearEntries() : inventory.ToolEntries();
-            if (row.Value >= entries.Count) return false;
-            toolInstance = entries[row.Value].InstanceId;
-            return true;
+            var tools = inventoryView.Tab == InventoryCategory.Gear ? inventory.GearEntries() : inventory.ToolEntries();
+            return row < tools.Count ? new RowEntry(tools[row].ItemId, tools[row].InstanceId, null) : null;
         }
-
         var stacks = inventory.StackEntries(inventoryView.Tab);
-        if (row.Value >= stacks.Count) return false;
-        id = stacks[row.Value].Id;
-        return true;
+        return row < stacks.Count ? new RowEntry(stacks[row].Id, 0, null) : null;
     }
 
     /// <summary>
@@ -138,10 +141,14 @@ internal sealed class InventoryPanelInput
     /// </summary>
     internal void AssignHoveredRowToHotbar()
     {
-        var inventory = ActiveWorld?.Inventory;
-        if (inventory == null) return;
-        if (!HoveredRow(out var id, out var tool)) return;
-        if (id == 0 && tool == 0) return;
+        var world = ActiveWorld;
+        if (world == null || PointerWindow() is not { } pointer) return;
+        if (!inventoryView.Search.IsEmpty || inventoryView.Tab == InventoryCategory.Crafting || world.Camera.IsCreative)
+            return;
+        var inventory = world.Inventory;
+        if (EntryAt(pointer, inventory, creative: false) is not { } entry) return;
+        var id = entry.Id;
+        var tool = entry.ToolInstance;
         // Worn gear is not held in hand, so a number key never puts it on the hotbar
         if (tool != 0 && inventory.GetToolStack(tool)?.Item is GearItem) return;
 
@@ -182,7 +189,8 @@ internal sealed class InventoryPanelInput
     }
 
     /// <summary>Number of list rows the given panel tab shows this frame. In creative the
-    /// Blocks/Tools/Misc tabs list the whole catalog; the Craft tab always lists every recipe.</summary>
+    /// Blocks/Tools/Misc tabs list the whole catalog; the Craft tab lists what
+    /// <see cref="Inventory.ListedRecipes"/> does.</summary>
     internal int RowCountFor(InventoryCategory tab)
     {
         if (tab == InventoryCategory.Crafting)
@@ -208,7 +216,7 @@ internal sealed class InventoryPanelInput
         var p = renderManager.Ui.ToCanvas(position);
         var searching = !inventoryView.Search.IsEmpty;
         var rowCount = searching
-            ? InventorySearch.Search(inventoryView.Search.Query, ActiveWorld!.Inventory, ActiveWorld.Camera.IsCreative).Count
+            ? inventoryView.SearchHits(ActiveWorld!.Inventory, ActiveWorld.Camera.IsCreative).Count
             : RowCountFor(inventoryView.Tab);
         var offset = searching
             ? InventoryPanelLayout.ClampedOffset(inventoryView.Search.ScrollOffset, rowCount, canvas)
@@ -285,7 +293,7 @@ internal sealed class InventoryPanelInput
     private void MoveSearchHighlight(int delta)
     {
         if (inventoryView.Search.IsEmpty) return;
-        var count = InventorySearch.Search(inventoryView.Search.Query, ActiveWorld!.Inventory, ActiveWorld.Camera.IsCreative).Count;
+        var count = inventoryView.SearchHits(ActiveWorld!.Inventory, ActiveWorld.Camera.IsCreative).Count;
         if (count == 0) return;
         inventoryView.Search.Highlight = inventoryView.Search.Highlight < 0
             ? (delta > 0 ? 0 : count - 1)
@@ -309,7 +317,7 @@ internal sealed class InventoryPanelInput
     private void ApplyHighlightedSearchHit()
     {
         if (inventoryView.Search.IsEmpty) return;
-        var hits = InventorySearch.Search(inventoryView.Search.Query, ActiveWorld!.Inventory, ActiveWorld.Camera.IsCreative);
+        var hits = inventoryView.SearchHits(ActiveWorld!.Inventory, ActiveWorld.Camera.IsCreative);
         if (hits.Count == 0) return;
         // The highlight is only clamped by the arrow keys; the list can shrink under it (an owned
         // item crafted away, a server inventory sync), so Enter falls back to the first hit.
@@ -325,13 +333,9 @@ internal sealed class InventoryPanelInput
     /// </summary>
     private void ApplySearchHit(SearchHit hit)
     {
-        if (hit.IsRecipe)
+        if (hit.Recipe is { } recipe)
         {
-            inventoryView.Tab = InventoryCategory.Crafting;
-            inventoryView.Craft.Select(hit.Recipe);
-            inventoryView.CraftScrollOffset = 0f;
-            inventoryView.Search.Clear();
-            inventoryView.Focus = InventoryFocus.None;
+            OpenRecipe(recipe);
             return;
         }
 
@@ -348,6 +352,16 @@ internal sealed class InventoryPanelInput
         inventoryView.Tab = hit.Category;
         if (hit.ToolInstance == 0 && inventoryView.Craft.Recipe != null)
             inventoryView.Craft.FeedFromInventory(hit.Id, ActiveWorld.Inventory);
+    }
+
+    // Opens a recipe on the Craft tab, at the top of its card; the query that found it, if any, is cleared
+    private void OpenRecipe(CraftingRecipe recipe)
+    {
+        inventoryView.Tab = InventoryCategory.Crafting;
+        inventoryView.Craft.Select(recipe);
+        inventoryView.CraftScrollOffset = 0f;
+        inventoryView.Search.Clear();
+        inventoryView.Focus = InventoryFocus.None;
     }
 
     /// <summary>Grants a catalog id to the player, popping the hotbar slot a fresh pickup lands
@@ -408,7 +422,7 @@ internal sealed class InventoryPanelInput
     private ListState CurrentList(Inventory inventory, bool creative)
     {
         var searching = !inventoryView.Search.IsEmpty;
-        var hits = searching ? InventorySearch.Search(inventoryView.Search.Query, inventory, creative) : null;
+        var hits = searching ? inventoryView.SearchHits(inventory, creative) : null;
         var rowCount = hits?.Count ?? RowCountFor(inventoryView.Tab);
         var offset = InventoryPanelLayout.ClampedOffset(
             searching ? inventoryView.Search.ScrollOffset : inventoryView.ScrollOffset,
@@ -449,15 +463,20 @@ internal sealed class InventoryPanelInput
         ApplyRowClick(row, list, world.Inventory, creative, Vector2.Zero);
     }
 
-    // What a click on a listed row does, by what the list holds: a search hit acts, a creative row is a button
-    // at the click, and a plain row picks its item, tool instance or recipe.
+    // What a click on a listed row does, by what the list holds: a search hit acts (in creative an item hit is a
+    // catalog row, like the tab's), a creative row is a button at the click, and a plain row picks its item, tool
+    // instance or recipe. A left click never equips a row; that is the right-click's (HandleInventoryRightClick).
     private void ApplyRowClick(int row, ListState list, Inventory inventory, bool creative, Vector2 position)
     {
         if (TryDepositRow(row, list, inventory, creative)) return;
         if (list.Hits != null)
         {
-            if (row < list.Hits.Count)
-                ApplySearchHit(list.Hits[row]);
+            if (row >= list.Hits.Count) return;
+            var hit = list.Hits[row];
+            if (creative && !hit.IsRecipe)
+                ApplyCatalogButton(hit.Id, row, list.Offset, list.RowCount, position);
+            else
+                ApplySearchHit(hit);
         }
         else if (creative && inventoryView.Tab != InventoryCategory.Crafting)
         {
@@ -472,20 +491,13 @@ internal sealed class InventoryPanelInput
                 inventoryView.SelectedId = 0;
                 break;
             case InventoryCategory.Gear:
-            {
-                // The first click picks the piece (its fitting slots light up); picking it again wears it, or
-                // takes it off when it is already on
-                var instance = inventory.GearEntries()[row].InstanceId;
-                var already = inventoryView.SelectedToolInstance == instance;
-                inventoryView.SelectedToolInstance = instance;
+                // A click picks the piece (its fitting slots light up), however often; a click on a lit slot or a
+                // right-click on the row wears it
+                inventoryView.SelectedToolInstance = inventory.GearEntries()[row].InstanceId;
                 inventoryView.SelectedId = 0;
-                if (already) ToggleWorn(inventory, instance);
                 break;
-            }
             case InventoryCategory.Crafting:
-                inventoryView.Craft.Select(inventory.ListedRecipes(creative)[row]);
-                // A newly opened recipe starts at the top of its card.
-                inventoryView.CraftScrollOffset = 0f;
+                OpenRecipe(inventory.ListedRecipes(creative)[row]);
                 break;
             default:
             {
@@ -532,21 +544,6 @@ internal sealed class InventoryPanelInput
         }
     }
 
-    // Wears an owned gear instance in its first fitting slot, or takes it off when it is worn. Applied here at
-    // once and, while connected, sent as an intent the server replays against its own copy.
-    private void ToggleWorn(Inventory inventory, int instance)
-    {
-        var worn = inventory.Equipment.SlotOf(instance);
-        if (worn >= 0)
-        {
-            if (inventory.Equipment.Unequip(worn))
-                session.SendInventoryIntent(InventoryIntent.UnequipGear(worn));
-            return;
-        }
-        if (!inventory.Equipment.TryEquipAuto(instance)) return;
-        session.SendInventoryIntent(InventoryIntent.EquipGear(inventory.Equipment.SlotOf(instance), instance));
-    }
-
     // A click on the equipment card: the picked gear goes into the slot when it fits there, otherwise a worn
     // piece comes off.
     private void ClickEquipmentSlot(Inventory inventory, int slot)
@@ -562,9 +559,30 @@ internal sealed class InventoryPanelInput
     }
 
     /// <summary>
-    /// Routes one left-click inside the open panel: the field boxes focus, tabs switch, rows
-    /// pick for preview (or act on a search result), crafting controls feed the open recipe, and
-    /// hotbar slots equip the pick (clicking what the slot already shows clears it).
+    /// Routes one right-click inside the open panel: the listed row under it is equipped in one click
+    /// (<see cref="RowEquip"/>: gear is worn or taken off, a tool or a stackable goes into the selected hotbar
+    /// slot), where a left click only picks it; a recipe row or hit opens on the Craft tab, as a left click does.
+    /// Applied here at once and, while connected, sent as the intent the server replays against its own copy.
+    /// </summary>
+    internal void HandleInventoryRightClick(Vector2 position)
+    {
+        if (ActiveWorld is not { } world) return;
+        var inventory = world.Inventory;
+        if (EntryAt(position, inventory, world.Camera.IsCreative) is not { } entry) return;
+        if (entry.Recipe is { } recipe)
+        {
+            OpenRecipe(recipe);
+            return;
+        }
+        if (RowEquip.Apply(inventory, entry.Id, entry.ToolInstance) is { } intent)
+            session.SendInventoryIntent(intent);
+    }
+
+    /// <summary>
+    /// Routes one left-click inside the open panel: the field boxes focus, the scope button cycles
+    /// what the search lists, tabs switch, rows pick for preview (or act on a search result),
+    /// crafting controls feed the open recipe, and hotbar slots equip the pick (clicking what the
+    /// slot already shows clears it).
     /// </summary>
     internal void HandleInventoryClick(Vector2 position)
     {
@@ -575,6 +593,12 @@ internal sealed class InventoryPanelInput
         if (renderManager.Ui.Panel.SearchBoxAt(position))
         {
             inventoryView.Focus = InventoryFocus.Search;
+            return;
+        }
+        // The scope button beside it keeps the field's focus, so typing carries on after a cycle
+        if (renderManager.Ui.Panel.ScopeButtonAt(position))
+        {
+            inventoryView.CycleSearchScope();
             return;
         }
         inventoryView.Focus = InventoryFocus.None;

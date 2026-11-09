@@ -31,7 +31,8 @@ OpenGLTest/
       FieldPointer.cs          # the mouse's side of text fields: a press places the caret, Shift extends, holding drags a selection (menu fields, the chat line,
                                #   [E] and chest search, the waystone screen's rename and search fields)
       TextFieldKeys.cs         # maps key events (and the Ctrl/Shift state and clipboard) onto TextFieldEditing for the focused field
-      InventoryPanelInput.cs   # the [E] panel's input: clicks, scrollbar, search keys, creative buttons, hovered row, tooltip
+      InventoryPanelInput.cs   # the [E] panel's input: clicks, the right-click equip, scrollbar, search keys and scope button,
+                               #   creative buttons, hovered row, tooltip
       MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings
       ScenarioUi.cs            # the app's IScenarioUi: lets a VOXEL_SCRIPT run open the [E] panel and the spell builder, pick a tab or row,
                                #   type a search, hold the pointer and drive the waystone screen through the real input components

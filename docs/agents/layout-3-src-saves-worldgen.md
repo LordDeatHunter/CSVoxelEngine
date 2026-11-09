@@ -226,13 +226,19 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         Inventory.cs, ItemStack.cs  # the three pools, the hotbar, stacks and their components
         InventoryCategory.cs   # which storage pool an id belongs to (Blocks, Tools, Misc, Crafting)
         InventoryCrafting.cs   # GL-free crafting rules behind Inventory's Craftable/CanCraftBatch/TryCraft forwarders
-        InventoryPanelLayout.cs # [E] panel geometry, tabs, the search field, the catalog buttons, rows and scrollbar hit-testing
+        InventoryPanelLayout.cs # [E] panel geometry, tabs, the search field and its scope button, the catalog buttons, rows
+                               #   and scrollbar hit-testing
         InventorySaveCodec.cs  # Inventory's player.json mapping (Export/Import forwarders), HandledComponentTypes
-        InventorySearch.cs     # GL-free matching of owned items and recipes behind the search field
-        InventoryView.cs       # [E] panel selection/scroll/focus state; ResetForNewWorld between worlds
+        InventorySearch.cs     # GL-free matching of owned items and recipes behind the search field (survival: only the
+                               #   recipes the Craft tab lists), narrowed by a SearchScope
+        InventoryView.cs       # [E] panel selection/scroll/focus state, the search scope; ResetForNewWorld between worlds
+        PanelTabLabels.cs      # the tab strip's titles and counts (survival's Craft count names no recipe total)
+        RowEquip.cs            # the right-click equip of a listed row: gear worn or taken off, a tool or a stackable into
+                               #   the selected hotbar slot; returns the intent that mirrors it
         StaffComponent.cs      # a staff's bound spells (part keys per slot) and selected slot, immutable
         PanelTransition.cs     # the [E] panel's open/close easing: eased alpha and slide from a self-clocked progress
         SearchFieldState.cs    # a dropdown search field's query, suggestion cursor and scroll
+        SearchScope.cs         # what the [E] search lists: items and recipes (default), items only, recipes only
       Menus/                   # main, pause and settings menus, the loading screen, text fields
         LoadingScreen.cs       # LoadingScreenView (eased monotone progress, fade-out) + LoadingScreenLayout (spinner)
         MainMenu.cs            # main-menu pages, hit kinds, fields, keys, actions and MainMenuView

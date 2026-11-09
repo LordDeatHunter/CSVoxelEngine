@@ -147,6 +147,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Hud/                       # chat (its log layout and link hit-test: ChatLogLayoutTests), clock, compass, hit marker,
                                #   hotbar feedback, toasts, tooltips, the look label, screenshot paths
     InventoryPanel/            # the inventory and its save shape, the [E] panel layout, crafting cards, the creative catalog, search
+                               #   and its scope, the tab counts, the right-click equip
     Menus/                     # main and pause menus, the loading screen, text fields
     SpellBuilder/              # the builder's selection rules, live stats and layout hit-tests
     Waystone/                  # the waystone screen's page rules, rows and layout hit-tests

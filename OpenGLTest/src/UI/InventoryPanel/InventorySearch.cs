@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using VoxelEngine.Content;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Items;
 
@@ -36,27 +35,35 @@ public readonly record struct SearchHit(
 /// <summary>
 /// GL-free matching behind the inventory panel's search field. A query narrows the panel to
 /// whatever it can act on right now: the items the player actually owns (blocks, misc and one
-/// row per tool kind) and the crafting recipes that make or consume a matching thing. The
+/// row per tool kind) and the crafting recipes that make or consume a matching thing. A survival
+/// player only ever finds the recipes the Craft tab lists (<see cref="Inventory.ListedRecipes"/>),
+/// so a recipe out of reach stays locked away from the search as well. The
 /// ranking puts a name that starts with the query ahead of a mere substring, and an owned item
 /// ahead of a recipe that produces it, so typing a few letters surfaces what is in hand first.
 /// </summary>
 public static class InventorySearch
 {
     /// <summary>Rows for <paramref name="query"/> over <paramref name="inventory"/>'s stock and
-    /// every compiled recipe, best match first; an empty query matches nothing. In creative mode
-    /// <paramref name="includeCatalog"/> widens the inventory side to every item that exists, so
-    /// a query reaches something the player has not collected yet.</summary>
-    public static IReadOnlyList<SearchHit> Search(string? query, Inventory inventory, bool includeCatalog = false)
+    /// the recipes the player may see, best match first; an empty query matches nothing. In
+    /// <paramref name="creative"/> mode the inventory side widens to every item that exists, so a
+    /// query reaches something the player has not collected yet, and every recipe is listed.
+    /// <paramref name="scope"/> keeps only the items or only the recipes.</summary>
+    public static IReadOnlyList<SearchHit> Search(string? query, Inventory inventory, bool creative = false,
+        SearchScope scope = SearchScope.All)
     {
         var q = query?.Trim() ?? "";
         if (q.Length == 0) return [];
 
         var hits = new List<SearchHit>();
-        var owned = new HashSet<byte>();
-        AddInventoryHits(q, inventory, hits, owned);
-        if (includeCatalog)
-            AddCatalogHits(q, inventory, hits, owned);
-        AddRecipeHits(q, hits);
+        if (scope != SearchScope.Recipes)
+        {
+            var owned = new HashSet<byte>();
+            AddInventoryHits(q, inventory, hits, owned);
+            if (creative)
+                AddCatalogHits(q, inventory, hits, owned);
+        }
+        if (scope != SearchScope.Items)
+            AddRecipeHits(q, inventory.ListedRecipes(creative), hits);
 
         hits.Sort((a, b) =>
         {
@@ -129,9 +136,9 @@ public static class InventorySearch
         }
     }
 
-    private static void AddRecipeHits(string query, List<SearchHit> hits)
+    private static void AddRecipeHits(string query, IReadOnlyList<CraftingRecipe> recipes, List<SearchHit> hits)
     {
-        foreach (var recipe in ContentRegistry.CraftingRecipes)
+        foreach (var recipe in recipes)
         {
             var name = Inventory.DisplayName(recipe.ResultId);
             if (!Matches(name, query) && !IngredientMatches(recipe, query)) continue;

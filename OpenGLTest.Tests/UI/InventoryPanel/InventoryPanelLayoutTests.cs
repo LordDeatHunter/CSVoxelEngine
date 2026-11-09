@@ -133,6 +133,23 @@ public sealed class InventoryPanelLayoutTests
         }
     }
 
+    [Theory]
+    [InlineData(800f)]
+    [InlineData(1920f)]
+    public void TheScopeButtonSitsBesideTheSearchFieldInsideThePanelWithoutOverlappingIt(float width)
+    {
+        var screen = new Vector2(width, 1080f);
+        var (box, boxSize) = InventoryPanelLayout.SearchBoxRect(screen);
+        var (button, buttonSize) = InventoryPanelLayout.ScopeButtonRect(screen);
+
+        Assert.True(InventoryPanelLayout.ScopeButtonAt(button, screen));
+        Assert.False(InventoryPanelLayout.SearchBoxAt(button, screen));
+        Assert.True(InventoryPanelLayout.SearchBoxAt(box, screen));
+        Assert.False(InventoryPanelLayout.ScopeButtonAt(box, screen));
+        Assert.True(box.X + boxSize.X * 0.5f < button.X - buttonSize.X * 0.5f);
+        Assert.True(button.X + buttonSize.X * 0.5f <= InventoryPanelLayout.PanelLeft + InventoryPanelLayout.PanelWidth(screen));
+    }
+
     [Fact]
     public void ListSitsAboveTheHotbarOnTheReferenceCanvas()
     {

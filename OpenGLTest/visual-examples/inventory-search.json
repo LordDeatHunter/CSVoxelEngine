@@ -1,0 +1,41 @@
+{
+  // The [E] panel's search and recipe access: run with VOXEL_SCRIPT=visual-examples/inventory-search.json
+  // VOXEL_TIME=147 from OpenGLTest/. Shots land in visual/inventory-search/. Films the survival Craft tab's
+  // count (just the craftable recipes, no total) beside the search scope button, a survival search (only the
+  // recipes the player can make), a hovered search result's tooltip, and the same search in creative, whose
+  // item results carry the catalog's +1/+10/+100/X buttons and whose Craft count reads craftable/total.
+  // Same open forest clearing as inventory-ui.json (ground y 9..10).
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "give", "block": "cobblestone", "count": 20 },
+    { "op": "give", "block": "oak_planks", "count": 8 },
+    { "op": "give", "block": "item/branch", "count": 6 },
+    { "op": "give", "block": "item/primitive_pickaxe", "count": 1 },
+    { "op": "wait", "seconds": 0.5 },
+
+    // The survival Craft tab: its count is the craftable recipes alone; the scope button reads "All"
+    { "op": "panel", "open": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "tab", "tab": "crafting" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "craft-count" },
+
+    // A survival search: owned items and only the recipes the player can make
+    { "op": "search", "text": "stone" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "survival-search" },
+
+    // The first result hovered: its item tooltip
+    { "op": "hover", "pos": [200, 223] },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "search-hover" },
+    { "op": "hover", "clear": true },
+
+    // The same query in creative: catalog buttons on the item results, every recipe, craftable/total count
+    { "op": "creative" },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "creative-search" }
+  ]
+}

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using VoxelEngine.Rendering.Overlays;
 
 namespace VoxelEngine.UI.InventoryPanel;
@@ -28,6 +29,24 @@ public sealed class InventoryView
 
     /// <summary>The panel's dropdown search field; an empty query shows the tab's own list.</summary>
     public SearchFieldState Search { get; } = new();
+
+    /// <summary>What the search lists: items and recipes (the default), or only one of them. Kept while the panel
+    /// closes; a new world starts back at <c>All</c>.</summary>
+    public SearchScope SearchScope { get; private set; }
+
+    /// <summary>Steps <see cref="SearchScope"/> to the next scope, wrapping back to the first (the cycle button).
+    /// The results list starts again at its top.</summary>
+    public void CycleSearchScope()
+    {
+        SearchScope = (SearchScope)(((int)SearchScope + 1) % Enum.GetValues<SearchScope>().Length);
+        Search.Highlight = -1;
+        Search.ScrollOffset = 0f;
+    }
+
+    /// <summary>This frame's search results for the field's query in the current <see cref="SearchScope"/>; the
+    /// draw, the clicks, the keys and the wheel all read the list through here, so they always agree.</summary>
+    public IReadOnlyList<SearchHit> SearchHits(Inventory inventory, bool creative) =>
+        InventorySearch.Search(Search.Query, inventory, creative, SearchScope);
 
     /// <summary>Which text field keys go to; clicking the box focuses it, clicking elsewhere clears it.</summary>
     public InventoryFocus Focus { get; set; }
@@ -137,6 +156,7 @@ public sealed class InventoryView
         _motionTime = float.NaN;
         ClearSelection();
         ClearInput();
+        SearchScope = SearchScope.All;
         Craft.Clear();
         EndThumbDrag();
         ThumbDragRowCount = 0;

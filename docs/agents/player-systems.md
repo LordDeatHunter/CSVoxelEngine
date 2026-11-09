@@ -137,7 +137,8 @@ mining and attack pace and `Combat.*Damage` read the mining, attack-speed and da
 (`LeftClickAction`) and the server (`BreakProgress.Start`, `AttackPacing`). Wearing is a `NetInventoryAction.EquipGear` /
 `UnequipGear` intent (protocol 19), judged by `Equipment.TryEquip`; the worn ids save as `InventoryData.Equipped`. The
 [E] panel's Gear tab lists the pieces ("worn" marked) over `EquipmentCardLayout`/`EquipmentCardRenderer`: pick a row, then
-click a lit slot (or the row again) to wear it. `GearTests`; `visual-examples/gear.json` and `accessories.json` (the double jump
+click a lit slot to wear it, or right-click the row (or a gear search hit) to wear it or take it off in one click
+(`RowEquip`; a second left click only picks again). `GearTests`, `RowEquipTests`; `visual-examples/gear.json` and `accessories.json` (the double jump
 and a feather-charm fall; both `VOXEL_TIME=147`).
 **Worn armor (I-3).** A body is drawn wearing its visible armor (`equip.visible`, slots head, chest, legs, feet, gloves) as flat
 tinted shells: `ArmorLook` (GL-free) is the item id per armor slot, `ArmorLook.From(Equipment)` for the local player and

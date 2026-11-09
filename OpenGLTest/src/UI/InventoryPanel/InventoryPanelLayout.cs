@@ -90,8 +90,13 @@ public static class InventoryPanelLayout
     /// <summary>Left edge of the search field box.</summary>
     public static float SearchLeft => PanelLeft + PanelPad;
 
-    /// <summary>Width of the search field box: the panel inside its pads.</summary>
-    public static float SearchWidth(Vector2 screen) => PanelWidth(screen) - PanelPad * 2f;
+    // The search scope's cycle button sits right of the field, on the field's row.
+    public const float ScopeButtonWidth = 96f;
+    public const float ScopeButtonGap = 6f;
+
+    /// <summary>Width of the search field box: the panel inside its pads, less the scope button beside it.</summary>
+    public static float SearchWidth(Vector2 screen) =>
+        PanelWidth(screen) - PanelPad * 2f - ScopeButtonWidth - ScopeButtonGap;
 
     public static (Vector2 Center, Vector2 Size) SearchBoxRect(Vector2 screen) =>
         (new Vector2(SearchLeft + SearchWidth(screen) * 0.5f, SearchTop + SearchHeight * 0.5f),
@@ -100,6 +105,15 @@ public static class InventoryPanelLayout
     /// <summary>Whether a canvas point is over the search field box.</summary>
     public static bool SearchBoxAt(Vector2 point, Vector2 screen) =>
         InBox(point, SearchBoxRect(screen));
+
+    /// <summary>The search scope's cycle button: right of the field, a gap away, flush with the panel's inner edge.</summary>
+    public static (Vector2 Center, Vector2 Size) ScopeButtonRect(Vector2 screen) =>
+        (new Vector2(PanelLeft + PanelWidth(screen) - PanelPad - ScopeButtonWidth * 0.5f, SearchTop + SearchHeight * 0.5f),
+            new Vector2(ScopeButtonWidth, SearchHeight));
+
+    /// <summary>Whether a canvas point is over the search scope's cycle button.</summary>
+    public static bool ScopeButtonAt(Vector2 point, Vector2 screen) =>
+        InBox(point, ScopeButtonRect(screen));
 
     // The creative catalog row's four action buttons, right-aligned: +1, +10, +100, X.
     public const int CatalogButtonCount = 4;
