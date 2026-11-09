@@ -575,11 +575,13 @@ public static class MobConfig
     /// <summary>A target within this melee reach of the king makes it slam (MobTargets.InMeleeReach).</summary>
     public const float SkeletonKingSlamTriggerReach = 3f;
     /// <summary>The slam's shockwave reaches every target within this horizontal radius...</summary>
-    public const float SkeletonKingSlamRadius = 6f;
+    public const float SkeletonKingSlamRadius = 7.5f;
     /// <summary>...whose feet stand within this many blocks of the king's (MobTargets.InShockwave).</summary>
     public const float SkeletonKingSlamHeight = 2.5f;
     /// <summary>The damage the slam's shockwave deals.</summary>
-    public const int SkeletonKingSlamDamage = 42;
+    public const int SkeletonKingSlamDamage = 50;
+    /// <summary>How far in front of the king's feet its club strikes the ground (where the ground heaves).</summary>
+    public const float SkeletonKingSlamReachBlocks = 1.6f;
     /// <summary>The knockback speed of the slam's shockwave.</summary>
     public const float SkeletonKingSlamKnockbackSpeed = 12f;
     /// <summary>The upward lift of the slam's shockwave.</summary>
@@ -597,16 +599,22 @@ public static class MobConfig
     public const float SkeletonKingVolleyMinRange = 4f;
     /// <summary>Beyond this horizontal distance the king does not volley (must stay inside v^2/g at the volley speed).</summary>
     public const float SkeletonKingVolleyMaxRange = 16f;
-    /// <summary>A volley bone's launch speed.</summary>
+    /// <summary>A volley bone's launch speed, before the burst's jitter.</summary>
     public const float SkeletonKingVolleySpeed = 24f;
-    /// <summary>How many bones one volley throws in its fan.</summary>
-    public const int SkeletonKingVolleyBones = 5;
-    /// <summary>How many more bones an enraged (phase 3) volley throws.</summary>
-    public const int SkeletonKingVolleyEnrageExtraBones = 2;
-    /// <summary>The whole width of a volley's fan in degrees, outermost bone to outermost bone.</summary>
-    public const float SkeletonKingVolleySpreadDegrees = 30f;
-    /// <summary>The damage one volley bone deals.</summary>
-    public const int SkeletonKingVolleyDamage = 18;
+    /// <summary>How many bones one volley's burst throws, one after another.</summary>
+    public const int SkeletonKingBurstBones = 9;
+    /// <summary>How many more bones an enraged (phase 3) burst throws.</summary>
+    public const int SkeletonKingBurstEnrageExtraBones = 4;
+    /// <summary>Seconds from a burst's first bone to its last.</summary>
+    public const float SkeletonKingBurstSeconds = 0.5f;
+    /// <summary>The most a burst bone strays left or right of the aimed throw, in degrees.</summary>
+    public const float SkeletonKingBurstSpreadDegrees = 13f;
+    /// <summary>The most a burst bone strays up or down from the aimed throw, in degrees.</summary>
+    public const float SkeletonKingBurstPitchDegrees = 5f;
+    /// <summary>The most a burst bone's speed differs from the aimed throw's, as a share.</summary>
+    public const float SkeletonKingBurstSpeedJitter = 0.12f;
+    /// <summary>The damage one burst bone deals.</summary>
+    public const int SkeletonKingVolleyDamage = 9;
     /// <summary>The knockback speed of a king's bone hit (a volley bone or a slam shard).</summary>
     public const float SkeletonKingBoneKnockbackSpeed = 4f;
     /// <summary>Seconds between two volleys (shortened by the enrage).</summary>

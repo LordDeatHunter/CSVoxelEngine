@@ -200,6 +200,7 @@ internal sealed class WorldRenderer
         renderManager.Objects.RenderBlockDebris(Camera, _debris.Debris);
         if (_world.CollapseEffects is { } collapse)
             renderManager.Objects.RenderCollapseDebris(Camera, collapse.Debris);
+        renderManager.Objects.RenderGroundHeave(Camera, _world.Ambient.Heave);
         foreach (var tree in _toppling)
             renderManager.Objects.RenderTopplingTree(Camera, tree);
         var armorVersion = Inventory.Equipment.Version;

@@ -13,7 +13,8 @@ namespace VoxelEngine.Simulation.Tower;
 /// <summary>
 /// Owns the battle tower's <see cref="SkeletonKing"/>s and the bones they throw, on the shared realm frame
 /// (<see cref="RealmMobManager{TMob}"/>): at the slam's impact it bills the shockwave to every target it reaches and
-/// throws bone shrapnel all round, at the volley's release it throws a fan of bones (both <see cref="MobMissiles"/>,
+/// throws bone shrapnel all round, from the volley's release it throws a burst of bones, each strayed a little off the
+/// aimed throw (both <see cref="MobMissiles"/>,
 /// which hurt only targets, never the king or a skeleton), and at the summon it raises a ring of
 /// skeletons of the king's tier through the <see cref="SkeletonManager"/>, never more living than
 /// <see cref="MobConfig.SkeletonKingMaxMinions"/>. A king never spawns on its own: only through
@@ -155,16 +156,13 @@ public sealed class SkeletonKingManager : RealmMobManager<SkeletonKing>
     /// exactly as a slam's burst does.</summary>
     internal ThrownProjectile TestLaunchShard(Vector3 origin, Vector3 velocity) => LaunchShard(origin, velocity);
 
-    // A slam's shockwave and shards land at its impact, a volley's bones at its release, a summon's skeletons at its
-    // event
+    // A slam's shockwave and shards land at its impact, a volley's burst bones one after another from its release, a
+    // summon's skeletons at its event
     /// <inheritdoc />
     protected override void Attack(SkeletonKing mob, IReadOnlyList<IMobTarget> targets)
     {
-        if (mob.TryTakeVolleyRelease(out var origin, out var aim))
-        {
-            Volley(mob, origin, aim);
-            return;
-        }
+        while (mob.TryTakeBurstBone(out var origin, out var aim))
+            BurstBone(origin, aim);
 
         if (mob.TryTakeSummon())
         {
@@ -203,17 +201,21 @@ public sealed class SkeletonKingManager : RealmMobManager<SkeletonKing>
     /// <inheritdoc />
     protected override float ShoveSpeedOf(SkeletonKing mob) => MobConfig.SkeletonKingShoveSpeed;
 
-    private void Volley(SkeletonKing king, Vector3 origin, Vector3 aim)
+    // One bone of a burst: the aimed throw strayed at random within the burst's spread, pitch and speed jitter
+    private void BurstBone(Vector3 origin, Vector3 aim)
     {
         GoblinAim.TryLaunchVelocity(origin, aim, MobConfig.SkeletonKingVolleySpeed, ThrownProjectile.Gravity,
             out var velocity);
-        var count = MobConfig.SkeletonKingVolleyBones
-                    + (king.Brain.IsEnraged ? MobConfig.SkeletonKingVolleyEnrageExtraBones : 0);
-        Span<Vector3> fan = stackalloc Vector3[count];
-        SkeletonKing.VolleyVelocities(velocity, MobConfig.SkeletonKingVolleySpreadDegrees * (MathF.PI / 180f), fan);
-        for (var i = 0; i < fan.Length; i++)
-            _bones.Launch(_boneItemId, origin, fan[i], MobConfig.SkeletonKingVolleyDamage);
+        const float toRadians = MathF.PI / 180f;
+        var velocityOut = SkeletonKing.ScatterVelocity(velocity,
+            Signed() * MobConfig.SkeletonKingBurstSpreadDegrees * toRadians,
+            Signed() * MobConfig.SkeletonKingBurstPitchDegrees * toRadians,
+            1f + Signed() * MobConfig.SkeletonKingBurstSpeedJitter);
+        _bones.Launch(_boneItemId, origin, velocityOut, MobConfig.SkeletonKingVolleyDamage);
     }
+
+    // Uniform in [-1, 1)
+    private static float Signed() => Random.Shared.NextSingle() * 2f - 1f;
 
     // Raises up to SummonCount skeletons of the king's tier on a ring around its feet, never past the minion cap or
     // the hard cap; a ring spot needs solid ground under two free body cells (an unloaded cell refuses it)

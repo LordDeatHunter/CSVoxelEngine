@@ -456,10 +456,12 @@ OpenGLTest/
         SkeletonRattle.cs      # the skeletons' ambient bone rattle: a randomized timer plays a skeleton_rattle clip when a
                                #   skeleton is in earshot of the camera (World ticks it; injected play and random, GL-free)
         SkeletonKing.cs        # the tower boss (a RealmMob, IsBoss, IsUndead): slam, volley and summon clips over one count,
-                               #   the leash to its home (HomeMove, EnforceLeash), the unengaged reset, the volley fan
+                               #   the leash to its home (HomeMove, EnforceLeash), the unengaged reset, the volley burst and its
+                               #   scatter, the slam's landing cue for the ground heave
         SkeletonKingBrain.cs   # GL-free: phases by health share (the first observation silent, a phase change owes a summon),
                                #   the attack choice by range, sight and cooldown with an injected roll, the phase-3 enrage
         SkeletonKingAttack.cs  # None / Slam / Volley / Summon
+        BoneBurst.cs           # GL-free: the king's volley as a burst, its bones due one after another over a window
         SkeletonKingHome.cs    # where a king is leashed: its tower (or none), the altar-top feet, the leash radius, the summon tier
         TowerDifficulty.cs     # GL-free: the floor tier's multiplier (health, damage), clamp and pack size (a pile's wave)
         TowerFloorRef.cs       # the tower (by placement cell) and floor whose lock a bound skeleton counts toward

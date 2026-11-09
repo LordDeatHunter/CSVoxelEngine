@@ -213,7 +213,7 @@ public sealed class SkeletonKingManagerTests
     }
 
     [Fact]
-    public void AVolleyFansSeveralBones()
+    public void AVolleyBurstsItsBonesOneAfterAnotherEachOnItsOwnHeading()
     {
         var chunks = StoneFloor();
         var manager = new SkeletonKingManager(KingType);
@@ -223,15 +223,19 @@ public sealed class SkeletonKingManagerTests
 
         for (var i = 0; i < (int)(6f / Dt) && manager.Bones.Count == 0; i++)
             manager.Update(Dt, chunks, drops, targets);
+        // The first bone leaves at the release, the rest over the burst's window, not all in one frame
+        Assert.True(manager.Bones.Count < MobConfig.SkeletonKingBurstBones, "the whole burst left at once");
+        for (var i = 0; i < (int)(MobConfig.SkeletonKingBurstSeconds / Dt) + 2; i++)
+            manager.Update(Dt, chunks, drops, targets);
 
         var bones = manager.Bones;
-        Assert.True(bones.Count > 1, "the volley threw fewer than two bones");
+        Assert.True(bones.Count > 1, "the burst threw fewer than two bones");
         var headings = new List<float>();
         foreach (var bone in bones)
             headings.Add(MathF.Atan2(bone.Velocity.Z, bone.Velocity.X));
         for (var a = 0; a < headings.Count; a++)
         for (var b = a + 1; b < headings.Count; b++)
-            Assert.True(MathF.Abs(headings[a] - headings[b]) > 1e-3f, "two bones flew the same heading");
+            Assert.True(MathF.Abs(headings[a] - headings[b]) > 1e-4f, "two bones flew the same heading");
     }
 
     [Fact]

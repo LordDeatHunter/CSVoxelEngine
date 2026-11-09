@@ -1034,7 +1034,7 @@ public class World
         Director.AnimateIcebergMirrors(deltaTime);
         Ambient.UpdateStatusParticles((float)deltaTime);
         Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
-        Ambient.UpdateRitualEffects((float)deltaTime);
+        Ambient.UpdateKingEffects((float)deltaTime);
         WormEffects?.Update((float)deltaTime, Sandworms);
         CollapseEffects?.Update((float)deltaTime);
         Ambient.GatherStationFires();
@@ -1201,7 +1201,7 @@ public class World
             _dust.TakeMobLandings(_mobs, _chunkManager, _debris);
             Ambient.UpdateStatusParticles((float)deltaTime);
             Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
-            Ambient.UpdateRitualEffects((float)deltaTime);
+            Ambient.UpdateKingEffects((float)deltaTime);
             WormEffects?.Update((float)deltaTime, Sandworms);
             CollapseEffects?.Update((float)deltaTime);
         }

@@ -151,7 +151,7 @@ public class BlockDebrisSystem
     /// <paramref name="columns"/> (null means worldgen), and anything else, or a column that source
     /// does not have yet (a client's streamed column that has not arrived), is untinted white.
     /// </summary>
-    private static Vector3 TintAt(Vector3 cell, byte blockId, IColumnSource? columns) =>
+    internal static Vector3 TintAt(Vector3 cell, byte blockId, IColumnSource? columns) =>
         BlockType.ById[blockId]?.BiomeTint is { } bt
         && BiomeTint.TryCellTint(columns ?? WorldgenColumnSource.Instance, bt.Palette,
             (int)MathF.Floor(cell.X), (int)MathF.Floor(cell.Z), out var cellTint)

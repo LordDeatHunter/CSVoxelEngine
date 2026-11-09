@@ -7,8 +7,9 @@ namespace VoxelEngine.Entities.TowerMobs;
 /// <summary>
 /// The Skeleton King: the battle tower's boss, raised once by the roof altar's ritual. A big undead humanoid driven
 /// by a <see cref="SkeletonKingBrain"/>: in slam reach it smashes its club down (the slam clip; the shockwave goes out
-/// at <see cref="ImpactEvent"/>, <see cref="TryTakeSlamImpact"/>), at range it throws a fan of bones (the volley clip,
-/// released at <see cref="ReleaseEvent"/>, <see cref="TryTakeVolleyRelease"/>), and from phase 2 it calls up skeletons
+/// at <see cref="ImpactEvent"/>, <see cref="TryTakeSlamImpact"/>, and the ground heaves where the club lands,
+/// <see cref="TryTakeSlamLanded"/>), at range it throws a burst of bones (the volley clip: from
+/// <see cref="ReleaseEvent"/> the bones leave one after another, <see cref="TryTakeBurstBone"/>), and from phase 2 it calls up skeletons
 /// (the summon clip, at <see cref="SummonEvent"/>, <see cref="TryTakeSummon"/>); the manager lands each one. It is
 /// leashed to its <see cref="Home"/> on the tower roof: past the leash it walks home (<see cref="HomeMove"/>), and
 /// knocked well past it or off the roof it is put back (<see cref="EnforceLeash"/>). With no target engaged for
@@ -50,6 +51,9 @@ public sealed class SkeletonKing : RealmMob
 
     private Vector3 _aim;
     private float _unengaged;
+    private readonly BoneBurst _burst = new();
+    // Where the last slam's club landed, until the ground heave takes it (cosmetic; null when none is pending)
+    private Vector3? _slamLanded;
 
     /// <param name="type">The king's kind, with its model and clips.</param>
     /// <param name="position">The body center it spawns at.</param>
@@ -117,6 +121,9 @@ public sealed class SkeletonKing : RealmMob
     /// <summary>Where the bones leave the hand: a little in front of the body at shoulder height.</summary>
     public Vector3 VolleyOrigin => Position + Forward * 0.6f + new Vector3(0f, BodyHeight * 0.2f, 0f);
 
+    /// <summary>Where the club strikes the ground: in front of the feet by <see cref="MobConfig.SkeletonKingSlamReachBlocks"/>.</summary>
+    public Vector3 SlamPoint => Feet + Forward * MobConfig.SkeletonKingSlamReachBlocks;
+
     /// <summary>Throws, naming the model file, unless the model is a humanoid rig with idle, walk, a slam clip
     /// carrying the impact event, a volley clip carrying the release event and a summon clip carrying the summon
     /// event.</summary>
@@ -148,26 +155,31 @@ public sealed class SkeletonKing : RealmMob
     }
 
     /// <summary>
-    /// Fills <paramref name="into"/> with a fan of launch velocities: <paramref name="baseVelocity"/> turned about
-    /// the vertical axis, evenly spread over <paramref name="spreadRadians"/> and centered on it, so the fan is
-    /// symmetric and every bone keeps the base speed (one bone flies straight).
+    /// One burst bone's launch velocity: <paramref name="baseVelocity"/> (the aimed throw) turned
+    /// <paramref name="yawRadians"/> about the vertical axis, tipped <paramref name="pitchRadians"/> up (negative: down)
+    /// in its own vertical plane, and its speed scaled by <paramref name="speedScale"/>. Zero offsets and a scale of 1
+    /// give the aimed throw back.
     /// </summary>
-    public static void VolleyVelocities(Vector3 baseVelocity, float spreadRadians, Span<Vector3> into)
+    public static Vector3 ScatterVelocity(Vector3 baseVelocity, float yawRadians, float pitchRadians, float speedScale)
     {
-        var n = into.Length;
-        for (var i = 0; i < n; i++)
-        {
-            var angle = n == 1 ? 0f : spreadRadians * (i / (float)(n - 1) - 0.5f);
-            var (sin, cos) = MathF.SinCos(angle);
-            into[i] = new Vector3(baseVelocity.X * cos - baseVelocity.Z * sin, baseVelocity.Y,
-                baseVelocity.X * sin + baseVelocity.Z * cos);
-        }
+        var (sin, cos) = MathF.SinCos(yawRadians);
+        var turned = new Vector3(baseVelocity.X * cos - baseVelocity.Z * sin, baseVelocity.Y,
+            baseVelocity.X * sin + baseVelocity.Z * cos);
+        var flat = new Vector3(turned.X, 0f, turned.Z);
+        var across = flat.Length();
+        var speed = turned.Length() * speedScale;
+        if (speed <= 0f) return Vector3.Zero;
+        var elevation = MathF.Atan2(turned.Y, across) + pitchRadians;
+        var heading = across > 1e-6f ? flat / across : Vector3.UnitX;
+        var (up, out_) = MathF.SinCos(elevation);
+        return (heading * out_ + Vector3.UnitY * up) * speed;
     }
 
     /// <inheritdoc />
     protected override void TickCooldowns(float scaledDelta)
     {
         Brain.Tick(scaledDelta);
+        _burst.Tick(scaledDelta);
         _unengaged += scaledDelta;
         if (_unengaged < MobConfig.SkeletonKingResetSeconds || Health >= MaxHealth) return;
 
@@ -205,20 +217,53 @@ public sealed class SkeletonKing : RealmMob
     }
 
     /// <summary>True once per slam, at the slam clip's impact event; the manager finds the targets the shockwave
-    /// reaches (<see cref="InShockwave"/>).</summary>
-    public bool TryTakeSlamImpact() => Animation.ConsumeEvent(ImpactEvent);
-
-    /// <summary>True once per volley, at the volley clip's release event: where the bones leave the hand and the
-    /// chest the volley was aimed at when it started.</summary>
-    public bool TryTakeVolleyRelease(out Vector3 origin, out Vector3 aim)
+    /// reaches (<see cref="InShockwave"/>). The landing is also kept for the ground heave
+    /// (<see cref="TryTakeSlamLanded"/>).</summary>
+    public bool TryTakeSlamImpact()
     {
-        origin = default;
-        aim = default;
-        if (!Animation.ConsumeEvent(ReleaseEvent)) return false;
+        if (!Animation.ConsumeEvent(ImpactEvent)) return false;
+        _slamLanded = SlamPoint;
+        return true;
+    }
 
+    /// <summary>True once per slam whose club has landed, with where it struck (<see cref="SlamPoint"/>): the cosmetic
+    /// ground heave's cue, on the authoritative world (the manager took the impact) and on a client's mirror (its own
+    /// clip reached the impact, <see cref="AnimateMirror"/>).</summary>
+    public bool TryTakeSlamLanded(out Vector3 at)
+    {
+        at = _slamLanded ?? default;
+        if (_slamLanded == null) return false;
+        _slamLanded = null;
+        return true;
+    }
+
+    /// <summary>
+    /// True once for each bone of a volley's burst whose moment has come: the volley clip's release event starts a
+    /// <see cref="BoneBurst"/> of <see cref="MobConfig.SkeletonKingBurstBones"/> (more when enraged) over
+    /// <see cref="MobConfig.SkeletonKingBurstSeconds"/>, and every bone leaves the hand as it stands then, toward the
+    /// chest the volley was aimed at when it started. A dying king's burst stops.
+    /// </summary>
+    public bool TryTakeBurstBone(out Vector3 origin, out Vector3 aim)
+    {
+        if (Animation.ConsumeEvent(ReleaseEvent))
+            _burst.Start(MobConfig.SkeletonKingBurstBones + (Brain.IsEnraged ? MobConfig.SkeletonKingBurstEnrageExtraBones : 0),
+                MobConfig.SkeletonKingBurstSeconds);
         origin = VolleyOrigin;
         aim = _aim;
-        return true;
+        if (IsDying || IsDead)
+        {
+            _burst.Stop();
+            return false;
+        }
+        return _burst.TryTake();
+    }
+
+    /// <inheritdoc />
+    public override void AnimateMirror(float deltaTime)
+    {
+        base.AnimateMirror(deltaTime);
+        // A mirror never lands the slam (the server bills it), but its club still strikes the ground: the heave plays
+        if (Animation.ConsumeEvent(ImpactEvent)) _slamLanded = SlamPoint;
     }
 
     /// <summary>True once per summon, at the summon clip's summon event; the manager raises the skeletons.</summary>

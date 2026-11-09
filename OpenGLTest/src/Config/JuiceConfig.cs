@@ -136,6 +136,24 @@ public static class JuiceConfig
     public const int TreeThudDustCount = 5;
     public const float TreeThudDustSpeed = 2.6f;
 
+    // --- Skeleton King's slam (GroundHeave, AmbientEffects.UpdateKingEffects): where the club strikes, the full-cube
+    // ground within SlamHeaveRadiusBlocks pops up and settles back over SlamHeaveSeconds per block, the ring rippling out
+    // at SlamHeaveWaveSpeed, each block rising SlamHeaveHeight near the strike and EdgeShare of it at the rim; a copy is
+    // drawn raised (never a cell write) while it stands at least SlamHeaveMinDrawLift up, and the camera jolts by its
+    // distance (ShakeFalloff). Only slams within SlamHeaveEffectRangeBlocks of the eye heave. Cosmetic: singleplayer and
+    // a client (from its mirror's own clip), never a server. ---
+    public const float SlamHeaveRadiusBlocks = 6f;
+    public const int SlamHeaveSearchDepth = 3;
+    public const float SlamHeaveHeight = 0.7f;
+    public const float SlamHeaveEdgeShare = 0.35f;
+    public const float SlamHeaveSeconds = 0.32f;
+    public const float SlamHeaveWaveSpeed = 11f;
+    public const float SlamHeaveMinDrawLift = 0.02f;
+    public const float SlamHeaveEffectRangeBlocks = 80f;
+    public const float SlamShakeStrength = 0.55f;
+    public const float SlamShakeNearBlocks = 6f;
+    public const float SlamShakeRangeBlocks = 40f;
+
     // --- Tower collapse (TowerCollapseEffects, CollapseDebris): while a defeated battle tower falls into
     // its ruin, every unbreakable cell the collapse rewrites within the effect range crumbles into a few
     // chips of itself (at most ChipsPerSecond of them in all), the cells near the wall (from

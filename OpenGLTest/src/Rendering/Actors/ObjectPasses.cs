@@ -6,6 +6,7 @@ using VoxelEngine.Graphics;
 using VoxelEngine.Items;
 using VoxelEngine.Particles;
 using VoxelEngine.Particles.Collapse;
+using VoxelEngine.Particles.Heave;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 
@@ -263,6 +264,39 @@ internal sealed class ObjectPasses
             _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(block.Position));
             mesh.Render();
         }
+    }
+
+    /// <summary>
+    /// Draws the ground a Skeleton King's slam heaves (<see cref="GroundHeave"/>): a copy of each heaving block raised
+    /// over the real one, a hair narrower so its sides never fight a neighbor's or the real block's faces. A block that
+    /// has barely left the ground is skipped, since its copy would fight the real top face.
+    /// </summary>
+    internal void RenderGroundHeave(Camera camera, GroundHeave heave)
+    {
+        if (camera == null || heave.Blocks.Count == 0) return;
+
+        _owner.WorldShader.Use();
+        _owner.BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+        var narrow = Matrix4x4.CreateScale(0.996f, 1f, 0.996f);
+        var blocks = heave.Blocks;
+        for (var i = 0; i < blocks.Count; i++)
+        {
+            var block = blocks[i];
+            var lift = heave.LiftOf(block);
+            if (lift < JuiceConfig.SlamHeaveMinDrawLift) continue;
+            var mesh = _owner.BlockCubes.GetTinted(block.BlockId);
+            if (mesh == null) continue;
+
+            var center = block.Center + new Vector3(0f, lift, 0f);
+            var model = narrow * Matrix4x4.CreateTranslation(center);
+            _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(center));
+            // A grass copy takes its column's tint, like a break chip (RenderBlockDebris)
+            _owner.WorldShader.SetUniform(_owner.LocBiomeTint, block.Tint);
+            mesh.Render();
+        }
+        _owner.WorldShader.SetUniform(_owner.LocBiomeTint, Vector3.One);
     }
 
     /// <summary>

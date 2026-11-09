@@ -6,7 +6,9 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Juice;
+using VoxelEngine.Particles.Heave;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.WorldGen.Caves;
@@ -232,18 +234,46 @@ internal sealed class AmbientEffects
     private float _ritualSparkDebt;
     private float _ritualShakeClock;
 
+    /// <summary>The Skeleton King's slams heaving the ground (<see cref="UpdateKingEffects"/>), drawn by the entity pass.</summary>
+    internal GroundHeave Heave { get; } = new();
+
+    /// <summary>
+    /// The Skeleton King's shows: the altar ritual's (<see cref="UpdateRitualEffects"/>) and each slam's, whose club,
+    /// landed within <see cref="JuiceConfig.SlamHeaveEffectRangeBlocks"/> of the eye on the authoritative world or a
+    /// client's mirror (<see cref="SkeletonKing.TryTakeSlamLanded"/>), heaves the ground round the strike
+    /// (<see cref="GroundHeave"/>) and jolts the camera by its distance. Cosmetic: singleplayer and a client, never a
+    /// headless server.
+    /// </summary>
+    internal void UpdateKingEffects(float deltaTime)
+    {
+        if (_serverMode || deltaTime <= 0f)
+            return;
+        UpdateRitualEffects(deltaTime);
+
+        var eye = Camera.RenderEye;
+        var kings = _world.SkeletonKings;
+        for (var i = 0; i < kings.Count; i++)
+        {
+            if (!kings[i].TryTakeSlamLanded(out var strike)) continue;
+            var distance = Vector3.Distance(strike, eye);
+            if (distance > JuiceConfig.SlamHeaveEffectRangeBlocks) continue;
+            Heave.Raise(_chunkManager, strike);
+            Camera.AddShake(ShakeFalloff.Trauma(JuiceConfig.SlamShakeStrength, JuiceConfig.SlamShakeNearBlocks,
+                JuiceConfig.SlamShakeRangeBlocks, distance));
+        }
+        Heave.Update(deltaTime);
+    }
+
     /// <summary>
     /// The altar ritual's show: every tower altar whose ritual runs (<see cref="Simulation.Tower.TowerManager.RitualAltars"/>,
     /// on the authoritative world or a client's mirrored records) within
     /// <see cref="MobConfig.SkeletonKingRitualEffectRangeBlocks"/> of the eye throws sparks off its top at
     /// <see cref="MobConfig.SkeletonKingRitualSparksPerSecond"/> on the campfire particle instance, and the nearest one
     /// rumbles the camera every <see cref="MobConfig.SkeletonKingRitualShakePulseSeconds"/>, by its distance
-    /// (<see cref="ShakeFalloff"/>). Cosmetic: singleplayer and a client, never a headless server.
+    /// (<see cref="ShakeFalloff"/>).
     /// </summary>
-    internal void UpdateRitualEffects(float deltaTime)
+    private void UpdateRitualEffects(float deltaTime)
     {
-        if (_serverMode || deltaTime <= 0f)
-            return;
         _ritualAltars.Clear();
         _world.Towers.RitualAltars(_ritualAltars);
         if (_ritualAltars.Count == 0)

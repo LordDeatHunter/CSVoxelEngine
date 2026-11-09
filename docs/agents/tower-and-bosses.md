@@ -194,8 +194,8 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   authoritative worlds): a Ritual record counts `MobConfig.SkeletonKingRitualSeconds` down, then spawns one king through
   `SkeletonKingManager.Spawn` at `TowerRecord.KingHome` (feet on top of the altar, leash `OuterRadius`, summon tier
   `TowerDifficulty.Clamp(Floors.Length - 1)`) with its rise clip, and turns Awake; a full hard cap retries next frame.
-  While a record is in Ritual, `AmbientEffects.UpdateRitualEffects` puffs sparks over the altar and pulses a small camera
-  shake by distance (singleplayer and a client, from the mirrored state; never a server).
+  While a record is in Ritual, `AmbientEffects.UpdateKingEffects` (its ritual half) puffs sparks over the altar and pulses
+  a small camera shake by distance (singleplayer and a client, from the mirrored state; never a server).
 - **Settling** (`TowerManager.SettleAltars(kings, pendingKing)`, after every `UpdateAltars` and right before the stations
   capture): over Ritual and Awake records, the tower's `SkeletonKingManager.StatusFor(key)` (a `KingStatus`) decides. A
   king at `Health <= 0` (Killed, dead or dying) marks the tower **Defeated the same frame**, before its death has played,
@@ -222,11 +222,23 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   line, grounded, off cooldown; phase 3 enrages (shorter cooldowns, faster walk). `SkeletonKingManager`
   (`Simulation/Tower/`, on the shared `RealmMobManager` frame and `MobCaps`, forced spawn only, one king per tower: a tower
   that reads Alive or Killed refuses another) lands the slam as a shockwave (`MobTargets.InShockwave`, the cloud golem's
-  rule) plus a burst of `SkeletonKingSlamShrapnelCount` bone shards all round from `SkeletonKingSlamShrapnelLiftBlocks`
+  rule, `SkeletonKingSlamRadius` round its feet for `SkeletonKingSlamDamage`) plus a burst of
+  `SkeletonKingSlamShrapnelCount` bone shards all round from `SkeletonKingSlamShrapnelLiftBlocks`
   over its feet, flying like the bone blade's shrapnel (`BoneShrapnel.RollFragment`; `ShrapnelConfig`'s speeds, gravity
   share and life, which `ThrownProjectile` and `MobMissiles.Launch` take per missile) and dealing
   `SkeletonKingSlamShrapnelDamage` to a target they touch; like every mob missile they never touch a mob, so the king and
-  the skeletons are never hurt by them. It lands the volley as a fan of `bone` projectiles through the same `MobMissiles`
+  the skeletons are never hurt by them. The slam also **heaves the ground** where the club strikes
+  (`SkeletonKing.SlamPoint`, `SkeletonKingSlamReachBlocks` in front of its feet), cosmetic only: the impact (the manager's
+  on the authoritative world, the mirror's own clip on a client, `SkeletonKing.AnimateMirror`) leaves a cue
+  (`TryTakeSlamLanded`) that `AmbientEffects.UpdateKingEffects` turns into a `GroundHeave` (`Particles/Heave/`, never on a
+  server) and a camera jolt by distance: every full-cube ground cell with no full cube over it within
+  `JuiceConfig.SlamHeaveRadiusBlocks` pops up and settles back, later and lower the farther it stands, so the ring ripples
+  out; `ObjectPasses.RenderGroundHeave` draws a raised, biome-tinted copy of each block (`BlockDebrisSystem.TintAt`) and no
+  cell, body, save or wire ever sees it (`GroundHeaveTests`). The volley is a **burst** (`BoneBurst`): from the clip's
+  release `SkeletonKingBurstBones` `bone` projectiles (more when enraged) leave the hand one after another over
+  `SkeletonKingBurstSeconds` (`SkeletonKing.TryTakeBurstBone`, a dying king's burst stops), each the aimed throw strayed
+  at random within `SkeletonKingBurstSpreadDegrees`, `SkeletonKingBurstPitchDegrees` and `SkeletonKingBurstSpeedJitter`
+  (`SkeletonKing.ScatterVelocity`), through the same `MobMissiles`
   (merged into `ThrowAction`'s projectile list; a hit by either knocks back `SkeletonKingBoneKnockbackSpeed`), and
   the summon as a ring of skeletons at the home's summon tier (`SkeletonManager.Spawn`, standing spots at the feet level,
   a cell below or a cell above, so a king on the altar raises them on the roof), never more living than
@@ -247,7 +259,7 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
 - **Scenario and tests (BT-6)**: the `altar` op (`World.UseAltar` plus its toast); `visual-examples/skeleton-king.json`
   (`VOXEL_TIME=147`) clears the default tower's floors with `towerclear`, then films the altar, the ritual, the rise, the
   boss bar, the slam, the volley and a summon. Tests: `TowerAltarTests`, `TowerAltarWorldTests`, `SkeletonKingBrainTests`,
-  `SkeletonKingTests`, `SkeletonKingManagerTests` (the slam's shrapnel: `ASlamThrowsBoneShrapnel`,
+  `SkeletonKingTests` (the burst's scatter and timing), `SkeletonKingManagerTests` (the slam's shrapnel: `ASlamThrowsBoneShrapnel`,
   `ASlamShardFliesThroughTheKingAndASkeletonAndHurtsOnlyTheTarget`), the altar cases of `TowerPlacementTests`, `TowerLockBlockTests`,
   `TowerManagerSaveTests` and `StationNetCodecTests`, `BossSelectionTests.ABossBarRespectsItsRange`, the king in
   `WorldLifecycleTests`, `NetworkEntitySyncTests` and `UndeadStrikeTests`, `VisualScenarioTests.AnAltarStepParsesItsCell`

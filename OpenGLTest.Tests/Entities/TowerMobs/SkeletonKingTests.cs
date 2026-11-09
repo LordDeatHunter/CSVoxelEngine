@@ -105,32 +105,57 @@ public sealed class SkeletonKingTests
     }
 
     [Fact]
-    public void TheVolleyFansSymmetricallyAtOneSpeed()
+    public void ABurstBoneStraysOnlyAsFarAsItsOffsetsAndKeepsItsScaledSpeed()
     {
         var baseVelocity = new Vector3(18f, 6f, 5f);
-        Span<Vector3> fan = stackalloc Vector3[5];
-        var spread = MobConfig.SkeletonKingVolleySpreadDegrees * MathF.PI / 180f;
-        SkeletonKing.VolleyVelocities(baseVelocity, spread, fan);
+        Assert.Equal(baseVelocity.X, SkeletonKing.ScatterVelocity(baseVelocity, 0f, 0f, 1f).X, 3);
+        Assert.Equal(baseVelocity.Y, SkeletonKing.ScatterVelocity(baseVelocity, 0f, 0f, 1f).Y, 3);
+        Assert.Equal(baseVelocity.Z, SkeletonKing.ScatterVelocity(baseVelocity, 0f, 0f, 1f).Z, 3);
 
         var baseYaw = MathF.Atan2(baseVelocity.Z, baseVelocity.X);
-        for (var i = 0; i < fan.Length; i++)
+        var baseElevation = MathF.Atan2(baseVelocity.Y, new Vector2(baseVelocity.X, baseVelocity.Z).Length());
+        foreach (var (yaw, pitch, scale) in new[] { (0.2f, 0f, 1f), (-0.15f, 0.08f, 0.9f), (0.05f, -0.07f, 1.1f) })
         {
-            Assert.Equal(baseVelocity.Length(), fan[i].Length(), 3);
-            Assert.Equal(baseVelocity.Y, fan[i].Y, 4);
-            for (var j = 0; j < i; j++)
-                Assert.True(Vector3.Distance(fan[i], fan[j]) > 0.1f, $"bones {i} and {j} share a heading");
-
-            var yaw = MathF.Atan2(fan[i].Z, fan[i].X) - baseYaw;
-            var mirror = MathF.Atan2(fan[fan.Length - 1 - i].Z, fan[fan.Length - 1 - i].X) - baseYaw;
-            Assert.Equal(-yaw, mirror, 3);
-            Assert.True(MathF.Abs(yaw) <= spread * 0.5f + 1e-4f, "a bone flew outside the fan");
+            var bone = SkeletonKing.ScatterVelocity(baseVelocity, yaw, pitch, scale);
+            Assert.Equal(baseVelocity.Length() * scale, bone.Length(), 3);
+            Assert.Equal(baseYaw + yaw, MathF.Atan2(bone.Z, bone.X), 3);
+            Assert.Equal(baseElevation + pitch, MathF.Atan2(bone.Y, new Vector2(bone.X, bone.Z).Length()), 3);
         }
-        Assert.Equal(baseVelocity.X, fan[2].X, 3);
-        Assert.Equal(baseVelocity.Z, fan[2].Z, 3);
 
-        // The volley band stays inside a bone's level range
+        // The volley band stays inside the aimed throw's level range (a jittered bone may fall short or long: the spray)
         var levelRange = MobConfig.SkeletonKingVolleySpeed * MobConfig.SkeletonKingVolleySpeed / ThrownProjectile.Gravity;
         Assert.True(MobConfig.SkeletonKingVolleyMaxRange < levelRange * 0.9f);
+    }
+
+    [Fact]
+    public void ABurstLetsItsBonesGoOneAfterAnotherAcrossItsWindowAndNeverSkipsOne()
+    {
+        var burst = new BoneBurst();
+        burst.Start(5, 0.4f);
+        Assert.True(burst.TryTake(), "the first bone did not leave at the release");
+        Assert.False(burst.TryTake(), "two bones left at once");
+
+        var taken = 1;
+        for (var i = 0; i < 4; i++)
+        {
+            burst.Tick(0.1f + 1e-4f);
+            Assert.True(burst.TryTake());
+            Assert.False(burst.TryTake());
+            taken++;
+        }
+        Assert.Equal(5, taken);
+        Assert.False(burst.Active);
+
+        // One long frame owes every bone that came due, and a stop drops the rest
+        burst.Start(4, 0.3f);
+        burst.Tick(1f);
+        var due = 0;
+        while (burst.TryTake()) due++;
+        Assert.Equal(4, due);
+        burst.Start(4, 0.3f);
+        burst.Stop();
+        burst.Tick(1f);
+        Assert.False(burst.TryTake());
     }
 
     [Fact]
@@ -149,7 +174,7 @@ public sealed class SkeletonKingTests
             var swinging = king.Animation.IsPlaying(SkeletonKing.SlamClip);
             if (swinging && !wasSwinging) swings++;
             wasSwinging = swinging;
-            Assert.False(king.TryTakeVolleyRelease(out _, out _), "volleyed at a target in reach");
+            Assert.False(king.TryTakeBurstBone(out _, out _), "volleyed at a target in reach");
             if (!king.TryTakeSlamImpact()) continue;
             impacts++;
             Assert.True(swinging, "the slam landed after its clip had ended");

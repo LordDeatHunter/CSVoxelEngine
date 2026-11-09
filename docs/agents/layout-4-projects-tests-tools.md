@@ -122,6 +122,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Particles/                   # every particle system and the dust, splash and pop emitters
     Collapse/                  # a defeated tower's collapse show: its rule, thrown blocks burst and never write a cell
                                #   (TowerCollapseEffectsTests)
+    Heave/                     # the king's slam heave: only exposed ground in the radius, the ripple, the settle, no write
   Player/                      # camera, physics, water phases and swimming, health and fall tracking,
                                #   the player model, creative, sprint, the saved-player restore
   Rendering/                   # render-pass gates: GPU timing, reflection reuse, shadow cascades, the texture-unit cache,

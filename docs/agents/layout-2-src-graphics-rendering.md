@@ -263,6 +263,9 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         CollapseDebris.cs      # one block thrown off the tower: tumbles, bounces and rolls on the terrain (read-only), then bursts
         TowerCollapseEffects.cs # World component: the chips, thrown blocks and rumble of a defeated tower's falling cells,
                                #   fed by TowerBlockWriter's replaced hook or a client's journal (ShowsCollapse)
+      Heave/                   # the Skeleton King's slam heaving the ground (never on a server)
+        GroundHeave.cs         # GL-free: the full-cube ground round a strike pops up and settles in an outward ripple; no write
+        HeavedBlock.cs         # one heaving block: its cell center, block, biome tint, start and height
     Platform/                  # Silk.NET window and input setup
       InputManager.cs          # keyboard/mouse context
       WindowManager.cs         # Silk.NET window setup
