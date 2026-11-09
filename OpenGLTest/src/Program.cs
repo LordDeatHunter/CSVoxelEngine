@@ -571,6 +571,7 @@ public static class Program
         var hideHud = !gameplay.HudVisible
             || (visualDirector?.TakeScreenshot == true && visualDirector.ScreenshotHideHud);
         inventoryView.HoverCanvas = panelInput.PointerCanvas();
+        renderManager.Ui.Pointer = panelInput.UiPointerCanvas();
         if (!hideHud)
             world.Renderer.RenderUI(renderManager, inventoryView,
                 (float)world.LightingTime, shownFps, diagnostics.DebugEnabled,

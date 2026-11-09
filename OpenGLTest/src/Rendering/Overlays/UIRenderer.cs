@@ -318,6 +318,13 @@ public class UIRenderer : IDisposable
     /// first <see cref="Begin(Vector2D{int}, Vector2D{int}, float)"/>.</summary>
     public Vector2 ToCanvas(Vector2 windowPoint) => UiCanvas.WindowToCanvas(windowPoint, _scale);
 
+    /// <summary>The pointer in canvas units, set once per frame before the UI pass (null with no pointer); what
+    /// <see cref="IsHovered"/> tests, so every button lights up the same way.</summary>
+    internal Vector2? Pointer { get; set; }
+
+    /// <summary>Whether the pointer is over the box of this center and size.</summary>
+    internal bool IsHovered(Vector2 center, Vector2 size) => Pointer is { } p && new UiRect(center, size).Contains(p);
+
     // The per-pass state and shared resources the page renderers draw with. They read it live,
     // never as copies: Begin rewrites the canvas and the text fade every pass.
     internal float CountScale => _countScale;

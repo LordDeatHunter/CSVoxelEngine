@@ -142,7 +142,8 @@ internal sealed class SpellBuilderRenderer
 
     private void DrawButton((Vector2 Center, Vector2 Size) rect, string label, bool enabled, Rgba accent)
     {
-        _ui.DrawRect(rect.Center, rect.Size, enabled ? ChipBackground : SlotBackground);
+        _ui.DrawRect(rect.Center, rect.Size,
+            enabled ? _ui.IsHovered(rect.Center, rect.Size) ? ButtonHover : ChipBackground : SlotBackground);
         _ui.DrawBorder(rect.Center, rect.Size, Border.Standard, enabled ? accent : SlotBorderColor);
         _ui.DrawTextMiddle(label, rect.Center, _ui.CountScale,
             enabled ? Rgba.White : TextDim);

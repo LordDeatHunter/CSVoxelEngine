@@ -95,7 +95,7 @@ internal sealed class CraftCardRenderer
 
     private void DrawBoxButton(Vector2 center, float size, string label, Rgba bg, Rgba border, Rgba text)
     {
-        _ui.DrawRect(center, new Vector2(size), bg);
+        _ui.DrawRect(center, new Vector2(size), _ui.IsHovered(center, new Vector2(size)) ? ButtonHover : bg);
         _ui.DrawBorder(center, new Vector2(size), Border.Thin, border);
         _ui.DrawTextMiddle(label, center, _ui.CountScale, text);
     }

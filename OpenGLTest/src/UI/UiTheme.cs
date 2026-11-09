@@ -44,6 +44,8 @@ public static class UiTheme
     public static readonly Rgba SlotBackground = Rgba.Gray(0.08f, 0.55f);
     public static readonly Rgba SelectedBackground = Rgba.Gray(0.18f, 0.65f);
     public static readonly Rgba HoverBackground = Rgba.Gray(0.14f, 0.6f);
+    /// <summary>A button under the pointer: lighter and more opaque than any resting button fill.</summary>
+    public static readonly Rgba ButtonHover = Rgba.Gray(0.28f, 0.95f);
 
     // Frames
     public static readonly Rgba SlotBorderColor = Rgba.Gray(0.65f, 0.45f);

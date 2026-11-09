@@ -247,7 +247,7 @@ internal sealed class InventoryPanelRenderer
     {
         var (center, size) = InventoryPanelLayout.ScopeButtonRect(_ui.ScreenSize);
         var hovered = _hover is { } p && new UiRect(center, size).Contains(p);
-        _ui.DrawRect(center, size, hovered ? HoverBackground : ChipBackground);
+        _ui.DrawRect(center, size, hovered ? ButtonHover : ChipBackground);
         _ui.DrawBorder(center, size, Border.Standard, scope == SearchScope.All ? SlotBorderColor : AccentGold);
         var label = scope switch
         {
@@ -330,7 +330,7 @@ internal sealed class InventoryPanelRenderer
     private void DrawCatalogButton(Vector2 center, string label, bool danger)
     {
         var size = new Vector2(InventoryPanelLayout.CatalogButtonWidth, InventoryPanelLayout.CatalogButtonHeight);
-        _ui.DrawRect(center, size, ChipBackground);
+        _ui.DrawRect(center, size, _ui.IsHovered(center, size) ? ButtonHover : ChipBackground);
         _ui.DrawBorder(center, size, Border.Standard, danger ? DangerRed : AccentGold);
         if (_ui.Font == null) return;
 

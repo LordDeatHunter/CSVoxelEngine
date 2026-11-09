@@ -171,12 +171,8 @@ internal sealed class MenuRenderer
         return PauseMenuLayout.HitAt(point, _ui.ScreenSize, view.Page);
     }
 
-    private void DrawMenuButton(Vector2 center, string label)
-    {
-        _ui.DrawRect(center, PauseMenuLayout.ButtonSize, SlotBackground);
-        _ui.DrawBorder(center, PauseMenuLayout.ButtonSize, Border.Standard, SelectedBorderColor);
-        _ui.DrawTextMiddle(label, center, _ui.CountScale, Rgba.White);
-    }
+    private void DrawMenuButton(Vector2 center, string label) =>
+        DrawSmallButton(center, PauseMenuLayout.ButtonSize, label);
 
     /// <summary>
     /// The main menu the game boots to, over an opaque backdrop (no world is rendered behind a
@@ -425,7 +421,7 @@ internal sealed class MenuRenderer
     /// <summary>A <see cref="DrawMenuButton"/> of any size, with an optional border color.</summary>
     private void DrawSmallButton(Vector2 center, Vector2 size, string label, Rgba? border = null)
     {
-        _ui.DrawRect(center, size, SlotBackground);
+        _ui.DrawRect(center, size, _ui.IsHovered(center, size) ? ButtonHover : SlotBackground);
         _ui.DrawBorder(center, size, Border.Standard, border ?? SelectedBorderColor);
         _ui.DrawTextMiddle(label, center, _ui.CountScale, Rgba.White);
     }
