@@ -158,6 +158,22 @@ public sealed class MiningTests
     }
 
     [Fact]
+    public void TheCaveOresGateByTheirDepth()
+    {
+        // Crystal and fungal sit above the magma-touched deep: copper opens them, the deep's cinnabar waits for iron.
+        foreach (var ore in new[] { "amethyst_ore", "jade_ore" })
+        {
+            Assert.False(Mining.CanMine(BlockOf(ore), ItemOf("tin_pickaxe")), ore);
+            Assert.True(Mining.CanMine(BlockOf(ore), ItemOf("copper_pickaxe")), ore);
+        }
+
+        var cinnabar = BlockOf("cinnabar_ore");
+        Assert.False(Mining.CanMine(cinnabar, ItemOf("bronze_pickaxe")));
+        Assert.True(Mining.CanMine(cinnabar, ItemOf("iron_pickaxe")));
+        Assert.False(Mining.CanMine(cinnabar, null));
+    }
+
+    [Fact]
     public void IronOutranksBronzeAndMinesEverythingBronzeMines()
     {
         var bronze = ItemOf("bronze_pickaxe");

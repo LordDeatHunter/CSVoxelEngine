@@ -373,6 +373,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const bool MalachiteEnabled = true;
     public const float MalachiteFrequency = 1f / 18f;
     public const float MalachiteThreshold = 0.83f;
+    // Cave biome richness (plans/CAVE_BIOMES.md CB-2): added to the threshold in that cave biome's cells, so
+    // negative means richer and positive poorer; every biome not listed keeps the plain field. First guesses.
+    public const float MalachiteCrystalShift = -0.03f;
 
     // --- Coal ore (CoalGenerator) ---
     // Same threshold-on-noise deposits as malachite (on the same OreNoiseLattice field), but
@@ -384,6 +387,11 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const bool CoalEnabled = true;
     public const float CoalFrequency = 1f / 20f;
     public const float CoalThreshold = 0.84f;
+    // Cave biome richness (plans/CAVE_BIOMES.md CB-2): added to the threshold in that cave biome's cells, so
+    // negative means richer and positive poorer; every biome not listed keeps the plain field. First guesses.
+    public const float CoalFungalShift = -0.03f;
+    public const float CoalDesertEchoShift = -0.02f;
+    public const float CoalMagmaDeepShift = 0.04f;   // burned out by the heat
 
     // --- Hematite ore (HematiteGenerator) ---
     // Iron: the same OreNoiseLattice deposits on a noise of its own, but deep stone only, in the
@@ -393,6 +401,9 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const bool HematiteEnabled = true;
     public const float HematiteFrequency = 1f / 18f;
     public const float HematiteThreshold = 0.86f;
+    // Cave biome richness (plans/CAVE_BIOMES.md CB-2): added to the threshold in that cave biome's cells, so
+    // negative means richer and positive poorer; every biome not listed keeps the plain field. First guesses.
+    public const float HematiteMagmaDeepShift = -0.03f;
     public const int HematiteMaxY = LavaMaxY;
 
     // --- Tin ore (TinGenerator) ---
@@ -401,6 +412,10 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const bool TinEnabled = true;
     public const float TinFrequency = 1f / 18f;
     public const float TinThreshold = 0.8f;
+    // Cave biome richness (plans/CAVE_BIOMES.md CB-2): added to the threshold in that cave biome's cells, so
+    // negative means richer and positive poorer; every biome not listed keeps the plain field. First guesses.
+    public const float TinFrozenEchoShift = -0.02f;
+    public const float TinDesertEchoShift = -0.02f;
     public const int TinMinY = -96;
     public const int TinMaxY = 64;
 
@@ -972,6 +987,74 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
 
     /// <summary>One magma-touched cave face cell in this many is a magma block.</summary>
     public const int CaveMagmaAccentRate = 24;
+
+    // Cave biome shape (plans/CAVE_BIOMES.md CB-2, CaveShape): only the sub-band biomes change the carve. Crystal
+    // caves open bigger cheese rooms, fungal caves wider tunnels and the magma-touched deep both, while plain and
+    // echo caves are carved exactly as before (a boost of 0 and a scale of 1 are exact). Each boost is scaled per
+    // region by 1 + CaveShapeScaleVariation * s, s being NoiseCaves' ninth lattice channel (seed offset 182), so
+    // cave size varies across a biome. A worm node's radius is multiplied at its center. First guesses.
+
+    /// <summary>Frequency of the cave shape scale noise (seed offset 182), NoiseCaves' ninth lattice channel.</summary>
+    public const float CaveShapeScaleFrequency = 1f / 192f;
+
+    /// <summary>How far the shape scale noise moves a sub-biome's boosts: each is multiplied by
+    /// <c>1 + CaveShapeScaleVariation * s</c>, s in -1..1.</summary>
+    public const float CaveShapeScaleVariation = 0.5f;
+
+    /// <summary>How much a crystal cell lowers the cheese threshold: bigger rooms.</summary>
+    public const float CaveCrystalCheeseBoost = 0.10f;
+
+    /// <summary>How much a magma-touched cell lowers the cheese threshold.</summary>
+    public const float CaveMagmaCheeseBoost = 0.05f;
+
+    /// <summary>How much a magma-touched cell lowers the cavern threshold: more open caverns.</summary>
+    public const float CaveMagmaCavernBoost = 0.10f;
+
+    /// <summary>The share a fungal cell widens both spaghetti tunnel radii by.</summary>
+    public const float CaveFungalTunnelBoost = 0.45f;
+
+    /// <summary>What a worm node's radius is multiplied by when its center is a fungal cell.</summary>
+    public const float CaveFungalWormRadiusFactor = 1.35f;
+
+    /// <summary>What a worm node's radius is multiplied by when its center is a magma-touched cell.</summary>
+    public const float CaveMagmaWormRadiusFactor = 1.15f;
+
+    // Cave biome exclusive ores (plans/CAVE_BIOMES.md CB-2, CaveOres): one vein ore per sub-band biome, amethyst in
+    // crystal caves (seed offset 183), jade in fungal caves (184) and cinnabar in the magma-touched deep (185), each
+    // on the OreNoiseLattice like the Y-band ores. Each hosts only plain stone whose cell is its own biome, at or below
+    // its MaxY, and runs right after the Y-band ores, before the palette pass: that pass rewrites only exact stone, so
+    // the ore survives even inside the magma-touched deep's scorched hellrock. The echoes get no exclusive ore. First
+    // guesses.
+
+    /// <summary>Whether worldgen stamps the cave biome exclusive ores (CaveOres).</summary>
+    public const bool CaveOresEnabled = true;
+
+    /// <summary>Frequency of the amethyst vein noise (seed offset 183).</summary>
+    public const float CaveAmethystFrequency = 1f / 16f;
+
+    /// <summary>Amethyst vein threshold in -1..1: higher is rarer.</summary>
+    public const float CaveAmethystThreshold = 0.80f;
+
+    /// <summary>The highest world y amethyst grows at; below the crystal caves' highest reach.</summary>
+    public const int CaveAmethystMaxY = -192;
+
+    /// <summary>Frequency of the jade vein noise (seed offset 184).</summary>
+    public const float CaveJadeFrequency = 1f / 18f;
+
+    /// <summary>Jade vein threshold in -1..1: higher is rarer.</summary>
+    public const float CaveJadeThreshold = 0.80f;
+
+    /// <summary>The highest world y jade grows at; below the fungal caves' highest reach.</summary>
+    public const int CaveJadeMaxY = -192;
+
+    /// <summary>Frequency of the cinnabar vein noise (seed offset 185).</summary>
+    public const float CaveCinnabarFrequency = 1f / 14f;
+
+    /// <summary>Cinnabar vein threshold in -1..1: higher is rarer.</summary>
+    public const float CaveCinnabarThreshold = 0.82f;
+
+    /// <summary>The highest world y cinnabar grows at; below the magma-touched deep's highest reach.</summary>
+    public const int CaveCinnabarMaxY = -256;
 
     /// <summary>Capacity of the sky tree cache (one entry per sky tree cell, a tree or none), read by the
     /// generation workers; see <see cref="TreeShapeCacheCapacity"/>.</summary>

@@ -74,6 +74,7 @@ public static class WorldSeed
         HellGenerator.Reseed();
         HellBiomes.Reseed();
         CaveBiomes.Reseed();
+        CaveOres.Reseed();
         CloudPatchGenerator.Reseed();
         CloudSeaGenerator.Reseed();
         SkyIslands.Reseed();

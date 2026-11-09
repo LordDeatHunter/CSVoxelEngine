@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Sky;
@@ -139,13 +140,15 @@ internal static class StampGateSample
         // The barrier band lies far below every column's ground: one anchor column's chunk stack
         // through it, one chunk past each edge, so its gate both admits and skips a filled chunk,
         // and on down through hell's first two layers, whose wholly-hell chunks take the fill's
-        // hell path (gated) against the whole pipeline (ungated)
+        // hell path (gated) against the whole pipeline (ungated). The stack reaches up through the
+        // cave sub-biome band to one chunk past its highest reach, so the cave shape, the cave biome
+        // ore richness and the exclusive cave ores meet real sub-biome cells
         if (columns.Count > 0)
         {
             var (bcx, bcz) = columns[0];
             var hellBottom = WorldGenerationConfig.HellTopY - 2 * WorldGenerationConfig.HellLayerPeriodBlocks;
             for (var cy = hellBottom >> Chunk.SizeShift;
-                 cy <= (WorldGenerationConfig.BarrierTopY >> Chunk.SizeShift) + 1; cy++)
+                 cy <= (CaveBiomes.SubBandTopY >> Chunk.SizeShift) + 1; cy++)
                 AddChunk(new Vector3(bcx, cy, bcz));
         }
 

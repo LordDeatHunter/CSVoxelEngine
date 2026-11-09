@@ -26,10 +26,13 @@ namespace VoxelEngine.WorldGen.Caves;
 /// <item>nothing at or below <see cref="WorldGenerationConfig.BarrierTopY"/>, so the barrier and hell are
 /// untouched.</item>
 /// </list>
-/// <see cref="At"/> and <see cref="Stamp"/> read the same lattice points, use the same fraction
+/// <see cref="At"/> and <see cref="Fill"/> read the same lattice points, use the same fraction
 /// expressions and call the same <see cref="Classify"/>, so they agree bit for bit across every chunk
-/// seam. A pure function of position, the column's stored biome and height, and the seed; thread-safe:
-/// the noises are read-only after their reseed, and all scratch lives on the stack.
+/// seam. <see cref="Fill"/> classifies a chunk once into a <see cref="CaveBiomeMap"/> (CB-2) that every
+/// cave consumer reads (the noise cave shape, the ore richness, the exclusive ores) and that
+/// <see cref="Stamp(byte[], CaveBiomeMap, int, int, int)"/> dresses the caves from. A pure function of
+/// position, the column's stored biome and height, and the seed; thread-safe: the noises are read-only
+/// after their reseed, and all scratch lives on the stack or in the caller's map.
 /// </summary>
 public static class CaveBiomes
 {
@@ -49,8 +52,8 @@ public static class CaveBiomes
     // the ranges Stamp decides a cell by only have to contain the exact blend
     private const float BoundSlack = 1e-4f;
 
-    // The highest y a sub-biome can reach: the echo band's bottom at its highest drift
-    private const int SubBandTopY = WorldGenerationConfig.CaveEchoBottomY + WorldGenerationConfig.CaveEchoDriftBlocks;
+    /// <summary>The highest y a sub-biome can reach: the echo band's bottom at its highest drift.</summary>
+    internal const int SubBandTopY = WorldGenerationConfig.CaveEchoBottomY + WorldGenerationConfig.CaveEchoDriftBlocks;
 
     // Salt of the accent scatter, so it never lines up with another feature hashing the same cell
     private const ulong AccentSalt = 0x43415645UL;
@@ -111,7 +114,7 @@ public static class CaveBiomes
     /// The cave biome of world cell (x, y, z) in a column whose stored surface biome is
     /// <paramref name="surfaceBiome"/> and whose top is <paramref name="surfaceHeight"/>
     /// (<see cref="ColumnData.Biomes"/> and <see cref="ColumnData.Heights"/>): exactly what
-    /// <see cref="Stamp"/> decides for that cell.
+    /// <see cref="Fill"/> writes for that cell.
     /// </summary>
     public static CaveBiome At(int x, int y, int z, Biome surfaceBiome, int surfaceHeight)
     {
@@ -288,7 +291,8 @@ public static class CaveBiomes
     }
 
     /// <summary>
-    /// The world y band <see cref="Stamp"/> can write over <paramref name="column"/>, from
+    /// The world y band in which <see cref="Fill"/> can find a non-plain cell, and so the band the palette
+    /// pass can write, over <paramref name="column"/>, from
     /// <see cref="Classify"/>'s bounds with its clamp: nothing at or below the barrier top; a sub-biome
     /// at most at the echo band's highest bottom; an echo cell only in a frozen or desert column and at
     /// least the bare cover under that column's top, so at most the cover under the chunk column's
@@ -303,17 +307,53 @@ public static class CaveBiomes
     }
 
     /// <summary>
-    /// Rewrites every stone cell of the chunk at world origin (worldX0, worldY0, worldZ0) whose cave
-    /// biome is not plain with <see cref="BlockFor"/> of its biome and role. Only plain stone is a host,
-    /// so ores, pockets, geodes, fluids, plants and every block that needs support are left alone, and
-    /// every palette block occludes like the stone it replaces, so the roles can be read in place. Most
-    /// cells are classified by their lattice cell's <see cref="CellRule"/> alone, which is exact, and only
-    /// a cell near a band line or a selector threshold pays its own blend.
+    /// The self-contained palette pass: classifies the chunk at world origin (worldX0, worldY0, worldZ0)
+    /// into a fresh map with <see cref="Fill"/> and stamps from it. Generation fills one shared map per
+    /// chunk instead and calls <see cref="Stamp(byte[], CaveBiomeMap, int, int, int)"/>.
     /// </summary>
     public static void Stamp(byte[] blocks, ColumnData column, int worldX0, int worldY0, int worldZ0)
     {
-        if (worldY0 + Chunk.SizeMask <= WorldGenerationConfig.BarrierTopY) return;
-        if (worldY0 > SubBandTopY && !AnyEchoColumn(column)) return;
+        var map = new CaveBiomeMap();
+        if (Fill(map, column, worldX0, worldY0, worldZ0)) Stamp(blocks, map, worldX0, worldY0, worldZ0);
+    }
+
+    /// <summary>
+    /// Rewrites every stone cell of the chunk at world origin (worldX0, worldY0, worldZ0) whose cave
+    /// biome in <paramref name="caves"/> is not plain with <see cref="BlockFor"/> of its biome and role.
+    /// Only plain stone is a host, so ores, pockets, geodes, fluids, plants and every block that needs
+    /// support are left alone, and every palette block occludes like the stone it replaces, so the roles
+    /// can be read in place.
+    /// </summary>
+    public static void Stamp(byte[] blocks, CaveBiomeMap caves, int worldX0, int worldY0, int worldZ0)
+    {
+        var cells = caves.Cells;
+        for (var x = 0; x < Chunk.Size; x++)
+        for (var z = 0; z < Chunk.Size; z++)
+        for (var y = 0; y < Chunk.Size; y++)
+        {
+            var idx = Chunk.Idx(x, y, z);
+            var biome = (CaveBiome)cells[idx];
+            if (biome == CaveBiome.Plain || blocks[idx] != RockBlock) continue;
+
+            var block = BlockFor(biome, RoleAt(blocks, x, y, z), worldX0 + x, worldY0 + y, worldZ0 + z);
+            if (block != blocks[idx]) blocks[idx] = block;
+        }
+    }
+
+    /// <summary>
+    /// Classifies every cell of the chunk at world origin (worldX0, worldY0, worldZ0) into
+    /// <paramref name="map"/>, exactly as <see cref="At"/> does, whatever the cell holds (the carvers
+    /// have not run yet). Returns whether some cell is not plain; when it returns false the map's cells
+    /// may be stale and must not be read. Most cells are classified by their lattice cell's
+    /// <see cref="CellRule"/> alone, which is exact, and only a cell near a band line or a selector
+    /// threshold pays its own blend.
+    /// </summary>
+    internal static bool Fill(CaveBiomeMap map, ColumnData column, int worldX0, int worldY0, int worldZ0)
+    {
+        if (worldY0 + Chunk.SizeMask <= WorldGenerationConfig.BarrierTopY) return false;
+        if (worldY0 > SubBandTopY && !AnyEchoColumn(column)) return false;
+
+        map.Clear();
 
         // NaN marks a lattice point not sampled yet; the noise never returns NaN
         Span<float> echo = stackalloc float[GridCount];
@@ -339,24 +379,32 @@ public static class CaveBiomes
             for (var y = 0; y < Chunk.Size; y++)
             {
                 var idx = Chunk.Idx(x, y, z);
-                if (blocks[idx] != RockBlock) continue;
-
                 var wy = worldY0 + y;
-                if (wy <= WorldGenerationConfig.BarrierTopY) continue;
-
                 var depth = height - wy;
+
+                // Exact fast paths to plain, no lattice read: at or below the barrier top Classify gives
+                // plain; above SubBandTopY a cell is above every echo line (the line at its highest clamped
+                // drift is SubBandTopY), so Classify gives plain when the column has no echo or the cell is
+                // shallower than the bare cover (CoverDepth is never below CaveEchoCoverBlocks)
+                if (wy <= WorldGenerationConfig.BarrierTopY
+                    || (wy > SubBandTopY
+                        && (surfaceEcho == CaveBiome.Plain || depth < WorldGenerationConfig.CaveEchoCoverBlocks)))
+                {
+                    map.Set(idx, CaveBiome.Plain);
+                    continue;
+                }
+
                 var cell = (x / Stride * Cells + y / Stride) * Cells + z / Stride;
                 ref readonly var rule = ref RuleOf(rules, ruled, corners, echo, deep, selector,
                     worldX0, worldY0, worldZ0, cell, x, y, z);
                 if (!rule.TryDecide(wy, depth, surfaceEcho, out var biome))
                     biome = ClassifyCell(corners.Slice(cell * CornersPerCell, CornersPerCell), x, y, z, wy, depth,
                         surface);
-                if (biome == CaveBiome.Plain) continue;
-
-                var block = BlockFor(biome, RoleAt(blocks, x, y, z), worldX0 + x, wy, worldZ0 + z);
-                if (block != blocks[idx]) blocks[idx] = block;
+                map.Set(idx, biome);
             }
         }
+
+        return map.Present != 1 << (int)CaveBiome.Plain;
     }
 
     /// <summary>

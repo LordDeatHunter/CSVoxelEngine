@@ -76,6 +76,10 @@ public static class GravelPocketGenerator
 
         public byte Replacement(int worldX, int worldY, int worldZ) =>
             UnitHash(worldX, worldY, worldZ) < WorldFeatureConfig.GravelPocketSandShare ? SandBlock : GravelBlock;
+
+        public float ThresholdShift(int localX, int localY, int localZ) => 0f;
+
+        public float MinThresholdShift => 0f;
     }
 
     private static float UnitHash(int x, int y, int z)

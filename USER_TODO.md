@@ -185,6 +185,19 @@ All three made by `tools/generate-tower-lock-textures.py`: re-running puts the p
   `chest_ruin_underground_*` tiles; same layout as the ruin chests (the shared `block/chest` model).
   Repoint `tower_chest.json`'s textures when they land.
 
+### Cave biome ores
+
+All three made by `tools/generate-cave-ore-textures.py` as palette swaps of `malachite_ore.png` (its
+brown matrix kept, its six green mineral shades repainted by luminance rank, the way `tin_ore.png`
+recolors it): re-running puts the placeholders back (`--check` compares), so remove or repoint that
+generator with the replacement. Each must stay 32x32, fully opaque and tileable (a `cube_all`
+block), and its own tile: the block's reflective `material` is keyed per tile, so a shared tile
+would share it.
+
+- [ ] **Amethyst ore** — `amethyst_ore.png`, the crystal caves' exclusive ore (violet).
+- [ ] **Jade ore** — `jade_ore.png`, the fungal caves' exclusive ore (pale green).
+- [ ] **Cinnabar ore** — `cinnabar_ore.png`, the magma-touched deep's exclusive ore (red).
+
 ## Entity models
 
 Paths are under `OpenGLTest/assets/models/entity/`. Every model is a Blockbench `.bbmodel` with its

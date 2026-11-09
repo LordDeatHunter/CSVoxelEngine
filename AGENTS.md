@@ -1317,7 +1317,11 @@ OpenGLTest/
                                #   Hell*VineRate, HellGlowFernRate, HellEmberBloomRate, HellTree*), and the solid
                                #   cloud patches (CloudPatchesEnabled, CloudPatchFrequency, CloudPatchThreshold,
                                #   CloudPatchCoreValue, CloudPatchDetailFrequency), and the cave biomes
-                               #   (CaveBiome*, CaveEcho*, CaveDeep*, CaveSubBiomeFrequency, Cave*AccentRate)
+                               #   (CaveBiome*, CaveEcho*, CaveDeep*, CaveSubBiomeFrequency, Cave*AccentRate), their
+                               #   shape (CaveShapeScale*, Cave*CheeseBoost, CaveMagmaCavernBoost, CaveFungalTunnelBoost,
+                               #   Cave*WormRadiusFactor), the Y-band ores' cave richness (*CrystalShift, *FungalShift,
+                               #   *EchoShift, *MagmaDeepShift beside each ore's threshold) and the exclusive cave ores
+                               #   (CaveOresEnabled, CaveAmethyst*, CaveJade*, CaveCinnabar*)
     Content/                   # the data-driven content pipeline (ContentRegistry) — see "Content" below
       ContentRegistry.cs       # the static facade: owns the content tables, assigns byte ids, runs Load / BakeModels /
                                #   Reset in order and serves the public lookups (RequireBlock, recipes, tags, ...)
@@ -2382,7 +2386,8 @@ OpenGLTest/
                                #   sea-level fallback, island), the per-column Sample (weight, surface, floor, ravine
                                #   guard, river level, bank, outflow), RiverLevelAt, RampRiverBeside, RiverShare,
                                #   NearAnyFootprint
-      NoiseCaves.cs            # 3D-noise caves (cheese rooms, wide/narrow spaghetti, deep caverns) on a strided lattice
+      NoiseCaves.cs            # 3D-noise caves (cheese rooms, wide/narrow spaghetti, deep caverns) on a strided lattice,
+                               #   nine channels (the ninth the cave sub-biomes' shape scale, seed offset 182)
       SplitMix64.cs            # deterministic integer-hash PRNG so worms don't depend on System.Random internals
       TerrainGenerator.cs      # the 2D column build: the palette, LandHeight (with the relief layer, trenches and ravines), Compute ->
                                #   ColumnData, Climate, and the column queries (forwarding to BiomeClassifier, WaterBodies, TerrainNoise);
@@ -2421,7 +2426,14 @@ OpenGLTest/
         CaveCellRole.cs        # Interior / Wall / Floor / Ceiling: where a rock cell sits against the open cave
         CaveBiomePalette.cs    # one cave biome's blocks: base stone, floor, ceiling, an accent and its rate
         CaveBiomes.cs          # the field (three 3D noises, seed offsets 179-181, on a stride-8 lattice), the one
-                               #   Classify rule, the point query At, the palette pass Stamp (stone hosts only) and its band
+                               #   Classify rule, the point query At, Fill (the per-chunk map), the palette pass Stamp
+                               #   (stone hosts only) and its band
+        CaveBiomeMap.cs        # one chunk's cave biome per cell plus a mask of the biomes present, classified once by
+                               #   CaveBiomes.Fill before the carvers and read by every cave consumer
+        CaveShape.cs           # the sub-biomes' cave shape: cheese, tunnel and cavern boosts, the worm radius factor
+        CaveRichness.cs        # a Y-band ore's threshold shift per cave biome (negative richer)
+        CaveOres.cs            # the exclusive ores (amethyst, jade, cinnabar; seeds 183-185): HasOre, the stamp (plain
+                               #   stone of its own biome, one merged host scan) and its band
       Hell/                    # the realm under the barrier band (plans/LAYERS.md), namespace VoxelEngine.WorldGen.Hell
         HellGenerator.cs       # hell's endless layers: cavern pockets over hellrock slabs on a 3D lattice noise (seed
                                #   offset 163), pools ponding the floors' dips, the biome skins (Classify over the
@@ -2464,7 +2476,8 @@ OpenGLTest/
         SkyZone.cs             # the zone at a point: weight, tier (bigger is rarer; L-15 spawns by it), radius, center
       WorldgenStats.cs         # lock-free worldgen timing from the generation workers and
                                #   the LOD builder, drained once a second by FrameProfiler
-      WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere
+      WormCarver.cs            # worm-carved tunnels: per-XZ-cell deterministic paths, cached, carved sphere by sphere;
+                               #   a node's radius times its center's cave biome factor (RadiusFactorAt)
       Structures/              # template placement (see "Structure templates and ruins")
         PlacedStructure.cs     # a template placed in the world: center column, origin y, turns, footprint box
         RuinPlacement.cs       # the ruins of the four realms on hashed cells, and the realm site rules satellites share
@@ -2739,8 +2752,9 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   the worldgen cost probe and the stage-timer tests
     Features/                  # every feature generator (mirrors src/WorldGen/Features)
       Underground/             # coal, malachite, hematite, gravel pockets, cave life (mirrors src/WorldGen/Features/Underground)
-    Caves/                     # the cave biomes: point query equals stamp, bands, determinism, safe palettes, and the
-                               #   spot finder behind cave-biomes.json (mirrors src/WorldGen/Caves)
+    Caves/                     # the cave biomes: point query equals stamp, the map, bands, determinism, safe palettes,
+                               #   the cave shape and worm factor, the ore richness, the exclusive ores, and the spot
+                               #   finder behind cave-biomes.json (mirrors src/WorldGen/Caves)
     Hell/                      # the hell caverns, biomes, palette and flora (mirrors src/WorldGen/Hell)
     Sky/                       # the solid cloud patches, the cloud sea, the sky islands, the sky biomes and their
                                #   flora (mirrors src/WorldGen/Sky)
@@ -2763,6 +2777,9 @@ tools/                                # asset generators: models, animation clip
                                       #   arrow and bone sprites, on the hell script's machinery; --check
   generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout), skeleton_pile and
                                       #   tower_altar_top tiles, stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
+  generate-cave-ore-textures.py       # deterministic placeholder amethyst_ore, jade_ore and cinnabar_ore tiles: palette swaps
+                                      #   of malachite_ore's green shades, stdlib PNG reader and writer; listed in USER_TODO.md;
+                                      #   --check
   generate-skeleton-king-model.py     # deterministic skeleton_king .bbmodel (crowned rig with its club, clips) and palette
                                       #   skin, on the hell and skeleton scripts' machinery; listed in USER_TODO.md; --check
   generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
@@ -3658,6 +3675,10 @@ counts and one more armor point each). The `iron_pickaxe` is the top pickaxe tie
 `pickaxe` tag), the tool the hell barrier needs (plans/LAYERS.md), so hell is now reachable in survival
 (`MiningTests.IronOutranksBronzeAndMinesEverythingBronzeMines`).
 
+**The cave ores** (`CaveOres`, plans/CAVE_BIOMES.md CB-2) are three ores found only in one cave sub-biome each, which drop
+themselves: `amethyst_ore` in crystal caves and `jade_ore` in fungal caves (copper pickaxe and up) and `cinnabar_ore` in the
+magma-touched deep (iron pickaxe; `MiningTests.TheCaveOresGateByTheirDepth`). They have no use yet.
+
 **The barrier** (the `basalt` block, `BarrierGenerator`) seals the overworld from hell: `requiresTool` with
 `tools: {"pickaxe": 3}`, so only the iron pickaxe mines it, hardness 40, and it drops itself (no loot
 table, so a player may place it back). Worldgen lays it over `BarrierBottomY..BarrierTopY`: a gapless
@@ -4064,7 +4085,7 @@ Other invariants:
   - **Hell** (`HellGenerator`, see "Hell") owns every cell at or below `HellTopY`: its stamp, run after the barrier (`Stage.Hell`), overwrites them all whatever the overworld pipeline put there, and its `WriteBand` is open-ended downward (`int.MinValue..HellTopY`). A chunk wholly in hell (`HellGenerator.Covers`) therefore skips the neighborhood scan, the carvers and every other stamp and only runs the hell stamp, the hell trees (`HellTrees.Stamp`, also run after the hell stamp on the straddling chunk), the solid recount and the frontier scan, which is bit-identical (`StampGateTests` proves it: the ungated `stampGates: false` path runs the whole pipeline there) and about 0.26 ms a chunk warm. Chunks load to any depth (the streaming sphere has no vertical cap); overworld cave slimes never spawn in hell (`MobSpawner.TryFindCaveSpawn`). `HellEnabled = false` turns it off and leaves stone.
   - Caves fade out within ~`CaveSurfaceFadeEnd` blocks of the surface (`WormSurfaceMargin` for worms), except inside entrance zones — sparse patches where `ColumnData.EntranceWeight` lifts the fade and caves reach the sky. The entrance weight fades out before the shore band (`EntranceShoreFade`, see `OceanShoreWeight`), so a cave never breaches a beach or the sea floor into a water-filled hole.
   - Worldgen is a **pure function of world position**: each chunk generates its own blocks with no cross-chunk writes, so neighbors agree at their borders without shared state. Worm paths are cached per 64-block XZ cell in `WormCarver` exactly the way column data is cached per chunk column in `ColumnCache.Get`, and so are the four tree caches in `TreeBatches` and `TreeCanopy` (see `### Trees`): the cell batches (`TreeBatches.BatchCache`, every tree rooted in one 64x64 XZ cell grown together, shared by `Stamp` on the generation workers and the first LOD ring's canopy on the LOD builder), the solo tree shapes (`TreeBatches.ShapeCache`, which `BuildBatch` reads as the neighboring cells' obstacles), the grown canopy tops (`TreeCanopy.CanopyCache`) and the far rings' crown-proxy canopy (`TreeCanopy.ProxyCanopyCache`), the last two read by their one engine caller `LodRegion.BuildMeshData` once per *fine* column of a region; and so are the massif and lone-peak site verdicts (`TerrainPeaks.MassifSiteAt`/`PeakSiteAt`, one accepted-or-rejected `TerrainSite` per site cell) and the great-lake verdicts (`GreatLakes.SiteAt`, one `GreatLakeSite` per great-lake cell, whose factory reads the massif and lone-peak caches one way: a lake reads the peaks, the peaks never read lakes, so nothing recurses); and so are the pond verdicts (`WaterBodies.PondSiteAt`, one (accepted, surface, floor) per lake cell, whose factory reads only heights, river weights and the great-lake footprints, never a water level, so it cannot recurse either); and so are the hell trees (`HellTrees`, one grown tree or none per hell tree cell and layer, whose factory reads only hell's own pure field); and so are the sky trees (`SkyTrees`, one grown tree or none per sky tree cell, whose factory reads only the sky islands' own pure column rule); and so are the tower sites (`TowerPlacement`, one accepted `TowerSite` or none per 1536-block tower cell, whose factory reads only heights, biomes, water and the structure templates, never a ruin). All thirteen go through `GenerationalCache<TKey, TValue>` (`WorldGen/GenerationalCache.cs`): the cache is split into G generation dictionaries published as one immutable node swapped by `Interlocked.CompareExchange`, a read probes the newest first, a miss computes into the newest, and when the newest fills its `capacity / G` insert budget the node rotates and the *oldest* generation is dropped — so eviction retains the most recently used generations instead of clearing wholesale, and an entry read while it sits in the oldest generation is promoted forward (a second chance). Entries are deterministic, so a race, an eviction or a duplicate yields identical values, and the worst an evicted entry can ever cost is a recompute. Capacities and generation counts all live in `WorldGenerationConfig`, one pair per site: `ColumnCacheCapacity`/`ColumnCacheGenerations`, `CellCacheCapacity`/`CellCacheGenerations`, `TreeBatchCacheCapacity`/`TreeBatchCacheGenerations`, `TreeShapeCacheCapacity`/`TreeShapeCacheGenerations`, `TreeCanopyCacheCapacity`/`TreeCanopyCacheGenerations`, `TreeProxyCanopyCacheCapacity`/`TreeProxyCanopyCacheGenerations`, `MassifSiteCacheCapacity`/`MassifSiteCacheGenerations`, `PeakSiteCacheCapacity`/`PeakSiteCacheGenerations`, `GreatLakeSiteCacheCapacity`/`GreatLakeSiteCacheGenerations`, `PondSiteCacheCapacity`/`PondSiteCacheGenerations`, `HellTreeCacheCapacity`/`HellTreeCacheGenerations`, `SkyTreeCacheCapacity`/`SkyTreeCacheGenerations` and `TowerSiteCacheCapacity`/`TowerSiteCacheGenerations` — every site ships at 4 generations, and that count is a re-pricing lever that may only be moved against a real capture, never blind. The factory a site passes to `GetOrAdd` must be a `static`, non-capturing delegate *field* (`ColumnCache.Compute`, `WormCarver.BuildCellFor`, `TreeBatches.BuildShapeFor`, `BuildBatchFor`, `TreeCanopy.BuildCanopyFor`, `BuildProxyCanopyFor`, `TerrainPeaks.BuildMassifSiteFor`, `BuildPeakSiteFor`, `GreatLakes.BuildSiteFor`, `WaterBodies.BuildPondSiteFor`, `HellTrees.BuildFor`, `SkyTrees.BuildFor`, `TowerPlacement.BuildFor`), because the factory takes the key alone: a lambda written at the call site that captured locals would allocate a closure on every call, hits included, on the generation workers — recomputing those values from the key on a miss is the cheaper trade. **Standing rule: only values that are a pure function of the key may live in that type.** State carrying *player edits* must never be moved into it, because there eviction is data loss rather than a recompute — `LodColumnCaps` (mined-column LOD caps) and `TreeCanopy.CanopyDisturbed` (felled-canopy markers) are the two current examples, and both are tracked as their own items rather than converted. They are still plain process-global tables; `LodEditState` exports and imports them per world (with the `LodSurface` overrides) and `WorldSeed.Apply` resets them between worlds.
-  - 3D cave noise is sampled on a `CaveNoiseStride` lattice (aligned to world coordinates so adjacent chunks share boundary samples) and trilinearly interpolated per block before thresholding. Ore veins (`MalachiteGenerator`, `CoalGenerator`, `HematiteGenerator`) and gravel/sand pockets (`GravelPocketGenerator`) are sampled the same way on the `OreNoiseStride` lattice through `OreNoiseLattice` (PERF_TODO G3): a lattice cell whose 8 corners are all at or below the threshold holds none (a trilinear blend never exceeds its largest corner, so this is part of the field, not an approximation), and `HasOre`/`HasPocket` evaluate the very same field (`OreNoiseLattice.Exceeds`), so a point query equals what the chunk stamp writes, bit for bit and across chunk seams (`OreNoiseLatticeTests`). `HematiteGenerator.HasOre` applies the same world-Y ceiling (`HematiteMaxY`) as its stamp's host rule, which is what keeps that equality for an ore confined to a depth band (`ChunkTerrainFill` also skips the call for a chunk whose floor is above the ceiling, which is bit-identical).
+  - 3D cave noise is sampled on a `CaveNoiseStride` lattice (aligned to world coordinates so adjacent chunks share boundary samples) and trilinearly interpolated per block before thresholding. Ore veins (`MalachiteGenerator`, `CoalGenerator`, `HematiteGenerator`) and gravel/sand pockets (`GravelPocketGenerator`) are sampled the same way on the `OreNoiseStride` lattice through `OreNoiseLattice` (PERF_TODO G3): a lattice cell whose 8 corners are all at or below the threshold holds none (a trilinear blend never exceeds its largest corner, so this is part of the field, not an approximation), and `HasOre`/`HasPocket` evaluate the very same field (`OreNoiseLattice.Exceeds`), so a point query equals what the chunk stamp writes, bit for bit and across chunk seams (`OreNoiseLatticeTests`). `HematiteGenerator.HasOre` applies the same world-Y ceiling (`HematiteMaxY`) as its stamp's host rule, which is what keeps that equality for an ore confined to a depth band (`ChunkTerrainFill` also skips the call for a chunk whose floor is above the ceiling, which is bit-identical). A rule may shift the threshold per cell (`IOreLatticeRule.ThresholdShift`, the cave biome richness, `CaveRichness`): the stamp culls a lattice cell against the threshold plus the rule's lowest shift (`MinThresholdShift`) and tests each host cell with `max > t` and `blend > t` for its own `t = threshold + shift`, exactly what the point query tests when passed that sum, and a shift of 0 is the plain field bit for bit (`CaveOreRichnessTests`). `NoiseCaves` has nine lattice channels: the ninth (seed offset 182) is the cave sub-biomes' shape scale, sampled only in a chunk whose cave biome map holds a sub-biome and read only by sub-biome cells, whose boosts of 0 and scale of 1 elsewhere carve plain and echo cells exactly as before (`CaveShapeTests`). The cave biome map (`CaveBiomeMap`) is classified once per chunk, right after the column fill, and handed to the carvers, the ores and the palette pass.
 - **Far-terrain LOD**: full-detail chunks load to `ChunkRadius` (16 chunks = 256 blocks); a cascade of LOD rings defined in `LodRegion.Levels` extends the render distance (level 1: 2-block cells to 512, level 2: 4-block cells to 1024, level 3: 8-block cells to 2048 blocks). Regions are columns meshed at reduced resolution straight from the heightmap cache (`LodRegion.BuildMeshData`, built by `LodMeshBuilder` and `LodFaceEmitter`) (no block data; a column a server's world source supplies is read from that source's `ColumnData` instead, see "World sources"). Each level's heights are eroded (min over a widened fine-column window) and biased downward so its mesh sits strictly inside real terrain *and* strictly below the next finer level — finer geometry always buries coarser via the depth buffer, so no masking or camera-driven remeshing exists. Because those shells are stacked, only one level may actually be drawn per area — otherwise they are all visible once the camera is inside the terrain — so `LodCoverPass.UpdateBuriedFlags` marks each region whose footprint is fully covered by *loaded* finer-level regions (region grids nest exactly: one region = ratio×ratio regions of the finer level) and `TerrainPasses.RenderLod` skips those. Testing loaded regions rather than each level's radius means an unbuilt finer region can never open a hole in the horizon. The finest level (0) has no finer level to hide it, so it is additionally marked buried wherever the full-detail chunks its shell could show through are loaded *and* meshed (`LodCoverPass.IsCoveredByChunks`, using the per-column inclusive chunk-Y ranges recorded at region build in `LodRegion.ColumnCyMin/ColumnCyMax` and `Chunk.IsMeshed`, which unlike `HasMesh` is true for all-air and fully enclosed chunks too). This is needed because caves cut into the band the shell occupies and would otherwise show it from inside; presence is tested per chunk rather than by horizontal distance because the load volume is a sphere. LOD side faces use grass at the top cell, dirt above `NominalDirtDepth` and the stone tile below it, so far cliffs match near ones; a desert cell wears sand over sandstone and a sea-floor cell the sand/gravel/stone band its depth picks (`LodRegion.BuildMeshData` reads `ColumnCache.GetBiomes`). The nesting invariants (`SampleMargin(L+1) >= SampleMargin(L) + CellSize(L) - 1`, `HeightBias(L+1) >= HeightBias(L) + CellSize(L)`) must hold when adding levels, and `Camera.NearPlane`/`FarPlane` are tuned to keep those separations from z-fighting at the outermost ring. LOD draws before chunks, coarsest level first (`TerrainPasses.RenderLod`). Destroying a block would expose the buried LOD, so removals cap that column's LOD height below the removed block (`LodColumnCaps.LowerColumnBelow`) and affected regions on every level rebuild (`LodManager.MarkEditedColumn`); placements need nothing. All of this runs where the LOD is built (singleplayer and the server): a multiplayer client's far LOD is the server's, streamed as finished vertices, so its edits return before these hooks (see "Multiple players and chat"). Canopy bumps come from `TreeGenerator.TryGetCanopy(x, z, proxy, out top, out leaf)`, read once per fine column with the level's `LodLevelSpec.ProxyCanopy`: the first ring reads the grown canopy of the same cell batches the chunks stamp, and the farther rings read each species' `lod` crown proxy (`LodCrownProxy.TopOffset` over its `LodCrownProfile`), which never grows a tree. Either way a bump wears the leaf block that owns its top cell (the species' `LeavesId`, resolved generically via `BlockType.ById` in `LodRegion.BuildMeshData`, falling back to `TreeGenerator.LeavesBlock`), so a new tree species only needs its species file — never a new LOD branch. An edited canopy reads as open sky: mining or blasting a wood or leaf cell, every fell, every column `LeafDecayManager` clears or `TreeGrowthWriter` writes call `TreeGenerator.PoisonCanopy`, whose `CanopyDisturbed` markers `TryGetCanopy` and `CanopyLeafBlock` consult before either cache. LOD vertices bake a coarse sky exposure from those same column heights into `Vertex.Sun` (`LodSkyExposure`, tuned by the `LodSky*`/`LodValleyShade`/`LodCanopyShade` constants): a vertex darkens by how far the columns in front of or around it rise above it, and a canopy bump darkens toward its base, while open ground, straight walls under open sky and the water sheet keep full sun so the ring matches the near chunks.
 
 ## Saves
@@ -5175,7 +5196,8 @@ its depth under its column's top and the column's stored, dithered surface biome
   content id) and is solid, opaque and occluding; ice, sand, gravel and basalt are deliberately not used.
 
 `CaveBiomes.At(x, y, z, surfaceBiome, surfaceHeight)` (the column's `ColumnData.Biomes[i]` and `Heights[i]`) equals
-what `CaveBiomes.Stamp` writes, bit for bit across seams. The pass (`Stage.CaveBiomes`) runs after `UndergroundPools`
+what `CaveBiomes.Fill` writes into the chunk's `CaveBiomeMap`, bit for bit across seams; the map is filled once, right after
+the column fill (`Stage.CaveBiomeMap`), and read by every cave consumer below. The pass (`Stage.CaveBiomes`) runs after `UndergroundPools`
 and before `RuinsUnderground`, gated by `CaveBiomes.WriteBand` and a `StampGateTests` row, and rewrites only cells that
 are exactly `stone`, so ores, pockets, geodes, pools, lava and plants are untouched. It swaps a non-plain biome's whole
 stone volume to its base stone and takes the floor, ceiling and accent from in-chunk openness (`CaveBiomes.RoleAt`),
@@ -5183,6 +5205,17 @@ so a cave face on a chunk plane still wears the biome stone. A per-lattice-cell 
 corner ranges, exactly; only cells near a line pay their own blend. `CaveBiomeTests`, `CaveBiomeSpotTests` (prints a
 spot per biome), `LayerBandTests.CaveBiomeBandsLieAboveTheBarrierInOrder`; `visual-examples/cave-biomes.json`
 (`VOXEL_TIME=147`).
+
+**Cave shape and ores (CB-2)**, read from the same map: crystal cells open bigger cheese rooms, fungal cells wider spaghetti
+tunnels and magma-touched cells both cheese and caverns (`CaveShape`, scaled per region by `NoiseCaves`' ninth channel), and a
+worm node's radius is multiplied by its center's biome factor (`WormCarver.RadiusFactorAt`, exactly 1 above the sub band, so
+worms, which rarely reach it, mostly keep their size); plain and echo caves carve exactly as before. The four Y-band ores shift
+their thresholds per cell by biome (`CaveRichness`: malachite richer in crystal, coal in fungal and desert echo caves but leaner
+in the magma deep, hematite richer there, tin in both echoes), and three exclusive ores (`CaveOres`, seeds 183-185, its own
+`Stage.CaveOres` right after `Tin` with a `CaveOres.WriteBand` and a `StampGateTests` row) grow only in plain stone of their own
+biome below their highest y, before the palette pass, so they survive inside the magma deep's scorched hellrock. Biome borders
+step the cave size and ore richness hard, like the palette. `CaveShapeTests`, `CaveOreRichnessTests`, `CaveOreTests`,
+`LayerBandTests.EveryExclusiveCaveOreGrowsInsideItsBiomesReach`.
 
 ## Layers: hell below, sky above
 
@@ -5228,11 +5261,12 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   attack clip"); all four are saved in `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 244 of the 255 content ids are used (134 blocks, 109 items, air), 11 left; the battle tower
-  (plans/BATTLE_TOWER.md) is done, and the rest is left for `CAVE_BIOMES.md`. Seed offsets
+- **Budgets**: 247 of the 255 content ids are used (137 blocks, 109 items, air), 8 left; the battle tower
+  (plans/BATTLE_TOWER.md) is done, the cave biomes' three exclusive ores (`CB-2`) took 3, and the rest is left for
+  `CAVE_BIOMES.md`. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
-  168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes), 175 to 178 (sky landmasses) and 179 to 181
-  (cave biomes); the whole table is in
+  168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes), 175 to 178 (sky landmasses), 179 to 181
+  (cave biomes), 182 (cave shape scale) and 183 to 185 (cave ores); the whole table is in
   `plans/BIOMEGEN.md`.
 - **Visual checks** (each with `VOXEL_TIME=147`): `barrier.json`, `cave-biomes.json`, `hell.json`, `hell-flora.json`,
   `hell-mobs.json`, `layers-fog.json`, `clouds-solid.json`, `sky-islands.json`, `sky-density.json`,
@@ -5735,7 +5769,7 @@ reference and the measured costs ("Costs (BT-9)": the sky-cover mesh build, the 
 per-frame step, with their ceilings). This section is the **floor locks** (`BT-4`), the **chests** (`BT-5`), the **roof
 altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collapse** (`BT-8`) and the **dark interiors**
 (`BT-10`). The current protocol is 27 (the altar byte and the king; the collapse needs no wire change). The tower's
-content ids leave 244 of the 255 used (see "Budgets" under "Layers").
+content ids left 244 of the 255 used, before the cave ores took 3 more (see "Budgets" under "Layers").
 - **Dark interiors (BT-10)**: the floors get no sun. The three palette bricks carry `coversSky`, so a mesh build over a
   tower chunk starts every sun seed above the slab over it ("Sky cover (BT-10)" under "Chunk meshing"); a floor is lit only
   by its template lanterns and the torches a player brings, identically in singleplayer, on a server and on a client. The

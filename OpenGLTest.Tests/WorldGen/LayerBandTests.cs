@@ -1,3 +1,4 @@
+using VoxelEngine.WorldGen.Caves;
 using Xunit;
 
 namespace VoxelEngine.Tests.WorldGen;
@@ -8,7 +9,8 @@ namespace VoxelEngine.Tests.WorldGen;
 /// solid cloud slab clears the terrain's relief ceiling and the drawn cloud layer; the sky-island
 /// cloud sea lies between the slab and the islands above it; every hell layer is more than its
 /// slab, so it holds a pocket; and the cave biome bands (plans/CAVE_BIOMES.md) stack in order above
-/// the barrier and under the sea, their wavy edges never crossing.
+/// the barrier and under the sea, their wavy edges never crossing, each exclusive cave ore growing
+/// only inside the reach of its own biome.
 /// </summary>
 public sealed class LayerBandTests
 {
@@ -62,5 +64,23 @@ public sealed class LayerBandTests
         Assert.True(V(WorldGenerationConfig.CaveEchoCoverBlocks) >= 0f);
         Assert.True(V(WorldGenerationConfig.CaveEchoCoverJitterBlocks) >= 0f);
         Assert.True(V(WorldGenerationConfig.CaveFungalMaxValue) <= V(WorldGenerationConfig.CaveCrystalMinValue));
+    }
+
+    [Fact]
+    public void EveryExclusiveCaveOreGrowsInsideItsBiomesReach()
+    {
+        TestContent.EnsureLoaded();
+        (CaveBiome Biome, int HighestReach)[] reaches =
+        [
+            (CaveBiome.Crystal, CaveBiomes.SubBandTopY),
+            (CaveBiome.Fungal, CaveBiomes.SubBandTopY),
+            (CaveBiome.MagmaDeep, WorldGenerationConfig.CaveDeepTopY + WorldGenerationConfig.CaveDeepDriftBlocks),
+        ];
+        foreach (var (biome, highestReach) in reaches)
+        {
+            Assert.NotEqual(0, CaveOres.OreOf(biome));
+            Assert.True(V(CaveOres.MaxYOf(biome)) > V(WorldGenerationConfig.BarrierTopY), biome.ToString());
+            Assert.True(V(CaveOres.MaxYOf(biome)) <= V(highestReach), biome.ToString());
+        }
     }
 }

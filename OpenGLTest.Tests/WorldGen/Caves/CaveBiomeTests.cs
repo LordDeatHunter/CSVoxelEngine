@@ -112,6 +112,58 @@ public sealed class CaveBiomeTests
         Assert.True(changed > 0);
     }
 
+    [Fact]
+    public void TheMapMatchesThePointQueryAcrossEverySeam()
+    {
+        var (fx, fz) = FrozenColumn.Value;
+        var (dx, dz) = DesertColumn.Value;
+        var blocks = new (int Cx, int Cz, int Cy)[]
+        {
+            (fx, fz, EchoChunkY(fx, fz)),
+            (fx, fz, EchoChunkY(fx, fz) + 3),
+            (dx, dz, EchoChunkY(dx, dz)),
+            (dx, dz, -14),
+            (fx, fz, -17),
+            (-2, -4, -14),
+            (-2, -4, -17),
+            (-2, -4, 2),
+            (5, 7, (WorldGenerationConfig.BarrierTopY >> Chunk.SizeShift) + 1),
+        };
+
+        var map = new CaveBiomeMap();
+        int filled = 0, empty = 0;
+        foreach (var (bcx, bcz, bcy) in blocks)
+        for (var cx = bcx - 1; cx <= bcx; cx++)
+        for (var cz = bcz - 1; cz <= bcz; cz++)
+        for (var cy = bcy - 1; cy <= bcy; cy++)
+        {
+            var column = ColumnCache.Get(cx, cz);
+            int x0 = cx * Chunk.Size, y0 = cy * Chunk.Size, z0 = cz * Chunk.Size;
+            var any = CaveBiomes.Fill(map, column, x0, y0, z0);
+            var anyExpected = false;
+            for (var x = 0; x < Chunk.Size; x++)
+            for (var y = 0; y < Chunk.Size; y++)
+            for (var z = 0; z < Chunk.Size; z++)
+            {
+                var i = (x << Chunk.SizeShift) | z;
+                var expected = CaveBiomes.At(x0 + x, y0 + y, z0 + z, column.Biomes[i], column.Heights[i]);
+                anyExpected |= expected != CaveBiome.Plain;
+                if (!any) continue;
+
+                var actual = (CaveBiome)map.Cells[Chunk.Idx(x, y, z)];
+                if (actual != expected)
+                    Assert.Fail($"the map and the point query disagree at ({x0 + x}, {y0 + y}, {z0 + z}): {actual} vs {expected}");
+                Assert.True(map.Has(actual));
+            }
+
+            Assert.True(any == anyExpected, $"Fill reported {any} for chunk ({cx}, {cy}, {cz}), the point query {anyExpected}");
+            if (any) filled++;
+            else empty++;
+        }
+
+        Assert.True(filled > 0 && empty > 0, "the sample never held both a plain and a non-plain chunk");
+    }
+
     /// <summary>All stone, about a quarter opened to air and a few other blocks, by a hash of the world cell.</summary>
     private static void FillSynthetic(byte[] blocks, byte stone, byte[] others, int x0, int y0, int z0)
     {

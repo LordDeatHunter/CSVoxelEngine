@@ -1,0 +1,9 @@
+{
+  "name": "Amethyst Ore",
+  "model": { "parent": "block/cube_all", "textures": { "all": "amethyst_ore" } },
+  "material": { "metallic": 0.4, "roughness": 0.3, "normalStrength": 1.0 },
+  "sfx": "hit_rock",
+  "hardness": 12,
+  "requiresTool": true,
+  "tools": { "pickaxe": 2 }
+}

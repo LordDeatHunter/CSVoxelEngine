@@ -84,6 +84,12 @@ public sealed class StampGateTests
             (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => UndergroundPoolGenerator.Stamp(b, c, x, y, z), false),
         new("CaveBiomes", Stage.CaveBiomes, (c, _) => CaveBiomes.WriteBand(c),
             (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) => CaveBiomes.Stamp(b, c, x, y, z), true),
+        new("CaveOres", Stage.CaveOres, (_, _) => CaveOres.WriteBand(),
+            (byte[] b, ref byte[]? _, ColumnData c, int x, int y, int z) =>
+            {
+                var map = new CaveBiomeMap();
+                if (CaveBiomes.Fill(map, c, x, y, z)) CaveOres.Stamp(b, map, x, y, z);
+            }, true),
         new("IceSpikes", Stage.IceSpikes, (c, _) => IceSpikeGenerator.WriteBand(c),
             (byte[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => IceSpikeGenerator.Stamp(b, x, y, z), false),
         new("SnowGround", Stage.Snow, (c, _) => SnowGenerator.GroundWriteBand(c),
