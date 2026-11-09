@@ -507,7 +507,8 @@ public class World
                 _fluidManager, _leafDecay, _lodManager, _leaves, _falling, _toppling, clientMode, serverMode);
             // Built before the persistence, whose constructor restores the stations (towers included)
             _towers = new TowerManager(clientMode ? null : new TowerBlockWriter(_chunkManager, _fluidManager, _leafDecay,
-                _falling, _lodManager, Edits.NotifyLodEdit, Edits.PopUnsupportedAt));
+                _falling, _lodManager, Edits.NotifyLodEdit, Edits.PopUnsupportedAt,
+                spillChest: (x, y, z, profile, state) => _chests.NotifyBlockRemoved(x, y, z, profile, state, _dropManager)));
             LeftClick =new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
             Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
                 _lodManager, _debris, clientMode, serverMode);

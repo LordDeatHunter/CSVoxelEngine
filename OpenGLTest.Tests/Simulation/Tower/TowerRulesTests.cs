@@ -79,4 +79,12 @@ public sealed class TowerRulesTests
         Assert.False(TowerRules.Strayed(center + new Vector3(0f, 500f, leash * 0.99f), cx, cz, leash));
         Assert.True(TowerRules.Strayed(center + new Vector3(leash * 1.01f, 0f, 0f), cx, cz, leash));
     }
+
+    [Fact]
+    public void ACollapseIsDueOnlyForADefeatedTowerThatHasNotFinished()
+    {
+        foreach (var altar in System.Enum.GetValues<TowerAltarState>())
+        foreach (var done in new[] { false, true })
+            Assert.Equal(altar == TowerAltarState.Defeated && !done, TowerRules.CollapseDue(altar, done));
+    }
 }

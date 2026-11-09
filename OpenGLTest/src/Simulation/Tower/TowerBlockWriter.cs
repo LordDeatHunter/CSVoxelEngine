@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Lod;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
@@ -9,9 +10,9 @@ using VoxelEngine.WorldGen;
 namespace VoxelEngine.Simulation.Tower;
 
 /// <summary>
-/// Clears the battle tower's worldgen cells that no gameplay path may remove: a floor's door once the floor is
-/// cleared and a spent skeleton pile (BT-4), and later the tower's collapse (BT-8). It is the one sanctioned
-/// writer past the <c>unbreakable</c> flag, over <see cref="Chunk.CollapseWriteAt"/>. Main thread only, and
+/// Writes over the battle tower's worldgen cells that no gameplay path may remove: it clears a floor's door once the
+/// floor is cleared and a spent skeleton pile (BT-4), and replaces a conquered tower's cells with their ruin (BT-8's
+/// collapse, <see cref="TryReplace"/>). It is the one sanctioned writer past the <c>unbreakable</c> flag, over <see cref="Chunk.CollapseWriteAt"/>. Main thread only, and
 /// built only where the world is authoritative (singleplayer and the server), never on a client, whose door and
 /// pile cells arrive through the server's journal.
 /// <para>
@@ -20,7 +21,7 @@ namespace VoxelEngine.Simulation.Tower;
 /// <list type="bullet">
 /// <item>raw writer: <see cref="Chunk.CollapseWriteAt"/> (through <see cref="Chunk.SetBlockRaw"/>), which marks
 /// the chunk for the save and, on a server, journals the cell to the clients (<see cref="Chunk.CellWritten"/>);
-/// the state byte is zeroed;</item>
+/// the state byte is the given one (zero for a clear);</item>
 /// <item>player-placed: <see cref="ChunkManager.UnmarkPlayerPlaced"/>;</item>
 /// <item>remesh: <see cref="ChunkManager.MarkAreaDirty"/> over the light radius, asynchronous, never a loop of
 /// immediate remeshes;</item>
@@ -31,8 +32,9 @@ namespace VoxelEngine.Simulation.Tower;
 /// <item>needs-support: the <c>popUnsupported</c> hook (<c>BlockEditor.PopUnsupportedAt</c>), which pops what
 /// the emptied cell held up;</item>
 /// <item>trees: <see cref="TreeGenerator.PoisonCanopy"/> and <see cref="LodManager.MarkEditedColumn"/> when the
-/// cleared block was tree wood or leaves;</item>
-/// <item>loot: none - a door opens and a spent pile crumbles, neither is mined;</item>
+/// replaced block was tree wood or leaves;</item>
+/// <item>loot: none - a door opens and a spent pile crumbles, neither is mined - except that a replaced chest spills what it
+/// holds through the <c>spillChest</c> hook (<c>ChestManager.NotifyBlockRemoved</c>), so the collapse loses nothing;</item>
 /// <item>multiplayer: no player predicted the write, so no <c>World.BlockEdited</c>;</item>
 /// <item>unloaded chunks: every read goes through <see cref="ChunkManager.TryGetCell"/>, and an unloaded cell
 /// is reported, never written.</item>
@@ -42,7 +44,7 @@ namespace VoxelEngine.Simulation.Tower;
 /// </summary>
 public sealed class TowerBlockWriter(ChunkManager chunks, FluidManager fluids, LeafDecayManager leafDecay,
     FallingBlockManager falling, LodManager lod, Action<int, int, int> notifyLodEdit,
-    Action<int, int, int>? popUnsupported)
+    Action<int, int, int>? popUnsupported, Action<int, int, int, ChestProfile, byte>? spillChest = null)
 {
     private int _writesThisFrame;
 
@@ -51,15 +53,22 @@ public sealed class TowerBlockWriter(ChunkManager chunks, FluidManager fluids, L
 
     /// <summary>
     /// Clears the cell (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>) to air when it still holds
-    /// <paramref name="expected"/>, running every edit hook. Returns <see cref="TowerWriteResult.Capped"/> once the
-    /// frame's budget is spent, <see cref="TowerWriteResult.Unloaded"/> for a cell in an unloaded chunk and
-    /// <see cref="TowerWriteResult.Gone"/> for a loaded cell holding anything else, writing nothing in each case.
+    /// <paramref name="expected"/>: <see cref="TryReplace"/> with air.
     /// </summary>
-    public TowerWriteResult TryClear(int x, int y, int z, byte expected)
+    public TowerWriteResult TryClear(int x, int y, int z, byte expected) => TryReplace(x, y, z, expected, BlockType.Air, 0);
+
+    /// <summary>
+    /// Replaces the cell (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>) with <paramref name="block"/> and
+    /// <paramref name="state"/> when it still holds <paramref name="expected"/>, running every edit hook (and spilling a replaced
+    /// chest). Returns <see cref="TowerWriteResult.Capped"/> once the frame's budget is spent,
+    /// <see cref="TowerWriteResult.Unloaded"/> for a cell in an unloaded chunk and <see cref="TowerWriteResult.Gone"/> for a
+    /// loaded cell holding anything else, writing nothing in each case.
+    /// </summary>
+    public TowerWriteResult TryReplace(int x, int y, int z, byte expected, byte block, byte state)
     {
         if (_writesThisFrame >= MobConfig.TowerMaxBlockWritesPerFrame)
             return TowerWriteResult.Capped;
-        if (!chunks.TryGetCell(x, y, z, out var id, out _))
+        if (!chunks.TryGetCell(x, y, z, out var id, out var oldState))
             return TowerWriteResult.Unloaded;
         var chunk = chunks.ChunkAt(x, y, z);
         if (chunk == null)
@@ -68,7 +77,7 @@ public sealed class TowerBlockWriter(ChunkManager chunks, FluidManager fluids, L
             return TowerWriteResult.Gone;
 
         var cell = new Vector3(x, y, z);
-        chunk.CollapseWriteAt(cell, BlockType.Air, 0);
+        chunk.CollapseWriteAt(cell, block, state);
         chunks.UnmarkPlayerPlaced(x, y, z);
         chunks.MarkAreaDirty(cell, cell + Vector3.One, LightingConfig.LightPropagationRadius);
         fluids.ScheduleAround(x, y, z);
@@ -81,6 +90,8 @@ public sealed class TowerBlockWriter(ChunkManager chunks, FluidManager fluids, L
             TreeGenerator.PoisonCanopy(x, z, TreeGenerator.SingleEditPoisonRadius);
             lod.MarkEditedColumn(x, z);
         }
+        if (BlockType.ById[expected]?.Chest is { } profile)
+            spillChest?.Invoke(x, y, z, profile, oldState);
         _writesThisFrame++;
         return TowerWriteResult.Written;
     }

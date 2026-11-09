@@ -6,6 +6,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Networking;
+using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.WorldGen.Structures;
 
@@ -21,8 +22,12 @@ namespace VoxelEngine.Simulation.Tower;
 /// living, owed or pending a restore). A capped, non-blocking sweep then clears depleted piles and open doors through
 /// <see cref="TowerBlockWriter"/>: a cell in an unloaded chunk waits without holding back the others. Each record also
 /// carries its roof altar's <see cref="TowerAltarState"/>: <see cref="BeginRitual"/> starts the ritual once every door
-/// is open, and <see cref="MarkDefeated"/> records the Skeleton King's death (<see cref="BossDefeated"/>). A manager built
-/// without a writer is a client's display-only mirror and never ticks. Main thread only.
+/// is open, and <see cref="MarkDefeated"/> records the Skeleton King's death (<see cref="BossDefeated"/>). A defeated tower
+/// then collapses into its ruin (BT-8): once <see cref="TowerRules.CollapseDue"/> holds, its <see cref="TowerCollapse"/>
+/// rewrites it top-down after <see cref="MobConfig.TowerCollapseDelaySeconds"/>, sharing the writer's frame cap with the sweep
+/// under <see cref="MobConfig.TowerCollapseScanCellsPerFrame"/>; unloaded cells wait per chunk, and the progress is saved. A
+/// manager built without a writer is a client's display-only mirror and never ticks (the ruin reaches a client through the
+/// cell journal, like the doors). Main thread only.
 /// </summary>
 public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerSite?>? findSite = null)
 {
@@ -33,6 +38,9 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
     // Bound skeletons owed back to their floors, gathered once a frame
     private readonly List<TowerFloorRef> _owedScratch = [];
     private float _scanTimer;
+    // The frame's targets, whose bodies a collapse never fills with rubble
+    private IReadOnlyList<IMobTarget> _targets = [];
+    private Func<int, int, int, bool>? _bodyAt;
 
     /// <summary>The largest footprint radius a station snapshot may carry.</summary>
     private const int MaxNetRadius = 64;
@@ -81,7 +89,8 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
     /// One frame of the locks: materializes the towers <paramref name="targets"/> stand in, recounts and leashes the
     /// bound skeletons, credits the owed ones (<paramref name="takeDiscarded"/> hands over timed-out restores), runs
     /// the awake floors' piles, judges every door (<paramref name="pending"/> counts a floor's skeletons still waiting
-    /// to be restored) and sweeps. Does nothing on a client's mirror or without skeletons.
+    /// to be restored), sweeps and runs the defeated towers' collapses. Does nothing on a client's mirror or without
+    /// skeletons.
     /// </summary>
     public void Update(float dt, ChunkManager chunks, SkeletonManager? skeletons, IReadOnlyList<IMobTarget> targets,
         Func<TowerFloorRef, int>? pending, Action<List<TowerFloorRef>>? takeDiscarded)
@@ -93,6 +102,9 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         CreditOwed(skeletons, takeDiscarded);
         JudgeFloors(dt, chunks, skeletons, targets, pending);
         Sweep(writer);
+        _targets = targets;
+        _bodyAt ??= BodyAt;
+        Collapse(dt, chunks, writer);
     }
 
     /// <summary>
@@ -122,7 +134,8 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
     }
 
     /// <summary>Raised once when a tower's Skeleton King is killed (its altar turns
-    /// <see cref="TowerAltarState.Defeated"/>): the hook the tower's collapse listens to.</summary>
+    /// <see cref="TowerAltarState.Defeated"/>). A public hook only: the collapse polls <see cref="TowerRules.CollapseDue"/>
+    /// each frame instead, so a defeat restored from a save takes the same path as a live one.</summary>
     public event Action<TowerRecord>? BossDefeated;
 
     /// <summary>
@@ -275,6 +288,7 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
                 Cell = [record.Key.CellX, record.Key.CellZ],
                 Floors = floors,
                 Altar = record.AltarState == TowerAltarState.Dormant ? null : record.AltarState.ToString(),
+                Collapse = record.Collapse?.Capture(),
             });
         }
         return towers;
@@ -285,7 +299,8 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
     /// holds no tower, or whose floors, piles, waves or owed count no longer fit that tower, is skipped. An open door is
     /// re-swept (its cells already cleared read as gone) and a depleted pile's block is cleared by the sweep. Returns how
     /// many entries were skipped. The altar's state comes back by name (absent or unknown reads dormant), and a ritual
-    /// under way restarts its timer.
+    /// under way restarts its timer. A defeated tower's saved collapse resumes at once (a finished one stays finished); a
+    /// collapse entry on a tower that is not defeated is ignored, and a defeated tower with none starts a fresh collapse.
     /// </summary>
     public int Restore(List<StationSaveData.TowerData>? towers)
     {
@@ -310,6 +325,11 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
                 ? altar
                 : TowerAltarState.Dormant;
             if (record.AltarState == TowerAltarState.Ritual) record.RitualLeft = MobConfig.SkeletonKingRitualSeconds;
+            if (data.Collapse != null && record.AltarState == TowerAltarState.Defeated)
+            {
+                record.Collapse = TowerCollapse.ForSite(site, 0f);
+                record.Collapse.Apply(data.Collapse);
+            }
             _records[record.Key] = record;
         }
         return skipped;
@@ -472,6 +492,34 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
                 floor.DoorRemaining.AddRange(floor.DoorCells);
             }
         }
+    }
+
+    // Runs every defeated tower's collapse under one scan budget and the writer's shared frame cap
+    private void Collapse(float dt, ChunkManager chunks, TowerBlockWriter blocks)
+    {
+        var scan = MobConfig.TowerCollapseScanCellsPerFrame;
+        foreach (var record in _records.Values)
+        {
+            if (record.Site is not { } site) continue;
+            if (!TowerRules.CollapseDue(record.AltarState, record.Collapse?.Done == true)) continue;
+            if (record.Collapse == null)
+            {
+                record.Collapse = TowerCollapse.ForSite(site, MobConfig.TowerCollapseDelaySeconds);
+                Log.WriteLine($"Tower at ({record.CenterX}, {record.CenterZ}) begins to collapse.");
+            }
+            var going = record.Collapse.Step(dt, blocks, chunks, ref scan, _bodyAt);
+            if (record.Collapse.Done) Log.WriteLine($"Tower at ({record.CenterX}, {record.CenterZ}) has collapsed into a ruin.");
+            if (!going || scan <= 0) return;
+        }
+    }
+
+    // Whether any target's body overlaps the cell (x, y, z)
+    private bool BodyAt(int x, int y, int z)
+    {
+        var cell = new Vector3(x, y, z);
+        for (var i = 0; i < _targets.Count; i++)
+            if (PlayerContext.BodyOverlapsCell(_targets[i].Eye, cell)) return true;
+        return false;
     }
 
     // Clears depleted piles and open doors, within the writer's frame budget; an unloaded cell waits for later

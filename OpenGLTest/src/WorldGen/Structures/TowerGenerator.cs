@@ -31,6 +31,11 @@ public static class TowerGenerator
         return Merge(site, TowerShell.RingOf(site, dx, dz, step), step, x, y, z);
     }
 
+    /// <summary>The cell <paramref name="s"/> writes at world (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>)
+    /// for a caller that already knows the column's <paramref name="ring"/> and stair <paramref name="step"/> (the ruin rule),
+    /// so the angle is computed once per cell: -1 or <c>block | state &lt;&lt; 8</c>.</summary>
+    internal static int CellIn(TowerSite s, TowerRing ring, int step, int x, int y, int z) => Merge(s, ring, step, x, y, z);
+
     // The shell cell, unless a floor's or the roof's dressing template writes there
     private static int Merge(TowerSite s, TowerRing ring, int step, int x, int y, int z)
     {

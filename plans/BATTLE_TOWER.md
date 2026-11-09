@@ -4,12 +4,12 @@
 
 ## Status
 
-BT-1 to BT-7 done; BT-8 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
+BT-1 to BT-8 done; BT-9 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
 the tower generator (see "Tower generator (BT-2)" under Reference), BT-3 the undead skeleton with its melee rake, bow
 and arrows, floor-tier difficulty and forced-spawn-only manager (see "Skeleton (BT-3)" and AGENTS.md "Skeleton"), BT-4
 the skeleton piles, the floor doors and `TowerManager` (see "Locks (BT-4)" and AGENTS.md "Battle tower"), BT-5 the
 tower chest and per-floor loot (see "Chests (BT-5)"), BT-6 the roof altar and the Skeleton King boss (see "Skeleton King
-(BT-6)").
+(BT-6)"), BT-8 the staged collapse of a defeated tower into a ruin (see "Collapse (BT-8)").
 Tracks the battle tower: a rare, huge (radius ~20+) cylindrical landmark of 4-8 floors with skeleton piles, chests, floor locks, a roof
 altar that summons the Skeleton King, unique boss loot and a collapse into a ruin. One phase per prompt; each phase
 leaves the game building and the tests green. **Content ids are tight: 11 left, see Reference.**
@@ -21,14 +21,6 @@ Nothing.
 
 ## Open
 
-- [ ] **`BT-8` · Collapse into a ruin** — P2, L.
-  After the boss dies, a staged collapse (top floors first) replaces the tower with rubble and ruin blocks placed
-  around where it stood, through a capped-per-frame writer like `StatusEffectBlockWriter` that calls every edit-path
-  hook (journal, LOD, fluids, leaf decay, gravity). Written chunks become `ModifiedSinceSave`, so the ruin persists;
-  hold the collapse until every footprint chunk is loaded, and record the tower as conquered in the world save so a
-  chunk that loads late still gets the ruin. The writer is the one thing allowed past `unbreakable`: reuse BT-4's
-  `TowerBlockWriter`, which writes through `Chunk.CollapseWriteAt` and already runs every edit-path hook (it only clears
-  to air today; a ruin needs a target block too).
 - [ ] **`BT-9` · Verify and document** — P2, S.
   Extend `visual-examples/battle-tower.json` (`VOXEL_TIME=147`, from BT-2; BT-4 added piles, a gate and a cleared floor)
   with the boss (BT-6's own `skeleton-king.json` and loopback `GameServerTests` already cover it), a perf pass, then
@@ -44,10 +36,9 @@ Nothing.
 
 - **Content id budget (budget constraint, after BT-3, which used 2: the `arrow` and `bone` items, BT-7's bone pair,
   which used 2: `bone_breaker_blade`, `bone_charm`, BT-4, which used 2: `skeleton_pile`, `tower_door`, BT-5, which
-  used 1: `tower_chest`, and BT-6, which used 1: `tower_altar`): 244 of 255 used (134 blocks, 109 items, air), 11
-  free.** Rough needs of the later phases: BT-7 one more unique plus a boss material (~2-3 items; the bone fragments
-  reuse `bone`); BT-8 rubble or ruin block(s) (1-2). About 6-8 left to spend: the tower fits, but leaves little for `CAVE_BIOMES.md`.
-  Reuse existing ruin blocks for the rubble.
+  used 1: `tower_chest`, BT-6, which used 1: `tower_altar`, and BT-8, which used 0: the rubble reuses `stone_bricks`, `cobblestone` and
+  `gravel`): 244 of 255 used (134 blocks, 109 items, air), 11 free.** No later phase plans a content id; the rest is
+  left for `CAVE_BIOMES.md`.
 - **How `unbreakable` is enforced** (BT-1): load rules (`BlockFieldRules.ValidateUnbreakable` refuses fluid, falls,
   needsSupport, replaceableByPlacement, flammable, meltsTo, the tree-wood and multiblock renderers, upperHalf and
   prime_tnt, and `BlockLinkResolver` refuses an unbreakable multiblock source) keep the block away from every raw-write
@@ -126,9 +117,9 @@ Nothing.
     is depleted and alive = living + owed + pending is 0; floor k's piles sleep until door k - 1 opens. Opening is
     permanent and saved (`stations.json` `Towers`, protocol 26 on the wire).
   - **Hooks**: BT-6 refuses the altar until every `TowerFloorState.DoorOpen` of the tower's record is set
-    (`TowerRules.AltarVerdictOf`; the client mirror carries the door bits too). BT-8 reuses
-    `TowerBlockWriter` (capped, every edit-path hook; extend it to write a target block, not only air) and can read
-    `TowerSite.PileCells(k)`/`DoorCells(k)`; a conquered tower should drop its `TowerRecord` (or stop judging it).
+    (`TowerRules.AltarVerdictOf`; the client mirror carries the door bits too). BT-8's collapse writes through
+    `TowerBlockWriter.TryReplace` (a target block and state; `TryClear` is its air case) under the same cap; a collapsed
+    tower keeps its `TowerRecord` (it carries the saved Done flag), whose cleared piles and open doors judge nothing.
   - **Default seed**: tower (2920, -1411) has floor-0 piles at feet y 11 at (2920, -1417), (2916, -1411), (2924, -1411),
     (2920, -1405) and door 0 at x 2906..2909, y 15..18, z -1426..-1423 (`visual-examples/battle-tower.json`).
   - **Tuning** (first guesses, `MobConfig` "Battle tower locks"): 4 piles a floor, 2 waves a pile of
@@ -157,8 +148,8 @@ Nothing.
     least rarity and gear count, a chest rolls its tier's table whatever its facing, determinism, open equals break,
     no state until used, the `tiers` load rules) and the chest cases of `TowerPlacementTests` (chests per floor at their
     tier, the treasure tier on the roof, chest states in the point-query-equals-stamp check).
-  - **Known gaps**: towers in chunks saved before BT-5 have no chests; an unopened chest destroyed by a blast or by BT-8's
-    collapse rolls nothing, like a ruin chest; the chest reuses the underground ruin chest's tiles (USER_TODO.md).
+  - **Known gaps**: towers in chunks saved before BT-5 have no chests; an unopened chest destroyed by a blast rolls nothing, like a ruin
+    chest (BT-8's collapse instead spills it through `ChestManager.NotifyBlockRemoved`, rolling an unopened one first); the chest reuses the underground ruin chest's tiles (USER_TODO.md).
 
 - **Skeleton King (BT-6)**, 1 content id (`tower_altar`). See AGENTS.md "Battle tower" for the whole design.
   - **Files**: `src/Entities/TowerMobs/` `SkeletonKing`, `SkeletonKingBrain`, `SkeletonKingAttack`, `SkeletonKingHome`;
@@ -181,12 +172,39 @@ Nothing.
   - **Hook for BT-7**: the king rolls the placeholder `loot/skeleton_king.json` (bones, wrought iron, bronze ingots);
     done in BT-7: its first pool rolls exactly one unique (blade, charm or crystal staff), then bones, metal and a scroll or draught (`SkeletonKingLootTests`). No new content ids; the staff-or-scroll unique reuses `crystal_staff`.
   - **Hook for BT-8**: `TowerManager.BossDefeated` (an event, raised once per tower) and `TowerRecord.BossDefeated` (true
-    from then on, saved); nothing listens yet.
+    from then on, saved); done in BT-8: `TowerManager`'s collapse polls `TowerRules.CollapseDue` over the record's altar
+    state each frame (the event stays a public hook).
   - **Tuning**: the "Skeleton King" block of `MobConfig` (all first guesses: hp 400 in the JSON, phase shares 0.66/0.33,
     slam, volley and summon numbers, minion cap 6, leash margin, reset 20 s, boss bar range 48, ritual 3.5 s).
   - **Known gaps**: the bones are not on the wire; the king is not drawn in the water mirror; a ritual's remaining time is
     not saved; tower chunks saved before BT-6 keep an air altar cell, so their altar cannot be clicked; the numbers are not
     play-tested.
+
+- **Collapse (BT-8)**, 0 content ids. See AGENTS.md "Battle tower".
+  - **Files**: `src/WorldGen/Structures/TowerRuin.cs` (`RuinAt`, `StumpTop`; salt `0x5E80`), `TowerGenerator.CellIn`;
+    `src/Simulation/Tower/TowerCollapse.cs`; `TowerBlockWriter.TryReplace` and its `spillChest` hook (wired by `World` to
+    `ChestManager.NotifyBlockRemoved`); `TowerRules.CollapseDue`; `TowerRecord.Site`/`Collapse`; `TowerManager`'s
+    `Collapse`, `Capture` and `Restore`; `StationSaveData.TowerCollapseData`; the `TowerRuin*` constants in
+    `WorldGenerationConfig` and `TowerCollapseDelaySeconds`/`TowerCollapseScanCellsPerFrame` in `MobConfig`.
+  - **Rules**: a Defeated tower whose collapse is not done collapses (polled each frame after the door/pile sweep, so a
+    restored defeat takes the live path); a new collapse waits 4 s, a restored one resumes at once. Each wall column keeps a
+    hashed stump of 2-9 blocks over the ground slab; unbreakable cells at or below it become stone bricks or cobblestone,
+    doors, piles and the altar air, everything above air except floor 0's breakable dressing (chests included), and 15 % of
+    the room's air columns get a gravel or cobblestone pile on the ground slab. The apron and breakable cells under a stump
+    stay. Layers go top-down under a 4096-cell scan budget and the writer's shared 32-write cap; an unloaded cell's chunk
+    waits and is swept when it loads; done is permanent. Rubble never fills a cell a target's body overlaps. A replaced chest
+    spills what it holds.
+  - **Saves and wire**: `stations.json` `TowerData.Collapse` (`NextY`, `Waiting` chunks, `Done`; absent = not started, a
+    Defeated tower with none starts fresh, an entry on a tower that is not Defeated is ignored). Collapsed chunks are
+    `ModifiedSinceSave`, so their saves win over worldgen. No wire change (the cell journal carries the ruin; protocol 27).
+  - **Tests**: `TowerRuinTests`, `TowerCollapseTests`, the `TryReplace`/spill cases of `TowerBlockWriterTests`,
+    `TowerRulesTests.ACollapseIsDueOnlyForADefeatedTowerThatHasNotFinished`, the collapse cases of `TowerManagerSaveTests`
+    and `TowerAltarTests.ADefeatedTowerStartsCollapsingAndAnUndefeatedOneNever`.
+  - **Known gaps**: desert and frost towers fall to stone rubble; a storeless world regenerates a ruined chunk intact after
+    unload; a crash between a chunk's save and `stations.json` saying Done can leave an intact part that is never redone; a
+    late, unmodified chunk shows the intact tower until the waiting sweep reaches it (worldgen never builds the ruin); no
+    collapse dust, sound or shake; a whole tower takes some tens of seconds at 32 writes a frame (BT-9's perf pass should
+    measure the remeshing); mobs and drops in a rubble cell are not protected like players.
 
 - **Bone shrapnel (BT-7's first two uniques)**, 2 content ids (`bone_breaker_blade`, `bone_charm`); see AGENTS.md
   "Bone shrapnel". The blade carries `shrapnel: { count: 6, damage: 3 }`; the charm grants `bone_shrapnel`

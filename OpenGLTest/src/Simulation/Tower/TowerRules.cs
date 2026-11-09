@@ -74,6 +74,10 @@ public static class TowerRules
         return AltarVerdict.Begin;
     }
 
+    /// <summary>Whether a tower whose altar is <paramref name="altar"/> should be collapsing into its ruin (BT-8): its
+    /// Skeleton King was killed and its collapse is not <paramref name="done"/> yet.</summary>
+    public static bool CollapseDue(TowerAltarState altar, bool done) => altar == TowerAltarState.Defeated && !done;
+
     /// <summary>Whether a bound skeleton at <paramref name="position"/> strayed more than <paramref name="leash"/>
     /// blocks horizontally from its tower's center column.</summary>
     public static bool Strayed(Vector3 position, int centerX, int centerZ, float leash)

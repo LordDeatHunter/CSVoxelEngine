@@ -15,7 +15,7 @@ namespace VoxelEngine.Simulation.Tower;
 public sealed class TowerRecord
 {
     private TowerRecord((int CellX, int CellZ) key, int centerX, int centerZ, int outerRadius, TowerFloorState[] floors,
-        bool hasSite)
+        bool hasSite, TowerSite? site)
     {
         if (floors.Length == 0) throw new ArgumentException("A tower needs at least one floor.", nameof(floors));
         Key = key;
@@ -24,6 +24,7 @@ public sealed class TowerRecord
         OuterRadius = outerRadius;
         Floors = floors;
         HasSite = hasSite;
+        Site = site;
     }
 
     /// <summary>The tower's placement cell.</summary>
@@ -44,6 +45,14 @@ public sealed class TowerRecord
     /// <summary>Whether the record was built from a world site, so it is saved (a test record or a mirror is not).</summary>
     public bool HasSite { get; }
 
+    /// <summary>The world site the record was built from (<see cref="FromSite"/>), or null for a <see cref="Build"/>
+    /// record or a client's <see cref="Mirror"/>; only a record with a site can collapse.</summary>
+    public TowerSite? Site { get; }
+
+    /// <summary>The staged collapse of the defeated tower into its ruin (BT-8): null until it starts, authoritative side
+    /// only.</summary>
+    public TowerCollapse? Collapse { get; internal set; }
+
     /// <summary>Where the roof altar's one fight stands.</summary>
     public TowerAltarState AltarState { get; set; }
 
@@ -51,7 +60,8 @@ public sealed class TowerRecord
     /// (authoritative side only; never saved or sent).</summary>
     public float RitualLeft { get; set; }
 
-    /// <summary>Whether this tower's Skeleton King was killed (the hook the tower's collapse reads).</summary>
+    /// <summary>Whether this tower's Skeleton King was killed: what <see cref="TowerRules.CollapseDue"/> reads to start
+    /// the tower's <see cref="Collapse"/>.</summary>
     public bool BossDefeated => AltarState == TowerAltarState.Defeated;
 
     /// <summary>The roof altar's cell: the center column right above the roof slab (the top floor's top), the same cell
@@ -87,7 +97,11 @@ public sealed class TowerRecord
     /// </summary>
     public static TowerRecord Build((int CellX, int CellZ) key, int centerX, int centerZ, int outerRadius,
         IReadOnlyList<(int Bottom, int Top, IReadOnlyList<(int X, int Y, int Z)> Piles, IReadOnlyList<(int X, int Y, int Z)> Doors)> floors,
-        bool hasSite)
+        bool hasSite) => Build(key, centerX, centerZ, outerRadius, floors, hasSite, null);
+
+    private static TowerRecord Build((int CellX, int CellZ) key, int centerX, int centerZ, int outerRadius,
+        IReadOnlyList<(int Bottom, int Top, IReadOnlyList<(int X, int Y, int Z)> Piles, IReadOnlyList<(int X, int Y, int Z)> Doors)> floors,
+        bool hasSite, TowerSite? site)
     {
         var states = new TowerFloorState[floors.Count];
         for (var k = 0; k < floors.Count; k++)
@@ -99,7 +113,7 @@ public sealed class TowerRecord
             states[k] = new TowerFloorState(k, floor.Bottom, floor.Top, new TowerFloorRef(key.CellX, key.CellZ, k), piles,
                 floor.Doors);
         }
-        return new TowerRecord(key, centerX, centerZ, outerRadius, states, hasSite);
+        return new TowerRecord(key, centerX, centerZ, outerRadius, states, hasSite, site);
     }
 
     /// <summary>The record of a world site: each floor's band from its slab to the next, its piles and its door. The
@@ -109,7 +123,7 @@ public sealed class TowerRecord
         var floors = new (int, int, IReadOnlyList<(int X, int Y, int Z)>, IReadOnlyList<(int X, int Y, int Z)>)[site.Floors];
         for (var k = 0; k < site.Floors; k++)
             floors[k] = (site.FloorY(k), site.FloorY(k + 1), site.PileCells(k), site.DoorCells(k));
-        return Build((site.CellX, site.CellZ), site.CenterX, site.CenterZ, site.OuterRadius, floors, hasSite: true);
+        return Build((site.CellX, site.CellZ), site.CenterX, site.CenterZ, site.OuterRadius, floors, hasSite: true, site);
     }
 
     /// <summary>
@@ -130,6 +144,6 @@ public sealed class TowerRecord
                 DoorOpen = floor.DoorOpen,
             };
         }
-        return new TowerRecord(key, centerX, centerZ, outerRadius, states, hasSite: false) { AltarState = altarState };
+        return new TowerRecord(key, centerX, centerZ, outerRadius, states, hasSite: false, null) { AltarState = altarState };
     }
 }

@@ -431,6 +431,12 @@ public static class MobConfig
     public const float TowerScanSeconds = 0.5f;
     /// <summary>A bound skeleton farther than this from its tower's center is released and owed back to its floor.</summary>
     public const float TowerSkeletonLeashBlocks = 48f;
+    /// <summary>Seconds a defeated tower waits before it starts to collapse (BT-8), so the Skeleton King's death and loot
+    /// play first (a first guess).</summary>
+    public const float TowerCollapseDelaySeconds = 4f;
+    /// <summary>The most tower cells the collapse checks against its ruin rule in one frame, across every collapsing tower;
+    /// the writes themselves share <see cref="TowerMaxBlockWritesPerFrame"/> with the door and pile sweep.</summary>
+    public const int TowerCollapseScanCellsPerFrame = 4096;
 
     // --- Skeleton King (SkeletonKingManager, SkeletonKing, TowerManager's altar) ---
     /// <summary>Seconds the altar's ritual runs before the Skeleton King rises (a first guess).</summary>

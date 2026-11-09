@@ -992,6 +992,22 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>How deep the brick foundation reaches under the ground slab.</summary>
     public const int TowerFoundationDepth = 6;
 
+    /// <summary>The lowest a conquered tower's wall stump stands above its ground slab, in blocks (BT-8, <c>TowerRuin</c>).</summary>
+    public const int TowerRuinStumpMinBlocks = 2;
+
+    /// <summary>The highest a conquered tower's wall stump stands above its ground slab, in blocks (BT-8); kept under one
+    /// floor's height so no stump reaches the first floor's slab.</summary>
+    public const int TowerRuinStumpMaxBlocks = 9;
+
+    /// <summary>The share of a ruined tower's ground-floor air columns that get a rubble pile on the ground slab (BT-8).</summary>
+    public const float TowerRuinRubbleChance = 0.15f;
+
+    /// <summary>The share of the rubble piles that are gravel rather than cobblestone (BT-8).</summary>
+    public const float TowerRuinGravelShare = 0.4f;
+
+    /// <summary>The share of a ruined tower's brick cells that crumble to cobblestone rather than stone bricks (BT-8).</summary>
+    public const float TowerRuinCobbleShare = 0.35f;
+
     /// <summary>The largest ground height step from the center a tower site accepts across its disc.</summary>
     public const int TowerMaxStep = 4;
 

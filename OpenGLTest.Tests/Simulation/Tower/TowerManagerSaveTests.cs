@@ -154,4 +154,51 @@ public sealed class TowerManagerSaveTests
         Assert.Equal(bad.Count, towers.Restore(RoundTrip([.. bad, valid])));
         Assert.NotNull(towers.RecordAt(site.CenterX, site.CenterZ));
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ACollapseComesBackFromStationsJson(bool done)
+    {
+        var site = Nearest();
+        var saved = new TowerManager(null);
+        var record = saved.Track(site);
+        record.AltarState = TowerAltarState.Defeated;
+        var waiting = new[] { VoxelCoords.WorldToChunk(site.CenterX), VoxelCoords.WorldToChunk(site.GroundY),
+            VoxelCoords.WorldToChunk(site.CenterZ) };
+        record.Collapse = TowerCollapse.ForSite(site, 0f);
+        record.Collapse.Apply(new StationSaveData.TowerCollapseData
+        {
+            NextY = site.GroundY + 3,
+            Waiting = [waiting],
+            Done = done,
+        });
+
+        var restored = new TowerManager(null);
+        Assert.Equal(0, restored.Restore(RoundTrip(saved.Capture())));
+        var back = restored.RecordAt(site.CenterX, site.CenterZ)!.Collapse;
+        Assert.NotNull(back);
+        Assert.Equal(record.Collapse.Done, back!.Done);
+        Assert.Equal(record.Collapse.NextY, back.NextY);
+        Assert.Equal(record.Collapse.Waiting.OrderBy(c => c), back.Waiting.OrderBy(c => c));
+        Assert.Equal(done, back.Waiting.Count == 0);
+        // A restored collapse starts at once
+        Assert.Equal(0f, back.DelayLeft);
+    }
+
+    [Fact]
+    public void ACollapseEntryOnATowerThatIsNotDefeatedIsIgnored()
+    {
+        var site = Nearest();
+        var saved = new TowerManager(null);
+        saved.Track(site);
+        var entry = RoundTrip(saved.Capture())!.Single();
+        entry.Collapse = new StationSaveData.TowerCollapseData { NextY = site.GroundY, Done = false };
+
+        var restored = new TowerManager(null);
+        Assert.Equal(0, restored.Restore([entry]));
+        var back = restored.RecordAt(site.CenterX, site.CenterZ)!;
+        Assert.Equal(TowerAltarState.Dormant, back.AltarState);
+        Assert.Null(back.Collapse);
+    }
 }

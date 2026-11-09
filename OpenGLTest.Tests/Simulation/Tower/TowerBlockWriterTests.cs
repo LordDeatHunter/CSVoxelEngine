@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Lod;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
@@ -31,6 +32,7 @@ public sealed class TowerBlockWriterTests
         public required TowerBlockWriter Writer;
         public readonly List<(int X, int Y, int Z)> LodEdits = [];
         public readonly List<(int X, int Y, int Z)> Pops = [];
+        public readonly List<(int X, int Y, int Z, ChestProfile Profile, byte State)> Spills = [];
     }
 
     // One loaded chunk at the origin with a stone floor at y = 0, and a writer over it
@@ -51,7 +53,8 @@ public sealed class TowerBlockWriterTests
         var lod = new LodManager(null!);
         Rig? rig = null;
         var writer = new TowerBlockWriter(chunks, fluids, leafDecay, falling, lod,
-            (x, y, z) => rig!.LodEdits.Add((x, y, z)), (x, y, z) => rig!.Pops.Add((x, y, z)));
+            (x, y, z) => rig!.LodEdits.Add((x, y, z)), (x, y, z) => rig!.Pops.Add((x, y, z)),
+            (x, y, z, profile, state) => rig!.Spills.Add((x, y, z, profile, state)));
         rig = new Rig
         {
             Chunks = chunks, Chunk = chunk, Fluids = fluids, LeafDecay = leafDecay, Falling = falling, Writer = writer,
@@ -154,5 +157,89 @@ public sealed class TowerBlockWriterTests
 
         Assert.NotEmpty(rig.Falling.Falling);
         Assert.True(rig.Chunk.ModifiedSinceSave);
+    }
+
+    [Fact]
+    public void ItReplacesACellWithTheTargetBlockAndState()
+    {
+        var rig = Setup();
+        var brick = Id("tower_bricks");
+        var cobble = Id("cobblestone");
+        rig.Chunk.SetBlockRaw(5, 1, 5, brick, 0);
+        rig.Chunk.TakeSnapshot(null);
+        Assert.False(rig.Chunk.ModifiedSinceSave);
+
+        rig.Writer.BeginFrame();
+        Assert.Equal(TowerWriteResult.Written, rig.Writer.TryReplace(5, 1, 5, brick, cobble, 2));
+
+        Assert.True(rig.Chunks.TryGetCell(5, 1, 5, out var id, out var state));
+        Assert.Equal(cobble, id);
+        Assert.Equal(2, state);
+        Assert.True(rig.Chunk.ModifiedSinceSave);
+    }
+
+    [Fact]
+    public void ReplaceLeavesACellHoldingAnythingElse()
+    {
+        var rig = Setup();
+        var stone = Id("stone");
+        rig.Chunk.SetBlockRaw(5, 1, 5, stone, 0);
+
+        rig.Writer.BeginFrame();
+        Assert.Equal(TowerWriteResult.Gone, rig.Writer.TryReplace(5, 1, 5, Id("tower_bricks"), Id("cobblestone"), 0));
+        Assert.Equal(stone, rig.Chunks.GetBlockGlobal(5, 1, 5));
+        Assert.Empty(rig.LodEdits);
+    }
+
+    [Fact]
+    public void ClearsAndReplacesShareOneFrameBudget()
+    {
+        var rig = Setup();
+        var brick = Id("tower_bricks");
+        var cobble = Id("cobblestone");
+        var cells = new List<(int X, int Y, int Z)>();
+        for (var y = 1; cells.Count <= MobConfig.TowerMaxBlockWritesPerFrame; y++)
+        for (var x = 0; x < Chunk.Size && cells.Count <= MobConfig.TowerMaxBlockWritesPerFrame; x++)
+        {
+            rig.Chunk.SetBlockRaw(x, y, 8, brick, 0);
+            cells.Add((x, y, 8));
+        }
+
+        rig.Writer.BeginFrame();
+        var written = 0;
+        var last = TowerWriteResult.Written;
+        for (var i = 0; i < cells.Count; i++)
+        {
+            var (x, y, z) = cells[i];
+            last = i % 2 == 0 ? rig.Writer.TryClear(x, y, z, brick) : rig.Writer.TryReplace(x, y, z, brick, cobble, 0);
+            if (last == TowerWriteResult.Written) written++;
+        }
+        Assert.Equal(MobConfig.TowerMaxBlockWritesPerFrame, written);
+        Assert.Equal(TowerWriteResult.Capped, last);
+
+        var (lx, ly, lz) = cells[^1];
+        rig.Writer.BeginFrame();
+        Assert.Equal(TowerWriteResult.Written, rig.Writer.TryReplace(lx, ly, lz, brick, cobble, 0));
+        Assert.Equal(cobble, rig.Chunks.GetBlockGlobal(lx, ly, lz));
+    }
+
+    [Fact]
+    public void ReplacingAChestHandsItToTheSpillHook()
+    {
+        var rig = Setup();
+        var chest = Id("tower_chest");
+        var stone = Id("stone");
+        rig.Chunk.SetBlockRaw(5, 1, 5, chest, 13);
+        rig.Chunk.SetBlockRaw(6, 1, 5, stone, 0);
+
+        rig.Writer.BeginFrame();
+        Assert.Equal(TowerWriteResult.Written, rig.Writer.TryReplace(6, 1, 5, stone, BlockType.Air, 0));
+        Assert.Empty(rig.Spills);
+        Assert.Equal(TowerWriteResult.Written, rig.Writer.TryReplace(5, 1, 5, chest, BlockType.Air, 0));
+
+        var spill = Assert.Single(rig.Spills);
+        Assert.Equal((5, 1, 5), (spill.X, spill.Y, spill.Z));
+        Assert.Same(BlockType.ById[chest]!.Chest, spill.Profile);
+        Assert.Equal(13, spill.State);
     }
 }

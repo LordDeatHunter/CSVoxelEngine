@@ -2198,7 +2198,10 @@ OpenGLTest/
                                #   bound skeleton's despawn or leash release (TakeReleased) so its floor owes it
         TowerManager.cs        # the floor locks (see "Battle tower"): records materialized near a player, the recount, owed
                                #   and leash, the door judgement, the capped sweep, ClearFloor, Detail, stations.json and the wire;
-                               #   the roof altar: JudgeAltar, BeginRitual, UpdateAltars/SettleAltars, the BossDefeated event
+                               #   the roof altar: JudgeAltar, BeginRitual, UpdateAltars/SettleAltars, the BossDefeated event;
+                               #   a defeated tower's collapse (TowerRules.CollapseDue, saved with the tower)
+        TowerCollapse.cs       # the staged, capped, resumable collapse of a defeated tower into its TowerRuin: a top-down
+                               #   layer cursor under a scan budget, unloaded chunks waiting, the saved NextY/Waiting/Done
         SkeletonKingManager.cs # the Skeleton King: forced spawn only, one per tower (StatusFor), the slam shockwave, the bone
                                #   volley (MobMissiles), the summoned minions (capped), the empty-server fade, client mirrors
         KingStatus.cs          # None / Alive / Killed (health 0) / Fading (a despawn with health left): what a tower's king is
@@ -2213,9 +2216,10 @@ OpenGLTest/
         SkeletonPileManager.cs # a floor's piles: waves of TowerDifficulty.PackSize skeletons for a non-immune target in
                                #   range, then depleted; owed skeletons re-raised at any pile; never writes blocks
         TowerRules.cs          # GL-free: the pile trigger, floor awake, the door rule, spawn points round a pile, the leash,
-                               #   the altar verdict (AltarVerdictOf)
+                               #   the altar verdict (AltarVerdictOf), the collapse gate (CollapseDue)
         TowerBlockWriter.cs    # the capped writer past `unbreakable` (Chunk.CollapseWriteAt plus every edit-path hook): the
-                               #   BT-4 doors and depleted piles, BT-8's collapse; TowerWriteResult.cs is its answer
+                               #   BT-4 doors and depleted piles (TryClear), BT-8's collapse (TryReplace, which spills a replaced
+                               #   chest); TowerWriteResult.cs is its answer
         TowerReadout.cs        # the look-at status line of a pile, a sealed door or the altar, and the altar's toasts
       TopplingTree.cs          # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once by
                                #   CellBatchMesher (one mesh per chunk it spans), swung flat around the cut, then popped out as drops
@@ -2454,6 +2458,8 @@ OpenGLTest/
         TowerPalette.cs        # the biome palette swap: tower_bricks / _sandstone (desert) / _frost (frozen, taiga), the step
                                #   slab, the door, pile and chest blocks
         TowerRing.cs           # Outside / Apron / OuterWall / Corridor / InnerWall / Room
+        TowerRuin.cs           # GL-free, pure: what BT-8's collapse leaves of a tower cell (RuinAt: hashed wall stumps, brick
+                               #   rubble, floor 0's dressing kept, gravel and cobblestone piles on the ground slab; salt 0x5E80)
       Features/                # every surface feature generator (see "Biomes"); the underground ones below
         BoulderGenerator.cs    # a rare 2-4 cell stone or cobblestone blob on the forest/taiga floor
         BranchPileGenerator.cs # crossed-stick branch piles: up to 4 long thin logs sharing one air cell above the ground
@@ -2838,7 +2844,7 @@ trailing commas.
 | `fluid` | false | the block is a flowing fluid (water, lava): forces `solid`, `castsAO`, `hasItem`, `needsSupport` off, `occludes` off and `light.passes` on, and drops nothing whatever the file says |
 | `flow` | water behavior | per-fluid tuning, only legal with `fluid: true`: `tickDivisor` (ticks between updates, lava `2` = half water speed), `range` (sideways spread 1..7, lava `3`), `infinite` (adjacent sources birth new ones, lava `false`), and the `hardensTo` + `hardensTouching` pair (lava hardens to `cobblestone` on touching `block/water`) |
 | `flammable` | false | a status effect with `blocks.ignite` burns the block away to air (no loot, no fire block) when it ticks beside it (`BlockType.FlammableById`). Illegal on a fluid and on a multiblock anchor or part. The leaves and the ground plants set it; planks, logs, TNT and stations do not |
-| `unbreakable` | false | no gameplay path removes the block (`BlockType.IsUnbreakable`): mining whiffs with no crack progress (`Mining.CanMine`/`HitDamage`), creative swings but never breaks it, the server refuses its break (`BreakVerdict.Unbreakable`, before the creative shortcut), `BlockEditor.BreakBlockFor`/`RemoveBlock` return early, blasts skip it, `Chunk.RemoveBlockAt`/`ClearBlockAt` and placement (`Placement.CanOccupy`, so a falling cube's landing too) refuse it, and buckets (`FluidManager.SetCellImmediate`) and status or spell block actions (`StatusEffectBlockRule`) leave it. Only `Chunk.CollapseWriteAt`, through `TowerBlockWriter` (the battle tower's opened doors and depleted piles, and BT-8's collapse), writes over it; `Chunk.SetBlockRaw` stays raw. Refused with `fluid`, `falls`, `needsSupport`, `replaceableByPlacement`, `flammable`, `meltsTo`, the `tree_wood`/`multiblock`/`multiblock_part` renderers, `upperHalf` and `onBreak: "prime_tnt"` (`BlockFieldRules.ValidateUnbreakable`), and as a `multiblock.source`, since each would hand the cell to a raw-write path. The look-at label and outline still target it (the name in red, never mineable). `tower_bricks`, `tower_bricks_sandstone`, `tower_bricks_frost`, `tower_door`, `skeleton_pile` |
+| `unbreakable` | false | no gameplay path removes the block (`BlockType.IsUnbreakable`): mining whiffs with no crack progress (`Mining.CanMine`/`HitDamage`), creative swings but never breaks it, the server refuses its break (`BreakVerdict.Unbreakable`, before the creative shortcut), `BlockEditor.BreakBlockFor`/`RemoveBlock` return early, blasts skip it, `Chunk.RemoveBlockAt`/`ClearBlockAt` and placement (`Placement.CanOccupy`, so a falling cube's landing too) refuse it, and buckets (`FluidManager.SetCellImmediate`) and status or spell block actions (`StatusEffectBlockRule`) leave it. Only `Chunk.CollapseWriteAt`, through `TowerBlockWriter` (the battle tower's opened doors and depleted piles, and BT-8's collapse into a ruin through `TryReplace`, which also spills a replaced chest), writes over it; `Chunk.SetBlockRaw` stays raw. Refused with `fluid`, `falls`, `needsSupport`, `replaceableByPlacement`, `flammable`, `meltsTo`, the `tree_wood`/`multiblock`/`multiblock_part` renderers, `upperHalf` and `onBreak: "prime_tnt"` (`BlockFieldRules.ValidateUnbreakable`), and as a `multiblock.source`, since each would hand the cell to a raw-write path. The look-at label and outline still target it (the name in red, never mineable). `tower_bricks`, `tower_bricks_sandstone`, `tower_bricks_frost`, `tower_door`, `skeleton_pile` |
 | `freezesTo` | none | the solid block a fluid **source** freezes into under `blocks.freeze` and a spell's `freeze` impact (`BlockType.FreezesToById`; water -> `ice`, lava -> `cobblestone`). Only legal on a fluid, and the target must be a registered non-fluid block |
 | `meltsTo` | none | the fluid a block thaws into, as a source, under `blocks.thaw` (`BlockType.MeltsToById`; ice -> `water`). Only legal on a non-fluid, and the target must be a fluid other than the block itself |
 | `onBreak` | `"drop"` | `drop` (roll loot) or `prime_tnt` (no drop, spawns a `PrimedTnt`) |
@@ -4015,7 +4021,7 @@ Other invariants:
 - **Waking worldgen water**: the sea is generated as static source cells, so a cave or entrance carved into a land column beside it would leave a wall of water standing against worldgen air that nothing ever schedules. `FluidManager.WakeLoadedChunks(chunks)` — called from `World.Update` each frame, immediately before the fluid tick — fixes that by scheduling the frontier of its water against a carved cavity when it loads, so the sea pours into whatever breached it exactly like Minecraft water does when you dig into an ocean. Only cells at or below their column's natural terrain top count (`FluidWakeRules.IsCarvedFlowTarget`), so open air above the terrain — a ravine, a beach, a hillside — is never woken and generated water stays static across it. It has two halves: the **interior**, collected on the generation worker at the end of `ChunkTerrainFill.GenerateBlockData` into `Chunk.FluidFrontier` through `FluidWakeRules.IsWakeTarget` (local block indices of every fluid cell with a `FluidWakeRules.IsCarvedFlowTarget` neighbor in -X/+X/-Z/+Z/-Y — never +Y, since water does not flow upward and every sea-surface cell has air above it; only its own `_blocks` are read, so worldgen stays a pure per-chunk function), and the **borders**, which need both chunks loaded and are therefore scanned on the main thread (`FluidWakeScanner.WakeBorders`) over the shared 16x16 plane of each face neighbor, scheduling whichever side holds the fluid when the other side is a carved cavity (the vertical faces only ever schedule the fluid above the hole). Chunks entirely above every level they could share with a neighbor (`ColumnData.MaxWaterLevel`, never below `SeaLevel`) skip the border scan — generated water cannot reach them, and player-placed water is woken by the edit paths. The queue of newly generated chunks is `ChunkManager.TryDequeueLoaded`; a consumer must re-check that the chunk is still the live one at its position, because an unload can race the queue. Once the frontier has settled, it costs nothing again. Deep lava pockets wake through the same path: the frontier scan is fluid-generic, and chunks at or below `LavaMaxY` report theirs even when they never held sea water.
 - **Every block edit path must call `FluidManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the water beside the edit will never notice it: `BlockEditor.RemoveBlock`, `BlockEditor.FellWood` (per cleared cell, and in both single-block branches), `BlockPlacer.PlaceBlockAtFace` (which every placement ends in: `BlockPlacer.TryPlaceBlockFromRaycast` through `PlaceAgainstFace`, and the item-use `IItemUseWorld.PlaceBlockAtFace`), `BlockInteractions.ToggleOpenCell`, `TntManager.Detonate` (`ScheduleBox` over the blast box grown by one; the blast also **skips fluid cells**, since a dry crater under water would just refill from every side) and bucket edits through `FluidManager.SetCellImmediate` (`WorldItemUse`'s `ScoopFluidCell`/`PourFluidCell`), which is the only fluid write that remeshes synchronously. Mining never takes a fluid out: `BlockEditor.RemoveBlock` returns early on `BlockType.IsFluid`, so only a bucket removes fluids.
 - **Every block edit path must also call `LeafDecayManager.ScheduleAround(cell)`** (or `ScheduleBox(min, max)` for a batch) or the leaves near the edit never re-derive their hydration: a cut limb's canopy would hang forever, and an orphaned wood cell would never crumble. `Simulation/LeafDecay/LeafDecayManager.cs` (owned by `World` as `_leafDecay`, main thread only) grows each scheduled box by its `ScheduleReach` itself, so a caller passes only the edited cells. The current call sites: `BlockEditor.RemoveBlock`; `BlockEditor.FellWood` (`ScheduleAround` in both single-block branches, one `ScheduleBox` over the whole felled batch, never one per cell); `BlockPlacer.PlaceBlockAtFace`, which every placement goes through (`BlockPlacer.TryPlaceBlockFromRaycast` and the item-use `IItemUseWorld.PlaceBlockAtFace`); the `IItemUseWorld` bucket and TNT-prime wrappers on `WorldItemUse` (`ScoopFluidCell`, `PourFluidCell`, `RemoveCellForPrime`), scheduled for uniformity; `BlockInteractions.ToggleOpenCell`; `TntManager.Detonate` (`ScheduleBox` over the blast box); and `TreeGrowthWriter` (one `ScheduleBox` over the box it wrote). A new edit path adds its call next to its `FluidManager.ScheduleAround`.
-- **Unbreakable blocks** (`unbreakable` in the block schema) are refused by the semantic writers (`Chunk.RemoveBlockAt`, `ClearBlockAt`, `Placement.CanOccupy`) and the gameplay entry points, never by `Chunk.SetBlockRaw`, so a new raw-write path must guard itself. The one sanctioned write over one is `Chunk.CollapseWriteAt` (BT-8's collapse), which runs no hook: its caller owes every hook in these bullets (fluid and leaf-decay schedules, the falling-block topple, the far-LOD and canopy hooks, `UnmarkPlayerPlaced`) and the remesh.
+- **Unbreakable blocks** (`unbreakable` in the block schema) are refused by the semantic writers (`Chunk.RemoveBlockAt`, `ClearBlockAt`, `Placement.CanOccupy`) and the gameplay entry points, never by `Chunk.SetBlockRaw`, so a new raw-write path must guard itself. The one sanctioned write over one is `Chunk.CollapseWriteAt` (the tower's doors and piles, and BT-8's collapse; both through `TowerBlockWriter.TryReplace`, which also spills a replaced chest through `ChestManager.NotifyBlockRemoved`), which runs no hook: its caller owes every hook in these bullets (fluid and leaf-decay schedules, the falling-block topple, the far-LOD and canopy hooks, `UnmarkPlayerPlaced`) and the remesh.
 - **Gravity**: `Simulation/FallingBlockManager.cs` (owned by `World`, main thread only) topples `falls` blocks into `FallingBlock` entities and writes rested cubes back as blocks. Every edit path that can unsupport one must call `TryTopple` above it (`BlockEditor.RemoveBlock`, `BlockEditor.FellWood` per cleared cell, `BlockPlacer.PlaceAgainstFace` at the placed cell (the path of `BlockPlacer.TryPlaceBlockFromRaycast`) and `WorldItemUse`'s `IItemUseWorld.AfterPlaced` after an item's own placement, `TntManager.Detonate` via `CheckColumn` bottom-up over the blast box); fluids never count as support, so fluid edits need no hook. A landing cube slides with chance (8 - solid neighbors of its support) / 8 toward a random clear side, corners included (a corner needs its two flanking sides and the three cells above it clear), committing to its direction across landings, and drops straight once past the edge. Sand stacks on sand: a falls-block support never slides, so towers rebuild. A calm landing converts at once so a collapsing tower settles bottom-up instead of interpenetrating, and a cube that would rest over air pops out as a drop instead of floating. A live cube owns its cell: `BlockPlacer.PlaceBlockAtFace` refuses placements into one, cubes shove the player aside one-way (`Camera.PushOutOf`, never through walls, never while flying), and a cube motionless-but-unsettled for 5 s breaks into its usual loot instead of hovering. Shorelines generate from sand (`TerrainGenerator.IsBeachHeight`, gravel-capped where `IsGravelPatch`); the far LOD wears sand and gravel there too, the gravel read with one noise eval per cell.
 - **TNT**: `Simulation/TntManager.cs` (owned by `World`, main thread only, never ticked on a client) runs the primed cubes (`PrimedTnt`). A cube lit by hand burns `TntManager.PlayerFuseSeconds` (1 s) and one lit by another blast `ChainFuseSeconds` (0.5 s), so a chain stays prompt; `PrimedTnt.WhiteFlash` ramps its strobe from 4 to 16 Hz over whatever fuse it was given (`FirestarterTests`). A blast shoves everything loose within `BlastRadius` away from its center (`BlastImpulse.At`: `BlastPushMaxSpeed` at the center falling linearly to zero at the radius, the direction tipped up by `BlastPushUpBias`, never growing with distance): at the end of `Detonate`'s clearing, before the falling-block sweep (so sand the blast undermines falls straight), the other primed TNT (`PrimedTnt.Push`, chained cubes at spawn), the drops (`DropManager.ApplyBlastImpulse`, the blast's own loot included) and the falling cubes in the air (`FallingBlock.Push`); then `MobDirector.PushFromBlast` (World's mob component, called once per blast from `World.Update`) takes each center `TntManager.Blasts` reports and shoves the living mobs (`Mob.Shove`, sideways) and the players through `IMobTarget.TakeHit` with no damage: the local camera's knockback in singleplayer, each `ServerPlayer`'s queued knockback on a server (its `PlayerStatus` carries it to the client); a creative, flying or dead player is immune. Gameplay, so a client, which never ticks TNT, pushes nothing (`BlastEffectTests`).
 - Worldgen must stay deterministic and thread-safe (`FastNoiseLite.GetNoise` is read-only after setup; noise instances are configured once in static constructors and never re-tuned per call). All noise seeds derive from `WorldGenerationConfig.Seed` plus fixed per-channel offsets (`TerrainNoise.MakeNoise`, forwarded as `TerrainGenerator.MakeNoise`; every 2D channel is built by `TerrainNoise.Reseed`); `Seed` reads `WorldSeed.Value`, which `WorldSeed.Apply` sets (rebuilding every noise from it) before a World is built, never while one is live (see "Saves"). Before player edits, terrain obeys:
@@ -5669,7 +5675,7 @@ common hurt, death and spawn.
 
 The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are above ("Structure templates and ruins",
 "Skeleton"); plans/BATTLE_TOWER.md holds the phases still to come. This section is the **floor locks** (`BT-4`), the
-**chests** (`BT-5`) and the **roof altar with the Skeleton King** (`BT-6`).
+**chests** (`BT-5`), the **roof altar with the Skeleton King** (`BT-6`) and the **collapse** (`BT-8`).
 - **Two worldgen-only, unbreakable blocks** (`hasItem: false`, `loot: "none"`), both from the single tower cell function,
   so the point query still equals the stamp. `tower_door` (a solid, cutout, `cullSelf` portcullis `cube_all` that passes
   light) fills the headroom over the two door half-steps of every floor (`TowerSite.DoorCells(k)`, stamped by
@@ -5698,12 +5704,13 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
   manager, and pending the floor's tagged entries still waiting in the save restore
   (`WorldPersistence.PendingTowerSkeletons`); a restore that times out credits its tagged entries to owed
   (`TakeDiscardedTowerSkeletons`), so a reload never opens a door early. Opening is permanent.
-- **The writer** (`TowerBlockWriter`) is the one sanctioned path past `unbreakable`: `Chunk.CollapseWriteAt` to air, then
+- **The writer** (`TowerBlockWriter`) is the one sanctioned path past `unbreakable`: `Chunk.CollapseWriteAt` (`TryClear` to air,
+  `TryReplace` to any block and state, a replaced chest spilling through its `spillChest` hook), then
   every edit-path hook (player-placed unmark, `MarkAreaDirty` over the light radius, fluid and leaf-decay schedules, a falls
   block toppling above, the LOD notify, the support pop, the canopy branch), capped at `TowerMaxBlockWritesPerFrame`; the
   raw write journals the cell to clients as `BlockChanges`. Each frame a sweep writes the depleted piles and the open
   doors' remaining cells: a written or gone cell leaves the set, an unloaded one stays for later and never blocks the rest,
-  and the cap ends the sweep. BT-8's collapse reuses it.
+  and the cap ends the sweep. BT-8's collapse writes through it too, after the sweep and under the same cap.
 - **Saves and the wire**: `stations.json`'s `Towers` (`StationSaveData.TowerData`: the cell, and per floor the waves left
   per pile in `PileCells` order, the door bit and owed), restored before the entities through `TowerPlacement.TryGetSite`
   (an entry whose site, floor count or pile count no longer matches is dropped and counted). Only site-built records are
@@ -5730,7 +5737,8 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
   `tower_treasure`, all nesting `tower_supplies`, richer going up (a gear rarity band one step rarer a table, more gear,
   the ingot ladder tin..wrought iron, scrolls and mana draughts). Like any ruin chest it holds no state until first opened
   or broken. Hooks: `TowerGenerator.ChestCells(s, k)`/`AltarChestCells(s)`. Tests: `TowerChestTests` and the chest cases
-  of `TowerPlacementTests`. Known gap: towers in chunks saved before BT-5 have no chests.
+  of `TowerPlacementTests`. Known gap: towers in chunks saved before BT-5 have no chests. The collapse (BT-8) keeps floor 0's
+  chests and spills every higher one's contents (an unopened chest rolls its loot first), so nothing is lost.
 - **The altar (BT-6)**: `tower_altar` (worldgen-only, `unbreakable`, `loot: "none"`, a `cube_bottom_top` of
   `stone_bricks` with the placeholder `tower_altar_top` tile from `tools/generate-tower-lock-textures.py`, light 7 in the
   default color) stands at `TowerSite.AltarCell` (the center, `RoofY + 1`): the `tower_altar` structure template leaves that
@@ -5769,7 +5777,7 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
   So every target leaving (past `SkeletonKingLeaveRadiusBlocks`), an empty server (the manager fades a king when nobody is
   in play, which the base distance despawn skips) and a player dying and respawning far away all reset the tower, while
   only a kill defeats it. `TowerManager.MarkDefeated` raises the `TowerManager.BossDefeated` event once and
-  `TowerRecord.BossDefeated` reads true from then on: BT-8's collapse hook (nothing listens yet).
+  `TowerRecord.BossDefeated` reads true from then on, which BT-8's collapse reads (polled, not through the event).
 - **The Skeleton King** (`skeleton_king.json`, hp 400, not difficulty-scaled, `"boss": true`; the placeholder
   `loot/skeleton_king.json` of bones, wrought iron and bronze ingots until BT-7's unique pool) is a `SkeletonKing`
   (`Entities/TowerMobs/`), a `RealmMob` with `IsBoss` and `IsUndead` true (the `undeadDamage` stat applies) and no floating
@@ -5812,6 +5820,36 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
 - **Known gaps (BT-6)**: the king's bones, like every mob missile, are not on the wire (a client sees only the damage); the
   king is not drawn in the water mirror; a ritual's remaining time is not saved (it restarts); tower chunks saved before
   BT-6 keep an air altar cell, so that tower's altar cannot be clicked; the king's numbers are first guesses.
+- **Collapse (BT-8)**: once the king is killed the tower falls into a ruin. `TowerManager.Update` polls
+  `TowerRules.CollapseDue` (Defeated and not done) every frame after the door/pile sweep, so a live defeat and one restored
+  from a save take the same path; a new collapse waits `MobConfig.TowerCollapseDelaySeconds` (the death and loot play
+  first), a restored one resumes at once. Only a record built from a world site (`TowerRecord.Site`) collapses. **The rule**
+  (`WorldGen/Structures/TowerRuin.RuinAt`, GL-free and pure in cell, seed and site, salt `0x5E80`, no cache): each wall column
+  keeps a hashed stump (`TowerRuinStumpMinBlocks..MaxBlocks` over the ground slab), every unbreakable cell at or below its
+  stump (the palette bricks, ground slab and foundation included) becomes `stone_bricks` or `cobblestone`
+  (`TowerRuinCobbleShare`), doors, piles and the altar become air, everything above the stump becomes air except floor 0's
+  breakable dressing on the ground slab (its chests included), and a `TowerRuinRubbleChance` share of the room's air columns
+  gets a gravel or cobblestone pile at `GroundY + 1`, always on the solid ground slab so no gravel falls; the apron and
+  breakable cells below a stump are kept; no new content id. **The staging** (`Simulation/Tower/TowerCollapse`, built over a box
+  and a rule delegate, the test seam): a main pass walks layers from the site's `TopY` down to `BottomY` under
+  `TowerCollapseScanCellsPerFrame` (shared by every collapsing tower; every cell costs one, a waiting chunk's too, so a pass
+  over an unloaded tower never hitches) and the writer's `TowerMaxBlockWritesPerFrame` (shared with the door/pile sweep), so a
+  whole tower takes some tens of seconds. A cell whose chunk is unloaded puts that chunk on a waiting set and the pass moves
+  on; once the main pass is done each waiting chunk is swept top-down when it loads. Done is the main pass finished with
+  nothing waiting, and permanent. An air-to-solid rubble write into a cell a target's body overlaps is skipped
+  (`PlayerContext.BodyOverlapsCell`). A replaced chest spills through `ChestManager.NotifyBlockRemoved` (`World` wires the
+  writer's `spillChest`). **Saves**: `stations.json`'s `TowerData.Collapse` (`TowerCollapseData`: the main pass's `NextY`, the
+  `Waiting` chunks, `Done`; the in-layer index is not saved, since a rescan is idempotent: a cell no longer holding its
+  expected block reads gone); an entry on a tower that is not Defeated is ignored, and a Defeated tower with none (a save from
+  before BT-8) starts a fresh collapse. No wire change: clients see the ruin through the `BlockChanges` journal (protocol
+  stays 27). Tests: `TowerRuinTests`, `TowerCollapseTests` (top-down, the per-frame cap, the delay, unloaded cells waiting, the
+  save round trip, done is permanent, no body entombed), the `TryReplace` and spill cases of `TowerBlockWriterTests`,
+  `TowerRulesTests.ACollapseIsDueOnlyForADefeatedTowerThatHasNotFinished`, the collapse cases of `TowerManagerSaveTests` and
+  `TowerAltarTests.ADefeatedTowerStartsCollapsingAndAnUndefeatedOneNever`. **Known gaps**: desert and frost towers fall to
+  stone rubble too; a storeless world (a `VOXEL_SCRIPT` run) forgets a ruined chunk on unload, so it regenerates intact; a
+  crash between a chunk's save and `stations.json` saying Done can leave an intact part never redone; a late-loading,
+  unmodified chunk shows the intact tower until the waiting sweep reaches it; worldgen never builds the ruin itself; no
+  collapse dust, sound or shake yet; mobs and drops standing in a rubble cell are not protected like players.
 
 ### Sandworm
 

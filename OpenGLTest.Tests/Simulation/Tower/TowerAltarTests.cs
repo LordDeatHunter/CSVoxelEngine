@@ -298,4 +298,27 @@ public sealed class TowerAltarTests
         Assert.Empty(kings.Mobs);
         Assert.Equal(TowerAltarState.Ritual, record.AltarState);
     }
+
+    [Fact]
+    public void ADefeatedTowerStartsCollapsingAndAnUndefeatedOneNever()
+    {
+        var skeletons = new SkeletonManager(EntityRegistry.Require(Skeleton.EntityName));
+        foreach (var defeat in new[] { false, true })
+        {
+            var towers = Authoritative(out var chunks);
+            // The fixture's tower stands far from the loaded test chunks, so its cells wait unloaded
+            var record = towers.Track(TowerRecord.FromSite(TowerSiteFixture.SiteOf(WorldGenerationConfig.TowerMinRadius, 3, 0)));
+            var siteless = towers.Track(Record());
+            Assert.NotEqual(record.Key, siteless.Key);
+            if (defeat) towers.MarkDefeated(record);
+            towers.MarkDefeated(siteless);
+
+            for (var i = 0; i < 3; i++) towers.Update(Dt, chunks, skeletons, [], null, null);
+
+            Assert.Equal(defeat, record.Collapse != null);
+            Assert.False(record.Collapse?.Done ?? false);
+            // A record with no world site has nothing to collapse
+            Assert.Null(siteless.Collapse);
+        }
+    }
 }

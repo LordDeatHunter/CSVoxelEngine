@@ -45,6 +45,24 @@ public sealed class StationSaveData
         /// <summary>The roof altar's <see cref="Simulation.Tower.TowerAltarState"/> by name; absent = dormant (a save
         /// from before BT-6).</summary>
         public string? Altar { get; set; }
+
+        /// <summary>The collapse of a defeated tower (BT-8); absent = not started (or a save from before BT-8).</summary>
+        public TowerCollapseData? Collapse { get; set; }
+    }
+
+    /// <summary>How far a defeated tower's collapse has come (<see cref="Simulation.Tower.TowerCollapse"/>).</summary>
+    public sealed class TowerCollapseData
+    {
+        /// <summary>The main pass's next layer (world y), scanned from the top down; below the tower's bottom = the main pass
+        /// is finished; absent = the top.</summary>
+        public int? NextY { get; set; }
+
+        /// <summary>Chunk positions as <c>int[3]</c> whose cells were unloaded when the main pass reached them, still to sweep
+        /// once they load; absent = none.</summary>
+        public List<int[]>? Waiting { get; set; }
+
+        /// <summary>Whether the collapse has finished (permanent: a finished tower is never collapsed again).</summary>
+        public bool Done { get; set; }
     }
 
     /// <summary>One tower floor's lock state.</summary>
