@@ -12,6 +12,7 @@ using VoxelEngine.Player;
 using VoxelEngine.Rendering.Atmosphere;
 using VoxelEngine.UI;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Rendering;
 
@@ -146,6 +147,8 @@ internal sealed class FrameLighting
     // of the sky over the cloud slab
     private float _hellT;
     private float _altitudeT;
+    // The eased cave biome atmosphere at the eye (CaveClimate, CB-3): fog color and distances, ambient tint
+    private CaveAtmosphere _cave = CaveAtmosphere.None;
 
     private readonly Vector3[] _pointPos = new Vector3[LightingConfig.MaxPointLights];
     private readonly Vector3[] _pointColors = new Vector3[LightingConfig.MaxPointLights];
@@ -213,10 +216,12 @@ internal sealed class FrameLighting
     /// which uploads the result to the world shader through <see cref="RenderManager.ApplyFrameUniforms"/>.
     /// <paramref name="underwater"/> is whether the camera's eye sits below a fluid surface;
     /// it fades the underwater tint in and out. <paramref name="eyeInLava"/> picks the lava
-    /// variant of that tint, so a submerged view reads red instead of blue.
+    /// variant of that tint, so a submerged view reads red instead of blue. <paramref name="eyeCaveBiome"/> is
+    /// the cave biome at the eye (<c>World.EyeCaveBiome</c>), whose atmosphere the fog, palette and ambient ease
+    /// toward (<see cref="CaveClimate"/>); plain, the default, leaves them as they were.
     /// </summary>
     internal void SetLighting(double time, Camera? camera, IReadOnlyList<PrimedTnt>? primed, bool underwater, bool eyeInLava,
-        IReadOnlyList<Vector3>? campfires = null)
+        IReadOnlyList<Vector3>? campfires = null, CaveBiome eyeCaveBiome = CaveBiome.Plain)
     {
         // The window clock is the only time source this pass has; clamp the step so a hitch
         // (or the very first frame) cannot jump the fade
@@ -313,15 +318,21 @@ internal sealed class FrameLighting
         {
             _hellT = LayerClimate.Ease(_hellT, LayerClimate.HellTarget(camera.RenderEye.Y), dt);
             _altitudeT = LayerClimate.Ease(_altitudeT, LayerClimate.AltitudeTarget(camera.RenderEye.Y), dt);
+            _cave = CaveClimate.Ease(_cave, eyeCaveBiome, dt);
         }
+        // The cave biome's atmosphere (CaveClimate), gated by hell as a safeguard (a hell eye is plain anyway);
+        // its ambient tint lands before the wet mix below, so water and lava still win
+        var cave = _cave with { Strength = _cave.Strength * (1f - _hellT) };
+        _ambient *= CaveClimate.AmbientFactor(cave);
         // Nothing of the sky shows through hell's rock: the sun, moon, stars, glare and godrays go
         var open = 1f - _hellT;
         _sunVisibility *= open;
         _moonVisibility *= open;
 
-        // The warm glow toward the sun only while it crosses the horizon (the day sky stays flat)
-        _sky = LayerClimate.Apply(SkyPalette.Compute(dayness, duskAmount, SkyPalette.GlowAmount(elevation)),
-            _altitudeT, _hellT);
+        // The warm glow toward the sun only while it crosses the horizon (the day sky stays flat). The cave
+        // atmosphere shifts the palette last: the dry fog, the dome and the clear color all read it
+        _sky = CaveClimate.Apply(LayerClimate.Apply(SkyPalette.Compute(dayness, duskAmount, SkyPalette.GlowAmount(elevation)),
+            _altitudeT, _hellT), cave);
         // SkyPalette stays authored (and tested) in sRGB; the dome and fog want it linear
         _sky = _sky with
         {
@@ -440,11 +451,11 @@ internal sealed class FrameLighting
             AuroraDrift = Aurora.Drift(time),
         };
 
-        // Hell's caverns close the dry fog in; water closes it further
-        _fogNear = MathUtils.Lerp(MathUtils.Lerp(LightingConfig.FogNearBlocks, SkyConfig.HellFogNearBlocks, _hellT),
-            WaterRenderConfig.UnderwaterFogNearBlocks, wet);
-        _fogFar = MathUtils.Lerp(MathUtils.Lerp(LightingConfig.FogFarBlocks, SkyConfig.HellFogFarBlocks, _hellT),
-            WaterRenderConfig.UnderwaterFogFarBlocks, wet);
+        // A cave biome and hell's caverns close the dry fog in; water closes it further
+        _fogNear = MathUtils.Lerp(MathUtils.Lerp(CaveClimate.FogNear(LightingConfig.FogNearBlocks, cave),
+            SkyConfig.HellFogNearBlocks, _hellT), WaterRenderConfig.UnderwaterFogNearBlocks, wet);
+        _fogFar = MathUtils.Lerp(MathUtils.Lerp(CaveClimate.FogFar(LightingConfig.FogFarBlocks, cave),
+            SkyConfig.HellFogFarBlocks, _hellT), WaterRenderConfig.UnderwaterFogFarBlocks, wet);
 
         // Reset before the dry early-out, or a tint would stick after leaving water or lava
         _fogWet = wet;
@@ -512,6 +523,7 @@ internal sealed class FrameLighting
         _eyeInLava = false;
         _hellT = 0f;
         _altitudeT = 0f;
+        _cave = CaveAtmosphere.None;
         // The cached far map holds the released world's terrain.
         _owner.FarShadow.Invalidate();
     }

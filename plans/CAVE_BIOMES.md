@@ -6,19 +6,16 @@ CB-0 (barrier shift) and CB-1 (the cave biome field, its palette pass and the de
 -330..-370, hell top -401 (a chunk edge, so no chunk straddles hell); the overworld caves wear a frozen or desert echo down to
 about -200 and crystal, fungal or magma-touched sub-biomes from there to the barrier. CB-2 (shape and ores) done: the
 sub-biomes carve bigger rooms and wider tunnels, the Y-band ores' richness follows the cave biome and each sub-biome has an
-exclusive ore (amethyst, jade, cinnabar). Tracks 3D cave biomes: caves that stop
+exclusive ore (amethyst, jade, cinnabar). CB-3 (atmosphere and transport) done: each cave biome eases in its own fog,
+ambient tint and drifting motes, and the server sends the eye's cave biome in `PlayerStatus` (protocol 28). Tracks 3D cave biomes: caves that stop
 being biome-blind, plus the barrier shift that makes room for them. Third of three efforts, in order: accessories (done), the
 battle tower (`BATTLE_TOWER.md`), cave biomes. One phase per prompt; each leaves the game building and the tests green. Last
-updated 2026-11-09 (CB-2).
+updated 2026-11-09 (CB-3).
 
 ## In progress
 Nothing.
 
 ## Open
-- [ ] **`CB-3` Atmosphere and transport** - P1, M.
-  An eased cave-biome fog, ambient and particle target in `FrameLighting` beside `_hellT`/`_altitudeT` and `LayerClimate`. The
-  client has no seed, so the server sends a cave-biome byte at the player's eye in `PlayerStatus` (protocol bump); singleplayer
-  computes it directly (`CaveBiomes.At` with the eye column's stored biome and height).
 - [ ] **`CB-4` Mobs and loot** - P2, XL.
   A biome filter at the final `if` of `MobSpawner.TryFindCaveSpawn`, biome-gated slimes and goblins, and **one new mob per biome**
   (a cave mob manager on `MobCaps`, `RealmMob` frame, Blockbench rigs from deterministic generator scripts with `--check`, saves,
@@ -68,8 +65,8 @@ Nothing.
     near a band line or a selector threshold pay their own blend. That halved the deep-band cost.
   - Known gaps: hard vertical edges in rock where the stored column biome flips between frozen or desert and anything else (a chunk has
     no climate gradient per cell); frozen and desert cliffs and ravine walls deeper than the cover wear the echo stone, while the far
-    LOD still draws stone there; accents and floors are missed only on a chunk seam; the client derives nothing from the cave biome yet
-    (CB-3).
+    LOD still draws stone there; accents and floors are missed only on a chunk seam; the client derives nothing from the cave biome itself
+    and takes the eye's biome from its `PlayerStatus` (CB-3).
   - Scenario: `visual-examples/cave-biomes.json` (`VOXEL_TIME=147`), at the spots `CaveBiomeSpotTests` prints under the default seed.
 - **CB-1 cost** (2026-11-09, dev machine, `WorldgenCostProbe.ChunkFillCostPerStage`, median of 3 runs each, mean ms per chunk; cold
   is dominated by the column cache and unchanged within noise). Ceiling: at most +25% on underground chunks.
@@ -144,3 +141,22 @@ Nothing.
   with three separate host scans measured CaveOres at 0.108 ms and the deep band at +33% in one interleaved set, and merging the
   scans brought it under the ceiling. The whole-chunk means swing by about 10% between sets, so the stage sums are the steadier
   figure.
+- **CB-3 as built** (`Effects/Sky/CaveAtmosphere`, `CaveClimate`; `WorldGen/Caves/EyeCaveBiomeProbe`; knobs `CaveFog*`,
+  `CaveAmbient*` in `SkyConfig` and `CaveMote*` in `ParticleConfig`, all first guesses):
+  - Look: `CaveClimate.Target` gives each biome a strength plus full-strength fog color, fog near/far and ambient tint; every effect
+    lerps from neutral by the strength, so plain caves are exactly neutral. `FrameLighting.SetLighting` eases it (`CaveFogEaseRate`,
+    slower than the layer fog; a fade-out keeps the hue, a fade-in from nothing snaps to the target hue) and applies it gated by
+    `1 - _hellT`: the sRGB palette shift after `LayerClimate.Apply`, because the dry fog reads `SkySample` from the palette uniforms,
+    not `uFogColor` (so no shader changes); the fog near/far before the hell and water lerps; the ambient factor before the wet mix.
+    `Classify` already gives plain above the surface, inside the echo cover, in hell and in the sky, so no extra cave test exists.
+  - Transport: the byte is computed only on an authoritative world, because `ColumnTerrain` carries no surface biome and a client
+    has no seed. `EyeCaveBiomeProbe` reads `CaveBiomes.At` over `IWorldSource.GetColumn`, memoized per eye cell and plain at or
+    below the barrier without a read; `LocalPlayer.UpdateHealth` (singleplayer, never a client or a server) and
+    `ServerPlayer.TickStatus` (the body eye, so both agree; `StatusDirty` only when the byte changes, no hysteresis) run it. It
+    rides the end of `PlayerStatus` (protocol 28); the reader maps an undefined value to plain; `ClientMirror.ApplyNetworkCaveBiome`
+    mirrors it.
+  - Motes: `AmbientEffects.UpdateCaveMotes` puffs fixed `FireParticleKind`s on the campfire particle system (embers in the magma
+    deep, sparks in crystal and fungal caves, steam in a frozen echo, smoke dust in a desert echo) at open cells around the eye,
+    paced by a debt and capped per frame; singleplayer and a client, never a server. No new content ids, no new GL resource.
+  - Known gaps: the particle colors are fixed per kind (no per-biome tint); a client lags one status after crossing a biome line;
+    the tuning is a first guess, not yet checked against the scenario shots.

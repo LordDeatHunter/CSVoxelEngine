@@ -1,6 +1,8 @@
 {
   // Cave biome check (plans/CAVE_BIOMES.md CB-1): run from OpenGLTest/ with
   //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/cave-biomes.json
+  // The shots also show the CB-3 atmosphere (each biome's tinted, closer fog and its drifting motes): every
+  // wait after a teleport outlasts the atmosphere's ease.
   // Shots land in visual/cave-biomes/. Every spot is an eye CaveBiomeSpotTests prints under the default
   // seed (the first open cave whose floor lies in that biome, scanning out from the origin; an echo spot
   // only in a chunk column wholly of its surface biome, so its views stay inside the echo):

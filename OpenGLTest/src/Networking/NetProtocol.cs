@@ -197,8 +197,10 @@ public static class NetFraming
     /// 27: each tower's altar state byte (<see cref="Simulation.Tower.TowerAltarState"/>) appended after its floors in
     /// <see cref="NetMessage.StationState"/>; an older peer would misread the station frames. Also
     /// <see cref="NetEntityKind.SkeletonKing"/> (the tower's boss): its attack count in the ammo field (slam, volley, summon
-    /// by remainder modulo 3), its fight phase in the item byte; an older client would not draw it.</summary>
-    public const int ProtocolVersion = 27;
+    /// by remainder modulo 3), its fight phase in the item byte; an older client would not draw it.
+    /// 28: the eye's cave biome (<see cref="WorldGen.Caves.CaveBiome"/>) appended to <see cref="NetMessage.PlayerStatus"/>;
+    /// an older peer would misread the status.</summary>
+    public const int ProtocolVersion = 28;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

@@ -693,6 +693,31 @@ the sun, moon, stars, aurora, glare and godrays out (`1 - _hellT`); water and la
 `LayerClimate.HellLayerIndex` counts the hell layers down from the barrier. `LayerClimateTests`;
 `visual-examples/layers-fog.json` (`VOXEL_TIME=147`).
 
+**Cave biome atmosphere (CB-3).** The cave biome at the eye (see "Cave biomes") colors the fog around it:
+`CaveClimate.Target` maps each `CaveBiome` to a `CaveAtmosphere` (`Effects/Sky/`, GL-free): a strength in
+0..1 plus a dim sRGB fog color, fog near/far distances and a per-channel ambient tint, those four stored at
+full strength and every effect lerped from neutral by the strength, so plain caves (strength 0) change
+nothing. `FrameLighting.SetLighting` (its optional `eyeCaveBiome`, `World.EyeCaveBiome` from `Program`) eases
+`_cave` toward it beside `_hellT`/`_altitudeT` (`CaveClimate.Ease` at `SkyConfig.CaveFogEaseRate`: a fade-out
+keeps the hue, a fade-in from nothing takes the target hue at once) and, gated by `1 - _hellT`, applies it
+three ways: `CaveClimate.Apply` shifts the sRGB `SkyPalette` after `LayerClimate.Apply` (zenith and horizon
+toward the fog color, the glow out), which is what colors the dry fog, since dry fog reads `SkySample` from
+the palette uniforms, not `uFogColor`, so no shader changes; `CaveClimate.FogNear`/`FogFar` pull the dry fog
+toward `SkyConfig.CaveFogNearBlocks..FarBlocks` before the hell and water lerps; and `CaveClimate.AmbientFactor`
+multiplies `_ambient` before the wet mix, so water and lava still win. `ForgetWorld` resets it. The eye's biome
+is computed only where the world is authoritative, because a client has no seed and its `ColumnTerrain` has no
+surface biome: `EyeCaveBiomeProbe` (`WorldGen/Caves/`, memoized per cell, plain at or below the barrier
+without a read) runs `CaveBiomes.At` over `IWorldSource.GetColumn` in `LocalPlayer.UpdateHealth`
+(singleplayer) and `ServerPlayer.TickStatus` (server, `StatusDirty` only when the byte changes). The byte
+rides the end of `PlayerStatus` (protocol 28), which a client mirrors (`ClientMirror.ApplyNetworkCaveBiome`
+-> `LocalPlayer.MirrorCaveBiome`). `Classify` already gives plain above the surface, inside the echo cover, in
+hell and in the sky, so the atmosphere is zero there. Each biome also drifts motes around the eye
+(`CaveClimate.Motes`, `AmbientEffects.UpdateCaveMotes` on the campfire `FireParticleSystem`: embers in the
+magma deep, sparks in crystal and fungal caves, steam in a frozen echo, smoke dust in a desert echo; paced by a
+debt and capped at `ParticleConfig.CaveMoteMaxPerFrame`, singleplayer and a client, never a server).
+`CaveClimateTests`, `EyeCaveBiomeProbeTests`, `ServerPlayerCaveBiomeTests`, the cave byte in
+`NetworkProtocolTests`; `visual-examples/cave-biomes.json` (`VOXEL_TIME=147`).
+
 **Biome color grade.** The post pass multiplies the finished, anti-aliased display image by
 `uGrade` (`PostEffects.Grade`, (1, 1, 1) by default): `BiomeGrade.Tint` of the eye's climate (the same
 `EyeClimate.TryAt` sample the aurora reads), warm where it is warm and dry (the desert's own
@@ -1280,7 +1305,7 @@ OpenGLTest/
       NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules (the attack and cast slack),
                                #   timeouts, LOD streaming, ServerAllowCreative
       ParticleConfig.cs        # falling leaves, mining debris, campfire, lava and torch embers and smoke, bubbles,
-                               #   spring steam
+                               #   spring steam, the cave biome motes (CaveMote*)
       PlayerConfig.cs          # break overlay, camera and swing feel (sprint FOV, strafe tilt, hit-stop, throw
                                #   zoom), water depth states, lava speed, throws, slime block, sink blocks, bandage
       PostProcessConfig.cs     # biome grade, damage fringe, underwater wobble, FXAA, contact AO, godrays, GPU timer
@@ -1298,7 +1323,8 @@ OpenGLTest/
       StatusEffectConfig.cs    # status effects: the duration scale cap, the block writer's reach and write caps,
                                #   the mob tint strength, the particle emitter cap and rate
       SkyConfig.cs             # day length, sun and glare, sky dome, stars, moon, moonlight, aurora, clouds, wind,
-                               #   the sky-island cloud sea (SkyCloudSea*), the realm layer fog (HellFog*, SkyAltitudeTint)
+                               #   the sky-island cloud sea (SkyCloudSea*), the realm layer fog (HellFog*, SkyAltitudeTint),
+                               #   the cave biome atmosphere (CaveFog*, CaveAmbient*)
       StreamingConfig.cs       # view radius, per-frame mesh, dirty and scan budgets, thread counts, LOD build and
                                #   upload budgets, loading budgets and gate
       SurfaceShadingConfig.cs  # per-tile shader terms (ore, snow, leaf backlight, grass shimmer, ice, glass, wet
@@ -1487,6 +1513,9 @@ OpenGLTest/
                                #   (FrameLighting.SetLighting and the slime size roll both read it)
         LayerClimate.cs        # GL-free realm layer sky: hell tint and altitude shift of the eye's height, eased,
                                #   applied to the sRGB SkyPalette; the hell layer index
+        CaveAtmosphere.cs      # one cave biome atmosphere: strength plus full-strength fog color, fog near/far, ambient tint
+        CaveClimate.cs         # GL-free cave biome atmosphere: per-biome target, the ease, the palette shift, fog
+                               #   distances, ambient factor and motes (CB-3)
         Moonlight.cs           # GL-free key-light rule: sun by day, moon at night, handed over with both dark
         MoonPhase.cs           # GL-free moon: the day's phase (steps at noon), its light direction, lit share, visibility
         SkyPalette.cs          # GL-free zenith/horizon/glow sky palette and the C# reference of SkySample
@@ -2431,6 +2460,8 @@ OpenGLTest/
         CaveBiomeMap.cs        # one chunk's cave biome per cell plus a mask of the biomes present, classified once by
                                #   CaveBiomes.Fill before the carvers and read by every cave consumer
         CaveShape.cs           # the sub-biomes' cave shape: cheese, tunnel and cavern boosts, the worm radius factor
+        EyeCaveBiomeProbe.cs   # the cave biome at one player's eye over an IWorldSource, memoized per cell (CB-3;
+                               #   singleplayer and the server only)
         CaveRichness.cs        # a Y-band ore's threshold shift per cave biome (negative richer)
         CaveOres.cs            # the exclusive ores (amethyst, jade, cinnabar; seeds 183-185): HasOre, the stamp (plain
                                #   stone of its own biome, one merged host scan) and its band
@@ -2681,7 +2712,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Climate/                   # the biome tint field and its chunk, LOD, pop and texture consumers
     Lighting/                  # the campfire flicker and the block-light tint code
     Post/                      # biome grade, contact AO, eye adaptation, godrays, underwater wobble
-    Sky/                       # aurora, silver lining, moon, moonlight, sky palette, stars, glare, wind
+    Sky/                       # aurora, silver lining, moon, moonlight, sky palette, stars, glare, wind, the cave
+                               #   biome atmosphere (CaveClimateTests)
     Surfaces/                  # glass, grass, ice, lava, leaf and ore twins, the snow sparkle shader term
     Water/                     # deep-water fog, the waterline fresnel, sun glitter, the shore foam shader term
   Entities/                    # the Mob base and the shared mob rules (caps, targets, notice, interest, fall,
@@ -2715,8 +2747,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Networking/                  # protocol and codecs, end-to-end chunk and imported-world streaming
     Client/                    # client streaming, the mesh gate, predictions and intent flow, the entity
                                #   mirror, remote players, worldgen isolation
-    ServerSide/                # the server player and its status, movement and intent rules, operators,
-                               #   the loopback GameServer and the server-mode World
+    ServerSide/                # the server player and its status (the eye's cave biome: ServerPlayerCaveBiomeTests),
+                               #   movement and intent rules, operators, the loopback GameServer and the server-mode World
   Particles/                   # every particle system and the dust, splash and pop emitters
   Player/                      # camera, physics, water phases and swimming, health and fall tracking,
                                #   the player model, creative, sprint, the saved-player restore
@@ -2754,7 +2786,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
       Underground/             # coal, malachite, hematite, gravel pockets, cave life (mirrors src/WorldGen/Features/Underground)
     Caves/                     # the cave biomes: point query equals stamp, the map, bands, determinism, safe palettes,
                                #   the cave shape and worm factor, the ore richness, the exclusive ores, and the spot
-                               #   finder behind cave-biomes.json (mirrors src/WorldGen/Caves)
+                               #   finder behind cave-biomes.json, the eye probe (EyeCaveBiomeProbeTests) (mirrors
+                               #   src/WorldGen/Caves)
     Hell/                      # the hell caverns, biomes, palette and flora (mirrors src/WorldGen/Hell)
     Sky/                       # the solid cloud patches, the cloud sea, the sky islands, the sky biomes and their
                                #   flora (mirrors src/WorldGen/Sky)
@@ -4360,7 +4393,8 @@ seed, day clock, spawn), `KeepAlive`, `ChatSend`/`ChatMessage` (kind, sender, te
 `PlayerState` (eye, yaw, pitch, flags, the newest correction it acks), `PlayerStatus` (the
 player's server-owned status, `PlayerStatusCodec`: the creative/flight flags the server actually
 granted, health, a dead flag, the knockback impulse and lift of the mob hits since the last
-one, the air and the mana; sent at join, whenever it changed, and once when a mode request was refused),
+one, the air, the mana, the effect mask and the cave biome at the eye; sent at join, whenever it changed,
+and once when a mode request was refused),
 `PlayerCorrection` (a numbered eye the client must snap to: an illegal move undone, or a
 respawn), `PlayerList` (id, name, eye, yaw, pitch, flags), `WorldIntent` (a client's world action, `WorldIntentCodec`), `IntentResult` (sequence id,
 accepted), `BlockCorrection` (sequence id, then the authoritative cells around the intent's target),
@@ -4385,7 +4419,7 @@ refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's 
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
 whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell, sky or tower mob's `Ammo` carries its
 attack count the same way (`RealmMob.AttackCount`, see "A mirror's attack clip"), with no bump either. Every
-entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 27 (current) appends each battle tower's altar state byte to its `StationState` record and lets `EntityList` carry the Skeleton King (`NetEntityKind.SkeletonKing` 14: its fight phase rides `ItemId`, clamped to 1..3 on read, and its attack count rides `Ammo`, slam, volley and summon by remainder; see "Battle tower"); an older peer would misread the station frames and an older client would not draw the king. Version 26 appends the battle tower locks at the end of `StationState` (`TowerManager.WriteNet`/`ReadNet`: each tower's cell, center and radius, and per floor its band, piles left, skeletons left and door bit, bounds-checked; see "Battle tower"); an older peer would misread the station frames. Version 25 lets `EntityList` carry the battle tower's skeleton (`NetEntityKind.Skeleton` 13): its tower tier rides `ItemId` (a goblin's torch byte, 0 for other mobs; clamped to 0..`MobConfig.TowerMaxTier` on read, since a mirror cannot derive it from where it stands, and a mirror whose tier differs is replaced, `ClientMirror.KindMatches`) and its attack count rides `Ammo` (melee even, shot odd, see "A mirror's attack clip"); an older client would not draw it. Version 24 adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 28 (current) appends the eye's cave biome byte to `PlayerStatus` (`PlayerStatusData.CaveBiome`, an undefined value reads as Plain); an older peer would misread the status. Version 27 appends each battle tower's altar state byte to its `StationState` record and lets `EntityList` carry the Skeleton King (`NetEntityKind.SkeletonKing` 14: its fight phase rides `ItemId`, clamped to 1..3 on read, and its attack count rides `Ammo`, slam, volley and summon by remainder; see "Battle tower"); an older peer would misread the station frames and an older client would not draw the king. Version 26 appends the battle tower locks at the end of `StationState` (`TowerManager.WriteNet`/`ReadNet`: each tower's cell, center and radius, and per floor its band, piles left, skeletons left and door bit, bounds-checked; see "Battle tower"); an older peer would misread the station frames. Version 25 lets `EntityList` carry the battle tower's skeleton (`NetEntityKind.Skeleton` 13): its tower tier rides `ItemId` (a goblin's torch byte, 0 for other mobs; clamped to 0..`MobConfig.TowerMaxTier` on read, since a mirror cannot derive it from where it stands, and a mirror whose tier differs is replaced, `ClientMirror.KindMatches`) and its attack count rides `Ammo` (melee even, shot odd, see "A mirror's attack clip"); an older client would not draw it. Version 24 adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
 mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
@@ -4607,7 +4641,9 @@ damage; a body over unloaded chunks is not judged. Lava and the damage flash tic
 singleplayer. Mob hits land through `IMobTarget.TakeHit` (below), which bills the player's own
 pool and queues the knockback. Whatever changed the status marks `StatusDirty`, and `TickPlayers`
 then sends that player a `PlayerStatus` (modes, health, dead, the queued knockback, handed
-over and cleared by `TakePendingKnockback`, the air and the mana); one more goes out at join, so a returning player's
+over and cleared by `TakePendingKnockback`, the air, the mana, the effect mask and the cave biome at the eye,
+`ServerPlayer.EyeCaveBiome`, which marks the status dirty only when it changes; see "Cave biome atmosphere");
+one more goes out at join, so a returning player's
 health (or death) is mirrored at once. The status is saved with the player (health and respawn
 eye in `players/<slug>.json`). A **dead** player stays where it died: its states still record
 look, flags and modes but never move it, and every intent but `Respawn` is refused. The client
@@ -5768,7 +5804,8 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
 reference and the measured costs ("Costs (BT-9)": the sky-cover mesh build, the tower worldgen and the collapse's
 per-frame step, with their ceilings). This section is the **floor locks** (`BT-4`), the **chests** (`BT-5`), the **roof
 altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collapse** (`BT-8`) and the **dark interiors**
-(`BT-10`). The current protocol is 27 (the altar byte and the king; the collapse needs no wire change). The tower's
+(`BT-10`). The tower's last protocol was 27 (the altar byte and the king; the collapse needs no wire change); 28,
+the current one, came after it with the cave biome byte (CB-3). The tower's
 content ids left 244 of the 255 used, before the cave ores took 3 more (see "Budgets" under "Layers").
 - **Dark interiors (BT-10)**: the floors get no sun. The three palette bricks carry `coversSky`, so a mesh build over a
   tower chunk starts every sun seed above the slab over it ("Sky cover (BT-10)" under "Chunk meshing"); a floor is lit only

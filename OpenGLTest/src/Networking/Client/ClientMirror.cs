@@ -18,6 +18,7 @@ using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.Tower;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Networking.Client;
 
@@ -393,6 +394,14 @@ internal sealed class ClientMirror
     {
         if (_clientMode)
             _health.Effects.SetMirrorMask(mask);
+    }
+
+    /// <summary>A client takes the eye's cave biome the server's status reports (CB-3): the server alone
+    /// reads it, since a client has no seed and its streamed columns carry no surface biome.</summary>
+    internal void ApplyNetworkCaveBiome(CaveBiome biome)
+    {
+        if (_clientMode)
+            _world.LocalPlayer.MirrorCaveBiome(biome);
     }
 
     // A worm's phase rides the ammo field; an out-of-range byte reads as the first phase

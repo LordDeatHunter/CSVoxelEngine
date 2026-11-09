@@ -13,6 +13,7 @@ using VoxelEngine.Config;
 using VoxelEngine.Player;
 using VoxelEngine.Server;
 using VoxelEngine.UI.Hud;
+using VoxelEngine.WorldGen.Caves;
 using Xunit;
 
 namespace VoxelEngine.Tests.Networking;
@@ -249,6 +250,15 @@ public sealed class NetworkProtocolTests
         var negative = RoundTrip(hurt with { Mana = -3, MaxMana = 0 });
         Assert.Equal(0, negative.Mana);
         Assert.Equal(1, negative.MaxMana);
+
+        // The eye's cave biome rides along; a status built without one reads back plain, and an undefined byte reads
+        // as plain rather than a value no rule knows
+        foreach (var biome in Enum.GetValues<CaveBiome>())
+            Assert.Equal(biome, RoundTrip(hurt with { CaveBiome = biome }).CaveBiome);
+        Assert.Equal(CaveBiome.Plain, RoundTrip(hurt).CaveBiome);
+        var undefined = RoundTrip(hurt with { CaveBiome = (CaveBiome)250 }).CaveBiome;
+        Assert.True(Enum.IsDefined(undefined));
+        Assert.Equal(CaveBiome.Plain, undefined);
 
         // A correction: the sequence id the client acks, then the eye it snaps to
         var eye = new Vector3(12.5f, 70.62f, -8.5f);

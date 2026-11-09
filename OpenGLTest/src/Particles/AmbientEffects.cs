@@ -4,17 +4,19 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.StatusEffects;
+using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Juice;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Particles;
 
 /// <summary>
 /// The world's ambient effects: the burning cells the fire particles and the warm point lights
 /// share (<see cref="FireCells"/>), steam off hardening lava and hot springs, the embers over
-/// lava vents, the torch flames, the particles of the mobs' status effects, the local player's
+/// lava vents, the torch flames, the particles of the mobs' status effects, the cave biome motes, the local player's
 /// bubbles, the water splashes of every body and the camera shake of a blast. Never gameplay: nothing here changes the simulation. The fire-cell
 /// and lava-vent gathers run on a headless server too, while the splashes, bubbles and torch flames
 /// skip it. Owned by <see cref="World"/>, which keeps the particle systems it feeds and draws them;
@@ -172,6 +174,55 @@ internal sealed class AmbientEffects
                 if (StatusEffectRegistry.ById(id)?.Particle is not { } kind) continue;
                 if (Random.Shared.NextSingle() >= chance) continue;
                 _fire.Puff(mob.Position, 1, mob.BodyHalfExtent * 2f, kind);
+            }
+        }
+    }
+
+    // The cave motes owed but not yet spawned (UpdateCaveMotes), so the rate holds at any frame rate
+    private float _caveMoteDebt;
+
+    /// <summary>
+    /// The drifting motes of the cave biome at the eye (CB-3, <see cref="CaveClimate.Motes"/>: embers in the
+    /// magma deep, sparks in crystal and fungal caves, steam glints in a frozen echo, dust in a desert one):
+    /// at the biome's rate, owed across frames so the rate is independent of the frame rate and capped at
+    /// <see cref="ParticleConfig.CaveMoteMaxPerFrame"/>, each at a random open cell within
+    /// <see cref="ParticleConfig.CaveMoteRadius"/> of the eye (a point inside a solid block is tried again up to
+    /// <see cref="ParticleConfig.CaveMoteSpawnTries"/> times), puffed on the campfire particle instance.
+    /// Cosmetic: singleplayer, and a client from its mirrored cave biome, never a headless server.
+    /// </summary>
+    internal void UpdateCaveMotes(float deltaTime, CaveBiome biome)
+    {
+        if (_serverMode || deltaTime <= 0f)
+            return;
+        var (kind, rate) = CaveClimate.Motes(biome);
+        if (kind is not { } moteKind)
+        {
+            _caveMoteDebt = 0f;
+            return;
+        }
+
+        _caveMoteDebt += deltaTime * rate;
+        var owed = (int)_caveMoteDebt;
+        if (owed <= 0)
+            return;
+        _caveMoteDebt -= owed;
+        owed = Math.Min(owed, ParticleConfig.CaveMoteMaxPerFrame);
+
+        var eye = Camera.RenderEye;
+        const float radius = ParticleConfig.CaveMoteRadius;
+        for (var m = 0; m < owed; m++)
+        {
+            for (var attempt = 0; attempt < ParticleConfig.CaveMoteSpawnTries; attempt++)
+            {
+                var offset = new Vector3(Random.Shared.NextSingle() * 2f - 1f, Random.Shared.NextSingle() * 2f - 1f,
+                    Random.Shared.NextSingle() * 2f - 1f) * radius;
+                if (offset.LengthSquared() > radius * radius) continue;
+                var point = eye + offset;
+                var block = _chunkManager.GetBlockGlobal((int)MathF.Floor(point.X), (int)MathF.Floor(point.Y),
+                    (int)MathF.Floor(point.Z));
+                if (BlockType.IsSolid(block)) continue;
+                _fire.Puff(point, 1, ParticleConfig.CaveMoteSpread, moteKind);
+                break;
             }
         }
     }

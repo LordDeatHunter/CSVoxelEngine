@@ -41,6 +41,7 @@ using VoxelEngine.Status;
 using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Trees;
 
 namespace VoxelEngine;
@@ -269,6 +270,10 @@ public class World
 
     /// <summary>Current HP, 0-100, drawn as 10 hearts in the HUD.</summary>
     public int Health => _health.Health;
+
+    /// <summary>The cave biome at the local player's eye (CB-3), which the frame lighting eases its cave
+    /// atmosphere toward: computed in singleplayer, mirrored from the server on a client.</summary>
+    internal CaveBiome EyeCaveBiome => LocalPlayer.EyeCaveBiome;
 
     /// <summary>The air under water as a share of a full lung, 0..1; the HUD's bubbles.</summary>
     public float AirShare => _health.Breath.Fraction;
@@ -1003,6 +1008,7 @@ public class World
         _tntManager.AnimateMirrors((float)deltaTime);
         Director.AnimateIcebergMirrors(deltaTime);
         Ambient.UpdateStatusParticles((float)deltaTime);
+        Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
         Ambient.UpdateRitualEffects((float)deltaTime);
         WormEffects?.Update((float)deltaTime, Sandworms);
         Ambient.GatherStationFires();
@@ -1166,6 +1172,7 @@ public class World
         {
             _dust.TakeMobLandings(_mobs, _chunkManager, _debris);
             Ambient.UpdateStatusParticles((float)deltaTime);
+            Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
             Ambient.UpdateRitualEffects((float)deltaTime);
             WormEffects?.Update((float)deltaTime, Sandworms);
         }

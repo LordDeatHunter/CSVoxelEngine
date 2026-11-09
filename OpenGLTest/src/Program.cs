@@ -546,7 +546,7 @@ public static class Program
         FrameProfiler.Begin(ProfileSection.Lighting);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.Lighting);
         renderManager.Lighting.SetLighting(world.LightingTime, world.Camera, world.PrimedTnt,
-            world.Camera.IsEyeInWater, world.Camera.IsEyeInLava, world.FireCells);
+            world.Camera.IsEyeInWater, world.Camera.IsEyeInLava, world.FireCells, eyeCaveBiome: world.EyeCaveBiome);
         ambience?.Update(renderManager.Lighting.Dayness, (float)MathUtils.Clamp(deltaTime, 0.0, 0.25));
         sfx?.Update();
         renderManager.BeginFrame(world.Camera);
