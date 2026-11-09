@@ -17,7 +17,7 @@ namespace VoxelEngine.Interaction;
 public static class Mining
 {
     /// <summary>Gap between hits for a bare hand or any item that declares no tool pace.</summary>
-    public const float DefaultHitGapMs = 300f;
+    public const float DefaultHitGapMs = 600f;
 
     /// <summary>Mining tier a bare hand counts as when a block's <c>tools</c> gate is checked.</summary>
     public const float DefaultPower = 0.5f;
