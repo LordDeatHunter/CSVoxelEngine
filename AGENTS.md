@@ -322,8 +322,9 @@ slot takes a `GearItem` of its own `GearSlot`, `GearSlots.Fits`). Gear is an ite
 compiled by `ItemLoader.ParseEquip` into a `GearInfo`. `equip.abilities` (`air_jump`, `no_fall_damage`, `extra_air`,
 `magnet`, `bone_shrapnel`; an unknown name refuses the item) compiles into `GearInfo.Abilities` (`GearAbility` flags), and
 `Equipment.Abilities`/`Has` caches their union with the stats on `Version` (the `no_fall_damage`, `extra_air` and `magnet`
-consumers are under "Armor, modifiers and sets", `bone_shrapnel` under "Bone shrapnel"). Every gear sprite is 32x32 committed pixel art
-(the same width every item sprite is authored at; the large swords are the 42x42 exception): the five-piece silhouette
+consumers are under "Armor, modifiers and sets", `bone_shrapnel` under "Bone shrapnel"). Every gear
+sprite is 32x32 committed pixel art (the same width every item sprite is authored at; the large
+swords are the 42x42 exception; several are still placeholders, listed in `USER_TODO.md`): the five-piece silhouette
 of each set is drawn once, shaded by a shared bevel and recolored per material, then dressed per material (stitching on
 leather, rivets on metal), and the rings, charms and belt are drawn the same way. **Cloud boots** (`cloud_boots`, feet, from iron boots and cloud shards) carry `air_jump`: one free air jump per airtime
 (`PlayerPhysics`), on a fresh Space press while airborne, never in water or flight nor on the frame a creative double tap toggles
@@ -2665,9 +2666,12 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   stair, landings, the door seal flood fill; TowerPlacementTests: rarity, point query
                                #   equals stamp, generated chunks) (mirrors src/WorldGen/Structures)
     Trees/                     # the tree growth engine, flat over src's Trees/Shape, Logics and Features
+USER_TODO.md                          # placeholder art list: every stand-in asset an agent added, its generator and
+                                      #   what a replacement must keep (see "Placeholder art" under "Content")
 tools/                                # asset generators: models, animation clips, sounds and the wiki scenarios, each
-                                      #   re-run byte-identical; the pixel art (block tiles, item sprites, icons, normal
-                                      #   maps, skins) is committed art now, so its generators were removed
+                                      #   re-run byte-identical; most pixel art is committed art now, but the generators
+                                      #   below still write the entity models/skins and a few placeholder sprites (listed
+                                      #   in USER_TODO.md)
   generate-goblin-clips.py            # deterministic generator of the goblin's animation clips (goblin.bbmodel)
   generate-hell-mob-models.py         # deterministic hellbrute/cinderwitch .bbmodel (rig + clips) and skins, and the
                                       #   ember_shard sprite; its header pins the rig and clip contract, --check
@@ -2688,6 +2692,14 @@ tools/                                # asset generators: models, animation clip
 Nothing about a block is hardcoded any more. `ContentRegistry` reads `assets/data` and
 `assets/models` at startup, hands out byte ids and publishes read-only tables that the rest of
 the engine indexes by id. **Adding a block means adding JSON, not editing C#.**
+
+**Placeholder art.** Any asset an agent adds as a stand-in — a texture, sprite, model or skin — is
+recorded in `USER_TODO.md` at the repo root in the same change: one checkbox per asset or group,
+with its path, what generated it (a `tools/` script, if any) and what a replacement must keep
+(canvas size, alpha or cutout, the UV regions its model crops, palette rules). Tick and delete the
+entry once real art is in. If a `tools/` generator wrote the file, remove or repoint that generator
+in the same change, or a re-run puts the placeholder back. Sound is not tracked there: a feature
+that needs audio waits in `plans/TODO.md` (`M-26`).
 
 Ids are `byte` and chunk storage is a `byte[]`: id 0 is air (it has no definition file, and a
 block may not be named `air`), then blocks sorted by file name, then items sorted by file name.
@@ -3095,7 +3107,7 @@ species share to the leafy owner) and refusing, spending nothing, where the cell
 
 **Spell staffs** (`staff` in the item schema): the **wooden staff** (branches and a crystal block) and
 the **crystal staff** it is upgraded into (the wooden staff, crystal blocks and a copper ingot), a
-higher tier with more slots and the `advanced` part tag beside `basic`. Their sprites are committed placeholder art (`StaffContentTests`, `StaffBindingTests`).
+higher tier with more slots and the `advanced` part tag beside `basic`. Their sprites are placeholders recorded in `USER_TODO.md` (`StaffContentTests`, `StaffBindingTests`).
 
 **Spell table** (`spell_table`, four oak planks and a crystal block) is a plain `cube_bottom_top` block
 wearing the crystal block's tile on top and planks elsewhere, made a station by the `spellBuilder`
@@ -3654,7 +3666,7 @@ in the fungal glow's palette slot, and decays like leaves) on
 `support: "above"`: each cell is held by the one over it, a solid ceiling or a vine, so a vine cut
 anywhere drops what hangs below, through mining's recursive pop and, with this change, the blast scan
 (`TntManager.PopIfUnsupported` follows a popped block's dependents past the blast box) and leaf decay
-(`LeafDecayManager.PopUnsupportedAround` recurses), with no new block flag. Every tile is committed art.
+(`LeafDecayManager.PopUnsupportedAround` recurses), with no new block flag. Every tile is committed art, except the charred and fungal tree tiles, which are placeholders recorded in `USER_TODO.md`.
 `HellFloraTests`; `visual-examples/hell-flora.json` (`VOXEL_TIME=147`) frames the Fungal Grove and the
 Ashlands.
 

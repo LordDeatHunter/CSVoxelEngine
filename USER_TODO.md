@@ -1,0 +1,162 @@
+# USER_TODO — placeholder art to replace
+
+> Every stand-in asset an agent adds goes here: the file, what made it, and what a replacement has
+> to keep. Tick an entry and delete it once the real art is in. If a `tools/` generator wrote the
+> file, remove or repoint that generator in the same change, or a re-run puts the placeholder back.
+> Current list as of 2026-11-09. Sound is not tracked here: features that need it wait in
+> `plans/TODO.md` (`M-26`).
+
+## Items
+
+Paths are under `OpenGLTest/assets/textures/items/`. All sprites are 32x32 RGBA unless noted, with
+transparency around the shape.
+
+### Armor (all pieces)
+
+- [ ] **Leather set** — `leather_cap.png`, `leather_tunic.png`, `leather_pants.png`,
+  `leather_boots.png`, `leather_gloves.png`.
+- [ ] **Bronze set** — `bronze_cap.png`, `bronze_tunic.png`, `bronze_pants.png`,
+  `bronze_boots.png`, `bronze_gloves.png`.
+- [ ] **Iron set** — `iron_cap.png`, `iron_tunic.png`, `iron_pants.png`, `iron_boots.png`,
+  `iron_gloves.png`.
+- [ ] **Cloud boots** — `cloud_boots.png`.
+
+A set's five pieces share one silhouette and bevel, dressed per material (stitching on leather,
+rivets on metal), so keep a replacement consistent with its set. A worn piece's shell is tinted by
+the **mean color of its sprite** (`ArmorLook.ColorOf`), so replacing one also changes the color the
+body wears.
+
+### Accessories
+
+- [ ] **Charms** — `bone_charm.png`, `ember_charm.png`, `feather_charm.png`, `fire_charm.png`,
+  `frost_charm.png`, `gill_charm.png`, `magnet_charm.png`, `reserve_charm.png`. Each should read
+  as its own ability (bone, ember, feather, fire, frost, gill, lodestone, reserves).
+- [ ] **Amulet of vigor** — `amulet_of_vigor.png`.
+
+### Staffs
+
+- [ ] **Wooden staff** — `wooden_staff.png`.
+- [ ] **Crystal staff** — `crystal_staff.png`. Keep it visually above the wooden staff (the
+  `advanced` tier).
+
+### Consumables
+
+- [ ] **Mana draught** — `mana_draught.png`.
+- [ ] **Teaching scrolls** — `scroll_fire_projectile.png`, `scroll_frost.png`,
+  `scroll_modifiers.png`, `scroll_nature.png`, `scroll_self.png`. Keep them readable at hotbar
+  size and distinct from one another.
+
+### Tools and weapons
+
+- [ ] **Bow** — `bow.png`. No shot yet; the two-handed draw pose (`UsePose.Bow`) already uses the
+  held sprite.
+- [ ] **Smithing hammer** — `smithing_hammer.png`.
+- [ ] **Thumper** — `thumper.png`. Made by `tools/generate-sandworm-model.py`: re-running puts the
+  placeholder back (`--check` compares).
+- [ ] **Spear** — `spear.png`. `throwAligned`: the sprite's tip must sit on its (1, 1) diagonal
+  (up-right), or the thrown copy does not fly point first.
+
+### Drops
+
+- [ ] **Arrow** — `arrow.png`. Made by `tools/generate-skeleton-model.py` (re-running puts it back;
+  `--check` compares). `throwAligned`: keep the tip on the sprite's (1, 1) diagonal.
+- [ ] **Bone** — `bone.png`. Made by `tools/generate-skeleton-model.py`.
+- [ ] **Bloom** — `bloom.png`. The bloomery output.
+- [ ] **Sandworm fang** — `sandworm_fang.png`. Made by `tools/generate-sandworm-model.py`.
+
+### Tin (everything but the ring)
+
+- [ ] **Tin ingot** — `tin_ingot.png`.
+- [ ] **Tin ore (item)** — `tin_ore.png` (the raw ore chunk, not the block tile below).
+- [ ] **Crushed tin** — uses `tin_ore.png` too (`data/items/crushed_tin.json` points at the same
+  sprite), so replacing that one file covers both.
+- [ ] **Tin tool heads** — `tin_axe_head.png`, `tin_pickaxe_head.png`, `tin_sword_head.png`
+  (the sword head is 42x42).
+- [ ] **Tin tools** — `tin_axe.png`, `tin_pickaxe.png`, `tin_sword.png`. The sword is 42x42 (the
+  large-sword exception); everything else is 32x32. Keep the tool-family silhouettes so tin reads
+  as the same tools in a weaker metal.
+
+## Blocks
+
+Paths are under `OpenGLTest/assets/textures/blocks/`. All tiles are 32x32; no `tools/` generator
+writes them, so replace the PNG directly. Opaque `cube_all` tiles are greedy-merged and must stay
+fully opaque and tileable on both axes.
+
+### Hell and sky realms
+
+- [ ] **Hell rock and ground** — `basalt.png`, `hellrock.png`, `scorched_hellrock.png`,
+  `cinder_soil.png`, `magma_block.png`. `magma_block` is emissive: keep it reading as glowing rock.
+- [ ] **Charred log** — `charred_log_side.png`, `charred_log_top.png`. The Ashlands' leafless tree;
+  keep the side and end reads of a burnt log.
+- [ ] **Fungal tree** — `fungal_log_side.png`, `fungal_log_top.png`, `fungal_cap.png`. The cap is
+  the tree's leaves (opaque tile, teal glow). `fungal_soil.png` and `fungal_moss.png` are confirmed
+  fine and are **not** placeholders.
+- [ ] **Crystal tree** — `crystal_log_side.png`, `crystal_log_top.png`, `crystal_leaves.png`.
+  The leaves are cutout and glow pale cyan.
+- [ ] **Sky oak leaves** — `sky_oak_leaves.png`. Cutout and swaying; untinted (the sky has no
+  climate of its own), so keep transparent holes and a canopy silhouette.
+
+### Building
+
+- [ ] **Oak planks tile** — `oak_planks.png`. Fully opaque and tileable on both axes (greedy walls
+  repeat it). The slab, stairs and fence crop it with default UVs, so any region can show.
+- [ ] **Oak door tiles** — `oak_door_bottom.png`, `oak_door_top.png`. Fully opaque; the top tile
+  sits directly over the bottom one (no frame row where they meet). Keep the handle on the vertical
+  center line, or move it only with mirrored explicit UVs on one broad face (the baker mirrors
+  side-face UVs).
+- [ ] **Oak trapdoor tile** — `oak_trapdoor.png`. Fully opaque (holes would need `cutout: true` on
+  `oak_trapdoor.json`); the models crop it with default UVs.
+- [ ] **Anvil** — `anvil.png`. The model crops it with default UVs across the base, waist, top and
+  horn, so every part must read on its own. Keep it symmetric.
+- [ ] **Slag bricks** — `slag_bricks.png`. Opaque and tileable (greedy cube).
+- [ ] **Bloomery bricks** — `bloomery_bricks.png`. Opaque and tileable (greedy cube; the bloomery
+  multiblock's building block).
+- [ ] **Cloud block** — `cloud_block.png`. A soft white mottle whose alpha is about 0.7; keep the
+  alpha, since it is drawn in the translucent pass.
+- [ ] **Slime block** — `slime_block.png`. Opaque, green gel in 4x4-texel cells with rims and
+  glints; tileable on both axes (greedy-merged faces repeat it).
+
+### Chests
+
+One shared `block/chest` model, 32x32 tiles, front/side/top each.
+
+- [ ] **Wooden chest** — `chest_wooden_front.png`, `chest_wooden_side.png`, `chest_wooden_top.png`.
+- [ ] **Iron chest** — `chest_iron_front.png`, `chest_iron_side.png`, `chest_iron_top.png`.
+- [ ] **Bronze chest** — `chest_bronze_front.png`, `chest_bronze_side.png`, `chest_bronze_top.png`.
+- [ ] **Ruin chests** — `chest_ruin_surface_*`, `chest_ruin_underground_*`, `chest_ruin_sky_*`,
+  `chest_ruin_hell_*` (front, side and top each).
+
+The model crops each face with default UVs, and the front tile's lock plate lands across the seam
+between lid and body, so keep the plate centered on that seam.
+
+### Waystones
+
+Each realm has a stone tile and a lower/upper rune tile.
+
+- [ ] **Surface waystone** — `waystone_surface_stone.png`, `waystone_surface_runes.png`,
+  `waystone_surface_runes_upper.png`.
+- [ ] **Underground waystone** — `waystone_underground_stone.png`,
+  `waystone_underground_runes.png`, `waystone_underground_runes_upper.png`.
+- [ ] **Hell waystone** — `waystone_hell_stone.png`, `waystone_hell_runes.png`,
+  `waystone_hell_runes_upper.png`.
+- [ ] **Sky waystone** — `waystone_sky_stone.png`, `waystone_sky_runes.png`,
+  `waystone_sky_runes_upper.png`.
+
+The lower shaft crops the rune tile's columns 10..21, rows 0..21; the upper shaft crops rows 12..31,
+so the upper tile must continue the lower one across the cell seam. The stone tile dresses the
+plinth and cap; both models are symmetric.
+
+### Other
+
+- [ ] **Tin ore block** — `tin_ore.png` (the block tile; the item sprite above is a separate file
+  with the same name). Opaque and tileable.
+- [ ] **Lily pad** — `lily_pad.png`. Cutout; the model crops the whole tile on top and a one-texel
+  edge on the sides.
+- [ ] **Hollow log insides** — `hollow_oak_log_inner.png`, `hollow_oak_log_end.png`,
+  `hollow_spruce_log_inner.png`, `hollow_spruce_log_end.png`,
+  `hollow_stone_pine_log_inner.png`, `hollow_stone_pine_log_end.png`. The end tile's default UVs
+  crop its outer 3/16 band, so keep a readable cross-section ring. The outside bark is the species'
+  own log tile and is not listed here.
+- [ ] **Battle tower bricks** — `tower_bricks.png`, `tower_bricks_sandstone.png`,
+  `tower_bricks_frost.png`. Opaque and tileable; palette swaps of `stone_bricks`, so the three must
+  read as one structure in their biomes.
