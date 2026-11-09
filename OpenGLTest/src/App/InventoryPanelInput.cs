@@ -568,6 +568,11 @@ internal sealed class InventoryPanelInput
     {
         if (ActiveWorld is not { } world) return;
         var inventory = world.Inventory;
+        if (renderManager.Ui.Hud.HotbarSlotAt(position) is { } hotbar)
+        {
+            UnbindHotbarSlot(inventory, hotbar);
+            return;
+        }
         if (EntryAt(position, inventory, world.Camera.IsCreative) is not { } entry) return;
         if (entry.Recipe is { } recipe)
         {
@@ -576,6 +581,21 @@ internal sealed class InventoryPanelInput
         }
         if (RowEquip.Apply(inventory, entry.Id, entry.ToolInstance) is { } intent)
             session.SendInventoryIntent(intent);
+    }
+
+    // Equipping what a slot already shows clears it, so the unbind reuses the equip intent the server replays.
+    private void UnbindHotbarSlot(Inventory inventory, int slot)
+    {
+        var held = inventory.SlotAt(slot);
+        if (held.IsTool)
+        {
+            inventory.EquipTool(slot, held.ToolInstance);
+            session.SendInventoryIntent(InventoryIntent.EquipTool(slot, held.ToolInstance));
+            return;
+        }
+        if (held.Id == 0) return;
+        inventory.EquipStackable(slot, held.Id);
+        session.SendInventoryIntent(InventoryIntent.EquipStackable(slot, held.Id));
     }
 
     /// <summary>
