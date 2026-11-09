@@ -58,8 +58,6 @@ body wears.
 
 ### Drops
 
-- [ ] **Arrow** — `arrow.png`. Made by `tools/generate-skeleton-model.py` (re-running puts it back;
-  `--check` compares). `throwAligned`: keep the tip on the sprite's (1, 1) diagonal.
 - [ ] **Bone** — `bone.png`. Made by `tools/generate-skeleton-model.py`.
 - [ ] **Bloom** — `bloom.png`. The bloomery output.
 - [ ] **Sandworm fang** — `sandworm_fang.png`. Made by `tools/generate-sandworm-model.py`.
@@ -197,6 +195,12 @@ Paths are under `OpenGLTest/assets/models/entity/`. Every model is a Blockbench 
 skin PNG beside it; the `tools/` generator writes both, so replace them by editing that generator
 (or remove it in the same change), or a re-run puts the placeholder back (`--check` compares).
 
+- [ ] **Skeleton Archer and Skeleton Warrior** — `skeleton.bbmodel`/`skeleton.png` (lanky and tall, 32 px, a bow
+  under `ArmL`) and `skeleton_warrior.bbmodel`/`skeleton_warrior.png` (shorter and bulkier, 28 px, a copper dagger
+  under `ArmR`), 64x64 skins in the bone palette. Made by `tools/generate-skeleton-model.py`. Keep the humanoid groups
+  (head and arms under the torso), the clips (`idle`, `walk`, `melee` with `impact`, `shoot` with `release`, `hurt`,
+  `death`, `spawn`) that `Skeleton.ValidateContent` checks, and whole `Head`/`Torso`/`LegL`/`LegR` parts: the armor
+  shells (`SkeletonOutfit`) cover them.
 - [ ] **Skeleton King** — `skeleton_king.bbmodel` and `skeleton_king.png` (128x128 skin, small
   palette: the skeleton's bone shades, gold, purple, red eyes). Made by
   `tools/generate-skeleton-king-model.py`. Keep the humanoid groups (`Torso`, `Head`, `ArmL`, `ArmR`,
