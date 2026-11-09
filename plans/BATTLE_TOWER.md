@@ -4,7 +4,7 @@
 
 ## Status
 
-BT-1 to BT-6 done; BT-7 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
+BT-1 to BT-7 done; BT-8 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
 the tower generator (see "Tower generator (BT-2)" under Reference), BT-3 the undead skeleton with its melee rake, bow
 and arrows, floor-tier difficulty and forced-spawn-only manager (see "Skeleton (BT-3)" and AGENTS.md "Skeleton"), BT-4
 the skeleton piles, the floor doors and `TowerManager` (see "Locks (BT-4)" and AGENTS.md "Battle tower"), BT-5 the
@@ -21,13 +21,6 @@ Nothing.
 
 ## Open
 
-- [ ] **`BT-7` · Boss loot and unique items** — P2, L.
-  Exactly one guaranteed unique per boss, rolled from a pool, plus ingots and goodies from a boss table. Two of the
-  pool's uniques are shipped (crafted for now; the boss table is what is left): the **Bone-Breaker Blade**, a sword that
-  sprays bone fragments on every landed hit (`shrapnel`, stronger than the plan's old "kills burst" idea, which the user
-  changed to on-hit), and the **Bone Charm**, the accessory the plan asked for — very slight mana regen, +10 % against
-  undead and the same burst on any weapon, which also sharpens the blade's (`bone_shrapnel`). Still open: a **staff or
-  spell scroll** teaching a new part. No armor for now.
 - [ ] **`BT-8` · Collapse into a ruin** — P2, L.
   After the boss dies, a staged collapse (top floors first) replaces the tower with rubble and ruin blocks placed
   around where it stood, through a capped-per-frame writer like `StatusEffectBlockWriter` that calls every edit-path
@@ -186,7 +179,7 @@ Nothing.
   - **Saves and wire**: `stations.json` `TowerData.Altar` (absent = Dormant); the king in `entities.json` with
     `TowerCell` and `Tier`; protocol 27 (the altar byte, `NetEntityKind.SkeletonKing` 14, phase in `ItemId`).
   - **Hook for BT-7**: the king rolls the placeholder `loot/skeleton_king.json` (bones, wrought iron, bronze ingots);
-    replace it with the unique pool plus the boss table.
+    done in BT-7: its first pool rolls exactly one unique (blade, charm or crystal staff), then bones, metal and a scroll or draught (`SkeletonKingLootTests`). No new content ids; the staff-or-scroll unique reuses `crystal_staff`.
   - **Hook for BT-8**: `TowerManager.BossDefeated` (an event, raised once per tower) and `TowerRecord.BossDefeated` (true
     from then on, saved); nothing listens yet.
   - **Tuning**: the "Skeleton King" block of `MobConfig` (all first guesses: hp 400 in the JSON, phase shares 0.66/0.33,

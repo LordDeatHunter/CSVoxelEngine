@@ -1,6 +1,15 @@
-// The Skeleton King's placeholder boss table: bones and metal. BT-7 (plans/BATTLE_TOWER.md) owns its unique loot
+// The Skeleton King's boss table: exactly one guaranteed unique from the pool (its first pool rolls once, no empty entry),
+// then bones, metal and a scroll. Uniques: the bone-breaker blade, the bone charm, the crystal staff.
 {
   "pools": [
+    {
+      "rolls": 1,
+      "entries": [
+        { "item": "item/bone_breaker_blade", "weight": 3 },
+        { "item": "item/bone_charm", "weight": 3 },
+        { "item": "item/crystal_staff", "weight": 2 }
+      ]
+    },
     {
       "rolls": 1,
       "entries": [
@@ -17,6 +26,14 @@
       "rolls": 1,
       "entries": [
         { "item": "item/bronze_ingot", "weight": 1, "count": { "min": 1, "max": 3 } }
+      ]
+    },
+    {
+      "rolls": 1,
+      "chance": 0.5,
+      "entries": [
+        { "item": "item/scroll_modifiers", "weight": 1 },
+        { "item": "item/mana_draught", "weight": 2, "count": { "min": 1, "max": 2 } }
       ]
     }
   ]
