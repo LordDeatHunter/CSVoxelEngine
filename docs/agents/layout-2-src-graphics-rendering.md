@@ -259,6 +259,10 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       TreeShudder.cs           # GL-free: the leaf cells above and around a chopped trunk cell, thinned to a few, that an axe hit shakes loose
       WaterSplash.cs           # GL-free splash rule (droplets by crossing speed) + Track: a body's droplets off the water top
       WaterSplashTracker.cs    # GL-free per-body water crossing memory: in water last frame, speed from its own height
+      Collapse/                # a defeated tower's collapse show (never on a server)
+        CollapseDebris.cs      # one block thrown off the tower: tumbles, bounces and rolls on the terrain (read-only), then bursts
+        TowerCollapseEffects.cs # World component: the chips, thrown blocks and rumble of a defeated tower's falling cells,
+                               #   fed by TowerBlockWriter's replaced hook or a client's journal (ShowsCollapse)
     Platform/                  # Silk.NET window and input setup
       InputManager.cs          # keyboard/mouse context
       WindowManager.cs         # Silk.NET window setup
@@ -421,7 +425,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         MobPasses.cs           # the slime, goblin and hell mob draws (RenderSlimes, RenderGoblins, RenderHellMobs),
                                #   the slime mesh and skin, one RigMeshes per clip-animated kind, SlimeTransform
         RigMeshes.cs           # one clip-animated kind's rig, part meshes (ordinal-sorted) and skin, PartMatrix
-        ObjectPasses.cs        # drops, thrown items, primed TNT, falling blocks, mining debris and toppling trees
+        ObjectPasses.cs        # drops, thrown items, primed TNT, falling blocks, mining debris, a collapsing tower's
+                               #   thrown blocks (RenderCollapseDebris) and toppling trees
                                #   (Render*/Draw* pairs; the mirror reuses the Draw* cores)
         PlayerPasses.cs        # the player body, held item and remote players (RenderPlayer, RenderHeldItem, RenderRemotePlayers),
                                #   the player rig and its meshes; the held sprite through HeldItemPose and DrawItemSprite,

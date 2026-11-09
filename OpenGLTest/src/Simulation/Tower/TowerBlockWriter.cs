@@ -36,6 +36,9 @@ namespace VoxelEngine.Simulation.Tower;
 /// <item>loot: none - a door opens and a spent pile crumbles, neither is mined - except that a replaced chest spills what it
 /// holds through the <c>spillChest</c> hook (<c>ChestManager.NotifyBlockRemoved</c>), so the collapse loses nothing;</item>
 /// <item>multiplayer: no player predicted the write, so no <c>World.BlockEdited</c>;</item>
+/// <item>cosmetics: the <c>replaced</c> hook hears every write (cell, old block, new block), which singleplayer turns into
+/// the collapse's chips, thrown blocks and rumble (<c>TowerCollapseEffects.OnCellChanged</c>; a client gets the same from
+/// its journal);</item>
 /// <item>unloaded chunks: every read goes through <see cref="ChunkManager.TryGetCell"/>, and an unloaded cell
 /// is reported, never written.</item>
 /// </list>
@@ -44,7 +47,8 @@ namespace VoxelEngine.Simulation.Tower;
 /// </summary>
 public sealed class TowerBlockWriter(ChunkManager chunks, FluidManager fluids, LeafDecayManager leafDecay,
     FallingBlockManager falling, LodManager lod, Action<int, int, int> notifyLodEdit,
-    Action<int, int, int>? popUnsupported, Action<int, int, int, ChestProfile, byte>? spillChest = null)
+    Action<int, int, int>? popUnsupported, Action<int, int, int, ChestProfile, byte>? spillChest = null,
+    Action<int, int, int, byte, byte>? replaced = null)
 {
     private int _writesThisFrame;
 
@@ -92,6 +96,7 @@ public sealed class TowerBlockWriter(ChunkManager chunks, FluidManager fluids, L
         }
         if (BlockType.ById[expected]?.Chest is { } profile)
             spillChest?.Invoke(x, y, z, profile, oldState);
+        replaced?.Invoke(x, y, z, expected, block);
         _writesThisFrame++;
         return TowerWriteResult.Written;
     }

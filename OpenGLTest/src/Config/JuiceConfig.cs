@@ -4,8 +4,9 @@ namespace VoxelEngine.Config;
 
 /// <summary>
 /// Game-feel effect tuning: landing and footstep dust, slime splats, hit sparks, the death poof,
-/// blast shake and push, falling-block dust, lava steam, the tree thud, water splashes, tool
-/// shatter, the pickup sparkle, the low-health vignette, the damage arc and the surfacing droplets.
+/// blast shake and push, falling-block dust, lava steam, the tree thud, the tower collapse, water
+/// splashes, tool shatter, the pickup sparkle, the low-health vignette, the damage arc and the
+/// surfacing droplets.
 /// </summary>
 public static class JuiceConfig
 {
@@ -134,6 +135,56 @@ public static class JuiceConfig
     public const int TreeThudDustPoints = 8;
     public const int TreeThudDustCount = 5;
     public const float TreeThudDustSpeed = 2.6f;
+
+    // --- Tower collapse (TowerCollapseEffects, CollapseDebris): while a defeated battle tower falls into
+    // its ruin, every unbreakable cell the collapse rewrites within the effect range crumbles into a few
+    // chips of itself (at most ChipsPerSecond of them in all), the cells near the wall (from
+    // MinRadiusShare of the footprint radius out) that fall away to air with the cell outside them open,
+    // so the block clears the wall, throw whole blocks off the tower
+    // (at most LaunchesPerSecond, never more than DebrisMax alive), and the camera rumbles by its distance
+    // to the nearest falling cell (ShakeFalloff), a pulse every RumblePulseSeconds like the sandworm's
+    // thump, until RumbleHoldSeconds after the last one. A thrown block tumbles through the air, bounces and rolls
+    // along the ground (it only reads the terrain: no cell, body, damage or save ever sees it) and at the
+    // end of its life bursts into BurstChips chips, jolting a camera close by. Cosmetic: singleplayer and
+    // a client (from the cells its journal brings), never a server. ---
+    public const float TowerCollapseEffectRangeBlocks = 96f;
+    public const int TowerCollapseChipsPerCell = 2;
+    public const float TowerCollapseChipsPerSecond = 100f;
+    // Blocks per second a crumbling cell's chips fly out at, and their edge length (coarser than a
+    // mining chip, so the rubble reads from across the tower)
+    public const float TowerCollapseChipSpeed = 3f;
+    public const float TowerCollapseChipSize = 0.2f;
+    public const float TowerCollapseRumbleStrength = 0.5f;
+    public const float TowerCollapseRumbleNearBlocks = 16f;
+    public const float TowerCollapseRumbleRangeBlocks = 64f;
+    public const float TowerCollapseRumblePulseSeconds = 0.3f;
+    public const float TowerCollapseRumbleHoldSeconds = 0.6f;
+    public const float TowerDebrisMinRadiusShare = 0.75f;
+    public const float TowerDebrisLaunchesPerSecond = 20f;
+    public const int TowerDebrisMax = 96;
+    // Blocks per second a thrown block leaves the tower at: away from its center, upward and sideways
+    public const float TowerDebrisOutwardSpeedMin = 2.5f;
+    public const float TowerDebrisOutwardSpeedMax = 6f;
+    public const float TowerDebrisLiftMax = 4f;
+    public const float TowerDebrisSideSpeed = 1.5f;
+    // Edge length of a thrown block, in blocks
+    public const float TowerDebrisSizeMin = 0.55f;
+    public const float TowerDebrisSizeMax = 0.9f;
+    // Seconds a thrown block lives before it bursts: one thrown off the top falls for about two
+    // seconds, so it still lands, rolls and lies a moment at the foot of the wall
+    public const float TowerDebrisLifetimeMin = 4f;
+    public const float TowerDebrisLifetimeMax = 6f;
+    // Radians per second a thrown block tumbles at in the air
+    public const float TowerDebrisTumbleMin = 2f;
+    public const float TowerDebrisTumbleMax = 8f;
+    // How fast the ground scrubs a rolling block's speed, per second (gentler than BodyMotion.GroundFriction)
+    public const float TowerDebrisRollFriction = 1.6f;
+    // The chips a thrown block bursts into, and how fast they fly
+    public const int TowerDebrisBurstChips = 14;
+    public const float TowerDebrisBurstSpeed = 4f;
+    public const float TowerDebrisBurstShake = 0.15f;
+    public const float TowerDebrisBurstShakeNearBlocks = 3f;
+    public const float TowerDebrisBurstShakeRangeBlocks = 20f;
 
     // --- Water splash (WaterSplash, WaterSplashTracker, BlockDebrisSystem.Splash): anything that
     // crosses a water surface throws pale droplets up from the water top, none under the minimum

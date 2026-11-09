@@ -26,6 +26,7 @@ using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
+using VoxelEngine.Particles.Collapse;
 using VoxelEngine.Player;
 using VoxelEngine.Rendering;
 using VoxelEngine.Rendering.Geometry;
@@ -175,6 +176,10 @@ public class World
     /// <summary>The sandworm's cosmetic show: thump rumble, surfacing sand, breach boom, dash dust and the
     /// earthquake (never built on a headless server).</summary>
     internal SandwormEffects? WormEffects { get; }
+
+    /// <summary>A defeated tower's collapse show: rubble chips, thrown blocks and the rumble (never built on a headless
+    /// server).</summary>
+    internal TowerCollapseEffects? CollapseEffects { get; }
 
     /// <summary>The block edit paths: breaking, felling, multiblocks, tall blocks, toppling trees, edit reports.</summary>
     internal BlockEditor Edits { get; }
@@ -524,7 +529,10 @@ public class World
             // Built before the persistence, whose constructor restores the stations (towers included)
             _towers = new TowerManager(clientMode ? null : new TowerBlockWriter(_chunkManager, _fluidManager, _leafDecay,
                 _falling, _lodManager, Edits.NotifyLodEdit, Edits.PopUnsupportedAt,
-                spillChest: (x, y, z, profile, state) => _chests.NotifyBlockRemoved(x, y, z, profile, state, _dropManager)));
+                spillChest: (x, y, z, profile, state) => _chests.NotifyBlockRemoved(x, y, z, profile, state, _dropManager),
+                replaced: (x, y, z, before, after) => CollapseEffects?.OnCellChanged(x, y, z, before, after)));
+            if (!serverMode)
+                CollapseEffects = new TowerCollapseEffects(Camera, _debris, _chunkManager, _towers);
             LeftClick =new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
             Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
                 _lodManager, _debris, clientMode, serverMode);
@@ -1023,6 +1031,7 @@ public class World
         Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
         Ambient.UpdateRitualEffects((float)deltaTime);
         WormEffects?.Update((float)deltaTime, Sandworms);
+        CollapseEffects?.Update((float)deltaTime);
         Ambient.GatherStationFires();
         Ambient.AddGoblinTorches();
         _fire.Update((float)deltaTime, Ambient.FireCells, Camera.RenderEye, wind: Wind.Direction(LightingTime));
@@ -1187,6 +1196,7 @@ public class World
             Ambient.UpdateCaveMotes((float)deltaTime, EyeCaveBiome);
             Ambient.UpdateRitualEffects((float)deltaTime);
             WormEffects?.Update((float)deltaTime, Sandworms);
+            CollapseEffects?.Update((float)deltaTime);
         }
 
         Edits.UpdateToppling((float)deltaTime);

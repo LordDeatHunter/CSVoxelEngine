@@ -256,14 +256,34 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   `Waiting` chunks, `Done`; the in-layer index is not saved, since a rescan is idempotent: a cell no longer holding its
   expected block reads gone); an entry on a tower that is not Defeated is ignored, and a Defeated tower with none (a save from
   before BT-8) starts a fresh collapse. No wire change: clients see the ruin through the `BlockChanges` journal (protocol
-  stays 27). Tests: `TowerRuinTests`, `TowerCollapseTests` (top-down, the per-frame cap, the delay, unloaded cells waiting, the
-  save round trip, done is permanent, no body entombed), the `TryReplace` and spill cases of `TowerBlockWriterTests`,
-  `TowerRulesTests.ACollapseIsDueOnlyForADefeatedTowerThatHasNotFinished`, the collapse cases of `TowerManagerSaveTests` and
-  `TowerAltarTests.ADefeatedTowerStartsCollapsingAndAnUndefeatedOneNever`. **Known gaps**: desert and frost towers fall to
+  stays 27). **The show** (`Particles/Collapse/TowerCollapseEffects`, cosmetic, tuning in `JuiceConfig.TowerCollapse*` and
+  `TowerDebris*`, never built on a server): every cell going from an unbreakable block to anything else
+  (`TowerCollapseEffects.ShowsCollapse`: only the tower's writer can do that, so a player's edit never plays it) inside a
+  tracked tower whose king is killed, within `TowerCollapseEffectRangeBlocks` of the camera, crumbles into a few chips of
+  itself (coarse `BlockDebrisSystem.Puff` chips, under a chips-per-second cap), and one near the wall (from `TowerDebrisMinRadiusShare`
+  of the footprint radius out) that falls away to air, with the cell outside it on its main outward axis open (so the block
+  clears the wall instead of landing on the stump behind brick still standing), may throw a whole block off the tower (`CollapseDebris`, under a
+  launches-per-second cap and `TowerDebrisMax` alive): launched away from the tower's center with some lift, it tumbles,
+  bounces and rolls on the terrain (it only reads cells through `BoxSweep`; no cell, body, damage, save or wire ever sees
+  it, drawn by `ObjectPasses.RenderCollapseDebris`) and bursts into rubble chips when its life runs out, jolting a camera
+  close by. The camera rumbles by its distance to the nearest falling cell (`ShakeFalloff`), in overlapping pulses every
+  `TowerCollapseRumblePulseSeconds` like the sandworm's thump and the ritual's rumble, while cells keep falling (a
+  per-frame hold through `SandwormEffectRules.HoldTrauma` would stay invisible: the view shake decays linearly, so adding
+  `trauma * dt / 0.7` a frame never builds up). Singleplayer feeds it from the
+  writer's `replaced` hook, a client from the cells its journal brings (`ClientMirror.ApplyNetworkBlockChanges`, against
+  its mirrored tower records), so the same rule plays the same show with no wire of its own;
+  `visual-examples/tower-collapse.json` (`VOXEL_TIME=147`) films it. Tests: `TowerRuinTests`, `TowerCollapseTests` (top-down,
+  the per-frame cap, the delay, unloaded cells waiting, the save round trip, done is permanent, no body entombed), the
+  `TryReplace` and spill cases of `TowerBlockWriterTests`, `TowerRulesTests.ACollapseIsDueOnlyForADefeatedTowerThatHasNotFinished`,
+  the collapse cases of `TowerManagerSaveTests`, `TowerAltarTests.ADefeatedTowerStartsCollapsingAndAnUndefeatedOneNever` and
+  `TowerCollapseEffectsTests` (the show's rule, only a cell open on its outer side throws a block, a thrown block always
+  ends in a burst and never writes a cell).
+  **Known gaps**: desert and frost towers fall to
   stone rubble too; a storeless world (a `VOXEL_SCRIPT` run) forgets a ruined chunk on unload, so it regenerates intact; a
   crash between a chunk's save and `stations.json` saying Done can leave an intact part never redone; a late-loading,
   unmodified chunk shows the intact tower until the waiting sweep reaches it; worldgen never builds the ruin itself; no
-  collapse dust, sound or shake yet; mobs and drops standing in a rubble cell are not protected like players.
+  collapse sound yet, and the thrown blocks cast no shadow and are not in the water mirror; mobs and drops standing in a
+  rubble cell are not protected like players.
 
 ### Sandworm
 

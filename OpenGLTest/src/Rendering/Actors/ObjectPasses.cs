@@ -5,6 +5,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Graphics;
 using VoxelEngine.Items;
 using VoxelEngine.Particles;
+using VoxelEngine.Particles.Collapse;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
 
@@ -12,7 +13,8 @@ namespace VoxelEngine.Rendering.Actors;
 
 /// <summary>
 /// The loose-object draws of the entity pass: the floating item drops, the thrown items in
-/// flight, primed TNT, falling sand and gravel, the mining debris and the toppling trees. Each
+/// flight, primed TNT, falling sand and gravel, the mining debris, the blocks a collapsing tower
+/// throws off and the toppling trees. Each
 /// Draw* core takes its own view-projection and a mirror flag, so the water mirror redraws the
 /// same objects through them. Owns no GL resource: the world program and the item and block
 /// caches stay owned by <see cref="RenderManager"/>. Render thread only.
@@ -234,6 +236,32 @@ internal sealed class ObjectPasses
         // with worldShader still bound; it keeps uBiomeTint white unless a tinted draw is in
         // flight, for the plain draws that follow (toppling tree, drops, entities)
         _owner.WorldShader.SetUniform(_owner.LocBiomeTint, Vector3.One);
+    }
+
+    /// <summary>
+    /// Draws the blocks a collapsing tower throws off (<see cref="CollapseDebris"/>): whole cubes of the block that fell,
+    /// tumbling and rolling about their centers, at full opacity until they burst into chips. Untinted, like the
+    /// tower's own blocks, so <c>uBiomeTint</c> stays the white <see cref="RenderBlockDebris"/> leaves it at.
+    /// </summary>
+    internal void RenderCollapseDebris(Camera camera, IReadOnlyList<CollapseDebris> debris)
+    {
+        if (camera == null || debris.Count == 0) return;
+
+        _owner.WorldShader.Use();
+        _owner.BindWorldTextures();
+
+        var viewProj = camera.GetViewProjection();
+        foreach (var block in debris)
+        {
+            var mesh = _owner.BlockCubes.GetTinted(block.BlockId);
+            if (mesh == null) continue;
+
+            var model = Matrix4x4.CreateScale(block.Size)
+                        * Matrix4x4.CreateFromQuaternion(block.Orientation)
+                        * Matrix4x4.CreateTranslation(block.Position);
+            _owner.SetDrawUniforms(model, model * viewProj, 1f, _owner.LightAt(block.Position));
+            mesh.Render();
+        }
     }
 
     /// <summary>

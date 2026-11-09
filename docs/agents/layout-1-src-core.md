@@ -124,7 +124,7 @@ OpenGLTest/
       IcebergConfig.cs         # icebergs: caps and the spawn ring, the spawn band, size and mass, drift and push,
                                #   wobble, life cycle, the client mirror's lead
       JuiceConfig.cs           # landing and footstep dust, slime splat, hit sparks, death poof, blast shake and
-                               #   push, falling-block dust, lava steam, tree thud, splashes, tool shatter, pickup
+                               #   push, falling-block dust, lava steam, tree thud, tower collapse, splashes, tool shatter, pickup
                                #   sparkle, low-health vignette, damage arc, surfacing droplets
       LightingConfig.cs        # alpha cutoff, atlas anisotropy, light spread, shadow cascades, point and fire
                                #   lights, fog, tonemap exposure, eye adaptation

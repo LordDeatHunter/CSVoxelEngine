@@ -198,6 +198,8 @@ internal sealed class WorldRenderer
         FrameProfiler.Begin(ProfileSection.EntityPass);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.EntityPass);
         renderManager.Objects.RenderBlockDebris(Camera, _debris.Debris);
+        if (_world.CollapseEffects is { } collapse)
+            renderManager.Objects.RenderCollapseDebris(Camera, collapse.Debris);
         foreach (var tree in _toppling)
             renderManager.Objects.RenderTopplingTree(Camera, tree);
         var armorVersion = Inventory.Equipment.Version;

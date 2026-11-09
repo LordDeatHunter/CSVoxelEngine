@@ -196,7 +196,8 @@ Nothing.
   - **Known gaps**: desert and frost towers fall to stone rubble; a storeless world regenerates a ruined chunk intact after
     unload; a crash between a chunk's save and `stations.json` saying Done can leave an intact part that is never redone; a
     late, unmodified chunk shows the intact tower until the waiting sweep reaches it (worldgen never builds the ruin); no
-    collapse dust, sound or shake; a whole tower takes some tens of seconds at 32 writes a frame (measured under "Costs
+    collapse sound (the chips, thrown blocks and rumble are `TowerCollapseEffects`, see docs/agents/tower-and-bosses.md
+    "Collapse (BT-8)"); a whole tower takes some tens of seconds at 32 writes a frame (measured under "Costs
     (BT-9)"); mobs and drops in a rubble cell are not protected like players.
 
 - **Dark interiors (BT-10)**, 0 content ids. See AGENTS.md "Sky cover (BT-10)" and "Battle tower".

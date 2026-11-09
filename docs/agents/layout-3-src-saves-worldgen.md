@@ -144,7 +144,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   the altar verdict (AltarVerdictOf), the collapse gate (CollapseDue)
         TowerBlockWriter.cs    # the capped writer past `unbreakable` (Chunk.CollapseWriteAt plus every edit-path hook): the
                                #   BT-4 doors and depleted piles (TryClear), BT-8's collapse (TryReplace, which spills a replaced
-                               #   chest); TowerWriteResult.cs is its answer
+                               #   chest and tells the replaced hook, the collapse show); TowerWriteResult.cs is its answer
         TowerReadout.cs        # the look-at status line of a pile, a sealed door or the altar, and the altar's toasts
       TopplingTree.cs          # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once by
                                #   CellBatchMesher (one mesh per chunk it spans), swung flat around the cut, then popped out as drops

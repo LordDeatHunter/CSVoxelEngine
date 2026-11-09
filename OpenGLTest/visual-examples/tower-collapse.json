@@ -1,0 +1,45 @@
+{
+  // A defeated battle tower falling into its ruin, with its collapse show (TowerCollapseEffects): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/tower-collapse.json
+  // Shots land in visual/tower-collapse/. The tower is battle-tower.json's: center (2920, -1411), radius 18 plus a 3-block
+  // apron (west wall face at x 2902), ground slab at y 10, roof slab at y 45, top y 51, entrance facing -X. towerdefeat
+  // marks the king of the tower around the camera killed, so it runs from above the roof (inside the footprint); every
+  // shot then films the west wall from the west, looking down its face, since the bricks thrown off it fly toward the
+  // camera and land between it and the wall. The collapse waits MobConfig.TowerCollapseDelaySeconds (4 s) and then
+  // rewrites the tower top-down under the per-frame write cap, about a third of a second a layer at the scenario's frame
+  // rate, so (seconds after towerdefeat):
+  //   6.5  collapse_top: from above the stump, the top floors giving way (chips crumbling off the wall top, whole bricks
+  //        thrown off the face and tumbling down it; the camera rumbles, which a still cannot show);
+  //   9.5  collapse_falling: further back and lower, the face down to its foot, bricks falling along it and landing;
+  //   12.5 collapse_ground: at the foot of the wall, bricks lying and rolling on the ground and bursting into chips;
+  //   15.5 collapse_late: the low walls coming down, the last bricks still on the ground;
+  //   35.5 ruin: the finished ruin from the same spot, every brick burst.
+  // How far the collapse has got by each shot follows the frame rate (the cap is per frame).
+  "steps": [
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [2868.5, 30.5, -1402.5], "yaw": -9, "pitch": 2 },
+    { "op": "wait", "seconds": 15 },
+
+    { "op": "teleport", "pos": [2920.5, 70.5, -1411.5], "yaw": 0, "pitch": -30 },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "towerdefeat" },
+    { "op": "teleport", "pos": [2886.5, 47.5, -1405.5], "yaw": -10, "pitch": -14 },
+    { "op": "wait", "seconds": 6.5 },
+    { "op": "screenshot", "name": "collapse_top", "hideHud": true },
+
+    { "op": "teleport", "pos": [2878.5, 33.5, -1405.5], "yaw": -10, "pitch": -22 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "collapse_falling", "hideHud": true },
+
+    { "op": "teleport", "pos": [2886.5, 14.5, -1405.5], "yaw": -10, "pitch": -6 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "collapse_ground", "hideHud": true },
+
+    { "op": "teleport", "pos": [2878.5, 26.5, -1405.5], "yaw": -10, "pitch": -16 },
+    { "op": "wait", "seconds": 3 },
+    { "op": "screenshot", "name": "collapse_late", "hideHud": true },
+
+    { "op": "wait", "seconds": 20 },
+    { "op": "screenshot", "name": "ruin", "hideHud": true }
+  ]
+}

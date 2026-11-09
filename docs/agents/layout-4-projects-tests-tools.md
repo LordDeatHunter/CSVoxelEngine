@@ -120,6 +120,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     ServerSide/                # the server player and its status (the eye's cave biome: ServerPlayerCaveBiomeTests),
                                #   movement and intent rules, operators, the loopback GameServer and the server-mode World
   Particles/                   # every particle system and the dust, splash and pop emitters
+    Collapse/                  # a defeated tower's collapse show: its rule, thrown blocks burst and never write a cell
+                               #   (TowerCollapseEffectsTests)
   Player/                      # camera, physics, water phases and swimming, health and fall tracking,
                                #   the player model, creative, sprint, the saved-player restore
   Rendering/                   # render-pass gates: GPU timing, reflection reuse, shadow cascades, the texture-unit cache,

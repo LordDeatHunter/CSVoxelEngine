@@ -125,7 +125,8 @@ internal sealed class ClientMirror
     /// the same dirtying a local batch edit uses, so a remote lamp or roof edit relights the edge
     /// and corner chunks too), each chunk once however many of its cells changed. A cell that
     /// already holds the value is skipped, so a correction confirming a prediction costs nothing. A
-    /// quern that arrives registers its block entity so it draws. Never raises
+    /// quern that arrives registers its block entity so it draws, and a defeated tower's falling cells
+    /// play its collapse show (<see cref="World.CollapseEffects"/>). Never raises
     /// <see cref="World.BlockEdited"/>, so it cannot loop.
     /// </summary>
     internal void ApplyNetworkBlockChanges(IReadOnlyList<NetCellChange> changes)
@@ -153,6 +154,9 @@ internal sealed class ClientMirror
             // The server's lava hardening into its rock: steam, like a local hardening
             if (_clientMode && change.Id != 0 && BlockType.IsFluid(id) && BlockType.HardensToById[id] == change.Id)
                 _netHardened.Add(new Vector3(change.X, change.Y, change.Z));
+            // A defeated tower's collapse falling in: the same chips, thrown blocks and rumble as singleplayer's
+            if (_clientMode)
+                _world.CollapseEffects?.OnCellChanged(change.X, change.Y, change.Z, id, change.Id);
             if (BlockType.ById[change.Id]?.Renderer == BlockRenderer.Quern)
                 _querns.Ensure(change.X, change.Y, change.Z);
         }
