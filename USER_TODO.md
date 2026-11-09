@@ -84,8 +84,7 @@ fully opaque and tileable on both axes.
 
 ### Hell and sky realms
 
-- [ ] **Hell rock and ground** — `basalt.png`, `hellrock.png`, `scorched_hellrock.png`,
-  `cinder_soil.png`, `magma_block.png`. `magma_block` is emissive: keep it reading as glowing rock.
+- [ ] **Scorched hell rock** — `scorched_hellrock.png`.
 - [ ] **Charred log** — `charred_log_side.png`, `charred_log_top.png`. The Ashlands' leafless tree;
   keep the side and end reads of a burnt log.
 - [ ] **Fungal tree** — `fungal_log_side.png`, `fungal_log_top.png`, `fungal_cap.png`. The cap is
@@ -108,9 +107,6 @@ fully opaque and tileable on both axes.
   `oak_trapdoor.json`); the models crop it with default UVs.
 - [ ] **Anvil** — `anvil.png`. The model crops it with default UVs across the base, waist, top and
   horn, so every part must read on its own. Keep it symmetric.
-- [ ] **Slag bricks** — `slag_bricks.png`. Opaque and tileable (greedy cube).
-- [ ] **Bloomery bricks** — `bloomery_bricks.png`. Opaque and tileable (greedy cube; the bloomery
-  multiblock's building block).
 - [ ] **Cloud block** — `cloud_block.png`. A soft white mottle whose alpha is about 0.7; keep the
   alpha, since it is drawn in the translucent pass.
 - [ ] **Slime block** — `slime_block.png`. Opaque, green gel in 4x4-texel cells with rims and
@@ -157,6 +153,3 @@ plinth and cap; both models are symmetric.
   `hollow_stone_pine_log_inner.png`, `hollow_stone_pine_log_end.png`. The end tile's default UVs
   crop its outer 3/16 band, so keep a readable cross-section ring. The outside bark is the species'
   own log tile and is not listed here.
-- [ ] **Battle tower bricks** — `tower_bricks.png`, `tower_bricks_sandstone.png`,
-  `tower_bricks_frost.png`. Opaque and tileable; palette swaps of `stone_bricks`, so the three must
-  read as one structure in their biomes.
