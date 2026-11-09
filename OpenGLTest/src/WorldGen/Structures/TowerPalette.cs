@@ -24,6 +24,7 @@ public sealed record TowerPalette(byte Brick, byte Step)
         DoorBlock = ContentRegistry.RequireBlock("tower_door").Id;
         PileBlock = ContentRegistry.RequireBlock("skeleton_pile").Id;
         ChestBlock = ContentRegistry.RequireBlock("tower_chest").Id;
+        LanternBlock = ContentRegistry.RequireBlock("lantern").Id;
         AltarBlock = ContentRegistry.RequireBlock("tower_altar").Id;
         Plain = new TowerPalette(DefaultBrick, step);
         Sandstone = new TowerPalette(ContentRegistry.RequireBlock("tower_bricks_sandstone").Id, step);
@@ -61,6 +62,9 @@ public sealed record TowerPalette(byte Brick, byte Step)
     /// rather than by a block flag.
     /// </summary>
     internal static byte AltarBlock { get; }
+
+    /// <summary>The lantern hung in each floor's stairwell doorway, the same in every palette.</summary>
+    internal static byte LanternBlock { get; }
 
     /// <summary>Every palette, once each.</summary>
     internal static IReadOnlyList<TowerPalette> All { get; }

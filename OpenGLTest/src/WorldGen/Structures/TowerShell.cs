@@ -146,7 +146,9 @@ internal static class TowerShell
         if (k < 1 || k >= s.Floors || y > s.FloorY(k) + Headroom) return s.Palette.Brick;
         var gap = Math.Abs(step - Mod(s.LandingStep(k), StepsPerTurn));
         gap = Math.Min(gap, StepsPerTurn - gap);
-        return gap <= WorldGenerationConfig.TowerDoorwayHalfSteps ? BlockType.Air : s.Palette.Brick;
+        if (gap > WorldGenerationConfig.TowerDoorwayHalfSteps) return s.Palette.Brick;
+        // A lantern hangs from the lintel at the middle of each doorway
+        return gap == 0 && y == s.FloorY(k) + Headroom ? TowerPalette.LanternBlock : BlockType.Air;
     }
 
     private static int RoomAt(TowerSite s, int y)
