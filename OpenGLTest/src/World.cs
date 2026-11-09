@@ -920,6 +920,10 @@ public class World
     /// scenario op): its piles deplete and its tagged skeletons die. Never on a client.</summary>
     public bool ClearTowerFloor(Vector3 near, int floor) => !_clientMode && _towers.ClearFloor(near, floor, Skeletons);
 
+    /// <summary>Marks the Skeleton King of the tower around <paramref name="near"/> killed (the <c>towerdefeat</c>
+    /// scenario op), so the tower collapses like after a real kill. Never on a client.</summary>
+    public bool DefeatTower(Vector3 near) => !_clientMode && _towers.DefeatAt(near);
+
     /// <summary>
     /// A click on the tower altar at <paramref name="cell"/>: the authoritative world (singleplayer, or a server
     /// replaying a client's Use intent) begins the ritual when every floor is open (<see cref="TowerManager.BeginRitual"/>,

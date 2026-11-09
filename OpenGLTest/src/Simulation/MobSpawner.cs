@@ -6,6 +6,7 @@ using VoxelEngine.Player;
 using VoxelEngine.WorldGen;
 using VoxelEngine.WorldGen.Hell;
 using VoxelEngine.WorldGen.Sky;
+using VoxelEngine.WorldGen.Structures;
 
 namespace VoxelEngine.Simulation;
 
@@ -13,7 +14,8 @@ namespace VoxelEngine.Simulation;
 /// The surface spawn search shared by every mob manager: samples a ring around the player and
 /// returns the first dry, loaded column of a mob-spawning biome (<see cref="SpawnsMobs"/>: forest,
 /// steppe or savanna) with two clear cells above its ground that no torch
-/// lights (<see cref="IsLitByBlocks"/>). Main thread only (it reads the live chunk map).
+/// lights (<see cref="IsLitByBlocks"/>) and that lies outside every battle tower's footprint (whose dark ground floor
+/// is the tower skeletons' own). Main thread only (it reads the live chunk map).
 /// </summary>
 public static class MobSpawner
 {
@@ -23,7 +25,21 @@ public static class MobSpawner
     /// is the solid ground cell's Y; the caller places its body above it.
     /// </summary>
     public static bool TryFindSurfaceSpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
-        float maxRadius, int tries, out int x, out int groundY, out int z)
+        float maxRadius, int tries, out int x, out int groundY, out int z) =>
+        TryFindSurfaceSpawn(chunks, playerPosition, minRadius, maxRadius, tries, InTowerFootprint,
+            out x, out groundY, out z);
+
+    // A battle tower's footprint box: its ground floor is dark ground at the terrain height (BT-10), and its skeletons
+    // own it. TowerPlacement.Meets reads the cached site verdicts; the spawn search runs on the main thread of an
+    // authoritative world only (a client's mirrors never spawn).
+    private static readonly Func<int, int, bool> InTowerFootprint =
+        static (x, z) => WorldGenerationConfig.TowersEnabled && TowerPlacement.Meets(x, z, x, z);
+
+    /// <summary><see cref="TryFindSurfaceSpawn(ChunkManager, Vector3, float, float, int, out int, out int, out int)"/>
+    /// with the column refusal passed in: a generated column for which <paramref name="blockedColumn"/> holds never
+    /// spawns (the test seam; production refuses the tower footprints).</summary>
+    internal static bool TryFindSurfaceSpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
+        float maxRadius, int tries, Func<int, int, bool> blockedColumn, out int x, out int groundY, out int z)
     {
         for (var attempt = 0; attempt < tries; attempt++)
         {
@@ -54,6 +70,9 @@ public static class MobSpawner
             if (!chunks.TryGetCell(x, height, z, out var ground, out _) || !BlockType.IsSolid(ground)) continue;
             if (!chunks.TryGetCell(x, height + 1, z, out var above1, out _) || BlockType.IsSolid(above1)) continue;
             if (!chunks.TryGetCell(x, height + 2, z, out var above2, out _) || BlockType.IsSolid(above2)) continue;
+            // Never inside a battle tower: its dark ground floor passes every check above. A column a world source
+            // supplies holds no generated tower.
+            if (!source.Supplies(chunkX, chunkZ) && blockedColumn(x, z)) continue;
             // Torch-safe ground: never where a lamp or torch lights the cell a mob would stand in
             if (IsLitByBlocks(chunks, x, height + 1, z)) continue;
 

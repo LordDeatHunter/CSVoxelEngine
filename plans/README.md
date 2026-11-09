@@ -15,7 +15,7 @@ The one guide for every file in this folder. Agents: the `plan-docs` skill
 | [LAYERS.md](LAYERS.md) | Hell (below) and Sky (above) layers: all shipped, the decisions and future ideas |
 | [SANDWORM.md](SANDWORM.md) | The summoned desert sandworm boss: shipped, with the balance and polish follow-ups |
 | [WAYSTONES.md](WAYSTONES.md) | Natural waystones next to ruins, teleported between for mana: shipped, the decisions and future ideas |
-| [BATTLE_TOWER.md](BATTLE_TOWER.md) | The battle tower: skeleton floors, a roof altar, the Skeleton King boss and the collapse into a ruin (designed, not built) |
+| [BATTLE_TOWER.md](BATTLE_TOWER.md) | The battle tower: skeleton floors, a roof altar, the Skeleton King boss and the collapse into a ruin: shipped, the decisions, reference and costs |
 | [CAVE_BIOMES.md](CAVE_BIOMES.md) | 3D cave biomes and the barrier shift that makes room for them (designed, not built; third of the three efforts) |
 | [TREES.md](TREES.md) | Residue of the tree rework |
 | [INVENTORY.md](INVENTORY.md) | Gear, chests and ruin loot (designed; U-1 kit and tooling done) |

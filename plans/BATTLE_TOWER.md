@@ -4,15 +4,18 @@
 
 ## Status
 
-BT-1 to BT-8 done; BT-9 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
+Done: BT-1 to BT-10. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
 the tower generator (see "Tower generator (BT-2)" under Reference), BT-3 the undead skeleton with its melee rake, bow
 and arrows, floor-tier difficulty and forced-spawn-only manager (see "Skeleton (BT-3)" and AGENTS.md "Skeleton"), BT-4
 the skeleton piles, the floor doors and `TowerManager` (see "Locks (BT-4)" and AGENTS.md "Battle tower"), BT-5 the
 tower chest and per-floor loot (see "Chests (BT-5)"), BT-6 the roof altar and the Skeleton King boss (see "Skeleton King
 (BT-6)"), BT-8 the staged collapse of a defeated tower into a ruin (see "Collapse (BT-8)").
+BT-9 verified and documented it: the `towerdefeat` op, the dark, torch-lit and ruined shots in
+`visual-examples/battle-tower.json`, the cost probes (see "Costs (BT-9)"), AGENTS.md's "Battle tower" section and the
+wiki's battle tower page. BT-10 made the floors dark: the tower bricks cover the sky in the light flood, and surface
+ring spawns keep out of a tower's footprint (see "Dark interiors (BT-10)").
 Tracks the battle tower: a rare, huge (radius ~20+) cylindrical landmark of 4-8 floors with skeleton piles, chests, floor locks, a roof
-altar that summons the Skeleton King, unique boss loot and a collapse into a ruin. One phase per prompt; each phase
-leaves the game building and the tests green. **Content ids are tight: 11 left, see Reference.**
+altar that summons the Skeleton King, unique boss loot and a collapse into a ruin. **Content ids are tight: 11 left, see Reference.**
 Last updated 2026-11-09.
 
 ## In progress
@@ -21,16 +24,7 @@ Nothing.
 
 ## Open
 
-- [ ] **`BT-9` · Verify and document** — P2, S.
-  Extend `visual-examples/battle-tower.json` (`VOXEL_TIME=147`, from BT-2; BT-4 added piles, a gate and a cleared floor)
-  with the boss (BT-6's own `skeleton-king.json` and loopback `GameServerTests` already cover it), a perf pass, then
-  fold the rest of the design into AGENTS.md's "Battle tower" section (BT-4 started it) and the wiki, and delete this
-  file's finished entries.
-- [ ] **`BT-10` · Dark tower interiors** — P2, M.
-  Tower interiors are sunlit: `ChunkLighting` seeds sun from the column heightmap, which stays the terrain's (the
-  tower must not raise `ColumnData.Heights`, which the LOD, water and spawns read). Seed sun in a tower footprint from
-  the real overhead blocks instead (or treat tower columns as covered from the roof down), so the floors are lit only
-  by their lanterns and torches. Also look at surface mobs spawning on the ground floor once it is dark.
+Nothing.
 
 ## Reference
 
@@ -87,8 +81,7 @@ Nothing.
     growth about 180 and the Towers stage 0.28-0.30 (the stamp; the site build is paid in Columns by `TopReaching`); warm
     whole chunk median 0.44-0.50, warm Towers median 0.08 (the p90 of 1.6-2.7 is JIT tier 0 on unwarmed chunks; a steady
     full tower chunk stamps in 0.13-0.25). Surface chunks: Towers 0.001 cold, ~0 warm; Columns unchanged.
-  - **Known gaps**: sunlit interiors (`BT-10`); surface mobs can spawn on the ground floor; far-LOD canopy bumps over the
-    footprint; tree crowns and limbs cut at the disc edge leave floating leaves and orphan wood until a nearby edit schedules
+  - **Known gaps**: far-LOD canopy bumps over the footprint; tree crowns and limbs cut at the disc edge leave floating leaves and orphan wood until a nearby edit schedules
     decay; the stair's `cobblestone_slab` half-steps are breakable (a mined one leaves a pit over brick, never a bypass, as
     the flood-fill test proves).
 
@@ -203,8 +196,47 @@ Nothing.
   - **Known gaps**: desert and frost towers fall to stone rubble; a storeless world regenerates a ruined chunk intact after
     unload; a crash between a chunk's save and `stations.json` saying Done can leave an intact part that is never redone; a
     late, unmodified chunk shows the intact tower until the waiting sweep reaches it (worldgen never builds the ruin); no
-    collapse dust, sound or shake; a whole tower takes some tens of seconds at 32 writes a frame (BT-9's perf pass should
-    measure the remeshing); mobs and drops in a rubble cell are not protected like players.
+    collapse dust, sound or shake; a whole tower takes some tens of seconds at 32 writes a frame (measured under "Costs
+    (BT-9)"); mobs and drops in a rubble cell are not protected like players.
+
+- **Dark interiors (BT-10)**, 0 content ids. See AGENTS.md "Sky cover (BT-10)" and "Battle tower".
+  - **Files**: the `coversSky` block flag (`BlockDefinition.CoversSky`, `BlockType.CoversSky`/`CoversSkyById`/
+    `SkyCoverIds`/`ContainsSkyCover`, `BlockFieldRules.ValidateCoversSky`, `BlockLoader`, `ContentRegistry.Reset`), set on
+    the three tower bricks; `Chunk.MayHaveSkyCover` (set by `SetBlockRaw`, by `ChunkTerrainFill.GenerateBlockData` right
+    after the tower stamp and by `ChunkRestore` for every restore); `ChunkLighting.AnySkyCover` and the `skyCover`
+    argument of `ComputeLight` (`RaiseSeedsUnderSkyCover`), passed by `ChunkMeshBuilder`; `MobSpawner`'s
+    `InTowerFootprint` and the internal `TryFindSurfaceSpawn` overload.
+  - **Rule**: only when one of a mesh build's 27 resolved neighbors may hold a covering block, each light-volume column's
+    sun seeds start one above the highest covering cell at or above the heightmap start, so every floor under a slab
+    gets no sun and is lit only by its lanterns and the torches a player brings. Every seed still enters at 15, so the
+    pruned-seed flood stays exact. It reads only the volume's blocks, so singleplayer, a headless server and a client
+    (streamed chunks, restored through `ChunkRestore`) agree byte for byte with no wire change; the collapse's
+    light-radius remesh relights the ruin, whose rubble does not cover. A chunk with no flagged neighbor pays 27 field
+    reads. Surface ring spawns refuse a column inside a tower footprint box (`TowerPlacement.Meets`, gated by
+    `TowersEnabled`, skipped for a column a world source supplies), since the ground floor is dark ground with two clear
+    cells over it.
+  - **Tests**: `SkyCoverFlagTests`, `ChunkSkyCoverTests`, `LightFloodTests` (the `TowerSlabAboveTerrain` scene and the
+    cover-aware reference flood), `TowerInteriorLightTests` (no room cell between slabs above its terrain height gets sun
+    15, and a streamed copy lights byte-identically), `TowerFootprintSpawnTests`,
+    `TowerPlacementTests.EveryPaletteBrickIsUnbreakableAndCoversTheSky`.
+  - **Known gaps**: a room cell in the volume above a chunk whose slab lies past the volume's top still seeds sun, which
+    can reach the chunk only down the helical stair, more than 10 cells away (at worst a faint glow at a chunk's top in
+    the corridor); an edge or corner neighbor missing at mesh time reads as air, so a little sun may enter until the next
+    remesh; the chunk flag is sticky, so a ruin's chunks keep paying one extra top-down pass over the light volume.
+
+- **Costs (BT-9)**, dev machine, 2026-11-09, Release, numbers from one sitting.
+  - **Mesh build with sky cover** (`MeshBuildCostProbe`, the synthetic soup, 300 warm builds): 4885 us a build without
+    cover (case B), 4853 us with the flag raised and nothing covered (C1, every column scanned: noise), 5093 us under a
+    brick roof (C2, +4 %). Ceiling: within +15 % of the same scene without cover; met. A tower chunk's rebuild during the
+    collapse costs about one C2 build and is bounded by the mesh scheduler's per-frame budgets.
+  - **Tower worldgen** (`WorldgenCostProbe`, the `tower` class, 4 chunks): warm whole chunk median 0.51 ms (p90 2.8,
+    unwarmed JIT), the Towers stage median 0.10; cold whole chunk 207 median, 223 mean, mostly tree growth, the Towers
+    stage 0.27. Surface chunks: warm whole median 0.11-0.67 ms, the Towers stage about 0.002. Ceiling: tower chunk warm
+    median at most 0.6 ms; met.
+  - **Collapse** (`TowerCollapseCostProbe`, the largest tower: radius 24, 8 floors, 100 chunks): 2059 frames to finish
+    (about 34 s at 60 fps), 65803 cells changed; the main-thread step costs 0.25-0.33 ms mean, p90 0.55-0.61, p99
+    0.70-1.09; 7-27 frames pass 1 ms, the worst after the first frame 5.8-8.2 ms (the first 10-15 ms, JIT). Ceiling:
+    at most 1.0 ms on the worst frame; **not met**, tracked as `PERF.md` `F14`.
 
 - **Bone shrapnel (BT-7's first two uniques)**, 2 content ids (`bone_breaker_blade`, `bone_charm`); see AGENTS.md
   "Bone shrapnel". The blade carries `shrapnel: { count: 6, damage: 3 }`; the charm grants `bone_shrapnel`

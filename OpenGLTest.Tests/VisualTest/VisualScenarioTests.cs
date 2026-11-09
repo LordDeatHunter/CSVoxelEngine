@@ -140,6 +140,15 @@ public sealed class VisualScenarioTests
         Assert.Equal(new Vector3(1, 2, 3), scenario.Steps[1].Pos);
     }
 
+    [Fact]
+    public void ATowerDefeatStepParses()
+    {
+        var scenario = VisualScenario.Parse(
+            """{ "steps": [{ "op": "towerdefeat" }, { "op": "TowerDefeat" }] }""", "defeat");
+        Assert.Equal("towerdefeat", scenario.Steps[0].Op);
+        Assert.Equal("towerdefeat", scenario.Steps[1].Op);
+    }
+
     [Theory]
     [InlineData("""{ "steps": [{ "op": "altar" }] }""")]
     [InlineData("""{ "steps": [{ "op": "altar", "pos": [1, 2] }] }""")]

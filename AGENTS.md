@@ -92,7 +92,7 @@ Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated
 **without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
 player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
 any scenario that teleports a walking player above the ground, and turn it off again before a
-`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, an optional `"size"` (an integer from 1, default 1) is a slime's size and an optional `"tier"` (an integer from 0, default 0) is a skeleton's tower tier; the entity name (`slime`, `goblin`, `hellbrute`, `cinderwitch`, `galeraptor`, `cloudgolem`, `sandworm`, `iceberg`, `skeleton` or `skeleton_king`, the last spawned unbound to any tower) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/skeletons.json` (`VOXEL_TIME=147`) spawns a tier-0 and a tier-5 skeleton in goblins.json's open forest clearing (a tower floor's dressing walls block a shot's line of sight) and films them idle, drawing and loosing an arrow, an arrow in flight and raking. `towerclear` (`{ "op": "towerclear", "floor": k }`, floor 0 by default) clears floor `k` of the battle tower around the camera through `World.ClearTowerFloor` (its piles depleted, its bound skeletons killed, nothing owed), so its door opens on the next update; `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) uses it to film a floor's piles, the skeletons they raise, the sealed gate and the opened stairwell. `altar` (`{ "op": "altar", "pos": [x, y, z] }`, an exact cell, required) right-clicks a tower altar through `World.UseAltar` and shows its toast (the ritual begins only once every floor is cleared); `visual-examples/skeleton-king.json` (`VOXEL_TIME=147`) clears the default tower's floors with `towerclear`, then films its altar, the ritual, the Skeleton King's rise and boss bar, its slam, its bone volley and a summon. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, an optional `"size"` (an integer from 1, default 1) is a slime's size and an optional `"tier"` (an integer from 0, default 0) is a skeleton's tower tier; the entity name (`slime`, `goblin`, `hellbrute`, `cinderwitch`, `galeraptor`, `cloudgolem`, `sandworm`, `iceberg`, `skeleton` or `skeleton_king`, the last spawned unbound to any tower) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/skeletons.json` (`VOXEL_TIME=147`) spawns a tier-0 and a tier-5 skeleton in goblins.json's open forest clearing (a tower floor's dressing walls block a shot's line of sight) and films them idle, drawing and loosing an arrow, an arrow in flight and raking. `towerclear` (`{ "op": "towerclear", "floor": k }`, floor 0 by default) clears floor `k` of the battle tower around the camera through `World.ClearTowerFloor` (its piles depleted, its bound skeletons killed, nothing owed), so its door opens on the next update; `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) uses it to film a floor's piles, the skeletons they raise, the sealed gate and the opened stairwell, then a dark floor before and after three `setblock` torches. `towerdefeat` (`{ "op": "towerdefeat" }`) marks the Skeleton King of the tower around the camera killed through `World.DefeatTower` (`TowerManager.DefeatAt` -> `MarkDefeated`), so the real collapse runs; `battle-tower.json` ends on the ruin it leaves. `altar` (`{ "op": "altar", "pos": [x, y, z] }`, an exact cell, required) right-clicks a tower altar through `World.UseAltar` and shows its toast (the ritual begins only once every floor is cleared); `visual-examples/skeleton-king.json` (`VOXEL_TIME=147`) clears the default tower's floors with `towerclear`, then films its altar, the ritual, the Skeleton King's rise and boss bar, its slam, its bone volley and a summon. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
@@ -1001,6 +1001,22 @@ almost untouched (+0.2 % vertices over eight sampled surface and cave chunks, me
 within noise), since generated terrain is mostly uniformly lit and only lamp and shadow
 gradients split merges.
 
+**Sky cover (BT-10).** The sun seeds of a light volume normally start at the column's terrain height, which a battle
+tower stands above (its heightmap must not be raised: the far LOD, water and spawns read it). A block flagged
+`coversSky` (the three tower bricks) closes that gap. `Chunk.MayHaveSkyCover` is a sticky flag that a chunk may hold
+one: `ChunkTerrainFill.GenerateBlockData` sets it right after the tower stamp (a vectorized
+`BlockType.ContainsSkyCover` over the chunk, so only tower chunks pay the scan), `ChunkRestore` sets it from the blocks
+on every restore (a save, an imported map, a client's streamed chunk) and `Chunk.SetBlockRaw` raises it when it writes a
+covering id; an edit never clears it. `ChunkMeshBuilder` passes `ChunkLighting.AnySkyCover` (any of the 27 resolved
+neighbors flagged) to `ComputeLight`, and only then does `RaiseSeedsUnderSkyCover` scan each volume column top-down and
+start its seeds one above the highest covering cell at or above the heightmap start. Every seed still enters at 15, so
+the pruned-seed flood stays exact, and the rule reads only the volume's blocks: singleplayer, a headless server and a
+client compute byte-identical light with no wire change. The tower's slabs are 7 apart and the light border 15, so every
+floor cell sees its slab inside its own volume. The collapse's light-radius remesh relights the ruin, whose rubble does
+not cover. A chunk with no flagged neighbor pays 27 field reads. Known gap: a room cell in the volume above a chunk
+whose slab lies past the volume's top still seeds sun, which can reach the chunk only down the helical stair, more than
+10 cells away. `TowerInteriorLightTests`, `LightFloodTests`, `ChunkSkyCoverTests`.
+
 **Biome-tinted grass and leaves.** Grass and every species' leaves (`oak_leaves`, `spruce_leaves`,
 `baobab_leaves`, `stone_pine_leaves`, all on the `foliage` palette) take their color from the
 climate at their position, Minecraft style, while `FaceTiles` keep the default colored tiles, so
@@ -1213,7 +1229,8 @@ OpenGLTest/
         ChunkFaceTables.cs     # the mesher's per-face tables (neighbor/AO deltas, the AO neighbor table AONeighbors,
                                #   ShadeLut, SmoothLightDivisor) and the shared corner/UV helpers (BoxFaceCorners,
                                #   TiledUv, CropUv, VertexAO)
-        ChunkLighting.cs       # the wide light-volume snapshot and flood (sun + colored lamp) + corner light queries
+        ChunkLighting.cs       # the wide light-volume snapshot and flood (sun + colored lamp) + corner light queries;
+                               #   the sky cover rule (no sun under a coversSky block, gated by AnySkyCover; BT-10)
         ChunkMeshBuilder.cs    # the per-chunk mesh build: neighborhood resolve, padded and light snapshots, the light flood
                                #   and the per-voxel emitter loop (behind Chunk.GenerateMeshData)
         ChunkMeshData.cs       # CPU-side mesh of one chunk (opaque + translucent lists, light snapshot, vents, flame points)
@@ -2179,7 +2196,8 @@ OpenGLTest/
                                #   the drain of status-effect block actions into the StatusEffectBlockWriter)
       MobMissiles.cs           # GL-free: the shared mob missile flight (hell bolts, skeleton arrows): launch, fly, the touch
                                #   test, an immune target spared, the hits of the frame for the owning manager to bill
-      MobSpawner.cs            # the ring spawn searches: dry forest surface, dark caves, hell floors, sky island tops
+      MobSpawner.cs            # the ring spawn searches: dry forest surface (never in a tower footprint), dark caves,
+                               #   hell floors, sky island tops
       RealmMobManager.cs       # the realm mob managers' shared frame: the capped list, forced spawn, mirrors, the update
                                #   loop (target, hazards, loot, attack, shove, despawn), Hit and the spawn turn
       QuernManager.cs          # block-entity registry for querns: one crushable unit per cell plus a one-rotation spin timer
@@ -2696,7 +2714,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Tower/                     # the skeleton manager: forced spawn and the hard cap, tier, no natural spawn, rake, arrows,
                                #   despawn reports; the floor locks (TowerRulesTests, SkeletonPileManagerTests,
                                #   TowerBlockWriterTests, TowerManagerTests, TowerManagerSaveTests: stations.json); the
-                               #   altar and the king (TowerAltarTests, TowerAltarWorldTests, SkeletonKingManagerTests)
+                               #   altar and the king (TowerAltarTests, TowerAltarWorldTests, SkeletonKingManagerTests);
+                               #   the collapse (TowerCollapseTests) and its cost probe (TowerCollapseCostProbe)
     Waystones/                 # waystone names, the registry's discovery, rename, lost and save rules; the teleport rule,
                                #   the arrival search, the realm tag and a trip in a headless world
   Status/                      # the status effect set, the Apply API, the speed factors and the block rule and writer
@@ -2845,6 +2864,7 @@ trailing commas.
 | `flow` | water behavior | per-fluid tuning, only legal with `fluid: true`: `tickDivisor` (ticks between updates, lava `2` = half water speed), `range` (sideways spread 1..7, lava `3`), `infinite` (adjacent sources birth new ones, lava `false`), and the `hardensTo` + `hardensTouching` pair (lava hardens to `cobblestone` on touching `block/water`) |
 | `flammable` | false | a status effect with `blocks.ignite` burns the block away to air (no loot, no fire block) when it ticks beside it (`BlockType.FlammableById`). Illegal on a fluid and on a multiblock anchor or part. The leaves and the ground plants set it; planks, logs, TNT and stations do not |
 | `unbreakable` | false | no gameplay path removes the block (`BlockType.IsUnbreakable`): mining whiffs with no crack progress (`Mining.CanMine`/`HitDamage`), creative swings but never breaks it, the server refuses its break (`BreakVerdict.Unbreakable`, before the creative shortcut), `BlockEditor.BreakBlockFor`/`RemoveBlock` return early, blasts skip it, `Chunk.RemoveBlockAt`/`ClearBlockAt` and placement (`Placement.CanOccupy`, so a falling cube's landing too) refuse it, and buckets (`FluidManager.SetCellImmediate`) and status or spell block actions (`StatusEffectBlockRule`) leave it. Only `Chunk.CollapseWriteAt`, through `TowerBlockWriter` (the battle tower's opened doors and depleted piles, and BT-8's collapse into a ruin through `TryReplace`, which also spills a replaced chest), writes over it; `Chunk.SetBlockRaw` stays raw. Refused with `fluid`, `falls`, `needsSupport`, `replaceableByPlacement`, `flammable`, `meltsTo`, the `tree_wood`/`multiblock`/`multiblock_part` renderers, `upperHalf` and `onBreak: "prime_tnt"` (`BlockFieldRules.ValidateUnbreakable`), and as a `multiblock.source`, since each would hand the cell to a raw-write path. The look-at label and outline still target it (the name in red, never mineable). `tower_bricks`, `tower_bricks_sandstone`, `tower_bricks_frost`, `tower_door`, `skeleton_pile` |
+| `coversSky` | false | the block hides the sky from every cell under it in a chunk's light volume: sun seeds start one above the highest covering cell of their volume column (`BlockType.CoversSkyById`, see "Sky cover (BT-10)" under "Chunk meshing"). Only legal on a solid, opaque (not `cutout` or `translucent`), `model`-renderer block that is not a fluid and does not set `light.passes: true` (`BlockFieldRules.ValidateCoversSky`), so the cells under it really are shaded. `tower_bricks`, `tower_bricks_sandstone`, `tower_bricks_frost` |
 | `freezesTo` | none | the solid block a fluid **source** freezes into under `blocks.freeze` and a spell's `freeze` impact (`BlockType.FreezesToById`; water -> `ice`, lava -> `cobblestone`). Only legal on a fluid, and the target must be a registered non-fluid block |
 | `meltsTo` | none | the fluid a block thaws into, as a source, under `blocks.thaw` (`BlockType.MeltsToById`; ice -> `water`). Only legal on a non-fluid, and the target must be a fluid other than the block itself |
 | `onBreak` | `"drop"` | `drop` (roll loot) or `prime_tnt` (no drop, spawns a `PrimedTnt`) |
@@ -5173,8 +5193,8 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   attack clip"); all four are saved in `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 244 of the 255 content ids are used (134 blocks, 109 items, air), 11 left; the rest of the battle
-  tower (plans/BATTLE_TOWER.md) needs about 3-5 more. Seed offsets
+- **Budgets**: 244 of the 255 content ids are used (134 blocks, 109 items, air), 11 left; the battle tower
+  (plans/BATTLE_TOWER.md) is done, and the rest is left for `CAVE_BIOMES.md`. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
   `plans/BIOMEGEN.md`.
@@ -5669,13 +5689,25 @@ common hurt, death and spawn.
   `GameServerTests.SkeletonsReachTheClientsEntityListByKindWithTheirTier`. `visual-examples/skeletons.json`
   (`VOXEL_TIME=147`) films them idle, shooting and raking in an open forest clearing.
 - Known gaps: the arrows, like the goblin stones and hell bolts, are not on the wire (a client sees only the damage);
-  skeletons are not drawn in the water mirror; the tower interiors are sunlit (`BT-10`).
+  skeletons are not drawn in the water mirror.
 
 ### Battle tower
 
 The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are above ("Structure templates and ruins",
-"Skeleton"); plans/BATTLE_TOWER.md holds the phases still to come. This section is the **floor locks** (`BT-4`), the
-**chests** (`BT-5`), the **roof altar with the Skeleton King** (`BT-6`) and the **collapse** (`BT-8`).
+"Skeleton"). The battle tower is done (`BT-1`..`BT-10`); plans/BATTLE_TOWER.md keeps the decisions, the per-phase
+reference and the measured costs ("Costs (BT-9)": the sky-cover mesh build, the tower worldgen and the collapse's
+per-frame step, with their ceilings). This section is the **floor locks** (`BT-4`), the **chests** (`BT-5`), the **roof
+altar with the Skeleton King** (`BT-6`) and its **loot** (`BT-7`), the **collapse** (`BT-8`) and the **dark interiors**
+(`BT-10`). The current protocol is 27 (the altar byte and the king; the collapse needs no wire change). The tower's
+content ids leave 244 of the 255 used (see "Budgets" under "Layers").
+- **Dark interiors (BT-10)**: the floors get no sun. The three palette bricks carry `coversSky`, so a mesh build over a
+  tower chunk starts every sun seed above the slab over it ("Sky cover (BT-10)" under "Chunk meshing"); a floor is lit only
+  by its template lanterns and the torches a player brings, identically in singleplayer, on a server and on a client. The
+  ruin's rubble does not cover, so the collapse's remesh lets the sun back in.
+- **No surface spawns in a footprint**: `MobSpawner.TryFindSurfaceSpawn` refuses a ring column inside a tower's footprint
+  box (`TowerPlacement.Meets`, a cached site verdict, gated by `TowersEnabled` and skipped for a column a world source
+  supplies), since the dark ground floor would otherwise take slimes and goblins; the tower's skeletons own it.
+  `TowerFootprintSpawnTests`.
 - **Two worldgen-only, unbreakable blocks** (`hasItem: false`, `loot: "none"`), both from the single tower cell function,
   so the point query still equals the stamp. `tower_door` (a solid, cutout, `cullSelf` portcullis `cube_all` that passes
   light) fills the headroom over the two door half-steps of every floor (`TowerSite.DoorCells(k)`, stamped by
@@ -5719,8 +5751,10 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
   it through `BlockChanges`.
 - **Look-at line** (`TowerManager.Detail`, `TowerReadout`, on both sides): a pile reads "Floor 2: 3 piles, 4 skeletons", a
   sealed door "Floor 2 sealed: clear floor 1 first", "... 2 piles left" or "... 5 skeletons left" (floors counted from 1).
-- **Scenario**: the `towerclear` op (`World.ClearTowerFloor`) clears a floor at once; `visual-examples/battle-tower.json`
-  films it. Tests: `TowerLockBlockTests`, `TowerShellTests`, `TowerPlacementTests`, `TowerRulesTests`,
+- **Scenario**: the `towerclear` op (`World.ClearTowerFloor`) clears a floor at once and the `towerdefeat` op
+  (`World.DefeatTower`, `TowerManager.DefeatAt`) marks the king killed, so the real collapse runs;
+  `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) films the tower, the piles, a sealed and an opened door, floor 1
+  dark and then lit by three torches, floor 0 under its lanterns alone, and the ruin from outside, inside and above. Tests: `TowerLockBlockTests`, `TowerShellTests`, `TowerPlacementTests`, `TowerRulesTests`,
   `SkeletonPileManagerTests`, `TowerBlockWriterTests`, `TowerManagerTests`, `TowerManagerSaveTests`,
   `StationNetCodecTests`, the skeleton despawn cases of `SkeletonManagerTests`, the bound skeleton in
   `WorldLifecycleTests` and the loopback `GameServerTests.AClientSeesATowerDoorOpenOnceItsFloorIsCleared`.
@@ -5778,8 +5812,10 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
   in play, which the base distance despawn skips) and a player dying and respawning far away all reset the tower, while
   only a kill defeats it. `TowerManager.MarkDefeated` raises the `TowerManager.BossDefeated` event once and
   `TowerRecord.BossDefeated` reads true from then on, which BT-8's collapse reads (polled, not through the event).
-- **The Skeleton King** (`skeleton_king.json`, hp 400, not difficulty-scaled, `"boss": true`; the placeholder
-  `loot/skeleton_king.json` of bones, wrought iron and bronze ingots until BT-7's unique pool) is a `SkeletonKing`
+- **The Skeleton King** (`skeleton_king.json`, hp 400, not difficulty-scaled, `"boss": true`; its boss table
+  `loot/skeleton_king.json` (BT-7) rolls exactly one unique first, the bone-breaker blade, the bone charm or the crystal
+  staff, then bones, wrought iron, bronze ingots and, half the time, a modifier scroll or mana draughts;
+  `SkeletonKingLootTests`) is a `SkeletonKing`
   (`Entities/TowerMobs/`), a `RealmMob` with `IsBoss` and `IsUndead` true (the `undeadDamage` stat applies) and no floating
   healthbar. Its model and skin come from `tools/generate-skeleton-king-model.py` (deterministic, `--check`, on the hell and
   skeleton scripts' machinery): a 3-block crowned humanoid (`EntityContract.RequireHumanoid`) with a bone club under

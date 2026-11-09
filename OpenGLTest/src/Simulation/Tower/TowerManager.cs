@@ -133,6 +133,23 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         return true;
     }
 
+    /// <summary>
+    /// Marks the Skeleton King of the tower at <paramref name="near"/> killed (the <c>towerdefeat</c> scenario op), through
+    /// <see cref="MarkDefeated"/>, so the tower then collapses through <see cref="TowerRules.CollapseDue"/> like after a
+    /// real kill. A tower already defeated stays as it is. False when no tower stands there or this is a client's mirror.
+    /// </summary>
+    public bool DefeatAt(Vector3 near)
+    {
+        if (writer == null) return false;
+        var x = (int)MathF.Floor(near.X);
+        var z = (int)MathF.Floor(near.Z);
+        var record = RecordAt(x, z);
+        if (record == null && _findSite(x, z) is { } site) record = Track(site);
+        if (record == null) return false;
+        MarkDefeated(record);
+        return true;
+    }
+
     /// <summary>Raised once when a tower's Skeleton King is killed (its altar turns
     /// <see cref="TowerAltarState.Defeated"/>). A public hook only: the collapse polls <see cref="TowerRules.CollapseDue"/>
     /// each frame instead, so a defeat restored from a save takes the same path as a live one.</summary>

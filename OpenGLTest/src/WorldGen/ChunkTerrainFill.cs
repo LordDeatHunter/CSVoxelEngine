@@ -339,6 +339,9 @@ internal static class ChunkTerrainFill
             var state = chunk.StateArray;
             TowerPlacement.Stamp(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
             chunk.StateArray = state;
+            // Only a tower-stamped chunk pays the vectorized scan; no later stamp writes a covering block, and
+            // every other chunk keeps the flag false, so its light flood runs the plain heightmap rule
+            chunk.MayHaveSkyCover = BlockType.ContainsSkyCover(chunk.Blocks);
         }
         timer?.Mark(Stage.Towers);
 

@@ -71,10 +71,13 @@ internal static class ChunkMeshBuilder
         {
             FillPaddedSnapshot(padded, paddedState, neighbors, neighborStates);
             FillLightSnapshot(lightBlocks, neighbors);
+            // Read before the neighbors are cleared: a tower brick anywhere in the volume's chunks turns the
+            // sky-cover rule on (27 field reads; nothing more for a plain neighborhood)
+            var skyCover = AnySkyCover(neighbors);
             scratch.ClearNeighbors();
             Array.Clear(sunLight, 0, LightCount);
             Array.Clear(blockLight, 0, LightCount);
-            var anyTinted = ComputeLight(chunk, lightBlocks, sunLight, blockLight, queue);
+            var anyTinted = ComputeLight(chunk, lightBlocks, sunLight, blockLight, queue, skyCover);
             // Keep the chunk's own cells of the flood for entity lighting: a fresh array owned
             // by this build alone, published by UpdateMesh with the mesh it belongs to. A chunk
             // lit by colored light appends a second half holding each cell's color slot.

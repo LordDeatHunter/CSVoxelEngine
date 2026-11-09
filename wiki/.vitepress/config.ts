@@ -19,6 +19,7 @@ export default defineConfig({
           { text: 'Biomes', link: '/game/biomes' },
           { text: 'Terrain', link: '/game/terrain' },
           { text: 'Layers', link: '/game/layers' },
+          { text: 'Battle tower', link: '/game/battle-tower' },
           { text: 'Trees', link: '/game/reference/trees' }
         ] },
         { text: 'Systems', items: [

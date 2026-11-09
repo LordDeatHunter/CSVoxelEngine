@@ -1,3 +1,5 @@
+using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using VoxelEngine.Audio;
@@ -145,6 +147,18 @@ public sealed record BlockType
 
     // Blocks no gameplay path may remove (IsUnbreakable); only Chunk.CollapseWriteAt replaces one
     internal static readonly bool[] UnbreakableById = new bool[256];
+
+    // Blocks that hide the sky from the cells under them in a light volume (coversSky: the battle
+    // tower's bricks); ChunkLighting reads it per cell while it scans a covered neighborhood
+    internal static readonly bool[] CoversSkyById = new bool[256];
+
+    /// <summary>The ids whose <see cref="CoversSkyById"/> is true, as a vectorized search set
+    /// (empty until the blocks load).</summary>
+    public static SearchValues<byte> SkyCoverIds { get; internal set; } = SearchValues.Create(ReadOnlySpan<byte>.Empty);
+
+    /// <summary>Whether <paramref name="blocks"/> holds any <c>coversSky</c> block. Vectorized
+    /// and allocation-free, so a whole chunk's ids are cheap to scan.</summary>
+    internal static bool ContainsSkyCover(ReadOnlySpan<byte> blocks) => blocks.IndexOfAny(SkyCoverIds) >= 0;
 
     // Gravity checks run per block edit (not per voxel), but the flat shape keeps the
     // support test a single array read like the other per-id questions
@@ -493,6 +507,10 @@ public sealed record BlockType
 
     /// <summary>Whether no gameplay path may remove this block (see <see cref="IsUnbreakable"/>).</summary>
     public bool Unbreakable { get; init; }
+
+    /// <summary>Whether the block hides the sky from every cell under it in a light volume (see
+    /// <see cref="CoversSkyById"/>).</summary>
+    public bool CoversSky { get; init; }
 
     /// <summary>Solid block a source of this fluid becomes under a freezing status effect;
     /// 0 when it never freezes.</summary>

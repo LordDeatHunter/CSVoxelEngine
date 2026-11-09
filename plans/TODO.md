@@ -46,8 +46,8 @@ Prove the fantasy half. Infrastructure first, in order: `M-15` (structure templa
 (`P-17`), then the first magic slice, the spell builder with a few parts (`P-14`, `MAGIC.md`). A single hand-authored crypt with loot, a spawner
 room and a boss is enough to make health, combat and loot matter and to give survival a
 destination. Placing it needs a world-site hook, the one worldgen touch this milestone allows.
-The **battle tower** (`BT-1`..`BT-9`, tracked in `BATTLE_TOWER.md`) is the large-scale form of this dungeon: a multi-floor
-landmark with skeleton piles, chests, a boss altar and a collapse.
+The **battle tower** (`BT-1`..`BT-10`, done, see `BATTLE_TOWER.md`) is the large-scale form of this dungeon: a multi-floor
+landmark with skeleton piles, chests, dark floors, a boss altar and a collapse.
 
 #### Milestone 3 — Arc B vertical slice: first power
 

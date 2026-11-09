@@ -236,6 +236,11 @@ public sealed class BlockDefinition
     /// (<c>Chunk.CollapseWriteAt</c>) may replace it. Default false; never on a fluid.</summary>
     public bool? Unbreakable { get; set; }
 
+    /// <summary>Whether the block hides the sky from every cell under it inside a chunk's light
+    /// volume: the battle tower's interior darkness (see <c>ChunkLighting.ComputeLight</c>).
+    /// Default false; only on a solid, opaque, plain model block that does not pass light.</summary>
+    public bool? CoversSky { get; set; }
+
     /// <summary>The solid block a source of this fluid becomes under a freezing status effect
     /// (water's <c>"ice"</c>). Only on a fluid; omitted means it never freezes.</summary>
     public string? FreezesTo { get; set; }

@@ -8,7 +8,7 @@ Frame time (F#), worldgen, meshing and streaming (G#). Ids F4, F5 and F13 (and t
 comments still cite) exist only in git history or under Ruled out. Every number names its machine and
 date; a win not yet measured is labeled *estimated*. Landed items are summarized under Reference;
 `git log -p -- plans/PERF.md` has the full write-ups (history was trimmed on 2026-10-28, 2026-10-31
-and 2026-11-05). Last updated 2026-11-05.
+and 2026-11-05). Last updated 2026-11-09.
 
 ## In progress
 
@@ -57,6 +57,18 @@ bold title, then **Files**, **Win** (measured or estimated), **Verify** and **In
     visible list for `RenderWorld` and `CullWater`; column-level skips.
   - **Win**: estimated; CPU only, worth it once the frame is CPU-bound. **Verify**: perf-fly CPU rows of
     the render sections. **Invariant**: zero per-frame allocation; static comparers; per-pass draw order unchanged.
+
+- [ ] **`F14` Tower collapse worst frame** (CPU, low priority: once per conquered tower; over its 1.0 ms ceiling).
+  - **Measured** (`TowerCollapseCostProbe`, the largest tower, radius 24, 8 floors, dev machine, 2026-11-09): the
+    collapse's main-thread step costs 0.25-0.33 ms mean, p90 0.55-0.61, p99 0.70-1.09, but 7-27 of its 2059 frames
+    pass 1 ms and the worst after the first frame is 5.8-8.2 ms (the first frame 10-15 ms, JIT). The step's 32 writes
+    each run `TowerBlockWriter`'s hooks (`MarkAreaDirty` over the light radius, the fluid and leaf-decay schedules,
+    the LOD notify); the spikes are unattributed (GC, a costly write, tier-up).
+  - **Files**: `Simulation/Tower/TowerCollapse.cs`, `TowerBlockWriter.cs`. Capture a `// TEMP-DIAG` per-write timer
+    first; ideas: batch the `MarkAreaDirty` per chunk per frame instead of per write, lower the write cap.
+  - **Win**: estimated; the worst frame of a collapse. **Verify**: rerun the probe and an in-game `X` capture of the
+    `entities` row during a `towerdefeat`. **Invariant**: every edit-path hook still runs for every cell; the ruin is
+    unchanged.
 
 ### B. Worldgen, meshing and streaming
 

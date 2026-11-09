@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Text.Json;
@@ -69,6 +70,12 @@ internal static class BlockLoader
 
         links.Resolve(types);
         BlockType.Types = types;
+
+        // The vectorized set of covering ids, built once every block's tables are written
+        var coverIds = new List<byte>();
+        for (var id = 0; id < BlockType.CoversSkyById.Length; id++)
+            if (BlockType.CoversSkyById[id]) coverIds.Add((byte)id);
+        BlockType.SkyCoverIds = SearchValues.Create(coverIds.ToArray());
     }
 
     /// <summary>
@@ -86,6 +93,7 @@ internal static class BlockLoader
         var multiblockSize = BlockSchemaParser.ParseMultiblockSize(definition.Multiblock, path);
         BlockFieldRules.ValidateStatusFlags(definition, path);
         BlockFieldRules.ValidateUnbreakable(definition, renderer, path);
+        BlockFieldRules.ValidateCoversSky(definition, renderer, path);
         var onBreak = BlockFieldRules.ParseOnBreak(definition, path);
         var (tipHardness, woodLootBands) = BlockFieldRules.ParseWood(definition, renderer, path);
 
@@ -192,7 +200,8 @@ internal static class BlockLoader
             HardensToId = 0,
             HardensTouchingId = 0,
             Flammable = definition.Flammable ?? false,
-            Unbreakable = definition.Unbreakable ?? false
+            Unbreakable = definition.Unbreakable ?? false,
+            CoversSky = definition.CoversSky ?? false
         };
         // A facing block's selection boxes turn with it, exactly like its model will in BakeModels
         if (horizontalFacing)
@@ -237,6 +246,7 @@ internal static class BlockLoader
         BlockType.HardensTouchingById[id] = type.HardensTouchingId;
         BlockType.FlammableById[id] = type.Flammable;
         BlockType.UnbreakableById[id] = type.Unbreakable;
+        BlockType.CoversSkyById[id] = type.CoversSky;
         BlockType.FreezesToById[id] = type.FreezesToId;
         BlockType.MeltsToById[id] = type.MeltsToId;
         BlockType.FallsById[id] = type.Falls;

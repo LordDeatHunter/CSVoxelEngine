@@ -509,6 +509,8 @@ public static class ContentRegistry
         Array.Clear(BlockType.HardensTouchingById);
         Array.Clear(BlockType.FlammableById);
         Array.Clear(BlockType.UnbreakableById);
+        Array.Clear(BlockType.CoversSkyById);
+        BlockType.SkyCoverIds = System.Buffers.SearchValues.Create(ReadOnlySpan<byte>.Empty);
         Array.Clear(BlockType.FreezesToById);
         Array.Clear(BlockType.MeltsToById);
         Array.Clear(BlockType.ReplaceableById);

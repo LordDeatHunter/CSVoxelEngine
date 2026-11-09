@@ -18,7 +18,7 @@ namespace VoxelEngine.Tests.WorldGen.Structures;
 /// count stay in their ranges, every tower keeps the spawn clear on dry, level land, the point query equals the stamp in every
 /// footprint chunk, the dressing fits the smallest room and every support-fragile dressing block has its holder, the altar cell
 /// is free on an unbreakable roof, every floor holds chests of its own tier and the roof one of the treasure tier, and
-/// every palette brick is unbreakable.
+/// every palette brick is unbreakable and covers the sky while nothing the ruin writes does.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class TowerPlacementTests
@@ -423,13 +423,29 @@ public sealed class TowerPlacementTests
     }
 
     [Fact]
-    public void EveryPaletteBrickIsUnbreakable()
+    public void EveryPaletteBrickIsUnbreakableAndCoversTheSky()
     {
         foreach (var palette in TowerPalette.All)
         {
             Assert.True(BlockType.IsUnbreakable(palette.Brick));
             Assert.False(BlockType.IsUnbreakable(palette.Step));
+            Assert.True(BlockType.CoversSkyById[palette.Brick]);
+            Assert.False(BlockType.CoversSkyById[palette.Step]);
         }
+
+        // ...while nothing the collapse leaves covers the sky, so a ruin lets the sun back in: a slice through the
+        // nearest tower's center, from its foundation to its top
+        var s = Nearest();
+        var ruinWrites = 0;
+        for (var x = s.CenterX - s.Radius; x <= s.CenterX + s.Radius; x++)
+        for (var y = s.BottomY; y <= s.TopY; y++)
+        {
+            var ruin = TowerRuin.RuinAt(s, x, y, s.CenterZ, out _);
+            if (ruin < 0) continue;
+            ruinWrites++;
+            Assert.False(BlockType.CoversSkyById[BlockOf(ruin)], $"the ruin writes a covering block at ({x}, {y})");
+        }
+        Assert.True(ruinWrites > 0, "the slice crossed no ruin cell");
         Assert.Equal(TowerPalette.DefaultBrick, TowerPalette.For(Biome.Forest).Brick);
         Assert.Equal(TowerPalette.For(Biome.Frozen), TowerPalette.For(Biome.Taiga));
         Assert.NotEqual(TowerPalette.For(Biome.Forest), TowerPalette.For(Biome.Taiga));

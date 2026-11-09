@@ -300,6 +300,14 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 Advance();
                 break;
 
+            case "towerdefeat":
+                // Marks the Skeleton King of the tower around the camera killed, so the real collapse runs
+                var defeated = world.DefeatTower(world.Camera.Position);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} towerdefeat: "
+                              + (defeated ? "defeated" : "no tower here"));
+                Advance();
+                break;
+
             case "chest":
                 RunUi("chest", u =>
                 {

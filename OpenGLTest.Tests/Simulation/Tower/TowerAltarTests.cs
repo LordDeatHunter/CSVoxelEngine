@@ -13,7 +13,8 @@ namespace VoxelEngine.Tests.Simulation.Tower;
 
 /// <summary>
 /// The battle tower's roof altar (<see cref="TowerManager.JudgeAltar"/>, <see cref="TowerManager.BeginRitual"/>,
-/// <see cref="TowerManager.MarkDefeated"/>, <see cref="TowerManager.UpdateAltars"/>, <see cref="TowerManager.SettleAltars"/>):
+/// <see cref="TowerManager.MarkDefeated"/>, <see cref="TowerManager.DefeatAt"/>, <see cref="TowerManager.UpdateAltars"/>,
+/// <see cref="TowerManager.SettleAltars"/>):
 /// the ritual is refused while any floor is sealed, begins once and then only stirs, never begins again after the king
 /// fell, never begins on a client's mirror, and answers only on the altar cell; once it runs out exactly one king rises,
 /// a king that leaves unkilled frees the ritual unless its restore is pending, and a kill defeats the tower the same
@@ -168,6 +169,31 @@ public sealed class TowerAltarTests
         towers.MarkDefeated(record);
         towers.MarkDefeated(record);
         Assert.Equal(1, announced);
+    }
+
+    [Fact]
+    public void DefeatAtMarksTheTowerDefeatedOnceAndAMirrorRefuses()
+    {
+        var towers = Authoritative();
+        var record = towers.Track(Record());
+        var announced = 0;
+        towers.BossDefeated += _ => announced++;
+        var inside = new Vector3(CenterX + 0.5f, 0f, CenterZ + 0.5f);
+
+        Assert.True(towers.DefeatAt(inside));
+        Assert.True(towers.DefeatAt(inside));
+        Assert.Equal(TowerAltarState.Defeated, record.AltarState);
+        Assert.True(TowerRules.CollapseDue(record.AltarState, done: false));
+        Assert.Equal(1, announced);
+
+        // No tower stands far away
+        Assert.False(towers.DefeatAt(new Vector3(CenterX + 500f, 0f, CenterZ)));
+
+        // A client's mirror never defeats its copy
+        var mirror = new TowerManager(null);
+        var mirrored = mirror.Track(Record());
+        Assert.False(mirror.DefeatAt(inside));
+        Assert.Equal(TowerAltarState.Dormant, mirrored.AltarState);
     }
 
     [Fact]
