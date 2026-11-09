@@ -11,7 +11,7 @@
   "steps": [
     { "op": "creative", "on": true },
     { "op": "fly", "on": true },
-    { "op": "teleport", "pos": [-7.5, -328.5, -2.5], "yaw": 0, "pitch": -60 },
+    { "op": "teleport", "pos": [-7.5, -428.5, -2.5], "yaw": 0, "pitch": -60 },
     { "op": "wait", "seconds": 20 },
 
     // One lamp to each side, so the brute's path to the camera stays clear
@@ -22,8 +22,8 @@
     { "op": "look", "yaw": -90, "pitch": -18 },
     { "op": "wait", "seconds": 1 },
 
-    { "op": "spawn", "entity": "hellbrute", "pos": [-7.5, -330, -11.5] },
-    { "op": "spawn", "entity": "cinderwitch", "pos": [-4.5, -331, -13.5] },
+    { "op": "spawn", "entity": "hellbrute", "pos": [-7.5, -430, -11.5] },
+    { "op": "spawn", "entity": "cinderwitch", "pos": [-4.5, -431, -13.5] },
     { "op": "wait", "seconds": 0.6 },
     { "op": "screenshot", "name": "idle", "hideHud": true },
     { "op": "wait", "seconds": 1.2 },

@@ -130,6 +130,7 @@ public sealed class HellTests
         // The chunk straddling hell's top, a pocket chunk and a deep layer's chunk, over 3x3 columns
         int[] floors =
         [
+            (WorldGenerationConfig.HellTopY + 1) >> Chunk.SizeShift << Chunk.SizeShift,
             WorldGenerationConfig.HellTopY >> Chunk.SizeShift << Chunk.SizeShift,
             (LayerTop(0) - 60) >> Chunk.SizeShift << Chunk.SizeShift,
             (LayerTop(9) - 70) >> Chunk.SizeShift << Chunk.SizeShift,

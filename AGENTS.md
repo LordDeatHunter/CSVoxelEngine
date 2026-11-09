@@ -5158,8 +5158,8 @@ Aether-like sky over it: no dimensions, no portals. This is the map; each part h
 in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for later.
 
 - **Bands** (`WorldGenerationConfig`, their order held by `LayerBandTests`): the overworld down to the
-  barrier band `BarrierTopY..BarrierBottomY` (-200..-300, a gapless core `BarrierFullTopY..BarrierFullBottomY`,
-  -230..-270, between patchy ramps); hell from `HellTopY` (-301) down forever in `HellLayerPeriodBlocks` (96)
+  barrier band `BarrierTopY..BarrierBottomY` (-300..-400, a gapless core `BarrierFullTopY..BarrierFullBottomY`,
+  -330..-370, between patchy ramps); hell from `HellTopY` (-401) down forever in `HellLayerPeriodBlocks` (96)
   layers, each a cavern pocket over a 16-block hellrock slab; above every peak (`ReliefCeilingHeight` 148) and
   the drawn cloud layer (160), the solid cloud slab `CloudSlabBottomY..CloudSlabTopY` (198..203); the cloud sea
   (`SkyConfig.SkyCloudSeaHeight`, `SkyCloudSeaThickness`: 290..301); the sky islands

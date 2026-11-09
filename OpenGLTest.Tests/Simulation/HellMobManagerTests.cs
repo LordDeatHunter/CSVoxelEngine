@@ -26,12 +26,11 @@ public sealed class HellMobManagerTests
     // cells tall carved across all of it; every cell publishes the given block light (no skylight)
     private static ChunkManager Pocket(int floor, int block = 0)
     {
-        var cy = floor >> Chunk.SizeShift;
-        Assert.Equal(cy, (floor + 3) >> Chunk.SizeShift);
         var chunks = new ChunkManager(null!);
         var stone = ContentRegistry.RequireBlock("stone").Id;
         var light = new byte[Chunk.Size * Chunk.Size * Chunk.Size];
         Array.Fill(light, (byte)block);
+        for (var cy = floor >> Chunk.SizeShift; cy <= (floor + 3) >> Chunk.SizeShift; cy++)
         for (var cx = -3; cx <= 2; cx++)
         for (var cz = -3; cz <= 2; cz++)
         {

@@ -150,6 +150,10 @@ public sealed class StampGateTests
         for (var f = 0; f < Features.Length; f++)
         {
             Assert.True(rejected[f], $"{Features[f].Name}: its gate never skipped a filled sample chunk");
+            // Hell's top is a chunk edge, so no filled (overworld-pipeline) chunk reaches hell's band: the
+            // hell stamps run only on the wholly-hell path, which the byte comparison above already covers
+            var hellOnly = Features[f].Name.EndsWith("Hell") && (WorldGenerationConfig.HellTopY + 1) % Chunk.Size == 0;
+            if (hellOnly) continue;
             Assert.True(admitted[f], $"{Features[f].Name}: its gate never admitted a filled sample chunk");
         }
     }

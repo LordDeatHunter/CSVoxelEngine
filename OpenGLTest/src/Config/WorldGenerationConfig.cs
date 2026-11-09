@@ -744,18 +744,18 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
 
     /// <summary>Top of the barrier band, where its ramp starts: the barrier block's share of the
     /// stone rises from 0 here to 100 % at <see cref="BarrierFullTopY"/>.</summary>
-    public const int BarrierTopY = -200;
+    public const int BarrierTopY = -300;
 
     /// <summary>Top of the barrier band's solid core: 100 % barrier from here down to
     /// <see cref="BarrierFullBottomY"/>.</summary>
-    public const int BarrierFullTopY = -230;
+    public const int BarrierFullTopY = -330;
 
     /// <summary>Bottom of the barrier band's solid core; below it the share ramps back to 0 at
     /// <see cref="BarrierBottomY"/>.</summary>
-    public const int BarrierFullBottomY = -270;
+    public const int BarrierFullBottomY = -370;
 
     /// <summary>Bottom of the barrier band, where its lower ramp ends at 0 %.</summary>
-    public const int BarrierBottomY = -300;
+    public const int BarrierBottomY = -400;
 
     /// <summary>Whether worldgen stamps the barrier band (BarrierGenerator).</summary>
     public const bool BarrierEnabled = true;

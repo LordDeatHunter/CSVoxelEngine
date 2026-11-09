@@ -14,11 +14,11 @@
     { "op": "wait", "seconds": 12 },
     { "op": "screenshot", "name": "surface", "hideHud": true },
 
-    { "op": "teleport", "pos": [0.5, -400.5, 0.5], "yaw": -90, "pitch": 0 },
+    { "op": "teleport", "pos": [0.5, -500.5, 0.5], "yaw": -90, "pitch": 0 },
     { "op": "wait", "seconds": 8 },
     { "op": "screenshot", "name": "hell", "hideHud": true },
 
-    { "op": "teleport", "pos": [0.5, -250.5, 0.5], "yaw": -90, "pitch": 0 },
+    { "op": "teleport", "pos": [0.5, -350.5, 0.5], "yaw": -90, "pitch": 0 },
     { "op": "wait", "seconds": 6 },
     { "op": "screenshot", "name": "barrier", "hideHud": true },
 

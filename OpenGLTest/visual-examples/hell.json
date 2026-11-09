@@ -14,7 +14,7 @@
     { "op": "creative", "on": true },
     { "op": "fly", "on": true },
 
-    { "op": "teleport", "pos": [-15.5, -330, -7.5], "yaw": -90, "pitch": -20 },
+    { "op": "teleport", "pos": [-15.5, -430, -7.5], "yaw": -90, "pitch": -20 },
     { "op": "wait", "seconds": 24 },
     { "op": "screenshot", "name": "layer0_ahead", "hideHud": true },
     { "op": "look", "yaw": 90, "pitch": -40 },
@@ -22,13 +22,13 @@
     { "op": "look", "yaw": 0, "pitch": 10 },
     { "op": "screenshot", "name": "layer0_ceiling", "hideHud": true },
 
-    { "op": "teleport", "pos": [0.5, -430, 0.5], "yaw": -90, "pitch": -15 },
+    { "op": "teleport", "pos": [0.5, -530, 0.5], "yaw": -90, "pitch": -15 },
     { "op": "wait", "seconds": 20 },
     { "op": "screenshot", "name": "layer1_ahead", "hideHud": true },
     { "op": "look", "yaw": 45, "pitch": -50 },
     { "op": "screenshot", "name": "layer1_floor", "hideHud": true },
 
-    { "op": "teleport", "pos": [4.5, -706, 8.5], "yaw": -90, "pitch": -30 },
+    { "op": "teleport", "pos": [4.5, -806, 8.5], "yaw": -90, "pitch": -30 },
     { "op": "wait", "seconds": 20 },
     { "op": "screenshot", "name": "layer4_lava", "hideHud": true },
     { "op": "look", "yaw": 90, "pitch": -10 },
@@ -36,7 +36,7 @@
     { "op": "look", "yaw": 180, "pitch": -89 },
     { "op": "screenshot", "name": "layer4_down", "hideHud": true },
 
-    { "op": "teleport", "pos": [-7.5, -329.4, -7.5], "yaw": -90, "pitch": -15 },
+    { "op": "teleport", "pos": [-7.5, -429.4, -7.5], "yaw": -90, "pitch": -15 },
     { "op": "wait", "seconds": 20 },
     { "op": "screenshot", "name": "ashlands_ahead", "hideHud": true },
     { "op": "look", "yaw": -90, "pitch": -60 },
@@ -44,7 +44,7 @@
     { "op": "look", "yaw": 90, "pitch": 35 },
     { "op": "screenshot", "name": "ashlands_ceiling", "hideHud": true },
 
-    { "op": "teleport", "pos": [-23.5, -449.4, 8.5], "yaw": 0, "pitch": -15 },
+    { "op": "teleport", "pos": [-23.5, -549.4, 8.5], "yaw": 0, "pitch": -15 },
     { "op": "wait", "seconds": 20 },
     { "op": "screenshot", "name": "magma_ahead", "hideHud": true },
     { "op": "look", "yaw": 0, "pitch": -60 },
@@ -53,7 +53,7 @@
     { "op": "screenshot", "name": "magma_ceiling", "hideHud": true },
 
     // Two blocks over the floor: the grove's glow ferns (L-9) grow at eye height there now
-    { "op": "teleport", "pos": [-135.5, -424.4, -103.5], "yaw": 0, "pitch": -15 },
+    { "op": "teleport", "pos": [-135.5, -524.4, -103.5], "yaw": 0, "pitch": -15 },
     { "op": "wait", "seconds": 20 },
     { "op": "screenshot", "name": "fungal_ahead", "hideHud": true },
     { "op": "look", "yaw": 0, "pitch": -60 },

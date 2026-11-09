@@ -7,7 +7,7 @@
   //   surface pavilion  waystone (29, 12, 58), beside the ruined hall at (16, 13, 65), steppe;
   //   underground crypt waystone (-204, -162, 122), sealed in rock (filmed from inside only);
   //   sky arch          waystone (-130, 380, -35), on the island of a cloud pavilion ruin at (-121, 381, -28);
-  //   hell ember ring   waystone (-2607, -346, -411), hell layer 0, beside a basalt cell ruin at (-2592, -365, -390).
+  //   hell ember ring   waystone (-2607, -446, -411), hell layer 0, beside a basalt cell ruin at (-2592, -365, -390).
   // The camera flies (so mobs cannot hurt it and the trips are free), films each structure from outside (no HUD) and from
   // beside its waystone, discovering each one (the popup), then films the teleport list with all four realms and a trip
   // back to the surface pavilion. The screens themselves (rename, search, a lost row, the mana footer) are filmed by
@@ -62,16 +62,16 @@
     { "op": "waystone", "action": "close" },
 
     // ---- Hell: the ember ring in a layer-0 cavern ----
-    { "op": "teleport", "pos": [-2601.5, -339.5, -422.5], "yaw": 112, "pitch": -23 },
+    { "op": "teleport", "pos": [-2601.5, -439.5, -422.5], "yaw": 112, "pitch": -23 },
     { "op": "wait", "seconds": 12 },
     { "op": "screenshot", "name": "hell-outside", "hideHud": true },
-    { "op": "teleport", "pos": [-2601.5, -339.5, -398.5], "yaw": -112, "pitch": -23 },
+    { "op": "teleport", "pos": [-2601.5, -439.5, -398.5], "yaw": -112, "pitch": -23 },
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "hell-outside-2", "hideHud": true },
-    { "op": "teleport", "pos": [-2604.0, -344.9, -409.5], "yaw": -158, "pitch": -6 },
+    { "op": "teleport", "pos": [-2604.0, -444.9, -409.5], "yaw": -158, "pitch": -6 },
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "hell-inside", "hideHud": true },
-    { "op": "waystone", "action": "open", "pos": [-2607, -346, -411] },
+    { "op": "waystone", "action": "open", "pos": [-2607, -446, -411] },
     { "op": "wait", "seconds": 0.4 },
     { "op": "screenshot", "name": "hell-discovered" },
     { "op": "waystone", "action": "confirm" },

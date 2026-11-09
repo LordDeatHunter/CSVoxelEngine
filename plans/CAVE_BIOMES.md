@@ -2,7 +2,7 @@
 > Guide: plans/README.md
 
 ## Status
-Designed, nothing built yet. Tracks 3D cave biomes: caves that stop being biome-blind, plus the barrier shift that makes room for
+CB-0 (barrier shift) done: barrier -300..-400, core -330..-370, hell top -401 (a chunk edge, so no chunk straddles hell). Rest designed, nothing built yet. Tracks 3D cave biomes: caves that stop being biome-blind, plus the barrier shift that makes room for
 them. Third of three efforts, in order: accessories (done), the battle tower (`BATTLE_TOWER.md`), cave biomes. One phase
 per prompt; each leaves the game building and the tests green. Last updated 2026-11-08.
 
@@ -10,10 +10,6 @@ per prompt; each leaves the game building and the tests green. Last updated 2026
 Nothing.
 
 ## Open
-- [ ] **`CB-0` Barrier shift** - P1, M.
-  Push the barrier 100 blocks down: `-300..-400` (core `-330..-370`), hell top `-401`. Update the band constants in
-  `WorldGenerationConfig` (`LayerBandTests` holds their order), the waystone realm classifier, the hematite and lava Y limits, the
-  scenarios `barrier.json`, `hell*.json`, `layers-fog.json`, and the layer numbers in AGENTS.md. Old saves need no compatibility work.
 - [ ] **`CB-1` `CaveBiomes` field, palettes, debug scenario** - P1, L.
   `WorldGen/Caves/`: `CaveBiome` enum (its own, never the surface `Biome`), `CaveBiomePalette`, `CaveBiomes.At(x, y, z)`, pure, on a
   true 3D lattice like `OreNoiseLattice` (seed offsets 179 and up), so the point query equals the stamp bit for bit across seams.
