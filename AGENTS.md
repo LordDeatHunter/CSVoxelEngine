@@ -2842,6 +2842,8 @@ tools/                                # asset generators: models, animation clip
   generate-sandworm-model.py          # deterministic sandworm .bbmodel, skin and fang sprite (placeholder art); --check
   generate-spell-sfx.py               # deterministic placeholder spell sounds (spell_cast/impact/fizzle.wav), --check
   generate-wiki-shots.mjs             # the wiki's screenshot scenarios (visual-examples/wiki-*.json) and wiki/data/screenshots.json from one spec of poses and captions
+  scroll-sprite.py                    # utility: lays one sprite out as a scrolling animation sheet (frames wrapped toward a direction,
+                                      #   N px/frame, vertical/horizontal/square), PNG in and out, stdlib only
 ```
 
 ## Content: blocks, items, models and loot are data
