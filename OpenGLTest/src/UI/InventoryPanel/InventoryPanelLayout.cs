@@ -91,7 +91,7 @@ public static class InventoryPanelLayout
     public static float SearchLeft => PanelLeft + PanelPad;
 
     // The search scope's cycle button sits right of the field, on the field's row.
-    public const float ScopeButtonWidth = 96f;
+    public const float ScopeButtonWidth = 140f;
     public const float ScopeButtonGap = 6f;
 
     /// <summary>Width of the search field box: the panel inside its pads, less the scope button beside it.</summary>
