@@ -100,7 +100,7 @@ only while `SatellitesOf(kind)` lists satellites (`TryPick(..., satellite: true)
 roof, a lantern over the waystone), `waystone_crypt` (underground: a sealed stone-brick chamber with wall lamps, the waystone on a slab dais),
 `waystone_ember_ring` (hell: a basalt disc ringed by basalt pillars crowned with ember crystal, on a two-layer hellrock foundation)
 and `waystone_sky_arch` (sky: a frost-stone plaza under a crystal-keyed arch). `WaystonePlacement` (`WorldGen/Structures/`) places
-them only beside ruins: every placed ruin's hash, mixed with salt `0x5E7E` (`SatelliteHash`), rolls `WaystoneSatelliteChance`, the
+them beside ruins and, on the surface, out from a battle tower's entrance (`TryFindTower`: each tower rolls `WaystoneTowerChance` from its own hash, then up to `WaystoneSiteTries` spots straight out of the entrance strips, within `WaystoneTowerSpreadRadians` and `WaystoneTowerExtraDistance`, through the same `TrySurfaceGround`): every placed ruin's hash, mixed with salt `0x5E7E` (`SatelliteHash`), rolls `WaystoneSatelliteChance`, the
 template and its turn, and up to `WaystoneSiteTries` distances (`WaystoneMinDistance..MaxDistance` between centers) and directions,
 each pushed out until the two footprints keep `WaystoneRuinGap` empty columns apart; the first try whose site passes the realm's
 rule wins. The rules are the ruins' own, shared through `RuinPlacement`: surface `TrySurfaceGround` (a land biome, dry, within

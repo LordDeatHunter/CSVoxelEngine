@@ -164,7 +164,13 @@ public static class WorldFeatureConfig
     // --- Waystones (WaystonePlacement): a waystone structure a short walk from a placed ruin, never on its own ---
     public const bool WaystonesEnabled = true;
     // The share of placed ruins that get a waystone satellite
-    public const float WaystoneSatelliteChance = 0.25f;
+    public const float WaystoneSatelliteChance = 0.2f;
+    // The share of battle towers that get a waystone in front of their entrance (WaystonePlacement.TryFindTower)
+    public const float WaystoneTowerChance = 0.8f;
+    // How far a tower's waystone may stray from straight out of the entrance: half-angle in radians, and extra columns of
+    // distance past the clearance, both rolled per try
+    public const float WaystoneTowerSpreadRadians = 0.35f;
+    public const float WaystoneTowerExtraDistance = 6f;
     // The rolled distance between the ruin's center and the waystone's (pushed farther when their footprints would meet)
     public const float WaystoneMinDistance = 12f;
     public const float WaystoneMaxDistance = 30f;

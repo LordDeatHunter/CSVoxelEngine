@@ -7,7 +7,7 @@ using VoxelEngine.WorldGen.Sky;
 namespace VoxelEngine.WorldGen.Structures;
 
 /// <summary>
-/// Where the waystone structures stand: only beside ruins (plans/WAYSTONES.md). Every ruin a <see cref="RuinPlacement"/> places
+/// Where the waystone structures stand: beside ruins and, on the surface, out from a battle tower's entrance (plans/WAYSTONES.md). Every ruin a <see cref="RuinPlacement"/> places
 /// may get one satellite a short walk away: its chance rolls from a salted hash of the ruin's own, its template is one of the
 /// satellites of the ruin's kind, and up to <see cref="WorldFeatureConfig.WaystoneSiteTries"/> rolled distances and directions
 /// are tried in order, the first whose site passes that realm's ruin rule winning (level dry land, a sealed chamber at a
@@ -42,6 +42,7 @@ public static class WaystonePlacement
         foreach (var (cellX, cellZ) in RuinPlacement.CellsReaching(worldX0, worldZ0, CellReach))
             if (TryFindSurface(cellX, cellZ, (worldX0, worldZ0), out _, out var waystone))
                 Stamp(blocks, ref state, worldX0, worldY0, worldZ0, waystone);
+        StampTowers(blocks, ref state, worldX0, worldY0, worldZ0);
     }
 
     /// <summary>The surface ruin of a ruin cell and its waystone: false when the cell holds no ruin, the ruin no satellite, or
@@ -75,6 +76,72 @@ public static class WaystonePlacement
         }
         return false;
     }
+
+    // ---- Battle towers ----
+
+    // How far past a chunk's columns a tower's center may lie and still put its waystone's footprint into the chunk: the
+    // tower's reach, the waystone's whole footprint, the gap, the rolled extra distance and a column of rounding slack
+    private static readonly int TowerCellReach = TowerPlacement.Reach + StructureRegistry.MaxSize + WorldFeatureConfig.WaystoneRuinGap
+        + (int)Math.Ceiling(WorldFeatureConfig.WaystoneTowerExtraDistance) + 2;
+
+    // Stamps every tower's waystone whose footprint reaches the chunk
+    private static void StampTowers(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    {
+        var maxX = worldX0 + Chunk.Size - 1;
+        var maxZ = worldZ0 + Chunk.Size - 1;
+        for (var cellX = TowerPlacement.CellOf(worldX0 - TowerCellReach); cellX <= TowerPlacement.CellOf(maxX + TowerCellReach); cellX++)
+        for (var cellZ = TowerPlacement.CellOf(worldZ0 - TowerCellReach); cellZ <= TowerPlacement.CellOf(maxZ + TowerCellReach); cellZ++)
+            if (TryFindTower(cellX, cellZ, (worldX0, worldZ0), out _, out var waystone))
+                Stamp(blocks, ref state, worldX0, worldY0, worldZ0, waystone);
+    }
+
+    /// <summary>The battle tower of a tower cell and its waystone, standing out from the tower's entrance on level dry land:
+    /// false when the cell holds no tower, the tower no waystone, or no tried site is level, dry land.</summary>
+    internal static bool TryFindTower(int cellX, int cellZ, out TowerSite tower, out PlacedStructure waystone) =>
+        TryFindTower(cellX, cellZ, null, out tower, out waystone);
+
+    private static bool TryFindTower(int cellX, int cellZ, (int X0, int Z0)? chunk, out TowerSite tower,
+        out PlacedStructure waystone)
+    {
+        tower = null!;
+        waystone = default;
+        // A constant && keeps the compiler from flagging the rest as unreachable while towers are switched off
+        if (!(WorldGenerationConfig.TowersEnabled && TowerPlacement.TryRoll(cellX, cellZ, out var hash, out var cx, out var cz, out _)))
+            return false;
+        var sat = SatelliteHash(hash);
+        if (SplitMix64.Unit(sat, 0) >= WorldFeatureConfig.WaystoneTowerChance
+            || chunk is { } c && !TowerMayReach(cx, cz, c.X0, c.Z0)
+            || !TowerPlacement.TryGetSite(cellX, cellZ, out tower)
+            || !StructureRegistry.TryPick(StructureKind.Surface, TerrainGenerator.BiomeAt(cx, cz), SplitMix64.Unit(sat, 4),
+                out var template, satellite: true))
+            return false;
+        var entrance = EntranceAngle(tower);
+        var clearance = tower.OuterRadius + template.Half + WorldFeatureConfig.WaystoneRuinGap;
+        for (var attempt = 0; attempt < WorldFeatureConfig.WaystoneSiteTries; attempt++)
+        {
+            var tryHash = TryHash(sat, attempt);
+            var angle = entrance + (SplitMix64.Unit(tryHash, 1) * 2 - 1) * WorldFeatureConfig.WaystoneTowerSpreadRadians;
+            var (dx, dz) = (Math.Cos(angle), Math.Sin(angle));
+            var d = PushFor(clearance, dx, dz) + SplitMix64.Unit(tryHash, 3) * WorldFeatureConfig.WaystoneTowerExtraDistance;
+            var x = tower.CenterX + (int)Math.Round(dx * d, MidpointRounding.AwayFromZero);
+            var z = tower.CenterZ + (int)Math.Round(dz * d, MidpointRounding.AwayFromZero);
+            if (TerrainGenerator.BiomeAt(x, z) == Biome.Ocean || !RuinPlacement.TrySurfaceGround(template, x, z, out var ground))
+                continue;
+            waystone = new PlacedStructure(template, RuinPlacement.TurnsOf(sat), x, ground + 1 - template.GroundLayer, z);
+            return true;
+        }
+        return false;
+    }
+
+    // The angle (in the X, Z plane, as Atan2(dz, dx)) straight out of the tower's entrance: the middle of the entrance strips
+    // (TowerShell.StepOf turns the strips by the site's quarter turns)
+    private static double EntranceAngle(TowerSite s) =>
+        2 * Math.PI * (1 - WorldGenerationConfig.TowerEntranceSteps / (2.0 * WorldGenerationConfig.TowerStairStepsPerTurn) - s.Turns * 0.25);
+
+    // Whether a tower centered at (cx, cz) can put its waystone into the chunk, before any site is searched
+    private static bool TowerMayReach(int cx, int cz, int worldX0, int worldZ0) =>
+        cx + TowerCellReach >= worldX0 && cx - TowerCellReach <= worldX0 + Chunk.Size - 1
+        && cz + TowerCellReach >= worldZ0 && cz - TowerCellReach <= worldZ0 + Chunk.Size - 1;
 
     // ---- Underground ----
 
