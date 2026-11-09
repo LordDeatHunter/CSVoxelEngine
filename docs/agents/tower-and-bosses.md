@@ -4,6 +4,9 @@ The skeleton, the battle tower with its king, the sandworm boss and the icebergs
 
 ### Skeleton
 
+Ambiently, `SkeletonRattle` (`src/Entities/TowerMobs/`, ticked by `World`) plays a random `skeleton_rattle_N` clip every
+12-35 s (`AudioConfig`) while a live skeleton is within 24 blocks of the camera; the sound is not positional.
+
 The battle tower's undead archer (plans/BATTLE_TOWER.md `BT-3`): one `Skeleton` (`src/Entities/TowerMobs/`), a
 `RealmMob` like the hell and sky mobs but with no realm base, run by `SkeletonManager` (`src/Simulation/Tower/`) on the
 shared `RealmMobManager<TMob>` frame, joined to the world's `MobCaps`. Its model, palette skin and the `arrow` and `bone`

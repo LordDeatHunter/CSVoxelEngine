@@ -92,7 +92,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     SkyMobs/                   # sky mob contracts, zone difficulty, the flyer's hover and dive, the golem's
                                #   shockwave and ledge caution
     CaveMobs/                  # cave mob contracts, the depth tier and its scaling, the shard band, each attack's event
-    TowerMobs/                 # the skeleton's contract, tier scaling, bow band and line of sight, melee, undead; the
+    TowerMobs/                 # the skeleton's contract, tier scaling, bow band and line of sight, melee, undead, the ambient rattle's timer and range gate; the
                                #   Skeleton King's contract, leash, shockwave and volley fan, its brain's phases and choices
     Sandworms/                 # the sandworm's chain, brain and pose, its melee through the real punch path
     Icebergs/                  # iceberg shape, motion, wobble, spawn band, contact, the berg (mirrors src/Entities/Icebergs)

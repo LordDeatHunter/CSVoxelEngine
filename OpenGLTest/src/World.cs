@@ -211,6 +211,9 @@ public class World
     /// <summary>The cosmetic side of casts (the cast burst and sounds, a client's preview bolts); null on a headless server.</summary>
     internal SpellFeedback? Feedback { get; }
 
+    // The skeletons' ambient rattle; null without audio or on a headless server
+    private readonly SkeletonRattle? _skeletonRattle;
+
     /// <summary>The multiplayer client's mirror of its server: cell changes, entities, stations, health, remote players.</summary>
     internal ClientMirror ClientMirror { get; }
 
@@ -564,6 +567,8 @@ public class World
             if (Spells != null) Caster.Effect = Spells.Cast;
             Feedback = serverMode ? null : new SpellFeedback(this, _chunkManager, _debris, sfx, clientMode);
             if (Feedback != null) Caster.Feedback = Feedback.OnCast;
+            if (sfx != null && !serverMode)
+                _skeletonRattle = new SkeletonRattle(sfx.Play, Random.Shared);
             Renderer = new WorldRenderer(this, _window, _chunkManager, _lodManager, _dropManager, _tntManager, _falling,
                 _goblins, _campfires, _querns, _kilns, _casting, _toppling, _projectiles, _remotePlayers, _debris,
                 _leaves, _fire, _lavaFire, _torchFire, _bubbles, _sliceTrails, _health, _hotbarName, _hotbarPops);
@@ -1041,6 +1046,7 @@ public class World
         Throws.RefreshProjectiles();
         Ambient.UpdateSplashes((float)deltaTime);
         Feedback?.Update((float)deltaTime, _remotePlayers);
+        _skeletonRattle?.Tick((float)deltaTime, Skeletons, Camera.Position);
         FrameProfiler.End(ProfileSection.Entities);
 
         _hotbarPops.Update(Inventory, (float)deltaTime);
@@ -1182,6 +1188,7 @@ public class World
         // updates and the damage they deal (MobDirector)
         Director.UpdateIcebergs(deltaTime);
         Director.Update(deltaTime);
+        _skeletonRattle?.Tick((float)deltaTime, Skeletons, Camera.Position);
 
         // After every mob manager and before the thrown items, so a mob killed or despawned
         // this frame is never hit by a projectile or drawn a healthbar.

@@ -44,7 +44,7 @@ OpenGLTest/
     Audio/                     # sound: the sfx library, mixer and manager, the ambience bed
       AmbienceManager.cs       # looping day/night ambience with a slow crossfade
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups (and names the
-                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle)
+                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle)
       SfxManager.cs            # one-shot sound effects built on the same NAudio stack as AmbienceManager
       SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline
     Chunks/                    # chunk storage and lifecycle, the column cache and column terrain, the light
@@ -447,6 +447,8 @@ OpenGLTest/
                                #   King and the floor-tier difficulty
         Skeleton.cs            # the undead archer (a RealmMob): melee rake at its impact event, a bow shot at its release
                                #   event inside its band with a clear line, two attack clips over one count, its tier
+        SkeletonRattle.cs      # the skeletons' ambient bone rattle: a randomized timer plays a skeleton_rattle clip when a
+                               #   skeleton is in earshot of the camera (World ticks it; injected play and random, GL-free)
         SkeletonKing.cs        # the tower boss (a RealmMob, IsBoss, IsUndead): slam, volley and summon clips over one count,
                                #   the leash to its home (HomeMove, EnforceLeash), the unengaged reset, the volley fan
         SkeletonKingBrain.cs   # GL-free: phases by health share (the first observation silent, a phase change owes a summon),
