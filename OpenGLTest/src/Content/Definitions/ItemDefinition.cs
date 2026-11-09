@@ -46,6 +46,13 @@ public sealed class ItemDefinition
     public bool ThrowAligned { get; set; }
 
     /// <summary>
+    /// A block whose small cube a throw of this item draws in place of the item's sprite (a flint or obsidian shard
+    /// flies as the same stone cube it rests as on the ground), named like <c>use.block</c>, e.g. <c>block/pebble</c>.
+    /// Needs <see cref="ThrowDamage"/>.
+    /// </summary>
+    public string? ThrowBlock { get; set; }
+
+    /// <summary>
     /// Attack behavior the left-click drives: <c>punch</c> (default), <c>slice</c> or <c>sword</c>. See
     /// <see cref="AttackPattern"/>.
     /// </summary>

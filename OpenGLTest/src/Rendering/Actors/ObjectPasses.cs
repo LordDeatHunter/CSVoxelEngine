@@ -100,9 +100,10 @@ internal sealed class ObjectPasses
         foreach (var projectile in thrown)
         {
             Mesh? mesh;
-            if (ItemRegistry.IsItem(projectile.ItemId))
+            var renderId = projectile.RenderId;
+            if (ItemRegistry.IsItem(renderId))
             {
-                if (!_owner.ItemMeshes.TryGet(projectile.ItemId, out mesh, out var itemTexture)) continue;
+                if (!_owner.ItemMeshes.TryGet(renderId, out mesh, out var itemTexture)) continue;
                 Units.BindUnit(0, TextureTarget.Texture2DArray, itemTexture);
                 atlasBound = false;
             }
@@ -114,7 +115,7 @@ internal sealed class ObjectPasses
                     atlasBound = true;
                 }
 
-                mesh = _owner.BlockCubes.Get(projectile.ItemId);
+                mesh = _owner.BlockCubes.Get(renderId);
                 if (mesh == null) continue;
             }
 

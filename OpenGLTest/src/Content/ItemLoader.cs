@@ -155,6 +155,9 @@ internal static class ItemLoader
             if (definition.ThrowAligned && throwDamage == null)
                 throw new InvalidOperationException($"Item '{path}' sets throwAligned but has no throwDamage.");
 
+            if (definition.ThrowBlock != null && throwDamage == null)
+                throw new InvalidOperationException($"Item '{path}' sets throwBlock but has no throwDamage.");
+
             types[id] = ItemFactory.Create(name, new ItemFactory.ItemSpec(
                 id, definition.Name ?? name, definition.Texture,
                 action,
@@ -172,6 +175,7 @@ internal static class ItemLoader
                 EntityName: use?.Entity,
                 TrailColor: trailColor,
                 ThrowAligned: definition.ThrowAligned,
+                ThrowBlockId: ResolveUseTarget(definition.ThrowBlock, "throwBlock", path),
                 UsePose: usePose,
                 StaffSlots: staff?.Slots ?? 0,
                 StaffTier: staff?.Tier ?? 0,

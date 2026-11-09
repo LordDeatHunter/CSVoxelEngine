@@ -132,6 +132,9 @@ public abstract class Item
     /// <summary>Whether a thrown copy flies point first along its velocity (a spear) rather than tumbling.</summary>
     public bool ThrowAligned { get; internal init; }
 
+    /// <summary>The block whose cube a thrown copy is drawn as instead of this item's sprite, or 0 for the sprite.</summary>
+    public byte ThrowBlockId { get; internal init; }
+
     /// <summary>Seconds between uses of this item; 0 means the global click rate applies.</summary>
     public float UseDelaySeconds { get; internal init; }
 
@@ -275,6 +278,7 @@ public abstract class Item
         EntityDamage = spec.EntityDamage;
         ThrowDamage = spec.ThrowDamage;
         ThrowAligned = spec.ThrowAligned;
+        ThrowBlockId = spec.ThrowBlockId;
         Rarity = spec.Rarity;
     }
 

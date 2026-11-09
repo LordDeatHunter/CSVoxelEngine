@@ -62,8 +62,12 @@ public sealed class ThrownProjectile
     /// (<see cref="WaterSplash.Track"/>).</summary>
     internal WaterSplashTracker Splash { get; } = new();
 
+    /// <summary>The id the projectile is drawn as: the block cube its item names (<see cref="Item.ThrowBlockId"/>), else
+    /// the item itself (a sprite) or the block it is.</summary>
+    public byte RenderId => ItemRegistry.TryGet(ItemId) is { ThrowBlockId: not 0 } item ? item.ThrowBlockId : ItemId;
+
     public float Spin => _age * 9f;
-    public float Scale => ItemDrop.Size * (ItemRegistry.IsItem(ItemId) ? 1.5f : 1f);
+    public float Scale => ItemDrop.Size * (ItemRegistry.IsItem(RenderId) ? 1.5f : 1f);
     public bool IsExpired => _age >= _lifeSeconds;
 
     /// <summary>A projectile that falls under <paramref name="gravityScale"/> of <see cref="Gravity"/> (bone shrapnel

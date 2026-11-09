@@ -1,3 +1,4 @@
 { "name": "Flint", "texture": "assets/textures/items/flint.png",
+  "throwBlock": "block/pebble",
   "throwDamage": 1.5,
   "use": { "action": "place_stack", "block": "block/pebble" } }

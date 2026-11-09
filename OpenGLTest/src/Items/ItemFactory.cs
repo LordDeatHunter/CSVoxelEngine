@@ -51,6 +51,7 @@ public static class ItemFactory
         string? EntityName = null,
         Rgba? TrailColor = null,
         bool ThrowAligned = false,
+        byte ThrowBlockId = 0,
         UsePose UsePose = UsePose.Raise,
         int StaffSlots = 0,
         int StaffTier = 0,
