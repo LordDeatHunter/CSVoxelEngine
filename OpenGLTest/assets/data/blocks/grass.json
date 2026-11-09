@@ -10,5 +10,6 @@
       "side": { "base": "dirt", "overlay": "grass_side_textureless" }
     }
   },
-  "pebbleWeight": 0.3
+  "pebbleWeight": 0.3,
+  "loot": "grass"
 }
