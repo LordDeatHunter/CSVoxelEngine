@@ -143,7 +143,7 @@ chop takes only the one mob in the punch cone at the highest power (`Combat.Swor
 double shove and the heaviest hit-stop, and each has its own length and impact frame
 (`PlayerModel.SwordDuration`/`SwordImpactProgress`), so the chain paces itself. All three blade
 paths land through one `LeftClickAction.StrikeNearest` (nearest first, line of sight required) and
-`MobStrikes.StrikeMob`, whose shove speed a chop doubles.
+`MobStrikes.StrikeMob`, whose shove speed a chop doubles. A mob mid-attack (`Mob.IsMidAttack`: a rigged mob's attack or throw clip is playing) takes the damage but no shove, so a hit never knocks it out of reach of its own swing.
 
 A larger slime is pushed less: every shove (a punch, a slice, a grounded player walking into it) is
 divided by its body scale (`SlimeSize.ShoveSpeed`, applied in `Slime.Shove`), while a split child's

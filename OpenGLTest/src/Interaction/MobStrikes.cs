@@ -57,6 +57,8 @@ internal sealed class MobStrikes
         }
         ShowLandedHit(mob, hits);
         SpawnHitSparks(mob, from);
+        // A mob mid-attack is not knocked back, so a hit never cancels its swing or throw
+        if (mob.IsMidAttack) return landed;
         // A flyer is knocked away in 3D (up off a blow from below), a ground mob sideways
         var away = mob.Position - from;
         if (!mob.Flies) away.Y = 0f;

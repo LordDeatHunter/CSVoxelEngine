@@ -394,6 +394,10 @@ public abstract class Mob
         LastHitDamage = amount;
     }
 
+    /// <summary>Whether the mob is in the middle of an attack (a swing, a throw, a bite): a blow that lands now
+    /// still hurts it but does not knock it back, so a hit never cancels the attack. False by default.</summary>
+    public virtual bool IsMidAttack => false;
+
     /// <summary>Sets the shove a contact or hit imparts along <paramref name="direction"/>: a ground mob
     /// takes only its horizontal part and keeps its vertical motion, a flyer (<see cref="Flies"/>) is
     /// knocked along all three axes. Setting (not adding) keeps a sustained touch from accelerating the mob.</summary>

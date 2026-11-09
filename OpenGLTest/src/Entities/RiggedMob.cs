@@ -175,6 +175,9 @@ public abstract class RiggedMob : Mob
     }
 
     /// <inheritdoc />
+    public override bool IsMidAttack => !IsDying && Animation.IsActionPlaying && !Animation.IsPlaying(SpawnClip);
+
+    /// <inheritdoc />
     public override void Shove(Vector3 direction, float speed)
     {
         if (!Flies) direction.Y = 0f;
