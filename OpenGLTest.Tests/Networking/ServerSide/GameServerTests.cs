@@ -399,12 +399,15 @@ public sealed class GameServerTests : IDisposable
         return (id, state);
     }
 
-    /// <summary>Grants <paramref name="id"/> through a creative request, then drops back to survival.</summary>
+    /// <summary>Grants <paramref name="id"/> through a creative request and puts it in hand (a grant never lands on
+    /// the hotbar by itself), then drops back to survival.</summary>
     private void GrantAsSurvival(NetworkClient client, byte id, int count)
     {
         _server.AllowCreative = true;
         SendModes(client, NetPlayerFlags.Creative);
         SendIntent(client, InventoryIntent.CreativeGrant(id, count));
+        AwaitInventory(client);
+        SendIntent(client, InventoryIntent.PickBlock(id));
         AwaitInventory(client);
         SendModes(client, NetPlayerFlags.None);
         PumpFor(0.05);

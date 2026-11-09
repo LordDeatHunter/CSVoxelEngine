@@ -141,9 +141,11 @@ public class Inventory
     /// Returns false for an id with no pool, or when its pool is full — the caller must
     /// leave the drop on the ground.
     /// A pickup of an id the pools hold none of yet auto-equips into the first empty
-    /// hotbar slot, when there is one, so a new find is immediately in hand.
+    /// hotbar slot, when there is one, so a new find is immediately in hand; a grant the player
+    /// clicked in the panel passes <paramref name="autoEquip"/> false, since only a slot click or a
+    /// drop puts it on the hotbar.
     /// </summary>
-    public bool Add(byte id, int amount = 1)
+    public bool Add(byte id, int amount = 1, bool autoEquip = true)
     {
         var category = CategoryOf(id);
         if (!category.HasValue || amount <= 0) return false;
@@ -159,7 +161,7 @@ public class Inventory
                 var firstNewIndex = _tools.Count;
                 for (var i = 0; i < Math.Min(room, amount); i++)
                     _tools.Add(new ItemStack(_nextToolInstance++, id));
-                if (newTool && category.Value == InventoryCategory.Tools)
+                if (newTool && autoEquip && category.Value == InventoryCategory.Tools)
                     EquipNewTool(_tools[firstNewIndex].InstanceId);
                 return true;
             default:
@@ -171,7 +173,7 @@ public class Inventory
                 var fresh = store.GetValueOrDefault(id) <= 0;
                 var n = Math.Min(capacity - used, amount);
                 store[id] = CountFor(id) + n;
-                if (fresh)
+                if (fresh && autoEquip)
                     EquipNewStackable(id);
                 return true;
             }

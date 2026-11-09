@@ -129,7 +129,8 @@ internal sealed class UiPasses
         if (view.IsOpen || view.Transition.Visible)
         {
             _owner.Ui.SetOverlay(new Vector2(0f, view.Transition.SlideY), view.Transition.Alpha);
-            _owner.Ui.Panel.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true);
+            _owner.Ui.Panel.DrawInventoryPanel(inventory, view, time, heading, camera?.IsCreative == true,
+                chest is { IsOpen: true });
             _owner.Ui.ClearOverlay();
         }
         if (chest != null)
@@ -142,6 +143,9 @@ internal sealed class UiPasses
                 _owner.Ui.ClearOverlay();
             }
         }
+        // A row dragged toward a slot rides the pointer over the panel, the chest card and the hotbar
+        if (view.IsOpen && view.Drag is { Lifted: true } drag && view.HoverCanvas is { } pointer)
+            _owner.Ui.Panel.DrawDraggedRow(drag.Id, pointer, heading, time);
         if (builder != null)
         {
             builder.Transition.Step(builder.IsOpen, time);

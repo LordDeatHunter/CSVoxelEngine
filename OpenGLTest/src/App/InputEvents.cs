@@ -126,13 +126,16 @@ internal sealed class InputEvents
                     inventoryView.EndThumbDrag();
                     return;
                 }
+                // ...and a row dragged off its press drops into the slot under it instead of clicking
+                if (panelInput.RowDrag.TryDrop(inputManager.Mouse.Position)) return;
                 panelInput.HandleInventoryClick(inputManager.Mouse.Position);
                 break;
             }
         }
     }
 
-    /// <summary>A pressed button: the settings sliders start a drag and the [E] panel scrollbar a thumb drag.</summary>
+    /// <summary>A pressed button: the settings sliders start a drag, the [E] panel scrollbar a thumb drag and a listed
+    /// row a row drag.</summary>
     internal void OnMouseDown(MouseButton button)
     {
         switch (Screen)
@@ -146,6 +149,7 @@ internal sealed class InputEvents
             case AppScreen.Playing when inventoryView.IsOpen && !pauseMenuView.IsOpen
                                                              && button == MouseButton.Left && inputManager.Mouse != null:
                 panelInput.HandleInventoryScrollbarPress(inputManager.Mouse.Position);
+                panelInput.RowDrag.Press(inputManager.Mouse.Position);
                 return;
         }
 

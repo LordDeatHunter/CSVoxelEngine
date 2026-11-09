@@ -19,7 +19,8 @@ namespace VoxelEngine.Networking.ServerSide;
 /// no ownership.</item>
 /// <item>Craft runs <see cref="Inventory.TryCraft(CraftingRecipe, int, Func{int, CraftingRecipe.Ingredient, byte})"/>
 /// with exactly the fed members, so it consumes from this inventory only and nothing when it fails.</item>
-/// <item>Creative grants and clears need the player's server-owned creative flag.</item>
+/// <item>Creative grants and clears need the player's server-owned creative flag; a grant never lands on the hotbar
+/// by itself, as on the client (<see cref="Inventory.Add"/>).</item>
 /// <item>Pick-block only selects or equips what the player owns, or any block for a creative player (<see cref="Inventory.PickBlock"/>).</item>
 /// <item>A staff slot selection needs a staff in hand and a slot it has (<see cref="HeldStaff.TrySelect"/>).</item>
 /// <item>A staff bind needs a staff in hand, keys that resolve, parts the player knows
@@ -54,7 +55,7 @@ public static class InventoryIntentRules
 
             case NetInventoryAction.CreativeGrant:
                 return creative && IsId(intent.Id) && intent.Count > 0
-                    && inventory.Add((byte)intent.Id, intent.Count);
+                    && inventory.Add((byte)intent.Id, intent.Count, autoEquip: false);
 
             case NetInventoryAction.CreativeClear:
                 return creative && IsId(intent.Id) && inventory.RemoveAll((byte)intent.Id);

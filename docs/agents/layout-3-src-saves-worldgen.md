@@ -233,8 +233,11 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   recipes the Craft tab lists), narrowed by a SearchScope
         InventoryView.cs       # [E] panel selection/scroll/focus state, the search scope; ResetForNewWorld between worlds
         PanelTabLabels.cs      # the tab strip's titles and counts (survival's Craft count names no recipe total)
-        RowEquip.cs            # the right-click equip of a listed row: gear worn or taken off, a tool or a stackable into
-                               #   the selected hotbar slot; returns the intent that mirrors it
+        RowEquip.cs            # equipping a listed row: the right-click (gear worn or taken off, a tool or a stackable into
+                               #   the selected hotbar slot), a drop onto a hotbar or equipment slot, and whether a row is
+                               #   on the hotbar or worn; returns the intent that mirrors a change
+        RowDrag.cs             # a pressed [E] row that lifts into a drag once the pointer leaves the press
+        EquippedMark.cs        # how a listed row shows it is equipped: the hotbar key chip, "worn", the green bar
         StaffComponent.cs      # a staff's bound spells (part keys per slot) and selected slot, immutable
         PanelTransition.cs     # the [E] panel's open/close easing: eased alpha and slide from a self-clocked progress
         SearchFieldState.cs    # a dropdown search field's query, suggestion cursor and scroll

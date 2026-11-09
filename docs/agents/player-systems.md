@@ -136,9 +136,16 @@ is simulated, the mana max and regen (`PlayerMana.SetGear`); `Camera.GearMoveFac
 mining and attack pace and `Combat.*Damage` read the mining, attack-speed and damage factors on the client
 (`LeftClickAction`) and the server (`BreakProgress.Start`, `AttackPacing`). Wearing is a `NetInventoryAction.EquipGear` /
 `UnequipGear` intent (protocol 19), judged by `Equipment.TryEquip`; the worn ids save as `InventoryData.Equipped`. The
-[E] panel's Gear tab lists the pieces ("worn" marked) over `EquipmentCardLayout`/`EquipmentCardRenderer`: pick a row, then
-click a lit slot to wear it, or right-click the row (or a gear search hit) to wear it or take it off in one click
-(`RowEquip`; a second left click only picks again). `GearTests`, `RowEquipTests`; `visual-examples/gear.json` and `accessories.json` (the double jump
+[E] panel's Gear tab lists the pieces over `EquipmentCardLayout`/`EquipmentCardRenderer`: pick a row, then
+click a lit slot to wear it, drag the row onto a slot, or right-click the row (or a gear search hit) to wear it or take it
+off in one click (`RowEquip`; a second left click only picks again). Every list of the panel (a tab's rows, the search
+results and the creative catalog) marks an equipped row the same way (`EquippedMark`): a green accent bar, "worn" in
+place of the count for a worn piece, and the hotbar key on a chip over the icon for an item on the hotbar. A left click
+never puts a row on the hotbar: a pick goes there by a click on a slot, a drag onto it (`RowDragInput`, `RowDrag`: a press
+that lifts once the pointer leaves it by `RowDrag.LiftDistance`, then `RowEquip.DropOnHotbar`/`DropOnEquipment`, never a
+toggle; a creative catalog row is granted one first), the right-click or a number key over the row; a creative catalog
+grant is picked but stays off the hotbar (`Inventory.Add(..., autoEquip: false)`, on the server's replay too), while a
+world pickup still lands in the first empty slot. `GearTests`, `RowEquipTests`; `visual-examples/gear.json` and `accessories.json` (the double jump
 and a feather-charm fall; both `VOXEL_TIME=147`).
 **Worn armor (I-3).** A body is drawn wearing its visible armor (`equip.visible`, slots head, chest, legs, feet, gloves) as flat
 tinted shells: `ArmorLook` (GL-free) is the item id per armor slot, `ArmorLook.From(Equipment)` for the local player and
@@ -202,7 +209,8 @@ the server. A break and the stale sweep spill the contents as drops (instances l
 (server) judges each move against that player's open chest and reach, tells every viewer, and closes the chest when it is
 broken or out of reach. Right-clicking a chest is a `RightClickOutcome.Container` claim (sneak places against it instead);
 `ChestInput` (owned by `InventoryPanelInput`) opens the `ChestView` card (`UI/Chest/`, `ChestCardRenderer`) beside the [E] list,
-whose rows then deposit (one unit, all with shift) while the card's rows withdraw. `ChestTests`, `TowerChestTests`, `ChestServerTests`;
+whose rows then deposit (one unit, all with shift) while the card's rows withdraw. The chest card takes the right side
+of the panel, so the preview, equipment and crafting cards are neither drawn nor clicked while it is up. `ChestTests`, `TowerChestTests`, `ChestServerTests`;
 `visual-examples/chests.json` (`VOXEL_TIME=147`, with the `setblock`, `chest` and `chestrow` ops).
 
 **Waystones (W-1..W-3, plans/WAYSTONES.md).** A block with `"waystone": true` (`BlockType.Waystone`; the four

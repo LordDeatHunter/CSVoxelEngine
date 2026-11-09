@@ -408,6 +408,16 @@ public class UIRenderer : IDisposable
     }
 
     /// <summary>
+    /// Clears the depth buffer again, so the next 3D icon draws over every icon already drawn this pass: icons never
+    /// overlap except one riding the pointer (a dragged row). Never while a scissor is on, like the first clear.
+    /// </summary>
+    internal void ClearDepthForOverlay()
+    {
+        _gl.Clear(ClearBufferMask.DepthBufferBit);
+        _depthCleared = true;
+    }
+
+    /// <summary>
     /// A block drawn as a rotated 3D cube. Air (id 0) and unknown ids draw nothing.
     /// </summary>
     /// <param name="center">Center of the icon, in canvas pixels.</param>

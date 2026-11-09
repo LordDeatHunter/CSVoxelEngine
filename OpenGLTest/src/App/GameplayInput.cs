@@ -263,6 +263,9 @@ internal sealed class GameplayInput
                 p.Y - grab, inventoryView.ThumbDragRowCount, canvas);
             panelInput.SetListScroll(value, !inventoryView.Search.IsEmpty);
         }
+        // ...and so does a row drag, which lifts once the pointer leaves the press
+        if (inventoryView.IsOpen)
+            panelInput.RowDrag.Track();
 
         // The [E] panel owns the mouse: clicks equip, hotbar keys rest, and the world runs on.
         // While a text field has focus, E is typing, not a close.

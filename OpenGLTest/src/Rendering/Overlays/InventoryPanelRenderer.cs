@@ -52,10 +52,11 @@ internal sealed class InventoryPanelRenderer
     /// <summary>
     /// The [E] panel: tabs and a name-sorted list on the left, a rotating preview with the
     /// picked name on the right. The hotbar stays visible underneath so picks can be aimed
-    /// at slots. <paramref name="time"/> spins the preview.
+    /// at slots. <paramref name="time"/> spins the preview. With <paramref name="chestOpen"/> the chest card
+    /// takes the right side, so no preview, equipment or crafting card is drawn under it.
     /// </summary>
     internal void DrawInventoryPanel(Inventory inventory, InventoryView view, float time,
-        float headingDegrees, bool creative)
+        float headingDegrees, bool creative, bool chestOpen)
     {
         var top = PanelTop;
         var height = InventoryPanelLayout.PanelHeight(_ui.ScreenSize);
@@ -145,28 +146,27 @@ internal sealed class InventoryPanelRenderer
                 {
                     var highlighted = i == view.Search.Highlight;
                     if (creative && !hits[i].IsRecipe)
-                        DrawCatalogRow(i, offset, rowCount, hits[i].Id, hits[i].Name, hits[i].Count, highlighted,
-                            headingDegrees, time);
+                        DrawCatalogRow(i, offset, rowCount, inventory, hits[i].Id, hits[i].Name, hits[i].Count,
+                            highlighted, headingDegrees, time);
                     else
-                        DrawSearchRow(i, offset, hits[i], highlighted, headingDegrees, time);
+                        DrawSearchRow(i, offset, inventory, hits[i], highlighted, headingDegrees, time);
                 }
             }
             else if (catalog != null)
             {
                 for (var i = first; i < end; i++)
-                    DrawCatalogRow(i, offset, rowCount, catalog[i].Id, catalog[i].Name, catalog[i].Count, false,
-                        headingDegrees, time);
+                    DrawCatalogRow(i, offset, rowCount, inventory, catalog[i].Id, catalog[i].Name, catalog[i].Count,
+                        false, headingDegrees, time);
             }
             else if (tools != null)
             {
                 for (var i = first; i < end; i++)
                 {
                     var selected = view.SelectedToolInstance == tools[i].InstanceId;
-                    // A worn piece reads "worn" in green, so the list shows what is on at a glance
-                    var worn = view.Tab == InventoryCategory.Gear && inventory.Equipment.IsEquipped(tools[i].InstanceId);
-                    DrawEntryRow(i, offset, tools[i].ItemId, tools[i].Name, worn ? "worn" : "1", selected, false,
-                        headingDegrees, time, worn ? ReadyGreen : null,
-                        inventory.ToolDurabilityFraction(tools[i].InstanceId));
+                    var mark = EquippedMark.Of(inventory, tools[i].ItemId, tools[i].InstanceId);
+                    DrawEntryRow(i, offset, tools[i].ItemId, tools[i].Name, mark.CountLabel("1"), selected, false,
+                        headingDegrees, time, mark.Accent, inventory.ToolDurabilityFraction(tools[i].InstanceId),
+                        hotbarSlot: mark.HotbarSlot);
                 }
             }
             else if (recipes != null)
@@ -185,8 +185,12 @@ internal sealed class InventoryPanelRenderer
             else if (rows != null)
             {
                 for (var i = first; i < end; i++)
+                {
+                    var mark = EquippedMark.Of(inventory, rows[i].Id, 0);
                     DrawEntryRow(i, offset, rows[i].Id, rows[i].Name, rows[i].Count.ToString(),
-                        view.SelectedId == rows[i].Id, false, headingDegrees, time);
+                        view.SelectedId == rows[i].Id, false, headingDegrees, time, mark.Accent,
+                        hotbarSlot: mark.HotbarSlot);
+                }
             }
         }
         finally
@@ -205,7 +209,18 @@ internal sealed class InventoryPanelRenderer
                 view.ThumbDragGrab.HasValue ? SelectedBorderColor : SlotBorderColor);
         }
 
-        DrawPreview(inventory, view, time, headingDegrees);
+        if (!chestOpen)
+            DrawPreview(inventory, view, time, headingDegrees);
+    }
+
+    /// <summary>
+    /// A row being dragged (<see cref="RowDrag"/>): its item rides the pointer over everything drawn so far, the
+    /// rows, the cards and the hotbar it is aimed at.
+    /// </summary>
+    internal void DrawDraggedRow(byte id, Vector2 pointer, float headingDegrees, float timeSeconds)
+    {
+        _ui.ClearDepthForOverlay();
+        _ui.DrawIdIcon(pointer, RowIcon * 1.4f, id, headingDegrees, timeSeconds);
     }
 
     /// <summary>Panel tab under a window-pixel point, if any.</summary>
@@ -260,7 +275,7 @@ internal sealed class InventoryPanelRenderer
 
     private void DrawEntryRow(int row, float offset, byte id, string name, string count, bool selected,
         bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null, float? durability = null,
-        float countInset = 0f)
+        float countInset = 0f, int hotbarSlot = -1)
     {
         var centerY = InventoryPanelLayout.RowCenterY(row, offset);
         var center = new Vector2(PanelLeft + PanelWidth * 0.5f, centerY);
@@ -276,6 +291,8 @@ internal sealed class InventoryPanelRenderer
 
         var iconCenter = new Vector2(PanelLeft + PanelPad + RowIcon * 0.5f + 8f, centerY);
         _ui.DrawIdIcon(iconCenter, RowIcon, id, headingDegrees, timeSeconds);
+        if (hotbarSlot >= 0)
+            DrawHotbarChip(iconCenter, hotbarSlot);
 
         _ui.DrawTextCenteredY(_ui.FitText(name, _ui.CountScale, RowNameAvail(count, countInset)), iconCenter.X + RowIcon * 0.5f + 8f, centerY,
             _ui.CountScale, dim && !selected ? TextDim : Rgba.White);
@@ -297,21 +314,29 @@ internal sealed class InventoryPanelRenderer
         }
     }
 
-    private void DrawSearchRow(int row, float offset, SearchHit hit, bool selected,
+    // An owned item hit wears the same equipped marks as the tab's own rows; a recipe hit stays gold
+    private void DrawSearchRow(int row, float offset, Inventory inventory, SearchHit hit, bool selected,
         float headingDegrees, float timeSeconds)
     {
-        var detail = hit.IsRecipe ? $"recipe x{hit.Count}"
-            : hit.ToolInstance != 0 ? "tool"
-            : hit.Count.ToString();
-        DrawEntryRow(row, offset, hit.Id, hit.Name, detail, selected, false,
-            headingDegrees, timeSeconds, hit.IsRecipe ? AccentGold : null);
+        if (hit.IsRecipe)
+        {
+            DrawEntryRow(row, offset, hit.Id, hit.Name, $"recipe x{hit.Count}", selected, false,
+                headingDegrees, timeSeconds, AccentGold);
+            return;
+        }
+
+        var mark = EquippedMark.Of(inventory, hit.Id, hit.ToolInstance);
+        DrawEntryRow(row, offset, hit.Id, hit.Name, mark.CountLabel(hit.ToolInstance != 0 ? "tool" : hit.Count.ToString()),
+            selected, false, headingDegrees, timeSeconds, mark.Accent, hotbarSlot: mark.HotbarSlot);
     }
 
-    private void DrawCatalogRow(int row, float offset, int rowCount, byte id, string name, int count, bool selected,
-        float headingDegrees, float timeSeconds)
+    private void DrawCatalogRow(int row, float offset, int rowCount, Inventory inventory, byte id, string name, int count,
+        bool selected, float headingDegrees, float timeSeconds)
     {
-        DrawEntryRow(row, offset, id, name, count.ToString(), selected, false,
-            headingDegrees, timeSeconds, null, null, InventoryPanelLayout.CatalogButtonGroupWidth + 12f);
+        var mark = EquippedMark.Of(inventory, id, 0);
+        DrawEntryRow(row, offset, id, name, mark.CountLabel(count.ToString()), selected, false,
+            headingDegrees, timeSeconds, mark.Accent, null, InventoryPanelLayout.CatalogButtonGroupWidth + 12f,
+            mark.HotbarSlot);
         for (var which = 0; which < InventoryPanelLayout.CatalogButtonCount; which++)
         {
             var center = InventoryPanelLayout.CatalogButtonCenter(row, offset, _ui.ScreenSize, rowCount, which);
@@ -401,6 +426,16 @@ internal sealed class InventoryPanelRenderer
         _ui.DrawTextCenteredFitted(name, center.X, textTop, _ui.HeadScale, Rgba.White, inner);
         _ui.DrawTextCenteredFitted(stock, center.X, textTop + 30f, _ui.CountScale, TextDim, inner);
         _ui.DrawTextCenteredFitted("Click a slot to equip", center.X, textTop + 52f, _ui.CountScale, TextDim, inner);
+    }
+
+    // The hotbar key ("1".."9", "0") of the slot showing a row's item, on a chip over the icon's top-left corner
+    private void DrawHotbarChip(Vector2 iconCenter, int slot)
+    {
+        var center = iconCenter - new Vector2(RowIcon * 0.5f - 4f);
+        var size = new Vector2(19f);
+        _ui.DrawRect(center, size, ChipBackground);
+        _ui.DrawBorder(center, size, Border.Thin, ReadyGreen);
+        _ui.DrawTextMiddle(EquippedMark.HotbarKey(slot), center, _ui.CapHeightScale(11f), Rgba.White);
     }
 
     private float RowNameAvail(string count, float countInset)

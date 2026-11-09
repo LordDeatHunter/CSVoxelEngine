@@ -34,11 +34,15 @@ internal sealed class InventoryPanelInput
         this.pauseMenuView = pauseMenuView;
         this.session = session;
         textKeys = new TextFieldKeys(inputManager);
-        Chest =new ChestInput(inputManager, renderManager, inventoryView, session, this);
+        Chest = new ChestInput(inputManager, renderManager, inventoryView, session, this);
+        RowDrag = new RowDragInput(renderManager, inventoryView, session, this);
     }
 
     /// <summary>The chest panel's input: it opens beside this panel and takes deposits from its list.</summary>
     internal ChestInput Chest { get; }
+
+    /// <summary>Dragging a listed row onto a hotbar or equipment slot.</summary>
+    internal RowDragInput RowDrag { get; }
 
     private World? ActiveWorld => Program.ActiveWorld;
 
@@ -78,6 +82,8 @@ internal sealed class InventoryPanelInput
     internal (Vector2 Anchor, List<string> Lines, IReadOnlyDictionary<int, Rgba> Colors)? HoveredTooltip()
     {
         if (!inventoryView.IsOpen || pauseMenuView.IsOpen || PointerWindow() is not { } position) return null;
+        // A dragged row rides the pointer; a tooltip would cover the slot it is aimed at
+        if (inventoryView.Drag is { Lifted: true }) return null;
         var world = ActiveWorld;
         if (world == null || renderManager == null) return null;
         var inventory = world.Inventory;
@@ -102,14 +108,15 @@ internal sealed class InventoryPanelInput
 
     /// <summary>What a listed row names: its item id, the tool or gear instance it stands for (else 0), and the
     /// recipe it opens (a recipe row or hit, else null).</summary>
-    private readonly record struct RowEntry(byte Id, int ToolInstance, CraftingRecipe? Recipe);
+    internal readonly record struct RowEntry(byte Id, int ToolInstance, CraftingRecipe? Recipe);
 
     /// <summary>
     /// The listed row under a window-pixel point and what it names, read from the list the panel shows this frame
     /// (a search hit, a recipe, a creative catalog row or one of the player's own rows); null off the rows. The one
-    /// reading of "which row is that" the tooltip, the number keys and the right-click share, so they never disagree.
+    /// reading of "which row is that" the tooltip, the number keys, the right-click and a row drag share, so they never
+    /// disagree.
     /// </summary>
-    private RowEntry? EntryAt(Vector2 window, Inventory inventory, bool creative)
+    internal RowEntry? EntryAt(Vector2 window, Inventory inventory, bool creative)
     {
         var list = CurrentList(inventory, creative);
         if (renderManager.Ui.Panel.PanelRowAt(window, list.Offset, list.RowCount) is not { } row) return null;
@@ -187,6 +194,7 @@ internal sealed class InventoryPanelInput
             inventoryView.ClearInput();
             inventoryView.Craft.Clear();
             inventoryView.EndThumbDrag();
+            inventoryView.Drag = null;
         }
         ActiveWorld.Camera.SuppressLook = open;
         inputManager.Mouse?.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
@@ -368,16 +376,17 @@ internal sealed class InventoryPanelInput
         inventoryView.Focus = InventoryFocus.None;
     }
 
-    /// <summary>Grants a catalog id to the player, popping the hotbar slot a fresh pickup lands
-    /// in; the catalog's +1/+10/+100 buttons and the row body go through here.</summary>
-    private void GrantFromCreative(byte id, int amount)
+    /// <summary>Grants a catalog id to the player and picks it; the catalog's +1/+10/+100 buttons and the row body go
+    /// through here. The grant never lands on the hotbar by itself: a click on a slot (or a drop) puts it there.</summary>
+    internal void GrantFromCreative(byte id, int amount)
     {
         var inventory = ActiveWorld!.Inventory;
-        if (!inventory.Add(id, amount)) return;
+        if (!inventory.Add(id, amount, autoEquip: false)) return;
         // Applied here at once; on a server only a player it lets be creative keeps it
         session.SendInventoryIntent(InventoryIntent.CreativeGrant(id, amount));
-        if (Inventory.CategoryOf(id) is InventoryCategory.Blocks or InventoryCategory.Misc)
-            inventoryView.SelectedId = id;
+        var instance = RowEquip.FirstInstanceOf(inventory, id);
+        inventoryView.SelectedToolInstance = instance;
+        inventoryView.SelectedId = instance != 0 ? (byte)0 : id;
     }
 
     /// <summary>
@@ -411,6 +420,15 @@ internal sealed class InventoryPanelInput
                 GrantFromCreative(id, 1);
                 break;
         }
+    }
+
+    /// <summary>Whether a window-pixel point is on one of a creative catalog row's grant buttons (its own click).</summary>
+    internal bool IsOnCatalogButton(Vector2 window, Inventory inventory)
+    {
+        var list = CurrentList(inventory, creative: true);
+        return renderManager.Ui.Panel.PanelRowAt(window, list.Offset, list.RowCount) is { } row
+               && InventoryPanelLayout.CatalogButtonAt(renderManager.Ui.ToCanvas(window), row, list.Offset, list.RowCount,
+                   renderManager.Ui.ScreenSize) != null;
     }
 
     internal void SetListScroll(float offset, bool searching)
@@ -650,14 +668,15 @@ internal sealed class InventoryPanelInput
             return;
         }
 
-        if (inventoryView.Tab == InventoryCategory.Gear
+        // An open chest's card covers the equipment and crafting cards, so neither takes a click under it
+        if (inventoryView.Tab == InventoryCategory.Gear && !Chest.IsOpen
             && EquipmentCardLayout.SlotAt(renderManager.Ui.ToCanvas(position), renderManager.Ui.ScreenSize) is { } slot)
         {
             ClickEquipmentSlot(inventory, slot);
             return;
         }
 
-        if (inventoryView.Tab == InventoryCategory.Crafting)
+        if (inventoryView.Tab == InventoryCategory.Crafting && !Chest.IsOpen)
         {
             var hit = renderManager.Ui.CraftCard.CraftHitAt(position, inventoryView);
             var craft = inventoryView.Craft;
@@ -700,10 +719,13 @@ internal sealed class InventoryPanelInput
         // same equip to its copy (only for something this player owns), so the next sync keeps it.
         var hotbar = renderManager.Ui.Hud.HotbarSlotAt(position);
         if (!hotbar.HasValue) return;
-        if (inventoryView.Tab == InventoryCategory.Tools && inventoryView.SelectedToolInstance != 0)
+        var picked = inventoryView.SelectedToolInstance;
+        if (picked != 0)
         {
-            inventory.EquipTool(hotbar.Value, inventoryView.SelectedToolInstance);
-            session.SendInventoryIntent(InventoryIntent.EquipTool(hotbar.Value, inventoryView.SelectedToolInstance));
+            // Worn gear is never held, so a picked piece leaves the slot alone
+            if (inventory.GetToolStack(picked)?.Item is null or GearItem) return;
+            inventory.EquipTool(hotbar.Value, picked);
+            session.SendInventoryIntent(InventoryIntent.EquipTool(hotbar.Value, picked));
         }
         else if (inventoryView.SelectedId != 0)
         {
