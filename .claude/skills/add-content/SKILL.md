@@ -5,7 +5,7 @@ description: Recipe for adding data-driven content to CSVoxelEngine - a block, i
 
 # Adding content (JSON, not C#)
 
-AGENTS.md ("Content: blocks, items, models and loot are data") holds the full schemas. This skill is the procedure and the traps. Read the relevant schema table there before writing a file.
+`docs/agents/content-blocks-items.md` holds the full schemas. This skill is the procedure and the traps. Read the relevant schema table there before writing a file. Other schemas: trees in `docs/agents/trees.md`, recipes and molten materials in `docs/agents/recipes-and-metalworks.md`, spell parts and status effects in `docs/agents/spells-and-effects.md`.
 
 ## Where files go
 | Thing | Path |

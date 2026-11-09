@@ -39,4 +39,4 @@ description: Rules and checklist for changing CSVoxelEngine biome, climate, terr
 6. Features: tree species JSON `worldgen.biomes` (check tree reach), generators that gate on biome (flowers, tufts, cotton, boulders), `MobSpawner.SpawnsMobs`.
 7. LOD (`LodMeshBuilder` + `LodFaceEmitter`) so distance matches near terrain, and the world-source-supplied column path.
 8. Tint palette / grade if it should differ (they key on climate, not biome; a new palette row must keep the grass monotone).
-9. Relational tests in `BiomeTests` computed from the seams; update `AGENTS.md` and `plans/BIOMEGEN.md`; frame it in `visual-examples/biomes.json`.
+9. Relational tests in `BiomeTests` computed from the seams; update `docs/agents/biomes.md` and `plans/BIOMEGEN.md`; frame it in `visual-examples/biomes.json`.

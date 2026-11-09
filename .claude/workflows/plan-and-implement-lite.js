@@ -21,11 +21,11 @@ const dryRun = !!(args && args.dryRun)
 
 const REPO = `
 Repository: C# / .NET 9 Minecraft-style voxel engine using Silk.NET. Working directory is the repo root.
-Read AGENTS.md before anything else — it is the authoritative guide (all code lives under the "VoxelEngine" root namespace with one sub-namespace per folder; Release builds only; GL calls only on the render thread;
+AGENTS.md (already in your context) is the authoritative guide; it is small and indexes the reference docs in docs/agents/ (grep them by heading and read only the section you need, never a whole file) (all code lives under the "VoxelEngine" root namespace with one sub-namespace per folder; Release builds only; GL calls only on the render thread;
 chunk work happens on worker threads). plans/TODO.md and plans/PERF.md hold in-flight plans and known debt.
-The system "dotnet" has no SDK — always use ~/.dotnet/dotnet.exe:
-  build: ~/.dotnet/dotnet.exe build VoxelEngine.sln -c Release
-  tests: ~/.dotnet/dotnet.exe test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release
+The code is C# 14 and needs the .NET 10 SDK, which is the system "dotnet" (~/.dotnet is a 9.0.100 SDK that cannot compile it); prefix with DOTNET_ROLL_FORWARD=LatestMajor:
+  build: DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release
+  tests: DOTNET_ROLL_FORWARD=LatestMajor dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release
 `.trim()
 
 const TASK = `TASK:\n${task}${extraContext ? `\n\nADDITIONAL CONTEXT FROM THE USER:\n${extraContext}` : ''}`
@@ -169,7 +169,7 @@ const plan = await agent(`${REPO}
 You are the software architect for this change. You design; you do not write the implementation. Do NOT modify files.
 The scouts' open questions are yours to settle: read the code yourself, and where it does not settle them, record an assumption. There is no second planning round.
 Produce a plan an implementer can execute without asking questions:
-- Steps are ordered and each must leave the solution building (~/.dotnet/dotnet.exe build VoxelEngine.sln -c Release).
+- Steps are ordered and each must leave the solution building (DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release).
 - Name exact files, types and methods. Say what to add, change or delete, and why.
 - Respect the constraints the scouts found (threading, perf, namespace "VoxelEngine", Release-only).
 - Every step has an acceptance check. Non-trivial behaviour gets an xUnit test in OpenGLTest.Tests/ (logic only; never assert constants or content literals).
@@ -225,7 +225,7 @@ const IMPLEMENTER_ROLE = `${REPO}
 You are an implementer. The design is decided — execute your assigned workstream faithfully, step by step. Do not redesign, do not do other workstreams,
 do not refactor unrelated code. If the plan is wrong in a way that blocks you, make the smallest local deviation that unblocks you and record it in "deviations".
 Work in the current working tree (no branches, no commits, no stashes).
-Run ~/.dotnet/dotnet.exe build VoxelEngine.sln -c Release after each step and fix every error and every new warning you introduced. Set buildPassed honestly.`
+Run DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release after each step and fix every error and every new warning you introduced. Set buildPassed honestly.`
 
 const implemented = []
 for (let w = 0; w < workstreams.length; w++) {

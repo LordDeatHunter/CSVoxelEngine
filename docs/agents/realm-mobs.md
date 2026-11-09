@@ -1,0 +1,204 @@
+# Hell, flying, sky and cave mobs
+
+The hell mobs, the flight rules, the sky mobs and the cave mobs.
+
+### Hell mobs
+
+Hell's cavern pockets hold two harder kinds (plans/LAYERS.md `L-10`), both `HellMob`s
+(`src/Entities/HellMobs/`), which are `RealmMob`s (the chase frame they share with the sky mobs: facing,
+`Decide`, `Locomote`, the throttled line of sight) and like the goblin `RiggedMob`s: a walking body animated from its
+`.bbmodel` clips through an `EntityAnimator` (`RiggedMob` owns the walk, auto-jump and float physics, the
+facing, the death, spawn and hurt clips, a mirror's animation and `BodyEffect`; `Goblin` derives from it
+too). Both models, their skins and the `ember_shard` sprite come from `tools/generate-hell-mob-models.py`
+(deterministic, `--check`); both are humanoid rigs (`EntityContract.HumanoidParts`, head and arms under the
+torso) checked at startup (`Hellbrute.ValidateContent`, `Cinderwitch.ValidateContent` over
+`EntityContract.RequireHumanoid`).
+- **The hellbrute** (`hellbrute.json`, hp 60, loot ember shards and coal) is slow and tanky: it walks at
+  its target, charges at `HellbruteChargeSpeedFactor` once it sees it (a clear line from its eye to the
+  chest, `RealmMob.SeesTarget`, throttled) within `HellbruteChargeRangeBlocks`, and in reach plays its
+  `melee` clip, whose `impact` event bills `MeleeDamage` with a heavy knockback to every non-immune target
+  still in reach (`HellMobManager`). A player walking into it barely moves it (`HellbruteShoveSpeed`).
+- **The cinderwitch** (`cinderwitch.json`, hp 24, loot ember shards) keeps
+  `HellCasterMinRange..HellCasterMaxRange` and, grounded off its cooldown with a clear line, plays its cast
+  (the `throw` clip) **even inside the band**: a target that hugs it still gets burned instead of the caster
+  only backing away; at its `release` event the manager launches a **fire bolt**: a `ThrownProjectile`
+  of the `ember_shard` item on `GoblinAim`'s low arc (the band stays inside `v^2/g`), merged into the
+  projectile list like the goblin stones (`HellMobManager.Bolts`, flown and touch-tested by the shared
+  `MobMissiles`, which the skeleton's arrows use too), shedding embers in flight. A bolt that
+  touches a non-immune target deals the caster's `BoltDamage` and applies `burning` through
+  `StatusEffects.Apply(IMobTarget, "burning", HellBoltBurnScale)`; any touched target or block stops it.
+- **Layer difficulty** (`LayerDifficulty`, GL-free): `1 + layer * MobConfig.LayerDifficultyPerLayer`,
+  capped at `LayerDifficultyMaxMultiplier`, scales a mob's pool (`HellMob.MaxHealth`), its damage and a
+  caster's cooldown, from the hell layer of its spawn height (`HellMob.Layer`, fixed for life, so a save
+  restore and a client mirror at the same spot agree); a ring spawn rolls a pack of up to
+  `LayerDifficulty.PackSize(layer)`.
+- **Spawning** (`HellMobManager`, one manager for both kinds on the shared `RealmMobManager<TMob>` frame,
+  joined to the world's `MobCaps`): every
+  `HellSpawnIntervalSeconds`, under the natural cap, around a target standing in hell only,
+  `MobSpawner.TryFindHellSpawn` scans ring columns for an open cavern floor whose two standing cells are in
+  hell and whose block light is at most `HellSpawnMaxBlockLight` (no skylight reaches hell); the overworld
+  cave slimes stop above `HellTopY`. `HellCasterShare` of the spawns are casters. Despawn and the shared
+  hazards work as for the goblin.
+- **Plumbing**: `World.HellMobs`, `MobDirector` (update, damage billing, `RefreshMobs`, the `spawn` op names),
+  `MobPasses.RenderRealmMobs` and the near shadow cascade (no mirror: hell lies far under the water plane),
+  `entities.json` by kind name, the `EntityList` kinds above and `ClientMirror`'s reconcile, and the item
+  debugger's ENTITIES tab. Tests: `HellMobTests`, `HellMobManagerTests`, the hell round trip in
+  `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `NetworkEntitySyncTests` and the loopback
+  `GameServerTests.HellMobsReachTheClientsEntityListAndItsMirrorKeepsTheirLayerAndAttacks` (a deep, scaled
+  mob keeps its scaled pool on the client, since the mirror reads its layer from where it stands).
+- **A mirror's attack clip** (every realm mob, hell, sky and the tower's skeleton alike): a kind starts its attack clip
+  (`RealmMob.AttackClip`: the brute's melee, the witch's cast, the raptor's dive, the golem's slam) through
+  `RealmMob.StartAttack`, which counts it (`AttackCount`). A kind with several attack clips declares
+  `AttackVariants` and `AttackClipOf(variant)` (the skeleton: 0 its melee, 1 its shot): `StartAttack(variant)` moves
+  the count to the next value whose remainder modulo the variant count is that variant (so by 1 up to n; with one
+  variant it is the plain +1), and the count's remainder names the clip (`AttackClipFor(count)`); the server sends that count in the mob's
+  `EntityList` `Ammo` field (no protocol bump: the layout is unchanged), and `ClientMirror` hands it to
+  `RealmMob.MirrorAttackCount`, which plays `AttackClipFor(count)` whenever the count moves (the first count it sees only
+  sets it, a dying mirror keeps its death), so the mirror swings, casts, dives and slams with the server and
+  falls back to its locomotion when the clip ends. Its events are never consumed there: the blows, bolts and
+  shockwaves stay the server's. `RealmMobMirrorTests`, `NetEntityCodecTests` (the entry codec,
+  `NetEntityCodec`, the server's writer and the client's reader).
+- Known gaps: the bolts, like the goblin stones, are not on the wire (a client sees only their damage and
+  the burning); a goblin's mirror still shows no throw or melee clip; the casters walk.
+
+### Flying mobs
+
+The shared mob layer can fly (plans/LAYERS.md `L-14`): the galeraptor (see "Sky mobs") is the shipped flyer,
+and the rules are also exercised by a test-only flyer (`FlightTests`). A `RiggedMob` kind
+opts in by passing a `FlightTuning` to the base constructor (cruise and vertical speed, the
+`MathUtils.Damp` acceleration, a hover band, a minimum clearance and a bob; `Validate` refuses a misordered
+one). `Mob.Flies` follows from that, so it is a property of the kind and needs no wire bit. A flyer's update
+calls `RiggedMob.Fly(goal, chasing, speedFactor, ...)` instead of `Walk`:
+- **No ground rules.** No gravity (`BodyMotion.Steer` eases the 3D velocity toward the steered one), no
+  ground friction, auto-jump or buoyancy, no fall damage (`Mob.NoteLanding` never bills a flyer) and no ledge
+  caution (`Mob.IsLedgeAhead` is false). A dying flyer drops out of the sky under gravity.
+- **Steering** (`FlightSteering`, GL-free and state-free): a chased target's goal is
+  `ChaseGoal(eye, HoverHeight)` (each flyer rolls its own `HoverHeight` inside the band at spawn, so a flock
+  spreads out); with no goal it hovers where it is at `HoverHeight` over the floor. `GroundBelow` probes down
+  (up to `MobFlightGroundProbeBlocks`) for the first solid or fluid cell, and `GoalHeight` keeps the goal in
+  the hover band over that floor while idle or wandering and above the minimum clearance while chasing (so it
+  follows a target up a cliff); `BobOffset` adds the gentle bob first. `DesiredVelocity` flies at cruise
+  toward the goal, easing off within `MobFlightArriveBlocks`, and climbs by `MobFlightAltitudeGain` per block
+  of height error; `AvoidSolids` probes `MobFlightProbeBlocks` ahead on each axis, dropping a component into a
+  solid (so it slides along a wall) and climbing over a wall it is blocked by. The body then sweeps through
+  `BoxSweep` like every mob, so it never enters a solid cell. It faces its goal.
+- **Wander**: `Mob.WanderGoal(count, dt, chunks)` gives a flyer a 3D goal (`MobInterest.FlyingWanderPoint`,
+  up to `MobFlightWanderRiseBlocks` above or below), rerolled up to `MobFlightWanderTries` times until it is
+  an air cell, reached in 3D. Interest, idle despawn and the notice rule are unchanged (horizontal).
+- **Hazards and hits**: `Mob.UpdateHazards` still burns a flyer touching lava. `Mob.Shove` knocks a flyer
+  along the whole direction (a ground mob keeps the horizontal part): `MobStrikes.StrikeMob` passes the 3D
+  direction from the striker for a flyer, and `MobDirector.PushFromBlast` the whole blast impulse. The punch
+  and slice cones, the projectile overlap and the healthbar were already 3D.
+- **Animation**: `EntityAnimator`'s moving clip is chosen per mob (`moveClip`: `WalkClip`, or `FlyClip`,
+  `fly`, for a flyer) and crossfaded with idle by the speed the owner hands it, horizontal for a walker and 3D
+  for a flyer (`RiggedMob`, its mirror too). `BodyEffect` pitches a flyer into its speed and nose-up in a
+  climb and banks it into a turn (the velocity lagging the facing), about its body center; a walker's effect
+  is unchanged.
+- **Mirrors**: a client mirror takes the snapshot's full `Vector3` position and velocity
+  (`NetworkSetState`) and never integrates or ground-snaps it, so a flyer keeps its height between snapshots.
+
+### Sky mobs
+
+The sky islands hold two kinds (plans/LAYERS.md `L-15`), both `SkyMob`s (`src/Entities/SkyMobs/`): `RealmMob`s
+like the hell mobs, scaled by the **tier of the island zone** they spawned in (`SkyIslands.ZoneAt`, read once
+from the spawn column into `SkyMob.Tier`, so a save restore and a client mirror over the same column agree).
+Both models, their skins and the `cloud_shard` sprite come from `tools/generate-sky-mob-models.py`
+(deterministic, `--check`; it loads the hell script's rig, UV, PNG and clip machinery from that file, whose
+`main` takes the outputs to write). Both rigs carry the humanoid groups, head and arms under the torso.
+- **The galeraptor** (`galeraptor.json`, hp 24, loot a cloud shard sometimes) is a flyer
+  (`Galeraptor.Tuning`, a `FlightTuning`; `EntityContract.RequireFlyer`: idle, `fly`, and `dive` with an
+  `impact` event; its wings are `ArmL`/`ArmR` and its talons the legs). It hovers `HoverHeight` (inside
+  `GaleraptorHoverMin..MaxBlocks`) over its target's eye (`FlightSteering.ChaseGoal`) and, off its cooldown
+  with a clear line within `GaleraptorDiveRangeBlocks` horizontally, plays `dive` and stoops at the chest at
+  `GaleraptorDiveSpeedFactor` of its flight (`Galeraptor.Locomote` overrides the walk with `Fly`); at the
+  clip's `impact` the manager bills `DiveDamage` to every non-immune target whose chest is within
+  `GaleraptorDiveReach` (`Galeraptor.InDiveReach`), then it climbs back to its hover. Idle it holds its hover
+  band over the island; wandering it flies its 3D wander goal.
+- **The cloud golem** (`cloudgolem.json`, hp 150, loot cloud shards and cobblestone) is a slow ground bruiser,
+  tougher and harder-hitting than a first-layer hellbrute. In `CloudgolemSlamTriggerReach` and off its
+  cooldown it plays `slam`; at its `impact` the **shockwave** bills `SlamDamage` with a big shove and lift to
+  every non-immune target within `CloudgolemShockwaveRadius` horizontally whose feet stand within
+  `CloudgolemShockwaveHeight` of its own (`Cloudgolem.InShockwave`, over the shared `MobTargets.InShockwave(feet, eye, radius, height)` the Skeleton King's
+  slam uses too), none beyond. It walks with the shared
+  ledge caution, so the island's edge (a drop to the cloud sea far below, or unloaded cells: bottomless)
+  stops it unless its target is lower; a player barely shoves it.
+- **Zone difficulty** (`SkyDifficulty`, GL-free): `1 + tier * MobConfig.SkyDifficultyPerTier` scales a sky
+  mob's pool and damage (through `LayerDifficulty.ScaleBy`), a ring spawn rolls a pack of up to
+  `PackSize(tier)` (`SkyPackExtraPerTier` more per tier, capped), and only a big zone (`SkyZone.BigTier`)
+  takes the golem (`AllowsBruiser`, `KindFor`: `SkyBruiserShare` of its spawns); a galeraptor spawns in any
+  zone.
+- **Spawning** (`SkyMobManager` on the shared `RealmMobManager<TMob>` frame, joined to the world's `MobCaps`):
+  every `SkySpawnIntervalSeconds`, under the natural cap, around a target whose feet stand in the sky band
+  (`MobSpawner.InSkyBand`, `SkyIslandBottomY..SkyIslandTopY`) only, `MobSpawner.TryFindSkySpawn` scans ring
+  columns for an island top: solid ground under two clear dry cells, all three in the band (so never the cloud
+  sea, the overworld or hell), inside an island zone (islands also float in the open sky outside every zone,
+  and those hold no mobs) and not torch-lit. A golem stands on it; a galeraptor
+  appears in open air `SkyFlyerSpawnLiftMin..Max` blocks over it. The overworld's surface and cave searches
+  never land on an island (the surface search reads the terrain heightmap, the cave search wants a floor under
+  its column's surface). Despawn and the shared hazards work as for the other mobs.
+- **Plumbing**: `World.SkyMobs`, `MobDirector` (update, damage billing, `RefreshMobs`, the `spawn` op names
+  `galeraptor`/`cloudgolem`, exact feet with `[x, y, z]`), `MobPasses.RenderRealmMobs` and the near shadow
+  cascade, `entities.json` by kind name, the `EntityList` kinds (protocol 18) and `ClientMirror`'s reconcile,
+  and the item debugger's ENTITIES tab (its `fly` mode moves the mirror like `walk`). Tests: `SkyMobTests`,
+  `SkyMobManagerTests`, the realm round trip in `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`,
+  `NetworkEntitySyncTests.SkyMobsMirrorByKindAndAFlyerKeepsItsHeight` and the loopback
+  `GameServerTests.SkyMobsReachTheClientsEntityListByKindAndAFlyerAtItsHeight`.
+  `visual-examples/sky-mobs.json` (`VOXEL_TIME=147`) films the ring's own spawns, then both kinds on a
+  frost highland island in a zone core.
+- A client's mirror plays the dive and the slam with the server (see "A mirror's attack clip" under "Hell
+  mobs").
+- Known gaps: the slam's shockwave hits players only (no mobs, no blocks); `cloud_shard` has no use yet; the overworld ring spawners still spawn on the ground far below a
+  player standing on an island.
+
+### Cave mobs
+
+The overworld's cave sub-biomes (see "Cave biomes") each hold one kind (plans/CAVE_BIOMES.md `CB-4`), all `CaveMob`s
+(`src/Entities/CaveMobs/`): `RealmMob`s like the hell and sky mobs, scaled by a **depth tier**. Their models and palette skins
+come from `tools/generate-cave-mob-models.py` (deterministic, `--check`; on the hell script's rig, UV, PNG and clip machinery,
+with its own small-palette painters), placeholder art listed in `USER_TODO.md`; all three are humanoid rigs (head and arms
+under the torso) checked at startup (each kind's `ValidateContent` over `EntityContract.RequireHumanoid`).
+- **The shardling** (`shardling.json`, hp 24, loot amethyst ore and sometimes a crystal block; crystal caves) is a caster
+  copied from the cinderwitch: it keeps `CaveShardlingMinRange..MaxRange` (inside the level range of `CaveShardSpeed`), and
+  grounded, off its cooldown (a fresh one waits `CaveShardlingFirstCastDelaySeconds`) with a clear line, also inside the band,
+  plays its `throw` clip; at its `release` event the manager launches a `crystal_block` **shard** on `GoblinAim`'s low arc
+  through `MobMissiles` (`CaveMobManager.Shards`, merged into `ThrowAction.RefreshProjectiles`), which deals `ShardDamage` and
+  applies `frostburn` (`CaveShardChillScale`) to the non-immune target it touches.
+- **The sporeling** (`sporeling.json`, hp 32, loot jade ore, sometimes fungal glow and a bone; fungal caves) walks at its
+  target and, within `CaveSporelingTriggerReach` and off its cooldown, plays `melee`; its `impact` is a **spore burst**: every
+  non-immune target within `CaveSporeBurstRadius` horizontally and `CaveSporeBurstHeight` of its feet (`Sporeling.InBurst`,
+  the shared `MobTargets.InShockwave`) takes `BurstDamage` with a shove and the `spore` status effect.
+- **The magmaborn** (`magmaborn.json`, hp 70, loot cinnabar ore, ember shards and sometimes coal; the magma deep) is a slow
+  brute: in `CaveMagmabornMeleeReach` and off its cooldown it plays `melee`, and at its `impact` every non-immune target still
+  in reach takes `MeleeDamage`, a heavy knockback and `burning` (`CaveMagmabornBurnScale`). A player barely shoves it.
+- **The depth tier** (`CaveDifficulty`, GL-free): 0 at or above `WorldGenerationConfig.CaveEchoBottomY`, one more per
+  `MobConfig.CaveDifficultyBandBlocks` below it, clamped to `CaveMaxTier`; `1 + tier * CaveDifficultyPerTier`, capped at
+  `CaveDifficultyMaxMultiplier`, scales the pool and damage through `LayerDifficulty.ScaleBy`. It is fixed at spawn
+  (`CaveMob.Tier`): a ring spawn takes the tier of its floor, the `spawn` op the tier of its feet unless its `tier` is above 0, a
+  save restore the saved `MobData.Tier` (an old file the saved position's) and a client mirror the `ItemId` byte, so a mirror
+  and a restore keep the server's pool wherever they stand.
+- **Spawning** (`CaveMobManager`, `src/Simulation/Caves/`, on the shared `RealmMobManager<TMob>` frame, joined to the world's
+  `MobCaps`): every `CaveMobSpawnIntervalSeconds`, under the natural cap, around a target standing underground
+  (`MobSpawner.TargetUnderground`) outside hell, `MobSpawner.TryFindCaveSpawn` searches a dark cave floor (a `CaveSpawnSearch`
+  with the `CaveMob*` radii and light limits and `CaveSpawnRules.CaveMobMask`); the cave biome it reports picks the kind
+  (`CaveSpawnRules.CaveMobKindFor`: plain and the echoes hold none) and a pack of up to `CaveMobPackMaxSize` is ringed on the
+  leader's floor with the mask narrowed to its biome, at its tier.
+- **The cave spawn filter** is shared: `TryFindCaveSpawn` resolves the standing cell's cave biome last, only for a floor that
+  passed the floor, hell, depth and light checks (`CaveBiomes.At` over the world source's stored column, or an injected
+  `CaveBiomeResolver`), and refuses it unless the search's mask allows it, so it costs one `CaveBiomes.At` per light-passing
+  try and nothing per frame. Cave slimes take `CaveSpawnRules.SlimeMask` (everywhere but the magma deep); goblins now spawn in
+  caves for a target underground (caves first, then the night-gated surface path), skipping the night gate and accepted against
+  a roll of `CaveSpawnRules.GoblinWeight` (favored in crystal and fungal caves, `GoblinCaveOtherWeight` in plain and the
+  echoes, never the magma deep), their pack mates held to the leader's biome. The fungal caves' glowing accents do not starve
+  their spawns at the shared torch-safe limit (measured in plans/CAVE_BIOMES.md).
+- **Plumbing**: `World.CaveMobs`, `MobDirector` (update, damage billing, status block actions, `RefreshMobs`, the `spawn` op
+  names `shardling`/`sporeling`/`magmaborn` with the optional `tier`), `ThrowAction` (the shards), `MobPasses.RenderRealmMobs`
+  and the near shadow cascade, `entities.json` by kind name with the tier, the `EntityList` kinds (protocol 29) and
+  `ClientMirror`'s reconcile (a different tier replaces the mirror), and the item debugger's ENTITIES tab (tier 0). Tests:
+  `CaveMobTests`, `CaveMobManagerTests`, `CaveSpawnFilterTests`, `CaveSpawnRulesTests`, `GoblinCaveSpawnTests`, the realm round
+  trip in `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `RealmMobMirrorTests`,
+  `NetworkEntitySyncTests.ACaveMobMirrorTakesItsTierFromTheSnapshotNotWhereItIsFirstSeen` and the loopback
+  `GameServerTests.CaveMobsReachTheClientsEntityListByKindAndAMirrorKeepsItsTierPool`. `visual-examples/cave-mobs.json`
+  (`VOXEL_TIME=147`) films each kind at its biome's spot.
+- A client's mirror plays the cast and the blows with the server (see "A mirror's attack clip" under "Hell mobs").
+- Known gaps: the shards, like goblin stones and hell bolts, are not on the wire (a client sees only the damage and the
+  chill); cave mobs are not drawn in the water mirror; the burst and blows hit players only; the numbers are first guesses.

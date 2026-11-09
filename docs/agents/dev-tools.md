@@ -1,0 +1,131 @@
+# Dev tools: env vars, scenarios, item debugger, profiler
+
+`VOXEL_*` environment variables, every `VOXEL_SCRIPT` scenario op, the item debugger (tabs, timeline, `ITEM_DEBUGGER_*` variables) and the `X` frame profiler overlay. Recipes live in the `visual-verify` and `item-debugger` skills.
+
+Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated floats, e.g. `-40,-107,-75`) starts the camera eye at exactly that world position instead of on the surface at the origin, which is handy for inspecting a specific cave or feature without flying to it; an unparseable value is ignored with a console warning. `VOXEL_LOOK` takes `yaw,pitch` in degrees (two floats, e.g. `-90,-20`; yaw 0 faces +X so the default `-90,0` faces -Z, and pitch is clamped to ±89 exactly as the mouse look is) and pins the initial facing, so a scripted verification run frames the same thing every time. `VOXEL_TIME` takes a number of seconds and is added to the window clock before the lighting pass reads it (`Program.timeOffset`), which jumps the day/night cycle straight to noon, dusk or night for a screenshot instead of waiting out the orbit (one full cycle is `SkyConfig.DayLengthSeconds`, 1200 s like Minecraft's 20 minutes, with the sun starting mid-morning, so noon is about 147 and sunset about 447). All three parse once at startup and ignore garbage with a console warning. `VOXEL_SPAWN` and `VOXEL_LOOK` (like `VOXEL_SCRIPT` below) skip the main menu and play a storeless, unsaved world; `VOXEL_TIME` alone still boots to the menu and offsets every world opened from it (see "Launch flow" above). Setting `VOXEL_SCRIPT` to a scenario JSON path (see `OpenGLTest/visual-examples/basic.json`) runs a scripted visual test instead of playing: `teleport`/`look`/`wait`/`walk`/`mine`/`place`/`fly`/`creative`/`give`/`spawn`/`grow`/`select`/`screenshot` steps drive the real update functions through a scripted keyboard and save numbered PNGs to `visual/<name>/` (`screenshot` takes an optional `hideHud`); `select` picks a 1-based hotbar slot like the number keys; the UI ops film the list-based UIs through `IScenarioUi` (`ScenarioUi`, the same input components a player reaches): `panel` and `spellbuilder` (`{ "open": true|false }`, default open; the spell builder needs a staff in hand) open or close the [E] panel and the builder, `tab` (`blocks`, `tools`, `misc`, `crafting`) and `row` (1-based, plain lists and search results only, so a survival player) pick like clicks, `search` types into the search field, and `hover` (`{ "pos": [x, y] }` in canvas units, or `"clear": true`) holds a scripted pointer that the hovered row and the tooltip read instead of the mouse; give each a short `wait` after `panel` (its fade takes about 0.2 s), and `visual-examples/inventory-ui.json` (`VOXEL_TIME=147`) is the baseline that films the panel on every tab, a search, a picked row, the craft card, a hover tooltip and the spell builder; `damage` hurts every live mob, or the player's own pool with `"target": "player"`; `effect` (`{ "op": "effect", "effect": "burning", "target": "mobs"|"player", "scale": 1 }`, target `mobs` by default) applies a status effect through `StatusEffects.Apply`, the name checked only when the step runs (an unknown one is warned and skipped); `cast` (`{ "op": "cast", "parts": ["element/fire", "shape/projectile"] }`) fires a spell of those part keys from the camera's eye and aim with no staff or mana (`SpellEffects.TestCast`; an unknown key or an invalid recipe stops the run), and `visual-examples/spells.json` (`VOXEL_TIME=147`) films a fire, a frost and a nature bolt; `waystone` (`{ "op": "waystone", "action": "open", "pos": [x, y, z] }` right-clicks the waystone at that cell, discovering it; then `confirm`, `rename`, `type` with a `"text"`, `submit`, `back` (Escape), `close` or `teleport` with a 1-based `"row"`) drives the waystone screen through `WaystoneInput` like a player's clicks, and `visual-examples/waystones-ui.json` (`VOXEL_TIME=147`) films the discovery popup, the rename dialog, the list with a lost row, its search, a short trip and the list with the mana spent, while `visual-examples/waystones.json` (`VOXEL_TIME=147`) flies to a natural satellite of each realm on the default seed (the surface pavilion, the sealed underground crypt from inside, the sky arch and the hell ember ring), films each from outside and beside its waystone, discovers all four and films the four-realm list and a trip home; then the window closes. `fly` turns creative flight on (or off with `"on": false`, `Camera.TestSetFlight`) so a scripted camera can hover over a spot instead of falling. `creative` turns creative mode on
+**without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
+player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
+any scenario that teleports a walking player above the ground, and turn it off again before a
+`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, an optional `"size"` (an integer from 1, default 1) is a slime's size and an optional `"tier"` (an integer from 0, default 0) is a skeleton's tower tier or, when above 0, a cave mob's depth tier (0 leaves a cave mob the tier of its feet, `CaveDifficulty.TierAt`); the entity name (`slime`, `goblin`, `hellbrute`, `cinderwitch`, `galeraptor`, `cloudgolem`, `shardling`, `sporeling`, `magmaborn`, `sandworm`, `iceberg`, `skeleton` or `skeleton_king`, the last spawned unbound to any tower) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging, and `visual-examples/cave-mobs.json` (`VOXEL_TIME=147`) spawns each cave sub-biome's mob at its `cave-biomes.json` spot and films it idle and attacking. `visual-examples/skeletons.json` (`VOXEL_TIME=147`) spawns a tier-0 and a tier-5 skeleton in goblins.json's open forest clearing (a tower floor's dressing walls block a shot's line of sight) and films them idle, drawing and loosing an arrow, an arrow in flight and raking. `towerclear` (`{ "op": "towerclear", "floor": k }`, floor 0 by default) clears floor `k` of the battle tower around the camera through `World.ClearTowerFloor` (its piles depleted, its bound skeletons killed, nothing owed), so its door opens on the next update; `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) uses it to film a floor's piles, the skeletons they raise, the sealed gate and the opened stairwell, then a dark floor before and after three `setblock` torches. `towerdefeat` (`{ "op": "towerdefeat" }`) marks the Skeleton King of the tower around the camera killed through `World.DefeatTower` (`TowerManager.DefeatAt` -> `MarkDefeated`), so the real collapse runs; `battle-tower.json` ends on the ruin it leaves. `altar` (`{ "op": "altar", "pos": [x, y, z] }`, an exact cell, required) right-clicks a tower altar through `World.UseAltar` and shows its toast (the ritual begins only once every floor is cleared); `visual-examples/skeleton-king.json` (`VOXEL_TIME=147`) clears the default tower's floors with `towerclear`, then films its altar, the ritual, the Skeleton King's rise and boss bar, its slam, its bone volley and a summon. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+
+The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
+rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
+display sliders, and the player body: its mode buttons are **every player animation**
+(`OpenGLTest.ItemDebugger/PlayerPreviewState.cs`, GL-free and tested): the poses IDLE WALK RUN SNEAK JUMP
+S-JUMP LAND SWIM FLOAT SURFACE FLY, and the swings and reactions PUNCH HEAVY SLICE BACK CUT B-CUT CHOP THROW HURT EQUIP DEATH and CAST (the staff gesture),
+which replay on their own after a short rest. Each only feeds the real `PlayerModel` the inputs and
+triggers the game does, so what shows is exactly what the game poses (a jump loop with the landing, a
+swim that strokes as long as forward is held, a throw that charges, holds and releases, a death that
+falls over and gets back up). **Use this tab first for any player animation change**: it is faster
+than a scenario and shows the body from any orbit angle (the VIEW button switches to first person).
+The blade modes (SLICE, BACK, CUT, B-CUT, CHOP) with a slice or sword item selected also draw the **slice
+trail**: `PlayerPreviewState.Trail` is fed once per fixed step on the preview's own clock through the
+`SliceTrailSampler` the program installs (posed with the display sliders' live values), so a scrub rebuilds
+exactly the trail playing would have, and a paused or finished clock holds it as it stands.
+Both animated tabs (ITEMS and ENTITIES) share a **timeline** along the bottom of the viewport
+(`AnimationClock`, GL-free and tested): a **Progress** slider (seconds into the current play; dragging it
+scrubs, and the clock stops while it is held), a **Speed** slider (x0 to x4 in steps of 0.1, 0 pauses) and a
+**LOOP** toggle (on: a one-shot starts over and a continuous pose wraps; off: the play runs once and holds its
+last frame). The clock steps the state in fixed 1/60 s slices, and a scrub restarts the state
+(`IPreviewDriver.Restart`: a fresh `PlayerModel` / mob, already settled unless the mode shows the spawn) and
+steps it up to the time, so scrubbing lands on exactly the frame playing would (a test asserts it for every
+mode). Both preview states are drivers: each mode has a `Duration`, the clock turns their own replay off
+(`Replay`) and owns it. `ITEM_DEBUGGER_SPEED` / `ITEM_DEBUGGER_LOOP` set the playback options at startup.
+**ENTITIES** lists every `EntityRegistry` entry and draws the selected one part by part
+through its `EntityAnimator` (`DebugSceneRenderer.RenderEntity`). The mode buttons are data-driven: one
+per clip in the selected model's `.bbmodel`, in file order, plus HURT (hurts the mob: the hit flash,
+its recoil and the `hurt` clip as an overlay, listed once when the model has that clip). For the goblin
+they read IDLE WALK THROW MELEE HURT DEATH SPAWN, for the hellbrute IDLE WALK MELEE HURT DEATH SPAWN and for
+the cinderwitch IDLE WALK THROW HURT DEATH SPAWN (its cast is named `throw`), for the skeleton IDLE WALK MELEE SHOOT
+HURT DEATH SPAWN. A goblin, a hell mob, a skeleton or a
+slime is previewed as the real `Goblin` / `Hellbrute` / `Cinderwitch` / `Skeleton` (at tier 0) / `Slime` object driven like a client drives a mob it does not simulate (`Mob.AnimateMirror`, and
+`NetworkSetState` for the walk velocity), so what the game layers on the clips shows too: the spawn pop,
+the hit recoil, the death, the rigged mob's body pose (`RiggedMob.BodyEffect`, applied to every part and the
+held flint) and the slime's spring squash. The clipless slime offers IDLE HOP HURT SPAWN DEATH (it hops on
+a hidden floor toward the camera and restarts). One-shot clips replay after a short rest, and the
+preview consumes their events itself. The GL-free, tested state behind the tab is
+`OpenGLTest.ItemDebugger/EntityPreviewState.cs`.
+
+**TREES** lists every `TreeSpeciesRegistry` species and grows the selected one pulse by pulse over a
+flat grass plane, at a fixed seed (`WorldSeed.Default` at first; the debugger never calls
+`WorldSeed.Apply`). The Step slider runs 0..the species' `MaturityStepsMax` and scrubs the growth
+deterministically: each step is regrown from scratch in a fresh `VirtualTreeSpace` through
+`TreeGrower.GrowSteps`, so dragging back and forth shows the same tree at the same step. STEP - and
+STEP + move one pulse, MATURE jumps to the step this seed rolls for maturity
+(`TreeGrower.MaturityStepsAt`, which is also where selecting a species lands), and REGROW (NEW SEED)
+bumps the seed and keeps the step. Features (the buttress fins) apply only from that maturity step
+on, so the mature step is exactly the worldgen tree (`GrowToMaturity`). Flat ground has no carved
+cells, so the roots feature never shows here. The tree is rasterized with `TreeRasterizer` and meshed
+by `CellBatchMesher` (`OpenGLTest/src/Chunks/Meshing/CellBatchMesher.cs`): the real chunk mesher run over scratch
+chunks at the cells' real chunk positions, padded by a ring of empty chunks, so thin tree-wood tubes,
+wide-trunk shells, the pixel-rim bevel, leaves and the biome tint look as in game, with no clipping at
+16-block seams. `DebugSceneRenderer.RenderTree` rebuilds the meshes only when the state's `Version`
+moves, and `ToDisplaySpaceTint` rebakes the biome-tinted vertex colors for the debugger, which
+samples its atlas without the sRGB decode. The camera frames the union of the current and the
+fully grown tree's bounds (`TreePreviewState.FitDistance`), so it stays steady while you scrub, and
+the wheel off the grid zooms that framing. The GL-free, tested state is
+`OpenGLTest.ItemDebugger/TreePreviewState.cs`.
+
+Environment variables for scripted captures:
+- `ITEM_DEBUGGER_SELECT=<item|entity|species>` tries the item grid first, then an entity by name or
+  display name (switching to ENTITIES), then a tree species by file name (switching to TREES). A
+  `tree/` prefix (`TreePreviewState.NamePrefix`) skips the first two, which is how `tree/cactus`
+  reaches the species past the `cactus` block. An unknown name logs a warning.
+- `ITEM_DEBUGGER_TREE_STEP=<n|mature>` pins the TREES step (an integer, clamped to the slider range,
+  or `mature`). Without it a selected species shows its mature tree.
+- `ITEM_DEBUGGER_ANIM=<clip|hurt|hop|spawn|death|...>` picks the entity mode. An unknown mode logs a
+  warning listing the valid ones.
+- `ITEM_DEBUGGER_PLAYER_ANIM=<mode>` picks the player animation (`idle`, `walk`, `run`, `sneak`, `jump`,
+  `sprint jump`, `land`, `swim`, `swim idle`, `surface`, `fly`, `punch`, `heavy punch`, `slice`, `slice back`, `cut`, `back cut`, `chop`, `throw`,
+  `hurt`, `equip`, `death`, `cast`) and selects the ITEMS tab. An unknown mode logs a warning listing them.
+- `ITEM_DEBUGGER_SPEED=<0..4>` and `ITEM_DEBUGGER_LOOP=<0|1>` set the timeline's speed and loop at startup.
+- `ITEM_DEBUGGER_SHOT=<png path>` saves one screenshot and closes. Without `ITEM_DEBUGGER_SHOT_AT` it
+  fires on an early frame, so a one-shot is caught near its start.
+- `ITEM_DEBUGGER_SHOT_AT=<seconds>` (with `ITEM_DEBUGGER_SHOT`) steps the simulation a fixed 1/60 s per
+  frame and captures once that much animation has run, so a given instant of a swing is the same every
+  run (a slice's strike is at about 0.4 s into a mode, its first play starting at once). Run it from
+  `OpenGLTest/` like the game: `ITEM_DEBUGGER_PLAYER_ANIM=slice ITEM_DEBUGGER_SHOT_AT=0.3
+  ITEM_DEBUGGER_SHOT=visual/debugger/slice.png dotnet run --project ../OpenGLTest.ItemDebugger -c Release`.
+- `ITEM_DEBUGGER_VIEW=first` starts the ITEMS view in first person.
+- `ITEM_DEBUGGER_ORBIT=yaw,pitch` pins the orbit camera in degrees (the default is 30,12): yaw 0 sees the
+  player from behind (the model faces -Z), 90 from the side, 180 from the front, which is where a limb coming
+  off the body shows.
+- `ITEM_DEBUGGER_LOOK=yaw,pitch` pins the first-person look angles.
+
+The app opens a window and grabs the mouse. Controls: WASD to move, mouse to look, Space to jump, `C` to toggle creative mode (placing costs nothing, breaking drops nothing; double-tap Space toggles flight, but only while creative — flight is noclip and Space/Left Ctrl move up/down while flying), Left Shift to sprint (1.5x on foot, 10x while flying), hold left-click to punch first, then mine: a mob (a slime or a goblin) inside the forward punch cone (3 blocks, 30° half-angle, line of sight required; only the nearest is hit) takes the held item's `entityDamage` (1 bare-hand, 3 for the primitive tools, 5 for the copper tools, 6 for the obsidian blade) and a knockback shove instead of being mined through (an item declaring `attack: "slice"` — the obsidian blade — instead swings a two-phase blade sweep: each click hits the nearest two mobs in the forward hemisphere of the same reach, the buffered return swing lands at half power, and the arm and blade are carried across the front; an item declaring `attack: "sword"` — the iron sword — swings a three-swing chain instead: a diagonal cut and a rising back cut over the same hemisphere, hitting the nearest three, then an overhead chop on the one mob under the aim at the highest power and a heavier shove, each swing buffered by a click or chained by a press shortly after the last one ended, see `SwordCombo`/`SwordSwings`), while a clear cone mines the targeted block (hit-based: one hit per the held item's `tool.hitDelayMs`, deals the item's `blockDamage`, 0.5 bare-hand, against the block's float `hardness`, declared in its JSON - 5 for most blocks, 8 for malachite ore, 24 for a full-cube trunk of the `tree_wood` logs and 1 for leaves; a tree-wood cell scales its block's `hardness` by the thickness in its `WoodState` (`Mining.HardnessOf`: `hardness * (tipHardness + (1 - tipHardness) * thickness / WoodState.FullCube)`, so the thinnest wood keeps `wood.tipHardness` of it and placed, detached wood is as hard as a trunk), and `0` means it pops on first contact like a pebble; a block with `requiresTool` and a `tools` dict needs a listed tool tag at or above its required tier, and the wrong tool whiffs for 0 damage and no progress; damage resets if you release, switch target or switch tool; instant while creative, which ignores the gate; a click with no block under the crosshair still swings the fist); a stepped crack-sprite overlay drawn on the block's faces via `break-*.glsl` from `assets/textures/environment/break_progress.png` (8 stacked 32x32 frames, the top one blank); each hit pops the block out and back via `SelectionPasses.RenderBlockPop`), right-click to place the selected block or, when the selected slot holds an item with a `use` action, to use it (the bucket scoops a water source and pours it back out — see the item schema below; with a spell staff held, right-click casts its selected spell slot instead and never places, and Left Ctrl + mouse wheel cycles that slot while the plain wheel still moves the hotbar; right-clicking a spell table with a staff in hand opens the spell builder instead, where clicks pick known parts and a slot and BIND/CLEAR write it, E or Escape closes it, the wheel and world clicks are held off while it is open, and without a staff a toast says to hold one), 1-10 to pick one of the 10 hotbar slots, `E` for the list inventory (a search field sits over the tabs: typing names the owned items and the recipes that make or consume a matching thing, ranked with prefix hits and owned items first, and clicking a result picks the item or opens its recipe; blocks/tools/misc tabs with shared caps of 2048/8/2048; click a row to preview, click a hotbar slot to equip, same item again to unequip; the world keeps running and `E`/Escape closes it, and a focused field takes the keyboard so typing never moves the player). A new survival world starts with just the **hint scroll** (`Items/StarterKit`: `scroll_fire_projectile`, which teaches fire + projectile; a server newcomer and a player saved before known spell parts get it too, never twice); `C` creative mode turns the same Blocks/Tools/Misc tabs into the **whole item catalog** (`CreativeCatalog`) - clicking a row grants one, each row's `[+1]` / `[+10]` / `[+100]` button grants that many, and a red `[X]` clears the id's counts (`Inventory.RemoveAll`), all through the ordinary            `Inventory.Add` - while the Craft tab keeps listing every recipe. `T` opens the chat (type, Enter sends, Escape closes, the arrow keys walk sent messages; while it is open the keyboard is captured so the player never moves while typing) and works in singleplayer and on a server. `X` to toggle debug logging
+           (FPS/position/water state to console), Escape to open the pause menu (RESUME / SETTINGS / SAVE & QUIT;        Escape on its settings page steps back to it, and on the main page resumes). SAVE & QUIT presents a `Saving...` frame, calls `World.SaveAndDispose` on the next update and returns to the main menu's worlds page. None of these keys act while a world is still loading.
+
+`X` also raises the **frame profiler overlay** under the FPS counter, and prints the same
+snapshot to the console once a second so a headless run's log carries it. Console writes go
+through the async `Log` queue (`OpenGLTest/src/Core/Log.cs`), so a slow terminal never stalls the
+frame that logged; `Log.Shutdown` drains it on exit. Each row is a section
+of the frame — `camera`, the three `chunk*` rows from `ChunkManager.Update`, `lod`, `entities`,
+`fluidWake`, `fluidTick`, `raycast`, `breaking`, plus the `progUpdate` input shell (`GameplayInput.Update`) and the
+`player` spawn/animation shell on the update side (right-click use/place work and console
+logging (`DevDiagnostics.LogDebugLine`) are split out as `usePlace` and `debugLog`, and the autosave of a store-backed world is
+the one `save` row, see "Saves" below), then `lighting`, `shadowNear`/`shadowFar` (the two
+cascades: `ShadowPass.RenderShadows` times itself, split at the far cascade's FBO bind because
+`TIME_ELAPSED` ranges cannot nest, so their sum is the whole shadow pass; `shadowFar` is
+amortized: about 0 on the frames that reuse the cached far map, the full far-box cost on the frames
+`FarShadowReuse` re-renders it, and the 3-slot GPU query ring drops slow results, so its GPU figure
+leans toward the cheap frames — see PERF_TODO F3), `reflect`,
+`lodPass`, `worldPass`, `entityPass`, `aoPass` (contact AO, see below), `waterPass`, `selectPass`, `postPass` (the tonemap resolve, see
+"Linear lighting" below), `uiPass` on the render side,
+and the `rendShell`/`screenshot`/`publish` frame shell —
+with its average and worst millisecond cost over the last second; `other` is the wall time no
+section claimed (buffer swap, window pump, OS/GC jitter). The header carries the frame time and FPS, the CPU
+sum against the GPU's own `TIME_ELAPSED` measurement of the whole frame (`--` until the first
+query comes back), GC collections per second and the loaded/visible chunk counts. CPU timings are
+collected every frame; per-pass GPU timing is gated (`GpuTimingGate.ShouldTime`, latched once per
+frame in `GpuPassTimer.BeginGpuFrame`) — every frame while the overlay is up, and one frame in
+`PostProcessConfig.GpuTimingIdleInterval` while it is down, which keeps enough samples in each
+once-a-second window that the snapshot standing when `X` is pressed already carries GPU figures.
+The caveat is that a pass which does not run every frame (`selectPass`) can collect no samples at
+all across an overlay-down window and read `--` in that first snapshot. The overlay's own glyph
+draws land in `uiPass`, so compare that row with `X` on and off before reading it as a baseline.
+`Program.OnLoad` and the `RenderManager` constructor each print one startup line — build
+configuration, debugger, GC mode and CPU count, then the GL
+renderer, vendor and version (which must report a 4.6 core context) — so a measurement always
+records which build and which GPU produced it. Timing lives in `OpenGLTest/src/Core/FrameProfiler.cs`;
+wrap new work in `FrameProfiler.Begin`/`End` (main thread only) rather than adding another ad-hoc
+stopwatch.

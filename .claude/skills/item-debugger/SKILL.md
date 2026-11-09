@@ -9,7 +9,7 @@ description: Preview and debug CSVoxelEngine's player animations, held items, en
 `CellBatchMesher` meshes with the game's shader, without a world: orbit camera, a mode button per
 animation, a timeline to scrub. **For any animation, held-item or model change look here first**; use a
 `VOXEL_SCRIPT` scenario (`visual-verify` skill) only to see it in the real world with terrain, camera and
-lighting around it.
+lighting around it. Full tab, mode and `ITEM_DEBUGGER_*` reference: `docs/agents/dev-tools.md`.
 
 ## Run recipe (working directory `OpenGLTest/`, Release)
 ```
