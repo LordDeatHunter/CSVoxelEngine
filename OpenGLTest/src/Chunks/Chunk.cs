@@ -80,6 +80,17 @@ public class Chunk : IDisposable
     /// </summary>
     internal int SolidCount { get => _solidCount; set => _solidCount = value; }
 
+    private volatile bool _mayHaveSkyCover;
+
+    /// <summary>
+    /// True once the chunk may hold a <c>coversSky</c> block (<see cref="BlockType.CoversSkyById"/>): set by
+    /// the worldgen fill after a tower stamp, by every restore from a snapshot and by <see cref="SetBlockRaw"/>
+    /// (the only writer of a non-air id). It is sticky: an edit never clears it, so a collapsed ruin only pays the
+    /// light flood's cover scan, which then finds nothing. Mesh builds read it after
+    /// <see cref="IsBlockDataReady"/> publishes it.
+    /// </summary>
+    internal bool MayHaveSkyCover { get => _mayHaveSkyCover; set => _mayHaveSkyCover = value; }
+
     public double lifetime = 0.0f;
     public const float MAX_LIFETIME = 0.5f;
 
@@ -321,6 +332,7 @@ public class Chunk : IDisposable
         else if (previous != 0 && id == 0) _solidCount--;
 
         _blocks[i] = id;
+        if (BlockType.CoversSkyById[id]) _mayHaveSkyCover = true;
 
         if (state != 0)
         {

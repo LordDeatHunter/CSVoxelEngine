@@ -188,7 +188,7 @@ internal sealed class LeftClickAction
             return new LookLabelState(state.Text, state.Known, state.Mineable, _selectedBlockPosition,
                 blockId, _chunkManager.GetStateGlobal(x, y, z),
                 EntityLight.Sample(_chunkManager, _selectedBlockPosition),
-                IronWorksDetail(blockId, anchorPos, x, y, z));
+                IronWorksDetail(blockId, anchorPos, x, y, z) ?? _world.Towers.Detail(blockId, x, y, z));
         }
     }
 

@@ -29,6 +29,55 @@ public sealed class StationSaveData
     /// <summary>The waystone registry's records (a waystone nobody activated has none).</summary>
     public List<WaystoneData>? Waystones { get; set; }
 
+    /// <summary>The battle towers' floor locks (a tower nobody entered has none and starts sealed).</summary>
+    public List<TowerData>? Towers { get; set; }
+
+    /// <summary>One battle tower's lock state, keyed by its placement cell (see
+    /// <see cref="Simulation.Tower.TowerManager"/>).</summary>
+    public sealed class TowerData
+    {
+        /// <summary>The tower's placement cell as <c>int[2]</c> (cellX, cellZ).</summary>
+        public int[]? Cell { get; set; }
+
+        /// <summary>One entry per floor, ground floor first.</summary>
+        public List<TowerFloorData>? Floors { get; set; }
+
+        /// <summary>The roof altar's <see cref="Simulation.Tower.TowerAltarState"/> by name; absent = dormant (a save
+        /// from before BT-6).</summary>
+        public string? Altar { get; set; }
+
+        /// <summary>The collapse of a defeated tower (BT-8); absent = not started (or a save from before BT-8).</summary>
+        public TowerCollapseData? Collapse { get; set; }
+    }
+
+    /// <summary>How far a defeated tower's collapse has come (<see cref="Simulation.Tower.TowerCollapse"/>).</summary>
+    public sealed class TowerCollapseData
+    {
+        /// <summary>The main pass's next layer (world y), scanned from the top down; below the tower's bottom = the main pass
+        /// is finished; absent = the top.</summary>
+        public int? NextY { get; set; }
+
+        /// <summary>Chunk positions as <c>int[3]</c> whose cells were unloaded when the main pass reached them, still to sweep
+        /// once they load; absent = none.</summary>
+        public List<int[]>? Waiting { get; set; }
+
+        /// <summary>Whether the collapse has finished (permanent: a finished tower is never collapsed again).</summary>
+        public bool Done { get; set; }
+    }
+
+    /// <summary>One tower floor's lock state.</summary>
+    public sealed class TowerFloorData
+    {
+        /// <summary>The waves each pile still raises, in the site's pile order.</summary>
+        public int[]? Waves { get; set; }
+
+        /// <summary>Whether the door sealing this floor from the next has opened (it stays open).</summary>
+        public bool DoorOpen { get; set; }
+
+        /// <summary>Bound skeletons that despawned or strayed and must be raised again.</summary>
+        public int Owed { get; set; }
+    }
+
     /// <summary>One waystone's registry row, keyed by its cell (see <see cref="Simulation.Waystones.WaystoneManager"/>).</summary>
     public sealed class WaystoneData
     {

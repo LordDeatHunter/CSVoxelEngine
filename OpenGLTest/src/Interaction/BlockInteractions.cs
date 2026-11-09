@@ -12,6 +12,7 @@ using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.Simulation.Smithing;
 using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Structures;
 
 namespace VoxelEngine.Interaction;
 
@@ -417,6 +418,23 @@ internal sealed class BlockInteractions
         if (!WaystoneManager.TryGetWaystoneCell(id, (int)hit.X, (int)hit.Y, (int)hit.Z, out var waystone)
             || !WaystoneManager.IsWaystoneAt(_chunkManager, waystone.X, waystone.Y, waystone.Z)) return false;
         cell = new Vector3(waystone.X, waystone.Y, waystone.Z);
+        return true;
+    }
+
+    /// <summary>
+    /// A right-click on a battle tower's roof altar (the <see cref="TowerPalette.AltarBlock"/> palette block, recognized
+    /// by id like the tower's piles and doors): claims the click (no side effect, no swing) unless the player is
+    /// sneaking or holds a block, which places against it instead. The caller judges the altar or begins its ritual
+    /// from the <see cref="RightClickOutcome.Altar"/> outcome. <paramref name="cell"/> is the altar's cell.
+    /// </summary>
+    internal bool TryUseAltar(float maxDistance, PlayerContext player, out Vector3 cell)
+    {
+        cell = default;
+        if (player.Camera is { IsSneaking: true } || player.Inventory.HeldItem is BlockItem) return false;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        if (!_chunkManager.TryGetCell((int)hit.X, (int)hit.Y, (int)hit.Z, out var id, out _)) return false;
+        if (id != TowerPalette.AltarBlock) return false;
+        cell = new Vector3((int)hit.X, (int)hit.Y, (int)hit.Z);
         return true;
     }
 

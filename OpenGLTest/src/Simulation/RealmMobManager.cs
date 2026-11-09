@@ -140,9 +140,16 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
             // Past every target's despawn radius, or idle long and far off: fades out, dropping nothing
             if (targets.Count > 0 && (MobTargets.MinHorizontalDistanceSquared(targets, mob.Position) > despawnSquared
                                       || mob.ShouldIdleDespawn(targets)))
+            {
+                OnDespawn(mob);
                 mob.BeginDying();
+            }
         }
     }
+
+    /// <summary>Called once for a living mob that fades out for distance or idleness (never for a death), just
+    /// before it starts dying. Does nothing by default.</summary>
+    protected virtual void OnDespawn(TMob mob) { }
 
     /// <summary>Lands whatever attack <paramref name="mob"/>'s clip released this frame (at its timeline
     /// event), billing each hit through <see cref="Hit"/>.</summary>

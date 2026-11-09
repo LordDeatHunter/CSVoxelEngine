@@ -9,6 +9,7 @@ using System.Threading;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Sandworms;
@@ -26,9 +27,11 @@ using VoxelEngine.Player;
 using VoxelEngine.Saves;
 using VoxelEngine.Server;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;
 using VoxelEngine.Tests.Magic;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Structures;
 using VoxelEngine.WorldGen.Trees;
 using Xunit;
 
@@ -101,6 +104,9 @@ public sealed class GameServerTests : IDisposable
         /// <summary>Each listed player's movement flags from the newest <see cref="NetMessage.PlayerList"/>, by name.</summary>
         public readonly Dictionary<string, NetPlayerFlags> ListedFlags = new();
 
+        /// <summary>The newest <see cref="NetMessage.StationState"/> payload received, raw (message byte included).</summary>
+        public byte[]? Stations;
+
         public void Drain(NetworkClient client)
         {
             while (client.Inbound.TryDequeue(out var payload))
@@ -171,6 +177,9 @@ public sealed class GameServerTests : IDisposable
                         }
                         break;
                     }
+                    case NetMessage.StationState:
+                        Stations = payload;
+                        break;
                 }
             }
         }
@@ -1254,6 +1263,71 @@ public sealed class GameServerTests : IDisposable
     }
 
     [Fact]
+    public void AClientSeesATowerDoorOpenOnceItsFloorIsCleared()
+    {
+        using var client = Connect("Climber");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var inbox = InboxOf(client);
+
+        // A one-floor tower around the arena: its band holds the arena's rows, a pile beside the player and a
+        // two-cell door in front of it
+        var door = new[] { (arena.X + 2, arena.Y, arena.Z), (arena.X + 2, arena.Y + 1, arena.Z) };
+        var pile = (arena.X - 2, arena.Y, arena.Z);
+        var record = TowerRecord.Build((900, 900), arena.X, arena.Z, 8,
+            [(arena.Y - 1, arena.Y + 4, (IReadOnlyList<(int X, int Y, int Z)>)[pile], door)], hasSite: false);
+        _world.Towers.Track(record);
+        foreach (var (x, y, z) in door)
+            SetCell(new Vector3(x, y, z), TowerPalette.DoorBlock);
+        SetCell(new Vector3(pile.Item1, pile.Item2, pile.Item3), TowerPalette.PileBlock);
+
+        bool Broadcasts(int from, (int X, int Y, int Z) cell, byte id) =>
+            inbox.Broadcast.Skip(from).Any(c => c.X == cell.X && c.Y == cell.Y && c.Z == cell.Z && c.Id == id);
+
+        // The closed door reaches the client (pumping the server only, so the pile never wakes)
+        var sw = Stopwatch.StartNew();
+        while (!door.All(d => Broadcasts(0, d, TowerPalette.DoorBlock)) && sw.Elapsed.TotalSeconds < 10)
+        {
+            _server.Pump(0.01);
+            Thread.Sleep(5);
+            DrainAll();
+        }
+        Assert.True(door.All(d => Broadcasts(0, d, TowerPalette.DoorBlock)), "the door never reached the client");
+
+        // Clearing the floor opens its door: the world writes the door cells to air and the client is told
+        var seen = inbox.Broadcast.Count;
+        Assert.True(_world.ClearTowerFloor(new Vector3(arena.X + 0.5f, arena.Y + 1f, arena.Z + 0.5f), 0));
+        sw.Restart();
+        while (!door.All(d => Broadcasts(seen, d, 0)) && sw.Elapsed.TotalSeconds < 10)
+            Tick(0.05);
+        Assert.True(door.All(d => Broadcasts(seen, d, 0)), "the opened door never reached the client");
+        Assert.True(record.Floors[0].DoorOpen);
+
+        // A station frame sent after the door opened carries it to the client's mirror
+        inbox.Stations = null;
+        sw.Restart();
+        while (inbox.Stations == null && sw.Elapsed.TotalSeconds < 10)
+            Tick(0.05);
+        Assert.NotNull(inbox.Stations);
+
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            // ClientSession hands ApplyNetworkStations a reader already past the message byte
+            using var reader = new PacketReader(inbox.Stations!);
+            Assert.Equal(NetMessage.StationState, reader.Message);
+            mirror.ClientMirror.ApplyNetworkStations(reader);
+            var copy = mirror.Towers.RecordAt(arena.X, arena.Z);
+            Assert.NotNull(copy);
+            Assert.True(copy!.Floors[0].DoorOpen);
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    [Fact]
     public void HellMobsReachTheClientsEntityListAndItsMirrorKeepsTheirLayerAndAttacks()
     {
         using var client = Connect("Watcher");
@@ -1354,6 +1428,138 @@ public sealed class GameServerTests : IDisposable
         {
             mirror.SaveAndDispose();
         }
+    }
+
+    [Fact]
+    public void CaveMobsReachTheClientsEntityListByKindAndAMirrorKeepsItsTierPool()
+    {
+        using var client = Connect("Delver");
+        var spawn = client.Server!.Value.Spawn;
+        // Straight under the player (the despawn rule is horizontal) and far below it, so it never reaches the player
+        var deep = new Vector3(spawn.X, spawn.Y - 200f, spawn.Z + 3f);
+        Assert.True(_world.SpawnEntity(Sporeling.EntityName, deep, tier: 3));
+        var sporeling = Assert.IsType<Sporeling>(Assert.Single(_world.CaveMobs));
+        Assert.Equal(3, sporeling.Tier);
+        sporeling.RestoreState(sporeling.MaxHealth - 2, 0.5f, Vector3.Zero);
+        // Stands in for the attacks the server simulated: the counter its entry carries
+        sporeling.MirrorAttackCount(2);
+
+        var inbox = InboxOf(client);
+        WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Sporeling && e.Ammo == 2));
+        // Sent as a sporeling (never under the switch's goblin default), its tier in the item byte
+        var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.Sporeling);
+        Assert.Equal(sporeling.Tier, carried.ItemId);
+        Assert.Equal(sporeling.Health, carried.Health);
+
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            var mirrored = Assert.IsType<Sporeling>(Assert.Single(mirror.CaveMobs));
+            Assert.Equal(sporeling.Tier, mirrored.Tier);
+            Assert.Equal(sporeling.MaxHealth, mirrored.MaxHealth);
+            Assert.Equal(sporeling.Health, mirrored.Health);
+            Assert.False(mirrored.Animation.IsPlaying(Sporeling.MeleeClip));
+
+            // The server bursts: the count moves and the mirror plays its melee
+            sporeling.MirrorAttackCount(3);
+            WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Sporeling && e.Ammo == 3));
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            Assert.True(mirrored.Animation.IsPlaying(Sporeling.MeleeClip));
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    // A one-floor tower whose roof altar stands in the arena's front cell (the altar block written there), its door
+    // open or held shut by an owed skeleton nothing can raise (it has no piles)
+    private TowerRecord AltarTower(Arena arena, bool cleared)
+    {
+        var record = TowerRecord.Build((901, 901), (int)arena.Front.X, (int)arena.Front.Z, 8,
+            [(arena.Y - 5, arena.Y, (IReadOnlyList<(int X, int Y, int Z)>)[], (IReadOnlyList<(int X, int Y, int Z)>)[])],
+            hasSite: false);
+        Assert.Equal(((int)arena.Front.X, (int)arena.Front.Y, (int)arena.Front.Z), record.AltarCell);
+        if (cleared) record.Floors[0].DoorOpen = true;
+        else record.Floors[0].Owed = 1;
+        _world.Towers.Track(record);
+        SetCell(arena.Front, TowerPalette.AltarBlock);
+        return record;
+    }
+
+    [Fact]
+    public void AClientRaisesTheSkeletonKingFromAClearedTowersAltar()
+    {
+        using var client = Connect("Challenger");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var inbox = InboxOf(client);
+        var record = AltarTower(arena, cleared: true);
+
+        // The client's right-click is only its usual Use intent: the server's replay claims the altar and begins
+        var seq = SendWorld(client, WorldIntent.Use(arena.Eye, arena.AimAtFront, arena.Front));
+        AwaitResult(client, seq);
+        Assert.NotEqual(TowerAltarState.Dormant, record.AltarState);
+
+        // Once the ritual has run its course the king rises, and the client's EntityList carries it by kind
+        var sw = Stopwatch.StartNew();
+        while (!(inbox.Entities?.Exists(e => e.Kind == NetEntityKind.SkeletonKing) ?? false)
+               && sw.Elapsed.TotalSeconds < MobConfig.SkeletonKingRitualSeconds + 15)
+            Tick(0.05);
+        var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.SkeletonKing);
+        var king = Assert.Single(_world.SkeletonKings);
+        Assert.Equal(record.Key, king.Home.Tower);
+        Assert.Equal(TowerAltarState.Awake, record.AltarState);
+        Assert.InRange(carried.ItemId, 1, 3);
+
+        // The client mirrors it as a boss, and a station frame tells its tower record the king walks
+        inbox.Stations = null;
+        sw.Restart();
+        while (inbox.Stations == null && sw.Elapsed.TotalSeconds < 10)
+            Tick(0.05);
+        Assert.NotNull(inbox.Stations);
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            var mirrored = Assert.Single(mirror.SkeletonKings);
+            Assert.True(mirrored.IsBoss);
+            Assert.Equal(carried.ItemId, mirrored.Phase);
+            mirror.RefreshMobs();
+            Assert.NotNull(BossSelection.Nearest(mirror.Mobs, mirrored.Position));
+
+            using var reader = new PacketReader(inbox.Stations!);
+            Assert.Equal(NetMessage.StationState, reader.Message);
+            mirror.ClientMirror.ApplyNetworkStations(reader);
+            var copy = mirror.Towers.RecordAt(record.CenterX, record.CenterZ);
+            Assert.NotNull(copy);
+            Assert.Equal(TowerAltarState.Awake, copy!.AltarState);
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    [Fact]
+    public void ASealedAltarRaisesNothingForAClient()
+    {
+        using var client = Connect("Hasty");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var inbox = InboxOf(client);
+        var record = AltarTower(arena, cleared: false);
+
+        var seq = SendWorld(client, WorldIntent.Use(arena.Eye, arena.AimAtFront, arena.Front));
+        AwaitResult(client, seq);
+        // Well past the ritual's length: the seals hold, so nothing began and no king rose
+        for (var t = 0f; t < MobConfig.SkeletonKingRitualSeconds + 1f; t += 0.05f)
+            Tick(0.05);
+        Assert.False(record.Floors[0].DoorOpen);
+        Assert.Equal(TowerAltarState.Dormant, record.AltarState);
+        Assert.Empty(_world.SkeletonKings);
+        Assert.False(inbox.Entities?.Exists(e => e.Kind == NetEntityKind.SkeletonKing) ?? false);
     }
 
     // Pumps the server until the newest EntityList the inbox holds satisfies the condition, or five seconds pass

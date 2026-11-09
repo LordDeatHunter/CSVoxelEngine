@@ -46,8 +46,8 @@ Prove the fantasy half. Infrastructure first, in order: `M-15` (structure templa
 (`P-17`), then the first magic slice, the spell builder with a few parts (`P-14`, `MAGIC.md`). A single hand-authored crypt with loot, a spawner
 room and a boss is enough to make health, combat and loot matter and to give survival a
 destination. Placing it needs a world-site hook, the one worldgen touch this milestone allows.
-The **battle tower** (`BT-1`..`BT-9`, tracked in `BATTLE_TOWER.md`) is the large-scale form of this dungeon: a multi-floor
-landmark with skeleton piles, chests, a boss altar and a collapse.
+The **battle tower** (`BT-1`..`BT-10`, done, see `BATTLE_TOWER.md`) is the large-scale form of this dungeon: a multi-floor
+landmark with skeleton piles, chests, dark floors, a boss altar and a collapse.
 
 #### Milestone 3 — Arc B vertical slice: first power
 
@@ -239,12 +239,14 @@ single-arc player.
 - [ ] **`P-27` · Second dimension + portals** — P3, XL.
   Separate seed/noise sets on the same chunk pipeline; new LOD palette. Base for `P-36`.
 - [ ] **`P-28` · Caves as destinations** — P2, M.
-  Larger caverns, underground biomes, rare crystals and hazard zones; builds on the existing
-  cave/worm/lava generation. A natural home for `P-47`'s crystal. Tracked in `CAVE_BIOMES.md` (`CB-0`..`CB-5`).
+  The cave biomes landed (`CAVE_BIOMES.md`, all phases done): larger caverns, frozen and desert echo
+  caves, crystal, fungal and magma-touched sub-biomes with their own atmosphere, exclusive ores
+  (amethyst, jade, cinnabar), cave mobs and biome loot. Still open: **hazard zones** (gas pockets,
+  unstable ceilings, flooding passages), and a use for the exclusive ores and `P-47`'s crystal.
 - [ ] **`P-56` · Ocean & island content** — P3, M.
   Islands, shipwrecks, reefs, deep-sea POIs; makes the ocean a destination rather than a border.
   Ties `F-19`.
-  Island, archipelago and great lake *shape* is in `BIOMEGEN.md` §6; the remaining ideas are its §12.
+  Island, archipelago and great lake *shape* is in `BIOMEGEN.md` §6; the remaining ideas are its Open section.
 - [ ] **`P-57` · World events** — P2, M.
   Blood moons, raids, meteors, wandering bosses, seasonal changes; drives `F-5` and gives the
   base a reason to be defended (`P-54`).
@@ -260,9 +262,10 @@ single-arc player.
   Cows/sheep/chickens; wandering, breeding, drops, leads. Needs `P-38`. Depends on entity AI.
 - [ ] **`F-3` · Mobs — hostiles (night / caves)** — P2, XL.
   The slime (hop AI, contact damage) and goblin (throw-then-melee raider, shared `Mob` base,
-  `MobSpawner`) landed. Still open: **light/time-keyed and cave spawns**, **voxel pathing**
-  (both currently walk/auto-jump straight at the player), more hostile kinds, and spawners
-  (`M-17`).
+  `MobSpawner`) landed, as did torch-safe ground, the night-keyed slime sizes and goblin torches,
+  and cave spawns filtered by cave biome (cave slimes, cave goblins and one mob per cave sub-biome,
+  `plans/CAVE_BIOMES.md` CB-4). Still open: **voxel pathing** (every walker still walks/auto-jumps
+  straight at the player), more hostile kinds, and spawners (`M-17`).
 - [ ] **`F-4` · Combat depth** — P2, L.
   Melee landed: punch, the two-phase obsidian-blade slice (`SliceCombo`), knockback, per-item
   `entityDamage`, and mobs that hit back. Still open: a **bow + arrows** (animation `V-15`; the `arrow` item, an

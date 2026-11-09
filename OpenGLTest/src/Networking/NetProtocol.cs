@@ -190,8 +190,20 @@ public static class NetFraming
     /// registry rows of its discovered waystones) current, and takes a <see cref="NetMessage.WaystoneRename"/> from a
     /// waystone's first discoverer. An older peer would refuse the intent as malformed and never open a waystone.
     /// 25: <see cref="NetEntityKind.Skeleton"/> (the battle tower's skeleton): its tower tier in the item byte, its attack
-    /// count (melee even, shot odd) in the ammo field; an older client would not draw it.</summary>
-    public const int ProtocolVersion = 25;
+    /// count (melee even, shot odd) in the ammo field; an older client would not draw it.
+    /// 26: the battle tower locks appended at the end of <see cref="NetMessage.StationState"/> (each tower's cell, center,
+    /// radius and per floor its band, piles left, skeletons left and door bit); an older peer would misread the station
+    /// frames.
+    /// 27: each tower's altar state byte (<see cref="Simulation.Tower.TowerAltarState"/>) appended after its floors in
+    /// <see cref="NetMessage.StationState"/>; an older peer would misread the station frames. Also
+    /// <see cref="NetEntityKind.SkeletonKing"/> (the tower's boss): its attack count in the ammo field (slam, volley, summon
+    /// by remainder modulo 3), its fight phase in the item byte; an older client would not draw it.
+    /// 28: the eye's cave biome (<see cref="WorldGen.Caves.CaveBiome"/>) appended to <see cref="NetMessage.PlayerStatus"/>;
+    /// an older peer would misread the status.
+    /// 29: the cave mobs (<see cref="NetEntityKind.Shardling"/>, <see cref="NetEntityKind.Sporeling"/>,
+    /// <see cref="NetEntityKind.Magmaborn"/>) in <see cref="NetMessage.EntityList"/>, their depth tier in the item byte and
+    /// attack count in the ammo field; an older client would not draw them.</summary>
+    public const int ProtocolVersion = 29;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

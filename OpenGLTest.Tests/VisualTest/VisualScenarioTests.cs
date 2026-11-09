@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Numerics;
 using Silk.NET.Input;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.VisualTest;
@@ -114,6 +115,48 @@ public sealed class VisualScenarioTests
         Assert.Equal("slime", spawn.Entity);
         Assert.False(spawn.SnapToGround);
         Assert.Equal(new System.Numerics.Vector3(3.5f, 64f, -7.25f), spawn.Pos);
+    }
+
+    [Fact]
+    public void ATowerClearStepParsesItsFloor()
+    {
+        var scenario = VisualScenario.Parse(
+            """{ "steps": [{ "op": "towerclear", "floor": 2 }, { "op": "TowerClear" }] }""", "tower");
+        Assert.Equal("towerclear", scenario.Steps[0].Op);
+        Assert.Equal(2, scenario.Steps[0].Floor);
+        // An absent floor is the ground floor
+        Assert.Equal("towerclear", scenario.Steps[1].Op);
+        Assert.Equal(0, scenario.Steps[1].Floor);
+    }
+
+    [Fact]
+    public void AnAltarStepParsesItsCell()
+    {
+        var scenario = VisualScenario.Parse(
+            """{ "steps": [{ "op": "altar", "pos": [2920, 46, -1411] }, { "op": "Altar", "pos": [1, 2, 3] }] }""", "altar");
+        Assert.Equal("altar", scenario.Steps[0].Op);
+        Assert.Equal(new Vector3(2920, 46, -1411), scenario.Steps[0].Pos);
+        Assert.Equal("altar", scenario.Steps[1].Op);
+        Assert.Equal(new Vector3(1, 2, 3), scenario.Steps[1].Pos);
+    }
+
+    [Fact]
+    public void ATowerDefeatStepParses()
+    {
+        var scenario = VisualScenario.Parse(
+            """{ "steps": [{ "op": "towerdefeat" }, { "op": "TowerDefeat" }] }""", "defeat");
+        Assert.Equal("towerdefeat", scenario.Steps[0].Op);
+        Assert.Equal("towerdefeat", scenario.Steps[1].Op);
+    }
+
+    [Theory]
+    [InlineData("""{ "steps": [{ "op": "altar" }] }""")]
+    [InlineData("""{ "steps": [{ "op": "altar", "pos": [1, 2] }] }""")]
+    public void AnAltarStepWithoutAnExactCellIsRefused(string json)
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
+        Assert.Contains("(altar)", ex.Message);
+        Assert.Contains("'pos'", ex.Message);
     }
 
     [Fact]

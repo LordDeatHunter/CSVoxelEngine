@@ -146,6 +146,27 @@ internal static class BlockFieldRules
                 $"Block '{path}' sets unbreakable with {field}; that path would remove the block anyway.");
     }
 
+    /// <summary>
+    /// The <c>coversSky</c> flag. A covering block stops the sun seeds of every cell under it in a
+    /// light volume, so it must be an opaque, plain full cell: anything that passes light or is
+    /// drawn see-through would leave the cells under it visibly lit by the sky it claims to hide.
+    /// </summary>
+    internal static void ValidateCoversSky(BlockDefinition definition, BlockRenderer renderer, string path)
+    {
+        if (!(definition.CoversSky ?? false)) return;
+
+        string? field = null;
+        if (definition.Fluid ?? false) field = "fluid";
+        else if (definition.Cutout ?? false) field = "cutout";
+        else if (definition.Translucent ?? false) field = "translucent";
+        else if (!(definition.Solid ?? true)) field = "solid: false";
+        else if (definition.Light?.Passes == true) field = "light.passes: true";
+        else if (renderer != BlockRenderer.Model) field = $"renderer \"{definition.Renderer}\"";
+        if (field != null)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets coversSky with {field}; only an opaque, plain full cell can shade the cells under it.");
+    }
+
     /// <summary>What mining the block does: roll its loot, or prime TNT.</summary>
     internal static BlockBreakAction ParseOnBreak(BlockDefinition definition, string path) =>
         definition.OnBreak switch

@@ -8,6 +8,7 @@ using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Interaction;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Trees;
@@ -279,6 +280,31 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 // One hit that ignores the hammer's gap, so a scenario can film the whole work in a few frames
                 world.HammerFor(step.Pos!.Value, 0f, 0f);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} hammer {step.Pos}");
+                Advance();
+                break;
+
+            case "towerclear":
+                // Clears the floor of the tower around the camera (its piles spent, its skeletons dead), so its
+                // door opens on the next frames as if the floor had been fought
+                var cleared = world.ClearTowerFloor(world.Camera.Position, step.Floor);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} towerclear floor {step.Floor}: "
+                              + (cleared ? "cleared" : "no tower here"));
+                Advance();
+                break;
+
+            case "altar":
+                // A right-click on the tower altar at that cell, through the same call the click chain makes
+                var verdict = world.UseAltar(step.Pos!.Value);
+                world.Toast.Show(TowerReadout.AltarToast(verdict));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} altar {step.Pos}: {verdict}");
+                Advance();
+                break;
+
+            case "towerdefeat":
+                // Marks the Skeleton King of the tower around the camera killed, so the real collapse runs
+                var defeated = world.DefeatTower(world.Camera.Position);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} towerdefeat: "
+                              + (defeated ? "defeated" : "no tower here"));
                 Advance();
                 break;
 

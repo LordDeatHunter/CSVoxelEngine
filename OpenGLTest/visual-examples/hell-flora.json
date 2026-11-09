@@ -10,7 +10,7 @@
     { "op": "creative", "on": true },
     { "op": "fly", "on": true },
 
-    { "op": "teleport", "pos": [-184.5, -448.5, -164.5], "yaw": 180, "pitch": 5 },
+    { "op": "teleport", "pos": [-184.5, -548.5, -164.5], "yaw": 180, "pitch": 5 },
     { "op": "wait", "seconds": 24 },
     { "op": "screenshot", "name": "fungal_tree", "hideHud": true },
     { "op": "look", "yaw": 180, "pitch": -45 },
@@ -18,13 +18,13 @@
     { "op": "look", "yaw": 90, "pitch": 30 },
     { "op": "screenshot", "name": "fungal_vines", "hideHud": true },
 
-    { "op": "teleport", "pos": [-135.5, -426.4, -103.5], "yaw": 180, "pitch": 25 },
+    { "op": "teleport", "pos": [-135.5, -526.4, -103.5], "yaw": 180, "pitch": 25 },
     { "op": "wait", "seconds": 20 },
     { "op": "screenshot", "name": "grove_ceiling", "hideHud": true },
     { "op": "look", "yaw": 0, "pitch": -20 },
     { "op": "screenshot", "name": "grove_ahead", "hideHud": true },
 
-    { "op": "teleport", "pos": [-56.5, -362.5, 19.5], "yaw": 180, "pitch": -10 },
+    { "op": "teleport", "pos": [-56.5, -462.5, 19.5], "yaw": 180, "pitch": -10 },
     { "op": "wait", "seconds": 20 },
     { "op": "screenshot", "name": "charred_tree", "hideHud": true },
     { "op": "look", "yaw": 90, "pitch": -45 },

@@ -153,3 +153,70 @@ plinth and cap; both models are symmetric.
   `hollow_stone_pine_log_inner.png`, `hollow_stone_pine_log_end.png`. The end tile's default UVs
   crop its outer 3/16 band, so keep a readable cross-section ring. The outside bark is the species'
   own log tile and is not listed here.
+
+### Battle tower locks and altar
+
+All three made by `tools/generate-tower-lock-textures.py`: re-running puts the placeholders back
+(`--check` compares), so remove or repoint that generator with the replacement.
+
+- [ ] **Tower gate** — `tower_door.png`. 32x32 RGBA, a cutout with binary alpha (fully clear gaps,
+  fully opaque iron): a `cube_all` portcullis seen through from both sides, with two cells stacked in
+  each stairwell, so its frame should still read where the cells meet.
+- [ ] **Skeleton pile** — `skeleton_pile.png`. 32x32 RGBA, fully opaque. The `skeleton_pile` model
+  crops it with default UVs: the base's sides take rows 26..31 across columns 4..27, its top the
+  square rows/columns 4..27; the skull's sides take rows 18..25 across columns 10..21 (the sockets
+  sit there) and its top the square rows/columns 10..21.
+- [ ] **Tower altar top** — `tower_altar_top.png`. 32x32, fully opaque: the top face of the
+  `tower_altar` (a `cube_bottom_top` whose sides and bottom are `stone_bricks`), so keep its rim in
+  the stone-brick grays where it meets the sides. The block glows (light 7), so a crystal or rune
+  center that reads as lit fits.
+
+### Battle tower chest
+
+- [ ] **Tower chest** — `chest_tower_front.png`, `chest_tower_side.png`, `chest_tower_top.png`. The
+  worldgen-only `tower_chest` (BT-5) currently reuses the underground ruin chest's
+  `chest_ruin_underground_*` tiles; same layout as the ruin chests (the shared `block/chest` model).
+  Repoint `tower_chest.json`'s textures when they land.
+
+### Cave biome ores
+
+All three made by `tools/generate-cave-ore-textures.py` as palette swaps of `malachite_ore.png` (its
+brown matrix kept, its six green mineral shades repainted by luminance rank, the way `tin_ore.png`
+recolors it): re-running puts the placeholders back (`--check` compares), so remove or repoint that
+generator with the replacement. Each must stay 32x32, fully opaque and tileable (a `cube_all`
+block), and its own tile: the block's reflective `material` is keyed per tile, so a shared tile
+would share it.
+
+- [ ] **Amethyst ore** — `amethyst_ore.png`, the crystal caves' exclusive ore (violet).
+- [ ] **Jade ore** — `jade_ore.png`, the fungal caves' exclusive ore (pale green).
+- [ ] **Cinnabar ore** — `cinnabar_ore.png`, the magma-touched deep's exclusive ore (red).
+
+## Entity models
+
+Paths are under `OpenGLTest/assets/models/entity/`. Every model is a Blockbench `.bbmodel` with its
+skin PNG beside it; the `tools/` generator writes both, so replace them by editing that generator
+(or remove it in the same change), or a re-run puts the placeholder back (`--check` compares).
+
+- [ ] **Skeleton King** — `skeleton_king.bbmodel` and `skeleton_king.png` (128x128 skin, small
+  palette: the skeleton's bone shades, gold, purple, red eyes). Made by
+  `tools/generate-skeleton-king-model.py`. Keep the humanoid groups (`Torso`, `Head`, `ArmL`, `ArmR`,
+  `LegL`, `LegR`, with the head and arms under the torso), the clip names (`idle`, `walk`, `slam`,
+  `volley`, `summon`, `hurt`, `death`, `spawn`) and their events (`impact` on `slam`, `release` on
+  `volley`, `summon` on `summon`), which `SkeletonKing.ValidateContent` checks at startup, and a
+  height near 3 blocks (`MobConfig.SkeletonKingHeight`).
+- [ ] **Shardling** — `shardling.bbmodel` and `shardling.png` (64x64 skin, small palette: pale violet
+  body, white-to-lilac faceted crystal spikes and shard hands, white eyes). Made by
+  `tools/generate-cave-mob-models.py`. Keep the humanoid groups (`Torso`, `Head`, `ArmL`, `ArmR`, `LegL`,
+  `LegR`, with the head and arms under the torso), the clip names (`idle`, `walk`, `throw`, `hurt`,
+  `death`, `spawn`) and the `release` event on `throw`, which `Shardling.ValidateContent` checks at
+  startup, and the `.bbmodel`'s UV layout (every cube face has its own rectangle of the skin).
+- [ ] **Sporeling** — `sporeling.bbmodel` and `sporeling.png` (64x64 skin, small palette: brown stem
+  body, a teal mushroom cap with pale spots, glowing teal eyes). Made by
+  `tools/generate-cave-mob-models.py`. Keep the humanoid groups (as above), the clip names (`idle`,
+  `walk`, `melee`, `hurt`, `death`, `spawn`) and the `impact` event on `melee` (its spore burst), which
+  `Sporeling.ValidateContent` checks at startup, and the `.bbmodel`'s UV layout.
+- [ ] **Magmaborn** — `magmaborn.bbmodel` and `magmaborn.png` (128x128 skin, small palette: black
+  cooled rock split by orange glowing cracks, ember eyes and mouth). Made by
+  `tools/generate-cave-mob-models.py`. Keep the humanoid groups (as above), the clip names (`idle`,
+  `walk`, `melee`, `hurt`, `death`, `spawn`) and the `impact` event on `melee`, which
+  `Magmaborn.ValidateContent` checks at startup, and the `.bbmodel`'s UV layout.

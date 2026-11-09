@@ -69,6 +69,6 @@ Borders bend and wander instead of tracing smooth blobs, and a coherent noise br
 
 ## Underground
 
-Caves come as large rooms and winding tunnels, with rare entrances to the surface. Ores (coal, malachite, tin, hematite), gravel and sand pockets, geodes, glow mushrooms, stalactites, underground pools, hot springs and deep lava pockets are all found in the rock.
+Caves come as large rooms and winding tunnels, with rare entrances to the surface. Ores (coal, malachite, tin, hematite), gravel and sand pockets, geodes, glow mushrooms, stalactites, underground pools, hot springs and deep lava pockets are all found in the rock. Under frozen and desert land the upper caves echo the surface, in frost stone over permafrost or in sandstone. Deeper, below about −200, the caves turn into crystal caves, fungal caves or the magma-touched deep, each with its own rock, glowing accents, fog and drifting motes, bigger rooms or wider tunnels, an ore found nowhere else (amethyst, jade, or cinnabar, which needs an iron pickaxe) and its own mob: the shard-throwing **shardling**, the spore-bursting **sporeling** and the burning **magmaborn**. Underground ruin chests hold loot of the cave they stand in.
 
 For mountains, islands and lakes, see [Terrain](/game/terrain).

@@ -6,6 +6,7 @@ using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
 using VoxelEngine.Platform;
 using VoxelEngine.Rendering;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
@@ -320,6 +321,10 @@ internal sealed class GameplayInput
                 // A waystone is discovered and its screen opened here (the click itself changes nothing)
                 if (outcome == RightClickOutcome.Waystone)
                     waystoneInput.OpenFromStation(w, w.RightClick.LastWaystoneCell);
+                // A tower altar says what the click came to, once per press: a held button repeats the use on the
+                // place timer (harmless, the ritual's start is idempotent) but must not repeat the toast
+                if (outcome == RightClickOutcome.Altar && rightPressed)
+                    w.Toast.Show(TowerReadout.AltarToast(w.RightClick.LastAltarVerdict));
                 if (!claimed)
                     w.Throws.TryBeginThrowCharge();
                 break;

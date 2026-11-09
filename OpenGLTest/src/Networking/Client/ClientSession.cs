@@ -347,6 +347,7 @@ internal sealed class ClientSession
                 w.ClientMirror.ApplyNetworkAir(status.Air);
                 w.ClientMirror.ApplyNetworkMana(status.Mana, status.MaxMana);
                 w.ClientMirror.ApplyNetworkEffects(status.EffectMask);
+                w.ClientMirror.ApplyNetworkCaveBiome(status.CaveBiome);
                 var knockback = status.Knockback;
                 // AddKnockback normalizes the direction itself and keeps a lift-only hit's pop
                 if (knockback.LengthSquared() > 0f || status.Lift > 0f)

@@ -8,7 +8,8 @@ namespace VoxelEngine.Entities;
 public static class BossSelection
 {
     /// <summary>The bar state of the boss nearest <paramref name="from"/> among <paramref name="mobs"/>, or null
-    /// when none is a living boss. A dead or dying boss never counts.</summary>
+    /// when none is a living boss. A dead or dying boss never counts, nor one farther than its
+    /// <see cref="Mob.BossBarRange"/>.</summary>
     public static BossBarState? Nearest(IReadOnlyList<Mob> mobs, Vector3 from)
     {
         Mob? best = null;
@@ -19,6 +20,9 @@ public static class BossSelection
                 continue;
             var distance = Vector3.DistanceSquared(mob.Position, from);
             if (distance >= bestDistance)
+                continue;
+            var range = mob.BossBarRange;
+            if (float.IsFinite(range) && distance > range * range)
                 continue;
             best = mob;
             bestDistance = distance;

@@ -10,8 +10,8 @@ using VoxelEngine.WorldGen;
 namespace VoxelEngine.Simulation.Chests;
 
 /// <summary>
-/// Fills a ruin chest from its loot table the first time it is used, deterministically: everything is a pure function
-/// of the chest's cell and the world seed, so opening it and breaking it unopened give the same contents, on the server
+/// Fills a ruin or tower chest from its loot table the first time it is used, deterministically: everything is a pure
+/// function of the chest's cell, its state byte (a tiered chest's tier picks the table) and the world seed, so opening it and breaking it unopened give the same contents, on the server
 /// and in a replay. A piece of gear in the roll gets its modifiers from <see cref="GearRoller"/> on a seed derived from
 /// the same value. GL-free.
 /// </summary>
@@ -27,13 +27,14 @@ public static class ChestLoot
     }
 
     /// <summary>
-    /// Rolls <paramref name="profile"/>'s loot table into a fresh chest state for the chest at the cell. A profile with
-    /// no table (an ordinary chest) is an empty state. Overflow past the chest's slots is lost.
+    /// Rolls <paramref name="profile"/>'s loot table into a fresh chest state for the chest at the cell. A tiered chest
+    /// rolls the table its cell <paramref name="state"/>'s tier picks (<see cref="ChestProfile.TableFor"/>); a profile
+    /// with no table (an ordinary chest) is an empty state. Overflow past the chest's slots is lost.
     /// </summary>
-    public static ChestState Materialize(ChestProfile profile, int x, int y, int z, int worldSeed)
+    public static ChestState Materialize(ChestProfile profile, byte state, int x, int y, int z, int worldSeed)
     {
         var chest = new ChestState(profile.Slots);
-        if (profile.LootTable == null || ContentRegistry.LootTableFor(profile.LootTable) is not { } table)
+        if (profile.TableFor(state) is not { } tableName || ContentRegistry.LootTableFor(tableName) is not { } table)
             return chest;
 
         var seed = SeedFor(x, y, z, worldSeed);

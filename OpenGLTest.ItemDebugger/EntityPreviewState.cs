@@ -5,6 +5,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.SkyMobs;
@@ -26,7 +27,9 @@ namespace VoxelEngine.ItemDebugger;
 /// <para>
 /// A goblin, a hell, sky or tower mob or a slime is previewed as the real <see cref="RiggedMob"/> (<see cref="Goblin"/>,
 /// <see cref="Hellbrute"/>, <see cref="Cinderwitch"/>, <see cref="Galeraptor"/>, <see cref="Cloudgolem"/>,
-/// <see cref="Skeleton"/> at tier 0) or
+/// <see cref="Skeleton"/> at tier 0, the <see cref="SkeletonKing"/> unbound, its modes reading IDLE WALK SLAM VOLLEY
+/// SUMMON HURT DEATH SPAWN, the cave mobs <see cref="Shardling"/>, <see cref="Sporeling"/> and
+/// <see cref="Magmaborn"/> at tier 0, reading IDLE WALK THROW (or MELEE) HURT DEATH SPAWN) or
 /// <see cref="Slime"/> object, driven
 /// the way a client drives a mob it does not simulate (<see cref="Mob.AnimateMirror"/>), so everything the
 /// game layers on top of the clips shows up here too: the spawn pop, the hit recoil and flash (and the
@@ -473,8 +476,8 @@ public sealed class EntityPreviewState : IPreviewDriver
         }
     }
 
-    // The selected kind's own mob when it is a clip-animated one (a goblin with stones to hold, a hell or
-    // sky mob), else null
+    // The selected kind's own mob when it is a clip-animated one (a goblin with stones to hold, a hell, sky,
+    // tower or cave mob), else null
     private RiggedMob? NewRigged(bool spawnIn = true)
     {
         var type = Selected!;
@@ -490,6 +493,14 @@ public sealed class EntityPreviewState : IPreviewDriver
             return new Cloudgolem(type, Vector3.Zero, spawnIn);
         if (string.Equals(type.Name, Skeleton.EntityName, StringComparison.OrdinalIgnoreCase))
             return new Skeleton(type, Vector3.Zero, tier: 0, spawnIn);
+        if (string.Equals(type.Name, SkeletonKing.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new SkeletonKing(type, Vector3.Zero, SkeletonKingHome.Unbound(Vector3.Zero), spawnIn);
+        if (string.Equals(type.Name, Shardling.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new Shardling(type, Vector3.Zero, tier: 0, spawnIn);
+        if (string.Equals(type.Name, Sporeling.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new Sporeling(type, Vector3.Zero, tier: 0, spawnIn);
+        if (string.Equals(type.Name, Magmaborn.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new Magmaborn(type, Vector3.Zero, tier: 0, spawnIn);
         return null;
     }
 

@@ -29,26 +29,30 @@ public sealed class ChestManager
     public ChestState? Peek(int x, int y, int z) => _chests.GetValueOrDefault((x, y, z));
 
     /// <summary>Whether the loaded cell holds a chest block, and its profile.</summary>
-    public static bool TryProfileAt(ChunkManager chunks, int x, int y, int z, out ChestProfile profile)
+    public static bool TryProfileAt(ChunkManager chunks, int x, int y, int z, out ChestProfile profile) =>
+        TryChestAt(chunks, x, y, z, out profile, out _);
+
+    // The chest block's profile and its cell state (a tiered chest's tier) at a loaded cell
+    private static bool TryChestAt(ChunkManager chunks, int x, int y, int z, out ChestProfile profile, out byte state)
     {
         profile = null!;
-        if (!chunks.TryGetCell(x, y, z, out var id, out _) || id == 0) return false;
+        if (!chunks.TryGetCell(x, y, z, out var id, out state) || id == 0) return false;
         if (BlockType.ById[id]?.Chest is not { } found) return false;
         profile = found;
         return true;
     }
 
     /// <summary>
-    /// The state of the chest at a loaded cell, created (and, for a ruin chest, rolled from its seed) when it was
-    /// never used. Null when the cell is not a loaded chest block.
+    /// The state of the chest at a loaded cell, created (and, for a ruin or tower chest, rolled from its seed and, for a
+    /// tiered chest, the tier in its cell state) when it was never used. Null when the cell is not a loaded chest block.
     /// </summary>
     public ChestState? Open(ChunkManager chunks, int x, int y, int z) =>
-        TryProfileAt(chunks, x, y, z, out var profile) ? GetOrCreate(x, y, z, profile) : null;
+        TryChestAt(chunks, x, y, z, out var profile, out var cellState) ? GetOrCreate(x, y, z, profile, cellState) : null;
 
-    private ChestState GetOrCreate(int x, int y, int z, ChestProfile profile)
+    private ChestState GetOrCreate(int x, int y, int z, ChestProfile profile, byte cellState)
     {
         if (_chests.TryGetValue((x, y, z), out var state)) return state;
-        state = ChestLoot.Materialize(profile, x, y, z, WorldGenerationConfig.Seed);
+        state = ChestLoot.Materialize(profile, cellState, x, y, z, WorldGenerationConfig.Seed);
         _chests[(x, y, z)] = state;
         return state;
     }
@@ -56,15 +60,16 @@ public sealed class ChestManager
     /// <summary>
     /// A chest block was removed at the cell: what it held is dropped where it stood (a never-used ruin chest rolls
     /// its loot first, so breaking it unopened loses nothing) and the cell is forgotten. <paramref name="removed"/> is
-    /// the broken block's chest profile. <paramref name="drops"/> is null on a client, which holds nothing.
+    /// the broken block's chest profile and <paramref name="removedState"/> the broken cell's state, so a never-opened
+    /// tiered chest rolls its own tier. <paramref name="drops"/> is null on a client, which holds nothing.
     /// </summary>
-    public void NotifyBlockRemoved(int x, int y, int z, ChestProfile? removed, DropManager? drops)
+    public void NotifyBlockRemoved(int x, int y, int z, ChestProfile? removed, byte removedState, DropManager? drops)
     {
         var key = (x, y, z);
         if (!_chests.TryGetValue(key, out var state))
         {
             if (removed == null || drops == null) return;
-            state = ChestLoot.Materialize(removed, x, y, z, WorldGenerationConfig.Seed);
+            state = ChestLoot.Materialize(removed, removedState, x, y, z, WorldGenerationConfig.Seed);
         }
         else _chests.Remove(key);
         if (drops != null) Spill(state, x, y, z, drops);

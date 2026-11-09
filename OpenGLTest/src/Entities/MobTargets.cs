@@ -26,6 +26,19 @@ public static class MobTargets
     }
 
     /// <summary>
+    /// Whether a ground shockwave from a mob standing at <paramref name="feet"/> reaches a player whose eye is at
+    /// <paramref name="eye"/>: within <paramref name="radius"/> blocks horizontally, the player's feet within
+    /// <paramref name="height"/> blocks of the mob's (a cloud golem's slam, the Skeleton King's).
+    /// </summary>
+    public static bool InShockwave(Vector3 feet, Vector3 eye, float radius, float height)
+    {
+        var dx = eye.X - feet.X;
+        var dz = eye.Z - feet.Z;
+        if (dx * dx + dz * dz > radius * radius) return false;
+        return MathF.Abs(eye.Y - Camera.EyeHeight - feet.Y) <= height;
+    }
+
+    /// <summary>
     /// Whether an entity cube at <paramref name="center"/> with the given half extent touches the
     /// body box of a player whose eye is at <paramref name="eye"/>. Bodies only touch when they
     /// genuinely overlap: a face flush against the body does not count.

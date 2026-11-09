@@ -215,4 +215,32 @@ public static class ParticleConfig
 
     /// <summary>Trail color of a blade item whose JSON names no <c>trail</c> color (sRGB).</summary>
     public static readonly Rgba SliceTrailDefaultColor = new(220, 220, 255);
+
+    // --- Cave biome motes (AmbientEffects.UpdateCaveMotes, CaveClimate.Motes) ---
+    /// <summary>Radius around the eye, in blocks, inside which cave motes appear.</summary>
+    public const float CaveMoteRadius = 10f;
+
+    /// <summary>Most cave motes spawned in one frame, however long the frame was.</summary>
+    public const int CaveMoteMaxPerFrame = 4;
+
+    /// <summary>Random points tried per mote before giving it up (a point inside rock is refused).</summary>
+    public const int CaveMoteSpawnTries = 3;
+
+    /// <summary>Scatter of one cave mote around its spawn point, in blocks.</summary>
+    public const float CaveMoteSpread = 0.6f;
+
+    /// <summary>Cave motes per second in a frozen echo cave (cold steam glints).</summary>
+    public const float CaveMoteFrozenEchoPerSecond = 3f;
+
+    /// <summary>Cave motes per second in a desert echo cave (drifting dust).</summary>
+    public const float CaveMoteDesertEchoPerSecond = 2f;
+
+    /// <summary>Cave motes per second in a crystal cave (glinting sparks).</summary>
+    public const float CaveMoteCrystalPerSecond = 4f;
+
+    /// <summary>Cave motes per second in a fungal cave (spores).</summary>
+    public const float CaveMoteFungalPerSecond = 5f;
+
+    /// <summary>Cave motes per second in the magma deep (embers).</summary>
+    public const float CaveMoteMagmaDeepPerSecond = 6f;
 }

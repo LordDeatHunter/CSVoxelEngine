@@ -27,6 +27,8 @@ internal sealed class WorldgenStageTimer
         Columns,
         /// <summary>The ColumnCache.GenerateColumn loop.</summary>
         Fill,
+        /// <summary>CaveBiomes.Fill, the per-cell cave biome map every cave consumer reads.</summary>
+        CaveBiomeMap,
         /// <summary>NoiseCaves.Carve.</summary>
         NoiseCaves,
         /// <summary>WormCarver.Carve.</summary>
@@ -39,6 +41,8 @@ internal sealed class WorldgenStageTimer
         Hematite,
         /// <summary>TinGenerator.Stamp.</summary>
         Tin,
+        /// <summary>CaveOres.Stamp.</summary>
+        CaveOres,
         /// <summary>FillWater (marked only while water is enabled).</summary>
         Water,
         /// <summary>StampMud.</summary>
@@ -77,6 +81,8 @@ internal sealed class WorldgenStageTimer
         GravelPockets,
         /// <summary>UndergroundPoolGenerator.Stamp.</summary>
         UndergroundPools,
+        /// <summary>CaveBiomes.Stamp, from the map <see cref="CaveBiomeMap"/> filled.</summary>
+        CaveBiomes,
         /// <summary>RuinPlacement.StampUnderground.</summary>
         RuinsUnderground,
         /// <summary>WaystonePlacement.StampUnderground.</summary>

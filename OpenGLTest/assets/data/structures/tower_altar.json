@@ -2,14 +2,16 @@
   // The battle tower's roof (plans/BATTLE_TOWER.md BT-2): the altar dressing, centered on the tower's axis on the roof
   // slab. Layer 0's center cell is left free ('.') for BT-6's altar; a cobblestone-slab step surrounds it inside a low
   // stone-brick dais ring open at its four sides. Four stone-brick pillars carry 2x2 caps whose inner corner overhangs
-  // the roof, and a lantern hangs under each overhang.
+  // the roof, and a lantern hangs under each overhang. One tower chest (BT-5) stands south of the dais facing it, the
+  // tower's treasure: the stamp gives it the treasure tier, one above any floor.
   "kind": "towerAltar",
   "weight": 1,
   "groundLayer": 0,
   "palette": {
     "b": "stone_bricks",
     "h": "cobblestone_slab",
-    "L": "lantern"
+    "L": "lantern",
+    "C": { "block": "tower_chest", "facing": "north" }
   },
   "layers": [
     [
@@ -22,7 +24,7 @@
       "   bhhhb   ",
       "   bb bb   ",
       "           ",
-      " b       b ",
+      " b   C   b ",
       "           "
     ],
     [

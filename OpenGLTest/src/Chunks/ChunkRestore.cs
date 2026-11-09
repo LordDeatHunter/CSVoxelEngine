@@ -47,6 +47,8 @@ internal static class ChunkRestore
         Array.Copy(snapshot.Blocks, chunk.Blocks, BlockCount);
         chunk.StateArray = snapshot.State is { } state ? (byte[])state.Clone() : null;
         chunk.SolidCount = BlockCount - chunk.Blocks.AsSpan().Count(BlockType.Air);
+        // From the blocks alone, so a save, an imported map and a client's streamed copy all agree
+        chunk.MayHaveSkyCover = BlockType.ContainsSkyCover(chunk.Blocks);
     }
 
     // The tail every restore shares; IsBlockDataReady goes true last, which publishes the rest.

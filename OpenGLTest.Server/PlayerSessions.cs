@@ -144,7 +144,7 @@ internal sealed class PlayerSessions
         using var writer = new PacketWriter(NetMessage.PlayerStatus);
         PlayerStatusCodec.Write(writer,
             new PlayerStatusData(player.GrantedModes, player.Status.Health, player.IsDead, knockback, lift, player.Status.Breath.NetStep,
-                player.Status.Mana.NetMana, player.Status.Mana.Max, player.Status.Effects.Mask));
+                player.Status.Mana.NetMana, player.Status.Mana.Max, player.Status.Effects.Mask, player.EyeCaveBiome));
         client.Send(writer.ToArray());
         player.StatusDirty = false;
     }

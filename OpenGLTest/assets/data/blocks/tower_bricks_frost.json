@@ -7,5 +7,7 @@
   "sfx": "hit_rock",
   "hasItem": false,
   "loot": "none",
-  "unbreakable": true
+  "unbreakable": true,
+  // Keeps the tower floors dark under their slabs until the collapse (BT-10)
+  "coversSky": true
 }

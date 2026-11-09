@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Structures;
 using VoxelEngine.Interaction;
 using VoxelEngine.WorldGen;
@@ -16,7 +17,8 @@ namespace VoxelEngine.Tests.WorldGen.Structures;
 /// within a few cells of the origin on the default seed, sites are a pure function of (cell, seed), the rolled radius and floor
 /// count stay in their ranges, every tower keeps the spawn clear on dry, level land, the point query equals the stamp in every
 /// footprint chunk, the dressing fits the smallest room and every support-fragile dressing block has its holder, the altar cell
-/// is free on an unbreakable roof, and every palette brick is unbreakable.
+/// is free on an unbreakable roof, every floor holds chests of its own tier and the roof one of the treasure tier, and
+/// every palette brick is unbreakable and covers the sky while nothing the ruin writes does.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class TowerPlacementTests
@@ -136,6 +138,7 @@ public sealed class TowerPlacementTests
         var s = Nearest();
         const int volume = Chunk.Size * Chunk.Size * Chunk.Size;
         var wrote = 0;
+        var chests = 0;
         (int X, int Y, int Z)? seam = null;
         for (var cx = s.MinChunkX; cx <= s.MaxChunkX; cx++)
         for (var cy = s.MinChunkY; cy <= s.MaxChunkY; cy++)
@@ -165,11 +168,18 @@ public sealed class TowerPlacementTests
                 chunkWrote++;
                 Assert.Equal(BlockOf(cell), stamped);
                 Assert.Equal(StateOf(cell), stampedState);
+                if (stamped != TowerPalette.ChestBlock) continue;
+                // A chest carries the tier of the floor it stands on, or the roof's treasure tier
+                chests++;
+                var wy = y0 + y;
+                var tier = wy < s.RoofY ? (wy - s.GroundY) / WorldGenerationConfig.TowerFloorHeight : TowerSite.TreasureTier;
+                Assert.Equal(tier, ChestProfile.TierOf(stampedState));
             }
             wrote += chunkWrote;
             if (seam == null && chunkWrote > 0 && chunkSkipped > 0) seam = (x0, y0, z0);
         }
         Assert.True(wrote > 0);
+        Assert.True(chests > 0, "the stamp wrote no chest, so no chest state was compared");
         Assert.NotNull(seam);
 
         // A seam chunk over junk: unwritten cells keep it, written cells get their exact state, zero included
@@ -301,33 +311,10 @@ public sealed class TowerPlacementTests
     private static bool Overlaps(TowerSite s, PlacedStructure p) =>
         p.MinX <= s.MaxX && p.MaxX >= s.MinX && p.MinZ <= s.MaxZ && p.MaxZ >= s.MinZ;
 
-    /// <summary>A tower of the smallest radius at a fixed spot, every floor wearing <paramref name="floor"/> and the roof
-    /// <paramref name="altar"/>, both at <paramref name="turns"/>.</summary>
-    private static TowerSite SyntheticSite(StructureTemplate floor, StructureTemplate altar, int turns)
-    {
-        var floors = WorldGenerationConfig.TowerMinFloors;
-        return new TowerSite(5, 7, 5 * 1536 + 700, 7 * 1536 + 600, 70, WorldGenerationConfig.TowerMinRadius, floors, 0,
-            TowerPalette.For(Biome.Forest), altar, turns, Enumerable.Repeat(floor, floors).ToArray(),
-            Enumerable.Repeat(turns, floors).ToArray());
-    }
-
-    /// <summary>One synthetic site per (floor template, altar template, turn) pairing, so every template is seen at every turn.</summary>
-    private static IEnumerable<TowerSite> SyntheticSites()
-    {
-        var floors = StructureRegistry.Of(StructureKind.TowerFloor);
-        var altars = StructureRegistry.Of(StructureKind.TowerAltar);
-        Assert.NotEmpty(floors);
-        Assert.NotEmpty(altars);
-        var pairs = Math.Max(floors.Count, altars.Count);
-        for (var i = 0; i < pairs; i++)
-        for (var turns = 0; turns < 4; turns++)
-            yield return SyntheticSite(floors[i % floors.Count], altars[i % altars.Count], turns);
-    }
-
     [Fact]
     public void DressingTemplatesFitTheSmallestRoomAtEveryTurn()
     {
-        var site = SyntheticSite(StructureRegistry.Of(StructureKind.TowerFloor)[0], StructureRegistry.Of(StructureKind.TowerAltar)[0], 0);
+        var site = TowerSiteFixture.SyntheticSite(StructureRegistry.Of(StructureKind.TowerFloor)[0], StructureRegistry.Of(StructureKind.TowerAltar)[0], 0);
         foreach (var template in StructureRegistry.Of(StructureKind.TowerFloor).Concat(StructureRegistry.Of(StructureKind.TowerAltar)))
         {
             if (template.Kind == StructureKind.TowerFloor)
@@ -350,7 +337,7 @@ public sealed class TowerPlacementTests
     public void EverySupportedDressingBlockHasItsHolder()
     {
         var checkedBlocks = 0;
-        foreach (var s in SyntheticSites())
+        foreach (var s in TowerSiteFixture.SyntheticSites())
         {
             var r = s.RoomRadius;
             for (var x = s.CenterX - r; x <= s.CenterX + r; x++)
@@ -371,25 +358,94 @@ public sealed class TowerPlacementTests
     }
 
     [Fact]
-    public void TheAltarCellIsFreeOnAnUnbreakableRoof()
+    public void TheAltarStandsInItsCellOnAnUnbreakableRoof()
     {
-        foreach (var s in SyntheticSites().Append(Nearest()))
+        foreach (var s in TowerSiteFixture.SyntheticSites().Append(Nearest()))
         {
             var (x, y, z) = s.AltarCell;
-            Assert.Equal(BlockType.Air, (byte)TowerGenerator.CellAt(s, x, y, z));
+            var altar = TowerGenerator.CellAt(s, x, y, z);
+            Assert.Equal(TowerPalette.AltarBlock, (byte)BlockOf(altar));
+            Assert.True(BlockType.IsUnbreakable(TowerPalette.AltarBlock));
             var roof = TowerGenerator.CellAt(s, x, y - 1, z);
             Assert.True(roof >= 0 && BlockType.IsUnbreakable((byte)BlockOf(roof)));
         }
     }
 
     [Fact]
-    public void EveryPaletteBrickIsUnbreakable()
+    public void EveryFloorHasPilesStandingOnItsSlabWhereThePointQuerySaysSo()
+    {
+        foreach (var s in TowerSiteFixture.SyntheticSites())
+        for (var k = 0; k < s.Floors; k++)
+        {
+            var piles = s.PileCells(k);
+            Assert.NotEmpty(piles);
+            Assert.Equal(piles.Count, piles.Distinct().Count());
+            foreach (var (x, y, z) in piles)
+            {
+                Assert.Equal(TowerPalette.PileBlock, (byte)BlockOf(TowerGenerator.CellAt(s, x, y, z)));
+                Assert.Equal(s.FloorY(k) + 1, y);
+            }
+        }
+    }
+
+    [Fact]
+    public void EveryFloorHoldsAChestOfItsOwnTierWhereThePointQuerySaysSo()
+    {
+        foreach (var s in TowerSiteFixture.SyntheticSites())
+        {
+            for (var k = 0; k < s.Floors; k++)
+            {
+                var chests = TowerGenerator.ChestCells(s, k);
+                Assert.NotEmpty(chests);
+                Assert.Equal(chests.Count, chests.Distinct().Count());
+                var piles = s.PileCells(k);
+                foreach (var (x, y, z) in chests)
+                {
+                    var cell = TowerGenerator.CellAt(s, x, y, z);
+                    Assert.Equal(TowerPalette.ChestBlock, (byte)BlockOf(cell));
+                    Assert.Equal(s.Tier(k), ChestProfile.TierOf(StateOf(cell)));
+                    Assert.Equal(s.FloorY(k) + 1, y);
+                    Assert.DoesNotContain((x, y, z), piles);
+                }
+            }
+
+            var treasure = TowerGenerator.AltarChestCells(s);
+            Assert.NotEmpty(treasure);
+            foreach (var (x, y, z) in treasure)
+            {
+                var cell = TowerGenerator.CellAt(s, x, y, z);
+                Assert.Equal(TowerPalette.ChestBlock, (byte)BlockOf(cell));
+                Assert.Equal(TowerSite.TreasureTier, ChestProfile.TierOf(StateOf(cell)));
+                Assert.Equal(s.RoofY + 1, y);
+                Assert.NotEqual(s.AltarCell, (x, y, z));
+            }
+        }
+    }
+
+    [Fact]
+    public void EveryPaletteBrickIsUnbreakableAndCoversTheSky()
     {
         foreach (var palette in TowerPalette.All)
         {
             Assert.True(BlockType.IsUnbreakable(palette.Brick));
             Assert.False(BlockType.IsUnbreakable(palette.Step));
+            Assert.True(BlockType.CoversSkyById[palette.Brick]);
+            Assert.False(BlockType.CoversSkyById[palette.Step]);
         }
+
+        // ...while nothing the collapse leaves covers the sky, so a ruin lets the sun back in: a slice through the
+        // nearest tower's center, from its foundation to its top
+        var s = Nearest();
+        var ruinWrites = 0;
+        for (var x = s.CenterX - s.Radius; x <= s.CenterX + s.Radius; x++)
+        for (var y = s.BottomY; y <= s.TopY; y++)
+        {
+            var ruin = TowerRuin.RuinAt(s, x, y, s.CenterZ, out _);
+            if (ruin < 0) continue;
+            ruinWrites++;
+            Assert.False(BlockType.CoversSkyById[BlockOf(ruin)], $"the ruin writes a covering block at ({x}, {y})");
+        }
+        Assert.True(ruinWrites > 0, "the slice crossed no ruin cell");
         Assert.Equal(TowerPalette.DefaultBrick, TowerPalette.For(Biome.Forest).Brick);
         Assert.Equal(TowerPalette.For(Biome.Frozen), TowerPalette.For(Biome.Taiga));
         Assert.NotEqual(TowerPalette.For(Biome.Forest), TowerPalette.For(Biome.Taiga));

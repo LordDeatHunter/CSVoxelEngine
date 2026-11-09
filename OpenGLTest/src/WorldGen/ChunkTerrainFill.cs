@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using VoxelEngine.Chunks;
 using VoxelEngine.Simulation.Fluids;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
@@ -15,6 +16,9 @@ namespace VoxelEngine.WorldGen;
 /// <summary>The worldgen fill of a fresh <see cref="Chunk"/>: column fill, carvers, water, mud, lava and every feature stamp, written straight into the chunk's arrays (never through the edit API, so a generated chunk is neither marked modified nor journaled). A pure function of world position; runs on the generation workers.</summary>
 internal static class ChunkTerrainFill
 {
+    /// <summary>Each generation worker's cave biome map, reused chunk after chunk (CaveBiomes.Fill writes every cell).</summary>
+    [ThreadStatic] private static CaveBiomeMap? t_caveMap;
+
     /// <summary>
     /// Fills the terrain columns (grass / dirt / stone by depth), lets the cave carvers clear
     /// their air out of the result, floods everything below sea level, then stamps trees onto
@@ -111,6 +115,17 @@ internal static class ChunkTerrainFill
         var worldX0 = (int)chunk.Position.X * Size;
         var worldZ0 = (int)chunk.Position.Z * Size;
 
+        // The cave biome of every cell, classified once (a pure function of position and the column, never
+        // of the blocks) and read by the cave shape, the ore richness and the palette pass below. Null when
+        // every cell is plain, which every consumer treats exactly as before the cave biomes existed.
+        CaveBiomeMap? caves = null;
+        if (WorldGenerationConfig.CaveBiomesEnabled && Admits(stampGates, CaveBiomes.WriteBand(column), lowerBoundY))
+        {
+            var map = t_caveMap ??= new CaveBiomeMap();
+            if (CaveBiomes.Fill(map, column, worldX0, lowerBoundY, worldZ0)) caves = map;
+        }
+        timer?.Mark(Stage.CaveBiomeMap);
+
         // Both carvers only ever clear blocks at or below their own column's terrain top:
         // NoiseCaves breaks each column at `depth < 0` before it reads a block or a sample, and
         // WormCarver skips every y at `depth < margin`, margin = WormSurfaceMargin * (1 - EntranceWeight)
@@ -122,32 +137,41 @@ internal static class ChunkTerrainFill
         var carvable = column.MaxHeight >= lowerBoundY;
 
         if (carvable && WorldGenerationConfig.NoiseCavesEnabled)
-            NoiseCaves.Carve(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
+            NoiseCaves.Carve(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0, caves);
         timer?.Mark(Stage.NoiseCaves);
 
         if (carvable && WorldGenerationConfig.WormCavesEnabled)
             WormCarver.Carve(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.WormCaves);
 
-        // After the carvers, so veins rim cave walls instead of being eaten by them.
+        // After the carvers, so veins rim cave walls instead of being eaten by them. Each ore's richness follows
+        // the cave biome map (a per-cell threshold shift; null keeps the plain field).
         if (WorldGenerationConfig.MalachiteEnabled)
-            MalachiteGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            MalachiteGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0, caves);
         timer?.Mark(Stage.Malachite);
 
         // Same pass, same reason; coal's two host rocks let it also fill desert sandstone.
         if (WorldGenerationConfig.CoalEnabled)
-            CoalGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            CoalGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0, caves);
         timer?.Mark(Stage.Coal);
 
         // Same pass again, deep stone only: a chunk whose floor is above the ceiling holds no host,
         // so skipping the call is bit-identical and saves its host scan on every shallower chunk.
         if (WorldGenerationConfig.HematiteEnabled && lowerBoundY <= WorldGenerationConfig.HematiteMaxY)
-            HematiteGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            HematiteGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0, caves);
         timer?.Mark(Stage.Hematite);
 
         if (WorldGenerationConfig.TinEnabled && lowerBoundY <= WorldGenerationConfig.TinMaxY)
-            TinGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0);
+            TinGenerator.Stamp(chunk.Blocks, worldX0, lowerBoundY, worldZ0, caves);
         timer?.Mark(Stage.Tin);
+
+        // The cave biome exclusive ores host plain stone of their own biome, so they sit before the palette pass
+        // (Stage.CaveBiomes), which rewrites only exact stone: an ore stamped here survives even in the
+        // magma-touched deep's scorched hellrock.
+        if (WorldGenerationConfig.CaveOresEnabled && caves is not null
+            && Admits(stampGates, CaveOres.WriteBand(), lowerBoundY))
+            CaveOres.Stamp(chunk.Blocks, caves, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.CaveOres);
 
         // After the carvers (so caves under the sea floor flood) and before the trees and
         // pebbles, which skip submerged columns rather than growing underwater
@@ -271,13 +295,21 @@ internal static class ChunkTerrainFill
             UndergroundPoolGenerator.Stamp(chunk.Blocks, column, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.UndergroundPools);
 
+        // The cave biomes' palette, after every carver, ore and underground stamp, so it rewrites only the plain
+        // stone they left (ore counts, pockets, pools and cave life unchanged), and before the underground ruins,
+        // which own their rooms. The cells were classified up front (Stage.CaveBiomeMap); this only dresses them
+        if (caves is not null)
+            CaveBiomes.Stamp(chunk.Blocks, caves, worldX0, lowerBoundY, worldZ0);
+        timer?.Mark(Stage.CaveBiomes);
+
         // Sealed underground rooms and their waystone chambers, after the deep features and the cave life, so no
-        // geode, mushroom, formation, gravel pocket or pool is left inside a room
+        // geode, mushroom, formation, gravel pocket or pool is left inside a room. A room's loot chests take their
+        // own cells' cave biomes as their tiers from the same map
         if (WorldFeatureConfig.RuinsEnabled
             && Admits(stampGates, RuinPlacement.UndergroundBand(neighborhoodMaxHeight), lowerBoundY))
         {
             var state = chunk.StateArray;
-            RuinPlacement.StampUnderground(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            RuinPlacement.StampUnderground(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0, caves);
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.RuinsUnderground);
@@ -339,6 +371,9 @@ internal static class ChunkTerrainFill
             var state = chunk.StateArray;
             TowerPlacement.Stamp(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
             chunk.StateArray = state;
+            // Only a tower-stamped chunk pays the vectorized scan; no later stamp writes a covering block, and
+            // every other chunk keeps the flag false, so its light flood runs the plain heightmap rule
+            chunk.MayHaveSkyCover = BlockType.ContainsSkyCover(chunk.Blocks);
         }
         timer?.Mark(Stage.Towers);
 

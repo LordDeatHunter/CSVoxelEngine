@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.TowerMobs;
@@ -142,5 +143,59 @@ public sealed class SkeletonManagerTests
         }
         Assert.True(launched, "no arrow left the bow");
         Assert.True(target.DamageTaken > 0, "no arrow reached the target");
+    }
+
+    [Fact]
+    public void ABoundSkeletonThatDespawnsIsReportedAndAnUnboundOneIsNot()
+    {
+        var chunks = StoneFloor();
+        var manager = new SkeletonManager(Type);
+        var drops = new DropManager();
+        var floor = new TowerFloorRef(3, -2, 1);
+        var bound = manager.Spawn(OnFloor(4.5f, 8.5f), tier: 1, spawnIn: false)!;
+        bound.Floor = floor;
+        var unbound = manager.Spawn(OnFloor(12.5f, 8.5f), tier: 0, spawnIn: false)!;
+        IMobTarget[] far = [PlayerAt(8.5f + MobConfig.SkeletonDespawnRadiusBlocks * 2f, 8.5f)];
+
+        manager.Update(Dt, chunks, drops, far);
+        Assert.True(bound.IsDying);
+        Assert.True(unbound.IsDying);
+
+        var released = new List<TowerFloorRef>();
+        manager.TakeReleased(released);
+        Assert.Equal([floor], released);
+
+        // Taking clears the report
+        released.Clear();
+        manager.TakeReleased(released);
+        Assert.Empty(released);
+    }
+
+    [Fact]
+    public void ReleasingABoundSkeletonReportsItOnce()
+    {
+        var chunks = StoneFloor();
+        var manager = new SkeletonManager(Type);
+        var drops = new DropManager();
+        var floor = new TowerFloorRef(0, 0, 2);
+        var skeleton = manager.Spawn(OnFloor(8.5f, 8.5f), tier: 2, spawnIn: false)!;
+        skeleton.Floor = floor;
+
+        manager.Release(skeleton);
+        Assert.True(skeleton.IsDying);
+        manager.Release(skeleton);
+        // Now far from every target too: a dying skeleton never despawns a second time
+        manager.Update(Dt, chunks, drops, [PlayerAt(8.5f + MobConfig.SkeletonDespawnRadiusBlocks * 2f, 8.5f)]);
+
+        var released = new List<TowerFloorRef>();
+        manager.TakeReleased(released);
+        Assert.Equal([floor], released);
+
+        // An unbound skeleton released reports nothing
+        var unbound = manager.Spawn(OnFloor(8.5f, 8.5f), tier: 0, spawnIn: false)!;
+        manager.Release(unbound);
+        released.Clear();
+        manager.TakeReleased(released);
+        Assert.Empty(released);
     }
 }

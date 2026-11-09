@@ -13,6 +13,7 @@ using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Player;
 
@@ -464,6 +465,16 @@ internal sealed class LocalPlayer
     /// <summary>The line the death screen shows ("Player fell from a high place"); null while alive.</summary>
     internal string? DeathLine { get; private set; }
 
+    // The eye's cave biome probe, memoized per cell (singleplayer only)
+    private readonly EyeCaveBiomeProbe _caveProbe = new();
+
+    /// <summary>The cave biome at the eye (CB-3): computed in singleplayer by <see cref="UpdateHealth"/>,
+    /// mirrored from the server's status on a client (<see cref="MirrorCaveBiome"/>), plain otherwise.</summary>
+    internal CaveBiome EyeCaveBiome { get; private set; }
+
+    /// <summary>A client takes the eye's cave biome the server's status reports.</summary>
+    internal void MirrorCaveBiome(CaveBiome biome) => EyeCaveBiome = biome;
+
     /// <summary>
     /// First-cut survival tick, after <see cref="Camera.Update"/> so grounded state is fresh:
     /// tracks the fall from its highest feet position, burns in lava, decays the damage
@@ -475,6 +486,9 @@ internal sealed class LocalPlayer
     internal void UpdateHealth(float deltaTime, ChunkManager chunkManager)
     {
         ApplyGear(simulatesMana: true);
+        // The eye's cave biome (CB-3), even while dead. UpdateHealth never runs on a client or a server, so no
+        // worldgen is read there: a client mirrors the byte from its status
+        EyeCaveBiome = _caveProbe.Update(chunkManager.WorldSource, Camera.Position);
         if (_spawnSettled && !_hasRespawnEye)
         {
             _respawnEye = Camera.Position;

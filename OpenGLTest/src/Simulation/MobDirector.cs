@@ -5,14 +5,17 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Interaction;
 using VoxelEngine.Juice;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Caves;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;
@@ -23,8 +26,9 @@ namespace VoxelEngine.Simulation;
 /// The per-frame mob job: the players the mobs chase (the local camera, or every connected player on a
 /// server), the slime and goblin updates with the damage they deal billed to the local player's pool, the
 /// TNT blast shove of the players and mobs, the rebuild of the shared mob list (<see cref="World.Mobs"/>)
-/// with its scenario seams, and the icebergs (not mobs, but driven by the same targets). Owned by <see cref="World"/>, which runs <see cref="Update"/> inside its entity
-/// update; main thread only.
+/// with its scenario seams, and the icebergs (not mobs, but driven by the same targets). It also runs the battle
+/// towers' floor locks and roof altars, whose ritual raises the Skeleton King. Owned by <see cref="World"/>, which runs
+/// <see cref="Update"/> inside its entity update; main thread only.
 /// </summary>
 internal sealed class MobDirector
 {
@@ -35,7 +39,9 @@ internal sealed class MobDirector
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly CaveMobManager? _caveMobs;
     private readonly SkeletonManager? _skeletons;
+    private readonly SkeletonKingManager? _kings;
     private readonly SandwormManager? _sandworms;
     private readonly IcebergManager? _icebergs;
     private readonly BlockDebrisSystem _debris;
@@ -57,14 +63,16 @@ internal sealed class MobDirector
     private MobStrikes Strikes => _world.Strikes;
 
     internal MobDirector(World world, ChunkManager chunkManager, DropManager dropManager, SlimeManager? slimes,
-        GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, SkeletonManager? skeletons, SandwormManager? sandworms,
-        IcebergManager? icebergs, BlockDebrisSystem debris,
+        GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, CaveMobManager? caveMobs,
+        SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs, BlockDebrisSystem debris,
         FireParticleSystem? embers, PlayerHealth health, List<Mob> mobs, bool serverMode, bool clientMode,
         StatusEffectBlockWriter? statusBlocks)
     {
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _caveMobs = caveMobs;
         _skeletons = skeletons;
+        _kings = kings;
         _sandworms = sandworms;
         _embers = embers;
         _statusBlocks = statusBlocks;
@@ -126,7 +134,9 @@ internal sealed class MobDirector
         _icebergs.CarryAndPushOut(Camera, _chunkManager);
     }
 
-    /// <summary>The mob part of the world's entity update: rebuilds the targets, runs the slime, goblin, hell, sky, skeleton and sandworm managers and bills the damage they dealt, then converts the cells the bodies' status effects pulsed (<see cref="ApplyStatusBlockActions"/>).</summary>
+    /// <summary>The mob part of the world's entity update: rebuilds the targets, runs the slime, goblin, hell, sky,
+    /// skeleton, Skeleton King and sandworm managers and bills the damage they dealt, ticks the towers' locks and altars,
+    /// then converts the cells the bodies' status effects pulsed (<see cref="ApplyStatusBlockActions"/>).</summary>
     internal void Update(double deltaTime)
     {
         RefreshTargets();
@@ -170,11 +180,38 @@ internal sealed class MobDirector
             BillLocalPlayer(_skyMobs.DamageDealtThisFrame);
         }
 
+        // The cave biomes' mobs: crystal shardlings throw chilling shards, fungal sporelings burst spores and the
+        // magma deep's magmaborn set their target burning
+        if (_caveMobs != null)
+        {
+            _caveMobs.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris);
+            BillLocalPlayer(_caveMobs.DamageDealtThisFrame);
+        }
+
         // The tower's skeletons rake up close and shoot arrows at range; they never spawn on their own
         if (_skeletons != null)
         {
             _skeletons.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris);
             BillLocalPlayer(_skeletons.DamageDealtThisFrame);
+        }
+
+        // The tower's piles raise skeletons, and its floor locks open once their floor is cleared
+        // (a client's tower mirror has no writer and never ticks)
+        if (!_clientMode)
+            _world.Towers.Update((float)deltaTime, _chunkManager, _skeletons, _mobTargets,
+                _world.Persistence.PendingTowerSkeletons, _world.Persistence.TakeDiscardedTowerSkeletons);
+
+        // The Skeleton King slams, throws bone volleys and summons skeletons; then the altars run their rituals and
+        // settle with their kings, after the king update so a kill (or a fade on an empty server) settles this frame
+        if (!_clientMode)
+        {
+            if (_kings != null)
+            {
+                _kings.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris,
+                    _skeletons);
+                BillLocalPlayer(_kings.DamageDealtThisFrame);
+            }
+            _world.Towers.UpdateAltars((float)deltaTime, _kings, _world.Persistence.PendingKingFor);
         }
 
         // The sandworm boss hunts under the sand, erupts under its target and slides at it
@@ -232,8 +269,12 @@ internal sealed class MobDirector
             ApplyMobBlockActions(_hellMobs.Mobs);
         if (_skyMobs != null)
             ApplyMobBlockActions(_skyMobs.Mobs);
+        if (_caveMobs != null)
+            ApplyMobBlockActions(_caveMobs.Mobs);
         if (_skeletons != null)
             ApplyMobBlockActions(_skeletons.Mobs);
+        if (_kings != null)
+            ApplyMobBlockActions(_kings.Mobs);
         if (_sandworms != null)
             ApplyMobBlockActions(_sandworms.Worms);
         for (var i = 0; i < _mobTargets.Count; i++)
@@ -321,8 +362,14 @@ internal sealed class MobDirector
         if (_skyMobs != null)
             AddLiving(_skyMobs.Mobs);
 
+        if (_caveMobs != null)
+            AddLiving(_caveMobs.Mobs);
+
         if (_skeletons != null)
             AddLiving(_skeletons.Mobs);
+
+        if (_kings != null)
+            AddLiving(_kings.Mobs);
 
         if (_sandworms != null)
             AddLiving(_sandworms.Worms);
@@ -341,7 +388,8 @@ internal sealed class MobDirector
     /// (the scripted visual tests' <c>spawn</c> op), a forced spawn under the hard mob cap. False
     /// for an unknown name, a kind whose manager does not exist because its content is not
     /// registered, or a full hard cap. <paramref name="size"/> is a slime's size and
-    /// <paramref name="tier"/> a skeleton's tower floor tier (other kinds have neither and ignore them).
+    /// <paramref name="tier"/> a skeleton's tower floor tier or a cave mob's depth tier (other kinds have neither and
+    /// ignore them); a cave mob given no tier (0) takes the depth tier of its feet (<see cref="CaveDifficulty.TierAt"/>).
     /// </summary>
     internal bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min, int tier = 0)
     {
@@ -372,9 +420,27 @@ internal sealed class MobDirector
             RefreshMobs();
             return true;
         }
+        if (_caveMobs != null && CaveMobManager.HeightOf(name) > 0f)
+        {
+            // A scenario's tier overrides the depth tier, as it does a skeleton's floor tier
+            var caveTier = tier > 0 ? tier : CaveDifficulty.TierAt(feet.Y);
+            if (_caveMobs.Spawn(name, feet + new Vector3(0f, CaveMobManager.HeightOf(name) * 0.5f, 0f), caveTier) == null)
+                return false;
+            RefreshMobs();
+            return true;
+        }
         if (_skeletons != null && SkeletonManager.HeightOf(name) > 0f)
         {
             if (_skeletons.Spawn(feet + new Vector3(0f, SkeletonManager.HeightOf(name) * 0.5f, 0f), tier) == null)
+                return false;
+            RefreshMobs();
+            return true;
+        }
+        if (_kings != null && SkeletonKingManager.HeightOf(name) > 0f)
+        {
+            // A scenario king is bound to no tower: it leashes to where it was spawned
+            if (_kings.Spawn(feet + new Vector3(0f, SkeletonKingManager.HeightOf(name) * 0.5f, 0f),
+                    SkeletonKingHome.Unbound(feet)) == null)
                 return false;
             RefreshMobs();
             return true;

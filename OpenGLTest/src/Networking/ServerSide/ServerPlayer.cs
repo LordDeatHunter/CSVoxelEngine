@@ -9,6 +9,7 @@ using VoxelEngine.Saves;
 using VoxelEngine.Simulation.Waystones;
 using VoxelEngine.Status;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.Networking.ServerSide;
 
@@ -338,7 +339,8 @@ public sealed class ServerPlayer : IMobTarget
     /// status effects tick (cleared while creative or flying), the damage flash decays and health and
     /// mana regenerate. A dead player is left as it is until <see cref="Respawn"/>, but for its status
     /// effects, which are cleared. A change of the active effects (an expiry here, or an application
-    /// since the last tick) marks the status dirty too.
+    /// since the last tick) marks the status dirty too. The cave biome at the eye is read here as well
+    /// (<see cref="EyeCaveBiome"/>, kept as it was while dead) and marks the status dirty only when it changes.
     /// </summary>
     public void TickStatus(float dt, ChunkManager chunks)
     {
@@ -348,6 +350,8 @@ public sealed class ServerPlayer : IMobTarget
             NoteEffectMask();
             return;
         }
+        _caveProbe.Update(chunks.WorldSource, Position);
+        NoteCaveBiome();
         // Worn gear sizes the pools; a change marks the status dirty through the max checks below
         Status.ApplyGear(Inventory.Equipment, simulatesMana: true);
         var before = Status.Health;
@@ -383,6 +387,22 @@ public sealed class ServerPlayer : IMobTarget
         if (mask == _reportedEffectMask)
             return;
         _reportedEffectMask = mask;
+        StatusDirty = true;
+    }
+
+    // The eye's cave biome probe (CB-3, memoized per cell) and the biome the client was last told about
+    private readonly EyeCaveBiomeProbe _caveProbe = new();
+    private CaveBiome _reportedCaveBiome;
+
+    /// <summary>The cave biome at the player's eye (plain outside caves), sent in its <c>PlayerStatus</c>.</summary>
+    public CaveBiome EyeCaveBiome => _caveProbe.Current;
+
+    // Marks the status dirty when the eye's cave biome differs from the last reported one
+    private void NoteCaveBiome()
+    {
+        if (_caveProbe.Current == _reportedCaveBiome)
+            return;
+        _reportedCaveBiome = _caveProbe.Current;
         StatusDirty = true;
     }
 

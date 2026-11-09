@@ -5,7 +5,9 @@ using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Structures;
 using Xunit;
 
 namespace VoxelEngine.Tests.Networking;
@@ -14,8 +16,8 @@ namespace VoxelEngine.Tests.Networking;
 /// The stations a server runs reach its clients whole: a snapshot read back into fresh managers
 /// shows exactly the fires, cooking, quern tops, kilns and pours the server has, a later snapshot
 /// replaces what an earlier one left (a station that is gone disappears), a malformed snapshot is
-/// refused, and a pour bound to a connected player drains that player's crucible and pauses once
-/// the player left.
+/// refused, a pour bound to a connected player drains that player's crucible and pauses once
+/// the player left, and the battle tower locks reach a client's mirror (a malformed section refused).
 /// </summary>
 public sealed class StationNetCodecTests
 {
@@ -184,5 +186,103 @@ public sealed class StationNetCodecTests
         casting.Update(step, manager, drops, nobody, 0, far, 10f);
         Assert.Equal(poured, casting.StateAt(0, 0, 0)!.FilledMl);
         Assert.False(casting.StateAt(0, 0, 0)!.Pouring);
+    }
+
+    [Fact]
+    public void TheTowerLocksRoundTripThroughTheStationFrame()
+    {
+        var server = new TowerManager(null, (_, _) => null);
+        var record = server.Track(TowerRecord.Build((2, -1), 40, -20, 9,
+        [
+            (10, 18, new[] { (38, 11, -20), (42, 11, -20) }, new[] { (40, 13, -24) }),
+            (18, 26, new[] { (38, 19, -20) }, new[] { (40, 21, -24) }),
+        ], hasSite: false));
+        record.Floors[0].Piles[0].WavesLeft = 0;
+        record.Floors[0].PilesLeft = record.Floors[0].CountPilesLeft();
+        record.Floors[0].Alive = 3;
+        record.Floors[1].PilesLeft = record.Floors[1].CountPilesLeft();
+        record.AltarState = TowerAltarState.Ritual;
+        var second = server.Track(TowerRecord.Build((-4, 7), -300, 500, 12,
+            [(60, 68, new[] { (-300, 61, 500) }, new[] { (-300, 63, 496) })], hasSite: false));
+        second.Floors[0].DoorOpen = true;
+        second.AltarState = TowerAltarState.Defeated;
+
+        using var writer = new PacketWriter(NetMessage.StationState);
+        server.WriteNet(writer);
+        using var reader = new PacketReader(writer.ToArray());
+        Assert.Equal(NetMessage.StationState, reader.Message);
+        var client = new TowerManager(null);
+        client.ReadNet(reader);
+
+        Assert.Equal(server.Records.Count, client.Records.Count);
+        foreach (var sent in server.Records)
+        {
+            var mirror = client.RecordAt(sent.CenterX, sent.CenterZ);
+            Assert.NotNull(mirror);
+            Assert.Equal(sent.Key, mirror!.Key);
+            Assert.Equal(sent.OuterRadius, mirror.OuterRadius);
+            Assert.Equal(sent.Floors.Length, mirror.Floors.Length);
+            Assert.Equal(sent.AltarState, mirror.AltarState);
+            for (var k = 0; k < sent.Floors.Length; k++)
+            {
+                Assert.Equal(sent.Floors[k].BottomY, mirror.Floors[k].BottomY);
+                Assert.Equal(sent.Floors[k].TopY, mirror.Floors[k].TopY);
+                Assert.Equal(sent.Floors[k].PilesLeft, mirror.Floors[k].PilesLeft);
+                Assert.Equal(sent.Floors[k].Alive, mirror.Floors[k].Alive);
+                Assert.Equal(sent.Floors[k].DoorOpen, mirror.Floors[k].DoorOpen);
+            }
+        }
+
+        // The mirror reads the same look-at lines as the server
+        Assert.Equal(server.Detail(TowerPalette.DoorBlock, 40, 13, -24), client.Detail(TowerPalette.DoorBlock, 40, 13, -24));
+        Assert.Equal(server.Detail(TowerPalette.PileBlock, 38, 19, -20), client.Detail(TowerPalette.PileBlock, 38, 19, -20));
+        Assert.NotNull(client.Detail(TowerPalette.DoorBlock, 40, 13, -24));
+        var (ax, ay, az) = record.AltarCell;
+        Assert.Equal(server.Detail(TowerPalette.AltarBlock, ax, ay, az), client.Detail(TowerPalette.AltarBlock, ax, ay, az));
+
+        // A later snapshot replaces the mirror whole
+        using var empty = new PacketWriter(NetMessage.StationState);
+        new TowerManager(null).WriteNet(empty);
+        using var emptyReader = new PacketReader(empty.ToArray());
+        Assert.Equal(NetMessage.StationState, emptyReader.Message);
+        client.ReadNet(emptyReader);
+        Assert.False(client.HasAny);
+    }
+
+    [Theory]
+    [InlineData(0, 10, 18)]
+    [InlineData(MobConfig.TowerMaxTier + 2, 10, 18)]
+    [InlineData(1, 18, 10)]
+    [InlineData(1, 10, 10)]
+    public void AMalformedTowerSectionIsRefused(int floors, int bottom, int top)
+    {
+        using var writer = new PacketWriter(NetMessage.StationState);
+        writer.Write(1);
+        writer.Write(0).Write(0).Write(8).Write(8).Write(9);
+        writer.Write((byte)floors);
+        for (var k = 0; k < floors; k++)
+        {
+            writer.Write(bottom).Write(top);
+            writer.Write((byte)0).Write((byte)0).Write(false);
+        }
+        writer.Write((byte)TowerAltarState.Dormant);
+        using var reader = new PacketReader(writer.ToArray());
+        Assert.Equal(NetMessage.StationState, reader.Message);
+        Assert.Throws<InvalidDataException>(() => new TowerManager(null).ReadNet(reader));
+    }
+
+    [Fact]
+    public void AnUndefinedAltarStateIsRefused()
+    {
+        using var writer = new PacketWriter(NetMessage.StationState);
+        writer.Write(1);
+        writer.Write(0).Write(0).Write(8).Write(8).Write(9);
+        writer.Write((byte)1);
+        writer.Write(10).Write(18);
+        writer.Write((byte)0).Write((byte)0).Write(false);
+        writer.Write((byte)(TowerAltarState.Defeated + 1));
+        using var reader = new PacketReader(writer.ToArray());
+        Assert.Equal(NetMessage.StationState, reader.Message);
+        Assert.Throws<InvalidDataException>(() => new TowerManager(null).ReadNet(reader));
     }
 }

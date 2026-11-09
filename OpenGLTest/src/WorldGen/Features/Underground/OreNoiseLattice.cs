@@ -13,8 +13,13 @@ namespace VoxelEngine.WorldGen.Features.Underground;
 /// exceeds its largest corner), which is what lets <see cref="Stamp{TRule}"/> skip whole cells.
 /// <see cref="Stamp{TRule}"/> and the point query <see cref="Exceeds"/> apply that rule and call the
 /// one <see cref="Trilinear"/> on the same integer lattice coordinates and the same fraction
-/// expressions, so they agree bit for bit. A pure function of world position and the noise, and
-/// thread-safe: the noise is read-only after its reseed, and all scratch lives on the stack.
+/// expressions, so they agree bit for bit. A rule may shift the threshold per cell
+/// (<see cref="IOreLatticeRule.ThresholdShift"/>, the cave biome richness): the stamp then tests each
+/// host cell with <c>max &gt; t</c> and <c>blend &gt; t</c> for its own <c>t = threshold + shift</c>,
+/// exactly what <see cref="Exceeds"/> tests when the caller passes that same sum, and it skips a whole
+/// lattice cell only when its largest corner is at or below the threshold plus the rule's lowest shift.
+/// A shift of 0 is the unshifted field bit for bit. A pure function of world position and the noise,
+/// and thread-safe: the noise is read-only after its reseed, and all scratch lives on the stack.
 /// </summary>
 internal static class OreNoiseLattice
 {
@@ -82,12 +87,29 @@ internal static class OreNoiseLattice
         {
             if (!rule.IsHost(blocks[Chunk.Idx(x, y, z)], x, y, z)) continue;
 
-            hostCells[(x / Stride) * Cells * Cells + (y / Stride) * Cells + z / Stride] = true;
+            hostCells[CellOf(x, y, z)] = true;
             anyHost = true;
         }
 
-        if (!anyHost) return;
+        if (anyHost) StampHostCells(blocks, noise, threshold, worldX0, worldY0, worldZ0, rule, hostCells);
+    }
 
+    /// <summary>The lattice cells per chunk, the length of a host-cell mask.</summary>
+    public const int HostCellCount = CellCount;
+
+    /// <summary>The index in a host-cell mask of the lattice cell holding chunk-local cell (x, y, z).</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int CellOf(int x, int y, int z) => (x / Stride) * Cells * Cells + (y / Stride) * Cells + z / Stride;
+
+    /// <summary>
+    /// <see cref="Stamp{TRule}"/> with its host scan done by the caller: <paramref name="hostCells"/> marks
+    /// (by <see cref="CellOf"/>) every lattice cell holding a cell <paramref name="rule"/> hosts, and may mark more,
+    /// since every cell is tested against the rule again. One scan can then serve several deposits.
+    /// </summary>
+    public static void StampHostCells<TRule>(byte[] blocks, FastNoiseLite noise, float threshold,
+        int worldX0, int worldY0, int worldZ0, TRule rule, ReadOnlySpan<bool> hostCells)
+        where TRule : struct, IOreLatticeRule
+    {
         // NaN marks a lattice point not sampled yet; the noise never returns NaN
         Span<float> samples = stackalloc float[GridCount];
         samples.Fill(float.NaN);
@@ -115,7 +137,9 @@ internal static class OreNoiseLattice
         var c101 = Corner(samples, noise, worldX0, worldY0, worldZ0, cx + 1, cy, cz + 1);
         var c110 = Corner(samples, noise, worldX0, worldY0, worldZ0, cx + 1, cy + 1, cz);
         var c111 = Corner(samples, noise, worldX0, worldY0, worldZ0, cx + 1, cy + 1, cz + 1);
-        if (!MayExceed(c000, c001, c010, c011, c100, c101, c110, c111, threshold)) return;
+        var max = Max(c000, c001, c010, c011, c100, c101, c110, c111);
+        // No cell's threshold is below threshold + MinThresholdShift (float addition is monotone)
+        if (max <= threshold + rule.MinThresholdShift) return;
 
         var x0 = cx * Stride;
         var y0 = cy * Stride;
@@ -127,11 +151,15 @@ internal static class OreNoiseLattice
             var i = Chunk.Idx(x, y, z);
             if (!rule.IsHost(blocks[i], x, y, z)) continue;
 
+            // The cell's own threshold, and Exceeds' two tests on it: the corner rule, then the blend
+            var t = threshold + rule.ThresholdShift(x, y, z);
+            if (max <= t) continue;
+
             // The same fraction expression as Exceeds: the chunk origin is a lattice multiple
             var fx = ((x & Mask) + 0.5f) * InvStride;
             var fy = ((y & Mask) + 0.5f) * InvStride;
             var fz = ((z & Mask) + 0.5f) * InvStride;
-            if (Trilinear(c000, c001, c010, c011, c100, c101, c110, c111, fx, fy, fz) <= threshold) continue;
+            if (Trilinear(c000, c001, c010, c011, c100, c101, c110, c111, fx, fy, fz) <= t) continue;
 
             blocks[i] = rule.Replacement(worldX0 + x, worldY0 + y, worldZ0 + z);
         }
@@ -154,12 +182,15 @@ internal static class OreNoiseLattice
     /// <summary>Whether the largest of the 8 corners is above the threshold.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool MayExceed(float c000, float c001, float c010, float c011,
-        float c100, float c101, float c110, float c111, float threshold)
-    {
-        var max = MathF.Max(MathF.Max(MathF.Max(c000, c001), MathF.Max(c010, c011)),
+        float c100, float c101, float c110, float c111, float threshold) =>
+        Max(c000, c001, c010, c011, c100, c101, c110, c111) > threshold;
+
+    /// <summary>The largest of the 8 corners.</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static float Max(float c000, float c001, float c010, float c011,
+        float c100, float c101, float c110, float c111) =>
+        MathF.Max(MathF.Max(MathF.Max(c000, c001), MathF.Max(c010, c011)),
             MathF.Max(MathF.Max(c100, c101), MathF.Max(c110, c111)));
-        return max > threshold;
-    }
 
     /// <summary>
     /// Trilinear blend of the corners cXYZ at fraction (fx, fy, fz): lerped in z, then y, then x,

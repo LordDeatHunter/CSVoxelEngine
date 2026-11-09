@@ -7,6 +7,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Caves;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
 
@@ -25,7 +26,9 @@ internal sealed class ThrowAction
     private readonly DropManager _dropManager;
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
+    private readonly CaveMobManager? _caveMobs;
     private readonly SkeletonManager? _skeletons;
+    private readonly SkeletonKingManager? _kings;
     private readonly List<Mob> _mobs;
     private readonly List<ThrownProjectile> _projectiles;
     private readonly bool _clientMode;
@@ -37,10 +40,12 @@ internal sealed class ThrowAction
     private MobStrikes Strikes => _world.Strikes;
 
     internal ThrowAction(World world, ChunkManager chunkManager, DropManager dropManager, GoblinManager? goblins,
-        HellMobManager? hellMobs, SkeletonManager? skeletons, List<Mob> mobs, List<ThrownProjectile> projectiles,
-        bool clientMode)
+        HellMobManager? hellMobs, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings,
+        List<Mob> mobs, List<ThrownProjectile> projectiles, bool clientMode)
     {
+        _kings = kings;
         _hellMobs = hellMobs;
+        _caveMobs = caveMobs;
         _skeletons = skeletons;
         _world = world;
         _chunkManager = chunkManager;
@@ -62,8 +67,8 @@ internal sealed class ThrowAction
     internal float ThrowCharge01 => MathUtils.Clamp01(_throwChargeSeconds / PlayerConfig.ThrowChargeSeconds);
 
     /// <summary>Rebuilds the projectile list (<c>_projectiles</c>) from the player's throws, the
-    /// goblins' stones, the hell casters' fire bolts and the skeletons' arrows, with indexed loops so a
-    /// frame allocates no enumerator.</summary>
+    /// goblins' stones, the hell casters' fire bolts, the shardlings' crystal shards, the skeletons' arrows and the
+    /// Skeleton Kings' bones, with indexed loops so a frame allocates no enumerator.</summary>
     internal void RefreshProjectiles()
     {
         _projectiles.Clear();
@@ -81,11 +86,23 @@ internal sealed class ThrowAction
             for (var i = 0; i < bolts.Count; i++)
                 _projectiles.Add(bolts[i]);
         }
+        if (_caveMobs != null)
+        {
+            var shards = _caveMobs.Shards;
+            for (var i = 0; i < shards.Count; i++)
+                _projectiles.Add(shards[i]);
+        }
         if (_skeletons != null)
         {
             var arrows = _skeletons.Arrows;
             for (var i = 0; i < arrows.Count; i++)
                 _projectiles.Add(arrows[i]);
+        }
+        if (_kings != null)
+        {
+            var bones = _kings.Bones;
+            for (var i = 0; i < bones.Count; i++)
+                _projectiles.Add(bones[i]);
         }
     }
 

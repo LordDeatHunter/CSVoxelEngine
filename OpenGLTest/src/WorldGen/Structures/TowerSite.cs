@@ -8,7 +8,9 @@ namespace VoxelEngine.WorldGen.Structures;
 /// <summary>
 /// One accepted battle tower: where it stands, how big it rolled, what it is built of and which dressing templates its floors
 /// and roof wear. Immutable, a pure function of its cell and the seed. Its members are the hooks the tower gameplay reads: the
-/// floor levels and tiers (BT-4 floor locks), the stairwell door cells each floor's barrier door fills (BT-4), the altar cell
+/// floor levels and tiers (BT-4 floor locks), the stairwell door cells each floor's barrier door fills and the skeleton pile
+/// cells each floor's dressing stands (BT-4), the tower chests each floor's dressing and the roof's stand, carrying their
+/// floor's tier (BT-5, <c>TowerGenerator.ChestCells</c>), the altar cell
 /// (BT-6) and the footprint's block and chunk range (BT-8 collapse). A main-thread or server consumer reads a cached site
 /// (<c>TowerPlacement</c>), never per frame and never on a client, which streams its terrain and generates nothing. The roof
 /// is open to the sky, so BT-6 must refuse the altar until every floor of the tower is cleared.
@@ -139,13 +141,23 @@ public sealed class TowerSite
     /// (0..<see cref="Floors"/> - 1): always odd, a full brick step, well past the floor's doorway.</summary>
     public int DoorStep(int k) => (k == 0 ? 1 : LandingStep(k)) + WorldGenerationConfig.TowerDoorStepOffset;
 
-    /// <summary>The cell the roof altar stands in (BT-6): free in the dressing, on the roof over the center.</summary>
+    /// <summary>The cell the roof altar stands in (BT-6), on the roof over the center: the altar template leaves it free and
+    /// the generator fills it with the altar block.</summary>
     public (int X, int Y, int Z) AltarCell => (CenterX, RoofY + 1, CenterZ);
 
     /// <summary>Floor <paramref name="floor"/>'s difficulty tier: its 0-based index.</summary>
     public int Tier(int floor) => floor;
 
-    /// <summary>The stair tube cells floor <paramref name="floor"/>'s barrier door fills (BT-4): air in the shell, the tube
-    /// over <see cref="DoorStep"/> and the step after it. Scans the disc, so a consumer keeps the result.</summary>
+    /// <summary>The tier of the roof's treasure chest (BT-5): one above any floor a tower can have, so it rolls the best
+    /// table.</summary>
+    public static int TreasureTier => WorldGenerationConfig.TowerMaxFloors;
+
+    /// <summary>The stair tube cells floor <paramref name="floor"/>'s barrier door fills (BT-4): the tube over
+    /// <see cref="DoorStep"/> and the step after it, stamped by worldgen as the closed door block and opened to air by the
+    /// <c>TowerManager</c>. Scans the disc, so a consumer keeps the result.</summary>
     public IReadOnlyList<(int X, int Y, int Z)> DoorCells(int floor) => TowerShell.DoorCells(this, floor);
+
+    /// <summary>The skeleton pile cells floor <paramref name="floor"/>'s dressing template stands (BT-4), each on that floor's
+    /// slab, in a fixed order. Scans the template, so a consumer keeps the result.</summary>
+    public IReadOnlyList<(int X, int Y, int Z)> PileCells(int floor) => TowerGenerator.PileCells(this, floor);
 }
