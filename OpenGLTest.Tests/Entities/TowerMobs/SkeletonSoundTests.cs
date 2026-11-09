@@ -8,6 +8,8 @@ namespace VoxelEngine.Tests.Entities.TowerMobs;
 
 public sealed class SkeletonSoundTests
 {
+    public SkeletonSoundTests() => TestContent.EnsureLoaded();
+
     [Fact]
     public void HitAndDeathSoundsNameShippedClipGroups()
     {

@@ -7,19 +7,30 @@ using VoxelEngine.Entities.Goblins;
 namespace VoxelEngine.Entities.TowerMobs;
 
 /// <summary>
-/// The skeleton: the battle tower's undead archer. In melee reach and off its cooldown it rakes its target
-/// (the melee clip; the blow lands at <see cref="ImpactEvent"/>, <see cref="TryTakeMeleeImpact"/>); inside
+/// The skeleton: the battle tower's undead, an archer or a warrior (<see cref="Role"/>, by its entity kind). In melee
+/// reach and off its cooldown either strikes its target (the melee clip; the blow lands at <see cref="ImpactEvent"/>,
+/// <see cref="TryTakeMeleeImpact"/>): the warrior stabs hard with its copper dagger, the archer only punches. The
+/// warrior otherwise walks in. The archer keeps its distance: inside
 /// <see cref="MobConfig.SkeletonBowMinRange"/>..<see cref="MobConfig.SkeletonBowMaxRange"/>, standing on the ground
 /// off its cooldown with a clear line to the chest, it draws its bow (the shoot clip; the arrow leaves at
-/// <see cref="ReleaseEvent"/>, <see cref="TryTakeShotRelease"/>); otherwise it walks in. Its health and damage are
-/// scaled by the tower floor it was raised on (<see cref="Tier"/>, <see cref="TowerDifficulty"/>), set at spawn
-/// since a mirror cannot derive it from where it stands. Two attack clips share the replicated attack count: an
-/// even count is a rake, an odd one a shot. Main thread only.
+/// <see cref="ReleaseEvent"/>, <see cref="TryTakeShotRelease"/>), nearer than the band it backs away, farther it walks
+/// in. Its health and damage are scaled by the tower floor it was raised on (<see cref="Tier"/>,
+/// <see cref="TowerDifficulty"/>), and its <see cref="Outfit"/> softens every blow it takes; all three are set at spawn,
+/// since a mirror cannot derive them from where it stands, and ride its wire byte (<see cref="PackLook"/>). Two attack
+/// clips share the replicated attack count: an even count is a strike, an odd one a shot. Main thread only.
 /// </summary>
 public sealed class Skeleton : RealmMob
 {
-    /// <summary>The entity file name (<c>assets/data/entities/skeleton.json</c>).</summary>
+    /// <summary>The archer's entity file name (<c>assets/data/entities/skeleton.json</c>).</summary>
     public const string EntityName = "skeleton";
+
+    /// <summary>The warrior's entity file name (<c>assets/data/entities/skeleton_warrior.json</c>).</summary>
+    public const string WarriorEntityName = "skeleton_warrior";
+
+    // The wire byte: the tier in the low bits, the role above it, the outfit code on top
+    private const int TierBits = 3;
+    private const int RoleShift = TierBits;
+    private const int OutfitShift = TierBits + 1;
 
     /// <summary>The melee clip, attack variant <see cref="MeleeVariant"/>.</summary>
     public const string MeleeClip = "melee";
@@ -47,15 +58,46 @@ public sealed class Skeleton : RealmMob
     /// <param name="position">The body center it spawns at.</param>
     /// <param name="tier">The tower floor tier it was raised on, clamped to the floors that exist.</param>
     /// <param name="spawnIn">Plays the spawn clip and the pop-in; false starts settled.</param>
-    public Skeleton(EntityType type, Vector3 position, int tier, bool spawnIn = true)
+    /// <param name="role">How it fights, which must match the kind of <paramref name="type"/>.</param>
+    /// <param name="outfit">The armor it wears.</param>
+    public Skeleton(EntityType type, Vector3 position, int tier, bool spawnIn = true,
+        SkeletonRole role = SkeletonRole.Archer, SkeletonOutfit outfit = default)
         : base(type, position, MobConfig.SkeletonWalkSpeed, spawnIn)
     {
         Tier = TowerDifficulty.Clamp(tier);
+        Role = role;
+        Outfit = outfit;
         Health = MaxHealth;
     }
 
     /// <summary>The tower floor tier this skeleton was raised on, fixed for life.</summary>
     public int Tier { get; }
+
+    /// <summary>How it fights, fixed for life.</summary>
+    public SkeletonRole Role { get; }
+
+    /// <summary>The armor it wears, fixed for life.</summary>
+    public SkeletonOutfit Outfit { get; }
+
+    /// <summary>The role an entity kind name stands for: the warrior's kind, else the archer.</summary>
+    public static SkeletonRole RoleOf(string kind) =>
+        string.Equals(kind, WarriorEntityName, StringComparison.OrdinalIgnoreCase) ? SkeletonRole.Warrior : SkeletonRole.Archer;
+
+    /// <summary>The entity kind name of <paramref name="role"/>.</summary>
+    public static string EntityNameOf(SkeletonRole role) => role == SkeletonRole.Warrior ? WarriorEntityName : EntityName;
+
+    /// <summary>The wire byte of a skeleton (<c>NetEntity.ItemId</c>): its tier, role and outfit code.</summary>
+    public static byte PackLook(int tier, SkeletonRole role, SkeletonOutfit outfit) =>
+        (byte)(TowerDifficulty.Clamp(tier) | (int)role << RoleShift | outfit.Code << OutfitShift);
+
+    /// <summary>The tier, role and outfit <see cref="PackLook"/> packed into <paramref name="look"/>, the tier clamped
+    /// to the floors that exist.</summary>
+    public static void UnpackLook(byte look, out int tier, out SkeletonRole role, out SkeletonOutfit outfit)
+    {
+        tier = TowerDifficulty.Clamp(look & ((1 << TierBits) - 1));
+        role = (SkeletonRole)((look >> RoleShift) & 1);
+        outfit = SkeletonOutfit.FromCode(look >> OutfitShift);
+    }
 
     /// <summary>
     /// The tower floor whose lock this skeleton counts toward, set by the bone pile that raised it or by a save
@@ -105,8 +147,14 @@ public sealed class Skeleton : RealmMob
     /// <inheritdoc />
     protected override string AttackClipOf(int variant) => variant == ShotVariant ? ShootClip : MeleeClip;
 
-    /// <summary>The damage one rake deals on this skeleton's tier.</summary>
-    public int MeleeDamage => TowerDifficulty.Scale(MobConfig.SkeletonMeleeDamage, Tier);
+    /// <summary>The damage one melee blow deals on this skeleton's tier: the warrior's dagger stab, the archer's punch.</summary>
+    public int MeleeDamage => TowerDifficulty.Scale(
+        Role == SkeletonRole.Warrior ? MobConfig.SkeletonMeleeDamage : MobConfig.SkeletonArcherPunchDamage, Tier);
+
+    /// <summary>How hard a melee blow shoves: the dagger's full knockback, a punch's lighter one.</summary>
+    public float MeleeKnockbackSpeed => Role == SkeletonRole.Warrior
+        ? MobConfig.SkeletonMeleeKnockbackSpeed
+        : MobConfig.SkeletonArcherPunchKnockbackSpeed;
 
     /// <summary>The damage one arrow deals on this skeleton's tier.</summary>
     public int ArrowDamage => TowerDifficulty.Scale(MobConfig.SkeletonArrowDamage, Tier);
@@ -128,6 +176,13 @@ public sealed class Skeleton : RealmMob
             ReleaseEvent);
     }
 
+    /// <summary>A blow loses the outfit's share (<see cref="SkeletonOutfit.DamageReduction"/>), never below 1.</summary>
+    public override int ScaleDamage(int amount, Vector3 from) =>
+        amount <= 0 ? amount : Math.Max(1, (int)MathF.Round(amount * (1f - Outfit.DamageReduction)));
+
+    /// <inheritdoc />
+    public override byte ArmorPieceOn(string part) => Outfit.TintItemOn(part);
+
     /// <inheritdoc />
     protected override void TickCooldowns(float scaledDelta)
     {
@@ -142,12 +197,17 @@ public sealed class Skeleton : RealmMob
         {
             if (_meleeCooldown > 0f) return Vector3.Zero;
             StartAttack(MeleeVariant);
-            _meleeCooldown = MobConfig.SkeletonMeleeCooldownSeconds;
+            _meleeCooldown = Role == SkeletonRole.Warrior
+                ? MobConfig.SkeletonMeleeCooldownSeconds
+                : MobConfig.SkeletonArcherPunchCooldownSeconds;
             return Vector3.Zero;
         }
 
-        // Too far to shoot, or too close: walk in (from inside the band it closes to melee)
-        if (dist > MobConfig.SkeletonBowMaxRange || dist < MobConfig.SkeletonBowMinRange) return toward;
+        // A warrior has no bow: it closes in. An archer nearer than its band backs away to shoot again (a target that
+        // keeps up is punched), and one farther than it walks in.
+        if (Role == SkeletonRole.Warrior) return toward;
+        if (dist < MobConfig.SkeletonBowMinRange) return -toward;
+        if (dist > MobConfig.SkeletonBowMaxRange) return toward;
 
         // Inside the band: shoot when grounded (so a jump never lifts the bow over a wall), off the cooldown
         // and with a clear line; otherwise keep walking at the target until the line clears.

@@ -209,8 +209,11 @@ public static class NetFraming
     /// attack count in the ammo field; an older client would not draw them.
     /// 30: every <see cref="NetMessage.ChatMessage"/> ends with an optional link (<see cref="ChatMessageCodec"/>): its
     /// suggested command, empty for none, then its start and length in the text; the server's <c>/locate</c> answers with
-    /// one. An older peer would misread the frame.</summary>
-    public const int ProtocolVersion = 30;
+    /// one. An older peer would misread the frame.
+    /// 31: a <see cref="NetEntityKind.Skeleton"/>'s item byte packs its role and outfit above its tier
+    /// (<see cref="Entities.TowerMobs.Skeleton.PackLook"/>); an older client would read a warrior or an armored skeleton as a
+    /// different tier.</summary>
+    public const int ProtocolVersion = 31;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

@@ -46,6 +46,21 @@ public sealed class SkeletonManagerTests
     }
 
     [Fact]
+    public void OrdinarySpawnsAreHalfArchersAndHalfWarriorsEachOfItsOwnKind()
+    {
+        var manager = new SkeletonManager(Type);
+        var at = OnFloor(8.5f, 8.5f);
+        var spawned = new List<Skeleton>();
+        for (var i = 0; i < 6; i++)
+            spawned.Add(manager.Spawn(at, tier: 1)!);
+
+        Assert.Equal(3, spawned.FindAll(s => s.Role == SkeletonRole.Archer).Count);
+        Assert.Equal(3, spawned.FindAll(s => s.Role == SkeletonRole.Warrior).Count);
+        Assert.All(spawned, s => Assert.Equal(Skeleton.EntityNameOf(s.Role), s.Type.Name));
+        Assert.All(spawned, s => Assert.Equal(s.Role, Skeleton.RoleOf(s.Type.Name)));
+    }
+
+    [Fact]
     public void ASpawnKeepsItsTierAndClampsOneOutOfRange()
     {
         var manager = new SkeletonManager(Type);

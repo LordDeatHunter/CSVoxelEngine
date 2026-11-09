@@ -440,7 +440,8 @@ internal sealed class WorldPersistence
         // Before the hell fall-through, which would otherwise take the skeleton
         if (SkeletonManager.HeightOf(name) > 0f)
         {
-            var skeleton = _skeletons!.Spawn(center, mob.Tier ?? 0);
+            var skeleton = _skeletons!.Spawn(center, mob.Tier ?? 0, Skeleton.RoleOf(name),
+                SkeletonOutfit.FromCode(mob.Outfit ?? 0));
             if (skeleton != null) skeleton.Floor = TowerFloorOf(mob);
             return skeleton;
         }
@@ -474,7 +475,8 @@ internal sealed class WorldPersistence
         mobs.AddRange(from t in HellMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in SkyMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in CaveMobs where !t.IsDead select MobSaveCodec.Capture(t, null, tier: t.Tier));
-        mobs.AddRange(from t in Skeletons where !t.IsDead select MobSaveCodec.Capture(t, null, tier: t.Tier, floor: t.Floor));
+        mobs.AddRange(from t in Skeletons where !t.IsDead
+            select MobSaveCodec.Capture(t, null, tier: t.Tier, floor: t.Floor, outfit: t.Outfit.Code));
         // A fading king is not saved: a reload never brings back a king its tower already let go
         mobs.AddRange(from t in SkeletonKings where !t.IsDead && !t.IsDying
             select MobSaveCodec.Capture(t, null, tier: t.Home.SummonTier, tower: t.Home.Tower));

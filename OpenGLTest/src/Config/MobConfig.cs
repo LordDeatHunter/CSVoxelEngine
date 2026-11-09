@@ -458,10 +458,11 @@ public static class MobConfig
     public const float CaveMagmabornBurnScale = 0.5f;
 
     // --- Skeletons (SkeletonManager, Skeleton; the battle tower) ---
-    // Raised only by the tower's bone piles (a forced spawn with the floor's tier), never by a ring. A
-    // skeleton swings a bony rake in melee reach and, inside SkeletonBowMinRange..SkeletonBowMaxRange with a
-    // clear line, draws its bow; the arrow leaves at the shoot clip's "release" event on GoblinAim's low arc
-    // under ThrownProjectile.Gravity, so the band must stay inside the arrow's level range v^2/g.
+    // Raised only by the tower's bone piles (a forced spawn with the floor's tier), never by a ring, half of them
+    // warriors and half archers. A warrior stabs with its copper dagger in melee reach and otherwise closes in; an
+    // archer, inside SkeletonBowMinRange..SkeletonBowMaxRange with a clear line, draws its bow, backs away when the
+    // target is nearer and only punches one in reach; the arrow leaves at the shoot clip's "release" event on
+    // GoblinAim's low arc under ThrownProjectile.Gravity, so the band must stay inside the arrow's level range v^2/g.
     /// <summary>Height of a skeleton's body box, in blocks.</summary>
     public const float SkeletonHeight = 1.9f;
     /// <summary>Half the width of a skeleton's body box, in blocks.</summary>
@@ -472,19 +473,25 @@ public static class MobConfig
     public const float SkeletonJumpSpeed = 8.5f;
     /// <summary>How hard a player walking into a grounded skeleton shoves it.</summary>
     public const float SkeletonShoveSpeed = 3f;
-    /// <summary>How far a skeleton's rake reaches (MobTargets.InMeleeReach).</summary>
+    /// <summary>How far a skeleton's melee blow reaches (MobTargets.InMeleeReach).</summary>
     public const float SkeletonMeleeReach = 2f;
-    /// <summary>The damage one rake deals on the first floor (TowerDifficulty scales it).</summary>
-    public const int SkeletonMeleeDamage = 12;
-    /// <summary>Seconds between two rakes.</summary>
-    public const float SkeletonMeleeCooldownSeconds = 0.93f;
-    /// <summary>The knockback speed of a landed rake.</summary>
+    /// <summary>The damage one warrior's dagger stab deals on the first floor (TowerDifficulty scales it).</summary>
+    public const int SkeletonMeleeDamage = 14;
+    /// <summary>Seconds between two dagger stabs.</summary>
+    public const float SkeletonMeleeCooldownSeconds = 0.85f;
+    /// <summary>The knockback speed of a landed stab.</summary>
     public const float SkeletonMeleeKnockbackSpeed = 5f;
-    /// <summary>The upward lift of a landed rake.</summary>
+    /// <summary>The upward lift of a landed melee blow (a stab or a punch).</summary>
     public const float SkeletonMeleeKnockbackLift = 2.5f;
-    /// <summary>Inside this horizontal distance a skeleton stops shooting and closes in to melee.</summary>
+    /// <summary>The damage one archer's punch deals on the first floor (TowerDifficulty scales it).</summary>
+    public const int SkeletonArcherPunchDamage = 5;
+    /// <summary>Seconds between two punches.</summary>
+    public const float SkeletonArcherPunchCooldownSeconds = 1.2f;
+    /// <summary>The knockback speed of a landed punch.</summary>
+    public const float SkeletonArcherPunchKnockbackSpeed = 3f;
+    /// <summary>Inside this horizontal distance an archer stops shooting and backs away.</summary>
     public const float SkeletonBowMinRange = 5f;
-    /// <summary>Beyond this horizontal distance a skeleton walks in before it shoots.</summary>
+    /// <summary>Beyond this horizontal distance an archer walks in before it shoots.</summary>
     public const float SkeletonBowMaxRange = 14f;
     /// <summary>Seconds a fresh skeleton waits before its first shot.</summary>
     public const float SkeletonFirstShotDelaySeconds = 0.8f;
@@ -500,6 +507,16 @@ public static class MobConfig
     public const float SkeletonArrowKnockbackSpeed = 2f;
     /// <summary>A skeleton farther than this from every target despawns.</summary>
     public const float SkeletonDespawnRadiusBlocks = 96f;
+    /// <summary>The chance a fresh warrior wears an outfit with a copper piece (SkeletonOutfit.Roll).</summary>
+    public const float SkeletonWarriorCopperChance = 0.12f;
+    /// <summary>The chance a fresh warrior wears leather alone, one to three pieces.</summary>
+    public const float SkeletonWarriorLeatherChance = 0.5f;
+    /// <summary>The chance a fresh archer wears a single leather piece.</summary>
+    public const float SkeletonArcherLeatherChance = 0.15f;
+    /// <summary>The share of every blow a leather piece on a skeleton takes off.</summary>
+    public const float SkeletonLeatherArmorShare = 0.06f;
+    /// <summary>The share of every blow a copper piece on a skeleton takes off.</summary>
+    public const float SkeletonCopperArmorShare = 0.12f;
     /// <summary>Seconds a skeleton bound to a tower floor may chase nobody (no target noticed, or its sight of one lost,
     /// see MobInterest) before it crumbles back into its floor's bone piles, owed and raised again at full health
     /// (a first guess).</summary>

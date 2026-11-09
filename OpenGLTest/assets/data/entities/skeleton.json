@@ -1,6 +1,7 @@
 {
-  "name": "Skeleton",
-  // The base pool on the tower's first floor; TowerDifficulty scales it with the floor tier
+  "name": "Skeleton Archer",
+  // The ranged half of the tower's skeletons (skeleton_warrior.json is the melee half): lanky and tall, a bow in
+  // hand. The base pool on the tower's first floor; TowerDifficulty scales it with the floor tier
   "hp": 40,
   "loot": "skeleton",
   "model": "assets/models/entity/skeleton.bbmodel"

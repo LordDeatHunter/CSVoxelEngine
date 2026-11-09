@@ -512,7 +512,7 @@ public class World
             if (shardlingType != null || sporelingType != null || magmabornType != null)
                 _caveMobs = new CaveMobManager(shardlingType, sporelingType, magmabornType, _mobCaps);
             if (EntityRegistry.TryGet(Skeleton.EntityName) is { } skeletonType)
-                _skeletons = new SkeletonManager(skeletonType, _mobCaps);
+                _skeletons = new SkeletonManager(skeletonType, _mobCaps, EntityRegistry.TryGet(Skeleton.WarriorEntityName));
             if (EntityRegistry.TryGet(SkeletonKing.EntityName) is { } kingType)
                 _kings = new SkeletonKingManager(kingType, _mobCaps);
             if (EntityRegistry.TryGet(Sandworm.EntityName) is { } wormType)

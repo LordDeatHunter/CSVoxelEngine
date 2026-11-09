@@ -8,22 +8,38 @@ Ambiently, `SkeletonRattle` (`src/Entities/TowerMobs/`, ticked by `World`) plays
 12-35 s (`AudioConfig`) while a live skeleton is within 24 blocks of the camera; the sound is not positional. A landed hit plays a `skeleton_hit` clip and a killing one a `skeleton_death` clip, via
 `Mob.HitSoundGroup`/`DeathSoundGroup` (null for silence on other mobs) read by `MobStrikes.ShowLandedHit`.
 
-The battle tower's undead archer (plans/BATTLE_TOWER.md `BT-3`): one `Skeleton` (`src/Entities/TowerMobs/`), a
+The battle tower's undead (plans/BATTLE_TOWER.md `BT-3`): one `Skeleton` class (`src/Entities/TowerMobs/`), a
 `RealmMob` like the hell and sky mobs but with no realm base, run by `SkeletonManager` (`src/Simulation/Tower/`) on the
-shared `RealmMobManager<TMob>` frame, joined to the world's `MobCaps`. Its model, palette skin and the `arrow` and `bone`
-sprites come from `tools/generate-skeleton-model.py` (deterministic, `--check`; it loads the hell script's rig, UV, PNG
-and clip machinery like the sky script): a thin humanoid rig (head and arms under the torso, checked by
-`Skeleton.ValidateContent` over `EntityContract.RequireHumanoid`) holding a bow modeled as cubes under `ArmL`, so the
-renderer needs no held-item code; clips idle, walk, `melee` (an `impact` event), `shoot` (a `release` event) and the
-common hurt, death and spawn.
-- **Behavior** (`skeleton.json`, hp 40 on the first floor, loot bones and sometimes arrows): in
-  `MobConfig.SkeletonMeleeReach` and off its cooldown it rakes (the `melee` clip), and at its `impact` the manager bills
-  `MeleeDamage` with a knockback to every non-immune target still in reach (`Skeleton.InMeleeReach`). Inside
-  `SkeletonBowMinRange..SkeletonBowMaxRange`, grounded, off its jittered cooldown (a fresh one waits
-  `SkeletonFirstShotDelaySeconds`) and with a clear line from `ShotOrigin` to the chest (`RealmMob.SeesTarget`), it draws
+shared `RealmMobManager<TMob>` frame, joined to the world's `MobCaps`, in two kinds: the **archer** (`skeleton.json`,
+"Skeleton Archer", hp 40) and the **warrior** (`skeleton_warrior.json`, "Skeleton Warrior", hp 46), its `Role`
+(`SkeletonRole`) named by the kind (`Skeleton.RoleOf`). Their models, palette skins and the `bone` sprite come from
+`tools/generate-skeleton-model.py` (deterministic, `--check`; it loads the hell script's rig, UV, PNG and clip machinery
+like the sky script), both built from one set of proportions (`bones`): the archer lanky and tall (32 px, long thin
+limbs, a narrow ribcage) holding a bow modeled as cubes under `ArmL`, the warrior shorter and bulkier (28 px, a wide
+deep ribcage, thick limbs) holding a copper dagger under `ArmR`, so the renderer needs no held-item code; both humanoid
+(head and arms under the torso, checked by `Skeleton.ValidateContent` over `EntityContract.RequireHumanoid`) with the same
+clips: idle, walk, `melee` (an `impact` event), `shoot` (a `release` event) and the common hurt, death and spawn. Both
+share `MobConfig.SkeletonHeight` as their body box.
+- **Behavior** (loot bones and sometimes arrows): in `MobConfig.SkeletonMeleeReach` and off its cooldown it strikes (the
+  `melee` clip), and at its `impact` the manager bills `MeleeDamage` with `MeleeKnockbackSpeed` to every non-immune
+  target still in reach (`Skeleton.InMeleeReach`): the warrior's dagger stab (`SkeletonMeleeDamage`, `SkeletonMeleeCooldownSeconds`)
+  or the archer's weaker punch (`SkeletonArcherPunch*`). The **warrior** never draws a bow: out of reach it walks in. The
+  **archer**, inside `SkeletonBowMinRange..SkeletonBowMaxRange`, grounded, off its jittered cooldown (a fresh one waits
+  `SkeletonFirstShotDelaySeconds`) and with a clear line from `ShotOrigin` to the chest (`RealmMob.SeesTarget`), draws
   (`shoot`); at its `release` (`TryTakeShotRelease`) an **arrow** leaves on `GoblinAim`'s low arc at
-  `SkeletonArrowSpeed` (the band stays inside `v^2/g`). Out of the band, or without a line, it walks in, so close up it
-  closes to melee.
+  `SkeletonArrowSpeed` (the band stays inside `v^2/g`). Nearer than the band it backs away (punching a target that keeps
+  up), farther or without a line it walks in.
+- **Half and half, and armored** (`SkeletonManager.Spawn(position, tier)`, every pile wave and king summon): archers and
+  warriors take turns, so a tower's waves are half each, and each rolls an **outfit** (`SkeletonOutfit.Roll`, one of 16
+  head/chest/legs combinations of `SkeletonArmor` None/Leather/Copper): a warrior wears leather with
+  `SkeletonWarriorLeatherChance` and a copper piece with `SkeletonWarriorCopperChance`, an archer a single leather piece
+  with `SkeletonArcherLeatherChance`. Each piece takes `SkeletonLeatherArmorShare`/`SkeletonCopperArmorShare` off every
+  blow (`Skeleton.ScaleDamage`, never below 1) and is drawn as a tinted shell over its rig part (`RiggedMob.ArmorPieceOn`,
+  `MobPasses.DrawArmorShell` on `PlayerRig.BuildArmorMesh`, the player's own shells: leather in the leather piece's
+  sprite color, copper in the copper ingot's; a helmet leaves its front open so the skull shows; the arms stay bare). The
+  pieces are a look, not items (no copper armor exists, and the id budget is short): they never drop. The outfit is saved
+  (`MobData.Outfit`) and rides the wire with the role in the tier byte (`Skeleton.PackLook`, protocol 31), so a mirror
+  draws the same skeleton. A scenario's `spawn` names the kind (`skeleton` or `skeleton_warrior`) and rolls the outfit.
 - **Arrows** are `ThrownProjectile`s of the `arrow` item (`throwAligned`, so they fly point first like the spear, which
   a player may also hand-throw; `recipes/arrow.json` makes four from a branch, a flint and a bone), flown by the shared
   `MobMissiles` (`SkeletonManager.Arrows`, merged into `ThrowAction.RefreshProjectiles`): a non-immune target touched
@@ -32,7 +48,8 @@ common hurt, death and spawn.
   `TowerSite.Tier(k)`), and `1 + tier * TowerDifficultyPerTier`, capped at `TowerDifficultyMaxMultiplier`, scales its
   pool and both damages through `LayerDifficulty.ScaleBy`; `PackSize(tier)` is the pile's wave hook for `BT-4`. The tier
   is a constructor argument fixed for life: a mirror cannot derive it from where it stands, so it is saved
-  (`EntitySaveData.MobData.Tier`, absent reads as 0) and sent (the entry's `ItemId`, see protocol 25), clamped on both.
+  (`EntitySaveData.MobData.Tier`, absent reads as 0) and sent (the low bits of the entry's `ItemId`, see protocols 25 and
+  31), clamped on both.
 - **Forced spawn only**: `SkeletonManager.Spawn(position, tier)` is the one way a skeleton appears (the `spawn`
   scenario op's `tier`, a save restore, a client mirror, a tower's skeleton piles) and returns null at the hard cap
   (`MobCaps.ForcedRoom`); there is no ring spawn. It keeps the shared distance and idle despawn, past a generous
@@ -52,8 +69,10 @@ common hurt, death and spawn.
   `SkeletonTests`, `SkeletonManagerTests`, `UndeadStrikeTests`, the realm round trip in
   `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `RealmMobMirrorTests`,
   `NetworkEntitySyncTests.ASkeletonMirrorTakesItsTierFromTheSnapshotAndIsReplacedWhenTheTierDiffers` and the loopback
-  `GameServerTests.SkeletonsReachTheClientsEntityListByKindWithTheirTier`. `visual-examples/skeletons.json`
-  (`VOXEL_TIME=147`) films them idle, shooting and raking in an open forest clearing.
+  `GameServerTests.SkeletonsReachTheClientsEntityListByKindWithTheirTier` (tier, role and outfit); the variants'
+  rules in `SkeletonTests` (a warrior never draws a bow and stabs harder, an archer backs away, the look byte round
+  trip, armor softening, the outfit rolls by role) and `SkeletonManagerTests.OrdinarySpawnsAreHalfArchersAndHalfWarriorsEachOfItsOwnKind`.
+  `visual-examples/skeletons.json` (`VOXEL_TIME=147`) films them idle, shooting and raking in an open forest clearing.
 - Known gaps: the arrows, like the goblin stones and hell bolts, are not on the wire (a client sees only the damage);
   skeletons are not drawn in the water mirror.
 

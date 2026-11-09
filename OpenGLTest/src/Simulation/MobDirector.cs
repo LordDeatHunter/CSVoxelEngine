@@ -431,7 +431,10 @@ internal sealed class MobDirector
         }
         if (_skeletons != null && SkeletonManager.HeightOf(name) > 0f)
         {
-            if (_skeletons.Spawn(feet + new Vector3(0f, SkeletonManager.HeightOf(name) * 0.5f, 0f), tier) == null)
+            // The named kind's role, in an outfit rolled like a pile's
+            var role = Skeleton.RoleOf(name);
+            var outfit = SkeletonOutfit.Roll(role, Random.Shared.NextSingle(), Random.Shared.NextSingle());
+            if (_skeletons.Spawn(feet + new Vector3(0f, SkeletonManager.HeightOf(name) * 0.5f, 0f), tier, role, outfit) == null)
                 return false;
             RefreshMobs();
             return true;

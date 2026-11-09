@@ -1,22 +1,25 @@
-"""Deterministic generator of the skeleton's model and skin and the arrow and bone sprites (placeholder art).
+"""Deterministic generator of the skeletons' models and skins and the bone sprite (placeholder art).
 
 Writes, under OpenGLTest/assets:
-  models/entity/skeleton.bbmodel + skeleton.png   the battle tower's archer (plans/BATTLE_TOWER.md BT-3)
-  textures/items/arrow.png                        the arrow it shoots and drops (a throwAligned sprite)
+  models/entity/skeleton.bbmodel + skeleton.png   the battle tower's archer (plans/BATTLE_TOWER.md BT-3): lanky and
+                                                  tall, a bow under the left arm
+  models/entity/skeleton_warrior.bbmodel + .png   its melee kin: the same bones a little shorter and bulkier, a copper
+                                                  dagger in the right hand instead of the bow
   textures/items/bone.png                         the bone it drops
 
 The rig, UV, PNG, JSON and clip machinery is the hell mobs' generator's (tools/generate-hell-mob-models.py),
 loaded from that file like the sky mobs' generator does, so every script writes its projects the same way:
 no randomness and no image library, every shade picked from a small hand-picked palette by an integer hash of
 the texel, so re-running reproduces every file byte for byte. Run from the repo root:
-    python -I tools/generate-skeleton-model.py           (writes the four files)
+    python -I tools/generate-skeleton-model.py           (writes the six files)
     python -I tools/generate-skeleton-model.py --check   (exit 1 if any file differs)
 
 Rig contract (EntityContract.RequireHumanoid): the groups Torso, Head, ArmL, ArmR, LegL and LegR, with Head
 and the arms nested under Torso and the legs at the top level; the model faces -Z, units are pixels (16 px =
-1 block) with the feet on y = 0, about 30 px tall. The bow is a few thin cubes under ArmL: at rest it hangs
-front to back beside the leg, and with the arm raised forward it stands upright with its string toward the
-body. Clips: idle, walk, "melee" (an overhand rake of the right arm) carrying the "impact" event and "shoot"
+1 block) with the feet on y = 0, the archer 32 px tall and the warrior 28. The bow is a few thin cubes under ArmL:
+at rest it hangs front to back beside the leg, and with the arm raised forward it stands upright with its string
+toward the body; the warrior's dagger is a grip, a guard and a blade under ArmR, pointing forward from the hand.
+Both share every clip: idle, walk, "melee" (an overhand rake of the right arm) carrying the "impact" event and "shoot"
 (the bow raised, the string drawn back to the cheek, a snap at the shot) carrying "release"
 (Skeleton.ValidateContent), plus the shared hurt, death and spawn. The event times pace the attacks.
 
@@ -50,6 +53,9 @@ EYE = (222, 52, 40)
 WOOD = (122, 84, 48)
 WOOD_DARK = (88, 58, 34)
 STRING = (234, 232, 220)
+COPPER = (206, 118, 64)
+COPPER_LIGHT = (232, 156, 98)
+COPPER_DARK = (150, 80, 44)
 OUTLINE = (46, 38, 32)
 
 
@@ -112,31 +118,74 @@ def skull(seed):
     return paint
 
 
-# ---- the rig: cubes as (name, bone, from, to, material) -----------------------------------------
+# ---- the rigs: cubes as (name, bone, from, to, material) ----------------------------------------
 
-SKELETON = {
-    "name": "skeleton",
-    "uuid": 0x90,
-    "skin": 64,
-    "origins": {"Torso": (0, 12, 0), "Head": (0, 24, 0), "ArmR": (5, 23, 0), "ArmL": (-5, 23, 0),
-                "LegR": (2, 12, 0), "LegL": (-2, 12, 0)},
-    "cubes": [
-        ("pelvis", "Torso", (-3, 12, -1), (3, 14, 1), paletted((BONE_SHADE, BONE_SHADE, BONE_DARK), 71)),
-        ("spine", "Torso", (-1, 14, -1), (1, 17, 1), spine(72)),
-        ("ribcage", "Torso", (-4, 17, -2), (4, 24, 2), ribcage(73)),
-        ("skull", "Head", (-3.5, 24, -3.5), (3.5, 30, 3.5), skull(74)),
-        ("arm_right", "ArmR", (4, 11, -1), (6, 24, 1), limb(75)),
-        ("arm_left", "ArmL", (-6, 11, -1), (-4, 24, 1), limb(75)),
-        ("bow_grip", "ArmL", (-5.5, 8, -1), (-4.5, 11, 1), paletted((WOOD_DARK,), 76)),
-        ("bow_front", "ArmL", (-5.5, 8, -6), (-4.5, 9, -1), paletted((WOOD, WOOD, WOOD_DARK), 77)),
-        ("bow_back", "ArmL", (-5.5, 8, 1), (-4.5, 9, 6), paletted((WOOD, WOOD, WOOD_DARK), 77)),
-        ("bow_tip_front", "ArmL", (-5.5, 9, -7), (-4.5, 11, -6), paletted((WOOD, WOOD_DARK), 78)),
-        ("bow_tip_back", "ArmL", (-5.5, 9, 6), (-4.5, 11, 7), paletted((WOOD, WOOD_DARK), 78)),
-        ("bow_string", "ArmL", (-5.25, 10.5, -6), (-4.75, 11, 6), paletted((STRING,), 79)),
-        ("leg_right", "LegR", (1, 0, -1), (3, 12, 1), limb(80)),
-        ("leg_left", "LegL", (-3, 0, -1), (-1, 12, 1), limb(80)),
-    ],
-}
+def bones(leg, hip, spine_len, rib_w, rib_d, arm_x, arm_w, arm_len):
+    """One skeleton's bones from its proportions: leg length, pelvis half-width, spine length, ribcage half-width
+    and half-depth, the arms' center offset, half-width and length. Returns the bone origins, the cubes and the
+    bottom of the hands (where a held thing hangs)."""
+    pelvis_top = leg + 2
+    rib_bottom = pelvis_top + spine_len
+    rib_top = rib_bottom + 7
+    hand = rib_top - arm_len
+    half = leg_half_width(leg)
+    origins = {"Torso": (0, leg, 0), "Head": (0, rib_top, 0), "ArmR": (arm_x, rib_top - 1, 0),
+               "ArmL": (-arm_x, rib_top - 1, 0), "LegR": (2, leg, 0), "LegL": (-2, leg, 0)}
+    cubes = [
+        ("pelvis", "Torso", (-hip, leg, -1), (hip, pelvis_top, 1), paletted((BONE_SHADE, BONE_SHADE, BONE_DARK), 71)),
+        ("spine", "Torso", (-1, pelvis_top, -1), (1, rib_bottom, 1), spine(72)),
+        ("ribcage", "Torso", (-rib_w, rib_bottom, -rib_d), (rib_w, rib_top, rib_d), ribcage(73)),
+        ("skull", "Head", (-3.5, rib_top, -3.5), (3.5, rib_top + 6, 3.5), skull(74)),
+        ("arm_right", "ArmR", (arm_x - arm_w, hand, -arm_w), (arm_x + arm_w, rib_top, arm_w), limb(75)),
+        ("arm_left", "ArmL", (-arm_x - arm_w, hand, -arm_w), (-arm_x + arm_w, rib_top, arm_w), limb(75)),
+        ("leg_right", "LegR", (2 - half, 0, -half), (2 + half, leg, half), limb(80)),
+        ("leg_left", "LegL", (-2 - half, 0, -half), (-2 + half, leg, half), limb(80)),
+    ]
+    return origins, cubes, hand
+
+
+def leg_half_width(leg):
+    """A leg's half-width: thinner on the longer legs, so the archer reads lanky and the warrior sturdy."""
+    return 1.25 if leg <= 11 else 0.75
+
+
+def bow(arm_x, hand):
+    """The archer's bow under ArmL, hanging from the hand front to back."""
+    x0, x1 = -arm_x - 0.5, -arm_x + 0.5
+    return [
+        ("bow_grip", "ArmL", (x0, hand - 3, -1), (x1, hand, 1), paletted((WOOD_DARK,), 76)),
+        ("bow_front", "ArmL", (x0, hand - 3, -6), (x1, hand - 2, -1), paletted((WOOD, WOOD, WOOD_DARK), 77)),
+        ("bow_back", "ArmL", (x0, hand - 3, 1), (x1, hand - 2, 6), paletted((WOOD, WOOD, WOOD_DARK), 77)),
+        ("bow_tip_front", "ArmL", (x0, hand - 2, -7), (x1, hand, -6), paletted((WOOD, WOOD_DARK), 78)),
+        ("bow_tip_back", "ArmL", (x0, hand - 2, 6), (x1, hand, 7), paletted((WOOD, WOOD_DARK), 78)),
+        ("bow_string", "ArmL", (x0 + 0.25, hand - 0.5, -6), (x1 - 0.25, hand, 6), paletted((STRING,), 79)),
+    ]
+
+
+def dagger(arm_x, hand):
+    """The warrior's copper dagger under ArmR: a grip in the fist, a guard and a blade pointing forward."""
+    x0, x1 = arm_x - 0.5, arm_x + 0.5
+    return [
+        ("dagger_grip", "ArmR", (x0, hand - 2, -0.5), (x1, hand, 0.5), paletted((WOOD_DARK, WOOD), 81)),
+        ("dagger_guard", "ArmR", (x0 - 0.5, hand - 2, -1.5), (x1 + 0.5, hand - 1, -0.5),
+         paletted((COPPER_DARK, COPPER), 82)),
+        ("dagger_blade", "ArmR", (x0 + 0.25, hand - 2, -6.5), (x1 - 0.25, hand - 1, -1.5),
+         paletted((COPPER, COPPER_LIGHT, COPPER), 83)),
+    ]
+
+
+def archer():
+    """Lanky and tall (32 px): long thin legs and arms, a narrow ribcage and a long spine."""
+    origins, cubes, hand = bones(leg=13, hip=2.5, spine_len=4, rib_w=3.5, rib_d=2, arm_x=4.75, arm_w=0.75, arm_len=14)
+    return {"name": "skeleton", "uuid": 0x90, "skin": 64, "origins": origins, "cubes": cubes + bow(4.75, hand)}
+
+
+def warrior():
+    """Shorter and bulkier (28 px): short sturdy legs, a wide deep ribcage, thick arms and a short spine."""
+    origins, cubes, hand = bones(leg=11, hip=3.5, spine_len=2, rib_w=4.5, rib_d=2.5, arm_x=5.75, arm_w=1.25,
+                                 arm_len=13)
+    return {"name": "skeleton_warrior", "uuid": 0x94, "skin": 64, "origins": origins,
+            "cubes": cubes + dagger(5.75, hand)}
 
 
 # ---- clips ---------------------------------------------------------------------------------------
@@ -191,29 +240,7 @@ def skeleton_clips():
 
 SPRITE_SIZE = 32
 # Half-resolution char maps (each character covers 2x2 texels of the 32x32 sprite); a blank cell beside a
-# filled one becomes the dark outline. The arrow's head is in the top-right corner, its tip on the sprite's
-# (1, 1) diagonal like the spear's, which is the axis a throwAligned item flies along.
-ARROW = [
-    "                ",
-    "            HHH ",
-    "          HHHHh ",
-    "           HHhh ",
-    "           =hh  ",
-    "          =  h  ",
-    "         =      ",
-    "        =       ",
-    "       =        ",
-    "      =         ",
-    "     =          ",
-    " FF =           ",
-    " Ff=f           ",
-    "  =ff           ",
-    " = fF           ",
-    "    F           ",
-]
-ARROW_COLORS = {"H": (178, 184, 192), "h": (112, 118, 128), "=": (150, 106, 62), "f": (236, 234, 224),
-                "F": (196, 58, 46)}
-
+# filled one becomes the dark outline. (The arrow it shoots is hand-drawn now: flint_arrow.png.)
 BONE_SPRITE = [
     "                ",
     "                ",
@@ -251,12 +278,16 @@ def sprite(rows, colors):
 
 # ---- outputs -------------------------------------------------------------------------------------
 
-def outputs():
-    text = hell.inline_number_arrays(json.dumps(hell.project(SKELETON, skeleton_clips()), indent=4)) + "\n"
+def model_outputs(rig):
+    text = hell.inline_number_arrays(json.dumps(hell.project(rig, skeleton_clips()), indent=4)) + "\n"
     return [
-        (os.path.join(hell.ENTITY_DIR, "skeleton.bbmodel"), text.encode("utf-8"), True),
-        (os.path.join(hell.ENTITY_DIR, "skeleton.png"), hell.skin(SKELETON), False),
-        (os.path.join(hell.ITEM_DIR, "arrow.png"), hell.png_bytes(SPRITE_SIZE, sprite(ARROW, ARROW_COLORS)), False),
+        (os.path.join(hell.ENTITY_DIR, rig["name"] + ".bbmodel"), text.encode("utf-8"), True),
+        (os.path.join(hell.ENTITY_DIR, rig["name"] + ".png"), hell.skin(rig), False),
+    ]
+
+
+def outputs():
+    return model_outputs(archer()) + model_outputs(warrior()) + [
         (os.path.join(hell.ITEM_DIR, "bone.png"), hell.png_bytes(SPRITE_SIZE, sprite(BONE_SPRITE, BONE_COLORS)), False),
     ]
 

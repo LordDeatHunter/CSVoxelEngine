@@ -47,6 +47,10 @@ internal sealed class MobPasses : IDisposable
     private int _wormJaw;
     private int _wormTail;
     private readonly List<(Matrix4x4 Model, int Mesh, Vector3 LightAt)> _wormParts = [];
+    // The Chunk.CubeFaces index of the -Z face, the side a rig faces
+    private const int FrontFace = 0;
+    // Armor shells over realm mob parts (a tower skeleton's outfit), built on first use per (kind, part, tint item)
+    private readonly Dictionary<(EntityType Type, int Part, byte Piece), Mesh> _armorShells = [];
     // The flint item: the stone a goblin holds while it still has ammo.
     private byte _flintId;
     private byte _torchId;
@@ -61,7 +65,8 @@ internal sealed class MobPasses : IDisposable
     // The realm mob kinds a rig is built for, when their content is registered
     private static readonly string[] RealmRigNames =
         [Hellbrute.EntityName, Cinderwitch.EntityName, Galeraptor.EntityName, Cloudgolem.EntityName, Skeleton.EntityName,
-            SkeletonKing.EntityName, Shardling.EntityName, Sporeling.EntityName, Magmaborn.EntityName];
+            Skeleton.WarriorEntityName, SkeletonKing.EntityName, Shardling.EntityName, Sporeling.EntityName,
+            Magmaborn.EntityName];
 
     internal MobPasses(GL gl, RenderManager owner)
     {
@@ -301,7 +306,26 @@ internal sealed class MobPasses : IDisposable
             var model = rig.PartMatrix(mob, i) * effect;
             _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
             rig.Meshes[i].Render();
+            var piece = mob.ArmorPieceOn(rig.PartNames[i]);
+            if (piece != 0) DrawArmorShell(mob.Type, rig, i, piece);
         }
+    }
+
+    // The armor shell over one already drawn part, with its uniforms still set: the part's cuboids grown a little and
+    // tinted by the piece's item color over the white texture (the player's own shells, PlayerPasses.DrawPart)
+    private void DrawArmorShell(EntityType type, RigMeshes rig, int part, byte piece)
+    {
+        if (!_armorShells.TryGetValue((type, part, piece), out var shell))
+        {
+            if (!rig.Rig.Parts.TryGetValue(rig.PartNames[part], out var rigPart)) return;
+            // A helmet leaves the front (-Z, the model's facing) open, so the skull's face shows through it
+            shell = PlayerRig.BuildArmorMesh(_gl, rigPart, PlayerPasses.ArmorInflate, ArmorLook.ColorOf(piece),
+                rig.PartNames[part] == "Head" ? FrontFace : -1);
+            _armorShells[(type, part, piece)] = shell;
+        }
+        Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.Players.WhiteTexture);
+        shell.Render();
+        Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
     }
 
     // The uStatusTint value of one mob: its first tinted active effect's linear color at the
@@ -324,5 +348,8 @@ internal sealed class MobPasses : IDisposable
         foreach (var rig in _realmRigs.Values)
             rig.Dispose();
         _realmRigs.Clear();
+        foreach (var shell in _armorShells.Values)
+            shell.Dispose();
+        _armorShells.Clear();
     }
 }

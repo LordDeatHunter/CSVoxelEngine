@@ -207,11 +207,14 @@ public sealed class PlayerRig
     /// <summary>
     /// The armor shell of one part: its cuboids grown by <paramref name="inflate"/> blocks on every side, colored
     /// <paramref name="tint"/> through the vertex color and sampling the center of a 1x1 white texture (every UV is 0.5, 0.5).
+    /// <paramref name="openFace"/> (a <see cref="Chunk.CubeFaces"/> index, or -1) is left off every cuboid: a mob's
+    /// helmet leaves its front open, so the face it covers still shows.
     /// </summary>
-    public static Mesh BuildArmorMesh(GL gl, RigPart part, float inflate, (byte R, byte G, byte B) tint) =>
-        BuildPartMesh(gl, part, inflate, tint);
+    public static Mesh BuildArmorMesh(GL gl, RigPart part, float inflate, (byte R, byte G, byte B) tint, int openFace = -1) =>
+        BuildPartMesh(gl, part, inflate, tint, openFace);
 
-    private static Mesh BuildPartMesh(GL gl, PlayerRig.RigPart part, float inflate = 0f, (byte R, byte G, byte B)? tint = null)
+    private static Mesh BuildPartMesh(GL gl, PlayerRig.RigPart part, float inflate = 0f, (byte R, byte G, byte B)? tint = null,
+        int openFace = -1)
     {
         var vertices = new List<Vertex>();
         var indices = new List<ushort>();
@@ -225,7 +228,7 @@ public sealed class PlayerRig
             for (var face = 0; face < 6; face++)
             {
                 // A face omitted in the file leaves a hole (open reinforced edges, no cap).
-                if (cube.Faces[face] is not { } rect) continue;
+                if (face == openFace || cube.Faces[face] is not { } rect) continue;
                 rect.CornersTo(corners);
 
                 var positions = Chunk.CubeFaces[face].face;

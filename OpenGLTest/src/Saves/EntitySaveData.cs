@@ -65,6 +65,10 @@ public sealed class EntitySaveData
         /// <summary>The tower floor whose lock this skeleton counts toward, with <see cref="TowerCell"/>; absent
         /// for an unbound mob.</summary>
         public int? TowerFloor { get; set; }
+
+        /// <summary>A skeleton's outfit code (<see cref="SkeletonOutfit.Code"/>); absent, as in a file saved before
+        /// skeletons wore armor, restores bare bones. Its role is its <see cref="Type"/>.</summary>
+        public int? Outfit { get; set; }
     }
 
     /// <summary>One item drop lying (or falling) in the world.</summary>

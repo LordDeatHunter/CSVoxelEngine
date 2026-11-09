@@ -245,4 +245,106 @@ public sealed class SkeletonTests
     {
         Assert.True(new Skeleton(Type, Vector3.Zero, 0, spawnIn: false).IsUndead);
     }
+
+    private static EntityType WarriorType => EntityRegistry.Require(Skeleton.WarriorEntityName);
+
+    [Fact]
+    public void AWarriorNeverDrawsABowAndClosesInToStabHarderThanAnArcherPunches()
+    {
+        Skeleton.ValidateContent(WarriorType);
+        var chunks = StoneFloor();
+        var band = (MobConfig.SkeletonBowMinRange + MobConfig.SkeletonBowMaxRange) * 0.5f;
+        var warrior = new Skeleton(WarriorType, OnFloor(1.5f, 8.5f), 0, spawnIn: false, SkeletonRole.Warrior);
+        var target = PlayerAt(1.5f + band, 8.5f);
+
+        var stabbed = false;
+        for (var i = 0; i < (int)(8f / Dt) && !stabbed; i++)
+        {
+            warrior.Update(Dt, chunks, target);
+            Assert.False(warrior.Animation.IsPlaying(Skeleton.ShootClip), $"a warrior drew a bow at frame {i}");
+            Assert.False(warrior.TryTakeShotRelease(out _, out _));
+            stabbed = warrior.Animation.IsPlaying(Skeleton.MeleeClip);
+        }
+        Assert.True(stabbed, "the warrior never closed in to stab");
+
+        var archer = new Skeleton(Type, Vector3.Zero, 0, spawnIn: false);
+        Assert.True(warrior.MeleeDamage > archer.MeleeDamage);
+        Assert.True(warrior.MeleeKnockbackSpeed > archer.MeleeKnockbackSpeed);
+    }
+
+    [Fact]
+    public void AnArcherBacksAwayFromATargetInsideItsBandButOutOfReach()
+    {
+        var chunks = StoneFloor();
+        var archer = new Skeleton(Type, OnFloor(8.5f, 8.5f), 0, spawnIn: false);
+        var near = (MobConfig.SkeletonMeleeReach + MobConfig.SkeletonBowMinRange) * 0.5f;
+        var target = PlayerAt(8.5f + near, 8.5f);
+        var start = archer.Position.X;
+
+        for (var i = 0; i < (int)(1f / Dt); i++)
+            archer.Update(Dt, chunks, target);
+
+        Assert.True(archer.Position.X < start - 0.5f, $"the archer did not back away ({start} -> {archer.Position.X})");
+        Assert.False(archer.Animation.IsPlaying(Skeleton.MeleeClip), "punched a target out of reach");
+    }
+
+    [Fact]
+    public void TheLookByteRoundTripsEveryTierRoleAndOutfit()
+    {
+        foreach (var role in Enum.GetValues<SkeletonRole>())
+        for (var tier = 0; tier <= MobConfig.TowerMaxTier; tier++)
+        for (var code = 0; code < SkeletonOutfit.Count; code++)
+        {
+            var outfit = SkeletonOutfit.FromCode(code);
+            Skeleton.UnpackLook(Skeleton.PackLook(tier, role, outfit), out var readTier, out var readRole, out var readOutfit);
+            Assert.Equal((tier, role, outfit), (readTier, readRole, readOutfit));
+        }
+    }
+
+    [Fact]
+    public void ArmorSoftensEveryBlowMoreWithMoreAndHarderPiecesButNeverToNothing()
+    {
+        int Blow(int code, int amount) =>
+            new Skeleton(Type, Vector3.Zero, 0, spawnIn: false, outfit: SkeletonOutfit.FromCode(code)).ScaleDamage(amount, Vector3.Zero);
+
+        var bare = Blow(0, 40);
+        var leatherCap = Blow(1, 40);
+        var fullLeather = Blow(7, 40);
+        var copperCap = Blow(8, 40);
+        Assert.Equal(40, bare);
+        Assert.True(leatherCap < bare && fullLeather < leatherCap, $"{bare} {leatherCap} {fullLeather}");
+        Assert.True(copperCap < leatherCap, "copper softened a blow less than leather in the same slot");
+        for (var code = 0; code < SkeletonOutfit.Count; code++)
+            Assert.Equal(1, Blow(code, 1));
+    }
+
+    [Fact]
+    public void AnArcherRollsAtMostOneLeatherPieceWhileAWarriorMayWearCopper()
+    {
+        static int Pieces(SkeletonOutfit outfit, SkeletonArmor armor)
+        {
+            var count = 0;
+            for (var slot = 0; slot < SkeletonOutfit.SlotCount; slot++)
+                if (outfit.At(slot) == armor) count++;
+            return count;
+        }
+
+        var warriorCopper = false;
+        var warriorLeather = false;
+        for (var chance = 0f; chance < 1f; chance += 0.01f)
+        for (var pick = 0f; pick < 1f; pick += 0.05f)
+        {
+            var archer = SkeletonOutfit.Roll(SkeletonRole.Archer, chance, pick);
+            Assert.Equal(0, Pieces(archer, SkeletonArmor.Copper));
+            Assert.InRange(Pieces(archer, SkeletonArmor.Leather), 0, 1);
+
+            var warrior = SkeletonOutfit.Roll(SkeletonRole.Warrior, chance, pick);
+            warriorCopper |= Pieces(warrior, SkeletonArmor.Copper) > 0;
+            warriorLeather |= Pieces(warrior, SkeletonArmor.Leather) > 0;
+        }
+        Assert.True(warriorCopper && warriorLeather, "a warrior never rolled copper or leather");
+        // Past every share a roll is bare bones
+        Assert.Equal(SkeletonOutfit.None, SkeletonOutfit.Roll(SkeletonRole.Warrior, 0.999f, 0.5f));
+        Assert.Equal(SkeletonOutfit.None, SkeletonOutfit.Roll(SkeletonRole.Archer, 0.999f, 0.5f));
+    }
 }

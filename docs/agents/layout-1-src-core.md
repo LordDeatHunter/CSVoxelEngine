@@ -446,8 +446,13 @@ OpenGLTest/
         Magmaborn.cs           # the magma deep's brute: the melee clip's impact event, a burning blow
       TowerMobs/               # the battle tower's mobs (see "Skeleton" and "Battle tower"): the skeleton, the Skeleton
                                #   King and the floor-tier difficulty
-        Skeleton.cs            # the undead archer (a RealmMob): melee rake at its impact event, a bow shot at its release
-                               #   event inside its band with a clear line, two attack clips over one count, its tier
+        Skeleton.cs            # the undead archer or warrior (a RealmMob, Role by kind): melee stab or punch at its impact
+                               #   event, the archer's bow shot at its release event inside its band with a clear line (it
+                               #   backs away nearer), two attack clips over one count, its tier, outfit and wire look byte
+        SkeletonRole.cs        # Archer / Warrior: how a tower skeleton fights, named by its entity kind
+        SkeletonArmor.cs       # None / Leather / Copper: one piece of a skeleton's outfit
+        SkeletonOutfit.cs      # GL-free: a skeleton's armor (one of 16 head/chest/legs outfits), its roll by role, its
+                               #   damage share and the item colors its shells are tinted by
         SkeletonRattle.cs      # the skeletons' ambient bone rattle: a randomized timer plays a skeleton_rattle clip when a
                                #   skeleton is in earshot of the camera (World ticks it; injected play and random, GL-free)
         SkeletonKing.cs        # the tower boss (a RealmMob, IsBoss, IsUndead): slam, volley and summon clips over one count,

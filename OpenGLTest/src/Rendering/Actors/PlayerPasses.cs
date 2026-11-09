@@ -32,8 +32,8 @@ internal sealed class PlayerPasses : IDisposable
     // Armor shells, built on first use per (part, piece): the part's cuboids grown a little and tinted by the piece
     private readonly Dictionary<(string Part, byte Piece), Mesh> _armorMeshes = new();
 
-    /// <summary>How far an armor shell stands off the body, in blocks.</summary>
-    private const float ArmorInflate = 0.03f;
+    /// <summary>How far an armor shell stands off the body, in blocks (a mob's shells too, <see cref="MobPasses"/>).</summary>
+    internal const float ArmorInflate = 0.03f;
 
     /// <summary>The armor the local player wears, set once a frame by the world renderer; the mirror pass reads it too.</summary>
     internal ArmorLook LocalArmor { get; set; } = ArmorLook.None;
@@ -46,6 +46,9 @@ internal sealed class PlayerPasses : IDisposable
 
     // Live views of the palette and the part meshes, for the shadow pass.
     internal uint PlayerPaletteTex => _playerPaletteTex;
+
+    /// <summary>The 1x1 white texture an armor shell samples, so its vertex color alone tints it (a mob's shells too).</summary>
+    internal uint WhiteTexture => _whiteTex;
     internal Dictionary<string, Mesh> PlayerMeshes => _playerMeshes;
 
     private TextureUnits Units => _owner.Units;

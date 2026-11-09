@@ -441,13 +441,21 @@ internal sealed class ClientMirror
         NetEntityKind.Galeraptor => mob is Galeraptor,
         NetEntityKind.Cloudgolem => mob is Cloudgolem,
         NetEntityKind.Sandworm => mob is Sandworm,
-        NetEntityKind.Skeleton => mob is Skeleton skeleton && skeleton.Tier == TowerDifficulty.Clamp(entry.ItemId),
+        NetEntityKind.Skeleton => mob is Skeleton skeleton
+                                  && Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit) == SkeletonLookOf(entry.ItemId),
         NetEntityKind.SkeletonKing => mob is SkeletonKing,
         NetEntityKind.Shardling => mob is Shardling shardling && shardling.Tier == CaveDifficulty.Clamp(entry.ItemId),
         NetEntityKind.Sporeling => mob is Sporeling sporeling && sporeling.Tier == CaveDifficulty.Clamp(entry.ItemId),
         NetEntityKind.Magmaborn => mob is Magmaborn magmaborn && magmaborn.Tier == CaveDifficulty.Clamp(entry.ItemId),
         _ => false,
     };
+
+    // A skeleton's look byte as a mirror built from it would pack it again (its tier clamped)
+    private static byte SkeletonLookOf(byte itemId)
+    {
+        Skeleton.UnpackLook(itemId, out var tier, out var role, out var outfit);
+        return Skeleton.PackLook(tier, role, outfit);
+    }
 
     // The Skeleton King's fight phase rides the item byte, clamped to its three phases
     private static int KingPhaseOf(byte itemId) => Math.Clamp((int)itemId, 1, 3);
@@ -467,8 +475,8 @@ internal sealed class ClientMirror
             NetEntityKind.Cloudgolem => _skyMobs?.Spawn(Cloudgolem.EntityName, entry.Position),
             // The boss mirrors with its chain laid behind its heading, then drags it after the head
             NetEntityKind.Sandworm => _sandworms?.SpawnMirror(entry.Position, entry.Yaw),
-            // A skeleton's tower tier rides the item byte, since a mirror cannot derive it from where it stands
-            NetEntityKind.Skeleton => _skeletons?.Spawn(entry.Position, entry.ItemId),
+            // A skeleton's tower tier, role and outfit ride the item byte, since a mirror cannot derive them from where it stands
+            NetEntityKind.Skeleton => SpawnSkeletonMirror(entry),
             // The boss mirrors unbound: its leash, summons and altar bookkeeping stay the server's
             NetEntityKind.SkeletonKing => _kings?.SpawnMirror(entry.Position),
             // A cave mob's depth tier rides the item byte too: it was fixed where it spawned, not where it is first seen
@@ -484,6 +492,12 @@ internal sealed class ClientMirror
         if (mob is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
         if (mob is SkeletonKing king) king.MirrorPhase(KingPhaseOf(entry.ItemId));
         return mob;
+    }
+
+    private Skeleton? SpawnSkeletonMirror(NetEntity entry)
+    {
+        Skeleton.UnpackLook(entry.ItemId, out var tier, out var role, out var outfit);
+        return _skeletons?.Spawn(entry.Position, tier, role, outfit);
     }
 
     private void RemoveNetMob(int id)

@@ -1445,9 +1445,9 @@ public sealed class GameServerTests : IDisposable
 
         var inbox = InboxOf(client);
         WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Skeleton && e.Ammo == 3));
-        // Sent as a skeleton (never under the switch's goblin default), its tier in the item byte
+        // Sent as a skeleton (never under the switch's goblin default), its tier, role and outfit in the item byte
         var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.Skeleton);
-        Assert.Equal(skeleton.Tier, carried.ItemId);
+        Assert.Equal(Skeleton.PackLook(skeleton.Tier, skeleton.Role, skeleton.Outfit), carried.ItemId);
         Assert.Equal(skeleton.Health, carried.Health);
 
         var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
@@ -1457,6 +1457,8 @@ public sealed class GameServerTests : IDisposable
             mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
             var mirrored = Assert.Single(mirror.Skeletons);
             Assert.Equal(skeleton.Tier, mirrored.Tier);
+            Assert.Equal(skeleton.Role, mirrored.Role);
+            Assert.Equal(skeleton.Outfit, mirrored.Outfit);
             Assert.Equal(skeleton.MaxHealth, mirrored.MaxHealth);
             Assert.Equal(skeleton.Health, mirrored.Health);
             // The first count only sets: an attack already under way when first seen is not replayed
