@@ -87,10 +87,9 @@ internal sealed class HudRenderer : IDisposable
     private readonly uint[] _effectIcons = new uint[StatusEffect.MaxKinds];
 
     // Heart sprites with the 1px side padding cropped out of their UVs (see the Heart
-    // metrics above): full width for empty/full, left half for a half heart.
+    // metrics above); a partly filled heart clips the full sprite with a scissor.
     private readonly Mesh _heartEmptyMesh;
     private readonly Mesh _heartFullMesh;
-    private readonly Mesh _heartHalfMesh;
 
     // The crosshair's five cropped pieces (see DrawCrosshair)
     private readonly Mesh _crosshairCenterMesh;
@@ -130,10 +129,8 @@ internal sealed class HudRenderer : IDisposable
             if (effect.IconPath != null)
                 _effectIcons[effect.Id] = TextureLoader.LoadFromFile(gl, effect.IconPath);
         var heartUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(31f / 32f, 1f));
-        var heartHalfUv = new UvRect(new Vector2(1f / 32f, 0f), new Vector2(16f / 32f, 1f));
         _heartEmptyMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
         _heartFullMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartUv);
-        _heartHalfMesh = Primitives.CreateRectangle(gl, 1f, 1f, uv: heartHalfUv);
 
         // The crosshair's five pieces, cropped out of the 16x16 texture: a 4x4 center dot and four
         // 5x4 pills with an empty row and column between them (see DrawCrosshair)
@@ -251,8 +248,8 @@ internal sealed class HudRenderer : IDisposable
 
     /// <summary>
     /// The survival hearts: 10 in a row centered above the hotbar, 1 heart per 10 HP.
-    /// Every heart draws its empty shell first and the red heart over it — full, left
-    /// half (5 HP steps), or nothing — so damage reads heart by heart like Minecraft.
+    /// Every heart draws its empty shell first and the red heart over it, clipped from the
+    /// left to its exact share of the (eased) HP, so damage reads continuously.
     /// </summary>
     internal void DrawHearts(int health, int maxHealth = PlayerHealth.MaxHealth)
     {
@@ -264,20 +261,41 @@ internal sealed class HudRenderer : IDisposable
         var hotbarTop = _ui.ScreenSize.Y - BottomMargin - SlotSize;
         var centerY = hotbarTop - HeartGap - HeartDrawHeight * 0.5f;
         var fullSize = new Vector2(HeartDrawWidth, HeartDrawHeight);
-        var halfSize = new Vector2(HeartDrawWidth * 0.5f, HeartDrawHeight);
 
         for (var i = 0; i < PlayerHealth.HeartCount; i++)
         {
             var center = new Vector2(firstX + i * HeartStride, centerY);
             _ui.DrawMesh(_heartEmptyMesh, RectTransform(center, fullSize), Rgba.White, _heartEmptyTexture);
 
-            var fill = Math.Clamp(hp - i * perHeart, 0f, perHeart);
-            if (fill >= perHeart - 1e-3f)
+            var share = Math.Clamp((hp - i * perHeart) / perHeart, 0f, 1f);
+            if (share <= 0f) continue;
+            if (share >= 1f - 1e-3f)
+            {
                 _ui.DrawMesh(_heartFullMesh, RectTransform(center, fullSize), Rgba.White, _heartTexture);
-            else if (fill >= perHeart * 0.5f - 1e-3f)
-                _ui.DrawMesh(_heartHalfMesh,
-                    RectTransform(center with { X = center.X - HeartDrawWidth * 0.25f }, halfSize),
-                    Rgba.White, _heartTexture);
+                continue;
+            }
+            DrawHeartFill(center, fullSize, share);
+        }
+    }
+
+    /// <summary>
+    /// A partly filled heart: the red heart clipped to its left <paramref name="share"/>, so the HP reads
+    /// to the pixel instead of in half-heart steps.
+    /// </summary>
+    private void DrawHeartFill(Vector2 center, Vector2 size, float share)
+    {
+        var topLeft = center - size * 0.5f + _ui.OverlayOffset;
+        var (sx, sy, sw, sh) = UiCanvas.ScissorRect(topLeft, new Vector2(size.X * share, size.Y),
+            _ui.Scale, _ui.WindowSize, _ui.FramebufferSize);
+        _gl.Enable(EnableCap.ScissorTest);
+        _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
+        try
+        {
+            _ui.DrawMesh(_heartFullMesh, RectTransform(center, size), Rgba.White, _heartTexture);
+        }
+        finally
+        {
+            _gl.Disable(EnableCap.ScissorTest);
         }
     }
 
@@ -639,7 +657,6 @@ internal sealed class HudRenderer : IDisposable
         _bubbleMesh.Dispose();
         _heartEmptyMesh.Dispose();
         _heartFullMesh.Dispose();
-        _heartHalfMesh.Dispose();
         _crosshairCenterMesh.Dispose();
         foreach (var arm in _crosshairArmMeshes)
             arm.Dispose();
