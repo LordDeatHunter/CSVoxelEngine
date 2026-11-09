@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.OpenGL;
 using VoxelEngine.Chunks;
 using VoxelEngine.Data;
+using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using static VoxelEngine.Rendering.Overlays.UIRenderer;
 using static VoxelEngine.UI.UiTheme;
@@ -90,16 +92,11 @@ internal sealed class TopStripRenderer
             _gl.Disable(EnableCap.DepthTest);
         }
 
-        var name = _ui.FittedText(label.Text, _ui.CountScale, LookLabelMaxWidth);
-        _ui.DrawTextCentered(name, center.X, cubeCenter.Y + LookLabelNameGap, _ui.CountScale,
-            label.Mineable ? Rgba.White : DangerRed);
-        var detailTop = cubeCenter.Y + LookLabelNameGap + TextSize.Body + 6f;
+        var textTop = cubeCenter.Y + LookLabelNameGap;
+        textTop = DrawWrappedCentered(label.Text, center.X, textTop, label.Mineable ? Rgba.White : DangerRed) + 2f;
+        var detailTop = textTop;
         if (!string.IsNullOrEmpty(label.Detail))
-        {
-            var detail = _ui.FittedText(label.Detail, _ui.CountScale, LookLabelDetailMaxWidth);
-            _ui.DrawTextCentered(detail, center.X, detailTop, _ui.CountScale, TextDim);
-            detailTop += TextSize.Body + 4f;
-        }
+            detailTop = DrawWrappedCentered(label.Detail, center.X, detailTop, TextDim);
         if (!debug) return;
 
         var chunkPos = VoxelCoords.ChunkPosOf(label.Cell);
@@ -112,6 +109,22 @@ internal sealed class TopStripRenderer
         var linesTop = detailTop;
         for (var i = 0; i < lines.Length; i++)
             _ui.DrawTextCentered(lines[i], center.X, linesTop + i * (TextSize.Body + 4f), _ui.CountScale, TextDim);
+    }
+
+    // Draws `text` centered on one line when it fits the label's width cap and otherwise wrapped onto as many lines as it
+    // needs, so a long name or helper line grows downward instead of being cut; returns the y below the last line.
+    private float DrawWrappedCentered(string text, float centerX, float top, Rgba color)
+    {
+        var scale = _ui.CountScale;
+        var maxWidth = MathF.Min(LookLabelMaxWidth, _ui.ScreenSize.X - 2f * LookLabelSideMargin);
+        _wrapScratch.Clear();
+        TextWrap.Wrap(text, maxWidth, line => _ui.MeasureTextWidth(line.ToString(), scale), _wrapScratch);
+        foreach (var line in _wrapScratch)
+        {
+            _ui.DrawTextCentered(line, centerX, top, scale, color);
+            top += TextSize.Body + 4f;
+        }
+        return top;
     }
 
     /// <summary>
@@ -140,10 +153,10 @@ internal sealed class TopStripRenderer
         * (MathF.Cos(LookLabelCubeTilt) + MathF.Sin(LookLabelCubeTilt) * MathF.Sqrt(2f));
     private const float LookLabelTopGap = 6f;
     private const float LookLabelNameGap = 14f;
-    private const float LookLabelMaxWidth = 200f;
-
-    // The status line under the name (a bloomery's heat and ore) is longer than a block name
-    private const float LookLabelDetailMaxWidth = 460f;
+    // Wider than any block name, so a long line (a bloomery's heat and ore, a locked gate's hint) wraps rather than being cut
+    private const float LookLabelMaxWidth = 460f;
+    private const float LookLabelSideMargin = 20f;
+    private readonly List<string> _wrapScratch = [];
 
     /// <summary>
     /// The held clock's readout: the same top-center panel the compass uses, showing the day
