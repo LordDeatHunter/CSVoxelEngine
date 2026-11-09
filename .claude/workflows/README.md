@@ -1,10 +1,11 @@
 # Workflows
 
-Three tiers for getting work done. Pick the cheapest one that fits.
+Four tiers for getting work done. Pick the cheapest one that fits.
 
 | Tier | Use when | Agents | Rough cost | Invoke |
 |---|---|---|---|---|
 | **Direct** | Small or well-scoped: single-area fix, a few files, a tweak, a quick investigation | none (or one pinned `sonnet` helper) | minutes | just do it in the main session |
+| **Quick** (`quick`) | Most 1-6 file changes with a testable or visible result: a feature slice, a fix, a tuning change, a content batch | 1 Opus does (plans, implements, updates its docs, writes the test and the scenario), 1 Sonnet builds, runs the targeted tests and films the change; on failure one Opus fix round and a re-verify | 2 agents happy path, 3-4 on failure | `args`: string or `{task, extraContext?, fullTests?}`; it stops with `too-big` if the task needs lite or full |
 | **Lite** (`plan-and-implement-lite`) | Mid-sized: a feature or fix over roughly 2-6 files in one or two areas, design mostly clear but worth a short plan | 4 Sonnet scouts, 1 Opus planner, 1-2 Opus implementers | a fraction of full | `args`: string or `{task, extraContext?, effort?: "medium"\|"high", dryRun?}` |
 | **Full** (`plan-and-implement`) | Large: cross-cutting, unclear design, needs adversarial review of the plan and an independent acceptance review | 4 Sonnet scouts + Sonnet question answerers, Opus draft / resolve / red-team / final, one Opus agent per step, Opus verifier and reviewer | ~20 min, ~1M tokens | `args`: string or `{task, extraContext?, maxFixRounds?, dryRun?}` |
 
@@ -22,5 +23,5 @@ No commits are made by either workflow. There is no separate verifier or reviewe
 
 ## Tips
 - Run with `dryRun: true` first when the scope is unclear: it stops after the plan. Then resume or rerun with the plan's gaps and amendments in `extraContext`.
-- Build with `~/.dotnet/dotnet.exe build VoxelEngine.sln -c Release`; tests with `~/.dotnet/dotnet.exe test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`.
+- Build with `DOTNET_ROLL_FORWARD=LatestMajor dotnet build VoxelEngine.sln -c Release`; tests with `DOTNET_ROLL_FORWARD=LatestMajor dotnet test OpenGLTest.Tests/VoxelEngine.Tests.csproj -c Release`.
 - Phased plans (one phase per prompt): use the full workflow or direct work per phase, not lite across phases.
