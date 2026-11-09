@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Entities;
 using VoxelEngine.Items;
 using VoxelEngine.Particles;
@@ -11,7 +12,7 @@ namespace VoxelEngine.Interaction;
 
 /// <summary>
 /// What a landed hit does to a mob: its damage and shove, the pale hit sparks off its body and the
-/// floating damage number over it. Every strike path (punch, slice, thrown items) and the client's
+/// floating damage number and sound over it. Every strike path (punch, slice, thrown items) and the client's
 /// snapshot health drops go through it. Owned by <see cref="World"/>, whose
 /// <see cref="World.DamageNumbers"/> pool it fills; main thread only.
 /// </summary>
@@ -19,14 +20,16 @@ internal sealed class MobStrikes
 {
     private readonly World _world;
     private readonly BlockDebrisSystem _debris;
+    private readonly SfxManager? _sfx;
     private readonly bool _serverMode;
 
     private DamageNumberPool DamageNumbers => _world.DamageNumbers;
 
-    internal MobStrikes(World world, BlockDebrisSystem debris, bool serverMode)
+    internal MobStrikes(World world, BlockDebrisSystem debris, SfxManager? sfx, bool serverMode)
     {
         _world = world;
         _debris = debris;
+        _sfx = sfx;
         _serverMode = serverMode;
     }
 
@@ -75,12 +78,14 @@ internal sealed class MobStrikes
             JuiceConfig.HitSparkSize);
     }
 
-    // Floats the damage of a hit over the mob when TakeDamage accepted it (its hit count moved). A
-    // headless server draws nothing, so it shows none.
+    // Floats the damage of a hit over the mob and plays its hit (or, when it killed, death) sound when
+    // TakeDamage accepted the hit (its hit count moved). A headless server draws and plays nothing.
     internal void ShowLandedHit(Mob mob, int hitsBefore)
     {
         if (_serverMode || mob.HitsTaken == hitsBefore) return;
         ShowDamageNumber(mob, mob.LastHitDamage);
+        var sound = mob.IsDead ? mob.DeathSoundGroup : mob.HitSoundGroup;
+        if (sound != null) _sfx?.Play(sound);
     }
 
     internal void ShowDamageNumber(Mob mob, int amount) =>

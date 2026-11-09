@@ -373,6 +373,12 @@ public abstract class Mob
     /// <summary>Whether this mob is undead (the tower's skeletons): gear with undead damage hits it harder.</summary>
     public virtual bool IsUndead => false;
 
+    /// <summary>Sound group (see <c>SfxLibrary</c>) played when a hit lands on this mob without killing it; null for silence.</summary>
+    public virtual string? HitSoundGroup => null;
+
+    /// <summary>Sound group played when a hit kills this mob; null for silence.</summary>
+    public virtual string? DeathSoundGroup => null;
+
     /// <summary>Applies a hit; the owner drops the loot and removes the mob once dead.</summary>
     public virtual void TakeDamage(int amount)
     {

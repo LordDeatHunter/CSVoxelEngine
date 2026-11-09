@@ -521,7 +521,7 @@ public class World
                 _icebergs = new IcebergManager(icebergType);
             Camera.BodySolids = _icebergs;
             // The per-job components: each only stores its references here and reads this world lazily
-            Strikes = new MobStrikes(this, _debris, serverMode);
+            Strikes = new MobStrikes(this, _debris, sfx, serverMode);
             Shrapnel = new BoneShrapnel(this, _chunkManager, _debris, serverMode);
             Ambient = new AmbientEffects(this, _chunkManager, _fire, _torchFire, _bubbles, _debris, _dropManager,
                 _falling, _tntManager, _mobs, _projectiles, serverMode, _campfires, _kilns, _goblins);

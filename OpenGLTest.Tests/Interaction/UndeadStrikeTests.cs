@@ -22,7 +22,7 @@ public sealed class UndeadStrikeTests
     private const int Damage = 6;
 
     // Server mode draws no sparks or damage numbers, so neither the world nor the debris is ever read
-    private static MobStrikes Strikes() => new(null!, null!, serverMode: true);
+    private static MobStrikes Strikes() => new(null!, null!, null, serverMode: true);
 
     private static PlayerHealth Hallowed()
     {

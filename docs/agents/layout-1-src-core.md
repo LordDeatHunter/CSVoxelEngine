@@ -44,7 +44,7 @@ OpenGLTest/
     Audio/                     # sound: the sfx library, mixer and manager, the ambience bed
       AmbienceManager.cs       # looping day/night ambience with a slow crossfade
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups (and names the
-                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle)
+                               #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death)
       SfxManager.cs            # one-shot sound effects built on the same NAudio stack as AmbienceManager
       SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline
     Chunks/                    # chunk storage and lifecycle, the column cache and column terrain, the light

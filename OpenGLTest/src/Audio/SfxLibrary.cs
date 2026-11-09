@@ -35,6 +35,12 @@ public static class SfxLibrary
     /// <summary>Group played when the caster's own spell fizzles.</summary>
     public const string SpellFizzleGroup = "spell_fizzle";
 
+    /// <summary>Group played when a hit lands on a skeleton.</summary>
+    public const string SkeletonHitGroup = "skeleton_hit";
+
+    /// <summary>Group played when a hit kills a skeleton.</summary>
+    public const string SkeletonDeathGroup = "skeleton_death";
+
     /// <summary>Group played ambiently from time to time by a skeleton near the camera.</summary>
     public const string SkeletonRattleGroup = "skeleton_rattle";
 

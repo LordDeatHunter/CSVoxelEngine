@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities.Goblins;
 
@@ -76,6 +77,12 @@ public sealed class Skeleton : RealmMob
 
     /// <inheritdoc />
     public override bool IsUndead => true;
+
+    /// <inheritdoc />
+    public override string HitSoundGroup => SfxLibrary.SkeletonHitGroup;
+
+    /// <inheritdoc />
+    public override string DeathSoundGroup => SfxLibrary.SkeletonDeathGroup;
 
     /// <inheritdoc />
     public override float BodyHeight => MobConfig.SkeletonHeight;
