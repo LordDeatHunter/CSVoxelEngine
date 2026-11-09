@@ -4,6 +4,7 @@ using VoxelEngine.Items;
 using VoxelEngine.Magic;
 using VoxelEngine.Networking;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Interaction;
@@ -137,6 +138,15 @@ internal sealed class RightClickAction
             outcome = RightClickOutcome.Waystone;
             return true;
         }
+        // A tower altar claims it too: the authoritative world begins the ritual (singleplayer, or a server replaying a
+        // client's Use intent through this same chain), a client only judges it from its mirror
+        if (Interactions.TryUseAltar(maxDistance, player, out var altarCell))
+        {
+            LastAltarCell = altarCell;
+            LastAltarVerdict = _world.UseAltar(altarCell);
+            outcome = RightClickOutcome.Altar;
+            return true;
+        }
         var item = player.Inventory.HeldItem;
         if (item is StaffItem)
         {
@@ -165,6 +175,13 @@ internal sealed class RightClickAction
 
     /// <summary>The cell of the waystone the newest <see cref="RightClickOutcome.Waystone"/> claim named.</summary>
     internal System.Numerics.Vector3 LastWaystoneCell { get; private set; }
+
+    /// <summary>The cell of the altar the newest <see cref="RightClickOutcome.Altar"/> claim named.</summary>
+    internal System.Numerics.Vector3 LastAltarCell { get; private set; }
+
+    /// <summary>What the newest <see cref="RightClickOutcome.Altar"/> claim came to: the ritual's start on the
+    /// authoritative side, a prediction from the mirror on a client.</summary>
+    internal AltarVerdict LastAltarVerdict { get; private set; }
 
     /// <summary>Whether a timed use is charging (see <see cref="TryBeginUseCharge"/>).</summary>
     internal bool IsUseCharging { get; private set; }

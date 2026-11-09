@@ -1429,6 +1429,94 @@ public sealed class GameServerTests : IDisposable
         }
     }
 
+    // A one-floor tower whose roof altar stands in the arena's front cell (the altar block written there), its door
+    // open or held shut by an owed skeleton nothing can raise (it has no piles)
+    private TowerRecord AltarTower(Arena arena, bool cleared)
+    {
+        var record = TowerRecord.Build((901, 901), (int)arena.Front.X, (int)arena.Front.Z, 8,
+            [(arena.Y - 5, arena.Y, (IReadOnlyList<(int X, int Y, int Z)>)[], (IReadOnlyList<(int X, int Y, int Z)>)[])],
+            hasSite: false);
+        Assert.Equal(((int)arena.Front.X, (int)arena.Front.Y, (int)arena.Front.Z), record.AltarCell);
+        if (cleared) record.Floors[0].DoorOpen = true;
+        else record.Floors[0].Owed = 1;
+        _world.Towers.Track(record);
+        SetCell(arena.Front, TowerPalette.AltarBlock);
+        return record;
+    }
+
+    [Fact]
+    public void AClientRaisesTheSkeletonKingFromAClearedTowersAltar()
+    {
+        using var client = Connect("Challenger");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var inbox = InboxOf(client);
+        var record = AltarTower(arena, cleared: true);
+
+        // The client's right-click is only its usual Use intent: the server's replay claims the altar and begins
+        var seq = SendWorld(client, WorldIntent.Use(arena.Eye, arena.AimAtFront, arena.Front));
+        AwaitResult(client, seq);
+        Assert.NotEqual(TowerAltarState.Dormant, record.AltarState);
+
+        // Once the ritual has run its course the king rises, and the client's EntityList carries it by kind
+        var sw = Stopwatch.StartNew();
+        while (!(inbox.Entities?.Exists(e => e.Kind == NetEntityKind.SkeletonKing) ?? false)
+               && sw.Elapsed.TotalSeconds < MobConfig.SkeletonKingRitualSeconds + 15)
+            Tick(0.05);
+        var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.SkeletonKing);
+        var king = Assert.Single(_world.SkeletonKings);
+        Assert.Equal(record.Key, king.Home.Tower);
+        Assert.Equal(TowerAltarState.Awake, record.AltarState);
+        Assert.InRange(carried.ItemId, 1, 3);
+
+        // The client mirrors it as a boss, and a station frame tells its tower record the king walks
+        inbox.Stations = null;
+        sw.Restart();
+        while (inbox.Stations == null && sw.Elapsed.TotalSeconds < 10)
+            Tick(0.05);
+        Assert.NotNull(inbox.Stations);
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            var mirrored = Assert.Single(mirror.SkeletonKings);
+            Assert.True(mirrored.IsBoss);
+            Assert.Equal(carried.ItemId, mirrored.Phase);
+            mirror.RefreshMobs();
+            Assert.NotNull(BossSelection.Nearest(mirror.Mobs, mirrored.Position));
+
+            using var reader = new PacketReader(inbox.Stations!);
+            Assert.Equal(NetMessage.StationState, reader.Message);
+            mirror.ClientMirror.ApplyNetworkStations(reader);
+            var copy = mirror.Towers.RecordAt(record.CenterX, record.CenterZ);
+            Assert.NotNull(copy);
+            Assert.Equal(TowerAltarState.Awake, copy!.AltarState);
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    [Fact]
+    public void ASealedAltarRaisesNothingForAClient()
+    {
+        using var client = Connect("Hasty");
+        var arena = PrepareArena(client.Server!.Value.Spawn);
+        var inbox = InboxOf(client);
+        var record = AltarTower(arena, cleared: false);
+
+        var seq = SendWorld(client, WorldIntent.Use(arena.Eye, arena.AimAtFront, arena.Front));
+        AwaitResult(client, seq);
+        // Well past the ritual's length: the seals hold, so nothing began and no king rose
+        for (var t = 0f; t < MobConfig.SkeletonKingRitualSeconds + 1f; t += 0.05f)
+            Tick(0.05);
+        Assert.False(record.Floors[0].DoorOpen);
+        Assert.Equal(TowerAltarState.Dormant, record.AltarState);
+        Assert.Empty(_world.SkeletonKings);
+        Assert.False(inbox.Entities?.Exists(e => e.Kind == NetEntityKind.SkeletonKing) ?? false);
+    }
+
     // Pumps the server until the newest EntityList the inbox holds satisfies the condition, or five seconds pass
     private void WaitForEntities(Inbox inbox, Predicate<List<NetEntity>> ready)
     {

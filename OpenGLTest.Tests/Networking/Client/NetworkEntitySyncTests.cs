@@ -127,6 +127,53 @@ public sealed class NetworkEntitySyncTests : IDisposable
     }
 
     [Fact]
+    public void TheSkeletonKingMirrorsByKindWithItsPhaseAndAttacks()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        var pos = new Vector3(4f, 60f, 4f);
+        var type = EntityRegistry.Require(SkeletonKing.EntityName);
+        var wounded = type.MaxHealth / 2;
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.SkeletonKing, 9, pos, 0f, wounded, 0, 2, Vector3.Zero),
+        ]);
+        var king = Assert.IsType<SkeletonKing>(Assert.Single(_world.SkeletonKings));
+        Assert.True(king.IsBoss);
+        Assert.Equal(2, king.Phase);
+        Assert.Equal(wounded, king.Health);
+
+        // The boss bar reads the mirror like the server's own king: its name and health share
+        _world.RefreshMobs();
+        var bar = BossSelection.Nearest(_world.Mobs, pos + new Vector3(3f, 0f, 0f));
+        Assert.NotNull(bar);
+        Assert.Equal(type.DisplayName, bar.Value.Name);
+        Assert.Equal(wounded / (float)king.MaxHealth, bar.Value.Share, 3);
+
+        // The same id updates in place: the phase follows the item byte, and an attack count of 1 plays the volley
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.SkeletonKing, 9, pos, 0f, wounded, 1, 3, Vector3.Zero),
+        ]);
+        Assert.Same(king, Assert.Single(_world.SkeletonKings));
+        Assert.Equal(3, king.Phase);
+        Assert.True(king.Animation.IsPlaying(SkeletonKing.VolleyClip));
+
+        // A phase byte out of range clamps to the king's three phases
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.SkeletonKing, 9, pos, 0f, wounded, 1, 0, Vector3.Zero),
+        ]);
+        Assert.Equal(1, king.Phase);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.SkeletonKing, 9, pos, 0f, wounded, 1, 200, Vector3.Zero),
+        ]);
+        Assert.Equal(3, king.Phase);
+
+        // A king the server stops reporting dies on the client too
+        _world.ClientMirror.ApplyNetworkEntities([]);
+        Assert.True(king.IsDying);
+    }
+
+    [Fact]
     public void SkyMobsMirrorByKindAndAFlyerKeepsItsHeight()
     {
         WorldSeed.Apply(WorldSeed.Default);

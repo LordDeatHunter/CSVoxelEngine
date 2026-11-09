@@ -141,7 +141,8 @@ public sealed class TowerSite
     /// (0..<see cref="Floors"/> - 1): always odd, a full brick step, well past the floor's doorway.</summary>
     public int DoorStep(int k) => (k == 0 ? 1 : LandingStep(k)) + WorldGenerationConfig.TowerDoorStepOffset;
 
-    /// <summary>The cell the roof altar stands in (BT-6): free in the dressing, on the roof over the center.</summary>
+    /// <summary>The cell the roof altar stands in (BT-6), on the roof over the center: the altar template leaves it free and
+    /// the generator fills it with the altar block.</summary>
     public (int X, int Y, int Z) AltarCell => (CenterX, RoofY + 1, CenterZ);
 
     /// <summary>Floor <paramref name="floor"/>'s difficulty tier: its 0-based index.</summary>

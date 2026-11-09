@@ -1,7 +1,6 @@
 using System;
 using System.Numerics;
 using VoxelEngine.Chunks;
-using VoxelEngine.Player;
 
 namespace VoxelEngine.Entities.SkyMobs;
 
@@ -57,14 +56,8 @@ public sealed class Cloudgolem : SkyMob
     /// <paramref name="eye"/>: within <see cref="MobConfig.CloudgolemShockwaveRadius"/> horizontally, its feet
     /// within <see cref="MobConfig.CloudgolemShockwaveHeight"/> of the golem's.
     /// </summary>
-    public static bool InShockwave(Vector3 feet, Vector3 eye)
-    {
-        var dx = eye.X - feet.X;
-        var dz = eye.Z - feet.Z;
-        const float radius = MobConfig.CloudgolemShockwaveRadius;
-        if (dx * dx + dz * dz > radius * radius) return false;
-        return MathF.Abs(eye.Y - Camera.EyeHeight - feet.Y) <= MobConfig.CloudgolemShockwaveHeight;
-    }
+    public static bool InShockwave(Vector3 feet, Vector3 eye) =>
+        MobTargets.InShockwave(feet, eye, MobConfig.CloudgolemShockwaveRadius, MobConfig.CloudgolemShockwaveHeight);
 
     /// <summary>Throws, naming the model file, unless the model is a humanoid rig with idle, walk and a slam clip
     /// carrying the impact event.</summary>

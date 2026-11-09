@@ -41,6 +41,10 @@ public sealed class StationSaveData
 
         /// <summary>One entry per floor, ground floor first.</summary>
         public List<TowerFloorData>? Floors { get; set; }
+
+        /// <summary>The roof altar's <see cref="Simulation.Tower.TowerAltarState"/> by name; absent = dormant (a save
+        /// from before BT-6).</summary>
+        public string? Altar { get; set; }
     }
 
     /// <summary>One tower floor's lock state.</summary>

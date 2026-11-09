@@ -8,6 +8,7 @@ using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Interaction;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.WorldGen.Trees;
@@ -288,6 +289,14 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 var cleared = world.ClearTowerFloor(world.Camera.Position, step.Floor);
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} towerclear floor {step.Floor}: "
                               + (cleared ? "cleared" : "no tower here"));
+                Advance();
+                break;
+
+            case "altar":
+                // A right-click on the tower altar at that cell, through the same call the click chain makes
+                var verdict = world.UseAltar(step.Pos!.Value);
+                world.Toast.Show(TowerReadout.AltarToast(verdict));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} altar {step.Pos}: {verdict}");
                 Advance();
                 break;
 

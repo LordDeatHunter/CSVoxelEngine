@@ -26,7 +26,8 @@ namespace VoxelEngine.ItemDebugger;
 /// <para>
 /// A goblin, a hell, sky or tower mob or a slime is previewed as the real <see cref="RiggedMob"/> (<see cref="Goblin"/>,
 /// <see cref="Hellbrute"/>, <see cref="Cinderwitch"/>, <see cref="Galeraptor"/>, <see cref="Cloudgolem"/>,
-/// <see cref="Skeleton"/> at tier 0) or
+/// <see cref="Skeleton"/> at tier 0, the <see cref="SkeletonKing"/> unbound, its modes reading IDLE WALK SLAM VOLLEY
+/// SUMMON HURT DEATH SPAWN) or
 /// <see cref="Slime"/> object, driven
 /// the way a client drives a mob it does not simulate (<see cref="Mob.AnimateMirror"/>), so everything the
 /// game layers on top of the clips shows up here too: the spawn pop, the hit recoil and flash (and the
@@ -490,6 +491,8 @@ public sealed class EntityPreviewState : IPreviewDriver
             return new Cloudgolem(type, Vector3.Zero, spawnIn);
         if (string.Equals(type.Name, Skeleton.EntityName, StringComparison.OrdinalIgnoreCase))
             return new Skeleton(type, Vector3.Zero, tier: 0, spawnIn);
+        if (string.Equals(type.Name, SkeletonKing.EntityName, StringComparison.OrdinalIgnoreCase))
+            return new SkeletonKing(type, Vector3.Zero, SkeletonKingHome.Unbound(Vector3.Zero), spawnIn);
         return null;
     }
 

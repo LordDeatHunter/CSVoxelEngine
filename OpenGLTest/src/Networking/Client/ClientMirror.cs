@@ -39,6 +39,7 @@ internal sealed class ClientMirror
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
     private readonly SkeletonManager? _skeletons;
+    private readonly SkeletonKingManager? _kings;
     private readonly SandwormManager? _sandworms;
     private readonly CampfireManager _campfires;
     private readonly QuernManager _querns;
@@ -58,7 +59,8 @@ internal sealed class ClientMirror
 
     internal ClientMirror(World world, ChunkManager chunkManager, DropManager dropManager, TntManager tntManager,
         FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, SkeletonManager? skeletons, SandwormManager? sandworms, IcebergManager? icebergs,
+        SkyMobManager? skyMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms,
+        IcebergManager? icebergs,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         BlockDebrisSystem debris, PlayerHealth health, List<RemotePlayer> remotePlayers, bool clientMode,
         bool serverMode)
@@ -73,6 +75,7 @@ internal sealed class ClientMirror
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
         _skeletons = skeletons;
+        _kings = kings;
         _sandworms = sandworms;
         _icebergs = icebergs;
         _campfires = campfires;
@@ -185,6 +188,7 @@ internal sealed class ClientMirror
                 // A realm mob's attack count moving means the server started an attack: play its clip
                 if (existing is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
                 if (existing is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
+                if (existing is SkeletonKing king) king.MirrorPhase(KingPhaseOf(entry.ItemId));
                 if (!_serverMode && existing.Health < before)
                     Strikes.ShowDamageNumber(existing, before - existing.Health);
                 continue;
@@ -421,8 +425,12 @@ internal sealed class ClientMirror
         NetEntityKind.Cloudgolem => mob is Cloudgolem,
         NetEntityKind.Sandworm => mob is Sandworm,
         NetEntityKind.Skeleton => mob is Skeleton skeleton && skeleton.Tier == TowerDifficulty.Clamp(entry.ItemId),
+        NetEntityKind.SkeletonKing => mob is SkeletonKing,
         _ => false,
     };
+
+    // The Skeleton King's fight phase rides the item byte, clamped to its three phases
+    private static int KingPhaseOf(byte itemId) => Math.Clamp((int)itemId, 1, 3);
 
     private Mob? SpawnNetMob(NetEntity entry)
     {
@@ -441,6 +449,8 @@ internal sealed class ClientMirror
             NetEntityKind.Sandworm => _sandworms?.SpawnMirror(entry.Position, entry.Yaw),
             // A skeleton's tower tier rides the item byte, since a mirror cannot derive it from where it stands
             NetEntityKind.Skeleton => _skeletons?.Spawn(entry.Position, entry.ItemId),
+            // The boss mirrors unbound: its leash, summons and altar bookkeeping stay the server's
+            NetEntityKind.SkeletonKing => _kings?.SpawnMirror(entry.Position),
             _ => null,
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
@@ -448,6 +458,7 @@ internal sealed class ClientMirror
         // The first count only sets it: an attack already under way when first seen is not replayed
         if (mob is RealmMob realm) realm.MirrorAttackCount(entry.Ammo);
         if (mob is Sandworm worm) worm.MirrorPhase(PhaseOf(entry.Ammo));
+        if (mob is SkeletonKing king) king.MirrorPhase(KingPhaseOf(entry.ItemId));
         return mob;
     }
 
@@ -462,6 +473,7 @@ internal sealed class ClientMirror
             case HellMob hellMob: _hellMobs?.Remove(hellMob); break;
             case SkyMob skyMob: _skyMobs?.Remove(skyMob); break;
             case Skeleton skeleton: _skeletons?.Remove(skeleton); break;
+            case SkeletonKing king: _kings?.Remove(king); break;
             case Sandworm sandworm: _sandworms?.Remove(sandworm); break;
         }
     }

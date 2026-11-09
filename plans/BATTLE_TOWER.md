@@ -4,14 +4,15 @@
 
 ## Status
 
-BT-1 to BT-5 done; BT-6 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
+BT-1 to BT-6 done; BT-7 next. BT-1 added the `unbreakable` block flag and the three worldgen-only tower bricks, BT-2
 the tower generator (see "Tower generator (BT-2)" under Reference), BT-3 the undead skeleton with its melee rake, bow
 and arrows, floor-tier difficulty and forced-spawn-only manager (see "Skeleton (BT-3)" and AGENTS.md "Skeleton"), BT-4
 the skeleton piles, the floor doors and `TowerManager` (see "Locks (BT-4)" and AGENTS.md "Battle tower"), BT-5 the
-tower chest and per-floor loot (see "Chests (BT-5)").
+tower chest and per-floor loot (see "Chests (BT-5)"), BT-6 the roof altar and the Skeleton King boss (see "Skeleton King
+(BT-6)").
 Tracks the battle tower: a rare, huge (radius ~20+) cylindrical landmark of 4-8 floors with skeleton piles, chests, floor locks, a roof
 altar that summons the Skeleton King, unique boss loot and a collapse into a ruin. One phase per prompt; each phase
-leaves the game building and the tests green. **Content ids are tight: 12 left, see Reference.**
+leaves the game building and the tests green. **Content ids are tight: 11 left, see Reference.**
 Last updated 2026-11-09.
 
 ## In progress
@@ -20,14 +21,6 @@ Nothing.
 
 ## Open
 
-- [ ] **`BT-6` · Skeleton King and the altar** — P1, XL.
-  Big humanoid rig and brain: melee slam, skeleton wave summon, bone volley, phases by health. Right-clicking the altar
-  (a claimed `RightClickOutcome`, like the waystone) starts a short ritual and the boss rises, once per tower. Uses the
-  boss health bar HUD. Server-authoritative, saved, on the wire (`NetEntityKind`, protocol bump). **Hook:** the
-  sandworm (`SandwormManager`) is the boss template; `RealmMob` is the frame.
-  **The altar sits on an open roof** (a player can pillar up the outside), so the ritual must be refused until
-  `TowerManager` reports every floor of that tower cleared (every `TowerFloorState.DoorOpen` of its record, see "Locks
-  (BT-4)"). The altar cell is `TowerSite.AltarCell`.
 - [ ] **`BT-7` · Boss loot and unique items** — P2, L.
   Exactly one guaranteed unique per boss, rolled from a pool, plus ingots and goodies from a boss table. Two of the
   pool's uniques are shipped (crafted for now; the boss table is what is left): the **Bone-Breaker Blade**, a sword that
@@ -45,7 +38,7 @@ Nothing.
   to air today; a ruin needs a target block too).
 - [ ] **`BT-9` · Verify and document** — P2, S.
   Extend `visual-examples/battle-tower.json` (`VOXEL_TIME=147`, from BT-2; BT-4 added piles, a gate and a cleared floor)
-  with the boss, loopback `GameServerTests` for the boss on a client (skeletons and locks have theirs), a perf pass, then
+  with the boss (BT-6's own `skeleton-king.json` and loopback `GameServerTests` already cover it), a perf pass, then
   fold the rest of the design into AGENTS.md's "Battle tower" section (BT-4 started it) and the wiki, and delete this
   file's finished entries.
 - [ ] **`BT-10` · Dark tower interiors** — P2, M.
@@ -57,9 +50,9 @@ Nothing.
 ## Reference
 
 - **Content id budget (budget constraint, after BT-3, which used 2: the `arrow` and `bone` items, BT-7's bone pair,
-  which used 2: `bone_breaker_blade`, `bone_charm`, BT-4, which used 2: `skeleton_pile`, `tower_door`, and BT-5, which
-  used 1: `tower_chest`): 243 of 255 used (133 blocks, 109 items, air), 12 free.** Rough needs of the later phases:
-  BT-6 altar block (1); BT-7 one more unique plus a boss material (~2-3 items; the bone fragments
+  which used 2: `bone_breaker_blade`, `bone_charm`, BT-4, which used 2: `skeleton_pile`, `tower_door`, BT-5, which
+  used 1: `tower_chest`, and BT-6, which used 1: `tower_altar`): 244 of 255 used (134 blocks, 109 items, air), 11
+  free.** Rough needs of the later phases: BT-7 one more unique plus a boss material (~2-3 items; the bone fragments
   reuse `bone`); BT-8 rubble or ruin block(s) (1-2). About 6-8 left to spend: the tower fits, but leaves little for `CAVE_BIOMES.md`.
   Reuse existing ruin blocks for the rubble.
 - **How `unbreakable` is enforced** (BT-1): load rules (`BlockFieldRules.ValidateUnbreakable` refuses fluid, falls,
@@ -140,7 +133,7 @@ Nothing.
     is depleted and alive = living + owed + pending is 0; floor k's piles sleep until door k - 1 opens. Opening is
     permanent and saved (`stations.json` `Towers`, protocol 26 on the wire).
   - **Hooks**: BT-6 refuses the altar until every `TowerFloorState.DoorOpen` of the tower's record is set
-    (`World.Towers.RecordAt(x, z)`, authoritative side; the client mirror carries the door bits too). BT-8 reuses
+    (`TowerRules.AltarVerdictOf`; the client mirror carries the door bits too). BT-8 reuses
     `TowerBlockWriter` (capped, every edit-path hook; extend it to write a target block, not only air) and can read
     `TowerSite.PileCells(k)`/`DoorCells(k)`; a conquered tower should drop its `TowerRecord` (or stop judging it).
   - **Default seed**: tower (2920, -1411) has floor-0 piles at feet y 11 at (2920, -1417), (2916, -1411), (2924, -1411),
@@ -173,6 +166,34 @@ Nothing.
     tier, the treasure tier on the roof, chest states in the point-query-equals-stamp check).
   - **Known gaps**: towers in chunks saved before BT-5 have no chests; an unopened chest destroyed by a blast or by BT-8's
     collapse rolls nothing, like a ruin chest; the chest reuses the underground ruin chest's tiles (USER_TODO.md).
+
+- **Skeleton King (BT-6)**, 1 content id (`tower_altar`). See AGENTS.md "Battle tower" for the whole design.
+  - **Files**: `src/Entities/TowerMobs/` `SkeletonKing`, `SkeletonKingBrain`, `SkeletonKingAttack`, `SkeletonKingHome`;
+    `src/Simulation/Tower/` `SkeletonKingManager`, `KingStatus`, `TowerAltarState`, `AltarVerdict`, plus the altar parts
+    of `TowerManager` (`JudgeAltar`, `BeginRitual`, `UpdateAltars`, `SettleAltars`, `MarkDefeated`, `RitualAltars`),
+    `TowerRecord` (`AltarState`, `RitualLeft`, `AltarCell`, `KingHome`, `BossDefeated`), `TowerRules.AltarVerdictOf` and
+    `TowerReadout.AltarToast`/`Altar`; `BlockInteractions.TryUseAltar`, `RightClickOutcome.Altar`, `World.UseAltar`;
+    `MobTargets.InShockwave` (shared with the cloud golem) and `Mob.BossBarRange` (read by `BossSelection`);
+    `blocks/tower_altar.json`, `entities/skeleton_king.json`, `loot/skeleton_king.json`; the model from
+    `tools/generate-skeleton-king-model.py` and the `tower_altar_top` tile from `tools/generate-tower-lock-textures.py`
+    (both placeholders, USER_TODO.md); `visual-examples/skeleton-king.json` and the `altar` op.
+  - **Rules**: the altar stands at `TowerSite.AltarCell`, written by `TowerGenerator.Merge` (the template leaves the cell
+    free). A click is Sealed until every floor door is open, then begins a ritual once (idempotent: later clicks read
+    Stirring); after `SkeletonKingRitualSeconds` one king rises on the altar. A king at health 0 defeats the tower the same
+    frame; a king that fades (every target gone, an empty server, a far respawn) returns the tower to Dormant unless its
+    save entry is pending, so only a kill defeats it. The brain's phases come from the health share (the first observation
+    silent, each phase change owes a summon, phase 3 enrages); it is leashed to the altar and heals after a long lull.
+  - **Saves and wire**: `stations.json` `TowerData.Altar` (absent = Dormant); the king in `entities.json` with
+    `TowerCell` and `Tier`; protocol 27 (the altar byte, `NetEntityKind.SkeletonKing` 14, phase in `ItemId`).
+  - **Hook for BT-7**: the king rolls the placeholder `loot/skeleton_king.json` (bones, wrought iron, bronze ingots);
+    replace it with the unique pool plus the boss table.
+  - **Hook for BT-8**: `TowerManager.BossDefeated` (an event, raised once per tower) and `TowerRecord.BossDefeated` (true
+    from then on, saved); nothing listens yet.
+  - **Tuning**: the "Skeleton King" block of `MobConfig` (all first guesses: hp 400 in the JSON, phase shares 0.66/0.33,
+    slam, volley and summon numbers, minion cap 6, leash margin, reset 20 s, boss bar range 48, ritual 3.5 s).
+  - **Known gaps**: the bones are not on the wire; the king is not drawn in the water mirror; a ritual's remaining time is
+    not saved; tower chunks saved before BT-6 keep an air altar cell, so their altar cannot be clicked; the numbers are not
+    play-tested.
 
 - **Bone shrapnel (BT-7's first two uniques)**, 2 content ids (`bone_breaker_blade`, `bone_charm`); see AGENTS.md
   "Bone shrapnel". The blade carries `shrapnel: { count: 6, damage: 3 }`; the charm grants `bone_shrapnel`

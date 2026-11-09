@@ -59,7 +59,8 @@ internal sealed class MobPasses : IDisposable
 
     // The realm mob kinds a rig is built for, when their content is registered
     private static readonly string[] RealmRigNames =
-        [Hellbrute.EntityName, Cinderwitch.EntityName, Galeraptor.EntityName, Cloudgolem.EntityName, Skeleton.EntityName];
+        [Hellbrute.EntityName, Cinderwitch.EntityName, Galeraptor.EntityName, Cloudgolem.EntityName, Skeleton.EntityName,
+            SkeletonKing.EntityName];
 
     internal MobPasses(GL gl, RenderManager owner)
     {

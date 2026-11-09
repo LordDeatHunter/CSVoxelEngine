@@ -366,6 +366,10 @@ public abstract class Mob
     /// <summary>Whether this mob is a boss: while one lives (and is not dying) the HUD shows its boss bar.</summary>
     public virtual bool IsBoss => false;
 
+    /// <summary>How far from the viewer this boss's bar still shows, in blocks: unlimited by default (the sandworm);
+    /// a boss bound to an arena (the Skeleton King) shows its bar only nearby.</summary>
+    public virtual float BossBarRange => float.PositiveInfinity;
+
     /// <summary>Whether this mob is undead (the tower's skeletons): gear with undead damage hits it harder.</summary>
     public virtual bool IsUndead => false;
 

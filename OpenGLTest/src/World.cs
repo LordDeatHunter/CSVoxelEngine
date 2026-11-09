@@ -78,6 +78,7 @@ public class World
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
     private readonly SkeletonManager? _skeletons;
+    private readonly SkeletonKingManager? _kings;
     private readonly SandwormManager? _sandworms;
     private readonly SaplingManager _saplings = new();
     // The sapling clock's grow callback, built once: a method group allocates a delegate each time it is converted
@@ -337,6 +338,12 @@ public class World
     /// <summary>Live tower skeletons, feeding the entity and shadow passes.</summary>
     public IReadOnlyList<Skeleton> Skeletons => _skeletons?.Mobs ?? [];
 
+    /// <summary>Live Skeleton Kings (the battle towers' bosses), feeding the entity and shadow passes.</summary>
+    public IReadOnlyList<SkeletonKing> SkeletonKings => _kings?.Mobs ?? [];
+
+    /// <summary>The Skeleton King manager, or null without its content (the tests' and the altar's seam).</summary>
+    internal SkeletonKingManager? SkeletonKingManager => _kings;
+
     /// <summary>The live sandworm boss, if any (plus one playing its death), feeding the entity and shadow passes.</summary>
     public IReadOnlyList<Sandworm> Sandworms => _sandworms?.Worms ?? [];
 
@@ -482,6 +489,8 @@ public class World
                 _skyMobs = new SkyMobManager(flyerType, golemType, _mobCaps);
             if (EntityRegistry.TryGet(Skeleton.EntityName) is { } skeletonType)
                 _skeletons = new SkeletonManager(skeletonType, _mobCaps);
+            if (EntityRegistry.TryGet(SkeletonKing.EntityName) is { } kingType)
+                _kings = new SkeletonKingManager(kingType, _mobCaps);
             if (EntityRegistry.TryGet(Sandworm.EntityName) is { } wormType)
                 _sandworms = new SandwormManager(wormType, _mobCaps);
             if (EntityRegistry.TryGet("iceberg") is { } icebergType)
@@ -502,7 +511,7 @@ public class World
             LeftClick =new LeftClickAction(this, _chunkManager, _debris, _leaves, _hitMarker, _mobs, sfx, clientMode);
             Placer = new BlockPlacer(this, _chunkManager, _falling, _icebergs, _querns, _fluidManager, _leafDecay,
                 _lodManager, _debris, clientMode, serverMode);
-            Throws = new ThrowAction(this, _chunkManager, _dropManager, _goblins, _hellMobs, _skeletons, _mobs,
+            Throws = new ThrowAction(this, _chunkManager, _dropManager, _goblins, _hellMobs, _skeletons, _kings, _mobs,
                 _projectiles, clientMode);
             Interactions = new BlockInteractions(this, _chunkManager, _dropManager, _campfires, _querns, _kilns,
                 _casting, _fluidManager, _leafDecay);
@@ -511,9 +520,9 @@ public class World
             RightClick = new RightClickAction(this, clientMode);
             Caster = new SpellCaster(this, clientMode);
             ClientMirror = new ClientMirror(this, _chunkManager, _dropManager, _tntManager, _falling, _slimes, _goblins, _hellMobs,
-                _skyMobs, _skeletons, _sandworms, _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
+                _skyMobs, _skeletons, _kings, _sandworms, _icebergs, _campfires, _querns, _kilns, _casting, _debris, _health, _remotePlayers, clientMode, serverMode);
             Persistence = new WorldPersistence(this, saveStore, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _skeletons,
-                _sandworms, _icebergs, _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
+                _kings, _sandworms, _icebergs, _health, serverMode, savedPlayer, savedEntities, _campfires, _querns, _kilns, _casting, savedStations);
             Pickup = new DropPickup(this, _dropManager, _chunkManager, _goblins, _fire, sfx, serverMode, clientMode);
             WaystoneTravel = new WaystoneTravel(Camera, LocalPlayer, _chunkManager);
             // Status effects convert cells only where the world is authoritative: a client's effects
@@ -522,7 +531,7 @@ public class World
                 ? null
                 : new StatusEffectBlockWriter(_chunkManager, _fluidManager, _leafDecay, _falling, _lodManager,
                     Edits.NotifyLodEdit);
-            Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _skeletons, _sandworms,
+            Director = new MobDirector(this, _chunkManager, _dropManager, _slimes, _goblins, _hellMobs, _skyMobs, _skeletons, _kings, _sandworms,
                 _icebergs, _debris, serverMode ? null : _fire, _health, _mobs, serverMode, clientMode, statusBlocks);
             Spells = statusBlocks == null
                 ? null
@@ -910,6 +919,22 @@ public class World
     /// scenario op): its piles deplete and its tagged skeletons die. Never on a client.</summary>
     public bool ClearTowerFloor(Vector3 near, int floor) => !_clientMode && _towers.ClearFloor(near, floor, Skeletons);
 
+    /// <summary>
+    /// A click on the tower altar at <paramref name="cell"/>: the authoritative world (singleplayer, or a server
+    /// replaying a client's Use intent) begins the ritual when every floor is open (<see cref="TowerManager.BeginRitual"/>,
+    /// idempotent); a client only judges it from its mirror (<see cref="TowerManager.JudgeAltar"/>), a prediction for its
+    /// toast. <see cref="AltarVerdict.NoTower"/> while the world is not playing.
+    /// </summary>
+    public AltarVerdict UseAltar(Vector3 cell)
+    {
+        if (!IsPlaying) return AltarVerdict.NoTower;
+        int x = MathUtils.FloorToInt(cell.X), y = MathUtils.FloorToInt(cell.Y), z = MathUtils.FloorToInt(cell.Z);
+        return _clientMode ? _towers.JudgeAltar(x, y, z) : _towers.BeginRitual(x, y, z);
+    }
+
+    /// <summary>The cell of the altar the newest right-click claim named (<see cref="RightClickOutcome.Altar"/>).</summary>
+    public Vector3 LastAltarCell => RightClick.LastAltarCell;
+
     public bool HasStations =>
         StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting) || _smithing.HasAny || _towers.HasAny;
 
@@ -968,10 +993,12 @@ public class World
         _hellMobs?.AnimateMirrors((float)deltaTime, _debris);
         _skyMobs?.AnimateMirrors((float)deltaTime, _debris);
         _skeletons?.AnimateMirrors((float)deltaTime, _debris);
+        _kings?.AnimateMirrors((float)deltaTime, _debris);
         _sandworms?.AnimateMirrors((float)deltaTime, _chunkManager);
         _tntManager.AnimateMirrors((float)deltaTime);
         Director.AnimateIcebergMirrors(deltaTime);
         Ambient.UpdateStatusParticles((float)deltaTime);
+        Ambient.UpdateRitualEffects((float)deltaTime);
         WormEffects?.Update((float)deltaTime, Sandworms);
         Ambient.GatherStationFires();
         Ambient.AddGoblinTorches();
@@ -1134,6 +1161,7 @@ public class World
         {
             _dust.TakeMobLandings(_mobs, _chunkManager, _debris);
             Ambient.UpdateStatusParticles((float)deltaTime);
+            Ambient.UpdateRitualEffects((float)deltaTime);
             WormEffects?.Update((float)deltaTime, Sandworms);
         }
 

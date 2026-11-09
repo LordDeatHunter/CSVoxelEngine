@@ -60,4 +60,21 @@ public sealed class UndeadStrikeTests
         // A striker wearing nothing hits a skeleton exactly as hard as no striker at all
         Assert.Equal(LostTo(NewSkeleton(), null), LostTo(NewSkeleton(), new PlayerHealth()));
     }
+
+    private static SkeletonKing NewKing()
+    {
+        var center = new Vector3(8.5f, 2f, 8.5f);
+        return new SkeletonKing(EntityRegistry.Require(SkeletonKing.EntityName), center,
+            SkeletonKingHome.Unbound(center - new Vector3(0f, MobConfig.SkeletonKingHeight / 2f, 0f)), spawnIn: false);
+    }
+
+    [Fact]
+    public void TheUndeadBonusRaisesAStrikeOnTheSkeletonKing()
+    {
+        var striker = Hallowed();
+
+        Assert.True(LostTo(NewKing(), striker) > LostTo(NewKing(), null),
+            "the undead bonus did not raise a strike on the Skeleton King");
+        Assert.Equal(LostTo(NewKing(), null), LostTo(NewKing(), new PlayerHealth()));
+    }
 }

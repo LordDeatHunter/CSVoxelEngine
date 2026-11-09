@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.WorldGen.Structures;
 
@@ -42,6 +43,25 @@ public sealed class TowerRecord
 
     /// <summary>Whether the record was built from a world site, so it is saved (a test record or a mirror is not).</summary>
     public bool HasSite { get; }
+
+    /// <summary>Where the roof altar's one fight stands.</summary>
+    public TowerAltarState AltarState { get; set; }
+
+    /// <summary>Seconds left of the ritual while <see cref="AltarState"/> is <see cref="TowerAltarState.Ritual"/>
+    /// (authoritative side only; never saved or sent).</summary>
+    public float RitualLeft { get; set; }
+
+    /// <summary>Whether this tower's Skeleton King was killed (the hook the tower's collapse reads).</summary>
+    public bool BossDefeated => AltarState == TowerAltarState.Defeated;
+
+    /// <summary>The roof altar's cell: the center column right above the roof slab (the top floor's top), the same cell
+    /// as the site's <see cref="TowerSite.AltarCell"/>.</summary>
+    public (int X, int Y, int Z) AltarCell => (CenterX, Floors[^1].TopY + 1, CenterZ);
+
+    /// <summary>Where this tower's Skeleton King lives: its feet on top of the altar block, leashed to the footprint
+    /// disc, summoning skeletons of the top floor's tier.</summary>
+    public SkeletonKingHome KingHome => new(Key, new Vector3(CenterX + 0.5f, AltarCell.Y + 1, CenterZ + 0.5f),
+        OuterRadius, TowerDifficulty.Clamp(Floors.Length - 1));
 
     /// <summary>Whether the column (<paramref name="x"/>, <paramref name="z"/>) lies in the tower's footprint disc.</summary>
     public bool Contains(int x, int z)
@@ -94,10 +114,10 @@ public sealed class TowerRecord
 
     /// <summary>
     /// A client's display-only copy of the server's record: per floor its band, piles left, skeletons left and door bit,
-    /// with no piles or door cells of its own. It never ticks.
+    /// and the altar's state, with no piles or door cells of its own. It never ticks.
     /// </summary>
     public static TowerRecord Mirror((int CellX, int CellZ) key, int centerX, int centerZ, int outerRadius,
-        IReadOnlyList<(int Bottom, int Top, int PilesLeft, int Alive, bool DoorOpen)> floors)
+        IReadOnlyList<(int Bottom, int Top, int PilesLeft, int Alive, bool DoorOpen)> floors, TowerAltarState altarState)
     {
         var states = new TowerFloorState[floors.Count];
         for (var k = 0; k < floors.Count; k++)
@@ -110,6 +130,6 @@ public sealed class TowerRecord
                 DoorOpen = floor.DoorOpen,
             };
         }
-        return new TowerRecord(key, centerX, centerZ, outerRadius, states, hasSite: false);
+        return new TowerRecord(key, centerX, centerZ, outerRadius, states, hasSite: false) { AltarState = altarState };
     }
 }

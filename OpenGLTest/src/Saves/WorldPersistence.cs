@@ -15,6 +15,7 @@ using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
+using VoxelEngine.WorldGen.Structures;
 
 namespace VoxelEngine.Saves;
 
@@ -34,6 +35,7 @@ internal sealed class WorldPersistence
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
     private readonly SkeletonManager? _skeletons;
+    private readonly SkeletonKingManager? _kings;
     private readonly SandwormManager? _sandworms;
     private readonly IcebergManager? _icebergs;
     private readonly PlayerHealth _health;
@@ -52,12 +54,14 @@ internal sealed class WorldPersistence
     private IReadOnlyList<HellMob> HellMobs => _world.HellMobs;
     private IReadOnlyList<SkyMob> SkyMobs => _world.SkyMobs;
     private IReadOnlyList<Skeleton> Skeletons => _world.Skeletons;
+    private IReadOnlyList<SkeletonKing> SkeletonKings => _world.SkeletonKings;
     private IReadOnlyList<Sandworm> Sandworms => _world.Sandworms;
     private LocalPlayer LocalPlayer => _world.LocalPlayer;
 
     internal WorldPersistence(World world, ChunkSaveStore? saveStore, ChunkManager chunkManager,
         DropManager dropManager, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, SkeletonManager? skeletons, SandwormManager? sandworms, IcebergManager? icebergs, PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
+        SkyMobManager? skyMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs,
+        PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         StationSaveData? savedStations)
     {
@@ -75,6 +79,7 @@ internal sealed class WorldPersistence
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
         _skeletons = skeletons;
+        _kings = kings;
         _sandworms = sandworms;
         _icebergs = icebergs;
         _health = health;
@@ -250,6 +255,17 @@ internal sealed class WorldPersistence
         _discardedTowerSkeletons.Clear();
     }
 
+    /// <summary>Whether a saved Skeleton King bound to tower <paramref name="tower"/> still waits for a restore, so
+    /// its tower stays awake rather than freeing the ritual.</summary>
+    internal bool PendingKingFor((int CellX, int CellZ) tower)
+    {
+        foreach (var mob in _pendingMobs)
+            if (mob.Type != null && SkeletonKingManager.HeightOf(mob.Type) > 0f
+                && mob.TowerCell is { Length: 2 } cell && cell[0] == tower.CellX && cell[1] == tower.CellZ)
+                return true;
+        return false;
+    }
+
     // The tower floor a saved skeleton counts toward, or null for an untagged or other entry
     private static TowerFloorRef? TowerFloorOf(EntitySaveData.MobData mob) =>
         mob.TowerCell is { Length: 2 } cell && mob.TowerFloor is >= 0 and var floor
@@ -390,12 +406,23 @@ internal sealed class WorldPersistence
         || (_hellMobs != null && HellMobManager.HeightOf(name) > 0f)
         || (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f)
         || (_skeletons != null && SkeletonManager.HeightOf(name) > 0f)
+        || (_kings != null && SkeletonKingManager.HeightOf(name) > 0f)
         || (_sandworms != null && string.Equals(name, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase));
 
     // A forced spawn of a saved mob of a known kind (null at a full hard cap); a hell mob's layer and a sky
     // mob's zone tier, and so its pool, follow from its saved position, while a skeleton's tower tier is saved
     private Mob? SpawnSaved(string name, Vector3 center, EntitySaveData.MobData mob)
     {
+        // Before the skeleton and hell fall-throughs: a Skeleton King comes back bound to its tower (its home, leash
+        // and summon tier follow from the site), with no ritual and no rise; the restored health then sets the
+        // brain's phase silently on its first observation, so a reload never re-summons
+        if (SkeletonKingManager.HeightOf(name) > 0f)
+        {
+            var home = mob.TowerCell is { Length: 2 } c && TowerPlacement.TryGetSite(c[0], c[1], out var site)
+                ? _world.Towers.Track(site).KingHome
+                : SkeletonKingHome.Unbound(center - new Vector3(0f, MobConfig.SkeletonKingHeight / 2f, 0f));
+            return _kings!.Spawn(center, home, spawnIn: false);
+        }
         // A file saved before slimes had sizes carries none: those were all the smallest size
         if (string.Equals(name, "slime", StringComparison.OrdinalIgnoreCase))
             return _slimes!.Spawn(center, mob.Size ?? SlimeSize.Min);
@@ -422,8 +449,8 @@ internal sealed class WorldPersistence
 
     /// <summary>
     /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime,
-    /// goblin, hell and sky mob, skeleton and sandworm (kind by <see cref="EntityType.Name"/>, body center, health,
-    /// facing, velocity, a goblin's ammo and torches, a slime's size, a skeleton's tower tier) and the item drops nearest the player first, capped at
+    /// goblin, hell and sky mob, skeleton, Skeleton King (not one fading out) and sandworm (kind by <see cref="EntityType.Name"/>, body center, health,
+    /// facing, velocity, a goblin's ammo and torches, a slime's size, a skeleton's tower tier, a king's tower and summon tier) and the item drops nearest the player first, capped at
     /// <see cref="SaveConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
     /// with no name is skipped with one warning). Entries still pending a restore are appended, so a
     /// flush during loading, or before a far entity's chunk arrived, never loses them.
@@ -437,6 +464,9 @@ internal sealed class WorldPersistence
         mobs.AddRange(from t in HellMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in SkyMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in Skeletons where !t.IsDead select MobSaveCodec.Capture(t, null, tier: t.Tier, floor: t.Floor));
+        // A fading king is not saved: a reload never brings back a king its tower already let go
+        mobs.AddRange(from t in SkeletonKings where !t.IsDead && !t.IsDying
+            select MobSaveCodec.Capture(t, null, tier: t.Home.SummonTier, tower: t.Home.Tower));
         mobs.AddRange(from t in Sandworms where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(_pendingMobs);
 
@@ -527,6 +557,8 @@ internal sealed class WorldPersistence
     private void SaveStationState()
     {
         if (_saveStore == null) return;
+        // A king killed earlier this frame defeats its tower before the altar is captured, never saved as dormant
+        _world.Towers.SettleAltars(_kings, PendingKingFor);
         var data = new StationSaveData
         {
             Campfires = _campfires.Capture(),

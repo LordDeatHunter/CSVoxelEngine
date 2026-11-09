@@ -80,6 +80,7 @@ internal sealed class ServerBroadcasts
                 Cloudgolem => NetEntityKind.Cloudgolem,
                 Sandworm => NetEntityKind.Sandworm,
                 Skeleton => NetEntityKind.Skeleton,
+                SkeletonKing => NetEntityKind.SkeletonKing,
                 _ => NetEntityKind.Goblin,
             };
             // The int field is a goblin's ammo, a slime's size and a realm mob's attack count (NetEntity)
@@ -91,12 +92,13 @@ internal sealed class ServerBroadcasts
                 Sandworm worm => (int)worm.Phase,
                 _ => 0,
             };
-            // The byte field is a goblin's torch count or a skeleton's tower tier (0 for the rest); every entry
-            // ends with a status-effect mask (NetEntity.Effects), a mob's own
+            // The byte field is a goblin's torch count, a skeleton's tower tier or the Skeleton King's phase (0 for the
+            // rest); every entry ends with a status-effect mask (NetEntity.Effects), a mob's own
             var itemByte = mob switch
             {
                 Goblin goblin => (byte)goblin.Torches,
                 Skeleton skeleton => (byte)skeleton.Tier,
+                SkeletonKing king => (byte)king.Phase,
                 _ => (byte)0,
             };
             NetEntityCodec.Write(writer, new NetEntity(kind, IdFor(mob), mob.Position, mob.Facing, mob.Health, ammo,

@@ -314,6 +314,7 @@ public sealed class VisualScenario
             },
             "waystone" => ReadWaystone(element, index),
             "towerclear" => new VisualStep { Op = "towerclear", Floor = ReadInt(element, "floor") },
+            "altar" => new VisualStep { Op = "altar", Pos = ReadPos(element, index, "altar") },
             "screenshot" => new VisualStep
             {
                 Op = "screenshot",
@@ -321,7 +322,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, chest, chestrow, waystone, towerclear or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, chest, chestrow, waystone, towerclear, altar or screenshot."),
         };
     }
 

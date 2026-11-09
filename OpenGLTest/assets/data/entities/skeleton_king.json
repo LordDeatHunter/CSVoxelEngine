@@ -1,0 +1,11 @@
+{
+  "name": "Skeleton King",
+  // The battle tower's roof boss, raised once per tower by the altar ritual (plans/BATTLE_TOWER.md BT-6).
+  // Not difficulty-scaled: this one pool is the whole fight, on the server and on a client's mirror alike
+  "hp": 400,
+  // The wiki lists a boss under its own Bosses heading on the mobs page (wiki/scripts/build-data.mjs); the game ignores this
+  "boss": true,
+  // A placeholder boss table; BT-7 replaces it with the king's unique loot
+  "loot": "skeleton_king",
+  "model": "assets/models/entity/skeleton_king.bbmodel"
+}

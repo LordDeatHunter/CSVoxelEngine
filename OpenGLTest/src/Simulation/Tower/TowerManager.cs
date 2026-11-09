@@ -19,7 +19,9 @@ namespace VoxelEngine.Simulation.Tower;
 /// lets the awake floors' piles raise their waves and owed skeletons (<see cref="SkeletonPileManager"/>), and opens a
 /// floor's door once <see cref="TowerRules.DoorMayOpen"/> holds (the floor below open, every pile depleted, nothing
 /// living, owed or pending a restore). A capped, non-blocking sweep then clears depleted piles and open doors through
-/// <see cref="TowerBlockWriter"/>: a cell in an unloaded chunk waits without holding back the others. A manager built
+/// <see cref="TowerBlockWriter"/>: a cell in an unloaded chunk waits without holding back the others. Each record also
+/// carries its roof altar's <see cref="TowerAltarState"/>: <see cref="BeginRitual"/> starts the ritual once every door
+/// is open, and <see cref="MarkDefeated"/> records the Skeleton King's death (<see cref="BossDefeated"/>). A manager built
 /// without a writer is a client's display-only mirror and never ticks. Main thread only.
 /// </summary>
 public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerSite?>? findSite = null)
@@ -119,16 +121,133 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         return true;
     }
 
+    /// <summary>Raised once when a tower's Skeleton King is killed (its altar turns
+    /// <see cref="TowerAltarState.Defeated"/>): the hook the tower's collapse listens to.</summary>
+    public event Action<TowerRecord>? BossDefeated;
+
     /// <summary>
-    /// The look-at status line of the pile or door block <paramref name="blockId"/> at (<paramref name="x"/>,
+    /// What a right-click on the altar cell (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>) comes to,
+    /// without changing any altar: <see cref="AltarVerdict.NoTower"/> when no tracked tower's altar stands there, else
+    /// <see cref="TowerRules.AltarVerdictOf"/>. On the authoritative side (a manager with a writer) a tower not yet
+    /// tracked is looked up from the world sites and may be tracked on this first use; a client's mirror judges only the
+    /// towers its snapshot carries.
+    /// </summary>
+    public AltarVerdict JudgeAltar(int x, int y, int z)
+    {
+        var record = RecordAt(x, z);
+        if (record == null && writer != null && _findSite(x, z) is { } site) record = Track(site);
+        if (record == null || record.AltarCell != (x, y, z)) return AltarVerdict.NoTower;
+        return TowerRules.AltarVerdictOf(record);
+    }
+
+    /// <summary>
+    /// A right-click on the altar cell (<paramref name="x"/>, <paramref name="y"/>, <paramref name="z"/>): judges it like
+    /// <see cref="JudgeAltar"/> and, on the authoritative side, starts the ritual when the verdict is
+    /// <see cref="AltarVerdict.Begin"/>. Returns the verdict either way, so a repeated click reads
+    /// <see cref="AltarVerdict.Stirring"/> and starts nothing twice.
+    /// </summary>
+    public AltarVerdict BeginRitual(int x, int y, int z)
+    {
+        var verdict = JudgeAltar(x, y, z);
+        if (writer == null || verdict != AltarVerdict.Begin) return verdict;
+        var record = RecordAt(x, z)!;
+        record.AltarState = TowerAltarState.Ritual;
+        record.RitualLeft = MobConfig.SkeletonKingRitualSeconds;
+        return verdict;
+    }
+
+    /// <summary>Marks <paramref name="record"/>'s Skeleton King killed and raises <see cref="BossDefeated"/>, once: a
+    /// record already defeated is left alone.</summary>
+    internal void MarkDefeated(TowerRecord record)
+    {
+        if (record.AltarState == TowerAltarState.Defeated) return;
+        record.AltarState = TowerAltarState.Defeated;
+        record.RitualLeft = 0f;
+        BossDefeated?.Invoke(record);
+    }
+
+    /// <summary>
+    /// One frame of the altars: counts down every ritual whose king has not risen yet and, when it runs out, raises the
+    /// king on top of the altar (<see cref="TowerRecord.KingHome"/>), turning the tower
+    /// <see cref="TowerAltarState.Awake"/>; a spawn the hard cap refuses retries next frame. Then
+    /// <see cref="SettleAltars"/>. Does nothing on a client's mirror or without kings.
+    /// </summary>
+    public void UpdateAltars(float dt, SkeletonKingManager? kings, Func<(int CellX, int CellZ), bool>? pendingKing)
+    {
+        if (writer == null || kings == null) return;
+        foreach (var record in _records.Values)
+        {
+            if (record.AltarState != TowerAltarState.Ritual) continue;
+            var status = kings.StatusFor(record.Key);
+            if (status is not (KingStatus.None or KingStatus.Fading)) continue;
+            record.RitualLeft -= dt;
+            if (record.RitualLeft > 0f) continue;
+            var home = record.KingHome;
+            var king = kings.Spawn(home.Feet + new Vector3(0f, MobConfig.SkeletonKingHeight * 0.5f, 0f), home);
+            if (king == null) continue;
+            record.AltarState = TowerAltarState.Awake;
+            record.RitualLeft = 0f;
+        }
+        SettleAltars(kings, pendingKing);
+    }
+
+    /// <summary>
+    /// Reconciles every altar with its king (<see cref="SkeletonKingManager.StatusFor"/>): a killed king defeats the
+    /// tower at once (<see cref="MarkDefeated"/>), even before its death has started; a living king under a ritual
+    /// makes the tower <see cref="TowerAltarState.Awake"/>; and an awake tower whose king is gone or fading out (it left
+    /// unkilled) turns <see cref="TowerAltarState.Dormant"/> again, so the ritual comes free, unless
+    /// <paramref name="pendingKing"/> says its king is still waiting to be restored from a save. Runs each frame after
+    /// the kings and right before the stations are saved, so a kill is never saved as dormant. Does nothing on a
+    /// client's mirror or without kings.
+    /// </summary>
+    public void SettleAltars(SkeletonKingManager? kings, Func<(int CellX, int CellZ), bool>? pendingKing)
+    {
+        if (writer == null || kings == null) return;
+        foreach (var record in _records.Values)
+        {
+            if (record.AltarState is not (TowerAltarState.Ritual or TowerAltarState.Awake)) continue;
+            var status = kings.StatusFor(record.Key);
+            if (status == KingStatus.Killed)
+            {
+                MarkDefeated(record);
+                continue;
+            }
+            if (record.AltarState == TowerAltarState.Ritual)
+            {
+                if (status != KingStatus.Alive) continue;
+                record.AltarState = TowerAltarState.Awake;
+                record.RitualLeft = 0f;
+                continue;
+            }
+            if (status == KingStatus.Alive || pendingKing?.Invoke(record.Key) == true) continue;
+            record.AltarState = TowerAltarState.Dormant;
+        }
+    }
+
+    /// <summary>Adds the top of every altar whose ritual is under way (where its sparks rise) to <paramref name="into"/>.
+    /// Reads mirrors too.</summary>
+    public void RitualAltars(List<Vector3> into)
+    {
+        foreach (var record in _records.Values)
+        {
+            if (record.AltarState != TowerAltarState.Ritual) continue;
+            var (x, y, z) = record.AltarCell;
+            into.Add(new Vector3(x + 0.5f, y + 1f, z + 0.5f));
+        }
+    }
+
+    /// <summary>
+    /// The look-at status line of the pile, door or altar block <paramref name="blockId"/> at (<paramref name="x"/>,
     /// <paramref name="y"/>, <paramref name="z"/>), or null for any other block or a cell outside every tracked tower.
     /// Reads mirrors too. A door is named by the floor whose band holds it (a door sits on its own floor's stair).
     /// </summary>
     public string? Detail(byte blockId, int x, int y, int z)
     {
-        if (blockId != TowerPalette.PileBlock && blockId != TowerPalette.DoorBlock) return null;
+        if (blockId != TowerPalette.PileBlock && blockId != TowerPalette.DoorBlock && blockId != TowerPalette.AltarBlock)
+            return null;
         var record = RecordAt(x, z);
         if (record == null) return null;
+        if (blockId == TowerPalette.AltarBlock) return TowerReadout.Altar(TowerRules.AltarVerdictOf(record));
         var k = record.FloorOf(y);
         var floor = record.Floors[k];
         if (blockId == TowerPalette.PileBlock) return TowerReadout.Pile(floor);
@@ -151,7 +270,12 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
                 for (var i = 0; i < waves.Length; i++) waves[i] = Math.Max(0, floor.Piles[i].WavesLeft);
                 floors.Add(new StationSaveData.TowerFloorData { Waves = waves, DoorOpen = floor.DoorOpen, Owed = floor.Owed });
             }
-            (towers ??= []).Add(new StationSaveData.TowerData { Cell = [record.Key.CellX, record.Key.CellZ], Floors = floors });
+            (towers ??= []).Add(new StationSaveData.TowerData
+            {
+                Cell = [record.Key.CellX, record.Key.CellZ],
+                Floors = floors,
+                Altar = record.AltarState == TowerAltarState.Dormant ? null : record.AltarState.ToString(),
+            });
         }
         return towers;
     }
@@ -160,7 +284,8 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
     /// Restores the towers <see cref="Capture"/> saved, rebuilding each record from its world site. An entry whose cell
     /// holds no tower, or whose floors, piles, waves or owed count no longer fit that tower, is skipped. An open door is
     /// re-swept (its cells already cleared read as gone) and a depleted pile's block is cleared by the sweep. Returns how
-    /// many entries were skipped.
+    /// many entries were skipped. The altar's state comes back by name (absent or unknown reads dormant), and a ritual
+    /// under way restarts its timer.
     /// </summary>
     public int Restore(List<StationSaveData.TowerData>? towers)
     {
@@ -181,6 +306,10 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
                 skipped++;
                 continue;
             }
+            record.AltarState = Enum.TryParse<TowerAltarState>(data.Altar, true, out var altar) && Enum.IsDefined(altar)
+                ? altar
+                : TowerAltarState.Dormant;
+            if (record.AltarState == TowerAltarState.Ritual) record.RitualLeft = MobConfig.SkeletonKingRitualSeconds;
             _records[record.Key] = record;
         }
         return skipped;
@@ -214,7 +343,8 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
 
     /// <summary>
     /// Writes every tracked tower to the station frame: its cell, center and radius, then per floor its band, piles left,
-    /// skeletons left (both clamped to a byte) and door bit, which is all a client's mirror shows.
+    /// skeletons left (both clamped to a byte) and door bit, then the altar's state byte, which is all a client's mirror
+    /// shows.
     /// </summary>
     internal void WriteNet(PacketWriter writer)
     {
@@ -237,12 +367,13 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
                 writer.Write((byte)Math.Clamp(floor.Alive, 0, byte.MaxValue));
                 writer.Write(floor.DoorOpen);
             }
+            writer.Write((byte)record.AltarState);
         }
     }
 
     /// <summary>Replaces the tracked towers with display-only mirrors of a snapshot written by <see cref="WriteNet"/>
     /// (a client's). A floor count outside 1..<see cref="MobConfig.TowerMaxTier"/> + 1, a radius outside
-    /// 1..<see cref="MaxNetRadius"/> or an empty band is refused as malformed.</summary>
+    /// 1..<see cref="MaxNetRadius"/>, an empty band or an undefined altar state is refused as malformed.</summary>
     internal void ReadNet(PacketReader reader)
     {
         _records.Clear();
@@ -265,7 +396,9 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
                 if (top <= bottom) throw new InvalidDataException("tower snapshot with an empty floor band");
                 floors[k] = (bottom, top, reader.ReadByte(), reader.ReadByte(), reader.ReadBool());
             }
-            _records[key] = TowerRecord.Mirror(key, centerX, centerZ, radius, floors);
+            var altar = (TowerAltarState)reader.ReadByte();
+            if (!Enum.IsDefined(altar)) throw new InvalidDataException($"tower snapshot with altar state {(byte)altar}");
+            _records[key] = TowerRecord.Mirror(key, centerX, centerZ, radius, floors, altar);
         }
     }
 

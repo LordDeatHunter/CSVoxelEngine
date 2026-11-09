@@ -201,9 +201,11 @@ public sealed class StationNetCodecTests
         record.Floors[0].PilesLeft = record.Floors[0].CountPilesLeft();
         record.Floors[0].Alive = 3;
         record.Floors[1].PilesLeft = record.Floors[1].CountPilesLeft();
-        server.Track(TowerRecord.Build((-4, 7), -300, 500, 12,
-            [(60, 68, new[] { (-300, 61, 500) }, new[] { (-300, 63, 496) })], hasSite: false))
-            .Floors[0].DoorOpen = true;
+        record.AltarState = TowerAltarState.Ritual;
+        var second = server.Track(TowerRecord.Build((-4, 7), -300, 500, 12,
+            [(60, 68, new[] { (-300, 61, 500) }, new[] { (-300, 63, 496) })], hasSite: false));
+        second.Floors[0].DoorOpen = true;
+        second.AltarState = TowerAltarState.Defeated;
 
         using var writer = new PacketWriter(NetMessage.StationState);
         server.WriteNet(writer);
@@ -220,6 +222,7 @@ public sealed class StationNetCodecTests
             Assert.Equal(sent.Key, mirror!.Key);
             Assert.Equal(sent.OuterRadius, mirror.OuterRadius);
             Assert.Equal(sent.Floors.Length, mirror.Floors.Length);
+            Assert.Equal(sent.AltarState, mirror.AltarState);
             for (var k = 0; k < sent.Floors.Length; k++)
             {
                 Assert.Equal(sent.Floors[k].BottomY, mirror.Floors[k].BottomY);
@@ -234,6 +237,8 @@ public sealed class StationNetCodecTests
         Assert.Equal(server.Detail(TowerPalette.DoorBlock, 40, 13, -24), client.Detail(TowerPalette.DoorBlock, 40, 13, -24));
         Assert.Equal(server.Detail(TowerPalette.PileBlock, 38, 19, -20), client.Detail(TowerPalette.PileBlock, 38, 19, -20));
         Assert.NotNull(client.Detail(TowerPalette.DoorBlock, 40, 13, -24));
+        var (ax, ay, az) = record.AltarCell;
+        Assert.Equal(server.Detail(TowerPalette.AltarBlock, ax, ay, az), client.Detail(TowerPalette.AltarBlock, ax, ay, az));
 
         // A later snapshot replaces the mirror whole
         using var empty = new PacketWriter(NetMessage.StationState);
@@ -260,6 +265,22 @@ public sealed class StationNetCodecTests
             writer.Write(bottom).Write(top);
             writer.Write((byte)0).Write((byte)0).Write(false);
         }
+        writer.Write((byte)TowerAltarState.Dormant);
+        using var reader = new PacketReader(writer.ToArray());
+        Assert.Equal(NetMessage.StationState, reader.Message);
+        Assert.Throws<InvalidDataException>(() => new TowerManager(null).ReadNet(reader));
+    }
+
+    [Fact]
+    public void AnUndefinedAltarStateIsRefused()
+    {
+        using var writer = new PacketWriter(NetMessage.StationState);
+        writer.Write(1);
+        writer.Write(0).Write(0).Write(8).Write(8).Write(9);
+        writer.Write((byte)1);
+        writer.Write(10).Write(18);
+        writer.Write((byte)0).Write((byte)0).Write(false);
+        writer.Write((byte)(TowerAltarState.Defeated + 1));
         using var reader = new PacketReader(writer.ToArray());
         Assert.Equal(NetMessage.StationState, reader.Message);
         Assert.Throws<InvalidDataException>(() => new TowerManager(null).ReadNet(reader));

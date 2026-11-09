@@ -6,8 +6,8 @@ namespace VoxelEngine.Simulation.Tower;
 
 /// <summary>
 /// The battle tower's lock rules, GL-free and state-free: when a skeleton pile wakes for a target, when a floor is awake
-/// at all, when a floor's door may open, where a pile raises its skeletons and when a bound skeleton has strayed too far
-/// from its tower. <see cref="SkeletonPileManager"/> and <c>TowerManager</c> apply them.
+/// at all, when a floor's door may open, where a pile raises its skeletons, when a bound skeleton has strayed too far
+/// from its tower and what a click on the roof altar comes to. <see cref="SkeletonPileManager"/> and <c>TowerManager</c> apply them.
 /// </summary>
 public static class TowerRules
 {
@@ -55,6 +55,23 @@ public static class TowerRules
             points.Add(new Vector3(cx + 0.5f, y + MobConfig.SkeletonHeight * 0.5f, cz + 0.5f));
         }
         return points;
+    }
+
+    /// <summary>
+    /// What a right-click on <paramref name="record"/>'s altar comes to: a killed king's tower is silent for good, a
+    /// waking or awake one says so, and otherwise the ritual may begin only once every floor's door is open.
+    /// </summary>
+    public static AltarVerdict AltarVerdictOf(TowerRecord record)
+    {
+        switch (record.AltarState)
+        {
+            case TowerAltarState.Defeated: return AltarVerdict.Defeated;
+            case TowerAltarState.Awake: return AltarVerdict.Awake;
+            case TowerAltarState.Ritual: return AltarVerdict.Stirring;
+        }
+        foreach (var floor in record.Floors)
+            if (!floor.DoorOpen) return AltarVerdict.Sealed;
+        return AltarVerdict.Begin;
     }
 
     /// <summary>Whether a bound skeleton at <paramref name="position"/> strayed more than <paramref name="leash"/>

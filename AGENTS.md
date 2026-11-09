@@ -92,7 +92,7 @@ Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated
 **without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
 player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
 any scenario that teleports a walking player above the ground, and turn it off again before a
-`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, an optional `"size"` (an integer from 1, default 1) is a slime's size and an optional `"tier"` (an integer from 0, default 0) is a skeleton's tower tier; the entity name (`slime`, `goblin`, `hellbrute`, `cinderwitch`, `galeraptor`, `cloudgolem`, `sandworm`, `iceberg` or `skeleton`) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/skeletons.json` (`VOXEL_TIME=147`) spawns a tier-0 and a tier-5 skeleton in goblins.json's open forest clearing (a tower floor's dressing walls block a shot's line of sight) and films them idle, drawing and loosing an arrow, an arrow in flight and raking. `towerclear` (`{ "op": "towerclear", "floor": k }`, floor 0 by default) clears floor `k` of the battle tower around the camera through `World.ClearTowerFloor` (its piles depleted, its bound skeletons killed, nothing owed), so its door opens on the next update; `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) uses it to film a floor's piles, the skeletons they raise, the sealed gate and the opened stairwell. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, an optional `"size"` (an integer from 1, default 1) is a slime's size and an optional `"tier"` (an integer from 0, default 0) is a skeleton's tower tier; the entity name (`slime`, `goblin`, `hellbrute`, `cinderwitch`, `galeraptor`, `cloudgolem`, `sandworm`, `iceberg`, `skeleton` or `skeleton_king`, the last spawned unbound to any tower) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/skeletons.json` (`VOXEL_TIME=147`) spawns a tier-0 and a tier-5 skeleton in goblins.json's open forest clearing (a tower floor's dressing walls block a shot's line of sight) and films them idle, drawing and loosing an arrow, an arrow in flight and raking. `towerclear` (`{ "op": "towerclear", "floor": k }`, floor 0 by default) clears floor `k` of the battle tower around the camera through `World.ClearTowerFloor` (its piles depleted, its bound skeletons killed, nothing owed), so its door opens on the next update; `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) uses it to film a floor's piles, the skeletons they raise, the sealed gate and the opened stairwell. `altar` (`{ "op": "altar", "pos": [x, y, z] }`, an exact cell, required) right-clicks a tower altar through `World.UseAltar` and shows its toast (the ritual begins only once every floor is cleared); `visual-examples/skeleton-king.json` (`VOXEL_TIME=147`) clears the default tower's floors with `towerclear`, then films its altar, the ritual, the Skeleton King's rise and boss bar, its slam, its bone volley and a summon. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
@@ -1489,6 +1489,8 @@ OpenGLTest/
                                #   primed TNT, falling blocks, damage numbers, the entity animator and clips
       AnimationClip.cs         # GL-free Blockbench keyframe clip: per-bone rotation/position/scale
                                #   tracks, linear/catmull-rom/step, loop/once/hold, timeline events
+      BossSelection.cs         # GL-free pick of the boss the HUD's boss bar shows: the nearest living IsBoss mob within its
+                               #   BossBarRange (the sandworm's unlimited, the Skeleton King's MobConfig.SkeletonKingBossBarRangeBlocks)
       ContactDamage.cs         # GL-free contact damage a body takes standing against a cactus
       DamageNumber.cs          # one floating damage number in a DamageNumberPool: where it started, the damage it shows
       DamageNumberPool.cs      # the floating damage numbers over struck mobs, in one fixed array: a hit claims a free slot
@@ -1552,9 +1554,16 @@ OpenGLTest/
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
         Cloudgolem.cs          # the ground bruiser: walk with ledge caution, the slam clip's impact event, the shockwave
         SkyDifficulty.cs       # GL-free: the zone tier's multiplier (health, damage), pack size, the bruiser's big-zone gate
-      TowerMobs/               # the battle tower's mobs (see "Skeleton"): the skeleton and the floor-tier difficulty
+      TowerMobs/               # the battle tower's mobs (see "Skeleton" and "Battle tower"): the skeleton, the Skeleton
+                               #   King and the floor-tier difficulty
         Skeleton.cs            # the undead archer (a RealmMob): melee rake at its impact event, a bow shot at its release
                                #   event inside its band with a clear line, two attack clips over one count, its tier
+        SkeletonKing.cs        # the tower boss (a RealmMob, IsBoss, IsUndead): slam, volley and summon clips over one count,
+                               #   the leash to its home (HomeMove, EnforceLeash), the unengaged reset, the volley fan
+        SkeletonKingBrain.cs   # GL-free: phases by health share (the first observation silent, a phase change owes a summon),
+                               #   the attack choice by range, sight and cooldown with an injected roll, the phase-3 enrage
+        SkeletonKingAttack.cs  # None / Slam / Volley / Summon
+        SkeletonKingHome.cs    # where a king is leashed: its tower (or none), the altar-top feet, the leash radius, the summon tier
         TowerDifficulty.cs     # GL-free: the floor tier's multiplier (health, damage), clamp and pack size (a pile's wave)
         TowerFloorRef.cs       # the tower (by placement cell) and floor whose lock a bound skeleton counts toward
       Sandworms/               # the desert boss (see "Sandworm"): the mob, its chain, its brain and its pose
@@ -1616,7 +1625,7 @@ OpenGLTest/
       RightClickAction.cs      # World component: the right-click chain (TryUseSelected: stations, the spell table,
                                #   a staff's cast, the item's use, placement; one overload hands back the outcome)
                                #   and the timed use charge
-      RightClickOutcome.cs     # what claimed a right-click: a station, a chest, the spell table, a waystone, the item's use, a placement or a cast
+      RightClickOutcome.cs     # what claimed a right-click: a station, a chest, the spell table, a waystone, a tower altar, the item's use, a placement or a cast
       SelectionOutlineMesh.cs  # GL-free selection outline: the 12 box edges as thin beams (no glLineWidth)
       SelectionPulse.cs        # GL-free twin of the outline's breathing opacity (steady while mining)
       SliceCombo.cs            # the blade's two-phase slice combo: press/queue/advance state
@@ -2188,18 +2197,26 @@ OpenGLTest/
                                #   its impact, the arrows (MobMissiles), loot, despawn, client mirrors; no ring spawn; reports a
                                #   bound skeleton's despawn or leash release (TakeReleased) so its floor owes it
         TowerManager.cs        # the floor locks (see "Battle tower"): records materialized near a player, the recount, owed
-                               #   and leash, the door judgement, the capped sweep, ClearFloor, Detail, stations.json and the wire
-        TowerRecord.cs         # one tower: key, center, radius and a TowerFloorState per floor; Build (explicit data, the
-                               #   test seam), FromSite (the one PileCells/DoorCells scan) and Mirror (the client's copy)
+                               #   and leash, the door judgement, the capped sweep, ClearFloor, Detail, stations.json and the wire;
+                               #   the roof altar: JudgeAltar, BeginRitual, UpdateAltars/SettleAltars, the BossDefeated event
+        SkeletonKingManager.cs # the Skeleton King: forced spawn only, one per tower (StatusFor), the slam shockwave, the bone
+                               #   volley (MobMissiles), the summoned minions (capped), the empty-server fade, client mirrors
+        KingStatus.cs          # None / Alive / Killed (health 0) / Fading (a despawn with health left): what a tower's king is
+        TowerAltarState.cs     # Dormant / Ritual / Awake / Defeated: a tower's altar
+        AltarVerdict.cs        # Begin / Sealed / Stirring / Awake / Defeated / NoTower: what an altar click comes to
+        TowerRecord.cs         # one tower: key, center, radius and a TowerFloorState per floor, the altar state, cell and the
+                               #   king's home; Build (explicit data, the test seam), FromSite (the one PileCells/DoorCells scan)
+                               #   and Mirror (the client's copy)
         TowerFloorState.cs     # one floor: band, piles, door cells and the ones still to sweep, living, owed, piles left,
                                #   alive and the door bit
         PileState.cs           # one skeleton pile: cell, waves left, cooldown, removed
         SkeletonPileManager.cs # a floor's piles: waves of TowerDifficulty.PackSize skeletons for a non-immune target in
                                #   range, then depleted; owed skeletons re-raised at any pile; never writes blocks
-        TowerRules.cs          # GL-free: the pile trigger, floor awake, the door rule, spawn points round a pile, the leash
+        TowerRules.cs          # GL-free: the pile trigger, floor awake, the door rule, spawn points round a pile, the leash,
+                               #   the altar verdict (AltarVerdictOf)
         TowerBlockWriter.cs    # the capped writer past `unbreakable` (Chunk.CollapseWriteAt plus every edit-path hook): the
                                #   BT-4 doors and depleted piles, BT-8's collapse; TowerWriteResult.cs is its answer
-        TowerReadout.cs        # the look-at status line of a pile or a sealed door
+        TowerReadout.cs        # the look-at status line of a pile, a sealed door or the altar, and the altar's toasts
       TopplingTree.cs          # a felled tree: the wood TreeSupport finds cut off plus its canopy, meshed once by
                                #   CellBatchMesher (one mesh per chunk it spans), swung flat around the cut, then popped out as drops
       TreeGrowthResult.cs      # the outcome of one TreeGrowthWriter call: its status,
@@ -2246,6 +2263,7 @@ OpenGLTest/
                                #   craft card, spell builder and the gear and chest panels build on (plans/INVENTORY_UI.md)
       Hud/                     # HUD widgets: chat, clock, compass, crosshair state,
                                #   toasts, hotbar feedback, look label, tooltips, screenshots
+        BossBarState.cs        # what one frame's boss bar draws: the boss's name and health share (BossSelection)
         Chat.cs                # ChatKind/ChatMessage, ChatView (log/input/history) and ChatLayout
         Clock.cs               # pure clock math behind the HUD's held-clock readout (see TopStripRenderer.DrawClock)
         Compass.cs             # HUD compass heading math
@@ -2630,7 +2648,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     HellMobs/                  # hell mob contracts, layer difficulty, brute blow, caster cast and bolt burn
     SkyMobs/                   # sky mob contracts, zone difficulty, the flyer's hover and dive, the golem's
                                #   shockwave and ledge caution
-    TowerMobs/                 # the skeleton's contract, tier scaling, bow band and line of sight, melee, undead
+    TowerMobs/                 # the skeleton's contract, tier scaling, bow band and line of sight, melee, undead; the
+                               #   Skeleton King's contract, leash, shockwave and volley fan, its brain's phases and choices
     Sandworms/                 # the sandworm's chain, brain and pose, its melee through the real punch path
     Icebergs/                  # iceberg shape, motion, wobble, spawn band, contact, the berg (mirrors src/Entities/Icebergs)
     Slimes/                    # slime sizes, hops, knockback, split and merge (mirrors src/Entities/Slimes)
@@ -2670,7 +2689,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World
     Tower/                     # the skeleton manager: forced spawn and the hard cap, tier, no natural spawn, rake, arrows,
                                #   despawn reports; the floor locks (TowerRulesTests, SkeletonPileManagerTests,
-                               #   TowerBlockWriterTests, TowerManagerTests, TowerManagerSaveTests: stations.json)
+                               #   TowerBlockWriterTests, TowerManagerTests, TowerManagerSaveTests: stations.json); the
+                               #   altar and the king (TowerAltarTests, TowerAltarWorldTests, SkeletonKingManagerTests)
     Waystones/                 # waystone names, the registry's discovery, rename, lost and save rules; the teleport rule,
                                #   the arrival search, the realm tag and a trip in a headless world
   Status/                      # the status effect set, the Apply API, the speed factors and the block rule and writer
@@ -2707,8 +2727,10 @@ tools/                                # asset generators: models, animation clip
                                       #   cloud_shard sprite, on the hell script's machinery; --check
   generate-skeleton-model.py          # deterministic skeleton .bbmodel (rig with its bow, clips) and palette skin, and the
                                       #   arrow and bone sprites, on the hell script's machinery; --check
-  generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout) and skeleton_pile tiles,
-                                      #   stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
+  generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout), skeleton_pile and
+                                      #   tower_altar_top tiles, stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
+  generate-skeleton-king-model.py     # deterministic skeleton_king .bbmodel (crowned rig with its club, clips) and palette
+                                      #   skin, on the hell and skeleton scripts' machinery; listed in USER_TODO.md; --check
   generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
                                       #   the geometry rules (waterline, shelf, 8 px inset steps) and the UV layout
   generate-mold-models.ps1            # the eight cast molds' block models under assets/models/block/, from their sprites' alpha silhouettes
@@ -3822,7 +3844,7 @@ progress is saved with the world (`stations.json`, see "Saves"; a pour comes bac
 rather than being forgotten.
 
 The right-click chain in `RightClickAction.TryUseSelected` runs `TryCookOrCollect` -> `TryQuernInteract` ->
-`TryKilnInteract` -> `TryCastInteract` -> `TryToggleOpenable` -> `TryOpenChest` -> `TryOpenSpellTable` -> `TryOpenWaystone` (all on `BlockInteractions`) -> a held spell staff's cast (which never places) -> the item's own `use` action or block placement, and the
+`TryKilnInteract` -> `TryCastInteract` -> `TryToggleOpenable` -> `TryOpenChest` -> `TryOpenSpellTable` -> `TryOpenWaystone` -> `TryUseAltar` (all on `BlockInteractions`) -> a held spell staff's cast (which never places) -> the item's own `use` action or block placement, and the
 first one that claims the click wins (`TryUseSelected(maxDistance, out RightClickOutcome)` hands back which). On a kiln: an empty hand lifts the crucible out (and puts it
 straight back when the tools pool is full), a crucible stands one in, a melt input charges it, fuel
 goes into the hearth, a **firestarter falls through** to its own `Item.OnUse` so it can strike and
@@ -3838,7 +3860,9 @@ so a staff in hand never casts at the table. Then `TryOpenWaystone`: a click on 
 holding a block (which place against it), is claimed as `RightClickOutcome.Waystone` the same way, its cell kept in
 `RightClickAction.LastWaystoneCell`; the local player's `GameplayInput` hands it to `WaystoneInput.OpenFromStation`,
 which discovers it and opens the waystone screen (see "Waystones"); a server replaying a client's `Use` discovers it for that
-player instead (`World.LastWaystoneCell`, see "Waystones on a server").
+player instead (`World.LastWaystoneCell`, see "Waystones on a server"). Then `TryUseAltar`: a click on a battle tower's
+altar, on the same terms, is claimed as `RightClickOutcome.Altar` and judged or begun through `World.UseAltar` (see
+"Battle tower").
 
 ### Spell part schema (`assets/data/spell/<kind>/<name>.json`)
 
@@ -4305,7 +4329,7 @@ refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's 
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
 whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell, sky or tower mob's `Ammo` carries its
 attack count the same way (`RealmMob.AttackCount`, see "A mirror's attack clip"), with no bump either. Every
-entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 26 (current) appends the battle tower locks at the end of `StationState` (`TowerManager.WriteNet`/`ReadNet`: each tower's cell, center and radius, and per floor its band, piles left, skeletons left and door bit, bounds-checked; see "Battle tower"); an older peer would misread the station frames. Version 25 lets `EntityList` carry the battle tower's skeleton (`NetEntityKind.Skeleton` 13): its tower tier rides `ItemId` (a goblin's torch byte, 0 for other mobs; clamped to 0..`MobConfig.TowerMaxTier` on read, since a mirror cannot derive it from where it stands, and a mirror whose tier differs is replaced, `ClientMirror.KindMatches`) and its attack count rides `Ammo` (melee even, shot odd, see "A mirror's attack clip"); an older client would not draw it. Version 24 adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 27 (current) appends each battle tower's altar state byte to its `StationState` record and lets `EntityList` carry the Skeleton King (`NetEntityKind.SkeletonKing` 14: its fight phase rides `ItemId`, clamped to 1..3 on read, and its attack count rides `Ammo`, slam, volley and summon by remainder; see "Battle tower"); an older peer would misread the station frames and an older client would not draw the king. Version 26 appends the battle tower locks at the end of `StationState` (`TowerManager.WriteNet`/`ReadNet`: each tower's cell, center and radius, and per floor its band, piles left, skeletons left and door bit, bounds-checked; see "Battle tower"); an older peer would misread the station frames. Version 25 lets `EntityList` carry the battle tower's skeleton (`NetEntityKind.Skeleton` 13): its tower tier rides `ItemId` (a goblin's torch byte, 0 for other mobs; clamped to 0..`MobConfig.TowerMaxTier` on read, since a mirror cannot derive it from where it stands, and a mirror whose tier differs is replaced, `ClientMirror.KindMatches`) and its attack count rides `Ammo` (melee even, shot odd, see "A mirror's attack clip"); an older client would not draw it. Version 24 adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
 mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
@@ -5143,8 +5167,8 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   attack clip"); all four are saved in `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 242 of the 255 content ids are used (132 blocks, 109 items, air), 13 left; the rest of the battle
-  tower (plans/BATTLE_TOWER.md) needs about 5-8 more. Seed offsets
+- **Budgets**: 244 of the 255 content ids are used (134 blocks, 109 items, air), 11 left; the rest of the battle
+  tower (plans/BATTLE_TOWER.md) needs about 3-5 more. Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes) and 175 to 178 (sky landmasses); the whole table is in
   `plans/BIOMEGEN.md`.
@@ -5227,7 +5251,8 @@ plus its skin. The goblin draws per part: `PlayerRig.FromBbmodel(type.Model)` +
 Every hostile derives from the abstract **`Mob`** (`Mob.cs`). It exposes `Type`, `Position` (the body
 center), `Health`/`IsDead`, `Facing` (yaw, the model faces -Z at 0), `HitFlash`, and the body box as
 `BodyHalfExtent`/`BodyHalfHeight`. `HeadAboveCenter` is where the healthbar sits. It also has
-`TakeDamage` and `Shove`. `World`'s `MobDirector` rebuilds one `_mobs` list each frame (`MobDirector.RefreshMobs`), after every mob
+`TakeDamage` and `Shove`. A boss (`IsBoss`: the sandworm, the Skeleton King) is shown by the HUD's boss bar instead
+(`BossSelection.Nearest`: the nearest living boss within its `Mob.BossBarRange`, unlimited by default). `World`'s `MobDirector` rebuilds one `_mobs` list each frame (`MobDirector.RefreshMobs`), after every mob
 manager has run and before `ThrowAction.UpdateThrown`, so a mob killed or despawned this frame is never hit or given
 a healthbar. The punch, the slice, the player's thrown items (`ThrownProjectile.Update`, an AABB overlap
 against each mob's body box, so a tall goblin is hit through its head and shins) and the healthbars
@@ -5560,7 +5585,8 @@ Both models, their skins and the `cloud_shard` sprite come from `tools/generate-
   tougher and harder-hitting than a first-layer hellbrute. In `CloudgolemSlamTriggerReach` and off its
   cooldown it plays `slam`; at its `impact` the **shockwave** bills `SlamDamage` with a big shove and lift to
   every non-immune target within `CloudgolemShockwaveRadius` horizontally whose feet stand within
-  `CloudgolemShockwaveHeight` of its own (`Cloudgolem.InShockwave`), none beyond. It walks with the shared
+  `CloudgolemShockwaveHeight` of its own (`Cloudgolem.InShockwave`, over the shared `MobTargets.InShockwave(feet, eye, radius, height)` the Skeleton King's
+  slam uses too), none beyond. It walks with the shared
   ledge caution, so the island's edge (a drop to the cloud sea far below, or unloaded cells: bottomless)
   stops it unless its target is lower; a player barely shoves it.
 - **Zone difficulty** (`SkyDifficulty`, GL-free): `1 + tier * MobConfig.SkyDifficultyPerTier` scales a sky
@@ -5642,8 +5668,8 @@ common hurt, death and spawn.
 ### Battle tower
 
 The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are above ("Structure templates and ruins",
-"Skeleton"); plans/BATTLE_TOWER.md holds the phases still to come. This section is the **floor locks** (`BT-4`) and the
-**chests** (`BT-5`).
+"Skeleton"); plans/BATTLE_TOWER.md holds the phases still to come. This section is the **floor locks** (`BT-4`), the
+**chests** (`BT-5`) and the **roof altar with the Skeleton King** (`BT-6`).
 - **Two worldgen-only, unbreakable blocks** (`hasItem: false`, `loot: "none"`), both from the single tower cell function,
   so the point query still equals the stamp. `tower_door` (a solid, cutout, `cullSelf` portcullis `cube_all` that passes
   light) fills the headroom over the two door half-steps of every floor (`TowerSite.DoorCells(k)`, stamped by
@@ -5681,7 +5707,7 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
 - **Saves and the wire**: `stations.json`'s `Towers` (`StationSaveData.TowerData`: the cell, and per floor the waves left
   per pile in `PileCells` order, the door bit and owed), restored before the entities through `TowerPlacement.TryGetSite`
   (an entry whose site, floor count or pile count no longer matches is dropped and counted). Only site-built records are
-  saved. Every record rides the end of `StationState` (protocol 26). The client's manager has no writer: it never ticks,
+  saved. Every record rides the end of `StationState` (protocol 26; 27 appends its altar state byte). The client's manager has no writer: it never ticks,
   never raises a skeleton or opens a door, and each snapshot replaces its `TowerRecord.Mirror`s; door and pile cells reach
   it through `BlockChanges`.
 - **Look-at line** (`TowerManager.Detail`, `TowerReadout`, on both sides): a pile reads "Floor 2: 3 piles, 4 skeletons", a
@@ -5705,6 +5731,87 @@ The battle tower's generator (`WorldGen/Structures/Tower*`) and its skeleton are
   the ingot ladder tin..wrought iron, scrolls and mana draughts). Like any ruin chest it holds no state until first opened
   or broken. Hooks: `TowerGenerator.ChestCells(s, k)`/`AltarChestCells(s)`. Tests: `TowerChestTests` and the chest cases
   of `TowerPlacementTests`. Known gap: towers in chunks saved before BT-5 have no chests.
+- **The altar (BT-6)**: `tower_altar` (worldgen-only, `unbreakable`, `loot: "none"`, a `cube_bottom_top` of
+  `stone_bricks` with the placeholder `tower_altar_top` tile from `tools/generate-tower-lock-textures.py`, light 7 in the
+  default color) stands at `TowerSite.AltarCell` (the center, `RoofY + 1`): the `tower_altar` structure template leaves that
+  cell free (`StructureLoader`'s rule) and `TowerGenerator.Merge` writes `TowerPalette.AltarBlock` there, so the point query
+  still equals the stamp. Like piles and doors it is recognized by its **palette id**, never a JSON flag: a worldgen-only
+  tower part means nothing outside its `TowerRecord`, so a generic flag would only move the same id check.
+  `TowerRecord.AltarCell` (center, top floor's `TopY + 1`) equals the site's, so test records and mirrors have one too.
+- **Altar state** (`TowerRecord.AltarState`, a `TowerAltarState`): Dormant, Ritual (with `RitualLeft`), Awake, Defeated.
+  `TowerRules.AltarVerdictOf` is the one rule, first match wins: Defeated, Awake, Ritual reads Stirring, any floor whose
+  `DoorOpen` is unset reads Sealed (the roof is open, so a player can pillar up the outside), else Begin.
+  `TowerManager.JudgeAltar(cell)` answers it without changing anything (NoTower when no record holds the cell as its altar;
+  the authoritative side tracks the tower on first use, like `ClearFloor`); `BeginRitual(cell)` sets Ritual only with a
+  writer and a Begin verdict, and always returns the verdict, so it is idempotent (a second click reads Stirring). Toasts
+  and look-at lines: `TowerReadout.AltarToast` ("The ritual begins...", "The seals still hold", "The ritual is under way",
+  "The Skeleton King walks", "The Skeleton King has fallen", "The altar is silent") and `TowerReadout.Altar`, which
+  `TowerManager.Detail` shows for the altar block.
+- **The right-click**: `BlockInteractions.TryUseAltar` claims a click on the altar block (not while sneaking or holding a
+  block, which place against it) as `RightClickOutcome.Altar`, right after the waystone claim in
+  `RightClickAction.TryUseSelected`, and calls `World.UseAltar(cell)` (`RightClickAction.LastAltarCell` and
+  `LastAltarVerdict`): a client only judges from its mirrored record (a prediction; the chain still raises the usual `Use`
+  intent), while singleplayer and the server's replay of that `Use` both begin the ritual through the same call, so
+  `IntentReplay` has no altar branch and no message is new. `GameplayInput` toasts the verdict on a fresh press only (a
+  held button repeats the use harmlessly).
+- **The ritual and the rise** (`TowerManager.UpdateAltars`, called by `MobDirector.Update` right after the king manager on
+  authoritative worlds): a Ritual record counts `MobConfig.SkeletonKingRitualSeconds` down, then spawns one king through
+  `SkeletonKingManager.Spawn` at `TowerRecord.KingHome` (feet on top of the altar, leash `OuterRadius`, summon tier
+  `TowerDifficulty.Clamp(Floors.Length - 1)`) with its rise clip, and turns Awake; a full hard cap retries next frame.
+  While a record is in Ritual, `AmbientEffects.UpdateRitualEffects` puffs sparks over the altar and pulses a small camera
+  shake by distance (singleplayer and a client, from the mirrored state; never a server).
+- **Settling** (`TowerManager.SettleAltars(kings, pendingKing)`, after every `UpdateAltars` and right before the stations
+  capture): over Ritual and Awake records, the tower's `SkeletonKingManager.StatusFor(key)` (a `KingStatus`) decides. A
+  king at `Health <= 0` (Killed, dead or dying) marks the tower **Defeated the same frame**, before its death has played,
+  so no frame or save ever records Dormant for a killed king; a Ritual record whose king is Alive turns Awake; an Awake
+  record with no living king (None, or Fading: a despawn keeps its health, since `Mob.BeginDying` never touches it) and no
+  entry pending in the save restore (`WorldPersistence.PendingKingFor`) returns to **Dormant**, so the ritual is free again.
+  So every target leaving (past `SkeletonKingLeaveRadiusBlocks`), an empty server (the manager fades a king when nobody is
+  in play, which the base distance despawn skips) and a player dying and respawning far away all reset the tower, while
+  only a kill defeats it. `TowerManager.MarkDefeated` raises the `TowerManager.BossDefeated` event once and
+  `TowerRecord.BossDefeated` reads true from then on: BT-8's collapse hook (nothing listens yet).
+- **The Skeleton King** (`skeleton_king.json`, hp 400, not difficulty-scaled, `"boss": true`; the placeholder
+  `loot/skeleton_king.json` of bones, wrought iron and bronze ingots until BT-7's unique pool) is a `SkeletonKing`
+  (`Entities/TowerMobs/`), a `RealmMob` with `IsBoss` and `IsUndead` true (the `undeadDamage` stat applies) and no floating
+  healthbar. Its model and skin come from `tools/generate-skeleton-king-model.py` (deterministic, `--check`, on the hell and
+  skeleton scripts' machinery): a 3-block crowned humanoid (`EntityContract.RequireHumanoid`) with a bone club under
+  `ArmR`, clips idle, walk, `slam` (`impact`), `volley` (`release`), `summon` (`summon`), hurt, death and a `spawn` that
+  rises out of the altar. Three attack variants ride one `AttackCount` (slam 0, volley 1, summon 2; a mirror plays the clip
+  by remainder, see "A mirror's attack clip"). Its GL-free `SkeletonKingBrain` (an injected roll) observes the health share:
+  phase 2 below `SkeletonKingPhase2Share`, phase 3 below `SkeletonKingPhase3Share`, rising only; the first observation is
+  silent (so a restore never re-summons) and each later phase change owes one summon. It chooses, first match wins: an owed
+  summon, a slam in reach off cooldown, from phase 2 a rolled summon off cooldown, a volley inside its band with a clear
+  line, grounded, off cooldown; phase 3 enrages (shorter cooldowns, faster walk). `SkeletonKingManager`
+  (`Simulation/Tower/`, on the shared `RealmMobManager` frame and `MobCaps`, forced spawn only, one king per tower: a tower
+  that reads Alive or Killed refuses another) lands the slam as a shockwave (`MobTargets.InShockwave`, the cloud golem's
+  rule), the volley as a fan of `bone` projectiles through `MobMissiles` (merged into `ThrowAction`'s projectile list), and
+  the summon as a ring of skeletons at the home's summon tier (`SkeletonManager.Spawn`, standing spots at the feet level,
+  a cell below or a cell above, so a king on the altar raises them on the roof), never more living than
+  `SkeletonKingMaxMinions`; summoned skeletons have no floor, so the lock recount ignores them. The king is leashed to its
+  home: past its leash it walks back (`SkeletonKing.HomeMove`), and knocked far past it or below the roof it is put back on
+  the altar (`EnforceLeash`); with no target for `SkeletonKingResetSeconds` it heals to full and its brain resets. Tuning:
+  the "Skeleton King" block of `MobConfig` (first guesses).
+- **The boss bar** comes from `BossSelection.Nearest` over `World.Mobs` (`MobDirector.RefreshMobs` adds the kings), in
+  singleplayer and from a client's mirrors alike, limited by the king's `Mob.BossBarRange`
+  (`SkeletonKingBossBarRangeBlocks`; the sandworm's is unlimited).
+- **Saves and the wire (BT-6)**: `stations.json`'s `TowerData.Altar` (the state's name, absent = Dormant; a Ritual restores
+  with a full timer) and `entities.json`'s king (a `MobData` with `TowerCell` its tower and `Tier` its summon tier; a
+  fading king is not saved): a restore re-binds it through `TowerPlacement.TryGetSite` and `Towers.Track(site).KingHome`
+  and spawns it with no rise and no ritual, resuming the fight, and the tower stays Awake while the entry is pending.
+  Protocol 27: each tower's altar state byte at the end of its `StationState` record, and `NetEntityKind.SkeletonKing` (14),
+  its phase in `ItemId` (clamped to 1..3 on read) and its attack count in `Ammo`; a client mirrors it unbound
+  (`SkeletonKingManager.SpawnMirror`, no leash, no summons).
+- **Scenario and tests (BT-6)**: the `altar` op (`World.UseAltar` plus its toast); `visual-examples/skeleton-king.json`
+  (`VOXEL_TIME=147`) clears the default tower's floors with `towerclear`, then films the altar, the ritual, the rise, the
+  boss bar, the slam, the volley and a summon. Tests: `TowerAltarTests`, `TowerAltarWorldTests`, `SkeletonKingBrainTests`,
+  `SkeletonKingTests`, `SkeletonKingManagerTests`, the altar cases of `TowerPlacementTests`, `TowerLockBlockTests`,
+  `TowerManagerSaveTests` and `StationNetCodecTests`, `BossSelectionTests.ABossBarRespectsItsRange`, the king in
+  `WorldLifecycleTests`, `NetworkEntitySyncTests` and `UndeadStrikeTests`, `VisualScenarioTests.AnAltarStepParsesItsCell`
+  and the loopback `GameServerTests.AClientRaisesTheSkeletonKingFromAClearedTowersAltar` and
+  `ASealedAltarRaisesNothingForAClient`.
+- **Known gaps (BT-6)**: the king's bones, like every mob missile, are not on the wire (a client sees only the damage); the
+  king is not drawn in the water mirror; a ritual's remaining time is not saved (it restarts); tower chunks saved before
+  BT-6 keep an air altar cell, so that tower's altar cannot be clicked; the king's numbers are first guesses.
 
 ### Sandworm
 

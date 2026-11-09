@@ -43,4 +43,33 @@ public sealed class BossSelectionTests
         worm.BeginDying();
         Assert.Null(BossSelection.Nearest(new List<Mob> { worm }, Vector3.Zero));
     }
+
+    [Fact]
+    public void ABossBarRespectsItsRange()
+    {
+        const float range = 20f;
+        var boss = new RangedBoss(new Vector3(range - 1f, 0f, 0f), range);
+        Assert.NotNull(BossSelection.Nearest(new List<Mob> { boss }, Vector3.Zero));
+        Assert.Null(BossSelection.Nearest(new List<Mob> { boss }, new Vector3(-2f, 0f, 0f)));
+
+        // A boss beyond its range never hides one still within reach, and an unlimited boss (the sandworm) shows
+        // however far away it is.
+        var worm = Worm(10_000f);
+        var bar = BossSelection.Nearest(new List<Mob> { boss, worm }, new Vector3(-2f, 0f, 0f));
+        Assert.NotNull(bar);
+        Assert.Equal(worm.Type.DisplayName, bar!.Value.Name);
+    }
+
+    /// <summary>A boss whose bar shows only within <c>range</c> blocks of the viewer.</summary>
+    private sealed class RangedBoss(Vector3 position, float range) : Mob(EntityRegistry.Require("slime"), position)
+    {
+        public override bool IsBoss => true;
+        public override float BossBarRange => range;
+        public override float BodyHalfExtent => 0.5f;
+        public override float BodyHalfHeight => 0.5f;
+        public override float HeadAboveCenter => 0.5f;
+        public override Vector3 Velocity => Vector3.Zero;
+        public override void Shove(Vector3 direction, float speed) { }
+        protected override void SetVelocity(Vector3 velocity) { }
+    }
 }

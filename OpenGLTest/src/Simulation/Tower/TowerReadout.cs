@@ -1,7 +1,7 @@
 namespace VoxelEngine.Simulation.Tower;
 
 /// <summary>
-/// The look-at status lines of a battle tower's skeleton piles and doors, built from a <see cref="TowerFloorState"/>
+/// The look-at status lines of a battle tower's skeleton piles, doors and altar (and the altar's toasts), built from a <see cref="TowerFloorState"/>
 /// (live on the authoritative side, read from the wire on a client's mirror). Floors are numbered from 1 for the
 /// player: floor index 0 reads "Floor 1".
 /// </summary>
@@ -22,6 +22,28 @@ public static class TowerReadout
         if (floor.PilesLeft > 0) return $"Floor {name} sealed: {Count(floor.PilesLeft, "pile")} left";
         return $"Floor {name} sealed: {Count(floor.Alive, "skeleton")} left";
     }
+
+    /// <summary>The toast a right-click on the altar shows for <paramref name="verdict"/>.</summary>
+    public static string AltarToast(AltarVerdict verdict) => verdict switch
+    {
+        AltarVerdict.Begin => "The ritual begins...",
+        AltarVerdict.Sealed => "The seals still hold",
+        AltarVerdict.Stirring => "The ritual is under way",
+        AltarVerdict.Awake => "The Skeleton King walks",
+        AltarVerdict.Defeated => "The Skeleton King has fallen",
+        _ => "The altar is silent",
+    };
+
+    /// <summary>The altar's look-at line for <paramref name="verdict"/>.</summary>
+    public static string Altar(AltarVerdict verdict) => verdict switch
+    {
+        AltarVerdict.Begin => "Altar: ready for the ritual",
+        AltarVerdict.Sealed => "Altar: sealed until every floor is cleared",
+        AltarVerdict.Stirring => "Altar: the ritual is under way",
+        AltarVerdict.Awake => "Altar: the Skeleton King walks",
+        AltarVerdict.Defeated => "Altar: the Skeleton King has fallen",
+        _ => "Altar: silent",
+    };
 
     private static string Count(int n, string noun) => n == 1 ? $"1 {noun}" : $"{n} {noun}s";
 }

@@ -1,0 +1,67 @@
+{
+  // The Skeleton King and the roof altar (plans/BATTLE_TOWER.md BT-6): run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/skeleton-king.json
+  // Shots land in visual/skeleton-king/. The tower is battle-tower.json's, the one nearest the origin on the
+  // default seed: center (2920, -1411), 5 floors, roof at y 45, the altar block at (2920, 46, -1411), so a risen
+  // king stands on it with its feet at y 47. The camera flies (and so is immune: the king still faces and swings at
+  // it, as the goblins do in goblins.json). The five towerclear steps open every floor's door, which the ritual
+  // needs; the altar step is the right-click on the altar (World.UseAltar plus its toast). The camera waits for the
+  // ritual well outside the volley band, so the first volley is still to come when it moves in.
+  // Shots: the altar; the ritual's sparks and toast; the rise; the king standing with its boss bar; a slam close up
+  // from the shoulder view (wind-up, impact, follow-through); a bone volley flying at the player from the volley
+  // band; then a damage step past the phase-2 share, the owed summon and the skeletons it raised.
+  // The fight shots ride the king's cooldowns (SkeletonKingBrain), so retuning them may need new waits here.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+
+    { "op": "teleport", "pos": [2909.5, 48.5, -1410.5], "yaw": 0, "pitch": -12 },
+    { "op": "wait", "seconds": 15 },
+
+    { "op": "towerclear", "floor": 0 },
+    { "op": "towerclear", "floor": 1 },
+    { "op": "towerclear", "floor": 2 },
+    { "op": "towerclear", "floor": 3 },
+    { "op": "towerclear", "floor": 4 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "altar", "hideHud": true },
+
+    { "op": "altar", "pos": [2920, 46, -1411] },
+    { "op": "teleport", "pos": [2902.5, 50.5, -1410.5], "yaw": 0, "pitch": -8 },
+    { "op": "wait", "seconds": 1.0 },
+    { "op": "screenshot", "name": "ritual" },
+
+    { "op": "wait", "seconds": 3.0 },
+    { "op": "screenshot", "name": "rise", "hideHud": true },
+
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "risen" },
+
+    { "op": "view", "mode": "shoulder" },
+    { "op": "teleport", "pos": [2918.2, 49.3, -1412.2], "yaw": 36, "pitch": 4 },
+    { "op": "wait", "seconds": 0.3 },
+    { "op": "screenshot", "name": "slam_windup", "hideHud": true },
+    { "op": "wait", "seconds": 0.25 },
+    { "op": "screenshot", "name": "slam_impact", "hideHud": true },
+    { "op": "wait", "seconds": 0.25 },
+    { "op": "screenshot", "name": "slam_follow", "hideHud": true },
+
+    { "op": "teleport", "pos": [2909.5, 49.5, -1410.5], "yaw": 0, "pitch": -5 },
+    { "op": "wait", "seconds": 0.45 },
+    { "op": "screenshot", "name": "volley_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "volley_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "volley_c", "hideHud": true },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "volley_d", "hideHud": true },
+
+    { "op": "view", "mode": "first" },
+    { "op": "teleport", "pos": [2905.5, 51.5, -1410.5], "yaw": 0, "pitch": -12 },
+    { "op": "damage", "amount": 150 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "summon" },
+    { "op": "wait", "seconds": 1.2 },
+    { "op": "screenshot", "name": "minions", "hideHud": true }
+  ]
+}

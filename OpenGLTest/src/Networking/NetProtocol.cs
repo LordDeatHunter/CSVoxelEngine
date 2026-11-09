@@ -193,8 +193,12 @@ public static class NetFraming
     /// count (melee even, shot odd) in the ammo field; an older client would not draw it.
     /// 26: the battle tower locks appended at the end of <see cref="NetMessage.StationState"/> (each tower's cell, center,
     /// radius and per floor its band, piles left, skeletons left and door bit); an older peer would misread the station
-    /// frames.</summary>
-    public const int ProtocolVersion = 26;
+    /// frames.
+    /// 27: each tower's altar state byte (<see cref="Simulation.Tower.TowerAltarState"/>) appended after its floors in
+    /// <see cref="NetMessage.StationState"/>; an older peer would misread the station frames. Also
+    /// <see cref="NetEntityKind.SkeletonKing"/> (the tower's boss): its attack count in the ammo field (slam, volley, summon
+    /// by remainder modulo 3), its fight phase in the item byte; an older client would not draw it.</summary>
+    public const int ProtocolVersion = 27;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

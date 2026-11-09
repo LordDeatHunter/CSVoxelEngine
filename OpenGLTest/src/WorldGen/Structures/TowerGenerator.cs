@@ -11,8 +11,9 @@ namespace VoxelEngine.WorldGen.Structures;
 /// One cell function (<see cref="Merge"/>) feeds both the chunk stamp (<see cref="StampSite"/>) and the point query
 /// (<see cref="CellAt(int, int, int)"/>), so the two agree across every chunk seam by construction. A template cell naming the
 /// plain tower brick is swapped for the site's palette brick, and a tower chest cell carries its floor's tier in its state
-/// (<see cref="ChestProfile.TierState"/> OR'd onto its facing; the roof's chest <see cref="TowerSite.TreasureTier"/>). GL-free
-/// and pure.
+/// (<see cref="ChestProfile.TierState"/> OR'd onto its facing; the roof's chest <see cref="TowerSite.TreasureTier"/>). The roof's
+/// template leaves its center cell free (the structure loader's rule) and the generator fills it with the altar block at
+/// <see cref="TowerSite.AltarCell"/>. GL-free and pure.
 /// </summary>
 public static class TowerGenerator
 {
@@ -46,6 +47,7 @@ public static class TowerGenerator
         }
         else if (ring != TowerRing.Apron && y > s.RoofY && y <= s.RoofY + s.Altar.Height)
         {
+            if ((x, y, z) == s.AltarCell) return TowerPalette.AltarBlock;
             var dressed = TemplateCell(s, s.Altar, s.AltarTurns, x, y - s.RoofY - 1, z, TowerSite.TreasureTier);
             if (dressed >= 0) return dressed;
         }

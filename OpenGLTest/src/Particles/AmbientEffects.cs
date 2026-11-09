@@ -176,6 +176,56 @@ internal sealed class AmbientEffects
         }
     }
 
+    // The altar tops of the towers whose ritual runs this frame (UpdateRitualEffects), and its two clocks
+    private readonly List<Vector3> _ritualAltars = [];
+    private float _ritualSparkDebt;
+    private float _ritualShakeClock;
+
+    /// <summary>
+    /// The altar ritual's show: every tower altar whose ritual runs (<see cref="Simulation.Tower.TowerManager.RitualAltars"/>,
+    /// on the authoritative world or a client's mirrored records) within
+    /// <see cref="MobConfig.SkeletonKingRitualEffectRangeBlocks"/> of the eye throws sparks off its top at
+    /// <see cref="MobConfig.SkeletonKingRitualSparksPerSecond"/> on the campfire particle instance, and the nearest one
+    /// rumbles the camera every <see cref="MobConfig.SkeletonKingRitualShakePulseSeconds"/>, by its distance
+    /// (<see cref="ShakeFalloff"/>). Cosmetic: singleplayer and a client, never a headless server.
+    /// </summary>
+    internal void UpdateRitualEffects(float deltaTime)
+    {
+        if (_serverMode || deltaTime <= 0f)
+            return;
+        _ritualAltars.Clear();
+        _world.Towers.RitualAltars(_ritualAltars);
+        if (_ritualAltars.Count == 0)
+        {
+            _ritualSparkDebt = 0f;
+            _ritualShakeClock = 0f;
+            return;
+        }
+
+        var eye = Camera.RenderEye;
+        const float reach = MobConfig.SkeletonKingRitualEffectRangeBlocks * MobConfig.SkeletonKingRitualEffectRangeBlocks;
+        _ritualSparkDebt += MobConfig.SkeletonKingRitualSparksPerSecond * deltaTime;
+        var sparks = (int)_ritualSparkDebt;
+        _ritualSparkDebt -= sparks;
+        var nearest = float.MaxValue;
+        for (var i = 0; i < _ritualAltars.Count; i++)
+        {
+            var top = _ritualAltars[i];
+            var d2 = Vector3.DistanceSquared(top, eye);
+            if (d2 > reach) continue;
+            nearest = Math.Min(nearest, d2);
+            if (sparks > 0)
+                _fire.Puff(top, sparks, 0.8f, FireParticleKind.Spark);
+        }
+
+        _ritualShakeClock += deltaTime;
+        if (_ritualShakeClock < MobConfig.SkeletonKingRitualShakePulseSeconds || nearest == float.MaxValue) return;
+        _ritualShakeClock = 0f;
+        Camera.AddShake(ShakeFalloff.Trauma(MobConfig.SkeletonKingRitualShakeStrength,
+            MobConfig.SkeletonKingRitualShakeNearBlocks, MobConfig.SkeletonKingRitualEffectRangeBlocks,
+            MathF.Sqrt(nearest)));
+    }
+
     /// <summary>Shakes the local camera for a TNT blast at <paramref name="center"/>, by its distance
     /// (<see cref="ShakeFalloff"/>). Cosmetic: singleplayer and a client.</summary>
     internal void ShakeForBlast(Vector3 center) =>

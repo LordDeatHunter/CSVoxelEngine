@@ -68,6 +68,48 @@ public sealed class TowerManagerSaveTests
         }
     }
 
+    [Theory]
+    [InlineData(TowerAltarState.Ritual)]
+    [InlineData(TowerAltarState.Awake)]
+    [InlineData(TowerAltarState.Defeated)]
+    public void TheAltarStateComesBackFromStationsJson(TowerAltarState state)
+    {
+        var site = Nearest();
+        var saved = new TowerManager(null);
+        saved.Track(site).AltarState = state;
+
+        var restored = new TowerManager(null);
+        Assert.Equal(0, restored.Restore(RoundTrip(saved.Capture())));
+        var back = restored.RecordAt(site.CenterX, site.CenterZ)!;
+        Assert.Equal(state, back.AltarState);
+        // A ritual under way restarts its timer
+        Assert.Equal(state == TowerAltarState.Ritual, back.RitualLeft > 0f);
+    }
+
+    [Fact]
+    public void AnEntryWithoutAnAltarStateRestoresDormant()
+    {
+        var site = Nearest();
+        var saved = new TowerManager(null);
+        saved.Track(site).AltarState = TowerAltarState.Defeated;
+        var entry = RoundTrip(saved.Capture())!.Single();
+        entry.Altar = null;
+        var unknown = RoundTrip(saved.Capture())!.Single();
+        unknown.Altar = "NotAState";
+
+        foreach (var data in new[] { entry, unknown })
+        {
+            var restored = new TowerManager(null);
+            Assert.Equal(0, restored.Restore([data]));
+            Assert.Equal(TowerAltarState.Dormant, restored.RecordAt(site.CenterX, site.CenterZ)!.AltarState);
+        }
+
+        // A dormant altar is not written at all
+        var dormant = new TowerManager(null);
+        dormant.Track(site);
+        Assert.Null(dormant.Capture()!.Single().Altar);
+    }
+
     [Fact]
     public void AnEntryWithNoTowerIsDroppedAndCounted()
     {

@@ -358,12 +358,14 @@ public sealed class TowerPlacementTests
     }
 
     [Fact]
-    public void TheAltarCellIsFreeOnAnUnbreakableRoof()
+    public void TheAltarStandsInItsCellOnAnUnbreakableRoof()
     {
         foreach (var s in TowerSiteFixture.SyntheticSites().Append(Nearest()))
         {
             var (x, y, z) = s.AltarCell;
-            Assert.Equal(BlockType.Air, (byte)TowerGenerator.CellAt(s, x, y, z));
+            var altar = TowerGenerator.CellAt(s, x, y, z);
+            Assert.Equal(TowerPalette.AltarBlock, (byte)BlockOf(altar));
+            Assert.True(BlockType.IsUnbreakable(TowerPalette.AltarBlock));
             var roof = TowerGenerator.CellAt(s, x, y - 1, z);
             Assert.True(roof >= 0 && BlockType.IsUnbreakable((byte)BlockOf(roof)));
         }

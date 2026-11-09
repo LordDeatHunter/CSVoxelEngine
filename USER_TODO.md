@@ -161,9 +161,9 @@ plinth and cap; both models are symmetric.
   `tower_bricks_frost.png`. Opaque and tileable; palette swaps of `stone_bricks`, so the three must
   read as one structure in their biomes.
 
-### Battle tower locks
+### Battle tower locks and altar
 
-Both made by `tools/generate-tower-lock-textures.py`: re-running puts the placeholders back
+All three made by `tools/generate-tower-lock-textures.py`: re-running puts the placeholders back
 (`--check` compares), so remove or repoint that generator with the replacement.
 
 - [ ] **Tower gate** — `tower_door.png`. 32x32 RGBA, a cutout with binary alpha (fully clear gaps,
@@ -173,6 +173,10 @@ Both made by `tools/generate-tower-lock-textures.py`: re-running puts the placeh
   crops it with default UVs: the base's sides take rows 26..31 across columns 4..27, its top the
   square rows/columns 4..27; the skull's sides take rows 18..25 across columns 10..21 (the sockets
   sit there) and its top the square rows/columns 10..21.
+- [ ] **Tower altar top** — `tower_altar_top.png`. 32x32, fully opaque: the top face of the
+  `tower_altar` (a `cube_bottom_top` whose sides and bottom are `stone_bricks`), so keep its rim in
+  the stone-brick grays where it meets the sides. The block glows (light 7), so a crystal or rune
+  center that reads as lit fits.
 
 ### Battle tower chest
 
@@ -180,3 +184,17 @@ Both made by `tools/generate-tower-lock-textures.py`: re-running puts the placeh
   worldgen-only `tower_chest` (BT-5) currently reuses the underground ruin chest's
   `chest_ruin_underground_*` tiles; same layout as the ruin chests (the shared `block/chest` model).
   Repoint `tower_chest.json`'s textures when they land.
+
+## Entity models
+
+Paths are under `OpenGLTest/assets/models/entity/`. Every model is a Blockbench `.bbmodel` with its
+skin PNG beside it; the `tools/` generator writes both, so replace them by editing that generator
+(or remove it in the same change), or a re-run puts the placeholder back (`--check` compares).
+
+- [ ] **Skeleton King** — `skeleton_king.bbmodel` and `skeleton_king.png` (128x128 skin, small
+  palette: the skeleton's bone shades, gold, purple, red eyes). Made by
+  `tools/generate-skeleton-king-model.py`. Keep the humanoid groups (`Torso`, `Head`, `ArmL`, `ArmR`,
+  `LegL`, `LegR`, with the head and arms under the torso), the clip names (`idle`, `walk`, `slam`,
+  `volley`, `summon`, `hurt`, `death`, `spawn`) and their events (`impact` on `slam`, `release` on
+  `volley`, `summon` on `summon`), which `SkeletonKing.ValidateContent` checks at startup, and a
+  height near 3 blocks (`MobConfig.SkeletonKingHeight`).

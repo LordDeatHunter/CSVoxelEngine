@@ -432,6 +432,94 @@ public static class MobConfig
     /// <summary>A bound skeleton farther than this from its tower's center is released and owed back to its floor.</summary>
     public const float TowerSkeletonLeashBlocks = 48f;
 
+    // --- Skeleton King (SkeletonKingManager, SkeletonKing, TowerManager's altar) ---
+    /// <summary>Seconds the altar's ritual runs before the Skeleton King rises (a first guess).</summary>
+    public const float SkeletonKingRitualSeconds = 3.5f;
+    // Every number below is a first guess, to be tuned from visual-examples/skeleton-king.json.
+    /// <summary>Height of the king's collision body in blocks (the model stands 48 px).</summary>
+    public const float SkeletonKingHeight = 3.0f;
+    /// <summary>Half the king's horizontal body edge in blocks (its trunk; pauldrons and club stick out).</summary>
+    public const float SkeletonKingHalfExtent = 0.6f;
+    /// <summary>The king's walk speed in blocks per second (before the enrage speeds it up).</summary>
+    public const float SkeletonKingWalkSpeed = 2.2f;
+    /// <summary>The king's auto-jump launch speed.</summary>
+    public const float SkeletonKingJumpSpeed = 9f;
+    /// <summary>How far a player walking into the king pushes it (it barely moves).</summary>
+    public const float SkeletonKingShoveSpeed = 0.4f;
+    /// <summary>At or below this share of its health the king enters phase 2 (summon waves join its attacks).</summary>
+    public const float SkeletonKingPhase2Share = 0.66f;
+    /// <summary>At or below this share of its health the king enters phase 3 (the enrage).</summary>
+    public const float SkeletonKingPhase3Share = 0.33f;
+    /// <summary>A target within this melee reach of the king makes it slam (MobTargets.InMeleeReach).</summary>
+    public const float SkeletonKingSlamTriggerReach = 3f;
+    /// <summary>The slam's shockwave reaches every target within this horizontal radius...</summary>
+    public const float SkeletonKingSlamRadius = 6f;
+    /// <summary>...whose feet stand within this many blocks of the king's (MobTargets.InShockwave).</summary>
+    public const float SkeletonKingSlamHeight = 2.5f;
+    /// <summary>The damage the slam's shockwave deals.</summary>
+    public const int SkeletonKingSlamDamage = 14;
+    /// <summary>The knockback speed of the slam's shockwave.</summary>
+    public const float SkeletonKingSlamKnockbackSpeed = 12f;
+    /// <summary>The upward lift of the slam's shockwave.</summary>
+    public const float SkeletonKingSlamKnockbackLift = 7f;
+    /// <summary>Seconds between two slams (shortened by the enrage).</summary>
+    public const float SkeletonKingSlamCooldownSeconds = 3.5f;
+    /// <summary>Inside this horizontal distance the king does not volley.</summary>
+    public const float SkeletonKingVolleyMinRange = 4f;
+    /// <summary>Beyond this horizontal distance the king does not volley (must stay inside v^2/g at the volley speed).</summary>
+    public const float SkeletonKingVolleyMaxRange = 16f;
+    /// <summary>A volley bone's launch speed.</summary>
+    public const float SkeletonKingVolleySpeed = 24f;
+    /// <summary>How many bones one volley throws in its fan.</summary>
+    public const int SkeletonKingVolleyBones = 5;
+    /// <summary>How many more bones an enraged (phase 3) volley throws.</summary>
+    public const int SkeletonKingVolleyEnrageExtraBones = 2;
+    /// <summary>The whole width of a volley's fan in degrees, outermost bone to outermost bone.</summary>
+    public const float SkeletonKingVolleySpreadDegrees = 30f;
+    /// <summary>The damage one volley bone deals.</summary>
+    public const int SkeletonKingVolleyDamage = 6;
+    /// <summary>The knockback speed of a volley bone hit.</summary>
+    public const float SkeletonKingVolleyKnockbackSpeed = 4f;
+    /// <summary>Seconds between two volleys (shortened by the enrage).</summary>
+    public const float SkeletonKingVolleyCooldownSeconds = 4f;
+    /// <summary>Seconds a freshly risen king waits before its first volley.</summary>
+    public const float SkeletonKingFirstVolleyDelaySeconds = 2f;
+    /// <summary>Seconds between two summon waves (shortened by the enrage).</summary>
+    public const float SkeletonKingSummonCooldownSeconds = 14f;
+    /// <summary>The chance, from phase 2 on, that a summon wave is chosen when its cooldown is over.</summary>
+    public const float SkeletonKingSummonChance = 0.35f;
+    /// <summary>How many skeletons one summon wave raises at most.</summary>
+    public const int SkeletonKingSummonCount = 3;
+    /// <summary>The most living skeletons the king's summons keep at once.</summary>
+    public const int SkeletonKingMaxMinions = 6;
+    /// <summary>How far from the king's feet a summoned skeleton rises.</summary>
+    public const float SkeletonKingSummonRadius = 3.5f;
+    /// <summary>The enraged (phase 3) king's cooldowns are multiplied by this.</summary>
+    public const float SkeletonKingEnrageCooldownFactor = 0.6f;
+    /// <summary>The enraged (phase 3) king walks this much faster.</summary>
+    public const float SkeletonKingEnrageSpeedFactor = 1.35f;
+    /// <summary>Seconds with no target engaged after which a hurt king heals to full and starts over at phase 1.</summary>
+    public const float SkeletonKingResetSeconds = 20f;
+    /// <summary>A king this far below its home's feet (it fell off the roof) is put back on its home.</summary>
+    public const float SkeletonKingLeashDropBlocks = 6f;
+    /// <summary>A king knocked this far past its leash radius is put back on its home.</summary>
+    public const float SkeletonKingLeashMarginBlocks = 4f;
+    /// <summary>A king farther than this from every target fades out (the tower lets it go); also an unbound king's leash.</summary>
+    public const float SkeletonKingLeaveRadiusBlocks = 64f;
+    /// <summary>The boss bar shows while the viewer is within this many blocks of the king.</summary>
+    public const float SkeletonKingBossBarRangeBlocks = 48f;
+    /// <summary>The ritual's sparks and shake show within this many blocks of the altar.</summary>
+    public const float SkeletonKingRitualEffectRangeBlocks = 64f;
+    /// <summary>Sparks per second off an altar while its ritual runs.</summary>
+    public const float SkeletonKingRitualSparksPerSecond = 30f;
+    /// <summary>Seconds between the ritual's small camera rumbles (a first guess).</summary>
+    public const float SkeletonKingRitualShakePulseSeconds = 0.6f;
+    /// <summary>Trauma of one ritual rumble within <see cref="SkeletonKingRitualShakeNearBlocks"/> of the altar, falling
+    /// off with distance (<c>ShakeFalloff</c>) to nothing at <see cref="SkeletonKingRitualEffectRangeBlocks"/>.</summary>
+    public const float SkeletonKingRitualShakeStrength = 0.25f;
+    /// <summary>Within this many blocks of the altar a ritual rumble shakes at full strength.</summary>
+    public const float SkeletonKingRitualShakeNearBlocks = 8f;
+
     // --- Entity healthbars (EntityHealthbarRenderer) ---
     // Five hearts float above every live mob, billboarded to face the camera, using the same
     // heart sprites as the player HUD. The pool is drawn proportionally across the row (each

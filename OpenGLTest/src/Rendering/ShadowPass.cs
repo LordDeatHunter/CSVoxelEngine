@@ -97,7 +97,7 @@ internal sealed class ShadowPass
         IReadOnlyList<LodRegion>? lodRegions = null, IReadOnlyList<Goblin>? goblins = null,
         IReadOnlyList<Iceberg>? icebergs = null, IReadOnlyList<RiggedMob>? hellMobs = null,
         IReadOnlyList<RiggedMob>? skyMobs = null, IReadOnlyList<Sandworm>? sandworms = null,
-        IReadOnlyList<RiggedMob>? skeletons = null)
+        IReadOnlyList<RiggedMob>? skeletons = null, IReadOnlyList<RiggedMob>? skeletonKings = null)
     {
         // The dry strength, not the wet-faded one: submerged, the caustics and the sun shafts
         // still sample this map even though the world diffuse has stopped using it.
@@ -204,6 +204,7 @@ internal sealed class ShadowPass
         DrawRealmCasters(hellMobs);
         DrawRealmCasters(skyMobs);
         DrawRealmCasters(skeletons);
+        DrawRealmCasters(skeletonKings);
         DrawSandwormCasters(sandworms);
 
         if (icebergs != null)
