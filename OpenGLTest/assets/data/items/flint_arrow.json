@@ -1,4 +1,4 @@
-{ "name": "Arrow", "texture": "assets/textures/items/arrow.png",
+{ "name": "Arrow", "texture": "assets/textures/items/flint_arrow.png",
   "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.6 },
   "throwDamage": 2,
   "throwAligned": true }

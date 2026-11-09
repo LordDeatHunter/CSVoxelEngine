@@ -38,7 +38,7 @@ public sealed class SkeletonManager : RealmMobManager<Skeleton>
     {
         if (type != null) Skeleton.ValidateContent(type);
         _type = type;
-        _arrowItemId = ContentRegistry.RequireItem("arrow").Id;
+        _arrowItemId = ContentRegistry.RequireItem("flint_arrow").Id;
     }
 
     /// <summary>Arrows in flight; drawn and mirrored like the player's own throws.</summary>
