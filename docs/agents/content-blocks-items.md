@@ -345,9 +345,9 @@ box's 34 blocks), then asks each column the same rule `BlockAt` asks: the point 
 across seams, a chunk reads no neighbor and nothing is cached. Islands write into air only.
 
 **Sky landmasses** (`WorldGen/Sky/SkyLandmasses.cs`, `SkyIslandConfig.Landmass*`, seed offsets 175-178) are whole
-floating continents beside the ordinary islands: one hashed candidate per `LandmassCellBlocks` (4200) cell
-(`TerrainSites`, salt "SKYL"), a bounding radius spread evenly from `LandmassMinRadius` (1200) to
-`LandmassMaxRadius` (2500), kept `LandmassGapBlocks` clear of lower-hash neighbors. A landmass is a `SkyIsland` with
+floating continents beside the ordinary islands: one hashed candidate per `LandmassCellBlocks` (2100) cell
+(`TerrainSites`, salt "SKYL"), a bounding radius spread evenly from `LandmassMinRadius` (300) to
+`LandmassMaxRadius` (625), kept `LandmassGapBlocks` clear of lower-hash neighbors. A landmass is a `SkyIsland` with
 an `Aspect` (`IsLandmass`; `Radius` is its bounding disc, `Dome` its hill height, `Depth` its keel), so `CollectIslands`
 hands it out first and the stamp, flora, sky trees, ruins and mob spawner read it unchanged. Its outline is a long
 ellipse of a hashed turn and aspect (`LandmassMinAspect`..1) whose point is first domain-warped (`LandmassWarp`, noise 175/176

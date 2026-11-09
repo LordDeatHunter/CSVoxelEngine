@@ -120,7 +120,7 @@ public static class SkyIslandConfig
     // --- Landmasses: great floating continents, one hashed candidate per big cell (SkyLandmasses) ---
 
     /// <summary>Side of the square cell that rolls at most one landmass.</summary>
-    public const int LandmassCellBlocks = 4200;
+    public const int LandmassCellBlocks = 2100;
 
     /// <summary>Chance a landmass cell rolls a candidate.</summary>
     public const float LandmassChance = 0.9f;
@@ -129,19 +129,19 @@ public static class SkyIslandConfig
     public const float LandmassSizeSkew = 1.0f;
 
     /// <summary>Bounding radius of the smallest landmass.</summary>
-    public const float LandmassMinRadius = 1200f;
+    public const float LandmassMinRadius = 300f;
 
     /// <summary>Bounding radius of the biggest landmass.</summary>
-    public const float LandmassMaxRadius = 2500f;
+    public const float LandmassMaxRadius = 625f;
 
     /// <summary>The least open sky between two landmasses' bounding discs.</summary>
-    public const float LandmassGapBlocks = 400f;
+    public const float LandmassGapBlocks = 100f;
 
     /// <summary>The ring around a landmass' bounding disc, as a share of its radius, in which broken-off islands drift.</summary>
     public const float LandmassFringeShare = 0.35f;
 
     /// <summary>The most blocks the fringe is wide, whatever the landmass' size.</summary>
-    public const float LandmassFringeMaxBlocks = 600f;
+    public const float LandmassFringeMaxBlocks = 150f;
 
     /// <summary>Share of the bounding radius that is the ellipse's long semi-axis: the rest is room for the coast's warp.</summary>
     public const float LandmassBoundShare = 1.35f;
@@ -183,10 +183,10 @@ public static class SkyIslandConfig
     public const float LandmassKeelFrequency = 1f / 60f;
 
     /// <summary>Bounding radius from which a landmass counts as medium (sky mob tier 1).</summary>
-    public const float LandmassMediumTierRadius = 1700f;
+    public const float LandmassMediumTierRadius = 425f;
 
     /// <summary>Bounding radius from which a landmass counts as big (sky mob tier 2).</summary>
-    public const float LandmassBigTierRadius = 2100f;
+    public const float LandmassBigTierRadius = 525f;
 
     // --- Sky biomes (L-13): meadow and frost highland, by a coherent 2D noise at the island's center ---
 

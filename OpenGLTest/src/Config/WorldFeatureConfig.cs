@@ -24,13 +24,17 @@ public static class WorldFeatureConfig
     // Meadow cross-blocks in clumps on dry grass, only where the forest is open enough
     public const bool FlowersEnabled = true;
     public const int MeadowCellShift = 5;
-    public const int MeadowRadius = 4;
+    public const int MeadowRadius = 8;
     public const int MeadowJitter = 3;
     public const int MeadowMinMembers = 4;
     public const float MeadowClumpChance = 0.45f;
-    public const float MeadowEdgeDensity = 0.25f;
+    public const float MeadowEdgeDensity = 0.4f;
     // ForestOpenness a clump's center needs: the open stretches between the woodland
     public const float MeadowMinOpenness = 0.55f;
+    // Inside a meadow, at most one flower per MeadowFlowerSpacing x MeadowFlowerSpacing patch, rolled
+    // with MeadowFlowerChance: the flowers spread over the meadow instead of bunching up
+    public const int MeadowFlowerSpacing = 3;
+    public const float MeadowFlowerChance = 0.7f;
 
     // --- Foliage (FoliageGenerator) ---
     // Ground cover on the biome's own surface: forest grass tufts are common, desert dead shrubs

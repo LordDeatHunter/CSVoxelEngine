@@ -149,7 +149,8 @@ island from offshore, its beach, a sand knoll, an archipelago chain and islands 
 **openness** mask (`Openness*`) flattens the hills a little and thins the trees toward none, so the
 forest alternates between rolling woodland and open grass instead of one uniform canopy
 (`TreeGenerator.TryGetTree` reads `TerrainGenerator.ForestOpenness`, scaled per species by its
-`worldgen.openness`, so a taiga keeps more of its spruce and the desert's cactus ignores it). On land a hashed lake bowl and a warped river ridge carve below
+`worldgen.openness`, so a taiga keeps more of its spruce, while the desert's cactus takes all of it and spacing 4, so a desert alternates
+between cactus groves and empty dunes). On land a hashed lake bowl and a warped river ridge carve below
 their own water level and flood only those (every land biome but the desert; both fade out toward a
 desert so a pond closes on its own rim) — see the Water invariant below. Far from the spawn (past
 `GreatLakeSpawnClearRadius`, 1536 blocks) rare **great lakes** (`WorldGen/GreatLakes.cs`, phase D)
@@ -216,7 +217,7 @@ in the desert (where it wins over the dead tree, since
 the desert, the frozen tundra and the steppe, and `stone_pine` in the savanna, whose umbrella crown
 stands in for an acacia (its reach equals the palm's, so `ReachChunkRadius` did not grow), while
 `baobab` never generates (`EveryTreeGrowsInItsSpeciesBiome` checks every land biome a species
-names); the forest and the steppe grow flowers in open clumps (`FlowerGenerator`), grass tufts
+names); the forest and the steppe grow flowers in open meadows (`FlowerGenerator`), grass tufts
 grow in the forest, steppe and savanna, and dead shrubs grow sparsely on desert sand and on the
 frozen plains' permafrost (`FoliageGenerator.TryGetDeadShrub`). A tundra shrub replaces the snow cell
 the snow pass already laid over permafrost: the one exception to the into-air stamp rule, confined
@@ -296,7 +297,9 @@ the gated `StampGround`) is never gated, since its leaves may come from neighbor
 
 The tuft density of the `tall_grass`/`dead_shrub` plants runs with the climate's wetness
 (`FoliageGenerator.GrassDensityAt`, `GrassDensityDry`..`GrassDensityWet`) and every flower stands in
-an open-forest clump (`FlowerGenerator`, the `PlantClumps` rule) (`MeadowTests`).
+an open-forest clump (`FlowerGenerator`, the `PlantClumps` rule), spread inside it at most one per
+`MeadowFlowerSpacing` square patch at a spot off the patch's last row and column, so no two flowers touch
+(`FlowerGenerator.IsSpreadSpot`) (`MeadowTests`).
 
 **Cave biomes** (`WorldGen/Caves/`, plans/CAVE_BIOMES.md CB-1, tuning `CaveBiome*`/`CaveEcho*`/`CaveDeep*` in
 `WorldGenerationConfig`) dress the overworld's carved caves. `CaveBiome` is its own enum, never the surface `Biome`.
