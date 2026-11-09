@@ -38,6 +38,12 @@ const loadModel = (p) => {
   return modelCache.get(name)
 }
 
+// An animated item's or block's spritesheet: the grid of frames, how it picks one and how fast a loop plays
+const sheetOf = (sh) => sh ? {
+  cols: sh.cols, rows: sh.rows, frames: sh.frames ?? sh.cols * sh.rows,
+  mode: String(sh.mode ?? 'loop').toLowerCase(), fps: sh.fps ?? 8
+} : null
+
 const blocks = {}
 const structures = {}
 for (const { id, file } of listJson(path.join(assets, 'data/blocks'))) {
@@ -50,6 +56,7 @@ for (const { id, file } of listJson(path.join(assets, 'data/blocks'))) {
     fluid: !!d.fluid, emission: d.light?.emission ?? 0, facing: d.facing ?? null, loot: d.loot ?? id,
     size: d.multiblock ? d.multiblock.size ?? 2 : 1,
     biomeTint: d.biomeTint ? Object.values(d.biomeTint.faces ?? {}).map((f) => f.tile ?? f.overlay).filter(Boolean) : null,
+    sheet: sheetOf(d.spritesheet), sheetTexture: d.spritesheet?.texture ?? null,
     model
   }
   const st = structureFrom(id, d)
@@ -57,11 +64,6 @@ for (const { id, file } of listJson(path.join(assets, 'data/blocks'))) {
 }
 
 const items = {}
-// An animated item's spritesheet: the grid of frames, how it picks one and how fast a loop plays
-const sheetOf = (sh) => sh ? {
-  cols: sh.cols, rows: sh.rows, frames: sh.frames ?? sh.cols * sh.rows,
-  mode: String(sh.mode ?? 'loop').toLowerCase(), fps: sh.fps ?? 8
-} : null
 
 for (const { id, file } of listJson(path.join(assets, 'data/items'))) {
   const d = readJson(file)
@@ -219,18 +221,22 @@ const blockDrops = (b) => {
 ` : ''
 }
 
-const shownBlocks = Object.values(blocks).filter((b) => b.hasItem)
+// Blocks with an item get a page, and so does an animated block (lava), which is never held but plays its frames
+const shownBlocks = Object.values(blocks).filter((b) => b.hasItem || b.sheet)
 for (const b of shownBlocks) {
   const tool = b.tools ? Object.entries(b.tools).map(([t, p]) => `${t} (tier ${p})`).join(', ') : null
   const note = b.renderer !== 'model'
     ? `\n::: info\nThis block's shape depends on its surroundings or state (${b.renderer}); the preview shows a representative form.\n:::\n`
     : ''
+  const preview = b.sheet ? `<SheetTile block="${b.id}" />` : `<ModelViewer kind="block" id="${b.id}" />`
   writePage(`game/blocks/${b.id}.md`,
-    `---\ntitle: ${JSON.stringify(b.name)}\n---\n\n# ${esc(b.name)}\n\n<ModelViewer kind="block" id="${b.id}" />\n\n` +
+    `---\ntitle: ${JSON.stringify(b.name)}\n---\n\n# ${esc(b.name)}\n\n${preview}\n\n` +
     `| Property | Value |\n|---|---|\n| Hardness | ${b.hardness} |\n| Needs tool | ${b.requiresTool ? tool ?? 'yes' : 'no'} |\n| Light | ${b.emission || 'none'} |\n` +
     note + blockDrops(b) + recipeSection('block/' + b.id))
 }
-writePage('game/blocks/index.md', '# Blocks\n\n<ItemGrid kind="blocks" />\n')
+const animatedBlocks = shownBlocks.filter((b) => !b.hasItem).map((b) => `[${esc(b.name)}](/game/blocks/${b.id})`)
+writePage('game/blocks/index.md', '# Blocks\n\n<ItemGrid kind="blocks" />\n' +
+  (animatedBlocks.length ? `\nAlso animated, with no item to hold: ${animatedBlocks.join(', ')}.\n` : ''))
 
 for (const i of Object.values(items)) {
   const stats = [

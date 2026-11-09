@@ -217,6 +217,10 @@ uniform vec2 uWaterGlitterFade;
 uniform vec3 uLodLeafColor;
 // Atlas slice of the lava tile: fluid fragments on this layer glow instead of refracting.
 uniform float uLavaLayer;
+// The lava spritesheet: uLavaFrames animation frames in consecutive layers from uLavaLayer, cycled at uLavaFps.
+// One frame (the ItemDebugger's default) is the plain tile.
+uniform float uLavaFrames;
+uniform float uLavaFps;
 uniform float uLavaNormalScale;  // slope-to-normal gain of the lava swell (SurfaceShadingConfig.LavaNormalScale)
 uniform float uLavaCatchLight;   // strength of the point-light catch-light on lava
 uniform float uLavaCatchPower;   // Blinn exponent of that catch-light
@@ -629,7 +633,13 @@ void main() {
         wob1 = sin(fWorldPos.x * 2.1 + uTime * 1.6 + sin(fWorldPos.z * 1.7 + uTime * 1.1));
         wob2 = sin(fWorldPos.z * 2.7 - uTime * 1.9 + sin(fWorldPos.x * 1.3 - uTime * 0.8));
     }
-    vec4 texColor = texture(uTextureAtlas, vec3(fTexCoord, float(fLayer)));
+    // Lava frames are consecutive layers after the lava tile, so the layer a lava fragment samples
+    // is picked by the clock (the frame at the current fps), never by the mesh.
+    float lavaFrame = float(fLayer) - uLavaLayer;
+    bool isLava = isWater && lavaFrame > -0.5 && lavaFrame < max(uLavaFrames, 1.0) - 0.5;
+    float sampleLayer = float(fLayer);
+    if (isLava) sampleLayer = uLavaLayer + mod(floor(uTime * uLavaFps), max(uLavaFrames, 1.0));
+    vec4 texColor = texture(uTextureAtlas, vec3(fTexCoord, sampleLayer));
     // Leaf tiles have transparent holes; cut them out so the canopy sees through instead of
     // blending ghosts. The cutoff is a uniform: the opaque pass uses 0.5 for the leaf holes,
     // the translucent pass uses 0 so glass's faint interior blends instead of vanishing.
@@ -892,7 +902,6 @@ void main() {
     }
 
     float waterSpec = 0.0;
-    bool isLava = isWater && abs(float(fLayer) - uLavaLayer) < 0.5;
     if (isLava) {
         // Molten rock glows on its own instead of refracting: albedo-tinted emission with
         // a slow pulse, flat in shadow and at night. Fog still closes in below.

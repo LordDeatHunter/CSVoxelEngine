@@ -258,6 +258,26 @@ internal static class BlockSchemaParser
 
     /// <summary>Reads a block's <c>anvil</c> object into its <see cref="AnvilProfile"/>. An anvil is a plain model
     /// block; a multiblock is refused. Null for a block that is not an anvil.</summary>
+    /// <summary>Validates a block's <c>spritesheet</c> object into its <see cref="TextureSheet"/>.</summary>
+    internal static TextureSheet ParseSpritesheet(BlockDefinition.SpritesheetDefinition definition, string path)
+    {
+        var texture = definition.Texture;
+        if (string.IsNullOrWhiteSpace(texture))
+            throw new InvalidOperationException($"Block '{path}' has a spritesheet without a texture name.");
+        var cols = definition.Cols ?? 0;
+        var rows = definition.Rows ?? 0;
+        if (cols < 1 || rows < 1)
+            throw new InvalidOperationException($"Block '{path}' has a spritesheet without a positive cols and rows.");
+        var frames = definition.Frames ?? cols * rows;
+        if (frames < 1 || frames > cols * rows)
+            throw new InvalidOperationException(
+                $"Block '{path}' has spritesheet.frames {frames}; expected 1..{cols * rows}.");
+        var fps = definition.Fps ?? 8f;
+        if (!(fps > 0f) || float.IsInfinity(fps))
+            throw new InvalidOperationException($"Block '{path}' has spritesheet.fps {fps}; expected a positive number.");
+        return new TextureSheet(texture, cols, rows, frames, fps);
+    }
+
     internal static AnvilProfile? ParseAnvil(BlockDefinition.AnvilDefinition? definition, BlockRenderer renderer,
         string path)
     {

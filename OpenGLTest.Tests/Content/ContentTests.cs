@@ -78,10 +78,22 @@ public sealed class ContentTests
             .Select(System.IO.Path.GetFileNameWithoutExtension)
             .OrderBy(n => n, StringComparer.Ordinal)
             .ToArray();
-        Assert.Equal(files.Length, TextureAtlas.LayerCount);
-        Assert.Equal(Array.IndexOf(files, "stone"), TextureAtlas.TileOf("stone"));
+        var extraFrames = TextureSheetRegistry.All.Sum(sheet => sheet.Frames - 1);
+        Assert.Equal(files.Length + extraFrames, TextureAtlas.LayerCount);
+        Assert.Equal(Array.IndexOf(TextureAtlas.TileNames.ToArray(), "stone"), TextureAtlas.TileOf("stone"));
         Assert.Equal(TextureAtlas.TileOf("grass_top"), ContentRegistry.RequireBlock("grass").FaceTiles[4]);
         Assert.Equal(TextureAtlas.TileOf("grass_side"), ContentRegistry.RequireBlock("grass").FaceTiles[0]);
+    }
+
+    [Fact]
+    public void TheLavaSpritesheetIsConsecutiveLayersFromItsFirstFrame()
+    {
+        // The fluid shader steps from the lava tile through the following layers, so the frames must be contiguous.
+        var sheet = TextureSheetRegistry.TryGet("lava");
+        Assert.NotNull(sheet);
+        var first = TextureAtlas.TileOf("lava");
+        for (var frame = 1; frame < sheet.Frames; frame++)
+            Assert.Equal(first + frame, TextureAtlas.TileOf($"lava_frame_{frame:00}"));
     }
 
     [Fact]

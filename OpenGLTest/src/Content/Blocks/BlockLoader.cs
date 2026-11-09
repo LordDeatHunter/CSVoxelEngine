@@ -66,6 +66,8 @@ internal static class BlockLoader
             ContentRegistry.BlockDefinitions[id] = definition;
             types[id] = type;
             RegisterTables(type, stackSolidAt);
+            if (definition.Spritesheet != null)
+                TextureSheetRegistry.Add(BlockSchemaParser.ParseSpritesheet(definition.Spritesheet, path));
         }
 
         links.Resolve(types);

@@ -10,6 +10,7 @@ import SlotList from './SlotList.vue'
 import ItemGrid from './ItemGrid.vue'
 import MobGrid from './MobGrid.vue'
 import ShotGallery from './ShotGallery.vue'
+import SheetTile from './SheetTile.vue'
 
 export default {
   extends: DefaultTheme,
@@ -24,5 +25,6 @@ export default {
     app.component('ItemGrid', ItemGrid)
     app.component('MobGrid', MobGrid)
     app.component('ShotGallery', ShotGallery)
+    app.component('SheetTile', SheetTile)
   }
 } satisfies Theme

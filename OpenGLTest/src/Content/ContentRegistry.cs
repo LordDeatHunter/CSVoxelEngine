@@ -473,6 +473,7 @@ public static class ContentRegistry
         OpenModels.Clear();
         ItemModels.Clear();
         BlockDefinitions.Clear();
+        TextureSheetRegistry.Reset();
         BiomeTintPending.Clear();
         ModelTintPending.Clear();
         SfxGroups = new Dictionary<string, IReadOnlyList<string>>();

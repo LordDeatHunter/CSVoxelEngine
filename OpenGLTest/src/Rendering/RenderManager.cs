@@ -708,6 +708,9 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterGlitterFade",
             new Vector2(WaterRenderConfig.WaterGlitterFadeNearBlocks, WaterRenderConfig.WaterGlitterFadeFarBlocks));
         program.SetUniform("uLavaLayer", (float)ContentRegistry.RequireBlock("lava").Top);
+        var lavaSheet = TextureSheetRegistry.TryGet("lava");
+        program.SetUniform("uLavaFrames", (float)(lavaSheet?.Frames ?? 1));
+        program.SetUniform("uLavaFps", lavaSheet?.Fps ?? 0f);
         program.SetUniform("uLavaNormalScale", SurfaceShadingConfig.LavaNormalScale);
         program.SetUniform("uLavaCatchLight", SurfaceShadingConfig.LavaCatchLightStrength);
         program.SetUniform("uLavaCatchPower", SurfaceShadingConfig.LavaCatchLightPower);

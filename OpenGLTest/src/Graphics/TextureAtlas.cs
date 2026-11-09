@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Silk.NET.OpenGL;
 using StbImageSharp;
+using VoxelEngine.Content;
 
 namespace VoxelEngine.Graphics;
 
@@ -115,28 +116,74 @@ public static class TextureAtlas
             var image = ImageResult.FromStream(stream, ColorComponents.RedGreenBlueAlpha);
             images.Add((Path.GetFileNameWithoutExtension(file), image));
         }
+        foreach (var sheet in TextureSheetRegistry.All)
+            if (!images.Exists(i => i.Name == sheet.Texture))
+                throw new InvalidOperationException($"Spritesheet texture '{sheet.Texture}.png' is not in '{folder}'.");
 
-        var tileWidth = images[0].Image.Width;
-        var tileHeight = images[0].Image.Height;
-        foreach (var (name, image) in images)
-            if (image.Width != tileWidth || image.Height != tileHeight)
-                throw new InvalidOperationException(
-                    $"Block texture '{name}.png' is {image.Width}x{image.Height}, expected {tileWidth}x{tileHeight}: all atlas tiles must share one size.");
-
-        Tiles.Clear();
+        // Plain tiles set the atlas tile size; a spritesheet is read as a grid of cells that size.
+        var (tileWidth, tileHeight) = TileSizeOf(images);
         var layers = new List<byte[]>(images.Count);
-        for (var i = 0; i < images.Count; i++)
+        var names = new List<string>(images.Count);
+        Tiles.Clear();
+        foreach (var (name, image) in images)
         {
-            var (name, image) = images[i];
-            layers.Add(image.Data);
-            Tiles[name] = (ushort)i;
+            var sheet = TextureSheetRegistry.TryGet(name);
+            if (sheet == null)
+            {
+                if (image.Width != tileWidth || image.Height != tileHeight)
+                    throw new InvalidOperationException(
+                        $"Block texture '{name}.png' is {image.Width}x{image.Height}, expected {tileWidth}x{tileHeight}: all atlas tiles must share one size.");
+                AddLayer(name, image.Data, layers, names);
+                continue;
+            }
+            if (image.Width != sheet.Cols * tileWidth || image.Height != sheet.Rows * tileHeight)
+                throw new InvalidOperationException(
+                    $"Spritesheet '{name}.png' is {image.Width}x{image.Height}, expected {sheet.Cols}x{sheet.Rows} cells of {tileWidth}x{tileHeight}.");
+            for (var frame = 0; frame < sheet.Frames; frame++)
+            {
+                // Frame 0 keeps the texture's own name, so a block's face names the first frame; the rest
+                // follow it in consecutive layers, which is what the fluid shader steps through.
+                var frameName = frame == 0 ? name : $"{name}_frame_{frame:00}";
+                AddLayer(frameName, CropCell(image, frame % sheet.Cols, frame / sheet.Cols, tileWidth, tileHeight),
+                    layers, names);
+            }
         }
 
-        TileNames = images.ConvertAll(i => i.Name);
+        TileNames = names;
         LayerCount = layers.Count;
         TileWidth = tileWidth;
         TileHeight = tileHeight;
         return (layers, tileWidth, tileHeight);
+    }
+
+    /// <summary>The atlas tile size: the first plain (non-spritesheet) texture's size, which every plain tile must share.</summary>
+    private static (int Width, int Height) TileSizeOf(List<(string Name, ImageResult Image)> images)
+    {
+        foreach (var (name, image) in images)
+            if (TextureSheetRegistry.TryGet(name) == null)
+                return (image.Width, image.Height);
+        throw new InvalidOperationException("The block textures are all spritesheets: at least one plain tile sets the atlas tile size.");
+    }
+
+    private static void AddLayer(string name, byte[] data, List<byte[]> layers, List<string> names)
+    {
+        Tiles[name] = (ushort)layers.Count;
+        layers.Add(data);
+        names.Add(name);
+    }
+
+    /// <summary>Copies one cell of a spritesheet out as its own tile-sized RGBA layer.</summary>
+    private static byte[] CropCell(ImageResult sheet, int col, int row, int tileWidth, int tileHeight)
+    {
+        var rowBytes = tileWidth * 4;
+        var sheetRowBytes = sheet.Width * 4;
+        var cell = new byte[rowBytes * tileHeight];
+        for (var y = 0; y < tileHeight; y++)
+        {
+            var source = (row * tileHeight + y) * sheetRowBytes + col * rowBytes;
+            System.Buffer.BlockCopy(sheet.Data, source, cell, y * rowBytes, rowBytes);
+        }
+        return cell;
     }
 
     /// <summary>

@@ -1,7 +1,8 @@
 {
   "name": "Lava",
-  "model": { "parent": "block/cube_all", "textures": { "all": "lava_still" } },
+  "model": { "parent": "block/cube_all", "textures": { "all": "lava" } },
   "fluid": true,
+  "spritesheet": { "texture": "lava", "cols": 6, "rows": 6, "frames": 32, "fps": 8 },
   "renderer": "fluid",
   "hardness": 0,
   "solid": false,

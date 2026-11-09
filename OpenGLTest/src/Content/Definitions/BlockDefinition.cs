@@ -296,6 +296,31 @@ public sealed class BlockDefinition
     /// multiblock.</summary>
     public AnvilDefinition? Anvil { get; set; }
 
+    /// <summary>
+    /// Marks <c>texture</c> as a spritesheet of animation frames (the lava). The atlas slices each frame into its
+    /// own layer and the fluid shader cycles through them at <c>fps</c>; see <see cref="VoxelEngine.Content.TextureSheet"/>.
+    /// </summary>
+    public SpritesheetDefinition? Spritesheet { get; set; }
+
+    /// <summary>The <c>spritesheet</c> object: the texture and its grid, the frame count and the playback rate.</summary>
+    public sealed class SpritesheetDefinition
+    {
+        /// <summary>The block texture file name, without extension, under <c>assets/textures/blocks</c>.</summary>
+        public string? Texture { get; set; }
+
+        /// <summary>Cells across the texture.</summary>
+        public int? Cols { get; set; }
+
+        /// <summary>Cells down the texture.</summary>
+        public int? Rows { get; set; }
+
+        /// <summary>Frames used, from the top-left cell; defaults to the whole grid.</summary>
+        public int? Frames { get; set; }
+
+        /// <summary>Frames per second; defaults to 8.</summary>
+        public float? Fps { get; set; }
+    }
+
     /// <summary>Marks the block as a chest: a right-click opens it and it holds `slots` stacks, kept by the chest
     /// manager (a block entity). `loot` names the loot table a never-opened one rolls at first open or break (a ruin
     /// chest); a crafted chest names none. Only legal on the `model` renderer.</summary>
