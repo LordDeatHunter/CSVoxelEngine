@@ -176,8 +176,9 @@ internal sealed class PlayerPhysics
         _knockback.X = MathUtils.Damp(_knockback.X, 0f, KnockbackDamping, deltaTime);
         _knockback.Z = MathUtils.Damp(_knockback.Z, 0f, KnockbackDamping, deltaTime);
 
-        // Sprinting needs forward: holding only A or D (a side-sprint) runs at walking speed
-        var sprinting = camera.SprintHeld && keyboard.IsKeyPressed(Key.W);
+        // On foot sprinting needs forward: holding only A or D (a side-sprint) runs at walking speed.
+        // Flying sprints in any direction, backward, sideways and up or down included.
+        var sprinting = camera.SprintHeld && (camera.IsFlying || keyboard.IsKeyPressed(Key.W));
         var moveSpeed = BaseSpeed * (sprinting ? (camera.IsFlying ? FlyBoostMultiplier : SprintMultiplier) : 1f);
         var direction = camera.IsOrbit ? camera.ViewDirection : camera.GetForwardVector();
         var right = Vector3.Normalize(Vector3.Cross(direction, Vector3.UnitY));
