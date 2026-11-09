@@ -90,9 +90,8 @@ public sealed class SkyMobManagerTests
         {
             Assert.False(MobSpawner.TryFindSurfaceSpawn(island, eye, MobConfig.SlimeSpawnMinRadiusBlocks,
                 MobConfig.SlimeSpawnMaxRadiusBlocks, 64, out _, out _, out _));
-            Assert.False(MobSpawner.TryFindCaveSpawn(island, eye, MobConfig.SlimeSpawnMinRadiusBlocks,
-                MobConfig.SlimeSpawnMaxRadiusBlocks, 64, MobConfig.SlimeCaveSearchHalfHeight,
-                MobConfig.SlimeCaveScanDepth, MobConfig.SlimeCaveMaxSkyLight, out _, out _, out _));
+            Assert.False(MobSpawner.TryFindCaveSpawn(island, eye, CaveSlimeTests.AnyCave with { Tries = 64 }, null,
+                out _, out _, out _, out _));
         }
     }
 

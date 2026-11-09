@@ -1,5 +1,6 @@
 using System.Numerics;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.TowerMobs;
@@ -27,6 +28,9 @@ public sealed class RealmMobMirrorTests
             Cinderwitch.EntityName => new Cinderwitch(type, position, spawnIn: false),
             Galeraptor.EntityName => new Galeraptor(type, position, spawnIn: false),
             Skeleton.EntityName => new Skeleton(type, position, tier: 0, spawnIn: false),
+            Shardling.EntityName => new Shardling(type, position, tier: 0, spawnIn: false),
+            Sporeling.EntityName => new Sporeling(type, position, tier: 0, spawnIn: false),
+            Magmaborn.EntityName => new Magmaborn(type, position, tier: 0, spawnIn: false),
             _ => new Cloudgolem(type, position, spawnIn: false),
         };
     }
@@ -43,6 +47,9 @@ public sealed class RealmMobMirrorTests
     [InlineData(Galeraptor.EntityName)]
     [InlineData(Cloudgolem.EntityName)]
     [InlineData(Skeleton.EntityName)]
+    [InlineData(Shardling.EntityName)]
+    [InlineData(Sporeling.EntityName)]
+    [InlineData(Magmaborn.EntityName)]
     public void AMirrorPlaysItsAttackClipWhenTheServersCountMovesThenReturnsToLocomotion(string kind)
     {
         var mirror = Create(kind, new Vector3(0f, 80f, 0f));

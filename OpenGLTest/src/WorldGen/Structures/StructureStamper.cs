@@ -1,6 +1,8 @@
 using System;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.Structures;
+using VoxelEngine.WorldGen.Caves;
 
 namespace VoxelEngine.WorldGen.Structures;
 
@@ -19,10 +21,14 @@ public static class StructureStamper
     /// bottom corner sits at (<paramref name="originX"/>, <paramref name="originY"/>, <paramref name="originZ"/>), into the chunk
     /// whose minimum corner is (<paramref name="worldX0"/>, <paramref name="worldY0"/>, <paramref name="worldZ0"/>). A cell
     /// outside <paramref name="minY"/>..<paramref name="maxY"/> is skipped. A chest cell is left empty when
-    /// <paramref name="keepChests"/> is false. Returns whether anything was written.
+    /// <paramref name="keepChests"/> is false. With <paramref name="chestBiomes"/> (the chunk's cave biome map), a tiered chest
+    /// (<see cref="ChestProfile.TierTables"/>) takes its own cell's cave biome as its tier, OR'd onto its facing in state bits
+    /// 2-7 (<see cref="ChestProfile.TierState"/>), so the loot it rolls follows the cave it stands in; without one every
+    /// chest keeps the template's state. Returns whether anything was written.
     /// </summary>
     public static bool Stamp(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
-        StructureTemplate template, int turns, int originX, int originY, int originZ, int minY, int maxY, bool keepChests = true)
+        StructureTemplate template, int turns, int originX, int originY, int originZ, int minY, int maxY, bool keepChests = true,
+        CaveBiomeMap? chestBiomes = null)
     {
         var size = template.Size;
         var xLo = Math.Max(0, worldX0 - originX);
@@ -54,6 +60,8 @@ public static class StructureStamper
 
             // Assign, never OR: the block id decides what the state byte means
             var cellState = (byte)(cell >> 8);
+            if (chestBiomes != null && id != BlockType.Air && BlockType.ById[id].Chest is { TierTables: not null })
+                cellState |= ChestProfile.TierState(chestBiomes.Cells[index]);
             if (cellState != 0 || state != null)
                 (state ??= new byte[Chunk.Size * Chunk.Size * Chunk.Size])[index] = cellState;
             wrote = true;

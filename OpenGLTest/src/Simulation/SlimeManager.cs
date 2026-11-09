@@ -8,6 +8,7 @@ using VoxelEngine.Entities;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Caves;
 
 namespace VoxelEngine.Simulation;
 
@@ -322,7 +323,7 @@ public sealed class SlimeManager : IMobPopulation
         out Vector3 position, out int size)
     {
         int x, groundY, z;
-        var found = PlayerUnderground(chunks, playerPosition)
+        var found = MobSpawner.TargetUnderground(chunks, playerPosition)
             ? TryFindCave(chunks, playerPosition, out x, out groundY, out z)
               || TryFindSurface(chunks, playerPosition, out x, out groundY, out z)
             : TryFindSurface(chunks, playerPosition, out x, out groundY, out z)
@@ -353,20 +354,13 @@ public sealed class SlimeManager : IMobPopulation
             MobConfig.SlimeSpawnMinRadiusBlocks, MobConfig.SlimeSpawnMaxRadiusBlocks,
             MobConfig.SlimeSpawnTries, out x, out groundY, out z);
 
-    private static bool TryFindCave(ChunkManager chunks, Vector3 playerPosition, out int x, out int groundY, out int z) =>
-        MobSpawner.TryFindCaveSpawn(chunks, playerPosition,
-            MobConfig.SlimeSpawnMinRadiusBlocks, MobConfig.SlimeSpawnMaxRadiusBlocks,
-            MobConfig.SlimeCaveSpawnTries, MobConfig.SlimeCaveSearchHalfHeight,
-            MobConfig.SlimeCaveScanDepth, MobConfig.SlimeCaveMaxSkyLight,
-            out x, out groundY, out z);
+    // Cave slimes keep out of the magma deep (CaveSpawnRules.SlimeMask)
+    private static readonly CaveSpawnSearch CaveSearch = new(
+        MobConfig.SlimeSpawnMinRadiusBlocks, MobConfig.SlimeSpawnMaxRadiusBlocks,
+        MobConfig.SlimeCaveSpawnTries, MobConfig.SlimeCaveSearchHalfHeight,
+        MobConfig.SlimeCaveScanDepth, MobConfig.SlimeCaveMaxSkyLight,
+        MobConfig.MobSpawnBlockLightLimit, CaveSpawnRules.SlimeMask);
 
-    // Whether the player's feet stand underground: well under its own column's terrain height
-    private static bool PlayerUnderground(ChunkManager chunks, Vector3 playerPosition)
-    {
-        var x = MathUtils.FloorToInt(playerPosition.X);
-        var z = MathUtils.FloorToInt(playerPosition.Z);
-        var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
-        var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
-        return SlimeSize.IsUnderground(MathUtils.FloorToInt(playerPosition.Y - Camera.EyeHeight) - 1, surface);
-    }
+    private static bool TryFindCave(ChunkManager chunks, Vector3 playerPosition, out int x, out int groundY, out int z) =>
+        MobSpawner.TryFindCaveSpawn(chunks, playerPosition, CaveSearch, null, out x, out groundY, out z, out _);
 }

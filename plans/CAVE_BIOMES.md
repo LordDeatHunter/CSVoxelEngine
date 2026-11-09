@@ -7,22 +7,21 @@ CB-0 (barrier shift) and CB-1 (the cave biome field, its palette pass and the de
 about -200 and crystal, fungal or magma-touched sub-biomes from there to the barrier. CB-2 (shape and ores) done: the
 sub-biomes carve bigger rooms and wider tunnels, the Y-band ores' richness follows the cave biome and each sub-biome has an
 exclusive ore (amethyst, jade, cinnabar). CB-3 (atmosphere and transport) done: each cave biome eases in its own fog,
-ambient tint and drifting motes, and the server sends the eye's cave biome in `PlayerStatus` (protocol 28). Tracks 3D cave biomes: caves that stop
+ambient tint and drifting motes, and the server sends the eye's cave biome in `PlayerStatus` (protocol 28). CB-4 (mobs and loot)
+done: the cave spawn search filters by cave biome (no slimes in the magma deep, goblins favor crystal and fungal caves and now
+spawn underground), one mob per sub-biome (shardling, sporeling, magmaborn; protocol 29) and underground ruin chests that roll a
+table of their own cave biome. Only CB-5 (documentation) is left. Tracks 3D cave biomes: caves that stop
 being biome-blind, plus the barrier shift that makes room for them. Third of three efforts, in order: accessories (done), the
 battle tower (`BATTLE_TOWER.md`), cave biomes. One phase per prompt; each leaves the game building and the tests green. Last
-updated 2026-11-09 (CB-3).
+updated 2026-11-09 (CB-4).
 
 ## In progress
 Nothing.
 
 ## Open
-- [ ] **`CB-4` Mobs and loot** - P2, XL.
-  A biome filter at the final `if` of `MobSpawner.TryFindCaveSpawn`, biome-gated slimes and goblins, and **one new mob per biome**
-  (a cave mob manager on `MobCaps`, `RealmMob` frame, Blockbench rigs from deterministic generator scripts with `--check`, saves,
-  `NetEntityKind`, item debugger modes), plus per-biome chest loot tables.
 - [ ] **`CB-5` Document** - P2, S.
-  A `BIOMEGEN.md` section on the cave biomes (the seed table already lists 179-181), a final AGENTS.md pass once CB-2..CB-4 land;
-  then delete this file's finished entries.
+  A `BIOMEGEN.md` section on the cave biomes (the seed table already lists 179-181), a final AGENTS.md pass now that CB-2..CB-4
+  have landed; then delete this file's finished entries.
 
 ## Reference
 - Decisions (2026-11-08): hybrid model, a surface echo biome that drifts into 3D-noise cave biomes with depth; per-biome palette,
@@ -160,3 +159,48 @@ Nothing.
     paced by a debt and capped per frame; singleplayer and a client, never a server. No new content ids, no new GL resource.
   - Known gaps: the particle colors are fixed per kind (no per-biome tint); a client lags one status after crossing a biome line;
     the tuning is a first guess, not yet checked against the scenario shots.
+- **CB-4 as built** (`Simulation/Caves/`: `CaveSpawnSearch`, `CaveBiomeResolver`, `CaveSpawnRules`, `CaveMobManager`;
+  `Entities/CaveMobs/`: `CaveMob`, `CaveDifficulty`, `Shardling`, `Sporeling`, `Magmaborn`; knobs `GoblinCave*` and `Cave*` in
+  `MobConfig`, all first guesses):
+  - Spawn filter: `MobSpawner.TryFindCaveSpawn` takes a `CaveSpawnSearch` record (ring radii, tries, search half height, scan
+    depth, max sky light, block-light limit and an allowed-biome mask, `CaveSpawnRules.Bit`) and an injectable
+    `CaveBiomeResolver` (null reads `CaveBiomes.At` over the world source's stored column biome and height), and reports the
+    biome. The biome is resolved last, only for a candidate that passed the floor, hell, depth and light checks: one
+    `CaveBiomes.At` (three noise blends) per light-passing try, never per frame. `EyeCaveBiomeProbe` is not reused (per-eye
+    state).
+  - Slimes and goblins (`CaveSpawnRules`): cave slimes everywhere but the magma deep (`SlimeMask`); goblins now spawn in caves
+    for a target standing underground (`MobSpawner.TargetUnderground`, moved from `SlimeManager`), caves first, then the
+    night-gated surface path. A cave goblin skips the night gate (caves are always dark) and is accepted against a roll of
+    `GoblinWeight` (1.0 in crystal and fungal, 0.3 in plain and the echoes, 0 in the magma deep, so none there); its pack mates
+    are ringed on the leader's floor at eye height with the mask narrowed to the leader's biome.
+  - Mobs (one per sub-biome, `CaveSpawnRules.CaveMobKindFor`), `RealmMob`s on a `CaveMob` base run by one `CaveMobManager` on
+    `RealmMobManager<CaveMob>`, joined to `MobCaps`: the **shardling** (crystal; a Cinderwitch-style caster that throws
+    `crystal_block` shards through `MobMissiles`, damage plus `frostburn`), the **sporeling** (fungal; a melee walker whose `melee`
+    impact is a spore burst, `MobTargets.InShockwave`, hurting every non-immune target inside and applying `spore`) and the
+    **magmaborn** (the magma deep; a brute whose blow also sets the target `burning`). The ring spawns only around an underground
+    target outside hell, with the mask `CaveMobMask`; pack mates keep the leader's biome and tier. Loot uses existing content
+    only (the exclusive ores, crystal block, fungal glow, bones, ember shards, coal).
+  - Difficulty is a quantized depth tier fixed at spawn (`CaveDifficulty.TierAt`: 0 at or above `CaveEchoBottomY`, one tier per
+    `CaveDifficultyBandBlocks` below, capped at `CaveMaxTier`; the multiplier scales pool and damage). It is saved
+    (`MobData.Tier`, an old file falls back to the saved position's tier) and sent (the `ItemId` byte), so a restore and a
+    mirror keep the server's pool; a `spawn` op's non-zero `tier` overrides it. A continuous y-read difficulty was rejected
+    because mirrors and restores see a different y.
+  - The `spore` status effect (`assets/data/effects/spore.json`, no icon): 3 of the 8 effect slots used; it sorts after
+    `burning` and `frostburn`, so their ids are unchanged.
+  - Wire: `NetEntityKind` `Shardling` 15, `Sporeling` 16, `Magmaborn` 17, the tier in `ItemId` (clamped on read, a different
+    tier replaces the mirror), the attack count in `Ammo`; protocol 29. Saved in `entities.json` by kind name.
+  - Chests: `ruin_chest_underground` uses `chest.tiers` in `CaveBiome` ordinal order (`ruin_underground` for plain, then
+    `_frozen`, `_desert`, `_crystal`, `_fungal`, `_magma`, each nesting `ruin_underground` and adding a flavor pool and one
+    uncommon..rare charm or ring). The tier is the chest cell's own cave biome, stamped into state bits 2-7 by
+    `StructureStamper.Stamp(..., chestBiomes:)` from the `CaveBiomeMap` `ChunkTerrainFill` already built
+    (`RuinPlacement.StampUnderground(..., caves)`), so `ChestLoot` and `ChestManager` are unchanged, opening and breaking
+    unopened agree, and a client or an imported world source never reads worldgen. Resolving the biome at open time was rejected
+    (`NotifyBlockRemoved` has no column access, clients must not touch worldgen).
+  - Content ids: 0 new (247 of 255 used); entities use none.
+  - Measured (default seed, generated and lit chunks around the `cave-biomes.json` spots, 200 spawn turns each): at the shared
+    block-light limit of 8 the fungal spot still lands a fungal floor on 33 turns (0.17 a turn; 131 turns land on some mob biome
+    with the real mask), the crystal and magma spots 164 and 169 turns; raising the limit to 15 only lifts fungal to 63. So
+    `CaveMobSpawnBlockLightLimit` stays at `MobSpawnBlockLightLimit` (fungal glow does not starve the sporeling).
+  - Scenario: `visual-examples/cave-mobs.json` (`VOXEL_TIME=147`) spawns each mob at its biome's spot and films idle and attack.
+  - Known gaps: the shards, like goblin stones and hell bolts, are not on the wire (a client sees only their damage); cave mobs
+    are not drawn in the water mirror; chests in chunks saved before CB-4 keep tier 0 (plain); the numbers are first guesses.

@@ -3,7 +3,9 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Caves;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Hell;
 using VoxelEngine.WorldGen.Sky;
 using VoxelEngine.WorldGen.Structures;
@@ -91,41 +93,74 @@ public static class MobSpawner
     private static bool SpawnsMobs(Biome biome) => biome is Biome.Forest or Biome.Steppe or Biome.Savanna;
 
     /// <summary>
-    /// The underground counterpart of <see cref="TryFindSurfaceSpawn"/>: up to <paramref name="tries"/>
-    /// random columns in the same ring, each scanned downward from a random height within
-    /// <paramref name="searchHalfHeight"/> of the player's feet for at most <paramref name="scanDepth"/>
-    /// cells, taking the first solid floor with two clear, dry cells above it. The floor must lie at
-    /// least <see cref="MobConfig.SlimeUndergroundDepthBlocks"/> under its column's terrain
+    /// The underground counterpart of <see cref="TryFindSurfaceSpawn"/>: up to <see cref="CaveSpawnSearch.Tries"/>
+    /// random columns in the <see cref="CaveSpawnSearch.MinRadius"/>..<see cref="CaveSpawnSearch.MaxRadius"/> ring
+    /// around <paramref name="eye"/> (a target's eye: its feet are <c>eye.Y - Camera.EyeHeight</c>), each scanned
+    /// downward from a random height within <see cref="CaveSpawnSearch.SearchHalfHeight"/> of those feet for at most
+    /// <see cref="CaveSpawnSearch.ScanDepth"/> cells, taking the first solid floor with two clear, dry cells above it.
+    /// The floor must lie at least <see cref="MobConfig.SlimeUndergroundDepthBlocks"/> under its column's terrain
     /// height (<see cref="SlimeSize.IsUnderground"/>), the cell above it must be dark (sky light at most
-    /// <paramref name="maxSkyLight"/>, read like <see cref="IsLitByBlocks"/>; a cell without a published
-    /// light snapshot reads as full sun, so it is refused) and not torch-lit, and every cell read must
-    /// be loaded. Any biome, but never in hell (<see cref="HellGenerator.InHell"/>), which is the hell
-    /// mobs' own ground. On success <paramref name="groundY"/> is the floor cell's Y.
+    /// <see cref="CaveSpawnSearch.MaxSkyLight"/>; a cell without a published light snapshot reads as full sun, so it is
+    /// refused) and not torch-lit (<see cref="IsLitByBlocks(ChunkManager, int, int, int, int)"/> at
+    /// <see cref="CaveSpawnSearch.BlockLightLimit"/>), and every cell read must be loaded. Never in hell
+    /// (<see cref="HellGenerator.InHell"/>), which is the hell mobs' own ground. Last of all, only on a floor that
+    /// passed every other check (so it costs nothing per frame), the standing cell's cave biome is read through
+    /// <paramref name="biomes"/> (null: <see cref="CaveBiomes.At"/> over the column's stored biome and height) and
+    /// the try is refused unless <see cref="CaveSpawnSearch.AllowedBiomes"/> holds it. On success
+    /// <paramref name="groundY"/> is the floor cell's Y and <paramref name="biome"/> its standing cell's cave biome
+    /// (<see cref="CaveBiome.Plain"/> on failure).
     /// </summary>
-    public static bool TryFindCaveSpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
-        float maxRadius, int tries, int searchHalfHeight, int scanDepth, int maxSkyLight,
-        out int x, out int groundY, out int z)
+    public static bool TryFindCaveSpawn(ChunkManager chunks, Vector3 eye, in CaveSpawnSearch search,
+        CaveBiomeResolver? biomes, out int x, out int groundY, out int z, out CaveBiome biome)
     {
-        var feetY = MathUtils.FloorToInt(playerPosition.Y - Camera.EyeHeight);
-        for (var attempt = 0; attempt < tries; attempt++)
+        var feetY = MathUtils.FloorToInt(eye.Y - Camera.EyeHeight);
+        for (var attempt = 0; attempt < search.Tries; attempt++)
         {
-            RingColumn(playerPosition, minRadius, maxRadius, out x, out z);
+            RingColumn(eye, search.MinRadius, search.MaxRadius, out x, out z);
             var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
             var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
 
-            var top = feetY + Random.Shared.Next(-searchHalfHeight, searchHalfHeight + 1);
+            var top = feetY + Random.Shared.Next(-search.SearchHalfHeight, search.SearchHalfHeight + 1);
             // The first floor under two clear cells decides this try
-            if (!TryScanFloor(chunks, x, top, z, scanDepth, out var y)) continue;
-            if (!HellGenerator.InHell(y) && SlimeSize.IsUnderground(y, surface) && !IsLitByBlocks(chunks, x, y + 1, z)
-                && (int)MathF.Round(EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 1.5f, z + 0.5f)).Sun * 15f) <= maxSkyLight)
-            {
-                groundY = y;
-                return true;
-            }
+            if (!TryScanFloor(chunks, x, top, z, search.ScanDepth, out var y)) continue;
+            if (HellGenerator.InHell(y) || !SlimeSize.IsUnderground(y, surface)) continue;
+            if (IsLitByBlocks(chunks, x, y + 1, z, search.BlockLightLimit)) continue;
+            if ((int)MathF.Round(EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 1.5f, z + 0.5f)).Sun * 15f)
+                > search.MaxSkyLight) continue;
+            // The cave biome last: three noise blends, paid only by an otherwise accepted floor
+            biome = (biomes ?? DefaultCaveBiomes)(chunks, x, y + 1, z);
+            if (!CaveSpawnRules.Allows(search.AllowedBiomes, biome)) continue;
+
+            groundY = y;
+            return true;
         }
 
         x = groundY = z = 0;
+        biome = CaveBiome.Plain;
         return false;
+    }
+
+    /// <summary>The production <see cref="CaveBiomeResolver"/>: <see cref="CaveBiomes.At"/> at the cell over its
+    /// column's stored (dithered) surface biome and terrain height, read from the world source.</summary>
+    internal static readonly CaveBiomeResolver DefaultCaveBiomes = CaveBiomeAt;
+
+    private static CaveBiome CaveBiomeAt(ChunkManager chunks, int x, int y, int z)
+    {
+        var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+        var i = VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z));
+        return CaveBiomes.At(x, y, z, column.Biomes[i], column.Heights[i]);
+    }
+
+    /// <summary>Whether the feet under <paramref name="eye"/> stand underground: well under their own column's
+    /// terrain height (<see cref="SlimeSize.IsUnderground"/> at the cell under the feet). The cave searches run
+    /// first, or only, around such a target.</summary>
+    internal static bool TargetUnderground(ChunkManager chunks, Vector3 eye)
+    {
+        var x = MathUtils.FloorToInt(eye.X);
+        var z = MathUtils.FloorToInt(eye.Z);
+        var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
+        var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
+        return SlimeSize.IsUnderground(MathUtils.FloorToInt(eye.Y - Camera.EyeHeight) - 1, surface);
     }
 
     /// <summary>
@@ -241,9 +276,14 @@ public static class MobSpawner
     /// <see cref="EntityLight.Sample"/> from the light each chunk publishes with its mesh (a headless
     /// server publishes it too); a cell without one reads as unlit.
     /// </summary>
-    public static bool IsLitByBlocks(ChunkManager chunks, int x, int y, int z)
+    public static bool IsLitByBlocks(ChunkManager chunks, int x, int y, int z) =>
+        IsLitByBlocks(chunks, x, y, z, MobConfig.MobSpawnBlockLightLimit);
+
+    /// <summary><see cref="IsLitByBlocks(ChunkManager, int, int, int)"/> against <paramref name="limit"/> (0..15)
+    /// instead of the shared torch-safe limit.</summary>
+    public static bool IsLitByBlocks(ChunkManager chunks, int x, int y, int z, int limit)
     {
         var light = EntityLight.Sample(chunks, new Vector3(x + 0.5f, y + 0.5f, z + 0.5f));
-        return (int)MathF.Round(light.Block * 15f) >= MobConfig.MobSpawnBlockLightLimit;
+        return (int)MathF.Round(light.Block * 15f) >= limit;
     }
 }

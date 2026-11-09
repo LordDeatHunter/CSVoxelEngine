@@ -211,3 +211,19 @@ skin PNG beside it; the `tools/` generator writes both, so replace them by editi
   `volley`, `summon`, `hurt`, `death`, `spawn`) and their events (`impact` on `slam`, `release` on
   `volley`, `summon` on `summon`), which `SkeletonKing.ValidateContent` checks at startup, and a
   height near 3 blocks (`MobConfig.SkeletonKingHeight`).
+- [ ] **Shardling** — `shardling.bbmodel` and `shardling.png` (64x64 skin, small palette: pale violet
+  body, white-to-lilac faceted crystal spikes and shard hands, white eyes). Made by
+  `tools/generate-cave-mob-models.py`. Keep the humanoid groups (`Torso`, `Head`, `ArmL`, `ArmR`, `LegL`,
+  `LegR`, with the head and arms under the torso), the clip names (`idle`, `walk`, `throw`, `hurt`,
+  `death`, `spawn`) and the `release` event on `throw`, which `Shardling.ValidateContent` checks at
+  startup, and the `.bbmodel`'s UV layout (every cube face has its own rectangle of the skin).
+- [ ] **Sporeling** — `sporeling.bbmodel` and `sporeling.png` (64x64 skin, small palette: brown stem
+  body, a teal mushroom cap with pale spots, glowing teal eyes). Made by
+  `tools/generate-cave-mob-models.py`. Keep the humanoid groups (as above), the clip names (`idle`,
+  `walk`, `melee`, `hurt`, `death`, `spawn`) and the `impact` event on `melee` (its spore burst), which
+  `Sporeling.ValidateContent` checks at startup, and the `.bbmodel`'s UV layout.
+- [ ] **Magmaborn** — `magmaborn.bbmodel` and `magmaborn.png` (128x128 skin, small palette: black
+  cooled rock split by orange glowing cracks, ember eyes and mouth). Made by
+  `tools/generate-cave-mob-models.py`. Keep the humanoid groups (as above), the clip names (`idle`,
+  `walk`, `melee`, `hurt`, `death`, `spawn`) and the `impact` event on `melee`, which
+  `Magmaborn.ValidateContent` checks at startup, and the `.bbmodel`'s UV layout.

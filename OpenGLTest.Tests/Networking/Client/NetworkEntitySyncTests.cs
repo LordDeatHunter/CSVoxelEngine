@@ -4,6 +4,7 @@ using System.Numerics;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
@@ -122,6 +123,95 @@ public sealed class NetworkEntitySyncTests : IDisposable
         Assert.Equal(MobConfig.TowerMaxTier, clamped.Tier);
         _world.ClientMirror.ApplyNetworkEntities([
             new NetEntity(NetEntityKind.Skeleton, 8, pos, 1f, 20, 0, 255, Vector3.Zero),
+        ]);
+        Assert.False(clamped.IsDying);
+    }
+
+    [Fact]
+    public void CaveMobsMirrorByKindFromASnapshotAndPlayTheirDeathWhenDropped()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        var shardPos = new Vector3(4f, 60f, 4f);
+        var sporePos = new Vector3(-4f, 60f, 4f);
+        var magmaPos = new Vector3(4f, 60f, -4f);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Shardling, 7, shardPos, 1f, 20, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Sporeling, 8, sporePos, 0.5f, 25, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Magmaborn, 9, magmaPos, 0f, 60, 0, 0, Vector3.Zero),
+        ]);
+        Assert.Equal(3, _world.CaveMobs.Count);
+        var shard = Assert.IsType<Shardling>(Assert.Single(_world.CaveMobs, m => m is Shardling));
+        var spore = Assert.IsType<Sporeling>(Assert.Single(_world.CaveMobs, m => m is Sporeling));
+        var magma = Assert.IsType<Magmaborn>(Assert.Single(_world.CaveMobs, m => m is Magmaborn));
+        Assert.Equal(shardPos, shard.Position);
+        Assert.Equal(20, shard.Health);
+        Assert.Equal(25, spore.Health);
+        Assert.Equal(60, magma.Health);
+
+        // The same id updates in place and its attack count plays the attack clip; a kind changed under an id is replaced
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Shardling, 7, shardPos + Vector3.UnitX, 1f, 15, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Shardling, 8, sporePos, 0.5f, 25, 0, 0, Vector3.Zero),
+            new NetEntity(NetEntityKind.Magmaborn, 9, magmaPos, 0f, 60, 1, 0, Vector3.Zero),
+        ]);
+        Assert.Same(shard, Assert.Single(_world.CaveMobs, m => m.Position == shardPos + Vector3.UnitX));
+        Assert.Equal(15, shard.Health);
+        Assert.True(spore.IsDying);
+        Assert.True(magma.Animation.IsPlaying(magma.AttackClip));
+
+        // A mob the server stops reporting plays its death and is then dropped
+        _world.ClientMirror.ApplyNetworkEntities([]);
+        Assert.True(shard.IsDying);
+        for (var i = 0; i < 120 && _world.CaveMobs.Count > 0; i++)
+            _world.Update(Dt, null);
+        Assert.Empty(_world.CaveMobs);
+    }
+
+    [Fact]
+    public void ACaveMobMirrorTakesItsTierFromTheSnapshotNotWhereItIsFirstSeen()
+    {
+        WorldSeed.Apply(WorldSeed.Default);
+        _world = new World(null!, null!, null!, null!, null!, null!, null, null);
+
+        // Seen above the echo bottom, where the depth would give tier 0: the tier, and so the pool, is the snapshot's
+        var pos = new Vector3(4f, 60f, 4f);
+        Assert.Equal(0, CaveDifficulty.TierAt(pos.Y));
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Sporeling, 7, pos, 1f, 30, 0, 3, Vector3.Zero),
+        ]);
+        var sporeling = Assert.IsType<Sporeling>(Assert.Single(_world.CaveMobs));
+        Assert.Equal(3, sporeling.Tier);
+        var server = new Sporeling(EntityRegistry.Require(Sporeling.EntityName), new Vector3(0f, -300f, 0f), 3);
+        Assert.Equal(server.MaxHealth, sporeling.MaxHealth);
+        Assert.True(sporeling.MaxHealth > EntityRegistry.Require(Sporeling.EntityName).MaxHealth);
+        Assert.Equal(30, sporeling.Health);
+
+        // The same tier updates in place
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Sporeling, 7, pos + Vector3.UnitX, 1f, 25, 0, 3, Vector3.Zero),
+        ]);
+        Assert.Same(sporeling, Assert.Single(_world.CaveMobs, m => !m.IsDying));
+        Assert.Equal(25, sporeling.Health);
+
+        // A different tier under the same id is a different mob
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Sporeling, 7, pos, 1f, 25, 0, 1, Vector3.Zero),
+        ]);
+        Assert.True(sporeling.IsDying);
+        var replaced = Assert.Single(_world.CaveMobs, m => !m.IsDying);
+        Assert.NotSame(sporeling, replaced);
+        Assert.Equal(1, replaced.Tier);
+
+        // A tier past the deepest clamps, and then matches the clamped mirror instead of churning
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Magmaborn, 8, pos, 1f, 20, 0, 255, Vector3.Zero),
+        ]);
+        var clamped = Assert.Single(_world.CaveMobs, m => !m.IsDying && m is Magmaborn);
+        Assert.Equal(MobConfig.CaveMaxTier, clamped.Tier);
+        _world.ClientMirror.ApplyNetworkEntities([
+            new NetEntity(NetEntityKind.Magmaborn, 8, pos, 1f, 20, 0, 255, Vector3.Zero),
         ]);
         Assert.False(clamped.IsDying);
     }

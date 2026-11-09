@@ -260,9 +260,10 @@ single-arc player.
   Cows/sheep/chickens; wandering, breeding, drops, leads. Needs `P-38`. Depends on entity AI.
 - [ ] **`F-3` · Mobs — hostiles (night / caves)** — P2, XL.
   The slime (hop AI, contact damage) and goblin (throw-then-melee raider, shared `Mob` base,
-  `MobSpawner`) landed. Still open: **light/time-keyed and cave spawns**, **voxel pathing**
-  (both currently walk/auto-jump straight at the player), more hostile kinds, and spawners
-  (`M-17`).
+  `MobSpawner`) landed, as did torch-safe ground, the night-keyed slime sizes and goblin torches,
+  and cave spawns filtered by cave biome (cave slimes, cave goblins and one mob per cave sub-biome,
+  `plans/CAVE_BIOMES.md` CB-4). Still open: **voxel pathing** (every walker still walks/auto-jumps
+  straight at the player), more hostile kinds, and spawners (`M-17`).
 - [ ] **`F-4` · Combat depth** — P2, L.
   Melee landed: punch, the two-phase obsidian-blade slice (`SliceCombo`), knockback, per-item
   `entityDamage`, and mobs that hit back. Still open: a **bow + arrows** (animation `V-15`; the `arrow` item, an

@@ -143,6 +143,11 @@ public sealed class LootDepthTests
     [Theory]
     [InlineData("ruin_surface", Rarity.Common, Rarity.Uncommon)]
     [InlineData("ruin_underground", Rarity.Uncommon, Rarity.Rare)]
+    [InlineData("ruin_underground_frozen", Rarity.Uncommon, Rarity.Rare)]
+    [InlineData("ruin_underground_desert", Rarity.Uncommon, Rarity.Rare)]
+    [InlineData("ruin_underground_crystal", Rarity.Uncommon, Rarity.Rare)]
+    [InlineData("ruin_underground_fungal", Rarity.Uncommon, Rarity.Rare)]
+    [InlineData("ruin_underground_magma", Rarity.Uncommon, Rarity.Rare)]
     [InlineData("ruin_hell", Rarity.Rare, Rarity.Epic)]
     [InlineData("ruin_sky", Rarity.Rare, Rarity.Legendary)]
     public void EveryRuinTableHandsOutGearWithinItsTier(string name, Rarity least, Rarity most)

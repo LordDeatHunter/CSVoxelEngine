@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
@@ -12,6 +13,7 @@ using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Caves;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.UI.InventoryPanel;
@@ -34,6 +36,7 @@ internal sealed class WorldPersistence
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly CaveMobManager? _caveMobs;
     private readonly SkeletonManager? _skeletons;
     private readonly SkeletonKingManager? _kings;
     private readonly SandwormManager? _sandworms;
@@ -53,6 +56,7 @@ internal sealed class WorldPersistence
     private IReadOnlyList<Goblin> Goblins => _world.Goblins;
     private IReadOnlyList<HellMob> HellMobs => _world.HellMobs;
     private IReadOnlyList<SkyMob> SkyMobs => _world.SkyMobs;
+    private IReadOnlyList<CaveMob> CaveMobs => _world.CaveMobs;
     private IReadOnlyList<Skeleton> Skeletons => _world.Skeletons;
     private IReadOnlyList<SkeletonKing> SkeletonKings => _world.SkeletonKings;
     private IReadOnlyList<Sandworm> Sandworms => _world.Sandworms;
@@ -60,7 +64,7 @@ internal sealed class WorldPersistence
 
     internal WorldPersistence(World world, ChunkSaveStore? saveStore, ChunkManager chunkManager,
         DropManager dropManager, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs,
+        SkyMobManager? skyMobs, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs,
         PlayerHealth health, bool serverMode, PlayerSaveData? savedPlayer, EntitySaveData? savedEntities,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         StationSaveData? savedStations)
@@ -78,6 +82,7 @@ internal sealed class WorldPersistence
         _goblins = goblins;
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _caveMobs = caveMobs;
         _skeletons = skeletons;
         _kings = kings;
         _sandworms = sandworms;
@@ -405,12 +410,14 @@ internal sealed class WorldPersistence
         || (_goblins != null && string.Equals(name, "goblin", StringComparison.OrdinalIgnoreCase))
         || (_hellMobs != null && HellMobManager.HeightOf(name) > 0f)
         || (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f)
+        || (_caveMobs != null && CaveMobManager.HeightOf(name) > 0f)
         || (_skeletons != null && SkeletonManager.HeightOf(name) > 0f)
         || (_kings != null && SkeletonKingManager.HeightOf(name) > 0f)
         || (_sandworms != null && string.Equals(name, Sandworm.EntityName, StringComparison.OrdinalIgnoreCase));
 
     // A forced spawn of a saved mob of a known kind (null at a full hard cap); a hell mob's layer and a sky
-    // mob's zone tier, and so its pool, follow from its saved position, while a skeleton's tower tier is saved
+    // mob's zone tier, and so its pool, follow from its saved position, while a skeleton's tower tier and a cave
+    // mob's depth tier are saved (a cave mob saved without one takes the depth tier of its saved position)
     private Mob? SpawnSaved(string name, Vector3 center, EntitySaveData.MobData mob)
     {
         // Before the skeleton and hell fall-throughs: a Skeleton King comes back bound to its tower (its home, leash
@@ -444,13 +451,16 @@ internal sealed class WorldPersistence
             worm?.Brain.SkipThump();
             return worm;
         }
+        // Before the hell fall-through, which would otherwise take the cave mob
+        if (CaveMobManager.HeightOf(name) > 0f)
+            return _caveMobs!.Spawn(name, center, mob.Tier ?? CaveDifficulty.TierAt(center.Y));
         return _hellMobs!.Spawn(name, center);
     }
 
     /// <summary>
     /// The live mobs and drops as <see cref="EntitySaveCodec"/> writes them: every living slime,
-    /// goblin, hell and sky mob, skeleton, Skeleton King (not one fading out) and sandworm (kind by <see cref="EntityType.Name"/>, body center, health,
-    /// facing, velocity, a goblin's ammo and torches, a slime's size, a skeleton's tower tier, a king's tower and summon tier) and the item drops nearest the player first, capped at
+    /// goblin, hell, sky and cave mob, skeleton, Skeleton King (not one fading out) and sandworm (kind by <see cref="EntityType.Name"/>, body center, health,
+    /// facing, velocity, a goblin's ammo and torches, a slime's size, a skeleton's tower tier, a cave mob's depth tier, a king's tower and summon tier) and the item drops nearest the player first, capped at
     /// <see cref="SaveConfig.MaxSavedDrops"/>, by <see cref="SaveNames"/> name (an id
     /// with no name is skipped with one warning). Entries still pending a restore are appended, so a
     /// flush during loading, or before a far entity's chunk arrived, never loses them.
@@ -463,6 +473,7 @@ internal sealed class WorldPersistence
         mobs.AddRange(from t in goblins where !t.IsDead select MobSaveCodec.Capture(t, t.Ammo, torches: t.Torches));
         mobs.AddRange(from t in HellMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
         mobs.AddRange(from t in SkyMobs where !t.IsDead select MobSaveCodec.Capture(t, null));
+        mobs.AddRange(from t in CaveMobs where !t.IsDead select MobSaveCodec.Capture(t, null, tier: t.Tier));
         mobs.AddRange(from t in Skeletons where !t.IsDead select MobSaveCodec.Capture(t, null, tier: t.Tier, floor: t.Floor));
         // A fading king is not saved: a reload never brings back a king its tower already let go
         mobs.AddRange(from t in SkeletonKings where !t.IsDead && !t.IsDying

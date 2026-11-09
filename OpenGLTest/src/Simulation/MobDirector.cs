@@ -5,6 +5,7 @@ using VoxelEngine.Chunks;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.Slimes;
@@ -14,6 +15,7 @@ using VoxelEngine.Juice;
 using VoxelEngine.Networking.ServerSide;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
+using VoxelEngine.Simulation.Caves;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;
@@ -37,6 +39,7 @@ internal sealed class MobDirector
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly CaveMobManager? _caveMobs;
     private readonly SkeletonManager? _skeletons;
     private readonly SkeletonKingManager? _kings;
     private readonly SandwormManager? _sandworms;
@@ -60,13 +63,14 @@ internal sealed class MobDirector
     private MobStrikes Strikes => _world.Strikes;
 
     internal MobDirector(World world, ChunkManager chunkManager, DropManager dropManager, SlimeManager? slimes,
-        GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, SkeletonManager? skeletons,
-        SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs, BlockDebrisSystem debris,
+        GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, CaveMobManager? caveMobs,
+        SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs, BlockDebrisSystem debris,
         FireParticleSystem? embers, PlayerHealth health, List<Mob> mobs, bool serverMode, bool clientMode,
         StatusEffectBlockWriter? statusBlocks)
     {
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _caveMobs = caveMobs;
         _skeletons = skeletons;
         _kings = kings;
         _sandworms = sandworms;
@@ -176,6 +180,14 @@ internal sealed class MobDirector
             BillLocalPlayer(_skyMobs.DamageDealtThisFrame);
         }
 
+        // The cave biomes' mobs: crystal shardlings throw chilling shards, fungal sporelings burst spores and the
+        // magma deep's magmaborn set their target burning
+        if (_caveMobs != null)
+        {
+            _caveMobs.Update((float)deltaTime, _chunkManager, _dropManager, _mobTargets, _serverMode ? null : _debris);
+            BillLocalPlayer(_caveMobs.DamageDealtThisFrame);
+        }
+
         // The tower's skeletons rake up close and shoot arrows at range; they never spawn on their own
         if (_skeletons != null)
         {
@@ -257,6 +269,8 @@ internal sealed class MobDirector
             ApplyMobBlockActions(_hellMobs.Mobs);
         if (_skyMobs != null)
             ApplyMobBlockActions(_skyMobs.Mobs);
+        if (_caveMobs != null)
+            ApplyMobBlockActions(_caveMobs.Mobs);
         if (_skeletons != null)
             ApplyMobBlockActions(_skeletons.Mobs);
         if (_kings != null)
@@ -348,6 +362,9 @@ internal sealed class MobDirector
         if (_skyMobs != null)
             AddLiving(_skyMobs.Mobs);
 
+        if (_caveMobs != null)
+            AddLiving(_caveMobs.Mobs);
+
         if (_skeletons != null)
             AddLiving(_skeletons.Mobs);
 
@@ -371,7 +388,8 @@ internal sealed class MobDirector
     /// (the scripted visual tests' <c>spawn</c> op), a forced spawn under the hard mob cap. False
     /// for an unknown name, a kind whose manager does not exist because its content is not
     /// registered, or a full hard cap. <paramref name="size"/> is a slime's size and
-    /// <paramref name="tier"/> a skeleton's tower floor tier (other kinds have neither and ignore them).
+    /// <paramref name="tier"/> a skeleton's tower floor tier or a cave mob's depth tier (other kinds have neither and
+    /// ignore them); a cave mob given no tier (0) takes the depth tier of its feet (<see cref="CaveDifficulty.TierAt"/>).
     /// </summary>
     internal bool SpawnEntity(string name, Vector3 feet, int size = SlimeSize.Min, int tier = 0)
     {
@@ -398,6 +416,15 @@ internal sealed class MobDirector
         if (_skyMobs != null && SkyMobManager.HeightOf(name) > 0f)
         {
             if (_skyMobs.Spawn(name, feet + new Vector3(0f, SkyMobManager.HeightOf(name) * 0.5f, 0f)) == null)
+                return false;
+            RefreshMobs();
+            return true;
+        }
+        if (_caveMobs != null && CaveMobManager.HeightOf(name) > 0f)
+        {
+            // A scenario's tier overrides the depth tier, as it does a skeleton's floor tier
+            var caveTier = tier > 0 ? tier : CaveDifficulty.TierAt(feet.Y);
+            if (_caveMobs.Spawn(name, feet + new Vector3(0f, CaveMobManager.HeightOf(name) * 0.5f, 0f), caveTier) == null)
                 return false;
             RefreshMobs();
             return true;

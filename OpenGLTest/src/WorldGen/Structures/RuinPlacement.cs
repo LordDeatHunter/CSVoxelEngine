@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Structures;
+using VoxelEngine.WorldGen.Caves;
 using VoxelEngine.WorldGen.Features;
 using VoxelEngine.WorldGen.Hell;
 using VoxelEngine.WorldGen.Sky;
@@ -87,15 +88,20 @@ public static class RuinPlacement
     internal static StampBand UndergroundBand(int neighborhoodMaxHeight) =>
         new(WorldGenerationConfig.BarrierTopY + 1, neighborhoodMaxHeight - WorldFeatureConfig.RuinUndergroundCover);
 
-    /// <summary>Stamps every sealed underground room whose footprint reaches the chunk.</summary>
-    public static void StampUnderground(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0)
+    /// <summary>Stamps every sealed underground room whose footprint reaches the chunk. Each tiered loot chest in it takes its
+    /// own cell's cave biome from <paramref name="caves"/> as its tier (<see cref="StructureStamper.Stamp"/>), so a room in a
+    /// crystal cave rolls the crystal table; a null map (no cave biomes in the chunk) leaves every chest plain, tier 0, which
+    /// is what <see cref="CaveBiomes.At"/> answers there too.</summary>
+    public static void StampUnderground(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
+        CaveBiomeMap? caves = null)
     {
         if (StructureRegistry.Of(StructureKind.Underground).Count == 0) return;
         foreach (var (cellX, cellZ) in CellsReaching(worldX0, worldZ0, Reach))
         {
             if (!TryRollRuin(StructureKind.Underground, cellX, cellZ, 0, out var hash, out var x, out var z)) continue;
             if (!TryFindUndergroundSite(x, z, hash, out var template, out var originY)) continue;
-            StampAt(blocks, ref state, worldX0, worldY0, worldZ0, template, TurnsOf(hash), x, originY, z, int.MinValue, int.MaxValue);
+            StampAt(blocks, ref state, worldX0, worldY0, worldZ0, template, TurnsOf(hash), x, originY, z, int.MinValue, int.MaxValue,
+                caves);
         }
     }
 
@@ -350,11 +356,13 @@ public static class RuinPlacement
     /// <summary>The quarter turns a hash gives a placed template.</summary>
     internal static int TurnsOf(ulong hash) => (int)(SplitMix64.Mix(hash + 3) & 3);
 
-    /// <summary>Stamps a template centered on column (x, z) with its bottom layer at <paramref name="originY"/>.</summary>
+    /// <summary>Stamps a template centered on column (x, z) with its bottom layer at <paramref name="originY"/>; a tiered chest
+    /// takes its cell's cave biome from <paramref name="chestBiomes"/> when one is given.</summary>
     internal static void StampAt(byte[] blocks, ref byte[]? state, int worldX0, int worldY0, int worldZ0,
-        StructureTemplate template, int turns, int x, int originY, int z, int minY, int maxY) =>
+        StructureTemplate template, int turns, int x, int originY, int z, int minY, int maxY, CaveBiomeMap? chestBiomes = null) =>
         StructureStamper.Stamp(blocks, ref state, worldX0, worldY0, worldZ0, template, turns,
-            StructureStamper.OriginOf(x, template), originY, StructureStamper.OriginOf(z, template), minY, maxY);
+            StructureStamper.OriginOf(x, template), originY, StructureStamper.OriginOf(z, template), minY, maxY,
+            chestBiomes: chestBiomes);
 
     /// <summary>The generated ground height of column (x, z).</summary>
     internal static int HeightAt(int x, int z) =>

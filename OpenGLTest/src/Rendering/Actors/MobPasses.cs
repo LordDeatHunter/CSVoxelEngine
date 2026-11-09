@@ -5,6 +5,7 @@ using Silk.NET.OpenGL;
 using VoxelEngine.Content;
 using VoxelEngine.Entities;
 using VoxelEngine.Chunks;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
@@ -18,7 +19,7 @@ namespace VoxelEngine.Rendering.Actors;
 
 /// <summary>
 /// The mob draws: the live slimes from the shared entity mesh, the goblins part by part with the
-/// flint and the torch they hold, and the realm (hell, sky and tower) mobs part by part, for the entity pass and the
+/// flint and the torch they hold, and the realm (hell, sky, tower and cave) mobs part by part, for the entity pass and the
 /// water mirror. Owns the slime mesh and skin and one <see cref="RigMeshes"/> per clip-animated kind,
 /// built from their Blockbench projects at load; the world program and the item and block caches stay owned by
 /// <see cref="RenderManager"/>. Render thread only.
@@ -60,7 +61,7 @@ internal sealed class MobPasses : IDisposable
     // The realm mob kinds a rig is built for, when their content is registered
     private static readonly string[] RealmRigNames =
         [Hellbrute.EntityName, Cinderwitch.EntityName, Galeraptor.EntityName, Cloudgolem.EntityName, Skeleton.EntityName,
-            SkeletonKing.EntityName];
+            SkeletonKing.EntityName, Shardling.EntityName, Sporeling.EntityName, Magmaborn.EntityName];
 
     internal MobPasses(GL gl, RenderManager owner)
     {

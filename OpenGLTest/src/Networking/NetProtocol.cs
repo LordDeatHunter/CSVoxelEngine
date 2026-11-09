@@ -199,8 +199,11 @@ public static class NetFraming
     /// <see cref="NetEntityKind.SkeletonKing"/> (the tower's boss): its attack count in the ammo field (slam, volley, summon
     /// by remainder modulo 3), its fight phase in the item byte; an older client would not draw it.
     /// 28: the eye's cave biome (<see cref="WorldGen.Caves.CaveBiome"/>) appended to <see cref="NetMessage.PlayerStatus"/>;
-    /// an older peer would misread the status.</summary>
-    public const int ProtocolVersion = 28;
+    /// an older peer would misread the status.
+    /// 29: the cave mobs (<see cref="NetEntityKind.Shardling"/>, <see cref="NetEntityKind.Sporeling"/>,
+    /// <see cref="NetEntityKind.Magmaborn"/>) in <see cref="NetMessage.EntityList"/>, their depth tier in the item byte and
+    /// attack count in the ammo field; an older client would not draw them.</summary>
+    public const int ProtocolVersion = 29;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

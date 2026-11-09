@@ -92,7 +92,7 @@ Setting the `VOXEL_SPAWN` environment variable to `x,y,z` (three comma-separated
 **without** flight (or off with `"on": false`, which ends flight too, as the C key does): the
 player still falls and lands, but a drop from a mid-air teleport costs no health. Put it first in
 any scenario that teleports a walking player above the ground, and turn it off again before a
-`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, an optional `"size"` (an integer from 1, default 1) is a slime's size and an optional `"tier"` (an integer from 0, default 0) is a skeleton's tower tier; the entity name (`slime`, `goblin`, `hellbrute`, `cinderwitch`, `galeraptor`, `cloudgolem`, `sandworm`, `iceberg`, `skeleton` or `skeleton_king`, the last spawned unbound to any tower) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging. `visual-examples/skeletons.json` (`VOXEL_TIME=147`) spawns a tier-0 and a tier-5 skeleton in goblins.json's open forest clearing (a tower floor's dressing walls block a shot's line of sight) and films them idle, drawing and loosing an arrow, an arrow in flight and raking. `towerclear` (`{ "op": "towerclear", "floor": k }`, floor 0 by default) clears floor `k` of the battle tower around the camera through `World.ClearTowerFloor` (its piles depleted, its bound skeletons killed, nothing owed), so its door opens on the next update; `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) uses it to film a floor's piles, the skeletons they raise, the sealed gate and the opened stairwell, then a dark floor before and after three `setblock` torches. `towerdefeat` (`{ "op": "towerdefeat" }`) marks the Skeleton King of the tower around the camera killed through `World.DefeatTower` (`TowerManager.DefeatAt` -> `MarkDefeated`), so the real collapse runs; `battle-tower.json` ends on the ruin it leaves. `altar` (`{ "op": "altar", "pos": [x, y, z] }`, an exact cell, required) right-clicks a tower altar through `World.UseAltar` and shows its toast (the ritual begins only once every floor is cleared); `visual-examples/skeleton-king.json` (`VOXEL_TIME=147`) clears the default tower's floors with `towerclear`, then films its altar, the ritual, the Skeleton King's rise and boss bar, its slam, its bone volley and a summon. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
+`mine` step that should take real hits (creative breaks on the first hit). `spawn` places a mob through `World.SpawnEntity`: `{ "op": "spawn", "entity": "goblin", "pos": [x, z] }` snaps the feet onto the terrain (`World.TryGroundHeight` + 1), while `"pos": [x, y, z]` is an exact feet position, an optional `"size"` (an integer from 1, default 1) is a slime's size and an optional `"tier"` (an integer from 0, default 0) is a skeleton's tower tier or, when above 0, a cave mob's depth tier (0 leaves a cave mob the tier of its feet, `CaveDifficulty.TierAt`); the entity name (`slime`, `goblin`, `hellbrute`, `cinderwitch`, `galeraptor`, `cloudgolem`, `shardling`, `sporeling`, `magmaborn`, `sandworm`, `iceberg`, `skeleton` or `skeleton_king`, the last spawned unbound to any tower) is checked only when the step runs, so parsing stays registry-free. `visual-examples/slime-sizes.json` (`VOXEL_TIME=147`) films the three slime sizes side by side and mid-hop. `bloomery` builds a loaded (and optionally lit) bloomery with `{ "op": "bloomery", "pos": [x, y, z], "state": facing, "ore": n, "fuel": n, "lit": true, "heat": 0.55 }`, `anvil` an anvil with a bloom on it (`"piece"`, `"hits"`) and `hammer` lands one gap-free hit on an anvil; `visual-examples/bloomery.json` (`VOXEL_TIME=147`) films them. `visual-examples/hell-mobs.json` (`VOXEL_TIME=147`) spawns a hellbrute and a cinderwitch in a lamp-lit hell cavern and films them idle, casting and swinging, and `visual-examples/cave-mobs.json` (`VOXEL_TIME=147`) spawns each cave sub-biome's mob at its `cave-biomes.json` spot and films it idle and attacking. `visual-examples/skeletons.json` (`VOXEL_TIME=147`) spawns a tier-0 and a tier-5 skeleton in goblins.json's open forest clearing (a tower floor's dressing walls block a shot's line of sight) and films them idle, drawing and loosing an arrow, an arrow in flight and raking. `towerclear` (`{ "op": "towerclear", "floor": k }`, floor 0 by default) clears floor `k` of the battle tower around the camera through `World.ClearTowerFloor` (its piles depleted, its bound skeletons killed, nothing owed), so its door opens on the next update; `visual-examples/battle-tower.json` (`VOXEL_TIME=147`) uses it to film a floor's piles, the skeletons they raise, the sealed gate and the opened stairwell, then a dark floor before and after three `setblock` torches. `towerdefeat` (`{ "op": "towerdefeat" }`) marks the Skeleton King of the tower around the camera killed through `World.DefeatTower` (`TowerManager.DefeatAt` -> `MarkDefeated`), so the real collapse runs; `battle-tower.json` ends on the ruin it leaves. `altar` (`{ "op": "altar", "pos": [x, y, z] }`, an exact cell, required) right-clicks a tower altar through `World.UseAltar` and shows its toast (the ritual begins only once every floor is cleared); `visual-examples/skeleton-king.json` (`VOXEL_TIME=147`) clears the default tower's floors with `towerclear`, then films its altar, the ritual, the Skeleton King's rise and boss bar, its slam, its bone volley and a summon. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
@@ -398,7 +398,7 @@ slight `manaRegen`, +10 % `undeadDamage`) are crafted; `BoneShrapnelTests`, and 
 
 **Chests (I-4).** A block with a `chest` object (`slots`, optional `loot`; `BlockType.Chest`) is a chest block entity kept by
 `ChestManager` (`Simulation/Chests/`, owned by `World`, saved in `stations.json` as `Chests`). Its `ChestState` is created on
-first use (`ChestManager.Open`, a break): a ruin chest (`ruin_chest_*`, worldgen-only) then rolls its loot table with
+first use (`ChestManager.Open`, a break): a ruin chest (`ruin_chest_*`, worldgen-only; the underground one rolls the table of its cave biome, see "Structure templates and ruins") then rolls its loot table with
 `ChestLoot.Materialize` from the hash of its cell and the world seed, so a chest nobody touched holds no state and is never
 saved. An optional `chest.tiers` list of loot tables instead of `loot` (validated at load; the two are exclusive) makes a
 **tiered chest** (the battle tower's `tower_chest`): its tier is state bits 2-7 (`ChestProfile.TierShift`/`TierState`/`TierOf`,
@@ -1301,7 +1301,8 @@ OpenGLTest/
       SpellConfig.cs           # spell recipe rules: when complexity starts to fizzle, the chance per unit and its cap;
                                #   the staff slot cap and the cast cooldown (CastCooldownSeconds)
       MobConfig.cs             # mob caps and shared mob rules (flight's probes, arrival and wander rise), layer difficulty, hell and sky mobs, slimes, goblins (flee, dodge, pack, torches, notice
-                               #   pip), healthbars, damage numbers, the realm layer difficulty step
+                               #   pip, cave weights), the cave mobs and their depth tier, healthbars, damage numbers, the realm layer
+                               #   difficulty step
       NetworkConfig.cs         # multiplayer cadences, movement, edit and intent rules (the attack and cast slack),
                                #   timeouts, LOD streaming, ServerAllowCreative
       ParticleConfig.cs        # falling leaves, mining debris, campfire, lava and torch embers and smoke, bubbles,
@@ -1605,6 +1606,12 @@ OpenGLTest/
         Galeraptor.cs          # the diving flyer: FlightTuning, the hover over its target, the dive clip's impact event
         Cloudgolem.cs          # the ground bruiser: walk with ledge caution, the slam clip's impact event, the shockwave
         SkyDifficulty.cs       # GL-free: the zone tier's multiplier (health, damage), pack size, the bruiser's big-zone gate
+      CaveMobs/                # the cave sub-biomes' mobs (see "Cave mobs"): the shared base, the three kinds, the depth tier
+        CaveMob.cs             # abstract cave mob (a RealmMob): its depth tier, fixed at spawn, and its tier-scaled pool
+        CaveDifficulty.cs      # GL-free: the depth tier of a y (TierAt), Clamp, the tier's multiplier (health, damage)
+        Shardling.cs           # the crystal caves' caster: the range band, a cast with a clear line, the release event's shard
+        Sporeling.cs           # the fungal caves' walker: the melee clip's impact event as a spore burst (InBurst)
+        Magmaborn.cs           # the magma deep's brute: the melee clip's impact event, a burning blow
       TowerMobs/               # the battle tower's mobs (see "Skeleton" and "Battle tower"): the skeleton, the Skeleton
                                #   King and the floor-tier difficulty
         Skeleton.cs            # the undead archer (a RealmMob): melee rake at its impact event, a bow shot at its release
@@ -2204,7 +2211,7 @@ OpenGLTest/
         FluidWakeRules.cs      # pure, worker-thread-safe IsFlowTarget / IsCarvedFlowTarget / IsWakeTarget
         FluidWakeScanner.cs    # waking loaded chunks' water: the worker-found frontier and the border scan
       GoblinManager.cs         # goblins: AI tick, their thrown stones, melee damage at the impact
-                               #   event, loot + carried flint on death, ring spawning
+                               #   event, loot + carried flint on death, ring spawning (night surface; caves by biome weight)
       HellMobManager.cs        # the hell mobs: AI tick, the brute's blow at its impact, the casters' fire bolts
                                #   (MobMissiles; damage + burning), loot, despawn, the hell-only ring spawn (packs by layer)
       Icebergs/                # the iceberg simulation, namespace VoxelEngine.Simulation.Icebergs
@@ -2241,7 +2248,14 @@ OpenGLTest/
                                #   slam impact, the sky-band ring spawn on island tops (tier-scaled packs, big-zone golems)
       SandwormGround.cs        # what the worm reads of the ground: the surface height, sand or not, desert or not
       SandwormManager.cs       # the sandworm boss: one at a time, summoned (the thumper), hunts, bites, loot, retreat; client mirrors
-      SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning
+      SlimeManager.cs          # slimes: hop AI tick, contact damage, loot, ring spawning (surface, and caves but the magma deep)
+      Caves/                   # cave spawning by cave biome, namespace VoxelEngine.Simulation.Caves (see "Cave mobs")
+        CaveSpawnSearch.cs     # the cave spawn search's parameters: ring radii, tries, heights, light limits, allowed biomes
+        CaveBiomeResolver.cs   # the delegate the search asks a standing cell's cave biome through (a test seam)
+        CaveSpawnRules.cs      # GL-free: the biome masks, slimes everywhere but the magma deep, the goblin weight per biome,
+                               #   the cave mob kind per sub-biome
+        CaveMobManager.cs      # the cave mobs: the shardlings' shards (MobMissiles; damage + frostburn), the spore burst
+                               #   (spore), the magmaborn's burning blow, loot, despawn, the ring spawn by cave biome and tier
       TntManager.cs            # owns the live primed TNT: spawns cubes where firestarter
                                #   strikes and blasts light TNT, ticks their fuses
       Tower/                   # the battle tower's simulation, namespace VoxelEngine.Simulation.Tower
@@ -2695,7 +2709,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   WideTreeSpecies, TreeWorldgenFixture, IcebergTestWorld (a hand-built sea with a
                                #   pack-ice strip), StubTarget, BoxSolids, SkyZoneFinder (sky zones under the seed),
                                #   SyntheticGear (gear items with made-up abilities and modifiers), TowerSiteFixture
-                               #   (synthetic tower sites of any radius, floor count and turn)
+                               #   (synthetic tower sites of any radius, floor count and turn), CaveTestWorld
+                               #   (a carved, evenly lit cave for the cave spawn searches)
                                #   and the three [CollectionDefinition]s
   Audio/                       # the sfx library and the ambience bed
   Chunks/                      # chunk storage, keys and map, the chunk manager and its mesh scheduling, the
@@ -2720,10 +2735,11 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   lava, ledge, loot, body separation), clips and the animator, drops, projectiles,
                                #   damage numbers
     Goblins/                   # goblin AI, aim and stones, flee, dodge, pack alert,
-                               #   torches, the content contract (mirrors src/Entities/Goblins)
+                               #   torches, cave spawns, the content contract (mirrors src/Entities/Goblins)
     HellMobs/                  # hell mob contracts, layer difficulty, brute blow, caster cast and bolt burn
     SkyMobs/                   # sky mob contracts, zone difficulty, the flyer's hover and dive, the golem's
                                #   shockwave and ledge caution
+    CaveMobs/                  # cave mob contracts, the depth tier and its scaling, the shard band, each attack's event
     TowerMobs/                 # the skeleton's contract, tier scaling, bow band and line of sight, melee, undead; the
                                #   Skeleton King's contract, leash, shockwave and volley fan, its brain's phases and choices
     Sandworms/                 # the sandworm's chain, brain and pose, its melee through the real punch path
@@ -2763,6 +2779,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
   Simulation/                  # the main-thread simulations: fluids, falling blocks, leaf decay, tree growth
                                #   and felling, saplings, the stations, drops, the mob managers and spawning
     Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World
+    Caves/                     # the cave spawn filter and rules, the cave mob manager (spawns by biome, tier, caps, attacks)
+    Chests/                    # chests, tower chests and the underground ruin chests' cave biome tables (CaveChestTests)
     Tower/                     # the skeleton manager: forced spawn and the hard cap, tier, no natural spawn, rake, arrows,
                                #   despawn reports; the floor locks (TowerRulesTests, SkeletonPileManagerTests,
                                #   TowerBlockWriterTests, TowerManagerTests, TowerManagerSaveTests: stations.json); the
@@ -2813,6 +2831,8 @@ tools/                                # asset generators: models, animation clip
   generate-cave-ore-textures.py       # deterministic placeholder amethyst_ore, jade_ore and cinnabar_ore tiles: palette swaps
                                       #   of malachite_ore's green shades, stdlib PNG reader and writer; listed in USER_TODO.md;
                                       #   --check
+  generate-cave-mob-models.py         # deterministic shardling, sporeling and magmaborn .bbmodels (humanoid rigs, clips) and
+                                      #   palette skins, on the hell script's machinery; listed in USER_TODO.md; --check
   generate-skeleton-king-model.py     # deterministic skeleton_king .bbmodel (crowned rig with its club, clips) and palette
                                       #   skin, on the hell and skeleton scripts' machinery; listed in USER_TODO.md; --check
   generate-iceberg-models.py          # deterministic iceberg_{small,medium,large}.bbmodel and iceberg.png; its header pins
@@ -4032,9 +4052,10 @@ and every error names its file. Tests compile in-memory effects through the pure
 | `icon` | none | a `.png` path under `assets/`: the player's HUD icon |
 | `deathMessage` | none | the phrase after the player's name in a death line ("burned to death") |
 
-An effect must do something: damage, a factor below 1 or a block flag. Two ship: `burning` (fire; 6 s,
-5% a second, ignite and thaw, orange, embers) and `frostburn` (frost; 8 s, 2% every 2 s, half speed, 0.6
-attack, freeze, pale blue, steam), first guesses.
+An effect must do something: damage, a factor below 1 or a block flag. Three ship: `burning` (fire; 6 s,
+5% a second, ignite and thaw, orange, embers), `frostburn` (frost; 8 s, 2% every 2 s, half speed, 0.6
+attack, freeze, pale blue, steam) and `spore` (the sporeling's burst, see "Cave mobs"; 6 s, 3% every 1.5 s, 0.75
+speed, 0.85 attack, fungal green, smoke, no icon), first guesses.
 
 **Rules.** A target's effects are one `StatusEffectSet` (`Status/`, GL-free, allocation-free after the
 first apply): re-applying an active effect refreshes its remaining time to the larger of the two and
@@ -4419,7 +4440,7 @@ refused at hello. A slime entry's `Ammo` (a goblin's flint) carries the slime's 
 did not change, so no version bump: an older server's 0 reads as the smallest size, and a mirror
 whose reported size differs is replaced (`ClientMirror.KindMatches`). A hell, sky or tower mob's `Ammo` carries its
 attack count the same way (`RealmMob.AttackCount`, see "A mirror's attack clip"), with no bump either. Every
-entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 28 (current) appends the eye's cave biome byte to `PlayerStatus` (`PlayerStatusData.CaveBiome`, an undefined value reads as Plain); an older peer would misread the status. Version 27 appends each battle tower's altar state byte to its `StationState` record and lets `EntityList` carry the Skeleton King (`NetEntityKind.SkeletonKing` 14: its fight phase rides `ItemId`, clamped to 1..3 on read, and its attack count rides `Ammo`, slam, volley and summon by remainder; see "Battle tower"); an older peer would misread the station frames and an older client would not draw the king. Version 26 appends the battle tower locks at the end of `StationState` (`TowerManager.WriteNet`/`ReadNet`: each tower's cell, center and radius, and per floor its band, piles left, skeletons left and door bit, bounds-checked; see "Battle tower"); an older peer would misread the station frames. Version 25 lets `EntityList` carry the battle tower's skeleton (`NetEntityKind.Skeleton` 13): its tower tier rides `ItemId` (a goblin's torch byte, 0 for other mobs; clamped to 0..`MobConfig.TowerMaxTier` on read, since a mirror cannot derive it from where it stands, and a mirror whose tier differs is replaced, `ClientMirror.KindMatches`) and its attack count rides `Ammo` (melee even, shot odd, see "A mirror's attack clip"); an older client would not draw it. Version 24 adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
+entry is written and read by one codec, `NetEntityCodec`. Version 9 ends `PlayerStatus` with the player's air byte. Version 10 lets an `Attack` intent carry the sword's swings (`NetAttackKind.SwordCut`/`SwordBackCut`/`SwordChop`, mapped by `NetAttacks`) and the player list their `NetPlayerAction`s; an older peer would refuse the intent as malformed and drop the connection. Version 11 ends `PlayerStatus` with the player's mana and its max (two ints, clamped on read). Version 12 adds the `Cast` world intent (its slot byte) and the `SelectStaffSlot` inventory action; an older peer would refuse either as malformed. Version 14 adds the `BindStaffSlot` and `ClearStaffSlot` inventory actions (the spell table); an older peer would refuse either as malformed. Version 15 adds the known spell parts (`KnownParts`, by key) to the `InventoryState` snapshot. Versions 19, 20 and 21 add the gear equip actions, the per-player chest messages and the worn armor pieces at the end of each player list entry (see "Gear and equipment" and "Chests" above). Version 29 (current) lets `EntityList` carry the cave mobs (`NetEntityKind.Shardling` 15, `Sporeling` 16 and `Magmaborn` 17): the depth tier rides `ItemId` (clamped to 0..`MobConfig.CaveMaxTier` on read; a mirror whose tier differs is replaced, `ClientMirror.KindMatches`) and the attack count rides `Ammo` (see "Cave mobs"); an older client would not draw them. Version 28 appends the eye's cave biome byte to `PlayerStatus` (`PlayerStatusData.CaveBiome`, an undefined value reads as Plain); an older peer would misread the status. Version 27 appends each battle tower's altar state byte to its `StationState` record and lets `EntityList` carry the Skeleton King (`NetEntityKind.SkeletonKing` 14: its fight phase rides `ItemId`, clamped to 1..3 on read, and its attack count rides `Ammo`, slam, volley and summon by remainder; see "Battle tower"); an older peer would misread the station frames and an older client would not draw the king. Version 26 appends the battle tower locks at the end of `StationState` (`TowerManager.WriteNet`/`ReadNet`: each tower's cell, center and radius, and per floor its band, piles left, skeletons left and door bit, bounds-checked; see "Battle tower"); an older peer would misread the station frames. Version 25 lets `EntityList` carry the battle tower's skeleton (`NetEntityKind.Skeleton` 13): its tower tier rides `ItemId` (a goblin's torch byte, 0 for other mobs; clamped to 0..`MobConfig.TowerMaxTier` on read, since a mirror cannot derive it from where it stands, and a mirror whose tier differs is replaced, `ClientMirror.KindMatches`) and its attack count rides `Ammo` (melee even, shot odd, see "A mirror's attack clip"); an older client would not draw it. Version 24 adds waystones: the `Waystone(cell)` world intent and the `WaystoneRename`, `WaystoneRows` and `WaystoneOpened` messages (see "Waystones on a server"); an older peer would refuse the intent as malformed and never open a waystone. Version 23 adds the sandworm boss (`NetEntityKind.Sandworm` for its head, its phase in the ammo field, and `SandwormTarget` for the point it will surface at; see "Sandworm"); an older client would not draw it. Version 22 appends the bloomeries and anvils to the `StationState` frame and adds the `Hammer` world intent (see "The bloomery and the anvil"); an older peer would misread the station frames and refuse the intent as malformed. Version 18 lets `EntityList` carry the sky mobs (`NetEntityKind.Galeraptor` 9 and `Cloudgolem` 10, the
 mob fields only: a flyer's whole position and velocity ride the entry and its flight follows from its kind, and a
 mirror's zone tier, and so its pool, follows from the column it is first seen over); an older client would not draw
 them. Version 17 lets `EntityList` carry the hell mobs (`NetEntityKind.Hellbrute` 7 and `Cinderwitch` 8, the
@@ -5289,7 +5310,7 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   galeraptor and the slamming cloud golem), all `RealmMob`s run by a `RealmMobManager` (`HellMobManager`,
   `SkyMobManager`) under the world's shared mob caps, each spawning only in its own realm
   (`MobSpawner.TryFindHellSpawn`, `TryFindSkySpawn`); "Flying mobs" is the flight every mob kind can opt
-  into. **Difficulty** grows with depth and zone: `LayerDifficulty` (`1 + layer *
+  into. The overworld's cave sub-biomes have their own ("Cave mobs", scaled by a depth tier). **Difficulty** grows with depth and zone: `LayerDifficulty` (`1 + layer *
   MobConfig.LayerDifficultyPerLayer`, capped at `LayerDifficultyMaxMultiplier`) by the hell layer and
   `SkyDifficulty` (`1 + tier * MobConfig.SkyDifficultyPerTier`) by the island zone's tier scale health,
   damage, a caster's rate and the pack, read from where the mob spawned, so a save restore and a client mirror
@@ -5298,8 +5319,8 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
 - **Budgets**: 247 of the 255 content ids are used (137 blocks, 109 items, air), 8 left; the battle tower
-  (plans/BATTLE_TOWER.md) is done, the cave biomes' three exclusive ores (`CB-2`) took 3, and the rest is left for
-  `CAVE_BIOMES.md`. Seed offsets
+  (plans/BATTLE_TOWER.md) is done, the cave biomes' three exclusive ores (`CB-2`) took 3, their mobs and chest tables
+  (`CB-4`) none (entities take no id). Status effects: 3 of the 8 slots (`burning`, `frostburn`, `spore`). Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes), 175 to 178 (sky landmasses), 179 to 181
   (cave biomes), 182 (cave shape scale) and 183 to 185 (cave ores); the whole table is in
@@ -5326,7 +5347,12 @@ site (jittered), its template and its turn from the hash, a pure function of (ce
 `RuinsSurface`, after the wells) need a land biome, dry ground and a footprint within `RuinSurfaceMaxStep` of level.
 **Underground** rooms (`RuinsUnderground`) sit at a hashed depth between the barrier and `RuinUndergroundCover` under the
 ground at their center and are sealed by their own walls; they (and their waystone chambers) are stamped after the geodes, the
-cave life, the gravel pockets and the pools, so none of those is left inside a room. **Hell** ruins (`RuinsHell`, hooked into both the wholly-hell early
+cave life, the gravel pockets and the pools, so none of those is left inside a room. Their `ruin_chest_underground` is a
+tiered chest (`chest.tiers` in `CaveBiome` ordinal order: `ruin_underground` for plain, then `_frozen`, `_desert`, `_crystal`,
+`_fungal`, `_magma`, each nesting `ruin_underground` plus a flavor pool and one uncommon..rare charm or ring): the stamp ORs the
+chest cell's own cave biome into its state as the tier (`StructureStamper.Stamp(..., chestBiomes:)`, fed the chunk's
+`CaveBiomeMap` through `RuinPlacement.StampUnderground(..., caves)`; a null map is all plain, tier 0), so opening and breaking
+unopened roll the same table and nothing reads worldgen at open time (`CaveChestTests`). **Hell** ruins (`RuinsHell`, hooked into both the wholly-hell early
 path and the straddle path through `StampHellRuins`) stand on the first solid pocket floor scanning down from a hashed row,
 per layer, with the whole footprint level and clear above, and their cells stay inside their layer. **Sky** ruins (`RuinsSky`,
 inside `StampSky` after the sky trees) take at most one per island, on its center top when the top is within
@@ -5748,6 +5774,59 @@ Both models, their skins and the `cloud_shard` sprite come from `tools/generate-
   mobs").
 - Known gaps: the slam's shockwave hits players only (no mobs, no blocks); `cloud_shard` has no use yet; the overworld ring spawners still spawn on the ground far below a
   player standing on an island.
+
+### Cave mobs
+
+The overworld's cave sub-biomes (see "Cave biomes") each hold one kind (plans/CAVE_BIOMES.md `CB-4`), all `CaveMob`s
+(`src/Entities/CaveMobs/`): `RealmMob`s like the hell and sky mobs, scaled by a **depth tier**. Their models and palette skins
+come from `tools/generate-cave-mob-models.py` (deterministic, `--check`; on the hell script's rig, UV, PNG and clip machinery,
+with its own small-palette painters), placeholder art listed in `USER_TODO.md`; all three are humanoid rigs (head and arms
+under the torso) checked at startup (each kind's `ValidateContent` over `EntityContract.RequireHumanoid`).
+- **The shardling** (`shardling.json`, hp 24, loot amethyst ore and sometimes a crystal block; crystal caves) is a caster
+  copied from the cinderwitch: it keeps `CaveShardlingMinRange..MaxRange` (inside the level range of `CaveShardSpeed`), and
+  grounded, off its cooldown (a fresh one waits `CaveShardlingFirstCastDelaySeconds`) with a clear line, also inside the band,
+  plays its `throw` clip; at its `release` event the manager launches a `crystal_block` **shard** on `GoblinAim`'s low arc
+  through `MobMissiles` (`CaveMobManager.Shards`, merged into `ThrowAction.RefreshProjectiles`), which deals `ShardDamage` and
+  applies `frostburn` (`CaveShardChillScale`) to the non-immune target it touches.
+- **The sporeling** (`sporeling.json`, hp 32, loot jade ore, sometimes fungal glow and a bone; fungal caves) walks at its
+  target and, within `CaveSporelingTriggerReach` and off its cooldown, plays `melee`; its `impact` is a **spore burst**: every
+  non-immune target within `CaveSporeBurstRadius` horizontally and `CaveSporeBurstHeight` of its feet (`Sporeling.InBurst`,
+  the shared `MobTargets.InShockwave`) takes `BurstDamage` with a shove and the `spore` status effect.
+- **The magmaborn** (`magmaborn.json`, hp 70, loot cinnabar ore, ember shards and sometimes coal; the magma deep) is a slow
+  brute: in `CaveMagmabornMeleeReach` and off its cooldown it plays `melee`, and at its `impact` every non-immune target still
+  in reach takes `MeleeDamage`, a heavy knockback and `burning` (`CaveMagmabornBurnScale`). A player barely shoves it.
+- **The depth tier** (`CaveDifficulty`, GL-free): 0 at or above `WorldGenerationConfig.CaveEchoBottomY`, one more per
+  `MobConfig.CaveDifficultyBandBlocks` below it, clamped to `CaveMaxTier`; `1 + tier * CaveDifficultyPerTier`, capped at
+  `CaveDifficultyMaxMultiplier`, scales the pool and damage through `LayerDifficulty.ScaleBy`. It is fixed at spawn
+  (`CaveMob.Tier`): a ring spawn takes the tier of its floor, the `spawn` op the tier of its feet unless its `tier` is above 0, a
+  save restore the saved `MobData.Tier` (an old file the saved position's) and a client mirror the `ItemId` byte, so a mirror
+  and a restore keep the server's pool wherever they stand.
+- **Spawning** (`CaveMobManager`, `src/Simulation/Caves/`, on the shared `RealmMobManager<TMob>` frame, joined to the world's
+  `MobCaps`): every `CaveMobSpawnIntervalSeconds`, under the natural cap, around a target standing underground
+  (`MobSpawner.TargetUnderground`) outside hell, `MobSpawner.TryFindCaveSpawn` searches a dark cave floor (a `CaveSpawnSearch`
+  with the `CaveMob*` radii and light limits and `CaveSpawnRules.CaveMobMask`); the cave biome it reports picks the kind
+  (`CaveSpawnRules.CaveMobKindFor`: plain and the echoes hold none) and a pack of up to `CaveMobPackMaxSize` is ringed on the
+  leader's floor with the mask narrowed to its biome, at its tier.
+- **The cave spawn filter** is shared: `TryFindCaveSpawn` resolves the standing cell's cave biome last, only for a floor that
+  passed the floor, hell, depth and light checks (`CaveBiomes.At` over the world source's stored column, or an injected
+  `CaveBiomeResolver`), and refuses it unless the search's mask allows it, so it costs one `CaveBiomes.At` per light-passing
+  try and nothing per frame. Cave slimes take `CaveSpawnRules.SlimeMask` (everywhere but the magma deep); goblins now spawn in
+  caves for a target underground (caves first, then the night-gated surface path), skipping the night gate and accepted against
+  a roll of `CaveSpawnRules.GoblinWeight` (favored in crystal and fungal caves, `GoblinCaveOtherWeight` in plain and the
+  echoes, never the magma deep), their pack mates held to the leader's biome. The fungal caves' glowing accents do not starve
+  their spawns at the shared torch-safe limit (measured in plans/CAVE_BIOMES.md).
+- **Plumbing**: `World.CaveMobs`, `MobDirector` (update, damage billing, status block actions, `RefreshMobs`, the `spawn` op
+  names `shardling`/`sporeling`/`magmaborn` with the optional `tier`), `ThrowAction` (the shards), `MobPasses.RenderRealmMobs`
+  and the near shadow cascade, `entities.json` by kind name with the tier, the `EntityList` kinds (protocol 29) and
+  `ClientMirror`'s reconcile (a different tier replaces the mirror), and the item debugger's ENTITIES tab (tier 0). Tests:
+  `CaveMobTests`, `CaveMobManagerTests`, `CaveSpawnFilterTests`, `CaveSpawnRulesTests`, `GoblinCaveSpawnTests`, the realm round
+  trip in `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `RealmMobMirrorTests`,
+  `NetworkEntitySyncTests.ACaveMobMirrorTakesItsTierFromTheSnapshotNotWhereItIsFirstSeen` and the loopback
+  `GameServerTests.CaveMobsReachTheClientsEntityListByKindAndAMirrorKeepsItsTierPool`. `visual-examples/cave-mobs.json`
+  (`VOXEL_TIME=147`) films each kind at its biome's spot.
+- A client's mirror plays the cast and the blows with the server (see "A mirror's attack clip" under "Hell mobs").
+- Known gaps: the shards, like goblin stones and hell bolts, are not on the wire (a client sees only the damage and the
+  chill); cave mobs are not drawn in the water mirror; the burst and blows hit players only; the numbers are first guesses.
 
 ### Skeleton
 

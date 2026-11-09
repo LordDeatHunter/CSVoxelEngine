@@ -5,6 +5,7 @@ using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content.Blocks;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
@@ -16,6 +17,7 @@ using VoxelEngine.Interaction;
 using VoxelEngine.Particles;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation;
+using VoxelEngine.Simulation.Caves;
 using VoxelEngine.Simulation.Icebergs;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.WorldGen.Caves;
@@ -39,6 +41,7 @@ internal sealed class ClientMirror
     private readonly GoblinManager? _goblins;
     private readonly HellMobManager? _hellMobs;
     private readonly SkyMobManager? _skyMobs;
+    private readonly CaveMobManager? _caveMobs;
     private readonly SkeletonManager? _skeletons;
     private readonly SkeletonKingManager? _kings;
     private readonly SandwormManager? _sandworms;
@@ -60,7 +63,7 @@ internal sealed class ClientMirror
 
     internal ClientMirror(World world, ChunkManager chunkManager, DropManager dropManager, TntManager tntManager,
         FallingBlockManager falling, SlimeManager? slimes, GoblinManager? goblins, HellMobManager? hellMobs,
-        SkyMobManager? skyMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms,
+        SkyMobManager? skyMobs, CaveMobManager? caveMobs, SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms,
         IcebergManager? icebergs,
         CampfireManager campfires, QuernManager querns, KilnManager kilns, CastingManager casting,
         BlockDebrisSystem debris, PlayerHealth health, List<RemotePlayer> remotePlayers, bool clientMode,
@@ -75,6 +78,7 @@ internal sealed class ClientMirror
         _goblins = goblins;
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
+        _caveMobs = caveMobs;
         _skeletons = skeletons;
         _kings = kings;
         _sandworms = sandworms;
@@ -422,8 +426,8 @@ internal sealed class ClientMirror
         }
     }
 
-    // A slime mirror also has to be the reported size (the ammo field) and a skeleton the reported tier (the item
-    // byte), since both are fixed for life
+    // A slime mirror also has to be the reported size (the ammo field) and a skeleton or cave mob the reported tier (the
+    // item byte), since each is fixed for life
     private static bool KindMatches(Mob mob, NetEntity entry) => entry.Kind switch
     {
         NetEntityKind.Slime => mob is Slime slime && slime.Size == SlimeSize.Clamp(entry.Ammo),
@@ -435,6 +439,9 @@ internal sealed class ClientMirror
         NetEntityKind.Sandworm => mob is Sandworm,
         NetEntityKind.Skeleton => mob is Skeleton skeleton && skeleton.Tier == TowerDifficulty.Clamp(entry.ItemId),
         NetEntityKind.SkeletonKing => mob is SkeletonKing,
+        NetEntityKind.Shardling => mob is Shardling shardling && shardling.Tier == CaveDifficulty.Clamp(entry.ItemId),
+        NetEntityKind.Sporeling => mob is Sporeling sporeling && sporeling.Tier == CaveDifficulty.Clamp(entry.ItemId),
+        NetEntityKind.Magmaborn => mob is Magmaborn magmaborn && magmaborn.Tier == CaveDifficulty.Clamp(entry.ItemId),
         _ => false,
     };
 
@@ -460,6 +467,10 @@ internal sealed class ClientMirror
             NetEntityKind.Skeleton => _skeletons?.Spawn(entry.Position, entry.ItemId),
             // The boss mirrors unbound: its leash, summons and altar bookkeeping stay the server's
             NetEntityKind.SkeletonKing => _kings?.SpawnMirror(entry.Position),
+            // A cave mob's depth tier rides the item byte too: it was fixed where it spawned, not where it is first seen
+            NetEntityKind.Shardling => _caveMobs?.Spawn(Shardling.EntityName, entry.Position, entry.ItemId),
+            NetEntityKind.Sporeling => _caveMobs?.Spawn(Sporeling.EntityName, entry.Position, entry.ItemId),
+            NetEntityKind.Magmaborn => _caveMobs?.Spawn(Magmaborn.EntityName, entry.Position, entry.ItemId),
             _ => null,
         };
         mob?.NetworkSetState(entry.Position, entry.Yaw, entry.Health, entry.Velocity);
@@ -481,6 +492,7 @@ internal sealed class ClientMirror
             case Goblin goblin: _goblins?.Remove(goblin); break;
             case HellMob hellMob: _hellMobs?.Remove(hellMob); break;
             case SkyMob skyMob: _skyMobs?.Remove(skyMob); break;
+            case CaveMob caveMob: _caveMobs?.Remove(caveMob); break;
             case Skeleton skeleton: _skeletons?.Remove(skeleton); break;
             case SkeletonKing king: _kings?.Remove(king); break;
             case Sandworm sandworm: _sandworms?.Remove(sandworm); break;

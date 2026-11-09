@@ -303,12 +303,13 @@ internal static class ChunkTerrainFill
         timer?.Mark(Stage.CaveBiomes);
 
         // Sealed underground rooms and their waystone chambers, after the deep features and the cave life, so no
-        // geode, mushroom, formation, gravel pocket or pool is left inside a room
+        // geode, mushroom, formation, gravel pocket or pool is left inside a room. A room's loot chests take their
+        // own cells' cave biomes as their tiers from the same map
         if (WorldFeatureConfig.RuinsEnabled
             && Admits(stampGates, RuinPlacement.UndergroundBand(neighborhoodMaxHeight), lowerBoundY))
         {
             var state = chunk.StateArray;
-            RuinPlacement.StampUnderground(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0);
+            RuinPlacement.StampUnderground(chunk.Blocks, ref state, worldX0, lowerBoundY, worldZ0, caves);
             chunk.StateArray = state;
         }
         timer?.Mark(Stage.RuinsUnderground);

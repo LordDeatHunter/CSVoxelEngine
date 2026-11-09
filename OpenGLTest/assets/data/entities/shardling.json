@@ -1,0 +1,8 @@
+{
+  "name": "Shardling",
+  // The crystal caves' shard caster (plans/CAVE_BIOMES.md CB-4). The base pool at depth tier 0;
+  // CaveDifficulty scales it with the tier the mob spawned at
+  "hp": 24,
+  "loot": "shardling",
+  "model": "assets/models/entity/shardling.bbmodel"
+}

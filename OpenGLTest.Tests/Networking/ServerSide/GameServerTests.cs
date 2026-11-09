@@ -9,6 +9,7 @@ using System.Threading;
 using VoxelEngine.Content.Recipes;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Icebergs;
 using VoxelEngine.Entities.Sandworms;
@@ -1422,6 +1423,50 @@ public sealed class GameServerTests : IDisposable
             mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
             Assert.True(mirrored.Animation.IsPlaying(Skeleton.ShootClip));
             Assert.False(mirrored.Animation.IsPlaying(Skeleton.MeleeClip));
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    [Fact]
+    public void CaveMobsReachTheClientsEntityListByKindAndAMirrorKeepsItsTierPool()
+    {
+        using var client = Connect("Delver");
+        var spawn = client.Server!.Value.Spawn;
+        // Straight under the player (the despawn rule is horizontal) and far below it, so it never reaches the player
+        var deep = new Vector3(spawn.X, spawn.Y - 200f, spawn.Z + 3f);
+        Assert.True(_world.SpawnEntity(Sporeling.EntityName, deep, tier: 3));
+        var sporeling = Assert.IsType<Sporeling>(Assert.Single(_world.CaveMobs));
+        Assert.Equal(3, sporeling.Tier);
+        sporeling.RestoreState(sporeling.MaxHealth - 2, 0.5f, Vector3.Zero);
+        // Stands in for the attacks the server simulated: the counter its entry carries
+        sporeling.MirrorAttackCount(2);
+
+        var inbox = InboxOf(client);
+        WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Sporeling && e.Ammo == 2));
+        // Sent as a sporeling (never under the switch's goblin default), its tier in the item byte
+        var carried = Assert.Single(inbox.Entities!, e => e.Kind == NetEntityKind.Sporeling);
+        Assert.Equal(sporeling.Tier, carried.ItemId);
+        Assert.Equal(sporeling.Health, carried.Health);
+
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            var mirrored = Assert.IsType<Sporeling>(Assert.Single(mirror.CaveMobs));
+            Assert.Equal(sporeling.Tier, mirrored.Tier);
+            Assert.Equal(sporeling.MaxHealth, mirrored.MaxHealth);
+            Assert.Equal(sporeling.Health, mirrored.Health);
+            Assert.False(mirrored.Animation.IsPlaying(Sporeling.MeleeClip));
+
+            // The server bursts: the count moves and the mirror plays its melee
+            sporeling.MirrorAttackCount(3);
+            WaitForEntities(inbox, entities => entities.Exists(e => e.Kind == NetEntityKind.Sporeling && e.Ammo == 3));
+            mirror.ClientMirror.ApplyNetworkEntities(inbox.Entities!);
+            Assert.True(mirrored.Animation.IsPlaying(Sporeling.MeleeClip));
         }
         finally
         {

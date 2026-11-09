@@ -6,6 +6,7 @@ using System.Linq;
 using System.Numerics;
 using System.Threading;
 using VoxelEngine.Entities;
+using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.HellMobs;
 using VoxelEngine.Entities.Sandworms;
 using VoxelEngine.Entities.SkyMobs;
@@ -316,6 +317,12 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(5f, High - 1f, -5f), tier: 4));
         // A second, first-floor skeleton left unbound, beside the first one bound to a tower floor
         Assert.True(first.SpawnEntity(Skeleton.EntityName, new Vector3(-5f, High - 1f, -5f), tier: 0));
+        // The three cave kinds beside the surface player (their chunks load with it), one at a scenario tier its
+        // position (far above the caves, depth tier 0) cannot give back
+        Assert.True(first.SpawnEntity(Shardling.EntityName, new Vector3(6f, High - 1f, 6f)));
+        Assert.True(first.SpawnEntity(Sporeling.EntityName, new Vector3(-6f, High - 1f, 6f), tier: 3));
+        Assert.True(first.SpawnEntity(Magmaborn.EntityName, new Vector3(6f, High - 1f, -6f)));
+        var tieredCave = Assert.Single(first.CaveMobs, m => m.Tier > 0);
         var boundFloor = new TowerFloorRef(7, -3, 4);
         var bound = Assert.Single(first.Skeletons, s => s.Tier > 0);
         bound.Floor = boundFloor;
@@ -332,14 +339,20 @@ public sealed class WorldLifecycleTests : IDisposable
         var goblinCenter = goblin.Position;
         var goblinAmmo = goblin.Ammo;
         var goblinHealth = goblin.Health;
-        // Every hell, sky and tower kind wounded and turned, so the restore keeps each kind and its own state
+        // Every hell, sky, cave and tower kind wounded and turned, so the restore keeps each kind and its own state
         var realmSaved = new List<(Type Kind, Vector3 Center, int Health, float Facing)>();
-        foreach (var realmMob in first.HellMobs.Concat<RealmMob>(first.SkyMobs).Concat(first.Skeletons))
+        var realmSpawned = first.HellMobs.Concat<RealmMob>(first.SkyMobs).Concat(first.CaveMobs).Concat(first.Skeletons)
+            .ToList();
+        foreach (var realmMob in realmSpawned)
         {
             realmMob.RestoreState(realmMob.MaxHealth - 2, 0.75f, Vector3.Zero);
             realmSaved.Add((realmMob.GetType(), realmMob.Position, realmMob.Health, realmMob.Facing));
         }
-        Assert.Equal(6, realmSaved.Count);
+        // Two hell, two sky, three cave kinds and two skeletons, each spawned above
+        Assert.Equal(2 + 2 + 3 + 2, realmSaved.Count);
+        var caveTier = tieredCave.Tier;
+        var caveCenter = tieredCave.Position;
+        var cavePool = tieredCave.MaxHealth;
         var skeletonTier = bound.Tier;
         var boundCenter = bound.Position;
         var unboundCenter = Assert.Single(first.Skeletons, s => s != bound).Position;
@@ -369,7 +382,8 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(goblinCenter, restoredGoblin.Position);
         Assert.Equal(goblinAmmo, restoredGoblin.Ammo);
         Assert.Equal(goblinHealth, restoredGoblin.Health);
-        var restoredRealm = second.HellMobs.Concat<RealmMob>(second.SkyMobs).Concat(second.Skeletons).ToList();
+        var restoredRealm = second.HellMobs.Concat<RealmMob>(second.SkyMobs).Concat(second.CaveMobs)
+            .Concat(second.Skeletons).ToList();
         Assert.Equal(realmSaved.Count, restoredRealm.Count);
         foreach (var (kind, center, health, facing) in realmSaved)
         {
@@ -385,6 +399,11 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.True(restoredSkeleton.MaxHealth > restoredSkeleton.Type.MaxHealth);
         Assert.Equal(boundFloor, restoredSkeleton.Floor);
         Assert.Null(Assert.Single(second.Skeletons, s => s.Position == unboundCenter).Floor);
+        // The tiered cave mob came back at its saved tier with the same, tier-scaled pool, not its position's tier 0
+        var restoredCave = Assert.Single(second.CaveMobs, m => m.Position == caveCenter);
+        Assert.Equal(caveTier, restoredCave.Tier);
+        Assert.Equal(cavePool, restoredCave.MaxHealth);
+        Assert.True(restoredCave.MaxHealth > restoredCave.Type.MaxHealth);
         Assert.Equal(2 + realmSaved.Count, second.Mobs.Count); // RefreshMobs ran at the flip
 
         var restoredDrop = Assert.Single(second.Drops);
@@ -392,6 +411,22 @@ public sealed class WorldLifecycleTests : IDisposable
         Assert.Equal(dropPosition, restoredDrop.Position);
         Assert.Equal(dropVelocity, restoredDrop.Velocity);
         Assert.True(second.SaveAndDispose());
+    }
+
+    [Fact]
+    public void ACaveMobSpawnedWithNoTierTakesTheDepthTierOfItsFeet()
+    {
+        var world = NewWorld(null);
+        Assert.True(world.IsPlaying);
+
+        // Above the echo bottom the depth tier is 0, so the spawn op's tierless sporeling is a tier-0 one
+        var feet = new Vector3(0f, High - 1f, 0f);
+        Assert.True(world.SpawnEntity(Sporeling.EntityName, feet));
+        var sporeling = Assert.IsType<Sporeling>(Assert.Single(world.CaveMobs));
+        Assert.Equal(CaveDifficulty.TierAt(feet.Y), sporeling.Tier);
+        Assert.Equal(0, sporeling.Tier);
+        Assert.Contains(sporeling, world.Mobs);
+        Assert.True(world.SaveAndDispose());
     }
 
     // The default seed's nearest battle tower: only a site-built tower record is saved and restored
