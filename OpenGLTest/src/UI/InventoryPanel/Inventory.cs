@@ -406,7 +406,12 @@ public class Inventory
         return false;
     }
 
-    public bool PickBlock(byte id)
+    /// <summary>
+    /// Selects the hotbar slot already showing <paramref name="id"/>, or equips it into the selected slot. A creative
+    /// player needs to own none of it: a block it holds none of is granted one first, so the slot can place it (creative
+    /// placing spends nothing).
+    /// </summary>
+    public bool PickBlock(byte id, bool creative = false)
     {
         if (id == 0) return false;
         for (var i = 0; i < SlotCount; i++)
@@ -415,7 +420,7 @@ public class Inventory
             Select(i);
             return true;
         }
-        if (CountFor(id) <= 0) return false;
+        if (CountFor(id) <= 0 && !(creative && Add(id, 1))) return false;
         if (CategoryOf(id) is InventoryCategory.Tools or InventoryCategory.Gear)
         {
             var instance = _tools.FirstOrDefault(t => t.DefinitionId == id);

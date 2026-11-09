@@ -185,6 +185,20 @@ public sealed class InventoryTests
     }
 
     [Fact]
+    public void ACreativePickEquipsABlockTheInventoryHoldsNoneOf()
+    {
+        var inventory = Inventory.Empty();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        Assert.Equal(0, inventory.CountFor(stone));
+
+        Assert.False(inventory.PickBlock(stone));
+        Assert.True(inventory.PickBlock(stone, creative: true));
+
+        Assert.Equal(stone, inventory.SelectedBlockId);
+        Assert.True(inventory.CanPlaceSelected);
+    }
+
+    [Fact]
     public void PickBlockDoesNothingWhenTargetInNeitherPoolNorHotbar()
     {
         var inventory = new Inventory();

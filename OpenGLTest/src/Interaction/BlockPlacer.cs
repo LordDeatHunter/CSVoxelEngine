@@ -152,7 +152,7 @@ internal sealed class BlockPlacer
         var id = BlockType.PickId(Edits.BlockIdAt(LeftClick.SelectedBlockPosition));
         if (id == 0) return false;
         pickedId = id;
-        return inventory.PickBlock(id);
+        return inventory.PickBlock(id, Camera.IsCreative);
     }
 
     /// <summary>Places a block against the face <paramref name="player"/> targets, recording the
