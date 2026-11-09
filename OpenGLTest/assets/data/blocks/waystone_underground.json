@@ -3,7 +3,7 @@
   // a discovered one teleports to the others; its name, first discoverer and lost flag live in the world's waystone
   // registry (WaystoneManager), created on first use, so the block keeps no state. This is the lower half of a
   // waystone two cells tall: its upper half (waystone_underground_upper) stands above it, written with it, and the
-  // registry keys the waystone by this cell. Worldgen-only (no item); mining either half takes both down, marks the
+  // registry keys the waystone by this cell. Worldgen-placed, and a creative player can place it from the catalog; mining either half takes both down, marks the
   // waystone lost for everyone who found it and breaks it into stone bricks (loot/waystone.json). The runes glow in
   // the default warm torch color, an existing block-light palette slot. Tiles are committed art.
   "name": "Deep Waystone",
@@ -15,7 +15,6 @@
   "tools": { "pickaxe": 1 },
   "light": { "emission": 6 },
   "castsAO": false,
-  "hasItem": false,
   "loot": "waystone",
   "waystone": true,
   "collidesByHitbox": true,

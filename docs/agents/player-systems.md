@@ -215,8 +215,8 @@ mining either half takes both down and rolls the lower half's loot once. Each ha
 waystone by its lower cell: `WaystoneManager.TryGetWaystoneCell` maps either half to it (a right-click on either half opens it,
 a break of either marks it lost once), and `WaystoneManager.IsWaystoneAt` holds only while both halves stand, so a lone half (a
 blast's leftover, or a waystone saved before they were two cells tall: it reads as a remnant, lost to its discoverers, and
-breaks like a door's orphan) is no waystone; `WaystoneArrival.StoneHeight` is where a traveler held on top stands. Worldgen-only
-(`hasItem: false`), only a pickaxe breaks it and it crumbles into stone bricks (`loot/waystone.json`). `WaystoneManager` (`Simulation/Waystones/`, owned by `World` as
+breaks like a door's orphan) is no waystone; `WaystoneArrival.StoneHeight` is where a traveler held on top stands. Worldgen-placed, and in the creative catalog (the lower half has an item, so a creative player places one anywhere and it works like a generated one; survival has no source for it)
+Only a pickaxe breaks it and it crumbles into stone bricks (`loot/waystone.json`). `WaystoneManager` (`Simulation/Waystones/`, owned by `World` as
 `World.Waystones`, authoritative worlds only, saved in `stations.json` as `Waystones`) keeps one `WaystoneRecord` per cell,
 created on the first activation (`Discover`/`DiscoverFor`, `World.DiscoverWaystoneFor`): a random `WaystoneNames.Generate`
 name and the activator as first discoverer (`WaystoneManager.DiscovererOf`: the name slug, or `@local` for the local

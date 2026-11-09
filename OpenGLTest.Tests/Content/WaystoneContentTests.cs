@@ -20,7 +20,7 @@ public sealed class WaystoneContentTests
         BlockType.ById.Where(b => b is { Waystone: true }).Select(b => b!).ToList();
 
     [Fact]
-    public void EveryWaystoneIsWorldgenOnlyRockOnlyAPickaxeBreaks()
+    public void EveryWaystoneIsRockOnlyAPickaxeBreaks()
     {
         var waystones = Waystones();
         Assert.NotEmpty(waystones);
@@ -33,7 +33,6 @@ public sealed class WaystoneContentTests
 
         foreach (var waystone in waystones)
         {
-            Assert.False(waystone.HasItem, waystone.Name);
             Assert.True(waystone.Hardness > stone.Hardness, waystone.Name);
             Assert.False(Mining.CanMine(waystone.Id, null), waystone.Name);
             Assert.False(Mining.CanMine(waystone.Id, axe), waystone.Name);
