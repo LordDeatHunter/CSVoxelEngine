@@ -81,9 +81,11 @@ public sealed class TowerShellTests
         {
             var floorY = s.FloorY(k);
             var strip = k == 0 ? StepsPerTurn - 1 : s.LandingStep(k) % StepsPerTurn;
+            // Passable, not necessarily air: the doorway's lantern hangs there without blocking the way
             var open = columns.Any(c => c.Ring == TowerRing.InnerWall && c.Step == strip
                                         && Enumerable.Range(floorY + 1, Headroom)
-                                            .All(y => TowerShell.CellAt(s, c.Ring, c.Step, y) == BlockType.Air));
+                                            .All(y => TowerShell.CellAt(s, c.Ring, c.Step, y) is var cell and >= 0
+                                                      && !BlockType.IsSolid((byte)BlockOf(cell))));
             Assert.True(open, $"floor {k} has no doorway in its inner wall (r {radius}, {floors} floors, turn {turns})");
         }
     }
