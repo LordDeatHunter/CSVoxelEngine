@@ -184,6 +184,7 @@ internal static class BlockLoader
             HasItem = !fluid && (definition.HasItem ?? true),
             NeedsSupport = support.NeedsSupport,
             FlowResistant = support.FlowResistant,
+            SupportFullFace = support.FullFace,
             SupportAttached = supportAttached,
             SupportAbove = supportAbove,
             HasHorizontalFacing = horizontalFacing,

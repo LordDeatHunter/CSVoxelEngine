@@ -100,6 +100,10 @@ public sealed record BlockType
     // test and per DDA step by the raycast, so flat like the other flags.
     internal static readonly bool[] TreeWoodById = new bool[256];
 
+    // Whether the block is solid and its model fills the whole cell, so every face is a full square: what a
+    // supportFullFace block mounts on. Tree wood is answered by its state instead (HoldsFullFace).
+    internal static readonly bool[] FullCubeById = new bool[256];
+
     // Whether the tree wood belongs to a species whose trunk rim is "pixel": its outer shells
     // bevel their exposed corners (TreeWoodShape.RimBoxes). Set from the compiled tree species,
     // read per cell by the mesher, the raycast and body collision.
@@ -413,6 +417,10 @@ public sealed record BlockType
     /// it up is mined, which is <see cref="BlockSupport"/>'s rule, not this one.</summary>
     public bool FlowResistant { get; init; }
 
+    /// <summary>Whether a <see cref="NeedsSupport"/> block is only held up by a full block face
+    /// (<see cref="HoldsFullFace"/>), never by a thin or shaped solid block (a torch).</summary>
+    public bool SupportFullFace { get; init; }
+
     /// <summary>Whether a <see cref="NeedsSupport"/> block hangs off the cell behind its front
     /// (a wall torch) instead of standing on the cell below; only ever set together with
     /// <see cref="HasHorizontalFacing"/>, whose facing names that front.</summary>
@@ -662,6 +670,11 @@ public sealed record BlockType
     /// state byte is a <see cref="WoodState"/>.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsTreeWood(byte blockId) => TreeWoodById[blockId];
+
+    /// <summary>Whether every face of the cell is a full solid square: a solid full-cube block, or tree wood at full
+    /// thickness (a branch or a thin trunk is not).</summary>
+    public static bool HoldsFullFace(byte blockId, byte state) =>
+        TreeWoodById[blockId] ? WoodState.IsFullCube(state) : FullCubeById[blockId];
 
     /// <summary>Whether a tree-wood id belongs to a <c>rim: "pixel"</c> species, so its trunk
     /// shells bevel their exposed corners (<see cref="TreeWoodShape.RimCornerMask"/>).</summary>

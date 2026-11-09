@@ -362,4 +362,32 @@ public sealed class TorchTests : IDisposable
         Assert.False(_world.Place(_torch, new Vector3(x, ground + 1, z), Vector3.UnitX));
         Assert.Equal(BlockType.Air, _world.IdAt(x + 1, ground + 1, z));
     }
+
+    [Fact]
+    public void ATorchMountsOnlyOnAFullBlockFace()
+    {
+        _world = new SupportTestWorld();
+        var log = ContentRegistry.RequireBlock("oak_log").Id;
+        var waystone = ContentRegistry.RequireBlock("waystone_surface").Id;
+        var ground = _world.Top;
+        var (x, z) = (6, 6);
+        _world.Load(x, ground + 2, z);
+
+        // A thin branch and a waystone are solid but no full face: neither holds a torch, on top or on a side
+        _world.Set(x, ground + 1, z, log, WoodState.Encode(WoodState.FullCube - 8, WoodState.ParentDetached, false));
+        _world.Set(x + 4, ground + 1, z, waystone, 0);
+        foreach (var cellX in new[] { x, x + 4 })
+        {
+            Assert.False(_world.Place(_torch, new Vector3(cellX, ground + 1, z), Vector3.UnitY));
+            Assert.False(_world.Place(_torch, new Vector3(cellX, ground + 1, z), -Vector3.UnitZ));
+            Assert.Equal(BlockType.Air, _world.IdAt(cellX, ground + 2, z));
+            Assert.Equal(BlockType.Air, _world.IdAt(cellX, ground + 1, z - 1));
+        }
+
+        // The same log at full thickness, and the stone ground, are full faces
+        _world.Set(x, ground + 1, z, log, WoodState.Detached);
+        Assert.True(_world.Place(_torch, new Vector3(x, ground + 1, z), Vector3.UnitY));
+        Assert.True(_world.Place(_torch, new Vector3(x, ground + 1, z), -Vector3.UnitZ));
+        Assert.True(_world.Place(_torch, new Vector3(x + 2, ground, z), Vector3.UnitY));
+    }
 }

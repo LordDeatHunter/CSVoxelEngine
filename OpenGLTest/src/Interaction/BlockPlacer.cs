@@ -259,10 +259,11 @@ internal sealed class BlockPlacer
         if (BlockType.IsSolid(blockId) && BodyBlocksPlacement(placePos))
             return false;
         // Fragile blocks need something solid holding them up (the ground, or the wall a wall
-        // torch hangs on): a flower planted into mid-air would hover until anything remeshed it,
-        // so the placement fails and the caller keeps its item
+        // torch hangs on), a torch a full block face: a flower planted into mid-air would hover
+        // until anything remeshed it, so the placement fails and the caller keeps its item
         if (BlockSupport.TryGetSupportCell(blockId, state, placePos, out var support)
-            && !BlockType.IsSolid(Edits.BlockIdAt(support)))
+            && !BlockSupport.CanHold(blockId, Edits.BlockIdAt(support),
+                _chunkManager.GetStateGlobal((int)support.X, (int)support.Y, (int)support.Z)))
             return false;
 
         // A placed log is building material, not part of a tree: it is a plain full cube that

@@ -280,6 +280,7 @@ public static class ContentRegistry
             }
 
             BlockType.OccludesById[id] = type.OccludesNeighbors;
+            BlockType.FullCubeById[id] = type.Solid && type.Renderer == BlockRenderer.Model && !type.Fluid && baked.IsFullCube;
             BlockType.PassesLightById[id] = type.PassesLight;
             BlockType.GreedyById[id] = type.Renderer == BlockRenderer.Model && !type.Fluid && ModelBakeSteps.BakesGreedy(baked);
         }
@@ -489,6 +490,7 @@ public static class ContentRegistry
         BlockLightPalette.Reset();
         Array.Clear(BlockType.PassesLightById);
         Array.Clear(BlockType.TreeWoodById);
+        Array.Clear(BlockType.FullCubeById);
         Array.Clear(BlockType.PixelRimById);
         Array.Clear(BlockType.PaneById);
         Array.Clear(BlockType.PaneProfileById);

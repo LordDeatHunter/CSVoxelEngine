@@ -42,4 +42,12 @@ public static class BlockSupport
     /// <paramref name="holder"/>, i.e. loses its support when that cell is emptied.</summary>
     public static bool IsHeldUpBy(byte blockId, byte state, Vector3 cell, Vector3 holder) =>
         TryGetSupportCell(blockId, state, cell, out var support) && support == holder;
+
+    /// <summary>Whether the block <paramref name="holderId"/> (with state <paramref name="holderState"/>) may hold up a
+    /// newly placed support-fragile <paramref name="blockId"/>: any solid block, or only a full block face for a
+    /// <see cref="BlockType.SupportFullFace"/> block (a torch).</summary>
+    public static bool CanHold(byte blockId, byte holderId, byte holderState) =>
+        BlockType.ById[blockId] is { SupportFullFace: true }
+            ? BlockType.HoldsFullFace(holderId, holderState)
+            : BlockType.IsSolid(holderId);
 }

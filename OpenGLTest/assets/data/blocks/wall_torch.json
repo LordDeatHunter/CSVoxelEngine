@@ -16,6 +16,8 @@
   // Pops when the block behind it goes, not the one below; drops a torch (loot/wall_torch.json)
   "needsSupport": true,
   "support": "attached",
+  // Hangs only on a full block face, like the floor torch
+  "supportFullFace": true,
   "facing": "horizontal",
   // Never held: placing a torch on a side is what makes one, and picking one picks the torch
   "hasItem": false,

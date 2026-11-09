@@ -13,8 +13,9 @@ internal readonly record struct FlowTuning(int TickDivisor, int Range);
 /// <summary>A block's stack limits: <c>stackMax</c> (0 = not a stack) and the count at which it turns solid.</summary>
 internal readonly record struct StackLimits(int StackMax, int StackSolidAt);
 
-/// <summary>The support flags of a block: whether it pops without a holder and whether a flow may wash it away.</summary>
-internal readonly record struct SupportRules(bool NeedsSupport, bool FlowResistant);
+/// <summary>The support flags of a block: whether it pops without a holder, whether a flow may wash it away and whether
+/// only a full block face holds it.</summary>
+internal readonly record struct SupportRules(bool NeedsSupport, bool FlowResistant, bool FullFace);
 
 /// <summary>How a body moves over and through a block: speed, grip, pebbles, footfall dust and contact damage.</summary>
 internal readonly record struct GroundTraits(
@@ -243,7 +244,7 @@ internal static class BlockFieldRules
         return new StackLimits(stackMax, stackSolidAt);
     }
 
-    /// <summary>The <c>needsSupport</c> / <c>flowResistant</c> pair. A fluid is never support-fragile (it is what pops those blocks).</summary>
+    /// <summary>The <c>needsSupport</c> / <c>flowResistant</c> / <c>supportFullFace</c> flags. A fluid is never support-fragile (it is what pops those blocks).</summary>
     internal static SupportRules ParseSupport(BlockDefinition definition, bool fluid, bool falls, string path)
     {
         var needsSupport = !fluid && (definition.NeedsSupport ?? false);
@@ -254,7 +255,11 @@ internal static class BlockFieldRules
         if (flowResistant && !needsSupport)
             throw new InvalidOperationException(
                 $"Block '{path}' sets flowResistant without needsSupport: only a fragile block has a wash-away rule to opt out of.");
-        return new SupportRules(needsSupport, flowResistant);
+        var fullFace = definition.SupportFullFace ?? false;
+        if (fullFace && !needsSupport)
+            throw new InvalidOperationException(
+                $"Block '{path}' sets supportFullFace without needsSupport: only a fragile block has a holder to be picky about.");
+        return new SupportRules(needsSupport, flowResistant, fullFace);
     }
 
     /// <summary>State-dependent solidity (<c>stackSolidAt</c>) needs a non-solid block to switch on.</summary>

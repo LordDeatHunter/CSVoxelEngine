@@ -160,6 +160,13 @@ public sealed class BlockDefinition
     public string? Support { get; set; }
 
     /// <summary>
+    /// Whether a <see cref="NeedsSupport"/> block is only held up by a full block face: a solid block whose model fills
+    /// its cell, or tree wood at full thickness. A torch never mounts on a branch, a waystone, stairs or a slab. Only
+    /// legal with <c>needsSupport</c>.
+    /// </summary>
+    public bool? SupportFullFace { get; set; }
+
+    /// <summary>
     /// <c>"horizontal"</c> marks a block whose state byte's low two bits are a horizontal facing
     /// (north -Z = 0, south +Z = 1, west -X = 2, east +X = 3): its model and hitbox are authored
     /// with the front on north and pre-turned to all four (see <see cref="HorizontalFacing"/>).
