@@ -3,6 +3,7 @@
   // The magma-touched deep's burning brute (plans/CAVE_BIOMES.md CB-4). The base pool at depth tier 0;
   // CaveDifficulty scales it with the tier the mob spawned at
   "hp": 70,
+  "immune": ["burning"],
   "loot": "magmaborn",
   "model": "assets/models/entity/magmaborn.bbmodel"
 }

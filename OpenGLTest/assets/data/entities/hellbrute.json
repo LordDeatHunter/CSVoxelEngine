@@ -2,6 +2,7 @@
   "name": "Hellbrute",
   // The base pool on hell's first layer; LayerDifficulty scales it with the layer it spawns in
   "hp": 60,
+  "immune": ["burning"],
   "loot": "hellbrute",
   "model": "assets/models/entity/hellbrute.bbmodel"
 }

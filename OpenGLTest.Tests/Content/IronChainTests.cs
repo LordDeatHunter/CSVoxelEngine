@@ -38,14 +38,19 @@ public sealed class IronChainTests
         Assert.Null(ContentRegistry.MeltRecipeForInput(AnvilBlock.Anvil!.ResultId));
     }
 
+    /// <summary>The crafting recipes minus the cinder sword's, the one recipe that takes a refined metal bar directly
+    /// (24 ember shards, 30 basalt and 1 refined vulcanite).</summary>
+    private static IEnumerable<CraftingRecipe> ExceptCinderSword =>
+        ContentRegistry.CraftingRecipes.Where(r => r.ResultId != ContentRegistry.ItemIds["cinder_sword"]);
+
     [Fact]
     public void NoCraftingRecipeTakesWroughtIronItIsForgedOnTheAnvil()
     {
         var wrought = AnvilBlock.Anvil!.ResultId;
         Assert.True(ContentRegistry.IsForgeMetal(wrought));
-        Assert.DoesNotContain(ContentRegistry.CraftingRecipes, r => r.Ingredients.Any(i => i.Accepts(wrought)));
-        // No other forge metal is crafted with either: a solid metal is worked only on the anvil
-        Assert.DoesNotContain(ContentRegistry.CraftingRecipes,
+        Assert.DoesNotContain(ExceptCinderSword, r => r.Ingredients.Any(i => i.Accepts(wrought)));
+        // No other forge metal is crafted with either: a solid metal is worked only on the anvil (bar the cinder sword)
+        Assert.DoesNotContain(ExceptCinderSword,
             r => r.Ingredients.Any(i => i.AcceptedIds.Any(ContentRegistry.IsForgeMetal)));
     }
 
@@ -128,7 +133,7 @@ public sealed class IronChainTests
             // Every part is hafted into a tool, and no crafting recipe takes the shard or the refined metal
             Assert.All(parts, p => Assert.Contains(ContentRegistry.CraftingRecipes,
                 c => c.Ingredients.Any(i => i.Accepts(p.ResultId))));
-            Assert.DoesNotContain(ContentRegistry.CraftingRecipes, c => c.Ingredients.Any(
+            Assert.DoesNotContain(ExceptCinderSword, c => c.Ingredients.Any(
                 i => i.Accepts(shard) || refining.Any(f => i.Accepts(f.ResultId))));
         }
     }

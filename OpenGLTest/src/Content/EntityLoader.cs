@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
+using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
 using VoxelEngine.Items;
 
@@ -41,10 +43,11 @@ internal static class EntityLoader
             }
 
             var blood = ParseBlood(definition.Blood, path);
+            var immune = (definition.Immune ?? []).Select(effect => effect.Trim()).ToHashSet(StringComparer.Ordinal);
 
             if (definition.Variants != null)
             {
-                types[name] = LoadVariants(name, path, definition, hp, loot, blood);
+                types[name] = LoadVariants(name, path, definition, hp, loot, blood, immune);
                 continue;
             }
 
@@ -65,6 +68,7 @@ internal static class EntityLoader
                 MaxHealth = hp,
                 LootTable = loot,
                 BloodColor = blood,
+                Immune = immune,
                 ModelPath = model,
                 Model = parsed,
                 HeldItemId = held.ItemId,
@@ -74,6 +78,17 @@ internal static class EntityLoader
         }
 
         EntityRegistry.Publish(types);
+    }
+
+    /// <summary>Matches every entity's <c>immune</c> names against the loaded status effects, so a typo fails
+    /// content load naming the entity.</summary>
+    internal static void ValidateImmunities()
+    {
+        foreach (var type in EntityRegistry.ByName.Values)
+            foreach (var effect in type.Immune)
+                if (!StatusEffectRegistry.TryGet(effect, out _))
+                    throw new InvalidOperationException(
+                        $"Entity '{type.Name}' is immune to unknown status effect '{effect}'.");
     }
 
     /// <summary>
@@ -105,7 +120,7 @@ internal static class EntityLoader
     /// and the first one is the kind's <see cref="EntityType.Model"/>.
     /// </summary>
     private static EntityType LoadVariants(string name, string path, EntityDefinition definition, int hp, LootTable? loot,
-        Vector3? blood)
+        Vector3? blood, IReadOnlySet<string> immune)
     {
         var variants = definition.Variants!;
         if (variants.Length == 0)
@@ -131,6 +146,7 @@ internal static class EntityLoader
             MaxHealth = hp,
             LootTable = loot,
             BloodColor = blood,
+            Immune = immune,
             ModelPath = variants[0],
             Model = parsed[0],
             VariantPaths = variants,

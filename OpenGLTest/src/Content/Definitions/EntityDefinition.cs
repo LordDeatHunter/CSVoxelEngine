@@ -27,6 +27,13 @@ public sealed class EntityDefinition
     public JsonElement? Blood { get; set; }
 
     /// <summary>
+    /// Status effect file names (<c>assets/data/effects</c>) this entity can never be given: an effect applied to it is
+    /// refused (the hell and magma mobs are immune to <c>burning</c>). Omitted is immune to nothing; every name is
+    /// checked against the loaded effects.
+    /// </summary>
+    public string[]? Immune { get; set; }
+
+    /// <summary>
     /// Blockbench project to render the entity from, relative to the working directory.
     /// Omitted means <c>assets/models/entity/&lt;name&gt;.bbmodel</c>. The project's own
     /// <c>textures</c> entry supplies the skin, resolved next to the model file.

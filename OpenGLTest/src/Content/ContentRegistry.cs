@@ -141,6 +141,7 @@ public static class ContentRegistry
         SpellPartLoader.LoadSpellParts(Path.Combine(assetsRoot, "data", "spell"));
         ItemLoader.ValidateItemUses(itemFiles);
         ItemLoader.ValidateGear();
+        EntityLoader.ValidateImmunities();
         GearSetLoader.LoadSets(Path.Combine(assetsRoot, "data", "sets"));
         StructureLoader.LoadStructures(Path.Combine(assetsRoot, "data", "structures"));
     }

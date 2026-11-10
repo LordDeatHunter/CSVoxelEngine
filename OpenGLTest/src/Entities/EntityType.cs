@@ -36,6 +36,9 @@ public sealed class EntityType
     /// <summary>Red blood: what an entity file that omits <c>blood</c> sprays.</summary>
     public static readonly Vector3 DefaultBloodColor = new(0.6f, 0.04f, 0.04f);
 
+    /// <summary>Status effect names this kind is immune to (the entity file's <c>immune</c>); empty by default.</summary>
+    public IReadOnlySet<string> Immune { get; init; } = new HashSet<string>();
+
     /// <summary>Blockbench project that supplies the entity's mesh and skin.</summary>
     public required string ModelPath { get; init; }
 

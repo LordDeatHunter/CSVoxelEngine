@@ -35,6 +35,7 @@ public abstract class Mob
         Type = type;
         Position = position;
         Health = type.MaxHealth;
+        if (type.Immune.Count > 0) Effects.ImmunityCheck = type.Immune.Contains;
     }
 
     public EntityType Type { get; }

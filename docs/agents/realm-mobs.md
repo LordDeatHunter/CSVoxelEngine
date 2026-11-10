@@ -4,6 +4,8 @@ The hell mobs, the flight rules, the sky mobs and the cave mobs.
 
 ### Hell mobs
 
+Every hell mob and the magmaborn are immune to `burning`: an entity file's `immune` list (`EntityDefinition.Immune`, `EntityType.Immune`, checked against the effects by `EntityLoader.ValidateImmunities`) makes `Mob.Effects` refuse those effects.
+
 Hell's cavern pockets hold two harder kinds (plans/LAYERS.md `L-10`), both `HellMob`s
 (`src/Entities/HellMobs/`), which are `RealmMob`s (the chase frame they share with the sky mobs: facing,
 `Decide`, `Locomote`, the throttled line of sight) and like the goblin `RiggedMob`s: a walking body animated from its

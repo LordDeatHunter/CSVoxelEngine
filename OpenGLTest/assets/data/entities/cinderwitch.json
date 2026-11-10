@@ -2,6 +2,7 @@
   "name": "Cinderwitch",
   // The base pool on hell's first layer; LayerDifficulty scales it with the layer it spawns in
   "hp": 24,
+  "immune": ["burning"],
   "loot": "cinderwitch",
   "model": "assets/models/entity/cinderwitch.bbmodel"
 }
