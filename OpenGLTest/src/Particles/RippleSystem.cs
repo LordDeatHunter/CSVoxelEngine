@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Chunks;
 
 namespace VoxelEngine.Particles;
 
@@ -17,13 +18,19 @@ public sealed class RippleSystem
     public IReadOnlyList<WaterRipple> Ripples => _ripples;
 
     /// <summary>Starts a ring at <paramref name="waterTop"/> (the column's surface point) for a crossing
-    /// of <paramref name="strength"/> 0..1; <paramref name="sizeScale"/> widens it for a big body.</summary>
-    public void Spawn(Vector3 waterTop, float strength, float sizeScale = 1f)
+    /// of <paramref name="strength"/> 0..1; <paramref name="sizeScale"/> widens it for a big body. With
+    /// <paramref name="chunks"/> the ring is confined to the water cells round the crossing
+    /// (<see cref="RippleSurface"/>); without, it spreads unclipped.</summary>
+    public void Spawn(Vector3 waterTop, float strength, float sizeScale = 1f, ChunkManager? chunks = null)
     {
         if (_ripples.Count >= ParticleConfig.RippleMax)
             _ripples.RemoveAt(0);
-        _ripples.Add(new WaterRipple(waterTop + new Vector3(0f, ParticleConfig.RippleLift, 0f),
-            MathUtils.Clamp01(strength), sizeScale, Random.Shared.NextSingle()));
+        var position = waterTop + new Vector3(0f, ParticleConfig.RippleLift, 0f);
+        var ripple = new WaterRipple(position, MathUtils.Clamp01(strength), sizeScale,
+            Random.Shared.NextSingle());
+        if (chunks != null)
+            ripple.ConfineTo(RippleSurface.Gather(chunks, waterTop, waterTop.Y, ripple.Half));
+        _ripples.Add(ripple);
     }
 
     public void Update(float deltaTime)

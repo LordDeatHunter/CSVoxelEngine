@@ -258,6 +258,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       SliceTrailSystem.cs      # World component: feeds the local and remote players' slice trails; AssumedBlade
       TreeShudder.cs           # GL-free: the leaf cells above and around a chopped trunk cell, thinned to a few, that an axe hit shakes loose
       WaterSplash.cs           # GL-free splash rule (droplets by crossing speed) + Track: a body's droplets off the water top
+      RippleSurface.cs         # GL-free: the water cells (at the crossing's level) a ripple ring may spread over, so it stops at the water's edge
       WaterSplashTracker.cs    # GL-free per-body water crossing memory: in water last frame, speed from its own height
       Collapse/                # a defeated tower's collapse show (never on a server)
         CollapseDebris.cs      # one block thrown off the tower: tumbles, bounces and rolls on the terrain (read-only), then bursts

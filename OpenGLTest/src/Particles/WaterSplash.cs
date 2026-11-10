@@ -56,7 +56,7 @@ public static class WaterSplash
 
         // A ring spreads for every crossing the tracker reports, however gentle: a drop landing too
         // softly to throw droplets still dimples the surface
-        ripples?.Spawn(new Vector3(bottom.X, top, bottom.Z), Strength(speed), RippleScale(scale));
+        ripples?.Spawn(new Vector3(bottom.X, top, bottom.Z), Strength(speed), RippleScale(scale), chunks);
 
         var count = Count(speed, scale);
         if (count <= 0) return 0;

@@ -143,6 +143,12 @@ public static class ParticleConfig
     public const float RippleTrainWaves = 3.2f;
     /// <summary>The quad reaches this far past the final radius, so the last crest is never clipped.</summary>
     public const float RippleQuadMargin = 1.12f;
+    /// <summary>A neighboring water cell takes the ring only when its surface stands within this many blocks of
+    /// the crossing's, so a ring never climbs a waterfall or a ledge.</summary>
+    public const float RippleLevelTolerance = 0.5f;
+    /// <summary>Quads the ripple buffer holds per ripple on average; a crowd of wide rings over a big pool
+    /// drops the cells past it rather than grow the buffer.</summary>
+    public const int RippleQuadsPerRipple = 24;
 
     // Steam: puffs a second over every vent in range, the reach it gathers within and the cap
     public const float SpringSteamPerSecond = 0.6f;

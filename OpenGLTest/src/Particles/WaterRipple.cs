@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Numerics;
 
 namespace VoxelEngine.Particles;
@@ -25,6 +26,10 @@ public sealed class WaterRipple
     /// <summary>0..1, fixed for life: turns the ring's slight irregularity so no two look alike.</summary>
     public float Seed { get; }
 
+    /// <summary>The water cells the ring spreads over (<see cref="RippleSurface.Gather"/>), or null to spread
+    /// over a full square unclipped.</summary>
+    public IReadOnlyList<RippleCell>? Cells { get; private set; }
+
     public WaterRipple(Vector3 position, float strength, float sizeScale = 1f, float seed = 0f)
     {
         Position = position;
@@ -33,6 +38,9 @@ public sealed class WaterRipple
         MaxRadius = MathUtils.Lerp(ParticleConfig.RippleMinRadius, ParticleConfig.RippleMaxRadius, strength)
                     * sizeScale;
     }
+
+    /// <summary>Confines the ring to <paramref name="cells"/>: only the water it was born on shows it.</summary>
+    public void ConfineTo(IReadOnlyList<RippleCell> cells) => Cells = cells;
 
     /// <summary>Ages the ring; false once it is over and should be removed.</summary>
     public bool Update(float deltaTime)
@@ -54,6 +62,10 @@ public sealed class WaterRipple
         var fadeOut = 1f - MathUtils.SmoothStep(0.15f, 1f, t);
         return fadeIn * fadeOut;
     }
+
+    /// <summary>Half the side of the square the ring is drawn in: the final radius plus the margin that keeps
+    /// the last crest from being clipped.</summary>
+    public float Half => MaxRadius * ParticleConfig.RippleQuadMargin;
 
     public float Radius => RadiusAt(Age, Life, MaxRadius);
 
