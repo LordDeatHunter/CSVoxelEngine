@@ -64,6 +64,7 @@ public sealed class Goblin : RiggedMob
     private float _losRetry;
     private bool _losBlocked;
     private Vector3 _aimTarget;
+    private Vector3 _aimVelocity;
     // Which way the goblin sidesteps a charged throw aimed at it: fixed per goblin at spawn from
     // its cell, so the same goblin always breaks the same way instead of jittering
     private readonly float _dodgeSide;
@@ -292,6 +293,7 @@ public sealed class Goblin : RiggedMob
                 {
                     _losBlocked = false;
                     _aimTarget = chest;
+                    _aimVelocity = player.Velocity;
                     _thrownOnce = true;
                     Animation.Play(ThrowClip);
                     _throwCooldown = MobConfig.GoblinThrowCooldownSeconds
@@ -331,8 +333,8 @@ public sealed class Goblin : RiggedMob
 
         origin = ThrowOrigin;
         // The bool is ignored: an out-of-range player still gets the fallback toss.
-        GoblinAim.TryLaunchVelocity(origin, _aimTarget, MobConfig.GoblinStoneSpeed,
-            ThrownProjectile.Gravity, out velocity);
+        GoblinAim.TryLeadVelocity(origin, _aimTarget, _aimVelocity, MobConfig.GoblinStoneSpeed,
+            ThrownProjectile.Gravity, MobConfig.RangedWindupLeadSeconds, out velocity);
         Ammo--;
         return true;
     }

@@ -54,6 +54,7 @@ public sealed class Skeleton : RealmMob
     private float _meleeCooldown;
     private float _shotCooldown = MobConfig.SkeletonFirstShotDelaySeconds;
     private Vector3 _aimTarget;
+    private Vector3 _aimVelocity;
     private readonly VantageSeeker _vantage = new();
 
     /// <param name="type">The skeleton kind, with its model and clips.</param>
@@ -224,6 +225,7 @@ public sealed class Skeleton : RealmMob
         if (!IsGrounded || _shotCooldown > 0f) return Vector3.Zero;
 
         _aimTarget = chest;
+        _aimVelocity = target.Velocity;
         StartAttack(ShotVariant);
         var jitter = (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.SkeletonShotCooldownJitter;
         _shotCooldown = MobConfig.SkeletonShotCooldownSeconds + jitter;
@@ -246,8 +248,8 @@ public sealed class Skeleton : RealmMob
         if (!Animation.ConsumeEvent(ReleaseEvent)) return false;
 
         origin = ShotOrigin;
-        GoblinAim.TryLaunchVelocity(origin, _aimTarget, MobConfig.SkeletonArrowSpeed, ThrownProjectile.Gravity,
-            out velocity);
+        GoblinAim.TryLeadVelocity(origin, _aimTarget, _aimVelocity, MobConfig.SkeletonArrowSpeed,
+            ThrownProjectile.Gravity, MobConfig.RangedWindupLeadSeconds, out velocity);
         return true;
     }
 }

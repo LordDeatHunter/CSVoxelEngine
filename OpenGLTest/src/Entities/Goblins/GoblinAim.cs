@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Player;
 
 namespace VoxelEngine.Entities.Goblins;
 
@@ -50,4 +51,52 @@ public static class GoblinAim
         velocity = unit * (speed * MathF.Cos(theta)) + Vector3.UnitY * (speed * MathF.Sin(theta));
         return true;
     }
+
+    /// <summary>
+    /// <see cref="TryLaunchVelocity"/> at where a moving target will be when the projectile arrives: the
+    /// target's horizontal velocity carries it for the wind-up still to run plus the flight time, which is
+    /// found by fixed-point iteration (the flight time depends on the aim point and vice versa). A target
+    /// moving vertically (a jump or a fall) is led along its parabola under the player's gravity, never
+    /// below where it was aimed for a jump (it lands at its start height) or <see cref="MaxLeadDrop"/> below for a
+    /// fall, since the ground is not known here.
+    /// </summary>
+    public static bool TryLeadVelocity(Vector3 from, Vector3 to, Vector3 targetVelocity, float speed, float gravity,
+        float windupSeconds, out Vector3 velocity)
+    {
+        float flight = 0f;
+        bool reachable = TryLaunchVelocity(from, to, speed, gravity, out velocity);
+        for (int i = 0; i < LeadIterations; i++)
+        {
+            var horizontalSpeed = new Vector3(velocity.X, 0f, velocity.Z).Length();
+            var d = new Vector3(to.X - from.X, 0f, to.Z - from.Z).Length();
+            flight = horizontalSpeed > 1e-3f ? MathF.Min(d / horizontalSpeed, MaxLeadFlightSeconds) : 0f;
+            reachable = TryLaunchVelocity(from, PredictTarget(to, targetVelocity, windupSeconds + flight), speed, gravity,
+                out velocity);
+        }
+
+        return reachable;
+    }
+
+    /// <summary>Where a target at <paramref name="to"/> moving at <paramref name="velocity"/> is after
+    /// <paramref name="seconds"/>: straight along the ground, on a gravity parabola when airborne.</summary>
+    private static Vector3 PredictTarget(Vector3 to, Vector3 velocity, float seconds)
+    {
+        float y = 0f;
+        if (MathF.Abs(velocity.Y) > AirborneSpeed)
+            y = MathF.Max(velocity.Y * seconds - 0.5f * PlayerPhysics.Gravity * seconds * seconds,
+                velocity.Y > 0f ? 0f : -MaxLeadDrop);
+        return to + new Vector3(velocity.X * seconds, y, velocity.Z * seconds);
+    }
+
+    /// <summary>Vertical speed above which the target counts as airborne; a grounded body reports none.</summary>
+    private const float AirborneSpeed = 0.5f;
+
+    /// <summary>The furthest the lead drops below the locked aim point, in blocks.</summary>
+    private const float MaxLeadDrop = 4f;
+
+    /// <summary>Fixed-point passes of the lead solve; the flight time converges in two or three.</summary>
+    private const int LeadIterations = 4;
+
+    /// <summary>Caps the flight time the lead trusts, so a lob at a far target never leads it past reason.</summary>
+    private const float MaxLeadFlightSeconds = 2f;
 }

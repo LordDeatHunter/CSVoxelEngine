@@ -29,6 +29,7 @@ public sealed class Shardling : CaveMob
 
     private float _castCooldown = MobConfig.CaveShardlingFirstCastDelaySeconds;
     private Vector3 _aimTarget;
+    private Vector3 _aimVelocity;
 
     public Shardling(EntityType type, Vector3 position, int tier, bool spawnIn = true)
         : base(type, position, tier, MobConfig.CaveShardlingWalkSpeed, spawnIn)
@@ -70,6 +71,7 @@ public sealed class Shardling : CaveMob
             && SeesTarget(ShotOrigin, target, chunks))
         {
             _aimTarget = ChestOf(target.Eye);
+            _aimVelocity = target.Velocity;
             StartAttack();
             var jitter = (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.CaveShardlingCooldownJitter;
             _castCooldown = MobConfig.CaveShardlingCooldownSeconds + jitter;
@@ -94,8 +96,8 @@ public sealed class Shardling : CaveMob
         if (!Animation.ConsumeEvent(ReleaseEvent)) return false;
 
         origin = ShotOrigin;
-        GoblinAim.TryLaunchVelocity(origin, _aimTarget, MobConfig.CaveShardSpeed, ThrownProjectile.Gravity,
-            out velocity);
+        GoblinAim.TryLeadVelocity(origin, _aimTarget, _aimVelocity, MobConfig.CaveShardSpeed,
+            ThrownProjectile.Gravity, MobConfig.RangedWindupLeadSeconds, out velocity);
         return true;
     }
 }

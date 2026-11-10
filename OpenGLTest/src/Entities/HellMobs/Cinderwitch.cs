@@ -31,6 +31,7 @@ public sealed class Cinderwitch : HellMob
 
     private float _castCooldown = MobConfig.HellCasterFirstCastDelaySeconds;
     private Vector3 _aimTarget;
+    private Vector3 _aimVelocity;
 
     public Cinderwitch(EntityType type, Vector3 position, bool spawnIn = true)
         : base(type, position, MobConfig.HellCasterWalkSpeed, spawnIn)
@@ -73,6 +74,7 @@ public sealed class Cinderwitch : HellMob
             && SeesTarget(CastOrigin, target, chunks))
         {
             _aimTarget = ChestOf(target.Eye);
+            _aimVelocity = target.Velocity;
             StartAttack();
             var jitter = (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.HellCasterCooldownJitter;
             _castCooldown = LayerDifficulty.Cooldown(MobConfig.HellCasterCooldownSeconds + jitter, Layer);
@@ -98,8 +100,8 @@ public sealed class Cinderwitch : HellMob
         if (!Animation.ConsumeEvent(ReleaseEvent)) return false;
 
         origin = CastOrigin;
-        GoblinAim.TryLaunchVelocity(origin, _aimTarget, MobConfig.HellBoltSpeed, ThrownProjectile.Gravity,
-            out velocity);
+        GoblinAim.TryLeadVelocity(origin, _aimTarget, _aimVelocity, MobConfig.HellBoltSpeed,
+            ThrownProjectile.Gravity, MobConfig.RangedWindupLeadSeconds, out velocity);
         return true;
     }
 }

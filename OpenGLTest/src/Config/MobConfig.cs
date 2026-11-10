@@ -270,6 +270,11 @@ public static class MobConfig
     // 20^2 / 28 = 14.3 blocks of level range, so the 12-block band edge solves with ~2 blocks
     // to spare.
     public const float GoblinStoneSpeed = 20f;
+
+    /// <summary>Seconds between a ranged mob locking its aim and the projectile leaving the hand (the clip's
+    /// wind-up); the lead adds it to the flight time so the shot meets a moving player.</summary>
+    public const float RangedWindupLeadSeconds = 0.35f;
+
     public const int GoblinStoneDamage = 8;
     public const float GoblinStoneKnockbackSpeed = 3f;
     public const float GoblinMeleeReach = 1.9f;
