@@ -11,7 +11,7 @@ Ambiently, `SkeletonRattle` (`src/Entities/TowerMobs/`, ticked by `World`) plays
 The battle tower's undead (plans/BATTLE_TOWER.md `BT-3`): one `Skeleton` class (`src/Entities/TowerMobs/`), a
 `RealmMob` like the hell and sky mobs but with no realm base, run by `SkeletonManager` (`src/Simulation/Tower/`) on the
 shared `RealmMobManager<TMob>` frame, joined to the world's `MobCaps`, in two kinds: the **archer** (`skeleton.json`,
-"Skeleton Archer", hp 40) and the **warrior** (`skeleton_warrior.json`, "Skeleton Warrior", hp 46), its `Role`
+"Skeleton Archer", hp 40) and the **warrior** (`skeleton_warrior.json`, "Skeleton Warrior", hp 56), its `Role`
 (`SkeletonRole`) named by the kind (`Skeleton.RoleOf`). Their models, palette skins and the `bone` sprite come from
 `tools/generate-skeleton-model.py` (deterministic, `--check`; it loads the hell script's rig, UV, PNG and clip machinery
 like the sky script), both built from one set of proportions (`bones`): the archer lanky and tall (32 px, long thin

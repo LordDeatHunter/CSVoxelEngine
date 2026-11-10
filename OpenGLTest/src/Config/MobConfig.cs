@@ -492,7 +492,7 @@ public static class MobConfig
     /// <summary>Half the width of a skeleton's body box, in blocks.</summary>
     public const float SkeletonHalfExtent = 0.3f;
     /// <summary>A skeleton's walk speed, in blocks per second.</summary>
-    public const float SkeletonWalkSpeed = 3.75f;
+    public const float SkeletonWalkSpeed = 5.625f;
     /// <summary>A skeleton's auto-jump launch speed.</summary>
     public const float SkeletonJumpSpeed = 8.5f;
     /// <summary>How hard a player walking into a grounded skeleton shoves it.</summary>
