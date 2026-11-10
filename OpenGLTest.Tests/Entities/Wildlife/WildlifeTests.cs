@@ -204,6 +204,26 @@ public sealed class WildlifeTests
     }
 
     [Fact]
+    public void AnUnprovokedCrowStealsALooseItemInsteadOfAttacking()
+    {
+        var chunks = WideFloor();
+        var manager = NewManager();
+        var crow = Airborne<Crow>(manager, Crow.EntityName, 8f, 8f);
+        var drops = new DropManager();
+        drops.SpawnAt(ContentRegistry.RequireBlock("stone").Id, new Vector3(4.5f, 1.2f, 8.5f));
+        var player = PlayerAt(8f + WildlifeConfig.CrowNoticeRangeBlocks * 0.5f, 8f);
+
+        for (var t = 0f; t < 40f && drops.Drops.Count > 0; t += 0.05f)
+        {
+            drops.Update(0.05f, player.Eye, chunks, _ => false);
+            manager.Update(0.05f, chunks, drops, [player]);
+        }
+
+        Assert.Empty(drops.Drops);
+        Assert.Equal(0, player.DamageTaken);
+    }
+
+    [Fact]
     public void ACrowHarassesAPlayerItNoticesAndLeavesADistantOneAlone()
     {
         var chunks = WideFloor();
@@ -214,6 +234,8 @@ public sealed class WildlifeTests
         Assert.False(crow.Heeds([distant]));
 
         var near = PlayerAt(8f + WildlifeConfig.CrowNoticeRangeBlocks * 0.5f, 8f);
+        Assert.False(crow.Heeds([near]), "a crow nobody has hurt must leave players alone");
+        crow.TakeDamage(1);
         Assert.True(crow.Heeds([near]));
         Assert.True(RunUntil(manager, chunks, [near], 30f, () => near.DamageTaken > 0), "the crow never struck the player beside it");
         Assert.Equal(0, distant.DamageTaken);
@@ -280,6 +302,7 @@ public sealed class WildlifeTests
 
         // Four blocks off: inside what either species notices, outside a crow's peck
         var near = PlayerAt(flyer.Position.X + 4f, flyer.Position.Z);
+        (flyer as Crow)?.TakeDamage(1);
         Assert.True(RunUntil(manager, chunks, [near], 1.5f, () => !flyer.IsPerched), $"the resting {name} sat still beside a player");
         Assert.True(RunUntil(manager, chunks, [near], 3f, () => flyer.Feet.Y > 2f), $"the {name} left the ground but did not climb");
     }

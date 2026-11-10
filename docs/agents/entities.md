@@ -310,10 +310,13 @@ debugger take a new species from it instead of naming it; adding one means a cla
   `takeoff` clip, with a kick upward) when the rest is over, when hurt, or when it heeds somebody it will not sit
   still for (`StaysPerchedNear`). The locomotion pair follows the state through `SetGait`, and since a mirror
   cannot tell a hovering body from a sitting one, the state rides `Animal.Posture` in the entry's item byte.
-- **Crow** (`Crow`): a pest in flocks. A player within `CrowNoticeRangeBlocks` draws it: it circles overhead and
-  swoops (its `swoop` clip flown at the chest), raking whoever is within `CrowStrikeReach` at the impact; on the
-  ground it pecks an ankle within `CrowPeckReach` instead. It soars on its `glide` clip when it has nobody to harass
-  and pecks the dirt or caws while resting.
+- **Crow** (`Crow`): a thief in flocks. It never attacks until hurt; for `CrowAngerSeconds` after a blow, a player
+  within `CrowNoticeRangeBlocks` draws it: it circles overhead and swoops (its `swoop` clip flown at the chest),
+  raking whoever is within `CrowStrikeReach` at the impact; on the ground it pecks an ankle within `CrowPeckReach`.
+  Calm, it flies down to the nearest loose item within `CrowThiefRangeBlocks` (`WildlifeManager.SendThieves`) and takes
+  it within `CrowThiefReach` (`TakeLoot`), then rests `CrowThiefCooldownSeconds`. Its rests prefer a tree top
+  (`FlyingAnimal.ChoosePerchSpot`: leaf or wood within `FlyerPerchSearchRadiusBlocks`, given up after
+  `FlyerPerchSeekSeconds`). It soars on its `glide` clip and pecks the dirt or caws while resting.
 - **Dragonfly** (`Dragonfly`): the man-sized hunter of the waterside. A player within `DragonflyNoticeRangeBlocks` is
   prey: it holds itself over their head and darts in its `bite` clip, biting whoever is within `DragonflyBiteReach`
   at the impact. On the ground it plays `perch`. Riding one is a later task (`plans/TODO.md`).
