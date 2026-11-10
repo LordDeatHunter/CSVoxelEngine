@@ -3,6 +3,7 @@
   // The desert's crawler, on the sand and in the desert's caves: it walks every surface on solved legs like the
   // spiders (CrawlerMob), pinches and stings (Scorpion, ScorpionConfig). The base pool at depth tier 0;
   // CaveDifficulty scales it with the tier it spawned at
+  "blood": { "color": [70, 120, 210] },
   "hp": 34,
   "loot": "scorpion",
   "model": "assets/models/entity/scorpion.bbmodel"

@@ -119,6 +119,32 @@ public class BlockDebrisSystem
         Spray(origin, BlockType.Air, DebrisLook.Color, BiomeTint.VertexTint(colorSrgb), count, speed, size,
             radius, lift: 0.8f, random ?? Random.Shared);
 
+    /// <summary>
+    /// Sprays <paramref name="count"/> droplets of one flat sRGB <paramref name="colorSrgb"/> (blood,
+    /// <see cref="DebrisLook.Color"/>) out of <paramref name="origin"/> along <paramref name="direction"/> (a unit
+    /// vector, away from the striker): each flies at about <paramref name="speed"/> blocks per second inside a cone
+    /// around it with a little lift, so a hit reads as a spurt that arcs down under gravity.
+    /// </summary>
+    public void Gore(Vector3 origin, Vector3 direction, Vector3 colorSrgb, int count, float speed, float size,
+        Random? random = null)
+    {
+        if (count <= 0 || speed <= 0f) return;
+        var rng = random ?? Random.Shared;
+        var tint = BiomeTint.VertexTint(colorSrgb);
+        for (var i = 0; i < count; i++)
+        {
+            var scatter = new Vector3(rng.NextSingle() * 2f - 1f, rng.NextSingle() * 0.8f, rng.NextSingle() * 2f - 1f);
+            var launch = (direction + scatter * 0.7f) * (speed * (0.5f + 0.7f * rng.NextSingle()));
+            launch.Y += speed * 0.3f;
+            var start = origin + new Vector3((rng.NextSingle() - 0.5f) * 0.15f, (rng.NextSingle() - 0.5f) * 0.15f,
+                (rng.NextSingle() - 0.5f) * 0.15f);
+            if (_debris.Count >= ParticleConfig.BlockDebrisMax)
+                _debris.RemoveAt(0);
+            _debris.Add(new BlockDebris(BlockType.Air, start, launch, size * (0.6f + 0.8f * rng.NextSingle()), rng,
+                tint, pop: false, look: DebrisLook.Color));
+        }
+    }
+
     // The ring launch Puff, Skirt and Splat share: headings spread round the ring with a jitter (so
     // even a three-chip puff fans out), each starting innerRadius plus up to radius out along its
     // heading, flying at 60-100 % of speed sideways and lift..2 lift of it upward, plus a shared

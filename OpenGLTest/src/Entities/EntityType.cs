@@ -29,6 +29,13 @@ public sealed class EntityType
     /// <summary>Table rolled on death; null drops nothing.</summary>
     public LootTable? LootTable { get; init; }
 
+    /// <summary>The flat sRGB color (0..1) a hit sprays off this kind (the entity file's
+    /// <c>blood</c>); null sprays nothing.</summary>
+    public Vector3? BloodColor { get; init; } = DefaultBloodColor;
+
+    /// <summary>Red blood: what an entity file that omits <c>blood</c> sprays.</summary>
+    public static readonly Vector3 DefaultBloodColor = new(0.6f, 0.04f, 0.04f);
+
     /// <summary>Blockbench project that supplies the entity's mesh and skin.</summary>
     public required string ModelPath { get; init; }
 

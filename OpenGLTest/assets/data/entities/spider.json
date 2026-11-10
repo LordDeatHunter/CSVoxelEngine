@@ -2,6 +2,7 @@
   "name": "Giant Spider",
   // The cave crawler: it walks floors, walls and ceilings and its legs are posed against the blocks around it
   // (Spider, CrawlerLegs). The base pool at depth tier 0; CaveDifficulty scales it with the tier it spawned at
+  "blood": { "color": [70, 120, 210] },
   "hp": 18,
   "loot": "spider",
   "model": "assets/models/entity/spider.bbmodel"

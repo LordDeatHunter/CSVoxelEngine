@@ -276,6 +276,10 @@ overshoot or jiggle.
   (`SelectionPasses.RenderBlockPop`, `PopBoxEmitter`).
 - **Mob hit sparks.** A punch, slice or throw that connects throws pale chips from the wound point
   on top of the floating damage number.
+  The wound also spurts **gore** (`BlockDebrisSystem.Gore`, `JuiceConfig.Gore*`): droplets of the kind's `blood` (its entity file:
+  omitted is red, `"none"` sprays nothing (skeletons, the Skeleton King), `{"color": [r, g, b]}` sRGB 0..255 (bluish for the
+  spiders and scorpion, yellow-green for the dragonfly); `EntityType.BloodColor`, parsed by `EntityLoader.ParseBlood`,
+  `EntityBloodTests`) out the far side of the blow, more on a kill.
 - **Drop landing bounce.** A drop that lands hops back up once or twice, damped by `BounceDamping`,
   so a pickup reads as physical.
 - **Tool break shatter.** A tool whose durability runs out shatters into chips of its own sprite

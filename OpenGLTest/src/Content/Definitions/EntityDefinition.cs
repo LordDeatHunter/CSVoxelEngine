@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace VoxelEngine.Content.Definitions;
 
 /// <summary>JSON shape of <c>assets/data/entities/&lt;name&gt;.json</c>.</summary>
@@ -17,6 +19,12 @@ public sealed class EntityDefinition
     /// nothing. A named table must exist (same schema as block loot).
     /// </summary>
     public string? Loot { get; set; }
+
+    /// <summary>
+    /// What a hit sprays off the entity. Omitted is red blood; <c>"none"</c> sprays nothing (bone, stone);
+    /// <c>{"color": [r, g, b]}</c> (sRGB 0..255) sprays that color (a spider's blue ichor).
+    /// </summary>
+    public JsonElement? Blood { get; set; }
 
     /// <summary>
     /// Blockbench project to render the entity from, relative to the working directory.

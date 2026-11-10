@@ -78,6 +78,16 @@ internal sealed class MobStrikes
         _debris.Spark(contact, JuiceConfig.HitSparkColor, mob.BodyHalfExtent * 0.5f,
             JuiceConfig.HitSparkCount, JuiceConfig.HitSparkSpeed,
             JuiceConfig.HitSparkSize);
+        SpawnGore(mob, contact, -direction);
+    }
+
+    // The mob's blood (its entity file's `blood`) spurts out the far side of the blow; a kill sprays more
+    private void SpawnGore(Mob mob, Vector3 contact, Vector3 away)
+    {
+        if (mob.Type.BloodColor is not { } color) return;
+        var count = mob.IsDead ? JuiceConfig.GoreKillCount : JuiceConfig.GoreHitCount;
+        _debris.Gore(contact + new Vector3(0f, mob.BodyHalfHeight * 0.2f, 0f), away, color, count,
+            JuiceConfig.GoreSpeed, JuiceConfig.GoreSize);
     }
 
     // Floats the damage of a hit over the mob and plays its hit (or, when it killed, death) sound when

@@ -48,6 +48,14 @@ public static class JuiceConfig
     public const float HitSparkSize = 0.07f;
     public static readonly Vector3 HitSparkColor = new(1f, 0.96f, 0.8f);
 
+    // --- Gore (BlockDebrisSystem.Gore): a connecting hit spurts droplets of the mob's blood color
+    // (EntityType.BloodColor, its entity file's `blood`) out the far side of the blow; a killing blow sprays more ---
+    public const int GoreHitCount = 7;
+    public const int GoreKillCount = 16;
+    // Blocks per second the droplets fly out at
+    public const float GoreSpeed = 2.6f;
+    public const float GoreSize = 0.06f;
+
     // --- Mob death poof (GroundDust.DeathPoof): a mob whose death animation just ended bursts
     // into chips of its own skin color (LandingDust.SkinColor of its model), so a goblin throws
     // goblin-colored chips and a slime its green. Cosmetic: singleplayer and a client, never a server. ---

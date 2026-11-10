@@ -2,6 +2,7 @@
   "name": "Skeleton Warrior",
   // The melee half of the tower's skeletons: shorter and bulkier than the archer, a copper dagger in hand. The base
   // pool on the tower's first floor; TowerDifficulty scales it with the floor tier
+  "blood": "none",
   "hp": 56,
   "loot": "skeleton_warrior",
   "model": "assets/models/entity/skeleton_warrior.bbmodel",

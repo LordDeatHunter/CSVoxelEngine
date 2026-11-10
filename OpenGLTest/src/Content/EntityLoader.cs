@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
+using System.Text.Json;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
@@ -39,9 +40,11 @@ internal static class EntityLoader
                         $"Entity '{path}' names loot table '{lootName}', which does not exist.");
             }
 
+            var blood = ParseBlood(definition.Blood, path);
+
             if (definition.Variants != null)
             {
-                types[name] = LoadVariants(name, path, definition, hp, loot);
+                types[name] = LoadVariants(name, path, definition, hp, loot, blood);
                 continue;
             }
 
@@ -61,6 +64,7 @@ internal static class EntityLoader
                 DisplayName = definition.Name ?? name,
                 MaxHealth = hp,
                 LootTable = loot,
+                BloodColor = blood,
                 ModelPath = model,
                 Model = parsed,
                 HeldItemId = held.ItemId,
@@ -73,10 +77,35 @@ internal static class EntityLoader
     }
 
     /// <summary>
+    /// An entity's <c>blood</c>: omitted is <see cref="EntityType.DefaultBloodColor"/>, <c>"none"</c> is null (no
+    /// spray), an object's <c>color</c> is three integers in 0..255 read as sRGB.
+    /// </summary>
+    internal static Vector3? ParseBlood(JsonElement? blood, string path)
+    {
+        if (blood is not { } element) return EntityType.DefaultBloodColor;
+        if (element.ValueKind == JsonValueKind.String && element.GetString() == "none") return null;
+        if (element.ValueKind != JsonValueKind.Object
+            || !element.TryGetProperty("color", out var color)
+            || color.ValueKind != JsonValueKind.Array || color.GetArrayLength() != 3)
+            throw new InvalidOperationException(
+                $"Entity '{path}' has a blood that is neither \"none\" nor {{\"color\": [r, g, b]}}.");
+        var channels = new float[3];
+        var i = 0;
+        foreach (var channel in color.EnumerateArray())
+        {
+            if (channel.ValueKind != JsonValueKind.Number || !channel.TryGetInt32(out var value) || value is < 0 or > 255)
+                throw new InvalidOperationException($"Entity '{path}' has a blood.color that is not three integers in 0..255.");
+            channels[i++] = value / 255f;
+        }
+        return new Vector3(channels[0], channels[1], channels[2]);
+    }
+
+    /// <summary>
     /// An entity authored as a list of <c>variants</c>: every project must exist and carry a skin,
     /// and the first one is the kind's <see cref="EntityType.Model"/>.
     /// </summary>
-    private static EntityType LoadVariants(string name, string path, EntityDefinition definition, int hp, LootTable? loot)
+    private static EntityType LoadVariants(string name, string path, EntityDefinition definition, int hp, LootTable? loot,
+        Vector3? blood)
     {
         var variants = definition.Variants!;
         if (variants.Length == 0)
@@ -101,6 +130,7 @@ internal static class EntityLoader
             DisplayName = definition.Name ?? name,
             MaxHealth = hp,
             LootTable = loot,
+            BloodColor = blood,
             ModelPath = variants[0],
             Model = parsed[0],
             VariantPaths = variants,
