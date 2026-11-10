@@ -95,7 +95,6 @@ public sealed class NetworkEntitySyncTests : IDisposable
         var skeleton = Assert.IsType<Skeleton>(Assert.Single(_world.Skeletons));
         // Nothing about where it stands names its floor: the tier is the snapshot's, and so is its scaled pool
         Assert.Equal(4, skeleton.Tier);
-        Assert.True(skeleton.MaxHealth > EntityRegistry.Require(Skeleton.EntityName).MaxHealth);
         Assert.Equal(25, skeleton.Health);
 
         // The same tier updates in place, and its attack count plays the clip the count names

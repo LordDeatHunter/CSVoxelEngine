@@ -400,7 +400,6 @@ public sealed class WorldLifecycleTests : IDisposable
         // and bound to the same tower floor; the unbound one came back bound to none
         var restoredSkeleton = Assert.Single(second.Skeletons, s => s.Position == boundCenter);
         Assert.Equal(skeletonTier, restoredSkeleton.Tier);
-        Assert.True(restoredSkeleton.MaxHealth > restoredSkeleton.Type.MaxHealth);
         Assert.Equal(boundFloor, restoredSkeleton.Floor);
         Assert.Null(Assert.Single(second.Skeletons, s => s.Position == unboundCenter).Floor);
         // The tiered cave mob came back at its saved tier with the same, tier-scaled pool, not its position's tier 0

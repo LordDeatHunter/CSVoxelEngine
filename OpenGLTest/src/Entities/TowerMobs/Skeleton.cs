@@ -15,8 +15,8 @@ namespace VoxelEngine.Entities.TowerMobs;
 /// off its cooldown with a clear line to the chest, it draws its bow (the shoot clip; the arrow leaves at
 /// <see cref="ReleaseEvent"/>, <see cref="TryTakeShotRelease"/>); inside the band without a line it walks around the
 /// target to a spot that has one (<see cref="VantageSeeker"/>), nearer than the band it backs away, farther it walks
-/// in. Its health and damage are scaled by the tower floor it was raised on (<see cref="Tier"/>,
-/// <see cref="TowerDifficulty"/>), and its <see cref="Outfit"/> softens every blow it takes; all three are set at spawn,
+/// in. Its damage (its health stays the fixed pool of its kind) is scaled by the tower floor it was raised on (<see cref="Tier"/>,
+/// <see cref="TowerDifficulty"/>), and its <see cref="Outfit"/> softens every blow it takes; the tier and the outfit are set at spawn,
 /// since a mirror cannot derive them from where it stands, and ride its wire byte (<see cref="PackLook"/>). Two attack
 /// clips share the replicated attack count: an even count is a strike, an odd one a shot. Main thread only.
 /// </summary>
@@ -115,9 +115,6 @@ public sealed class Skeleton : RealmMob
     /// </summary>
     public bool ReturnsToPile =>
         Floor != null && !IsDying && !IsDead && Interest.IdleSeconds >= MobConfig.SkeletonPileReturnIdleSeconds;
-
-    /// <inheritdoc />
-    public override int MaxHealth => TowerDifficulty.Scale(Type.MaxHealth, Tier);
 
     /// <inheritdoc />
     public override bool IsUndead => true;

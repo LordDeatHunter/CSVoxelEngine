@@ -100,7 +100,7 @@ public sealed class SkeletonTests
     }
 
     [Fact]
-    public void AHigherTierSkeletonIsTougherAndHitsHarder()
+    public void AHigherTierSkeletonHitsHarderButKeepsItsHealth()
     {
         Skeleton? previous = null;
         for (var tier = 0; tier <= MobConfig.TowerMaxTier; tier++)
@@ -109,7 +109,7 @@ public sealed class SkeletonTests
             Assert.Equal(skeleton.MaxHealth, skeleton.Health);
             if (previous != null)
             {
-                Assert.True(skeleton.MaxHealth >= previous.MaxHealth);
+                Assert.Equal(previous.MaxHealth, skeleton.MaxHealth);
                 Assert.True(skeleton.MeleeDamage >= previous.MeleeDamage);
                 Assert.True(skeleton.ArrowDamage >= previous.ArrowDamage);
             }
@@ -118,7 +118,6 @@ public sealed class SkeletonTests
 
         var ground = new Skeleton(Type, Vector3.Zero, 0, spawnIn: false);
         var top = new Skeleton(Type, Vector3.Zero, MobConfig.TowerMaxTier, spawnIn: false);
-        Assert.True(top.MaxHealth > ground.MaxHealth);
         Assert.True(top.MeleeDamage > ground.MeleeDamage);
         Assert.True(top.ArrowDamage > ground.ArrowDamage);
         Assert.Equal(MobConfig.TowerMaxTier, new Skeleton(Type, Vector3.Zero, MobConfig.TowerMaxTier + 5).Tier);
