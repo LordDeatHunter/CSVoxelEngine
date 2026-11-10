@@ -145,7 +145,7 @@ results and the creative catalog) marks an equipped row the same way (`EquippedM
 place of the count for a worn piece, and the hotbar key on a chip over the icon for an item on the hotbar. A left click
 never puts a row on the hotbar: a pick goes there by a click on a slot, a drag onto it (`RowDragInput`, `RowDrag`: a press
 that lifts once the pointer leaves it by `RowDrag.LiftDistance`, then `RowEquip.DropOnHotbar`/`DropOnEquipment`, never a
-toggle; a creative catalog row is granted one first), the right-click or a number key over the row; a creative catalog
+toggle; a creative catalog row is granted one first), the right-click or a number key over the row (a plain row or a search hit the player holds); a creative catalog
 grant is picked but stays off the hotbar (`Inventory.Add(..., autoEquip: false)`, on the server's replay too), while a
 world pickup still lands in the first empty slot. `GearTests`, `RowEquipTests`; `visual-examples/gear.json` and `accessories.json` (the double jump
 and a feather-charm fall; both `VOXEL_TIME=147`).

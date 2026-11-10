@@ -152,8 +152,9 @@ internal sealed class InventoryPanelInput
 
     /// <summary>
     /// The number keys while the [E] panel is open: the row under the cursor goes into that hotbar
-    /// slot, the same equip a click on the slot performs with the row selected. Only the plain
-    /// tabs — a search result and a creative catalog row have their own click actions.
+    /// slot, the same equip a click on the slot performs with the row selected. Works on the
+    /// plain tabs and on search results the player owns; a recipe row and a creative catalog row have their
+    /// own click actions.
     /// </summary>
     internal void AssignHoveredRowToHotbar(bool active)
     {
@@ -170,14 +171,15 @@ internal sealed class InventoryPanelInput
 
         var world = ActiveWorld;
         if (world == null || PointerWindow() is not { } pointer) return;
-        if (!inventoryView.Search.IsEmpty || inventoryView.Tab == InventoryCategory.Crafting || world.Camera.IsCreative)
-            return;
+        if (world.Camera.IsCreative) return;
         var inventory = world.Inventory;
-        if (EntryAt(pointer, inventory, creative: false) is not { } entry) return;
+        if (EntryAt(pointer, inventory, creative: false) is not { } entry || entry.Recipe != null) return;
         var id = entry.Id;
         var tool = entry.ToolInstance;
         // Worn gear is not held in hand, so a number key never puts it on the hotbar
         if (tool != 0 && inventory.GetToolStack(tool)?.Item is GearItem) return;
+        // A search can list a catalog item the player does not hold: nothing to put in hand
+        if (tool == 0 && inventory.CountFor(id) <= 0) return;
 
         // Applied before the send, like every other equip: the connected server's snapshot overrules it if it refuses
         if (tool != 0)
