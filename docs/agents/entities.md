@@ -289,7 +289,7 @@ debugger take a new species from it instead of naming it; adding one means a cla
   for the column's biome and whether surface water is near (`WildlifeSpawnRules.Pick` over
   `MobSpawner.SurfaceBiomeAt` and `IsNearSurfaceWater`: deer in forest, taiga and steppe; boars in forest, taiga and
   savanna; the rare dire boar in forest and taiga; crows on any land; dragonflies only at the waterside), and places
-  its group within `GroupSpawnRadiusBlocks`, each body only where it fits (`BoxSweep.IsColliding` at
+  that one animal (never a group), its body only where it fits (`BoxSweep.IsColliding` at
   `MobSpawner.StandingCenterY`, a flyer `AirSpawnLiftMin..MaxBlocks` up in the open air). An animal fades out only when no
   target keeps it in play (`MobTargets.OutOfPlay`); it never despawns for idling
   (`RealmMobManager.DespawnsWhenIdle`).

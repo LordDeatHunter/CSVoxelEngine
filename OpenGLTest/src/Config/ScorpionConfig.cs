@@ -32,7 +32,7 @@ public static class ScorpionConfig
     // not underground, kept only on a desert column, always at night and with DaySpawnChance by day.
     public const float CaveSpawnChance = 0.6f;
     public const int CavePackMaxSize = 2;
-    public const float SurfaceSpawnIntervalSeconds = 8f;
+    public const float SurfaceSpawnIntervalSeconds = 16f;
     public const float DaySpawnChance = 0.3f;
     public const float SurfaceSpawnMinRadius = 24f;
     public const float SurfaceSpawnMaxRadius = 44f;

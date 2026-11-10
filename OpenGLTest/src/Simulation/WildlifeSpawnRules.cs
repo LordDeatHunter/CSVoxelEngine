@@ -6,10 +6,10 @@ namespace VoxelEngine.Simulation;
 
 /// <summary>
 /// Where one species of wild animal lives: the surface biomes it spawns in, how likely it is among the
-/// species sharing a column (a relative weight), how many spawn together, and whether it keeps to the
+/// species sharing a column (a relative weight), and whether it keeps to the
 /// waterside (<see cref="NearWater"/>).
 /// </summary>
-public readonly record struct WildlifeSpawnRule(WildlifeKind Kind, float Weight, int GroupMin, int GroupMax, Biome[] Biomes,
+public readonly record struct WildlifeSpawnRule(WildlifeKind Kind, float Weight, Biome[] Biomes,
     bool NearWater = false)
 {
     /// <summary>Whether the species spawns on a column of <paramref name="biome"/> that has surface water
@@ -27,15 +27,15 @@ public static class WildlifeSpawnRules
     /// <summary>Every species' rule, in <see cref="WildlifeKind"/> order.</summary>
     public static readonly WildlifeSpawnRule[] All =
     [
-        new(WildlifeKind.Deer, WildlifeConfig.DeerSpawnWeight, WildlifeConfig.DeerGroupMin, WildlifeConfig.DeerGroupMax,
+        new(WildlifeKind.Deer, WildlifeConfig.DeerSpawnWeight,
             [Biome.Forest, Biome.Taiga, Biome.Steppe]),
-        new(WildlifeKind.Boar, WildlifeConfig.BoarSpawnWeight, WildlifeConfig.BoarGroupMin, WildlifeConfig.BoarGroupMax,
+        new(WildlifeKind.Boar, WildlifeConfig.BoarSpawnWeight,
             [Biome.Forest, Biome.Taiga, Biome.Savanna]),
-        new(WildlifeKind.DireBoar, WildlifeConfig.DireBoarSpawnWeight, 1, 1, [Biome.Forest, Biome.Taiga]),
-        new(WildlifeKind.Crow, WildlifeConfig.CrowSpawnWeight, WildlifeConfig.CrowGroupMin, WildlifeConfig.CrowGroupMax,
+        new(WildlifeKind.DireBoar, WildlifeConfig.DireBoarSpawnWeight, [Biome.Forest, Biome.Taiga]),
+        new(WildlifeKind.Crow, WildlifeConfig.CrowSpawnWeight,
             [Biome.Forest, Biome.Desert, Biome.Taiga, Biome.Frozen, Biome.Steppe, Biome.Savanna]),
-        new(WildlifeKind.Dragonfly, WildlifeConfig.DragonflySpawnWeight, WildlifeConfig.DragonflyGroupMin,
-            WildlifeConfig.DragonflyGroupMax, [Biome.Forest, Biome.Taiga, Biome.Steppe, Biome.Savanna], NearWater: true),
+        new(WildlifeKind.Dragonfly, WildlifeConfig.DragonflySpawnWeight,
+            [Biome.Forest, Biome.Taiga, Biome.Steppe, Biome.Savanna], NearWater: true),
     ];
 
     /// <summary>

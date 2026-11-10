@@ -137,7 +137,7 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
     protected override float ShoveSpeedOf(Animal mob) => mob.ShoveSpeed;
 
     // Each turn of the shared timer searches the surface ring round the next target in turn (never one
-    // underground, who would not see the herd), rolls the species its column holds and places its group.
+    // underground, who would not see the herd), rolls the species its column holds and places that one animal.
     private void UpdateSpawning(float deltaTime, ChunkManager chunks, IReadOnlyList<IMobTarget> targets)
     {
         if (!TryTakeSpawnTurn(deltaTime, targets, WildlifeConfig.SpawnIntervalSeconds, out var target)) return;
@@ -152,16 +152,7 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
             kind => _types[(int)kind] != null);
         if (picked is not { } rule) return;
 
-        if (!Place(chunks, rule.Kind, x, groundY, z)) return;
-
-        var group = Random.Shared.Next(rule.GroupMin, rule.GroupMax + 1);
-        var leader = new Vector3(x + 0.5f, groundY + 1.5f, z + 0.5f);
-        for (var member = 1; member < group && Caps.AllowsWildlifeSpawn; member++)
-        {
-            if (MobSpawner.TryFindSurfaceSpawn(chunks, leader, 1f, WildlifeConfig.GroupSpawnRadiusBlocks,
-                    WildlifeConfig.GroupSpawnTries, out var mx, out var my, out var mz))
-                Place(chunks, rule.Kind, mx, my, mz);
-        }
+        Place(chunks, rule.Kind, x, groundY, z);
     }
 
     // One animal of the species over ground cell (x, y, z): standing on it, or for a flyer in the air a few

@@ -142,7 +142,7 @@ public static class MobConfig
     // around the player and are culled when they stray too far. Damage only lands while a slime
     // is airborne; a grounded touch shoves it instead. Combat values live here so a future
     // player-attack pass reads one place.
-    public const float SlimeSpawnIntervalSeconds = 4f;
+    public const float SlimeSpawnIntervalSeconds = 8f;
     public const float SlimeSpawnMinRadiusBlocks = 40f;
     public const float SlimeSpawnMaxRadiusBlocks = 64f;
     public const float SlimeDespawnRadiusBlocks = 100f;

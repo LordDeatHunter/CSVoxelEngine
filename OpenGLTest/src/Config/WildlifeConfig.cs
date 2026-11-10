@@ -11,34 +11,24 @@ public static class WildlifeConfig
     // Up to WildlifeCap animals live around each player (MobCaps scales it like the hostile cap). Every
     // SpawnIntervalSeconds (sooner the emptier the wild is, MobCaps.WildlifeSpawnHaste) one dry surface
     // column is searched in the SpawnMin..MaxRadiusBlocks ring around a target, the species rolled for its
-    // biome and hour (WildlifeSpawnRules), and its group placed within GroupSpawnRadiusBlocks of the first.
+    // biome and hour (WildlifeSpawnRules); every animal spawns on its own, never in a group.
     // An animal no target keeps in play (MobTargets.OutOfPlay at DespawnRadiusBlocks) fades out; unlike a
     // hostile mob it never despawns for standing idle.
     public const int WildlifeCap = 60;
-    public const float SpawnIntervalSeconds = 1.5f;
+    public const float SpawnIntervalSeconds = 5f;
     public const float SpawnMinRadiusBlocks = 36f;
     public const float SpawnMaxRadiusBlocks = 64f;
     public const int SpawnTries = 8;
-    public const float GroupSpawnRadiusBlocks = 5f;
-    public const int GroupSpawnTries = 8;
     public const float DespawnRadiusBlocks = 100f;
 
-    // How likely each species is among the ones a column may spawn (relative weights), and its group size
+    // How likely each species is among the ones a column may spawn (relative weights)
     public const float DeerSpawnWeight = 5f;
-    public const int DeerGroupMin = 2;
-    public const int DeerGroupMax = 4;
     public const float BoarSpawnWeight = 3f;
-    public const int BoarGroupMin = 1;
-    public const int BoarGroupMax = 3;
     // The dire boar is the rare one: a lone miniboss among many herds
     public const float DireBoarSpawnWeight = 0.25f;
-    public const float CrowSpawnWeight = 1.5f;
-    public const int CrowGroupMin = 2;
-    public const int CrowGroupMax = 4;
+    public const float CrowSpawnWeight = 0.8f;
     // Dragonflies keep to the waterside: only a column within NearWaterRadiusBlocks of surface water spawns one
     public const float DragonflySpawnWeight = 2f;
-    public const int DragonflyGroupMin = 1;
-    public const int DragonflyGroupMax = 2;
     public const float NearWaterRadiusBlocks = 8f;
     // A flyer appears in the open air AirSpawnLiftMin..MaxBlocks over the ground cell its spawn found
     public const float AirSpawnLiftMinBlocks = 3f;
@@ -128,8 +118,8 @@ public static class WildlifeConfig
     // CrowAngerSeconds after the blow, and none of the above applies before that. Unprovoked it is a thief:
     // a dropped item within CrowThiefRangeBlocks draws it down, and within CrowThiefReach it takes the item,
     // then leaves the next one alone for CrowThiefCooldownSeconds. It prefers to perch in trees.
-    public const float CrowHeight = 0.6f;
-    public const float CrowHalfExtent = 0.28f;
+    public const float CrowHeight = 0.7f;
+    public const float CrowHalfExtent = 0.45f;
     public const float CrowShoveSpeed = 4f;
     public const float CrowCruiseSpeed = 7f;
     public const float CrowVerticalSpeed = 5f;
