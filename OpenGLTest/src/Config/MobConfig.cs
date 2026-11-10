@@ -603,7 +603,7 @@ public static class MobConfig
     /// <summary>...whose feet stand within this many blocks of the king's (MobTargets.InShockwave).</summary>
     public const float SkeletonKingSlamHeight = 2.5f;
     /// <summary>The damage the slam's shockwave deals.</summary>
-    public const int SkeletonKingSlamDamage = 50;
+    public const int SkeletonKingSlamDamage = 100;
     /// <summary>How far in front of the king's feet its club strikes the ground (where the ground heaves).</summary>
     public const float SkeletonKingSlamReachBlocks = 1.6f;
     /// <summary>The knockback speed of the slam's shockwave.</summary>
@@ -616,7 +616,7 @@ public static class MobConfig
     /// shrapnel, ShrapnelConfig).</summary>
     public const int SkeletonKingSlamShrapnelCount = 10;
     /// <summary>The damage one slam shard deals to the target it touches (never to the king or a skeleton).</summary>
-    public const int SkeletonKingSlamShrapnelDamage = 6;
+    public const int SkeletonKingSlamShrapnelDamage = 12;
     /// <summary>How far above the king's feet the slam's shards burst out, so they fly at a standing player's body.</summary>
     public const float SkeletonKingSlamShrapnelLiftBlocks = 0.8f;
     /// <summary>Inside this horizontal distance the king does not volley.</summary>
@@ -638,7 +638,7 @@ public static class MobConfig
     /// <summary>The most a burst bone's speed differs from the aimed throw's, as a share.</summary>
     public const float SkeletonKingBurstSpeedJitter = 0.12f;
     /// <summary>The damage one burst bone deals.</summary>
-    public const int SkeletonKingVolleyDamage = 9;
+    public const int SkeletonKingVolleyDamage = 18;
     /// <summary>The knockback speed of a king's bone hit (a volley bone or a slam shard).</summary>
     public const float SkeletonKingBoneKnockbackSpeed = 4f;
     /// <summary>Seconds between two volleys (shortened by the enrage).</summary>

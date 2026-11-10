@@ -206,7 +206,7 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   in play, which the base distance despawn skips) and a player dying and respawning far away all reset the tower, while
   only a kill defeats it. `TowerManager.MarkDefeated` raises the `TowerManager.BossDefeated` event once and
   `TowerRecord.BossDefeated` reads true from then on, which BT-8's collapse reads (polled, not through the event).
-- **The Skeleton King** (`skeleton_king.json`, hp 400, not difficulty-scaled, `"boss": true`; its boss table
+- **The Skeleton King** (`skeleton_king.json`, hp 600, not difficulty-scaled, `"boss": true`; its boss table
   `loot/skeleton_king.json` (BT-7) rolls exactly one unique first, the bone-breaker blade, the bone charm or the crystal
   staff, then bones, wrought iron, bronze ingots and, half the time, a modifier scroll or mana draughts;
   `SkeletonKingLootTests`) is a `SkeletonKing`
