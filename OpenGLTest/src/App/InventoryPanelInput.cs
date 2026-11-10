@@ -179,14 +179,14 @@ internal sealed class InventoryPanelInput
         // Worn gear is not held in hand, so a number key never puts it on the hotbar
         if (tool != 0 && inventory.GetToolStack(tool)?.Item is GearItem) return;
 
-        var intent = tool != 0
-            ? InventoryIntent.EquipTool(pressedNow, tool)
-            : InventoryIntent.EquipStackable(pressedNow, id);
-        if (session.SendInventoryIntent(intent)) return;
+        // Applied before the send, like every other equip: the connected server's snapshot overrules it if it refuses
         if (tool != 0)
             inventory.EquipTool(pressedNow, tool);
         else
             inventory.EquipStackable(pressedNow, id);
+        session.SendInventoryIntent(tool != 0
+            ? InventoryIntent.EquipTool(pressedNow, tool)
+            : InventoryIntent.EquipStackable(pressedNow, id));
     }
 
     /// <summary>

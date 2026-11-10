@@ -512,12 +512,20 @@ internal sealed class ClientSession
         return true;
     }
 
-    /// <summary>The equip and unequip cues, for every way a player puts an item on the hotbar or takes gear off.</summary>
+    /// <summary>
+    /// The equip and unequip cues, for every way a player puts an item on the hotbar or off it, or wears or takes
+    /// off gear. Called with the local change already applied.
+    /// </summary>
     private void PlayEquipSound(InventoryIntent intent)
     {
         switch (intent.Action)
         {
             case NetInventoryAction.Equip:
+                // Equipping what the slot already shows clears it, so the (already applied) slot says which happened
+                var shown = ActiveWorld?.Inventory.SlotAt(intent.Slot);
+                var equipped = shown is { } slot && (intent.IsTool ? slot.IsTool && slot.ToolInstance == intent.Id : !slot.IsTool && slot.Id == intent.Id);
+                sfx?.Play(equipped ? SfxLibrary.EquipGroup : SfxLibrary.UnequipGroup);
+                break;
             case NetInventoryAction.EquipGear:
                 sfx?.Play(SfxLibrary.EquipGroup);
                 break;
