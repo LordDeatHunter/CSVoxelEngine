@@ -296,8 +296,8 @@ internal sealed class GameplayInput
         var qPressed = inputManager.Keyboard?.IsKeyPressed(Key.Q) == true;
         // With the panel open, the number keys put the hovered row into that hotbar slot instead
         // (the equip a click on the slot performs with the row selected)
-        if (inventoryView.IsOpen && inventoryView.Focus == InventoryFocus.None && !pauseMenuView.IsOpen)
-            panelInput.AssignHoveredRowToHotbar();
+        panelInput.AssignHoveredRowToHotbar(
+            inventoryView.IsOpen && inventoryView.Focus == InventoryFocus.None && !pauseMenuView.IsOpen);
 
         if (!PanelOpen && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp)
         {

@@ -70,6 +70,8 @@ internal sealed class InventoryPanelInput
             : null;
 
     // Hotbar hotkeys 1-0, hoisted so the per-frame poll allocates nothing.
+    private readonly bool[] _numberKeyWasDown = new bool[10];
+
     internal static readonly Key[] NumberKeys =
         [Key.Number1, Key.Number2, Key.Number3, Key.Number4, Key.Number5,
             Key.Number6, Key.Number7, Key.Number8, Key.Number9, Key.Number0];
@@ -153,8 +155,19 @@ internal sealed class InventoryPanelInput
     /// slot, the same equip a click on the slot performs with the row selected. Only the plain
     /// tabs — a search result and a creative catalog row have their own click actions.
     /// </summary>
-    internal void AssignHoveredRowToHotbar()
+    internal void AssignHoveredRowToHotbar(bool active)
     {
+        // The latch tracks every number key each frame, gated or not, so a key held while the panel
+        // opens or while a field has focus never reads as a fresh press; one press assigns once.
+        var pressedNow = -1;
+        for (var i = 0; i < NumberKeys.Length; i++)
+        {
+            var down = inputManager!.Keyboard?.IsKeyPressed(NumberKeys[i]) == true;
+            if (down && !_numberKeyWasDown[i] && pressedNow < 0) pressedNow = i;
+            _numberKeyWasDown[i] = down;
+        }
+        if (!active || pressedNow < 0) return;
+
         var world = ActiveWorld;
         if (world == null || PointerWindow() is not { } pointer) return;
         if (!inventoryView.Search.IsEmpty || inventoryView.Tab == InventoryCategory.Crafting || world.Camera.IsCreative)
@@ -166,19 +179,14 @@ internal sealed class InventoryPanelInput
         // Worn gear is not held in hand, so a number key never puts it on the hotbar
         if (tool != 0 && inventory.GetToolStack(tool)?.Item is GearItem) return;
 
-        for (var i = 0; i < NumberKeys.Length; i++)
-        {
-            if (inputManager!.Keyboard?.IsKeyPressed(NumberKeys[i]) != true) continue;
-            var intent = tool != 0
-                ? InventoryIntent.EquipTool(i, tool)
-                : InventoryIntent.EquipStackable(i, id);
-            if (session.SendInventoryIntent(intent)) return;
-            if (tool != 0)
-                inventory.EquipTool(i, tool);
-            else
-                inventory.EquipStackable(i, id);
-            return;
-        }
+        var intent = tool != 0
+            ? InventoryIntent.EquipTool(pressedNow, tool)
+            : InventoryIntent.EquipStackable(pressedNow, id);
+        if (session.SendInventoryIntent(intent)) return;
+        if (tool != 0)
+            inventory.EquipTool(pressedNow, tool);
+        else
+            inventory.EquipStackable(pressedNow, id);
     }
 
     /// <summary>
