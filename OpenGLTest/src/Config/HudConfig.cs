@@ -40,6 +40,10 @@ public static class HudConfig
     // the hotbar: fully opaque for the hold, then faded out, about 1.5 s in all.
     public const float HotbarNameHoldSeconds = 1.0f;
     public const float HotbarNameFadeSeconds = 0.5f;
+    // A name too wide for its box (the equipment card's) scrolls back and forth: it rests this long at each end,
+    // and travels at MarqueeSpeed canvas pixels per second.
+    public const float MarqueeHoldSeconds = 1.0f;
+    public const float MarqueeSpeed = 30f;
     // A slot whose count rises (a pickup, a craft result, a server snapshot) bumps its icon to
     // this scale and springs back over the duration. The hotbar's icon fill leaves room for it.
     public const float HotbarPopSeconds = 0.3f;

@@ -64,8 +64,9 @@ internal sealed class EquipmentCardRenderer
             var iconCenter = new Vector2(row.Left + EquipmentCardLayout.LabelColumnWidth + SlotIcon * 0.5f, row.Center.Y);
             _ui.DrawIdIcon(iconCenter, SlotIcon, worn.DefinitionId, headingDegrees, time);
             var nameLeft = iconCenter.X + SlotIcon * 0.5f + 6f;
-            _ui.DrawTextCenteredY(_ui.FitText(worn.ResolvedName, _ui.CountScale, row.Right - nameLeft - 6f),
-                nameLeft, row.Center.Y, _ui.CountScale, Rgba.White);
+            // The full name, scrolling back and forth when it is wider than the row has room for
+            var nameClip = UiRect.FromTopLeft(new Vector2(nameLeft, row.Top), new Vector2(row.Right - 6f - nameLeft, row.Size.Y));
+            _ui.DrawTextMarqueeY(worn.ResolvedName, nameClip, nameLeft, row.Center.Y, _ui.CountScale, Rgba.White, time);
         }
 
         var lines = GearText.Lines(equipment.Stats);

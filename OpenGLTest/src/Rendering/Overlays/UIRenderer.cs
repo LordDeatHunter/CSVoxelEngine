@@ -496,6 +496,40 @@ public class UIRenderer : IDisposable
         DrawGlyphs(_font.LayoutCentered(text.AsSpan(), left, centerY, scale, _glyphScratch), color);
     }
 
+    /// <summary>
+    /// One-line text centered vertically on <paramref name="centerY"/> from <paramref name="left"/>, clipped to
+    /// <paramref name="clip"/>. A text that fits its clip draws as <see cref="DrawTextCenteredY"/>; a wider one
+    /// scrolls back and forth inside the clip (see <see cref="TextMarquee"/>) so no part of it is ever cut off.
+    /// </summary>
+    public void DrawTextMarqueeY(string text, UiRect clip, float left, float centerY, float scale, Rgba color,
+        float time)
+    {
+        if (_font == null || string.IsNullOrEmpty(text))
+            return;
+        var width = MeasureTextWidth(text, scale);
+        if (width <= clip.Size.X)
+        {
+            DrawTextCenteredY(text, left, centerY, scale, color);
+            return;
+        }
+
+        // The pass's one full-screen depth clear must happen before the scissor goes on (a clear honors it)
+        EnsureDepthCleared();
+        var shift = TextMarquee.Offset(width, clip.Size.X, time);
+        var (sx, sy, sw, sh) = UiCanvas.ScissorRect(new Vector2(clip.Left, clip.Top) + _overlayOffset, clip.Size,
+            _scale, _windowSize, _framebufferSize);
+        _gl.Enable(EnableCap.ScissorTest);
+        _gl.Scissor(sx, sy, (uint)sw, (uint)sh);
+        try
+        {
+            DrawTextCenteredY(text, left - shift, centerY, scale, color);
+        }
+        finally
+        {
+            _gl.Disable(EnableCap.ScissorTest);
+        }
+    }
+
     // Writes the laid-out glyphs in _glyphScratch as shadow quads then face quads and draws them.
     private void DrawGlyphs(int n, Rgba color)
     {
