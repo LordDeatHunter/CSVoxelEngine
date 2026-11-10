@@ -4,4 +4,11 @@
   <PropertyGroup>
     <Configuration Condition="'$(Configuration)'==''">Release</Configuration>
   </PropertyGroup>
+  <!-- Release pdbs record source paths relative to the repo (/_/OpenGLTest/src/...), so a stack
+       trace from a shared build shows no builder's local folder. The SDK's CI switch maps the
+       compiler paths and the embedded SourceLink table together. Debug keeps the real paths for
+       the debugger's source lookup. -->
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
 </Project>

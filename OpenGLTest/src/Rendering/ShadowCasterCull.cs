@@ -239,7 +239,13 @@ internal sealed class ShadowCasterCull
     /// <summary>
     /// Andrew's monotone chain over the projected points into hull <paramref name="hull"/>'s edges,
     /// counter-clockwise, collinear and duplicate points dropped. False when fewer than three
-    /// vertices remain.
+    /// vertices remain, or more than there are points: on a nearly flat projection the float
+    /// <see cref="Cross"/> can keep near-collinear points in both chains.
+    /// <para>
+    /// Each edge's offset and the bounds are then pushed out to every projected point, so the region
+    /// contains all of them even where rounding left the chain slightly non-convex (on an exact hull
+    /// this changes nothing).
+    /// </para>
     /// </summary>
     private bool BuildHull(int hull)
     {
@@ -265,11 +271,9 @@ internal sealed class ShadowCasterCull
         for (var i = MaxPoints - 2; i >= 0; i--) k = PushChain(k, lowerEnd, i);
 
         var vertices = k - 1; // the chain ends back on its first point
-        if (vertices < 3) return false;
+        if (vertices < 3 || vertices > MaxPoints) return false;
 
         var start = hull * MaxPoints;
-        _minX[hull] = _maxX[hull] = _chainX[0];
-        _minY[hull] = _maxY[hull] = _chainY[0];
         for (var v = 0; v < vertices; v++)
         {
             float ax = _chainX[v], ay = _chainY[v], bx = _chainX[v + 1], by = _chainY[v + 1];
@@ -277,11 +281,19 @@ internal sealed class ShadowCasterCull
             var ny = ax - bx;
             _nx[start + v] = nx;
             _ny[start + v] = ny;
-            _d[start + v] = nx * ax + ny * ay;
-            _minX[hull] = MathF.Min(_minX[hull], ax);
-            _maxX[hull] = MathF.Max(_maxX[hull], ax);
-            _minY[hull] = MathF.Min(_minY[hull], ay);
-            _maxY[hull] = MathF.Max(_maxY[hull], ay);
+            var d = nx * ax + ny * ay;
+            for (var i = 0; i < MaxPoints; i++) d = MathF.Max(d, nx * _px[i] + ny * _py[i]);
+            _d[start + v] = d;
+        }
+
+        _minX[hull] = _maxX[hull] = _px[0];
+        _minY[hull] = _maxY[hull] = _py[0];
+        for (var i = 1; i < MaxPoints; i++)
+        {
+            _minX[hull] = MathF.Min(_minX[hull], _px[i]);
+            _maxX[hull] = MathF.Max(_maxX[hull], _px[i]);
+            _minY[hull] = MathF.Min(_minY[hull], _py[i]);
+            _maxY[hull] = MathF.Max(_maxY[hull], _py[i]);
         }
 
         _edgeCount[hull] = vertices;

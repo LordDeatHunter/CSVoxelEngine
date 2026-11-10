@@ -371,6 +371,37 @@ public sealed class ShadowCasterCullTests
     }
 
     [Fact]
+    public void ANearlyFlatPyramidNeverOverflowsAHull()
+    {
+        // A pyramid whose light-space projection is nearly a line (its points collinear up to float
+        // noise) can make the monotone chain keep more vertices than there are points; both hulls
+        // must still build, and each view's own eye must stay kept.
+        var rng = new Random(11);
+        var cull = new ShadowCasterCull();
+        var projection = Projection(70f, 16f / 9f);
+        for (var trial = 0; trial < 20000; trial++)
+        {
+            var row = RandomUnit(rng) * Range(rng, 0.001f, 1f);
+            var lean = Range(rng, -2f, 2f);
+            var noise = RandomUnit(rng) * Range(rng, 0f, 1e-6f);
+            var light = new Matrix4x4(
+                row.X, row.X * lean + noise.X, 0f, 0f,
+                row.Y, row.Y * lean + noise.Y, 0f, 0f,
+                row.Z, row.Z * lean + noise.Z, 0f, 0f,
+                Range(rng, -1f, 1f), Range(rng, -1f, 1f), 0f, 1f);
+            cull.Begin(light, 2048, 1f, 0f);
+            for (var hull = 0; hull < 2; hull++)
+            {
+                var eye = InCube(rng, Vector3.Zero, 3000f);
+                var dir = RandomUnit(rng);
+                var up = MathF.Abs(dir.Y) > 0.99f ? Vector3.UnitX : Vector3.UnitY;
+                cull.AddViewPyramid(Matrix4x4.CreateLookAt(eye, eye + dir, up), projection, 2f * Camera.FarPlane, eye);
+                Assert.True(cull.MayShadowReceivers(eye, eye), "a flat pyramid dropped a caster at its own eye");
+            }
+        }
+    }
+
+    [Fact]
     public void TheSwayDisplacementNeverExceedsTheSwayReach()
     {
         // A C# replica of shadow-vertex.glsl's sway displacement (byte-identical to test-vertex.glsl's
