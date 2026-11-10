@@ -247,6 +247,15 @@ public sealed class ServerPlayer : IMobTarget
     /// <summary>The mobs chase and hit this player at its accepted eye.</summary>
     Vector3 IMobTarget.Eye => Position;
 
+    private readonly MotionEstimate _motion = new();
+
+    /// <summary>How the accepted eye has been moving (<see cref="ObserveMotion"/>), which the ring spawners lead.</summary>
+    Vector3 IMobTarget.Velocity => _motion.Velocity;
+
+    /// <summary>Feeds the velocity estimate the eye's position this frame; the world's mob update calls it once a
+    /// frame for every connected player.</summary>
+    public void ObserveMotion(float deltaTime) => _motion.Observe(Position, deltaTime);
+
     /// <summary>No mob hurts a creative, flying or dead player, nor one held on a waystone trip (it is not really there
     /// yet).</summary>
     public bool IsImmune => Creative || Flying || IsDead || WaystoneTrip != null;

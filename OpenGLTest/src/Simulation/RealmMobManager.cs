@@ -100,15 +100,14 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
     /// <summary>
     /// The shared frame: resets <see cref="DamageDealtThisFrame"/>, then ticks every mob against
     /// <paramref name="targets"/>, rolls the loot of the dead, lands the kinds' attacks (<see cref="Attack"/>),
-    /// lets a player shove a grounded one aside and fades out a mob past every target's
-    /// <paramref name="despawnRadius"/> or idle long and far off.
+    /// lets a player shove a grounded one aside and fades out a mob no target keeps in play
+    /// (<see cref="MobTargets.OutOfPlay"/> at <paramref name="despawnRadius"/>) or idle long and far off.
     /// </summary>
     protected void UpdateMobs(float deltaTime, ChunkManager chunks, DropManager drops,
         IReadOnlyList<IMobTarget> targets, BlockDebrisSystem? debris, float despawnRadius)
     {
         DamageDealtThisFrame = 0;
         FrameDelta = deltaTime;
-        var despawnSquared = despawnRadius * despawnRadius;
         for (var i = _mobs.Count - 1; i >= 0; i--)
         {
             var mob = _mobs[i];
@@ -137,8 +136,8 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
             Attack(mob, targets);
             ShoveOffTargets(mob, targets);
 
-            // Past every target's despawn radius, or idle long and far off: fades out, dropping nothing
-            if (targets.Count > 0 && (MobTargets.MinHorizontalDistanceSquared(targets, mob.Position) > despawnSquared
+            // Out of every target's play, or idle long and far off: fades out, dropping nothing
+            if (targets.Count > 0 && (MobTargets.OutOfPlay(targets, mob.Position, despawnRadius)
                                       || mob.ShouldIdleDespawn(targets)))
             {
                 OnDespawn(mob);
@@ -173,8 +172,9 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
 
     /// <summary>
     /// The one shared spawn timer under the natural cap every mob kind shares: true once per
-    /// <paramref name="intervalSeconds"/> while the cap allows, handing out the next target in turn (round-robin),
-    /// whose surroundings the subclass then searches.
+    /// <paramref name="intervalSeconds"/> (sooner the emptier the world is, <see cref="MobCaps.SpawnHaste"/>)
+    /// while the cap allows, handing out the next target in turn (round-robin), whose surroundings the subclass
+    /// then searches.
     /// </summary>
     protected bool TryTakeSpawnTurn(float deltaTime, IReadOnlyList<IMobTarget> targets, float intervalSeconds,
         out IMobTarget target)
@@ -182,7 +182,7 @@ public abstract class RealmMobManager<TMob> : IMobPopulation where TMob : RealmM
         target = null!;
         if (!Caps.AllowsNaturalSpawn) return false;
 
-        _spawnTimer += deltaTime;
+        _spawnTimer += deltaTime * Caps.SpawnHaste;
         if (_spawnTimer < intervalSeconds) return false;
         _spawnTimer = 0f;
 

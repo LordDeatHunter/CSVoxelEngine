@@ -39,11 +39,23 @@ carries both. Ring spawning on dry, loaded forest surface goes through `Simulati
 (`TryFindSurfaceSpawn`), and each manager wraps it with its own radii and body-center offset.
 **Two global caps** bound every kind together (`MobCaps`, owned by `World` and handed to each manager,
 which registers itself as an `IMobPopulation`; a manager built alone caps itself): the ring spawners
-stop at the **natural cap** (`MobNaturalCap`), and a **forced** spawn — a manager's public `Spawn`
+stop at the **natural cap** (`MobCaps.NaturalCap`: `MobNaturalCap` for each player in play, up to
+`MobNaturalCapMaxPlayers` of them; `MobDirector.Update` sets `MobCaps.Players` each frame), and a **forced** spawn — a manager's public `Spawn`
 (a slime splitting, a scenario, a save restore, a client mirroring its server) — may pass it but
 returns null at the **hard cap** (`MobHardCap`, `MobHardCapFactor` times the natural one, which is
 `MobsMaxAlive`). Both count living mobs only (`LivingCount`, dying excluded), so a new kind needs no
 cap of its own: it registers with the world's `MobCaps`.
+**Spawn pacing** keeps a moving player in company (`SpawnPacingTests`). Every ring spawner's timer runs
+faster the emptier the world is (`MobCaps.SpawnHaste`: 1 at the natural cap, up to 1 + `MobSpawnRefillHaste`
+with nothing alive). A ring search starts from a `SpawnOrigin` (a target's eye and velocity,
+`SpawnOrigin.Of`; a plain position converts to one at rest), and around a target moving at
+`MobSpawnAheadMinSpeed` or faster `MobSpawner.RingColumn` puts `MobSpawnAheadShare` of its columns inside
+`MobSpawnAheadHalfAngleDegrees` of the heading, so mobs appear where the player is going. A mob stops
+counting as in play (`MobTargets.OutOfPlay`, the one despawn test of the slime, goblin and realm managers)
+once every target is past its despawn radius or has left it behind: the target runs, and the mob is more
+than `MobLeftBehindBlocks` away in the rear third of the circle around its heading. `IMobTarget.Velocity`
+feeds both: the camera reports its physics velocity, a `ServerPlayer` an estimate from its accepted
+positions (`MotionEstimate`, fed by `MobDirector.Update`).
 The managers never read the camera: they take a list of `IMobTarget`s (the camera in
 singleplayer, every connected player on a server), chase the nearest non-immune one, spawn rings
 round-robin over them under the global caps and despawn by the distance to the nearest (see "Mobs

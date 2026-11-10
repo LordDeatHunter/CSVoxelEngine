@@ -10,12 +10,33 @@ public static class MobConfig
     // --- Mob caps (MobCaps) ---
     // Two caps shared by every mob kind, judged against the living mobs of every manager together
     // (dying ones excluded), so a new kind needs no cap of its own. The ring spawners stop at the
-    // natural cap; a forced spawn (a slime splitting, a scenario, a save restore, a client's
-    // mirror) may pass it, but nothing ever spawns past the hard cap, which also sizes the
-    // healthbar buffers (MobsMaxAlive).
-    public const int MobNaturalCap = 12;
+    // natural cap, which is MobNaturalCap for each player in play up to MobNaturalCapMaxPlayers of
+    // them; a forced spawn (a slime splitting, a scenario, a save restore, a client's mirror) may
+    // pass it, but nothing ever spawns past the hard cap, which also sizes the healthbar buffers
+    // (MobsMaxAlive).
+    public const int MobNaturalCap = 15;
+    public const int MobNaturalCapMaxPlayers = 3;
     public const int MobHardCapFactor = 15;
     public const int MobHardCap = MobNaturalCap * MobHardCapFactor;
+
+    // --- Spawn pacing (MobCaps.SpawnHaste, SpawnOrigin, MobTargets.OutOfPlay) ---
+    // An emptier world refills faster: every ring spawner's timer runs 1 + MobSpawnRefillHaste times as
+    // fast with nothing alive, easing to its plain interval at the natural cap. A target moving at
+    // MobSpawnAheadMinSpeed or faster gets MobSpawnAheadShare of its ring columns inside the arc
+    // MobSpawnAheadHalfAngleDegrees to either side of its heading, so mobs appear where it is going; and
+    // a mob farther than MobLeftBehindBlocks behind such a target (in the rear third of the circle) no
+    // longer counts as in play, which frees its place for one ahead.
+    public const float MobSpawnRefillHaste = 3f;
+    public const float MobSpawnAheadMinSpeed = 2.5f;
+    public const float MobSpawnAheadShare = 0.8f;
+    public const float MobSpawnAheadHalfAngleDegrees = 55f;
+    public const float MobLeftBehindBlocks = 56f;
+
+    // A target that only reports positions (a server's connected player) has its velocity estimated
+    // (MotionEstimate): averaged over MobMotionSmoothingSeconds, and a jump faster than MobMotionMaxSpeed
+    // is a teleport that restarts it at rest.
+    public const float MobMotionSmoothingSeconds = 0.5f;
+    public const float MobMotionMaxSpeed = 24f;
 
     // --- Layer difficulty (plans/LAYERS.md) ---
     /// <summary>How much harder a realm mob gets per hell layer (or sky-island zone step) past the
@@ -121,7 +142,7 @@ public static class MobConfig
     // around the player and are culled when they stray too far. Damage only lands while a slime
     // is airborne; a grounded touch shoves it instead. Combat values live here so a future
     // player-attack pass reads one place.
-    public const float SlimeSpawnIntervalSeconds = 8f;
+    public const float SlimeSpawnIntervalSeconds = 4f;
     public const float SlimeSpawnMinRadiusBlocks = 40f;
     public const float SlimeSpawnMaxRadiusBlocks = 64f;
     public const float SlimeDespawnRadiusBlocks = 100f;
@@ -198,7 +219,7 @@ public static class MobConfig
     // throw band must stay inside the stone's level-ground range, v^2/g at GoblinStoneSpeed
     // under ThrownProjectile.Gravity, with margin for a chest-height target and the
     // semi-implicit Euler drop, or the far edge of the band has no solvable arc.
-    public const float GoblinSpawnIntervalSeconds = 14f;
+    public const float GoblinSpawnIntervalSeconds = 7f;
     /// <summary>The night factor (0 day, 1 night) below which no goblin spawns on the surface.</summary>
     public const float GoblinMinNightToSpawn = 0.35f;
 
@@ -274,7 +295,7 @@ public static class MobConfig
     // lava-lit pool edge or a torched base stays clear). The layer index scales each spawn's health,
     // damage and the caster's fire rate (LayerDifficulty) and the pack size: one more mob every
     // HellPackLayersPerExtra layers, up to HellPackMaxSize. HellCasterShare of the spawns are casters.
-    public const float HellSpawnIntervalSeconds = 10f;
+    public const float HellSpawnIntervalSeconds = 5f;
     public const float HellSpawnMinRadiusBlocks = 30f;
     public const float HellSpawnMaxRadiusBlocks = 52f;
     public const int HellSpawnTries = 10;
@@ -337,7 +358,7 @@ public static class MobConfig
     // 1 + tier * SkyDifficultyPerTier (SkyDifficulty) and its pack: SkyPackExtraPerTier more mobs per tier,
     // up to SkyPackMaxSize. Only a big zone spawns the golem, as SkyBruiserShare of its spawns; a galeraptor
     // appears SkyFlyerSpawnLiftMin..Max blocks over the island top it was found on.
-    public const float SkySpawnIntervalSeconds = 10f;
+    public const float SkySpawnIntervalSeconds = 5f;
     public const float SkySpawnMinRadiusBlocks = 24f;
     public const float SkySpawnMaxRadiusBlocks = 48f;
     public const int SkySpawnTries = 16;
@@ -414,7 +435,7 @@ public static class MobConfig
     // CaveMobSearchHalfHeight of the target's feet, down at most CaveMobScanDepth cells, with at most
     // CaveMobMaxSkyLight sky light and under CaveMobSpawnBlockLightLimit block light. A pack of up to
     // CaveMobPackMaxSize stands within CaveMobPackSpawnRadiusBlocks of the leader, on its own biome.
-    public const float CaveMobSpawnIntervalSeconds = 12f;
+    public const float CaveMobSpawnIntervalSeconds = 6f;
     public const float CaveMobSpawnMinRadius = 20f;
     public const float CaveMobSpawnMaxRadius = 40f;
     public const int CaveMobSpawnTries = 16;

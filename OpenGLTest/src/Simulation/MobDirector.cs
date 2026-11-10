@@ -60,6 +60,7 @@ internal sealed class MobDirector
     // The night's goblin camp; null without goblins and on a client, which never pitches one
     private readonly GoblinCamps? _camps;
     private readonly CampfireManager _campfires;
+    private readonly MobCaps _caps;
 
     private Camera Camera => _world.Camera;
     private IReadOnlyList<ServerPlayer> ServerPlayers => _world.ServerPlayers;
@@ -71,9 +72,10 @@ internal sealed class MobDirector
         GoblinManager? goblins, HellMobManager? hellMobs, SkyMobManager? skyMobs, CaveMobManager? caveMobs,
         SkeletonManager? skeletons, SkeletonKingManager? kings, SandwormManager? sandworms, IcebergManager? icebergs, BlockDebrisSystem debris,
         FireParticleSystem? embers, PlayerHealth health, List<Mob> mobs, bool serverMode, bool clientMode,
-        StatusEffectBlockWriter? statusBlocks, CampfireManager campfires)
+        StatusEffectBlockWriter? statusBlocks, CampfireManager campfires, MobCaps caps)
     {
         _campfires = campfires;
+        _caps = caps;
         if (goblins != null && !clientMode) _camps = new GoblinCamps(goblins, PitchCampfire);
         _hellMobs = hellMobs;
         _skyMobs = skyMobs;
@@ -170,6 +172,15 @@ internal sealed class MobDirector
     internal void Update(double deltaTime)
     {
         RefreshTargets();
+        // The natural cap grows with the players in play, and a server's players report only positions,
+        // so their headings (which the ring spawners lead) are estimated here
+        _caps.Players = _mobTargets.Count;
+        if (_serverMode)
+        {
+            var players = ServerPlayers;
+            for (var i = 0; i < players.Count; i++)
+                players[i].ObserveMotion((float)deltaTime);
+        }
 
         // Slimes hop at the player: an airborne touch bills damage, a grounded one is just
         // shoved aside. The manager only reports the amount; the health pool stays here (a

@@ -116,7 +116,7 @@ public sealed class SkyMobManager : RealmMobManager<SkyMob>
         var eye = target.Eye;
         if (!MobSpawner.InSkyBand(MathUtils.FloorToInt(eye.Y - Camera.EyeHeight))) return;
 
-        if (!MobSpawner.TryFindSkySpawn(chunks, eye, MobConfig.SkySpawnMinRadiusBlocks,
+        if (!MobSpawner.TryFindSkySpawn(chunks, SpawnOrigin.Of(target), MobConfig.SkySpawnMinRadiusBlocks,
                 MobConfig.SkySpawnMaxRadiusBlocks, MobConfig.SkySpawnTries, MobConfig.SkySpawnSearchHalfHeight,
                 MobConfig.SkySpawnScanDepth, out var x, out var groundY, out var z))
             return;

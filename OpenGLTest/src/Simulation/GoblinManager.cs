@@ -241,8 +241,6 @@ public sealed class GoblinManager : IMobPopulation
 
         var dodgeAimed = aimCharge >= MobConfig.GoblinDodgeChargeThreshold
                          && aimOrigin.HasValue && aimDirection.HasValue;
-        var despawnSquared = MobConfig.GoblinDespawnRadiusBlocks
-            * MobConfig.GoblinDespawnRadiusBlocks;
 
         for (var i = _goblins.Count - 1; i >= 0; i--)
         {
@@ -317,7 +315,7 @@ public sealed class GoblinManager : IMobPopulation
 
             // Past every target's despawn radius, or idle long and far off: fades out through the
             // death pose, dropping nothing
-            if (targets.Count > 0 && (MobTargets.MinHorizontalDistanceSquared(targets, goblin.Position) > despawnSquared
+            if (targets.Count > 0 && (MobTargets.OutOfPlay(targets, goblin.Position, MobConfig.GoblinDespawnRadiusBlocks)
                                       || goblin.ShouldIdleDespawn(targets)))
                 goblin.BeginDying();
         }
@@ -451,19 +449,19 @@ public sealed class GoblinManager : IMobPopulation
     {
         if (!_caps.AllowsNaturalSpawn) return;
 
-        _spawnTimer += deltaTime;
+        _spawnTimer += deltaTime * _caps.SpawnHaste;
         if (_spawnTimer < MobConfig.GoblinSpawnIntervalSeconds) return;
         _spawnTimer = 0f;
 
         if (targets.Count == 0) return;
         var index = _spawnCursor % targets.Count;
         _spawnCursor = index + 1;
-        var eye = targets[index].Eye;
+        var origin = SpawnOrigin.Of(targets[index]);
 
         // A target underground is searched for a cave floor first. Caves are always dark, so the night
         // gate does not apply there; a cave pack keeps to its leader's cave biome.
-        if (MobSpawner.TargetUnderground(chunks, eye)
-            && TryFindCaveFloor(chunks, eye, Random.Shared.NextSingle(), null,
+        if (MobSpawner.TargetUnderground(chunks, origin.Eye)
+            && TryFindCaveFloor(chunks, origin, Random.Shared.NextSingle(), null,
                 out var caveX, out var caveY, out var caveZ, out var biome))
         {
             var leader = BodyCenter(caveX, caveY, caveZ);
@@ -480,7 +478,7 @@ public sealed class GoblinManager : IMobPopulation
         // Goblins raid the surface only in the dark
         if (night < MobConfig.GoblinMinNightToSpawn) return;
 
-        if (TryFindSpawn(chunks, eye, out var position))
+        if (TryFindSpawn(chunks, origin, out var position))
         {
             // A ring spawn rolls a pack: the found cell leads, and one to two more join it within
             // GoblinPackSpawnRadiusBlocks while the shared natural cap still has room. Each member
@@ -517,9 +515,9 @@ public sealed class GoblinManager : IMobPopulation
 
     /// <summary>The goblin's spawn ring through <see cref="MobSpawner.TryFindSurfaceSpawn"/>,
     /// returning the body center standing on the found ground cell.</summary>
-    internal static bool TryFindSpawn(ChunkManager chunks, Vector3 playerPosition, out Vector3 position)
+    internal static bool TryFindSpawn(ChunkManager chunks, SpawnOrigin origin, out Vector3 position)
     {
-        if (!MobSpawner.TryFindSurfaceSpawn(chunks, playerPosition,
+        if (!MobSpawner.TryFindSurfaceSpawn(chunks, origin,
                 MobConfig.GoblinSpawnMinRadiusBlocks, MobConfig.GoblinSpawnMaxRadiusBlocks,
                 MobConfig.GoblinSpawnTries, out var x, out var groundY, out var z))
         {
@@ -538,17 +536,17 @@ public sealed class GoblinManager : IMobPopulation
         MobConfig.SlimeCaveMaxSkyLight, MobConfig.MobSpawnBlockLightLimit, CaveSpawnRules.GoblinMask);
 
     /// <summary>
-    /// The goblin ring's cave spawn around a target's <paramref name="eye"/>: a dark cave floor found by
+    /// The goblin ring's cave spawn around a target (<paramref name="origin"/>): a dark cave floor found by
     /// <see cref="MobSpawner.TryFindCaveSpawn"/> in a biome a goblin may take, kept only when
     /// <paramref name="roll"/> (uniform 0..1) is under that biome's <see cref="CaveSpawnRules.GoblinWeight"/>,
     /// so goblins favor the crystal and fungal caves and never take the magma deep. Returns the body center
     /// standing on the floor and the floor's cave biome. <paramref name="biomes"/> null reads the world's
     /// cave biome field.
     /// </summary>
-    internal static bool TryFindCaveSpawn(ChunkManager chunks, Vector3 eye, float roll, CaveBiomeResolver? biomes,
+    internal static bool TryFindCaveSpawn(ChunkManager chunks, SpawnOrigin origin, float roll, CaveBiomeResolver? biomes,
         out Vector3 position, out CaveBiome biome)
     {
-        if (!TryFindCaveFloor(chunks, eye, roll, biomes, out var x, out var groundY, out var z, out biome))
+        if (!TryFindCaveFloor(chunks, origin, roll, biomes, out var x, out var groundY, out var z, out biome))
         {
             position = default;
             return false;
@@ -558,10 +556,10 @@ public sealed class GoblinManager : IMobPopulation
         return true;
     }
 
-    private static bool TryFindCaveFloor(ChunkManager chunks, Vector3 eye, float roll, CaveBiomeResolver? biomes,
+    private static bool TryFindCaveFloor(ChunkManager chunks, SpawnOrigin origin, float roll, CaveBiomeResolver? biomes,
         out int x, out int groundY, out int z, out CaveBiome biome)
     {
-        if (MobSpawner.TryFindCaveSpawn(chunks, eye, CaveSearch, biomes, out x, out groundY, out z, out biome)
+        if (MobSpawner.TryFindCaveSpawn(chunks, origin, CaveSearch, biomes, out x, out groundY, out z, out biome)
             && roll < CaveSpawnRules.GoblinWeight(biome))
             return true;
 

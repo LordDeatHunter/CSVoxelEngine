@@ -106,6 +106,38 @@ public static class MobTargets
         return best >= 0 ? best : bestImmune;
     }
 
+    /// <summary>
+    /// Whether no target keeps a mob at <paramref name="position"/> in play, so it fades out: every one is
+    /// farther than <paramref name="despawnRadius"/> horizontally, or has left it behind (it moves at
+    /// <see cref="MobConfig.MobSpawnAheadMinSpeed"/> or faster, and the mob lies more than
+    /// <see cref="MobConfig.MobLeftBehindBlocks"/> away in the third of the circle behind its heading). True with
+    /// no targets at all; the managers only ask while somebody is in play.
+    /// </summary>
+    public static bool OutOfPlay(IReadOnlyList<IMobTarget> targets, Vector3 position, float despawnRadius)
+    {
+        for (var i = 0; i < targets.Count; i++)
+        {
+            var eye = targets[i].Eye;
+            var dx = position.X - eye.X;
+            var dz = position.Z - eye.Z;
+            var squared = dx * dx + dz * dz;
+            if (squared > despawnRadius * despawnRadius) continue;
+            if (!LeftBehind(targets[i].Velocity, dx, dz, squared)) return false;
+        }
+
+        return true;
+    }
+
+    // Whether a target moving at velocity has left behind a mob (dx, dz) away from it: far enough, and
+    // more than 120 degrees off its heading (the cosine of the angle between them under -0.5)
+    private static bool LeftBehind(Vector3 velocity, float dx, float dz, float squared)
+    {
+        if (squared <= MobConfig.MobLeftBehindBlocks * MobConfig.MobLeftBehindBlocks) return false;
+        var speedSquared = velocity.X * velocity.X + velocity.Z * velocity.Z;
+        if (speedSquared < MobConfig.MobSpawnAheadMinSpeed * MobConfig.MobSpawnAheadMinSpeed) return false;
+        return dx * velocity.X + dz * velocity.Z < -0.5f * MathF.Sqrt(squared * speedSquared);
+    }
+
     /// <summary>The squared horizontal distance from <paramref name="position"/> to the nearest
     /// target, immune or not; <see cref="float.PositiveInfinity"/> when there are none.</summary>
     public static float MinHorizontalDistanceSquared(IReadOnlyList<IMobTarget> targets, Vector3 position)

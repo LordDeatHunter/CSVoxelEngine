@@ -136,9 +136,6 @@ public sealed class SlimeManager : IMobPopulation
         DamageDealtThisFrame = 0;
         if (chunks == null || targets == null) return;
 
-        var despawnSquared = MobConfig.SlimeDespawnRadiusBlocks
-            * MobConfig.SlimeDespawnRadiusBlocks;
-
         for (var i = _slimes.Count - 1; i >= 0; i--)
         {
             var slime = _slimes[i];
@@ -196,7 +193,7 @@ public sealed class SlimeManager : IMobPopulation
 
             // Past every target's despawn radius, or idle long and far off: fades out through the
             // death pose, dropping nothing
-            if (targets.Count > 0 && (MobTargets.MinHorizontalDistanceSquared(targets, slime.Position) > despawnSquared
+            if (targets.Count > 0 && (MobTargets.OutOfPlay(targets, slime.Position, MobConfig.SlimeDespawnRadiusBlocks)
                                       || slime.ShouldIdleDespawn(targets)))
                 slime.BeginDying();
         }
@@ -290,7 +287,7 @@ public sealed class SlimeManager : IMobPopulation
     {
         if (!_caps.AllowsNaturalSpawn) return;
 
-        _spawnTimer += deltaTime;
+        _spawnTimer += deltaTime * _caps.SpawnHaste;
         if (_spawnTimer < MobConfig.SlimeSpawnIntervalSeconds) return;
         _spawnTimer = 0f;
 
@@ -298,14 +295,15 @@ public sealed class SlimeManager : IMobPopulation
         var index = _spawnCursor % targets.Count;
         _spawnCursor = index + 1;
 
-        if (TryFindSpawn(chunks, targets[index].Eye, night, Random.Shared.NextSingle(), out var position, out var size))
+        if (TryFindSpawn(chunks, SpawnOrigin.Of(targets[index]), night, Random.Shared.NextSingle(), out var position,
+                out var size))
             Spawn(position, size);
     }
 
     /// <summary>The smallest slime's spawn ring (a size roll that never grows); see
-    /// <see cref="TryFindSpawn(ChunkManager, Vector3, float, float, out Vector3, out int)"/>.</summary>
-    internal static bool TryFindSpawn(ChunkManager chunks, Vector3 playerPosition, out Vector3 position) =>
-        TryFindSpawn(chunks, playerPosition, 0f, 1f, out position, out _);
+    /// <see cref="TryFindSpawn(ChunkManager, SpawnOrigin, float, float, out Vector3, out int)"/>.</summary>
+    internal static bool TryFindSpawn(ChunkManager chunks, SpawnOrigin origin, out Vector3 position) =>
+        TryFindSpawn(chunks, origin, 0f, 1f, out position, out _);
 
     /// <summary>
     /// The slime's spawn ring through <see cref="MobSpawner.TryFindSurfaceSpawn"/> and, for cave
@@ -319,15 +317,15 @@ public sealed class SlimeManager : IMobPopulation
     /// one ground cell, so a larger body that would overlap a solid cell beside them steps down a
     /// size at a time until it fits; the smallest body sits inside that column and always does.
     /// </summary>
-    internal static bool TryFindSpawn(ChunkManager chunks, Vector3 playerPosition, float night, float sizeRoll,
+    internal static bool TryFindSpawn(ChunkManager chunks, SpawnOrigin origin, float night, float sizeRoll,
         out Vector3 position, out int size)
     {
         int x, groundY, z;
-        var found = MobSpawner.TargetUnderground(chunks, playerPosition)
-            ? TryFindCave(chunks, playerPosition, out x, out groundY, out z)
-              || TryFindSurface(chunks, playerPosition, out x, out groundY, out z)
-            : TryFindSurface(chunks, playerPosition, out x, out groundY, out z)
-              || TryFindCave(chunks, playerPosition, out x, out groundY, out z);
+        var found = MobSpawner.TargetUnderground(chunks, origin.Eye)
+            ? TryFindCave(chunks, origin, out x, out groundY, out z)
+              || TryFindSurface(chunks, origin, out x, out groundY, out z)
+            : TryFindSurface(chunks, origin, out x, out groundY, out z)
+              || TryFindCave(chunks, origin, out x, out groundY, out z);
         if (!found)
         {
             position = default;
@@ -349,8 +347,8 @@ public sealed class SlimeManager : IMobPopulation
         }
     }
 
-    private static bool TryFindSurface(ChunkManager chunks, Vector3 playerPosition, out int x, out int groundY, out int z) =>
-        MobSpawner.TryFindSurfaceSpawn(chunks, playerPosition,
+    private static bool TryFindSurface(ChunkManager chunks, SpawnOrigin origin, out int x, out int groundY, out int z) =>
+        MobSpawner.TryFindSurfaceSpawn(chunks, origin,
             MobConfig.SlimeSpawnMinRadiusBlocks, MobConfig.SlimeSpawnMaxRadiusBlocks,
             MobConfig.SlimeSpawnTries, out x, out groundY, out z);
 
@@ -361,6 +359,6 @@ public sealed class SlimeManager : IMobPopulation
         MobConfig.SlimeCaveScanDepth, MobConfig.SlimeCaveMaxSkyLight,
         MobConfig.MobSpawnBlockLightLimit, CaveSpawnRules.SlimeMask);
 
-    private static bool TryFindCave(ChunkManager chunks, Vector3 playerPosition, out int x, out int groundY, out int z) =>
-        MobSpawner.TryFindCaveSpawn(chunks, playerPosition, CaveSearch, null, out x, out groundY, out z, out _);
+    private static bool TryFindCave(ChunkManager chunks, SpawnOrigin origin, out int x, out int groundY, out int z) =>
+        MobSpawner.TryFindCaveSpawn(chunks, origin, CaveSearch, null, out x, out groundY, out z, out _);
 }

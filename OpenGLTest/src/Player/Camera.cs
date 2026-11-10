@@ -559,6 +559,9 @@ public class Camera : IMobTarget
     /// <inheritdoc />
     Vector3 IMobTarget.Eye => Position;
 
+    /// <summary>The body's velocity, which the ring spawners lead and the despawn rule reads.</summary>
+    Vector3 IMobTarget.Velocity => new(HorizontalVelocity.X, VerticalVelocity, HorizontalVelocity.Y);
+
     /// <inheritdoc />
     public bool IsImmune => IsCreative || IsFlying;
 

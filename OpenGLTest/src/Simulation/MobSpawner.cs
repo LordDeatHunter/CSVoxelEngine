@@ -13,9 +13,10 @@ using VoxelEngine.WorldGen.Structures;
 namespace VoxelEngine.Simulation;
 
 /// <summary>
-/// The surface spawn search shared by every mob manager: samples a ring around the player and
-/// returns the first dry, loaded column of a mob-spawning biome (<see cref="SpawnsMobs"/>: forest,
-/// steppe or savanna) with two clear cells above its ground that no torch
+/// The surface spawn search shared by every mob manager: samples a ring around the player (leaning toward
+/// where a moving one is heading, <see cref="RingColumn"/>) and
+/// returns the first dry, loaded column of a mob-spawning biome (<see cref="SpawnsMobs"/>: any land
+/// biome) with two clear cells above its ground that no torch
 /// lights (<see cref="IsLitByBlocks"/>) and that lies outside every battle tower's footprint (whose dark ground floor
 /// is the tower skeletons' own). Main thread only (it reads the live chunk map).
 /// </summary>
@@ -26,9 +27,9 @@ public static class MobSpawner
     /// <paramref name="maxRadius"/> ring around the player. On success <paramref name="groundY"/>
     /// is the solid ground cell's Y; the caller places its body above it.
     /// </summary>
-    public static bool TryFindSurfaceSpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
+    public static bool TryFindSurfaceSpawn(ChunkManager chunks, SpawnOrigin origin, float minRadius,
         float maxRadius, int tries, out int x, out int groundY, out int z) =>
-        TryFindSurfaceSpawn(chunks, playerPosition, minRadius, maxRadius, tries, InTowerFootprint,
+        TryFindSurfaceSpawn(chunks, origin, minRadius, maxRadius, tries, InTowerFootprint,
             out x, out groundY, out z);
 
     // A battle tower's footprint box: its ground floor is dark ground at the terrain height (BT-10), and its skeletons
@@ -37,15 +38,15 @@ public static class MobSpawner
     private static readonly Func<int, int, bool> InTowerFootprint =
         static (x, z) => WorldGenerationConfig.TowersEnabled && TowerPlacement.Meets(x, z, x, z);
 
-    /// <summary><see cref="TryFindSurfaceSpawn(ChunkManager, Vector3, float, float, int, out int, out int, out int)"/>
+    /// <summary><see cref="TryFindSurfaceSpawn(ChunkManager, SpawnOrigin, float, float, int, out int, out int, out int)"/>
     /// with the column refusal passed in: a generated column for which <paramref name="blockedColumn"/> holds never
     /// spawns (the test seam; production refuses the tower footprints).</summary>
-    internal static bool TryFindSurfaceSpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
+    internal static bool TryFindSurfaceSpawn(ChunkManager chunks, SpawnOrigin origin, float minRadius,
         float maxRadius, int tries, Func<int, int, bool> blockedColumn, out int x, out int groundY, out int z)
     {
         for (var attempt = 0; attempt < tries; attempt++)
         {
-            RingColumn(playerPosition, minRadius, maxRadius, out x, out z);
+            RingColumn(origin, minRadius, maxRadius, out x, out z);
 
             var chunkX = VoxelCoords.WorldToChunk(x);
             var chunkZ = VoxelCoords.WorldToChunk(z);
@@ -87,15 +88,15 @@ public static class MobSpawner
     }
 
     /// <summary>
-    /// The biomes whose surface the ring spawn search takes: the temperate and warm grasslands
-    /// (forest, steppe, savanna). The desert, the ocean and the snowy taiga and frozen plains spawn nothing.
+    /// The biomes whose surface the ring spawn search takes: every land biome. Only the ocean spawns nothing
+    /// (its dry islands and beaches included).
     /// </summary>
-    private static bool SpawnsMobs(Biome biome) => biome is Biome.Forest or Biome.Steppe or Biome.Savanna;
+    private static bool SpawnsMobs(Biome biome) => biome != Biome.Ocean;
 
     /// <summary>
     /// The underground counterpart of <see cref="TryFindSurfaceSpawn"/>: up to <see cref="CaveSpawnSearch.Tries"/>
     /// random columns in the <see cref="CaveSpawnSearch.MinRadius"/>..<see cref="CaveSpawnSearch.MaxRadius"/> ring
-    /// around <paramref name="eye"/> (a target's eye: its feet are <c>eye.Y - Camera.EyeHeight</c>), each scanned
+    /// around <paramref name="origin"/> (a target's eye: its feet are <c>eye.Y - Camera.EyeHeight</c>), each scanned
     /// downward from a random height within <see cref="CaveSpawnSearch.SearchHalfHeight"/> of those feet for at most
     /// <see cref="CaveSpawnSearch.ScanDepth"/> cells, taking the first solid floor with two clear, dry cells above it.
     /// The floor must lie at least <see cref="MobConfig.SlimeUndergroundDepthBlocks"/> under its column's terrain
@@ -110,13 +111,13 @@ public static class MobSpawner
     /// <paramref name="groundY"/> is the floor cell's Y and <paramref name="biome"/> its standing cell's cave biome
     /// (<see cref="CaveBiome.Plain"/> on failure).
     /// </summary>
-    public static bool TryFindCaveSpawn(ChunkManager chunks, Vector3 eye, in CaveSpawnSearch search,
+    public static bool TryFindCaveSpawn(ChunkManager chunks, SpawnOrigin origin, in CaveSpawnSearch search,
         CaveBiomeResolver? biomes, out int x, out int groundY, out int z, out CaveBiome biome)
     {
-        var feetY = MathUtils.FloorToInt(eye.Y - Camera.EyeHeight);
+        var feetY = MathUtils.FloorToInt(origin.Eye.Y - Camera.EyeHeight);
         for (var attempt = 0; attempt < search.Tries; attempt++)
         {
-            RingColumn(eye, search.MinRadius, search.MaxRadius, out x, out z);
+            RingColumn(origin, search.MinRadius, search.MaxRadius, out x, out z);
             var column = chunks.WorldSource.GetColumn(VoxelCoords.WorldToChunk(x), VoxelCoords.WorldToChunk(z));
             var surface = column.Heights[VoxelCoords.ColumnIndex(VoxelCoords.WorldToLocal(x), VoxelCoords.WorldToLocal(z))];
 
@@ -173,13 +174,13 @@ public static class MobSpawner
     /// <see cref="MobConfig.HellSpawnMaxBlockLight"/> (a lava-lit pool edge or a torched base stays
     /// clear; hell has no skylight). On success <paramref name="groundY"/> is the floor cell's Y.
     /// </summary>
-    public static bool TryFindHellSpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
+    public static bool TryFindHellSpawn(ChunkManager chunks, SpawnOrigin origin, float minRadius,
         float maxRadius, int tries, int searchHalfHeight, int scanDepth, out int x, out int groundY, out int z)
     {
-        var feetY = MathUtils.FloorToInt(playerPosition.Y - Camera.EyeHeight);
+        var feetY = MathUtils.FloorToInt(origin.Eye.Y - Camera.EyeHeight);
         for (var attempt = 0; attempt < tries; attempt++)
         {
-            RingColumn(playerPosition, minRadius, maxRadius, out x, out z);
+            RingColumn(origin, minRadius, maxRadius, out x, out z);
             var top = feetY + Random.Shared.Next(-searchHalfHeight, searchHalfHeight + 1);
             if (!TryScanFloor(chunks, x, top, z, scanDepth, out var y)) continue;
             if (!HellGenerator.InHell(y + 2)) continue;
@@ -210,13 +211,13 @@ public static class MobSpawner
     /// light the standing cell (<see cref="IsLitByBlocks"/>). On success <paramref name="groundY"/> is the
     /// island top's Y.
     /// </summary>
-    public static bool TryFindSkySpawn(ChunkManager chunks, Vector3 playerPosition, float minRadius,
+    public static bool TryFindSkySpawn(ChunkManager chunks, SpawnOrigin origin, float minRadius,
         float maxRadius, int tries, int searchHalfHeight, int scanDepth, out int x, out int groundY, out int z)
     {
-        var feetY = MathUtils.FloorToInt(playerPosition.Y - Camera.EyeHeight);
+        var feetY = MathUtils.FloorToInt(origin.Eye.Y - Camera.EyeHeight);
         for (var attempt = 0; attempt < tries; attempt++)
         {
-            RingColumn(playerPosition, minRadius, maxRadius, out x, out z);
+            RingColumn(origin, minRadius, maxRadius, out x, out z);
             var top = feetY + Random.Shared.Next(-searchHalfHeight, searchHalfHeight + 1);
             if (!TryScanFloor(chunks, x, top, z, scanDepth, out var y)) continue;
             if (!InSkyBand(y) || !InSkyBand(y + 2)) continue;
@@ -230,13 +231,29 @@ public static class MobSpawner
         return false;
     }
 
-    // A random column in the minRadius..maxRadius ring around the player
-    private static void RingColumn(Vector3 playerPosition, float minRadius, float maxRadius, out int x, out int z)
+    /// <summary>
+    /// A random column in the <paramref name="minRadius"/>..<paramref name="maxRadius"/> ring around
+    /// <paramref name="origin"/>. Around one moving at <see cref="MobConfig.MobSpawnAheadMinSpeed"/> or faster,
+    /// <see cref="MobConfig.MobSpawnAheadShare"/> of the columns fall inside the arc
+    /// <see cref="MobConfig.MobSpawnAheadHalfAngleDegrees"/> to either side of its heading, so a running player
+    /// meets what spawns instead of leaving it behind; the rest, and every column around a slow or standing
+    /// one, are spread over the whole circle.
+    /// </summary>
+    internal static void RingColumn(SpawnOrigin origin, float minRadius, float maxRadius, out int x, out int z)
     {
         var angle = Random.Shared.NextSingle() * MathF.Tau;
+        var velocity = origin.Velocity;
+        var speedSquared = velocity.X * velocity.X + velocity.Z * velocity.Z;
+        if (speedSquared >= MobConfig.MobSpawnAheadMinSpeed * MobConfig.MobSpawnAheadMinSpeed
+            && Random.Shared.NextSingle() < MobConfig.MobSpawnAheadShare)
+        {
+            var spread = MobConfig.MobSpawnAheadHalfAngleDegrees * (MathF.PI / 180f);
+            angle = MathF.Atan2(velocity.Z, velocity.X) + (Random.Shared.NextSingle() * 2f - 1f) * spread;
+        }
+
         var radius = MathUtils.Lerp(minRadius, maxRadius, Random.Shared.NextSingle());
-        x = MathUtils.FloorToInt(playerPosition.X + MathF.Cos(angle) * radius);
-        z = MathUtils.FloorToInt(playerPosition.Z + MathF.Sin(angle) * radius);
+        x = MathUtils.FloorToInt(origin.Eye.X + MathF.Cos(angle) * radius);
+        z = MathUtils.FloorToInt(origin.Eye.Z + MathF.Sin(angle) * radius);
     }
 
     // Scans column (x, z) down from top for at most scanDepth cells to the first solid floor with two

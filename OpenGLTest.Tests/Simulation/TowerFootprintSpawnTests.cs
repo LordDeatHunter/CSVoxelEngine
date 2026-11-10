@@ -8,7 +8,7 @@ namespace VoxelEngine.Tests.Simulation;
 
 /// <summary>
 /// No surface ring spawn inside a battle tower (BT-10): a tower's dark ground floor would pass every other check of
-/// <see cref="MobSpawner.TryFindSurfaceSpawn(ChunkManager, Vector3, float, float, int, out int, out int, out int)"/>,
+/// <see cref="MobSpawner.TryFindSurfaceSpawn(ChunkManager, SpawnOrigin, float, float, int, out int, out int, out int)"/>,
 /// so a blocked column never spawns while the rest of the ring still does, and the footprint test the search uses
 /// agrees with the tower site lookup.
 /// </summary>

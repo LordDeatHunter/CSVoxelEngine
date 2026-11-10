@@ -144,7 +144,7 @@ public sealed class HellMobManager : RealmMobManager<HellMob>
         var eye = target.Eye;
         if (!HellGenerator.InHell(MathUtils.FloorToInt(eye.Y - Camera.EyeHeight))) return;
 
-        if (!MobSpawner.TryFindHellSpawn(chunks, eye, MobConfig.HellSpawnMinRadiusBlocks,
+        if (!MobSpawner.TryFindHellSpawn(chunks, SpawnOrigin.Of(target), MobConfig.HellSpawnMinRadiusBlocks,
                 MobConfig.HellSpawnMaxRadiusBlocks, MobConfig.HellSpawnTries, MobConfig.HellSpawnSearchHalfHeight,
                 MobConfig.HellSpawnScanDepth, out var x, out var groundY, out var z))
             return;

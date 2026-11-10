@@ -198,7 +198,7 @@ public sealed class CaveMobManager : RealmMobManager<CaveMob>
         if (HellGenerator.InHell(MathUtils.FloorToInt(eye.Y - Camera.EyeHeight))) return;
         if (!MobSpawner.TargetUnderground(chunks, eye)) return;
 
-        if (!MobSpawner.TryFindCaveSpawn(chunks, eye, RingSearch, Biomes, out var x, out var groundY, out var z,
+        if (!MobSpawner.TryFindCaveSpawn(chunks, SpawnOrigin.Of(target), RingSearch, Biomes, out var x, out var groundY, out var z,
                 out var biome))
             return;
 

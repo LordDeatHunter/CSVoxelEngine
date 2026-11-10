@@ -13,7 +13,7 @@ namespace VoxelEngine.Simulation.Camps;
 /// (<see cref="MobConfig.GoblinCampNightFactor"/>), every <see cref="MobConfig.GoblinCampCheckSeconds"/> a roll of
 /// <see cref="MobConfig.GoblinCampChancePerCheck"/> pitches one camp per night, far from a player
 /// (<see cref="MobConfig.GoblinCampMinDistanceBlocks"/>..<see cref="MobConfig.GoblinCampMaxDistanceBlocks"/>, on the dry
-/// surface the ring spawns take, <see cref="MobSpawner.TryFindSurfaceSpawn(ChunkManager, Vector3, float, float, int, out int, out int, out int)"/>):
+/// surface the ring spawns take, <see cref="MobSpawner.TryFindSurfaceSpawn(ChunkManager, SpawnOrigin, float, float, int, out int, out int, out int)"/>):
 /// a lit campfire (<c>pitchFire</c>, the world's own placement and ignition) and
 /// <see cref="MobConfig.GoblinCampMinGoblins"/>..<see cref="MobConfig.GoblinCampMaxGoblins"/> goblins round it, each
 /// carrying a torch and wandering about the fire (<see cref="Mob.WanderAnchor"/>) until a player comes close. A camp is

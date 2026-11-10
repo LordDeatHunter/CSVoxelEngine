@@ -418,7 +418,8 @@ OpenGLTest/
                                #   time, the idle despawn gate and wander goals
       MobLava.cs               # GL-free mob lava rule: body box in a burning fluid (BurningFluid), damage per tick
       MobLoot.cs               # GL-free loot toss: the up-and-out launch a killed mob's drops get
-      MobTargets.cs            # GL-free target rules: body contact, nearest non-immune target, min distance
+      MotionEstimate.cs        # GL-free velocity estimate from a body's positions (a server player's heading)
+      MobTargets.cs            # GL-free target rules: body contact, nearest non-immune target, min distance, out of play
       RealmMob.cs              # abstract realm mob (the hell and sky mobs): the chase frame (face, Decide, Locomote: a
                                #   walk by default, a flyer steers), the throttled line of sight (SeesTarget), ChestOf,
                                #   the attack clip and its replicated count (StartAttack, AttackCount, MirrorAttackCount)

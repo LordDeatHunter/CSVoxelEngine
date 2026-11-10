@@ -99,7 +99,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       MobMissiles.cs           # GL-free: the shared mob missile flight (hell bolts, skeleton arrows, the king's bones and
                                #   shards): launch (gravity share and life per missile), fly, the touch test (targets only,
                                #   never a mob), an immune target spared, the hits of the frame for the owning manager to bill
-      MobSpawner.cs            # the ring spawn searches: dry forest surface (never in a tower footprint), dark caves,
+      SpawnOrigin.cs           # where a ring search is centered and how that center moves (a target's eye and velocity)
+      MobSpawner.cs            # the ring spawn searches, leaning toward a running target's heading: dry land surface (never in a tower footprint), dark caves,
                                #   hell floors, sky island tops
       RealmMobManager.cs       # the realm mob managers' shared frame: the capped list, forced spawn, mirrors, the update
                                #   loop (target, hazards, loot, attack, shove, despawn), Hit and the spawn turn

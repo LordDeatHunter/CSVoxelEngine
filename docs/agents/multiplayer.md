@@ -530,7 +530,7 @@ own pool and queues the knockback for its status), so a server with nobody onlin
 and despawns nothing. `MobTargets` (GL-free) holds the rules: each mob chases the horizontally
 nearest non-immune target (the nearest immune one only when every target is), contact and stones
 hit whichever non-immune target they touch (a stone stops at any target) and a goblin's melee
-impact every non-immune target still in reach, a mob despawns only when it is past its despawn radius from **every** target, and the one shared
+impact every non-immune target still in reach, a mob despawns only when **no** target keeps it in play (`MobTargets.OutOfPlay`: each is past its despawn radius or has run on and left it far behind), and the one shared
 spawn timer tries its ring around each target in turn (round-robin, `_spawnCursor`) under the
 unchanged global caps. `Goblin.Update` takes the target, and a null one means no chase.
 

@@ -232,7 +232,7 @@ it, so a clump is never cut at a cell or chunk border. A pure hash of (cell, see
 reseed; a later clumped plant needs only its own spec and gate. Like flowers, the far LOD draws none.
 How a tree is grown, stamped, felled and decays is in `### Trees`. Mob spawning (`MobSpawner`,
 shared by slimes and goblins) takes a column whose biome spawns mobs (`MobSpawner.SpawnsMobs`:
-forest, steppe or savanna; a supplied column's stored biome, a generated column's undithered
+every land biome, so only the ocean spawns nothing; a supplied column's stored biome, a generated column's undithered
 `TerrainGenerator.BiomeAt`). Steppe and savanna hold lakes and rivers like the forest
 (`WaterBodies.CanHoldSurfaceWater`: every land biome but the desert).
 

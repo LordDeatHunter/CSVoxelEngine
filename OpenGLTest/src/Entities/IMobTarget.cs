@@ -14,6 +14,11 @@ public interface IMobTarget
     /// <summary>The player's eye; the body box hangs <see cref="Camera.EyeHeight"/> below it.</summary>
     Vector3 Eye { get; }
 
+    /// <summary>How fast and which way the player moves, in blocks per second: the ring spawners lead a
+    /// moving player (<see cref="Simulation.SpawnOrigin"/>) and drop the mobs it leaves far behind
+    /// (<see cref="MobTargets.OutOfPlay"/>). Zero for a target that does not report it.</summary>
+    Vector3 Velocity => Vector3.Zero;
+
     /// <summary>Whether no mob hit can hurt this player right now (creative or flying). Mobs still
     /// chase an immune player when no other is in play, so a hovering camera can film them.</summary>
     bool IsImmune { get; }
