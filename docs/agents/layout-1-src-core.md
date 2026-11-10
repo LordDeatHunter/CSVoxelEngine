@@ -46,11 +46,13 @@ OpenGLTest/
       WaystoneInput.cs         # the waystone screen's input: discover on a right-click, the popup, rename dialog and teleport list,
                                #   cursor and look capture, clicks, keys, wheel, the close rules, the trip request; connected,
                                #   opens on the server's answer and sends the rename and the trip intent
-    Audio/                     # sound: the sfx library, mixer and manager, the ambience bed
+    Audio/                     # sound: the sfx library, mixer and manager, the ambience bed, the OpenAL output
       AmbienceManager.cs       # looping day/night ambience with a slow crossfade
+      AudioDevice.cs           # the shared OpenAL Soft device and context (refcounted; natives for Windows, Linux, macOS)
+      AudioOutput.cs           # streams a 16-bit PCM IWaveProvider to an OpenAL source on its own refill thread
       SfxLibrary.cs            # maps the loose .wav files under a folder onto sound groups (and names the
                                #   code-played ones: item_pickup, spell_cast, spell_impact, spell_fizzle, skeleton_rattle, skeleton_hit, skeleton_death)
-      SfxManager.cs            # one-shot sound effects built on the same NAudio stack as AmbienceManager
+      SfxManager.cs            # one-shot sound effects, decoded and mixed like AmbienceManager's, through one AudioOutput
       SfxMixer.cs              # mixes any number of overlapping 16-bit stereo 44100 Hz clips over a silent baseline
     Chunks/                    # chunk storage and lifecycle, the column cache and column terrain, the light
                                #   query entities read (EntityLight); meshing, world sources and streaming below

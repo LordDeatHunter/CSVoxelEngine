@@ -405,7 +405,7 @@ single-arc player.
 
 - [ ] **`M-2` · Gameplay SFX** — P1, M.
   `SfxManager`/`SfxMixer` play per-block hit groups and pickup, with an SFX volume slider. Still
-  open: **place/step/splash/fire/UI** sounds. Note: audio is NAudio + NLayer, not Silk.NET.
+  open: **place/step/splash/fire/UI** sounds. Note: audio decodes with NAudio.Core + NLayer and plays through Silk.NET.OpenAL (`AudioOutput`).
 - [ ] **`M-25` · Mining sound pitch by hardness** — P3, S. *(reconsider before doing)*
   Pitch the block-hit sound a little lower on harder blocks so stone sounds heavier than dirt;
   one multiplier in `SfxManager`. Open question: whether per-hardness pitch beats authoring
