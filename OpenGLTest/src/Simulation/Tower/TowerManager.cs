@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Entities;
@@ -208,6 +209,20 @@ public sealed class TowerManager(TowerBlockWriter? writer, Func<int, int, TowerS
         record.AltarState = TowerAltarState.Ritual;
         record.RitualLeft = MobConfig.SkeletonKingRitualSeconds;
         return verdict;
+    }
+
+    /// <summary>
+    /// Opening the chest at <paramref name="chest"/> starts the roof altar's ritual when that chest is one of the altar's
+    /// treasure chests (the Skeleton King chest): the same as a right-click on the altar, so it begins only once every
+    /// floor's door is open and nothing has started. Returns the altar's verdict, or <see cref="AltarVerdict.NoTower"/>
+    /// when the chest is no tower's altar chest; none on a client's mirror.
+    /// </summary>
+    public AltarVerdict BeginRitualFromChest((int X, int Y, int Z) chest)
+    {
+        if (writer == null || RecordAt(chest.X, chest.Z) is not { Site: { } site } record) return AltarVerdict.NoTower;
+        if (!TowerGenerator.AltarChestCells(site).Contains(chest)) return AltarVerdict.NoTower;
+        var (x, y, z) = record.AltarCell;
+        return BeginRitual(x, y, z);
     }
 
     /// <summary>Marks <paramref name="record"/>'s Skeleton King killed and raises <see cref="BossDefeated"/>, once: a

@@ -7,6 +7,7 @@ using VoxelEngine.Simulation;
 using VoxelEngine.Simulation.Fluids;
 using VoxelEngine.Simulation.LeafDecay;
 using VoxelEngine.Simulation.Tower;
+using VoxelEngine.WorldGen.Structures;
 using Xunit;
 
 namespace VoxelEngine.Tests.Simulation.Tower;
@@ -71,6 +72,24 @@ public sealed class TowerAltarTests
     {
         var (x, y, z) = record.AltarCell;
         return towers.BeginRitual(x, y, z);
+    }
+
+    [Fact]
+    public void OpeningTheRoofChestBeginsTheRitualOnlyOnceEveryFloorIsOpen()
+    {
+        var site = TowerSiteFixture.SiteOf(WorldGenerationConfig.TowerMinRadius, 3, 0);
+        var towers = Authoritative();
+        var record = towers.Track(TowerRecord.FromSite(site));
+        var roofChest = TowerGenerator.AltarChestCells(site)[0];
+
+        Assert.Equal(AltarVerdict.NoTower, towers.BeginRitualFromChest(TowerGenerator.ChestCells(site, 0)[0]));
+        Assert.Equal(AltarVerdict.Sealed, towers.BeginRitualFromChest(roofChest));
+        Assert.Equal(TowerAltarState.Dormant, record.AltarState);
+
+        OpenAll(record);
+        Assert.Equal(AltarVerdict.Begin, towers.BeginRitualFromChest(roofChest));
+        Assert.Equal(TowerAltarState.Ritual, record.AltarState);
+        Assert.Equal(AltarVerdict.Stirring, towers.BeginRitualFromChest(roofChest));
     }
 
     [Fact]

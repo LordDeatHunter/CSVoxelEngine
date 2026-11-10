@@ -61,6 +61,7 @@ internal sealed class ChestInput
             contents = ChestAccess.TryOpen(world.Chests, chunks, world.Camera.Position, x, y, z, World.InteractionReach);
             if (contents == null) return;
             world.Towers.AlarmPilesNear((x, y, z));
+            world.Towers.BeginRitualFromChest((x, y, z));
         }
         panel.SetInventoryOpen(true);
         world.ChestPanel.Show((x, y, z), type.DisplayName, contents);

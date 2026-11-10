@@ -195,6 +195,9 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   intent), while singleplayer and the server's replay of that `Use` both begin the ritual through the same call, so
   `IntentReplay` has no altar branch and no message is new. `GameplayInput` toasts the verdict on a fresh press only (a
   held button repeats the use harmlessly).
+- **The roof chest**: opening the altar's treasure chest (`TowerGenerator.AltarChestCells`, the Skeleton King chest) calls
+  `TowerManager.BeginRitualFromChest` where the chest opens (`ChestInput.Open` in singleplayer, `ChestSessions.OnOpen` on the
+  server): the same ritual start as a right-click on the altar, so it begins only on a Dormant altar with every door open.
 - **The ritual and the rise** (`TowerManager.UpdateAltars`, called by `MobDirector.Update` right after the king manager on
   authoritative worlds): a Ritual record counts `MobConfig.SkeletonKingRitualSeconds` down, then spawns one king through
   `SkeletonKingManager.Spawn` at `TowerRecord.KingHome` (feet on top of the altar, leash `OuterRadius`, summon tier

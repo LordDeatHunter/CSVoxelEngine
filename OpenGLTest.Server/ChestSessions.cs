@@ -39,6 +39,7 @@ internal sealed class ChestSessions(ServerState state)
         }
         player.OpenChest = (x, y, z);
         state.World.Towers.AlarmPilesNear((x, y, z));
+        state.World.Towers.BeginRitualFromChest((x, y, z));
         SendContents(client, x, y, z, chest);
     }
 
