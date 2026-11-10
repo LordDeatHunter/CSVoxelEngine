@@ -605,9 +605,9 @@ public static class MobConfig
     /// <summary>At or below this share of its health the king enters phase 3 (the enrage).</summary>
     public const float SkeletonKingPhase3Share = 0.33f;
     /// <summary>A target within this melee reach of the king makes it slam (MobTargets.InMeleeReach).</summary>
-    public const float SkeletonKingSlamTriggerReach = 3f;
+    public const float SkeletonKingSlamTriggerReach = 4.5f;
     /// <summary>The slam's shockwave reaches every target within this horizontal radius...</summary>
-    public const float SkeletonKingSlamRadius = 7.5f;
+    public const float SkeletonKingSlamRadius = 9f;
     /// <summary>...whose feet stand within this many blocks of the king's (MobTargets.InShockwave).</summary>
     public const float SkeletonKingSlamHeight = 2.5f;
     /// <summary>The damage the slam's shockwave deals.</summary>
