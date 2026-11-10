@@ -222,6 +222,18 @@ uniform float uWaterGlitterDensity;
 uniform float uWaterGlitterTilt;
 uniform float uWaterGlitterRate;
 uniform vec2 uWaterGlitterFade;
+// Splash ripples (RippleField packs them, RippleWave is the twin of their shape): the wave packets
+// spreading from where bodies crossed the surface this frame, nearest the eye first. Shape = center
+// x, surface y, center z, leading edge radius in blocks; wave = peak slope, wavelength in blocks,
+// seed, phase in cycles. uRippleTrain = the train's length, its lead ahead of the edge and its rise
+// behind it (all in wavelengths) and the chirp; uRippleLevel = how far a surface may stand from the
+// ripple's own and still take it. A count of 0 (the default and the ItemDebugger's) costs nothing.
+const int MaxRipples = 16;   // == ParticleConfig.RippleShaded
+uniform int uRippleCount;
+uniform vec4 uRippleShape[MaxRipples];
+uniform vec4 uRippleWave[MaxRipples];
+uniform vec4 uRippleTrain;
+uniform float uRippleLevel;
 // Average opaque color of the leaves tile, for LOD foliage below: far crowns are
 // drawn opaque (no cutout holes) and transparent texels fall back to this.
 uniform vec3 uLodLeafColor;
@@ -427,6 +439,47 @@ vec3 FlowWaveNormal(vec2 p, float t, float k, vec2 flow) {
     vec2 dir = flow / fs;
     g -= dir * dot(dir, g) * (uWaterFlowStretch * fs);
     return normalize(vec3(-g.x * k, 1.0, -g.y * k));
+}
+
+// Height of a splash ripple's wave packet 0..1 at u wavelengths behind its leading edge: nothing
+// ahead of the edge, a quick rise just behind it, dying away toward the middle. Twin:
+// RippleWave.Envelope.
+float RippleEnvelope(float u) {
+    if (u <= -uRippleTrain.y || u >= uRippleTrain.x) return 0.0;
+    float fall = min(1.0 - u / uRippleTrain.x, 1.0);
+    return smoothstep(-uRippleTrain.y, uRippleTrain.z, u) * fall * fall;
+}
+
+// Its slope there, -1..1: the waves shorten toward the back of the train (the chirp) and the phase,
+// which grows with the ripple's age, runs the crests forward through it. Twin: RippleWave.Slope.
+float RippleSlopeAt(float u, float phase) {
+    float cycles = u * (1.0 + uRippleTrain.w * u / uRippleTrain.x);
+    return RippleEnvelope(u) * sin(6.2831853 * (cycles + phase));
+}
+
+// The summed surface gradient of every splash ripple at world point p: each one a ring of waves
+// around its crossing, pointing along the way out from it, so overlapping rings interfere. Only
+// water at the ripple's own level takes it. The edge is not a perfect circle: a couple of slow
+// lobes, different for every ripple.
+vec2 RippleGradient(vec3 p) {
+    vec2 g = vec2(0.0);
+    for (int i = 0; i < uRippleCount; i++) {
+        vec4 shape = uRippleShape[i];
+        vec4 wave = uRippleWave[i];
+        vec2 d = p.xz - shape.xz;
+        float d2 = dot(d, d);
+        // 1.08 covers the widest lobe below
+        float reach = (shape.w + wave.y * uRippleTrain.y) * 1.08;
+        if (d2 > reach * reach || abs(p.y - shape.y) > uRippleLevel) continue;
+        float dist = sqrt(d2);
+        float ang = atan(d.y, d.x);
+        float wob = 1.0 + 0.045 * sin(ang * 3.0 + wave.z * 6.2831853) + 0.03 * sin(ang * 5.0 + wave.z * 17.0);
+        float u = (shape.w - dist / wob) / wave.y;
+        // The very middle has no way out to slope along: ease the ring in over half a wavelength
+        float s = wave.x * RippleSlopeAt(u, wave.w) * smoothstep(0.0, wave.y * 0.5, dist);
+        g += d / max(dist, 1e-4) * s;
+    }
+    return g;
 }
 
 vec2 Hash2(vec2 p) {
@@ -1032,6 +1085,12 @@ void main() {
         // a pond stands above sea level, and one frame can hold several bodies at different heights.
         bool fromBehind = dot(geomN, V) < 0.0;
         vec3 nWup = FlowWaveNormal(fWorldPos.xz, uTime, uWaterNormalScale, fWaterFlow.xy);
+        // Splash ripples tilt the same normal, so the mirror, the refraction, the fresnel and the sun
+        // glints below all bend with them: the rings are waves in the water, never a drawn line.
+        if (uRippleCount > 0 && geomN.y > 0.5) {
+            vec2 rg = RippleGradient(fWorldPos);
+            nWup = normalize(vec3(nWup.x / nWup.y - rg.x, 1.0, nWup.z / nWup.y - rg.y));
+        }
         nWup = normalize(nWup + vec3(wob1 * 0.09, 0.0, wob2 * 0.09));   // fine glitter on top of the swell
         vec2 tilt = nWup.xz / max(nWup.y, 0.2);
         vec3 nW;

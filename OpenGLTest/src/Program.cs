@@ -549,6 +549,7 @@ public static class Program
             world.Camera.IsEyeInWater, world.Camera.IsEyeInLava, world.FireCells, eyeCaveBiome: world.EyeCaveBiome);
         ambience?.Update(renderManager.Lighting.Dayness, (float)MathUtils.Clamp(deltaTime, 0.0, 0.25));
         sfx?.Update();
+        renderManager.WaterRipples.Pack(world.Ambient.Ripples.Ripples, world.Camera.RenderEye);
         renderManager.BeginFrame(world.Camera);
         renderManager.GpuTimer.EndGpuPass(ProfileSection.Lighting);
         FrameProfiler.End(ProfileSection.Lighting);

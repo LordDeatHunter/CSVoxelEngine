@@ -113,19 +113,6 @@ internal sealed class BillboardPasses
     }
 
     /// <summary>
-    /// Draws the expanding water ripple rings (see <see cref="RippleRenderer"/>), flat on the water top.
-    /// Skipped with the eye under water, where the surface is seen from below.
-    /// </summary>
-    internal void RenderRipples(Camera camera, IReadOnlyList<WaterRipple> ripples)
-    {
-        if (camera == null || ripples.Count == 0 || _owner.Ripples == null || camera.IsEyeInWater) return;
-
-        _owner.Ripples.Render(ripples, camera.GetViewProjection(), camera.RenderEye,
-            Lighting.FogColor, Lighting.FogNear, Lighting.FogFar);
-        // The ripple renderer binds no texture unit, so the unit cache stays valid.
-    }
-
-    /// <summary>
     /// Draws every active blade slice trail (see <see cref="SliceTrailRenderer"/>) as an additive
     /// ribbon, faded with the world fog distances.
     /// </summary>

@@ -126,29 +126,45 @@ public static class ParticleConfig
     public const float SwimStrokeBubbleForward = 0.4f;
     public const float SwimStrokeBubbleSpread = 0.15f;
 
-    // --- Water ripple rings (RippleSystem + RippleRenderer, rule WaterRipple) ---
-    // A flat ring spreads over the water top wherever a body crosses the surface (the splash
-    // crossings of WaterSplash); a harder crossing (strength 0..1) spreads wider, slower and longer.
+    // --- Water ripples (RippleSystem, rule WaterRipple, wave RippleWave, upload RippleField) ---
+    // A wave packet spreads over the water top wherever a body crosses the surface (the splash
+    // crossings of WaterSplash); a harder crossing (strength 0..1) spreads wider, longer and steeper.
+    // Nothing is drawn for it: the water shader tilts its own normal by the packet's slope, so the
+    // reflection, the refraction and the sun glints bend with the waves.
     public const int RippleMax = 48;
-    public const float RippleMinRadius = 0.7f;
-    public const float RippleMaxRadius = 2.4f;
-    public const float RippleMinSeconds = 0.9f;
-    public const float RippleMaxSeconds = 1.7f;
-    public const float RippleAlpha = 0.9f;
-    /// <summary>Lift over the water top, so the wave train never z-fights the surface it lies on.</summary>
-    public const float RippleLift = 0.03f;
-    /// <summary>Distance in blocks between two crests of the train behind the leading edge.</summary>
-    public const float RippleWavelength = 0.32f;
-    /// <summary>How many wavelengths of train trail the leading edge before it dies away.</summary>
-    public const float RippleTrainWaves = 3.2f;
-    /// <summary>The quad reaches this far past the final radius, so the last crest is never clipped.</summary>
-    public const float RippleQuadMargin = 1.12f;
-    /// <summary>A neighboring water cell takes the ring only when its surface stands within this many blocks of
-    /// the crossing's, so a ring never climbs a waterfall or a ledge.</summary>
+    /// <summary>Ripples the water shader takes a frame (its uniform arrays); past it the nearest win.</summary>
+    public const int RippleShaded = 16;
+    public const float RippleMinRadius = 1.6f;
+    public const float RippleMaxRadius = 5.5f;
+    public const float RippleMinSeconds = 1.8f;
+    public const float RippleMaxSeconds = 3.4f;
+    /// <summary>Share of the spread that runs at a constant speed; the rest eases out, so a ring keeps
+    /// moving for its whole life and only settles a little at the end.</summary>
+    public const float RippleSteadyShare = 0.7f;
+    /// <summary>Peak surface slope (rise over run) of the packet for the gentlest and the hardest crossing,
+    /// before the spread and the life thin it.</summary>
+    public const float RippleMinSlope = 0.4f;
+    public const float RippleMaxSlope = 1.1f;
+    /// <summary>The packet keeps its full slope up to this radius in blocks, then thins with the square root
+    /// of the spread (the same energy over a longer circle).</summary>
+    public const float RippleFullSlopeRadius = 1f;
+    /// <summary>Distance in blocks between two crests at the leading edge, for a player-sized body.</summary>
+    public const float RippleWavelength = 0.5f;
+    /// <summary>How many wavelengths of train trail the leading edge before the water is calm again.</summary>
+    public const float RippleTrainWaves = 3.5f;
+    /// <summary>Wavelengths ahead of the leading edge where the first swell starts to rise, and behind it
+    /// where the packet reaches full height.</summary>
+    public const float RippleLeadWaves = 0.3f;
+    public const float RippleRiseWaves = 0.5f;
+    /// <summary>How much shorter the waves get toward the back of the train (long waves outrun short ones):
+    /// the wavenumber at the tail is 1 + twice this times the one at the edge.</summary>
+    public const float RippleChirp = 0.35f;
+    /// <summary>Crests a second that run forward through the packet and die at its leading edge, so the
+    /// train is moving water rather than a fixed pattern growing.</summary>
+    public const float RippleCrestRate = 1.5f;
+    /// <summary>Water whose surface stands farther than this many blocks from the crossing's takes none of
+    /// its ripple, so a ring never climbs a waterfall or a ledge.</summary>
     public const float RippleLevelTolerance = 0.5f;
-    /// <summary>Quads the ripple buffer holds per ripple on average; a crowd of wide rings over a big pool
-    /// drops the cells past it rather than grow the buffer.</summary>
-    public const int RippleQuadsPerRipple = 24;
 
     // Steam: puffs a second over every vent in range, the reach it gathers within and the cap
     public const float SpringSteamPerSecond = 0.6f;

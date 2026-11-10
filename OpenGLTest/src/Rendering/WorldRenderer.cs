@@ -301,7 +301,6 @@ internal sealed class WorldRenderer
         renderManager.Billboards.RenderFireParticles(Camera, _lavaFire.Particles);
         renderManager.Billboards.RenderFireParticles(Camera, _torchFire.Particles);
         renderManager.Billboards.RenderBubbleParticles(Camera, _bubbles.Particles);
-        renderManager.Billboards.RenderRipples(Camera, _world.Ambient.Ripples.Ripples);
         // Slice trails: additive and depthless like the embers, so they go here after the clouds;
         // never drawn in the mirror or the shadow pass
         renderManager.Billboards.RenderSliceTrails(Camera, _sliceTrails.Active, Now);

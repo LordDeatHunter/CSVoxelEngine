@@ -165,7 +165,6 @@ public class RenderManager : IDisposable
     private LeafParticleRenderer? _leaves;
     private FireParticleRenderer? _fire;
     private BubbleParticleRenderer? _bubbles;
-    private RippleRenderer? _ripples;
     private SliceTrailRenderer? _sliceTrails;
 
     // Entity healthbars: one five-heart billboard row above every live slime.
@@ -374,7 +373,8 @@ public class RenderManager : IDisposable
     internal LeafParticleRenderer? Leaves => _leaves;
     internal FireParticleRenderer? Fire => _fire;
     internal BubbleParticleRenderer? Bubbles => _bubbles;
-    internal RippleRenderer? Ripples => _ripples;
+    /// <summary>This frame's splash ripples for the water shader; packed before <see cref="BeginFrame"/>.</summary>
+    internal RippleField WaterRipples { get; } = new();
     internal SliceTrailRenderer? SliceTrails => _sliceTrails;
     internal EntityHealthbarRenderer? Healthbars => _healthbars;
     internal DamageNumberRenderer? DamageNumbers => _damageNumbers;
@@ -567,7 +567,6 @@ public class RenderManager : IDisposable
         _leaves = new LeafParticleRenderer(gl);
         _fire = new FireParticleRenderer(gl);
         _bubbles = new BubbleParticleRenderer(gl);
-        _ripples = new RippleRenderer(gl);
         _sliceTrails = new SliceTrailRenderer(gl, linearOutput: true);
         _healthbars = new EntityHealthbarRenderer(gl);
 
@@ -709,6 +708,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterFoamWidth", WaterRenderConfig.WaterFoamWidthBlocks);
         program.SetUniform("uWaterFoamStrength", WaterRenderConfig.WaterFoamStrength);
         program.SetUniform("uWaterFoamColor", ColorSpace.SrgbToLinear(WaterRenderConfig.WaterFoamColor));
+        RippleUniforms.Init(program);
         // Hashed sun sparkles on the waves (WaterGlitter); 0 strength leaves them off
         program.SetUniform("uWaterGlitter", WaterRenderConfig.WaterGlitterStrength);
         program.SetUniform("uWaterGlitterCells", WaterRenderConfig.WaterGlitterCellsPerBlock);
@@ -973,6 +973,7 @@ public class RenderManager : IDisposable
         program.SetUniform("uWaterNormalScale", GameSettings.WaterWaves);
         program.SetUniform("uWaterRefractStrength", GameSettings.WaterRefraction);
         program.SetUniform("uWaterCausticStrength", GameSettings.WaterCaustics);
+        RippleUniforms.Apply(program, WaterRipples);
         program.SetUniform("uLightViewProj", _nearShadow.ViewProj);
         program.SetUniform("uShadowStrength", Lighting.ShadowStrength);
         program.SetUniform("uShadowTexel", 1f / LightingConfig.ShadowMapSize);
@@ -1058,7 +1059,6 @@ public class RenderManager : IDisposable
         _leaves?.Dispose();
         _fire?.Dispose();
         _bubbles?.Dispose();
-        _ripples?.Dispose();
         _sliceTrails?.Dispose();
         _healthbars?.Dispose();
         _damageNumbers?.Dispose();

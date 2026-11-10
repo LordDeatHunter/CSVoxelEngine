@@ -313,8 +313,8 @@ internal sealed class AmbientEffects
         Camera.AddShake(ShakeFalloff.Trauma(JuiceConfig.BlastShakeStrength, TntManager.BlastRadius,
             JuiceConfig.BlastShakeRangeBlocks, Vector3.Distance(Camera.Position, center)));
 
-    /// <summary>The live water ripple rings every splash crossing starts (<see cref="UpdateSplashes"/>),
-    /// drawn by <see cref="RippleRenderer"/>.</summary>
+    /// <summary>The live water ripples every splash crossing starts (<see cref="UpdateSplashes"/>), shaded
+    /// by the water itself (<see cref="RippleField"/>).</summary>
     internal RippleSystem Ripples { get; } = new();
 
     // The local player's water-splash memory (its swim state, Camera.IsInWater)
