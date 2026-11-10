@@ -59,6 +59,9 @@ public static class SfxLibrary
     /// <summary>Group played when a hit lands on a bug (spider, scorpion, dragonfly), and when it dies: a squish.</summary>
     public const string BugSquishGroup = "squish";
 
+    /// <summary>Group played when a blade (slice, sword or axe chop) starts a swing: a swoosh.</summary>
+    public const string SwooshGroup = "swoosh";
+
     /// <summary>
     /// Every group directly under <paramref name="root"/> (subfolders are ignored, so the
     /// ambience tracks in <c>ambience/</c> never become hit groups). Clips are file-name

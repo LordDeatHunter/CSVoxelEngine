@@ -680,6 +680,7 @@ internal sealed class LeftClickAction
         if (justPressed && _sliceCombo.Press())
         {
             Player.StartSlice(_sliceCombo.Direction);
+            _sfx?.Play(SfxLibrary.SwooshGroup);
             _sliceImpactDone = false;
         }
 
@@ -700,6 +701,7 @@ internal sealed class LeftClickAction
 
         if (!_sliceCombo.Advance()) return;
         Player.StartSlice(_sliceCombo.Direction);
+        _sfx?.Play(SfxLibrary.SwooshGroup);
         _sliceImpactDone = false;
     }
 
@@ -717,6 +719,7 @@ internal sealed class LeftClickAction
         if (justPressed && _swordCombo.Press())
         {
             Player.StartSword(_swordCombo.Swing);
+            _sfx?.Play(SfxLibrary.SwooshGroup);
             _swordImpactDone = false;
         }
 
@@ -737,6 +740,7 @@ internal sealed class LeftClickAction
 
         if (!_swordCombo.Advance()) return;
         Player.StartSword(_swordCombo.Swing);
+        _sfx?.Play(SfxLibrary.SwooshGroup);
         _swordImpactDone = false;
     }
 

@@ -4,3 +4,6 @@ Night ambience - https://pixabay.com/sound-effects/nature-night-atmosphere-with-
 Rattling Bones - https://freesound.org/people/spookymodem/sounds/202102/
 CrackingDryWood - https://freesound.org/people/HerbertBoland/sounds/33206/
 Cloth Grab - https://freesound.org/people/alegemaate/sounds/667271/
+Case open SFX - https://freesound.org/people/RiceWitch/sounds/682729/
+spone_squish_water_blood_squird_1003_2026 - https://freesound.org/people/Artninja/sounds/873150/
+Swoosh - https://freesound.org/people/Brsjak/sounds/482880/
