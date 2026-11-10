@@ -421,6 +421,8 @@ OpenGLTest/
                                #   collides with blocks axis by axis like the player and the item drops (BoxSweep)
       ThrownProjectile.cs      # a thrown item or a goblin stone in flight: falls under Gravity,
                                #   its damage scaled by the charge, hits a mob or stops on a block
+      VantageSeeker.cs         # GL-free vantage seeking: a ranged mob without a line walks around its target to a
+                               #   standable, reachable spot with one (the skeleton archer)
       Goblins/                 # the goblin: the mob, its stone aim and its torch roll
         Goblin.cs              # the goblin: body physics, throw-then-melee AI, clip/event contract
                                #   (ValidateContent), animation-driven release/impact events

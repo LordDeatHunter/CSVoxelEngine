@@ -13,7 +13,8 @@ namespace VoxelEngine.Entities.TowerMobs;
 /// warrior otherwise walks in. The archer keeps its distance: inside
 /// <see cref="MobConfig.SkeletonBowMinRange"/>..<see cref="MobConfig.SkeletonBowMaxRange"/>, standing on the ground
 /// off its cooldown with a clear line to the chest, it draws its bow (the shoot clip; the arrow leaves at
-/// <see cref="ReleaseEvent"/>, <see cref="TryTakeShotRelease"/>), nearer than the band it backs away, farther it walks
+/// <see cref="ReleaseEvent"/>, <see cref="TryTakeShotRelease"/>); inside the band without a line it walks around the
+/// target to a spot that has one (<see cref="VantageSeeker"/>), nearer than the band it backs away, farther it walks
 /// in. Its health and damage are scaled by the tower floor it was raised on (<see cref="Tier"/>,
 /// <see cref="TowerDifficulty"/>), and its <see cref="Outfit"/> softens every blow it takes; all three are set at spawn,
 /// since a mirror cannot derive them from where it stands, and ride its wire byte (<see cref="PackLook"/>). Two attack
@@ -53,6 +54,7 @@ public sealed class Skeleton : RealmMob
     private float _meleeCooldown;
     private float _shotCooldown = MobConfig.SkeletonFirstShotDelaySeconds;
     private Vector3 _aimTarget;
+    private readonly VantageSeeker _vantage = new();
 
     /// <param name="type">The skeleton kind, with its model and clips.</param>
     /// <param name="position">The body center it spawns at.</param>
@@ -188,6 +190,7 @@ public sealed class Skeleton : RealmMob
     {
         _meleeCooldown = MathF.Max(0f, _meleeCooldown - scaledDelta);
         _shotCooldown = MathF.Max(0f, _shotCooldown - scaledDelta);
+        _vantage.Tick(scaledDelta);
     }
 
     /// <inheritdoc />
@@ -206,15 +209,24 @@ public sealed class Skeleton : RealmMob
         // A warrior has no bow: it closes in. An archer nearer than its band backs away to shoot again (a target that
         // keeps up is punched), and one farther than it walks in.
         if (Role == SkeletonRole.Warrior) return toward;
-        if (dist < MobConfig.SkeletonBowMinRange) return -toward;
-        if (dist > MobConfig.SkeletonBowMaxRange) return toward;
+        if (dist < MobConfig.SkeletonBowMinRange || dist > MobConfig.SkeletonBowMaxRange)
+        {
+            _vantage.Clear();
+            return dist < MobConfig.SkeletonBowMinRange ? -toward : toward;
+        }
 
-        // Inside the band: shoot when grounded (so a jump never lifts the bow over a wall), off the cooldown
-        // and with a clear line; otherwise keep walking at the target until the line clears.
-        if (!SeesTarget(ShotOrigin, target, chunks)) return toward;
+        // Inside the band without a line: walk around the target to a spot that has one (walking at it only pushes
+        // into the wall), or at it when no spot is standable at all.
+        var chest = ChestOf(target.Eye);
+        if (!SeesTarget(ShotOrigin, target, chunks))
+            return _vantage.Move(Position, ShotOrigin, BodyHeight, chest, MobConfig.SkeletonBowMinRange,
+                MobConfig.SkeletonBowMaxRange, chunks) ?? toward;
+
+        // With a line: shoot when grounded (so a jump never lifts the bow over a wall) and off the cooldown
+        _vantage.Clear();
         if (!IsGrounded || _shotCooldown > 0f) return Vector3.Zero;
 
-        _aimTarget = ChestOf(target.Eye);
+        _aimTarget = chest;
         StartAttack(ShotVariant);
         var jitter = (Random.Shared.NextSingle() - 0.5f) * 2f * MobConfig.SkeletonShotCooldownJitter;
         _shotCooldown = MobConfig.SkeletonShotCooldownSeconds + jitter;

@@ -30,7 +30,14 @@ share `MobConfig.SkeletonHeight` as their body box.
   `SkeletonFirstShotDelaySeconds`) and with a clear line from `ShotOrigin` to the chest (`RealmMob.SeesTarget`), draws
   (`shoot`); at its `release` (`TryTakeShotRelease`) an **arrow** leaves on `GoblinAim`'s low arc at
   `SkeletonArrowSpeed` (the band stays inside `v^2/g`). Nearer than the band it backs away (punching a target that keeps
-  up), farther or without a line it walks in.
+  up), farther it walks in. Inside the band **without a line** it repositions instead of pushing into the obstruction
+  (`VantageSeeker`, GL-free in `src/Entities/`, built to be reused by any ranged mob): every `RealmMobLosRetrySeconds`
+  it samples spots on arcs around the target (its own distance clamped `VantageBandMarginBlocks` inside the band, and `VantageInwardBlocks` nearer),
+  `VantageArcStepBlocks` apart up to `VantageArcSteps` to either side, keeps those it can stand on (solid ground at most
+  a step up or `MobLedgeMaxDropBlocks` down, its height clear) and walk to in a straight line, and walks to the nearest
+  with a clear line from its shot height to the chest; with none it strafes toward the farthest standable one, and one
+  that moved less than `VantageMinProgressBlocks` between picks tries the other side first. No standable spot at all
+  falls back to walking in. The goal is dropped as soon as the line clears or it leaves the band.
 - **Half and half, and armored** (`SkeletonManager.Spawn(position, tier)`, every pile wave and king summon): archers and
   warriors take turns, so a tower's waves are half each, and each rolls an **outfit** (`SkeletonOutfit.Roll`, one of 16
   head/chest/legs combinations of `SkeletonArmor` None/Leather/Copper): a warrior wears leather with
@@ -72,9 +79,11 @@ share `MobConfig.SkeletonHeight` as their body box.
   `WorldLifecycleTests.EntitiesRoundTripThroughSaveAndReload`, `RealmMobMirrorTests`,
   `NetworkEntitySyncTests.ASkeletonMirrorTakesItsTierFromTheSnapshotAndIsReplacedWhenTheTierDiffers` and the loopback
   `GameServerTests.SkeletonsReachTheClientsEntityListByKindWithTheirTier` (tier, role and outfit); the variants'
-  rules in `SkeletonTests` (a warrior never draws a bow and stabs harder, an archer backs away, the look byte round
-  trip, armor softening, the outfit rolls by role) and `SkeletonManagerTests.OrdinarySpawnsAreHalfArchersAndHalfWarriorsEachOfItsOwnKind`.
-  `visual-examples/skeletons.json` (`VOXEL_TIME=147`) films them idle, shooting and raking in an open forest clearing.
+  rules in `SkeletonTests` (a warrior never draws a bow and stabs harder, an archer backs away, an archer behind a
+  pillar walks around it to a clear line and shoots, the look byte round trip, armor softening, the outfit rolls by
+  role) and `SkeletonManagerTests.OrdinarySpawnsAreHalfArchersAndHalfWarriorsEachOfItsOwnKind`.
+  `visual-examples/skeletons.json` (`VOXEL_TIME=147`) films them idle, shooting and raking in an open forest clearing;
+  `visual-examples/skeleton-vantage.json` (same time) films an archer stepping out from behind a stone pillar to shoot.
 - Known gaps: the arrows, like the goblin stones and hell bolts, are not on the wire (a client sees only the damage);
   skeletons are not drawn in the water mirror.
 

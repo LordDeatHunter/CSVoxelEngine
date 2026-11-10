@@ -5,6 +5,7 @@ using VoxelEngine.Content.Models;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.TowerMobs;
+using VoxelEngine.Interaction;
 using Xunit;
 
 namespace VoxelEngine.Tests.Entities.TowerMobs;
@@ -13,7 +14,7 @@ namespace VoxelEngine.Tests.Entities.TowerMobs;
 /// The skeleton's own rules, driven headless: its shipped model satisfies its contract (and a model that does
 /// not names its file), the tower difficulty never eases with the floor tier and stays capped, a higher-tier
 /// skeleton is tougher and hits harder, it shoots only inside its bow band with a clear line (and rakes a target
-/// in reach instead), each clip's event is taken once per attack, the band stays inside the arrow's range, the
+/// in reach instead), an archer hidden behind a pillar walks around it to shoot, each clip's event is taken once per attack, the band stays inside the arrow's range, the
 /// replicated attack count names the clip it started, and it is undead.
 /// </summary>
 public sealed class SkeletonTests
@@ -286,6 +287,34 @@ public sealed class SkeletonTests
 
         Assert.True(archer.Position.X < start - 0.5f, $"the archer did not back away ({start} -> {archer.Position.X})");
         Assert.False(archer.Animation.IsPlaying(Skeleton.MeleeClip), "punched a target out of reach");
+    }
+
+    [Fact]
+    public void AnArcherBehindAPillarInItsBandWalksAroundItToAClearLineAndShoots()
+    {
+        // A pillar too tall to jump, wide enough that walking straight at the target only pushes into it
+        var chunks = StoneFloor();
+        var stone = ContentRegistry.RequireBlock("stone").Id;
+        for (var y = 1; y <= 4; y++)
+        for (var z = 6; z <= 10; z++)
+            chunks.Chunks[Vector3.Zero].SetBlockRaw(6, y, z, stone, 0);
+        var archer = new Skeleton(Type, OnFloor(2.5f, 8.5f), 0, spawnIn: false);
+        var target = PlayerAt(12.5f, 8.5f);
+        var chest = RealmMob.ChestOf(target.Eye);
+        Assert.True(BlockRaycaster.SegmentHitsBlock(archer.ShotOrigin, chest, chunks), "the pillar does not hide the target");
+
+        var shot = false;
+        for (var i = 0; i < (int)(6f / Dt) && !shot; i++)
+        {
+            archer.Update(Dt, chunks, target);
+            shot = archer.Animation.IsPlaying(Skeleton.ShootClip);
+        }
+
+        Assert.True(shot, $"the archer never found a line around the pillar (stuck at {archer.Position})");
+        Assert.True(MathF.Abs(archer.Position.Z - 8.5f) > 1f, "the archer shot without stepping out from behind the pillar");
+        Assert.False(BlockRaycaster.SegmentHitsBlock(archer.ShotOrigin, chest, chunks), "drew its bow without a clear line");
+        var dist = new Vector2(target.Eye.X - archer.Position.X, target.Eye.Z - archer.Position.Z).Length();
+        Assert.InRange(dist, MobConfig.SkeletonBowMinRange, MobConfig.SkeletonBowMaxRange);
     }
 
     [Fact]

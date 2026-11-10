@@ -86,6 +86,20 @@ public static class MobConfig
     public const float MobLedgeMaxDropBlocks = 3f;
     public const float MobLedgeProbeBlocks = 0.5f;
 
+    // --- Vantage seeking (VantageSeeker; the skeleton archer) ---
+    // A ranged mob with no line to its target samples spots on arcs around it, VantageArcStepBlocks of arc apart
+    // and up to VantageArcSteps of them to either side, at its own distance and VantageInwardBlocks nearer, and
+    // walks to the nearest one with a clear line (re-picked every RealmMobLosRetrySeconds), the arcs kept
+    // VantageBandMarginBlocks inside the range band so the walk across never leaves it; within
+    // VantageArriveBlocks of it it stands, and one that moved less than VantageMinProgressBlocks between two picks
+    // tries the other side first (first guesses).
+    public const float VantageArcStepBlocks = 2.5f;
+    public const int VantageArcSteps = 4;
+    public const float VantageInwardBlocks = 3f;
+    public const float VantageBandMarginBlocks = 1f;
+    public const float VantageArriveBlocks = 0.4f;
+    public const float VantageMinProgressBlocks = 0.3f;
+
     // --- Flight (FlightSteering, RiggedMob.Fly) ---
     // A flying mob's kind tunes its speeds and hover band (FlightTuning); these are the shared rules.
     // The wall probe looks MobFlightProbeBlocks ahead of the body on each axis it moves along; the
@@ -484,9 +498,10 @@ public static class MobConfig
     // --- Skeletons (SkeletonManager, Skeleton; the battle tower) ---
     // Raised only by the tower's bone piles (a forced spawn with the floor's tier), never by a ring, half of them
     // warriors and half archers. A warrior stabs with its copper dagger in melee reach and otherwise closes in; an
-    // archer, inside SkeletonBowMinRange..SkeletonBowMaxRange with a clear line, draws its bow, backs away when the
-    // target is nearer and only punches one in reach; the arrow leaves at the shoot clip's "release" event on
-    // GoblinAim's low arc under ThrownProjectile.Gravity, so the band must stay inside the arrow's level range v^2/g.
+    // archer, inside SkeletonBowMinRange..SkeletonBowMaxRange with a clear line, draws its bow, without one walks to a
+    // spot that has one (VantageSeeker), backs away when the target is nearer and only punches one in reach; the
+    // arrow leaves at the shoot clip's "release" event on GoblinAim's low arc under ThrownProjectile.Gravity, so the
+    // band must stay inside the arrow's level range v^2/g.
     /// <summary>Height of a skeleton's body box, in blocks.</summary>
     public const float SkeletonHeight = 1.9f;
     /// <summary>Half the width of a skeleton's body box, in blocks.</summary>
