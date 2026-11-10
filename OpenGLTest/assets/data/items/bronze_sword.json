@@ -4,5 +4,5 @@
   "display": { "rotation": [0, -90, 45], "translation": [0, 0.25, 0.1], "scale": 1.8 },
   "attack": "sword",
   "trail": { "color": [215, 160, 70] },
-  "entityDamage": 6
+  "entityDamage": 14
 }

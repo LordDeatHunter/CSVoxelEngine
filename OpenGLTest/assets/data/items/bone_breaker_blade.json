@@ -6,7 +6,7 @@
   "display": { "rotation": [0, -90, 45], "translation": [0, 0.1, -0.025], "scale": 1.6 },
   "attack": "sword",
   "trail": { "color": [226, 216, 190] },
-  "entityDamage": 6,
+  "entityDamage": 12,
   "rarity": "rare",
   "shrapnel": { "count": 6, "damage": 3 }
 }

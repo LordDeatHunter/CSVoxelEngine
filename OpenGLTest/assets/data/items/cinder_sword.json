@@ -4,6 +4,6 @@
   "display": { "rotation": [0, -90, 45], "translation": [0, 0.25, 0.1], "scale": 1.8 },
   "attack": "sword",
   "trail": { "color": [255, 110, 30] },
-  "entityDamage": 15,
+  "entityDamage": 30,
   "onHit": { "trigger": "on_hit", "effect": "burning" }
 }
