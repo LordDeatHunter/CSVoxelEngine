@@ -539,6 +539,7 @@ public class World
             Camera.BodySolids = _icebergs;
             // The per-job components: each only stores its references here and reads this world lazily
             Strikes = new MobStrikes(this, _debris, sfx, serverMode);
+            ChestLids.LidStarted += opening => sfx?.Play(opening ? SfxLibrary.ChestOpenGroup : SfxLibrary.ChestCloseGroup);
             Shrapnel = new BoneShrapnel(this, _chunkManager, _debris, serverMode);
             Ambient = new AmbientEffects(this, _chunkManager, _fire, _torchFire, _bubbles, _debris, _dropManager,
                 _falling, _tntManager, _mobs, _projectiles, serverMode, _campfires, _kilns, _goblins);

@@ -32,6 +32,12 @@ public static class SfxLibrary
     /// <summary>Group played when the player takes worn gear off.</summary>
     public const string UnequipGroup = "unequip";
 
+    /// <summary>Group played when a chest lid starts to swing open.</summary>
+    public const string ChestOpenGroup = "chest_open";
+
+    /// <summary>Group played when a chest lid starts to swing shut.</summary>
+    public const string ChestCloseGroup = "chest_close";
+
     /// <summary>Group played when a staff casts a spell (the caster's own cast).</summary>
     public const string SpellCastGroup = "spell_cast";
 
