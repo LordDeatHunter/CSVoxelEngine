@@ -583,10 +583,16 @@ public class Inventory
 
     /// <summary>
     /// Whether this player has ever obtained the id — the look-at label's "Unknown" rule (see
-    /// <see cref="LookLabel"/>). Every credited id is marked in <see cref="Add(ushort, int, bool)"/>, and a
-    /// restored save's obtained names are marked on import.
+    /// <see cref="LookLabel"/>). Every credited id is marked in <see cref="Add(ushort, int, bool)"/>, a block the
+    /// player mined in <see cref="MarkKnown"/>, and a restored save's obtained names are marked on import.
     /// </summary>
     public bool Knows(ushort id) => _known.Contains(id);
+
+    /// <summary>
+    /// Marks an id discovered without crediting it: the player mined that block (a break by TNT or any other
+    /// non-player cause never calls this). False when it was already known.
+    /// </summary>
+    public bool MarkKnown(ushort id) => _known.Add(id);
 
     /// <summary>
     /// Moves whenever the spell parts this inventory knows really change (never for an equal set), so

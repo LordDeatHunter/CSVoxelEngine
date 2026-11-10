@@ -514,7 +514,10 @@ internal sealed class LeftClickAction
     /// </summary>
     private void BreakMined(Vector3 cell, PlayerContext player)
     {
+        // Mining a block discovers it (the look label's "Unknown"), whether or not its drop is picked up
+        var mined = Edits.BlockIdAt(cell);
         Edits.RemoveBlock(cell, player);
+        if (Edits.BlockIdAt(cell) == 0) player.Inventory.MarkKnown(mined);
         _world.RaiseIntent(WorldIntent.BreakComplete(Camera.Position, _selectedAimDirection, cell));
     }
 

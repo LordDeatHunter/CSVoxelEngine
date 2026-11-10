@@ -13,7 +13,7 @@ its `LookLabelTop` over `BlockCubeCache`), the name in red while the held item c
 it, and "Unknown" with a flat dark silhouette until its item has been obtained; creative mode and a
 block with no item at all always know, and `X` adds id, state, sun/block light and cell debug lines
 (`LookLabel`, `LeftClickAction.LookAt`, `LookLabelTests`, `look-label.json`). "Obtained" is the inventory's own
-set (`Inventory.Knows`, marked in `Add`, saved as names in `player.json` and riding the
+set (`Inventory.Knows`, marked in `Add` and by `MarkKnown` when the player finishes mining the block, never by TNT or other non-player breaks, saved as names in `player.json` and riding the
 `InventoryNetCodec` snapshot, so a server's player and a client agree), which also drives the
 "New: <name>" toast on a first pickup or `/give`. `HudToast` draws one line above the item-name row
 for the day toast ("Day N" as the sun rises through dawn), the inventory-full warning, the

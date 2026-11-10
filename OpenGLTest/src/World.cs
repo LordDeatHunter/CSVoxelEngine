@@ -813,8 +813,15 @@ public class World
 
     /// <summary>Breaks the block in <paramref name="cell"/> for <paramref name="player"/> with every
     /// consequence a local break has (see <see cref="BlockEditor.BreakBlockFor"/>); public for the
-    /// dedicated server.</summary>
-    public bool BreakBlockFor(PlayerContext player, Vector3 cell) => Edits.BreakBlockFor(player, cell);
+    /// dedicated server. A finished mine also discovers the block for the player (<see cref="Inventory.MarkKnown"/>),
+    /// and a server resends the snapshot that carries it.</summary>
+    public bool BreakBlockFor(PlayerContext player, Vector3 cell)
+    {
+        var id = Edits.BlockIdAt(cell);
+        if (!Edits.BreakBlockFor(player, cell)) return false;
+        if (player.Inventory.MarkKnown(id)) FlagInventoryChanged(player);
+        return true;
+    }
 
     /// <summary>Places <paramref name="player"/>'s selected block against a face it can see (see
     /// <see cref="BlockPlacer.TryPlaceSelectedBlockAt"/>); public for the dedicated server.</summary>
