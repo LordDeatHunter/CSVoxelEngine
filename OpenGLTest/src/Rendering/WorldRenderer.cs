@@ -119,7 +119,8 @@ internal sealed class WorldRenderer
         renderManager.Shadows.RenderShadows(Camera, _chunkManager.Renderable, _tntManager.Primed, _falling.Falling, _toppling, Player, Slimes,
             _lodManager.RegionList, goblins: Goblins, icebergs: _world.Icebergs, hellMobs: _world.HellMobs,
             skyMobs: _world.SkyMobs, sandworms: _world.Sandworms, skeletons: _world.Skeletons,
-            skeletonKings: _world.SkeletonKings, caveMobs: _world.CaveMobs, wildlife: _world.Wildlife);
+            skeletonKings: _world.SkeletonKings, caveMobs: _world.CaveMobs, wildlife: _world.Wildlife,
+            chestChunks: _chunkManager.ChestChunks, chestLids: _world.ChestLids);
 
         FrameProfiler.Begin(ProfileSection.Reflection);
         renderManager.GpuTimer.BeginGpuPass(ProfileSection.Reflection);
@@ -171,6 +172,7 @@ internal sealed class WorldRenderer
         renderManager.Stations.RenderKilns(Camera, _kilns);
         renderManager.Stations.RenderSmithing(Camera, _world.Smithing);
         renderManager.Stations.RenderCastings(Camera, _casting);
+        renderManager.Chests.RenderChests(Camera, _chunkManager.ChestChunks, _world.ChestLids);
         renderManager.Objects.RenderPrimedTnt(Camera, _tntManager.Primed);
         renderManager.Objects.RenderFallingBlocks(Camera, _falling.Falling);
         renderManager.Mobs.RenderSlimes(Camera, Slimes);

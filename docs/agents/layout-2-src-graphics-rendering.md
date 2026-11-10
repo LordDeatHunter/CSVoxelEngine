@@ -432,6 +432,9 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   BindLazy, InvalidateTextureUnits) over the one TextureUnitCache
       WorldRenderer.cs         # World component: the world's frame (Render, every pass in order) and its UI (RenderUI)
       Actors/                  # the entity and station draws: mobs, loose objects, the player, the stations
+        ChestPasses.cs         # the chest draws: the shared chest model's base and lid for every chest cell
+                               #   (Chunk.ChestCells), posed by ChestLids, one texture per chest.skin; the entity and
+                               #   near-shadow passes
         IcebergPasses.cs       # the iceberg draws: one mesh and skin per variant, ModelMatrix (wobble and rise/sink
                                #   over IcebergShape.ModelMatrix), the entity, near-shadow and mirror passes
         MobPasses.cs           # the slime, goblin and hell mob draws (RenderSlimes, RenderGoblins, RenderHellMobs),

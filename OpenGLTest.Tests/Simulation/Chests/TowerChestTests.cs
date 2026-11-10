@@ -159,13 +159,32 @@ public sealed class TowerChestTests
         Exception Refused(BlockDefinition.ChestDefinition definition) => Assert.Throws<InvalidOperationException>(() =>
             BlockSchemaParser.ParseChest(definition, BlockRenderer.Model, path));
 
-        Assert.Contains(path, Refused(new BlockDefinition.ChestDefinition { Slots = 18, Tiers = [valid[0], "no_such_table"] }).Message);
-        Assert.Contains(path, Refused(new BlockDefinition.ChestDefinition { Slots = 18, Tiers = [] }).Message);
-        Assert.Contains(path, Refused(new BlockDefinition.ChestDefinition { Slots = 18, Tiers = [valid[0], " "] }).Message);
-        Assert.Contains(path, Refused(new BlockDefinition.ChestDefinition { Slots = 18, Loot = valid[0], Tiers = valid }).Message);
+        // Every case wears the tower chest's own skin, so only its tables can be what is refused
+        var skin = Profile.Skin;
+        Assert.Contains("no_such_table", Refused(new BlockDefinition.ChestDefinition { Slots = 18, Skin = skin, Tiers = [valid[0], "no_such_table"] }).Message);
+        Assert.Contains("empty", Refused(new BlockDefinition.ChestDefinition { Slots = 18, Skin = skin, Tiers = [] }).Message);
+        Assert.Contains("blank", Refused(new BlockDefinition.ChestDefinition { Slots = 18, Skin = skin, Tiers = [valid[0], " "] }).Message);
+        Assert.Contains("both", Refused(new BlockDefinition.ChestDefinition { Slots = 18, Skin = skin, Loot = valid[0], Tiers = valid }).Message);
+        Assert.Contains(path, Refused(new BlockDefinition.ChestDefinition { Slots = 18, Skin = skin, Tiers = [] }).Message);
 
-        var parsed = BlockSchemaParser.ParseChest(new BlockDefinition.ChestDefinition { Slots = 18, Tiers = valid }, BlockRenderer.Model, path)!;
+        var parsed = BlockSchemaParser.ParseChest(new BlockDefinition.ChestDefinition { Slots = 18, Skin = skin, Tiers = valid }, BlockRenderer.Model, path)!;
         Assert.Equal(valid, parsed.TierTables);
         Assert.Null(parsed.LootTable);
+    }
+
+    [Fact]
+    public void AChestIsRefusedUnlessItNamesASkinThatExists()
+    {
+        const string path = "blocks/test_skinless_chest.json";
+
+        Exception Refused(BlockDefinition.ChestDefinition definition) => Assert.Throws<InvalidOperationException>(() =>
+            BlockSchemaParser.ParseChest(definition, BlockRenderer.Model, path));
+
+        Assert.Contains(path, Refused(new BlockDefinition.ChestDefinition { Slots = 18 }).Message);
+        Assert.Contains(path, Refused(new BlockDefinition.ChestDefinition { Slots = 18, Skin = " " }).Message);
+        Assert.Contains("no_such_skin", Refused(new BlockDefinition.ChestDefinition { Slots = 18, Skin = "no_such_skin" }).Message);
+
+        var parsed = BlockSchemaParser.ParseChest(new BlockDefinition.ChestDefinition { Slots = 18, Skin = Profile.Skin }, BlockRenderer.Model, path)!;
+        Assert.Equal(Profile.Skin, parsed.Skin);
     }
 }

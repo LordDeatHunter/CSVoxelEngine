@@ -9,13 +9,17 @@ namespace VoxelEngine.Content.Blocks;
 /// loot table it rolls the first time it is opened or broken (see <c>ChestManager</c>). A crafted chest names no table
 /// and starts empty. A tiered chest (the tower chest) names one table per tier instead, and rolls the one its cell's
 /// state tier picks (<see cref="TableFor"/>): worldgen stamps the tier into state bits 2-7, bits 0-1 being the chest's
-/// facing.
+/// facing. Every chest is drawn with the one shared chest model (<c>ChestModel</c>) and differs only in the
+/// <see cref="Skin"/> it wears.
 /// </summary>
 /// <param name="Slots">How many stacks it holds.</param>
 /// <param name="LootTable">The loot table file name a never-opened chest rolls, or null.</param>
 /// <param name="TierTables">The loot table per tier of a tiered chest (the last entry used for any higher tier), or
 /// null.</param>
-public sealed record ChestProfile(int Slots, string? LootTable, IReadOnlyList<string>? TierTables = null)
+/// <param name="Skin">The name of the skin under <c>assets/textures/chests</c> the chest model wears; a loaded chest
+/// block always names one that exists.</param>
+public sealed record ChestProfile(int Slots, string? LootTable, IReadOnlyList<string>? TierTables = null,
+    string Skin = "")
 {
     /// <summary>The first state bit of a chest's tier: bits 0-1 are a facing chest's facing.</summary>
     public const int TierShift = 2;

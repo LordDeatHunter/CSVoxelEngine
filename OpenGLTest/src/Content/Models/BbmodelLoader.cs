@@ -268,6 +268,10 @@ public static class BbmodelLoader
                 continue;
             if (face.TryGetProperty("enabled", out var enabled) && !enabled.GetBoolean())
                 continue;
+            // A face the author cleared the texture of (Blockbench writes "texture": null) is one that can never
+            // be seen, such as the side of a wall that stands against another cube: it is left out of the mesh
+            if (face.TryGetProperty("texture", out var faceTexture) && faceTexture.ValueKind == JsonValueKind.Null)
+                continue;
             if (face.TryGetProperty("rotation", out var rotation) && Num(rotation, path, $"cube '{cubeName}'") != 0f)
                 throw new InvalidOperationException(
                     $"Model '{path}' cube '{cubeName}' has a rotated face UV: set it back to 0.");

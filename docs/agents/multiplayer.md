@@ -198,7 +198,8 @@ accepted), `BlockCorrection` (sequence id, then the authoritative cells around t
 `ChunkRequest`/`ChunkData` and `ColumnRequest`/`ColumnTerrain` (the streamed world,
 `ChunkNetCodec`; a column answer is the whole `ColumnTerrain`, `EncodeColumn`), `LodRegionRequest`/`LodRegionData` (a streamed far region, `LodNetCodec`),
 `EntityList` (the live mobs, drops, primed TNT and falling blocks, `NetEntity`), `StationState` (the campfires, querns, kilns and
-cast molds, `StationNetCodec`), `BlockChanges` (a batch of server cell changes, `NetCellChange`)
+cast molds, `StationNetCodec`, then the smithing stations, the towers and, since version 38, the cells of the chests at
+least one player has open, `ChestLids.WriteNet`, which is what swings a chest's lid for everyone), `BlockChanges` (a batch of server cell changes, `NetCellChange`)
 and `InventoryState`/`InventoryRequest` (a player's server-owned inventory, `InventoryNetCodec`,
 and its intents, `InventoryIntentCodec`), and the waystone messages `WaystoneRename` (a client's rename request),
 `WaystoneRows` (a player's registry rows) and `WaystoneOpened` (what a waystone activation came to; `WaystoneNetCodec`,

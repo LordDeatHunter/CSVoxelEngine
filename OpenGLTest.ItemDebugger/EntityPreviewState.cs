@@ -4,14 +4,17 @@ using System.IO;
 using System.Numerics;
 using VoxelEngine.Chunks;
 using VoxelEngine.Content;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
 using VoxelEngine.Entities.Goblins;
 using VoxelEngine.Entities.HellMobs;
+using VoxelEngine.Entities.Posing;
 using VoxelEngine.Entities.SkyMobs;
 using VoxelEngine.Entities.Wildlife;
 using VoxelEngine.Entities.Slimes;
 using VoxelEngine.Entities.TowerMobs;
+using VoxelEngine.Player;
 
 namespace VoxelEngine.ItemDebugger;
 
@@ -24,7 +27,9 @@ namespace VoxelEngine.ItemDebugger;
 /// its own. A clip-less model (the slime) offers the life-cycle modes <see cref="SlimeModes"/>. An entity
 /// with several model variants (the iceberg's size classes) offers one static mode per variant instead,
 /// named by its file (<see cref="SelectedVariant"/>), and an entity with no health pool is never offered
-/// <see cref="HurtMode"/>.
+/// <see cref="HurtMode"/>. The shared chest model (<see cref="ChestModel"/>) is listed after the entities as
+/// "Chest": no entity, but a Blockbench model with clips, each shown exactly as the game's lids show it (one
+/// clip at a time on its own clock, no blending, see <see cref="PartMatrix"/>).
 /// <para>
 /// A goblin, a hell, sky or tower mob or a slime is previewed as the real <see cref="RiggedMob"/> (<see cref="Goblin"/>,
 /// <see cref="Hellbrute"/>, <see cref="Cinderwitch"/>, <see cref="Galeraptor"/>, <see cref="Cloudgolem"/>,
@@ -86,6 +91,12 @@ public sealed class EntityPreviewState : IPreviewDriver
             var byDisplay = string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase);
             return byDisplay != 0 ? byDisplay : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         });
+        if (ChestModel.IsLoaded)
+            entries.Add(new EntityType
+            {
+                Name = "chest", DisplayName = "Chest", MaxHealth = 0, ModelPath = ChestModel.ModelPath,
+                Model = ChestModel.Data,
+            });
         Entries = entries;
         Animator = EmptyAnimator();
         Modes = HurtOnly;
@@ -143,6 +154,21 @@ public sealed class EntityPreviewState : IPreviewDriver
 
     // True while Modes are the selected type's variants (one per model) rather than clips or life-cycle modes.
     private bool _variantModes;
+
+    // True for the chest: its clips are shown one at a time at _clipTime, with no animator layers
+    private bool _clipOnly;
+    private float _clipTime;
+
+    /// <summary>
+    /// The world matrix of <paramref name="part"/> of the previewed model standing at <paramref name="feet"/>:
+    /// the animator's blended pose, or for the chest the active clip alone at its own time, which is what a chest's
+    /// lid shows in the game (<c>ChestLids</c>).
+    /// </summary>
+    public Matrix4x4 PartMatrix(string part, PlayerRig rig, Vector3 feet) =>
+        _clipOnly
+            ? RigPose.PartMatrix(new ClipPose(Animator.Find(Mode), _clipTime), part, rig,
+                Matrix4x4.CreateRotationY(FacingYaw) * Matrix4x4.CreateTranslation(feet))
+            : Animator.GetPartMatrix(part, rig, feet, FacingYaw);
 
     /// <summary>Seconds one play of the active mode lasts: its clip's length, or the life-cycle mode's own length.</summary>
     public float Duration
@@ -233,6 +259,7 @@ public sealed class EntityPreviewState : IPreviewDriver
             _slime = NewSlime();
         Animator = _rigged?.Animation ?? new EntityAnimator(clips, MobConfig.GoblinWalkSpeed);
         _variantModes = PreviewMob == null && type.Variants.Count > 1;
+        _clipOnly = ChestModel.IsLoaded && ReferenceEquals(type.Model, ChestModel.Data);
         SelectedVariant = 0;
         Modes = ModesFor(type, clips);
         Mode = Modes[0];
@@ -425,6 +452,14 @@ public sealed class EntityPreviewState : IPreviewDriver
     // A model that is neither a goblin nor a slime: clips only, with the plain hit-flash pulse.
     private void UpdateGeneric(float dt)
     {
+        // The chest's clip runs on its own clock and replays after a rest, holding its last frame meanwhile
+        if (_clipOnly)
+        {
+            _clipTime += dt;
+            if (_clipTime >= Duration + RestFor(RestBetweenPlays)) _clipTime = 0f;
+            return;
+        }
+
         // A variant mode (a static model per size class) and an idle mode both just stand.
         if (_variantModes || string.Equals(Mode, EntityAnimator.IdleClip, StringComparison.OrdinalIgnoreCase))
         {
@@ -526,6 +561,7 @@ public sealed class EntityPreviewState : IPreviewDriver
         _hurtTimer = 0f;
         _cycle = 0f;
         _flash = 0f;
+        _clipTime = 0f;
         Elapsed = 0f;
     }
 

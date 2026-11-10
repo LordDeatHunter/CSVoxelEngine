@@ -314,6 +314,17 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 Advance();
                 break;
 
+            case "chestwobble":
+            {
+                // The locked rattle, which no chest plays on its own yet
+                var cell = step.Pos!.Value;
+                var played = world.ChestLids.Wobble((int)cell.X, (int)cell.Y, (int)cell.Z);
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} chest wobble at {cell}"
+                              + (played ? "" : " (ignored: the lid is open or moving)"));
+                Advance();
+                break;
+            }
+
             case "chestrow":
                 RunUi("chestrow", u => u.PickChestRow(step.Row - 1, step.On));
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} chest row {step.Row}");

@@ -198,7 +198,7 @@ render them; `World.Shrapnel.AppendTo` adds them to the frame's projectile list 
 slight `manaRegen`, +10 % `undeadDamage`) are crafted; `BoneShrapnelTests`, and `visual-examples/bone-shrapnel.json`
 (`VOXEL_TIME=147`) films the sharpened burst.
 
-**Chests (I-4).** A block with a `chest` object (`slots`, optional `loot`; `BlockType.Chest`) is a chest block entity kept by
+**Chests (I-4).** A block with a `chest` object (`slots`, `skin`, optional `loot`; `BlockType.Chest`) is a chest block entity kept by
 `ChestManager` (`Simulation/Chests/`, owned by `World`, saved in `stations.json` as `Chests`). Its `ChestState` is created on
 first use (`ChestManager.Open`, a break): a ruin chest (`ruin_chest_*`, worldgen-only; the underground one rolls the table of its cave biome, see "Structure templates and ruins") then rolls its loot table with
 `ChestLoot.Materialize` from the hash of its cell and the world seed, so a chest nobody touched holds no state and is never
@@ -217,7 +217,34 @@ broken or out of reach. Right-clicking a chest is a `RightClickOutcome.Container
 whose rows then deposit (one unit, all with shift) while the card's rows withdraw; the card's rows wear the same
 `RarityStyle` chrome, accent bar and name color as the [E] rows (see "Rarity chrome"). The chest card takes the right side
 of the panel, so the preview, equipment and crafting cards are neither drawn nor clicked while it is up. `ChestTests`, `TowerChestTests`, `ChestServerTests`;
-`visual-examples/chests.json` (`VOXEL_TIME=147`, with the `setblock`, `chest` and `chestrow` ops).
+`visual-examples/chests.json` (`VOXEL_TIME=147`, with the `setblock`, `chest`, `chestrow` and `chestwobble` ops).
+
+**Chest model and lid.** In the world a chest is no part of its chunk's mesh: the mesher records each chest cell
+(`ChunkMeshData.ChestCells` -> `Chunk.ChestCells`, the chunks holding one in `ChunkManager.ChestChunks`) and `ChestPasses`
+draws it from the one shared Blockbench model, `assets/models/block/chest.bbmodel` (`ChestModel`, parsed at content load:
+the groups `Base` and `Lid`, the lid hinged along its back edge and carrying the latch, and the clips `open` (hold),
+`close` and `wobble`; a missing group or clip fails the load naming the file). It is turned to the cell's facing exactly
+as the static block model is (`ChestModel.Root`, the state's low two bits), lit by one light sample and cast into the near
+shadow cascade; it is not drawn in the water mirror. Chests differ only in their skin: `chest.skin` (required, checked at
+load) names a PNG under `assets/textures/chests/` laid out like the model's own texture (128 x 128 over 64 x 64 UV units,
+two texels per model pixel like a block tile). The model embeds the wooden skin, which is what Blockbench and the item
+debugger show. The JSON `models/block/chest.json` stays the block's static twin (the inventory icon, the held block, drops
+and break particles): two boxes that fill the hitbox exactly, the latch only painted on. `tools/generate-chest-textures.py`
+writes every skin and cuts the twin's three tiles from the same faces; the skin layout in it is the one the model's faces
+were mapped to in Blockbench.
+**A chest is open while it has at least one viewer** (`ChestLids`, GL-free, owned by `World`): its lid plays `open` the
+moment its viewers go above zero and holds the last frame, and plays `close` the moment they drop back to zero; a lid
+turned around mid-swing picks the other clip up at the matching point instead of its first frame. The viewers are the
+local player's own panel (`ChestView.OpenCell`, handed to `ChestLids.Update`, so singleplayer and a client's own chest
+answer at once) and, in multiplayer, every chest some player has open: `ChestSessions.Tick` hands those cells to the
+server world's `ChestLids.SetViewed`, they ride the end of every `StationState` frame (protocol 38, which also keeps the
+frames coming while a chest is open) and a client reads them back in `ClientMirror.ApplyNetworkStations`. Nothing is
+saved: every lid is shut after a load. `ChestLids.Wobble(x, y, z)` plays the `wobble` clip, a locked chest's rattle (the
+body rocks, the lid jumps against its latch), on a shut and resting chest only. No chest is locked yet, so nothing in
+play calls it: the `chestwobble` scenario op and the item debugger's Chest entry show it. A lid is posed by `ClipPose`
+(one clip at one time, no blending) through `RigPose` (see "Entity animation"). `ChestLidTests`,
+`ChestServerTests.AChestStandsOpenForEveryoneWhileAnyPlayerLooksIntoItAndShutsWhenTheLastLeaves`; the `lid-` shots of
+`visual-examples/chests.json`.
 
 **Waystones (W-1..W-3, plans/WAYSTONES.md).** A block with `"waystone": true` (`BlockType.Waystone`; the four
 `waystone_<realm>` blocks: surface, underground, hell, sky, on the shared `block/waystone` model) is a teleport point. A waystone stands two cells tall: the `waystone_<realm>` block is

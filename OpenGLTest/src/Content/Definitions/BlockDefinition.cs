@@ -330,7 +330,8 @@ public sealed class BlockDefinition
 
     /// <summary>Marks the block as a chest: a right-click opens it and it holds `slots` stacks, kept by the chest
     /// manager (a block entity). `loot` names the loot table a never-opened one rolls at first open or break (a ruin
-    /// chest); a crafted chest names none. Only legal on the `model` renderer.</summary>
+    /// chest); a crafted chest names none. `skin` names the texture the shared chest model wears in the world. Only
+    /// legal on the `model` renderer.</summary>
     public ChestDefinition? Chest { get; set; }
 
     /// <summary>The <c>chest</c> object.</summary>
@@ -338,6 +339,10 @@ public sealed class BlockDefinition
     {
         /// <summary>Slots, 1..<see cref="ChestConfig.MaxSlots"/>.</summary>
         public int? Slots { get; set; }
+
+        /// <summary>The skin the shared chest model wears in the world: the name of a PNG under
+        /// <c>assets/textures/chests</c>, laid out like the model's own texture. Required.</summary>
+        public string? Skin { get; set; }
 
         /// <summary>The loot table a never-opened chest rolls; omitted for an ordinary chest.</summary>
         public string? Loot { get; set; }

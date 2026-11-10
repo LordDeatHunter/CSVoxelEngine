@@ -356,6 +356,7 @@ internal sealed class ClientMirror
         StationNetCodec.Read(reader, _campfires, _querns, _kilns, _casting);
         _world.Smithing.ReadNet(reader);
         _world.Towers.ReadNet(reader);
+        _world.ChestLids.ReadNet(reader);
     }
 
     /// <summary>

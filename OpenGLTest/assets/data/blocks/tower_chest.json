@@ -3,8 +3,8 @@
   // breaking it spills what it holds. Worldgen-only: the tower stamp writes the floor's tier into state bits 2-7 (the
   // roof's treasure chest is tier 8, one above any floor), and the chest holds nothing until first opened or broken,
   // then rolls the loot table "tiers" names for its tier (the last entry for any higher tier) from the hash of its cell
-  // and the world seed. It is picked as a wooden chest and drops nothing but its contents. Placeholder tiles: the
-  // underground ruin chest's.
+  // and the world seed. It is picked as a wooden chest and drops nothing but its contents. Placeholder art: the
+  // underground ruin chest's skin and tiles.
   "name": "Tower Chest",
   "model": { "parent": "block/chest", "textures": { "front": "chest_ruin_underground_front", "side": "chest_ruin_underground_side", "top": "chest_ruin_underground_top" } },
   "facing": "horizontal",
@@ -19,6 +19,7 @@
   "loot": "none",
   "chest": {
     "slots": 18,
+    "skin": "chest_ruin_underground",
     "tiers": [
       "tower_floor_low", "tower_floor_low", "tower_floor_mid", "tower_floor_mid",
       "tower_floor_high", "tower_floor_high", "tower_floor_top", "tower_floor_top", "tower_treasure"

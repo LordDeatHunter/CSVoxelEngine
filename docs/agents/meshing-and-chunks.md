@@ -177,6 +177,12 @@ almost untouched (+0.2 % vertices over eight sampled surface and cave chunks, me
 within noise), since generated terrain is mostly uniformly lit and only lamp and shadow
 gradients split merges.
 
+**Chests are not meshed.** A chest block (`BlockType.Chest`) emits no quads: `GenerateMeshDataFromSnapshot` records its
+cell in `ChunkMeshData.ChestCells` (local `Chunk.Idx` indices, published as `Chunk.ChestCells` like the flame points) and
+the entity pass draws it from the shared chest model with its lid as it stands (`ChestPasses`, see "Chest model and lid").
+`ChunkRenderLists.ChestChunks` (`ChunkManager.ChestChunks`) lists the chunks with one, apart from `Renderable`, because a
+chunk holding nothing but a chest has no mesh at all.
+
 **Sky cover (BT-10).** The sun seeds of a light volume normally start at the column's terrain height, which a battle
 tower stands above (its heightmap must not be raised: the far LOD, water and spawns read it). A block flagged
 `coversSky` (the three tower bricks) closes that gap. `Chunk.MayHaveSkyCover` is a sticky flag that a chunk may hold

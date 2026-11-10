@@ -135,6 +135,7 @@ public static class ContentRegistry
         RecipeLoader.LoadAlloyRecipes(Path.Combine(assetsRoot, "data", "recipes", "alloy"));
         RecipeLoader.LoadForgeRecipes(Path.Combine(assetsRoot, "data", "recipes", "forge"));
         EntityLoader.LoadEntities(assetsRoot);
+        ChestModel.Load(assetsRoot);
         TreeSpeciesLoader.LoadTreeSpecies(Path.Combine(assetsRoot, "data", "trees"));
         StatusEffectLoader.LoadEffects(Path.Combine(assetsRoot, "data", "effects"));
         SpellPartLoader.LoadSpellParts(Path.Combine(assetsRoot, "data", "spell"));
@@ -506,6 +507,7 @@ public static class ContentRegistry
         SfxGroups = new Dictionary<string, IReadOnlyList<string>>();
         ItemRegistry.Reset();
         EntityRegistry.Reset();
+        ChestModel.Reset();
         TreeSpeciesRegistry.Reset();
         SpellPartRegistry.Reset();
         StatusEffectRegistry.Reset();

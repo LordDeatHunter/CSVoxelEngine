@@ -13,6 +13,10 @@ the stab. `towerclear` (`{ "op": "towerclear", "floor": k }`, floor 0 by default
 (`MobDirector.PitchGoblinCamp`: its lit fire and its goblins), night or not; `visual-examples/goblin-camp.json`
 (`VOXEL_TIME=700`) films one. `altar` (`{ "op": "altar", "pos": [x, y, z] }`, an exact cell, required) right-clicks a tower altar through `World.UseAltar` and shows its toast (the ritual begins only once every floor is cleared); `visual-examples/skeleton-king.json` (`VOXEL_TIME=147`) clears the default tower's floors with `towerclear`, then films its altar, the ritual, the Skeleton King's rise and boss bar, its slam, its bone volley and a summon. `visual-examples/goblins.json` (run it with `VOXEL_TIME=147`) spawns two goblins in a flat forest clearing under a flying — and therefore immune — camera and shoots `windup`, `stones` and `charge`. `grow` grows a tree on the live world: `{ "op": "grow", "species": "oak", "pos": [x, z], "steps": n }` snaps the column onto the terrain (`World.TryGroundHeight` + 1) and calls `World.TryGrowTree`, which hands it to `TreeGrowthWriter`: the writer rebuilds the tree rooted in that column from its wood state bytes (`TreeGraph.FromWorld`), or plants a sapling on the ground when the column holds none of that species, runs `n` (> 0) pulses of `TreeGrower.GrowFurther` and writes the difference back (see `### Trees`). Like `spawn`, the species name is checked against `TreeSpeciesRegistry` only when the step runs. `visual-examples/trees.json` (run it with `VOXEL_TIME=147`) frames the oak, spruce and cactus, a cut limb and the leaves decaying after it, a felled trunk, grown oaks, saplings, a baobab and a stone pine, the baobab's wide-trunk cuts and fall, and the stone pine's bare limbs under their leaf pads. `visual-examples/wiki-*.json` (surface, far-biomes, highlands, water-land, hell, sky, night) are the wiki's screenshot scenarios, generated with their captions into `wiki/data/screenshots.json` by `tools/generate-wiki-shots.mjs` (each has its own `VOXEL_TIME` in its header, short enough to stay in daylight); `npm run shots` in `wiki/` converts the PNGs to the committed WebP. Scenario parsing is covered by `VisualScenarioTests`; prefer a scenario over ad-hoc scripts for screenshot verification. `VOXEL_DEBUG=1` starts with the X debug line already on, so such a run logs FPS, position and the profiler breakdown once a second.
 
+`chestwobble` (`{ "op": "chestwobble", "pos": [x, y, z] }`) plays the locked-chest rattle on the chest at that cell
+(`ChestLids.Wobble`; ignored while its lid is open or moving), which nothing in play triggers yet;
+`visual-examples/chests.json` films it with the lid's open and close.
+
 The **item debugger** (`dotnet run --project OpenGLTest.ItemDebugger -c Release`, same working-directory
 rule) previews held items, entities and trees. Its left panel has three tabs. **ITEMS** is the item grid with the
 display sliders, and the player body: its mode buttons are **every player animation**
@@ -37,7 +41,10 @@ steps it up to the time, so scrubbing lands on exactly the frame playing would (
 mode). Both preview states are drivers: each mode has a `Duration`, the clock turns their own replay off
 (`Replay`) and owns it. `ITEM_DEBUGGER_SPEED` / `ITEM_DEBUGGER_LOOP` set the playback options at startup.
 **ENTITIES** lists every `EntityRegistry` entry and draws the selected one part by part
-through its `EntityAnimator` (`DebugSceneRenderer.RenderEntity`). The mode buttons are data-driven: one
+through its `EntityAnimator` (`DebugSceneRenderer.RenderEntity`). The shared chest model is listed last as "Chest"
+(`ITEM_DEBUGGER_SELECT=chest`) with the modes OPEN CLOSE WOBBLE: no entity, so each clip plays alone on its own clock,
+exactly as a chest's lid shows it in the game (`EntityPreviewState.PartMatrix`, a `ClipPose`), in the model's own
+(wooden) skin. The mode buttons are data-driven: one
 per clip in the selected model's `.bbmodel`, in file order, plus HURT (hurts the mob: the hit flash,
 its recoil and the `hurt` clip as an overlay, listed once when the model has that clip). For the goblin
 they read IDLE WALK THROW MELEE HURT DEATH SPAWN, for the hellbrute IDLE WALK MELEE HURT DEATH SPAWN and for

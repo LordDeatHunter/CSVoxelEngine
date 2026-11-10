@@ -2,7 +2,8 @@
   // Chests: run with VOXEL_SCRIPT=visual-examples/chests.json VOXEL_TIME=147 from OpenGLTest/. Shots land in
   // visual/chests/. Sets the seven chest blocks down in a row in the forest clearing (state 1 = facing south, toward the
   // player), opens a ruin chest (it rolls its loot from the hash of its cell), takes from it and puts into it through
-  // the [E] list, and breaks a full chest to see it spill.
+  // the [E] list, and breaks a full chest to see it spill. A chest's lid swings open while its panel is up and shuts
+  // when it closes (the "lid-" shots hide the HUD to show it), and "chestwobble" plays the locked rattle.
   "steps": [
     { "op": "wait", "seconds": 12 },
     { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -12 },
@@ -21,8 +22,16 @@
     { "op": "wait", "seconds": 1 },
     { "op": "screenshot", "name": "chest-row" },
 
+    { "op": "chestwobble", "pos": [-44, 10, 59] },
+    { "op": "wait", "seconds": 0.07 },
+    { "op": "screenshot", "name": "lid-wobble", "hideHud": true },
+    { "op": "wait", "seconds": 0.7 },
+
     { "op": "chest", "pos": [-42, 10, 59] },
+    { "op": "wait", "seconds": 0.15 },
+    { "op": "screenshot", "name": "lid-opening", "hideHud": true },
     { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "lid-open", "hideHud": true },
     { "op": "screenshot", "name": "ruin-open" },
     { "op": "chestrow", "row": 1, "all": true },
     { "op": "chestrow", "row": 1 },
@@ -35,7 +44,9 @@
     { "op": "screenshot", "name": "after-deposit" },
     { "op": "chest", "open": false },
     { "op": "panel", "open": false },
-    { "op": "wait", "seconds": 0.3 },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "lid-closing", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
 
     { "op": "chest", "pos": [-38, 10, 59] },
     { "op": "wait", "seconds": 0.5 },

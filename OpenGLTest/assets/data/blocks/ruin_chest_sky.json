@@ -14,5 +14,5 @@
   "hasItem": false,
   "pickAs": "wooden_chest",
   "loot": "none",
-  "chest": { "slots": 18, "loot": "ruin_sky" }
+  "chest": { "slots": 18, "skin": "chest_ruin_sky", "loot": "ruin_sky" }
 }

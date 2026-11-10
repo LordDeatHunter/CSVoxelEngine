@@ -16,6 +16,8 @@ internal sealed class ChestSessions(ServerState state)
 {
     // Scratch for the per-pump sweep, so a quiet frame allocates nothing
     private readonly List<ServerPlayer> _closing = [];
+    // The cells at least one player has open, rebuilt each pump for the world's lids
+    private readonly HashSet<(int X, int Y, int Z)> _viewed = [];
 
     /// <summary>A player asks to open the chest at a cell: its contents come back, or the closed answer when it
     /// cannot be opened (not a chest, unloaded, out of reach, dead player).</summary>
@@ -71,7 +73,9 @@ internal sealed class ChestSessions(ServerState state)
 
     /// <summary>
     /// Once a pump: closes the chest of every player who walked out of reach, died, or whose chest no longer exists
-    /// (broken, blasted, replaced), telling them with the closed answer.
+    /// (broken, blasted, replaced), telling them with the closed answer. Then tells the world's lids which chests
+    /// still have a viewer (<see cref="ChestLids.SetViewed"/>), which the station broadcast carries to every client:
+    /// a chest's lid opens for everyone when its first viewer arrives and shuts when its last one leaves.
     /// </summary>
     internal void Tick()
     {
@@ -87,6 +91,12 @@ internal sealed class ChestSessions(ServerState state)
         }
         foreach (var player in _closing)
             Close(player);
+
+        _viewed.Clear();
+        foreach (var player in state.PlayerList)
+            if (player.OpenChest is { } cell)
+                _viewed.Add(cell);
+        state.World.ChestLids.SetViewed(_viewed);
     }
 
     private void Close(ServerPlayer player)

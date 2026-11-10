@@ -186,7 +186,7 @@ public sealed class DebugSceneRenderer : IDisposable
 
     /// <summary>
     /// Draws the entity <paramref name="state"/> previews, part by part, at the origin: each part
-    /// from the state's <see cref="EntityAnimator.GetPartMatrix"/>, the flint in the hand when the
+    /// from the state's <see cref="EntityPreviewState.PartMatrix"/>, the flint in the hand when the
     /// rig has one, the item its entity file holds, and the hurt mode's hit-flash tint. Same frame setup as <see cref="Render"/>.
     /// </summary>
     public void RenderEntity(Matrix4x4 viewProj, Vector3 eyePos, EntityPreviewState state, float time,
@@ -206,7 +206,7 @@ public sealed class DebugSceneRenderer : IDisposable
         BindArray(0, preview.Texture);
         for (var i = 0; i < preview.Parts.Length; i++)
             Draw(preview.Parts[i],
-                animator.GetPartMatrix(preview.PartNames[i], preview.Rig, feet, state.FacingYaw) * effect, viewProj);
+                state.PartMatrix(preview.PartNames[i], preview.Rig, feet) * effect, viewProj);
 
         if (state.ShowsHeldStone && _itemMeshes.TryGet(_flintId, out var stone, out var stoneTex))
         {

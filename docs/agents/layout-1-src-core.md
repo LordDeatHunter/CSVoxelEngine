@@ -79,7 +79,7 @@ OpenGLTest/
                                #   (unload only outside every focus's radius), saves of edited chunks, the world cell queries;
                                #   composes ChunkMeshScheduler, ChunkRenderLists and PlayerPlacedIndex and forwards their public members
       ChunkMap.cs              # the loaded-chunk table (ChunkManager.Chunks): a ConcurrentDictionary keyed on a packed ChunkKey long
-      ChunkRenderLists.cs      # Renderable / TranslucentRenderable swap-remove bookkeeping and MeshVersion (behind ChunkManager's forwarders)
+      ChunkRenderLists.cs      # Renderable / TranslucentRenderable / ChestChunks swap-remove bookkeeping and MeshVersion (behind ChunkManager's forwarders)
       ChunkRestore.cs          # rebuilds a chunk from a ChunkSnapshot (a save, a world source's map, a streamed chunk):
                                #   shares a Uniform storage, clones a compact one or recompacts an edited one, copies
                                #   state, recounts, surface floor, fluid frontier, publishes (behind Chunk.RestoreFrom)
@@ -244,6 +244,8 @@ OpenGLTest/
                                #   (the player's posing is procedural, entities
                                #   animate from their clips)
         BlockModel.cs, ModelLoader.cs  # Minecraft model format: parent chains, #texture refs
+        ChestModel.cs          # the one Blockbench model every chest is drawn with (models/block/chest.bbmodel): its rig,
+                               #   the open/close/wobble clips, the contract check, SkinPath, Root (facing) and PartMatrix
         ModelBakeSteps.cs      # BakeModels' steps: facing/multiblock bake checks, BakesGreedy, tint resolution, parent self-check
       Recipes/                 # compiled craft, cook, crush, melt, cast, alloy and forge recipes
         AlloyRecipe.cs         # one alloy: a set of molten parts (material, ml) -> the same ml of the result
@@ -450,6 +452,10 @@ OpenGLTest/
         Cinderwitch.cs         # the fire caster: the range band, a cast with a clear line, the release event's bolt
         LayerDifficulty.cs     # GL-free: the per-layer multiplier (health, damage, cast cooldown) and pack size;
                                #   ScaleBy, the rounding every realm's difficulty scales through
+      Posing/                  # rig poses, namespace VoxelEngine.Entities.Posing
+        IBonePose.cs           # a pose of a Blockbench rig: each bone's animated local transform
+        RigPose.cs             # GL-free: composes a pose down the rig's parent chain into a part's world matrix
+        ClipPose.cs            # one clip sampled at one time as a pose, no layers (a chest's lid); default = rest
       Icebergs/                # drifting icebergs (not mobs): the berg and its GL-free rules, see "Icebergs"
         Iceberg.cs             # one berg: variant, horizontal scale, quarter turns, seed, waterline center,
                                #   velocity, cached world boxes, emerge/sink, the client mirror's dead reckoning

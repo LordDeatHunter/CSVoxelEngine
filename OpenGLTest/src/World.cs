@@ -8,6 +8,7 @@ using VoxelEngine.Audio;
 using VoxelEngine.Chunks;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Chunks.Streaming;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Effects.Sky;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.CaveMobs;
@@ -879,6 +880,10 @@ public class World
     /// <summary>The chest panel's UI state: which chest is open and what it shows (see <see cref="ChestView"/>).</summary>
     public ChestView ChestPanel { get; } = new();
 
+    /// <summary>Which chests stand open and what their lids are playing: open while a chest has a viewer (this
+    /// player's panel, or a server's players), shut when the last one leaves.</summary>
+    public ChestLids ChestLids { get; } = new(ChestModel.Open, ChestModel.Close, ChestModel.Wobble);
+
     /// <summary>The waystone registry (names, first discoverers, lost flags); authoritative worlds only.</summary>
     public WaystoneManager Waystones => _waystones;
 
@@ -988,7 +993,8 @@ public class World
     public Vector3 LastAltarCell => RightClick.LastAltarCell;
 
     public bool HasStations =>
-        StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting) || _smithing.HasAny || _towers.HasAny;
+        StationNetCodec.AnyStations(_campfires, _querns, _kilns, _casting) || _smithing.HasAny || _towers.HasAny
+        || ChestLids.HasViewed;
 
     /// <summary>Writes every station block entity for the server's broadcast
     /// (<see cref="NetMessage.StationState"/>).</summary>
@@ -997,6 +1003,7 @@ public class World
         StationNetCodec.Write(writer, _campfires, _querns, _kilns, _casting);
         _smithing.WriteNet(writer);
         _towers.WriteNet(writer);
+        ChestLids.WriteNet(writer);
     }
 
     /// <summary>
@@ -1040,6 +1047,7 @@ public class World
         _leaves.Update((float)deltaTime, Camera.RenderEye, _chunkManager, windTime: LightingTime);
         _debris.Update((float)deltaTime, _chunkManager);
         _querns.Animate((float)deltaTime);
+        ChestLids.Update((float)deltaTime, ChestPanel.OpenCell);
         _slimes?.AnimateMirrors((float)deltaTime, _debris);
         _goblins?.AnimateMirrors((float)deltaTime, _debris, _chunkManager, DayCycle.NightFactor(LightingTime));
         _hellMobs?.AnimateMirrors((float)deltaTime, _debris);
@@ -1171,6 +1179,7 @@ public class World
         _campfires.Update((float)deltaTime, _chunkManager, _dropManager);
         _querns.Update((float)deltaTime, _chunkManager, _dropManager);
         _chests.Update(_chunkManager, _dropManager);
+        ChestLids.Update((float)deltaTime, ChestPanel.OpenCell);
         _waystones.Update(_chunkManager);
         _kilns.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);
         _smithing.Update((float)deltaTime, _chunkManager, _dropManager, _lodManager);

@@ -174,6 +174,12 @@ public class Chunk : IDisposable
     public int TranslucentRenderIndex = -1;
 
     /// <summary>
+    /// This chunk's index in <see cref="ChunkManager.ChestChunks"/>, or -1 while it is not in that list (no chest
+    /// cell in its last mesh, or unloaded). Same contract as <see cref="RenderIndex"/>.
+    /// </summary>
+    public int ChestRenderIndex = -1;
+
+    /// <summary>
     /// The lowest terrain-surface height (<see cref="ColumnData.MinHeight"/>: ravines already
     /// cut in, caves not — carvers only remove blocks) anywhere in this chunk's 16x16 column.
     /// Nothing in a chunk whose top is below this can be lit by the sun, which is what the
@@ -601,6 +607,13 @@ public class Chunk : IDisposable
     public Vector3[]? FlamePoints { get; private set; }
 
     /// <summary>
+    /// Local <see cref="Idx"/> indices of the chest cells of the last applied mesh, or null when there are none.
+    /// The chunk mesh holds no chest geometry; the chest pass draws each from the shared chest model. Main thread
+    /// only. A headless server never sets it, since it draws nothing.
+    /// </summary>
+    public ushort[]? ChestCells { get; private set; }
+
+    /// <summary>
     /// Uploads a finished mesh into the shared chunk geometry pools, releasing whatever this
     /// chunk held before. The upload is a synchronous <c>glBufferSubData</c>, so the caller may
     /// recycle <paramref name="meshData"/>'s lists the moment this returns. An empty list never
@@ -634,6 +647,7 @@ public class Chunk : IDisposable
         HotFluidVents = meshData.HotFluidVents;
         SpringVents = meshData.SpringVents;
         FlamePoints = meshData.FlamePoints;
+        ChestCells = meshData.ChestCells;
     }
 
     /// <summary>

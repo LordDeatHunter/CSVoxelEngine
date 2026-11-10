@@ -63,6 +63,9 @@ public class ChunkManager
     /// <inheritdoc cref="ChunkRenderLists.TranslucentRenderable"/>
     public List<Chunk> TranslucentRenderable => _renderLists.TranslucentRenderable;
 
+    /// <inheritdoc cref="ChunkRenderLists.ChestChunks"/>
+    public List<Chunk> ChestChunks => _renderLists.ChestChunks;
+
     /// <summary>Recycled opaque mesh buffers; see <see cref="MeshBufferPool"/>.</summary>
     public MeshBufferPool MeshBuffers { get; } = new();
 
@@ -347,6 +350,7 @@ public class ChunkManager
         // Belt and braces: every renderable chunk was in Chunks, so both lists are empty already
         Renderable.Clear();
         TranslucentRenderable.Clear();
+        ChestChunks.Clear();
 
         _meshScheduler.Release();
         _placedIndex.Release();

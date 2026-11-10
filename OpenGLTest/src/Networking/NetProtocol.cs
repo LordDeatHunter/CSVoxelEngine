@@ -231,8 +231,11 @@ public static class NetFraming
     /// realm mob's. An older client would not draw them.
     /// 37: two more wild animals (<see cref="NetEntityKind.Crow"/>, <see cref="NetEntityKind.Dragonfly"/>), and a wild
     /// animal's <see cref="NetEntity.ItemId"/> carries its posture (<c>Animal.Posture</c>); an older client would not
-    /// draw the new kinds.</summary>
-    public const int ProtocolVersion = 37;
+    /// draw the new kinds.
+    /// 38: <see cref="NetMessage.StationState"/> ends with the cells of the chests at least one player has open
+    /// (<c>ChestLids.WriteNet</c>), so every client swings those lids open and shut; an older peer would misread the
+    /// station frames.</summary>
+    public const int ProtocolVersion = 38;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

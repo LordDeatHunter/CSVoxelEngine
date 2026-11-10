@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Loot;
+using VoxelEngine.Content.Models;
 using VoxelEngine.Content.Shapes;
 using VoxelEngine.Content.Stations;
 using VoxelEngine.Graphics;
@@ -302,7 +304,8 @@ internal static class BlockSchemaParser
     /// Reads a block's <c>chest</c> object: its slot count (1..<see cref="ChestConfig.MaxSlots"/>) and the optional loot
     /// table a never-opened one rolls, which must be a loaded loot table (loot tables load before blocks), or instead a
     /// non-empty <c>tiers</c> list of loaded loot tables (at most <see cref="ChestProfile.MaxTiers"/>), one per tier of
-    /// a tiered chest; <c>loot</c> and <c>tiers</c> are exclusive. A chest is a plain model block; any other renderer
+    /// a tiered chest; <c>loot</c> and <c>tiers</c> are exclusive. Its <c>skin</c> must name a PNG under
+    /// <c>textures/chests</c> (<see cref="ChestModel.SkinPath"/>). A chest is a plain model block; any other renderer
     /// is refused. Null for a block that is not a chest.
     /// </summary>
     internal static ChestProfile? ParseChest(BlockDefinition.ChestDefinition? definition, BlockRenderer renderer,
@@ -314,10 +317,17 @@ internal static class BlockSchemaParser
         if (definition.Slots is not { } slots || slots < 1 || slots > ChestConfig.MaxSlots)
             throw new InvalidOperationException(
                 $"Block '{path}' has chest.slots {definition.Slots}; expected 1..{ChestConfig.MaxSlots}.");
+        if (string.IsNullOrWhiteSpace(definition.Skin))
+            throw new InvalidOperationException($"Block '{path}' has a chest object without a chest.skin.");
+        var skin = definition.Skin.Trim();
+        var skinPath = ChestModel.SkinPath(ContentRegistry.AssetsRoot, skin);
+        if (!File.Exists(skinPath))
+            throw new InvalidOperationException(
+                $"Block '{path}' has chest.skin '{skin}', but '{skinPath}' does not exist.");
         var loot = string.IsNullOrWhiteSpace(definition.Loot) ? null : definition.Loot.Trim();
         if (loot != null && !ContentRegistry.LootTables.ContainsKey(loot))
             throw new InvalidOperationException($"Block '{path}' has chest.loot '{loot}', which is not a loot table.");
-        if (definition.Tiers == null) return new ChestProfile(slots, loot);
+        if (definition.Tiers == null) return new ChestProfile(slots, loot, Skin: skin);
 
         if (loot != null)
             throw new InvalidOperationException($"Block '{path}' has both chest.loot and chest.tiers; give one.");
@@ -337,7 +347,7 @@ internal static class BlockSchemaParser
                     $"Block '{path}' has chest.tiers entry '{name}', which is not a loot table.");
             tiers.Add(name);
         }
-        return new ChestProfile(slots, null, tiers);
+        return new ChestProfile(slots, null, tiers, skin);
     }
 
     /// <summary>

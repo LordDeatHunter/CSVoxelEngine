@@ -316,6 +316,7 @@ public sealed class VisualScenario
             },
             "hammer" => new VisualStep { Op = "hammer", Pos = ReadPos(element, index, "hammer") },
             "chest" => ReadChest(element, index),
+            "chestwobble" => new VisualStep { Op = "chestwobble", Pos = ReadPos(element, index, "chestwobble") },
             "chestrow" => new VisualStep
             {
                 Op = "chestrow",
@@ -337,7 +338,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, waystone, towerclear, altar, towerdefeat, goblincamp or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, chestwobble, waystone, towerclear, altar, towerdefeat, goblincamp or screenshot."),
         };
     }
 

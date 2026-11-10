@@ -21,6 +21,8 @@ project's top-level `animations` array is parsed by `BbmodelLoader.ReadAnimation
   channel, `bezier` or any other interpolation, and an animator naming a group the outliner lacks all
   throw, naming the file and the animation.
 - **Unanimated files:** a file without `animations` loads exactly as before.
+- **Cleared faces:** a cube face whose texture the author cleared (`"texture": null`, a wall's side that stands
+  against another cube) is left out of the mesh, like a disabled one.
 The **sign and order convention** lives in one place, the comment above `BbmodelLoader.ReadAnimations`,
 taken from Blockbench's `BoneAnimator.displayRotation`/`displayPosition`:
 - A rotation `(x, y, z)` in degrees becomes engine Euler `(-x, -y, z)`, applied X first, then Y, then
@@ -54,6 +56,9 @@ order: scale, rotation, then pivot delta plus animated translation, then the par
 `RotY(facing) * T(feet)`. `HandAnchor(part, ...)` is that matrix dropped to the part's lowest cube; it
 is where the goblin's held flint is drawn (`Goblin.HandPart` = `ArmR`, `Goblin.HeldStoneScale`). The
 player's `PlayerModel` still poses procedurally and ignores `Parent`.
+The chain composition itself is `RigPose.PartMatrix(pose, part, rig, root)` (`Entities/Posing/`), generic over an
+`IBonePose` (a bone's animated local transform): the animator is one, and `ClipPose`, one clip sampled at one time with
+no layers and no blending, is the other. A chest's lid is posed that way (`ChestModel`, see "Chest model and lid").
 
 The goblin's **content contract** is enforced at startup by `Goblin.ValidateContent`, which the
 `GoblinManager` constructor calls. The model must provide:

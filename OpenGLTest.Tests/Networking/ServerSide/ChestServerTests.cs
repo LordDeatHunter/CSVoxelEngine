@@ -17,7 +17,8 @@ namespace VoxelEngine.Tests.Networking.ServerSide;
 
 /// <summary>
 /// Chests over a loopback server: two players share one chest and each sees every move, a player who never opened a chest
-/// or walked out of reach moves nothing, and a broken chest closes for its viewers and spills its contents.
+/// or walked out of reach moves nothing, a broken chest closes for its viewers and spills its contents, and a chest's lid
+/// stands open for everyone while any player looks into it.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class ChestServerTests : IDisposable
@@ -55,12 +56,17 @@ public sealed class ChestServerTests : IDisposable
         public ChestState? Contents;
         public int Answers;
 
+        /// <summary>The newest station snapshot, whole (it ends with the chests that stand open).</summary>
+        public byte[]? Stations;
+
         public void Drain(NetworkClient client)
         {
             while (client.Inbound.TryDequeue(out var payload))
             {
                 using var reader = new PacketReader(payload);
-                if (reader.Message != NetMessage.ChestContents) continue;
+                var message = reader.Message;
+                if (message == NetMessage.StationState) Stations = payload;
+                if (message != NetMessage.ChestContents) continue;
                 var read = ChestNetCodec.ReadContents(reader);
                 Contents = read?.Contents;
                 Answered = true;
@@ -253,5 +259,56 @@ public sealed class ChestServerTests : IDisposable
 
         Assert.Equal(6, _world.Drops.Count(d => d.BlockId == Flint));
         Assert.Null(PlayerOf(a).OpenChest);
+    }
+
+    // Whether a client that applies this station snapshot shows the chest at the cell open
+    private static bool AClientShowsItOpen(byte[] stations, (int X, int Y, int Z) cell)
+    {
+        var mirror = new World(null!, null!, null!, null!, null!, null!, null, null, clientMode: true);
+        try
+        {
+            mirror.GetChunkManager().Headless = true;
+            // ClientSession hands ApplyNetworkStations a reader already past the message byte
+            using var reader = new PacketReader(stations);
+            Assert.Equal(NetMessage.StationState, reader.Message);
+            mirror.ClientMirror.ApplyNetworkStations(reader);
+            mirror.ChestLids.Update(0.01f);
+            return mirror.ChestLids.IsOpen(cell.X, cell.Y, cell.Z);
+        }
+        finally
+        {
+            mirror.SaveAndDispose();
+        }
+    }
+
+    [Fact]
+    public void AChestStandsOpenForEveryoneWhileAnyPlayerLooksIntoItAndShutsWhenTheLastLeaves()
+    {
+        var a = Connect("Alice");
+        var b = Connect("Bob");
+        var watcher = Connect("Carol");
+        var cell = PlaceChest(a);
+        var lids = _world.ChestLids;
+        Assert.False(lids.IsOpen(cell.X, cell.Y, cell.Z));
+
+        // The first viewer opens the lid, and a client that never touched the chest is told
+        Open(a, cell);
+        TickUntil(() => lids.IsOpen(cell.X, cell.Y, cell.Z), "the first viewer never opened the lid");
+        _inboxes[watcher].Stations = null;
+        TickUntil(() => _inboxes[watcher].Stations != null, "no station snapshot followed the open");
+        Assert.True(AClientShowsItOpen(_inboxes[watcher].Stations!, cell));
+
+        // One of two viewers leaving shuts nothing
+        Open(b, cell);
+        Send(a, NetMessage.ChestClose);
+        TickUntil(() => PlayerOf(a).OpenChest == null, "the close never reached the server");
+        for (var i = 0; i < 10; i++) Tick(0.02);
+        Assert.True(lids.IsOpen(cell.X, cell.Y, cell.Z));
+
+        // The last one leaving shuts it, here and (with the snapshot that follows) on every client
+        Send(b, NetMessage.ChestClose);
+        TickUntil(() => !lids.IsOpen(cell.X, cell.Y, cell.Z), "the lid never shut after its last viewer left");
+        for (var i = 0; i < 25; i++) Tick(0.02);
+        Assert.False(AClientShowsItOpen(_inboxes[watcher].Stations!, cell));
     }
 }

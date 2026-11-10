@@ -24,6 +24,10 @@ public sealed class ChestView
     /// <summary>The cell of the open chest.</summary>
     public (int X, int Y, int Z) Cell { get; private set; }
 
+    /// <summary>The cell of the chest this player is looking into, or null while no panel is up: the local
+    /// viewer the chest lids count (<c>ChestLids.Update</c>).</summary>
+    public (int X, int Y, int Z)? OpenCell => IsOpen ? Cell : null;
+
     /// <summary>The panel title (the chest block's name).</summary>
     public string Title { get; private set; } = "";
 

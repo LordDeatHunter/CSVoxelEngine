@@ -300,6 +300,8 @@ internal static class ChunkMeshBuilder
         List<ushort>? springVents = null;
         // Chunk-local flame points of the blocks that burn one (torches), likewise lazy
         List<Vector3>? flames = null;
+        // The chest cells, which the chest pass draws instead of the chunk, likewise lazy
+        List<ushort>? chests = null;
 
         // World origin of this chunk, for the procedural emitters' per-cell world position; a
         // submerged face whose column leaves the padded snapshot reads its water level from the
@@ -446,6 +448,14 @@ internal static class ChunkMeshBuilder
             // A multiblock part is a solid, occluding cell that draws nothing: the anchor's
             // model already covers the whole volume it belongs to.
             if (type.Renderer == BlockRenderer.MultiblockPart) continue;
+
+            // A chest's lid swings, so it is drawn from the shared chest model by the chest pass (ChestPasses):
+            // the chunk draws none of its static model and only records where it stands
+            if (type.Chest != null)
+            {
+                (chests ??= []).Add((ushort)Idx(x, y, z));
+                continue;
+            }
 
             // ...and the anchor draws that whole model, pre-rotated to the facing its state
             // byte's low two bits carry (see MultiblockShape), as does a facing block such as a
@@ -643,6 +653,9 @@ internal static class ChunkMeshBuilder
         }
 
         return new ChunkMeshData(vertices, indices, tVertices ?? new List<Vertex>(), tIndices ?? new List<ushort>(), hasWater)
-            { HotFluidVents = vents?.ToArray(), SpringVents = springVents?.ToArray(), FlamePoints = flames?.ToArray() };
+        {
+            HotFluidVents = vents?.ToArray(), SpringVents = springVents?.ToArray(), FlamePoints = flames?.ToArray(),
+            ChestCells = chests?.ToArray(),
+        };
     }
 }

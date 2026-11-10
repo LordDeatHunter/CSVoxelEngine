@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using VoxelEngine.Entities.Posing;
 using VoxelEngine.Player;
 
 namespace VoxelEngine.Entities;
@@ -17,7 +18,7 @@ namespace VoxelEngine.Entities;
 /// which is how gameplay learns the frame a stone leaves the hand or a swing lands.
 /// GL-free; allocates nothing per frame after construction.
 /// </summary>
-public sealed class EntityAnimator
+public sealed class EntityAnimator : IBonePose
 {
     /// <summary>Name of the looping clip played while standing.</summary>
     public const string IdleClip = "idle";
@@ -41,8 +42,6 @@ public sealed class EntityAnimator
     private const float WalkClockMinBlend = 0.01f;
     // A fading walk keeps stepping at least this fraction of its authored rate.
     private const float MinWalkRate = 0.5f;
-    // Longest parent chain composed before a cycle is assumed.
-    private const int MaxChainDepth = 16;
 
     private AnimationClip? _idle;
     private AnimationClip? _walk;
@@ -278,19 +277,13 @@ public sealed class EntityAnimator
 
     /// <summary>
     /// World matrix of <paramref name="part"/>: its animated local transform composed down the
-    /// outliner's parent chain onto a root placed at <paramref name="feet"/> and turned by
-    /// <paramref name="facingYaw"/> (radians about +Y; the model faces -Z at 0). Per link,
-    /// scale, rotate, then translate by the pivot offset from the parent plus the animated
-    /// translation, then the parent — System.Numerics is row-vector, so the leftmost factor runs
-    /// first. The part's cubes are pivot-relative, so this is their model matrix. An unknown part
-    /// or a parent cycle yields identity.
+    /// outliner's parent chain (<see cref="RigPose.PartMatrix"/>) onto a root placed at
+    /// <paramref name="feet"/> and turned by <paramref name="facingYaw"/> (radians about +Y; the
+    /// model faces -Z at 0). The part's cubes are pivot-relative, so this is their model matrix.
+    /// An unknown part or a parent cycle yields identity.
     /// </summary>
-    public Matrix4x4 GetPartMatrix(string part, PlayerRig rig, Vector3 feet, float facingYaw)
-    {
-        if (!rig.Parts.ContainsKey(part)) return Matrix4x4.Identity;
-        var root = Matrix4x4.CreateRotationY(facingYaw) * Matrix4x4.CreateTranslation(feet);
-        return TryCompose(part, rig, root, 0, out var matrix) ? matrix : Matrix4x4.Identity;
-    }
+    public Matrix4x4 GetPartMatrix(string part, PlayerRig rig, Vector3 feet, float facingYaw) =>
+        RigPose.PartMatrix(this, part, rig, Matrix4x4.CreateRotationY(facingYaw) * Matrix4x4.CreateTranslation(feet));
 
     /// <summary>
     /// Anchor for an item held by <paramref name="part"/>: the part's matrix moved down to the
@@ -304,34 +297,6 @@ public sealed class EntityAnimator
             foreach (var cube in p.Cubes)
                 depth = MathF.Min(depth, cube.Min.Y);
         return Matrix4x4.CreateTranslation(0f, depth, 0f) * GetPartMatrix(part, rig, feet, facingYaw);
-    }
-
-    private bool TryCompose(string name, PlayerRig rig, Matrix4x4 root, int depth,
-        out Matrix4x4 matrix)
-    {
-        matrix = Matrix4x4.Identity;
-        if (depth > MaxChainDepth) return false;
-        var part = rig.Parts[name];
-
-        Matrix4x4 parentMatrix;
-        Vector3 parentPivot;
-        if (part.Parent != null && rig.Parts.TryGetValue(part.Parent, out var parent))
-        {
-            if (!TryCompose(part.Parent, rig, root, depth + 1, out parentMatrix)) return false;
-            parentPivot = parent.Pivot;
-        }
-        else
-        {
-            parentMatrix = root;
-            parentPivot = Vector3.Zero;
-        }
-
-        var tr = LocalTransform(name);
-        var local = Matrix4x4.CreateScale(tr.Scale)
-            * Matrix4x4.CreateFromQuaternion(tr.Rotation)
-            * Matrix4x4.CreateTranslation(part.Pivot - parentPivot + tr.Translation);
-        matrix = local * parentMatrix;
-        return true;
     }
 
     // One locomotion pair's pose for a bone: its idle and moving clips blended by the walk weight

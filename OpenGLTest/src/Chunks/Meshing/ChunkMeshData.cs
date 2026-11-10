@@ -35,4 +35,10 @@ public record ChunkMeshData(List<Vertex> Vertices, List<ushort> Indices,
     /// already turned to each cell's facing), or null when there are none.
     /// </summary>
     public Vector3[]? FlamePoints { get; init; }
+
+    /// <summary>
+    /// Local <see cref="Chunk.Idx"/> indices of the chunk's chest cells, or null when there are none. A chest has
+    /// no quads in the chunk mesh: the chest pass draws it from the shared chest model, so its lid can swing.
+    /// </summary>
+    public ushort[]? ChestCells { get; init; }
 }

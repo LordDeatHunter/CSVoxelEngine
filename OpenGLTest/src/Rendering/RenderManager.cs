@@ -329,6 +329,10 @@ public class RenderManager : IDisposable
     /// <summary>The iceberg draws: one mesh and skin per iceberg variant.</summary>
     internal IcebergPasses IcebergPasses { get; private set; }
 
+    /// <summary>The chest draws: the shared chest model's base and lid for every chest cell, each on its
+    /// block's skin.</summary>
+    internal ChestPasses Chests { get; private set; }
+
     /// <summary>The depth-only sun shadow passes: the near and far cascades' casters; owns the
     /// CHUNK_DRAW shadow program's uniform locations.</summary>
     internal ShadowPass Shadows { get; private set; }
@@ -580,6 +584,7 @@ public class RenderManager : IDisposable
         Players = new PlayerPasses(gl, this);
         Mobs = new MobPasses(gl, this);
         IcebergPasses = new IcebergPasses(gl, this);
+        Chests = new ChestPasses(gl, this);
         ui = new UIRenderer(gl, textureAtlas, blockCubes, itemMeshes, atlasIsSrgb: true);
         // The damage numbers are laid out from the HUD's font; without one there is nothing to draw
         if (ui.Font is { } font)
@@ -1040,6 +1045,7 @@ public class RenderManager : IDisposable
         Stations.Dispose();
         Players.Dispose();
         IcebergPasses.Dispose();
+        Chests.Dispose();
         Mobs.Dispose();
         worldShader.Dispose();
         chunkShader.Dispose();

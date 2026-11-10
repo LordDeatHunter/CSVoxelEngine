@@ -72,6 +72,15 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Camps/                   # goblin camps, namespace VoxelEngine.Simulation.Camps (see "Goblin camps")
         GoblinCamps.cs         # one camp a dark night by chance, far from a player: a lit fire and torch-bearing goblins
                                #   milling round it (MobDirector owns it, pitching the fire through BlockPlacer)
+      Chests/                  # chest block entities, namespace VoxelEngine.Simulation.Chests (see "Chests (I-4)")
+        ChestManager.cs        # the registry by cell: state created on first use (a ruin chest rolls its loot), the
+                               #   spill on a break and the stale sweep, the stations.json capture and restore
+        ChestState.cs, ChestSlot.cs  # what a chest holds: per slot one stackable or one tool/gear instance
+        ChestLoot.cs           # a never-opened chest's contents from its (tier's) loot table, its cell and the seed
+        ChestTransfer.cs, ChestMove.cs, ChestAccess.cs  # the conserving moves between an inventory and a chest, the
+                               #   move a click or the wire names, and the reach-checked open and apply both sides share
+        ChestLids.cs           # GL-free: which chests stand open (at least one viewer) and what each lid plays (open,
+                               #   close, the locked wobble), the viewed cells on the wire (the end of StationState)
       HellMobManager.cs        # the hell mobs: AI tick, the brute's blow at its impact, the casters' fire bolts
                                #   (MobMissiles; damage + burning), loot, despawn, the hell-only ring spawn (packs by layer)
       Icebergs/                # the iceberg simulation, namespace VoxelEngine.Simulation.Icebergs

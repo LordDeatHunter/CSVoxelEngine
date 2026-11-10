@@ -144,7 +144,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Icebergs/                  # the iceberg manager, its spawner and icebergs in a headless World
     Camps/                     # goblin camps: the fire first, torch-bearing goblins round it, one a dark night
     Caves/                     # the cave spawn filter and rules, the cave mob manager (spawns by biome, tier, caps, attacks)
-    Chests/                    # chests, tower chests and the underground ruin chests' cave biome tables (CaveChestTests)
+    Chests/                    # chests, tower chests, the underground ruin chests' cave biome tables (CaveChestTests) and
+                               #   the lid: open while viewed, the wobble, the model's facing, no chunk quads (ChestLidTests)
     Tower/                     # the skeleton manager: forced spawn and the hard cap, tier, no natural spawn, rake, arrows,
                                #   despawn reports; the floor locks (TowerRulesTests, SkeletonPileManagerTests,
                                #   TowerBlockWriterTests, TowerManagerTests, TowerManagerSaveTests: stations.json); the
@@ -197,6 +198,9 @@ tools/                                # asset generators: models, animation clip
                                       #   bulkier, empty handed: its dagger is the held item) .bbmodels (rigs from proportions,
                                       #   shared clips) and palette skins, and the bone sprite, on the hell script's machinery;
                                       #   --check
+  generate-chest-textures.py          # deterministic placeholder chest art: one 128 x 128 skin per chest variant for the
+                                      #   shared chest.bbmodel (textures/chests/) and the static twin's front/side/top tiles
+                                      #   cut from the same faces; stdlib PNG writer; listed in USER_TODO.md; --check
   generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout), skeleton_pile and
                                       #   tower_altar_top tiles, stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
   generate-critter-models.py          # deterministic dragonfly, crow and deer .bbmodels (their own bone sets around the

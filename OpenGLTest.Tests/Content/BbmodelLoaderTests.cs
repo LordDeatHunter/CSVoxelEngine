@@ -340,6 +340,19 @@ public sealed class BbmodelLoaderTests
     }
 
     [Fact]
+    public void AFaceWhoseTextureWasClearedIsLeftOutOfTheCube()
+    {
+        // Blockbench writes "texture": null for a face the author cleared (a wall's side against its neighbor)
+        var root = JsonNode.Parse(MinimalModel())!;
+        root["elements"]![0]!["faces"]!["north"]!["texture"] = null;
+        var data = BbmodelLoader.Parse(root.ToJsonString(), Path, _ => throw new NotSupportedException());
+
+        var cube = Assert.Single(data.Parts[BbmodelLoader.RequiredParts[0]].Cubes);
+        Assert.Null(cube.Faces[0]);
+        Assert.NotNull(cube.Faces[4]);
+    }
+
+    [Fact]
     public void MissingGroupNamesTheFile()
     {
         var json = MinimalModel().Replace("\"UpperArmL\"", "\"ArmTypo\"");
