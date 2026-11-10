@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -182,6 +183,55 @@ public sealed class BbmodelLoaderTests
 
     private static BbmodelData ParseEntity(string json) =>
         BbmodelLoader.Parse(json, Path, _ => [], Array.Empty<string>());
+
+    /// <summary>
+    /// The same model as Blockbench 5 saves it after opening the 4.0 file: format 5.0, every group's name
+    /// and origin moved from its outliner node into the root <c>groups</c> array, and each bone keyframe
+    /// with its rotation x and y and its position x negated.
+    /// </summary>
+    private static string ResavedByBlockbench5(string json)
+    {
+        var root = JsonNode.Parse(json)!.AsObject();
+        root["meta"]!["format_version"] = "5.0";
+
+        var groups = new JsonArray();
+        void Hoist(JsonArray nodes)
+        {
+            foreach (var node in nodes)
+            {
+                if (node is not JsonObject group) continue;
+                groups.Add(new JsonObject
+                {
+                    ["name"] = group["name"]!.DeepClone(),
+                    ["uuid"] = group["uuid"]!.DeepClone(),
+                    ["origin"] = group["origin"]!.DeepClone(),
+                    ["rotation"] = new JsonArray(0, 0, 0),
+                });
+                group.Remove("name");
+                group.Remove("origin");
+                Hoist(group["children"]!.AsArray());
+            }
+        }
+        Hoist(root["outliner"]!.AsArray());
+        root["groups"] = groups;
+
+        foreach (var animation in root["animations"]!.AsArray())
+        foreach (var (_, animator) in animation!["animators"]!.AsObject())
+        {
+            if (animator!["type"]!.GetValue<string>() != "bone") continue;
+            foreach (var key in animator["keyframes"]!.AsArray())
+            {
+                var point = key!["data_points"]![0]!.AsObject();
+                var channel = key["channel"]!.GetValue<string>();
+                if (channel is "rotation" or "position") point["x"] = Negated(point["x"]!);
+                if (channel == "rotation") point["y"] = Negated(point["y"]!);
+            }
+        }
+        return root.ToJsonString();
+    }
+
+    private static string Negated(JsonNode value) =>
+        (-float.Parse(value.GetValue<string>(), CultureInfo.InvariantCulture)).ToString(CultureInfo.InvariantCulture);
 
     private static byte[] TestPng()
     {
@@ -377,6 +427,30 @@ public sealed class BbmodelLoaderTests
         var data = ParseEntity(AnimatedModel(new JsonArray(Key("position", 0, "16", "16", "0"))));
         var moved = data.Animations[0].Sample("Torso", 0f).Translation;
         Assert.True(Vector3.Distance(new Vector3(-1f, 1f, 0f), moved) < 1e-5f, $"got {moved}");
+    }
+
+    [Fact]
+    public void ABlockbench5ResaveReadsAsTheSameRigAndClip()
+    {
+        // Opening a file in Blockbench 5 and saving it moves the group data and flips the stored keyframe
+        // signs; in the engine it must still be the same rig posing the same way.
+        var keys = new JsonArray(
+            Key("rotation", 0, "0", "0", "0"),
+            Key("rotation", 0.5, "-30", "20", "10", "catmullrom"),
+            Key("position", 0, "16", "8", "-4"));
+        var original = ParseEntity(AnimatedModel(keys));
+        var resaved = ParseEntity(ResavedByBlockbench5(AnimatedModel(keys.DeepClone().AsArray())));
+
+        Assert.Equal(original.Parts.Keys.Order(), resaved.Parts.Keys.Order());
+        foreach (var (name, part) in original.Parts)
+        {
+            Assert.Equal(part.Pivot, resaved.Parts[name].Pivot);
+            Assert.Equal(part.Parent, resaved.Parts[name].Parent);
+            Assert.Equal(part.Cubes.Count, resaved.Parts[name].Cubes.Count);
+        }
+
+        foreach (var time in new[] { 0f, 0.25f, 0.5f })
+            Assert.Equal(original.Animations[0].Sample("Torso", time), resaved.Animations[0].Sample("Torso", time));
     }
 
     [Fact]

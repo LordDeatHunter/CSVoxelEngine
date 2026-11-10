@@ -1,0 +1,6 @@
+{
+  "name": "Dire Boar",
+  // The rarer, oversized boar (a miniboss), authored in Blockbench: model, rig and clips only so far
+  "hp": 160,
+  "model": "assets/models/entity/dire_boar.bbmodel"
+}

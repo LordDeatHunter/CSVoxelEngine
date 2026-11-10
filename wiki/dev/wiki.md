@@ -22,7 +22,7 @@ The tree pages replay data from `OpenGLTest.WikiExport`, a small headless consol
 
 - **Blocks** are built from the resolved model elements with nearest-neighbor textures.
 - **Items** are the sprite extruded into a thin slab of voxels.
-- **Mobs** load the real `.bbmodel` (cubes, nested groups, per-face UVs) and play its clips with the engine's sign convention: rotation (x, y, z) in degrees becomes Euler (-x, -y, z) applied X first, and position (x, y, z) in pixels becomes (-x, y, z) / 16 blocks.
+- **Mobs** load the real `.bbmodel` (cubes, nested groups, per-face UVs) and play its clips with the engine's sign convention: rotation (x, y, z) in degrees becomes Euler (-x, -y, z) applied X first, and position (x, y, z) in pixels becomes (-x, y, z) / 16 blocks. A model saved by Blockbench 5 (format 5.0) stores those signs already flipped, keeps its group data in a root `groups` array and embeds its skin; the viewer reads both layouts.
 
 Blocks whose shape depends on placement (panes, fluids, tree wood and others) show a representative shape.
 

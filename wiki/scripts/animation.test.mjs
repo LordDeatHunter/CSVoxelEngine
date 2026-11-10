@@ -1,6 +1,19 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sample, rotationToEuler, positionToBlocks, clipTime, parsePoint, sheetFrame, sheetStyle } from '../.vitepress/theme/animation.ts'
+import { sample, rotationToEuler, positionToBlocks, clipTime, parsePoint, sheetFrame, sheetStyle, keyValue, storesPreviewSigns } from '../.vitepress/theme/animation.ts'
+
+test('a Blockbench 5 re-save of a key poses like the 4.x original', () => {
+  const old = { meta: { format_version: '4.0' } }
+  const resaved = { meta: { format_version: '5.0' } }
+  assert.equal(storesPreviewSigns(old), false)
+  assert.equal(storesPreviewSigns({}), false)
+  // Blockbench 5 negates rotation x and y and position x when it opens the older file, and saves those.
+  assert.deepEqual(keyValue('rotation', { x: '30', y: '-20', z: '10' }, storesPreviewSigns(resaved)),
+    keyValue('rotation', { x: '-30', y: '20', z: '10' }, storesPreviewSigns(old)))
+  assert.deepEqual(keyValue('position', { x: '-16', y: '8', z: '4' }, storesPreviewSigns(resaved)),
+    keyValue('position', { x: '16', y: '8', z: '4' }, storesPreviewSigns(old)))
+  assert.deepEqual(keyValue('scale', { x: '2', y: '2', z: '2' }, true), [2, 2, 2])
+})
 
 test('rotation follows the engine sign convention: x and y negate, z keeps its sign', () => {
   const [x, y, z] = rotationToEuler([90, 90, 90])

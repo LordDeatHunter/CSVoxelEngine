@@ -1,6 +1,6 @@
 // three.js scene builders for the wiki's ModelViewer: blocks (resolved model elements), items (extruded
 // sprite) and entities (.bbmodel with animation clips). three is imported lazily so SSR never loads it.
-import { clipTime, parsePoint, positionToBlocks, rotationToEuler, sample, sheetFrame, type Key, type Sheet, type Vec3 } from './animation.ts'
+import { clipTime, keyValue, positionToBlocks, rotationToEuler, sample, sheetFrame, storesPreviewSigns, type Key, type Sheet, type Vec3 } from './animation.ts'
 
 type THREE = typeof import('three')
 
@@ -289,8 +289,11 @@ interface Clip { name: string; loop: string; length: number; tracks: { bone: str
 
 /** The entity model as a bone hierarchy in block units (feet at the origin); bones are recorded by name in <bones>. */
 export async function entityRoot(T: THREE, model: any, modelFile: string, base: string, bones: Map<string, { node: any; rest: Vec3 }>) {
-  const texInfo = model.textures?.[0]
-  const tex = await loadTexture(T, `${base}/models/entity/${texInfo?.source ?? modelFile.replace('.bbmodel', '.png')}`)
+  // A file saved by Blockbench embeds its skin as a data URL; a generated one names the PNG beside it.
+  const source: string = model.textures?.[0]?.source ?? modelFile.replace('.bbmodel', '.png')
+  const tex = await loadTexture(T, source.startsWith('data:') ? source : `${base}/models/entity/${source}`)
+  // Blockbench 5 keeps a group's name and origin in the root 'groups' array, an older file in the outliner node.
+  const groups = new Map<string, any>((model.groups ?? []).map((g: any) => [g.uuid, g]))
   const material = lit(T, tex)
   const rw = model.resolution?.width ?? 64
   const rh = model.resolution?.height ?? 64
@@ -319,12 +322,13 @@ export async function entityRoot(T: THREE, model: any, modelFile: string, base: 
         parent.add(new T.Mesh(g, material))
         continue
       }
-      const origin = n.origin as Vec3
+      const info = n.origin ? n : groups.get(n.uuid) ?? n
+      const origin = info.origin as Vec3
       const node = new T.Group()
       const rest: Vec3 = [(origin[0] - parentOrigin[0]) / 16, (origin[1] - parentOrigin[1]) / 16, (origin[2] - parentOrigin[2]) / 16]
       node.position.set(...rest)
       parent.add(node)
-      bones.set(n.name, { node, rest })
+      bones.set(info.name, { node, rest })
       build(n.children ?? [], node, origin)
     }
   }
@@ -340,13 +344,14 @@ export async function buildEntity(host: HTMLElement, modelFile: string, base: st
   let paused = false
   let loopOverride: boolean | null = null
   const bones = new Map<string, { node: any; rest: Vec3 }>()
+  const previewSigns = storesPreviewSigns(model)
   const clips: Clip[] = (model.animations ?? []).map((a: any) => ({
     name: a.name, loop: a.loop ?? 'once', length: a.length ?? 0,
     tracks: Object.values<any>(a.animators ?? {}).filter((an) => an.type === 'bone' || an.keyframes).flatMap((an) =>
       (['rotation', 'position', 'scale'] as const).map((channel) => ({
         bone: an.name, channel,
         keys: (an.keyframes ?? []).filter((k: any) => k.channel === channel)
-          .map((k: any) => ({ time: k.time, value: parsePoint(k.data_points[0]), interpolation: k.interpolation ?? 'linear' }))
+          .map((k: any) => ({ time: k.time, value: keyValue(channel, k.data_points[0], previewSigns), interpolation: k.interpolation ?? 'linear' }))
           .sort((p: Key, q: Key) => p.time - q.time)
       })).filter((t) => t.keys.length)
     )

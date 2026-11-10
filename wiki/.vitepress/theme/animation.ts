@@ -1,6 +1,8 @@
 // Pure Blockbench animation math (no three.js): keyframe sampling and the engine's sign convention.
 // Convention (see BbmodelLoader.ReadAnimations in the game): rotation degrees (x, y, z) become Euler
 // (-x, -y, z) applied X first, then Y, then Z; position pixels (x, y, z) become (-x, y, z) / 16 blocks.
+// That is how files up to format 4.x store their keys. Blockbench 5 saves them with rotation x and y and
+// position x already negated (meta.format_version 5.0), so keyValue turns those back into the 4.x form.
 
 export type Vec3 = [number, number, number]
 export interface Key { time: number; value: Vec3; interpolation: string }
@@ -11,6 +13,19 @@ export function parsePoint(p: { x: unknown; y: unknown; z: unknown }): Vec3 {
     return Number.isFinite(f) ? f : 0
   }
   return [n(p.x), n(p.y), n(p.z)]
+}
+
+/** True for a model saved by Blockbench 5 or later, whose keyframes carry the signs its preview applies. */
+export function storesPreviewSigns(model: { meta?: { format_version?: unknown } }): boolean {
+  return parseInt(String(model.meta?.format_version ?? ''), 10) >= 5
+}
+
+/** A keyframe's value in the 4.x convention the functions below take, whichever Blockbench saved the file. */
+export function keyValue(channel: string, point: { x: unknown; y: unknown; z: unknown }, previewSigns: boolean): Vec3 {
+  const [x, y, z] = parsePoint(point)
+  if (!previewSigns) return [x, y, z]
+  if (channel === 'rotation') return [-x, -y, z]
+  return channel === 'position' ? [-x, y, z] : [x, y, z]
 }
 
 /** Engine Euler radians (x, y, z), to be applied in three.js order 'ZYX' (X first). */

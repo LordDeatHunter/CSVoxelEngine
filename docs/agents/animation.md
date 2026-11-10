@@ -29,6 +29,13 @@ taken from Blockbench's `BoneAnimator.displayRotation`/`displayPosition`:
 - Scale is unchanged.
 - +X is the model's right (`ArmR`) and -Z its front, so a Blockbench author types a **negative** x to
   raise a hanging arm forward.
+- **Blockbench 5 files.** The lines above are how a file up to format 4.x stores its keys (every generated
+  model). Blockbench 5 applies a Generic model's keys as stored: opening an older file it negates rotation
+  x and y and position x, and it saves `meta.format_version` 5.0 with those values, which are the engine's
+  own, so `StoresPreviewSigns` reads such a file without the flip (there a **positive** x raises a hanging
+  arm forward). A 5.x file also keeps each group's name, origin and rotation in a root `groups` array and
+  only its uuid and children in the outliner (`GroupData` reads either layout), and embeds its skin as a
+  data URL. `boar.bbmodel` and `dire_boar.bbmodel` are such files, saved from Blockbench itself.
 If a clip ever plays mirrored, fix the loader, never the clips.
 
 **`EntityAnimator`** (one per entity, GL-free, no per-frame allocation) has two layers:
