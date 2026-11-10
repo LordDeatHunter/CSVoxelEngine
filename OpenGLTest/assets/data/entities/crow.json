@@ -2,5 +2,6 @@
   "name": "Crow",
   // A pest that flies in flocks, swoops at players and lands to strut and caw (Crow, WildlifeConfig)
   "hp": 8,
+  "loot": "crow",
   "model": "assets/models/entity/crow.bbmodel"
 }

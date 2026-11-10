@@ -325,6 +325,11 @@ debugger take a new species from it instead of naming it; adding one means a cla
   clip's `impact` whoever is in `InGoreReach` (billed by the manager, never an immune target). Its anger lasts
   `BoarAngerSeconds` past its last sight of the target. The dire boar is the same class oversized and is provoked
   by anyone it notices within `DireBoarNoticeRangeBlocks`.
+- **Drops.** Each species has a loot table of its own name (`WildlifeDropTests`): raw venison and hide from the
+  deer; raw boar meat, hide and sometimes a tusk from the boar; a pile of all three plus its trophy `dire_tusk`
+  from the dire boar; feathers from the crow; a wing from the dragonfly. The meats cook on a campfire into food
+  that heals (`heals`), a hide makes leather gear with fewer units than cotton (`recipes/leather_*_from_hide.json`),
+  a feather fletches six arrows where a bone makes four, and a tusk splits into bone.
 - **Health bars.** An animal shows its bar only once hurt (`Animal.ShowsHealthbar`); a provoked boar and the dire
   boar always do.
 - **Network and saves.** One `NetEntityKind` per species from `Deer` on (`NetEntity.KindOf` / `TryGetWildlife`,

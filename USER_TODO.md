@@ -42,6 +42,11 @@ body wears.
 ### Consumables
 
 - [ ] **Mana draught** — `mana_draught.png`.
+- [ ] **Wildlife drops** — `raw_venison.png`, `cooked_venison.png`, `raw_boar_meat.png`, `cooked_boar_meat.png`,
+  `hide.png`, `crow_feather.png`, `boar_tusk.png`, `dire_tusk.png`, `dragonfly_wing.png` (32x32, drawn at half
+  resolution, small palettes; the wing's film is half transparent). Made by
+  `tools/generate-wildlife-item-sprites.py`: replace them by editing that generator (or remove it in the same
+  change), or a re-run puts the placeholders back.
 - [ ] **Teaching scrolls** — `scroll_fire_projectile.png`, `scroll_frost.png`,
   `scroll_modifiers.png`, `scroll_nature.png`, `scroll_self.png`. Keep them readable at hotbar
   size and distinct from one another.

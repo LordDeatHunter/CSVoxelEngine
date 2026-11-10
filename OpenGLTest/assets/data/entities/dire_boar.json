@@ -2,5 +2,6 @@
   "name": "Dire Boar",
   // The rare, oversized boar (a miniboss), angry at anyone it notices (Boar with dire set, WildlifeConfig)
   "hp": 160,
+  "loot": "dire_boar",
   "model": "assets/models/entity/dire_boar.bbmodel"
 }

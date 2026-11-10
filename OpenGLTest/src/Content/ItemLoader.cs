@@ -45,6 +45,7 @@ internal static class ItemLoader
             };
             var teaches = ParseTeaches(definition, action, path);
             var restoresMana = ParseRestoresMana(definition, action, path);
+            var heals = ParseHeals(definition, action, path);
 
             var durability = definition.Durability ?? 0;
             if (durability < 0 || durability > 1000)
@@ -182,6 +183,7 @@ internal static class ItemLoader
                 StaffTags: staff?.Tags,
                 Teaches: teaches,
                 RestoresMana: restoresMana,
+                Heals: heals,
                 Rarity: rarity,
                 Equip: equip,
                 Shrapnel: shrapnel));
@@ -432,6 +434,25 @@ internal static class ItemLoader
         if (share is not { } value || !float.IsFinite(value) || value <= 0f || value > 1f)
             throw new InvalidOperationException(
                 $"Item '{path}' has use.action 'restore_mana' without a restoresMana share in (0, 1].");
+        return value;
+    }
+
+    /// <summary>
+    /// The health a heal item restores: its <c>heals</c>, or the bandage's amount when it declares none; 0 for
+    /// an item that does not heal. <c>heals</c> belongs only to <c>use.action: "heal"</c> and must be 1 or more.
+    /// </summary>
+    internal static int ParseHeals(ItemDefinition definition, ItemUseAction action, string path)
+    {
+        var heals = definition.Heals;
+        if (action != ItemUseAction.Heal)
+        {
+            if (heals != null)
+                throw new InvalidOperationException($"Item '{path}' has heals but its use.action is not heal.");
+            return 0;
+        }
+        if (heals is not { } value) return PlayerConfig.BandageHealAmount;
+        if (value < 1)
+            throw new InvalidOperationException($"Item '{path}' has heals {value}; expected 1 or more.");
         return value;
     }
 

@@ -217,6 +217,12 @@ public sealed class ItemDefinition
     public float? RestoresMana { get; set; }
 
     /// <summary>
+    /// The health one use restores, 1 or more; only legal with <c>use.action: "heal"</c>, where leaving it
+    /// out heals the bandage's amount (<c>PlayerConfig.BandageHealAmount</c>).
+    /// </summary>
+    public int? Heals { get; set; }
+
+    /// <summary>
     /// Optional <c>block/&lt;name&gt;</c> model under <c>assets/models</c>, baked into
     /// <see cref="Item.BakedModel"/> so the item can be drawn as real 3D geometry while it
     /// sits inside a station (a crucible standing in a kiln's hearth). The sprite stays the

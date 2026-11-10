@@ -1,0 +1,5 @@
+{
+  // A giant dragonfly's wing; nothing consumes it yet. The sprite is placeholder art.
+  "name": "Dragonfly Wing",
+  "texture": "assets/textures/items/dragonfly_wing.png"
+}

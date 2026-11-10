@@ -2,5 +2,6 @@
   "name": "Dragonfly",
   // A man-sized hunter of the waterside that darts in to bite and perches on the ground (Dragonfly, WildlifeConfig)
   "hp": 36,
+  "loot": "dragonfly",
   "model": "assets/models/entity/dragonfly.bbmodel"
 }

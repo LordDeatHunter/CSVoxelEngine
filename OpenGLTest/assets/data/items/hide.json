@@ -1,0 +1,6 @@
+{
+  // A deer's or a boar's pelt: leather gear takes fewer hides than cotton (recipes/leather_*_from_hide.json).
+  // The sprite is placeholder art.
+  "name": "Hide",
+  "texture": "assets/textures/items/hide.png"
+}

@@ -1,4 +1,7 @@
+using System;
+using System.Linq;
 using VoxelEngine.Content.Blocks;
+using VoxelEngine.Content.Definitions;
 using VoxelEngine.Items;
 using VoxelEngine.Player;
 using Xunit;
@@ -38,6 +41,39 @@ public sealed class HealItemTests
         Assert.False(result.Applied);
         Assert.Equal(PlayerHealth.MaxHealth, world.Health);
         Assert.Equal(0, world.Consumed);
+    }
+
+    [Fact]
+    public void AHealItemHealsItsOwnAmountAndOneWithoutTakesTheBandages()
+    {
+        // Every shipped heal item restores exactly what it declares (or the bandage's amount with none)
+        var healers = ItemRegistry.All.OfType<HealItem>().ToArray();
+        Assert.Contains(healers, h => h.Heals != PlayerConfig.BandageHealAmount);
+        foreach (var item in healers)
+        {
+            var world = new StubItemUseWorld { Health = 1 };
+            Assert.True(item.OnUse(new ItemUseContext(world, 4f, 0), null).Applied);
+            Assert.Equal(1 + item.Heals, world.Health);
+            Assert.Equal(1, world.Consumed);
+        }
+        Assert.Equal(PlayerConfig.BandageHealAmount, Assert.IsType<HealItem>(ContentRegistry.RequireItem("bandage")).Heals);
+    }
+
+    [Fact]
+    public void HealsBelongsToAHealItemAndMustBePositive()
+    {
+        const string path = "assets/data/items/broken.json";
+        var onANonHealer = new ItemDefinition { Heals = 5 };
+        var error = Assert.Throws<InvalidOperationException>(() => ItemLoader.ParseHeals(onANonHealer, ItemUseAction.None, path));
+        Assert.Contains(path, error.Message);
+
+        var zero = new ItemDefinition { Heals = 0 };
+        error = Assert.Throws<InvalidOperationException>(() => ItemLoader.ParseHeals(zero, ItemUseAction.Heal, path));
+        Assert.Contains(path, error.Message);
+
+        Assert.Equal(0, ItemLoader.ParseHeals(new ItemDefinition(), ItemUseAction.None, path));
+        Assert.Equal(PlayerConfig.BandageHealAmount, ItemLoader.ParseHeals(new ItemDefinition(), ItemUseAction.Heal, path));
+        Assert.Equal(7, ItemLoader.ParseHeals(new ItemDefinition { Heals = 7 }, ItemUseAction.Heal, path));
     }
 
     [Fact]

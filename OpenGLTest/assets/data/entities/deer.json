@@ -2,5 +2,6 @@
   "name": "Deer",
   // A shy grazer that watches from afar and bolts from anyone who comes close (Deer, WildlifeConfig)
   "hp": 20,
+  "loot": "deer",
   "model": "assets/models/entity/deer.bbmodel"
 }

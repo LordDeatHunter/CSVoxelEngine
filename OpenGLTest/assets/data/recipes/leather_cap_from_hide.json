@@ -1,0 +1,8 @@
+{
+  // The same piece as leather_cap.json from hide, which goes further than cotton.
+  "result": "item/leather_cap",
+  "count": 1,
+  "ingredients": [
+    { "item": "item/hide", "count": 2 }
+  ]
+}

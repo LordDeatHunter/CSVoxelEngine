@@ -58,6 +58,7 @@ public static class ItemFactory
         IReadOnlySet<string>? StaffTags = null,
         IReadOnlyList<string>? Teaches = null,
         float RestoresMana = 0f,
+        int Heals = 0,
         Rarity Rarity = Rarity.Common,
         GearInfo? Equip = null,
         ShrapnelProfile? Shrapnel = null);
