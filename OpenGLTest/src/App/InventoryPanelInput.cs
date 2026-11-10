@@ -9,6 +9,7 @@ using VoxelEngine.Networking.Client;
 using VoxelEngine.Platform;
 using VoxelEngine.Rendering;
 using VoxelEngine.Simulation.Chests;
+using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
@@ -188,6 +189,7 @@ internal sealed class InventoryPanelInput
     {
         // Only a playing world has a panel; while loading, SuppressLook belongs to the World
         if (ActiveWorld is not { IsPlaying: true }) return;
+        var opening = open && !inventoryView.IsOpen;
         inventoryView.IsOpen = open;
         if (!open)
         {
@@ -200,6 +202,9 @@ internal sealed class InventoryPanelInput
         }
         ActiveWorld.Camera.SuppressLook = open;
         inputManager.Mouse?.Cursor.CursorMode = open ? CursorMode.Normal : CursorMode.Disabled;
+        // The released cursor would reappear wherever it was last, maybe over a list row: start it mid-screen
+        if (opening && inputManager.Mouse is { } mouse)
+            mouse.Position = UiCanvas.CanvasToWindow(renderManager.Ui.ScreenSize / 2f, renderManager.Ui.Scale);
     }
 
     /// <summary>Number of list rows the given panel tab shows this frame. In creative the
