@@ -131,7 +131,7 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   band, every `SkeletonPileWaveSeconds`, for `SkeletonPileWaves` waves, then it is depleted. A pile never raises past `TowerDifficulty.PileNearLimit(k)` living skeletons within
   `SkeletonPileNearRadiusBlocks` of it (`SkeletonManager.LivingCountNear`; `SkeletonPileNearLimitBase` 5 on floor 0, plus
   `SkeletonPileNearLimitPerTier` 2 per floor): a wave is trimmed to the room left and waits for kills when there is none, and
-  owed respawns obey the same limit. A wave counts only if one
+  owed respawns obey the same limit. **Opening a chest alarms the nearby piles** (`TowerManager.AlarmPilesNear`, called where the chest opens: `ChestInput.Open` in singleplayer, `ChestSessions.OnOpen` on the server): every pile with a wave left on the chest's awake floor within `SkeletonChestAlarmBlocks` is `PileState.Alarmed` (never saved) and raises its next wave at once, ignoring its trigger range, its cooldown and the near limit (only the hard cap still holds). A wave counts only if one
   skeleton rose (the near limit and the hard cap keep it for later). A pile in an unloaded chunk freezes; a loaded cell without the pile
   block counts as depleted.
 - **Bound skeletons are never immortal.** Each raised skeleton is tagged with its `TowerFloorRef`. It despawns like any
