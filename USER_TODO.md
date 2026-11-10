@@ -88,7 +88,6 @@ The shard, `vulcanite_ingot.png` (refined vulcanite), `vulcanite_pickaxe.png` an
 committed art and not listed. The sword head and the sword are 42x42 like iron's; the other heads 32x32.
 
 - [ ] **Vulcanite tool heads** — `vulcanite_pickaxe_head.png`, `vulcanite_axe_head.png`, `vulcanite_sword_head.png`.
-- [ ] **Vulcanite sword** — `vulcanite_sword.png`. Keep the sword silhouette and the 42x42 canvas.
 
 ## Blocks
 

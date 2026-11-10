@@ -3,7 +3,6 @@
 Writes, under OpenGLTest/assets/textures/items:
   vulcanite_pickaxe_head.png, vulcanite_axe_head.png,
   vulcanite_sword_head.png                                  from the iron heads
-  vulcanite_sword.png                                       from iron_sword.png
 
 Each is a palette swap of its iron sprite, never noise: the iron's cool gray metal pixels (blue at or over red) are
 repainted with the six shades of the user-authored vulcanite_shard.png, picked by the source shade's luminance rank
@@ -31,7 +30,6 @@ SPRITES = (
     ("vulcanite_pickaxe_head", "iron_pickaxe_head"),
     ("vulcanite_axe_head", "iron_axe_head"),
     ("vulcanite_sword_head", "iron_sword_head"),
-    ("vulcanite_sword", "iron_sword"),
 )
 
 

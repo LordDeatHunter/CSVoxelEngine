@@ -198,7 +198,7 @@ public sealed class MiningTests
         Assert.True(Mining.BlockDamage(vulcanite) > Mining.BlockDamage(iron));
         Assert.True(vulcanite.EntityDamage > iron.EntityDamage);
         Assert.True(ItemOf("vulcanite_axe").ToolPower > ItemOf("iron_axe").ToolPower);
-        Assert.True(ItemOf("vulcanite_sword").EntityDamage > ItemOf("iron_sword").EntityDamage);
+        Assert.True(ItemOf("bleeding_edge").EntityDamage > ItemOf("iron_sword").EntityDamage);
 
         // The tier above iron only widens the gate, over every block
         foreach (var block in BlockType.Types.Values.Where(block => Mining.CanMine(block.Id, iron)))
