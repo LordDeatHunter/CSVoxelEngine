@@ -70,6 +70,7 @@ public static class WorldSeed
         MalachiteGenerator.Reseed();
         HematiteGenerator.Reseed();
         TinGenerator.Reseed();
+        VulcaniteGenerator.Reseed();
         BarrierGenerator.Reseed();
         HellGenerator.Reseed();
         HellBiomes.Reseed();

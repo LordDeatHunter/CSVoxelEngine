@@ -10,7 +10,7 @@ namespace VoxelEngine.Tests.Content;
 /// The iron chain as relations, so retuning a recipe can never strand the player: ore is smelted by the bloomery into
 /// what the anvil takes, the anvil makes the iron its forge recipes take (and no crafting recipe does), and the anvil
 /// and its hammer can be had without any iron (the bootstrap), so every piece of iron gear is reachable from the raw
-/// world.
+/// world. The same anvil works vulcanite: its ore drops shards the anvil refines before it forges anything of them.
 /// </summary>
 public sealed class IronChainTests
 {
@@ -50,7 +50,7 @@ public sealed class IronChainTests
     }
 
     [Fact]
-    public void EveryForgeRecipeOfWroughtIronIsReachableFromTheRawWorld()
+    public void EveryForgeRecipeIsReachableFromTheRawWorld()
     {
         var anvil = AnvilBlock;
         var wrought = anvil.Anvil!.ResultId;
@@ -92,13 +92,45 @@ public sealed class IronChainTests
         }
 
         Assert.Contains(wrought, obtainable);
-        var forged = ContentRegistry.ForgeRecipes.Where(r => r.MetalId == wrought).ToList();
-        Assert.NotEmpty(forged);
+        Assert.Contains(ContentRegistry.ForgeRecipes, r => r.MetalId == wrought);
+        // Every metal's recipes, wrought iron's and the vulcanite chain's alike
+        var forged = ContentRegistry.ForgeRecipes;
         Assert.All(forged, r => Assert.True(obtainable.Contains(r.ResultId),
-            $"{r.Name} forges wrought iron but cannot be reached"));
+            $"{r.Name} is a forge recipe but cannot be reached"));
         // ...and so is everything crafted from what the anvil forges (the hafted tools)
         Assert.All(ContentRegistry.CraftingRecipes.Where(r => r.Ingredients.Any(i => forged.Any(f => i.Accepts(f.ResultId)))),
             r => Assert.True(obtainable.Contains(r.ResultId), $"{r.Name} needs a forged part but cannot be reached"));
+    }
+
+    [Fact]
+    public void VulcaniteOreDropsShardsTheAnvilRefinesBeforeItForgesAnythingOfThem()
+    {
+        var ore = ContentRegistry.RequireBlock("vulcanite_ore");
+        var shards = ore.LootTable.AllEntries()
+            .Where(e => e.Nested == null && !e.IsEmpty && ContentRegistry.IsForgeMetal(e.Item))
+            .Select(e => e.Item).Distinct().ToList();
+        Assert.NotEmpty(shards);
+
+        foreach (var shard in shards)
+        {
+            // Only mined: no recipe makes a shard
+            Assert.Null(ContentRegistry.RecipeForResult(shard));
+            Assert.Null(ContentRegistry.ForgeRecipeForResult(shard));
+
+            // The shard forges nothing but a refined metal, and the refined metal forges the parts
+            var refining = ContentRegistry.ForgeRecipes.Where(r => r.MetalId == shard).ToList();
+            Assert.NotEmpty(refining);
+            Assert.All(refining, r => Assert.True(ContentRegistry.IsForgeMetal(r.ResultId),
+                $"{r.Name} forges shards straight into a part"));
+            var parts = ContentRegistry.ForgeRecipes.Where(r => refining.Any(f => f.ResultId == r.MetalId)).ToList();
+            Assert.NotEmpty(parts);
+
+            // Every part is hafted into a tool, and no crafting recipe takes the shard or the refined metal
+            Assert.All(parts, p => Assert.Contains(ContentRegistry.CraftingRecipes,
+                c => c.Ingredients.Any(i => i.Accepts(p.ResultId))));
+            Assert.DoesNotContain(ContentRegistry.CraftingRecipes, c => c.Ingredients.Any(
+                i => i.Accepts(shard) || refining.Any(f => i.Accepts(f.ResultId))));
+        }
     }
 
     [Fact]

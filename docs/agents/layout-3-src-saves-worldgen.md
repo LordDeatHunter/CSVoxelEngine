@@ -473,6 +473,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
           GravelPocketGenerator.cs # gravel and sand pockets buried in stone (falls blocks, see "Gravel pockets"),
                                    #   thresholding the OreNoiseLattice field inside the burial band
           TinGenerator.cs      # tin ore veins: commoner than malachite, in the TinMinY..TinMaxY world-Y band, on the OreNoiseLattice field of its own noise (seed offset 144)
+          VulcaniteGenerator.cs # vulcanite ore veins over basalt only (the barrier band, the Magma Caverns), denser by the lava
+                                #   (LavaProximity lowers the OreNoiseLattice threshold; seed offset 186)
         HematiteGenerator.cs # hematite (iron) ore veins: deep stone only, at or below HematiteMaxY (the lava
                                #   band), rarer than malachite, on the OreNoiseLattice field of its own noise
           HotSpringGenerator.cs # steaming cave water bodies

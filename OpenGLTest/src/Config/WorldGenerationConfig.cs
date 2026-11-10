@@ -419,6 +419,22 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     public const int TinMinY = -96;
     public const int TinMaxY = 64;
 
+    // --- Vulcanite ore (VulcaniteGenerator) ---
+    // The tier above iron: the same OreNoiseLattice deposits on a noise of its own (seed offset 186), hosted
+    // by basalt alone (the barrier band and the Magma Caverns' skin), so nothing is written above BarrierTopY.
+    // The threshold is the far-from-lava one, which almost no blend passes; near lava it drops by up to
+    // VulcaniteNearLavaShift, scaled by VulcaniteGenerator.LavaProximity (1 at the lava, 0 out of reach), so
+    // the veins gather at the pools (measured relationally in VulcaniteTests). First guesses.
+    public const bool VulcaniteEnabled = true;
+    public const float VulcaniteFrequency = 1f / 14f;
+    public const float VulcaniteThreshold = 0.93f;
+    public const float VulcaniteNearLavaShift = -0.11f;
+    // Hell: rows above the layer's lava level over which the proximity falls linearly from 1 to 0
+    public const int VulcaniteLavaReachBlocks = 12;
+    // The barrier band: how far (in LavaGenerator patch-noise units) under LavaPatchThreshold the proximity
+    // starts to rise, reaching 1 at a lava patch's edge and staying 1 inside it, where the deep pockets pond
+    public const float VulcanitePatchMargin = 0.15f;
+
     // --- Forest terrain shape (smooth rolling hills with flat valleys between them) ---
     // The floor is a broad swell plus a positive-only hill field gated by a low-frequency
     // hill-region mask, so hill masses rise in patches and flat valleys run between them instead

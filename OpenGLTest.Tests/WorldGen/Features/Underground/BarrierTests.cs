@@ -73,10 +73,12 @@ public sealed class BarrierTests
         BarrierGenerator.Stamp(blocks, 48, coreFloor, -16);
         Assert.All(blocks, b => Assert.Equal(BarrierGenerator.BarrierBlock, b));
 
-        // And a real generated chunk there, caves and all
+        // And a real generated chunk there, caves and all: barrier, or the vulcanite veined into it, which the same
+        // pickaxe gate holds (VulcaniteTests, MiningTests)
         var chunk = new Chunk(null!, new Vector3(3, coreFloor >> Chunk.SizeShift, -2), generateBlockData: false);
         ChunkTerrainFill.GenerateBlockData(chunk);
-        Assert.All(chunk.Storage.ToDense(), b => Assert.Equal(BarrierGenerator.BarrierBlock, b));
+        Assert.All(chunk.Storage.ToDense(),
+            b => Assert.True(b == BarrierGenerator.BarrierBlock || b == VulcaniteGenerator.OreBlock, $"block {b} in the core"));
     }
 
     [Fact]
@@ -192,7 +194,8 @@ public sealed class BarrierTests
             {
                 var block = chunk.GetLocalBlock(x, y, z);
                 var field = BarrierGenerator.IsBarrier(cx * Chunk.Size + x, chunk.LowerBoundY + y, Chunk.Size + z);
-                if (block == BarrierGenerator.BarrierBlock)
+                // Vulcanite veins only the barrier's own basalt (VulcaniteTests)
+                if (block == BarrierGenerator.BarrierBlock || block == VulcaniteGenerator.OreBlock)
                     Assert.True(field, $"barrier off the field at {x},{y},{z} of chunk y {cy}");
                 else if (field)
                     Assert.False(BarrierGenerator.IsHost(block), $"a host cell on the field was left at {x},{y},{z}");

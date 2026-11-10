@@ -1,0 +1,11 @@
+{
+  // Vulcanite veins in basalt (VulcaniteGenerator): the barrier band and the Magma Caverns, richest by the lava.
+  // Harder than the basalt around it and gated like it, so only the iron pickaxe and up dig it. Tile is committed art.
+  "name": "Vulcanite Ore",
+  "model": { "parent": "block/cube_all", "textures": { "all": "vulcanite_ore" } },
+  "material": { "metallic": 0.35, "roughness": 0.35, "normalStrength": 1.0 },
+  "sfx": "hit_rock",
+  "hardness": 60,
+  "requiresTool": true,
+  "tools": { "pickaxe": 3 }
+}

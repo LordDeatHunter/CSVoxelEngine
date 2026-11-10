@@ -640,8 +640,9 @@ Noise seed offsets: ReliefNoise 153, MountainSpineNoise 154, MountainRangeCellWa
   SkyLandmasses warp 175 and 176, hills 177 (3 octaves), keel 178 (the sky landmasses),
   CaveBiomes echo drift 179, deep drift 180, selector 181 (2 octaves; 3D, the cave biomes; plans/CAVE_BIOMES.md),
   NoiseCaves.ShapeScale 182 (3D, the cave sub-biomes' shape scale, NoiseCaves' ninth channel),
-  CaveOres amethyst 183, jade 184, cinnabar 185 (3D, the cave biome exclusive ores; plans/CAVE_BIOMES.md CB-2);
-  the next free noise offset is 186
+  CaveOres amethyst 183, jade 184, cinnabar 185 (3D, the cave biome exclusive ores; plans/CAVE_BIOMES.md CB-2),
+  VulcaniteGenerator.VeinNoise 186 (3D, the vulcanite veins in basalt);
+  the next free noise offset is 187
 Hash salts (no noise, SplitMix64.Hash(cell, Seed ^ salt), so a new one re-lays nothing else):
   ruins 0x5E7A-0x5E7D (RuinPlacement, one per kind), waystone satellites 0x5E7E (WaystonePlacement),
   battle towers 0x5E7F (TowerPlacement, cell 1536; plans/BATTLE_TOWER.md BT-2), tower ruin 0x5E80 (TowerRuin, BT-8),

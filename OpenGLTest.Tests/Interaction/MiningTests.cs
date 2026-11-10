@@ -189,6 +189,34 @@ public sealed class MiningTests
     }
 
     [Fact]
+    public void VulcaniteOutranksIronAndMinesEverythingIronMines()
+    {
+        var iron = ItemOf("iron_pickaxe");
+        var vulcanite = ItemOf("vulcanite_pickaxe");
+
+        Assert.True(vulcanite.ToolPower > iron.ToolPower);
+        Assert.True(Mining.BlockDamage(vulcanite) > Mining.BlockDamage(iron));
+        Assert.True(vulcanite.EntityDamage > iron.EntityDamage);
+        Assert.True(ItemOf("vulcanite_axe").ToolPower > ItemOf("iron_axe").ToolPower);
+        Assert.True(ItemOf("vulcanite_sword").EntityDamage > ItemOf("iron_sword").EntityDamage);
+
+        // The tier above iron only widens the gate, over every block
+        foreach (var block in BlockType.Types.Values.Where(block => Mining.CanMine(block.Id, iron)))
+            Assert.True(Mining.CanMine(block.Id, vulcanite), block.Name);
+    }
+
+    [Fact]
+    public void VulcaniteOreNeedsTheIronPickaxeAndOutlastsTheBasaltItVeins()
+    {
+        var ore = ContentRegistry.RequireBlock("vulcanite_ore");
+        Assert.False(Mining.CanMine(ore.Id, ItemOf("bronze_pickaxe")));
+        Assert.True(Mining.CanMine(ore.Id, ItemOf("iron_pickaxe")));
+        Assert.True(Mining.CanMine(ore.Id, ItemOf("vulcanite_pickaxe")));
+        Assert.False(Mining.CanMine(ore.Id, null));
+        Assert.True(ore.Hardness > ContentRegistry.RequireBlock("basalt").Hardness);
+    }
+
+    [Fact]
     public void FluidCellsRefuseEveryTool()
     {
         var water = BlockOf("water");

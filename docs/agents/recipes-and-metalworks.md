@@ -104,9 +104,28 @@ anvil hammers that into `wrought_iron`, which no crafting recipe takes (`IronCha
 it is stacked on the anvil and forged there (`recipes/forge/`) into the heads (`iron_pickaxe_head` 3, `iron_axe_head` 3,
 `iron_sword_head` 4), the five-piece iron armor set (`iron_cap` 5, `iron_tunic` 8, `iron_pants` 7, `iron_boots` 4, `iron_gloves`
 4, `sets/iron.json`; bronze's ring counts and one more armor point each) and `iron_ring` (2). The tools are still crafted
-from a forged head (`iron_pickaxe`, `iron_axe`, `iron_sword`, each head + branch + 2 vine). The `iron_pickaxe` is the top pickaxe tier (power 3, above bronze's 2.5; in the
-`pickaxe` tag), the tool the hell barrier needs (plans/LAYERS.md), so hell is now reachable in survival
+from a forged head (`iron_pickaxe`, `iron_axe`, `iron_sword`, each head + branch + 2 vine). The `iron_pickaxe` (power 3, above bronze's 2.5; in the
+`pickaxe` tag) is the tool the hell barrier needs (plans/LAYERS.md), so hell is now reachable in survival
 (`MiningTests.IronOutranksBronzeAndMinesEverythingBronzeMines`).
+
+**Vulcanite** is the tier above iron, worked on the same anvil with no new mechanic. `vulcanite_ore` (hardness 60, above the
+basalt it veins; `tools: {"pickaxe": 3}`, so the iron pickaxe and up) drops a `vulcanite_shard` (its loot table). The shard is
+a forge metal only because a forge recipe takes it: 3 shards forge into `refined_vulcanite` (`recipes/forge/refined_vulcanite.json`),
+and the refined metal forges into `vulcanite_pickaxe_head` 3, `vulcanite_axe_head` 3 and `vulcanite_sword_head` 4; no crafting
+recipe takes either metal. The tools are crafted like iron's (head + branch + 2 vine): `vulcanite_pickaxe` and `vulcanite_axe`
+(power 4, in the `pickaxe`/`axe` tags) and `vulcanite_sword`, every stat above iron's; no armor. Like the other hand tools they
+have no durability. **Worldgen** (`VulcaniteGenerator`, `Stage.Vulcanite`, tuning `Vulcanite*` in `WorldGenerationConfig`): the
+`OreNoiseLattice` deposits of a noise of their own (seed offset 186), stamped over **basalt only** right after hell's stamp, so they
+lie in the barrier band and the Magma Caverns' skin, never above `BarrierTopY`, and no hell tree or ruin is veined. The threshold
+`VulcaniteThreshold` (almost nothing passes it) drops by up to `VulcaniteNearLavaShift` times `VulcaniteGenerator.LavaProximity`, a
+pure field: in hell 1 at the layer's lava level falling to 0 `VulcaniteLavaReachBlocks` rows up (`HellGenerator.RowsAboveLava`;
+basalt lines only the all-lava Magma Caverns, so that level is the lava's surface), in the band 1 in the deep lava pockets' patches
+(`LavaGenerator.PatchValue`) fading to 0 `VulcanitePatchMargin` under their edge. So the ore gathers by the pools. `HasOre` is the
+stamp's point query on basalt (`VulcaniteGenerator.Over`). `VulcaniteTests`, `IronChainTests` (the shard is refined before anything
+is forged of it, and every forge recipe is reachable), `MiningTests` (the ore's gate, the tier over iron);
+`visual-examples/vulcanite.json` (`VOXEL_TIME=147`) films the ore beside a lava pool. The shard, ingot (refined vulcanite),
+pickaxe and axe sprites and the ore tile are committed art; the three heads and the sword are placeholders from
+`tools/generate-vulcanite-sprites.py` (USER_TODO.md).
 
 **The cave ores** (`CaveOres`, plans/CAVE_BIOMES.md CB-2) are three ores found only in one cave sub-biome each, which drop
 themselves: `amethyst_ore` in crystal caves and `jade_ore` in fungal caves (copper pickaxe and up) and `cinnabar_ore` in the
@@ -120,7 +139,7 @@ lava included, so no cave lets a player through; over the two ramps its share ri
 the band's edge to 1 at the core, a ramp cell is barrier where a 3D OpenSimplex noise (seed offset 162,
 `BarrierPatchFrequency`) mapped to 0..1 is under that share, and only solid, occluding ground is
 replaced there, so caves stay open and the edges break into patches. The stamp runs last of all the
-features (`Stage.Barrier`), so nothing writes over it; `BarrierGenerator.IsBarrier` is the field it
+features (`Stage.Barrier`), so nothing but its vulcanite veins (`Stage.Vulcanite`, see "Vulcanite") writes over it; `BarrierGenerator.IsBarrier` is the field it
 writes, bit for bit across chunk seams. Hell starts right below the band (see "Hell" next).
 `BarrierTests`;
 `visual-examples/barrier.json` (`VOXEL_TIME=147`) frames a ramp cave and the core's faces.
@@ -279,7 +298,7 @@ stacked back on the **anvil** + smithing hammer -> forged parts and armor (**the
   `{"hits", "input", "result", "slag"}` (`AnvilProfile`, `BlockType.Anvil`). An anvil holds **either one bloom or a stack
   of one forge metal, never both** (`AnvilManager.State`: `HasPiece`, or `MetalId`/`MetalCount`), so a bloom is laid only
   on a bare anvil and metal is stacked only where no bloom lies. Right-click (`BlockInteractions.TryAnvilInteract`): a
-  forge metal in hand (any item a forge recipe takes, `ContentRegistry.IsForgeMetal`: wrought iron today) stacks one more
+  forge metal in hand (any item a forge recipe takes, `ContentRegistry.IsForgeMetal`: wrought iron, vulcanite shards and refined vulcanite) stacks one more
   (`TryStack`, refused for another metal or at `AnvilManager.StackCap`, the largest recipe of that metal, so a stack never
   holds metal no recipe could use), the profile's input is laid on a bare anvil (`TryPlace`), and anything else, an empty
   hand included, takes one back (the bloom, or one of the stack; the whole stack while sneaking, `PlayerContext.IsSneaking`,

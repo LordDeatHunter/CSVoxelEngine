@@ -15,7 +15,8 @@ namespace VoxelEngine.WorldGen;
 /// marks <see cref="Stage.Columns"/>, <see cref="Stage.Clouds"/>, <see cref="Stage.CloudSea"/>,
 /// <see cref="Stage.SkyIslands"/>, <see cref="Stage.SkyTrees"/>, <see cref="Stage.RuinsSky"/>, <see cref="Stage.WaystonesSky"/>,
 /// <see cref="Stage.SolidCount"/> and <see cref="Stage.FluidFrontier"/>, and a chunk wholly in hell marks
-/// only <see cref="Stage.Columns"/>, <see cref="Stage.Hell"/>, <see cref="Stage.HellTrees"/>, <see cref="Stage.RuinsHell"/>,
+/// only <see cref="Stage.Columns"/>, <see cref="Stage.Hell"/>, <see cref="Stage.Vulcanite"/>, <see cref="Stage.HellTrees"/>,
+/// <see cref="Stage.RuinsHell"/>,
 /// <see cref="Stage.WaystonesHell"/>, <see cref="Stage.SolidCount"/> and <see cref="Stage.FluidFrontier"/>.
 /// </summary>
 internal sealed class WorldgenStageTimer
@@ -117,6 +118,8 @@ internal sealed class WorldgenStageTimer
         Barrier,
         /// <summary>HellGenerator.Stamp.</summary>
         Hell,
+        /// <summary>VulcaniteGenerator.Stamp, over the barrier band's and hell's basalt.</summary>
+        Vulcanite,
         /// <summary>HellTrees.Stamp (the trees grown on a cache miss included).</summary>
         HellTrees,
         /// <summary>RuinPlacement.StampHell.</summary>

@@ -32,6 +32,10 @@ public static class LavaGenerator
     /// </summary>
     internal static void Reseed() => PatchNoise = TerrainGenerator.MakeNoise(71, WorldGenerationConfig.LavaPatchFrequency);
 
+    /// <summary>The patch mask's noise at column (x, z): only a column above
+    /// <see cref="WorldGenerationConfig.LavaPatchThreshold"/> ponds lava (the vulcanite in the barrier band reads it too).</summary>
+    internal static float PatchValue(int x, int z) => PatchNoise.GetNoise(x, z);
+
     /// <summary>
     /// Whether the air cell (x, y, z) ponds lava. Deep interior cells only: below the lava
     /// ceiling and buried under the terrain, inside a patch and winning the pool roll.
@@ -40,7 +44,7 @@ public static class LavaGenerator
     {
         if (y > WorldGenerationConfig.LavaMaxY) return false;
         if (y > surfaceHeight - WorldGenerationConfig.LavaBurial) return false;
-        if (PatchNoise.GetNoise(x, z) <= WorldGenerationConfig.LavaPatchThreshold) return false;
+        if (PatchValue(x, z) <= WorldGenerationConfig.LavaPatchThreshold) return false;
         return UnitHash(x, y, z) < WorldGenerationConfig.LavaPoolChance;
     }
 
@@ -56,7 +60,7 @@ public static class LavaGenerator
         for (var x = 0; x < Chunk.Size; x++)
         for (var z = 0; z < Chunk.Size; z++)
         {
-            if (PatchNoise.GetNoise(worldX0 + x, worldZ0 + z) <= WorldGenerationConfig.LavaPatchThreshold)
+            if (PatchValue(worldX0 + x, worldZ0 + z) <= WorldGenerationConfig.LavaPatchThreshold)
                 continue;
             var surfaceHeight = column.Heights[(x << Chunk.SizeShift) | z];
 

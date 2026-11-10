@@ -49,6 +49,8 @@ internal static class ChunkTerrainFill
             timer?.Mark(Stage.Columns);
             HellGenerator.Stamp(blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
             timer?.Mark(Stage.Hell);
+            StampVulcanite(blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size, stampGates);
+            timer?.Mark(Stage.Vulcanite);
             StampHellTrees(chunk, blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size);
             timer?.Mark(Stage.HellTrees);
             StampHellRuins(chunk, blocks, (int)chunk.Position.X * Size, lowerBoundY, (int)chunk.Position.Z * Size, stampGates, timer);
@@ -380,8 +382,9 @@ internal static class ChunkTerrainFill
         // The sky layers, into air only: a chunk straddling the cloud slab under a tall tree's reach
         StampSky(chunk, blocks, worldX0, lowerBoundY, worldZ0, stampGates, timer);
 
-        // Last of every stamp, so nothing writes over it: the barrier band between the overworld
-        // and hell. Its core takes every cell, carved air and fluids included, so it is gapless.
+        // Last of every overworld stamp, so nothing but its own vulcanite writes over it: the barrier
+        // band between the overworld and hell. Its core takes every cell, carved air and fluids
+        // included, so it is gapless.
         if (WorldGenerationConfig.BarrierEnabled && Admits(stampGates, BarrierGenerator.WriteBand(), lowerBoundY))
             BarrierGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Barrier);
@@ -392,6 +395,8 @@ internal static class ChunkTerrainFill
         if (inHell)
             HellGenerator.Stamp(blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.Hell);
+        StampVulcanite(blocks, worldX0, lowerBoundY, worldZ0, stampGates);
+        timer?.Mark(Stage.Vulcanite);
         if (inHell)
             StampHellTrees(chunk, blocks, worldX0, lowerBoundY, worldZ0);
         timer?.Mark(Stage.HellTrees);
@@ -453,6 +458,14 @@ internal static class ChunkTerrainFill
 
     // The waystone satellites stand only beside ruins, so they need both switches
     private const bool WaystonesEnabled = WorldFeatureConfig.RuinsEnabled && WorldFeatureConfig.WaystonesEnabled;
+
+    /// <summary>The vulcanite ore (<see cref="VulcaniteGenerator.Stamp"/>) over the basalt the barrier band and hell
+    /// just laid, before any hell tree or ruin writes over the cavern and after every other stamp of the band.</summary>
+    private static void StampVulcanite(ushort[] blocks, int worldX0, int worldY0, int worldZ0, bool stampGates)
+    {
+        if (WorldGenerationConfig.VulcaniteEnabled && Admits(stampGates, VulcaniteGenerator.WriteBand(), worldY0))
+            VulcaniteGenerator.Stamp(blocks, worldX0, worldY0, worldZ0);
+    }
 
     /// <summary>The hell trees crossing the chunk (<see cref="HellTrees.Stamp"/>), after the hell stamp,
     /// through a local like the overworld trees: a ref to the volatile state field is refused.</summary>

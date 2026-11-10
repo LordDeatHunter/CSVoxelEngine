@@ -23,7 +23,8 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   "Sink and soft-landing flags"); hell has no bottom and its falls hurt as usual.
 - **Worldgen**, a pure function of position like the rest (each chunk alone, the point query equal to the
   stamp; the write rules are in the worldgen invariants under "Architecture"): "The barrier"
-  (`WorldGen/Features/Underground/BarrierGenerator.cs`, stamped last); "Hell", "Hell biomes" (Ashlands,
+  (`WorldGen/Features/Underground/BarrierGenerator.cs`, stamped last but for the "Vulcanite" veins over its and hell's
+  basalt, densest by the lava); "Hell", "Hell biomes" (Ashlands,
   Magma Caverns, Fungal Grove) and "Hell flora" (vines, plants, the `fungal_tree` and `charred_tree` through
   `HellTrees`) under `WorldGen/Hell/`, where a chunk wholly in hell skips the overworld pipeline; "Solid
   clouds", "Sky islands" (with the cloud sea) and "Sky biomes" (meadow and frost highland, their flora and the

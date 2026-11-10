@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Numerics;
 using VoxelEngine.Interaction;
 using VoxelEngine.WorldGen;
+using VoxelEngine.WorldGen.Features.Underground;
 using VoxelEngine.WorldGen.Hell;
 using Xunit;
 
@@ -189,11 +190,12 @@ public sealed class HellTests
                 if (!HellGenerator.InHell(wy)) continue;
                 var block = chunk.GetLocalBlock(x, y, z);
                 int wx = cx * Chunk.Size + x, wz = cz * Chunk.Size + z;
-                // A hell tree (HellTrees) grows over the point query's rule, into its air only
+                // A hell tree (HellTrees) grows over the point query's rule, into its air only, and vulcanite
+                // (VulcaniteGenerator) veins its basalt
                 if (BlockType.IsTreeWood(block) || TreeGenerator.IsLeaf(block))
                     Assert.True(HellGenerator.IsOpen(wx, wy, wz) && !HellGenerator.InPool(wy));
                 else
-                    Assert.Equal(HellGenerator.BlockAt(wx, wy, wz), block);
+                    Assert.Equal(VulcaniteGenerator.Over(HellGenerator.BlockAt(wx, wy, wz), wx, wy, wz), block);
                 sawLava |= block == HellGenerator.LavaBlock;
             }
 

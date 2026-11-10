@@ -122,6 +122,8 @@ public sealed class StampGateTests
             (ushort[] b, ref byte[]? s, ColumnData _, int x, int y, int z) => WaystonePlacement.StampHell(b, ref s, x, y, z), false),
         new("Hell", Stage.Hell, (_, _) => HellGenerator.WriteBand(),
             (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => HellGenerator.Stamp(b, x, y, z), true),
+        new("Vulcanite", Stage.Vulcanite, (_, _) => VulcaniteGenerator.WriteBand(),
+            (ushort[] b, ref byte[]? _, ColumnData _, int x, int y, int z) => VulcaniteGenerator.Stamp(b, x, y, z), false),
     ];
 
     private static Chunk Generate(Vector3 pos, WorldgenStageTimer? timer, bool stampGates)

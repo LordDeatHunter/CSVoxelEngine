@@ -167,7 +167,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
                                #   cache, the tree front end and batches, worldgen stats,
                                #   the worldgen cost probe and the stage-timer tests
     Features/                  # every feature generator (mirrors src/WorldGen/Features)
-      Underground/             # coal, malachite, hematite, gravel pockets, cave life (mirrors src/WorldGen/Features/Underground)
+      Underground/             # coal, malachite, hematite, tin, vulcanite, the barrier, gravel pockets, cave life (mirrors src/WorldGen/Features/Underground)
     Caves/                     # the cave biomes: point query equals stamp, the map, bands, determinism, safe palettes,
                                #   the cave shape and worm factor, the ore richness, the exclusive ores, and the spot
                                #   finder behind cave-biomes.json, the eye probe (EyeCaveBiomeProbeTests) (mirrors
@@ -207,6 +207,9 @@ tools/                                # asset generators: models, animation clip
   generate-cave-ore-textures.py       # deterministic placeholder amethyst_ore, jade_ore and cinnabar_ore tiles: palette swaps
                                       #   of malachite_ore's green shades, stdlib PNG reader and writer; listed in USER_TODO.md;
                                       #   --check
+  generate-vulcanite-sprites.py       # deterministic placeholder vulcanite tool heads and sword: palette swaps of the iron
+                                      #   sprites' metal onto vulcanite_shard's shades, stdlib PNG reader and writer; never writes
+                                      #   the committed vulcanite art; listed in USER_TODO.md; --check
   generate-cave-mob-models.py         # deterministic shardling, sporeling and magmaborn .bbmodels (humanoid rigs, clips) and
                                       #   palette skins, on the hell script's machinery; listed in USER_TODO.md; --check
   generate-skeleton-king-model.py     # deterministic skeleton_king .bbmodel (crowned rig with its club, clips) and palette

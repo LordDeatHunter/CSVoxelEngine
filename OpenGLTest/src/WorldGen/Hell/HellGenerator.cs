@@ -156,6 +156,17 @@ public static class HellGenerator
         return d < PocketHeight && PocketHeight - 1 - d < LavaDepth(LayerIndex(y));
     }
 
+    /// <summary>How many rows hell row <paramref name="y"/> stands above its layer's lava level: 0 in the pool
+    /// rows, 1 on the row right over the level and one more each row up the pocket; -1 in the slab and above
+    /// hell, which no pool lies under. A pure function of y (the vulcanite's lava proximity reads it).</summary>
+    public static int RowsAboveLava(int y)
+    {
+        if (!InHell(y)) return -1;
+        var d = DepthInLayer(y);
+        if (d >= PocketHeight) return -1;
+        return Math.Max(0, PocketHeight - LavaDepth(LayerIndex(y)) - d);
+    }
+
     /// <summary>Whether hell cell (x, y, z) is open cavern: air, or a pool cell (lava, or a dry
     /// pool's soil). The one field both <see cref="BlockAt"/> and <see cref="Stamp"/> read; false
     /// above hell and in every row that cannot open.</summary>
