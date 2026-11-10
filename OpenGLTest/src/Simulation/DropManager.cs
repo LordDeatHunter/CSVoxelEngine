@@ -36,6 +36,9 @@ public class DropManager
 
     public IReadOnlyList<ItemDrop> Drops => _drops;
 
+    /// <summary>Takes <paramref name="drop"/> out of the world uncollected (a thief's grab); false if it is gone.</summary>
+    public bool Remove(ItemDrop drop) => _drops.Remove(drop);
+
     /// <summary>Drops every tracked drop (a client rebuilds its list from a server snapshot).</summary>
     public void Clear() => _drops.Clear();
 

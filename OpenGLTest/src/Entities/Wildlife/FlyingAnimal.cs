@@ -21,6 +21,8 @@ public abstract class FlyingAnimal : Animal
     private bool _perched;
     private bool _chasing;
     private float _postureTimer;
+    private Vector3? _perchSpot;
+    private bool _perchSearched;
 
     protected FlyingAnimal(EntityType type, Vector3 position, FlightTuning flight, bool spawnIn)
         : base(type, position, flight.CruiseSpeed, spawnIn, flight)
@@ -43,6 +45,13 @@ public abstract class FlyingAnimal : Animal
 
     /// <summary>The counted action that plays its landing clip.</summary>
     protected abstract int LandAction { get; }
+
+    /// <summary>Where it would rather land than on whatever ground lies below (a tree top), or null for any
+    /// ground. Asked once per rest; a spot it cannot reach in time is given up.</summary>
+    protected virtual Vector3? ChoosePerchSpot(ChunkManager chunks) => null;
+
+    /// <summary>Somewhere it must fly to instead of resting or wandering (a thief's prize), or null.</summary>
+    protected virtual Vector3? Errand => null;
 
     /// <summary>Whether, sitting on the ground, it stays there for <paramref name="target"/> instead of taking
     /// off (a crow pecking at the ankles beside it). False by default.</summary>
@@ -98,12 +107,12 @@ public abstract class FlyingAnimal : Animal
             return;
         }
 
-        FlyToward(target, wander, deltaTime, chunks);
+        FlyToward(target, Errand ?? _perchSpot ?? wander, deltaTime, chunks);
     }
 
     /// <summary>One frame of flight: toward its place over <paramref name="target"/> (or at it, mid-attack),
     /// to <paramref name="wander"/>, or hovering where it is.</summary>
-    protected abstract void FlyToward(IMobTarget? target, Vector3? wander, float deltaTime, ChunkManager chunks);
+    protected abstract void FlyToward(IMobTarget? target, Vector3? goal, float deltaTime, ChunkManager chunks);
 
     // Lands when its time in the air is up and there is ground to land on; takes off when its rest is over or
     // somebody it will not sit still for comes near. Never in the middle of a clip.
@@ -114,11 +123,27 @@ public abstract class FlyingAnimal : Animal
 
         if (_perched)
         {
-            if (target != null ? !StaysPerchedNear(target) : _postureTimer <= 0f) TakeOff();
+            if (target != null ? !StaysPerchedNear(target) : _postureTimer <= 0f || Errand != null) TakeOff();
             return;
         }
 
-        if (target == null && _postureTimer <= 0f && GroundToLandOn(chunks)) Land();
+        if (target != null || _postureTimer > 0f || Errand != null) return;
+
+        // Its air time is up: head for a high perch if it likes one, else (or once that has taken too long) any ground
+        if (_perchSpot == null && _postureTimer > -WildlifeConfig.FlyerPerchSeekSeconds && !_perchSearched)
+        {
+            _perchSearched = true;
+            _perchSpot = ChoosePerchSpot(chunks);
+        }
+
+        if (_perchSpot is { } spot)
+        {
+            if (_postureTimer < -WildlifeConfig.FlyerPerchSeekSeconds) _perchSpot = null;
+            else if (Vector2.DistanceSquared(new Vector2(Position.X, Position.Z), new Vector2(spot.X, spot.Z)) > 0.5f)
+                return;
+        }
+
+        if (GroundToLandOn(chunks)) Land();
     }
 
     // Whether solid ground (never water, which the probe also stops at) lies within the landing drop below
@@ -134,6 +159,8 @@ public abstract class FlyingAnimal : Animal
     private void Land()
     {
         _perched = true;
+        _perchSpot = null;
+        _perchSearched = false;
         _postureTimer = Roll(WildlifeConfig.FlyerPerchMinSeconds, WildlifeConfig.FlyerPerchMaxSeconds);
         StartAttack(LandAction);
         ApplyGait();
@@ -142,6 +169,8 @@ public abstract class FlyingAnimal : Animal
     private void TakeOff()
     {
         _perched = false;
+        _perchSpot = null;
+        _perchSearched = false;
         _postureTimer = Roll(WildlifeConfig.FlyerAirMinSeconds, WildlifeConfig.FlyerAirMaxSeconds);
         StartAttack(TakeoffAction);
         SetVelocity(Velocity with { Y = Flight!.Value.VerticalSpeed });

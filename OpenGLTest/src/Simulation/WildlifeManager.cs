@@ -68,8 +68,55 @@ public sealed class WildlifeManager : RealmMobManager<Animal>
     {
         if (chunks == null || targets == null) return;
 
+        SendThieves(drops);
         UpdateMobs(deltaTime, chunks, drops, targets, debris, WildlifeConfig.DespawnRadiusBlocks);
+        TakeLoot(drops);
         UpdateSpawning(deltaTime, chunks, targets);
+    }
+
+    // Each calm crow with nothing in its claws picks the nearest loose item within its range; a prize another
+    // crow took, or a player collected, is forgotten
+    private void SendThieves(DropManager drops)
+    {
+        var loose = drops.Drops;
+        if (loose.Count == 0) return;
+        var rangeSquared = WildlifeConfig.CrowThiefRangeBlocks * WildlifeConfig.CrowThiefRangeBlocks;
+        foreach (var mob in Mobs)
+        {
+            if (mob is not Crow crow) continue;
+            if (crow.Prize is { } prize)
+            {
+                var stillThere = false;
+                for (var i = 0; i < loose.Count && !stillThere; i++) stillThere = ReferenceEquals(loose[i], prize);
+                if (stillThere && !crow.IsProvoked) continue;
+                crow.SetPrize(null);
+            }
+
+            if (!crow.WantsPrize) continue;
+            ItemDrop? nearest = null;
+            var nearestSquared = rangeSquared;
+            for (var i = 0; i < loose.Count; i++)
+            {
+                var drop = loose[i];
+                if (drop.IsAttracted || !drop.IsGrounded) continue;
+                var distance = Vector3.DistanceSquared(drop.Position, crow.Position);
+                if (distance >= nearestSquared) continue;
+                nearestSquared = distance;
+                nearest = drop;
+            }
+            crow.SetPrize(nearest);
+        }
+    }
+
+    // A crow that reached its prize flies off with it
+    private void TakeLoot(DropManager drops)
+    {
+        foreach (var mob in Mobs)
+        {
+            if (mob is not Crow { PrizeInReach: true } crow) continue;
+            drops.Remove(crow.Prize!);
+            crow.FinishErrand();
+        }
     }
 
     // An attack (a gore, a swoop, a bite) lands on every non-immune target it still reaches at its clip's impact

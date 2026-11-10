@@ -52,6 +52,12 @@ public static class WildlifeConfig
     public const float FlyerPerchMinSeconds = 6f;
     public const float FlyerPerchMaxSeconds = 16f;
     public const float FlyerLandDropBlocks = 8f;
+    // A flyer that likes a high perch (FlyingAnimal.ChoosePerchSpot) samples FlyerPerchSamples columns within
+    // FlyerPerchSearchRadiusBlocks and heads for the nearest tree top; if it has not landed FlyerPerchSeekSeconds
+    // after its air time ran out it gives up and takes any ground.
+    public const int FlyerPerchSamples = 20;
+    public const float FlyerPerchSearchRadiusBlocks = 14f;
+    public const float FlyerPerchSeekSeconds = 10f;
 
     // --- Gaits (Animal.ChooseGait) ---
     // A walker breaks into its run clip above RunGaitFraction of the way from its walk speed to its run
@@ -118,7 +124,10 @@ public static class WildlifeConfig
     // CrowSwoopSpeedFactor of its flight and rakes for CrowStrikeDamage whoever is within CrowStrikeReach of
     // it (in 3D, at the chest) at the impact, every CrowStrikeMin..MaxSeconds. On the ground it pecks an
     // ankle within CrowPeckReach instead, and left alone it pecks the dirt or caws every
-    // CrowHabitMin..MaxSeconds.
+    // CrowHabitMin..MaxSeconds. It is not hostile by nature: it only harasses a player who has hurt it, for
+    // CrowAngerSeconds after the blow, and none of the above applies before that. Unprovoked it is a thief:
+    // a dropped item within CrowThiefRangeBlocks draws it down, and within CrowThiefReach it takes the item,
+    // then leaves the next one alone for CrowThiefCooldownSeconds. It prefers to perch in trees.
     public const float CrowHeight = 0.6f;
     public const float CrowHalfExtent = 0.28f;
     public const float CrowShoveSpeed = 4f;
@@ -142,6 +151,10 @@ public static class WildlifeConfig
     public const float CrowKnockbackLift = 1f;
     public const float CrowHabitMinSeconds = 3f;
     public const float CrowHabitMaxSeconds = 8f;
+    public const float CrowAngerSeconds = 20f;
+    public const float CrowThiefRangeBlocks = 16f;
+    public const float CrowThiefReach = 0.9f;
+    public const float CrowThiefCooldownSeconds = 15f;
 
     // --- Dragonfly (Dragonfly) ---
     // A man-sized hunter of the waterside. A player within DragonflyNoticeRangeBlocks is prey: it holds
