@@ -500,6 +500,7 @@ internal sealed class ClientSession
     /// </summary>
     internal bool SendInventoryIntent(InventoryIntent intent)
     {
+        PlayEquipSound(intent);
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return false;
         using var writer = new PacketWriter(NetMessage.InventoryRequest);
@@ -509,6 +510,21 @@ internal sealed class ClientSession
         InventoryIntentCodec.Write(writer, intent);
         client.Send(writer.ToArray());
         return true;
+    }
+
+    /// <summary>The equip and unequip cues, for every way a player puts an item on the hotbar or takes gear off.</summary>
+    private void PlayEquipSound(InventoryIntent intent)
+    {
+        switch (intent.Action)
+        {
+            case NetInventoryAction.Equip:
+            case NetInventoryAction.EquipGear:
+                sfx?.Play(SfxLibrary.EquipGroup);
+                break;
+            case NetInventoryAction.UnequipGear:
+                sfx?.Play(SfxLibrary.UnequipGroup);
+                break;
+        }
     }
 
     /// <summary>Asks the server to open the chest at a cell; false when not connected. The answer is a

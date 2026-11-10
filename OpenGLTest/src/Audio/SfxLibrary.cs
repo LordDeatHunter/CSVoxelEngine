@@ -26,6 +26,12 @@ public static class SfxLibrary
     /// <summary>Group played when the player collects an item drop.</summary>
     public const string PickupGroup = "item_pickup";
 
+    /// <summary>Group played when the player equips an item on the hotbar or wears gear.</summary>
+    public const string EquipGroup = "equip";
+
+    /// <summary>Group played when the player takes worn gear off.</summary>
+    public const string UnequipGroup = "unequip";
+
     /// <summary>Group played when a staff casts a spell (the caster's own cast).</summary>
     public const string SpellCastGroup = "spell_cast";
 
