@@ -55,6 +55,7 @@ public sealed class NetFramingTests
             using var hello = new PacketWriter(NetMessage.ServerHello);
             hello.Write(NetFraming.ProtocolVersion).Write(1).Write("Slow reader")
                 .Write(1).Write(0.0).Write(Vector3.Zero);
+            WireIds.WriteTables(hello);
             NetFraming.WriteFrame(stream, hello.ToArray());
             return peer; // Keep the peer open but never read client payloads.
         });

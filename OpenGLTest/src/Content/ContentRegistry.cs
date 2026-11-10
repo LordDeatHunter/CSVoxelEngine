@@ -102,11 +102,12 @@ public static class ContentRegistry
         var itemFiles = ContentFiles.JsonFilesIn(Path.Combine(assetsRoot, "data", "items"));
 
         // 0 is air, so blocks and items share the remaining ids; the per-id tables are sized to
-        // exactly this many before any loader writes one
+        // exactly this many before any loader writes one. ushort.MaxValue is never assigned: it is the
+        // wire's "the server has no such id" (WireIds.NotOnServer)
         var total = 1 + blockFiles.Count + itemFiles.Count;
-        if (total - 1 > ushort.MaxValue)
+        if (total > ushort.MaxValue)
             throw new InvalidOperationException(
-                $"{blockFiles.Count} blocks + {itemFiles.Count} items exceed the {ushort.MaxValue} ids a block or item id can hold.");
+                $"{blockFiles.Count} blocks + {itemFiles.Count} items exceed the {ushort.MaxValue - 1} ids a block or item id can hold.");
         BlockTables.Allocate(total);
 
         var nextId = 1;

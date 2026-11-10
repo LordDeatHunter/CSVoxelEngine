@@ -7,7 +7,9 @@ namespace VoxelEngine.Networking;
 /// shape (<see cref="NetEntity"/> documents what each kind puts in the fields). The server writes the list
 /// through <see cref="Write"/> and the client reads it back through <see cref="Read"/>, so the two can never
 /// drift apart. A short frame throws <see cref="System.IO.EndOfStreamException"/>, which the client answers by
-/// leaving the server. GL-free and content-free.
+/// leaving the server. Only a drop, a primed TNT and a falling block carry a block or item id in the item field
+/// (<see cref="CarriesContentId"/>), so only theirs goes through the client's <see cref="WireIds"/>; a mob's look,
+/// tier or phase there is plain data. GL-free and content-free.
 /// </summary>
 public static class NetEntityCodec
 {
@@ -19,7 +21,8 @@ public static class NetEntityCodec
         writer.Write(entity.Yaw);
         writer.Write(entity.Health);
         writer.Write(entity.Ammo);
-        writer.WriteId(entity.ItemId);
+        if (CarriesContentId(entity.Kind)) writer.WriteId(entity.ItemId);
+        else writer.Write(entity.ItemId);
         writer.Write(entity.Velocity);
         writer.Write(entity.Effects);
     }
@@ -33,9 +36,13 @@ public static class NetEntityCodec
         var yaw = reader.ReadFloat();
         var health = reader.ReadInt();
         var ammo = reader.ReadInt();
-        var itemId = reader.ReadId();
+        var itemId = CarriesContentId(kind) ? reader.ReadId() : reader.ReadUInt16();
         var velocity = reader.ReadVector3();
-        var effects = reader.ReadByte();
+        var effects = reader.ReadEffectMask();
         return new NetEntity(kind, id, position, yaw, health, ammo, itemId, velocity, effects);
     }
+
+    /// <summary>Whether a kind's <see cref="NetEntity.ItemId"/> is a block or item id rather than mob data.</summary>
+    internal static bool CarriesContentId(NetEntityKind kind) =>
+        kind is NetEntityKind.Drop or NetEntityKind.PrimedTnt or NetEntityKind.FallingBlock;
 }

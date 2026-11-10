@@ -195,6 +195,7 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
       StationNetCodec.cs       # the StationState snapshot: campfires, querns, kilns, cast molds
       WaystoneNetCodec.cs      # the waystone messages: the rename request, a player's rows (WaystoneNetRow) and the
                                #   activation answer (WaystoneOpened), bounds-checked
+      WireIds.cs               # the server's id name tables in its hello and the client's translation of every wire id
       WorldIntent.cs           # one client world intent (break start/complete, place, use, throw, attack, cast, hammer,
                                #   waystone trip)
       WorldIntentCodec.cs      # its bounds-checked wire form, with the sequence id

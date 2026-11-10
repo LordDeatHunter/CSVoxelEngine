@@ -221,8 +221,12 @@ public static class NetFraming
     /// and world intents and the station frames; an older peer would misread every frame carrying an id.
     /// 34: the chunk payload is the palette form (a mode byte, then one id, or a palette of up to 256 ids with one index
     /// byte per cell, or one little-endian ushort per cell past 256 distinct ids), then the state as before; an older peer
-    /// would misread every ChunkData frame.</summary>
-    public const int ProtocolVersion = 34;
+    /// would misread every ChunkData frame.
+    /// 35: the <see cref="NetMessage.ServerHello"/> ends with the server's name for every block and item, molten
+    /// material, status effect and atlas tile id (<see cref="WireIds"/>), and a client translates every id it reads or
+    /// sends through them, so a client whose content is numbered differently still agrees with the server; an equip of
+    /// a stackable and a chest deposit carry their id at id width. An older peer would misread the hello.</summary>
+    public const int ProtocolVersion = 35;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;
@@ -267,9 +271,13 @@ public sealed class PacketWriter : IDisposable
 {
     private readonly MemoryStream _stream = new();
     private readonly BinaryWriter _writer;
+    private readonly WireIds? _wire;
 
-    public PacketWriter(NetMessage message)
+    /// <summary>A client passes its <see cref="WireIds"/>, so every id it writes goes out in the server's numbering;
+    /// the server passes none, since its ids are the wire's.</summary>
+    public PacketWriter(NetMessage message, WireIds? wire = null)
     {
+        _wire = wire;
         _writer = new BinaryWriter(_stream, Encoding.UTF8, leaveOpen: true);
         _writer.Write((byte)message);
     }
@@ -284,8 +292,12 @@ public sealed class PacketWriter : IDisposable
     public PacketWriter Write(Vector3 value) { _writer.Write(value.X); _writer.Write(value.Y); _writer.Write(value.Z); return this; }
 
     /// <summary>Writes a block or item id. The one place that fixes an id's wire width: every id that travels goes
-    /// through here and comes back through <see cref="PacketReader.ReadId"/>.</summary>
-    public PacketWriter WriteId(ushort id) { _writer.Write(id); return this; }
+    /// through here and comes back through <see cref="PacketReader.ReadId"/>, translated to the server's numbering
+    /// on a client.</summary>
+    public PacketWriter WriteId(ushort id) { _writer.Write(_wire?.ContentToServer(id) ?? id); return this; }
+
+    /// <summary>Writes a molten material id (0 = none), translated to the server's numbering on a client.</summary>
+    public PacketWriter WriteMaterial(byte id) { _writer.Write(_wire?.MaterialToServer(id) ?? id); return this; }
 
     /// <summary>Writes a length-prefixed byte array (the chunk/column payloads).</summary>
     public PacketWriter WriteBytes(byte[] value)
@@ -309,9 +321,13 @@ public sealed class PacketReader : IDisposable
 {
     private readonly MemoryStream _stream;
     private readonly BinaryReader _reader;
+    private readonly WireIds? _wire;
 
-    public PacketReader(byte[] payload)
+    /// <summary>A client passes its <see cref="WireIds"/>, so every id it reads comes back in its own numbering;
+    /// the server passes none.</summary>
+    public PacketReader(byte[] payload, WireIds? wire = null)
     {
+        _wire = wire;
         _stream = new MemoryStream(payload, writable: false);
         _reader = new BinaryReader(_stream, Encoding.UTF8, leaveOpen: true);
     }
@@ -327,8 +343,28 @@ public sealed class PacketReader : IDisposable
     public string ReadString() => _reader.ReadString();
     public Vector3 ReadVector3() => new(_reader.ReadSingle(), _reader.ReadSingle(), _reader.ReadSingle());
 
-    /// <summary>Reads a block or item id written by <see cref="PacketWriter.WriteId"/>, at the same width.</summary>
-    public ushort ReadId() => _reader.ReadUInt16();
+    /// <summary>Reads a block or item id written by <see cref="PacketWriter.WriteId"/>, at the same width, translated
+    /// to this run's numbering on a client.</summary>
+    public ushort ReadId()
+    {
+        var id = _reader.ReadUInt16();
+        return _wire?.ContentToLocal(id) ?? id;
+    }
+
+    /// <summary>Reads a molten material id written by <see cref="PacketWriter.WriteMaterial"/>.</summary>
+    public byte ReadMaterial()
+    {
+        var id = _reader.ReadByte();
+        return _wire?.MaterialToLocal(id) ?? id;
+    }
+
+    /// <summary>Reads a status effect mask (one bit per effect), with each bit moved to this run's bit for the same
+    /// effect on a client.</summary>
+    public byte ReadEffectMask()
+    {
+        var mask = _reader.ReadByte();
+        return _wire?.EffectMaskToLocal(mask) ?? mask;
+    }
 
     /// <summary>Reads a length-prefixed byte array written by <see cref="PacketWriter.WriteBytes"/>.</summary>
     public byte[] ReadBytes() => _reader.ReadBytes(_reader.ReadInt32());

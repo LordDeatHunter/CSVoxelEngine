@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -50,12 +51,21 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
     private volatile NetworkStatus _status = NetworkStatus.Connecting;
     private volatile string? _error;
     private volatile StrongBox<ServerHelloInfo>? _server;
+    private volatile WireIds? _wire;
+
+    // How many of the server's missing content names a refused connect lists before "and N more"
+    private const int MissingNamesShown = 8;
 
     public ServerAddress Address { get; } = address;
     public string PlayerName { get; } = playerName;
     public NetworkStatus Status => _status;
     public string? Error => _error;
     public ServerHelloInfo? Server => _server?.Value;
+
+    /// <summary>The server's id tables from its hello, set before <see cref="Server"/>: every reader and writer of this
+    /// connection passes them, so ids cross the wire in the server's numbering. Null on a test stream, where ids pass
+    /// through unchanged.</summary>
+    public WireIds? Wire => _wire;
 
     /// <summary>Framed payloads (message id first) read by the reader thread for the main thread.</summary>
     public ConcurrentQueue<byte[]> Inbound { get; } = new();
@@ -119,6 +129,14 @@ public sealed class NetworkClient(ServerAddress address, string playerName, doub
             var seed = reader.ReadInt();
             var time = reader.ReadDouble();
             var spawn = reader.ReadVector3();
+            var wire = WireIds.Read(reader);
+            if (wire.Missing.Count > 0)
+            {
+                Fail($"The server has content this game lacks: {string.Join(", ", wire.Missing.Take(MissingNamesShown))}" +
+                     (wire.Missing.Count > MissingNamesShown ? $" and {wire.Missing.Count - MissingNamesShown} more" : ""));
+                return;
+            }
+            _wire = wire;
             _server = new StrongBox<ServerHelloInfo>(new ServerHelloInfo(worldName, seed, time, spawn, playerId));
 
             // Play reads block for as long as the server is quiet; the idle sweep and KeepAlive

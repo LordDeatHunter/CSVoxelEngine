@@ -171,6 +171,7 @@ internal sealed class PlayerSessions
         writer.Write(_seed);
         writer.Write(_state.World.LightingTime);
         writer.Write(spawn);
+        WireIds.WriteTables(writer);
         client.Send(writer.ToArray());
     }
 

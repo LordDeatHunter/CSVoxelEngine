@@ -355,7 +355,7 @@ public sealed class CastingManager
             if (leftCasts-- == 0) break;
             StationNetCodec.WriteCell(writer, x, y, z);
             writer.WriteId(state.Recipe.MoldId);
-            writer.Write(state.Recipe.MaterialId);
+            writer.WriteMaterial(state.Recipe.MaterialId);
             writer.Write(state.FilledMl);
             writer.Write(state.Pouring);
             writer.Write(state.Cooling);
@@ -377,7 +377,7 @@ public sealed class CastingManager
         {
             var key = StationNetCodec.ReadCell(reader);
             var moldId = BlockTables.RequireAssigned(reader.ReadId());
-            var materialId = reader.ReadByte();
+            var materialId = reader.ReadMaterial();
             var filled = reader.ReadInt();
             var pouring = reader.ReadBool();
             var cooling = reader.ReadBool();

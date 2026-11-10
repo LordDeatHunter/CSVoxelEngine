@@ -33,7 +33,9 @@ public static class ChestNetCodec
     {
         writer.Write((byte)move.Kind);
         writer.Write(move.Slot);
-        writer.Write(move.Id);
+        // A deposited stack names a content id; an instance id is the server's own number
+        if (move.Kind == ChestMoveKind.DepositStack) writer.WriteId((ushort)move.Id);
+        else writer.Write(move.Id);
         writer.Write(move.Count);
     }
 
@@ -43,7 +45,7 @@ public static class ChestNetCodec
         var kind = (ChestMoveKind)reader.ReadByte();
         if (!System.Enum.IsDefined(kind)) throw new InvalidDataException($"unknown chest move {(byte)kind}");
         var slot = reader.ReadInt();
-        var id = reader.ReadInt();
+        var id = kind == ChestMoveKind.DepositStack ? reader.ReadId() : reader.ReadInt();
         var count = reader.ReadInt();
         return new ChestMove(kind, slot, id, System.Math.Clamp(count, 0, ChestConfig.MaxStack));
     }

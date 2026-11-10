@@ -71,7 +71,7 @@ public static class StationNetCodec
         writer.Write((byte)contents.Metals.Count);
         foreach (var metal in contents.Metals)
         {
-            writer.Write(metal.MaterialId);
+            writer.WriteMaterial(metal.MaterialId);
             writer.Write(metal.MoltenMl);
             writer.Write(metal.PendingMl);
         }
@@ -89,7 +89,7 @@ public static class StationNetCodec
         var metals = new List<CrucibleMetal>(count);
         for (var i = 0; i < count; i++)
         {
-            var metal = new CrucibleMetal(reader.ReadByte(), reader.ReadInt(), reader.ReadInt());
+            var metal = new CrucibleMetal(reader.ReadMaterial(), reader.ReadInt(), reader.ReadInt());
             if (metal.MaterialId == 0 || metal.MoltenMl < 0 || metal.PendingMl < 0
                 || metals.Exists(m => m.MaterialId == metal.MaterialId))
                 throw new InvalidDataException("crucible metal out of range");

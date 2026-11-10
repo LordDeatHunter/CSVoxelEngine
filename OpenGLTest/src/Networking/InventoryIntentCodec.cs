@@ -61,7 +61,9 @@ public static class InventoryIntentCodec
             case NetInventoryAction.Equip:
                 writer.Write(intent.Slot);
                 writer.Write(intent.IsTool);
-                writer.Write(intent.Id);
+                // A tool's instance id is the server's own number; a stackable's is a content id
+                if (intent.IsTool) writer.Write(intent.Id);
+                else writer.WriteId((ushort)intent.Id);
                 break;
             case NetInventoryAction.Craft:
             {
@@ -103,7 +105,7 @@ public static class InventoryIntentCodec
             {
                 var slot = reader.ReadInt();
                 var isTool = reader.ReadBool();
-                var id = reader.ReadInt();
+                var id = isTool ? reader.ReadInt() : reader.ReadId();
                 return new InventoryIntent(action, Slot: slot, IsTool: isTool, Id: id);
             }
             case NetInventoryAction.Craft:

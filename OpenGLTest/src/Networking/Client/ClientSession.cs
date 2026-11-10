@@ -175,8 +175,8 @@ internal sealed class ClientSession
             if (fb.Y > 0)
                 ActiveWorld.Camera.SetAspectRatio(fb.X / (float)fb.Y);
 
-            clientStreamer = new ClientChunkStreamer(ActiveWorld.GetChunkManager(), SendChunkRequest, SendColumnRequest);
-            clientLodStreamer = new ClientLodStreamer(ActiveWorld.GetLodManager(), SendLodRequest);
+            clientStreamer = new ClientChunkStreamer(ActiveWorld.GetChunkManager(), SendChunkRequest, SendColumnRequest, client.Wire);
+            clientLodStreamer = new ClientLodStreamer(ActiveWorld.GetLodManager(), SendLodRequest, client.Wire);
         }
         catch (Exception e)
         {
@@ -207,7 +207,7 @@ internal sealed class ClientSession
         {
             netStateTimer = 0;
             var camera = w.Camera;
-            using var writer = new PacketWriter(NetMessage.PlayerState);
+            using var writer = new PacketWriter(NetMessage.PlayerState, netClient?.Wire);
             writer.Write(camera.Position);
             writer.Write(camera.Yaw);
             writer.Write(camera.Pitch);
@@ -242,7 +242,7 @@ internal sealed class ClientSession
         if (netKeepAliveTimer >= NetworkConfig.NetKeepAliveSeconds)
         {
             netKeepAliveTimer = 0;
-            using var writer = new PacketWriter(NetMessage.KeepAlive);
+            using var writer = new PacketWriter(NetMessage.KeepAlive, netClient?.Wire);
             client.Send(writer.ToArray());
         }
 
@@ -269,7 +269,7 @@ internal sealed class ClientSession
 
     private void HandleNetworkMessage(World w, byte[] payload)
     {
-        using var reader = new PacketReader(payload);
+        using var reader = new PacketReader(payload, netClient?.Wire);
         switch (reader.Message)
         {
             case NetMessage.ChatMessage:
@@ -461,7 +461,7 @@ internal sealed class ClientSession
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
-        using var writer = new PacketWriter(NetMessage.ChunkRequest);
+        using var writer = new PacketWriter(NetMessage.ChunkRequest, netClient?.Wire);
         writer.Write(cx);
         writer.Write(cy);
         writer.Write(cz);
@@ -473,7 +473,7 @@ internal sealed class ClientSession
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
-        using var writer = new PacketWriter(NetMessage.ColumnRequest);
+        using var writer = new PacketWriter(NetMessage.ColumnRequest, netClient?.Wire);
         writer.Write(cx);
         writer.Write(cz);
         client.Send(writer.ToArray());
@@ -484,7 +484,7 @@ internal sealed class ClientSession
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
-        using var writer = new PacketWriter(NetMessage.LodRegionRequest);
+        using var writer = new PacketWriter(NetMessage.LodRegionRequest, netClient?.Wire);
         writer.Write(level);
         writer.Write(rx);
         writer.Write(rz);
@@ -502,7 +502,7 @@ internal sealed class ClientSession
         PlayEquipSound(intent);
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return false;
-        using var writer = new PacketWriter(NetMessage.InventoryRequest);
+        using var writer = new PacketWriter(NetMessage.InventoryRequest, netClient?.Wire);
         // Every inventory intent may change the inventory here, so snapshots answering an older
         // intent are dropped until this one's answer arrives
         writer.Write(prediction.Commit(predictsInventory: true));
@@ -539,7 +539,7 @@ internal sealed class ClientSession
     internal bool SendChestOpen(int x, int y, int z)
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
-        using var writer = new PacketWriter(NetMessage.ChestOpen);
+        using var writer = new PacketWriter(NetMessage.ChestOpen, netClient?.Wire);
         ChestNetCodec.WriteOpen(writer, x, y, z);
         client.Send(writer.ToArray());
         return true;
@@ -550,7 +550,7 @@ internal sealed class ClientSession
     internal bool SendChestMove(VoxelEngine.Simulation.Chests.ChestMove move)
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
-        using var writer = new PacketWriter(NetMessage.ChestMove);
+        using var writer = new PacketWriter(NetMessage.ChestMove, netClient?.Wire);
         ChestNetCodec.WriteMove(writer, move);
         client.Send(writer.ToArray());
         return true;
@@ -560,7 +560,7 @@ internal sealed class ClientSession
     internal bool SendChestClose()
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
-        using var writer = new PacketWriter(NetMessage.ChestClose);
+        using var writer = new PacketWriter(NetMessage.ChestClose, netClient?.Wire);
         client.Send(writer.ToArray());
         return true;
     }
@@ -584,7 +584,7 @@ internal sealed class ClientSession
     internal bool SendWaystoneRename((int X, int Y, int Z) cell, string name)
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client) return false;
-        using var writer = new PacketWriter(NetMessage.WaystoneRename);
+        using var writer = new PacketWriter(NetMessage.WaystoneRename, netClient?.Wire);
         WaystoneNetCodec.WriteRename(writer, cell, name);
         client.Send(writer.ToArray());
         return true;
@@ -603,7 +603,7 @@ internal sealed class ClientSession
     {
         if (netClient is not { Status: NetworkStatus.Handshaken } client)
             return;
-        using var writer = new PacketWriter(NetMessage.WorldIntent);
+        using var writer = new PacketWriter(NetMessage.WorldIntent, netClient?.Wire);
         var seq = prediction.Commit(intent.PredictsInventory);
         WorldIntentCodec.Write(writer, seq, intent);
         client.Send(writer.ToArray());
@@ -664,7 +664,7 @@ internal sealed class ClientSession
     {
         if (netClient is { Status: NetworkStatus.Handshaken } client)
         {
-            using var writer = new PacketWriter(NetMessage.ChatSend);
+            using var writer = new PacketWriter(NetMessage.ChatSend, netClient?.Wire);
             writer.Write(text);
             client.Send(writer.ToArray());
             return;

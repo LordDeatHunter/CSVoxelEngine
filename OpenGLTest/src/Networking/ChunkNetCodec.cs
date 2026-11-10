@@ -86,9 +86,10 @@ public static class ChunkNetCodec
 
     /// <summary>
     /// Decodes what <see cref="Encode"/> wrote back into a compact snapshot. A malformed or
-    /// truncated payload throws <see cref="InvalidDataException"/>.
+    /// truncated payload throws <see cref="InvalidDataException"/>. On a client, <paramref name="wire"/>
+    /// translates every id from the server's numbering into this run's.
     /// </summary>
-    public static ChunkSnapshot Decode(byte[] payload)
+    public static ChunkSnapshot Decode(byte[] payload, WireIds? wire = null)
     {
         try
         {
@@ -104,13 +105,17 @@ public static class ChunkNetCodec
                 case ModeUniform:
                     Span<byte> id = stackalloc byte[sizeof(ushort)];
                     ReadFully(deflate, id);
-                    dense.AsSpan().Fill(BinaryPrimitives.ReadUInt16LittleEndian(id));
+                    var uniform = BinaryPrimitives.ReadUInt16LittleEndian(id);
+                    dense.AsSpan().Fill(wire?.ContentToLocal(uniform) ?? uniform);
                     break;
                 case ModeIndexed:
-                    ReadIndexed(deflate, dense);
+                    ReadIndexed(deflate, dense, wire);
                     break;
                 case ModeDirect:
                     ReadFully(deflate, MemoryMarshal.AsBytes(dense.AsSpan()));
+                    if (wire != null)
+                        for (var i = 0; i < dense.Length; i++)
+                            dense[i] = wire.ContentToLocal(dense[i]);
                     break;
                 default:
                     throw new InvalidDataException($"Chunk payload has unknown block mode {mode}.");
@@ -144,8 +149,9 @@ public static class ChunkNetCodec
     }
 
     // An Indexed body: the palette count, the palette and one index byte per cell, gathered into
-    // the dense ids. An index at or past the palette count is refused.
-    private static void ReadIndexed(Stream stream, ushort[] dense)
+    // the dense ids. An index at or past the palette count is refused. The palette is translated to
+    // this run's ids once, before the gather.
+    private static void ReadIndexed(Stream stream, ushort[] dense, WireIds? wire)
     {
         var countByte = stream.ReadByte();
         if (countByte < 0)
@@ -155,6 +161,9 @@ public static class ChunkNetCodec
         Span<ushort> palette = stackalloc ushort[ChunkBlocks.PaletteCapacity];
         palette = palette[..count];
         ReadFully(stream, MemoryMarshal.AsBytes(palette));
+        if (wire != null)
+            for (var k = 0; k < palette.Length; k++)
+                palette[k] = wire.ContentToLocal(palette[k]);
 
         Span<byte> indices = stackalloc byte[Chunk.BlockCount];
         ReadFully(stream, indices);

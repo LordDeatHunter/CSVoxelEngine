@@ -63,7 +63,7 @@ public static class PlayerStatusCodec
         var mana = reader.ReadInt();
         var maxMana = Math.Clamp(reader.ReadInt(), 1, PlayerMana.WireMaxCap);
         mana = Math.Clamp(mana, 0, maxMana);
-        var effectMask = reader.ReadByte();
+        var effectMask = reader.ReadEffectMask();
         var rawCave = (CaveBiome)reader.ReadByte();
         var cave = Enum.IsDefined(rawCave) ? rawCave : CaveBiome.Plain;
         return new PlayerStatusData(modes, health, dead, knockback, lift, air, mana, maxMana, effectMask, cave);
