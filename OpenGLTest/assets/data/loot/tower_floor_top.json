@@ -1,5 +1,5 @@
 {
-  // A battle tower chest on floors 6-7: wrought iron, one or two pieces of epic to legendary iron gear and trinkets,
+  // A battle tower chest on floors 6-7: wrought iron, one or two epic to legendary trinkets,
   // and often a scroll or a mana draught.
   "pools": [
     { "rolls": 1, "entries": [ { "table": "tower_supplies" } ] },
@@ -15,12 +15,6 @@
       "chance": 0.9,
       "rolls": { "min": 1, "max": 2 },
       "entries": [
-        { "item": "item/iron_cap", "rarity": { "min": "epic", "max": "legendary" } },
-        { "item": "item/iron_tunic", "rarity": { "min": "epic", "max": "legendary" } },
-        { "item": "item/iron_pants", "rarity": { "min": "epic", "max": "legendary" } },
-        { "item": "item/iron_boots", "rarity": { "min": "epic", "max": "legendary" } },
-        { "item": "item/iron_gloves", "rarity": { "min": "epic", "max": "legendary" } },
-        { "item": "item/iron_ring", "rarity": { "min": "epic", "max": "legendary" } },
         { "item": "item/focus_ring", "rarity": { "min": "epic", "max": "legendary" } },
         { "item": "item/ember_charm", "rarity": { "min": "epic", "max": "legendary" } },
         { "item": "item/amulet_of_vigor", "rarity": { "min": "epic", "max": "legendary" } }

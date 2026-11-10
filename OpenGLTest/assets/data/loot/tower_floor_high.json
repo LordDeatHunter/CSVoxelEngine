@@ -1,5 +1,5 @@
 {
-  // A battle tower chest on floors 4-5: bronze and wrought iron, iron gear and the casters' trinkets (rare to epic),
+  // A battle tower chest on floors 4-5: bronze and wrought iron and the casters' trinkets (rare to epic),
   // often a scroll or a mana draught.
   "pools": [
     { "rolls": 1, "entries": [ { "table": "tower_supplies" } ] },
@@ -15,12 +15,6 @@
       "chance": 0.7,
       "rolls": 1,
       "entries": [
-        { "item": "item/iron_cap", "rarity": { "min": "rare", "max": "epic" } },
-        { "item": "item/iron_tunic", "rarity": { "min": "rare", "max": "epic" } },
-        { "item": "item/iron_pants", "rarity": { "min": "rare", "max": "epic" } },
-        { "item": "item/iron_boots", "rarity": { "min": "rare", "max": "epic" } },
-        { "item": "item/iron_gloves", "rarity": { "min": "rare", "max": "epic" } },
-        { "item": "item/iron_ring", "weight": 2, "rarity": { "min": "rare", "max": "epic" } },
         { "item": "item/focus_ring", "rarity": { "min": "rare", "max": "epic" } },
         { "item": "item/frost_charm", "rarity": { "min": "rare", "max": "epic" } },
         { "item": "item/fire_charm", "rarity": { "min": "rare", "max": "epic" } },
