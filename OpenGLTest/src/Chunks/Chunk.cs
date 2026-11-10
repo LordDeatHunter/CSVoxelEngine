@@ -3,6 +3,7 @@ using Silk.NET.OpenGL;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 using VoxelEngine.Chunks.Meshing;
 using VoxelEngine.Chunks.Sources;
 using VoxelEngine.Data;
@@ -158,6 +159,14 @@ public class Chunk : IDisposable
     /// "chunk has nothing to draw", which <see cref="HasMesh"/> cannot.
     /// </summary>
     public bool IsMeshed { get; private set; }
+
+    private long _meshRevision;
+
+    /// <summary>Generation advanced by synchronous remesh requests to invalidate older worker output.</summary>
+    internal long MeshRevision => Volatile.Read(ref _meshRevision);
+
+    /// <summary>Invalidates older worker results when a synchronous remesh is requested.</summary>
+    internal void AdvanceMeshRevision() => Interlocked.Increment(ref _meshRevision);
 
     /// <summary>
     /// This chunk's index in <see cref="ChunkManager.Renderable"/>, or -1 while it is not in
