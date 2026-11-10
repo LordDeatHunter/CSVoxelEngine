@@ -339,7 +339,8 @@ internal sealed class ShadowPass
         Units.BindUnit(0, TextureTarget.Texture2DArray, _owner.AtlasTexture);
     }
 
-    // Every part of one rigged mob into the near cascade; its skin is already bound on unit 0
+    // Every part of one rigged mob into the near cascade, then the item its kind holds on its own sprite texture
+    // (the cutout is alpha-tested); its skin is already bound on unit 0 and is bound again after the item
     private void DrawRigCaster(RiggedMob mob, RigMeshes rig)
     {
         for (var i = 0; i < rig.Meshes.Length; i++)
@@ -349,6 +350,15 @@ internal sealed class ShadowPass
             _owner.ShadowShader.SetUniform("uLightMVP", model * _owner.NearShadow.ViewProj);
             rig.Meshes[i].Render();
         }
+
+        var type = mob.Type;
+        if (type.HeldItemId == 0 || !_owner.ItemMeshes.TryGet(type.HeldItemId, out var held, out var texture)) return;
+        Units.BindUnit(0, TextureTarget.Texture2DArray, texture);
+        var heldModel = type.HeldMatrix(mob.Animation, rig.Rig, mob.Feet, mob.Facing);
+        _owner.ShadowShader.SetUniform("uModel", heldModel);
+        _owner.ShadowShader.SetUniform("uLightMVP", heldModel * _owner.NearShadow.ViewProj);
+        held.Render();
+        Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
     }
 
     // The bergs inside the near light box, each on its own skin like the goblin casters (its texels

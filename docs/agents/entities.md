@@ -9,7 +9,13 @@ Entities (mobs) are data-driven like blocks: `assets/data/entities/<name>.json` 
 and the `Mob` constructor refuses it), an optional `loot` table rolled on death, and an optional
 `model` Blockbench project (default `assets/models/entity/<name>.bbmodel`), or instead of `model`
 a non-empty `variants` list of projects, one per size class or look (`EntityType.Variants` /
-`VariantPaths`, whose first entry is always `Model`; the icebergs use it). `ContentRegistry.Load` parses them into
+`VariantPaths`, whose first entry is always `Model`; the icebergs use it), and an optional `held` item every spawn
+holds: `{ "item", "part", "display" }`, a pure item drawn from its own extruded sprite at the hand of that group
+(`EntityAnimator.HandAnchor`, the bottom of its lowest cube, so it swings with the limb), posed by the item file's
+`display` shape and parser (`ItemLoader.ParseDisplay`, `Item.ComposeDisplay`). The loader checks the item and that every
+variant has the group; `EntityType.HeldItemId`/`HeldPart`/`HeldTransform` carry it and `EntityType.HeldMatrix` is the one
+world matrix the entity pass (`MobPasses.DrawRigParts`), the shadow casters (`ShadowPass.DrawRigCaster`) and the item
+debugger's entity preview draw it with (the skeleton warrior's copper dagger). `ContentRegistry.Load` parses them into
 `EntityType`s published on `EntityRegistry` (`RequireEntity`/`TryGet`), and parses each entity's
 `.bbmodel` once, GL-free, into `EntityType.Model` (a `BbmodelData`: parts, skin pixels and animation
 clips). The entity, the renderer and the item debugger all share that one parse. A broken entity model

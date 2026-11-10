@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using VoxelEngine.Content;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
+using VoxelEngine.Player;
 
 namespace VoxelEngine.Entities;
 
@@ -59,6 +61,23 @@ public sealed class EntityType
         get => _variants ??= [Model];
         init => _variants = value;
     }
+
+    /// <summary>The item every spawn holds (the entity file's <c>held</c>), 0 for none.</summary>
+    public byte HeldItemId { get; init; }
+
+    /// <summary>The rig group whose hand holds <see cref="HeldItemId"/>; null when it is 0.</summary>
+    public string? HeldPart { get; init; }
+
+    /// <summary>The held item's transform in the hand anchor's space (its <c>held.display</c>).</summary>
+    public Matrix4x4 HeldTransform { get; init; } = Matrix4x4.Identity;
+
+    /// <summary>
+    /// The world matrix of the held item's sprite: <see cref="HeldTransform"/> under the hand anchor of
+    /// <see cref="HeldPart"/>, posed by <paramref name="animator"/>, so the item swings with that limb. The
+    /// caller multiplies its body effect on, like the parts. Only meaningful when <see cref="HeldItemId"/> is set.
+    /// </summary>
+    public Matrix4x4 HeldMatrix(EntityAnimator animator, PlayerRig rig, Vector3 feet, float facingYaw) =>
+        HeldTransform * animator.HandAnchor(HeldPart!, rig, feet, facingYaw);
 }
 
 /// <summary>

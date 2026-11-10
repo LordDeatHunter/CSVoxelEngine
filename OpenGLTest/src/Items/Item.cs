@@ -206,12 +206,18 @@ public abstract class Item
     /// the arm swing and the mine pump. <paramref name="rotationOffsetDegrees"/> is what the pose adds to
     /// the display rotation for this frame (<c>PlayerModel.HeldItemRotationOffset</c>, the same
     /// <c>[pitch, yaw, roll]</c> degrees), zero by default.</summary>
-    public Matrix4x4 DisplayMatrix(Vector3 rotationOffsetDegrees = default)
+    public Matrix4x4 DisplayMatrix(Vector3 rotationOffsetDegrees = default) =>
+        ComposeDisplay(DisplayRotation + rotationOffsetDegrees, DisplayTranslation, DisplayScale);
+
+    /// <summary>The one display-transform formula, shared by an item's held pose and an entity's held item
+    /// (<c>EntityType.HeldTransform</c>): scaled, rotated by <paramref name="rotationDegrees"/> as
+    /// <c>[pitch, yaw, roll]</c> (yaw, then pitch, then roll), then translated.</summary>
+    public static Matrix4x4 ComposeDisplay(Vector3 rotationDegrees, Vector3 translation, float scale)
     {
-        var radians = (DisplayRotation + rotationOffsetDegrees) * (MathF.PI / 180f);
-        return Matrix4x4.CreateScale(DisplayScale)
+        var radians = rotationDegrees * (MathF.PI / 180f);
+        return Matrix4x4.CreateScale(scale)
             * Matrix4x4.CreateFromYawPitchRoll(radians.Y, radians.X, radians.Z)
-            * Matrix4x4.CreateTranslation(DisplayTranslation);
+            * Matrix4x4.CreateTranslation(translation);
     }
 
     /// <summary>Frame to draw for this item at this moment.</summary>

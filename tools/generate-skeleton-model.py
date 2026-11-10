@@ -3,8 +3,9 @@
 Writes, under OpenGLTest/assets:
   models/entity/skeleton.bbmodel + skeleton.png   the battle tower's archer (plans/BATTLE_TOWER.md BT-3): lanky and
                                                   tall, a bow under the left arm
-  models/entity/skeleton_warrior.bbmodel + .png   its melee kin: the same bones a little shorter and bulkier, a copper
-                                                  dagger in the right hand instead of the bow
+  models/entity/skeleton_warrior.bbmodel + .png   its melee kin: the same bones a little shorter and bulkier and empty
+                                                  handed (its copper dagger is the real item, drawn at ArmR from the
+                                                  entity file's "held")
   textures/items/bone.png                         the bone it drops
 
 The rig, UV, PNG, JSON and clip machinery is the hell mobs' generator's (tools/generate-hell-mob-models.py),
@@ -18,7 +19,8 @@ Rig contract (EntityContract.RequireHumanoid): the groups Torso, Head, ArmL, Arm
 and the arms nested under Torso and the legs at the top level; the model faces -Z, units are pixels (16 px =
 1 block) with the feet on y = 0, the archer 32 px tall and the warrior 28. The bow is a few thin cubes under ArmL:
 at rest it hangs front to back beside the leg, and with the arm raised forward it stands upright with its string
-toward the body; the warrior's dagger is a grip, a guard and a blade under ArmR, pointing forward from the hand.
+toward the body. The warrior carries nothing in the model: the renderer draws the copper_dagger item's sprite at the
+bottom of ArmR (assets/data/entities/skeleton_warrior.json "held"), so ArmR's lowest cube must stay the arm's own.
 Both share every clip: idle, walk, "melee" (an overhand rake of the right arm) carrying the "impact" event and "shoot"
 (the bow raised, the string drawn back to the cheek, a snap at the shot) carrying "release"
 (Skeleton.ValidateContent), plus the shared hurt, death and spawn. The event times pace the attacks.
@@ -53,9 +55,6 @@ EYE = (222, 52, 40)
 WOOD = (122, 84, 48)
 WOOD_DARK = (88, 58, 34)
 STRING = (234, 232, 220)
-COPPER = (206, 118, 64)
-COPPER_LIGHT = (232, 156, 98)
-COPPER_DARK = (150, 80, 44)
 OUTLINE = (46, 38, 32)
 
 
@@ -162,18 +161,6 @@ def bow(arm_x, hand):
     ]
 
 
-def dagger(arm_x, hand):
-    """The warrior's copper dagger under ArmR: a grip in the fist, a guard and a blade pointing forward."""
-    x0, x1 = arm_x - 0.5, arm_x + 0.5
-    return [
-        ("dagger_grip", "ArmR", (x0, hand - 2, -0.5), (x1, hand, 0.5), paletted((WOOD_DARK, WOOD), 81)),
-        ("dagger_guard", "ArmR", (x0 - 0.5, hand - 2, -1.5), (x1 + 0.5, hand - 1, -0.5),
-         paletted((COPPER_DARK, COPPER), 82)),
-        ("dagger_blade", "ArmR", (x0 + 0.25, hand - 2, -6.5), (x1 - 0.25, hand - 1, -1.5),
-         paletted((COPPER, COPPER_LIGHT, COPPER), 83)),
-    ]
-
-
 def archer():
     """Lanky and tall (32 px): long thin legs and arms, a narrow ribcage and a long spine."""
     origins, cubes, hand = bones(leg=13, hip=2.5, spine_len=4, rib_w=3.5, rib_d=2, arm_x=4.75, arm_w=0.75, arm_len=14)
@@ -182,10 +169,9 @@ def archer():
 
 def warrior():
     """Shorter and bulkier (28 px): short sturdy legs, a wide deep ribcage, thick arms and a short spine."""
-    origins, cubes, hand = bones(leg=11, hip=3.5, spine_len=2, rib_w=4.5, rib_d=2.5, arm_x=5.75, arm_w=1.25,
-                                 arm_len=13)
-    return {"name": "skeleton_warrior", "uuid": 0x94, "skin": 64, "origins": origins,
-            "cubes": cubes + dagger(5.75, hand)}
+    origins, cubes, _ = bones(leg=11, hip=3.5, spine_len=2, rib_w=4.5, rib_d=2.5, arm_x=5.75, arm_w=1.25,
+                              arm_len=13)
+    return {"name": "skeleton_warrior", "uuid": 0x94, "skin": 64, "origins": origins, "cubes": cubes}
 
 
 # ---- clips ---------------------------------------------------------------------------------------

@@ -5,6 +5,7 @@ using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Entities;
 using VoxelEngine.Entities.Slimes;
+using VoxelEngine.Items;
 using Xunit;
 
 namespace VoxelEngine.Tests.Entities;
@@ -76,6 +77,25 @@ public sealed class EntityContentTests
             Assert.Equal(type.ModelPath, type.VariantPaths[0]);
             Assert.Equal(type.Variants.Count, type.VariantPaths.Count);
         }
+    }
+
+    [Fact]
+    public void EveryHeldItemIsAPureItemInAGroupOfEveryVariant()
+    {
+        var holders = 0;
+        foreach (var type in EntityRegistry.ByName.Values)
+        {
+            if (type.HeldItemId == 0)
+            {
+                Assert.Null(type.HeldPart);
+                continue;
+            }
+            holders++;
+            Assert.True(ItemRegistry.IsItem(type.HeldItemId), $"{type.Name} holds a non-item id {type.HeldItemId}");
+            Assert.NotNull(type.HeldPart);
+            Assert.All(type.Variants, model => Assert.True(model.Parts.ContainsKey(type.HeldPart!)));
+        }
+        Assert.True(holders > 0, "no entity holds an item, so the held path is untested");
     }
 
     [Fact]

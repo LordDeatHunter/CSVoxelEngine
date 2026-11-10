@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Numerics;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.Loot;
 using VoxelEngine.Content.Models;
 using VoxelEngine.Entities;
+using VoxelEngine.Items;
 
 namespace VoxelEngine.Content;
 
@@ -51,6 +53,7 @@ internal static class EntityLoader
             // Parsed once here, GL-free, so the entity, the renderer and the debugger share one
             // parse; the loader's own errors already name the model file.
             var parsed = BbmodelLoader.Load(model, Array.Empty<string>());
+            var held = ParseHeld(definition.Held, path, [parsed]);
 
             types[name] = new EntityType
             {
@@ -60,6 +63,9 @@ internal static class EntityLoader
                 LootTable = loot,
                 ModelPath = model,
                 Model = parsed,
+                HeldItemId = held.ItemId,
+                HeldPart = held.Part,
+                HeldTransform = held.Transform,
             };
         }
 
@@ -87,6 +93,7 @@ internal static class EntityLoader
             parsed[i] = BbmodelLoader.Load(variant, Array.Empty<string>());
             EntityModel.RequireTexture(parsed[i], variant);
         }
+        var held = ParseHeld(definition.Held, path, parsed);
 
         return new EntityType
         {
@@ -98,6 +105,32 @@ internal static class EntityLoader
             Model = parsed[0],
             VariantPaths = variants,
             Variants = parsed,
+            HeldItemId = held.ItemId,
+            HeldPart = held.Part,
+            HeldTransform = held.Transform,
         };
+    }
+
+    /// <summary>
+    /// An entity's <c>held</c> item: a registered pure item (items load before entities) in a hand that
+    /// every one of its models has, posed by the same <c>display</c> shape and parser as an item file.
+    /// Nothing held is item 0 with an identity transform.
+    /// </summary>
+    private static (byte ItemId, string? Part, Matrix4x4 Transform) ParseHeld(EntityDefinition.HeldDefinition? held,
+        string path, IReadOnlyList<BbmodelData> models)
+    {
+        if (held == null) return (0, null, Matrix4x4.Identity);
+
+        if (string.IsNullOrEmpty(held.Item) || !ContentRegistry.ItemIds.TryGetValue(held.Item, out var id)
+            || !ItemRegistry.IsItem(id))
+            throw new InvalidOperationException($"Entity '{path}' holds '{held.Item}', which is not a registered item.");
+        if (string.IsNullOrEmpty(held.Part))
+            throw new InvalidOperationException($"Entity '{path}' has a held item without a held.part.");
+        foreach (var model in models)
+            if (!model.Parts.ContainsKey(held.Part))
+                throw new InvalidOperationException(
+                    $"Entity '{path}' holds its item in part '{held.Part}', which its model does not have.");
+
+        return (id, held.Part, ItemLoader.ParseDisplay(held.Display, path).Matrix);
     }
 }

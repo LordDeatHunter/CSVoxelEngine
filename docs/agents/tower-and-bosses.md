@@ -16,7 +16,9 @@ shared `RealmMobManager<TMob>` frame, joined to the world's `MobCaps`, in two ki
 `tools/generate-skeleton-model.py` (deterministic, `--check`; it loads the hell script's rig, UV, PNG and clip machinery
 like the sky script), both built from one set of proportions (`bones`): the archer lanky and tall (32 px, long thin
 limbs, a narrow ribcage) holding a bow modeled as cubes under `ArmL`, the warrior shorter and bulkier (28 px, a wide
-deep ribcage, thick limbs) holding a copper dagger under `ArmR`, so the renderer needs no held-item code; both humanoid
+deep ribcage, thick limbs) empty handed in the model: its copper dagger is the real `copper_dagger` item, drawn from its
+sprite at `ArmR` by the entity file's `held` (grip in the fist, the blade turned onto -Z pointing forward, its flat to
+the sides; see "Entities"), so it swings with the arm through every clip and casts a shadow; both humanoid
 (head and arms under the torso, checked by `Skeleton.ValidateContent` over `EntityContract.RequireHumanoid`) with the same
 clips: idle, walk, `melee` (an `impact` event), `shoot` (a `release` event) and the common hurt, death and spawn. Both
 share `MobConfig.SkeletonHeight` as their body box.

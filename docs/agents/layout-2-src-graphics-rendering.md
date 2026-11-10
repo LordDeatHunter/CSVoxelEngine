@@ -427,7 +427,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         IcebergPasses.cs       # the iceberg draws: one mesh and skin per variant, ModelMatrix (wobble and rise/sink
                                #   over IcebergShape.ModelMatrix), the entity, near-shadow and mirror passes
         MobPasses.cs           # the slime, goblin and hell mob draws (RenderSlimes, RenderGoblins, RenderHellMobs),
-                               #   the slime mesh and skin, one RigMeshes per clip-animated kind, SlimeTransform
+                               #   the slime mesh and skin, one RigMeshes per clip-animated kind, SlimeTransform,
+                               #   a rigged kind's held item (EntityType.HeldMatrix) at its hand
         RigMeshes.cs           # one clip-animated kind's rig, part meshes (ordinal-sorted) and skin, PartMatrix
         ObjectPasses.cs        # drops, thrown items, primed TNT, falling blocks, mining debris, a collapsing tower's
                                #   thrown blocks (RenderCollapseDebris) and toppling trees

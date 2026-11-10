@@ -185,7 +185,7 @@ OpenGLTest/
       ContentRegistry.cs       # the static facade: owns the content tables, assigns byte ids, runs Load / BakeModels /
                                #   Reset in order and serves the public lookups (RequireBlock, recipes, tags, ...)
       ContentFiles.cs          # the one JsonSerializerOptions, JSON file listing and reading, name -> id resolution
-      EntityLoader.cs          # data/entities -> EntityRegistry (hp, loot table, the parsed .bbmodel)
+      EntityLoader.cs          # data/entities -> EntityRegistry (hp, loot table, the parsed .bbmodel, the held item)
       ItemLoader.cs            # data/items -> ItemRegistry (use, tool, display, spritesheet); the item-use check
       TagLoader.cs             # data/tags -> the tag sets; warns on a tool tag no item provides
       TreeSpeciesLoader.cs     # data/trees -> TreeSpeciesRegistry (TreeSpeciesCompiler) and the pixel-rim table

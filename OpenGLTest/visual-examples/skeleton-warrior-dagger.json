@@ -1,0 +1,32 @@
+{
+  // Skeleton warrior's held dagger: run from OpenGLTest/ with
+  //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/skeleton-warrior-dagger.json
+  // Shots land in visual/skeleton-warrior-dagger/. The warrior draws the real copper_dagger item's sprite at the
+  // bottom of ArmR (skeleton_warrior.json "held"), not cubes in its model. Same open, flat forest clearing as
+  // skeletons.json (ground at y 9..10, no trunks); the camera hovers in creative flight, so it is immune and the
+  // warrior still targets it. One warrior pops in 4 blocks ahead; the shoulder camera is turned right of it, so the
+  // warrior (facing the player) is seen three-quarter from its own right, the dagger side, with the blade's flat
+  // toward the camera. `idle` just after the spawn, `walk` while it closes in, then three shots through the
+  // overhand stab (melee clip, impact at 0.4 s) once it is in reach.
+  "steps": [
+    { "op": "creative", "on": true },
+    { "op": "fly", "on": true },
+    { "op": "teleport", "pos": [-43.0, 12.6, 56.5], "yaw": -90, "pitch": -4 },
+    // Chunks must be loaded before anything can stand on them
+    { "op": "wait", "seconds": 8 },
+
+    { "op": "view", "mode": "shoulder" },
+    { "op": "look", "yaw": -35, "pitch": -10 },
+    { "op": "spawn", "entity": "skeleton_warrior", "pos": [-43.0, 11, 52.5] },
+    { "op": "wait", "seconds": 0.4 },
+    { "op": "screenshot", "name": "idle", "hideHud": true },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "walk", "hideHud": true },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "melee_a", "hideHud": true },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "melee_b", "hideHud": true },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "melee_c", "hideHud": true }
+  ]
+}

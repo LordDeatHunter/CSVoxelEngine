@@ -19,8 +19,8 @@ namespace VoxelEngine.Rendering.Actors;
 
 /// <summary>
 /// The mob draws: the live slimes from the shared entity mesh, the goblins part by part with the
-/// flint and the torch they hold, and the realm (hell, sky, tower and cave) mobs part by part, for the entity pass and the
-/// water mirror. Owns the slime mesh and skin and one <see cref="RigMeshes"/> per clip-animated kind,
+/// flint and the torch they hold, and the realm (hell, sky, tower and cave) mobs part by part with the item their
+/// entity file holds (<see cref="EntityType.HeldItemId"/>), for the entity pass and the water mirror. Owns the slime mesh and skin and one <see cref="RigMeshes"/> per clip-animated kind,
 /// built from their Blockbench projects at load; the world program and the item and block caches stay owned by
 /// <see cref="RenderManager"/>. Render thread only.
 /// </summary>
@@ -309,6 +309,21 @@ internal sealed class MobPasses : IDisposable
             var piece = mob.ArmorPieceOn(rig.PartNames[i]);
             if (piece != 0) DrawArmorShell(mob.Type, rig, i, piece);
         }
+        DrawHeldItem(mob, rig, viewProj, light, effect);
+    }
+
+    // The item the kind holds (its entity file's held, the skeleton warrior's dagger) at its hand, swinging with
+    // that limb, on its own sprite texture with the mob's hit flash and tint still set; the skin goes back after
+    private void DrawHeldItem(RiggedMob mob, RigMeshes rig, in Matrix4x4 viewProj, EntityLightSample light,
+        in Matrix4x4 effect)
+    {
+        var type = mob.Type;
+        if (type.HeldItemId == 0 || !_owner.ItemMeshes.TryGet(type.HeldItemId, out var mesh, out var texture)) return;
+        Units.BindUnit(0, TextureTarget.Texture2DArray, texture);
+        var model = type.HeldMatrix(mob.Animation, rig.Rig, mob.Feet, mob.Facing) * effect;
+        _owner.SetDrawUniforms(model, model * viewProj, 1f, light);
+        mesh.Render();
+        Units.BindUnit(0, TextureTarget.Texture2DArray, rig.Texture);
     }
 
     // The armor shell over one already drawn part, with its uniforms still set: the part's cuboids grown a little and

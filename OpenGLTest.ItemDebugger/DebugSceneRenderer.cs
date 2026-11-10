@@ -187,7 +187,7 @@ public sealed class DebugSceneRenderer : IDisposable
     /// <summary>
     /// Draws the entity <paramref name="state"/> previews, part by part, at the origin: each part
     /// from the state's <see cref="EntityAnimator.GetPartMatrix"/>, the flint in the hand when the
-    /// rig has one, and the hurt mode's hit-flash tint. Same frame setup as <see cref="Render"/>.
+    /// rig has one, the item its entity file holds, and the hurt mode's hit-flash tint. Same frame setup as <see cref="Render"/>.
     /// </summary>
     public void RenderEntity(Matrix4x4 viewProj, Vector3 eyePos, EntityPreviewState state, float time,
         Vector2D<int> size)
@@ -214,6 +214,13 @@ public sealed class DebugSceneRenderer : IDisposable
             var model = Matrix4x4.CreateScale(Goblin.HeldStoneScale)
                         * animator.HandAnchor(Goblin.HandPart, preview.Rig, feet, state.FacingYaw) * effect;
             Draw(stone, model, viewProj);
+        }
+
+        // The item the kind's entity file holds (the skeleton warrior's dagger), as the game's MobPasses draws it
+        if (type.HeldItemId != 0 && _itemMeshes.TryGet(type.HeldItemId, out var held, out var heldTex))
+        {
+            BindArray(0, heldTex);
+            Draw(held, type.HeldMatrix(animator, preview.Rig, feet, state.FacingYaw) * effect, viewProj);
         }
         _world.SetUniform("uHitFlash", 0f);
     }

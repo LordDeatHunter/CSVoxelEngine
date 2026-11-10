@@ -186,8 +186,9 @@ tools/                                # asset generators: models, animation clip
   generate-sky-mob-models.py          # deterministic galeraptor/cloudgolem .bbmodel (rig + clips) and skins, and the
                                       #   cloud_shard sprite, on the hell script's machinery; --check
   generate-skeleton-model.py          # deterministic skeleton (lanky archer with its bow) and skeleton_warrior (shorter,
-                                      #   bulkier, a copper dagger) .bbmodels (rigs from proportions, shared clips) and palette
-                                      #   skins, and the bone sprite, on the hell script's machinery; --check
+                                      #   bulkier, empty handed: its dagger is the held item) .bbmodels (rigs from proportions,
+                                      #   shared clips) and palette skins, and the bone sprite, on the hell script's machinery;
+                                      #   --check
   generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout), skeleton_pile and
                                       #   tower_altar_top tiles, stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
   generate-cave-ore-textures.py       # deterministic placeholder amethyst_ore, jade_ore and cinnabar_ore tiles: palette swaps

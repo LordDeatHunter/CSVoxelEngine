@@ -466,13 +466,17 @@ internal static class ItemLoader
         return new ParsedSheet(cols, rows, frames, mode, fps);
     }
 
-    private readonly record struct ParsedDisplay(Vector3 Rotation, Vector3 Translation, float Scale);
+    internal readonly record struct ParsedDisplay(Vector3 Rotation, Vector3 Translation, float Scale)
+    {
+        /// <summary>The transform these values compose to (<see cref="Item.ComposeDisplay"/>).</summary>
+        public Matrix4x4 Matrix => Item.ComposeDisplay(Rotation, Translation, Scale);
+    }
 
     /// <summary>
-    /// Reads an item's held-in-hand transform, defaulting to the upright side-facing tool
-    /// pose when the file says nothing.
+    /// Reads a held-in-hand transform (an item's <c>display</c>, or an entity's <c>held.display</c>),
+    /// defaulting to the upright side-facing tool pose when the file says nothing.
     /// </summary>
-    private static ParsedDisplay ParseDisplay(ItemDefinition.DisplayDefinition? display, string path)
+    internal static ParsedDisplay ParseDisplay(ItemDefinition.DisplayDefinition? display, string path)
     {
         if (display == null)
             return new ParsedDisplay(new Vector3(-30f, 10f, 0f), Vector3.Zero, 1f);
@@ -480,7 +484,7 @@ internal static class ItemLoader
         var scale = display.Scale ?? 1f;
         if (!float.IsFinite(scale) || scale <= 0f)
             throw new InvalidOperationException(
-                $"Item '{path}' has display.scale {display.Scale}; expected a positive number.");
+                $"'{path}' has display.scale {display.Scale}; expected a positive number.");
 
         return new ParsedDisplay(ReadTriple(display.Rotation, "rotation"),
             ReadTriple(display.Translation, "translation"), scale);
@@ -490,7 +494,7 @@ internal static class ItemLoader
             if (values == null) return field == "rotation" ? new Vector3(-30f, 10f, 0f) : Vector3.Zero;
             if (values.Length != 3 || values.Any(v => !float.IsFinite(v)))
                 throw new InvalidOperationException(
-                    $"Item '{path}' has display.{field} with {values?.Length ?? 0} entries; expected 3 finite numbers.");
+                    $"'{path}' has display.{field} with {values?.Length ?? 0} entries; expected 3 finite numbers.");
             return new Vector3(values[0], values[1], values[2]);
         }
     }

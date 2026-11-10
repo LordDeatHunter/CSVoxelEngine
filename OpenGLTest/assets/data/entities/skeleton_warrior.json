@@ -4,5 +4,12 @@
   // pool on the tower's first floor; TowerDifficulty scales it with the floor tier
   "hp": 56,
   "loot": "skeleton_warrior",
-  "model": "assets/models/entity/skeleton_warrior.bbmodel"
+  "model": "assets/models/entity/skeleton_warrior.bbmodel",
+  // The copper dagger in the right fist, drawn from its item sprite: the grip in the hand, the blade pointing
+  // forward (the sprite's diagonal turned onto -Z, its flat facing the sides), swinging with the arm
+  "held": {
+    "item": "copper_dagger",
+    "part": "ArmR",
+    "display": { "rotation": [0, 90, -45], "translation": [0, -0.065, -0.11], "scale": 0.6 }
+  }
 }
