@@ -81,7 +81,7 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Post/                      # biome grade, contact AO, eye adaptation, godrays, underwater wobble
     Sky/                       # aurora, silver lining, moon, moonlight, sky palette, stars, glare, wind, the cave
                                #   biome atmosphere (CaveClimateTests)
-    Surfaces/                  # glass, grass, ice, lava, leaf and ore twins, the snow sparkle shader term
+    Surfaces/                  # forcefield, glass, grass, ice, lava, leaf and ore twins, the snow sparkle shader term
     Water/                     # deep-water fog, the waterline fresnel, sun glitter, the shore foam shader term
   Entities/                    # the Mob base and the shared mob rules (caps, targets, notice, interest, fall,
                                #   lava, ledge, loot, body separation), clips and the animator, drops, projectiles,
@@ -170,7 +170,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Sky/                       # the solid cloud patches, the cloud sea, the sky islands, the sky biomes and their
                                #   flora (mirrors src/WorldGen/Sky)
     Structures/                # templates, the ruins and their waystone satellites, the battle towers (TowerShellTests:
-                               #   stair, landings, the door seal flood fill, the closed doors; TowerPlacementTests: rarity,
+                               #   stair, landings, the door and roof seal flood fills (the parapet and the forcefield
+                               #   dome), the closed doors; TowerPlacementTests: rarity,
                                #   point query equals stamp, generated chunks, every floor's piles), the /locate search
                                #   (StructureLocatorTests: exactly the nearest, the ring cap, the landing) (mirrors
                                #   src/WorldGen/Structures)
@@ -192,6 +193,8 @@ tools/                                # asset generators: models, animation clip
                                       #   --check
   generate-tower-lock-textures.py     # deterministic placeholder tower_door (portcullis cutout), skeleton_pile and
                                       #   tower_altar_top tiles, stdlib PNG writer, small palettes; listed in USER_TODO.md; --check
+  generate-forcefield-texture.py      # deterministic placeholder tower_forcefield tile (a faint honeycomb, only the fallback
+                                      #   of the world shader's forcefield term), integer geometry; listed in USER_TODO.md; --check
   generate-cave-ore-textures.py       # deterministic placeholder amethyst_ore, jade_ore and cinnabar_ore tiles: palette swaps
                                       #   of malachite_ore's green shades, stdlib PNG reader and writer; listed in USER_TODO.md;
                                       #   --check

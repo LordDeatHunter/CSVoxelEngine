@@ -26,6 +26,7 @@ public sealed record TowerPalette(byte Brick, byte Step)
         ChestBlock = ContentRegistry.RequireBlock("tower_chest").Id;
         LanternBlock = ContentRegistry.RequireBlock("lantern").Id;
         AltarBlock = ContentRegistry.RequireBlock("tower_altar").Id;
+        ForcefieldBlock = ContentRegistry.RequireBlock("tower_forcefield").Id;
         Plain = new TowerPalette(DefaultBrick, step);
         Sandstone = new TowerPalette(ContentRegistry.RequireBlock("tower_bricks_sandstone").Id, step);
         Frost = new TowerPalette(ContentRegistry.RequireBlock("tower_bricks_frost").Id, step);
@@ -62,6 +63,12 @@ public sealed record TowerPalette(byte Brick, byte Step)
     /// rather than by a block flag.
     /// </summary>
     internal static byte AltarBlock { get; }
+
+    /// <summary>
+    /// The unbreakable, see-through forcefield the stamp writes on the roof dome's shell (<see cref="TowerDome"/>), the same
+    /// in every palette; only the tower's collapse clears it.
+    /// </summary>
+    internal static byte ForcefieldBlock { get; }
 
     /// <summary>The lantern hung in each floor's stairwell doorway, the same in every palette.</summary>
     internal static byte LanternBlock { get; }

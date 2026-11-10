@@ -168,6 +168,11 @@ All three made by `tools/generate-tower-lock-textures.py`: re-running puts the p
   `tower_altar` (a `cube_bottom_top` whose sides and bottom are `stone_bricks`), so keep its rim in
   the stone-brick grays where it meets the sides. The block glows (light 7), so a crystal or rune
   center that reads as lit fits.
+- [ ] **Tower forcefield** — `tower_forcefield.png`, made by `tools/generate-forcefield-texture.py`
+  (its own script, so re-running it touches nothing else). 32x32 RGBA, mostly transparent (alpha
+  ~10%, edges ~45%): the roof dome's `cube_all` block draws translucent, and in the game the world
+  shader replaces its color and alpha with its own shimmer, so this tile only shows where that term
+  is off (the ItemDebugger). Keep it faint and seamless; it needs no detail.
 
 ### Battle tower chest
 

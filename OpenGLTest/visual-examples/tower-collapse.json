@@ -2,7 +2,7 @@
   // A defeated battle tower falling into its ruin, with its collapse show (TowerCollapseEffects): run from OpenGLTest/ with
   //   VOXEL_TIME=147 VOXEL_SCRIPT=visual-examples/tower-collapse.json
   // Shots land in visual/tower-collapse/. The tower is battle-tower.json's: center (2920, -1411), radius 18 plus a 3-block
-  // apron (west wall face at x 2902), ground slab at y 10, roof slab at y 45, top y 51, entrance facing -X. towerdefeat
+  // apron (west wall face at x 2902), ground slab at y 10, roof slab at y 45, top y 61, entrance facing -X. towerdefeat
   // marks the king of the tower around the camera killed, so it runs from above the roof (inside the footprint); every
   // shot then films the west wall from the west, looking down its face, since the bricks thrown off it fly toward the
   // camera and land between it and the wall. The collapse waits MobConfig.TowerCollapseDelaySeconds (4 s) and then

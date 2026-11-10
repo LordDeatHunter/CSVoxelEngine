@@ -10,7 +10,8 @@ namespace VoxelEngine.Tests.WorldGen.Structures;
 /// The battle tower's shell geometry (<see cref="TowerShell"/>) over the smallest, a middle and the largest radius, the fewest
 /// and the most floors and every quarter turn: the stair climbs half a block at a time from the ground to the roof, every
 /// landing is level with its floor and opens onto its room, the door cells fill the tube two steps past their landing, closed
-/// doors seal every floor from the next one and the top floor from the roof even with every breakable cell gone, the walls,
+/// doors seal every floor from the next one and the top floor from the roof even with every breakable cell gone, the parapet
+/// and the forcefield dome (<see cref="TowerDome"/>) seal the roof from the outside under every altar dressing, the walls,
 /// slabs and corridor are unbreakable bricks, the parapet is crenellated, and the rings nest outward by distance.
 /// </summary>
 public sealed class TowerShellTests
@@ -172,42 +173,36 @@ public sealed class TowerShellTests
     public void ClosedDoorsSealEveryFloorEvenWithBreakableCellsRemoved(int radius, int floors, int turns)
     {
         var s = TowerSiteFixture.SiteOf(radius, floors, turns);
-        var x0 = s.MinX - 1;
-        var z0 = s.MinZ - 1;
-        var y0 = s.BottomY - 1;
-        var sx = s.MaxX + 2 - x0;
-        var sz = s.MaxZ + 2 - z0;
-        var sy = s.TopY + 2 - y0;
-        int Index(int x, int y, int z) => ((y - y0) * sz + (z - z0)) * sx + (x - x0);
+        var box = SiteBox.Round(s);
 
         // Solid: an unbreakable shell cell or a closed door. Breakable cells (slabs, the stoop), air, the dressing (ignored, it
-        // is breakable) and everything the shell leaves alone are passable
-        var solid = new bool[sx * sy * sz];
-        for (var z = z0; z < z0 + sz; z++)
-        for (var x = x0; x < x0 + sx; x++)
+        // is breakable), the dome (not shell) and everything the shell leaves alone are passable
+        var solid = new bool[box.Length];
+        for (var z = box.Z0; z < box.Z0 + box.Sz; z++)
+        for (var x = box.X0; x < box.X0 + box.Sx; x++)
         {
             var dx = x - s.CenterX;
             var dz = z - s.CenterZ;
             var step = TowerShell.StepOf(s, dx, dz);
             var ring = TowerShell.RingOf(s, dx, dz, step);
-            for (var y = y0; y < y0 + sy; y++)
+            for (var y = box.Y0; y < box.Y0 + box.Sy; y++)
             {
                 var cell = TowerShell.CellAt(s, ring, step, y);
-                solid[Index(x, y, z)] = cell > 0 && BlockType.IsUnbreakable((byte)BlockOf(cell));
+                solid[box.Index(x, y, z)] = cell > 0 && BlockType.IsUnbreakable((byte)BlockOf(cell));
             }
         }
         for (var k = 0; k < floors; k++)
             foreach (var (x, y, z) in s.DoorCells(k))
-                solid[Index(x, y, z)] = true;
+                solid[box.Index(x, y, z)] = true;
 
-        var labels = Label(solid, sx, sy, sz);
-        var outside = labels[Index(x0, y0, z0)];
+        var labels = Label(solid, box.Sx, box.Sy, box.Sz);
+        var outside = labels[box.Index(box.X0, box.Y0, box.Z0)];
         Assert.True(outside > 0);
-        var roofTop = labels[Index(s.CenterX, s.RoofY + 1, s.CenterZ)];
+        var roofTop = labels[box.Index(s.CenterX, s.RoofY + 1, s.CenterZ)];
         var rooms = new int[floors];
         for (var k = 0; k < floors; k++)
         {
-            rooms[k] = labels[Index(s.CenterX, s.FloorY(k) + 1, s.CenterZ)];
+            rooms[k] = labels[box.Index(s.CenterX, s.FloorY(k) + 1, s.CenterZ)];
             Assert.True(rooms[k] > 0, $"room {k}'s sample cell is solid");
         }
         Assert.Equal(outside, rooms[0]);
@@ -217,6 +212,55 @@ public sealed class TowerShellTests
             Assert.NotEqual(outside, rooms[k]);
             Assert.NotEqual(roofTop, rooms[k]);
         }
+    }
+
+    [Theory]
+    [MemberData(nameof(Shapes))]
+    public void TheParapetAndTheDomeSealTheRoofFromTheOutside(int radius, int floors, int turns) =>
+        AssertRoofSealed(TowerSiteFixture.SiteOf(radius, floors, turns));
+
+    [Fact]
+    public void EveryAltarDressingStaysUnderTheDomeAtEveryTurn()
+    {
+        foreach (var s in TowerSiteFixture.SyntheticSites()) AssertRoofSealed(s);
+    }
+
+    // Over the whole tower as the generator writes it, with every breakable cell gone and every skeleton pile spent (both
+    // open), the roof is one space under the dome, reached from the stair, and no face-connected path leads from it to the
+    // outside: neither over the parapet nor through the dome nor past a dressing block standing in the dome's way
+    private static void AssertRoofSealed(TowerSite s)
+    {
+        var box = SiteBox.Round(s);
+        var solid = new bool[box.Length];
+        for (var z = box.Z0; z < box.Z0 + box.Sz; z++)
+        for (var x = box.X0; x < box.X0 + box.Sx; x++)
+        for (var y = box.Y0; y < box.Y0 + box.Sy; y++)
+        {
+            var cell = TowerGenerator.CellAt(s, x, y, z);
+            var block = (byte)BlockOf(cell);
+            solid[box.Index(x, y, z)] = cell > 0 && BlockType.IsUnbreakable(block) && block != TowerPalette.PileBlock;
+        }
+
+        var labels = Label(solid, box.Sx, box.Sy, box.Sz);
+        var outside = labels[box.Index(box.X0, box.Y0, box.Z0)];
+        var underApex = labels[box.Index(s.CenterX, TowerDome.TopY(s) - 1, s.CenterZ)];
+        // A stair corridor column just over the roof slab, well clear of the altar dressing
+        var stairTop = labels[box.Index(s.CenterX + s.Radius - WorldGenerationConfig.TowerWallThickness - 1, s.RoofY + 1, s.CenterZ)];
+        Assert.True(outside > 0);
+        Assert.True(underApex > 0, "the cell under the dome's apex is solid");
+        Assert.Equal(underApex, stairTop);
+        Assert.NotEqual(outside, underApex);
+    }
+
+    // The site's footprint box from its foundation to its top, one cell of air wider on every side, and a cell's index in it
+    private readonly record struct SiteBox(int X0, int Y0, int Z0, int Sx, int Sy, int Sz)
+    {
+        public static SiteBox Round(TowerSite s) =>
+            new(s.MinX - 1, s.BottomY - 1, s.MinZ - 1, s.MaxX - s.MinX + 3, s.TopY - s.BottomY + 3, s.MaxZ - s.MinZ + 3);
+
+        public int Length => Sx * Sy * Sz;
+
+        public int Index(int x, int y, int z) => ((y - Y0) * Sz + (z - Z0)) * Sx + (x - X0);
     }
 
     // Face-connected component labels of the passable cells (0 = solid)

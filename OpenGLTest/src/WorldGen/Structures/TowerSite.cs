@@ -13,7 +13,8 @@ namespace VoxelEngine.WorldGen.Structures;
 /// floor's tier (BT-5, <c>TowerGenerator.ChestCells</c>), the altar cell
 /// (BT-6) and the footprint's block and chunk range (BT-8 collapse). A main-thread or server consumer reads a cached site
 /// (<c>TowerPlacement</c>), never per frame and never on a client, which streams its terrain and generates nothing. The roof
-/// is open to the sky, so BT-6 must refuse the altar until every floor of the tower is cleared.
+/// is sealed under a forcefield dome (<see cref="TowerDome"/>), reached only by the stair through every floor's door, and
+/// BT-6 still refuses the altar until every floor of the tower is cleared.
 /// </summary>
 public sealed class TowerSite
 {
@@ -82,8 +83,8 @@ public sealed class TowerSite
     /// <summary>The roof slab's world y.</summary>
     public int RoofY => FloorY(Floors);
 
-    /// <summary>The highest world y the tower writes: the parapet or the altar dressing, whichever is taller.</summary>
-    public int TopY => RoofY + Math.Max(WorldGenerationConfig.TowerParapetHeight, Altar.Height);
+    /// <summary>The highest world y the tower writes: the forcefield dome's apex or the altar dressing, whichever is taller.</summary>
+    public int TopY => Math.Max(TowerDome.TopY(this), RoofY + Altar.Height);
 
     /// <summary>The lowest world y the tower writes: the foundation's bottom.</summary>
     public int BottomY => GroundY - WorldGenerationConfig.TowerFoundationDepth;

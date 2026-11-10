@@ -4,7 +4,7 @@ namespace VoxelEngine.Config;
 
 /// <summary>
 /// Per-tile surface shading tuning: the ore highlight and twinkle, snow sparkle, leaf backlight,
-/// grass shimmer, ice glint, glass sheen, wet albedo and lava terms, the biome tint palette, the
+/// grass shimmer, ice glint, glass sheen, forcefield, wet albedo and lava terms, the biome tint palette, the
 /// far LOD's sky exposure and the leaf sway.
 /// </summary>
 public static class SurfaceShadingConfig
@@ -108,6 +108,31 @@ public static class SurfaceShadingConfig
     /// fresnel and folded into the blend (uGlassSheen). 0 switches the term off.
     /// </summary>
     public const float GlassSheenStrength = 0.6f;
+
+    // --- Forcefield (test-fragment.glsl, ForcefieldShimmer): the battle tower's roof dome ---
+    /// <summary>Scale on the whole forcefield film's alpha (uForcefield). 0 switches the term off and the block shows its
+    /// plain tile.</summary>
+    public const float ForcefieldStrength = 1f;
+    /// <summary>Alpha of the bare film seen head-on: barely there.</summary>
+    public const float ForcefieldFilmAlpha = 0.01f;
+    /// <summary>Alpha the film gains at a full graze (times the cube of 1 - |V.N|), so the dome's outline reads.</summary>
+    public const float ForcefieldRimAlpha = 0.04f;
+    /// <summary>Alpha of the honeycomb's edges inside one of the drifting patches where it shows.</summary>
+    public const float ForcefieldHexAlpha = 0.05f;
+    /// <summary>Alpha of the soft band that keeps rising up the dome, at its crest.</summary>
+    public const float ForcefieldBandAlpha = 0.05f;
+    /// <summary>Honeycomb cells per block along a face (the lattice spacing is its inverse).</summary>
+    public const float ForcefieldHexCellsPerBlock = 2.5f;
+    /// <summary>Distance, in blocks, where the honeycomb and the band start fading out, before a cell turns subpixel.</summary>
+    public const float ForcefieldDetailFadeNearBlocks = 24f;
+    /// <summary>Distance, in blocks, past which only the film and its rim are left.</summary>
+    public const float ForcefieldDetailFadeFarBlocks = 72f;
+    /// <summary>sRGB color of the film, standing in for an albedo under the shared light term, so the film dims at night
+    /// and in shadow with everything round it.</summary>
+    public static readonly Vector3 ForcefieldColor = new(0.6f, 0.85f, 1f);
+    /// <summary>Linear brightness multiplier on <see cref="ForcefieldColor"/>: a little past a white face, so the film reads
+    /// as light catching a sheet rather than paint.</summary>
+    public const float ForcefieldGlow = 1.5f;
 
     // --- Wet albedo (test-fragment.glsl, SH-22) ---
     // Albedo multiplier on a submerged face below its own baked water surface. Dry faces beside or

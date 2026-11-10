@@ -679,6 +679,16 @@ public class RenderManager : IDisposable
         // Glass blocks and panes share the glass tile; their grazing sky tint (GlassSheen)
         program.SetUniform("uGlassLayer", (float)ContentRegistry.RequireBlock("glass").Top);
         program.SetUniform("uGlassSheen", SurfaceShadingConfig.GlassSheenStrength);
+        // The battle tower dome's self-lit film (ForcefieldShimmer); 0 strength leaves its plain tile
+        program.SetUniform("uForcefieldLayer", (float)ContentRegistry.RequireBlock("tower_forcefield").Top);
+        program.SetUniform("uForcefield", SurfaceShadingConfig.ForcefieldStrength);
+        program.SetUniform("uForcefieldColor",
+            ColorSpace.SrgbToLinear(SurfaceShadingConfig.ForcefieldColor) * SurfaceShadingConfig.ForcefieldGlow);
+        program.SetUniform("uForcefieldTerms", new Vector4(SurfaceShadingConfig.ForcefieldFilmAlpha,
+            SurfaceShadingConfig.ForcefieldRimAlpha, SurfaceShadingConfig.ForcefieldHexAlpha, SurfaceShadingConfig.ForcefieldBandAlpha));
+        program.SetUniform("uForcefieldCells", SurfaceShadingConfig.ForcefieldHexCellsPerBlock);
+        program.SetUniform("uForcefieldFade",
+            new Vector2(SurfaceShadingConfig.ForcefieldDetailFadeNearBlocks, SurfaceShadingConfig.ForcefieldDetailFadeFarBlocks));
         program.SetUniform("uReflValid", 0f);
         // The water model's tuning constants never change at runtime, so they go up once here
         // instead of riding ApplyFrameUniforms every frame.

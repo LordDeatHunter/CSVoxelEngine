@@ -22,11 +22,15 @@ public static class TowerPlacement
     /// <summary>The farthest a tower writes from its center column: the largest wall plus the entrance apron.</summary>
     internal const int Reach = WorldGenerationConfig.TowerMaxRadius + WorldGenerationConfig.TowerApronDepth;
 
-    /// <summary>The farthest above its ground slab a tower writes: the most floors plus the taller of the parapet and the altar.</summary>
+    /// <summary>The farthest above its ground slab a tower writes: the most floors plus the taller of the forcefield dome on
+    /// its parapet and the altar.</summary>
     internal const int MaxHeightAboveGround = WorldGenerationConfig.TowerMaxFloors * WorldGenerationConfig.TowerFloorHeight
-                                              + (WorldGenerationConfig.TowerParapetHeight > WorldGenerationConfig.TowerAltarHeight
-                                                  ? WorldGenerationConfig.TowerParapetHeight
+                                              + (DomeAboveRoof > WorldGenerationConfig.TowerAltarHeight
+                                                  ? DomeAboveRoof
                                                   : WorldGenerationConfig.TowerAltarHeight);
+
+    // The dome's apex over the roof slab (TowerDome.TopY)
+    private const int DomeAboveRoof = WorldGenerationConfig.TowerParapetHeight + WorldGenerationConfig.TowerDomeHeight;
 
     // How far the center keeps from its cell's edges: the reach plus the site ring and a column of slack
     private const int Margin = Reach + WorldGenerationConfig.TowerSiteWaterRing + 1;

@@ -420,11 +420,13 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
                                #   chunk range)
         TowerShell.cs          # GL-free pure shell geometry: the rings, the helical half-step stair, doorways, slabs, parapet,
                                #   the closed tower_door cells (IsDoorStep, closed-form)
-        TowerGenerator.cs      # merges the shell with the floor and altar templates; the point query CellAt, StampSite and
-                               #   PileCells (a floor template's skeleton piles), ChestCells/AltarChestCells (the tower chests,
-                               #   each carrying its floor's tier in its state)
+        TowerDome.cs           # GL-free pure geometry of the roof's forcefield dome: a half spheroid on the parapet's top,
+                               #   its 6-tight shell (Holds), BaseY/TopY
+        TowerGenerator.cs      # merges the shell with the floor and altar templates and the dome's forcefield; the point
+                               #   query CellAt, StampSite and PileCells (a floor template's skeleton piles),
+                               #   ChestCells/AltarChestCells (the tower chests, each carrying its floor's tier in its state)
         TowerPalette.cs        # the biome palette swap: tower_bricks / _sandstone (desert) / _frost (frozen, taiga), the step
-                               #   slab, the door, pile and chest blocks
+                               #   slab, the door, pile, chest, altar and forcefield blocks
         TowerRing.cs           # Outside / Apron / OuterWall / Corridor / InnerWall / Room
         TowerRuin.cs           # GL-free, pure: what BT-8's collapse leaves of a tower cell (RuinAt: hashed wall stumps, brick
                                #   rubble, floor 0's dressing kept, gravel and cobblestone piles on the ground slab; salt 0x5E80)

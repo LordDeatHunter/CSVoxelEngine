@@ -399,6 +399,25 @@ proves that identity); `uGlassSheen` 0 (the ItemDebugger) switches it off.
 `visual-examples/glass-sheen.json` (`VOXEL_TIME=147`) places glass and panes on the frozen plain and
 frames them head-on, grazing and from above.
 
+**Forcefield shimmer.** The battle tower's roof dome (`tower_forcefield`, see "The sealed roof" under
+"Battle tower") shares the translucent pass with glass and the fluids but is barely there: on its tile
+(`uForcefieldLayer`) the world fragment swaps the albedo for the film's own color (`uForcefieldColor`,
+`ForcefieldColor` decoded times `ForcefieldGlow`) under the scene's light with the face's normal taken
+out (`fieldLight`: the ambient halfway between sky and ground, the sun at its mean side weight, so no
+down-facing step of the dome reads as a dark square), so it dims at night and in shadow with everything
+round it (self-lit, it glowed through the night once eye adaptation lifted it), and replaces the tile's
+alpha (`fieldAlpha`, like `glassAlpha`) with `ForcefieldAlpha`: a bare film (`uForcefieldTerms.x`), a
+rim that grows with the cube of `1 - |V.N|` (`.y`), a honeycomb in each face's own plane (`fTangent`,
+`fBitangent`; `ForcefieldHexEdge`, `uForcefieldCells` cells a block) that shows only in patches drifting
+on the shader's `ValueNoise` (`.z`), and a narrow band forever climbing the dome (`.w`); the honeycomb and the band fade
+out over `uForcefieldFade` before a cell turns subpixel, so a far dome is only the film and its rim. The
+tuning is `SurfaceShadingConfig.Forcefield*`; the shape literals (the lattice, the edge width, the
+flicker and band rates) are written in both the shader and `ForcefieldShimmer`, its GL-free twin
+(`ForcefieldShimmerTests`: faintest head-on, the background always dominates, the honeycomb repeats, the
+film moves, nothing but the film far away). `uForcefield` 0 (the ItemDebugger) leaves the plain
+placeholder tile. Like glass it writes depth, so particles behind the dome are hidden.
+`visual-examples/tower-dome.json` (`VOXEL_TIME=147`, and 700 for night) films it.
+
 Shaders (`assets/shaders/**/*.glsl`), textures (`assets/textures/**/*.png`), fonts (`assets/fonts/**/*.ttf`) and all content JSON (`assets/**/*.json` — blocks, items, loot tables, models) are copied to the output directory via `CopyToOutputDirectory` rules in the csproj — **new asset types/extensions need a matching `<None Update>` entry** or they won't be found at runtime. The JSON rule is a wildcard over the whole `assets` tree, so adding a block, item, loot table or model needs no csproj edit.
 
 Assets are opened by **relative** path (`FileUtils.ReadFile("assets/shaders/...")`, `TextureAtlas.Build(gl, "assets/textures/blocks")` in `RenderManager.LoadResources`), so the app must be launched with a working directory that contains `assets/` — either the build output directory or `OpenGLTest/`. `dotnet run --project OpenGLTest/VoxelEngine.csproj` satisfies this (it runs from the project folder); launching the built executable from an arbitrary directory does not.

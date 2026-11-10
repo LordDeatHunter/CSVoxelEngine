@@ -4,7 +4,8 @@
   // Shots land in visual/battle-tower/. The tower is the one nearest the origin on the default seed, found
   // with TowerPlacement.TryFindNearest(0, 0, 4) (TowerPlacementTests.ATowerStandsWithinAFewCellsOfTheOrigin
   // prints it): cell (1, -1), center (2920, -1411), ground y 10, radius 21, 5 floors, turns 2, plain
-  // tower_bricks; floor slabs at y 10/17/24/31/38, roof at y 45, altar cell (2920, 46, -1411), top y 51.
+  // tower_bricks; floor slabs at y 10/17/24/31/38, roof at y 45, altar cell (2920, 46, -1411), merlons at y 49 under
+  // the forcefield dome, top y 61 (its apex).
   // With turns 2 the entrance faces -X, a little toward +Z (about 171 degrees around from +X), and the
   // stair starts just south of it, climbing toward -Z. Shots: the exterior from 2.5 radii out, the
   // entrance, floor 0 and floor 2 inside (eye at the slab + 2.6), the stair corridor at half-step 10

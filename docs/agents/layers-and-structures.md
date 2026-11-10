@@ -47,9 +47,9 @@ in quotes. `plans/LAYERS.md` keeps the design decisions and the ideas left for l
   `entities.json`.
 - **Far LOD**: the realms exist only in full-detail chunks (the far LOD is a heightmap shell), so the clouds
   and islands pop in within the load sphere and hell never shows at distance (TODO `M-29`).
-- **Budgets**: 247 of the 255 content ids are used (137 blocks, 109 items, air), 8 left; the battle tower
-  (plans/BATTLE_TOWER.md) is done, the cave biomes' three exclusive ores (`CB-2`) took 3, their mobs and chest tables
-  (`CB-4`) none (entities take no id). Status effects: 3 of the 8 slots (`burning`, `frostburn`, `spore`). Seed offsets
+- **Budgets**: 249 of the 255 content ids are used (138 blocks, 110 items, air), 6 left; the battle tower
+  (plans/BATTLE_TOWER.md) is done (its roof dome's `tower_forcefield` came later and took 1), the cave biomes' three
+  exclusive ores (`CB-2`) took 3, their mobs and chest tables (`CB-4`) none (entities take no id). Status effects: 3 of the 8 slots (`burning`, `frostburn`, `spore`). Seed offsets
   162 (barrier ramps), 163 (hell caverns), 164 and 165 (hell biomes and pools), 166 and 167 (cloud patches),
   168 to 171 (sky zones and islands), 172 and 173 (cloud sea), 174 (sky biomes), 175 to 178 (sky landmasses), 179 to 181
   (cave biomes), 182 (cave shape scale) and 183 to 185 (cave ores); the whole table is in

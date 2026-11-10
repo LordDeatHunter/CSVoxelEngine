@@ -17,8 +17,9 @@ namespace VoxelEngine.Tests.WorldGen.Structures;
 /// within a few cells of the origin on the default seed, sites are a pure function of (cell, seed), the rolled radius and floor
 /// count stay in their ranges, every tower keeps the spawn clear on dry, level land, the point query equals the stamp in every
 /// footprint chunk, the dressing fits the smallest room and every support-fragile dressing block has its holder, the altar cell
-/// is free on an unbreakable roof, every floor holds chests of its own tier and the roof one of the treasure tier, and
-/// every palette brick is unbreakable and covers the sky while nothing the ruin writes does.
+/// is free on an unbreakable roof, every floor holds chests of its own tier and the roof one of the treasure tier,
+/// every palette brick is unbreakable and covers the sky while nothing the ruin writes does, and the roof dome's forcefield
+/// stops bodies but lets the sun through.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class TowerPlacementTests
@@ -453,5 +454,31 @@ public sealed class TowerPlacementTests
         Assert.NotEqual(TowerPalette.For(Biome.Desert), TowerPalette.For(Biome.Taiga));
         Assert.Equal(ContentRegistry.RequireBlock("tower_bricks_sandstone").Id, TowerPalette.For(Biome.Desert).Brick);
         Assert.Equal(ContentRegistry.RequireBlock("tower_bricks_frost").Id, TowerPalette.For(Biome.Frozen).Brick);
+    }
+
+    [Fact]
+    public void TheDomesForcefieldStopsBodiesButLetsTheSunOntoTheRoof()
+    {
+        // A wall no body passes and nothing but the tower's collapse removes...
+        var field = TowerPalette.ForcefieldBlock;
+        Assert.True(BlockType.IsSolid(field));
+        Assert.True(BlockType.IsUnbreakable(field));
+        // ...that the sun shines through, so the roof under it stays as lit as an open one and casts no dome shadow
+        Assert.True(BlockType.PassesLightById[field]);
+        Assert.False(BlockType.CoversSkyById[field]);
+        Assert.True(BlockType.ById[field]!.Translucent);
+
+        // The nearest tower really wears it, and only above its roof
+        var s = Nearest();
+        var fieldCells = 0;
+        for (var x = s.MinX; x <= s.MaxX; x++)
+        for (var y = s.BottomY; y <= s.TopY; y++)
+        {
+            var cell = TowerGenerator.CellAt(s, x, y, s.CenterZ);
+            if (cell < 0 || BlockOf(cell) != field) continue;
+            fieldCells++;
+            Assert.True(y > s.RoofY, $"a forcefield cell at ({x}, {y}) under the roof");
+        }
+        Assert.True(fieldCells > 0, "the slice through the tower's center crossed no forcefield");
     }
 }

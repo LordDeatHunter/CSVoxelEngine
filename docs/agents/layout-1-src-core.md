@@ -359,7 +359,8 @@ OpenGLTest/
         SunGlare.cs            # GL-free sun lens glare: per-frame intensity and its sky falloff
         Wind.cs                # the one wind of the world: a horizontal direction that turns slowly
                                #   and steadily with the lighting clock (window time plus VOXEL_TIME)
-      Surfaces/                # per-tile terms of test-fragment.glsl: glass, grass, ice, lava, leaves, ore
+      Surfaces/                # per-tile terms of test-fragment.glsl: forcefield, glass, grass, ice, lava, leaves, ore
+        ForcefieldShimmer.cs   # GL-free twin of the tower dome's forcefield film: rim, honeycomb patches and rising band
         GlassSheen.cs          # GL-free twin of the glass sheen: fresnel weight and the sky folded into the blend
         GrassShimmer.cs        # GL-free twin of the grass wind shimmer: gust-carried bands, distance fade, the face gate
         IceGlint.cs            # GL-free twin of the ice tile term: fresnel sky sheen weight, gated sun highlight

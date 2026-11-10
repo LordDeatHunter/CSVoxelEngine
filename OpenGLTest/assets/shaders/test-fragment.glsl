@@ -82,6 +82,16 @@ uniform float uIceSheen;
 // ItemDebugger's, switches it off.
 uniform float uGlassLayer;
 uniform float uGlassSheen;
+// Forcefield (ForcefieldShimmer is the twin): the forcefield tile's atlas slice (the battle tower's roof dome), the film's
+// strength (0, the default and the ItemDebugger's, leaves the plain tile), its linear color (lit like an albedo), the alpha weights
+// (x the bare film, y the rim at a graze, z the honeycomb, w the rising band), honeycomb cells per block and the
+// distance window the honeycomb and the band fade out over.
+uniform float uForcefieldLayer;
+uniform float uForcefield;
+uniform vec3 uForcefieldColor;
+uniform vec4 uForcefieldTerms;
+uniform float uForcefieldCells;
+uniform vec2 uForcefieldFade;
 // The leaf sway's wind (test-vertex.glsl): downwind direction * WindLean and the gusts' traveled
 // offset; the grass shimmer rolls its bands along it.
 uniform vec2 uWind;
@@ -452,6 +462,36 @@ float FoamField(vec2 p, float t) {
 float LavaPulseField(vec2 p, float t) {
     return 0.6 * ValueNoise(p * 0.22 + vec2(t * 0.11, -t * 0.07))
          + 0.4 * ValueNoise(p * 0.47 + vec2(-t * 0.09, t * 0.13));
+}
+
+// The forcefield's honeycomb: p in lattice units, cell centers one unit apart on a triangular lattice; 0 inside a cell,
+// rising to 1 on its edge (the nearest center's hexagonal distance reaches 0.5 there). GL-free twin:
+// ForcefieldShimmer.HexEdge.
+float ForcefieldHexEdge(vec2 p) {
+    const vec2 r = vec2(1.0, 1.7320508);
+    vec2 a = mod(p, r) - 0.5 * r;
+    vec2 b = mod(p - 0.5 * r, r) - 0.5 * r;
+    vec2 q = abs(dot(a, a) < dot(b, b) ? a : b);
+    return smoothstep(0.42, 0.5, max(q.x, dot(q, vec2(0.5, 0.8660254))));
+}
+
+// The forcefield film's alpha at a face point (face: its coordinates along the face's tangent and bitangent), seen at
+// cosView (V.N, from either side) from dist blocks: a bare film, a rim toward a graze, the honeycomb's edges showing only
+// in patches drifting on the value noise and a narrow band climbing the dome (a crest every ~14 blocks, ~2.9 blocks a
+// second); the honeycomb and the band fade out with distance before a cell turns subpixel. GL-free twin:
+// ForcefieldShimmer.Alpha.
+float ForcefieldAlpha(vec2 face, vec3 world, float cosView, float t, float dist) {
+    float graze = 1.0 - abs(cosView);
+    float film = uForcefieldTerms.x + uForcefieldTerms.y * graze * graze * graze;
+    float detail = 1.0 - smoothstep(uForcefieldFade.x, uForcefieldFade.y, dist);
+    float edge = ForcefieldHexEdge(face * uForcefieldCells);
+    float flicker = ValueNoise(world.xz * 0.35 + vec2(t * 0.23, -t * 0.17) + world.y * 0.5);
+    float band = 0.5 + 0.5 * sin(world.y * 0.45 - t * 1.3);
+    band *= band;
+    band *= band;
+    band *= band;
+    float sparkle = uForcefieldTerms.z * edge * smoothstep(0.4, 0.8, flicker) + uForcefieldTerms.w * band * (0.5 + 0.5 * edge);
+    return clamp(uForcefield * (film + detail * sparkle), 0.0, 1.0);
 }
 
 // FoamField carried along a flow by the same bounded two-phase flow map FlowWaveNormal uses, so
@@ -883,6 +923,23 @@ void main() {
         col = (col * (a * (1.0 - F)) + skyG * F) / max(glassAlpha, 1e-4);
     }
 
+    // Forcefield, on the forcefield tile only (the battle tower's roof dome), which draws blended in the translucent pass:
+    // a faint film whose own color stands in for the albedo under the scene's light, so it dims at night and in shadow
+    // with everything round it (a self-lit film glowed through the night once eye adaptation lifted it), and whose alpha
+    // replaces the tile's (fieldAlpha, like glassAlpha). The light is the shared term with the face's normal taken out
+    // (the ambient halfway between sky and ground, the sun at its mean side weight): a film catches light alike from every
+    // side, so no down-facing step of the dome reads as a dark square. The honeycomb lies in each face's own plane
+    // (fTangent, fBitangent), so merged quads keep one lattice. GL-free twin: ForcefieldShimmer.
+    float fieldAlpha = -1.0;
+    if (uForcefield > 0.0 && !isWater && abs(float(fLayer) - uForcefieldLayer) < 0.5) {
+        vec3 Vf = normalize(uCameraPos - fWorldPos);
+        vec2 face = vec2(dot(fWorldPos, fTangent), dot(fWorldPos, fBitangent));
+        fieldAlpha = ForcefieldAlpha(face, fWorldPos, dot(Vf, N), uTime, dist);
+        vec3 fieldLight = 0.5 * (uAmbient + uGroundAmbient) * (0.12 + 0.88 * fSun)
+                        + max(uSunColor * (fSun * uSunIntensity * 0.5 * shadow), torch + pl);
+        col = uForcefieldColor * fieldLight;
+    }
+
     if (fSubmerged > 0.5 && !isWater && dist < 96.0 && fWorldPos.y <= fWaterSurfaceY) {
         // Where on the surface did this sunlight come through? Follow the sun back up to this
         // face's own water surface (baked by the mesher), not the sea plane, so a pond above sea
@@ -1157,6 +1214,8 @@ void main() {
     float texAlpha = texColor.a;
     // The glass sheen folded the mirrored sky into the blend (see above)
     if (glassAlpha >= 0.0) texAlpha = glassAlpha;
+    // The forcefield's film is all the alpha it has (see above)
+    if (fieldAlpha >= 0.0) texAlpha = fieldAlpha;
 #ifdef CHUNK_DRAW
     // The atlas samples its mips, so a leaf texel that survived the cutoff can still carry a
     // filtered alpha below 1; blended as-is the sky would tint the canopy through it. In the

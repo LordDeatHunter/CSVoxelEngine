@@ -92,6 +92,23 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   tower chunk starts every sun seed above the slab over it ("Sky cover (BT-10)" under "Chunk meshing"); a floor is lit only
   by its template lanterns and the torches a player brings, identically in singleplayer, on a server and on a client. The
   ruin's rubble does not cover, so the collapse's remesh lets the sun back in.
+- **The sealed roof**: the parapet stands `TowerParapetHeight` (4) over the roof slab, solid but for its merlon layer, and
+  a forcefield dome closes it: `TowerDome` (GL-free, pure) is half a spheroid standing on that merlon layer, as wide as the
+  tower (the outer wall's `r² + r` edge, so its base is the tower's disc) and `TowerDomeHeight` tall over the center, and
+  `TowerGenerator.Merge` writes `tower_forcefield` (`TowerPalette.ForcefieldBlock`) on every air cell of its 6-tight
+  shell (`TowerDome.Holds`: inside, with a face neighbor outside), so walls and the roof's dressing always win and the
+  point query still equals the stamp. The roof is reached only by the stair through every floor's door: a player can
+  neither climb in from outside nor jump off mid-fight. The block is worldgen-only, `unbreakable`, solid, `translucent`,
+  `cullSelf`, passes light and covers no sky (the roof stays sunlit, the dome casts no shadow); the world shader draws it
+  as a faint shimmering film ("Forcefield shimmer" under "Rendering"). `TowerSite.TopY` is the dome's apex (or the altar
+  dressing, if ever taller) and `TowerPlacement.MaxHeightAboveGround` counts the dome, so the stamp band, the chunk range,
+  `TopReaching`, the cloud-slab rule and the collapse scan all include it. The collapse clears it first (it is above every
+  stump, and the scan runs top-down), and `TowerCollapseEffects.ShowsCollapse` skips a translucent block, so it winks out
+  with no chips. Tests: `TowerShellTests.TheParapetAndTheDomeSealTheRoofFromTheOutside` and
+  `EveryAltarDressingStaysUnderTheDomeAtEveryTurn` (a flood fill over the generated tower with every breakable cell and
+  pile gone), `TowerPlacementTests.TheDomesForcefieldStopsBodiesButLetsTheSunOntoTheRoof`;
+  `visual-examples/tower-dome.json` films it. Known gap: a tower in chunks saved before the dome keeps its low parapet and
+  open roof there (a tower half saved and half regenerated has part of a dome).
 - **No surface spawns in a footprint**: `MobSpawner.TryFindSurfaceSpawn` refuses a ring column inside a tower's footprint
   box (`TowerPlacement.Meets`, a cached site verdict, gated by `TowersEnabled` and skipped for a column a world source
   supplies), since the dark ground floor would otherwise take slimes and goblins; the tower's skeletons own it.
@@ -181,7 +198,7 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   `TowerRecord.AltarCell` (center, top floor's `TopY + 1`) equals the site's, so test records and mirrors have one too.
 - **Altar state** (`TowerRecord.AltarState`, a `TowerAltarState`): Dormant, Ritual (with `RitualLeft`), Awake, Defeated.
   `TowerRules.AltarVerdictOf` is the one rule, first match wins: Defeated, Awake, Ritual reads Stirring, any floor whose
-  `DoorOpen` is unset reads Sealed (the roof is open, so a player can pillar up the outside), else Begin.
+  `DoorOpen` is unset reads Sealed (the dome seals the roof, but a creative flyer noclips past it), else Begin.
   `TowerManager.JudgeAltar(cell)` answers it without changing anything (NoTower when no record holds the cell as its altar;
   the authoritative side tracks the tower on first use, like `ClearFloor`); `BeginRitual(cell)` sets Ritual only with a
   writer and a Begin verdict, and always returns the verdict, so it is idempotent (a second click reads Stirring). Toasts
@@ -301,7 +318,8 @@ content ids left 244 of the 255 used, before the cave ores took 3 more (see "Bud
   before BT-8) starts a fresh collapse. No wire change: clients see the ruin through the `BlockChanges` journal (protocol
   stays 27). **The show** (`Particles/Collapse/TowerCollapseEffects`, cosmetic, tuning in `JuiceConfig.TowerCollapse*` and
   `TowerDebris*`, never built on a server): every cell going from an unbreakable block to anything else
-  (`TowerCollapseEffects.ShowsCollapse`: only the tower's writer can do that, so a player's edit never plays it) inside a
+  (`TowerCollapseEffects.ShowsCollapse`: only the tower's writer can do that, so a player's edit never plays it; a
+  translucent one, the dome's forcefield, has no rubble and just winks out) inside a
   tracked tower whose king is killed, within `TowerCollapseEffectRangeBlocks` of the camera, crumbles into a few chips of
   itself (coarse `BlockDebrisSystem.Puff` chips, under a chips-per-second cap), and one near the wall (from `TowerDebrisMinRadiusShare`
   of the footprint radius out) that falls away to air, with the cell outside it on its main outward axis open (so the block

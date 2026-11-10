@@ -1129,8 +1129,13 @@ public const int LakeSpawnClearRadius = 72; // no lake this close to the origin 
     /// <summary>How far the entrance apron reaches outside the outer wall.</summary>
     public const int TowerApronDepth = 3;
 
-    /// <summary>Height of the crenellated parapet above the roof slab.</summary>
-    public const int TowerParapetHeight = 2;
+    /// <summary>Height of the crenellated parapet above the roof slab: solid up to the layer under its top, merlons on
+    /// the top layer, where the forcefield dome stands.</summary>
+    public const int TowerParapetHeight = 4;
+
+    /// <summary>How far the roof's forcefield dome rises over its base on the parapet's top layer, at the center
+    /// (<c>TowerDome</c>). It must clear the altar dressing (<see cref="TowerAltarHeight"/>) over the whole template.</summary>
+    public const int TowerDomeHeight = 12;
 
     /// <summary>The tallest the altar dressing on the roof may be (the towerAltar template's layer cap).</summary>
     public const int TowerAltarHeight = 8;

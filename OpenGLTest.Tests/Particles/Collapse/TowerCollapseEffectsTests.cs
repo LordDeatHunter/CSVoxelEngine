@@ -50,6 +50,10 @@ public sealed class TowerCollapseEffectsTests
         Assert.False(TowerCollapseEffects.ShowsCollapse(Bricks, Bricks));
         Assert.False(TowerCollapseEffects.ShowsCollapse(Stone, BlockType.Air));
         Assert.False(TowerCollapseEffects.ShowsCollapse(BlockType.Air, Stone));
+        // A see-through unbreakable block (the roof dome's forcefield) has no rubble to throw: it winks out
+        var field = ContentRegistry.RequireBlock("tower_forcefield").Id;
+        Assert.True(BlockType.IsUnbreakable(field));
+        Assert.False(TowerCollapseEffects.ShowsCollapse(field, BlockType.Air));
     }
 
     [Fact]

@@ -53,9 +53,11 @@ internal sealed class TowerCollapseEffects
     /// <summary>
     /// Whether a cell going from <paramref name="before"/> to <paramref name="after"/> shows as a collapse falling in: an
     /// unbreakable block (the tower's bricks, doors, piles and altar) giving way, which only the tower's own writer ever
-    /// does, so another player's edit never shakes anyone. The caller still checks that a defeated tower stands there.
+    /// does, so another player's edit never shakes anyone. A see-through one (the roof dome's forcefield) has no rubble to
+    /// throw and just winks out. The caller still checks that a defeated tower stands there.
     /// </summary>
-    internal static bool ShowsCollapse(byte before, byte after) => before != after && BlockType.IsUnbreakable(before);
+    internal static bool ShowsCollapse(byte before, byte after) =>
+        before != after && BlockType.IsUnbreakable(before) && !BlockType.ById[before].Translucent;
 
     /// <summary>
     /// One cell rewritten from <paramref name="before"/> to <paramref name="after"/> (the tower writer's hook in

@@ -13,7 +13,8 @@ namespace VoxelEngine.WorldGen.Structures;
 /// plain tower brick is swapped for the site's palette brick, and a tower chest cell carries its floor's tier in its state
 /// (<see cref="ChestProfile.TierState"/> OR'd onto its facing; the roof's chest <see cref="TowerSite.TreasureTier"/>). The roof's
 /// template leaves its center cell free (the structure loader's rule) and the generator fills it with the altar block at
-/// <see cref="TowerSite.AltarCell"/>. GL-free and pure.
+/// <see cref="TowerSite.AltarCell"/>. Over the roof, every air cell on the forcefield dome's shell (<see cref="TowerDome"/>)
+/// is the forcefield block, so walls and dressing always win over the dome. GL-free and pure.
 /// </summary>
 public static class TowerGenerator
 {
@@ -36,10 +37,17 @@ public static class TowerGenerator
     /// so the angle is computed once per cell: -1 or <c>block | state &lt;&lt; 8</c>.</summary>
     internal static int CellIn(TowerSite s, TowerRing ring, int step, int x, int y, int z) => Merge(s, ring, step, x, y, z);
 
-    // The shell cell, unless a floor's or the roof's dressing template writes there
+    // The shell cell, unless a floor's or the roof's dressing template writes there; air on the dome's shell is the
+    // forcefield
     private static int Merge(TowerSite s, TowerRing ring, int step, int x, int y, int z)
     {
         if (ring == TowerRing.Outside) return -1;
+        var cell = ShellOrDressing(s, ring, step, x, y, z);
+        return cell == BlockType.Air && TowerDome.Holds(s, x - s.CenterX, y, z - s.CenterZ) ? TowerPalette.ForcefieldBlock : cell;
+    }
+
+    private static int ShellOrDressing(TowerSite s, TowerRing ring, int step, int x, int y, int z)
+    {
         var shell = TowerShell.CellAt(s, ring, step, y);
         if (shell < 0) return shell;
 

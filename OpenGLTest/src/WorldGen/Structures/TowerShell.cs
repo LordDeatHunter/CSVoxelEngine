@@ -12,7 +12,8 @@ namespace VoxelEngine.WorldGen.Structures;
 /// (<see cref="WorldGenerationConfig.TowerStairStepsPerTurn"/> strips a turn), its half-steps alternating the palette's slab
 /// (even) and brick (odd); an inner wall with one doorway per floor where the stair is level with that floor's slab; and the
 /// rooms, a slab every <see cref="WorldGenerationConfig.TowerFloorHeight"/> blocks up to the roof. A short apron cuts a walkway
-/// in front of the entrance. Every disc cell from the foundation to the top is written, as air or block. The barrier door of
+/// in front of the entrance. Over the roof the generator closes the parapet's top with the forcefield dome
+/// (<see cref="TowerDome"/>), which is not part of the shell. Every disc cell from the foundation to the top is written, as air or block. The barrier door of
 /// floor k (BT-4) fills the tube over two steps just past its doorway (<see cref="DoorCells"/>, <see cref="IsDoorStep"/>):
 /// worldgen stamps the closed door there as the unbreakable door block, which the BT-4 <c>TowerManager</c> opens to air once the
 /// floor is cleared. With those cells shut, the unbreakable bricks seal every floor from the next one and the top floor from the
