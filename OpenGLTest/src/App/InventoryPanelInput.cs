@@ -51,7 +51,7 @@ internal sealed class InventoryPanelInput
     internal Vector2? ScriptedPointer { get; set; }
 
     // The pointer in window pixels (what every hit-test takes): the scripted one, else the mouse.
-    private Vector2? PointerWindow()
+    internal Vector2? PointerWindow()
     {
         if (ScriptedPointer is { } scripted)
             return scripted * renderManager.Ui.Scale;

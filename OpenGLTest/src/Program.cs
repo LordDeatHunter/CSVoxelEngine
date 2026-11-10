@@ -523,7 +523,7 @@ public static class Program
             FrameProfiler.Begin(ProfileSection.RenderShell);
             renderManager.UiPasses.RenderMenuFrame(windowManager.Window,
                 screen == AppScreen.Menu ? menu.View : null, settingsMenuView,
-                screen == AppScreen.Menu ? null : loadingView, windowManager.Window.Time);
+                screen == AppScreen.Menu ? null : loadingView, windowManager.Window.Time, panelInput.PointerWindow());
             ambience?.Update(renderManager.Lighting.Dayness, (float)MathUtils.Clamp(deltaTime, 0.0, 0.25));
             sfx?.Update();
             if (pending != PendingWork.None)

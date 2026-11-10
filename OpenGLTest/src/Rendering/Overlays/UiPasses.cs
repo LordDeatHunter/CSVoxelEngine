@@ -249,7 +249,7 @@ internal sealed class UiPasses
     /// framebuffer is cleared and written directly, in display space like the HUD. Render thread only.
     /// </summary>
     internal void RenderMenuFrame(IWindow window, MainMenuView? menu, SettingsMenuView settings,
-        LoadingScreenView? loading, double time)
+        LoadingScreenView? loading, double time, Vector2? pointerWindow)
     {
         Units.InvalidateTextureUnits();
         _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
@@ -260,6 +260,8 @@ internal sealed class UiPasses
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
+        // Menu buttons light up from the pointer, which the gameplay pass sets but this frame never reaches.
+        _owner.Ui.Pointer = pointerWindow is { } p ? _owner.Ui.ToCanvas(p) : null;
         if (loading != null)
             _owner.Ui.LoadingScreen.DrawLoadingScreen(loading, time, opaque: true);
         else if (menu != null)
