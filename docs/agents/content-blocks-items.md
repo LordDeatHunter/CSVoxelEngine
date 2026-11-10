@@ -225,7 +225,7 @@ The **lantern** hangs under a ceiling: `support: "above"` (`BlockSupport.Support
 in where a solid block stands over the target cell (a placement against a block's underside), and
 every pop path that asks `BlockSupport` (mining's `BlockEditor.PopUnsupportedAround`, the blast scan, leaf
 decay) takes it down with that block. It lights like the torch (emission 15, the default warm
-color), is non-solid, and crafts from a torch and a copper ingot. Its model crops a cage, a lid
+color), is non-solid, and crafts from a torch and a copper ring. Its model crops a cage, a lid
 and a chain out of one opaque tile. Note the trap: `ModelBaker` mirrors an explicit Minecraft uv on the way in (a side face samples column
 `32 - 2u`, an up/down face row `32 - 2v`), so an off-center uv must be written mirrored and the
 art kept symmetric. `HangingBlockTests` covers the rule; `visual-examples/lanterns.json`
@@ -423,7 +423,7 @@ species share to the leafy owner) and refusing, spending nothing, where the cell
 `World.TryGrowTree` is the reactive growth path behind both (`### Trees`).
 
 **Spell staffs** (`staff` in the item schema): the **wooden staff** (branches and a crystal block) and
-the **crystal staff** it is upgraded into (the wooden staff, crystal blocks and a copper ingot), a
+the **crystal staff** it is upgraded into (the wooden staff, crystal blocks and a copper ring), a
 higher tier with more slots and the `advanced` part tag beside `basic`. Their sprites are placeholders recorded in `USER_TODO.md` (`StaffContentTests`, `StaffBindingTests`).
 
 **Spell table** (`spell_table`, four oak planks and a crystal block) is a plain `cube_bottom_top` block

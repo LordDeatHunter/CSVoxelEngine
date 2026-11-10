@@ -21,6 +21,9 @@ public enum RightClickOutcome
     Container,
     /// <summary>A waystone took it: a local player discovers it and opens the waystone screen (<see cref="RightClickAction.LastWaystoneCell"/>).</summary>
     Waystone,
+    /// <summary>A smithing hammer on an anvil holding a metal stack took it: a local player opens the anvil's recipe list
+    /// (<see cref="RightClickAction.LastForgeCell"/>).</summary>
+    Forge,
     /// <summary>A battle tower's roof altar took it: the authoritative side begins the ritual, a client only judges it;
     /// the verdict is in <see cref="RightClickAction.LastAltarVerdict"/>.</summary>
     Altar,

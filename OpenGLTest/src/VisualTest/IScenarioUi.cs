@@ -45,4 +45,11 @@ public interface IScenarioUi
     /// clicks list row <paramref name="row"/> (0-based).
     /// </summary>
     void Waystone(string action, Vector3? cell, string? text, int row);
+
+    /// <summary>
+    /// Drives the anvil's recipe list: <c>open</c> opens it on the anvil at <paramref name="cell"/> (a smithing hammer
+    /// in hand and a metal stack on the anvil, as a right-click needs), <c>pick</c> clicks recipe card
+    /// <paramref name="card"/> (0-based) and <c>close</c> closes it.
+    /// </summary>
+    void Forge(string action, Vector3? cell, int card);
 }

@@ -1,0 +1,8 @@
+{
+  // An axe head, drawn out of three wrought iron on the anvil; hafted in recipes/iron_axe.json.
+  // Forged with a smithing hammer from wrought iron stacked on an anvil (see AnvilManager).
+  "metal": "item/wrought_iron",
+  "metalCount": 3,
+  "result": "item/iron_axe_head",
+  "count": 1
+}

@@ -13,6 +13,7 @@ using VoxelEngine.UI.Chest;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Menus;
 using VoxelEngine.UI.SpellBuilder;
+using VoxelEngine.UI.Forge;
 using VoxelEngine.UI.Waystone;
 
 namespace VoxelEngine.Rendering.Overlays;
@@ -50,10 +51,11 @@ internal sealed class UiPasses
         HotbarPickupPop? hotbarPops = null, double lightingTime = 0.0, HudToast? toast = null,
         CrosshairState crosshair = default, LookLabelState? lookAt = null, string? staffSlot = null,
         byte effectMask = 0, SpellBuilderView? builder = null, int maxHealth = PlayerHealth.MaxHealth,
-        ChestView? chest = null, WaystoneView? waystone = null, BossBarState? boss = null)
+        ChestView? chest = null, WaystoneView? waystone = null, BossBarState? boss = null, ForgeView? forge = null)
     {
-        // Any panel (the [E] inventory, the spell builder or the waystone screen) hides the crosshair and the status row.
-        var panelUp = view.IsOpen || builder?.IsOpen == true || waystone?.IsOpen == true;
+        // Any panel (the [E] inventory, the spell builder, the waystone screen or the anvil's recipe list) hides the
+        // crosshair and the status row.
+        var panelUp = view.IsOpen || builder?.IsOpen == true || waystone?.IsOpen == true || forge?.IsOpen == true;
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize, UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
 
@@ -163,6 +165,16 @@ internal sealed class UiPasses
             {
                 _owner.Ui.SetOverlay(new Vector2(0f, waystone.Transition.SlideY), waystone.Transition.Alpha);
                 _owner.Ui.Waystone.Draw(waystone, time);
+                _owner.Ui.ClearOverlay();
+            }
+        }
+        if (forge != null)
+        {
+            forge.Transition.Step(forge.IsOpen, time);
+            if (forge.IsOpen)
+            {
+                _owner.Ui.SetOverlay(new Vector2(0f, forge.Transition.SlideY), forge.Transition.Alpha);
+                _owner.Ui.Forge.Draw(forge, time, camera != null ? Compass.HeadingFromYaw(camera.Yaw) : 0f);
                 _owner.Ui.ClearOverlay();
             }
         }

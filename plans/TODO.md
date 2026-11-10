@@ -30,7 +30,8 @@ Mostly content JSON plus small systems; high feel, low engine risk. In order:
    pattern and becomes the automation seed. Lands before `P-2` gating. (The iron bloom shipped as the
    bloomery, see `AGENTS.md` "The bloomery and the anvil".)
 2. **`P-43` anvil / forge** — the iron half shipped: `crushed_iron` -> bloomery bloom -> anvil ->
-   `wrought_iron` -> iron tools and armor (never through the kiln's molten path). What remains is
+   `wrought_iron` stacked on the anvil and forged into iron parts and armor (`recipes/forge/`, never through the kiln's
+   molten path). What remains is
    steel (carburizing) and anything else the anvil should shape.
 3. **`P-7` / `P-25` metal tiers** — iron, tin, bronze, steel as the tier ladder (`P-44` covers the
    alloys). Progression, processing requirements and per-tier recipes are **TBD, defined later**.
@@ -143,8 +144,9 @@ the other while still being faster together.
   Spell effects bound to gear; a crafting-station cousin of the magic system. Cross-links `P-29`,
   `P-48`.
 - [ ] **`P-43` · Forge & anvil (metal shaping)** — P1, S–M. **Milestone 1.**
-  The anvil and the smithing hammer shipped with the bloomery (a bloom hammered into wrought iron). Left: steel
-  (carburizing wrought iron), and shaping parts on the anvil beyond the bloom, the gate to the upper tiers (`P-7`).
+  The anvil and the smithing hammer shipped with the bloomery (a bloom hammered into wrought iron), and the anvil now
+  forges stacked wrought iron into the iron heads, armor and ring (`recipes/forge/`, a recipe list per metal). Left: steel
+  (carburizing wrought iron), the gate to the upper tiers (`P-7`).
 - [ ] **`P-44` · Alloys** — P2, M.
   Bronze from copper + tin (tin ore, the 3x3x3 alloy furnace, bronze tools) shipped (see `AGENTS.md`
   "Recipes, cast molds and metalworks"); steel remains. Combines with `P-25`.

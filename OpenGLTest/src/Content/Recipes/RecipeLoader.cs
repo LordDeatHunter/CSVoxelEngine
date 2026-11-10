@@ -8,7 +8,7 @@ using VoxelEngine.Data;
 
 namespace VoxelEngine.Content.Recipes;
 
-/// <summary>Loads <c>data/recipes</c> (crafting), <c>recipes/cook</c>, <c>recipes/crush</c>, <c>data/molten</c>, <c>recipes/melt</c>, <c>recipes/cast</c> and <c>recipes/alloy</c> into the compiled lists <see cref="ContentRegistry"/> serves; a missing folder is no recipes.</summary>
+/// <summary>Loads <c>data/recipes</c> (crafting), <c>recipes/cook</c>, <c>recipes/crush</c>, <c>data/molten</c>, <c>recipes/melt</c>, <c>recipes/cast</c>, <c>recipes/alloy</c> and <c>recipes/forge</c> into the compiled lists <see cref="ContentRegistry"/> serves; a missing folder is no recipes.</summary>
 internal static class RecipeLoader
 {
     internal static void LoadRecipes(string folder)
@@ -59,6 +59,45 @@ internal static class RecipeLoader
         foreach (var (name, path) in ContentFiles.JsonFilesIn(folder))
             ContentRegistry.AlloyRecipesList.Add(CompileAlloyRecipe(ContentFiles.ReadJson<AlloyRecipeDefinition>(path), path, name));
     }
+
+    internal static void LoadForgeRecipes(string folder)
+    {
+        if (!Directory.Exists(folder)) return;
+        foreach (var (name, path) in ContentFiles.JsonFilesIn(folder))
+            ContentRegistry.ForgeRecipesList.Add(CompileForgeRecipe(name, ContentFiles.ReadJson<ForgeRecipeDefinition>(path), path));
+    }
+
+    /// <summary>
+    /// Compiles one anvil recipe: a registered metal taken 1..<see cref="MaxForgeMetalCount"/> at a time, a registered
+    /// result other than the metal, made 1 or more at a time, and one recipe per result (a pick on the anvil names its
+    /// recipe by the result). Every error names <paramref name="path"/>.
+    /// </summary>
+    private static ForgeRecipe CompileForgeRecipe(string name, ForgeRecipeDefinition definition, string path)
+    {
+        if (definition.Metal == null || !ContentFiles.TryResolve(definition.Metal, out var metalId))
+            throw new InvalidOperationException(
+                $"Forge recipe '{path}' names metal '{definition.Metal}', which is not a registered block or item.");
+        var metalCount = definition.MetalCount ?? 0;
+        if (metalCount is < 1 or > MaxForgeMetalCount)
+            throw new InvalidOperationException(
+                $"Forge recipe '{path}' has metalCount {definition.MetalCount}; expected 1..{MaxForgeMetalCount}.");
+        if (definition.Result == null || !ContentFiles.TryResolve(definition.Result, out var resultId))
+            throw new InvalidOperationException(
+                $"Forge recipe '{path}' names result '{definition.Result}', which is not a registered block or item.");
+        if (resultId == metalId)
+            throw new InvalidOperationException($"Forge recipe '{path}' forges its metal into itself.");
+        var resultCount = definition.Count ?? 1;
+        if (resultCount <= 0)
+            throw new InvalidOperationException($"Forge recipe '{path}' has count {resultCount}; expected 1 or more.");
+        if (ContentRegistry.ForgeRecipeForResult(resultId) is { } other)
+            throw new InvalidOperationException(
+                $"Forge recipe '{path}' duplicates the result of '{other.Name}': one forge recipe per result.");
+        return new ForgeRecipe(name, metalId, metalCount, resultId, resultCount);
+    }
+
+    /// <summary>The most metal one forge recipe may take: an anvil's stack is capped by its metal's largest recipe,
+    /// and the stack rides the wire in a byte.</summary>
+    internal const int MaxForgeMetalCount = 64;
 
     /// <summary>
     /// Compiles one alloy recipe: a molten result and at least two parts, each a distinct molten

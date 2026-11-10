@@ -1,7 +1,0 @@
-{
-  "result": "item/iron_tunic",
-  "count": 1,
-  "ingredients": [
-    { "item": "item/wrought_iron", "count": 8 }
-  ]
-}

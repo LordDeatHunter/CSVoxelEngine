@@ -491,6 +491,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
         DamageVignetteRenderer.cs # full-screen damage vignette: one oversized triangle with
                                   #   a radial fragment gradient, drawn inside the UI pass
         EntityHealthbarRenderer.cs # five hearts floating above every live mob, always facing the camera
+        ForgeRenderer.cs       # the anvil's recipe list: title, the stacked metal, a grid of recipe cards (result icon, rarity
+                               #   name, metal cost) with a hover look, CLOSE; geometry from ForgeLayout
         HudRenderer.cs         # crosshair, hearts, hotbar and its feedback, toasts, FPS and profiler, tooltip,
                                #   player list, the status effect icons (DrawEffects); owns the crosshair, heart and
                                #   effect icon sprites

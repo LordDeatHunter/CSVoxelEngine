@@ -2,6 +2,6 @@
   "result": "item/bronze_pants",
   "count": 1,
   "ingredients": [
-    { "item": "item/bronze_ingot", "count": 7 }
+    { "item": "item/bronze_ring", "count": 7 }
   ]
 }

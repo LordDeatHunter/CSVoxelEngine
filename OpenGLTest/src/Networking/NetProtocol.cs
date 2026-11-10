@@ -212,8 +212,11 @@ public static class NetFraming
     /// one. An older peer would misread the frame.
     /// 31: a <see cref="NetEntityKind.Skeleton"/>'s item byte packs its role and outfit above its tier
     /// (<see cref="Entities.TowerMobs.Skeleton.PackLook"/>); an older client would read a warrior or an armored skeleton as a
-    /// different tier.</summary>
-    public const int ProtocolVersion = 31;
+    /// different tier.
+    /// 32: the anvil forge. Each anvil in <see cref="NetMessage.StationState"/> ends with its stacked metal's id and count,
+    /// and a <see cref="NetIntentKind.Forge"/> world intent (the anvil's cell and the recipe's result id) forges from that
+    /// stack; an older peer would misread the station frames and refuse the intent as malformed.</summary>
+    public const int ProtocolVersion = 32;
 
     /// <summary>Largest accepted payload, so a bad length can never allocate unbounded memory.</summary>
     public const int MaxPayload = 1 << 20;

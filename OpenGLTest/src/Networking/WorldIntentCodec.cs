@@ -55,6 +55,10 @@ public static class WorldIntentCodec
             case NetIntentKind.Cast:
                 writer.Write((byte)intent.Slot);
                 break;
+            case NetIntentKind.Forge:
+                WriteCell(writer, intent);
+                writer.Write(intent.Recipe);
+                break;
             default:
                 throw new ArgumentException($"Unknown world intent {intent.Kind}.", nameof(intent));
         }
@@ -65,7 +69,7 @@ public static class WorldIntentCodec
     {
         seq = reader.ReadInt();
         var kind = (NetIntentKind)reader.ReadByte();
-        if (kind is < NetIntentKind.BreakStart or > NetIntentKind.Waystone)
+        if (kind is < NetIntentKind.BreakStart or > NetIntentKind.Forge)
             throw new InvalidDataException($"unknown world intent {(byte)kind}");
 
         var eye = reader.ReadVector3();
@@ -127,6 +131,11 @@ public static class WorldIntentCodec
                 if (slot >= SpellConfig.StaffMaxSlots)
                     throw new InvalidDataException($"cast slot {slot}");
                 return new WorldIntent(kind, eye, direction, Slot: slot);
+            }
+            case NetIntentKind.Forge:
+            {
+                var (x, y, z) = ReadCell(reader);
+                return new WorldIntent(kind, eye, direction, x, y, z, HasCell: true, Recipe: reader.ReadByte());
             }
             default:
                 throw new InvalidDataException($"unknown world intent {(byte)kind}");

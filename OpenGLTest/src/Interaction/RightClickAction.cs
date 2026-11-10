@@ -151,6 +151,13 @@ internal sealed class RightClickAction
             outcome = RightClickOutcome.Waystone;
             return true;
         }
+        // A hammer on an anvil holding a metal stack claims it the same way: the local player opens the recipe list
+        if (Interactions.TryOpenForge(maxDistance, player, out var forgeCell))
+        {
+            LastForgeCell = forgeCell;
+            outcome = RightClickOutcome.Forge;
+            return true;
+        }
         // A tower altar claims it too: the authoritative world begins the ritual (singleplayer, or a server replaying a
         // client's Use intent through this same chain), a client only judges it from its mirror
         if (Interactions.TryUseAltar(maxDistance, player, out var altarCell))
@@ -194,6 +201,9 @@ internal sealed class RightClickAction
 
     /// <summary>The cell of the waystone the newest <see cref="RightClickOutcome.Waystone"/> claim named.</summary>
     internal System.Numerics.Vector3 LastWaystoneCell { get; private set; }
+
+    /// <summary>The cell of the anvil the newest <see cref="RightClickOutcome.Forge"/> claim named.</summary>
+    internal System.Numerics.Vector3 LastForgeCell { get; private set; }
 
     /// <summary>The cell of the altar the newest <see cref="RightClickOutcome.Altar"/> claim named.</summary>
     internal System.Numerics.Vector3 LastAltarCell { get; private set; }

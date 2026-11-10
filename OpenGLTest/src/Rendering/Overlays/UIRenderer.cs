@@ -150,6 +150,7 @@ public class UIRenderer : IDisposable
     internal InventoryPanelRenderer Panel { get; }
     internal SpellBuilderRenderer SpellBuilder { get; }
     internal WaystoneRenderer Waystone { get; }
+    internal ForgeRenderer Forge { get; }
     internal TopStripRenderer TopStrip { get; }
     internal HudRenderer Hud { get; }
     /// <summary>The rarity chrome over list rows and the hover tooltip.</summary>
@@ -241,6 +242,7 @@ public class UIRenderer : IDisposable
         Panel = new InventoryPanelRenderer(gl, this);
         SpellBuilder = new SpellBuilderRenderer(this);
         Waystone = new WaystoneRenderer(gl, this);
+        Forge = new ForgeRenderer(this);
         TopStrip = new TopStripRenderer(gl, this);
     }
 

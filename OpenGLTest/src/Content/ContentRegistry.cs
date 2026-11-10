@@ -67,6 +67,7 @@ public static class ContentRegistry
     internal static readonly List<MeltRecipe> MeltRecipes = [];
     internal static readonly List<CastRecipe> CastRecipes = [];
     internal static readonly List<AlloyRecipe> AlloyRecipesList = [];
+    internal static readonly List<ForgeRecipe> ForgeRecipesList = [];
 
     // Blocks declaring a "biomeTint", validated at load (so a bad face names its file before any
     // GL) and resolved to atlas tiles in BakeModels, the first point the tiles exist.
@@ -129,6 +130,7 @@ public static class ContentRegistry
         RecipeLoader.LoadMeltRecipes(Path.Combine(assetsRoot, "data", "recipes", "melt"));
         RecipeLoader.LoadCastRecipes(Path.Combine(assetsRoot, "data", "recipes", "cast"));
         RecipeLoader.LoadAlloyRecipes(Path.Combine(assetsRoot, "data", "recipes", "alloy"));
+        RecipeLoader.LoadForgeRecipes(Path.Combine(assetsRoot, "data", "recipes", "forge"));
         EntityLoader.LoadEntities(assetsRoot);
         TreeSpeciesLoader.LoadTreeSpecies(Path.Combine(assetsRoot, "data", "trees"));
         StatusEffectLoader.LoadEffects(Path.Combine(assetsRoot, "data", "effects"));
@@ -448,6 +450,26 @@ public static class ContentRegistry
     /// crucible's mixed metals (<see cref="Simulation.AlloyRules"/>).</summary>
     public static IReadOnlyList<AlloyRecipe> AlloyRecipes => AlloyRecipesList;
 
+    /// <summary>Every compiled anvil recipe, in file-name order (<see cref="Simulation.Smithing.AnvilManager"/>).</summary>
+    public static IReadOnlyList<ForgeRecipe> ForgeRecipes => ForgeRecipesList;
+
+    /// <summary>The forge recipe making this id, or null when no anvil forges it.</summary>
+    public static ForgeRecipe? ForgeRecipeForResult(byte id)
+    {
+        foreach (var recipe in ForgeRecipesList)
+            if (recipe.ResultId == id) return recipe;
+        return null;
+    }
+
+    /// <summary>Whether this id is a forge metal: some forge recipe takes it, so it stacks on an anvil.</summary>
+    public static bool IsForgeMetal(byte id)
+    {
+        if (id == BlockType.Air) return false;
+        foreach (var recipe in ForgeRecipesList)
+            if (recipe.MetalId == id) return true;
+        return false;
+    }
+
     /// <summary>Whether any cast recipe pours into this block, i.e. whether it is a usable mold.</summary>
     public static bool IsCastMold(byte id)
     {
@@ -470,6 +492,7 @@ public static class ContentRegistry
         MeltRecipes.Clear();
         CastRecipes.Clear();
         AlloyRecipesList.Clear();
+        ForgeRecipesList.Clear();
         BlockModels.Clear();
         OpenModels.Clear();
         ItemModels.Clear();

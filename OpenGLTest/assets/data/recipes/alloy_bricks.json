@@ -1,10 +1,10 @@
 {
-  // A mud brick block bound with a copper and a tin ingot: the alloy furnace's shell takes 26.
+  // A mud brick block bound with a copper and a tin ring: the alloy furnace's shell takes 26.
   "result": "block/alloy_bricks",
   "count": 1,
   "ingredients": [
     { "item": "block/mud_bricks", "count": 1 },
-    { "item": "item/copper_ingot", "count": 1 },
-    { "item": "item/tin_ingot", "count": 1 }
+    { "item": "item/copper_ring", "count": 1 },
+    { "item": "item/tin_ring", "count": 1 }
   ]
 }

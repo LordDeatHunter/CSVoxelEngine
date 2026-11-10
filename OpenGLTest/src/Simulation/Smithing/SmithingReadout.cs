@@ -1,12 +1,13 @@
 using System;
 using VoxelEngine.Config;
+using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Simulation.Smithing;
 
 /// <summary>
 /// The one-line status of an iron works block, shown under the look-at label while the crosshair rests on it: how hot
 /// a lit bloomery is (the player keeps it in the band by jumping), what it holds, what waits to be collected, and how
-/// far an anvil's piece has been hammered. GL-free, so the HUD and the tests read the same text.
+/// far an anvil's piece has been hammered or how much metal is stacked on it. GL-free, so the HUD and the tests read the same text.
 /// </summary>
 public static class SmithingReadout
 {
@@ -32,7 +33,12 @@ public static class SmithingReadout
         return state.Ore > 0 && state.Fuel > 0 ? text + "   (strike to light)" : text;
     }
 
-    /// <summary>The status line of an anvil, or null when nothing lies on it.</summary>
-    public static string? Anvil(AnvilManager.State state) =>
-        state.HasPiece ? $"Hammered {state.Hits}/{state.Profile.Hits}" : null;
+    /// <summary>The status line of an anvil (a piece's hits, or a stack's metal and size), or null when nothing lies on
+    /// it.</summary>
+    public static string? Anvil(AnvilManager.State state)
+    {
+        if (state.HasPiece) return $"Hammered {state.Hits}/{state.Profile.Hits}";
+        if (state.MetalCount <= 0) return null;
+        return $"{Inventory.DisplayName(state.MetalId)} x{state.MetalCount}   (right-click with a hammer to forge)";
+    }
 }

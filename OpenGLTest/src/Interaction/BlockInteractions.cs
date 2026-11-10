@@ -254,30 +254,55 @@ internal sealed class BlockInteractions
     }
 
     /// <summary>
-    /// Right-click on an anvil: the item its profile takes (a bloom) is laid on an empty anvil, and an empty hand
-    /// takes the piece back off. Anything else, a block in hand included, falls through (a hammer is worked with
-    /// the left button; see <see cref="HammerAnvil"/>). Returns whether the click belonged to the anvil.
+    /// Right-click on an anvil, which holds either one bloom or a stack of one forge metal (<see cref="AnvilManager"/>):
+    /// a forge metal in hand (wrought iron) stacks one more on it, the item its profile takes (a bloom) is laid on an
+    /// empty anvil, and anything else (an empty hand or any other item) takes one back off, or all of the stack while
+    /// sneaking. A hammer never claims the click here (it opens the recipe list, <see cref="TryOpenForge"/>, and works
+    /// a bloom with the left button, <see cref="HammerAnvil"/>), and on an empty anvil the click falls through, so a
+    /// block still places against it. Returns whether the click belonged to the anvil.
     /// </summary>
     internal bool TryAnvilInteract(float maxDistance, PlayerContext player)
     {
         var inventory = player.Inventory;
-        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
-        var cell = new Vector3((int)hit.X, (int)hit.Y, (int)hit.Z);
-        if (!TryTrackAnvilAt(cell)) return false;
+        var held = inventory.HeldItem;
+        if (Mining.IsHammer(held) || !TryAimedAnvil(maxDistance, player, out var cell)) return false;
 
         var anvils = _world.Smithing.Anvils;
-        var held = inventory.HeldItem;
-        if (held == null)
+        var metal = held != null && ContentRegistry.IsForgeMetal(held.Id);
+        if (held != null && (metal ? anvils.TryStack(cell, held.Id) : anvils.TryPlace(cell, held.Id)))
         {
-            if (!anvils.TryTake(cell, out var taken)) return false;
-            if (!inventory.Add(taken))
-                _dropManager.Spawn(taken, cell);
+            if (!player.IsCreative)
+                inventory.ConsumeSelected();
             return true;
         }
-        if (!anvils.TryPlace(cell, held.Id)) return false;
-        if (!player.IsCreative)
-            inventory.ConsumeSelected();
+        // A forge metal that does not stack (a full stack, another metal, a bloom on the anvil) takes nothing back
+        if (metal) return false;
+        if (!anvils.TryTake(cell, player.IsSneaking, out var taken, out var count)) return false;
+        for (var i = 0; i < count; i++)
+            if (!inventory.Add(taken) && !_world.IsClientMode)
+                _dropManager.Spawn(taken, cell);
         return true;
+    }
+
+    /// <summary>
+    /// A right-click with a smithing hammer on an anvil holding a metal stack: claims the click (it changes nothing)
+    /// and names the anvil in <paramref name="cell"/>, so the local player opens the anvil's recipe list on it. A bare
+    /// anvil or one holding a bloom is not claimed: the bloom is hammered with the left button.
+    /// </summary>
+    internal bool TryOpenForge(float maxDistance, PlayerContext player, out Vector3 cell)
+    {
+        cell = default;
+        if (!Mining.IsHammer(player.Inventory.HeldItem) || !TryAimedAnvil(maxDistance, player, out cell)) return false;
+        return _world.Smithing.Anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z) is { MetalCount: > 0 };
+    }
+
+    // The anvil under this player's crosshair, tracked; false when the ray lands on anything else
+    private bool TryAimedAnvil(float maxDistance, PlayerContext player, out Vector3 cell)
+    {
+        cell = default;
+        if (!player.Raycast(maxDistance, _chunkManager, out var hit, out _)) return false;
+        cell = new Vector3((int)hit.X, (int)hit.Y, (int)hit.Z);
+        return TryTrackAnvilAt(cell);
     }
 
     /// <summary>Makes sure the anvil block at <paramref name="cell"/> is tracked. False when the cell is not an

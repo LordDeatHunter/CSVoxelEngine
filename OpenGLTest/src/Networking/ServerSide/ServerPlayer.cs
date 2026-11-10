@@ -134,7 +134,7 @@ public sealed class ServerPlayer : IMobTarget
 
     /// <summary>
     /// Points <see cref="Context"/> at an intent's eye and aim, with this player's current creative
-    /// flag, before the world applies it.
+    /// and sneaking flags, before the world applies it.
     /// </summary>
     public void Aim(Vector3 eye, Vector3 direction)
     {
@@ -142,6 +142,7 @@ public sealed class ServerPlayer : IMobTarget
         Context.Forward = direction;
         Context.ViewDirection = direction;
         Context.IsCreative = Creative;
+        Context.RemoteSneaking = IsSneaking;
     }
 
     public int Id { get; }

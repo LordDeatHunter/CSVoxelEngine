@@ -52,7 +52,7 @@ public sealed class MetalworksRecipeTests
         var bronze = ContentRegistry.MoltenMaterialByName("bronze");
         Assert.NotNull(bronze);
 
-        foreach (var name in new[] { "bronze_ingot", "bronze_pickaxe_head", "bronze_axe_head", "bronze_sword_head" })
+        foreach (var name in new[] { "bronze_ingot", "bronze_pickaxe_head", "bronze_axe_head", "bronze_sword_head", "bronze_ring" })
         {
             var recipe = ContentRegistry.MeltRecipeForInput(Item(name));
             Assert.NotNull(recipe);
@@ -60,7 +60,7 @@ public sealed class MetalworksRecipeTests
         }
 
         // Bronze is cast in the same fired molds as the other metals; the material picks the result.
-        foreach (var mold in new[] { "fired_mold_ingot", "fired_mold_pickaxe", "fired_mold_axe", "fired_mold_sword" })
+        foreach (var mold in new[] { "fired_mold_ingot", "fired_mold_pickaxe", "fired_mold_axe", "fired_mold_sword", "fired_mold_ring" })
         {
             var cast = ContentRegistry.CastRecipeFor(Block(mold), bronze.Id);
             Assert.NotNull(cast);
@@ -101,6 +101,21 @@ public sealed class MetalworksRecipeTests
             // miscast is never a loss of metal.
             Assert.Equal(cast.AmountMl * cast.ResultCount, melt.AmountMl);
         }
+    }
+
+    [Fact]
+    public void NoCraftingRecipeTakesAnIngotOfAMoltenMetal()
+    {
+        // A molten metal reaches an item only by being cast: an ingot is a storage form, so a
+        // recipe that wants metal asks for a cast part (a ring, a head) instead.
+        var ingots = ContentRegistry.CastRecipesList
+            .Where(cast => cast.MoldId == Block("fired_mold_ingot"))
+            .Select(cast => cast.ResultId)
+            .ToHashSet();
+        Assert.NotEmpty(ingots);
+
+        Assert.DoesNotContain(ContentRegistry.CraftingRecipes,
+            recipe => recipe.Ingredients.Any(i => ingots.Any(i.Accepts)));
     }
 
     [Fact]

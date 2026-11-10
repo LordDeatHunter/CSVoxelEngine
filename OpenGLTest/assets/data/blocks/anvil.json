@@ -1,5 +1,6 @@
 {
-  // A stone anvil (six cobblestone, recipes/anvil.json): the block a bloom is hammered on. Base, waist and a top with a
+  // A stone anvil (six cobblestone, recipes/anvil.json): the block a bloom is hammered on, and the forge wrought iron
+  // stacked on it is worked into parts and armor (recipes/forge/, AnvilManager). Base, waist and a top with a
   // horn (models/block/anvil.json, tile hand-authored). The body collides with its hitbox boxes.
   "name": "Anvil",
   "model": "block/anvil",

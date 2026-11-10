@@ -81,11 +81,12 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       KilnManager.cs           # kiln block entities keyed by anchor: fuel, ignition, the crucible
                                #   slot and its melt loop, plus the multiblock integrity sweep
       Smithing/                # the iron works, namespace VoxelEngine.Simulation.Smithing (see "The bloomery and the anvil")
-        AnvilManager.cs        # anvils keyed by cell: one piece, hammer hits gated by the hammer's gap, result and slag
+        AnvilManager.cs        # anvils keyed by cell: one piece (hammer hits gated by the hammer's gap, result and slag) or a
+                               #   stack of one forge metal (stack, take back, the recipes Offered, TryForge), save and wire
         BloomeryManager.cs     # bloomeries keyed by anchor: ore, fuel, heat, smelting, the integrity sweep, save and wire
         BloomeryRules.cs       # GL-free heat model: zones, decay, pump, fuel factor, burning
         SmithingReadout.cs     # GL-free look-at status lines of a bloomery and an anvil
-        SmithingStations.cs    # both registries as one unit (World.Smithing): update, save, wire
+        SmithingStations.cs    # both registries as one unit (World.Smithing): update, save, wire, and Forge (a pick into an inventory)
       LeafDecay/               # leaf decay and the orphaned-wood crumble, namespace VoxelEngine.Simulation.LeafDecay
         LeafDecayManager.cs    # the composition root and facade: the scheduled cells, the tick and its slicing,
                                #   ScheduleAround/ScheduleBox from every edit path, TickLeaf/TickWood and the removal
@@ -197,6 +198,9 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       Widgets/                 # GL-free widget layouts the renderers only draw: UiRect, PanelFrameLayout, ButtonLayout (+ WidgetState),
                                #   TabStripLayout, ListRowLayout, TextBoxLayout, ScrollViewLayout, TooltipLayout; the kit the [E] panel,
                                #   craft card, spell builder and the gear and chest panels build on (plans/INVENTORY_UI.md)
+      Forge/                   # the anvil's recipe list, GL-free (ForgeRenderer draws it, ForgeInput drives it)
+        ForgeView.cs           # open flag, the anvil, its metal stack and the recipes offered for it, hover, transition
+        ForgeLayout.cs         # canvas geometry of the panel, the card grid and CLOSE, and HitAt; ForgeHitKind.cs
       Hud/                     # HUD widgets: chat, clock, compass, crosshair state,
                                #   toasts, hotbar feedback, look label, tooltips, screenshots
         BossBarState.cs        # what one frame's boss bar draws: the boss's name and health share (BossSelection)
@@ -279,7 +283,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
     VisualTest/                # the VOXEL_SCRIPT scenario runner: parsed scenario, director, scripted keyboard, PNG capture
       ScriptedKeyboard.cs      # an IKeyboard whose pressed keys are set by code instead of the OS
       VisualCapture.cs         # reads the finished frame back from the GPU and writes it as a PNG
-      IScenarioUi.cs           # what a scenario may do to the live UI (panel, tab, search, row, hover, spell builder, waystone)
+      IScenarioUi.cs           # what a scenario may do to the live UI (panel, tab, search, row, hover, spell builder, waystone, forge)
       VisualDirector.cs        # runs a VisualScenario inside the live game
       VisualScenario.cs        # a scripted in-game run:
                                #   teleport/look/wait/walk/mine/place/fly/give/spawn/grow/damage/effect/screenshot
@@ -529,6 +533,7 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
   assets/data/recipes/melt/<in>.json  # what a block or item melts into, and how many ml
   assets/data/recipes/cast/<out>.json # (fired mold + material) -> result, amount and cooling time
   assets/data/recipes/alloy/<name>.json # an alloy: result + parts (material, ml); a full set -> the summed ml of the result
+  assets/data/recipes/forge/<out>.json # an anvil recipe: metal + metalCount stacked on the anvil -> result + count
   assets/data/spell/<kind>/<name>.json # spell parts by kind (element, shape, modifier, trigger): cost share,
                                       #   complexity, tags, modifier factors, an element's status `effect`
   assets/data/effects/<name>.json     # status effects (burning, frostburn): duration, damage over time, speed

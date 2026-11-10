@@ -1,7 +1,0 @@
-{
-  "result": "item/copper_ring",
-  "count": 1,
-  "ingredients": [
-    { "item": "item/copper_ingot", "count": 2 }
-  ]
-}

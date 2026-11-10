@@ -128,7 +128,7 @@ queued knockback lift) is what accepts the legal hop and corrects a second (see 
 protocol 24. `AirJumpTests`. **Accessories**: the stat accessories are the Ring of Focus (`focus_ring`, mana regen) and the
 Charm of Reserves (`reserve_charm`, max mana), both crafted and looted, plus `amulet_of_vigor`, `miners_belt` and
 `ember_charm`; the **metal ring ladder** is `tin_ring` and `copper_ring` (+1 armor) and `bronze_ring` and `iron_ring` (+2),
-armor only (no mana, no set), crafted from two ingots (iron from `wrought_iron`) and never looted, their armor adding to the
+armor only (no mana, no set), never looted, the tin, copper and bronze ones cast in the ring mold (200 ml, see "Cast molds") and the iron one forged on the anvil from two `wrought_iron` (`recipes/forge/iron_ring.json`, see "The bloomery and the anvil"), their armor adding to the
 body armor's in `GearStatsCalculator`; the ability charms are under "Armor, modifiers and sets". Its instances live in the same `Inventory.Tools` list as tool
 instances (so every instance lookup, the save and the wire carry them) but count against their own pool
 (`InventoryCategory.Gear`, `GearConfig.GearCapacity`), never take a hotbar slot and come off when removed from the

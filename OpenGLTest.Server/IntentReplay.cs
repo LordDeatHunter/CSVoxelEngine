@@ -9,7 +9,7 @@ using VoxelEngine.Simulation.Smithing;
 
 namespace VoxelEngine.Server;
 
-/// <summary>Replays a player's intents (breaks, placements, uses, throws, attacks, casts, hammer hits, waystone trips, respawns and inventory actions) through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
+/// <summary>Replays a player's intents (breaks, placements, uses, throws, attacks, casts, hammer hits, anvil forges, waystone trips, respawns and inventory actions) through the singleplayer rules and answers each one in order: the authoritative cells around a world intent's target, the inventory when it could change or was refused, then the result. Also refuses the retired raw block edit. Main thread only.</summary>
 internal sealed class IntentReplay
 {
     private readonly ServerState _state;
@@ -164,6 +164,8 @@ internal sealed class IntentReplay
                 return HammerFor(player, intent);
             case NetIntentKind.Waystone:
                 return _waystones.TripFor(player, intent);
+            case NetIntentKind.Forge:
+                return ForgeFor(player, intent);
             default:
                 return false;
         }
@@ -217,6 +219,18 @@ internal sealed class IntentReplay
             return false;
         var gap = Mining.HitGapSeconds(held, player.Inventory.Equipment.Stats.MiningFactor);
         return _state.World.HammerFor(intent.Cell, gap, BloomeryConfig.HammerSlackSeconds).Kind != AnvilHitKind.Refused;
+    }
+
+    /// <summary>
+    /// A pick from the anvil's recipe list: a smithing hammer in hand, the player's own ray landing on the anvil's cell,
+    /// then the forge itself (<see cref="SmithingStations.Forge"/>), which needs the recipe offered for the stack on the
+    /// anvil and room for its result. The inventory snapshot and the station broadcast carry the outcome.
+    /// </summary>
+    private bool ForgeFor(ServerPlayer player, in WorldIntent intent)
+    {
+        if (!Mining.IsHammer(player.Inventory.HeldItem) || !AimsAt(player, intent, out _))
+            return false;
+        return _state.World.Smithing.Forge(intent.Cell, intent.Recipe, player.Inventory);
     }
 
     private bool PlaceFor(ServerPlayer player, in WorldIntent intent)

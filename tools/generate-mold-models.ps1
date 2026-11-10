@@ -1,6 +1,6 @@
-# Generates the block models for the eight cast molds into assets/models/block/:
-# mold_pickaxe.json, mold_axe.json, mold_ingot.json, fired_mold_pickaxe.json, fired_mold_axe.json
-# fired_mold_ingot.json, mold_sword.json and fired_mold_sword.json (mold_sword.png is committed art). Each one is a
+# Generates the block models for the twelve cast molds into assets/models/block/:
+# mold_pickaxe.json, mold_axe.json, mold_ingot.json, mold_sword.json, mold_ring.json, mold_dagger.json and
+# their fired_mold_* twins (mold_sword.png is committed art). Each one is a
 # flat slab whose top is carved out into a pocket shaped like the tool the mold casts, so the
 # geometry is derived from the tool sprite rather than modelled by hand - never hand-edit the
 # output, re-run this instead.
@@ -233,6 +233,8 @@ Copy-IfMissing (Join-Path $blocksDir 'stone.png')         (Join-Path $blocksDir 
 Copy-IfMissing (Join-Path $itemsDir 'copper_pickaxe.png') (Join-Path $itemsDir 'mold_pickaxe.png')
 Copy-IfMissing (Join-Path $itemsDir 'copper_axe.png')     (Join-Path $itemsDir 'mold_axe.png')
 Copy-IfMissing (Join-Path $itemsDir 'copper_ingot.png')  (Join-Path $itemsDir 'mold_ingot.png')
+Copy-IfMissing (Join-Path $itemsDir 'copper_ring.png')   (Join-Path $itemsDir 'mold_ring.png')
+Copy-IfMissing (Join-Path $itemsDir 'copper_blade.png')  (Join-Path $itemsDir 'mold_dagger.png')
 
 # model name -> the sprite whose silhouette carves it and the atlas tile it wears. A fired mold is
 # the same geometry as its raw twin in a different tile, so both read the same mask.
@@ -241,10 +243,14 @@ $models = @(
     @{ Model = 'mold_axe';           Sprite = 'mold_axe';     Tile = 'mud' },
     @{ Model = 'mold_ingot';         Sprite = 'mold_ingot';   Tile = 'mud' },
     @{ Model = 'mold_sword';         Sprite = 'mold_sword';   Tile = 'mud' },
+    @{ Model = 'mold_ring';          Sprite = 'mold_ring';    Tile = 'mud' },
+    @{ Model = 'mold_dagger';        Sprite = 'mold_dagger';  Tile = 'mud' },
     @{ Model = 'fired_mold_pickaxe'; Sprite = 'mold_pickaxe'; Tile = 'fired_mud' },
     @{ Model = 'fired_mold_axe';     Sprite = 'mold_axe';     Tile = 'fired_mud' },
     @{ Model = 'fired_mold_ingot';   Sprite = 'mold_ingot';   Tile = 'fired_mud' },
-    @{ Model = 'fired_mold_sword';   Sprite = 'mold_sword';   Tile = 'fired_mud' }
+    @{ Model = 'fired_mold_sword';   Sprite = 'mold_sword';   Tile = 'fired_mud' },
+    @{ Model = 'fired_mold_ring';    Sprite = 'mold_ring';    Tile = 'fired_mud' },
+    @{ Model = 'fired_mold_dagger';  Sprite = 'mold_dagger';  Tile = 'fired_mud' }
 )
 
 $masks = @{}

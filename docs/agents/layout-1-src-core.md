@@ -24,6 +24,9 @@ OpenGLTest/
       AppScreen.cs             # what the window is showing: Menu / Loading / Playing / Saving
       ChatInput.cs             # the chat's keys, submitting a line, the local chat commands and the Tab player list's names
       DevDiagnostics.cs        # the startup build line, the VOXEL_TIME read, the live debug flag (X, VOXEL_DEBUG) and the X debug line
+      ForgeInput.cs            # the anvil's recipe list input (built by GameplayInput): open on a hammer's right-click on a stacked
+                               #   anvil, cursor and look capture, card clicks forge, the close rules; connected, predicts and
+                               #   sends the Forge intent
       GameplayInput.cs         # a playing world's per-frame polled input: key edges, hotbar, right-click chain, pause-gated world update, mining, middle pick;
                                #   frees the cursor while the chat is open (SyncChatCursor)
       InputEvents.cs           # the window's mouse and keyboard events, routed to whatever owns them on the current screen (a click on a chat link
@@ -36,7 +39,8 @@ OpenGLTest/
       RowDragInput.cs          # dragging a listed [E] row onto a hotbar or equipment slot: press, per-frame lift, drop
       MenuInput.cs             # the pause menu's and shared settings page's input, and applying the window-level settings
       ScenarioUi.cs            # the app's IScenarioUi: lets a VOXEL_SCRIPT run open the [E] panel and the spell builder, pick a tab or row,
-                               #   type a search, hold the pointer and drive the waystone screen through the real input components
+                               #   type a search, hold the pointer and drive the waystone screen and the anvil's recipe list through the
+                               #   real input components
       SpellBuilderInput.cs     # the spell builder's input: open from the table (or the hold-a-staff toast), close on
                                #   E/Escape or a changed held staff, cursor and look capture, clicks, bind/clear requests
       WaystoneInput.cs         # the waystone screen's input: discover on a right-click, the popup, rename dialog and teleport list,
@@ -209,6 +213,7 @@ OpenGLTest/
         CookRecipeDefinition.cs # JSON shape of assets/data/recipes/cook/<name>.json
         CrushRecipeDefinition.cs # JSON shape of assets/data/recipes/crush/<name>.json
         EntityDefinition.cs    # JSON shape of assets/data/entities/<name>.json
+        ForgeRecipeDefinition.cs # JSON shape of assets/data/recipes/forge/<result>.json: metal + metalCount -> result + count
         MeltRecipeDefinition.cs # block/item -> (material, ml)
         MoltenMaterialDefinition.cs # a molten metal: id, tile, tint
         RecipeDefinition.cs    # JSON shape of assets/data/recipes/<name>.json
@@ -229,14 +234,15 @@ OpenGLTest/
                                #   animate from their clips)
         BlockModel.cs, ModelLoader.cs  # Minecraft model format: parent chains, #texture refs
         ModelBakeSteps.cs      # BakeModels' steps: facing/multiblock bake checks, BakesGreedy, tint resolution, parent self-check
-      Recipes/                 # compiled craft, cook, crush, melt, cast and alloy recipes
+      Recipes/                 # compiled craft, cook, crush, melt, cast, alloy and forge recipes
         AlloyRecipe.cs         # one alloy: a set of molten parts (material, ml) -> the same ml of the result
         CastRecipe.cs          # (fired mold, material) -> result + cooling
         CookRecipe.cs          # one compiled campfire recipe: raw input, cooked result and seconds on the fire
         CraftingRecipe.cs      # one compiled crafting recipe: what it makes and what one craft consumes
         CrushRecipe.cs         # one compiled quern recipe: crushable input and the crushed result
+        ForgeRecipe.cs         # one anvil recipe: so many of a solid metal stacked on an anvil -> the result (one per result)
         MeltRecipe.cs          # block/item -> (material, ml)
-        RecipeLoader.cs        # data/recipes (craft, cook, crush, melt, cast, alloy) and data/molten -> the compiled lists
+        RecipeLoader.cs        # data/recipes (craft, cook, crush, melt, cast, alloy, forge) and data/molten -> the compiled lists
       Shapes/                  # hitboxes and the shape resolvers (pane, multiblock, tree wood, snow, facing, break overlay)
         BlockHitbox.cs         # one axis-aligned selection box in cell-local 0..1 space
         BlockShape.cs          # the one live-world box resolver (raycast, outline, pop,

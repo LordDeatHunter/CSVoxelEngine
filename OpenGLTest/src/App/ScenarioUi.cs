@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using VoxelEngine.Interaction;
 using VoxelEngine.Magic;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.VisualTest;
@@ -7,12 +8,13 @@ using VoxelEngine.VisualTest;
 namespace VoxelEngine.App;
 
 /// <summary>
-/// The app's <see cref="IScenarioUi"/>: a visual scenario drives the [E] panel, the spell builder and the waystone screen through
+/// The app's <see cref="IScenarioUi"/>: a visual scenario drives the [E] panel, the spell builder, the waystone screen and the
+/// anvil's recipe list through
 /// the same input components a player's keys and clicks reach, so what it films is what the game does.
 /// Built by Program from its own components; main thread only.
 /// </summary>
-internal sealed class ScenarioUi(InventoryPanelInput panelInput, SpellBuilderInput builderInput, WaystoneInput waystoneInput)
-    : IScenarioUi
+internal sealed class ScenarioUi(InventoryPanelInput panelInput, SpellBuilderInput builderInput, WaystoneInput waystoneInput,
+    ForgeInput forgeInput) : IScenarioUi
 {
     public void SetPanelOpen(bool open)
     {
@@ -106,6 +108,30 @@ internal sealed class ScenarioUi(InventoryPanelInput panelInput, SpellBuilderInp
         }
         // The input's per-frame refresh (rows, footer, reach) runs in GameplayInput, which a scenario bypasses
         waystoneInput.Update(world);
+    }
+
+    public void Forge(string action, Vector3? cell, int card)
+    {
+        var world = RequirePlaying("forge");
+        switch (action)
+        {
+            case "open":
+                if (!Mining.IsHammer(world.Inventory.HeldItem))
+                    throw new InvalidOperationException("opening the anvil's recipes needs a smithing hammer in hand (give and select one first).");
+                forgeInput.Open(world, cell!.Value);
+                break;
+            case "pick":
+                if (!forgeInput.Pick(card))
+                    throw new InvalidOperationException($"Forge card {card + 1} is not listed ({forgeInput.View.Recipes.Count} cards).");
+                break;
+            case "close":
+                forgeInput.Close();
+                break;
+        }
+        // The input's per-frame check (the stack, the hammer, the reach) runs in GameplayInput, which a scenario bypasses
+        forgeInput.Update(world);
+        if (action == "open" && !forgeInput.IsOpen)
+            throw new InvalidOperationException($"{cell} is not an anvil with a metal stack in reach.");
     }
 
     private static World RequirePlaying(string what) =>

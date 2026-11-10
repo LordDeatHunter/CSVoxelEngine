@@ -1,7 +1,0 @@
-{
-  "result": "item/tin_ring",
-  "count": 1,
-  "ingredients": [
-    { "item": "item/tin_ingot", "count": 2 }
-  ]
-}

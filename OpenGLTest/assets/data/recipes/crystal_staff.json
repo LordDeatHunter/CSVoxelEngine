@@ -6,6 +6,6 @@
   "ingredients": [
     { "item": "item/wooden_staff", "count": 1 },
     { "item": "block/crystal_block", "count": 2 },
-    { "item": "item/copper_ingot", "count": 1 }
+    { "item": "item/copper_ring", "count": 1 }
   ]
 }

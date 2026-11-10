@@ -196,6 +196,13 @@ public sealed class StationSaveData
         public string? Block { get; set; }
         public int Hits { get; set; }
         public float Cooldown { get; set; }
+
+        /// <summary>The forge metal stacked on the anvil by content name; absent for an anvil holding a piece (a bloom),
+        /// whose <see cref="Hits"/> and <see cref="Cooldown"/> are then what counts.</summary>
+        public string? Metal { get; set; }
+
+        /// <summary>How many of <see cref="Metal"/> are stacked.</summary>
+        public int Count { get; set; }
     }
 
     /// <summary>One mold cell holding a pour, its recipe named by mold block and material.</summary>

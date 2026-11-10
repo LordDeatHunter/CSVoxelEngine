@@ -13,7 +13,7 @@ using VoxelEngine.UI.Menus;
 
 namespace VoxelEngine.App;
 
-/// <summary>A playing world's per-frame polled input, in frame order: the chat, debug, HUD, screenshot, player-list, ESC and [E] keys, the hotbar keys and throws, the right-click use/place/charge chain (a spell table's claim opens the spell builder, a waystone's the waystone screen), then (unless paused) the world update, the chat clock, mining and the middle-click pick. An open [E] panel, spell builder or waystone screen owns the mouse (<see cref="PanelOpen"/>), and an open chat frees the cursor so its links and input can be clicked (<see cref="SyncChatCursor"/>). Owns the input edges and the right-click repeat timer. Owned by Program; main thread only.</summary>
+/// <summary>A playing world's per-frame polled input, in frame order: the chat, debug, HUD, screenshot, player-list, ESC and [E] keys, the hotbar keys and throws, the right-click use/place/charge chain (a spell table's claim opens the spell builder, a waystone's the waystone screen, a hammer on a stacked anvil its recipe list), then (unless paused) the world update, the chat clock, mining and the middle-click pick. An open [E] panel, spell builder, waystone screen or anvil recipe list owns the mouse (<see cref="PanelOpen"/>), and an open chat frees the cursor so its links and input can be clicked (<see cref="SyncChatCursor"/>). Owns the input edges and the right-click repeat timer. Owned by Program; main thread only.</summary>
 internal sealed class GameplayInput
 {
     private readonly InputManager inputManager;
@@ -62,12 +62,17 @@ internal sealed class GameplayInput
         this.menuInput = menuInput;
         this.session = session;
         this.diagnostics = diagnostics;
+        Forge = new ForgeInput(inputManager, renderManager, session);
     }
+
+    /// <summary>The anvil's recipe list, opened by a hammer's right-click on an anvil holding a metal stack.</summary>
+    internal ForgeInput Forge { get; }
 
     private World? ActiveWorld => Program.ActiveWorld;
 
-    /// <summary>A panel owns the mouse: the [E] panel, the spell builder or the waystone screen is open.</summary>
-    private bool PanelOpen => inventoryView.IsOpen || builderInput.IsOpen || waystoneInput.IsOpen;
+    /// <summary>A panel owns the mouse: the [E] panel, the spell builder, the waystone screen or the anvil's recipe list
+    /// is open.</summary>
+    private bool PanelOpen => inventoryView.IsOpen || builderInput.IsOpen || waystoneInput.IsOpen || Forge.IsOpen;
 
     /// <summary>Whether the HUD draws (F1).</summary>
     internal bool HudVisible => hudVisible;
@@ -105,6 +110,7 @@ internal sealed class GameplayInput
             panelInput.SetInventoryOpen(false);
             builderInput.SetOpen(false);
             waystoneInput.Close();
+            Forge.Close();
             menuInput.SetPauseMenu(PauseMenuPage.Closed);
         }
         w.Camera.SuppressLook = up;
@@ -233,6 +239,8 @@ internal sealed class GameplayInput
                 builderInput.SetOpen(false);
             else if (waystoneInput.IsOpen)
                 waystoneInput.Back();
+            else if (Forge.IsOpen)
+                Forge.Close();
             else switch (pauseMenuView.Page)
             {
                 case PauseMenuPage.Closed:
@@ -273,11 +281,13 @@ internal sealed class GameplayInput
         if (ePressed && !eWasPressed && !pauseMenuView.IsOpen && !chatView.IsOpen && !deathUp
             && inventoryView.Focus == InventoryFocus.None && !waystoneInput.HasFocusedField)
         {
-            // E closes an open spell builder or waystone screen rather than opening the [E] panel over it
+            // E closes an open spell builder, waystone screen or anvil recipe list rather than opening the [E] panel over it
             if (builderInput.IsOpen)
                 builderInput.SetOpen(false);
             else if (waystoneInput.IsOpen)
                 waystoneInput.Close();
+            else if (Forge.IsOpen)
+                Forge.Close();
             else
                 panelInput.SetInventoryOpen(!inventoryView.IsOpen);
         }
@@ -345,6 +355,9 @@ internal sealed class GameplayInput
                 // A waystone is discovered and its screen opened here (the click itself changes nothing)
                 if (outcome == RightClickOutcome.Waystone)
                     waystoneInput.OpenFromStation(w, w.RightClick.LastWaystoneCell);
+                // A hammer on an anvil holding a metal stack opens its recipe list (the click itself changes nothing)
+                if (outcome == RightClickOutcome.Forge)
+                    Forge.Open(w, w.RightClick.LastForgeCell);
                 // A tower altar says what the click came to, once per press: a held button repeats the use on the
                 // place timer (harmless, the ritual's start is idempotent) but must not repeat the toast
                 if (outcome == RightClickOutcome.Altar && rightPressed)
@@ -368,6 +381,10 @@ internal sealed class GameplayInput
         rightWasDown = rightDown;
         builderInput.Update(w);
         waystoneInput.Update(w);
+        // The pause menu takes the cursor over from the recipe list, which only steps aside
+        if (pauseMenuView.IsOpen)
+            Forge.Close(recapture: false);
+        Forge.Update(w);
         panelInput.Chest.Update(w);
         if (!rightHeld && (PanelOpen || pauseMenuView.IsOpen || chatView.IsOpen || deathUp))
         {

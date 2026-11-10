@@ -111,6 +111,10 @@ public sealed class VisualStep
     /// <summary>Hammer hits an <c>anvil</c> step has already put in the bloom it lays down.</summary>
     public int Hits { get; init; }
 
+    /// <summary>The forge metal an <c>anvil</c> step stacks (<see cref="Count"/> of it) instead of laying a bloom;
+    /// null for a bloom.</summary>
+    public string? Metal { get; init; }
+
     /// <summary>The tower floor (0 = the ground floor) a <c>towerclear</c> step clears; 0 by default.</summary>
     public int Floor { get; init; }
 }
@@ -307,6 +311,8 @@ public sealed class VisualScenario
                 Pos = ReadPos(element, index, "anvil"),
                 On = !element.TryGetProperty("piece", out var piece) || piece.ValueKind != JsonValueKind.False,
                 Hits = ReadInt(element, "hits"),
+                Metal = element.TryGetProperty("metal", out var metal) ? metal.GetString() : null,
+                Count = element.TryGetProperty("count", out var stack) && stack.TryGetInt32(out var units) ? units : 1,
             },
             "hammer" => new VisualStep { Op = "hammer", Pos = ReadPos(element, index, "hammer") },
             "chest" => ReadChest(element, index),
@@ -319,6 +325,7 @@ public sealed class VisualScenario
                 On = element.TryGetProperty("all", out var all) && all.ValueKind == JsonValueKind.True,
             },
             "waystone" => ReadWaystone(element, index),
+            "forge" => ReadForge(element, index),
             "towerclear" => new VisualStep { Op = "towerclear", Floor = ReadInt(element, "floor") },
             "altar" => new VisualStep { Op = "altar", Pos = ReadPos(element, index, "altar") },
             "towerdefeat" => new VisualStep { Op = "towerdefeat" },
@@ -330,7 +337,7 @@ public sealed class VisualScenario
                 HideHud = element.TryGetProperty("hideHud", out var hide) && hide.GetBoolean(),
             },
             _ => throw new InvalidOperationException(
-                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, chest, chestrow, waystone, towerclear, altar, towerdefeat, goblincamp or screenshot."),
+                $"Step {index} has unknown op '{op}'; expected teleport, look, wait, walk, mine, place, prime, fly, creative, give, spawn, grow, damage, effect, cast, view, player, select, panel, tab, search, row, hover, spellbuilder, setblock, bloomery, anvil, hammer, forge, chest, chestrow, waystone, towerclear, altar, towerdefeat, goblincamp or screenshot."),
         };
     }
 
@@ -373,6 +380,26 @@ public sealed class VisualScenario
                     : throw new InvalidOperationException($"Step {index} (waystone teleport) needs 'row', a 1-based row of the list."),
             },
             _ => new VisualStep { Op = "waystone", Action = action },
+        };
+    }
+
+    // forge drives the anvil's recipe list like a player's clicks: "action" open (with "pos" [x, y, z], the anvil's cell:
+    // a hammer's right-click there), pick (with "card", 1-based) or close.
+    private static VisualStep ReadForge(JsonElement element, int index)
+    {
+        var action = ReadChoice(element, index, "forge", "action", ["open", "pick", "close"]);
+        return action switch
+        {
+            "open" => new VisualStep { Op = "forge", Action = action, Pos = ReadPos(element, index, "forge") },
+            "pick" => new VisualStep
+            {
+                Op = "forge",
+                Action = action,
+                Row = element.TryGetProperty("card", out var cardElement) && cardElement.TryGetInt32(out var card) && card >= 1
+                    ? card
+                    : throw new InvalidOperationException($"Step {index} (forge pick) needs 'card', a 1-based recipe card."),
+            },
+            _ => new VisualStep { Op = "forge", Action = action },
         };
     }
 

@@ -114,6 +114,9 @@ internal sealed class InputEvents
             case MouseButton.Left when waystoneInput.IsOpen && inputManager.Mouse != null:
                 waystoneInput.HandleClick(inputManager.Mouse.Position);
                 break;
+            case MouseButton.Left when gameplay.Forge.IsOpen && inputManager.Mouse != null:
+                gameplay.Forge.HandleClick(inputManager.Mouse.Position);
+                break;
             case MouseButton.Left when builderInput.IsOpen && inputManager.Mouse != null:
                 builderInput.HandleClick(inputManager.Mouse.Position);
                 break;
@@ -183,6 +186,8 @@ internal sealed class InputEvents
         if (builderInput.IsOpen) return;
         // ...and so does the waystone screen, whose list takes the wheel over its panel
         if (inputManager.Mouse != null && waystoneInput.HandleScroll(inputManager.Mouse.Position, wheel.Y)) return;
+        // ...and the anvil's recipe list, so the wheel never steps the hammer out of the hand behind it
+        if (gameplay.Forge.IsOpen) return;
         switch (inventoryView.IsOpen)
         {
             case false when !pauseMenuView.IsOpen:

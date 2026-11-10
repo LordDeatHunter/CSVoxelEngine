@@ -1,0 +1,8 @@
+{
+  // A sword blade, drawn out of four wrought iron on the anvil; hilted in recipes/iron_sword.json.
+  // Forged with a smithing hammer from wrought iron stacked on an anvil (see AnvilManager).
+  "metal": "item/wrought_iron",
+  "metalCount": 4,
+  "result": "item/iron_sword_head",
+  "count": 1
+}

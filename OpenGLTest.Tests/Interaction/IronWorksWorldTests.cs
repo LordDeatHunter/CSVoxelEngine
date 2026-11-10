@@ -10,8 +10,9 @@ namespace VoxelEngine.Tests.Interaction;
 
 /// <summary>
 /// The iron works in a live world: a cube of bloomery bricks converts into a tracked bloomery through the world's own
-/// convert path, mining it hands back what it held, a bloomery and an anvil survive the world's save snapshot, and a
-/// hammer hit that finishes a bloom drops the iron and the slag on top of the anvil.
+/// convert path, mining it hands back what it held, a bloomery and an anvil survive the world's save snapshot, a
+/// hammer hit that finishes a bloom drops the iron and the slag on top of the anvil, and right-clicks stack that iron on
+/// the anvil and take it back.
 /// </summary>
 [Collection("Worldgen seed")]
 public sealed class IronWorksWorldTests : IDisposable
@@ -85,6 +86,61 @@ public sealed class IronWorksWorldTests : IDisposable
         Assert.Equal(BloomeryConfig.IronPerBloom, _world.World.Drops.Count(d => d.BlockId == profile.ResultId));
         Assert.Equal(BloomeryConfig.SlagPerBloom, _world.World.Drops.Count(d => d.BlockId == profile.SlagId));
         Assert.All(_world.World.Drops, d => Assert.True(d.Position.Y > cell.Y + 0.5f));
+    }
+
+    [Fact]
+    public void RightClicksStackTheMetalTakeOneBackOrAllWhileSneakingAndAHammerOpensTheRecipes()
+    {
+        _world = new SupportTestWorld();
+        var anvilBlock = Enumerable.Range(1, 255).Select(i => BlockType.ById[i]).First(b => b?.Anvil != null)!;
+        var (x, y, z) = (8, _world.Top + 1, 6);
+        _world.Load(x, y, z);
+        _world.Set(x, y, z, anvilBlock.Id);
+        var cell = new Vector3(x, y, z);
+
+        var player = _world.Player;
+        var inventory = player.Inventory;
+        var metal = anvilBlock.Anvil!.ResultId;
+        var coal = ContentRegistry.RequireItem("coal").Id;
+        var hammer = ContentRegistry.RequireItem("smithing_hammer").Id;
+        Assert.True(inventory.Add(coal));
+        Assert.True(inventory.Add(metal, 3));
+        var eye = player.Context.Eye;
+        player.Aim(eye, Vector3.Normalize(cell + new Vector3(0.5f, 0.9f, 0.5f) - eye));
+        bool Click() => _world.World.Interactions.TryAnvilInteract(World.InteractionReach, player.Context);
+        bool Hold(byte id) => inventory.PickBlock(id) && inventory.HeldItem?.Id == id;
+
+        // Each click with the metal in hand lays one more on the stack
+        Assert.True(Hold(metal));
+        for (var i = 0; i < 3; i++)
+            Assert.True(Click());
+        var state = _world.World.Smithing.Anvils.StateAt(x, y, z)!;
+        Assert.Equal((metal, 3), (state.MetalId, state.MetalCount));
+        Assert.Equal(0, inventory.CountFor(metal));
+
+        // Anything else in hand takes one back
+        Assert.True(Hold(coal));
+        Assert.True(Click());
+        Assert.Equal((2, 1), (state.MetalCount, inventory.CountFor(metal)));
+
+        // A hammer never takes or lays anything: it opens the recipe list on a stack
+        Assert.True(inventory.Add(hammer));
+        Assert.True(Hold(hammer));
+        Assert.False(Click());
+        Assert.True(_world.World.Interactions.TryOpenForge(World.InteractionReach, player.Context, out var forgeCell));
+        Assert.Equal(cell, forgeCell);
+
+        // ...and while sneaking the whole stack comes back
+        Assert.True(Hold(coal));
+        player.Context.RemoteSneaking = true;
+        Assert.True(Click());
+        Assert.True(state.IsEmpty);
+        Assert.Equal(3, inventory.CountFor(metal));
+
+        // An empty anvil does not claim the click, so a block still places against it, and a hammer opens nothing
+        Assert.False(Click());
+        Assert.True(Hold(hammer));
+        Assert.False(_world.World.Interactions.TryOpenForge(World.InteractionReach, player.Context, out _));
     }
 
     [Fact]

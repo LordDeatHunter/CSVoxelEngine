@@ -1,0 +1,30 @@
+{
+  // The anvil forge: run with VOXEL_SCRIPT=visual-examples/anvil-forge.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/anvil-forge/. Two anvils in bloomery.json's forest clearing, one with three wrought iron
+  // stacked on it (left) and one with eight (right), then the smithing hammer's recipe list on each: every iron recipe
+  // for the eight, only the three that three iron covers for the other. Picking the first card there forges an axe head,
+  // which spends the whole stack, so the list closes on a bare anvil.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "fly", "on": true },
+    { "op": "anvil", "pos": [-42, 10, 58], "metal": "wrought_iron", "count": 3 },
+    { "op": "anvil", "pos": [-40, 10, 58], "metal": "wrought_iron", "count": 8 },
+    { "op": "teleport", "pos": [-40.5, 12, 61], "yaw": -90, "pitch": -35 },
+    { "op": "wait", "seconds": 1.5 },
+    { "op": "screenshot", "name": "stacks" },
+
+    { "op": "give", "block": "item/smithing_hammer", "count": 1 },
+    { "op": "forge", "action": "open", "pos": [-40, 10, 58] },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "recipes-eight" },
+
+    { "op": "forge", "action": "close" },
+    { "op": "forge", "action": "open", "pos": [-42, 10, 58] },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "recipes-three" },
+
+    { "op": "forge", "action": "pick", "card": 1 },
+    { "op": "wait", "seconds": 0.8 },
+    { "op": "screenshot", "name": "after-pick" }
+  ]
+}

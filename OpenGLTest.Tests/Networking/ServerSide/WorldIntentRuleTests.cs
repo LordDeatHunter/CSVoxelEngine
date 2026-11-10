@@ -51,6 +51,7 @@ public sealed class WorldIntentRuleTests
             WorldIntent.AttackWith(Eye, direction, NetAttackKind.SwordChop),
             WorldIntent.Hammer(Eye, direction, cell),
             WorldIntent.Waystone(Eye, direction, (-300, -420, 77)),
+            WorldIntent.Forge(Eye, direction, cell, 200),
         };
 
         var seq = 40;
@@ -67,7 +68,19 @@ public sealed class WorldIntentRuleTests
             Assert.Equal(intent.Normal, back.Normal);
             Assert.Equal(intent.Charge, back.Charge);
             Assert.Equal(intent.Attack, back.Attack);
+            Assert.Equal(intent.Recipe, back.Recipe);
         }
+    }
+
+    [Fact]
+    public void AForgePickEditsNoCellButAnswersWithTheInventoryAndDrawsFromTheEditRate()
+    {
+        var back = RoundTrip(6, WorldIntent.Forge(Eye, Vector3.UnitX, new Vector3(4f, 70f, -9f), 77), out _);
+        Assert.Equal(NetIntentKind.Forge, back.Kind);
+        // The result lands in the inventory the client predicted; no cell changes, and a flood is capped
+        Assert.False(back.EditsCells);
+        Assert.True(back.PredictsInventory);
+        Assert.True(back.IsRateLimited);
     }
 
     [Fact]

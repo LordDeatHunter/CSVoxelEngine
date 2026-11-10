@@ -1,5 +1,5 @@
 {
-  // Bronze Chest: a crafted 27-slot chest from bronze ingots (recipes/bronze_chest.json). A chest block entity (ChestManager): right-click opens it, breaking it spills what it holds.
+  // Bronze Chest: a crafted 27-slot chest from bronze rings (recipes/bronze_chest.json). A chest block entity (ChestManager): right-click opens it, breaking it spills what it holds.
   "name": "Bronze Chest",
   "model": { "parent": "block/chest", "textures": { "front": "chest_bronze_front", "side": "chest_bronze_side", "top": "chest_bronze_top" } },
   "facing": "horizontal",

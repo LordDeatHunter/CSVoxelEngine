@@ -320,6 +320,12 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
                 Advance();
                 break;
 
+            case "forge":
+                RunUi("forge", u => u.Forge(step.Action!, step.Pos, step.Row - 1));
+                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} forge {step.Action}");
+                Advance();
+                break;
+
             case "waystone":
                 RunUi("waystone", u => u.Waystone(step.Action!, step.Pos, step.Text, step.Row - 1));
                 Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} waystone {step.Action}");
@@ -427,7 +433,7 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
             bloomeries.StateAt((int)anchor.X, (int)anchor.Y, (int)anchor.Z)!.Heat = step.Heat;
     }
 
-    // An anvil at the step's cell, with a bloom on it that has taken the step's hits
+    // An anvil at the step's cell, with a bloom on it that has taken the step's hits, or the step's metal stacked on it
     private void BuildAnvil(VisualStep step)
     {
         var type = ContentRegistry.RequireBlock("anvil");
@@ -439,6 +445,15 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
         var anvils = world.Smithing.Anvils;
         anvils.Ensure(cell, type.Id);
         if (!step.On) return;
+        if (step.Metal != null)
+        {
+            var metal = ContentRegistry.RequireItem(step.Metal).Id;
+            for (var i = 0; i < step.Count; i++)
+                if (!anvils.TryStack(cell, metal))
+                    throw new InvalidOperationException(
+                        $"Step {_step + 1} stacks {step.Count} {step.Metal}, which is not a forge metal or more than its stack holds.");
+            return;
+        }
         anvils.TryPlace(cell, type.Anvil!.InputId);
         anvils.StateAt((int)cell.X, (int)cell.Y, (int)cell.Z)!.Hits = Math.Clamp(step.Hits, 0, type.Anvil.Hits - 1);
     }

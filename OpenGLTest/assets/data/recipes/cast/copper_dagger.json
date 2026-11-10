@@ -1,0 +1,10 @@
+{
+  // Pouring molten copper into a fired dagger mold; the cast melts back into the same 200 ml
+  // (recipes/melt/copper_dagger.json).
+  "mold": "block/fired_mold_dagger",
+  "fluid": "copper",
+  "amountMl": 200,
+  "coolSeconds": 2,
+  "result": "item/copper_dagger",
+  "count": 1
+}

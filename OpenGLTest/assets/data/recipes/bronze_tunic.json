@@ -2,6 +2,6 @@
   "result": "item/bronze_tunic",
   "count": 1,
   "ingredients": [
-    { "item": "item/bronze_ingot", "count": 8 }
+    { "item": "item/bronze_ring", "count": 8 }
   ]
 }

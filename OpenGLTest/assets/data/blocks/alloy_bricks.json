@@ -1,5 +1,5 @@
 {
-  // The alloy furnace's building block: one mud brick block bound with a copper and a tin ingot
+  // The alloy furnace's building block: one mud brick block bound with a copper and a tin ring
   // (recipes/alloy_bricks.json). A 3x3x3 cube of them is what the multiblock converter presses
   // into an alloy furnace. The tile is committed art.
   "name": "Alloy Bricks",

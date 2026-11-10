@@ -1,8 +1,11 @@
 using System.Collections.Generic;
+using System.Numerics;
 using VoxelEngine.Chunks;
+using VoxelEngine.Content;
 using VoxelEngine.Lod;
 using VoxelEngine.Networking;
 using VoxelEngine.Saves;
+using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.Simulation.Smithing;
 
@@ -21,6 +24,24 @@ public sealed class SmithingStations
 
     /// <summary>Whether either holds anything, so an empty world sends no snapshot for them.</summary>
     public bool HasAny => Bloomeries.HasAny || Anvils.HasAny;
+
+    /// <summary>
+    /// Forges the recipe making <paramref name="resultId"/> from the stack on the anvil at <paramref name="cell"/> into
+    /// <paramref name="inventory"/>: singleplayer's pick from the anvil's recipe list, a server replaying a client's
+    /// <see cref="NetIntentKind.Forge"/> intent, and that client's prediction. Refused when the recipe is not offered
+    /// for the stack (<see cref="AnvilManager.TryForge"/>) or its result does not fit the inventory, so no metal is
+    /// ever lost. The caller judges the hammer in hand and the reach.
+    /// </summary>
+    public bool Forge(Vector3 cell, byte resultId, Inventory inventory)
+    {
+        if (ContentRegistry.ForgeRecipeForResult(resultId) is not { } wanted
+            || Inventory.CategoryOf(wanted.ResultId) is not { } category
+            || Inventory.CapacityOf(category) - inventory.UsedOf(category) < wanted.ResultCount)
+            return false;
+        if (!Anvils.TryForge(cell, resultId, out var recipe) || recipe == null) return false;
+        inventory.Add(recipe.ResultId, recipe.ResultCount);
+        return true;
+    }
 
     /// <summary>Runs both for one frame.</summary>
     public void Update(float deltaTime, ChunkManager chunks, DropManager drops, LodManager? lod)

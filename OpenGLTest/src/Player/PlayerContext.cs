@@ -40,6 +40,14 @@ public sealed class PlayerContext(Inventory inventory)
     /// <summary>Creative: placing and using spend nothing, breaking drops nothing.</summary>
     public bool IsCreative { get; set; }
 
+    /// <summary>A remote player's reported sneaking flag (<see cref="ServerPlayer.Aim"/> sets it per intent); the local
+    /// player's comes from its camera instead (<see cref="IsSneaking"/>).</summary>
+    public bool RemoteSneaking { get; set; }
+
+    /// <summary>Whether the player sneaks: the camera's own crouch for the local player, else
+    /// <see cref="RemoteSneaking"/>. A crouched right-click takes a whole stack off an anvil.</summary>
+    public bool IsSneaking => Camera?.IsSneaking ?? RemoteSneaking;
+
     /// <summary>
     /// False once the player has left: anything bound to it (a pour from its crucible) pauses
     /// instead of running against an inventory nobody is holding.
