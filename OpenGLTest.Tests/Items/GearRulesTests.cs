@@ -1,7 +1,5 @@
-using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using VoxelEngine.Config;
 using VoxelEngine.Content.Definitions;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Entities;
@@ -390,5 +388,20 @@ public sealed class GearRulesTests
         foreach (var modifier in rolled.Modifiers.Modifiers)
             Assert.Contains(GearText.Line(modifier), lines);
         Assert.Contains(lines, l => l.Contains("set (0/"));
+    }
+
+    [Fact]
+    public void AnItemShowsItsRolledRarityOverItsOwnAndABlockShowsCommon()
+    {
+        var inventory = Inventory.Empty();
+        var cap = Named("bronze_cap");
+        var rolledRarity = cap.Rarity == Rarity.Legendary ? Rarity.Common : cap.Rarity + 1;
+        Assert.True(inventory.AddRolledGear(cap.Id, GearRoller.Roll(cap, rolledRarity, 11)));
+        var rolledStack = inventory.GetToolStack(inventory.GearEntries()[0].InstanceId)!;
+
+        Assert.Equal(rolledRarity, Rarities.Of(cap.Id, rolledStack));
+        Assert.Equal(cap.Rarity, Rarities.Of(cap.Id, null));
+        Assert.Equal(cap.Rarity, Rarities.Of(cap.Id, new ItemStack(1, cap.Id)));
+        Assert.Equal(Rarity.Common, Rarities.Of(ContentRegistry.RequireBlock("stone").Id, null));
     }
 }

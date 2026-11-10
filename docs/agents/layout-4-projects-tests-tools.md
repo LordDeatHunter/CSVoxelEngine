@@ -147,7 +147,8 @@ OpenGLTest.Tests/                     # xUnit tests, headless (no window); a tes
     Waystones/                 # waystone names, the registry's discovery, rename, lost and save rules; the teleport rule,
                                #   the arrival search, the realm tag and a trip in a headless world
   Status/                      # the status effect set, the Apply API, the speed factors and the block rule and writer
-  UI/                          # the canvas, settings, scroll lists, text wrap
+  UI/                          # the canvas, settings, scroll lists, text wrap, the rarity style table and the
+                               #   rarity chrome twin (RarityStyleTests, RarityChromeTests)
     Hud/                       # chat (its log layout and link hit-test: ChatLogLayoutTests), clock, compass, hit marker,
                                #   hotbar feedback, toasts, tooltips, the look label, screenshot paths
     InventoryPanel/            # the inventory and its save shape, the [E] panel layout, crafting cards, the creative catalog, search

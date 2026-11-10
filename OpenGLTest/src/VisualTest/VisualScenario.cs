@@ -4,6 +4,7 @@ using System.IO;
 using System.Numerics;
 using System.Text.Json;
 using Silk.NET.Input;
+using VoxelEngine.Items;
 using VoxelEngine.UI.InventoryPanel;
 
 namespace VoxelEngine.VisualTest;
@@ -24,6 +25,10 @@ public sealed class VisualStep
     public bool HideHud { get; init; }
     public string? Block { get; init; }
     public int Count { get; init; } = 1;
+
+    /// <summary>The rarity a <c>give</c> step rolls a gear piece at (left unworn); null gives the plain item.</summary>
+    public Rarity? Rarity { get; init; }
+
     public bool On { get; init; } = true;
 
     /// <summary>The entity name a <c>spawn</c> step creates (resolved at run time).</summary>
@@ -223,6 +228,7 @@ public sealed class VisualScenario
                 Op = "give",
                 Block = ReadGiveBlock(element, index),
                 Count = ReadGiveCount(element, index),
+                Rarity = ReadGiveRarity(element, index),
             },
             "spawn" => ReadSpawn(element, index),
             "grow" => ReadGrow(element, index),
@@ -564,6 +570,16 @@ public sealed class VisualScenario
         if (count <= 0)
             throw new InvalidOperationException($"Step {index} (give) needs 'count' above 0.");
         return count;
+    }
+
+    // The rarity a give step rolls its gear at (case-insensitive); null when the step names none
+    private static Rarity? ReadGiveRarity(JsonElement element, int index)
+    {
+        if (!element.TryGetProperty("rarity", out var value)) return null;
+        if (value.ValueKind == JsonValueKind.String && Rarities.TryParse(value.GetString(), out var rarity))
+            return rarity;
+        var names = string.Join(", ", Array.ConvertAll(Enum.GetNames<Rarity>(), n => n.ToLowerInvariant()));
+        throw new InvalidOperationException($"Step {index} (give) has an unknown 'rarity'; expected one of {names}.");
     }
 
     private static float ReadSeconds(JsonElement element, int index)

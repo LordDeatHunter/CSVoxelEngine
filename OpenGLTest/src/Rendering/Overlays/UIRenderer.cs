@@ -152,6 +152,8 @@ public class UIRenderer : IDisposable
     internal WaystoneRenderer Waystone { get; }
     internal TopStripRenderer TopStrip { get; }
     internal HudRenderer Hud { get; }
+    /// <summary>The rarity chrome over list rows and the hover tooltip.</summary>
+    internal RarityChromeRenderer Chrome { get; }
 
     /// <param name="gl">The GL context every UI resource is created on.</param>
     /// <param name="atlasTexture">The block atlas array texture the block icons sample.</param>
@@ -206,6 +208,7 @@ public class UIRenderer : IDisposable
             Log.WriteLine($"Warning: count font '{CountFontPath}' not loaded ({e.Message}); hotbar counts hidden.");
         }
 
+        Chrome = new RarityChromeRenderer(this);
         CraftCard = new CraftCardRenderer(gl, this);
         EquipmentCard = new EquipmentCardRenderer(this);
         ChestCard = new ChestCardRenderer(gl, this);

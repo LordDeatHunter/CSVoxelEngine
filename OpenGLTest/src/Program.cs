@@ -584,7 +584,7 @@ public static class Program
             renderManager.UiPasses.RenderPlayerList(windowManager.Window, chatInput.PlayerListNames());
         // A hover tooltip over the [E] panel's rows and the hotbar slots
         if (!hideHud && !pauseMenuView.IsOpen)
-            renderManager.UiPasses.RenderTooltip(windowManager.Window, panelInput.HoveredTooltip());
+            renderManager.UiPasses.RenderTooltip(windowManager.Window, panelInput.HoveredTooltip(), (float)world.LightingTime);
         // The death screen covers the HUD and the world until the player asks to respawn; a
         // client has no death line (the server's chat carries it)
         if (!hideHud && gameplay.DeathScreenUp(world))

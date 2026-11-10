@@ -212,6 +212,19 @@ public static class MathUtils
     }
 
     /// <summary>
+    /// A sweep repeating every <paramref name="period"/> seconds: across the first
+    /// <paramref name="activeShare"/> of each cycle its progress eases 0 -> 1 (<see cref="EaseInOutCubic"/>),
+    /// then it is null while it rests until the next cycle. A non-positive period or share never sweeps (null).
+    /// </summary>
+    public static float? Sweep(float time, float period, float activeShare)
+    {
+        if (period <= 0f || activeShare <= 0f) return null;
+        var cycles = time / period;
+        var phase = cycles - MathF.Floor(cycles);
+        return phase < activeShare ? EaseInOutCubic(phase / activeShare) : null;
+    }
+
+    /// <summary>
     /// One-shot 0 -> 1 -> 0 bump with a springy settle, for a scale pop: an eased-out rise to 1
     /// at <paramref name="peakAt"/>, then an <see cref="EaseOutBack"/> fall that dips a little
     /// below 0 before landing on exactly 0 at t = 1, so whatever it scales rests where it began.

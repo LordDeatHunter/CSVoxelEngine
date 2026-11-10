@@ -8,7 +8,6 @@ using VoxelEngine.Items;
 using VoxelEngine.UI;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.UI.Widgets;
-using static VoxelEngine.Rendering.Overlays.UIRenderer;
 using static VoxelEngine.UI.UiTheme;
 
 namespace VoxelEngine.Rendering.Overlays;
@@ -165,8 +164,8 @@ internal sealed class InventoryPanelRenderer
                     var selected = view.SelectedToolInstance == tools[i].InstanceId;
                     var mark = EquippedMark.Of(inventory, tools[i].ItemId, tools[i].InstanceId);
                     DrawEntryRow(i, offset, tools[i].ItemId, tools[i].Name, mark.CountLabel("1"), selected, false,
-                        headingDegrees, time, mark.Accent, inventory.ToolDurabilityFraction(tools[i].InstanceId),
-                        hotbarSlot: mark.HotbarSlot);
+                        headingDegrees, time, RowRarity(inventory, tools[i].ItemId, tools[i].InstanceId), mark.Accent,
+                        inventory.ToolDurabilityFraction(tools[i].InstanceId), hotbarSlot: mark.HotbarSlot);
                 }
             }
             else if (recipes != null)
@@ -178,7 +177,7 @@ internal sealed class InventoryPanelRenderer
                         Inventory.DisplayName(recipes[i].ResultId),
                         $"x{recipes[i].ResultCount}",
                         view.Craft.Recipe != null && view.Craft.Recipe.Name == recipes[i].Name,
-                        !ready, headingDegrees, time,
+                        !ready, headingDegrees, time, RowRarity(inventory, recipes[i].ResultId, 0),
                         ready ? ReadyGreen : null);
                 }
             }
@@ -188,8 +187,8 @@ internal sealed class InventoryPanelRenderer
                 {
                     var mark = EquippedMark.Of(inventory, rows[i].Id, 0);
                     DrawEntryRow(i, offset, rows[i].Id, rows[i].Name, rows[i].Count.ToString(),
-                        view.SelectedId == rows[i].Id, false, headingDegrees, time, mark.Accent,
-                        hotbarSlot: mark.HotbarSlot);
+                        view.SelectedId == rows[i].Id, false, headingDegrees, time, RowRarity(inventory, rows[i].Id, 0),
+                        mark.Accent, hotbarSlot: mark.HotbarSlot);
                 }
             }
         }
@@ -273,8 +272,12 @@ internal sealed class InventoryPanelRenderer
         _ui.DrawTextMiddle(_ui.FitText(label, _ui.CountScale, size.X - 8f), center, _ui.CountScale, Rgba.White);
     }
 
+    // The rarity a row shows: a tool or gear row's own rolled stack, else its item's.
+    private static Rarity RowRarity(Inventory inventory, byte id, int toolInstance) =>
+        Rarities.Of(id, toolInstance != 0 ? inventory.GetToolStack(toolInstance) : null);
+
     private void DrawEntryRow(int row, float offset, byte id, string name, string count, bool selected,
-        bool dim, float headingDegrees, float timeSeconds, Rgba? accent = null, float? durability = null,
+        bool dim, float headingDegrees, float timeSeconds, Rarity rarity, Rgba? accent = null, float? durability = null,
         float countInset = 0f, int hotbarSlot = -1)
     {
         var centerY = InventoryPanelLayout.RowCenterY(row, offset);
@@ -284,7 +287,11 @@ internal sealed class InventoryPanelRenderer
             && pointer.Y >= InventoryPanelLayout.ListTop
             && pointer.Y < InventoryPanelLayout.ListTop + InventoryPanelLayout.ListHeight(_ui.ScreenSize);
         _ui.DrawRect(center, rowSize, selected ? RowSelected : hovered ? HoverBackground : SlotBackground);
+        var style = RarityStyle.Of(rarity);
+        _ui.Chrome.DrawRow(center, rowSize, style, timeSeconds, row, dim ? RarityStyleConfig.DimOpacity : 1f);
 
+        // The accent bar drawn over the chrome stays the row's status (equipped, ready, a recipe hit); the rarity
+        // shows through the chrome and the name color (Uncommon's green equals the ready green).
         var barColor = accent ?? (selected ? SelectedBorderColor : SlotBorderColor);
         _ui.DrawRect(new Vector2(PanelLeft + PanelPad + 2f, centerY),
             new Vector2(4f, RowHeight - 4f), dim ? TextDim : barColor);
@@ -295,7 +302,7 @@ internal sealed class InventoryPanelRenderer
             DrawHotbarChip(iconCenter, hotbarSlot);
 
         _ui.DrawTextCenteredY(_ui.FitText(name, _ui.CountScale, RowNameAvail(count, countInset)), iconCenter.X + RowIcon * 0.5f + 8f, centerY,
-            _ui.CountScale, dim && !selected ? TextDim : Rgba.White);
+            _ui.CountScale, dim && !selected ? TextDim : style.Color);
 
         if (_ui.Font != null)
         {
@@ -321,13 +328,14 @@ internal sealed class InventoryPanelRenderer
         if (hit.IsRecipe)
         {
             DrawEntryRow(row, offset, hit.Id, hit.Name, $"recipe x{hit.Count}", selected, false,
-                headingDegrees, timeSeconds, AccentGold);
+                headingDegrees, timeSeconds, RowRarity(inventory, hit.Id, 0), AccentGold);
             return;
         }
 
         var mark = EquippedMark.Of(inventory, hit.Id, hit.ToolInstance);
         DrawEntryRow(row, offset, hit.Id, hit.Name, mark.CountLabel(hit.ToolInstance != 0 ? "tool" : hit.Count.ToString()),
-            selected, false, headingDegrees, timeSeconds, mark.Accent, hotbarSlot: mark.HotbarSlot);
+            selected, false, headingDegrees, timeSeconds, RowRarity(inventory, hit.Id, hit.ToolInstance), mark.Accent,
+            hotbarSlot: mark.HotbarSlot);
     }
 
     private void DrawCatalogRow(int row, float offset, int rowCount, Inventory inventory, byte id, string name, int count,
@@ -335,8 +343,8 @@ internal sealed class InventoryPanelRenderer
     {
         var mark = EquippedMark.Of(inventory, id, 0);
         DrawEntryRow(row, offset, id, name, mark.CountLabel(count.ToString()), selected, false,
-            headingDegrees, timeSeconds, mark.Accent, null, InventoryPanelLayout.CatalogButtonGroupWidth + 12f,
-            mark.HotbarSlot);
+            headingDegrees, timeSeconds, RowRarity(inventory, id, 0), mark.Accent, null,
+            InventoryPanelLayout.CatalogButtonGroupWidth + 12f, mark.HotbarSlot);
         for (var which = 0; which < InventoryPanelLayout.CatalogButtonCount; which++)
         {
             var center = InventoryPanelLayout.CatalogButtonCenter(row, offset, _ui.ScreenSize, rowCount, which);

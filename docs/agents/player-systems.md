@@ -19,8 +19,10 @@ set (`Inventory.Knows`, marked in `Add`, saved as names in `player.json` and rid
 for the day toast ("Day N" as the sun rises through dawn), the inventory-full warning, the
 first-find toast and the spell table's hold-a-staff hint; the spell builder panel hides the crosshair
 and the hearts row like the [E] panel does; `HotbarNameFade` shows the selected item's name after a slot or item switch and
-`HotbarPickupPop` bumps a slot whose count rises, and a collected drop's icon arcs from where it lay into its hotbar slot (`PickupFlyIcons`, owned by the pop, spawned by `DropPickup` for local pickups only, drawn by `HudRenderer.DrawFlyingPickups`; a client sees none since its drops arrive as snapshots). The [E] panel fades and slides up on open and fades on close (`InventoryView.Transition`, `PanelTransition`; `UIRenderer.SetOverlay` shifts the pass's projection and sets `uFade` in `ui-fragment.glsl`, and panel scissors add `OverlayOffset`). The player's active status effects show as a row of icons left of the hearts (`HudRenderer.DrawEffects`, see "Status effects"). `ItemTooltip.Lines` builds the hover panel over the
-[E] panel's rows and the hotbar, and holding Tab draws the player list (a server session only). F2
+`HotbarPickupPop` bumps a slot whose count rises, and a collected drop's icon arcs from where it lay into its hotbar slot (`PickupFlyIcons`, owned by the pop, spawned by `DropPickup` for local pickups only, drawn by `HudRenderer.DrawFlyingPickups`; a client sees none since its drops arrive as snapshots). The [E] panel fades and slides up on open and fades on close (`InventoryView.Transition`, `PanelTransition`; `UIRenderer.SetOverlay` shifts the pass's projection and sets `uFade` in `ui-fragment.glsl`, and panel scissors add `OverlayOffset`). The player's active status effects show as a row of icons left of the hearts (`HudRenderer.DrawEffects`, see "Status effects"). `ItemTooltip.Hover` builds the hover panel over the
+[E] panel's rows and the hotbar as a `HoverTooltip` (its lines, their colors and the hovered item's rarity via
+`Rarities.Of`), and the box wears that rarity's chrome (see "Rarity chrome"); holding Tab draws the player list (a
+server session only). F2
 saves the finished frame through `VisualCapture`; F1 toggles `GameplayInput`'s `hudVisible`, the gate the scenario
 screenshot's `hideHud` drives. The chat commands are `/help`, `/tp x y z`, `/give <item> [count]`
 (the last two needing rights), `/time day|night|<seconds>` and `/locate tower`, which any player may use: it finds the
@@ -174,7 +176,10 @@ charms wear them: Feather (`feather_charm`, `no_fall_damage`), Gill (`gill_charm
 Frostward and Fireward (`frost_charm`, `fire_charm`: immune to frostburn / burning) and Lodestone (`magnet_charm`, `magnet`,
 `GearConfig.MagnetRangeFactor`), all rare and loot-only (ruin chests, rare mob drops; a mob-table charm is an unrolled instance,
 `CharmLootTests`). Accepted gaps: a magnet-latched drop is pulled through walls, and a client's bubble row can lag an equip by
-one status. The tooltip colors its title by rarity and shows rolled lines, set progress and abilities. `GearRulesTests`.
+one status. Any item's tooltip title takes its rarity's color (`RarityStyle`; the shown rarity is `Rarities.Of`: a stack's
+roll, else its item's JSON `rarity`, Common for a block), and a non-gear item above Common names its rarity on its kind line
+("Rare Item"). [E] list rows and chest rows wear the rarity chrome and name color (see "Rarity chrome") while the accent bar
+stays the equipped/ready status. The tooltip then shows rolled lines, set progress and abilities. `GearRulesTests`.
 
 **Bone shrapnel (the battle tower's bone pair).** A blade's own `shrapnel` object and the Bone Charm's `bone_shrapnel`
 ability feed one effect: a landed melee hit sprays bone fragments (`Simulation/BoneShrapnel`, authoritative worlds only,
@@ -209,7 +214,8 @@ the server. A break and the stale sweep spill the contents as drops (instances l
 (server) judges each move against that player's open chest and reach, tells every viewer, and closes the chest when it is
 broken or out of reach. Right-clicking a chest is a `RightClickOutcome.Container` claim (sneak places against it instead);
 `ChestInput` (owned by `InventoryPanelInput`) opens the `ChestView` card (`UI/Chest/`, `ChestCardRenderer`) beside the [E] list,
-whose rows then deposit (one unit, all with shift) while the card's rows withdraw. The chest card takes the right side
+whose rows then deposit (one unit, all with shift) while the card's rows withdraw; the card's rows wear the same
+`RarityStyle` chrome, accent bar and name color as the [E] rows (see "Rarity chrome"). The chest card takes the right side
 of the panel, so the preview, equipment and crafting cards are neither drawn nor clicked while it is up. `ChestTests`, `TowerChestTests`, `ChestServerTests`;
 `visual-examples/chests.json` (`VOXEL_TIME=147`, with the `setblock`, `chest` and `chestrow` ops).
 

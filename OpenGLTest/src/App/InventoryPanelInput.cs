@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Numerics;
 using Silk.NET.Input;
 using VoxelEngine.Content.Recipes;
-using VoxelEngine.Data;
 using VoxelEngine.Items;
 using VoxelEngine.Networking;
 using VoxelEngine.Networking.Client;
@@ -77,9 +76,10 @@ internal sealed class InventoryPanelInput
     /// <summary>
     /// The tooltip for whatever the cursor hovers while the [E] panel is open: a listed row's item
     /// (a search hit's, a recipe's result, a creative catalog row's, or the tool instance a row
-    /// names) or a hotbar slot's, with the cursor as the anchor. Null when nothing hovers.
+    /// names) or a hotbar slot's, with the cursor as the anchor and the hovered item's rarity, which dresses the box.
+    /// Null when nothing hovers.
     /// </summary>
-    internal (Vector2 Anchor, List<string> Lines, IReadOnlyDictionary<int, Rgba> Colors)? HoveredTooltip()
+    internal HoverTooltip? HoveredTooltip()
     {
         if (!inventoryView.IsOpen || pauseMenuView.IsOpen || PointerWindow() is not { } position) return null;
         // A dragged row rides the pointer; a tooltip would cover the slot it is aimed at
@@ -92,18 +92,14 @@ internal sealed class InventoryPanelInput
         if (EntryAt(position, inventory, world.Camera.IsCreative) is { } entry)
         {
             var stack = entry.ToolInstance != 0 ? inventory.GetToolStack(entry.ToolInstance) : null;
-            var rowLines = ItemTooltip.Lines(entry.Id, stack, inventory.Equipment, out var rowColors);
-            return (position, rowLines, rowColors);
+            return ItemTooltip.Hover(position, entry.Id, stack, inventory.Equipment);
         }
 
         if (renderManager.Ui.Hud.HotbarSlotAt(position) is not { } slot || slot < 0 || inventory.IdAt(slot) == 0)
             return null;
-        {
-            var tool = inventory.ToolInstanceAt(slot);
-            var stack = tool != 0 ? inventory.GetToolStack(tool) : null;
-            var slotLines = ItemTooltip.Lines(inventory.IdAt(slot), stack, inventory.Equipment, out var slotColors);
-            return (position, slotLines, slotColors);
-        }
+        var tool = inventory.ToolInstanceAt(slot);
+        var slotStack = tool != 0 ? inventory.GetToolStack(tool) : null;
+        return ItemTooltip.Hover(position, inventory.IdAt(slot), slotStack, inventory.Equipment);
     }
 
     /// <summary>What a listed row names: its item id, the tool or gear instance it stands for (else 0), and the

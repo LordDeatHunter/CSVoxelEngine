@@ -1,6 +1,10 @@
+using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using VoxelEngine.Content.Spells;
+using VoxelEngine.Data;
 using VoxelEngine.Items;
+using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
 using VoxelEngine.UI.InventoryPanel;
 using Xunit;
@@ -97,5 +101,38 @@ public sealed class ItemTooltipTests
             var lines = ItemTooltip.Lines(scroll.Id, null);
             Assert.Contains(lines, l => scroll.Teaches.All(k => l.Contains(SpellPartRegistry.TryGetByKey(k)!.DisplayName)));
         }
+    }
+
+    [Fact]
+    public void ATitleWearsItsItemsRarityAndANonGearItemNamesIt()
+    {
+        foreach (var item in ItemRegistry.All)
+        {
+            var lines = ItemTooltip.Lines(item.Id, null, null, out var colors);
+            var rarity = Rarities.Of(item.Id, null);
+            var style = RarityStyle.Of(rarity);
+            Assert.Equal(style.Color, colors.GetValueOrDefault(0, Rgba.White));
+            // Gear names its rarity with its slot; any other item above Common names it on its kind line
+            if (item is not GearItem and not BlockItem && style.HasChrome)
+                Assert.StartsWith(Rarities.Label(rarity), lines[1]);
+        }
+    }
+
+    [Fact]
+    public void TheHoverTooltipCarriesTheHoveredStacksRarity()
+    {
+        var inventory = Inventory.Empty();
+        var cap = ItemRegistry.All.OfType<GearItem>().First(g => g.SourceName == "bronze_cap");
+        var rolled = cap.Rarity == Rarity.Legendary ? Rarity.Common : cap.Rarity + 1;
+        Assert.True(inventory.AddRolledGear(cap.Id, GearRoller.Roll(cap, rolled, 5)));
+        var stack = inventory.GetToolStack(inventory.GearEntries()[0].InstanceId)!;
+        var anchor = new Vector2(120f, 64f);
+
+        var hover = ItemTooltip.Hover(anchor, cap.Id, stack, inventory.Equipment);
+
+        Assert.Equal(rolled, hover.Rarity);
+        Assert.Equal(RarityStyle.Of(rolled).Color, hover.Colors.GetValueOrDefault(0, Rgba.White));
+        Assert.Equal(anchor, hover.Anchor);
+        Assert.Equal(ItemTooltip.Lines(cap.Id, stack, inventory.Equipment, out _), hover.Lines);
     }
 }

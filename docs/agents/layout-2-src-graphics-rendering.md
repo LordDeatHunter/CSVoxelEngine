@@ -496,6 +496,8 @@ File tree of `OpenGLTest/src/` (part 2 of 4): Graphics, Interaction, Items, Juic
                                #   effect icon sprites
         InventoryPanelRenderer.cs # the [E] panel: tabs, search field and scope button, rows, creative catalog
                                   #   buttons (on the tab's list and on creative item hits), preview, and its hit-tests
+        RarityChromeRenderer.cs # the rarity chrome over a list row or the tooltip box: one uChrome quad of the ui
+                                #   program (RarityChrome.For's uniforms), reset to 0 right after; Ui.Chrome
         LoadingScreenRenderer.cs # the loading/saving screen and the fade over the first playing frames
         MenuRenderer.cs        # the pause and settings menus and every main-menu page, with their hit-tests
         NoticePipRenderer.cs   # draws the "!" a goblin pops over its head the moment it first notices a player

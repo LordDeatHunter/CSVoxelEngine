@@ -124,6 +124,8 @@ OpenGLTest/
       HudConfig.cs             # selection outline and pulse, hotbar name fade, pop and flash, the loading screen
       IcebergConfig.cs         # icebergs: caps and the spawn ring, the spawn band, size and mass, drift and push,
                                #   wobble, life cycle, the client mirror's lead
+      RarityStyleConfig.cs     # the rarity chrome's per-rarity layer strengths (opacity, wash, glow, sheen, sparkle,
+                               #   pulse depth) and its shape and motion knobs; Common all zero
       JuiceConfig.cs           # landing and footstep dust, slime splat, hit sparks, death poof, blast shake and
                                #   push, falling-block dust, lava steam, tree thud, tower collapse, splashes, tool shatter, pickup
                                #   sparkle, low-health vignette, damage arc, surfacing droplets
@@ -302,7 +304,7 @@ OpenGLTest/
                                #   per-pass GPU timing, which is gated by GpuTimingGate
       LaunchMode.cs            # GL-free rule: VOXEL_SCRIPT/SPAWN/LOOK bypass the menu (storeless world)
       Log.cs                   # async console sink: every diagnostic line is enqueued and written by one background thread in order
-      MathUtils.cs             # lerp/easing/pulse helpers for animation curves + shared constants
+      MathUtils.cs             # lerp/easing/pulse/sweep helpers for animation curves + shared constants
       Spring.cs                # a damped spring that carries its own velocity
       Vector2Utils.cs          # extension operations on Vector2 mirroring Vector3Utils
       Vector3Utils.cs          # extension operations on Vector3 that are repeated across gameplay, physics and render code

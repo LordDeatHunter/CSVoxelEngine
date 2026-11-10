@@ -189,6 +189,10 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
       TextFit.cs               # GL-free single-line fit: shrink to a floor, then an ellipsis, reporting whether it cut
       TextWrap.cs              # GL-free word wrap against a measure delegate (+ WrapRanges: the same lines as slices of the source)
       UiTheme.cs               # the spacing scale, border widths, text sizes and palette every list-based UI draws with
+      RarityStyle.cs           # how a rarity dresses an item: its color and chrome layer strengths (RarityStyleConfig);
+                               #   the one table the [E] rows, chest rows and tooltip share; Common has no chrome
+      RarityChrome.cs          # GL-free twin of ui-fragment.glsl's rarity chrome: packs the uChrome* uniforms (For)
+                               #   and evaluates the border, glow, wash, sheen and sparkles (Shade)
       UiCanvas.cs              # the virtual UI canvas: reference size, uniform scale, scissor rects
       Widgets/                 # GL-free widget layouts the renderers only draw: UiRect, PanelFrameLayout, ButtonLayout (+ WidgetState),
                                #   TabStripLayout, ListRowLayout, TextBoxLayout, ScrollViewLayout, TooltipLayout; the kit the [E] panel,
@@ -211,7 +215,8 @@ File tree of `OpenGLTest/src/` (part 3 of 4): Saves, Simulation, Status, UI, Vis
         HotbarPickupPop.cs     # the bump a hotbar slot gets when its count rises
         PickupFlyIcons.cs      # GL-free ring of collected-drop icons arcing into their hotbar slots
         HudToast.cs            # one hold-then-fade HUD line (the day toast, a first find, packs full)
-        ItemTooltip.cs         # the hover panel's lines, built from the item's own fields
+        ItemTooltip.cs         # the hover panel's lines, built from the item's own fields; Hover packs them with the rarity
+        HoverTooltip.cs        # the tooltip one frame shows: anchor, lines, line colors and the hovered item's rarity
         LookLabel.cs           # the look-at label's rule: name, "Unknown", the mineable flag
         LookLabelState.cs      # what one frame's label draws: text, flags, cell, state byte, light
         ScreenshotPaths.cs     # where F2's capture lands and what it is called

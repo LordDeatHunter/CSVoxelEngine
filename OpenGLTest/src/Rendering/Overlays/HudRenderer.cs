@@ -5,6 +5,7 @@ using Silk.NET.OpenGL;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Data;
 using VoxelEngine.Graphics;
+using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.UI;
 using VoxelEngine.UI.Hud;
@@ -416,9 +417,12 @@ internal sealed class HudRenderer : IDisposable
 
     /// <summary>
     /// One hover tooltip (see <see cref="ItemTooltip"/>): a panel just below-right of the cursor
-    /// with the hovered item's lines, clamped inside the canvas.
+    /// with the hovered item's lines, clamped inside the canvas. The box wears the hovered item's rarity
+    /// chrome (<see cref="RarityChromeRenderer"/>, animated on <paramref name="time"/>), or the plain
+    /// border for a Common item.
     /// </summary>
-    internal void DrawTooltip(Vector2 anchor, IReadOnlyList<string> lines, IReadOnlyDictionary<int, Rgba>? colors = null)
+    internal void DrawTooltip(Vector2 anchor, IReadOnlyList<string> lines, IReadOnlyDictionary<int, Rgba> colors,
+        Rarity rarity, float time)
     {
         if (_ui.Font == null || lines.Count == 0) return;
 
@@ -431,14 +435,19 @@ internal sealed class HudRenderer : IDisposable
         {
             var before = wrapped.Count;
             TextWrap.Wrap(lines[i], TooltipMaxTextWidth, Measure, wrapped);
-            var color = colors != null && colors.TryGetValue(i, out var picked) ? picked : i == 0 ? Rgba.White : TextDim;
+            var color = colors.TryGetValue(i, out var picked) ? picked : i == 0 ? Rgba.White : TextDim;
             for (var row = before; row < wrapped.Count; row++) rowColors.Add(color);
         }
 
         var lineHeight = TextSize.Body + 6f;
         var layout = TooltipLayout.Compute(wrapped, anchor, _ui.ScreenSize, TooltipMaxTextWidth, TooltipMaxLines, lineHeight, Measure);
         _ui.DrawRect(layout.Box.Center, layout.Box.Size, PanelBackground);
-        _ui.DrawBorder(layout.Box.Center, layout.Box.Size, Border.Standard, SlotBorderColor);
+        // The chrome's border band stands in for the plain border
+        var style = RarityStyle.Of(rarity);
+        if (style.HasChrome)
+            _ui.Chrome.DrawTooltip(layout.Box.Center, layout.Box.Size, style, time);
+        else
+            _ui.DrawBorder(layout.Box.Center, layout.Box.Size, Border.Standard, SlotBorderColor);
 
         var pad = UiTheme.Space.Md;
         for (var i = 0; i < layout.Lines.Count; i++)

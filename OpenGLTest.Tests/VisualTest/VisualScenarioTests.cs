@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using Silk.NET.Input;
+using VoxelEngine.Items;
 using VoxelEngine.UI.InventoryPanel;
 using VoxelEngine.VisualTest;
 using Xunit;
@@ -360,10 +361,24 @@ public sealed class VisualScenarioTests
     [InlineData("""{ "steps": [{ "op": "walk", "seconds": 1, "keys": ["Ww"] }] }""", "Ww")]
     [InlineData("""{ "steps": [{ }] }""", "'op'")]
     [InlineData("""{ "steps": [{ "op": "give" }] }""", "block")]
+    [InlineData("""{ "steps": [{ "op": "give", "block": "stone", "rarity": "mythic" }] }""", "rarity")]
     public void BadStepsThrowNamingTheProblem(string json, string fragment)
     {
         var ex = Assert.Throws<InvalidOperationException>(() => VisualScenario.Parse(json, "bad"));
         Assert.Contains(fragment, ex.Message);
+    }
+
+    [Fact]
+    public void AGiveCanRollGearAtARarity()
+    {
+        var scenario = VisualScenario.Parse("""
+            { "steps": [
+              { "op": "give", "block": "item/bronze_cap", "rarity": "Epic" },
+              { "op": "give", "block": "item/bronze_cap" },
+            ] }
+            """, "tour");
+        Assert.Equal(Rarity.Epic, scenario.Steps[0].Rarity);
+        Assert.Null(scenario.Steps[1].Rarity);
     }
 
     [Fact]

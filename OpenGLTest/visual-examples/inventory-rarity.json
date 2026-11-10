@@ -1,0 +1,58 @@
+{
+  // Rarity chrome: run with VOXEL_SCRIPT=visual-examples/inventory-rarity.json VOXEL_TIME=147 from OpenGLTest/.
+  // Shots land in visual/inventory-rarity/. Gives one piece of gear rolled at every rarity (a `give` with a
+  // `rarity` leaves it unworn) and a rare non-gear blade, then films the [E] panel's Gear tab twice (the sheen
+  // moves between the shots), the tooltip of each listed row, and the Misc tab (a weapon without durability lists
+  // there, not under Tools) with the blade's row and tooltip.
+  // Rolled pieces get generated names, so the Gear list order is not known ahead: every row is hovered.
+  // Row i (from 0) is centered at canvas y = 202 + 42 * i + 21.
+  "steps": [
+    { "op": "wait", "seconds": 12 },
+    { "op": "teleport", "pos": [-43.5, 12.5, 62.5], "yaw": -90, "pitch": -10 },
+    { "op": "wait", "seconds": 2 },
+    { "op": "give", "block": "item/leather_cap", "rarity": "common" },
+    { "op": "give", "block": "item/bronze_tunic", "rarity": "uncommon" },
+    { "op": "give", "block": "item/iron_boots", "rarity": "rare" },
+    { "op": "give", "block": "item/amulet_of_vigor", "rarity": "epic" },
+    { "op": "give", "block": "item/cloud_boots", "rarity": "legendary" },
+    // A non-gear weapon with a rare base rarity
+    { "op": "give", "block": "item/bone_breaker_blade", "count": 1 },
+    { "op": "wait", "seconds": 0.5 },
+
+    // The Gear tab's rows, then again a little later (the fade and slide take 0.18 s, so wait it out)
+    { "op": "panel", "open": true },
+    { "op": "tab", "tab": "gear" },
+    { "op": "wait", "seconds": 0.5 },
+    { "op": "screenshot", "name": "gear-rows" },
+    { "op": "wait", "seconds": 0.6 },
+    { "op": "screenshot", "name": "gear-rows-later" },
+
+    // A tooltip on each listed row
+    { "op": "hover", "pos": [200, 223] },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "tooltip-row-1" },
+    { "op": "hover", "pos": [200, 265] },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "tooltip-row-2" },
+    { "op": "hover", "pos": [200, 307] },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "tooltip-row-3" },
+    { "op": "hover", "pos": [200, 349] },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "tooltip-row-4" },
+    { "op": "hover", "pos": [200, 391] },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "tooltip-row-5" },
+    { "op": "hover", "clear": true },
+
+    // The Misc tab: the rare blade's row and its tooltip
+    { "op": "tab", "tab": "misc" },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "misc-rows" },
+    { "op": "hover", "pos": [200, 223] },
+    { "op": "wait", "seconds": 0.2 },
+    { "op": "screenshot", "name": "blade-tooltip" },
+    { "op": "hover", "clear": true },
+    { "op": "panel", "open": false }
+  ]
+}

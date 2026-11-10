@@ -322,6 +322,25 @@ the crease is exactly the plain midpoint crease. The cost is that a corner seen 
 keeps a band about that reach wide in the world rather than a tap radius wide on screen.
 `ContactAoEnabled = false` skips the pass entirely.
 
+**Rarity chrome.** An item's rarity dresses its [E] list rows, its chest card rows and its hover
+tooltip. `ui-fragment.glsl` has a `uChrome` mode with five vec4 uniforms (`uChromeBox`, `uChromeColor`,
+`uChromeLayers`, `uChromeShape`, `uChromeMotion`). With `uChrome` 1 the quad is a row or the tooltip box:
+`fTexCoord` runs 0..1 across it with y down, so the unit square needs no new vertex data. `RarityChromeRenderer`
+(`Ui.Chrome`, built by `UIRenderer`) draws one such quad over the row or box fill and sets `uChrome` back to 0
+right after it, so every rect, icon and text draw (and the ItemDebugger, where GL's default 0 holds) keeps the
+plain path. The layers are a rarity-colored border band and a soft inner glow, both breathing by the pulse; a
+wash fading in from the row's left or the tooltip's top; a slanted white sheen that sweeps across once a
+`SheenPeriodSeconds` (`MathUtils.Sweep`, staggered `SheenRowStaggerSeconds` per row so it cascades down a list)
+and rests between sweeps; and twinkling four-point sparkles in a hashed share of the cells, the hash rescaled so
+the stars twinkle out of step. `RarityStyle.Of` maps a rarity to `Rarities.Color` and the layer strengths of
+`RarityStyleConfig`: Common has none (no chrome draw, white name, the plain border), Uncommon the border and
+wash, Rare adds the glow and the sheen, Epic the pulse, Legendary the sparkles. The time curves (the sweep, the
+pulse, the twinkle phase) run on the CPU on the world's lighting clock; the shader does only the spatial work.
+`RarityChrome` is the GL-free twin (`For` packs the uniforms, `Shade` is the fragment): the formula, not the bits,
+since GPU `sin` differs, so `RarityChromeTests` asserts relations (see the shader-sync row). A dimmed row (an
+uncraftable recipe) draws it at `DimOpacity`; the row's accent bar stays its status (equipped, ready, a recipe
+hit) on top. `visual-examples/inventory-rarity.json` (`VOXEL_TIME=147`) films every tier.
+
 **Selection outline pulse.** The targeted block's outline breathes between
 `SelectionPulseMinOpacity` (70 %) and full opacity, one breath every `SelectionPulsePeriodSeconds`:
 `selection-fragment.glsl` scales the outline's `uOpacity` by `1 - uPulseDepth * (0.5 + 0.5 sin)` of

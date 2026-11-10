@@ -7,6 +7,7 @@ using VoxelEngine.Content;
 using VoxelEngine.Content.Spells;
 using VoxelEngine.Content.StatusEffects;
 using VoxelEngine.Interaction;
+using VoxelEngine.Items;
 using VoxelEngine.Player;
 using VoxelEngine.Simulation.Tower;
 using VoxelEngine.Status;
@@ -114,24 +115,8 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
 
             case "give":
                 var id = ContentRegistry.Require(step.Block!);
-                world.Inventory.Add(id, step.Count);
-                if (Inventory.CategoryOf(id) == InventoryCategory.Gear)
-                {
-                    // A piece of gear is put on, in its first fitting slot, so a shot shows it worn
-                    var worn = world.Inventory.GearEntries().Where(t => t.ItemId == id).Select(t => t.InstanceId)
-                        .DefaultIfEmpty(-1).Max();
-                    if (worn >= 0) world.Inventory.Equipment.TryEquipAuto(worn);
-                }
-                else if (Inventory.CategoryOf(id) == InventoryCategory.Tools)
-                {
-                    // A tool arrives as a new instance: put the newest one of that id in hand
-                    var newest = world.Inventory.ToolEntries().Where(t => t.ItemId == id).Select(t => t.InstanceId).DefaultIfEmpty(-1).Max();
-                    if (newest >= 0 && world.Inventory.ToolInstanceAt(world.Inventory.SelectedIndex) != newest)
-                        world.Inventory.EquipTool(world.Inventory.SelectedIndex, newest);
-                }
-                else if (world.Inventory.IdAt(world.Inventory.SelectedIndex) != id)
-                    world.Inventory.EquipStackable(world.Inventory.SelectedIndex, id);
-                Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} give {step.Count} {step.Block}");
+                if (step.Rarity is { } rarity) GiveRolled(id, rarity, step);
+                else Give(id, step);
                 Advance();
                 break;
 
@@ -372,6 +357,41 @@ public sealed class VisualDirector(VisualScenario scenario, World world, IScenar
             _keys.ReleaseAll();
             Advance();
         }
+    }
+
+    // A plain give: the item lands in the inventory and is put to use, so a shot shows it
+    private void Give(byte id, VisualStep step)
+    {
+        world.Inventory.Add(id, step.Count);
+        if (Inventory.CategoryOf(id) == InventoryCategory.Gear)
+        {
+            // A piece of gear is put on, in its first fitting slot, so a shot shows it worn
+            var worn = world.Inventory.GearEntries().Where(t => t.ItemId == id).Select(t => t.InstanceId)
+                .DefaultIfEmpty(-1).Max();
+            if (worn >= 0) world.Inventory.Equipment.TryEquipAuto(worn);
+        }
+        else if (Inventory.CategoryOf(id) == InventoryCategory.Tools)
+        {
+            // A tool arrives as a new instance: put the newest one of that id in hand
+            var newest = world.Inventory.ToolEntries().Where(t => t.ItemId == id).Select(t => t.InstanceId).DefaultIfEmpty(-1).Max();
+            if (newest >= 0 && world.Inventory.ToolInstanceAt(world.Inventory.SelectedIndex) != newest)
+                world.Inventory.EquipTool(world.Inventory.SelectedIndex, newest);
+        }
+        else if (world.Inventory.IdAt(world.Inventory.SelectedIndex) != id)
+            world.Inventory.EquipStackable(world.Inventory.SelectedIndex, id);
+        Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} give {step.Count} {step.Block}");
+    }
+
+    // A give with a rarity: each piece is rolled at it (seeded by the step, so a run is repeatable) and left unworn,
+    // so the Gear list shows every piece; only gear rolls one
+    private void GiveRolled(byte id, Rarity rarity, VisualStep step)
+    {
+        if (ItemRegistry.TryGet(id) is not GearItem gear)
+            throw new InvalidOperationException($"Step {_step + 1} gives {step.Block} a rarity, but only gear rolls one.");
+        for (var i = 0; i < step.Count; i++)
+            if (!world.Inventory.AddRolledGear(id, GearRoller.Roll(gear, rarity, (ulong)(_step * 64 + i))))
+                throw new InvalidOperationException($"Step {_step + 1} gives {step.Block}, but the gear pool is full.");
+        Log.WriteLine($"[visual] {_step + 1}/{scenario.Steps.Count} give {step.Count} {step.Block} ({rarity})");
     }
 
     /// <summary>An <c>effect</c> step: the effect name is validated here rather than at parse time, so

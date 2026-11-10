@@ -196,16 +196,16 @@ internal sealed class UiPasses
     }
 
     /// <summary>Draws one hover tooltip (see <see cref="HudRenderer.DrawTooltip"/>), or nothing when
-    /// the cursor hovers nothing.</summary>
-    internal void RenderTooltip(IWindow window,
-        (Vector2 Anchor, IReadOnlyList<string> Lines, IReadOnlyDictionary<int, Rgba> Colors)? tooltip)
+    /// the cursor hovers nothing. <paramref name="time"/> is the world's lighting clock, the one the
+    /// rows' icons and chrome animate on.</summary>
+    internal void RenderTooltip(IWindow window, HoverTooltip? tooltip, float time)
     {
         if (tooltip is not { Lines.Count: > 0 } hover) return;
         var windowSize = new Vector2(window.Size.X, window.Size.Y);
         _owner.Ui.Begin(window.Size, window.FramebufferSize,
             UiCanvas.EffectiveScale(GameSettings.RequestedGuiScale, windowSize, UiCanvas.ReferenceSize));
         // The anchor is the pointer in window pixels; the box is laid out and drawn in canvas units
-        _owner.Ui.Hud.DrawTooltip(_owner.Ui.ToCanvas(hover.Anchor), hover.Lines, hover.Colors);
+        _owner.Ui.Hud.DrawTooltip(_owner.Ui.ToCanvas(hover.Anchor), hover.Lines, hover.Colors, hover.Rarity, time);
         _owner.Ui.End();
         Units.InvalidateTextureUnits();
     }
